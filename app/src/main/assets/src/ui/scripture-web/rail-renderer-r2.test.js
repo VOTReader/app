@@ -113,13 +113,12 @@ describe('My Web r2 — G1 full resolution', () => {
   it('while a gesture is live a corridor keeps LIVE_CAP layers; at rest every visible one; the cap eases in coverage', () => {
     const base = { count: 0, versePos: new Float32Array(0), votPos: new Float32Array(0) };
     const ctx0 = fakeCtx(); drawPersonalWeb(ctx0, null, base, opts);
-    // w4: 30, under the full cap at the overview's alpha (37 layers at CONTEXT_FLOOR
-    // 0.14; through w3 the floor was 0.06, 87 layers, and this corridor was 40)
-    const n = 30;
+    const n = 40;
+    // under the full cap at the overview's alpha (w4: 67 layers at CONTEXT_FLOOR 0.08)
     expect(RR.layerCap(RR.personalInk(1).context.alpha, 1)).toBeGreaterThan(n);
     const corridor = { count: n, versePos: new Float32Array(n).map((_, i) => 50 + i * 0.01), votPos: new Float32Array(n).fill(20) };
     const rest = fakeCtx(); drawPersonalWeb(rest, null, corridor, opts);
-    expect(rest.calls.stroke - ctx0.calls.stroke).toBe(n);   // 30 < the full cap at this alpha
+    expect(rest.calls.stroke - ctx0.calls.stroke).toBe(n);   // 40 < the full cap at this alpha
     expect(rest.calls.glow - ctx0.calls.glow).toBe(1);
     const liveCtx = fakeCtx(); drawPersonalWeb(liveCtx, null, corridor, Object.assign({}, opts, { capFraction: 0 }));
     expect(liveCtx.calls.stroke - ctx0.calls.stroke).toBe(RR.LIVE_CAP + 1);   // LIVE_CAP layers + the shared overflow

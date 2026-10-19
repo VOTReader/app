@@ -532,7 +532,7 @@ class ContextBatches {
     /** @type {Map<number, Array<Array<[number, number]>>>} */
     const paths = new Map();
     // Layers beyond which one more thread moves a pixel by under 1/255 at this
-    // alpha: (1 - alpha)^n * 255 < 1. 0.14 at 1x needs 37 of them, 0.30 needs
+    // alpha: (1 - alpha)^n * 255 < 1. 0.08 at 1x needs 67 of them, 0.30 needs
     // 16; past the cap threads share and nothing shows.
     const cap = layerCap(alpha, capFraction == null ? 1 : capFraction);
     const held = new Int32Array(cap + 1);   // stamp = i + 1 when a neighbour holds that layer
@@ -747,25 +747,28 @@ export function nearestUnderlay(underlay, opts, limit) {
  * plateau to for a corridor comparison.
  *
  * w4 (r2-05, "the normal is probably too faint"): at 0.06 the overview read as
- * a haze, peak 128 of 255, where r2-05 shows Timothy's teal plainly. The floor
- * is CONTEXT_FLOOR 0.14, the ramp keeps its shape and still STOPS at the 0.30
- * plateau (C14: nothing brightens past it), now reached at 2.8x, so the whole
- * rise is about 2x instead of 5x: "a little clearer ... is fine". The link
- * thickens to 2.3 px at 40x (through w3 2.1) so its core alone still holds 5x
- * a thread to 5.8x, now that the thread is on its plateau there. Each anchored
- * thread carries a soft glow (r2-05), CONTEXT_GLOW_WIDTH past its core at
- * CONTEXT_GLOW_SHARE of its alpha, stroked once a source so it does not pile
- * up; a fly-over has none.
+ * a haze where r2-05 shows Timothy's teal plainly, with a glow. The floor is
+ * CONTEXT_FLOOR 0.08 and each thread with a foot on screen carries a soft glow,
+ * CONTEXT_GLOW_WIDTH past its core at CONTEXT_GLOW_SHARE of its alpha, stroked
+ * once a source so it does not pile up; a fly-over has none. The ramp keeps its
+ * shape and still STOPS at the 0.30 plateau (C14: nothing brightens past it),
+ * now reached at 5.8x. A floor of 0.14 matched r2-05's brightness better but
+ * flattened the structure the walk measures (tools/e2e-myweb.mjs R1a, p95/p50
+ * 2.5-2.7 < 3 on its three frames: corridors saturate while lone threads
+ * brighten); 0.08 with the glow keeps it (3.1-3.3) and the zoom reward (R1b
+ * 2.0x at 800x360, where 0.06 without the glow read 1.75x). The link thickens
+ * to 2.3 px at 40x (through w3 2.1) so its core alone still holds 5x a thread
+ * to 5.8x, where the thread now reaches its plateau.
  */
-/** Where the context's zoom ramp stops (call 07; C14); the default look past 2.8x (w4). */
+/** Where the context's zoom ramp stops (call 07; C14); the default look past 5.8x (w4). */
 export const CONTEXT_PLATEAU = 0.30;
 /** The context alpha's hard bound (design-myweb-colour.md, 2; the walk's knob may raise the plateau to it, never past). */
 export const CONTEXT_CEILING = 0.70;
-/** The overview's context alpha (w4: r2-05's teal reads at fit; through w3 0.06, "a haze"). */
-export const CONTEXT_FLOOR = 0.14;
+/** The overview's context alpha (w4: with the glow, r2-05's teal reads at fit; through w3 0.06, "a haze"). */
+export const CONTEXT_FLOOR = 0.08;
 /** The soft glow under Timothy's threads (r2-05): this wide past the core, CSS px, at this share of the core's alpha. */
-export const CONTEXT_GLOW_WIDTH = 3;
-export const CONTEXT_GLOW_SHARE = 0.35;
+export const CONTEXT_GLOW_WIDTH = 4;
+export const CONTEXT_GLOW_SHARE = 0.5;
 export function personalInk(z, ceiling) {
   const zz = Math.max(1, z || 1);
   const cap = ceiling > 0 ? Math.min(ceiling, CONTEXT_CEILING) : CONTEXT_PLATEAU;

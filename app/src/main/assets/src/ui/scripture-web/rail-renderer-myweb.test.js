@@ -83,18 +83,19 @@ describe('My Web ink law', () => {
 
   it('R1 the ink law after call 07 (Corbin, 2026-09-12: "the normal is probably too faint" and zooming "makes the colors get brighter and brighter ... odd") and w4 (r2-05): floor CONTEXT_FLOOR at 1x, the z^0.75 ramp up to a 0.30 plateau, FLAT from there to the ceiling on both frames', () => {
     const a = (z) => personalInk(z).context.alpha;
-    // w4: the floor is 0.14 (through w3 0.06, lifted from 0.04): at 0.06 the
-    // overview read as a haze where r2-05 shows Timothy's teal plainly. The
-    // ramp keeps its shape and its 0.30 plateau, which it now reaches at 2.8x.
-    expect(RR.CONTEXT_FLOOR).toBe(0.14);
+    // w4: the floor is 0.08 (through w3 0.06, lifted from 0.04) under a soft
+    // glow: at 0.06 the overview read as a haze where r2-05 shows Timothy's
+    // teal plainly. The ramp keeps its shape and its 0.30 plateau, which it
+    // now reaches at 5.8x (three zoom steps).
+    expect(RR.CONTEXT_FLOOR).toBe(0.08);
     expect(a(1)).toBeCloseTo(RR.CONTEXT_FLOOR, 3);                       // the overview floor
-    expect(a(2)).toBeCloseTo(RR.CONTEXT_FLOOR * Math.pow(2, 0.75), 3);   // 0.235 - below the plateau the ramp keeps its shape
-    expect(a(2.8)).toBeCloseTo(0.30, 3);                                 // the plateau (reached at 2.76x)
-    expect(a(16)).toBe(a(2.8));
+    expect(a(3)).toBeCloseTo(RR.CONTEXT_FLOOR * Math.pow(3, 0.75), 3);   // 0.182 - below the plateau the ramp keeps its shape
+    expect(a(6)).toBeCloseTo(0.30, 3);                                   // the plateau (reached at 5.83x)
+    expect(a(16)).toBe(a(6));
     expect(a(43.8)).toBe(a(16));                              // the phone's top-rail ceiling: not one bit brighter than 16x
     expect(a(18.2)).toBe(a(16));                              // the desktop's top-rail ceiling: the same
     expect(a(4000)).toBe(a(16));
-    expect(a(5.8)).toBeGreaterThanOrEqual(2 * a(1));          // the 5.8x reward survives (design-perf 09-10): 0.30 against 0.14
+    expect(a(5.8)).toBeGreaterThanOrEqual(2 * a(1));          // the 5.8x reward survives (design-perf 09-10): 0.30 against 0.08
     expect(a(0)).toBe(a(1));                                  // a bad z is overview, not NaN
     // the approved 0.70 ceiling is the law's hard BOUND: the walk's knob can raise the plateau to it and no further
     expect(RR.CONTEXT_PLATEAU).toBe(0.30);
@@ -105,7 +106,7 @@ describe('My Web ink law', () => {
     expect(personalInk(1).context.width).toBeCloseTo(0.8, 3);
     expect(personalInk(40).context.width).toBeCloseTo(1.6, 3);
     // the soft glow (w4, r2-05) follows its core's alpha, so it never brightens past the plateau either
-    for (const z of [1, 2, 2.8, 16, 43.8]) {
+    for (const z of [1, 3, 6, 16, 43.8]) {
       expect(personalInk(z).context.glow.alpha).toBeCloseTo(a(z) * RR.CONTEXT_GLOW_SHARE, 9);
       expect(personalInk(z).context.glow.width).toBe(RR.CONTEXT_GLOW_WIDTH);
     }
@@ -120,7 +121,7 @@ describe('My Web ink law', () => {
       // on the 0.30 plateau the context widens to 1.6 px at 40x; the link
       // thickens to 2.3 px and its halo keeps the lead at 6x, with the family
       // split (gold on teal-silver) and the pins on top of the ink. w4: the
-      // context reaches its plateau at 2.8x now (CONTEXT_FLOOR 0.14), so the
+      // context reaches its plateau at 5.8x now (through w3 8.6x), so the
       // link thickens 0.8 px over the zoom (through w3 0.6) to keep 5x to 5.8x
       expect((core + link.halo * link.haloAlpha) / thread).toBeGreaterThanOrEqual(6);
       expect(link.width).toBeCloseTo(1.5 + 0.8 * Math.min(1, Math.log(z) / Math.log(40)), 6);
