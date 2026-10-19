@@ -400,6 +400,31 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
+  /* w4 review: whether a book's start opened a bar was read from the ROUNDED device x of it and of
+     the bar before, so a sub-pixel pan moved that difference by a pixel near the bar pitch and the
+     grouping at that boundary changed: bars came and went while panning. */
+  for (const name of ['pc', 'phone']) {
+    it(name + ': a sub-pixel pan never regroups the bars: the same bars, the same lengths, at every pan within a pixel', () => {
+      const bars = (dx) => {
+        const fs = frameAt(name, 1, g.total / 2);
+        fs.cam.x += dx / fs.cam.ppv;
+        const rec = recorder();
+        paintCanonOverlay(rec.ctx, fs);
+        return inked(rec, (f) => BAR_FILLS.has(f)).sort((a, b) => a.x0 - b.x0);
+      };
+      const at0 = bars(0);
+      expect(at0.length).toBeGreaterThan(100);
+      for (let k = 1; k < 10; k++) {
+        const at = bars(-k / 10);
+        expect(at.length, 'bars at a pan of ' + k / 10 + ' device px').toBe(at0.length);
+        at.forEach((b, i) => {
+          expect(b.y1 - b.y0, 'bar ' + i + "'s length at a pan of " + k / 10).toBeCloseTo(at0[i].y1 - at0[i].y0, 6);
+          expect(Math.abs(b.x0 - at0[i].x0), 'bar ' + i + ' stays put within a pixel').toBeLessThanOrEqual(1);
+        });
+      }
+    });
+  }
+
   it('pc: the band fills the ruler as r2-01a does: the names within 80 px of the legend, the bars between the cited strip and the names', () => {
     const { canvas, legendTop } = chromeRoot('pc');
     const { rec, fs } = paint('pc', 1, g.total / 2, { canvas });

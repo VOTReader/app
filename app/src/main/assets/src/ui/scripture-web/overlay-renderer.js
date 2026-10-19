@@ -774,15 +774,16 @@ function drawOverview(ctx, g, cam, L, t, hits, holes) {
     const h = Math.max(1.5 * s, maxH * Math.pow(Math.min(1, len / BAR_FULL), 0.75));
     fillOut(ctx, Math.round(verseToX(cam, W, start)), top, bw, h, cut);
   };
-  // a book's start begins a bar when it stands far enough from the last one, counted in the
-  // device pixels the bars are drawn on (two rounded a pixel closer read as one)
-  const px = (v) => Math.round(verseToX(cam, W, v));
+  // a book's start begins a bar when it stands far enough from the last one: a whole number of
+  // device pixels by the zoom alone, so the two bars, drawn at rounded x, are never closer than
+  // that, and a pan never regroups them (it was the rounded x's difference, which a sub-pixel pan
+  // moved by a pixel: bars came and went, w4 review)
   const minGap = Math.ceil(0.84 * BAR_PITCH * s);
   let from = -1, book = -1, sum = 0, n = 0;
   for (let i = 0; i < g.chapters.length; i++) {
     const c = g.chapters[i];
     const d = c[2] - from;
-    if (from < 0 || d >= run || (c[0] !== book && px(c[2]) - px(from) >= minGap)) {
+    if (from < 0 || d >= run || (c[0] !== book && d * cam.ppv >= minGap)) {
       if (from >= 0) bar(from, book, sum / n);
       from = c[2]; book = c[0]; sum = 0; n = 0;
       if (from > vHi) { from = -1; break; }
