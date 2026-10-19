@@ -120,6 +120,17 @@ describe('the collision grid', () => {
     expect(grid.hits(box(-500, -500, -400, -400))).toBe(false);
     expect(grid.count).toBe(1);
   });
+  it('a test may pass over some boxes (the band reads the padded corner zones at their own edge, w4)', () => {
+    const grid = createGrid(64);
+    const zone = box(100, 100, 140, 140), label = box(10, 100, 60, 110);
+    grid.add(zone);
+    grid.add(label);
+    const q = box(66, 100, 96, 110);
+    expect(grid.hits(q, 8)).toBe(true);
+    expect(grid.hits(q, 8, (b) => b === zone)).toBe(true);
+    expect(grid.hits(q, 8, (b) => b === zone || b === label)).toBe(false);
+    expect(grid.hits(box(120, 120, 125, 125), 0, (b) => b === zone)).toBe(false);
+  });
   it('agrees with a brute-force check on random boxes', () => {
     let seed = 7;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);

@@ -157,12 +157,16 @@ export function createGrid(cell = LABEL_GRID_CELL) {
         return false;
       });
     },
-    /** Does `b`, grown by `pad`, meet any box added so far? @param {Box} b @param {number} [pad] */
-    hits(b, pad = 0) {
+    /**
+     * Does `b`, grown by `pad`, meet any box added so far? `except` passes over the boxes it
+     * names (the band tests the corner zones, already padded, at their own edge).
+     * @param {Box} b @param {number} [pad] @param {(box: Box) => boolean} [except]
+     */
+    hits(b, pad = 0, except) {
       return each(b, pad, (k) => {
         const list = cells.get(k);
         if (!list) return false;
-        for (let i = 0; i < list.length; i++) if (boxesMeet(b, list[i], pad)) return true;
+        for (let i = 0; i < list.length; i++) if (boxesMeet(b, list[i], pad) && !(except && except(list[i]))) return true;
         return false;
       });
     },
