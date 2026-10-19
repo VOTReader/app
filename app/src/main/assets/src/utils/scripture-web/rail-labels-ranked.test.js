@@ -61,6 +61,28 @@ describe('placeRailLabelsRanked', () => {
     expect(at2[1]).toBe(40);
   });
 
+  /* w4 fix 2: slid to a bare pad, a name sat hard against its neighbour ("LUKE |JOHN| ACTS"). Given
+     a roomy gap, a slide takes the nearest place that far clear within its range, and a pad clear
+     only where the range has no such place. */
+  it('a slide looks first for a place a roomy gap clear, then a pad clear; a box that fits stays put', () => {
+    const john = { left: 100, right: 140 };
+    const luke = { left: 50, right: 90 };
+    const at = [];
+    expect(placeRailLabelsRanked([Object.assign({ lo: 0, hi: 60 }, luke), john], 13, 1, [1, 0], undefined, at, 24)).toEqual([0, 0]);
+    expect(at[0]).toBe(36);   // its right edge 24 from JOHN's left, not 13
+    // the range has no room for 24 (36 < 40), so it takes the pad as before
+    expect(placeRailLabelsRanked([Object.assign({ lo: 40, hi: 60 }, luke), john], 13, 1, [1, 0], undefined, at, 24)).toEqual([0, 0]);
+    expect(at[0]).toBe(47);
+    // a box that fits a pad clear at its own place does not move for the roomy gap
+    const near = { left: 40, right: 80, lo: 0, hi: 60 };
+    expect(placeRailLabelsRanked([near, john], 13, 1, [1, 0], undefined, at, 24)).toEqual([0, 0]);
+    expect(at[0]).toBe(40);
+    // a roomy place blocked, the pad place next
+    const r = placeRailLabelsRanked([Object.assign({ lo: 0, hi: 60 }, luke), john], 13, 1, [1, 0], (i, _row, x) => i === 0 && x < 40, at, 24);
+    expect(r).toEqual([0, 0]);
+    expect(at[0]).toBe(47);
+  });
+
   it('a slide never takes a blocked place: blocked is asked at the left edge it would take', () => {
     const john = { left: 100, right: 140 };
     const luke = { left: 50, right: 90, lo: 0, hi: 200 };

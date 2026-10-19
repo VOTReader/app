@@ -52,7 +52,10 @@ export function placeRailLabels(boxes, pad, rows = 2) {
  * canon's names, along their own books, w4 review 2): where it meets a
  * neighbour on every row at its own place, it takes the nearest place in
  * that range a pad clear of every name on the row (beside one of them), the
- * row order as before; `at` is handed each placed box's left. A box with no
+ * row order as before; `at` is handed each placed box's left. Given `roomy`
+ * (a wider gap), a slide first looks for the nearest place that far clear, so
+ * a slid name does not sit hard against its neighbour where its range has
+ * room ("LUKE |JOHN| ACTS"), and only then for one a pad clear. A box with no
  * range is placed exactly as before.
  *
  * @param {ReadonlyArray<{left:number, right:number, lo?:number, hi?:number}>} boxes  left to right
@@ -62,16 +65,18 @@ export function placeRailLabels(boxes, pad, rows = 2) {
  * @param {(index: number, row: number, left: number) => boolean} [blocked]  a row the box may not
  *   take there, at that left edge (the corner buttons sit over the right end of the lower row on a phone)
  * @param {number[]} [at]  filled with each placed box's left edge (its own, or where it slid)
+ * @param {number} [roomy]  the gap a slide looks for first (default `pad`)
  * @returns {number[]}  row per box, or -1
  */
-export function placeRailLabelsRanked(boxes, pad, rows = 2, rank, blocked, at) {
+export function placeRailLabelsRanked(boxes, pad, rows = 2, rank, blocked, at, roomy) {
   const R = Math.max(1, rows | 0);
   /** @type {Array<Array<[number, number]>>} */
   const taken = Array.from({ length: R }, () => []);
   const out = new Array(boxes.length).fill(-1);
   const order = boxes.map((_, i) => i).sort((a, b) => ((rank ? rank[a] || 0 : 0) - (rank ? rank[b] || 0 : 0)) || (a - b));
-  /** @param {number} r @param {number} i @param {number} x0 @param {number} w */
-  const fits = (r, i, x0, w) => !(blocked && blocked(i, r, x0)) && taken[r].every(([l, rt]) => x0 >= rt + pad || x0 + w + pad <= l);
+  /** @param {number} r @param {number} i @param {number} x0 @param {number} w @param {number} [p] */
+  const fits = (r, i, x0, w, p = pad) => !(blocked && blocked(i, r, x0)) && taken[r].every(([l, rt]) => x0 >= rt + p || x0 + w + p <= l);
+  const gaps = roomy > pad ? [roomy, pad] : [pad];
   /** @param {number} r @param {number} i @param {number} x0 @param {number} w */
   const take = (r, i, x0, w) => { taken[r].push([x0, x0 + w]); out[i] = r; if (at) at[i] = x0; };
   for (const i of order) {
@@ -83,12 +88,14 @@ export function placeRailLabelsRanked(boxes, pad, rows = 2, rank, blocked, at) {
     if (r < R) { take(r, i, b.left, w); continue; }
     if (!(b.lo != null && b.hi != null && b.hi > b.lo)) continue;
     const lo = Math.min(b.lo, b.left), hi = Math.max(b.hi, b.left);
-    for (r = 0; r < R; r++) {
-      // beside each name on the row, nearest first: a free place, if any, starts or ends a pad from one
-      const tries = [];
-      for (const [l, rt] of taken[r]) tries.push(rt + pad, l - pad - w);
-      const ok = tries.filter((x) => x >= lo && x <= hi && fits(r, i, x, w)).sort((p, q) => Math.abs(p - b.left) - Math.abs(q - b.left));
-      if (ok.length) { take(r, i, ok[0], w); break; }
+    slide: for (const p of gaps) {
+      for (r = 0; r < R; r++) {
+        // beside each name on the row, nearest first: a free place, if any, starts or ends a gap from one
+        const tries = [];
+        for (const [l, rt] of taken[r]) tries.push(rt + p, l - p - w);
+        const ok = tries.filter((x) => x >= lo && x <= hi && fits(r, i, x, w, p)).sort((u, v) => Math.abs(u - b.left) - Math.abs(v - b.left));
+        if (ok.length) { take(r, i, ok[0], w); break slide; }
+      }
     }
   }
   return out;

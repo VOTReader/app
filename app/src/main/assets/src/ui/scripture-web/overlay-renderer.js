@@ -833,6 +833,10 @@ function drawOverview(ctx, g, cam, L, t, hits, holes) {
 /** Two book names on a row keep this much clear between them, CSS px: a word apart, so two never
     read as one ("PSALMS PROV", "DEUT JUDG" on a phone, w4). */
 const NAME_GAP = 14;
+/** The gap a name that slides along its book looks for first, CSS px: slid a bare word clear it sat
+    hard against its neighbour ("LUKE |JOHN| ACTS" 13 px apart where the rest stand 17 to 65, w4 fix 2);
+    it takes NAME_GAP only where its book has no more room, and no name goes for it. */
+const NAME_ROOM = 22;
 /** The form the names take, per graph and rail: 'abbr' or 'full', kept between frames. */
 /** @type {WeakMap<object, Map<string, string>>} */
 const FORMS = new WeakMap();
@@ -864,7 +868,8 @@ function nameForm(g, tag, share) {
  * a corner button refused; the canon's overview has one row (r2-01a). A name
  * that meets a neighbour slides along its own book to the nearest place a word
  * clear, its centre still over that book (LUKE and ACTS beside JOHN went for 3-5
- * px, w4 review 2), and goes only where there is no such place. The
+ * px, w4 review 2), first looking for one NAME_ROOM clear so it does not sit
+ * hard against its neighbour, and goes only where there is no such place. The
  * major books, and only they, are in the bold and the brighter ink. A thin
  * rule stands between each two neighbouring names, as r2-01a's cells: at the
  * right one's book start where that lies clear of both names, else midway
@@ -876,7 +881,7 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
   const spans = bookSpans(g);
   const fpx = fontPx(size, s), sp = 0.10 * fpx, capH = fpx * CAP;
   const fontN = canvasFont(size, s), fontM = canvasFont(size, s, 600);
-  const edge = 8 * s, gap = NAME_GAP * s;
+  const edge = 8 * s, gap = NAME_GAP * s, roomy = NAME_ROOM * s;
   const books = [];
   let roomAll = 0, roomFull = 0;
   for (let bi = 0; bi < spans.length; bi++) {
@@ -915,7 +920,7 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
   /** @type {number[]} */
   const at = [];
   const placed = placeRailLabelsRanked(names, gap, rows.length, names.map((n) => (n.major ? -1e9 : -n.verses)),
-    (i, r, x) => zones.some((z) => boxesMeet(boxAt({ left: x, right: x + names[i].right - names[i].left }, r), z)), at);
+    (i, r, x) => zones.some((z) => boxesMeet(boxAt({ left: x, right: x + names[i].right - names[i].left }, r), z)), at, roomy);
   names.forEach((n, i) => { if (placed[i] >= 0 && at[i] !== n.left) { n.right += at[i] - n.left; n.left = at[i]; } });
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';

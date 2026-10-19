@@ -407,6 +407,25 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
+  /* w4 fix 2: a name slid to the nearest place a bare word clear sat hard against its neighbour,
+     "LUKE |JOHN| ACTS" and "1CHR|2CHR" 13 px apart where every other pair stands 17 to 65 apart, as
+     r2-01a's roomy cells never do. A slide looks first for a place a wider gap clear, along its own
+     book, and takes the bare word only where the book has no more room, with no name lost to it. */
+  for (const [name, pairs, n] of [['pc', [['LUKE', 'JOHN'], ['JOHN', 'ACTS'], ['1CHR', '2CHR']], 23], ['phone', [['ISA', 'JER']], 15]]) {
+    it(name + ': a slid name is not hard against its neighbour where its own book has room (' + pairs.map((p) => p.join('|')).join(', ') + ')', () => {
+      for (const hidden of [false, true]) {
+        const { canvas } = chromeRoot(name, { hidden });
+        const { rec, fs } = paint(name, 1, g.total / 2, { canvas, em: 0.7 });
+        const s = fs.v.DPR, what = name + (hidden ? ' hidden' : '');
+        const drawn = bookTexts(rec);
+        const list = drawn.map((c) => c.t).join(' ');
+        expect(drawn.length, what + ': no name lost to the room: ' + list).toBeGreaterThanOrEqual(n);
+        const box = (t) => { const c = drawn.find((d) => d.t === t); expect(c, what + ': ' + t + ' in ' + list).toBeTruthy(); return textBox(c); };
+        for (const [a, b] of pairs) expect(box(b).x0 - box(a).x1, what + ': ' + a + ' to ' + b).toBeGreaterThanOrEqual(20 * s);
+      }
+    });
+  }
+
   it('a thin rule stands between each two neighbouring names, and only there (r2-01a\'s cells)', () => {
     for (const [name, zoom, verse] of [['pc', 1, g.total / 2], ['phone', 1, g.total / 2], ['pc', 3.5, verseOf('ezekiel', 1, 1)]]) {
       const { canvas } = chromeRoot(name);
