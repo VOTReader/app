@@ -267,7 +267,7 @@ function Quote({ text, children }) {
       <div className="sw-links">
         {children}
         {long ? (
-          <button type="button" className="sw-quote-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button type="button" className="sw-link sw-link-quiet sw-quote-more" aria-expanded={open} onClick={() => setOpen(!open)}>
             {open ? 'less' : 'more'}
           </button>
         ) : null}

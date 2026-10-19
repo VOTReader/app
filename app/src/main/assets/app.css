@@ -8245,14 +8245,15 @@
     .sw-cite-quote.is-clamped {
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
-    .sw-quote-more, .sw-more {
+    /* a quote's "more" is the row's quiet link (.sw-link .sw-link-quiet, web-panel.jsx), as "Verses it
+       cites" is: w4 review, its grey underline made a third look on one row, where r2-02 has one */
+    .sw-more {
       position: relative; display: inline-flex; align-items: center; min-height: 32px; padding: 0;
       background: none; border: 0; font-family: var(--sw-font); font-size: calc(var(--fsc-15) * var(--sw-ts));
-      color: var(--sw-text-meta); cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+      color: var(--sw-gold); cursor: pointer;
     }
-    .sw-quote-more::after, .sw-more::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
-    .sw-more { color: var(--sw-gold); text-decoration: none; }
-    .sw-quote-more:focus-visible, .sw-more:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
+    .sw-more::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
+    .sw-more:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     .sw-sort-note { margin: 0 0 4px; font-size: calc(var(--fsc-14) * var(--sw-ts)); font-style: italic; color: var(--sw-text-muted); }
     .sw-panel-empty, .sw-list-empty { margin: 8px 0; font-size: calc(var(--fsc-15) * var(--sw-ts)); color: var(--sw-text-muted); }
     /* MORE FROM: one 44 px header per book with a chevron, its rows under a gold rule */

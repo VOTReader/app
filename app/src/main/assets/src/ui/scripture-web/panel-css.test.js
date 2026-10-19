@@ -276,6 +276,20 @@ describe('panel density (w4)', () => {
     expect(rule('.sw-links')).toMatch(/gap:\s*12px 20px/);
   });
 
+  /* w4 review: one row read three ways, "Open letter ›" gold, "Verses it cites ›" quiet grey and
+     "more" grey and underlined. r2-02 shows a plain link; "more" is the row's quiet link now. */
+  it('a quote\'s "more" is never underlined at rest: it is a quiet link, underlined on hover', () => {
+    const underlined = [];
+    const re = /([^{}]+)\{([^{}]*)\}/g;
+    let m;
+    while ((m = re.exec(BARE))) {
+      if (/\.sw-quote-more(?![\w-])/.test(m[1]) && !/:hover/.test(m[1]) && /text-decoration:\s*underline/.test(m[2])) underlined.push(m[1].trim());
+    }
+    expect(underlined).toEqual([]);
+    expect(rule('.sw-link:hover')).toMatch(/text-decoration:\s*underline/);
+    expect(rule('.sw-link-quiet')).toMatch(/color:\s*var\(--sw-text-meta\)/);
+  });
+
   it('a citation’s quote clamps at two lines, as r2-02 shows it', () => {
     expect(rule('.sw-cite-quote.is-clamped')).toMatch(/-webkit-line-clamp:\s*2/);
   });

@@ -183,6 +183,8 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
       expect(quotes.length).toBeGreaterThan(0);
       for (const q of quotes) expect(q.classList.contains('is-clamped')).toBe(true);
       expect(panel.querySelectorAll('.sw-quote-more').length, 'cut: more').toBe(quotes.length);
+      // the row's quiet link, as "Verses it cites" is (w4 review: an underlined grey third look)
+      for (const b of panel.querySelectorAll('.sw-quote-more')) expect(b.className).toMatch(/\bsw-link\b.*\bsw-link-quiet\b/);
       cleanup();
       dims.scroll = 44;
       ({ panel } = mount({ detail: detail() }));
