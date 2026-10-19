@@ -1712,6 +1712,31 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect(status.textContent).toBe('No results for “zzyzx” in the Scriptures.');
   });
 
+  /* B9 review: the region built its words from the live box and the last search's state, so each key typed after
+     a search said a verdict on text not yet searched ("No results for “zzyzxqw”" before the search ran). A verdict
+     names only the text searched; text still waiting for its search is "Searching…". */
+  it('B9: a key typed after a search says no verdict on the new text until its search answers', async () => {
+    searchReturns({ results: [] });
+    const props = baseProps();
+    const r = await typeIn(props, 'zzyzxq');
+    const status = screen.getByRole('status');
+    expect(status.textContent).toBe('No results for “zzyzxq”.');
+    r.rerender(<SearchScreen {...props} query="zzyzxqw" />);
+    expect(status.textContent, 'not searched yet').not.toContain('zzyzxqw');
+    expect(status.textContent).toBe('Searching…');
+    expect(document.querySelector('.search-no-results').textContent, 'the line on screen names what was searched').toContain('No results for “zzyzxq”.');
+    await commit();
+    expect(status.textContent).toBe('No results for “zzyzxqw”.');
+    expect(document.querySelector('.search-no-results').textContent).toContain('No results for “zzyzxqw”.');
+    // a count is held the same way
+    searchReturns({ results: letters('v7', 2) });
+    r.rerender(<SearchScreen {...props} query="mercy" />);
+    await commit();
+    expect(status.textContent).toBe('Found 2 matches across 1 section.');
+    r.rerender(<SearchScreen {...props} query="mercyq" />);
+    expect(status.textContent).toBe('Searching…');
+  });
+
   it('B9: the status region says a stop word, a corrected word, a scope the tab cannot reach and an emoji, as the screen does', async () => {
     const props = baseProps();
     const said = async (/** @type {any} */ extra, /** @type {string} */ q) => {

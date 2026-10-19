@@ -461,13 +461,14 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (corpus !== 'all' && (!r.parsed || r.parsed.kind === 'text') && E && typeof E.parse === 'function') {
         try { const p = E.parse(q, { corpus: 'all' }); if (p && REF_CARD_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
       }
-      const done = { phase: 'done', memo, parsed: r.parsed, refParsed, results: r.results || [], terms, stopTyped, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
+      // `q`: the text this list answers (search200 B9 review); the box can be ahead of it, a key typed since.
+      const done = { phase: 'done', memo, q, parsed: r.parsed, refParsed, results: r.results || [], terms, stopTyped, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
       if (!r.error) lastSearch = { memo, allWordsFor, state: done };
       setState(done);
       if (r.meaningLater) rankWithMeaning();
     }).catch((err) => {
       if (stale || quiet) return;
-      setState({ phase: 'done', memo, parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
+      setState({ phase: 'done', memo, q, parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
     });
     const rankWithMeaning = () => {
       const E = pickEngine();
@@ -875,9 +876,15 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const countText = closestOnly ? 'Showing closest matches' : 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
     + (state.results.length === 1 ? 'match' : 'matches') + ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections');
   const scopeIn = searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : '';
+  /* A VERDICT NAMES THE TEXT SEARCHED (search200 B9 review). In the 140 ms before a key's
+     search runs, the box is ahead of the list: built from the box, the region said "No
+     results for “zzyzxqw”" for text not searched yet, at each key. `answered` is the text
+     the list answers; text still waiting for its search is "Searching…", said once. */
+  const answered = typeof state.q === 'string' ? state.q : qTrim;
+  const pending = isDone && answered !== qTrim && qTrim.replace(/[^\p{L}\p{N}]/gu, '').length >= 2;
   let liveText = '';
   if (qTrim && !/[\p{L}\p{N}]/u.test(qTrim)) liveText = 'Type a word, a title or a reference to search.';
-  else if (qTrim && buildInfo.ready && state.phase === 'searching') liveText = 'Searching…';
+  else if (qTrim && buildInfo.ready && (state.phase === 'searching' || pending)) liveText = 'Searching…';
   else if (isDone && state.error) liveText = 'Error: ' + state.error;
   else if (isDone) {
     const said = directEntries.map((d) => d.__label + '.');
@@ -888,9 +895,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (letterRefMissing) said.push(letterRefMissing);
     else if (state.results.length === 0 && directEntries.length === 0) {
       if (didYouMean) said.push('No results for “' + didYouMean.original + '”. Did you mean ' + didYouMean.suggestion + '?');
-      else if (state.stopWordsOnly) said.push('“' + qTrim + '” is in nearly every verse and letter. Add another word to search.');
+      else if (state.stopWordsOnly) said.push('“' + answered + '” is in nearly every verse and letter. Add another word to search.');
       else if (searchScope && conflict) said.push(scopeLabel + ' is in ' + conflict.home + ', and the ' + conflict.tab + ' tab is on.');
-      else said.push('No results for “' + qTrim + '”' + scopeIn + '.');
+      else said.push('No results for “' + answered + '”' + scopeIn + '.');
     }
     liveText = said.join(' ');
   }
@@ -1175,7 +1182,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <>
             <div className={'search-no-results' + (state.stopWordsOnly ? '' : ' has-picks')}>
               {state.stopWordsOnly ? (
-                <>“{query.trim()}” is in nearly every verse and letter. Add another word to search.</>
+                <>“{answered}” is in nearly every verse and letter. Add another word to search.</>
               ) : searchScope && conflict ? (
                 <>
                   {scopeLabel} is in {conflict.home}, and the {conflict.tab} tab is on.{' '}
@@ -1185,7 +1192,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 </>
               ) : (
                 <>
-                  No results for “{qTrim}”{scopeIn}.
+                  No results for “{answered}”{scopeIn}.
                   {searchScope ? <>{' '}<button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button></> :
                     tabName ? <>{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
                 </>
