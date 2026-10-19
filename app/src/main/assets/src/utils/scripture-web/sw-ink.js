@@ -122,8 +122,13 @@ export const INK = Object.freeze(TABLE);
 
 /** What the rest of the web keeps of its alpha while a line is tapped: it RECEDES, never to
  * black (Corbin 08-10: other lines may disappear "only if it is tapped"; hover dims nothing).
- * Replaces today's near-black isolation (.05) and the spec's x0.80; tunable. */
-export const TAP_CONTEXT = 0.30;
+ * Replaces today's near-black isolation (.05) and the spec's x0.80. The one named constant
+ * (w4 INK item 4, bounded .30-.60), chosen from pairs at .30, .45 and .60 on PC and phone: at
+ * .30 the field sank to a brown haze, at .60 its bright upper threads crowded the chosen line;
+ * at .45 the field keeps its hues and structure and the gold line reads first (r2-02).
+ * My Web's rail recedes by it too (rail-renderer), and the labels two thirds as far
+ * (overlay-renderer LABEL_RECEDE). */
+export const TAP_CONTEXT = 0.45;
 /** The centre chapter's own arcs (a foot inside it), in their own ramp colours (§4.4). */
 export const CENTRE_BRIGHT = 1.35;
 export const CENTRE_WIDTH = 1.25;

@@ -108,8 +108,11 @@ describe('the ink table', () => {
     expect(INK.panel.alpha, 'the panel is opaque').toBe(1);
   });
 
-  it('a tapped line makes the rest RECEDE, never vanish (C3, dead end 3): TAP_CONTEXT is about .30', () => {
-    expect(TAP_CONTEXT).toBe(0.30);
+  it('a tapped line makes the rest RECEDE, never vanish (C3, dead end 3): TAP_CONTEXT is .45, inside the .30-.60 the pictures allow', () => {
+    // w4 INK item 4: one named constant in .30-.60; .45 from the .30/.45/.60 pairs (sw-ink.js)
+    expect(TAP_CONTEXT).toBe(0.45);
+    expect(TAP_CONTEXT).toBeGreaterThanOrEqual(0.30);   // below, the field sinks to a haze
+    expect(TAP_CONTEXT).toBeLessThanOrEqual(0.60);      // above, it crowds the chosen line
     expect(TAP_CONTEXT).toBeGreaterThan(0.05);   // today's near-black isolation is what it replaces
     expect(TAP_CONTEXT).toBeLessThan(1);
     expect(CENTRE_BRIGHT).toBe(1.35);
@@ -129,7 +132,7 @@ describe('the helpers', () => {
   it('rgba01 gives straight-alpha floats for GLSL, scaled and clamped', () => {
     expect(rgba01('panel')).toEqual([28 / 255, 37 / 255, 39 / 255, 1]);
     expect(rgba01('cited')).toEqual([196 / 255, 164 / 255, 105 / 255, 0.70]);
-    expect(rgba01('lit', TAP_CONTEXT)[3]).toBeCloseTo(0.85 * 0.30, 10);
+    expect(rgba01('lit', TAP_CONTEXT)[3]).toBeCloseTo(0.85 * 0.45, 10);
     expect(rgba01('gold', 3)[3]).toBe(1);
     expect(rgba01('gold', -1)[3]).toBe(0);
   });
