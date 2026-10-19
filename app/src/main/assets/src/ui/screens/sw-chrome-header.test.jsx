@@ -194,12 +194,15 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
 
   /* The phone's round rule (0,4,0: .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, ...)) held the
      hidden pill at 40 px, so "Show controls" ran off the glass (phone-ui-hidden, w3 panel step 2).
-     The phone's hidden rule must name as many classes and come after it. */
+     The phone's hidden rule must name as many classes and come after it. (w4: the round rule's
+     selector list also names the error page's compact Back, so it is found by its first selector,
+     whatever follows it in the list.) */
   it('hidden, the hide-UI pill is as wide as its words on a phone too', () => {
-    const round = '.sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn) {';
+    const roundSel = '.sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn)';
     const pill = '.sw-root.sw-compact.sw-chrome-hidden .sw-hide-all {';
-    expect(BARE.indexOf(round), 'the phone\'s round rule').toBeGreaterThan(-1);
-    expect(BARE.indexOf(pill), 'the phone\'s hidden pill comes after it').toBeGreaterThan(BARE.indexOf(round));
+    const round = [' {', ', '].map((end) => BARE.indexOf(roundSel + end)).filter((i) => i > -1).sort((a, b) => a - b)[0] ?? -1;
+    expect(round, 'the phone\'s round rule').toBeGreaterThan(-1);
+    expect(BARE.indexOf(pill), 'the phone\'s hidden pill comes after it').toBeGreaterThan(round);
     expect(rule('.sw-root.sw-compact.sw-chrome-hidden .sw-hide-all')).toMatch(/width:\s*auto/);
   });
 
