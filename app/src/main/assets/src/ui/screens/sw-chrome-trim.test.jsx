@@ -395,17 +395,17 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(sub.textContent).not.toMatch(/ of /);
   });
 
-  /* Item 5's bottom half. drawRuler and drawRulerOnly each carried a copy of
-     the book-name block; both now call drawBookNames(), which places names
-     through placeRailLabels — the law the top rail adopted in the same batch.
+  /* Item 5's bottom half, rewritten to the w4 band (r2-01a): the canon's names
+     stand on ONE row (a second row is retired), placed through the ranked
+     law (rail-labels.js placeRailLabelsRanked) a word (NAME_GAP, 14 px) apart.
      This case witnesses that the bottom rail actually routes through the law
-     (a bite that pins every name to the top row reddens it); the law's own
-     shape is pinned in rail-label-collision.test.js. Geometry: three 600-verse
-     books at W = 800 are 15.4 px wide each, so with the recorder's fixed 20 px
-     measureText only the abbreviations qualify and neighbours overlap by ~5 px
-     — GEN takes the top row, EXO the second, and LEV clears GEN by 10.9 px and
-     returns to the top row. */
-  it('the bottom rail places colliding book names on two rows through the shared law', async () => {
+     (a bite that prints a colliding name, or opens a second row, reddens it);
+     the law's own shape is pinned in rail-labels-ranked.test.js. Geometry:
+     three 600-verse books at W = 800 are 15.4 px wide each, so with the
+     recorder's fixed 20 px measureText EXO overlaps GEN by 4.6 px and LEV
+     stands 10.8 px from it: GEN, a major book, takes its
+     place first, and EXO and LEV are left out. */
+  it('the bottom rail places the book names on one row through the shared law: a colliding name is left out', async () => {
     const CANON = 31102, START = 15000, SPAN = 600;
     const three = graph();
     three.books = [
@@ -417,7 +417,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     three.total = CANON;
     vi.mocked(decodeGraph).mockReturnValueOnce(/** @type {any} */ (three));
     await mount();
-    for (let i = 0; i < 60 && !labelsPainted().some((s) => s === 'LEV'); i++) {
+    for (let i = 0; i < 60 && !labelsPainted().some((s) => s === 'GEN'); i++) {
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     }
     const yOf = (label) => {
@@ -425,11 +425,11 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
       expect(hits.length, label + ' was painted').toBeGreaterThan(0);
       return hits[hits.length - 1][3];
     };
-    const yGen = yOf('GEN'), yExo = yOf('EXO'), yLev = yOf('LEV');
-    const DPR = Math.min(window.devicePixelRatio || 1, 3);
-    // one row below at the build spec's row pitch (§3: +32 / +47 on a compact frame, +52 / +70 on a
-    // PC one; the w3 canvas stream retired the old 14 px pitch for it)
-    expect([15 * DPR, 18 * DPR], 'EXO one row below GEN').toContain(yExo - yGen);
-    expect(yLev, 'LEV back on the top row').toBe(yGen);
+    const yGen = yOf('GEN');
+    const painted = CALLS.filter((c) => c[0] === 'fillText' && ['GEN', 'EXO', 'LEV', 'GENESIS', 'EXODUS', 'LEVITICUS'].includes(c[1]));
+    expect(new Set(painted.map((c) => c[3])).size, 'one row').toBe(1);
+    expect(painted[0][3]).toBe(yGen);
+    expect(labelsPainted().filter((t) => t === 'EXO' || t === 'EXODUS'), 'EXO collides with GEN: left out').toEqual([]);
+    expect(labelsPainted().filter((t) => t === 'LEV' || t === 'LEVITICUS'), 'LEV within a word of GEN: left out').toEqual([]);
   });
 });

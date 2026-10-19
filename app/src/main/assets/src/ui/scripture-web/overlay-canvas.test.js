@@ -135,7 +135,7 @@ describe('the cited strip marks exactly the verses the panel lists citations for
     for (const name of ['pc', 'phone']) {
       const { rec, fs } = paint(name, 1, g.total / 2);
       const W = fs.v.W, s = fs.v.DPR;
-      const top = fs.view.base + (name === 'pc' ? 4 : 3) * s;
+      const top = fs.view.base + (name === 'pc' ? 5 : 3) * s;   // w4: the PC strip a pixel lower (README §3)
       // each strip column's alpha (the rects of one path take the fill that closes it)
       const colA = new Float64Array(W);
       let pending = [];
@@ -188,7 +188,8 @@ describe('the overview ruler (r2-01a)', () => {
       const { rec, fs, out } = paint(name, 1, g.total / 2);
       const names = new Set(g.books.flatMap((b) => [String(b.title).toUpperCase(), String(b.abbr).toUpperCase()]));
       const drawn = rec.texts().filter((c) => names.has(c.t));
-      expect(drawn.length).toBeGreaterThan(20);
+      // one row since w4 (r2-01a): the phone holds fewer names than its two rows did
+      expect(drawn.length).toBeGreaterThan(name === 'pc' ? 20 : 12);
       for (const c of drawn) {
         const b = textBox(c);
         expect(b.x0, c.t + ' starts on the frame').toBeGreaterThanOrEqual(0);
@@ -221,7 +222,7 @@ describe('the overview ruler (r2-01a)', () => {
     const zone = { x0: (891 - 76 - 44 - 8) * s, x1: v.W, y0: (411 - 8 - 44 - 8) * s, y1: v.H };
     const names = new Set(g.books.flatMap((b) => [String(b.title).toUpperCase(), String(b.abbr).toUpperCase()]));
     const drawn = rec.texts().filter((c) => names.has(c.t));
-    expect(drawn.length).toBeGreaterThan(20);
+    expect(drawn.length, 'one row of names on the phone (w4)').toBeGreaterThan(12);
     for (const c of drawn) {
       const b = textBox(c);
       const top = c.y - fontPxOf(c.font) * 0.7;
@@ -264,6 +265,202 @@ describe('the overview ruler (r2-01a)', () => {
     expect(firstRect(shown.rec).a.slice(0, 2)).toEqual([0, 0]);
     expect(firstRect(shown.rec).a[3]).toBeGreaterThanOrEqual(104);
     expect(firstRect(hidden.rec).a[1]).toBeGreaterThan(0);
+  });
+});
+
+/* w4, the band stream: the band under the baseline read as r2-01a, r2-06 and r3-03 read. A
+   screen root laid out as app.css lays it out (the round buttons at their corner, or at the canvas
+   area's bottom-left while the panel is docked; the hidden pill; the legend's one line), CSS px. */
+function chromeRoot(name, { panel = 0, hidden = false } = {}) {
+  const pc = name === 'pc';
+  const W = pc ? 1600 : 891, H = pc ? 900 : 411;
+  const btn = pc ? 44 : 40, bottom = pc ? 16 : 8, side = pc ? 24 : 16, pill = pc ? 160 : 148;
+  const root = { className: 'sw-root' + (pc ? '' : ' sw-compact') + (panel ? ' sw-panel-open' : '') + (hidden ? ' sw-chrome-hidden' : ''), offsetParent: null };
+  const el = (left, top, w, h) => ({ offsetLeft: left, offsetTop: top, offsetWidth: w, offsetHeight: h, offsetParent: root });
+  const top = H - bottom - btn;
+  const els = {};
+  if (panel) {
+    els['.sw-guide-btn'] = el(side, top, btn, btn);
+    els['.sw-hide-all'] = el(pc ? 80 : 68, top, btn, btn);
+  } else if (hidden) {
+    els['.sw-hide-all'] = el(W - side - pill, top, pill, btn);
+  } else {
+    els['.sw-hide-all'] = el(W - side - btn, top, btn, btn);
+    els['.sw-guide-btn'] = el(W - (pc ? 80 : 68) - btn, top, btn, btn);
+  }
+  const lh = pc ? 14 * 1.35 : 12 * 1.25;
+  if (!panel) els['.sw-legend'] = el(side, H - bottom - lh, 600, lh);
+  root.querySelector = (sel) => els[sel] || null;
+  const canvas = { closest: () => root, offsetLeft: 0, offsetTop: 0, offsetParent: root };
+  const s = FRAMES[name].DPR;
+  const zones = Object.entries(els).filter(([k]) => k !== '.sw-legend').map(([, e]) => ({
+    x0: (e.offsetLeft - 8) * s, x1: (e.offsetLeft + e.offsetWidth + 8) * s, y0: (e.offsetTop - 8) * s, y1: (e.offsetTop + e.offsetHeight + 8) * s,
+  }));
+  return { canvas, zones, legendTop: (H - bottom - lh) * s };
+}
+const bookIds = (prefix) => g.books.filter((b) => b.id === prefix || b.id.startsWith(prefix + '-'));
+const MAJOR_FORMS = new Set(['genesis', 'psalms', 'isaiah', 'matthew', 'john', 'revelation']
+  .flatMap((p) => bookIds(p)).flatMap((b) => [String(b.title).toUpperCase(), String(b.abbr).toUpperCase()]));
+const ABBRS = new Set(g.books.map((b) => String(b.abbr).toUpperCase()));
+const TITLES = new Set(g.books.map((b) => String(b.title).toUpperCase()));
+const bookTexts = (rec) => rec.texts().filter((c) => (ABBRS.has(c.t) || TITLES.has(c.t)) && c.align !== 'center');
+/** Every mark the band inks, as boxes (device px): the fillRects, and the path rects and dots by the fill that closes them. */
+function inked(rec, fills) {
+  const out = [];
+  let pending = [];
+  for (const c of rec.calls) {
+    if (c.op === 'fillRect') { if (fills(c.fill)) out.push({ x0: c.x, x1: c.x + c.w, y0: c.y, y1: c.y + c.h, fill: c.fill }); }
+    else if (c.op === 'beginPath') pending = [];
+    else if (c.op === 'rect') pending.push({ x0: c.a[0], x1: c.a[0] + c.a[2], y0: c.a[1], y1: c.a[1] + c.a[3] });
+    else if (c.op === 'arc') pending.push({ x0: c.a[0] - c.a[2], x1: c.a[0] + c.a[2], y0: c.a[1] - c.a[2], y1: c.a[1] + c.a[2] });
+    else if (c.op === 'fill') { if (fills(c.fill)) for (const b of pending) out.push(Object.assign(b, { fill: c.fill })); pending = []; }
+  }
+  return out;
+}
+const meet = (a, b) => a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0;
+const textRect = (c) => { const b = textBox(c); return { x0: b.x0, x1: b.x1, y0: c.y - fontPxOf(c.font) * 0.66, y1: c.y }; };
+const BAR_FILLS = new Set([css('chapterBar'), css('chapterBar', 0.5625)]);
+
+describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
+  for (const name of ['pc', 'phone']) {
+    it(name + ': the overview names stand on ONE row, in one form (the abbreviations), a word apart, the six majors and only they in bold', () => {
+      for (const hidden of [false, true]) {
+        const { canvas, zones } = chromeRoot(name, { hidden });
+        const { rec, fs } = paint(name, 1, g.total / 2, { canvas });
+        const s = fs.v.DPR, what = name + (hidden ? ' hidden' : '');
+        const drawn = bookTexts(rec);
+        expect(drawn.length, what + ': names').toBeGreaterThan(name === 'pc' ? 20 : 12);
+        expect([...new Set(drawn.map((c) => Math.round(c.y)))], what + ': one row').toHaveLength(1);
+        for (const c of drawn) expect(ABBRS.has(c.t), what + ': ' + c.t + ' is an abbreviation').toBe(true);
+        const boxes = drawn.map(textBox).sort((a, b) => a.x0 - b.x0);
+        for (let i = 1; i < boxes.length; i++) expect(boxes[i].x0 - boxes[i - 1].x1, what + ': a word apart').toBeGreaterThanOrEqual(12 * s - 1e-6);
+        for (const c of drawn) {
+          const major = MAJOR_FORMS.has(c.t);
+          expect(/\b600\b/.test(c.font), what + ': ' + c.t + ' bold iff major').toBe(major);
+          expect(c.fill, what + ': ' + c.t + ' ink').toBe(css(major ? 'bookLabelMajor' : 'bookLabel'));
+        }
+        for (const c of drawn) for (const z of zones) expect(meet(textRect(c), z), what + ': ' + c.t + ' under a corner button or the pill').toBe(false);
+        for (const t of ['GEN', 'REV']) expect(drawn.some((c) => c.t === t), what + ': ' + t).toBe(true);
+      }
+    });
+  }
+
+  it('a thin rule stands between each two neighbouring names, and only there (r2-01a\'s cells)', () => {
+    for (const [name, zoom, verse] of [['pc', 1, g.total / 2], ['phone', 1, g.total / 2], ['pc', 3.5, verseOf('ezekiel', 1, 1)]]) {
+      const { canvas } = chromeRoot(name);
+      const { rec, fs } = paint(name, zoom, verse, { canvas });
+      const s = fs.v.DPR, what = name + ' ' + zoom + 'x';
+      const drawn = bookTexts(rec).map((c) => Object.assign(textRect(c), { t: c.t })).sort((a, b) => a.x0 - b.x0);
+      expect(drawn.length, what).toBeGreaterThan(3);
+      const y0 = Math.min(...drawn.map((r) => r.y0)), y1 = Math.max(...drawn.map((r) => r.y1));
+      const rules = inked(rec, (f) => f === css('chapterTick')).filter((r) => r.y0 < y1 && r.y1 > y0);
+      for (const r of rules) expect(r.x1 - r.x0, what + ': thin').toBeLessThanOrEqual(Math.max(1, Math.round(0.6 * s)) + 1e-9);
+      for (let k = 1; k < drawn.length; k++) {
+        const a = drawn[k - 1], b = drawn[k];
+        const between = rules.filter((r) => r.x0 >= a.x1 && r.x1 <= b.x0);
+        expect(between.length, what + ': one rule between ' + a.t + ' and ' + b.t).toBe(1);
+      }
+      expect(rules.length, what + ': no rule but between two names').toBe(drawn.length - 1);
+    }
+  });
+
+  it('full names when there is room: zoomed to the prophets every name is the title, and back at the overview every name the abbreviation', () => {
+    const ezek = verseOf('ezekiel', 1, 1);
+    for (const name of ['pc', 'phone']) {
+      const near = bookTexts(paint(name, 3.5, ezek).rec);
+      expect(near.length, name + ' 3.5x names').toBeGreaterThan(3);
+      for (const c of near) expect(TITLES.has(c.t), name + ' 3.5x: ' + c.t + ' is a title').toBe(true);
+      expect(near.some((c) => c.t === 'EZEKIEL'), name + ' EZEKIEL').toBe(true);
+      const far = bookTexts(paint(name, 1, g.total / 2).rec);
+      for (const c of far) expect(ABBRS.has(c.t), name + ' 1x: ' + c.t).toBe(true);
+    }
+  });
+
+  for (const name of ['pc', 'phone']) {
+    it(name + ': the chapter-length bars read as bars (r2-01a): thin bars a few pixels apart hanging from one line, the books alternately shaded, their lengths the chapters\'', () => {
+      const { canvas } = chromeRoot(name);
+      const { rec, fs } = paint(name, 1, g.total / 2, { canvas });
+      const s = fs.v.DPR, W = fs.v.W;
+      const bars = inked(rec, (f) => BAR_FILLS.has(f));
+      expect(bars.length, 'bars').toBeGreaterThan(W / (6 * s));
+      const top = Math.min(...bars.map((b) => b.y0));
+      for (const b of bars) expect(b.y0, 'hanging from one line').toBeCloseTo(top, 6);
+      for (const b of bars) {
+        expect(b.x1 - b.x0, 'at least a device pixel').toBeGreaterThanOrEqual(1 - 1e-9);
+        expect(b.x1 - b.x0, 'thin').toBeLessThanOrEqual(1.5 * s + 1e-9);
+      }
+      const xs = bars.map((b) => b.x0).sort((a, b) => a - b);
+      for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1], 'a bar every few pixels, not a solid strip').toBeGreaterThanOrEqual(2.5 * s - 1e-6);
+      let ink = 0;
+      for (const b of bars) ink += b.x1 - b.x0;
+      expect(ink / W, 'the strip is mostly black between its bars').toBeLessThan(0.5);
+      const hs = bars.map((b) => b.y1 - b.y0).sort((a, b) => a - b);
+      expect(hs[hs.length - 1], 'the longest chapter the longest bar').toBeGreaterThan(1.6 * hs[Math.floor(hs.length / 2)]);
+      expect(new Set(bars.map((b) => b.fill)).size, 'the books alternately shaded').toBe(2);
+    });
+  }
+
+  it('pc: the band fills the ruler as r2-01a does: the names within 80 px of the legend, the bars between the cited strip and the names', () => {
+    const { canvas, legendTop } = chromeRoot('pc');
+    const { rec, fs } = paint('pc', 1, g.total / 2, { canvas });
+    const base = fs.view.base;
+    const names = bookTexts(rec);
+    const foot = Math.max(...names.map((c) => c.y)), capTop = Math.min(...names.map((c) => textRect(c).y0));
+    expect(legendTop - foot, 'the gap from the names to the legend (it was about 98: the dead band)').toBeLessThanOrEqual(80);
+    expect(legendTop - foot, 'and the names do not crowd the legend').toBeGreaterThanOrEqual(48);
+    const bars = inked(rec, (f) => BAR_FILLS.has(f));
+    const barTop = Math.min(...bars.map((b) => b.y0)), barFoot = Math.max(...bars.map((b) => b.y1));
+    const cited = inked(rec, (f) => /^rgba\(196,164,105,/.test(String(f)));
+    const citedFoot = Math.max(...cited.map((b) => b.y1));
+    expect(barTop - citedFoot, 'the bars start just under the cited strip').toBeGreaterThanOrEqual(4);
+    expect(capTop - barFoot, 'the names stand clear under the bars').toBeGreaterThanOrEqual(16);
+    expect(barFoot - barTop, 'bars as tall as the picture\'s').toBeGreaterThanOrEqual(36);
+    expect(barTop - base).toBeGreaterThan(0);
+  });
+
+  /** Isaiah 7:14 - Matthew 1:23, the s04 pair, as an OpenBible thread. */
+  const S04 = (() => {
+    const a = verseOf('isaiah', 7, 14), b = verseOf('matthew', 1, 23);
+    for (let i = 0; i < g.count; i++) if ((g.from[i] === a && g.to[i] === b) || (g.from[i] === b && g.to[i] === a)) return { i, a, b };
+    return { i: -1, a, b };
+  })();
+  for (const name of ['pc', 'phone']) {
+    it(name + ': the chosen line\'s foot labels ("Isa 7:14", "Matt 1:23") stand just under the baseline, clear of the bars and the cited strip, above the book names (r2-02)', () => {
+      expect(S04.i, 'the s04 thread').toBeGreaterThanOrEqual(0);
+      const W = FRAMES[name].W;
+      const fit = geo.fitPPV({ total: g.total }, W);
+      const zoom = (0.7 * W) / ((S04.b - S04.a) * fit);
+      const { canvas } = chromeRoot(name);
+      const { rec, fs } = paint(name, zoom, (S04.a + S04.b) / 2, { canvas, focus: { arc: S04.i } });
+      const s = fs.v.DPR;
+      const gold = rec.texts().filter((c) => c.fill === css('chosenLabel'));
+      expect(gold.map((c) => c.t).sort(), name + ' at ' + zoom.toFixed(1) + 'x').toEqual(['Isa 7:14', 'Matt 1:23']);
+      const marks = inked(rec, (f) => BAR_FILLS.has(f) || /^rgba\(196,164,105,/.test(String(f)));
+      const names = bookTexts(rec);
+      expect(names.length).toBeGreaterThan(3);
+      const nameTop = Math.min(...names.map((c) => textRect(c).y0));
+      for (const c of gold) {
+        const r = textRect(c);
+        const halo = { x0: r.x0 - 2 * s, x1: r.x1 + 2 * s, y0: r.y0 - 2 * s, y1: r.y1 + 2 * s };
+        const under = marks.filter((m) => meet(m, halo));
+        expect(under.length, c.t + ': bars or cited ticks under it').toBe(0);
+        expect(r.y0, c.t + ' under the baseline').toBeGreaterThan(fs.view.base);
+        expect(r.y1, c.t + ' above the names').toBeLessThan(nameTop);
+      }
+    });
+  }
+
+  it('phone 200x: the ruler runs to the right end, its numerals clear above the corner buttons, and nothing is drawn under them', () => {
+    const { canvas, zones } = chromeRoot('phone');
+    const { rec, fs } = paint('phone', 207, ISA53_6, { canvas });
+    const s = fs.v.DPR;
+    const marks = inked(rec, (f) => [css('verseTick'), css('chapterTick'), css('citedDot')].includes(f) || /^rgba\(196,164,105,/.test(String(f)));
+    expect(marks.length).toBeGreaterThan(50);
+    for (const m of marks) for (const z of zones) expect(meet(m, z), 'a tick, rule or dot under a corner button at ' + Math.round(m.x0 / s)).toBe(false);
+    for (const c of rec.texts()) for (const z of zones) expect(meet(textRect(c), z), '"' + c.t + '" under a corner button').toBe(false);
+    const nums = rec.texts().filter((c) => /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
+    const right = Math.max(...nums.map((c) => textBox(c).x1));
+    expect(right / s, 'a chapter numeral at the right end (the right ' + Math.round((fs.v.W - right) / s) + ' px were empty)').toBeGreaterThan(891 - 90);
   });
 });
 
@@ -626,22 +823,20 @@ describe('the tap targets are a finger wide (w3 review: the hit boxes ran 14-30 
         if (hit.kind === 'chapter') expect(hit.chapter).toBe(h.hit.chapter);
       }
     }
-    // the overview's two name rows: a tap nearer one row's name reads that name
+    // the overview's one row of names (w4; it was two, and this read a tap between the rows):
+    // where two neighbours' grown targets meet, a tap nearer one name reads that name
     const ov = paint('phone', 1, ISA53_6);
-    const books = ov.out.hits.filter((h) => h.hit.kind === 'book');
+    const books = ov.out.hits.filter((h) => h.hit.kind === 'book').sort((p, q) => p.core.x0 - q.core.x0);
     let pairs = 0;
-    for (const a of books) {
-      for (const b of books) {
-        if (a === b || !(a.core.y0 > b.core.y1)) continue;   // a on the lower row, b on the upper
-        const x = Math.max(a.core.x0, b.core.x0), x1 = Math.min(a.core.x1, b.core.x1);
-        if (!(x1 > x)) continue;
-        const mx = (x + x1) / 2;
-        expect(hitOverlay(ov.fs, mx / s, (a.core.y0 - 1 * s) / s), 'just over the lower name').toBe(a.hit);
-        expect(hitOverlay(ov.fs, mx / s, (b.core.y1 + 1 * s) / s), 'just under the upper name').toBe(b.hit);
-        pairs++;
-      }
+    for (let k = 1; k < books.length; k++) {
+      const a = books[k - 1], b = books[k];
+      if (!(a.x1 > b.x0)) continue;   // their grown targets do not meet
+      const y = (a.core.y0 + a.core.y1) / 2;
+      expect(hitOverlay(ov.fs, (a.core.x1 + 1 * s) / s, y / s), 'just right of a name').toBe(a.hit);
+      expect(hitOverlay(ov.fs, (b.core.x0 - 1 * s) / s, y / s), 'just left of its neighbour').toBe(b.hit);
+      pairs++;
     }
-    expect(pairs, 'names on both rows over each other').toBeGreaterThan(3);
+    expect(pairs, 'neighbouring names whose targets meet').toBeGreaterThan(3);
   });
 });
 

@@ -207,11 +207,17 @@ const SIZES = {
 };
 
 /* The two ruler stacks, CSS px down from the baseline, as the spec draws them
-   (§3 / §4.3). A short band (the phone's legend sits inside the spec's +92;
-   a PC without the 212 px ruler has 100) keeps every row and closes the gaps
-   between them; a flexible row (the bars) gives some of its height last. */
-const OV_PC = { rows: [{ k: 'cited', top: 4, h: 5 }, { k: 'bars', top: 12, h: 30, min: 10 }, { k: 'row0', top: 52, h: 13 * CAP }], end: 62, row1: 18 };
-const OV_COMPACT = { rows: [{ k: 'cited', top: 3, h: 4 }, { k: 'bars', top: 9, h: 16, min: 8 }, { k: 'row0', top: 32, h: 12 * CAP }], end: 41, row1: 15 };
+   (§3 / §4.3). A short band (a PC without the 212 px ruler has 100) keeps
+   every row and closes the gaps between them; a flexible row (the bars) gives
+   some of its height last.
+   w4 (the band stream): the overview's names stand on one row, and on a PC the
+   rows spread over the ruler as r2-01a's do (the cited strip, the bars, the
+   names; a chosen foot's label cuts its notch in the bars, r2-06; the spec's +12..+42 bars and
+   +52 / +70 names left 98 px of black above the legend). On a phone the names
+   end above the corner buttons' zone (+44) and the deep band's numerals do too,
+   so a button never takes a numeral or the sticky name. */
+const OV_PC = { rows: [{ k: 'cited', top: 5, h: 5 }, { k: 'bars', top: 16, h: 48, min: 12 }, { k: 'row0', top: 90, h: 13 * CAP }], end: 104 };
+const OV_COMPACT = { rows: [{ k: 'cited', top: 3, h: 4 }, { k: 'bars', top: 10, h: 18, min: 8 }, { k: 'row0', top: 35, h: 12 * CAP }], end: 44 };
 const DEEP_PC = {
   rows: [
     { k: 'cited', top: 4, h: 5 }, { k: 'pills', top: 16, h: 20 }, { k: 'nums', top: 72.5, h: 28 * CAP },
@@ -430,6 +436,45 @@ function gradient(ctx, x0, y0, x1, y1, stops) {
   return gr;
 }
 
+/**
+ * What is left of the rect (x, y, w, h) outside the boxes, as rects [x0, y0, x1, y1]: the band's
+ * marks (ticks, rules, bars, the cited strip) run up to the corner buttons' zones and the chosen
+ * feet's labels and stop there, so a button stands on black and a label on clear ground (w4).
+ * @param {number} x @param {number} y @param {number} w @param {number} h @param {Box[]} boxes
+ */
+function rectsOutside(x, y, w, h, boxes) {
+  let parts = [[x, y, x + w, y + h]];
+  for (const b of boxes) {
+    /** @type {number[][]} */
+    const next = [];
+    for (const p of parts) {
+      const [x0, y0, x1, y1] = p;
+      if (b.x1 <= x0 || b.x0 >= x1 || b.y1 <= y0 || b.y0 >= y1) { next.push(p); continue; }
+      if (b.y0 > y0) next.push([x0, y0, x1, b.y0]);
+      if (b.y1 < y1) next.push([x0, b.y1, x1, y1]);
+      const ya = Math.max(y0, b.y0), yb = Math.min(y1, b.y1);
+      if (b.x0 > x0) next.push([x0, ya, b.x0, yb]);
+      if (b.x1 < x1) next.push([b.x1, ya, x1, yb]);
+    }
+    parts = next;
+  }
+  return parts;
+}
+const meetsAny = (x, y, w, h, boxes) => {
+  for (const b of boxes) if (b.x1 > x && b.x0 < x + w && b.y1 > y && b.y0 < y + h) return true;
+  return false;
+};
+/** ctx.rect into the open path, outside the boxes. */
+function rectOut(ctx, x, y, w, h, boxes) {
+  if (!boxes.length || !meetsAny(x, y, w, h, boxes)) { ctx.rect(x, y, w, h); return; }
+  for (const [x0, y0, x1, y1] of rectsOutside(x, y, w, h, boxes)) ctx.rect(x0, y0, x1 - x0, y1 - y0);
+}
+/** ctx.fillRect outside the boxes. */
+function fillOut(ctx, x, y, w, h, boxes) {
+  if (!boxes.length || !meetsAny(x, y, w, h, boxes)) { ctx.fillRect(x, y, w, h); return; }
+  for (const [x0, y0, x1, y1] of rectsOutside(x, y, w, h, boxes)) ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+}
+
 /* ── the chrome the canvas keeps off ───────────────────────────────────── */
 
 const NO_CHROME = { zones: /** @type {Box[]} */ ([]), legendTop: Infinity };
@@ -501,13 +546,12 @@ function layoutOf(ctx, fs) {
   // the ruler band ends above the legend line (or the frame's foot)
   let bandBottom = H - 4 * s;
   if (chrome.legendTop > base + 24 * s && chrome.legendTop - 4 * s < bandBottom) bandBottom = chrome.legendTop - 4 * s;
-  // the overview's name rows end above the corner buttons: the right-end names (2COR, HEB,
-  // REV) printed under them (#20); the lower row may still meet them, and gives way there
+  // the overview's name row ends above the corner buttons: the right-end names (2COR, HEB,
+  // REV) printed under them (#20)
   let zoneTop = bandBottom;
   for (const z of chrome.zones) if (z.y0 > base + 12 * s && z.y0 < zoneTop) zoneTop = z.y0;
   const ovSpec = compact ? OV_COMPACT : OV_PC;
   const ov = toDevice(stackRows(ovSpec.rows, ovSpec.end, (zoneTop - base) / s), base, s);
-  ov.row1 = { top: ov.row0.top + ovSpec.row1 * s, h: ov.row0.h };
   const dpSpec = compact ? DEEP_COMPACT : DEEP_PC;
   const dp = toDevice(stackRows(dpSpec.rows, dpSpec.end, (bandBottom - base) / s), base, s);
   const inset = fs.inset > 0 ? fs.inset : 0;
@@ -541,13 +585,16 @@ export function paintCanonOverlay(ctx, fs) {
   const usable = !!(ctx && g && g.total > 0 && g.chapters && g.chapters.length && g.chapterOfVerse);
   const L = usable ? layoutOf(ctx, fs) : null;
   const grid = createGrid();
+  // the chosen feet's references, known before the ruler so it leaves their ground clear
+  const ch = L ? chosenOf(ctx, g, cam, L, fs) : null;
   if (L) {
     ensureWebFont();   // the screen repaints when it loads (onWebFontReady)
     for (const z of L.zones) grid.add(z);
+    const holes = footHoles(ch, L.s);
     drawScrim(ctx, L);
     drawBaseline(ctx, L);
-    drawCited(ctx, g, cam, L);
-    drawOverview(ctx, g, cam, L, 1 - L.deepT, hits);
+    drawCited(ctx, g, cam, L, holes);
+    drawOverview(ctx, g, cam, L, 1 - L.deepT, hits, holes);
     drawDeep(ctx, g, cam, L, L.deepT, fs.centre, grid, hits);
     // the centre chapter's wash over the band it marks: over the sticky names' fades (no dark box
     // in the gold) and with its gold top edge over the baseline
@@ -568,7 +615,7 @@ export function paintCanonOverlay(ctx, fs) {
   for (const b of fs.keepOut || []) grid.add({ x0: b.x0 * dpr, x1: b.x1 * dpr, y0: b.y0 * dpr, y1: b.y1 * dpr });
   /** threads labelled this frame: OpenBible ids, and 'p<n>' for a prophecy pair */
   const labelled = new Set();
-  const chosen = drawChosen(ctx, g, cam, L, fs, grid, labelled);
+  const chosen = drawChosen(ctx, g, cam, L, fs, grid, labelled, ch);
   drawPills(ctx, g, cam, L, fs, grid, hits, badges);
   if (g.count > 0 && L.deepT >= 0.5) {
     const memo = memoOf(g);
@@ -647,11 +694,12 @@ function drawBaseline(ctx, L) {
  * strip is sparse). Past 2 px a verse, one tick per cited verse at its centre,
  * in the full ink.
  */
-function drawCited(ctx, g, cam, L) {
+function drawCited(ctx, g, cam, L, holes) {
   const cited = citedVerses(g);
   if (!cited.count) return;
   const { s, W } = L;
   const row = L.deepT < 0.5 ? L.ov.cited : L.dp.cited;
+  const cut = (holes || []).concat(L.zones);
   const pre = cited.pre, total = g.total;
   if (cam.ppv < 2 * s) {
     /** @type {number[][]} runs [x, w, ...] by ink level */
@@ -674,7 +722,7 @@ function drawCited(ctx, g, cam, L) {
       if (!r) continue;
       ctx.fillStyle = css('cited', l / CITED_LEVELS);
       ctx.beginPath();
-      for (let k = 0; k < r.length; k += 2) ctx.rect(r[k], row.top, r[k + 1], row.h);
+      for (let k = 0; k < r.length; k += 2) rectOut(ctx, r[k], row.top, r[k + 1], row.h, cut);
       ctx.fill();
     }
     return;
@@ -683,60 +731,119 @@ function drawCited(ctx, g, cam, L) {
   ctx.beginPath();
   const v0 = Math.max(0, Math.floor(xToVerse(cam, W, 0))), v1 = Math.min(total - 1, Math.ceil(xToVerse(cam, W, W)));
   const w = Math.max(1, Math.min(cam.ppv * 0.5, 2 * s));
-  for (let x = v0; x <= v1; x++) if (pre[x + 1] > pre[x]) ctx.rect(verseToX(cam, W, x + 0.5) - w / 2, row.top, w, row.h);
+  for (let x = v0; x <= v1; x++) if (pre[x + 1] > pre[x]) rectOut(ctx, verseToX(cam, W, x + 0.5) - w / 2, row.top, w, row.h, cut);
   ctx.fill();
 }
 
 /* ── the overview ruler (r2-01a) ───────────────────────────────────────── */
 
+/** The chapter-length bars stand at least this far apart, CSS px (r2-01a: a thin bar every few px). */
+const BAR_PITCH = 3;
+/** A chapter this long (verses) or longer takes the full bar. */
+const BAR_FULL = 64;
+
 /**
- * The chapter-length bars, one per chapter, their HEIGHT the chapter's length
- * (root-scaled so the short chapters still read; Psalm 119 the deepest), the
- * books alternately shaded; then the book names. A bar's width only marks
- * where its chapter starts: 0.8 of the chapter's width turned a long chapter
- * into a grey block once zoomed (sw1).
+ * The chapter-length bars (r2-01a): thin bars hanging from one line, their
+ * LENGTH the chapter's (a chapter of BAR_FULL verses or more the full bar,
+ * the short ones short on a softened curve: Psalm 119 against the Psalms
+ * around it), the books alternately shaded; then the book names. Where the
+ * chapters stand closer than BAR_PITCH, neighbours share a bar, their mean
+ * length, grouped from the canon's start in runs of a power of two verses so a
+ * pan never regroups them and a book's start begins a run: one bar per
+ * chapter at the overview's 1,189 over 1,600 px was a solid grey strip, and
+ * the longest of each run made every bar nearly the same (w4). A bar is a
+ * device pixel or two wide, whatever the zoom.
+ * @param {Box[]} holes  the chosen feet's references' ground (chosenOf), kept clear
  */
-function drawOverview(ctx, g, cam, L, t, hits) {
+function drawOverview(ctx, g, cam, L, t, hits, holes) {
   if (!(t > 0.01)) return;
   const { s, W } = L;
   ctx.save();
   ctx.globalAlpha = t;
   const top = L.ov.bars.top, maxH = L.ov.bars.h;
   const shade = [css('chapterBar'), css('chapterBar', 0.5625)];
+  const cut = (holes || []).concat(L.zones);
+  const run = Math.pow(2, Math.ceil(Math.log2(Math.max(1e-6, (BAR_PITCH * s) / cam.ppv))));
+  const bw = Math.max(1, Math.min(Math.round(1.5 * s), Math.round(0.3 * run * cam.ppv)));
+  const vLo = xToVerse(cam, W, -4 * s), vHi = xToVerse(cam, W, W + 4 * s);
   let fill = -1;
+  const bar = (start, book, len) => {
+    if (start < vLo || start > vHi) return;
+    const f = book % 2;
+    if (f !== fill) { ctx.fillStyle = shade[f]; fill = f; }
+    const h = Math.max(1.5 * s, maxH * Math.pow(Math.min(1, len / BAR_FULL), 0.75));
+    fillOut(ctx, Math.round(verseToX(cam, W, start)), top, bw, h, cut);
+  };
+  // a book's start begins a bar when it stands far enough from the last one, counted in the
+  // device pixels the bars are drawn on (two rounded a pixel closer read as one)
+  const px = (v) => Math.round(verseToX(cam, W, v));
+  const minGap = Math.ceil(0.84 * BAR_PITCH * s);
+  let from = -1, book = -1, sum = 0, n = 0;
   for (let i = 0; i < g.chapters.length; i++) {
     const c = g.chapters[i];
-    const x = verseToX(cam, W, c[2]), x2 = verseToX(cam, W, c[2] + c[3]);
-    if (x2 < -4 || x > W + 4) continue;
-    const f = c[0] % 2;
-    if (f !== fill) { ctx.fillStyle = shade[f]; fill = f; }
-    ctx.fillRect(x, top, Math.min(Math.max((x2 - x) * 0.8, 0.7 * s), 3 * s), Math.max(1.5 * s, maxH * Math.sqrt(Math.min(1, c[3] / 176))));
+    const d = c[2] - from;
+    if (from < 0 || d >= run || (c[0] !== book && px(c[2]) - px(from) >= minGap)) {
+      if (from >= 0) bar(from, book, sum / n);
+      from = c[2]; book = c[0]; sum = 0; n = 0;
+      if (from > vHi) { from = -1; break; }
+    }
+    sum += c[3]; n++;
   }
+  if (from >= 0) bar(from, book, sum / n);
   // the names hand over in halves (the overview's out by the middle, the deep band's in
   // from it), so two sets of names never print over each other
   const tt = Math.min(1, Math.max(0, 2 * t - 1));
   if (tt > 0.01) {
     ctx.globalAlpha = tt;
-    drawBookLabels(ctx, g, cam, L, [L.ov.row0, L.ov.row1], L.sz.label, tt > 0.25 ? hits : null);
+    drawBookLabels(ctx, g, cam, L, [L.ov.row0], L.sz.label, tt > 0.25 ? hits : null, 'canon');
   }
   ctx.restore();
 }
 
+/** Two book names on a row keep this much clear between them, CSS px: a word apart, so two never
+    read as one ("PSALMS PROV", "DEUT JUDG" on a phone, w4). */
+const NAME_GAP = 14;
+/** The form the names take, per graph and rail: 'abbr' or 'full', kept between frames. */
+/** @type {WeakMap<object, Map<string, string>>} */
+const FORMS = new WeakMap();
 /**
- * The book names along the rail: the full title where it fits the book's
- * span (a major book's with room to spare, a minor book's only with plenty),
- * else the abbreviation while it is under twice the span, else nothing.
- * Each is centred on what the frame holds of its book and kept wholly on
- * the frame (the old clamp to 30 px printed "ECHARIAH"), then placed on two
- * rows by the ranked law (rail-labels.js): the major books first, a row
- * under a corner button refused. A rule marks the start of each named book.
+ * One form for every name on the frame (w4: "GENESIS EXOD LEV" mixed them): the abbreviations
+ * (GEN EXOD LEV ... r2-01a) until the books whose titles fit inside their own spans hold most of
+ * the rail (r2-06: ISAIAH JEREMIAH EZEKIEL), then the titles; a band between the two thresholds
+ * keeps the last frame's form, so a pan never flickers it.
+ * @param {any} g @param {string} tag @param {number} share  of the rail's width
  */
-function drawBookLabels(ctx, g, cam, L, rows, size, hits) {
+function nameForm(g, tag, share) {
+  let m = FORMS.get(g);
+  if (!m) { m = new Map(); FORMS.set(g, m); }
+  const was = m.get(tag) || 'abbr';
+  const form = share >= 0.55 ? 'full' : share <= 0.45 ? 'abbr' : was;
+  m.set(tag, form);
+  return form;
+}
+
+/**
+ * The book names along the rail, in one form (nameForm): each centred on
+ * what the frame holds of its book and kept wholly on the frame (the old
+ * clamp to 30 px printed "ECHARIAH"), and only while it is under twice its
+ * span (three times for a major book: REV on a phone). Placed by the ranked
+ * law (rail-labels.js): the six major books first, then the longer books
+ * before the shorter, each a word (NAME_GAP) from its neighbours, a row under
+ * a corner button refused; the canon's overview has one row (r2-01a). The
+ * major books, and only they, are in the bold and the brighter ink. A thin
+ * rule stands between each two neighbouring names, as r2-01a's cells: at the
+ * right one's book start where that lies clear of both names, else midway
+ * (the start alone left most names without one, w4).
+ * @param {string} tag  whose rail ('canon', 'rail'): each keeps its own form
+ */
+function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
   const { s, W, Wc } = L;
   const spans = bookSpans(g);
   const fpx = fontPx(size, s), sp = 0.10 * fpx, capH = fpx * CAP;
   const fontN = canvasFont(size, s), fontM = canvasFont(size, s, 600);
-  const names = [];
+  const edge = 8 * s, gap = NAME_GAP * s;
+  const books = [];
+  let roomAll = 0, roomFull = 0;
   for (let bi = 0; bi < spans.length; bi++) {
     const span = spans[bi], book = g.books[bi];
     if (!span || !book) continue;
@@ -745,35 +852,44 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits) {
     const major = isMajor(book);
     const font = major ? fontM : fontN;
     const vis0 = Math.max(x0, 0), vis1 = Math.min(x1, Wc), room = vis1 - vis0;
-    const full = String(book.title || '').toUpperCase(), abbr = String(book.abbr || book.title || '').toUpperCase();
-    let label = '', w = 0;
+    const full = String(book.title || book.abbr || '').toUpperCase(), abbr = String(book.abbr || book.title || '').toUpperCase();
     const wF = full ? measure.width(ctx, font, full, sp) : Infinity;
-    if (wF <= room - (major ? 4 : 40) * s) { label = full; w = wF; }
-    else if (abbr) {
-      const wA = measure.width(ctx, font, abbr, sp);
-      // a major book's abbreviation may stand wider than its span (REV on a phone)
-      if (wA <= room * (major ? 3 : 2)) { label = abbr; w = wA; }
-    }
+    roomAll += room;
+    if (wF <= room - gap) roomFull += room;
+    books.push({ bi, major, font, x0, vis0, vis1, room, full, abbr, wF, verses: span[1] - span[0] });
+  }
+  const form = nameForm(g, tag || 'canon', roomAll > 0 ? roomFull / roomAll : 0);
+  const names = [];
+  for (const b of books) {
+    const label = form === 'full' ? b.full : b.abbr;
     if (!label) continue;
-    const edge = 8 * s;
-    const cx = Math.min(Math.max((vis0 + vis1) / 2, edge + w / 2), Wc - edge - w / 2);
-    if (cx - w / 2 >= vis1 || cx + w / 2 <= vis0) continue;   // it would name none of its own book
-    names.push({ bi, label, font, major, x0, left: cx - w / 2, right: cx + w / 2 });
+    const w = form === 'full' ? b.wF : measure.width(ctx, b.font, label, sp);
+    if (!(w <= b.room * (b.major ? 3 : 2))) continue;
+    const cx = Math.min(Math.max((b.vis0 + b.vis1) / 2, edge + w / 2), Wc - edge - w / 2);
+    if (cx - w / 2 >= b.vis1 || cx + w / 2 <= b.vis0) continue;   // it would name none of its own book
+    names.push({ bi: b.bi, label, font: b.font, major: b.major, x0: b.x0, verses: b.verses, left: cx - w / 2, right: cx + w / 2 });
   }
   const boxAt = (n, r) => ({ x0: n.left, x1: n.right, y0: rows[r].top, y1: rows[r].top + capH });
   const zones = L.zones || [];
-  const placed = placeRailLabelsRanked(names, 5 * s, rows.length, names.map((n) => (n.major ? 0 : 1)),
+  const placed = placeRailLabelsRanked(names, gap, rows.length, names.map((n) => (n.major ? -1e9 : -n.verses)),
     (i, r) => zones.some((z) => boxesMeet(boxAt(names[i], r), z)));
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
-  const rule = css('labelRule');
-  // a book's rule stands at its start, unless a name on that row would touch it
-  const clear = (x, r) => names.every((m, j) => placed[j] !== r || x < m.left - 4 * s || x > m.right + 4 * s);
+  const rule = css('chapterTick');
+  const rw = Math.max(1, Math.round(0.6 * s));
+  ctx.fillStyle = rule;
+  for (let r = 0; r < rows.length; r++) {
+    const row = names.filter((_n, j) => placed[j] === r).sort((p, q) => p.left - q.left);
+    for (let k = 1; k < row.length; k++) {
+      const a = row[k - 1], b = row[k];
+      const x = b.x0 > a.right + 7 * s && b.x0 < b.left - 7 * s ? b.x0 : (a.right + b.left) / 2;
+      fillOut(ctx, Math.round(x), rows[r].top - 4 * s, rw, capH + 8 * s, zones);
+    }
+  }
   names.forEach((n, i) => {
     const r = placed[i];
     if (r < 0) return;
     const b = boxAt(n, r);
-    if (n.x0 > 2 * s && n.x0 < Wc - 2 * s && clear(n.x0, r)) { ctx.fillStyle = rule; ctx.fillRect(Math.round(n.x0), b.y0 - 3 * s, 1 * s, 14 * s); }
     setFont(ctx, n.font, sp);
     ctx.fillStyle = css(n.major ? 'bookLabelMajor' : 'bookLabel');
     ctx.fillText(n.label, n.left, b.y1);
@@ -799,6 +915,12 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
   const takeHits = tt > 0.25;
   ctx.save();
   ctx.globalAlpha = t;
+  // the corner buttons' zones (their rectangles + ZONE_PAD, in the grid): a text keeps out of
+  // them at their own edge, not a second pad further (the right end's numerals went, w4), and
+  // the ticks, rules and dots stop at them, so a button stands on black
+  const zones = L.zones;
+  const isZone = (b) => zones.includes(b);
+  const inZone = (b) => zones.some((z) => boxesMeet(b, z));
 
   // the book names first: they outrank the numerals for the row
   const names = tt > 0.01 ? deepNames(ctx, g, cam, L, v0, v1, grid) : null;
@@ -812,7 +934,7 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     const tw = Math.max(1, Math.round(s));
     for (let x = v0; x <= v1; x++) {
       const n = x - g.chapters[g.chapterOfVerse[x]][2] + 1;
-      ctx.rect(Math.round(X(x + 0.5) - tw / 2), dp.ticks.top, tw, n % 5 === 0 ? dp.ticks.h : dp.ticks.h / 2);
+      rectOut(ctx, Math.round(X(x + 0.5) - tw / 2), dp.ticks.top, tw, n % 5 === 0 ? dp.ticks.h : dp.ticks.h / 2, zones);
     }
     ctx.fill();
   }
@@ -827,6 +949,7 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     for (let x = v0; x <= v1; x++) {
       if (!(pre[x + 1] > pre[x])) continue;
       const cx = X(x + 0.5);
+      if (meetsAny(cx - r, cy - r, 2 * r, 2 * r, zones)) continue;
       ctx.moveTo(cx + r, cy);
       ctx.arc(cx, cy, r, 0, Math.PI * 2);
     }
@@ -863,16 +986,31 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     const text = String(c[1]);
     const w = measure.width(ctx, numFont, text);
     const a = Math.max(x0, 0), b = Math.min(x1, Wc);
-    let lx;
+    let lx, lo, hi;
     if (b - a >= w + 8 * s && (stride === 1 || ci === centreCi)) {
       lx = Math.min(Math.max((a + b) / 2 - w / 2, a + 4 * s), b - 4 * s - w);
+      lo = a + 4 * s; hi = b - 4 * s;
     } else if (stride === 1) {
       continue;
     } else {
       lx = x0 + 5 * s;
+      lo = lx; hi = Math.max(lx + w, Math.min(x1, Wc));   // a strided numeral may run past its chapter, as before
     }
-    const box = { x0: lx, x1: lx + w, y0: dp.nums.top, y1: dp.nums.top + dp.nums.h };
-    if (box.x0 < 0 || box.x1 > Wc || grid.hits(box, 8 * s)) continue;   // wholly on the frame, or not at all
+    // wholly on the frame, or not at all; where a corner button takes its place, beside the
+    // button inside its own chapter
+    const y0n = dp.nums.top, y1n = dp.nums.top + dp.nums.h;
+    const tries = [lx];
+    for (const z of zones) if (z.y0 < y1n && z.y1 > y0n && z.x0 < lx + w && z.x1 > lx) tries.push(z.x0 - w, z.x1);
+    let box = null;
+    for (const x of tries) {
+      if (x < lo - 1e-6 || x + w > hi + 1e-6) continue;
+      const bx = { x0: x, x1: x + w, y0: y0n, y1: y1n };
+      if (bx.x0 < 0 || bx.x1 > Wc || inZone(bx) || grid.hits(bx, 8 * s, isZone)) continue;
+      box = bx;
+      break;
+    }
+    if (!box) continue;
+    lx = box.x0;
     grid.add(box);
     nums.push({ ci, text, lx, box });
     placedCi.add(ci);
@@ -896,9 +1034,9 @@ function drawDeep(ctx, g, cam, L, t, centre, grid, hits) {
     if (x0 < 0 || x0 > W) continue;
     const xr = Math.round(x0);
     const tall = (c[1] === 1 || placedCi.has(ci)) && !underText(xr);
-    if (tall && c[1] === 1) ctx.fillRect(xr, dp.nums.top - 8 * s, tw, ticksBottom + 4 * s - (dp.nums.top - 8 * s));
-    else if (tall) ctx.fillRect(xr, dp.nums.top - 2 * s, tw, ticksBottom - dp.nums.top + 2 * s);
-    else if (c[1] === 1 || X(c[2] + c[3]) - x0 >= 3 * s) ctx.fillRect(xr, dp.ticks.top, tw, dp.ticks.h);
+    if (tall && c[1] === 1) fillOut(ctx, xr, dp.nums.top - 8 * s, tw, ticksBottom + 4 * s - (dp.nums.top - 8 * s), zones);
+    else if (tall) fillOut(ctx, xr, dp.nums.top - 2 * s, tw, ticksBottom - dp.nums.top + 2 * s, zones);
+    else if (c[1] === 1 || X(c[2] + c[3]) - x0 >= 3 * s) fillOut(ctx, xr, dp.ticks.top, tw, dp.ticks.h, zones);
   }
   // the stuck names' fades, under every numeral
   ctx.globalAlpha = tt;
@@ -969,12 +1107,20 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
   const left = bookOf(Math.floor(xToVerse(cam, W, gutter)));
   const last = bookOf(v1);
   const list = [];
+  const zones = L.zones;
+  const isZone = (b) => zones.includes(b);
+  const free = (box, pad) => !zones.some((z) => boxesMeet(box, z)) && !grid.hits(box, pad, isZone);
   const dodge = (box) => {
-    for (const z of L.zones) {
+    for (const z of zones) {
       if (boxesMeet(box, z)) { const dx = box.x1 - (z.x0 - 4 * s); box.x0 -= dx; box.x1 -= dx; }
     }
     return box;
   };
+  // where the sticky name may stand: at the gutter, else just right of a corner button over the
+  // row (the panel open on a phone parks ? and hide-UI there: "JOHN" went under them, w4)
+  const stickyAt = [gutter];
+  for (const z of zones) if (z.y0 < y1 && z.y1 > y0 && z.x1 > gutter && z.x0 < Wc / 2) stickyAt.push(z.x1 + 4 * s);
+  stickyAt.sort((p, q) => p - q);
   let stuck = false, after = false;
   for (let bi = left; bi <= last && bi < spans.length; bi++) {
     const span = spans[bi], book = g.books[bi];
@@ -989,9 +1135,15 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
       for (const text of abbr && abbr !== full ? [full, abbr] : [full]) {
         const w = measure.width(ctx, font, text, sp);
         const total = wArrow + gap + w;
-        const x = Math.min(gutter, nextX - 2 * gap - total);
-        const box = { x0: x, x1: x + total, y0, y1 };
-        if (x < 0 || grid.hits(box, 0)) continue;
+        let box = null;
+        for (const at of stickyAt) {
+          const x = Math.min(at, nextX - 2 * gap - total);
+          const bx = { x0: x, x1: x + total, y0, y1 };
+          if (x < 0 || !free(bx, 0)) continue;
+          box = bx;
+          break;
+        }
+        if (!box) continue;
         grid.add(box);
         list.push({ bi, text, w, box, arrow: 'left' });
         stuck = true;
@@ -1006,7 +1158,7 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
       const w = measure.width(ctx, font, text, sp);
       if (startX + gap + w > Math.min(endX, Wc) - gap) continue;
       const box = dodge({ x0: startX + gap, x1: startX + gap + w, y0, y1 });
-      if (box.x0 < startX || grid.hits(box, 10 * s)) continue;
+      if (box.x0 < startX || !free(box, 10 * s)) continue;
       grid.add(box);
       list.push({ bi, text, w, box, arrow: null });
       break;
@@ -1021,7 +1173,7 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
       const w = measure.width(ctx, font, text, sp);
       const total = w + gap + wArrow;
       const box = dodge({ x0: Wc - gutter - total, x1: Wc - gutter, y0, y1 });
-      if (box.x0 > 0 && !grid.hits(box, 10 * s)) {
+      if (box.x0 > 0 && free(box, 10 * s)) {
         grid.add(box);
         list.push({ bi: next, text, w, box, arrow: 'right' });
         after = true;
@@ -1030,9 +1182,16 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
   }
   // the fades the stuck names stand on (paintDeepFades): their rows, and the solid part of each
   // reserved, so no numeral is placed under it
-  const top = dp.nums.top - 10 * s, bottom = Math.max(top + 1, Math.min(L.bandBottom, dp.end));
+  const top = dp.nums.top - 10 * s;
+  const bottom = Math.max(top + 1, Math.min(L.bandBottom, dp.end));
   const solid = FADE_SOLID * FADE_SPAN * s;
-  const fade = { top, bottom, left: stuck ? solid : 0, right: after ? Wc - solid : Wc };
+  // a name stepped off a corner button carries its solid part with it
+  const lName = list.find((n) => n.arrow === 'left'), rName = list.find((n) => n.arrow === 'right');
+  const fade = {
+    top, bottom,
+    left: stuck ? solid + (lName ? Math.max(0, lName.box.x0 - gutter) : 0) : 0,
+    right: after ? Wc - solid - (rName ? Math.max(0, Wc - gutter - rName.box.x1) : 0) : Wc,
+  };
   if (stuck) grid.add({ x0: 0, x1: fade.left, y0: top, y1: bottom });
   if (after) grid.add({ x0: fade.right, x1: Wc, y0: top, y1: bottom });
   return { list, font, sp, stuck, after, y1, wArrow, gap, fade };
@@ -1048,14 +1207,16 @@ function paintDeepFades(ctx, L, names) {
   if (!names || !names.list.length) return;
   const { s, Wc } = L;
   const { top, bottom } = names.fade;
-  const span = FADE_SPAN * s;
-  const stops = [[0, 'rgba(0,0,0,1)'], [FADE_SOLID, 'rgba(0,0,0,0.75)'], [1, 'rgba(0,0,0,0)']];
+  const clearSpan = (1 - FADE_SOLID) * FADE_SPAN * s;
+  const stops = (k) => [[0, 'rgba(0,0,0,1)'], [k, 'rgba(0,0,0,0.75)'], [1, 'rgba(0,0,0,0)']];
   if (names.stuck) {
-    const gr = gradient(ctx, 0, 0, span, 0, stops);
+    const span = names.fade.left + clearSpan;
+    const gr = gradient(ctx, 0, 0, span, 0, stops(names.fade.left / span));
     if (gr) { ctx.fillStyle = gr; ctx.beginPath(); ctx.rect(0, top, span, bottom - top); ctx.fill(); }
   }
   if (names.after) {
-    const gr = gradient(ctx, Wc, 0, Wc - span, 0, stops);
+    const span = Wc - names.fade.right + clearSpan;
+    const gr = gradient(ctx, Wc, 0, Wc - span, 0, stops((Wc - names.fade.right) / span));
     if (gr) { ctx.fillStyle = gr; ctx.beginPath(); ctx.rect(Wc - span, top, span, bottom - top); ctx.fill(); }
   }
 }
@@ -1134,14 +1295,16 @@ function haloText(ctx, text, x, y, fill, L) {
 }
 
 /**
- * The chosen line (OpenBible or prophecy): its feet marked on the baseline it
- * stands on (an 8 px gold dot in a 2 px black ring), each foot's reference in
- * gold just under the baseline, an end off the frame written beside its leg
- * (or at the body's middle when neither foot is on the frame). Placed before
- * every other label and over them; only the chrome's zones refuse it.
- * Returns whether a line is chosen.
+ * The chosen line and where its feet's references go, before the ruler is
+ * painted: the bars and the cited strip leave the ground under them clear
+ * (w4: "Isa 7:14" printed through the bars). Each reference stands just under
+ * the cited strip (r2-02: under the baseline, above the book names); one under
+ * a corner button's zone, or off the frame's foot, is not written. Null when
+ * no line is chosen.
+ * @returns {null|{a:number, b:number, x0:number, x1:number, on0:boolean, on1:boolean, key:any,
+ *   font:string, fpx:number, feet:Array<{text:string, box:Box}>}}
  */
-function drawChosen(ctx, g, cam, L, fs, grid, labelled) {
+function chosenOf(ctx, g, cam, L, fs) {
   const view = fs.view || {};
   let a = -1, b = -1, fa = 0, fb = 0, key = null;
   if (view.focusProphecy >= 0 && g.prophecy && g.prophecy[view.focusProphecy]) {
@@ -1151,12 +1314,44 @@ function drawChosen(ctx, g, cam, L, fs, grid, labelled) {
     const i = fs.focusArc, fan = fansOf(g);
     a = g.from[i]; b = g.to[i]; fa = fan.fanA[i]; fb = fan.fanB[i]; key = i;
   }
-  if (key === null) return false;
+  if (key === null) return null;
   const { s, W, Wc, base, camY, sz } = L;
   const x0 = footX(cam, W, a, fa), x1 = footX(cam, W, b, fb);
-  const yb = base + camY;
   // a foot under the open panel is off the frame the reader sees (Q12)
   const on0 = x0 >= 0 && x0 <= Wc, on1 = x1 >= 0 && x1 <= Wc;
+  const font = canvasFont(sz.chosen, s, 600), fpx = fontPx(sz.chosen, s);
+  const strip = L.deepT < 0.5 ? L.ov.cited : L.dp.cited;
+  const y0 = base + camY + (strip.top + strip.h - base) + 2 * s;
+  const feet = [];
+  for (const [on, x, verse] of /** @type {Array<[boolean, number, number]>} */ ([[on0, x0, a], [on1, x1, b]])) {
+    if (!on) continue;
+    const text = shortRef(g, verse);
+    const w = measure.width(ctx, font, text);
+    const lx = Math.min(Math.max(x - w / 2, 2 * s), Wc - 2 * s - w);
+    const box = { x0: lx, x1: lx + w, y0, y1: y0 + fpx * CAP };
+    if (box.y1 > L.H || L.zones.some((z) => boxesMeet(box, z))) continue;
+    feet.push({ text, box });
+  }
+  return { a, b, x0, x1, on0, on1, key, font, fpx, feet };
+}
+
+/** The ground a chosen foot's reference keeps clear: its box and the halo round it. */
+const footHoles = (ch, s) => (ch ? ch.feet.map((f) => ({ x0: f.box.x0 - 4 * s, x1: f.box.x1 + 4 * s, y0: f.box.y0 - 3 * s, y1: f.box.y1 + 3 * s })) : []);
+
+/**
+ * The chosen line (OpenBible or prophecy): its feet marked on the baseline it
+ * stands on (an 8 px gold dot in a 2 px black ring), each foot's reference in
+ * gold just under the baseline (chosenOf), an end off the frame written beside
+ * its leg (or at the body's middle when neither foot is on the frame). Placed
+ * before every other label and over them; only the chrome's zones refuse it.
+ * Returns whether a line is chosen.
+ */
+function drawChosen(ctx, g, cam, L, fs, grid, labelled, ch) {
+  if (!ch) return false;
+  const view = fs.view || {};
+  const { a, b, x0, x1, on0, on1, key, font, fpx } = ch;
+  const { s, camY, base } = L;
+  const yb = base + camY;
   for (const [on, x] of [[on0, x0], [on1, x1]]) {
     if (!on) continue;
     ctx.fillStyle = css('chosenFootRing');
@@ -1164,22 +1359,15 @@ function drawChosen(ctx, g, cam, L, fs, grid, labelled) {
     ctx.fillStyle = css('chosenFoot');
     ctx.beginPath(); ctx.arc(x, yb, 4 * s, 0, Math.PI * 2); ctx.fill();
   }
-  const font = canvasFont(sz.chosen, s, 600), fpx = fontPx(sz.chosen, s);
   setFont(ctx, font, 0);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   const gold = css('chosenLabel');
   let any = false;
   const outOfZones = (box) => !L.zones.some((z) => boxesMeet(box, z));
-  for (const [on, x, verse] of /** @type {Array<[boolean, number, number]>} */ ([[on0, x0, a], [on1, x1, b]])) {
-    if (!on) continue;
-    const text = shortRef(g, verse);
-    const w = measure.width(ctx, font, text);
-    const lx = Math.min(Math.max(x - w / 2, 2 * s), Wc - 2 * s - w);
-    const box = { x0: lx, x1: lx + w, y0: yb + 10 * s, y1: yb + 10 * s + fpx * CAP };
-    if (box.y1 > L.H || !outOfZones(box)) continue;
-    grid.add(box);
-    haloText(ctx, text, lx, box.y1, gold, L);
+  for (const f of ch.feet) {
+    grid.add(f.box);
+    haloText(ctx, f.text, f.box.x0, f.box.y1, gold, L);
     any = true;
   }
   const A = arcShape((x1 - x0) * 0.5, view.squash).A;
@@ -1681,5 +1869,5 @@ function drawRulerOnly(ctx, g, cam, view, v) {
   const L = { s, W: v.W, Wc: v.W, zones: chromeBoxes(ctx, v).zones };
   const capH = fontPx(12, s) * CAP;
   const rows = [{ top: view.base + 36 * s, h: capH }, { top: view.base + 50 * s, h: capH }];
-  drawBookLabels(ctx, g, cam, L, rows, 12, null);
+  drawBookLabels(ctx, g, cam, L, rows, 12, null, 'rail');
 }
