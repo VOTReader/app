@@ -60,8 +60,23 @@ export function useForcedLandscape(schedule) {
     if (!orientation || typeof orientation.lock !== 'function') return undefined;
     // A refusal is not an error here: the CSS rotation already covers it.
     // lock() can reject OR throw synchronously depending on the browser.
-    try { Promise.resolve(orientation.lock('landscape')).catch(() => {}); } catch (_e) { /* covered */ }
-    return undefined;
+    const ask = () => {
+      try { Promise.resolve(orientation.lock('landscape')).catch(() => {}); } catch (_e) { /* covered */ }
+    };
+    ask();
+    // Chrome refuses a lock outside fullscreen ("The page needs to be fullscreen"), and this
+    // effect runs before immersive mode's requestFullscreen has landed (w4 device check, the
+    // S22). Ask once more when fullscreen is in place: a real lock flips the display, so the
+    // keyboard, the fullscreen toast and the system bars come up landscape too. The rotation
+    // stays the fallback for a refusal there.
+    if (typeof document === 'undefined' || document.fullscreenElement) return undefined;
+    const onFull = () => {
+      if (!document.fullscreenElement) return;
+      document.removeEventListener('fullscreenchange', onFull);
+      ask();
+    };
+    document.addEventListener('fullscreenchange', onFull);
+    return () => document.removeEventListener('fullscreenchange', onFull);
   }, [rotated]);
 
   /** Viewport coords -> the rotated screen's own CSS space. */

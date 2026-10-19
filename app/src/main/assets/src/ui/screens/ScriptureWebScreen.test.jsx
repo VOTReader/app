@@ -1272,6 +1272,34 @@ describe('landscape on a phone — a portrait phone is rotated, and nothing asks
     expect(document.querySelector('.sw-orientation-note')).toBeNull();
   });
 
+  /* w4 device check (S22, Chrome): lock() ran in the same commit as immersive mode's
+     requestFullscreen, before the page was fullscreen, so Chrome refused it ("The page needs
+     to be fullscreen") and it was never asked again. The phone stayed portrait under the CSS
+     rotation, with the keyboard and the fullscreen toast sideways. The lock is asked again
+     once fullscreen is in place; the rotation is only the fallback for a refusal there. */
+  it('asks for the lock again once the page is fullscreen', async () => {
+    setViewport(400, 800);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
+    let full = null;
+    Object.defineProperty(document, 'fullscreenElement', { get: () => full, configurable: true });
+    const lock = vi.fn(() => (full ? Promise.resolve() : Promise.reject(new Error('SecurityError: needs fullscreen'))));
+    window.screen.orientation = { lock, unlock: () => {} };
+    try {
+      render(<ScriptureWebScreen {...baseProps()} />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(lock).toHaveBeenCalledTimes(1);
+      full = document.documentElement;
+      await act(async () => { document.dispatchEvent(new Event('fullscreenchange')); await Promise.resolve(); });
+      expect(lock, 'asked again inside fullscreen').toHaveBeenCalledTimes(2);
+      expect(lock).toHaveBeenLastCalledWith('landscape');
+      // once is enough: a later fullscreenchange (leaving) does not ask again
+      await act(async () => { document.dispatchEvent(new Event('fullscreenchange')); await Promise.resolve(); });
+      expect(lock).toHaveBeenCalledTimes(2);
+    } finally {
+      delete document.fullscreenElement;
+    }
+  });
+
   /* Was 'rotates a portrait viewport on a FINE pointer too — the touch-only gate is gone'.
      Corbin's "landscape by default, no rotate option" (09-10) was said of the phone; turning a
      desktop or tablet window on its side went further than his words, and Q11 (decided, the w1
