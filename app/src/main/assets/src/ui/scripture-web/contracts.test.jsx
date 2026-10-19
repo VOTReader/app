@@ -5,7 +5,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebCamera } from './use-web-camera.js';
-import { useWebSelection, panelOf, PANEL_MODES, CHOOSER_MOST } from './use-web-selection.js';
+import { useWebSelection, panelOf, PANEL_MODES, CHOOSER_MOST, isTie } from './use-web-selection.js';
+import { pickThreads } from '../../utils/scripture-web/pick.js';
 import { useJourney } from './use-journey.js';
 import { useGoTo, routeOverlayHit } from './goto.jsx';
 import { hitOverlay } from './overlay-renderer.js';
@@ -892,6 +893,47 @@ describe("the chooser's Zoom to, from a tap", () => {
     const { m, y } = tapAt([[1050, 3999, 10], [1060, 3998, 9]], x, [base - 12, base - 8, base - 5]);
     expect(y, 'the tap opened the chooser').toBeGreaterThan(0);
     expect(m.get().sel.choiceChapter).toBe(40);
+  });
+});
+
+/* w4 device check (finding 7): on a dense field under a fingertip a second thread was within 8 px
+   of almost every tap, so a dozen taps at the overview, 30x and 40x all opened "The 8 nearest
+   threads" and none chose its line. A tap clearly nearer one line chooses it; a real tie asks.
+   C5 holds: every line is still tappable, nearer to it than to any other, or from the chooser. */
+describe('a tap clearly nearest one line chooses it; a tie asks (w4)', () => {
+  it('isTie: a second within 8 px is a tie unless the nearest is twice as near and 3 px nearer', () => {
+    expect(isTie(1, 3, 1), '2 px apart').toBe(true);
+    expect(isTie(0, 2, 1), 'on one line, the other 2 px off').toBe(true);
+    expect(isTie(1, 5, 1)).toBe(false);
+    expect(isTie(2, 9, 1), 'no second within 8 px').toBe(false);
+    expect(isTie(3 * 2.6, 7 * 2.6, 2.6), 'device px on a phone: 3 and 7 CSS px').toBe(false);
+    expect(isTie(4 * 2.6, 7 * 2.6, 2.6), '4 and 7: not twice as near').toBe(true);
+  });
+
+  it('down a column over two threads: a tap clearly nearer one chooses it outright, a tie opens the chooser', () => {
+    // two threads 40 verses apart at each foot, their crowns over the same column 8 px apart
+    const m = mount({ make: graphChapters([[1050, 3990, 10], [1090, 3950, 9]]) });
+    const cam = { x: 2520, ppv: 0.2 };
+    let direct = 0, asked = 0;
+    for (let y = 2; y < 302; y++) {
+      act(() => { m.get().sel.closeCards(); });
+      m.get().cam.camRef.current = Object.assign({ total: TOTAL, y: 0 }, cam);
+      const near = pickThreads(/** @type {any} */ (m.g), m.get().cam.camRef.current, m.get().cam.viewFor(), 400, y, 14, CHOOSER_MOST);
+      if (near.length < 2 || near[1].distance > 8) continue;
+      const tie = isTie(near[0].distance, near[1].distance, 1);
+      act(() => { m.get().sel.handlersRef.current.tap(400, y); });
+      const { choices, detail } = m.get().sel;
+      if (tie) {
+        asked++;
+        expect(choices && choices.length, 'y ' + y + ': a tie asks').toBe(2);
+      } else {
+        direct++;
+        expect(choices, 'y ' + y + ': ' + near[0].distance.toFixed(1) + ' against ' + near[1].distance.toFixed(1)).toBeNull();
+        expect(detail && detail.index, 'y ' + y + ': the nearest is chosen').toBe(near[0].index);
+      }
+    }
+    expect(direct, 'taps clearly nearer one line (the chooser opened on every one before)').toBeGreaterThan(0);
+    expect(asked, 'taps at the crossing').toBeGreaterThan(0);
   });
 });
 

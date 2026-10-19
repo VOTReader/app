@@ -128,6 +128,25 @@ export const FRAME_MS = 450;
  * at 4, a dense crossing always read "4 threads close together"). */
 export const CHOOSER_MOST = 8;
 
+/** How near a second thread must be for a tap to ask which (CSS px), and how much nearer the first
+ * must be to be chosen outright: twice as near, and by TIE_CLEAR at least. */
+export const TIE_WITHIN = 8;
+export const TIE_CLEAR = 3;
+
+/**
+ * Whether a tap's two nearest threads (device px from the tap) are a real tie, so the chooser asks.
+ * Every line stays tappable (C5): a tap nearer one line than any other chooses it, and where two
+ * stand as near the chooser lists them. w4 device check: on a dense field under a fingertip a second
+ * thread is almost always within 8 px, so with that test alone every tap of a dozen at the overview,
+ * 30x and 40x opened "The 8 nearest threads" and none chose its line.
+ * @param {number} d0 the nearest's distance @param {number} d1 the next's @param {number} dpr
+ */
+export function isTie(d0, d1, dpr) {
+  const s = dpr > 0 ? dpr : 1;
+  if (!(d1 <= TIE_WITHIN * s)) return false;
+  return !(d1 >= 2 * d0 && d1 - d0 >= TIE_CLEAR * s);
+}
+
 /**
  * @param {any} p  the graph, mode, density and showUnderlay; the resume point
  *   (the sheet that was open); the cameras' refs and callbacks and flyTo
@@ -549,7 +568,7 @@ export function useWebSelection({
       focusRef.current = focusState();
       setTip(null); setChoices(null); setDetail(null); setListOpen(false); schedule(); return;
     }
-    const closeEnough = candidates.length > 1 && candidates[1].distance <= 8 * viewRef.current.DPR;
+    const closeEnough = candidates.length > 1 && isTie(candidates[0].distance, candidates[1].distance, viewRef.current.DPR);
     if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
         item.kind === 'link' || item.kind === 'underlay')) {
       setChoices(described);
