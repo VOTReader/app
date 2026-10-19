@@ -1413,6 +1413,32 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect(document.querySelector('.srch-results-summary').textContent).toContain('9 matches across 2 sections');
   });
 
+  /* search200 UX B10 item 2: "etched My words in stone" gave Volume Three's "Abide in the Doctrine" and the
+     Answers topic "Regarding Obedience" two of the five places, the same passage word for word. The reprint
+     folds under its original as the card's "Also in 1 place", and a short list's groups leave it out too. */
+  it('B10: a reprint folds under its original in Best Matches, and its own group leaves it out', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items }) => (
+      <div className="stub-group" data-key={gkey}>{items.map((e) => e.doc.title).join(',')}</div>
+    );
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, also }) => (
+      <div className="stub-card">{entry.doc.title + (also && also.length ? ' + ' + also.map((a) => a.doc.title).join(' + ') : '')}</div>
+    );
+    Object.assign(/** @type {any} */ (window).VotSearchMini, { snippet: (t) => t, snippetAt: (t, at) => t.slice(at) });
+    const ABIDE = 'etched My words in stone with My own finger, yet who has received My message? Who has obeyed My Word, as it is written?';
+    const hit = (g, kind, title, text) => ({ score: 1, doc: { kind, title, text, g } });
+    searchReturns({ parsed: { kind: 'text', phrase: '' }, parsedTerms: ['etched', 'stone'], results: [
+      hit('v3', 'letter', 'Abide in the Doctrine', ABIDE),
+      hit('answers', 'answers', 'Regarding Obedience', 'Regarding Obedience. ' + ABIDE),
+    ].concat(letters('v7', 6)) });
+    await typeIn(baseProps(), 'etched my words in stone');
+    const best = [...document.querySelectorAll('.srch-top-results .stub-card')].map((c) => c.textContent);
+    expect(best).toEqual(['Abide in the Doctrine + Regarding Obedience', 'v7-0', 'v7-1', 'v7-2', 'v7-3']);
+    const groups = [...document.querySelectorAll('.stub-group')].map((g) => [g.getAttribute('data-key'), g.textContent]);
+    expect(groups).toEqual([['v7', 'v7-4,v7-5']]);
+  });
+
   /* B2 review: in a short list a section whose results all went to Best Matches lost its header, and the summary
      still counted it ("Found 21 matches across 8 sections" over three headers, for "tittle"). The summary counts
      the sections it can show: with a section folded into Best Matches it says the matches alone. */

@@ -140,6 +140,41 @@ describe('B10 item 3 — real 44px search tap targets, paid for by trimmed paddi
   });
 });
 
+describe('B10 item 2 — a reprint folds under its original as "Also in N places"', () => {
+  it('the row is styled exactly as the more-places row: Cinzel --fs-10 at 0.12em, --gold, 44px, a --gold-border hairline above, the triangle at the right', () => {
+    for (const sel of ['.srch-also-toggle', '.srch-places-toggle']) {
+      const d = decls(sel);
+      expect(atLeast44(d['min-height']), sel).toBe(true);
+      expect(d['font-size'], sel).toBe('var(--fs-10)');
+      expect(d['letter-spacing'], sel).toBe('0.12em');
+      expect(d['text-transform'], sel).toBe('uppercase');
+      expect(d.color, sel).toBe('var(--gold)');
+      expect(d['border-top'], sel).toBe('1px solid var(--gold-border)');
+      expect(d['justify-content'], sel).toBe('space-between');
+    }
+  });
+
+  it('open, each reprint is a 44px sub-row some 16px in, ruled 2px --gold on its left, its title over its collection', () => {
+    const list = decls('.srch-also');
+    expect(list['list-style']).toBe('none');
+    expect(list.margin).toBe('0');
+    const item = decls('.srch-also-item');
+    expect(atLeast44(item['min-height'])).toBe(true);
+    expect(item.display).toBe('flex');
+    expect(item['flex-direction']).toBe('column');
+    expect(item['border-left']).toBe('2px solid var(--gold)');
+    // the card's 1.1rem gutter, then 16px in
+    expect(item['margin-left']).toBe('calc(1.1rem + 16px)');
+    const title = decls('.srch-also-title');
+    expect(title['font-size']).toBe('var(--fs-10)');
+    expect(title.color).toBe('var(--gold)');
+    const where = decls('.srch-also-where');
+    // the ladder's floor is --fs-10, so the collection recedes by colour and tracking, not size
+    expect(where['font-size']).toBe('var(--fs-10)');
+    expect(where.color).toBe('var(--gold-dim)');
+  });
+});
+
 describe('B10 item 4 — the order switch stacks at a large Text Size, nothing clipped, no sideways scroll', () => {
   const AT = '@container srch-filter';
   it('the order row is a size container and no longer scrolls sideways (BOOK ORDER hid off its edge at 300%)', () => {

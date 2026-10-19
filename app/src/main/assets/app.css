@@ -3927,8 +3927,17 @@
        read as part of the card above them. */
     .srch-card-wrap { border-bottom:1px solid rgba(200,164,86,0.12); }
     .srch-card-wrap > .srch-card { border-bottom:none; padding-bottom:0.4rem; }
-    .srch-places-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; width:calc(100% - 2.2rem); min-height:44px; margin:0 1.1rem; padding:0.35rem 0; background:none; border:none; border-top:1px solid rgba(200,164,86,0.12); cursor:pointer; text-align:left; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); }
-    .srch-places-toggle:active { color:var(--gold); }
+    /* A reprint Best Matches folded under this card (search200 UX B10 2, ux/mockups/2-reprints/PICK.png):
+       "Also in 1 place", the more-places row's twin and above it, opening to each reprint as an indented
+       sub-row (16px in, a 2px gold rule) that names it over its collection, each its own tap. The pick
+       styles both rows --gold over a --gold-border hairline. */
+    .srch-places-toggle, .srch-also-toggle { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; box-sizing:border-box; width:calc(100% - 2.2rem); min-height:44px; margin:0 1.1rem; padding:0.35rem 0; background:none; border:none; border-top:1px solid var(--gold-border); cursor:pointer; text-align:left; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); }
+    .srch-places-toggle:active, .srch-also-toggle:active { color:var(--gold-bright); }
+    .srch-also { list-style:none; margin:0; padding:0 0 0.5rem; }
+    .srch-also-item { display:flex; flex-direction:column; justify-content:center; align-items:flex-start; gap:0.2rem; box-sizing:border-box; width:calc(100% - 2.2rem - 16px); min-height:44px; margin-left:calc(1.1rem + 16px); padding:0.3rem 0 0.3rem 0.8rem; background:none; border:none; border-left:2px solid var(--gold); cursor:pointer; text-align:left; font-family:'Cinzel',serif; text-transform:uppercase; }
+    .srch-also-item:active { background:var(--gold-faint); }
+    .srch-also-title { font-size:var(--fs-10); letter-spacing:0.12em; line-height:1.4; color:var(--gold); }
+    .srch-also-where { font-size:var(--fs-10); letter-spacing:0.1em; line-height:1.4; color:var(--gold-dim); }
     .srch-places-chevron { width:24px; height:24px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; font-size:var(--fs-15); line-height:1; color:var(--gold); transition:transform 0.18s ease; }
     .srch-places-chevron.open { transform:rotate(90deg); }
     .srch-places { list-style:none; margin:0; padding:0 0 0.35rem; }

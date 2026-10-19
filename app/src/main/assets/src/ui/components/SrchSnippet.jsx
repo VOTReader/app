@@ -23,6 +23,18 @@ export function firstLineShown({ startMid, endMid, lineHeight, height, rows }) {
   return Math.min(last, Math.max(0, first));
 }
 
+/**
+ * The words a snippet quotes: the window round the terms, or the one opening at `start`.
+ * Shared with SrchCard's cardPassage, which Best Matches compares to fold a reprint (B10 2).
+ * @param {any} sm window.VotSearchMini @param {string} text @param {string[]} terms
+ * @param {number | undefined} start @param {number} maxLen
+ */
+export function snippetText(sm, text, terms, start, maxLen) {
+  return typeof start !== 'number' ? sm.snippet(text, terms || [], maxLen) :
+    typeof sm.snippetAt === 'function' ? sm.snippetAt(text, start, maxLen) :
+    sm.snippet(text.slice(start), terms || [], maxLen);
+}
+
 /** `start` (a placed hit's placeStart): the snippet opens there, where the tap lands (sweep W33).
  *  `typed`: the words the reader typed, apart from the engine's forms in `terms` (search200 B7). */
 export function SrchSnippet({ text, terms, maxLen = 180, start = undefined, typed = undefined }) {
@@ -64,10 +76,7 @@ export function SrchSnippet({ text, terms, maxLen = 180, start = undefined, type
   });
 
   if (!text) return null;
-  const sm = window.VotSearchMini;
-  const snippet = typeof start !== 'number' ? sm.snippet(text, terms || [], maxLen) :
-    typeof sm.snippetAt === 'function' ? sm.snippetAt(text, start, maxLen) :
-    sm.snippet(text.slice(start), terms || [], maxLen);
+  const snippet = snippetText(window.VotSearchMini, text, terms, start, maxLen);
   const spans = window.VotSearchMini.highlightSpans(snippet, terms || [], typed);
   return (
     <div ref={ref} className="srch-snippet-scroll">

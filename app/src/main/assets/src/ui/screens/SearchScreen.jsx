@@ -4,6 +4,8 @@
 
 import { kjvEncode } from '../../search/tokenize.js';
 import { applyCorrections } from '../../search/query-parse.js';
+import { foldReprints } from '../components/srch-reprints.js';
+import { cardPassage } from '../components/SrchCard.jsx';
 
 /**
  * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
@@ -711,36 +713,40 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // relevance, so this row is where relevance leads (only for text queries —
   // a reference the engine read already has its card; one read across every
   // tab, `refParsed`, sits above the tab's own row, search200 B2 review).
-  const topResults = React.useMemo(() => {
+  const topCards = React.useMemo(() => {
     if (!state.results.length) return [];
     if (engineNav && directEntries.length > 0) return [];
     if (grouped.length <= 1) return [];
     // One card per text: a Holy Days entry reprints its letter word for word, and
-    // both took a place in the five.
+    // both took a place in the five. A reprint of another standing whose shown passage
+    // is the card's folds under it as "Also in N places" (srch-reprints.js, search200 UX
+    // B10 2); a copy the fold cannot read (the same name and opening) is left out.
     const seen = new Set();
-    const top = [];
-    for (const r of state.results) {
-      const d = r.doc || {};
-      const k = (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      top.push(r);
-      if (top.length === 5) break;
-    }
-    return top;
-  }, [state.results, grouped.length, engineNav, directEntries.length]);
+    return foldReprints(state.results, (e) => cardPassage(e, state.terms, state.stopTyped), state.terms, {
+      take: 5,
+      reach: 30,
+      skip: (r) => {
+        const d = r.doc || {};
+        const k = (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
+        if (seen.has(k)) return true;
+        seen.add(k);
+        return false;
+      },
+    });
+  }, [state.results, state.terms, state.stopTyped, grouped.length, engineNav, directEntries.length]);
   /* A SHORT LIST SHOWS EACH RESULT ONCE (search200 B2). Thirty or fewer results open
      every group (renderGroups' defaultOpen) under Best Matches, which showed its five
      twice. The groups hold the rest, and one that gave some up counts them as "more";
-     when the five are the whole list, the open groups are the list, with no row above. */
+     when the five are the whole list, the open groups are the list, with no row above.
+     A reprint folded under a card is in Best Matches too. */
   const restGroups = React.useMemo(() => {
-    if (bookOrder || !topResults.length || state.results.length > 30) return null;
-    const inTop = new Set(topResults);
+    if (bookOrder || !topCards.length || state.results.length > 30) return null;
+    const inTop = new Set(topCards.flatMap((c) => [c.entry].concat(c.also)));
     return visibleGroups
       .map((g) => { const items = g.items.filter((e) => !inTop.has(e)); return { key: g.key, items, more: items.length < g.items.length }; })
       .filter((g) => g.items.length > 0);
-  }, [bookOrder, topResults, state.results.length, visibleGroups]);
-  const bestRow = restGroups && restGroups.length === 0 ? [] : topResults;
+  }, [bookOrder, topCards, state.results.length, visibleGroups]);
+  const bestRow = restGroups && restGroups.length === 0 ? [] : topCards;
   const listGroups = restGroups && restGroups.length > 0 ? restGroups : visibleGroups;
   /* A section whose results all sit in Best Matches has no header under it (search200 B2 review): "Found 21
      matches across 8 sections" stood over three for "tittle". The summary then says the matches alone. */
@@ -1186,8 +1192,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         {!bookOrder && bestRow.length > 0 && (
           <div className="srch-top-results">
             <h2 className="srch-section-label">Best Matches</h2>
-            {bestRow.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} memo={listMemo} where="best" />
+            {bestRow.map((c, i) => (
+              <SrchCard key={'top' + i} entry={c.entry} also={c.also.length ? c.also : undefined} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} memo={listMemo} where="best" />
             ))}
           </div>
         )}
