@@ -87,10 +87,17 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   const body = doc.kind === 'heading' ? (doc.heading || doc.text) :
   titled ? (doc.title || doc.text) :
   doc.text;
+  // A title marks the typed words it holds (search200 B6): a letter found by its title, whose
+  // body never says them, showed no mark anywhere. A reference ("Psalms 23:1") is a place, unmarked.
+  const smHead = /** @type {any} */ (window).VotSearchMini;
+  const headSpans = named && hlTerms && hlTerms.length && smHead && typeof smHead.highlightSpans === 'function'
+    ? smHead.highlightSpans(headline, hlTerms, terms) : null;
   const card = (
     <button className="srch-card" onClick={() => onSelect(entry)}>
       <div className="srch-card-top">
-        <span className="srch-card-ref">{headline}</span>
+        <span className="srch-card-ref">{headSpans ? headSpans.map((/** @type {{text:string, hit:boolean}} */ s, /** @type {number} */ i) =>
+          s.hit ? <mark key={i} className="search-highlight">{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>
+        ) : headline}</span>
         <span className={"srch-card-badge " + (meta.cls || '')}>{meta.label}</span>
         {/* W0: resolve the engine's raw translation id ('rnkjv') through the
             TRANSLATION_OPTIONS registry ('NKJV-R') — the same label the rest

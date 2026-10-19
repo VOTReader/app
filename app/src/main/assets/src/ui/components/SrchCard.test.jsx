@@ -193,6 +193,38 @@ describe('SrchCard for a Bible study chapter', () => {
   });
 });
 
+/* search200 B6 (polish): a letter found by its title showed no mark anywhere when its body never says the words
+   ("the watchman" opens The Watchman, whose text says "watchmen" or nothing). The headline marks them. */
+describe('SrchCard marks the typed words in a title headline (search200 B6)', () => {
+  const letterDoc = { kind: 'letter', title: 'The Watchman', ref: 'Volume Three · Letter 12', text: 'Behold, I have set you over My people as a guard.', volumeId: 'v3', letterId: 'watchman' };
+  beforeEach(() => { /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { letter: { label: 'Letter', cls: '' }, verse: { label: 'Verse', cls: '' } }; });
+  const refMarks = (/** @type {HTMLElement} */ c) => [...c.querySelectorAll('.srch-card-ref mark')].map((m) => m.textContent);
+
+  it('a title that holds the typed word marks it, and the headline still reads whole', () => {
+    const { container } = render(<SrchCard entry={{ score: 1, doc: letterDoc, terms: [] }} terms={['watchman']} onSelect={() => {}} isDirect={false} />);
+    expect(refMarks(container)).toEqual(['Watchman']);
+    expect(container.querySelector('.srch-card-ref').textContent).toBe('The Watchman');
+  });
+
+  it('a misspelling marks the title word the engine matched', () => {
+    const { container } = render(<SrchCard entry={{ score: 1, doc: letterDoc, terms: ['watchman'] }} terms={['wachman']} onSelect={() => {}} isDirect={false} />);
+    expect(refMarks(container)).toEqual(['Watchman']);
+  });
+
+  it('a verse reference is a place, not a title: "psalms" marks nothing in "Psalms 23:1"', () => {
+    const doc = { kind: 'verse', ref: 'Psalms 23:1', text: 'The LORD is my shepherd; I shall not want.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: [] }} terms={['psalms']} onSelect={() => {}} isDirect={false} />);
+    expect(refMarks(container)).toEqual([]);
+  });
+
+  it('a title without the typed words is plain, and the body keeps its marks', () => {
+    const { container } = render(<SrchCard entry={{ score: 1, doc: letterDoc, terms: [] }} terms={['guard']} onSelect={() => {}} isDirect={false} />);
+    expect(container.querySelector('.srch-card-ref').textContent).toBe('The Watchman');
+    expect(refMarks(container)).toEqual([]);
+    expect(marks(container)).toEqual(['guard']);
+  });
+});
+
 /* sweep W33 (2026-10-13): a placed card quoted the densest window of the typed words anywhere after placeStart, so
    it could show a passage the tap does not open. It quotes the window that opens at placeStart, and the place it no
    longer shows is offered under it. */
