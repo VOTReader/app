@@ -405,8 +405,11 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
      three 600-verse books at W = 800 are 15.4 px wide each, so with the
      recorder's fixed 20 px measureText EXO overlaps GEN by 4.6 px and LEV
      stands 10.8 px from it: GEN, a major book, takes its
-     place first, and EXO and LEV are left out. */
-  it('the bottom rail places the book names on one row through the shared law: a colliding name is left out', async () => {
+     place first. Since the w4 review 2 a name a few pixels short of the word
+     slides along its own book (LUKE beside JOHN): LEV slides 3.2 px right, to a
+     word from GEN with its centre still over Leviticus, and EXO, which has no
+     such place over its own book, is left out (rewritten to that intent). */
+  it('the bottom rail places the book names on one row through the shared law: a name with no room over its own book is left out, one a few pixels short slides', async () => {
     const CANON = 31102, START = 15000, SPAN = 600;
     const three = graph();
     three.books = [
@@ -430,7 +433,10 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     const painted = CALLS.filter((c) => c[0] === 'fillText' && ['GEN', 'EXO', 'LEV', 'GENESIS', 'EXODUS', 'LEVITICUS'].includes(c[1]));
     expect(new Set(painted.map((c) => c[3])).size, 'one row').toBe(1);
     expect(painted[0][3]).toBe(yGen);
-    expect(labelsPainted().filter((t) => t === 'EXO' || t === 'EXODUS'), 'EXO collides with GEN: left out').toEqual([]);
-    expect(labelsPainted().filter((t) => t === 'LEV' || t === 'LEVITICUS'), 'LEV within a word of GEN: left out').toEqual([]);
+    expect(labelsPainted().filter((t) => t === 'EXO' || t === 'EXODUS'), 'EXO collides with GEN wherever it stands over Exodus: left out').toEqual([]);
+    const xOf = (label) => CALLS.filter((c) => c[0] === 'fillText' && c[1] === label).pop()[2];
+    const dx = xOf('LEV') - xOf('GEN');
+    expect(dx, 'LEV a word (14 px) clear of GEN: it slid').toBeGreaterThanOrEqual(20 + 14 - 1e-6);
+    expect(dx, "LEV's centre still over Leviticus (2.5 books from GEN's centre at most)").toBeLessThanOrEqual(2.5 * 15.4);
   });
 });

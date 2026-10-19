@@ -855,7 +855,10 @@ function nameForm(g, tag, share) {
  * edge, can only stand over the canon's end (REV at 667 px, w4 review).
  * Placed by the ranked law (rail-labels.js): the six major books first, then the longer books
  * before the shorter, each a word (NAME_GAP) from its neighbours, a row under
- * a corner button refused; the canon's overview has one row (r2-01a). The
+ * a corner button refused; the canon's overview has one row (r2-01a). A name
+ * that meets a neighbour slides along its own book to the nearest place a word
+ * clear, its centre still over that book (LUKE and ACTS beside JOHN went for 3-5
+ * px, w4 review 2), and goes only where there is no such place. The
  * major books, and only they, are in the bold and the brighter ink. A thin
  * rule stands between each two neighbouring names, as r2-01a's cells: at the
  * right one's book start where that lies clear of both names, else midway
@@ -895,12 +898,19 @@ function drawBookLabels(ctx, g, cam, L, rows, size, hits, tag) {
     if (!(w <= b.room * (b.major ? 3 : 2)) && !(b.atEnd && w <= Wc - 2 * edge)) continue;
     const cx = Math.min(Math.max((b.vis0 + b.vis1) / 2, edge + w / 2), Wc - edge - w / 2);
     if (cx - w / 2 >= b.vis1 || cx + w / 2 <= b.vis0) continue;   // it would name none of its own book
-    names.push({ bi: b.bi, label, font: b.font, major: b.major, x0: b.x0, verses: b.verses, left: cx - w / 2, right: cx + w / 2 });
+    // where it meets a neighbour it may slide along its own book, its centre over what the frame
+    // holds of it and the name wholly on the frame (w4 review 2: LUKE and ACTS went for 3-5 px)
+    const lo = Math.max(edge, b.vis0 - w / 2), hi = Math.min(Wc - edge - w, b.vis1 - w / 2);
+    const left = cx - w / 2;
+    names.push({ bi: b.bi, label, font: b.font, major: b.major, x0: b.x0, verses: b.verses, left, right: left + w, lo: lo <= hi ? lo : left, hi: lo <= hi ? hi : left });
   }
   const boxAt = (n, r) => ({ x0: n.left, x1: n.right, y0: rows[r].top, y1: rows[r].top + capH });
   const zones = L.zones || [];
+  /** @type {number[]} */
+  const at = [];
   const placed = placeRailLabelsRanked(names, gap, rows.length, names.map((n) => (n.major ? -1e9 : -n.verses)),
-    (i, r) => zones.some((z) => boxesMeet(boxAt(names[i], r), z)));
+    (i, r, x) => zones.some((z) => boxesMeet(boxAt({ left: x, right: x + names[i].right - names[i].left }, r), z)), at);
+  names.forEach((n, i) => { if (placed[i] >= 0 && at[i] !== n.left) { n.right += at[i] - n.left; n.left = at[i]; } });
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
   const rule = css('chapterTick');

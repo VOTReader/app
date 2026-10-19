@@ -41,6 +41,36 @@ describe('placeRailLabelsRanked', () => {
     expect(placeRailLabelsRanked(b, 5, 2, undefined, (i) => i === 1)).toEqual([0, -1]);
   });
 
+  /* w4 review 2: a name pinned to its own place went for a few pixels (LUKE beside JOHN); one
+     given a range slides to the nearest place a pad clear of its neighbours, within that range. */
+  it('a box with a range slides to the nearest free place in it; without one it goes as before', () => {
+    const john = { left: 100, right: 140 };
+    const luke = { left: 50, right: 90 };   // 10 short of a pad of 13 from JOHN
+    const at = [];
+    expect(placeRailLabelsRanked([luke, john], 13, 1, [1, 0])).toEqual([-1, 0]);
+    expect(placeRailLabelsRanked([Object.assign({ lo: 40, hi: 60 }, luke), john], 13, 1, [1, 0], undefined, at)).toEqual([0, 0]);
+    expect(at[0]).toBe(47);   // its right edge a pad from JOHN's left
+    expect(at[1]).toBe(100);
+    // the range is a bound: 2 px of slide is not enough, and the name goes
+    expect(placeRailLabelsRanked([Object.assign({ lo: 48, hi: 52 }, luke), john], 13, 1, [1, 0])).toEqual([-1, 0]);
+    // nearest first, on either side: between two names it takes the closer free edge
+    const a = { left: 0, right: 30 }, c = { left: 120, right: 150 };
+    const mid = { left: 38, right: 68, lo: 20, hi: 90 };
+    const at2 = [];
+    expect(placeRailLabelsRanked([a, mid, c], 10, 1, [0, 1, 0], undefined, at2)).toEqual([0, 0, 0]);
+    expect(at2[1]).toBe(40);
+  });
+
+  it('a slide never takes a blocked place: blocked is asked at the left edge it would take', () => {
+    const john = { left: 100, right: 140 };
+    const luke = { left: 50, right: 90, lo: 0, hi: 200 };
+    const at = [];
+    // the place left of JOHN is blocked, so LUKE goes to the right of it
+    const r = placeRailLabelsRanked([luke, john], 13, 1, [1, 0], (i, _row, x) => i === 0 && x < 100, at);
+    expect(r).toEqual([0, 0]);
+    expect(at[0]).toBe(153);
+  });
+
   it('no two names on one row come within the pad', () => {
     const b = boxes(5, 120);
     const rank = b.map((_, i) => (i % 7 === 0 ? 0 : 1));

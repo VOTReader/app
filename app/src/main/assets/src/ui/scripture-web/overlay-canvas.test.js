@@ -374,6 +374,39 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
+  /* w4 review 2 (major): each name was pinned to its book's centre, so a name a few pixels short
+     of the gap went: at 1600x900 LUKE ended 11 px from JOHN (3 short of the word) and ACTS 9 px,
+     and the Gospels read "MATT ... JOHN" with a hole between, as JOSH, JUDG, MARK and ROM did
+     against r2-01a; on the phone PROV went between PS and ISA. A name that meets a neighbour slides
+     along its own book first, to the nearest place a word clear, its centre still over that book. */
+  for (const [name, want] of [['pc', ['LUKE', 'ACTS']], ['phone', ['PROV']]]) {
+    it(name + ': a name a few pixels short of the word slides along its own book rather than go (' + want.join(', ') + ')', () => {
+      for (const hidden of [false, true]) {
+        const { canvas, zones } = chromeRoot(name, { hidden });
+        const { rec, fs } = paint(name, 1, g.total / 2, { canvas, em: 0.7 });
+        const s = fs.v.DPR, what = name + (hidden ? ' hidden' : '');
+        const X = (v) => (v - fs.cam.x) * fs.cam.ppv + fs.v.W / 2;
+        const drawn = bookTexts(rec);
+        const list = drawn.map((c) => c.t).join(' ');
+        for (const t of want) expect(drawn.some((c) => c.t === t), what + ': ' + t + ' in ' + list).toBe(true);
+        for (const c of drawn) {
+          const bi = g.books.findIndex((b) => String(b.abbr).toUpperCase() === c.t);
+          const c0 = g.chapters.find((ch) => ch[0] === bi), c1 = g.chapters.filter((ch) => ch[0] === bi).pop();
+          const x0 = Math.max(0, X(c0[2])), x1 = Math.min(fs.v.W, X(c1[2] + c1[3]));
+          const b = textBox(c), mid = (b.x0 + b.x1) / 2;
+          expect(b.x1 > x0 && b.x0 < x1, what + ': ' + c.t + ' over its own book').toBe(true);
+          // the canon's end books may be held to the frame's edge, wider than their span (REV)
+          if (bi === 0 || bi === g.books.length - 1) continue;
+          expect(mid, what + ': ' + c.t + "'s centre over its own book").toBeGreaterThanOrEqual(x0 - 1e-6);
+          expect(mid, what + ': ' + c.t + "'s centre over its own book").toBeLessThanOrEqual(x1 + 1e-6);
+        }
+        const boxes = drawn.map(textBox).sort((a, b) => a.x0 - b.x0);
+        for (let i = 1; i < boxes.length; i++) expect(boxes[i].x0 - boxes[i - 1].x1, what + ': a word apart').toBeGreaterThanOrEqual(12 * s - 1e-6);
+        for (const c of drawn) for (const z of zones) expect(meet(textRect(c), z), what + ': ' + c.t + ' under a corner button or the pill').toBe(false);
+      }
+    });
+  }
+
   it('a thin rule stands between each two neighbouring names, and only there (r2-01a\'s cells)', () => {
     for (const [name, zoom, verse] of [['pc', 1, g.total / 2], ['phone', 1, g.total / 2], ['pc', 3.5, verseOf('ezekiel', 1, 1)]]) {
       const { canvas } = chromeRoot(name);
