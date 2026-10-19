@@ -10,9 +10,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { buildPersonal } from './personal-build.js';
+import { _NAV_ICONS } from '../../data/scripture-resolution.js';
 
 const g = /** @type {any} */ (globalThis);
-const STUBS = ['LinkStore', 'COLLECTIONS', 'READING_CHAIN', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES'];
+const STUBS = ['LinkStore', 'COLLECTIONS', 'READING_CHAIN', 'colLetterArr', 'colPreface', 'BIBLE_STUDIES', '_NAV_ICONS'];
 
 const GRAPH = {
   books: [{ id: 'genesis' }, { id: 'john' }],
@@ -58,6 +59,29 @@ describe('buildPersonal', () => {
     }] };
     const built = buildPersonal(GRAPH);
     expect(built.graph.bPos[0]).toBe(3);
+  });
+
+  it('w4 review: each collection carries a tiny form for a narrow rail (the nav badges; the studies\' own) and Volumes I-VII, and the WTLB parts, a family', () => {
+    // the rail's names step down short -> tiny when the short ones do not fit (rail-renderer
+    // drawRails); a family steps down together so "VOL I" never stands by "V2"
+    g._NAV_ICONS = _NAV_ICONS;
+    g.READING_CHAIN = ['one', 'seven', 'rebuke', 'wtlb1', 'wtlb2', 'holydays'];
+    g.COLLECTIONS = g.READING_CHAIN.map((volKey) => ({ volKey, label: volKey }));
+    g.colLetterArr = (col) => [{ id: col.volKey + '-a', title: 'A' }];
+    g.colPreface = () => null;
+    g.BIBLE_STUDIES = [
+      { id: 'more-than-a-man', title: 'More Than a Man', chapters: [{ id: 'm1' }] },
+      { id: 'trinity-exposed', title: 'The Trinity Exposed', chapters: [{ id: 't1' }] },
+      { id: 'purity', title: 'Purity', chapters: [{ id: 'p1' }] },
+    ];
+    const segs = buildPersonal(GRAPH).votRail.segments;
+    expect(segs.map((x) => [x.short, x.tiny, x.group])).toEqual([
+      ['Vol I', 'V1', 'vol'], ['Vol VII', 'V7', 'vol'], ['Rebuke', 'LR', 'rebuke'],
+      ['WTLB I', 'W1', 'wtlb'], ['WTLB II', 'W2', 'wtlb'], ['Holy Days', 'HD', 'holydays'],
+      ['MTaM', 'MTaM', 'study-more-than-a-man'], ['Trinity', 'Trin', 'study-trinity-exposed'], ['Purity', 'Pur', 'study-purity'],
+    ]);
+    // the Volumes' tiny forms ARE the nav badges, so the rail and the nav never disagree
+    for (const x of segs.slice(0, 6)) expect(x.tiny).toBe(_NAV_ICONS[x.volKey]);
   });
 
   it('is null before LinkStore exists, and never throws on a corpus with no studies', () => {

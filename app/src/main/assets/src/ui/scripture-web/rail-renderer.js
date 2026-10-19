@@ -44,6 +44,13 @@ const NAME_BAND_COMPACT = 28;
  * the lower one 8 px up so a reader's pin (its 5.5 px ring and 1 px stroke) stays under it. */
 const NAME_ROWS_PC = [14, 30];
 const NAME_ROWS_COMPACT = [8, 20];
+/** A frame narrower than this (CSS px) and taller than COMPACT_H (a portrait phone, a narrow
+ * window) names the rail in the phone's 11 px type on three rows, under the overline (w4
+ * review: by its height a 426 x 952 phone took the PC's 13 px type and lost 19 of 21 names). */
+const NARROW_W = 760;
+const NAME_ROWS_NARROW = [8, 20, 32];
+/** The overline's baseline over the Volumes rail, CSS px (PC and narrow frames). */
+const OVERLINE_Y = 46;
 /** A frame this short (CSS px) is the phone's: the compact rail, type and label rows. */
 const COMPACT_H = 500;
 /** Curve tension for the S-curves: how far the control points push out (a share of the gap). */
@@ -131,6 +138,79 @@ export function chromeInset(el, dpr) {
 /** The phone's frame (spec §3's compact column): a frame under COMPACT_H CSS px tall. */
 function isCompact(v) {
   return v.H / (v.DPR || 1) <= COMPACT_H;
+}
+
+/**
+ * How the Volumes rail's names are set on this frame: their size (CSS px),
+ * the rows' baselines over the rail, whether the overline names the rail, and
+ * whether the ticks keep low (a row 8 px over the rail). The rail's place is
+ * railFrame's (by height); the type goes by width as well (w4 review).
+ * @param {{width:number, height:number, DPR:number}} opts
+ * @returns {{size:number, rows:number[], overline:boolean, low:boolean}}
+ */
+function nameFrame(opts) {
+  const dpr = opts.DPR || 1;
+  if (isCompact({ H: opts.height, DPR: dpr })) return { size: 11, rows: NAME_ROWS_COMPACT, overline: false, low: true };
+  if (opts.width / dpr < NARROW_W) return { size: 11, rows: NAME_ROWS_NARROW, overline: true, low: true };
+  return { size: 13, rows: NAME_ROWS_PC, overline: true, low: false };
+}
+
+/** A band's names, longest first: its short name, then its tiny one (w4 review), upper-cased. */
+function railForms(seg) {
+  const out = [];
+  for (const f of [seg.short || seg.label, seg.tiny]) {
+    const t = f ? String(f).toUpperCase() : '';
+    if (t && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+/**
+ * The Volumes rail's names on this frame: each band's longest form that fits,
+ * placed by the shared law (placeRailLabelsSliding). A name wider than its
+ * band times the rows (on r rows every r-th name shares a row), or one no row
+ * can take, steps its family down to the next form and the rail is placed
+ * again (w4 review: "HOLY DAYS" was dropped at 732 x 360 and 19 of 21 names on
+ * a portrait phone; never drop, abbreviate). A family steps down together
+ * (Volumes I-VII, WTLB I-II), so one rail never mixes "VOL I" and "V2". Only
+ * a name already at its tiniest form is left unprinted (its tick stays): a
+ * band cut to a sliver by the screen edge on a zoom.
+ * @param {CanvasRenderingContext2D} ctx  its font and tracking set
+ * @param {Array<{span:{labelX:number, room:number}, forms:string[], group:string}>} bands
+ * @param {{width:number, pad:number, inset:number, rows:number}} o
+ * @returns {Array<{label:string, x:number, row:number}>}
+ */
+function placeRailNames(ctx, bands, o) {
+  const step = new Map();
+  const widths = new Map();
+  const measure = (t) => {
+    let w = widths.get(t);
+    if (w == null) { w = ctx.measureText(t).width; widths.set(t, w); }
+    return w;
+  };
+  for (let pass = 0; ; pass++) {
+    const names = [], from = [];
+    const down = new Set();
+    for (const b of bands) {
+      if (!b.forms.length) continue;
+      const t = Math.min(step.get(b.group) || 0, b.forms.length - 1);
+      const label = b.forms[t], w = measure(label);
+      const last = t === b.forms.length - 1;
+      if (w > b.span.room * o.rows) { if (!last) down.add(b.group); continue; }
+      const lo = w / 2 + o.inset, hi = o.width - w / 2 - o.inset;
+      const x = lo > hi ? o.width / 2 : Math.min(hi, Math.max(lo, b.span.labelX));
+      names.push({ label, x, w, max: Math.min(hi, b.span.labelX + b.span.room / 2) });
+      from.push({ b, last });
+    }
+    const at = placeRailLabelsSliding(names, o.pad, o.rows);
+    at.forEach((p, i) => { if (p.row < 0 && !from[i].last) down.add(from[i].b.group); });
+    if (!down.size || pass >= 3) {
+      const out = [];
+      names.forEach((nm, i) => { if (at[i].row >= 0) out.push({ label: nm.label, x: at[i].x, row: at[i].row }); });
+      return out;
+    }
+    for (const g of down) step.set(g, (step.get(g) || 0) + 1);
+  }
 }
 
 /**
@@ -803,11 +883,11 @@ export function personalInk(z, ceiling) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} opts
  * @param {{bottomY:number, topY:number}} rails
- * @returns {{names:Array<{label:string, x:number, y:number}>, size:number, compact:boolean}|null}
+ * @returns {{names:Array<{label:string, x:number, y:number}>, size:number, overline:boolean}|null}
  */
 function drawRails(ctx, opts, rails) {
   const { width, DPR, votRail } = opts;
-  const compact = isCompact({ H: opts.height, DPR });
+  const nf = nameFrame(opts);
   // the Bible rail (the canon's baseline ink) and the Volumes rail (spec §4.2)
   ctx.lineWidth = DPR;
   ctx.strokeStyle = inkCss('baseline');
@@ -824,8 +904,8 @@ function drawRails(ctx, opts, rails) {
   // names sit 14 px over the rail, clear of 7 px ticks; on the phone the
   // header leaves a 28 px band and the lower row sits 8 px over the rail
   // (clear of a pin's ring), and the ticks there rise only 2 px over it and
-  // reach below it instead.
-  const letterTick = compact ? [2, 2] : [4, 0], bandTick = compact ? [2, 5] : [7, 4];
+  // reach below it instead (and so on a narrow frame, its lowest row at 8 too).
+  const letterTick = nf.low ? [2, 2] : [4, 0], bandTick = nf.low ? [2, 5] : [7, 4];
   // letter ticks, 4 px, once a collection's letters stand apart: each
   // collection has its own pitch (w4, the slots), so each decides for its own
   // letters, and only the letters on screen are visited
@@ -848,24 +928,25 @@ function drawRails(ctx, opts, rails) {
   ctx.stroke();
 
   // the collections: a tick at each band's start, its name above the rail
-  const size = (compact ? 11 : 13) * DPR;
+  const size = nf.size * DPR;
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
   ctx.font = '500 ' + size + 'px ' + FONT;
   setTracking(ctx, 0.10 * size);
   // Measure before drawing: collection names are long ("Words To Live By:
-  // Part One"), and a name wider than twice its band is not printed at all.
+  // Part One"), and a name wider than its band times the rows steps down to
+  // its tiny form (placeRailNames, w4 review), never dropped for that alone.
   // The rows are then given by the placement law both rails share
   // (rail-labels.js): a name stands centred over its band on the first row
   // with room for it there, a gap of NAME_GAP_EM from its neighbours (a word
   // space is 0.4 em), slides on the row needing least only when none has,
-  // and takes NO row when neither has room. Every
+  // and steps down to its tiny form when no row has room. Every
   // band keeps its tick either way. A name is kept inside the screen (a band
   // cut by the edge printed its name past it: "VOL I" at x = 0 on the phone,
   // fix-review #3) and may slide right, over its own band (half of it), to
   // take a row rather than drop to the next one ("LAMB" by MTAM, fix-review
   // #13); w4 asks each row in turn (placeRailLabelsSliding), where the slide
   // looked only at the previous name and could leave the next one no row.
-  const names = [];
+  const bands = [];
   const pad = Math.max(5 * DPR, NAME_GAP_EM * size), inset = 4 * DPR;
   ctx.strokeStyle = inkCss('volumesTick');
   for (const seg of votRail.segments) {
@@ -875,26 +956,17 @@ function drawRails(ctx, opts, rails) {
     ctx.beginPath();
     ctx.moveTo(span.x0, rails.topY - bandTick[0] * DPR); ctx.lineTo(span.x0, rails.topY + bandTick[1] * DPR);
     ctx.stroke();
-    const label = (seg.short || seg.label).toUpperCase();
-    const w = ctx.measureText(label).width;
-    if (w > span.room * 2) continue;
-    const lo = w / 2 + inset, hi = width - w / 2 - inset;
-    const x = lo > hi ? width / 2 : Math.min(hi, Math.max(lo, span.labelX));
-    names.push({ label, x, w, max: Math.min(hi, span.labelX + span.room / 2) });
+    bands.push({ span, forms: railForms(seg), group: seg.group || seg.volKey });
   }
-  // two rows on both frames: the PC's on 136 and 120 (names 116-136), the
-  // phone's (w4) 8 and 20 px over the rail, so all 21 collections are named at
-  // 740-891 px; through w3 the phone kept one row and dropped five
-  // (VOL VII, WTLB I, BLESSED, TIMOTHY, TRINITY). A name neither row can take
-  // keeps its tick and shows on a zoom.
-  const at = placeRailLabelsSliding(names, pad, 2);
-  const rowY = compact ? NAME_ROWS_COMPACT : NAME_ROWS_PC;
-  const placed = [];
-  names.forEach((nm, i) => {
-    if (at[i].row >= 0) placed.push({ label: nm.label, x: at[i].x, y: rails.topY - rowY[at[i].row ? 1 : 0] * DPR });
-  });
+  // two rows on a PC (136 and 120, names 116-136) and a landscape phone (w4:
+  // 8 and 20 px over the rail), three on a narrow frame (8, 20, 32), so all 21
+  // collections are named from a 360 px portrait phone up; through w3 the
+  // phone kept one row and dropped five (VOL VII, WTLB I, BLESSED, TIMOTHY,
+  // TRINITY). A name no row can take in any form keeps its tick and shows on a zoom.
+  const placed = placeRailNames(ctx, bands, { width, pad, inset, rows: nf.rows.length })
+    .map((nm) => ({ label: nm.label, x: nm.x, y: rails.topY - nf.rows[nm.row] * DPR }));
   setTracking(ctx, 0);
-  return { names: placed, size, compact };
+  return { names: placed, size, overline: nf.overline };
 }
 
 /**
@@ -908,7 +980,7 @@ function drawRails(ctx, opts, rails) {
  * @param {CanvasRenderingContext2D} ctx
  * @param {any} opts
  * @param {{bottomY:number, topY:number}} rails
- * @param {{names:Array<{label:string, x:number, y:number}>, size:number, compact:boolean}|null} placed
+ * @param {{names:Array<{label:string, x:number, y:number}>, size:number, overline:boolean}|null} placed
  */
 function drawRailNames(ctx, opts, rails, placed) {
   if (!placed) return;
@@ -923,15 +995,15 @@ function drawRailNames(ctx, opts, rails, placed) {
   // every placed name in the one ink, the second row's too (fix-review #13)
   ctx.fillStyle = inkCss('volumesLabel');
   for (const nm of placed.names) ctx.fillText(nm.label, nm.x, nm.y);
-  // the overline names the rail, in the left gutter over its names (PC: the
-  // phone's header sits where it would go)
-  if (!placed.compact) {
+  // the overline names the rail, in the left gutter over its names (PC and a
+  // narrow frame: a landscape phone's header sits where it would go)
+  if (placed.overline) {
     const osize = 14 * DPR;
     ctx.font = '500 ' + osize + 'px ' + FONT;
     setTracking(ctx, 0.15 * osize);
     ctx.textAlign = 'left';
     ctx.fillStyle = inkCss('volumesOverline');
-    ctx.fillText('THE VOLUMES OF TRUTH', 16 * DPR, rails.topY - 46 * DPR);
+    ctx.fillText('THE VOLUMES OF TRUTH', 16 * DPR, rails.topY - OVERLINE_Y * DPR);
   }
   setTracking(ctx, 0);
   ctx.textAlign = 'center';

@@ -28,19 +28,25 @@ if (typeof globalThis.Path2D === 'undefined') {
 }
 
 // READING_CHAIN order, then BIBLE_STUDIES order; counts as the corpus ships them (2026-09-11).
-/** @type {[string, string, number][]} */
+// w4 review: each collection also has its tiny form (the nav badges, _NAV_ICONS; the studies'
+// own), and Volumes I-VII and the two WTLB parts each go to theirs together (personal-build.js)
+/** @type {[string, string, number, string, string][]} */
 const CHAIN = [
-  ['one', 'Vol I', 30], ['two', 'Vol II', 29], ['three', 'Vol III', 30], ['four', 'Vol IV', 29],
-  ['five', 'Vol V', 29], ['six', 'Vol VI', 31], ['seven', 'Vol VII', 67], ['rebuke', 'Rebuke', 31],
-  ['wtlb1', 'WTLB I', 150], ['wtlb2', 'WTLB II', 203], ['blessed', 'Blessed', 9], ['flock', 'Flock', 62],
-  ['timothy', 'Timothy', 15], ['holydays', 'Holy Days', 16],
-  ['study-more-than-a-man', 'MTaM', 31], ['study-odds-chart', 'Odds', 1], ['study-lamb-of-god', 'Lamb', 16],
-  ['study-state-of-the-dead', 'SotD', 5], ['study-grace-and-the-law', 'Grace', 7],
-  ['study-trinity-exposed', 'Trinity', 6], ['study-purity', 'Purity', 6],
+  ['one', 'Vol I', 30, 'V1', 'vol'], ['two', 'Vol II', 29, 'V2', 'vol'], ['three', 'Vol III', 30, 'V3', 'vol'],
+  ['four', 'Vol IV', 29, 'V4', 'vol'], ['five', 'Vol V', 29, 'V5', 'vol'], ['six', 'Vol VI', 31, 'V6', 'vol'],
+  ['seven', 'Vol VII', 67, 'V7', 'vol'], ['rebuke', 'Rebuke', 31, 'LR', 'rebuke'],
+  ['wtlb1', 'WTLB I', 150, 'W1', 'wtlb'], ['wtlb2', 'WTLB II', 203, 'W2', 'wtlb'], ['blessed', 'Blessed', 9, 'TB', 'blessed'],
+  ['flock', 'Flock', 62, 'LF', 'flock'], ['timothy', 'Timothy', 15, 'LT', 'timothy'], ['holydays', 'Holy Days', 16, 'HD', 'holydays'],
+  ['study-more-than-a-man', 'MTaM', 31, 'MTaM', 'mtam'], ['study-odds-chart', 'Odds', 1, 'Odds', 'odds'],
+  ['study-lamb-of-god', 'Lamb', 16, 'Lamb', 'lamb'], ['study-state-of-the-dead', 'SotD', 5, 'SotD', 'sotd'],
+  ['study-grace-and-the-law', 'Grace', 7, 'Grace', 'grace'], ['study-trinity-exposed', 'Trinity', 6, 'Trin', 'trinity'],
+  ['study-purity', 'Purity', 6, 'Pur', 'purity'],
 ];
-const rail = buildVotRail(CHAIN.map(([volKey, short, n]) => ({
-  volKey, label: short, short, items: Array.from({ length: n }, (_, i) => ({ id: volKey + '-' + i, title: short + ' ' + i })),
+const rail = buildVotRail(CHAIN.map(([volKey, short, n, tiny, group]) => ({
+  volKey, label: short, short, tiny, group, items: Array.from({ length: n }, (_, i) => ({ id: volKey + '-' + i, title: short + ' ' + i })),
 })));
+/** The forms a collection may be named by on the rail, longest first. */
+const formsOf = (i) => [CHAIN[i][1].toUpperCase(), CHAIN[i][3].toUpperCase()];
 expect(rail.total).toBe(803);
 
 // The web's face (EB Garamond 500, sw-ink FONT) at 11 px with no tracking, measureText().width in
@@ -50,6 +56,8 @@ const WIDTH_11 = {
   'VOL I': 28.1, 'VOL II': 31.92, 'VOL III': 35.75, 'VOL IV': 35.62, 'VOL V': 31.79, 'VOL VI': 35.62, 'VOL VII': 39.45,
   'REBUKE': 43.09, 'WTLB I': 37.17, 'WTLB II': 41, 'BLESSED': 44.33, 'FLOCK': 36.28, 'TIMOTHY': 52.44, 'HOLY DAYS': 59.09,
   'MTAM': 34.21, 'ODDS': 30.28, 'LAMB': 30.74, 'SOTD': 29.19, 'GRACE': 37.81, 'TRINITY': 46.1, 'PURITY': 40.45,
+  'V1': 12.99, 'V2': 12.99, 'V3': 12.99, 'V4': 12.99, 'V5': 12.99, 'V6': 12.99, 'V7': 12.99,
+  'LR': 14.46, 'W1': 15.95, 'W2': 15.95, 'TB': 14.08, 'LF': 12.2, 'LT': 12.62, 'HD': 17.21, 'TRIN': 28.1, 'PUR': 22.45,
 };
 const VERSES = 31102;
 
@@ -113,7 +121,14 @@ describe('the Volumes rail keeps its names apart (one placement law for both rai
      read as one string and on the phone "VOL I VOL II VOL III VOL IV" as one line. The law
      now keeps 0.9 em at least (a name's box ends after its own tracking). */
   const GAP_EM = 0.9;
-  for (const [wCss, hCss, dpr] of /** @type {Array<[number, number, number]>} */ ([[1920, 1080, 1], [1600, 900, 1], [952, 600, 2], [891, 411, 2.6]])) {
+  // w4 review (major 3): at 732 x 360 a name wider than twice its slot was dropped (HOLY DAYS),
+  // and a portrait phone (426 x 952) took the PC's 13 px type by its height and lost most
+  // names; the frames below run from the PC down to a 360 px portrait phone
+  const FRAMES = /** @type {Array<[number, number, number]>} */ ([
+    [1920, 1080, 1], [1600, 900, 1], [952, 600, 2], [891, 411, 2.6], [800, 360, 2], [732, 360, 2], [640, 360, 2],
+    [1024, 768, 1], [768, 1024, 2], [426, 952, 2], [412, 915, 2.6], [360, 780, 3],
+  ]);
+  for (const [wCss, hCss, dpr] of FRAMES) {
     it(`${wCss} x ${hCss} @${dpr}: every collection named, and no two names on one row nearer than ${GAP_EM} em`, () => {
       const f = frame(wCss, dpr, hCss);
       const ctx = recordingCtx();
@@ -125,8 +140,44 @@ describe('the Volumes rail keeps its names apart (one placement law for both rai
       const gaps = sameRowGaps(names);
       const size = names[0].size;
       expect(gaps[0].gap, `closest pair ${gaps[0].a}|${gaps[0].b} at y${gaps[0].y}`).toBeGreaterThanOrEqual(GAP_EM * size - 1e-6);
+      // each by one of its own forms, in rail order, inside the screen
+      names.forEach((l, i) => {
+        expect(formsOf(i), `${i}: ${l.text}`).toContain(l.text);
+        expect(l.left, l.text).toBeGreaterThanOrEqual(0);
+        expect(l.right, l.text).toBeLessThanOrEqual(f.W);
+      });
+      // Volumes I-VII read as one family: all by the short form or all by the tiny one
+      expect(new Set(names.slice(0, 7).map((l) => (l.text.startsWith('VOL ') ? 'short' : 'tiny'))).size, names.slice(0, 7).map((l) => l.text).join(',')).toBe(1);
+      expect(new Set(names.slice(8, 10).map((l) => (l.text.startsWith('WTLB') ? 'short' : 'tiny'))).size).toBe(1);
     });
   }
+
+  it('a frame narrower than a PC names the rail in the phone\'s 11 px type whatever its height, three rows under the overline (w4 review: 426 x 952 took the PC\'s 13 px)', () => {
+    for (const [wCss, hCss, dpr] of /** @type {Array<[number, number, number]>} */ ([[426, 952, 2], [360, 780, 3]])) {
+      const f = frame(wCss, dpr, hCss);
+      const ctx = recordingCtx();
+      drawPersonalWeb(ctx, null, null, f.opts);
+      const names = topRailLabels(ctx, f);
+      expect(names.length).toBe(CHAIN.length);
+      for (const l of names) expect(l.size, l.text).toBeCloseTo(11 * dpr, 6);
+      const rails = railFrame({ H: f.H, DPR: f.DPR }, f.opts.base);
+      const ys = [...new Set(names.map((l) => l.y))].sort((p, q) => q - p);
+      expect(ys.length).toBeLessThanOrEqual(3);
+      // the lowest row clears a reader's pin (its 5.5 px ring and 1 px stroke)
+      expect(rails.topY - ys[0]).toBeGreaterThanOrEqual(6.5 * dpr);
+      // the overline still names the rail, its baseline a clear 5 px over the top row's caps (0.7 em)
+      const over = ctx.labels.find((l) => l.text === 'THE VOLUMES OF TRUTH');
+      expect(over).toBeTruthy();
+      expect(ys[ys.length - 1] - 0.7 * 11 * dpr - over.y).toBeGreaterThanOrEqual(5 * dpr - 1e-6);
+    }
+    // a PC keeps its 13 px and its two rows
+    const pc = frame(1600, 1, 900);
+    const ctx = recordingCtx();
+    drawPersonalWeb(ctx, null, null, pc.opts);
+    const names = topRailLabels(ctx, pc);
+    for (const l of names) expect(l.size).toBe(13);
+    expect(new Set(names.map((l) => l.y)).size).toBe(2);
+  });
 
   it('1600 x 900 @1 (s10): every name stands centred over its slot; HOLY DAYS takes the second row between TIMOTHY and MTAM', () => {
     const f = frame(1600, 1, 900);

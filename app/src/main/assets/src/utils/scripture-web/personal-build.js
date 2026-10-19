@@ -30,6 +30,24 @@ const SHORT_STUDY = {
   'trinity-exposed': 'Trinity', 'purity': 'Purity',
 };
 
+/**
+ * The tiny forms, for a rail too narrow for the short ones (w4 review: a
+ * portrait phone gives each of the 21 collections 17-20 px). The Volumes'
+ * are the nav badges (_NAV_ICONS: V1, LR, W1, TB, HD ...), so the rail and
+ * the nav never disagree; the studies' keep a word where a badge would be a
+ * riddle. A family steps down together (drawRails), so "VOL I" never stands
+ * by "V2": Volumes I-VII, and the two parts of Words To Live By.
+ */
+const TINY_STUDY = {
+  'more-than-a-man': 'MTaM', 'odds-chart': 'Odds', 'lamb-of-god': 'Lamb',
+  'state-of-the-dead': 'SotD', 'grace-and-the-law': 'Grace',
+  'trinity-exposed': 'Trin', 'purity': 'Pur',
+};
+const FAMILY = {
+  one: 'vol', two: 'vol', three: 'vol', four: 'vol', five: 'vol', six: 'vol', seven: 'vol',
+  wtlb1: 'wtlb', wtlb2: 'wtlb',
+};
+
 /** Build the dual-rail personal web from live stores + the loaded corpora. */
 export function buildPersonal(graph) {
   if (typeof LinkStore === 'undefined') return null;
@@ -54,7 +72,8 @@ export function buildPersonal(graph) {
       // collection's segment, where the reading chain puts it.
       const pref = (typeof colPreface === 'function') ? colPreface(col) : null;
       const items = pref && pref.id ? [{ id: pref.id, title: pref.title || pref.id }].concat(arr) : arr;
-      collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, items });
+      const tiny = (typeof _NAV_ICONS !== 'undefined' && _NAV_ICONS && _NAV_ICONS[volKey]) || undefined;
+      collections.push({ volKey, label: col.label, short: SHORT_VOL[volKey] || col.label, tiny, group: FAMILY[volKey] || volKey, items });
     }
   }
   // The Bible studies are corpora too — their 781 curated threads need rail
@@ -67,6 +86,7 @@ export function buildPersonal(graph) {
       collections.push({
         volKey: 'study-' + key, label: st.title,
         short: SHORT_STUDY[st.id] || SHORT_STUDY[key] || 'Study',
+        tiny: TINY_STUDY[st.id] || TINY_STUDY[key], group: 'study-' + key,
         items: st.chapters.map((c) => ({ id: c.id, title: c.title || st.title })),
       });
     }

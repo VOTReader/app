@@ -340,17 +340,19 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     // drop". At equal slots (w4) a phone gives each collection 38-42 px and the names
     // run 37-71 px ("HOLY DAYS"); one row dropped five of them (VOL VII, WTLB I,
     // BLESSED, TIMOTHY, TRINITY at 891x411). The widths are the web's face as Chrome
-    // measures it at 11 px (rail-label-collision.test.js), scaled by the size the loop sets.
+    // measures it at 11 px with the loop's 0.1 em tracking (w4 fix pass, 2026-10-18), scaled
+    // by the size the loop sets; the short names alone (no tiny forms) all stand at these
+    // frames, and the review's gap (0.9 em, NAME_GAP_EM) holds between them.
     const WIDTH_11 = {
-      'VOL I': 32, 'VOL II': 38, 'VOL III': 42, 'VOL IV': 41, 'VOL V': 36, 'VOL VI': 41, 'VOL VII': 45,
-      'REBUKE': 51, 'WTLB I': 44, 'WTLB II': 48, 'BLESSED': 55, 'FLOCK': 41, 'TIMOTHY': 58, 'HOLY DAYS': 70,
-      'MTAM': 38, 'ODDS': 35, 'LAMB': 36, 'SOTD': 33, 'GRACE': 42, 'TRINITY': 51, 'PURITY': 47,
+      'VOL I': 33.6, 'VOL II': 38.52, 'VOL III': 43.45, 'VOL IV': 42.22, 'VOL V': 37.29, 'VOL VI': 42.22, 'VOL VII': 47.15,
+      'REBUKE': 49.69, 'WTLB I': 43.77, 'WTLB II': 48.7, 'BLESSED': 52.03, 'FLOCK': 41.78, 'TIMOTHY': 60.14, 'HOLY DAYS': 68.99,
+      'MTAM': 38.61, 'ODDS': 34.68, 'LAMB': 35.14, 'SOTD': 33.59, 'GRACE': 43.31, 'TRINITY': 53.8, 'PURITY': 47.05,
     };
     const shorts = ['Vol I', 'Vol II', 'Vol III', 'Vol IV', 'Vol V', 'Vol VI', 'Vol VII', 'Rebuke', 'WTLB I', 'WTLB II',
       'Blessed', 'Flock', 'Timothy', 'Holy Days', 'MTaM', 'Odds', 'Lamb', 'SotD', 'Grace', 'Trinity', 'Purity'];
     const all = buildVotRail(shorts.map((s, k) => ({ volKey: 'c' + k, label: s, short: s, items: Array.from({ length: 3 + k * 7 }, (_, i) => ({ id: k + '-' + i, title: 'L' })) })));
     const upper = shorts.map((s) => s.toUpperCase());
-    for (const [cw, ch, dpr] of [[891, 411, 2.6], [800, 360, 2], [740, 360, 3]]) {
+    for (const [cw, ch, dpr] of [[891, 411, 2.6], [800, 360, 2], [740, 360, 3], [732, 360, 2]]) {
       const w = cw * dpr;
       const ctx = recordingCtx();
       ctx.measureText = (t) => ({ width: WIDTH_11[String(t)] * Number(/([\d.]+)px/.exec(ctx.font)[1]) / 11 });
@@ -370,7 +372,7 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
         for (let i = 0; i < row.length; i++) {
           expect(row[i].l, tag + ' ' + row[i].text).toBeGreaterThanOrEqual(0);
           expect(row[i].r, tag + ' ' + row[i].text).toBeLessThanOrEqual(w);
-          if (i) expect(row[i].l - row[i - 1].r, tag + ' ' + row[i - 1].text + ' | ' + row[i].text).toBeGreaterThanOrEqual(5 * dpr - 1e-6);
+          if (i) expect(row[i].l - row[i - 1].r, tag + ' ' + row[i - 1].text + ' | ' + row[i].text).toBeGreaterThanOrEqual(0.9 * 11 * dpr - 1e-6);
         }
       }
     }

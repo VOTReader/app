@@ -20,7 +20,7 @@ import { myWebSourceIndex } from './palette.js';
 
 /**
  * @typedef {{ total:number, span?:number, index:Map<string, number>,
- *   segments:Array<{volKey:string, label:string, short?:string,
+ *   segments:Array<{volKey:string, label:string, short?:string, tiny?:string, group?:string,
  *     start:number, count:number, u0?:number, uw?:number}>,
  *   nodes:Array<{volKey:string, id:string, title:string}>,
  *   labels?:Map<string, string> }} VotRail
@@ -87,7 +87,7 @@ export function baseKey(key) {
 /**
  * Build the top rail from the live VOT corpus.
  *
- * @param {Array<{volKey:string, label:string, short?:string,
+ * @param {Array<{volKey:string, label:string, short?:string, tiny?:string, group?:string,
  *   items:Array<{id:string, title:string}>}>} collections
  *   in READING_CHAIN order
  * @param {'count'|'sqrt'|'equal'} [law] how the collections share the rail (RAIL_SLOTS)
@@ -102,10 +102,15 @@ export function buildVotRail(collections, law = RAIL_SLOTS) {
   for (const col of collections || []) {
     const items = col.items || [];
     if (col.label && !labels.has(col.label)) labels.set(col.label, col.volKey);
-    segments.push({
+    /** @type {VotRail['segments'][number]} */
+    const seg = {
       volKey: col.volKey, label: col.label, short: col.short || col.label,
       start: cursor, count: items.length,
-    });
+    };
+    // the rail's tiny form and the family that steps down to it together (w4 review)
+    if (col.tiny) seg.tiny = col.tiny;
+    if (col.group) seg.group = col.group;
+    segments.push(seg);
     for (const item of items) {
       if (!item || !item.id) continue;
       index.set(col.volKey + ':' + item.id, cursor);
