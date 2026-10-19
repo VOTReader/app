@@ -1212,3 +1212,21 @@ describe('the chip pass chooses its keepers in one pass', () => {
     }
   });
 });
+
+/* w4 device check (d06, d07): up in the sky at 30-40x the live readout "~1,861 verses" was filled in
+   the distance ramp's colour at .8, its only separation a thin halo, and blended into the threads
+   of that same colour behind it. It reads in the chrome's own ink now; the ramp keeps its tick. */
+describe('the sky\'s live altitude readout', () => {
+  it('reads in the chrome\'s ink over its halo, not in the ramp\'s colour of the threads behind it', () => {
+    for (const name of ['pc', 'phone']) {
+      const fs = frameAt(name, 30, ISA53_6);
+      fs.cam.y = 0.35 * fs.view.base;
+      const rec = recorder();
+      const out = paintCanonOverlay(rec.ctx, fs);
+      expect(out.altitudeSpan, name + ': a span at the frame\'s middle row').toBeGreaterThan(0);
+      const read = rec.texts().filter((c) => /^~[\d,]+ verses$/.test(c.t));
+      expect(read.length, name + ': one readout').toBe(1);
+      expect(read[0].fill, name).toBe(css('textBody', 0.92));
+    }
+  });
+});

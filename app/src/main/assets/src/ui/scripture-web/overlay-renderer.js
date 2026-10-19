@@ -1809,7 +1809,9 @@ function drawAltitude(ctx, g, cam, view, v, chrome, out) {
     ctx.strokeStyle = bg;
     ctx.strokeText(text, box.x0, yMid);
     ctx.lineWidth = DPR;
-    ctx.fillStyle = 'rgba(' + rgb + ',0.8)';
+    // in the chrome's ink, the ramp's colour kept for its tick: in that colour it blended into the
+    // threads of the same span behind it (w4 device check, d06 / d07 at 30-40x)
+    ctx.fillStyle = css('textBody', 0.92);
     ctx.fillText(text, box.x0, yMid);
     if (view.reserved) view.reserved.push(box);
   }
