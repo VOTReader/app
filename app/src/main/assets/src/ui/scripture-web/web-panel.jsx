@@ -151,12 +151,29 @@ function Section({ title, collapsible = false, startOpen = true, children, class
   );
 }
 
+/**
+ * An "A ↔ B" title as two boxes (app.css .sw-title-end), so the line breaks at the arrow and
+ * never inside a reference (w4: the phone read "Isaiah 11:1 ↔ Revelation" / "22:16"). The text
+ * reads as before; any other title is itself.
+ */
+function titleEnds(title) {
+  if (typeof title !== 'string') return title;
+  const at = title.indexOf(' ↔ ');
+  if (at < 0) return title;
+  return (
+    <>
+      <span className="sw-title-end">{title.slice(0, at + 2)}</span>{' '}
+      <span className="sw-title-end">{title.slice(at + 3)}</span>
+    </>
+  );
+}
+
 /** The panel's head: overline, title, meta (spec 4.6 items 1-3). */
 function PanelHead({ over, title, meta }) {
   return (
     <div className="sw-panel-head">
       <div className="sw-sheet-eyebrow sw-panel-over">{over}</div>
-      {title ? <h2 className="sw-panel-title">{title}</h2> : null}
+      {title ? <h2 className="sw-panel-title">{titleEnds(title)}</h2> : null}
       {meta ? <div className="sw-sheet-meta sw-panel-meta">{metaItems(meta)}</div> : null}
     </div>
   );

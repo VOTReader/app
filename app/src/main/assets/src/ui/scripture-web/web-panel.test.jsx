@@ -120,6 +120,16 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(panel.querySelector('.sw-panel-meta').textContent).toMatch(/^183 votes · [\d,]+ verses apart$/);
   });
 
+  /* w4 (the phone): a 24 px title in a 333 px panel read "Isaiah 11:1 ↔ Revelation" / "22:16".
+     Each end is its own box, so the line breaks at the arrow and a reference stays whole (a
+     reference wider than the line still wraps in its own box). The text reads as before. */
+  it('the title breaks at the arrow, never inside a reference; its text reads as before', () => {
+    const { panel } = mount({ detail: detail(), compact: true });
+    const title = panel.querySelector('.sw-panel-title');
+    expect([...title.querySelectorAll('.sw-title-end')].map((e) => e.textContent)).toEqual(['Isaiah 7:14 ↔', 'Matthew 1:23']);
+    expect(title.textContent).toBe('Isaiah 7:14 ↔ Matthew 1:23');
+  });
+
   it('shows both verses in full, each with "Open in reader", and Follow names the far end', () => {
     const { panel, byLabel, props } = mount({ detail: detail() });
     const refs = [...panel.querySelectorAll('.sw-verse-ref')].map((e) => e.textContent);

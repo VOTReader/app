@@ -280,6 +280,10 @@ describe('panel density (w4)', () => {
     expect(rule('.sw-cite-quote.is-clamped')).toMatch(/-webkit-line-clamp:\s*2/);
   });
 
+  it('each end of an "A ↔ B" title is one box, so the title breaks at the arrow', () => {
+    expect(rule('.sw-title-end')).toMatch(/display:\s*inline-block/);
+  });
+
   it('compact, the trail is a 32 px row (its Back 44 to hit) and stands where the overline was', () => {
     const crumbs = rule('.sw-root.sw-compact .sw-crumbs');
     expect(crumbs).toMatch(/min-height:\s*32px/);
