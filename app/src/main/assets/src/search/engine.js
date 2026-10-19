@@ -2817,9 +2817,12 @@ async function search(query, options) {
      or scored, none named among the first results) and no text but its own holds every typed content word, or a form
      of it, within the typed words' length and two (quotesNear's stretch). A short quote one word off a title is the
      quote ("a pillar of salt" is Genesis 19:26, not "A Pillar of Strength"), and a sentence holding the typed words
-     with a word of its own between them is that quote with a word dropped. */
+     with a word of its own between them is that quote with a word dropped. An Answers section heading is not read so
+     (review, 2026-10-18): it titles no text, only a stretch of a topic titled otherwise, which hands the lead to the
+     letter the section cites; a heading one word off ("a flood of mercy" for the heading "A Flood of Judgment", the
+     word its opposite) put first a letter whose title holds none of the typed words. */
   if (!admitted.length && titleIx) {
-    const sw = swapTitles(wanted, { index: titleIx, hits: scored.filter(admissible) }).filter(admissible);
+    const sw = swapTitles(wanted, { index: titleIx, hits: scored.filter(admissible) }).filter((h) => admissible(h) && h.kind !== 'heading');
     const mine = new Set(sw.map((h) => h.docId));
     const namedElse = () => out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc) && !mine.has(/** @type {string} */ (idOf.get(e))));
     if (sw.length && !namedElse()) {

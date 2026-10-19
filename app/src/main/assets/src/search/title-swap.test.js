@@ -2,8 +2,9 @@
    its words types the shape with a content word of their own in that word's place. The word is no form, typo or
    near-synonym of the title's, so titles.js named nothing, and the texts holding the typed words far apart led the
    title. swapTitles reads the shape where it fits one title alone; the engine admits it only where nothing else names a
-   title and no text holds the typed words together (a short quote one word off a title is the quote). Fixture texts
-   and titles only (no bench query). */
+   title and no text holds the typed words together (a short quote one word off a title is the quote), and never for
+   an Answers section heading (review: the heading titles no text, and the word changed may be its opposite). Fixture
+   texts and titles only (no bench query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { buildTitles, scoreTitles, swapTitles } from './titles.js';
 import { VotSearchMini as E } from './engine.js';
@@ -31,9 +32,13 @@ describe('swapTitles: the shape of one title, one content word changed', () => {
     doc('letter', 'v3', 'gate-five', 'The Gate Part Five'),
     doc('letter', 'v4', 'lamp-weary', 'The Lamp of the Weary'),
     doc('letter', 'v5', 'not-by-arm', 'Not By Strength of Arm'),
+    { id: 'd-ans', kind: 'answers', volumeId: 'answers', letterId: 'regarding-the-proud', title: 'Regarding the Proud', text: 'Of the proud. A Tempest of Judgment The proud are brought low.' },
   ];
+  const ANSWERS = [{ id: 'regarding-the-proud', paragraphs: [
+    { text: 'Of the proud.' }, { align: 'center', text: '**A Tempest of Judgment**' }, { text: 'The proud are brought low.' },
+  ] }];
   let ix;
-  beforeAll(() => { prev = window.VotSearchData; window.VotSearchData = VOT_DATA; ix = buildTitles(DOCS, {}); });
+  beforeAll(() => { prev = window.VotSearchData; window.VotSearchData = VOT_DATA; ix = buildTitles(DOCS, { answers: ANSWERS }); });
   afterAll(() => { window.VotSearchData = prev; });
   const uks = (q, hits) => swapTitles(q, { index: ix, hits }).map((h) => h.uk);
 
@@ -66,6 +71,11 @@ describe('swapTitles: the shape of one title, one content word changed', () => {
     expect(uks('lit to shine', [own])).toEqual(['v1/kindled', 'wtlb1/kindled-entry']);
   });
 
+  it('an Answers heading the shape fits is read here, as a heading (the engine does not admit it)', () => {
+    const sw = swapTitles('a tempest of mercy', { index: ix });
+    expect(sw.map((h) => [h.uk, h.kind])).toEqual([['answers/regarding-the-proud', 'heading']]);
+  });
+
   it('the collection named beside it: read in that collection only', () => {
     const sw = swapTitles('lit to shine volume one', { index: ix });
     expect(sw.map((h) => h.uk)).toEqual(['v1/kindled']);
@@ -91,6 +101,18 @@ const GLOBALS = {
     { id: 'lamp-weary', num: 7, title: 'The Lamp of the Weary', blocks: seg(filler(2) + 'Come to Me, all who labor and are heavy laden, and I will be a light in your night. ' + filler(2)) },
     // texts holding none of the typed content words, so the small words weigh as little as they do in the volumes
     ...Array.from({ length: 12 }, (_, k) => ({ id: 'words-' + k, num: 10 + k, title: 'Words ' + k, blocks: seg(filler(2)) })),
+    // a text holding both typed content words far apart; titled otherwise
+    { id: 'storm-shelter', num: 30, title: 'Shelter in the Storm', blocks: seg(filler(1) + 'Then came a tempest of wind upon the sea, and the ships were driven far from the shore. ' + filler(1) + 'Yet My mercy endures, and I will bring you home. ' + filler(1)) },
+    // the letter the Answers section below cites; it says neither typed word
+    { id: 'repay', num: 31, title: 'Vengeance Is Mine', blocks: seg(filler(2) + 'Vengeance is Mine, I will repay, says The Lord, and the proud shall be brought low. ' + filler(2)) },
+  ],
+  // an Answers section heading one content word off the query, the word its opposite
+  ANSWERS: [
+    { id: 'regarding-the-proud', num: 1, title: 'Regarding the Proud', paragraphs: [
+      { text: filler(3) + 'Hear, O people.' },
+      { align: 'center', text: '**A Tempest of Judgment**' },
+      { text: 'Vengeance is Mine, I will repay, says The Lord, and the proud shall be brought low. ~ [From “Vengeance Is Mine” ~ Volume One]' },
+    ] },
   ],
 };
 const ids = (r) => r.results.map((x) => x.doc.letterId || x.doc.ref);
@@ -117,6 +139,15 @@ describe('a title typed with one word wrong leads the texts holding its words fa
   it('a sentence holding the typed content words with words of its own between them: the sentence leads', async () => {
     const top = ids(await E.search('stoked to gleam'));
     expect(top.slice(0, 2)).toEqual(['stoked', 'kindled']);
+  });
+
+  it('an Answers heading typed with one word wrong is not admitted: the text holding the typed words leads', async () => {
+    // the word changed may be the heading's opposite ("mercy" for "Judgment"), and the heading's section and the letter
+    // it cites are titled otherwise: the shape of a heading inside a text is no evidence of a title remembered
+    const top = ids(await E.search('a tempest of mercy'));
+    expect(top[0]).toBe('storm-shelter');
+    // nor the letter the section cites, which holds neither typed word, pulled up beside it
+    expect(top.slice(0, 3)).not.toContain('repay');
   });
 
   it('a short quote of a sentence one word off a title: the sentence leads, the look-alike title is not pulled up', async () => {

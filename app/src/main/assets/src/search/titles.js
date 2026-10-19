@@ -618,7 +618,8 @@ function looseOrder(/** @type {any} */ a, /** @type {any} */ b) {
    words or more (a two-word title one word off is one word typed). The weakest reading of all: it names a title only
    when it is the one reading. One title fits (its reprints, same-titled, are one), in the typed words or with a
    collection's words taken off (then in that collection only), and scoreTitles named no other. The engine reads it
-   only when admitTitles names nothing, and only when no text holds the typed words together (search()). */
+   only when admitTitles names nothing, only when no text holds the typed words together, and never for an Answers
+   section heading (search()). */
 /** Title words, the lead word off, at least, for a title typed with one word wrong to be read as that title. */
 export const TITLE_SWAP_MIN = 3;
 /** A negation counts as a small word: "attained by human means" is not "Not By Human Means" with one word wrong. */
