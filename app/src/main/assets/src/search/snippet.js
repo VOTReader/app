@@ -617,14 +617,18 @@ export function highlightSpans(text, terms, typed) {
   if (whole.length) alts.push('(?:' + whole.join('|') + ')(?![\\p{L}\\p{N}])');
   let re;
   try { re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + alts.join('|') + ')', 'giu'); } catch { return [{ text, hit: false }]; }
-  // which typed word a hit is: its word's family ("loved" and "loves" are love's, and so is
-  // its synonym "charity"; familiesOf). One word said twice is no run: by the longest term a
-  // hit starts with alone, "holy" marked "Holiest of Holies" whole (search200 UX D8).
+  // which typed word a hit is (search200 UX D8): a word the reader typed is its own word, so
+  // "king of kings" typed whole is one mark; what search added for it is its word's family
+  // ("loved" and "loves" are a typed love's, and so is its synonym "charity"; familiesOf). One
+  // word said twice is no run: by the longest term a hit starts with alone, "holy" marked
+  // "Holiest of Holies" whole; by family alone, "king of kings" marked "KING" and "KINGS".
   const byLen = tokens.slice().sort(longerFirst);
   const fams = familiesOf(terms);
+  const own = typedOwn(typed && typed.length ? typed : terms);
   const tokOf = (/** @type {string} */ s) => {
     const l = s.toLowerCase();
     const t = byLen.find((x) => l.startsWith(x)) || l;
+    if (own.has(t)) return t;
     const f = fams.get(t);
     return f ? f.fam : t;
   };
@@ -648,6 +652,29 @@ export function highlightSpans(text, terms, typed) {
   }
   if (last < text.length) out.push({ text: text.slice(last), hit: false });
   return out.length ? besideTyped(out, typed && typed.length ? typed : terms) : [{ text, hit: false }];
+}
+
+/**
+ * The words the reader typed, out of a card's typed list (search200 UX D8 review). The screen
+ * hands the typed words with the synonym table's words for them after (SearchScreen
+ * expandSnippetTerms: "righteous" brings "just", "justified"), so a word that table gives for
+ * an earlier typed word is that word's synonym, not one the reader typed: "just as He is
+ * righteous" stays two marks for a lone "righteous".
+ * @param {string[]} typed
+ * @returns {Set<string>}
+ */
+function typedOwn(typed) {
+  const SYN = /** @type {Record<string, string[]>} */ (searchData().SYNONYM_MAP || {});
+  /** @type {Set<string>} */
+  const own = new Set();
+  for (const t of typed) {
+    const w = String(t || '').toLowerCase().trim();
+    if (!w || own.has(w)) continue;
+    let added = false;
+    for (const x of own) if (SYN[x] && SYN[x].indexOf(w) >= 0) { added = true; break; }
+    if (!added) own.add(w);
+  }
+  return own;
 }
 
 /* A SMALL WORD MARKS ONLY BESIDE A TYPED ONE (search200 B7). Once a real word was typed,

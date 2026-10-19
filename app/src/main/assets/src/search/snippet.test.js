@@ -353,7 +353,8 @@ describe('search200 B7: marks for what was typed, a run as one, never a dateline
   beforeEach(() => { window.VotSearchData = REAL; });
   afterEach(() => { window.VotSearchData = prev; });
   afterAll(() => { window.VotSearchData = prev; });
-  const hits = (/** @type {string} */ t, /** @type {string[]} */ terms) => highlightSpans(t, terms).filter((s) => s.hit).map((s) => s.text);
+  /** @param {string} t @param {string[]} terms @param {string[]} [typed] */
+  const hits = (t, terms, typed) => highlightSpans(t, terms, typed).filter((s) => s.hit).map((s) => s.text);
 
   it('a word of the fuller stop list marks only itself: "who" never "whom" or "whole", "not" never "nothing"', () => {
     expect(hits('Who is he whom you seek? The whole of it, whose it is, who knows.', ['who'])).toEqual(['Who', 'who']);
@@ -410,15 +411,40 @@ describe('search200 B7: marks for what was typed, a run as one, never a dateline
      righteous" (D:/Swarm/lanes/search200/out/ux/fix-D/bridge8-before.log). A hit is its word's family: the
      word typed, its forms, its synonyms and archaic twins (familiesOf), and one family twice is no run. */
   it('D8: the forms and synonyms of one typed word are one word: no run joins them across words never typed', () => {
-    // the card's terms: the typed word, its synonyms, then the engine's matched forms
-    expect(hits('He loved them and loves them still', ['love', 'charity', 'agape', 'loved', 'loves'])).toEqual(['loved', 'loves']);
+    // the card's terms: the typed word, its synonyms, then the engine's matched forms; its typed list: the
+    // typed word and its synonyms (SearchScreen expandSnippetTerms)
+    expect(hits('He loved them and loves them still', ['love', 'charity', 'agape', 'loved', 'loves'], ['love', 'charity', 'agape'])).toEqual(['loved', 'loves']);
     expect(hits('Beloved, love and charity are one', ['love', 'charity', 'agape'])).toEqual(['love', 'charity']);
-    expect(hits('into the Holiest of Holies', ['holy', 'holiest', 'holies'])).toEqual(['Holiest', 'Holies']);
-    expect(hits('Blessed are those who Bless', ['blessed', 'bless'])).toEqual(['Blessed', 'Bless']);
+    expect(hits('into the Holiest of Holies', ['holy', 'holiest', 'holies'], ['holy'])).toEqual(['Holiest', 'Holies']);
+    expect(hits('Blessed are those who Bless', ['blessed', 'bless'], ['blessed'])).toEqual(['Blessed', 'Bless']);
     expect(hits('just as He is righteous', ['righteous', 'righteousness', 'just', 'justified', 'justification'])).toEqual(['just', 'righteous']);
     // two typed words, each with its forms, still read as one run
     expect(hits('the still waters', ['still', 'waters', 'water'])).toEqual(['still waters']);
     expect(hits('Now faith is the substance of things', ['faith', 'substance', 'faithful'])).toEqual(['faith is the substance']);
+  });
+
+  /* search200 UX D8 review (of 9ed4911fb): a hit as its word's family split the typed words in a row when two of
+     them are forms of one word: "king of kings" marked "KING" and "KINGS" apart in Revelation 19:16, and "lord of
+     lords", "God of gods", "song of songs", "vanity of vanities" alike, on the snippet, the headline and the
+     places' clips (D:/Swarm/lanes/search200/out/ux/fix-D/kings8d-before.log). A word the reader typed is its own
+     word; only what search added for it (its forms, and the synonym table's words that ride the typed list)
+     folds into it. */
+  it('D8 review: two typed forms of one word in a row are one mark; what search added for a typed word still folds', () => {
+    // the card's typed list: the reader's words, the small ones dropped, then the synonym table's ("king": ruler, monarch, sovereign)
+    const kings = ['king', 'kings', 'lord', 'lords', 'ruler', 'monarch', 'sovereign'];
+    expect(hits('a name written: KING OF KINGS AND LORD OF LORDS.', kings.concat(['kingdom']), kings)).toEqual(['KING OF KINGS AND LORD OF LORDS']);
+    const ecc = '“Vanity of vanities,” says the Preacher; “Vanity of vanities! All is vanity.”';
+    expect(hits(ecc, ['vanity', 'vanities'], ['vanity', 'vanities'])).toEqual(['Vanity of vanities', 'Vanity of vanities', 'vanity']);
+    expect(hits('The song of songs, which is Solomon’s.', ['song', 'songs'], ['song', 'songs'])).toEqual(['song of songs']);
+    expect(hits('into the Holy of Holies', ['holy', 'holies', 'holiest'], ['holy', 'holies'])).toEqual(['Holy of Holies']);
+    // no typed list: the terms are the typed words
+    expect(hits('the God of gods', ['god', 'gods'])).toEqual(['God of gods']);
+    // what search added for one typed word is still that word: no run across words never typed
+    expect(hits('into the Holiest of Holies', ['holy', 'holiest', 'holies'], ['holy'])).toEqual(['Holiest', 'Holies']);
+    const righteous = ['righteous', 'righteousness', 'just', 'justified', 'justification'];
+    expect(hits('just as He is righteous', righteous, righteous)).toEqual(['just', 'righteous']);
+    expect(hits('He loved them and loves them still', ['love', 'charity', 'agape', 'loved', 'loves'], ['love', 'charity', 'agape']))
+      .toEqual(['loved', 'loves']);
   });
 
   it('a small word the engine matched marks only beside a typed word, once a real word was typed', () => {
