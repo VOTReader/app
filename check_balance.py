@@ -25,6 +25,7 @@ DEFAULT_FILES = [
     'volume-one','volume-two','volume-three','volume-four','volume-five',
     'volume-six','volume-seven','lords-rebuke','letters-flock','letters-timothy',
     'wtlb-one','wtlb-two','the-blessed','holy-days','hidden-manna','answers',
+    'answers-meta',   # the Answers sidecars (ANSWERS_META, c72): raw-injected like answers.js
     'matthew','matthew-nkjv','matthew-plain','bible-studies',
     'wtlb-scriptures','books','books-restored',
 ]

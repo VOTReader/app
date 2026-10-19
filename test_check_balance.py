@@ -192,5 +192,19 @@ class StrictModeTest(unittest.TestCase):
         self.assertNotIn('--strict', out)     # and the flag was not read as a data file
 
 
+class DefaultFilesTest(unittest.TestCase):
+    """The hook and CI run the gate with no file names, so a data file missing from DEFAULT_FILES is
+    never parsed there. answers-meta.js (the Answers sidecars, c72, tools/fetch-answers.py) is a
+    second raw-injected Answers file beside answers.js; a syntax error in it would reach the app."""
+
+    def test_both_answers_files_are_checked(self):
+        self.assertIn('answers', cb.DEFAULT_FILES)
+        self.assertIn('answers-meta', cb.DEFAULT_FILES)
+
+    def test_every_default_file_exists(self):
+        missing = [f for f in cb.DEFAULT_FILES if not os.path.exists(cb.DATA_DIR + f + '.js')]
+        self.assertEqual(missing, [])
+
+
 if __name__ == '__main__':
     unittest.main()
