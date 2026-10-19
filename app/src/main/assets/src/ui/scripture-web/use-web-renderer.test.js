@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { gestureStep, backingOf, keepZoom, putAttr, walkOn, clampRails, GESTURE_HOLD_MS } from './use-web-renderer.js';
 import { backingScale, backingSize } from './web-renderer.js';
-import { fitPPV, verseToX } from '../../utils/scripture-web/geometry.js';
+import { fitPPV, verseToX, END_MARGIN } from '../../utils/scripture-web/geometry.js';
 
 describe("w4: My Web's per-frame clamp keeps each rail in its world with the docked panel's slack", () => {
   const W = 3200, cap = () => 5000;
@@ -15,11 +15,15 @@ describe("w4: My Web's per-frame clamp keeps each rail in its world with the doc
     bible: { x: 31102, ppv: 0.5, total: 31102, y: 40 },
     vols: { x: 21, ppv: 600, total: 21, y: 0 },
   });
-  it("with the panel's slack each rail's end stands at the canvas area's edge, not the view's", () => {
+  // w4 integration: with the panel docked a rail's end stands the canvas area's outer tenth inside
+  // its edge (geometry END_MARGIN, the phone stream's law for the canon's ends), as the canon's does;
+  // through the My Web stream alone it stood on the area's edge, the panel's border
+  it("with the panel's slack each rail's end stands the area's outer tenth inside the canvas area's edge, not the view's", () => {
     const { bible, vols } = rails();
     clampRails(bible, vols, W, cap, () => 1280);
-    expect(verseToX(bible, W, 31102)).toBeCloseTo(W - 1280, 6);
-    expect(verseToX(vols, W, 21)).toBeCloseTo(W - 1280, 6);
+    const end = (W - 1280) * (1 - END_MARGIN);
+    expect(verseToX(bible, W, 31102)).toBeCloseTo(end, 6);
+    expect(verseToX(vols, W, 21)).toBeCloseTo(end, 6);
     // a rail has no y frame: a height carried over from the canon web is dropped
     expect(bible.y).toBe(0);
   });

@@ -284,13 +284,17 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
    * The panel stopped covering the right (it closed, or became the bottom sheet): a camera its
    * slack let stand past the view's own bound eases back inside it, at the same zoom, rather than
    * jumping there at the reader's next drag. usePanelInset calls it once the inset has shrunk, with
-   * the right inset it had (CSS px). The slack itself eases from that inset to the new one over
-   * INSET_EASE_MS, and every camera past the new bound is clamped with it each frame, so a rail's
-   * end glides from the panel's old edge to the view's (w4 fix round 2: My Web's Volumes rail stepped
-   * back at once, and the canon's fly clamped its first frame with the shrunk slack, so both rails
-   * snapped). Every other clamp (My Web's per frame, the gestures, a fly) reads the same eased slack
-   * through slackFor. With no frame loop, under reduced motion, or with no old inset given, it
-   * steps back at once; a fly running already clamps every frame, so the canon's is left to land.
+   * the right inset it had (CSS px). Each camera past the new bound has its BOUND eased from where
+   * the old inset let it stand to where the new one does, over INSET_EASE_MS, and is held inside it
+   * each frame, so a rail's end glides from the panel's old edge to the view's (w4 fix round 2: My
+   * Web's Volumes rail stepped back at once, and the canon's fly clamped its first frame with the
+   * shrunk slack, so both rails snapped). The bound eases, not the slack: clampCamera's END_MARGIN
+   * holds while any slack does, so an eased slack kept the margin to its last frame and the end then
+   * jumped by it (w4 integration, the phone stream's margin with the My Web stream's ease). While it
+   * runs, every other clamp (My Web's per frame, the gestures) reads the old inset through slackFor,
+   * a bound the eased one never passes. With no frame loop, under reduced motion, or with no old
+   * inset given, it steps back at once; a fly running already clamps every frame, so the canon's is
+   * left to land.
    * @param {number} [wasRight]  the right inset the panel covered, CSS px
    */
   const settleInset = React.useCallback((/** @type {number} */ wasRight = 0) => {
@@ -316,12 +320,20 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
       if (schedule) schedule();
       return;
     }
+    // where each camera stands now (inside the old inset's bound) and where the new bound puts it
+    const starts = past.map((c) => c.x);
+    const ends = past.map((c) => clampCamera({ x: c.x, ppv: c.ppv, total: c.total, y: c.y }, v.W, zoomCapFor(c),
+      yFrameFor(c) || undefined, slackFor(c)).x);
     let t = 0;
     settleSlackRef.current = from;
     animate((dt) => {
       t = Math.min(1, t + dt / INSET_EASE_MS);
-      settleSlackRef.current = t >= 1 ? 0 : now + (from - now) * (1 - easeInOutCubic(t));
-      for (const c of past) clampNow(c);
+      const k = t >= 1 ? 0 : 1 - easeInOutCubic(t);
+      past.forEach((c, i) => {
+        const bound = ends[i] + (starts[i] - ends[i]) * k;
+        c.x = starts[i] > ends[i] ? Math.min(c.x, bound) : Math.max(c.x, bound);
+      });
+      if (t >= 1) { settleSlackRef.current = 0; for (const c of past) clampNow(c); }
       return t < 1;
     }, () => { settleSlackRef.current = 0; });
   }, [zoomCapFor, yFrameFor, slackFor, modeRef, schedule, animate]);

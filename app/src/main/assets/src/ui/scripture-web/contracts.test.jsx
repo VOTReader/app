@@ -11,7 +11,7 @@ import { useGoTo, routeOverlayHit } from './goto.jsx';
 import { hitOverlay } from './overlay-renderer.js';
 import { railFrame } from './rail-renderer.js';
 import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
-import { verseToX, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
+import { verseToX, fitPPV, clampCamera, END_MARGIN } from '../../utils/scripture-web/geometry.js';
 
 const TOTAL = 31102;
 // one chapter (the whole canon, as the screen's Nearby fixture) and two threads
@@ -624,7 +624,9 @@ describe("My Web's two cameras leave the docked panel room at the rails' ends (w
     expect(cam.slackFor(vols)).toBe(0);
   });
 
-  it("with the panel docked each rail's end can stand at the canvas area's right edge; closing it settles both back inside the view", () => {
+  // w4 integration: the docked end stands the canvas area's outer tenth inside its right edge
+  // (geometry END_MARGIN, the phone stream's law for the canon's ends), not on the panel's border
+  it("with the panel docked each rail's end can stand the area's outer tenth inside the canvas area's right edge; closing it settles both back inside the view", () => {
     const { cam } = myWeb().get();
     const bible = cam.camRef.current, vols = cam.camVRef.current;
     cam.panelInsetRef.current = { right: 640, bottom: 0 };
@@ -632,12 +634,13 @@ describe("My Web's two cameras leave the docked panel room at the rails' ends (w
     bible.x = TOTAL; vols.x = SPAN;
     clampCamera(bible, W, 5000, undefined, cam.slackFor(bible));
     clampCamera(vols, W, 5000, undefined, cam.slackFor(vols));
-    expect(verseToX(bible, W, TOTAL)).toBeCloseTo(W - 1280, 6);
-    expect(verseToX(vols, W, SPAN)).toBeCloseTo(W - 1280, 6);
+    const docked = (W - 1280) * (1 - END_MARGIN);
+    expect(verseToX(bible, W, TOTAL)).toBeCloseTo(docked, 6);
+    expect(verseToX(vols, W, SPAN)).toBeCloseTo(docked, 6);
     // still docked: nothing to settle
     cam.settleInset();
-    expect(verseToX(cam.camRef.current, W, TOTAL)).toBeCloseTo(W - 1280, 6);
-    expect(verseToX(cam.camVRef.current, W, SPAN)).toBeCloseTo(W - 1280, 6);
+    expect(verseToX(cam.camRef.current, W, TOTAL)).toBeCloseTo(docked, 6);
+    expect(verseToX(cam.camVRef.current, W, SPAN)).toBeCloseTo(docked, 6);
     // closed: the view's own edge is each rail's bound again, at the same zoom (no frame loop here)
     cam.panelInsetRef.current = { right: 0, bottom: 0 };
     cam.settleInset();
@@ -690,7 +693,8 @@ describe("closing the docked panel at a rail's end eases both rails back inside 
   for (const mode of ['personal', 'canonical']) {
     it(`${mode === 'personal' ? 'My Web, both rails' : 'the canon'}: the end glides from the panel's old edge to the view's over about 250 ms, no frame a jump`, () => {
       const { cam, l, ends } = atEnds(mode);
-      const edge = W - PANEL * DPR;
+      // w4 integration: docked, the end stands END_MARGIN of the canvas area inside its edge
+      const edge = (W - PANEL * DPR) * (1 - END_MARGIN);
       for (const x of ends()) expect(x).toBeCloseTo(edge, 6);
       cam.panelInsetRef.current = { right: 0, bottom: 0 };   // usePanelInset wrote the shrunk inset, then:
       cam.settleInset(PANEL);
@@ -708,6 +712,9 @@ describe("closing the docked panel at a rail's end eases both rails back inside 
         for (const d of steps) expect(d).toBeGreaterThanOrEqual(-1e-6);
         expect(Math.max(...steps), `rail ${r}: ${xs.map((x) => Math.round(x)).join(',')}`).toBeLessThan(0.25 * dist);
         expect(steps[0]).toBeLessThan(0.05 * dist);
+        // and the last one too: an ease out, no snap as the panel's END_MARGIN lets go (w4
+        // integration: the eased slack kept the margin to its last frame, then the end jumped 320 px)
+        expect(steps[steps.length - 1], `rail ${r}: ${xs.map((x) => Math.round(x)).join(',')}`).toBeLessThan(0.05 * dist);
         // and lands at the view's own edge
         expect(xs[xs.length - 1]).toBeCloseTo(W, 6);
       });
