@@ -69,6 +69,9 @@ const GOTO_FIELD_H = 56;
 const GOTO_GUTTER = 24;
 /** Narrower than this between the title and the control row, the box drops under them. */
 export const GOTO_BOX_MIN = 480;
+/** The verse chip (CSS px): its gap from the foot it names, and the room it keeps from the area's edges. */
+const CHIP_GAP = 10;
+const CHIP_GUTTER = 8;
 
 /**
  * Where the PC box sits (spec 4.5, r3-04): 640 px at top 24, centred over the canvas area, and
@@ -498,12 +501,18 @@ export function useGoTo(web) {
       const sheetTop = v.H / dpr - ((panelInsetRef && panelInsetRef.current && panelInsetRef.current.bottom) || 0);
       const y = Math.min((va.base + (va.camY || 0)) / dpr, sheetTop);
       const el = chipElRef.current;
-      const tx = Math.round(x + 10), ty = Math.round(y - 12);
+      // on the foot's right; short of room there before the area's edge (the canon's end stands
+      // the outer tenth inside it with the panel docked), on the foot's left, and judged on the
+      // box it takes, so it never runs under the panel (w4 review: "Revelation 2" at its border)
+      const w = el.offsetWidth, edge = right / dpr - CHIP_GUTTER;
+      let tx = Math.round(x + CHIP_GAP);
+      if (tx + w > edge) tx = Math.max(CHIP_GUTTER, Math.round(x - CHIP_GAP - w));
+      const ty = Math.round(y - 12);
       el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) translateY(-100%)';
-      const shown = x >= 0 && x <= right / dpr - 40 && y <= v.H / dpr;
+      const shown = x >= 0 && x <= right / dpr && tx + w <= edge && y <= v.H / dpr;
       el.style.visibility = shown ? 'visible' : 'hidden';
       // the overlay's labels keep off it (its foot chip would print under it: "John 3:16 · J…")
-      if (shown) kept = { x0: tx, x1: tx + el.offsetWidth, y0: ty - el.offsetHeight, y1: ty };
+      if (shown) kept = { x0: tx, x1: tx + w, y0: ty - el.offsetHeight, y1: ty };
     }
     keepOut(kept);
     let left = null, rightEnd = null;

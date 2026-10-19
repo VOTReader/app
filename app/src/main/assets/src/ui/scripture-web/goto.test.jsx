@@ -251,6 +251,48 @@ describe('the go-to box (spec 4.5)', () => {
     expect(chipY(), 'the sheet gone: back at the foot').toBe(footY);
   });
 
+  /* w4 review (major): with the panel docked the canon's end now stands the outer tenth inside the
+     canvas area (5cb1d00f1), so a foot there passed the old "40 px short of the area's edge" test
+     and the chip grew right, under the panel: "Revelation 22:21 · 3 connections" ran from 866 to
+     1108 against an area edge of 960 on PC and read "Revelation 2" at the panel's border. Short of
+     room on the foot's right it stands on the foot's left, and it is judged on the box it takes. */
+  it('the chip keeps out of a docked panel: short of room on the foot\'s right, it stands on its left', async () => {
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(180);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30);
+    const { container, get } = mountWeb();
+    act(() => { get().goTo.open('Genesis 1:101'); });
+    fireEvent.keyDown(input(container), { key: 'Enter' });
+    settle(); await flush();
+    const el = () => /** @type {HTMLElement} */ (container.querySelector('.sw-goto-chip'));
+    const at = () => /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el().style.transform).slice(1).map(Number);
+    // docked: 300 px of the 800 px frame, the 500 px area beside it; the foot at 0.9 of the area
+    const cam = get().cam.camRef.current;
+    get().cam.panelInsetRef.current = { right: 300, bottom: 0 };
+    cam.ppv = 8; cam.x = 100.5 - (450 - 400) / 8;
+    act(() => { get().frames.schedule(); });
+    settle();
+    expect(verseToX(cam, 800, 100.5), 'the foot at 0.9 of the area').toBeCloseTo(450, 6);
+    const [tx, ty] = at();
+    expect(el().style.visibility).toBe('visible');
+    expect(tx + 180, 'its right edge inside the area, clear of the panel').toBeLessThanOrEqual(500);
+    expect(tx + 180, 'beside the foot, on its left').toBeLessThan(450);
+    expect(tx, 'inside the view').toBeGreaterThanOrEqual(8);
+    expect(get().keepOutRef.current, 'the overlay is told the box it takes').toEqual([{ x0: tx, x1: tx + 180, y0: ty - 30, y1: ty }]);
+    // the panel gone: room on the foot's right again
+    get().cam.panelInsetRef.current = { right: 0, bottom: 0 };
+    act(() => { get().frames.schedule(); });
+    settle();
+    expect(at()[0], 'back on the foot\'s right').toBe(460);
+    // a chip that fits neither side of its foot in the area is not shown half under the panel
+    get().cam.panelInsetRef.current = { right: 640, bottom: 0 };
+    cam.x = 100.5 - (80 - 400) / 8;
+    act(() => { get().frames.schedule(); });
+    settle();
+    expect(verseToX(cam, 800, 100.5)).toBeCloseTo(80, 6);
+    expect(el().style.visibility, 'a 180 px chip in a 160 px area: hidden').toBe('hidden');
+    expect(get().keepOutRef.current).toBeNull();
+  });
+
   it('the chip tells the overlay where it stands (keepOutRef, CSS px), so the canvas labels keep off it; it lets go when the chip goes', async () => {
     vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(180);
     vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(30);
