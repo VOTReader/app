@@ -52,9 +52,11 @@ describe('the ink table', () => {
     expect(INK.canvas).toEqual({ hex: '#000000', alpha: 1 });
     expect(INK.cited).toEqual({ hex: '#C4A469', alpha: 0.70 });
     // the prophecy class, retuned from the spec's .80 / 1.25 px / .12 (set for 51 pairs) to its
-    // pale-constellation intent over the asset's 131 (GL review 2026-10-18): a 1 device px core
-    expect(INK.prophecy).toEqual({ hex: '#EADFC4', alpha: 0.40 });
-    expect(INK.prophecyGlow).toEqual({ hex: '#EADFC4', alpha: 0.06, width: 4 });
+    // pale-constellation intent over the asset's 131 (GL review 2026-10-18): a 1 device px core,
+    // in r2-01a's pale gold and with no glow (w4 INK item 5); the legend's arc in the same gold
+    expect(INK.prophecy).toEqual({ hex: '#EFD18A', alpha: 0.35 });
+    expect(INK.prophecyKey).toEqual({ hex: '#EFD18A', alpha: 0.90 });
+    expect(INK.prophecyGlow, 'the class has no glow').toBeUndefined();
     // the chosen, hovered and lit lines in the pictures' gold (w4 INK item 3; the spec's #E6D3A3 read
     // cream): the spec's alphas and widths, which My Web's threads read too (rail-renderer)
     expect(INK.chosen).toEqual({ hex: '#F2D38A', alpha: 1, width: 3, widthCompact: 2.5 });
@@ -99,6 +101,21 @@ describe('the ink table', () => {
     expect(INK.hover.hex).toBe(INK.chosen.hex);
     // the label is text on the canvas: AAA
     expect(contrast(INK.chosenLabel.hex, INK.canvas.hex)).toBeGreaterThanOrEqual(7);
+  });
+
+  it('the prophecy class is r2-01a\'s pale gold: distinct from the field, told from the chosen line by weight, keyed in the legend in its own gold', () => {
+    const { h, s } = hsl(INK.prophecy.hex);
+    expect(h, 'hue: the gold family').toBeGreaterThanOrEqual(35);
+    expect(h, 'hue: the gold family').toBeLessThanOrEqual(48);
+    // the old #EADFC4 (.53 saturated) read as the field's own tan; r2-01a's arcs are gold
+    expect(s, 'saturation: gold, not cream').toBeGreaterThanOrEqual(0.65);
+    // pale by its ink, not its colour: at most .4 of the chosen line's, on a 1 device px core
+    expect(INK.prophecy.alpha).toBeLessThanOrEqual(INK.chosen.alpha * 0.4);
+    expect(INK.prophecy.width, '1 device px, the renderer\'s floor').toBeUndefined();
+    // the legend draws the canvas's mark (the spec's legend: "[pale arc] prophecy fulfilled"),
+    // at a weight a 1.5 px stroke can be seen by
+    expect(INK.prophecyKey.hex).toBe(INK.prophecy.hex);
+    expect(INK.prophecyKey.alpha).toBeGreaterThanOrEqual(0.85);
   });
 
   it('the panel and every chrome fill are night slate, never cream (#18, Q4)', () => {
@@ -161,6 +178,6 @@ describe('the helpers', () => {
     expect(src).toBe('vec4(0.0, 0.0, 0.0, 1.0)');
     const prophecy = inkGLSL('prophecy');
     expect(prophecy).toMatch(/^vec4\(([0-9]+\.[0-9]+, ){3}[0-9]+\.[0-9]+\)$/);
-    expect(prophecy.endsWith('0.4)')).toBe(true);
+    expect(prophecy.endsWith('0.35)')).toBe(true);
   });
 });

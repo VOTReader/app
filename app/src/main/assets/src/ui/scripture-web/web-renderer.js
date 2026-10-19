@@ -29,7 +29,8 @@
    Over it a TOP PASS draws the prophecy class (every g.prophecy pair, always
    on) and redraws the few threads the reader has asked about (the lit, the
    hovered, the chosen: utils/scripture-web/frame-set.js) in
-   the ink table's gold (sw-ink.js), a core under a soft halo, each
+   the ink table's gold (sw-ink.js), a core under a soft halo (the
+   prophecy class a bare core: no glow, w4 INK item 5), each
    tessellated for its own visible piece (geometry.topSegmentsFor), culled
    by the main pass's own test and drawn in runs by segment class
    (frame-set.topDraws), so the
@@ -318,10 +319,11 @@ export const TOP_SHADER_SOURCE = { vertex: TOP_VERT, fragment: TOP_FRAG };
 /** Each top-pass kind's ink (sw-ink.js rows) and its tessellation cap. */
 const TOP_LOOK = {
   // the core is 1 device px on every screen (the ink table's prophecy row has no CSS width, and
-  // nothing draws it thinner); it recedes with a tap
-  prophecy: { core: 'prophecy', halo: 'prophecyGlow', cap: 192, minDevicePx: 1, recedes: true },
+  // nothing draws it thinner), with no glow: a crisp gold constellation (r2-01a; w4 INK item 5),
+  // where a glow of a few CSS px fogged a phone's field round every pair; it recedes with a tap
+  prophecy: { core: 'prophecy', halo: '', cap: 192, minDevicePx: 1, recedes: true },
   // the pairs the chosen range keeps lit (frame-set.topSet): the same ink, and it does not recede
-  prophecyInRange: { core: 'prophecy', halo: 'prophecyGlow', cap: 192, minDevicePx: 1 },
+  prophecyInRange: { core: 'prophecy', halo: '', cap: 192, minDevicePx: 1 },
   lit: { core: 'lit', halo: '', cap: 192 },
   hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
   chosen: { core: 'chosen', halo: 'chosenHalo', cap: 512 },

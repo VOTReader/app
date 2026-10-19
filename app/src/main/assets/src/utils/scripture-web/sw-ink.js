@@ -43,9 +43,12 @@ const TABLE = {
   // the prophecy class: a pale constellation over the web (r2-01a). The spec's .80 / 1.25 px / .12 glow
   // were set for 51 pairs; the asset carries 131 distinct, clustered on a few feet (Matthew 1:1 x5,
   // Isaiah 7:14 x4), and at those numbers Psalms/Isaiah to the Gospels became a solid cream tangle
-  // (GL review 2026-10-18). Retuned to the picture's intent, not its count; the hub holds the call.
-  prophecy: { hex: '#EADFC4', alpha: 0.40 },                     // core: 1 DEVICE px (no CSS width, as cited); top pass, every density
-  prophecyGlow: { hex: '#EADFC4', alpha: 0.06, width: 4 },
+  // (GL review 2026-10-18). Retuned to the picture's intent, not its count. In r2-01a's pale gold
+  // (w4 INK item 5): the cream #EADFC4 sank into the field's own tan, a gold of .35 stays distinct
+  // without a tangle, and with no glow it is a crisp line on a phone too, where a glow of a few CSS
+  // px fogged the field round every pair.
+  prophecy: { hex: '#EFD18A', alpha: 0.35 },                     // core: 1 DEVICE px (no CSS width, as cited), no glow; top pass, every density
+  prophecyKey: { hex: '#EFD18A', alpha: 0.90 },                  // the legend's arc (app.css --sw-prophecy): the canvas's gold at legend size
 
   // ── the chosen, hovered and lit lines: the top pass (C1, C3) ────────────
   // In the pictures' gold (r2-02, r3-03, r3-04; w4 INK item 3): the spec's #E6D3A3 read as cream on

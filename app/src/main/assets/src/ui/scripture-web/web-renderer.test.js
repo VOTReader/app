@@ -553,9 +553,10 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     // each of the class's draws (a run per segment class) in its ink and widths
     const each = (name, want) => expect(idle.u(idle.top, name)).toEqual(idle.top.map(() => want));
     each('uCore', rgba01('prophecy'));
-    each('uHalo', rgba01('prophecyGlow'));
+    // no glow (w4 INK item 5): a bare core, nothing fogs the field round a pair
+    each('uHalo', [0, 0, 0, 0]);
     each('uCoreHalf', [0.5]);   // 1 device px at dpr 1
-    each('uHaloHalf', [inkWidth('prophecyGlow') / 2]);
+    each('uHaloHalf', [0]);
     expect(instancesOf(idle.top)).toBe(2);
     expect(idle.stats.instances).toBe(3);   // stats count the web alone
     expect(idle.stats.draws).toBe(idle.main.length);
@@ -575,7 +576,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     }
   });
 
-  it('the core never draws under 1 device px; the glow and the core recede with a tap, as far as TAP_CONTEXT and no further', () => {
+  it('the core never draws under 1 device px, with no glow; it recedes with a tap, as far as TAP_CONTEXT and no further', () => {
     const half = topLook('prophecy', 0.5, false);   // the row has no CSS width: 1 device px at any dpr
     expect(half.coreHalf).toBe(0.5);
     expect(half.core).toEqual(rgba01('prophecy'));
@@ -584,7 +585,8 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(at.core[3]).toBeCloseTo(rgba01('prophecy')[3] * (1 + (TAP_CONTEXT - 1) * 0.5), 12);
     const full = topLook('prophecy', 1, false, 1);
     expect(full.core[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
-    expect(full.halo[3]).toBeCloseTo(rgba01('prophecyGlow')[3] * TAP_CONTEXT, 12);
+    expect(full.halo, 'no glow to recede').toEqual([0, 0, 0, 0]);
+    expect(full.haloHalf).toBe(0);
     expect(topLook('prophecy', 1, false, 9).core[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
     // the chosen, lit and hovered never recede
     expect(topLook('chosen', 1, false, 1).core).toEqual(rgba01('chosen'));
@@ -594,18 +596,21 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
   /* GL review 2026-10-18: at the spec's .80 / 1.25 px / .12 glow (set for 51 pairs) the asset's 131
      distinct pairs, clustered on a few feet, drew Psalms/Isaiah to the Gospels as a solid cream tangle
      over the whole dome, against r2-01a's pale constellation. The class sits under what the reader
-     asks about: one device px on every screen, at most half the lit ink, its glow under the halos'. */
-  it('the prophecy class is a pale constellation: 1 device px on every screen, under half the lit ink', () => {
+     asks about: one device px on every screen, at most half the lit ink. w4 INK item 5: and no glow,
+     which at a few CSS px fogged a phone's field round every pair (the r2-01a pairs). */
+  it('the prophecy class is a pale constellation: 1 device px on every screen, under half the lit ink, no glow', () => {
     for (const dpr of [0.5, 1, 2, 2.625, 3]) {
       for (const compact of [false, true]) {
         const look = topLook('prophecy', dpr, compact);
         expect(look.coreHalf, `dpr ${dpr} compact ${compact}`).toBe(0.5);
         expect(look.core[3], `dpr ${dpr} compact ${compact}`).toBe(rgba01('prophecy')[3]);
+        expect(look.haloHalf, `dpr ${dpr} compact ${compact}: no glow`).toBe(0);
+        expect(look.halo[3]).toBe(0);
+        // the ribbon is the core and its feather, no wider
+        expect(look.ribbon).toBe(look.coreHalf + 0.5);
       }
     }
     expect(rgba01('prophecy')[3]).toBeLessThanOrEqual(rgba01('lit')[3] / 2);
-    expect(rgba01('prophecyGlow')[3]).toBeLessThan(rgba01('hoverHalo')[3] / 2);
-    expect(rgba01('prophecyGlow')[3]).toBeLessThan(rgba01('chosenHalo')[3] / 2);
   });
 
   /* GL review 2026-10-18 (finding 4): the top pass was never culled, so every pair went to the GPU
@@ -651,7 +656,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(cores.length).toBe(2);
     expect(cores[0][3], 'the pair from 5 to 180 recedes').toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
     expect(cores[1], 'the pair from 100 keeps its ink').toEqual(rgba01('prophecy'));
-    expect(glows[1]).toEqual(rgba01('prophecyGlow'));
+    expect(glows[1], 'and no glow').toEqual([0, 0, 0, 0]);
     expect(f.top.map((d) => d.args[3])).toEqual([1, 1]);
     expect(topLook('prophecyInRange', 2, true, 1)).toEqual(topLook('prophecy', 2, true, 0));
   });

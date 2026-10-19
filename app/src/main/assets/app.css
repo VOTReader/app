@@ -7729,7 +7729,7 @@
       --sw-active-border: rgba(196, 164, 105, 0.7);
       --sw-panel: #1C2527; --sw-panel-edge: #3A4547; --sw-hairline: #2C3537;
       --sw-cite-rule: rgba(196, 164, 105, 0.6);
-      --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(234, 223, 196, 0.4);
+      --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(239, 209, 138, 0.9);
       --sw-font: 'EB Garamond', Georgia, serif;
     }
     /* ONE PALETTE, ONE CANVAS. The canvas is black in both themes (SW_PALETTE,
@@ -8375,8 +8375,9 @@
     .sw-legend-line > * { position: relative; margin-left: 21px; }
     .sw-legend-line > *::before { content: '\00b7'; position: absolute; left: -13px; }
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
-    /* the cited tick (sw-ink `cited`) and the prophecy thread (sw-ink `prophecy`), as the
-       canvas paints them, a little larger so they read at legend size */
+    /* the cited tick (sw-ink `cited`) and the prophecy thread (sw-ink `prophecyKey`: the
+       canvas's prophecy gold, inked up from its .35 so a 1.5 px arc reads, w4 INK item 5), as
+       the canvas paints them, a little larger so they read at legend size */
     .sw-key-tick { width: 2px; height: 10px; border-radius: 1px; display: inline-block; background: var(--sw-cited); }
     .sw-key-arc {
       width: 28px; height: 8px; display: inline-block; box-sizing: border-box; margin-top: 3px;

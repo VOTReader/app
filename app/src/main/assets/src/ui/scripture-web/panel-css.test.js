@@ -53,8 +53,10 @@ const ROWS = {
   '--sw-hairline': 'hairline', '--sw-cite-rule': 'citeRule',
   // the canvas's black, which the root, the loader and the load error paint (Q4, w3 panel step 2)
   '--sw-canvas': 'canvas',
-  // the legend's cited tick and prophecy thread, the marks the canvas paints (w3 panel step 2)
-  '--sw-cited': 'cited', '--sw-prophecy': 'prophecy',
+  // the legend's cited tick and prophecy thread, the marks the canvas paints (w3 panel step 2);
+  // the thread is keyed in the canvas's gold at legend weight (w4 INK item 5: at the canvas's .35
+  // a 1.5 px arc did not read)
+  '--sw-cited': 'cited', '--sw-prophecy': 'prophecyKey',
 };
 
 describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () => {
@@ -70,6 +72,12 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
     expect(got, token + ' parses').toBeTruthy();
     expect(got.hex).toBe(INK[row].hex.toUpperCase());
     expect(got.alpha).toBeCloseTo(INK[row].alpha, 3);
+  });
+
+  it('the legend\'s prophecy arc is the canvas\'s prophecy gold, at a weight its 1.5 px stroke reads by', () => {
+    expect(INK.prophecyKey.hex).toBe(INK.prophecy.hex);
+    expect(INK.prophecyKey.alpha).toBeGreaterThanOrEqual(0.85);
+    expect(rule('.sw-key-arc')).toMatch(/border:\s*1\.5px solid var\(--sw-prophecy\)/);
   });
 
   it('the face is the web\'s one face', () => {
