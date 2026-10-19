@@ -510,6 +510,33 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
+  /* w4 review 2 (minor) held that two bar starts d * ppv >= minGap apart, unrounded, can round to
+     minGap - 1 apart and touch at DPR 1. They cannot: Math.round(y) is floor(y + 0.5), and
+     floor(u + d) >= floor(u) + floor(d), so rounding never brings two starts closer than the floor of
+     their distance - minGap (a whole number) for a book start, floor(3 s) for a run - and both stay a
+     device pixel or more wider than a bar (round(1.5 s) at most). Witnessed at every DPR the app
+     meets, over pans a fiftieth of a pixel apart. */
+  it('two neighbouring bars never touch: at least one device pixel of black between them, at every DPR, zoom and sub-pixel pan', () => {
+    for (const dpr of [1, 1.25, 1.5, 1.75, 2, 2.625, 3]) {
+      FRAMES['dpr' + dpr] = { W: Math.round(1600 * dpr), H: Math.round(900 * dpr), DPR: dpr };
+      // the overview, and zooms where a bar is at its widest (a run 5-6 px: two device px at DPR 1)
+      for (const zoom of [1, 1.67, 2.5, 3.4]) {
+        for (let k = 0; k < 20; k++) {
+          const fs = frameAt('dpr' + dpr, zoom, verseOf('psalms', 1, 1));
+          fs.cam.x += -k / 20 / fs.cam.ppv;
+          const rec = recorder();
+          paintCanonOverlay(rec.ctx, fs);
+          const bars = inked(rec, (f) => BAR_FILLS.has(f)).sort((p, q) => p.x0 - q.x0);
+          expect(bars.length).toBeGreaterThan(100);
+          for (let i = 1; i < bars.length; i++) {
+            expect(bars[i].x0 - bars[i - 1].x1, 'DPR ' + dpr + ' ' + zoom + 'x, pan ' + k / 20 + ': the black between bars ' + (i - 1) + ' and ' + i).toBeGreaterThanOrEqual(1);
+          }
+        }
+      }
+      delete FRAMES['dpr' + dpr];
+    }
+  });
+
   /* r2-01a at 900 px: the names stand about 55-60 px over the legend. w4's +90 row left about 78
      (it was about 98 before w4: the dead band); the w4 review set the bound at the picture's 60. */
   it('pc: the band fills the ruler as r2-01a does: the names within 60 px of the legend, the bars between the cited strip and the names', () => {

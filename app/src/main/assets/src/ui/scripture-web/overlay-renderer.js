@@ -798,8 +798,10 @@ function drawOverview(ctx, g, cam, L, t, hits, holes) {
   };
   // a book's start begins a bar when it stands far enough from the last one: a whole number of
   // device pixels by the zoom alone, so the two bars, drawn at rounded x, are never closer than
-  // that, and a pan never regroups them (it was the rounded x's difference, which a sub-pixel pan
-  // moved by a pixel: bars came and went, w4 review)
+  // that (Math.round is floor(x + 0.5), and floor(u + d) >= floor(u) + floor(d): rounding never
+  // brings two starts closer than the floor of their distance, and minGap is a pixel or more wider
+  // than a bar at every DPR), and a pan never regroups them (it was the rounded x's difference,
+  // which a sub-pixel pan moved by a pixel: bars came and went, w4 review)
   const minGap = Math.ceil(0.84 * BAR_PITCH * s);
   let from = -1, book = -1, sum = 0, n = 0;
   for (let i = 0; i < g.chapters.length; i++) {
