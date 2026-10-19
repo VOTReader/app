@@ -161,8 +161,11 @@ const baseProps = () => ({
   setFromSearch: vi.fn(),
   setFromSurprise: vi.fn(),
   setGenreId: vi.fn(),
-  setActiveReadKey: vi.fn(),
+  setActiveReadKey: vi.fn(),     // no longer a param (B1): kept so a call would still be seen
   setLastReadForVol: vi.fn(),
+  setSearchLanding: vi.fn(),
+  setFromWtlb: vi.fn(),
+  setFromMatthewCh: vi.fn(),
   handleSurprise: vi.fn(),
   goSettings: vi.fn(),
   goHome: vi.fn(),
@@ -529,7 +532,8 @@ describe('useSearch — handleSearchSelect (__direct refs)', () => {
     }); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setScreen).toHaveBeenCalledWith('vol-two-letter');
-    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:two', expect.any(Function));
+    // search200 UX B1: a hit is a look, not a read — the cursor is left alone.
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
   });
 
   it('ref-letter resolves letterNum → letterId via srchResolveLetterId', () => {
@@ -616,7 +620,8 @@ describe('useSearch — handleSearchSelect (Orama doc results)', () => {
     act(() => { result.current.handleSearchSelect({ doc: { kind, volumeId: 'vot-two', letterId: 'wide-path' } }); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setScreen).toHaveBeenCalledWith('vol-two-letter');
-    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:two', expect.any(Function));
+    // search200 UX B1: a hit is a look, not a read — the cursor is left alone.
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
   });
 
   it('letter-kind no-ops when volumeId unknown', () => {
@@ -918,5 +923,64 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'x' } }, ['x']); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+  });
+});
+
+/* search200 UX B1: a search hit is a look, not a read. Opening one used to move
+   the reading cursor (the index's "current" mark and the resume dot) onto it, so
+   a brief look became where the reader was. The hit now names the place it
+   opens (searchLanding): the catch-all arm in use-reading-position-nav skips
+   that place, and the routes switch the read tracker off for it. A hit also
+   starts a new trail for the breadcrumbs only an older path set (fromWtlb,
+   fromMatthewCh), which outranked fromSearch in the reader's back. */
+describe('useSearch — a search hit is a look, not a read (search200 UX B1)', () => {
+  it('a letter-shaped hit moves no cursor and names its place', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'wtlb', volumeId: 'vot-two', letterId: 'wide-path', text: '' } }, []); });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(props.setLastReadForVol).not.toHaveBeenCalled();
+    expect(props.setSearchLanding).toHaveBeenCalledWith('vol-two-letter:wide-path');
+  });
+
+  it('a parsed letter reference moves no cursor and names its place', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-letter', volumeId: 'vot-two', letterId: 'wide-path' } }); });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(props.setLastReadForVol).not.toHaveBeenCalled();
+    expect(props.setSearchLanding).toHaveBeenCalledWith('vol-two-letter:wide-path');
+  });
+
+  it('a verse hit names its chapter (a Bible book, and the Matthew study by its chapter)', () => {
+    const a = setup();
+    act(() => { a.result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1, verseNum: 3 } }); });
+    expect(a.props.setSearchLanding).toHaveBeenCalledWith('bible-ch:genesis:1');
+    const b = setup();
+    act(() => { b.result.current.handleSearchSelect({ doc: { kind: 'study-note', bookId: 'matthew', chapterNum: 5 } }); });
+    expect(b.props.setSearchLanding).toHaveBeenCalledWith('matthew-ch:5');
+  });
+
+  it('a parsed Bible reference names its chapter', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, __corpus: 'scriptures', ref: { kind: 'ref-bible', bookId: 'matthew', chapter: 5, verseStart: 3 } }); });
+    expect(props.setSearchLanding).toHaveBeenCalledWith('bible-ch:matthew-plain:5');
+  });
+
+  it('a study hit names its study chapter', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', studyChapterId: 'purity-ch1', chapterNum: 1, text: '' } }, []); });
+    expect(props.setSearchLanding).toHaveBeenCalledWith('bible-study-chapter:purity:purity-ch1');
+  });
+
+  it('a book reference lands on an index, which is no reading place: the landing is cleared', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-book', bookId: 'genesis' } }); });
+    expect(props.setSearchLanding).toHaveBeenCalledWith(null);
+  });
+
+  it('clears the older breadcrumbs that outranked fromSearch in the reader back', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
+    expect(props.setFromWtlb).toHaveBeenCalledWith(null);
+    expect(props.setFromMatthewCh).toHaveBeenCalledWith(null);
   });
 });

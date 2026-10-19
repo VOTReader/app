@@ -361,14 +361,14 @@ function App() {
     prophecyCardStatesRef, saveProphecyCardStates,
     setLastReadForVol,
     selectMatthewCh, selectBibleCh, selectScriptureBook: handleScriptureSelect,
-    goToLastRead,
+    goToLastRead, searchLanding, setSearchLanding,
   } = useReadingPositionNav({
     bookId, screen, chapterNum, letterId, studyId, studyChapterId,
     activeReadKey, lastReadLetterMap, lastReadChapters,
     setLetterId, setBookId, setChapterNum, setScreen, setGenreId,
     setActiveReadKey,
     setLastReadLetterMap, setLastReadChapters,
-    getStudyById, selectStudy, selectStudyChapter,
+    getStudyById, selectStudy, selectStudyChapter, tabField, fromSearch,
   });
 
   /* Tap-through openers (P7f). goToLetterFromMatthew + openInAppLetter
@@ -606,7 +606,7 @@ function App() {
     setScreen, setBookId, setChapterNum, setLetterId,
     setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise,
     setGenreId, // Wave 0 (sticky genreId): useSearch clears it on every result dispatch
-    setActiveReadKey, setLastReadForVol,
+    setSearchLanding, setFromWtlb, setFromMatthewCh, // search200 UX B1: a hit is a look, not a read
     handleSurprise, goSettings, goHome,
   });
 
@@ -701,7 +701,7 @@ function App() {
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
     prophecyCardStatesRef, saveProphecyCardStates,
     fromMatthewChRef, setFromMatthewCh,
-    setFromWtlb,
+    setFromWtlb, fromWtlb, fromSurprise, backActive, fromLetterRef, searchLanding, // search200 UX B1: the reader's back to results
     boundaryConfig,
     gardenPage, setGardenPage,
   }; const ROUTES = buildScreenRoutes(_routeDeps);

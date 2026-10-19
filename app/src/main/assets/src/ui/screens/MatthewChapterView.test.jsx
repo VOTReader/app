@@ -138,3 +138,35 @@ describe('MatthewChapterView — threads the edition down to the hero', () => {
     expect(captured.bibleAudio).toBe(null);
   });
 });
+
+/* search200 UX B1: from a search hit the route hands MatthewChapterView the
+   results back (navBack) and switches the read tracker off for the look
+   (markAsReadEnabled false). It carries both down; without them it keeps the
+   reader's own markAsRead setting. */
+describe('MatthewChapterView — carries the search visit down (search200 UX B1)', () => {
+  const renderMt = (extra) => {
+    let captured = null;
+    globalThis.ChapterView = (props) => { captured = props; return null; };
+    render(
+      <MatthewChapterView
+        chapter={MATTHEW_BOOK.chapters[1]} chapterNum={2} settings={{ markAsRead: true }}
+        prevChainEntry={() => null} nextChainEntry={() => null}
+        {...extra}
+      />,
+    );
+    return captured;
+  };
+
+  it('hands ChapterView the results back and the tracker off', () => {
+    const navBack = { onBack: () => {}, label: 'results' };
+    const props = renderMt({ navBack, markAsReadEnabled: false });
+    expect(props.navBack).toBe(navBack);
+    expect(props.markAsReadEnabled).toBe(false);
+  });
+
+  it('without a search visit, the reader\'s setting stands and there is no navBack', () => {
+    const props = renderMt({});
+    expect(props.navBack == null).toBe(true);
+    expect(props.markAsReadEnabled).toBe(true);
+  });
+});

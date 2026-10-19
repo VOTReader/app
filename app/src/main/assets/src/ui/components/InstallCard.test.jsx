@@ -9,7 +9,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import React from 'react';
 import * as ReactDOM from 'react-dom';
-import { InstallCard, _resetInstallCardSession } from './InstallCard.jsx';
+import { InstallCard, _resetInstallCardSession, isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
 import { attachInstallCapture, _resetInstallCapture } from '../../utils/install-offer.js';
 
 const UA = {
@@ -177,5 +177,159 @@ describe('InstallCard: saying no', () => {
     act(() => { fireEvent.click(card(v.container).querySelector('.install-card-never')); });
     expect(card(v.container)).toBeNull();
     expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+  });
+});
+
+/* search200 UX B1: a search jump is not the reader finishing the chapter.
+   With no read item (mark-as-read off, or a first visit) the card's one signal is "the reader scrolled to
+   this chapter's end". A search hit near the end landed the end on screen with the page already scrolled, so
+   the jump itself offered the card, and the long-press tip then sat on its heading. The end now counts only
+   when the reader's own hand moved the page: a drag, a wheel, a scroll key, the scrollbar. A tap (the find
+   pill's next, a link) and a programmatic scroll (a jump, a restore) are not. */
+describe('InstallCard: the end of the chapter is the reader\'s own scroll (search200 UX B1)', () => {
+  let ios; let now; let scroller; let top;
+  class FakeIO {
+    constructor(cb) { this.cb = cb; this.els = []; ios.push(this); }
+    observe(el) { this.els.push(el); }
+    unobserve(el) { this.els = this.els.filter((e) => e !== el); }
+    disconnect() { this.els = []; }
+  }
+  /** The observer reports `el` entering (or leaving) the screen. */
+  const onScreen = (el, on) => act(() => { for (const io of ios.slice()) if (io.els.includes(el)) io.cb([{ target: el, isIntersecting: on }]); });
+  const scrollTo = (y) => act(() => { top = y; fireEvent.scroll(scroller); });
+  const mount = () => {
+    const v = render(<InstallCard unitKey="genesis:1" />, { container: scroller });
+    return { ...v, sentinel: scroller.querySelector('.install-card-sentinel') };
+  };
+  const newScroller = () => {
+    scroller = document.createElement('div');
+    scroller.className = 'screen-scroll';
+    document.body.appendChild(scroller);
+    top = 0;
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, get: () => top, set: (y) => { top = y; } });
+  };
+  beforeEach(() => {
+    ios = []; now = 1_000_000; readItems = {};
+    globalThis.IntersectionObserver = FakeIO;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    newScroller();
+  });
+  afterEach(() => {
+    delete globalThis.IntersectionObserver;
+    vi.restoreAllMocks();
+    if (scroller.parentNode) scroller.parentNode.removeChild(scroller);
+  });
+
+  it('a search jump that lands at the end does not offer the card', () => {
+    const { container, sentinel } = mount();
+    scrollTo(1800);                     // the jump to the hit
+    onScreen(sentinel, true);
+    expect(card(container), 'the jump is not the reader at the end').toBeNull();
+  });
+
+  it('the reader dragging the page to the end offers it', () => {
+    const { container, sentinel } = mount();
+    fireEvent.touchMove(scroller); scrollTo(600);
+    expect(card(container), 'not at the end yet').toBeNull();
+    fireEvent.touchMove(scroller); scrollTo(1800);
+    onScreen(sentinel, true);
+    expect(card(container)).not.toBeNull();
+  });
+
+  it('landed at the end by the jump, then the reader scrolls: that is the reader at the end', () => {
+    const { container, sentinel } = mount();
+    scrollTo(1800); onScreen(sentinel, true);
+    expect(card(container), 'the jump alone').toBeNull();
+    fireEvent.wheel(scroller); scrollTo(1760);
+    expect(card(container), 'the reader moved the page at the end').not.toBeNull();
+  });
+
+  it('a fling carries on after the finger lifts: its momentum is still the reader\'s', () => {
+    const { container, sentinel } = mount();
+    fireEvent.touchMove(scroller); now += 100; scrollTo(400);
+    now += 2500; scrollTo(1800);        // momentum, long after the last touch
+    onScreen(sentinel, true);
+    expect(card(container)).not.toBeNull();
+  });
+
+  it('a tap (the find pill\'s next, a link) and a scroll long after the last touch are not the reader\'s', () => {
+    const { container, sentinel } = mount();
+    const next = document.createElement('button'); scroller.appendChild(next);
+    fireEvent.touchStart(next); fireEvent.pointerDown(next); fireEvent.keyDown(next, { key: 'Enter' });
+    scrollTo(1800); onScreen(sentinel, true);
+    expect(card(container), 'a tap that jumps').toBeNull();
+    onScreen(sentinel, false);
+    fireEvent.touchMove(scroller); now += 2000; scrollTo(1700); onScreen(sentinel, true);
+    expect(card(container), 'a restore two seconds after the last touch').toBeNull();
+  });
+
+  it('the scroll keys and the scrollbar are the reader\'s too', () => {
+    let v = mount();
+    fireEvent.keyDown(scroller, { key: 'End' }); scrollTo(1800); onScreen(v.sentinel, true);
+    expect(card(v.container), 'End').not.toBeNull();
+    cleanup(); _resetInstallCardSession();
+    newScroller();
+    v = mount();
+    fireEvent.pointerDown(scroller); scrollTo(1800); onScreen(v.sentinel, true);
+    expect(card(v.container), 'the scrollbar').not.toBeNull();
+  });
+
+  it('typing in a field is not a scroll key', () => {
+    const { container, sentinel } = mount();
+    const field = document.createElement('input'); scroller.appendChild(field);
+    fireEvent.keyDown(field, { key: ' ' }); scrollTo(1800); onScreen(sentinel, true);
+    expect(card(container)).toBeNull();
+  });
+});
+
+/* search200 UX B1: the long-press tip waits while the card is on screen (AnnotationHint reads this). */
+describe('InstallCard: says when it is on screen', () => {
+  let ios;
+  class FakeIO {
+    constructor(cb) { this.cb = cb; this.els = []; ios.push(this); }
+    observe(el) { this.els.push(el); }
+    unobserve(el) { this.els = this.els.filter((e) => e !== el); }
+    disconnect() { this.els = []; }
+  }
+  const onScreen = (el, on) => act(() => { for (const io of ios.slice()) if (io.els.includes(el)) io.cb([{ target: el, isIntersecting: on }]); });
+  beforeEach(() => { ios = []; });
+  afterEach(() => { delete globalThis.IntersectionObserver; });
+
+  it('on screen while the card is in view; not once it scrolls away, is dismissed or unmounts', () => {
+    globalThis.IntersectionObserver = FakeIO;
+    const v = render(<InstallCard unitKey="genesis:1" />);
+    const section = card(v.container);
+    expect(section, 'PRECONDITION: the card is shown').not.toBeNull();
+    expect(isInstallCardOnScreen(), 'below the fold').toBe(false);
+    onScreen(section, true);
+    expect(isInstallCardOnScreen()).toBe(true);
+    onScreen(section, false);
+    expect(isInstallCardOnScreen(), 'scrolled away').toBe(false);
+    onScreen(section, true);
+    act(() => { fireEvent.click(section.querySelector('.install-card-later')); });
+    expect(isInstallCardOnScreen(), 'Maybe later').toBe(false);
+  });
+
+  it('a card on screen that unmounts is no longer on screen', () => {
+    globalThis.IntersectionObserver = FakeIO;
+    const v = render(<InstallCard unitKey="genesis:1" />);
+    onScreen(card(v.container), true);
+    expect(isInstallCardOnScreen()).toBe(true);
+    cleanup();
+    expect(isInstallCardOnScreen(), 'unmounted').toBe(false);
+  });
+
+  it('without an observer a shown card counts as on screen and tells its subscribers; a hidden one does not', () => {
+    const cb = vi.fn();
+    const off = subscribeInstallCardOnScreen(cb);
+    render(<InstallCard unitKey="genesis:1" />);
+    expect(isInstallCardOnScreen()).toBe(true);
+    expect(cb).toHaveBeenCalled();
+    cleanup();
+    expect(isInstallCardOnScreen()).toBe(false);
+    off();
+    readItems = {};
+    render(<InstallCard unitKey="genesis:1" />);
+    expect(isInstallCardOnScreen(), 'no card shown').toBe(false);
   });
 });

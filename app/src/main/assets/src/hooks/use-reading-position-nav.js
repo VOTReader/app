@@ -86,11 +86,21 @@
      selectStudyChapter        From useBibleStudies. goToLastRead's
                                primary study-resume path.
 
+     tabField, fromSearch      search200 UX B1: the searchLanding tab field
+                               is declared here (the arm reads it; useSearch
+                               writes it through the returned setter). It
+                               names the reading place a search hit opened.
+                               While the reader is still there with the
+                               search breadcrumb live, the arm leaves the
+                               cursor alone: the look records no progress.
+                               Any other reading place retires it.
+
    RETURNS: {
      prophecyCardStatesRef, saveProphecyCardStates,
      setLastReadForVol,
      selectMatthewCh, selectBibleCh, selectScriptureBook,
      goToLastRead,
+     searchLanding, setSearchLanding,
    }
 
    STORAGE:
@@ -111,6 +121,7 @@
 
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
 import { COL_BY_KEY, COL_BY_LETTER_SC } from '../data/scripture-resolution.js';
+import { readingPlaceKey } from '../utils/search-visit.js';
 
 /**
  * Whether `id` names a book on the Scriptures shelves (SCRIPTURE_GENRES, an
@@ -151,7 +162,9 @@ function _isBibleBookId(id) {
  *   setLastReadChapters: (updater: (prev: any) => any) => void,
  *   getStudyById: (id: string) => any,
  *   selectStudy: (id: string) => void,
- *   selectStudyChapter: (sid: string, chId: string) => void
+ *   selectStudyChapter: (sid: string, chId: string) => void,
+ *   tabField?: (key: string) => any[],
+ *   fromSearch?: boolean
  * }} args
  * @returns {{
  *   prophecyCardStatesRef: { current: any },
@@ -160,7 +173,9 @@ function _isBibleBookId(id) {
  *   selectMatthewCh: (num: number) => void,
  *   selectBibleCh: (num: number) => void,
  *   selectScriptureBook: (id: string, clearGenre?: boolean) => void,
- *   goToLastRead: () => void
+ *   goToLastRead: () => void,
+ *   searchLanding: string | null,
+ *   setSearchLanding: ((v: string | null) => void) | null
  * }}
  */
 export function useReadingPositionNav({
@@ -170,7 +185,11 @@ export function useReadingPositionNav({
   setActiveReadKey,
   setLastReadLetterMap, setLastReadChapters,
   getStudyById, selectStudy, selectStudyChapter,
+  tabField, fromSearch,
 }) {
+  // search200 UX B1: the place a search hit opened (see PARAMS above). Per tab,
+  // so a tab switch or a cold-boot restore onto the look still records nothing.
+  const [searchLanding, setSearchLanding] = typeof tabField === 'function' ? tabField('searchLanding') : [null, null];
   // ── Catch-all position arm (owner-reported 2026-07-19) ────────────────
   // Every explicit nav selector arms the reading cursor, but some arrival
   // paths had NO selector: switching to a TAB already sitting on a reading
@@ -193,6 +212,16 @@ export function useReadingPositionNav({
   const armStudy = (screen === 'bible-study-chapter' && studyId && studyChapterId) ? getStudyById(studyId) : null;
   const studyArmKey = armStudy ? 'bible-study-' + armStudy.slug : null;   // studyReadKey format (goToLastRead slices this prefix)
   React.useEffect(() => {
+    // A search hit is a look, not a read (search200 UX B1): its own place arms
+    // nothing while the search breadcrumb is live. Any other reading place (the
+    // arrows, a link, an index pick that spent the breadcrumb) is reading again
+    // and retires the landing. A screen that is not for reading keeps it, for
+    // the return to the same hit.
+    const here = readingPlaceKey({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
+    if (here && searchLanding) {
+      if (fromSearch && here === searchLanding) return;
+      if (setSearchLanding) setSearchLanding(null);
+    }
     if (screen === 'bible-ch' || screen === 'matthew-ch') {
       const bid = screen === 'matthew-ch' ? 'matthew' : bookId;
       if (!bid || chapterNum == null) return;
@@ -206,7 +235,7 @@ export function useReadingPositionNav({
       if (!col || !letterId) return;
       setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, letterId));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity plus studyArmKey (the study's resolved read key, which turns non-null when the lazy studies land). The setters (setActiveReadKey, setLastReadChapters, setLastReadForVol) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity plus studyArmKey (the study's resolved read key, which turns non-null when the lazy studies land). searchLanding and fromSearch are read, not deps: useSearch sets them in the same batch as the place, and retiring the landing must not re-run the arm on the place that retired it. The setters (setActiveReadKey, setLastReadChapters, setLastReadForVol) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
   }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, studyArmKey]);
   // ── Prophecy card expand/collapse state (IDB-backed via ProphecyCardsStore) ─
   // Key format: "chapterId:blockIndex:cardType" → boolean.
@@ -326,5 +355,6 @@ export function useReadingPositionNav({
     setLastReadForVol,
     selectMatthewCh, selectBibleCh, selectScriptureBook,
     goToLastRead,
+    searchLanding, setSearchLanding,
   };
 }

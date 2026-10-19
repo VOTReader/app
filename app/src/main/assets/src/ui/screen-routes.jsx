@@ -49,6 +49,7 @@ import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
 import { answersSubjectById } from '../utils/answers-shelves.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
+import { searchBackActive, readingPlaceKey, RESULTS_LABEL } from '../utils/search-visit.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -190,6 +191,11 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {{ current: { chapterNum: number; }; }} fromMatthewChRef
  * @property {import('../hooks/use-tabs.js').TabSetter<'fromMatthewCh'>} setFromMatthewCh
  * @property {import('../hooks/use-tabs.js').TabSetter<'fromWtlb'>} setFromWtlb
+ * @property {import('../hooks/use-tabs.js').Tab['fromWtlb']} fromWtlb
+ * @property {import('../hooks/use-tabs.js').Tab['fromSurprise']} fromSurprise
+ * @property {boolean} backActive
+ * @property {{ current: any[] }} fromLetterRef
+ * @property {string | null} searchLanding
  * @property {(volKey: string, entry: any) => any} boundaryConfig
  * @property {import('../hooks/use-tabs.js').Tab['gardenPage']} gardenPage
  * @property {import('../hooks/use-tabs.js').TabSetter<'gardenPage'>} setGardenPage
@@ -257,6 +263,8 @@ export function buildScreenRoutes({
   fromMatthewChRef, setFromMatthewCh,
   // ── App-state needed by built-in helpers (sharedViewProps / _navToChapter) ──
   setFromWtlb,
+  // ── Back to results from a search hit (search200 UX B1) ──
+  fromWtlb, fromSurprise, backActive, fromLetterRef, searchLanding,
   // ── Boundary computation (from useReadingChainNav; sees per-volume context) ──
   boundaryConfig,
   // ── Garden ──
@@ -399,14 +407,32 @@ export function buildScreenRoutes({
     onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
     theme, onThemeChange: setTheme,
   });
+  // Back to results (search200 UX B1). From a search hit the reader's ‹ went to the
+  // parent index (a letter could never get back to its results by the arrows; a Bible
+  // chapter took two taps), while the system back returned to the results. When the
+  // system back would end at the results (searchBackActive mirrors handleAndroidBack's
+  // precedence), the ‹ (navBack) and the back pill both go there, named "results". The
+  // place the hit opened (searchLanding) is a look: the read tracker is off for it.
+  const _searchBack = searchBackActive({
+    screen, fromSearch, fromSurprise, fromWtlb,
+    fromMatthewCh: fromMatthewChRef ? fromMatthewChRef.current : null,
+    stackLength: fromLetterRef && Array.isArray(fromLetterRef.current) ? fromLetterRef.current.length : 0,
+    backActive,
+  });
+  const _backToResults = () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); };
+  const _navBack = _searchBack ? { onBack: _backToResults, label: RESULTS_LABEL } : null;
+  const _readerBackHint = _searchBack ? { title: RESULTS_LABEL, volumeLabel: null } : backHint;
+  const _searchLook = !!fromSearch && !!searchLanding &&
+    searchLanding === readingPlaceKey({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
+  const _readerMarkAsRead = _searchLook ? false : settings.markAsRead;
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
-    onInAppLink: openInAppLetter, backHint,
+    onInAppLink: openInAppLetter, backHint: _readerBackHint, navBack: _navBack,
     onNavigateToLink: navigateToLink,
     onLinkOpen: openLinkSidebar,
-    onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-    markAsReadEnabled: settings.markAsRead,
+    onBack: _navBack ? _navBack.onBack : () => window.handleAndroidBack && window.handleAndroidBack(),
+    markAsReadEnabled: _readerMarkAsRead,
     // Read-along (ui/components/ReadAlongHighlight.jsx). Two independent
     // gates: the sentence wash, and the follow-scroll that writes scrollTop
     // under the lease. Both default ON — an absent key must not silently
@@ -1357,7 +1383,7 @@ export function buildScreenRoutes({
           onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
           // Wave 0: label names the real destination (Search / Studies /
           // the genre / Scriptures — never "Books").
-          backLabel={fromSearch ? 'Search' : fromStudies ? 'Studies' : _idxGenre ? _idxGenre.label : 'Scriptures'}
+          backLabel={fromSearch ? RESULTS_LABEL : fromStudies ? 'Studies' : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
@@ -1412,7 +1438,7 @@ export function buildScreenRoutes({
           bibleAudio={bibleAudioFor(book.id)}
           onSelect={(num) => { _leaveSurprise(); selectBibleCh(num); }}
           onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
-          backLabel={fromSearch ? 'Search' : _idxGenre ? _idxGenre.label : 'Scriptures'}
+          backLabel={fromSearch ? RESULTS_LABEL : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
@@ -1443,7 +1469,7 @@ export function buildScreenRoutes({
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
         readTrackKey={getReadKey(bookId, chapterNum)}
-        markAsReadEnabled={settings.markAsRead}
+        markAsReadEnabled={_readerMarkAsRead}
         translation={settings.translation}
         restoredNames={settings.restoredNames}
         showChapterTitle={settings.showChapterTitle !== false}
@@ -1463,7 +1489,7 @@ export function buildScreenRoutes({
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}
         surpriseAnchor={surpriseAnchor}
-        backHint={backHint} onTapThroughBack={tapThroughBack}
+        backHint={_readerBackHint} onTapThroughBack={_navBack ? _navBack.onBack : tapThroughBack} navBack={_navBack}
         onLinkOpen={openLinkSidebar}
         readAlongOn={sharedViewProps.readAlongOn}
         readAlongFollow={sharedViewProps.readAlongFollow}
@@ -1512,7 +1538,8 @@ export function buildScreenRoutes({
           goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
           goToLetterFromMatthew={goToLetterFromMatthew}
           theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
-          backHint={backHint} tapThroughBack={tapThroughBack}
+          backHint={_readerBackHint} tapThroughBack={_navBack ? _navBack.onBack : tapThroughBack} navBack={_navBack}
+          markAsReadEnabled={_readerMarkAsRead}
           openLinkSidebar={openLinkSidebar}
           onNavigateToLink={navigateToLink}
         />

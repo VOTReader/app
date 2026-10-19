@@ -29,11 +29,11 @@
                                      scope-chip label.
 
    OWNED HELPERS (internal):
-     - srchVolLookup(searchVolId) → { screen, lastReadFn, activeKey }
+     - srchVolLookup(searchVolId) → { screen }
                                   Resolves a search-result's volumeId
-                                  to its letter screen + last-read
-                                  bookkeeping. Reads COL_BY_SEARCH_ID
-                                  (cross-bundle module global).
+                                  to its letter screen. Reads
+                                  COL_BY_SEARCH_ID (cross-bundle module
+                                  global).
      - SRCH_VOL_MAP               Proxy facade over srchVolLookup; used
                                   by handleSearchSelect / handleSearchCommand
                                   as a dict-style lookup. Kept as a
@@ -87,9 +87,9 @@
        extraction: useSurprise). Passed in as a PARAM and called from
        handleSearchCommand's 'random' action.
      - goSettings, goHome — useNav-owned (P7b). Passed in as PARAMS.
-     - setLastReadForVol — App-local last-read coordination (planned
-       extraction: useReadingPositionNav). Passed in as a PARAM.
-     - setActiveReadKey — useReadingDwell-owned (P6f). Passed as PARAM.
+     - The reading cursor. A hit no longer moves it (search200 UX B1):
+       it names its place through setSearchLanding (useReadingPositionNav
+       owns that tab field) and the catch-all arm skips the place.
 
    PARAMS (single object, flat):
      tabField                 Per-tab field accessor (from useTabs).
@@ -118,12 +118,21 @@
                               entry, and a stale genreId would misroute
                               a later index-level Back into a genre
                               visited in an earlier session leg.
-     setActiveReadKey         From useReadingDwell. Used by
-                              handleSearchSelect to set the dwell-timer
-                              gate when navigating into a letter.
-     setLastReadForVol        From App() (a #5 useReadingPositionNav
-                              candidate). Used by handleSearchSelect
-                              via srchVolLookup's lastReadFn closure.
+     setSearchLanding         From useReadingPositionNav (search200 UX
+                              B1). handleSearchSelect names the reading
+                              place a hit opens (readingPlaceKey); the
+                              catch-all arm leaves the cursor alone
+                              there and the routes switch the read
+                              tracker off, so the look records no
+                              progress. Null for a book (an index).
+                              (The hit used to arm the cursor itself
+                              through setActiveReadKey; it no longer
+                              touches it.)
+     setFromWtlb,             Breadcrumbs only an older path sets (a
+       setFromMatthewCh       WTLB {{nav}} hop, a Matthew card). They
+                              outrank fromSearch in the reader's back,
+                              so a stale one sent a hit's back to an
+                              old entry; a hit starts a new trail.
      handleSurprise           From App() (a #6 dissolution → useSurprise
                               candidate). Called by handleSearchCommand
                               for the 'random' action — cross-domain
@@ -174,6 +183,7 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+import { readingPlaceKey } from '../utils/search-visit.js';
 
 /**
  * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
@@ -227,8 +237,9 @@ function scopeBookTitle(bookId) {
  *   setFromSearch: (v: any) => void,
  *   setFromSurprise?: (v: boolean) => void,
  *   setGenreId: (v: any) => void,
- *   setActiveReadKey: (key: string, commitFn?: (() => void) | null) => void,
- *   setLastReadForVol: (volKey: string, letterId: string) => void,
+ *   setSearchLanding?: (v: string | null) => void,
+ *   setFromWtlb?: (v: string | null) => void,
+ *   setFromMatthewCh?: (v: any) => void,
  *   handleSurprise: () => void,
  *   goSettings: () => void,
  *   goHome: () => void
@@ -266,7 +277,7 @@ export function useSearch({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setLetterId,
   setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise, setGenreId,
-  setActiveReadKey, setLastReadForVol,
+  setSearchLanding, setFromWtlb, setFromMatthewCh,
   handleSurprise, goSettings, goHome,
 }) {
   // ── Search tabFields (per-tab state) ────────────────────────────────────
@@ -352,11 +363,7 @@ export function useSearch({
   const srchVolLookup = (searchVolId) => {
     const col = COL_BY_SEARCH_ID.get(searchVolId);
     if (!col) return null;
-    return {
-      screen: col.letterScreen,
-      lastReadFn: (id) => setLastReadForVol(col.volKey, id),
-      activeKey: 'vol:' + col.volKey,
-    };
+    return { screen: col.letterScreen };
   };
   // Compat alias — same shape as the old inline Proxy so call-site
   // semantics in handleSearchSelect / handleSearchCommand are identical.
@@ -448,6 +455,14 @@ export function useSearch({
     // into the corpus; clear it here (once, top-level) so a later
     // index-level Back can't misroute into a genre never visited this leg.
     setGenreId(null);
+    // search200 UX B1: a new trail for the breadcrumbs only an older path sets.
+    // They outrank fromSearch in the reader's back: a fromWtlb left by a WTLB
+    // entry's {{nav}} hop sent a hit's Bible chapter back to that entry, and a
+    // fromMatthewCh sent a hit's letter back to Matthew.
+    if (typeof setFromWtlb === 'function') setFromWtlb(null);
+    if (typeof setFromMatthewCh === 'function') setFromMatthewCh(null);
+    // ...and the place the hit opens is a look, not a read (set per branch below).
+    const land = (place) => { if (typeof setSearchLanding === 'function') setSearchLanding(place ? readingPlaceKey(place) : null); };
     // Direct parsed reference (from __direct entries)
     if (entry && entry.__direct && entry.ref) {
       const r = entry.ref;
@@ -471,6 +486,7 @@ export function useSearch({
         } else {
           setSurpriseAnchor(null);
         }
+        land({ screen: effectiveBookId === 'matthew' ? 'matthew-ch' : 'bible-ch', bookId: effectiveBookId, chapterNum: r.chapter });
         setScreen(effectiveBookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
         return;
       }
@@ -481,8 +497,7 @@ export function useSearch({
         if (!lid) return;
         setLetterId(lid);
         setSurpriseAnchor(null);   // a reference names the letter, not a place in it
-        if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(lid));
-        else vm.lastReadFn(lid);
+        land({ screen: vm.screen, letterId: lid });   // no cursor move: the arm skips the landing
         setScreen(vm.screen);
         return;
       }
@@ -493,6 +508,7 @@ export function useSearch({
         r.bookId;
         setBookId(effectiveBookId);
         setChapterNum(null);
+        land(null);   // an index is no reading place; a chapter picked from it is a read
         setScreen(effectiveBookId === 'matthew' ? 'matthew-idx' : 'bible-idx');
         return;
       }
@@ -512,6 +528,7 @@ export function useSearch({
       } else {
         setSurpriseAnchor(null);
       }
+      land({ screen: doc.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch', bookId: doc.bookId, chapterNum: doc.chapterNum });
       setScreen(doc.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
       return;
     }
@@ -520,8 +537,7 @@ export function useSearch({
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);
       setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query));
-      if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
-      else vm.lastReadFn(doc.letterId);
+      land({ screen: vm.screen, letterId: doc.letterId });   // no cursor move: the arm skips the landing
       setScreen(vm.screen);
       return;
     }
@@ -535,6 +551,7 @@ export function useSearch({
       setStudyId(doc.letterId || null);
       setStudyChapterId(chId || null);
       setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId, query));
+      land({ screen: 'bible-study-chapter', studyId: doc.letterId || null, studyChapterId: chId || null });
       setScreen('bible-study-chapter');
       return;
     }

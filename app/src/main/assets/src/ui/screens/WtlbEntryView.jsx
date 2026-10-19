@@ -26,7 +26,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, navBack = null, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
   // the resolved {type:'bible'} endpoint through navigateToLink (verse flash
@@ -436,7 +436,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         // its book). 'Index' described a generic noun, not a place — the
         // index this returns to is Part One / Part Two / The Blessed /
         // Regarding The Holy Days, which partLabel already carries.
-        onBack: onHome, backLabel: partLabel || 'Index',
+        // navBack (search200 UX B1): from a search hit the ‹ returns to the results.
+        onBack: navBack ? navBack.onBack : onHome, backLabel: navBack ? navBack.label : (partLabel || 'Index'),
         arrows: {
           onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),

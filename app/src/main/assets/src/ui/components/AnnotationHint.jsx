@@ -37,6 +37,9 @@
      tour's state is read through the bundle-b global TourController (the
      controller must not be imported here: a second bundled copy would be a
      second, silent state); the player is this bundle's own module.
+     It also holds while the install card is on screen (search200 UX B1):
+     on a first reader open the pill sat on the card's heading. InstallCard
+     is this bundle's own module too.
    - SAYS THE TOUR'S WORDS for the same gesture, through
      TourController.highlightWords(): tour-steps.js owns the sentence pair
      the highlight stop opens with, so this pill cannot drift from it as its
@@ -44,6 +47,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
 
 export function AnnotationHint() {
   // Store subscriptions — any first annotation/note/bookmark re-renders
@@ -62,8 +66,10 @@ export function AnnotationHint() {
     () => (_tour ? _tour.getVersion() : 0)
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // The install card on screen (search200 UX B1): both sit at the bottom of a chapter's end.
+  const cardOnScreen = React.useSyncExternalStore(subscribeInstallCardOnScreen, isInstallCardOnScreen);
   // The audio bar is open whenever the player is not idle (AudioPlayerBar.jsx).
-  const yielding = !!(_tour && _tour.getState().active) || AudioPlayer.getState().status !== 'idle';
+  const yielding = !!(_tour && _tour.getState().active) || AudioPlayer.getState().status !== 'idle' || cardOnScreen;
   React.useSyncExternalStore(
     React.useCallback((cb) => (_has ? AnnotationStore.subscribe(cb) : () => {}), [_has]),
     () => (_has ? AnnotationStore.getVersion() : 0)

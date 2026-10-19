@@ -11,7 +11,7 @@ import { tapToggle } from '../../utils/tap-guard.js';
 import { getEchoesForVerse, getNotesForVerse } from '../../utils/scripture-parse.js';
 import { studyHlKey } from '../../utils/hl-keys.js';
 
-export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showChapterTitle, titleFocusHidden, setTitleFocusHidden, onIndex, onNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, onVotLetterClick, onLinkOpen, backHint, onTapThroughBack, navBack = null, onNavigateToLink, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
   /* The eyebrow ("Book · Chapter N") is what the narrator says before verse 1:
      the read-along's lead-in (ReadAlongHighlight, 2026-09-22). */
@@ -142,7 +142,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       />}
       navChildren={LibraryNav({
         // onIndex — NOT onBack. onBack is the in-content back-hint pill.
-        onBack: onIndex, backLabel: book.title,
+        // navBack (search200 UX B1): from a search hit the ‹ returns to the results.
+        onBack: navBack ? navBack.onBack : onIndex, backLabel: navBack ? navBack.label : book.title,
         arrows: {
           onPrev: () => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary(),
           onNext: () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary(),

@@ -13,7 +13,7 @@ import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
 import { recordingTranslationFor, textForRecording } from '../../utils/audio-text-edition.js';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
   // The words on screen match the voice (critique 2026-10-05 #6): while this
   // book's recording is loaded, the chapter shows the recording's translation
@@ -168,7 +168,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       />}
       navChildren={LibraryNav({
         // onIndex — NOT onBack. onBack is the in-content back-hint pill.
-        onBack: onIndex, backLabel: book.title,
+        // navBack (search200 UX B1): from a search hit the ‹ returns to the results
+        // in one tap, not to the book index (which took a second).
+        onBack: navBack ? navBack.onBack : onIndex, backLabel: navBack ? navBack.label : book.title,
         arrows: {
           onPrev: goPrevCh, onNext: goNextCh,
           prevDisabled: !prevCh && !prevBook,

@@ -168,3 +168,16 @@ describe('WtlbEntryView back affordance [C3]', () => {
     expect(backBtn().getAttribute('aria-label')).toBe('Back to Index');
   });
 });
+
+/* search200 UX B1: navBack from a search hit — see LetterView.labels.test.jsx. */
+describe('WtlbEntryView — the ‹ goes back to the results from a search hit (search200 UX B1)', () => {
+  const backBtn = () => document.querySelector('.nav-back-icon');
+  it('names the results and goes there', () => {
+    const onHome = vi.fn(), onResults = vi.fn();
+    renderEntry({ onHome, navBack: { onBack: onResults, label: 'results' } });
+    expect(backBtn().getAttribute('aria-label')).toBe('Back to results');
+    fireEvent.click(backBtn());
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect(onHome).not.toHaveBeenCalled();
+  });
+});

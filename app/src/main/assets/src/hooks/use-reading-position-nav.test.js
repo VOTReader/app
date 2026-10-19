@@ -553,3 +553,72 @@ describe('useReadingPositionNav — catch-all position arm', () => {
     expect(props.setActiveReadKey.mock.calls[1][0]).toBe('proverbs');
   });
 });
+
+/* search200 UX B1: a search hit is a look, not a read. useSearch names the place a
+   hit opens (the searchLanding tab field, declared here); while the reader is still
+   on that place with the search breadcrumb live, the arm leaves the cursor alone
+   (the index's "current" mark, the resume dot, the streak dwell). Any other reading
+   place is reading again: it arms as before and retires the landing. */
+describe('useReadingPositionNav — a search landing is not armed (search200 UX B1)', () => {
+  let _prevColByLetterSc;
+  beforeEach(() => {
+    _prevColByLetterSc = window.COL_BY_LETTER_SC;
+    window.COL_BY_LETTER_SC = new Map([['vot-letter', { volKey: 'two', letterScreen: 'vot-letter' }]]);
+  });
+  afterEach(() => { window.COL_BY_LETTER_SC = _prevColByLetterSc; });
+
+  /** A tabField whose searchLanding starts at `landing`; the setter records and stores. */
+  const tabFieldWith = (landing) => {
+    const store = { searchLanding: landing };
+    const setters = {};
+    const tf = (key) => {
+      if (!setters[key]) setters[key] = vi.fn((v) => { store[key] = typeof v === 'function' ? v(store[key]) : v; });
+      return [store[key], setters[key]];
+    };
+    tf.setters = setters;
+    return tf;
+  };
+
+  it('the letter a hit opened arms nothing', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    const { props } = setup({ tabField, fromSearch: true, screen: 'vot-letter', letterId: 'grafted-in' });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(props.setLastReadLetterMap).not.toHaveBeenCalled();
+  });
+
+  it('the chapter a hit opened arms nothing', () => {
+    const tabField = tabFieldWith('bible-ch:proverbs:2');
+    const { props } = setup({ tabField, fromSearch: true, screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+  });
+
+  it('the next chapter is reading again: it arms once and retires the landing', () => {
+    const tabField = tabFieldWith('bible-ch:proverbs:2');
+    const props = { ...baseProps(), tabField, fromSearch: true, screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 };
+    const { rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    rerender({ ...props, chapterNum: 3 });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    expect(props.setActiveReadKey.mock.calls[0][0]).toBe('proverbs');
+    expect(tabField.setters.searchLanding).toHaveBeenCalledWith(null);
+  });
+
+  it('the same place reached with the search breadcrumb spent (an index pick) is a read', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    const { props } = setup({ tabField, fromSearch: false, screen: 'vot-letter', letterId: 'grafted-in' });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    expect(tabField.setters.searchLanding).toHaveBeenCalledWith(null);
+  });
+
+  it('a screen that is not for reading leaves the landing for the return to the hit', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    setup({ tabField, fromSearch: false, screen: 'search' });
+    expect(tabField.setters.searchLanding).not.toHaveBeenCalled();
+  });
+
+  it('returns the landing and its setter for useSearch and the routes', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    const { result } = setup({ tabField, fromSearch: true, screen: 'vot-letter', letterId: 'grafted-in' });
+    expect(result.current.searchLanding).toBe('vot-letter:grafted-in');
+    expect(typeof result.current.setSearchLanding).toBe('function');
+  });
+});

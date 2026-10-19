@@ -44,7 +44,7 @@ export function prophecyCardKeysOf(letter) {
   return keys;
 }
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
@@ -317,7 +317,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         // (the misattribution class) for any caller that forgets the prop.
         // Every route now passes volumeLabel explicitly, so this only fires
         // for a future caller, and it says the one thing that is always true.
-        onBack: onHome, backLabel: volumeLabel || "Library",
+        // navBack (search200 UX B1): from a search hit the ‹ returns to the results
+        // (screen-routes' searchBackActive), named so; the collection still heads the page.
+        onBack: navBack ? navBack.onBack : onHome, backLabel: navBack ? navBack.label : (volumeLabel || "Library"),
         arrows: {
           onPrev: () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
