@@ -931,6 +931,30 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(Math.abs(x - b), 'it stopped about where the switch found it').toBeLessThan(Math.max(1, Math.abs(home - a) / 4));
     });
 
+    /* w4 device check (finding 8, d19): My Web's Bible rail is the canon's camera (camRef), so it
+       opened at the canon's 12x round 2 Samuel, the reader's links running flat off the frame
+       until Reset Bible. Each web keeps its own camera: My Web's Bible rail opens at fit the first
+       time, and the canon's zoom and place are back on the return. */
+    it('w4: My Web opens its Bible rail at fit, and the canon\'s zoom is back on the return', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen }, threaded);
+      const root = container.querySelector('.sw-root');
+      const ppv = () => Number(root.getAttribute('data-ppv-css'));
+      const fit = ppv();
+      for (let k = 0; k < 10; k++) fireEvent.keyDown(root, { key: '+' });
+      for (let k = 0; k < 8; k++) fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(40);
+      const zoomed = ppv(), xz = DRAWN[DRAWN.length - 1].camX;
+      expect(zoomed / fit, 'PRECONDITION: the canon zoomed in').toBeGreaterThan(3);
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(60);
+      expect(ppv() / fit, 'My Web\'s Bible rail at fit, not the canon\'s zoom').toBeCloseTo(1, 2);
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      await settle(60);
+      expect(ppv() / zoomed, 'the canon\'s zoom is back').toBeCloseTo(1, 2);
+      expect(DRAWN[DRAWN.length - 1].camX, 'and its place').toBeCloseTo(xz, 1);
+    });
+
     it('w4: the density hint does not outlive the switch to My Web', async () => {
       stubMyWeb();
       const { container } = await mount({ settings: seen }, threaded);

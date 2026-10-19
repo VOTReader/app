@@ -362,17 +362,36 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   /** Scripture / My Web. The chosen line goes with the cards: a link's index and a canon thread's
    * index number two different graphs, so a focus kept across the switch spotlit an unrelated
    * line in the other web, with nothing open for Escape or Back to close (sweep v5, 2026-10-14). */
+  const webCamsRef = React.useRef(/** @type {Record<string, { x: number, ppv: number, y: number }>} */ ({}));
   const switchMode = React.useCallback((next) => {
     // w4: a fly under way (a go-to, a Follow, Reset) stops where it is: it drives camRef, which is
     // My Web's Bible rail too, so it carried on into the other web; and the canon's density hint
     // goes with the canon (My Web has no density)
     cancelFly();
+    // w4 device check (d19): camRef is My Web's Bible rail too, so My Web opened at the canon's zoom
+    // (12x round 2 Samuel), the reader's links flat off the frame until Reset Bible. Each web keeps
+    // its own camera: the one left is kept, the other's put back, and My Web's Bible rail opens at
+    // fit the first time
+    const cam = camRef.current, was = modeRef.current;
+    if (cam && next !== was) {
+      webCamsRef.current[was] = { x: cam.x, ppv: cam.ppv, y: cam.y > 0 ? cam.y : 0 };
+      const back = webCamsRef.current[next];
+      if (back) Object.assign(cam, back);
+      else if (next === 'personal' && viewRef.current && viewRef.current.W > 0) {
+        const v = viewRef.current;
+        cam.ppv = fitPPV(cam, v.W);
+        cam.x = cam.total / 2;
+        cam.y = 0;
+        clampCamera(cam, v.W, zoomCapFor(cam));
+      }
+      schedule();
+    }
     if (hintTimer.current) { clearTimeout(hintTimer.current); hintTimer.current = 0; }
     setHint('');
     closeCards();
     journey.clear();
     setMode(next);
-  }, [closeCards, journey, cancelFly]);
+  }, [closeCards, journey, cancelFly, camRef, modeRef, viewRef, zoomCapFor, schedule]);
 
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset
