@@ -118,7 +118,7 @@ describe('B10 item 3 — real 44px search tap targets, paid for by trimmed paddi
   it('both halves of the order switch are 44px, its outline rounded 22px, its row padding trimmed', () => {
     expect(atLeast44(decls('.srch-sort-btn')['min-height'])).toBe(true);
     expect(decls('.srch-sort')['border-radius']).toBe('22px');
-    expect(decls('.srch-filter-row').padding).toBe('4px 1.2rem 0');
+    expect(decls('.srch-filter-row').padding).toBe('4px min(1.2rem, 20px) 0');
   });
 
   it('group headers are 44px, the label still --fs-12', () => {
@@ -137,5 +137,49 @@ describe('B10 item 3 — real 44px search tap targets, paid for by trimmed paddi
     expect(chip['align-items']).toBe('center');
     expect(parseInt(chip['border-radius'], 10)).toBeGreaterThanOrEqual(22);
     expect(decls('.srch-quick-row').padding).toBe('0.4rem 1rem 0.8rem');
+  });
+});
+
+describe('B10 item 4 — the order switch stacks at a large Text Size, nothing clipped, no sideways scroll', () => {
+  const AT = '@container srch-filter';
+  it('the order row is a size container and no longer scrolls sideways (BOOK ORDER hid off its edge at 300%)', () => {
+    const row = decls('.srch-filter-row');
+    expect(row.container).toBe('srch-filter / inline-size');
+    expect(row['overflow-x']).toBeUndefined();
+  });
+
+  it('stacks only when the row cannot hold the switch (about 1.7x on 412px), so 100% is unchanged', () => {
+    const q = RULES.find((r) => r.at.startsWith(AT));
+    expect(q).toBeTruthy();
+    const rem = Number((/max-width:\s*([\d.]+)rem/.exec(q.at) || [])[1]);
+    // the switch is 12.3rem wide at any size (195px at 16px); the 412px row holds 21.9rem at 100%, 18.8 on 360px
+    expect(rem).toBeGreaterThanOrEqual(12.5);
+    expect(rem).toBeLessThanOrEqual(14);
+  });
+
+  it('stacked: the note on its own line, the switch a full-width column, RELEVANCE over BOOK ORDER split by a hairline', () => {
+    expect(decls('.srch-sort-note', AT)['flex-basis']).toBe('100%');
+    const sort = decls('.srch-sort', AT);
+    expect(sort['flex-direction']).toBe('column');
+    expect(sort.flex).toBe('1 1 100%');
+    expect(sort['border-radius']).toBe('20px');
+    const btn = decls('.srch-sort-btn', AT);
+    expect(btn['white-space']).toBe('normal');
+    expect(btn['text-align']).toBe('center');
+    const second = decls('.srch-sort-btn + .srch-sort-btn', AT);
+    expect(second['border-left']).toBe('none');
+    expect(second['border-top']).toBe('1px solid var(--gold-border)');
+  });
+
+  it('the row keeps the sides it had at 100% but caps them at 20px, so a stacked label has the width', () => {
+    expect(decls('.srch-filter-row').padding).toBe('4px min(1.2rem, 20px) 0');
+  });
+
+  it('the corpus pills still pair ALL with SCRIPTURES at 300%: px sides and gaps, tracking closed only past 2.6x', () => {
+    const row = decls('.srch-corpus-row');
+    expect(row.container).toBe('srch-corpus / inline-size');
+    expect(row.gap).toBe('6px');
+    expect(decls('.srch-corpus-btn').padding).toBe('0 8px');
+    expect(decls('.srch-corpus-btn', '@container srch-corpus (max-width: 9rem)')['letter-spacing']).toBe('0.06em');
   });
 });

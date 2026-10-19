@@ -3822,17 +3822,22 @@
        button off the right edge (a11y-ux-6, measured at 1.8 and 2.0). */
     /* search200 UX B10 (3): every search control is a real 44px target (the pills were 26px,
        the order halves 25, the quick chips 24), paid for by trimming the rows' own padding. */
-    .srch-corpus-row { flex-wrap:wrap; row-gap:0.35rem; display:flex; gap:0.35rem; padding:8px 16px; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
-    .srch-corpus-btn { flex:1; background:transparent; border:1px solid var(--gold-border); border-radius:22px; min-height:44px; padding:0 0.6rem; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
+    .srch-corpus-row { flex-wrap:wrap; row-gap:6px; display:flex; gap:6px; padding:8px 16px; container: srch-corpus / inline-size; border-bottom:1px solid var(--gold-border); background:var(--bg2); }
+    .srch-corpus-btn { flex:1; background:transparent; border:1px solid var(--gold-border); border-radius:22px; min-height:44px; padding:0 8px; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); cursor:pointer; transition:background 0.18s, color 0.18s, border-color 0.18s; }
     .srch-corpus-btn.active { background:var(--gold-faint); color:var(--gold-bright); border-color:var(--gold-dim); }
     .srch-corpus-btn:active { background:rgba(200,164,86,0.15); }
+    /* B10 (4): at about 2.6x and up the pills close their tracking a little, so ALL and SCRIPTURES
+       still share a row (VOLUMES takes the next) instead of three full-width rows. */
+    @container srch-corpus (max-width: 9rem) { .srch-corpus-btn { letter-spacing:0.06em; } }
     /* [8] result-filter chips + verse sort toggle — same pill language as
        the corpus row, but content-sized (chips carry per-category counts)
        and horizontally scrollable when they overflow a phone width. */
     /* The scope chips wrap at a large text size instead of running off the right edge behind a
        hidden scrollbar, where a reader at 1.8x could not know a third chip existed (a11y-ux-6). */
-    .srch-filter-row { display:flex; flex-wrap:wrap; gap:0.35rem; padding:4px 1.2rem 0; overflow-x:auto; scrollbar-width:none; align-items:center; }
-    .srch-filter-row::-webkit-scrollbar { display:none; }
+    /* search200 UX B10 (4): the row is a size container and no longer scrolls sideways. At 300%
+       BOOK ORDER sat past its right edge behind a hidden scrollbar; now the switch stacks instead
+       (the @container rule below the switch's own rules). */
+    .srch-filter-row { display:flex; flex-wrap:wrap; gap:0.35rem; padding:4px min(1.2rem, 20px) 0; align-items:center; container: srch-filter / inline-size; }
     /* The order switch (sr12): both orders named, the one in use lit like the corpus pills, a line
        on the left saying what it does. Each half is a real 44 px pill (B10 3), so the two never share a finger. */
     .srch-sort-note { flex:1 1 8rem; min-width:0; font-family:var(--font-garamond); font-style:italic; font-size:var(--fs-13); color:var(--cream-muted); }
@@ -3841,6 +3846,16 @@
     .srch-sort-btn + .srch-sort-btn { border-left:1px solid var(--gold-border); }
     .srch-sort-btn.active { background:var(--gold-faint); color:var(--gold-bright); }
     .srch-sort-btn:active { background:rgba(200,164,86,0.15); }
+    /* The switch stacks when the row cannot hold it on one line (it is 12.3rem wide at every
+       Text Size; the 412px row holds 21.9rem at 100%, so this is about 1.7x there, 1.5x on 360px):
+       the note takes its own line, RELEVANCE sits over BOOK ORDER in one full-width outline split
+       by a hairline, each half 44px with its label centred and free to wrap, never clipped. */
+    @container srch-filter (max-width: 13rem) {
+      .srch-sort-note { flex-basis:100%; }
+      .srch-sort { flex:1 1 100%; flex-direction:column; margin-left:0; border-radius:20px; }
+      .srch-sort-btn { white-space:normal; text-align:center; padding:0.35rem 0.75rem; }
+      .srch-sort-btn + .srch-sort-btn { border-left:none; border-top:1px solid var(--gold-border); }
+    }
 
     /* ── SEARCH v2 (Orama) ── */
 
