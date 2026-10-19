@@ -496,7 +496,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
         expect(look.ribbon).toBe(look.haloHalf + 0.5);
       }
     }
-    for (const kind of ['prophecy', 'prophecyInRange', 'lit', 'hover']) {
+    for (const kind of ['prophecy', 'prophecyInRange', 'lit']) {
       const look = topLook(kind, 2, false, 0, 1);
       expect([look.keyHalf, look.key], kind).toEqual([0, [0, 0, 0, 0]]);
     }
@@ -510,6 +510,22 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(src).toContain('o = vec4(uCore.rgb*core + under*(1. - core), core + underA*(1. - core));');
   });
 
+  /* w4 readdown item 1: the hover in the chosen line's gold hid in the Psalms-John mass; it takes the
+     chosen line's keyline, 1 CSS px each side (half of one on the phone), and dims nothing (C3). */
+  it("the hover core lies on the chosen line's keyline, over its halo, and never recedes", () => {
+    for (const dpr of [1, 2, 2.625]) {
+      for (const compact of [false, true]) {
+        const look = topLook('hover', dpr, compact, 1);
+        expect(look.keyHalf, `dpr ${dpr} compact ${compact}`).toBe((inkWidth('hoverKey', compact) * dpr) / 2);
+        expect(look.keyHalf - look.coreHalf).toBe((compact ? 0.5 : 1) * dpr);
+        expect(look.keyHalf).toBeLessThan(look.haloHalf);
+        expect(look.key).toEqual(rgba01('hoverKey'));
+        expect(look.core).toEqual(rgba01('hover'));
+        expect(look.ribbon).toBe(look.haloHalf + 0.5);
+      }
+    }
+  });
+
   it('a hover is drawn in the hover ink, and the rest of the web does not recede (uTapFade 0)', () => {
     const { calls, r } = build();
     const f = frame(r, calls, { hoverArc: 0 });
@@ -517,6 +533,8 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(f.u(f.top, 'uCore')).toEqual([rgba01('hover')]);
     expect(f.u(f.top, 'uHalo')).toEqual([rgba01('hoverHalo')]);
     expect(f.u(f.top, 'uCoreHalf')).toEqual([[inkWidth('hover') / 2]]);
+    expect(f.u(f.top, 'uKey')).toEqual([rgba01('hoverKey')]);
+    expect(f.u(f.top, 'uKeyHalf')).toEqual([[inkWidth('hoverKey') / 2]]);
   });
 
   it('a tap makes the rest recede by the fade it is handed; with none handed, at once; for a range or a prophecy pair too', () => {

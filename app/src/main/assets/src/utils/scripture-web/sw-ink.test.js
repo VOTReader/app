@@ -74,7 +74,13 @@ describe('the ink table', () => {
     expect(ink('chosenKey').alpha).toBeLessThanOrEqual(0.55);
     expect(inkWidth('chosenKey')).toBeLessThan(inkWidth('chosenHalo'));
     expect(INK.chosenLabel).toEqual({ hex: '#F2D38A', alpha: 1 });
-    expect(INK.hover).toEqual({ hex: '#F2D38A', alpha: 1, width: 2 });
+    // w4 readdown item 1: the chosen line's gold at 2 px hid in the pale-gold mass from Psalms to
+    // John; lighter, on the chosen line's keyline, it is cut out of it
+    expect(INK.hover).toEqual({ hex: '#FFE7A8', alpha: 1, width: 2 });
+    expect(INK.hoverKey).toEqual({ hex: '#000000', alpha: 0.50, width: 4, widthCompact: 3 });
+    expect(inkWidth('hoverKey') - inkWidth('hover')).toBe(2);
+    expect(inkWidth('hoverKey', true) - inkWidth('hover', true)).toBe(1);
+    expect(inkWidth('hoverKey')).toBeLessThan(inkWidth('hoverHalo'));
     expect(INK.hoverHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
     expect(INK.lit).toEqual({ hex: '#E8BE6E', alpha: 0.85, width: 1.5 });
     expect(INK.roots).toEqual({ hex: '#C4A469', alpha: 0.25 });
@@ -108,7 +114,12 @@ describe('the ink table', () => {
     }
     expect(hsl(INK.chosenHalo.hex).l, 'the halo is deeper than the core it lies under').toBeLessThan(hsl(INK.chosen.hex).l);
     expect(INK.hoverHalo.hex).toBe(INK.chosenHalo.hex);
-    expect(INK.hover.hex).toBe(INK.chosen.hex);
+    // the hover is the chosen line's gold, lighter, and lighter than the prophecy class it crosses in
+    // Psalms-John (w4 readdown item 1), on the chosen line's keyline
+    expect(Math.abs(hsl(INK.hover.hex).h - hsl(INK.chosen.hex).h)).toBeLessThanOrEqual(3);
+    expect(hsl(INK.hover.hex).l - hsl(INK.chosen.hex).l).toBeGreaterThanOrEqual(0.05);
+    expect(hsl(INK.hover.hex).l - hsl(INK.prophecy.hex).l).toBeGreaterThanOrEqual(0.05);
+    expect([INK.hoverKey.hex, INK.hoverKey.alpha]).toEqual([INK.chosenKey.hex, INK.chosenKey.alpha]);
     // the label is text on the canvas: AAA
     expect(contrast(INK.chosenLabel.hex, INK.canvas.hex)).toBeGreaterThanOrEqual(7);
   });

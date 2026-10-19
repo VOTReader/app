@@ -67,7 +67,12 @@ const TABLE = {
   chosenFoot: { hex: '#F2D38A', alpha: 1, width: 8 },            // the foot dot's diameter
   chosenFootRing: { hex: '#000000', alpha: 1, width: 2 },
   chosenLabel: { hex: '#F2D38A', alpha: 1 },                     // 16 / 14 px, 10 px below the baseline
-  hover: { hex: '#F2D38A', alpha: 1, width: 2 },                 // dims nothing (C3)
+  // the hover: the chosen line's gold, lighter, on the chosen line's keyline (w4 readdown item 1). At
+  // #F2D38A with no keyline a hovered line sank into the pale-gold mass from Psalms to John (the
+  // field's ramp and the prophecy class alike), where w3's white hover had read; the keyline cuts it
+  // out (its lead over the threads round it 1.34 to 1.47, w5/final s03). It still dims nothing (C3)
+  hover: { hex: '#FFE7A8', alpha: 1, width: 2 },
+  hoverKey: { hex: '#000000', alpha: 0.50, width: 4, widthCompact: 3 },   // 1 CSS px each side, half of one on the phone
   hoverHalo: { hex: '#E0A84E', alpha: 0.22, width: 10 },
   lit: { hex: '#E8BE6E', alpha: 0.85, width: 1.5 },              // focus.lit rows: go-to, verse mode, a chooser row under hover or focus
 

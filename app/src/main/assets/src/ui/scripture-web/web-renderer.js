@@ -334,7 +334,8 @@ const TOP_LOOK = {
   // the pairs the chosen range keeps lit (frame-set.topSet): the same ink, and it does not recede
   prophecyInRange: { core: 'prophecy', halo: '', cap: 192, minDevicePx: 1 },
   lit: { core: 'lit', halo: '', cap: 192 },
-  hover: { core: 'hover', halo: 'hoverHalo', cap: 512 },
+  // the hover on the chosen line's keyline, so it is cut out of the Psalms-John gold (w4 readdown item 1)
+  hover: { core: 'hover', halo: 'hoverHalo', key: 'hoverKey', cap: 512 },
   // the chosen core on its dark keyline (w4 INK review, finding 5), over the halo
   chosen: { core: 'chosen', halo: 'chosenHalo', key: 'chosenKey', cap: 512 },
 };
