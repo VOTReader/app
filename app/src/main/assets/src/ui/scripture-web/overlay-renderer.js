@@ -739,16 +739,31 @@ function drawCited(ctx, g, cam, L, holes) {
 
 /** The chapter-length bars stand at least this far apart, CSS px (r2-01a: a thin bar every few px). */
 const BAR_PITCH = 3;
-/** A chapter this long (verses) or longer takes the full bar. */
-const BAR_FULL = 64;
+/** A bar's length runs on this power of its chapters' length against the canon's longest (Psalm
+    119): softened, so the short chapters still read, and never saturated, so the long ones stand
+    out (at 64 verses or more for the full bar Psalm 119 stood no taller than Numbers 7, w4 review). */
+const BAR_GAMMA = 0.5;
+/** @type {WeakMap<object, number>} */
+const LONGEST = new WeakMap();
+/** The canon's longest chapter, verses. */
+function longestChapter(g) {
+  let m = LONGEST.get(g);
+  if (m) return m;
+  m = 1;
+  for (const c of g.chapters) if (c[3] > m) m = c[3];
+  LONGEST.set(g, m);
+  return m;
+}
 
 /**
  * The chapter-length bars (r2-01a): thin bars hanging from one line, their
- * LENGTH the chapter's (a chapter of BAR_FULL verses or more the full bar,
- * the short ones short on a softened curve: Psalm 119 against the Psalms
- * around it), the books alternately shaded; then the book names. Where the
- * chapters stand closer than BAR_PITCH, neighbours share a bar, their mean
- * length, grouped from the canon's start in runs of a power of two verses so a
+ * LENGTH the chapter's against the canon's longest on a softened curve
+ * (BAR_GAMMA: Psalm 119 the one full bar, the short psalms around it short),
+ * the books alternately shaded; then the book names. Where the chapters
+ * stand closer than BAR_PITCH, neighbours share a bar, their mean length by
+ * verse (a verse's chapter's length, averaged over the bar's verses: Psalm
+ * 119 keeps its peak beside the three short psalms it shares a run with),
+ * grouped from the canon's start in runs of a power of two verses so a
  * pan never regroups them and a book's start begins a run: one bar per
  * chapter at the overview's 1,189 over 1,600 px was a solid grey strip, and
  * the longest of each run made every bar nearly the same (w4). A bar is a
@@ -766,12 +781,13 @@ function drawOverview(ctx, g, cam, L, t, hits, holes) {
   const run = Math.pow(2, Math.ceil(Math.log2(Math.max(1e-6, (BAR_PITCH * s) / cam.ppv))));
   const bw = Math.max(1, Math.min(Math.round(1.5 * s), Math.round(0.3 * run * cam.ppv)));
   const vLo = xToVerse(cam, W, -4 * s), vHi = xToVerse(cam, W, W + 4 * s);
+  const longest = longestChapter(g);
   let fill = -1;
   const bar = (start, book, len) => {
     if (start < vLo || start > vHi) return;
     const f = book % 2;
     if (f !== fill) { ctx.fillStyle = shade[f]; fill = f; }
-    const h = Math.max(1.5 * s, maxH * Math.pow(Math.min(1, len / BAR_FULL), 0.75));
+    const h = Math.max(1.5 * s, maxH * Math.pow(Math.min(1, len / longest), BAR_GAMMA));
     fillOut(ctx, Math.round(verseToX(cam, W, start)), top, bw, h, cut);
   };
   // a book's start begins a bar when it stands far enough from the last one: a whole number of
@@ -788,7 +804,8 @@ function drawOverview(ctx, g, cam, L, t, hits, holes) {
       from = c[2]; book = c[0]; sum = 0; n = 0;
       if (from > vHi) { from = -1; break; }
     }
-    sum += c[3]; n++;
+    // by verse: each chapter weighs as many verses as it holds
+    sum += c[3] * c[3]; n += c[3];
   }
   if (from >= 0) bar(from, book, sum / n);
   // the names hand over in halves (the overview's out by the middle, the deep band's in

@@ -400,6 +400,28 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
+  /* w4 review: with every chapter of 64 verses or more given the full bar, Psalm 119 (176 verses)
+     stood no taller than Numbers 7 or Luke 1; the spec's and r2-01a's bars have their few clear
+     peaks, the deepest Psalm 119's, among the short psalms around it. */
+  for (const name of ['pc', 'phone']) {
+    it(name + ': at the overview Psalm 119\'s bar is the longest of all, and the short psalms around it short', () => {
+      const { rec, fs } = paint(name, 1, g.total / 2);
+      const bars = inked(rec, (f) => BAR_FILLS.has(f)).sort((a, b) => a.x0 - b.x0);
+      const X = (v) => (v - fs.cam.x) * fs.cam.ppv + fs.v.W / 2;
+      const p119 = verseOf('psalms', 119, 1);
+      let k = -1;
+      for (let i = 0; i < bars.length; i++) if (bars[i].x0 <= X(p119) + 0.5) k = i;
+      expect(k, 'the bar holding Psalm 119').toBeGreaterThanOrEqual(0);
+      const h = (b) => b.y1 - b.y0;
+      for (let i = 0; i < bars.length; i++) if (i !== k) expect(h(bars[i]), 'bar ' + i + ' against Psalm 119\'s').toBeLessThan(h(bars[k]));
+      // the psalms after it (120-134, the songs of ascents, 3 to 9 verses) are among the shortest
+      const p134 = verseOf('psalms', 134, 3);
+      const songs = bars.filter((b, i) => i > k && b.x0 <= X(p134));
+      expect(songs.length).toBeGreaterThan(0);
+      for (const b of songs) expect(h(b), 'a song of ascents').toBeLessThan(0.4 * h(bars[k]));
+    });
+  }
+
   /* w4 review: whether a book's start opened a bar was read from the ROUNDED device x of it and of
      the bar before, so a sub-pixel pan moved that difference by a pixel near the bar pitch and the
      grouping at that boundary changed: bars came and went while panning. */
