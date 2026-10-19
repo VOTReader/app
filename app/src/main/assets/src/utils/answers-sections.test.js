@@ -115,6 +115,47 @@ describe('answersAnchorPara — sampled letter links land on the heading the sit
     expect(missed).toEqual([]);
   });
 
+  /* The site's own pages link sections too: relatedMore, the Ten Commandments' related groups and
+     the topic links in the text, 168 anchored links in all. 159 name a section exactly (two of
+     them a dropped "Section One", which lands where it stood); the other 9 land only through
+     answersAnchorPara's fallbacks, the whole-word heading prefix (Come_Out_of_the_Churches_of_Men
+     x6, The_First_Resurrection x2) and the tail after the last " - "
+     (More_False_Doctrines_-_The_Catholic_Church). Pinned so the topic screens keep them. */
+  it('every section the site\'s own pages link lands on its heading, the fallbacks included', () => {
+    const links = [];
+    for (const e of A) {
+      const m = M[e.id] || {};
+      links.push(...(m.relatedMore || []));
+      for (const g of (m.relatedGroups || [])) links.push(...(g.items || []));
+      for (const field of ['links', 'bareLinks']) for (const items of Object.values(m[field] || {})) {
+        links.push(...items.filter((it) => it.kind === 'topic'));
+      }
+    }
+    const anchored = links.filter((it) => it.id && it.anchor);
+    expect(anchored.length).toBe(168);
+    const missed = [], fallback = new Set();
+    for (const it of anchored) {
+      const e = byId.get(it.id), meta = M[it.id];
+      const withMeta = answersAnchorPara(e, it.anchor, meta);
+      const sec = (meta.sections || []).find((s) => s.anchor === it.anchor);
+      if (sec && sec.synthetic) {
+        if (withMeta !== sec.at) missed.push(`${it.id}#${it.anchor} -> ${withMeta}, not ${sec.at}`);
+        continue;
+      }
+      if (!sec) fallback.add(`${it.id}#${it.anchor}`);
+      const t = withMeta >= 0 ? e.paragraphs[withMeta].text : '';
+      if (withMeta < 0 || answersAnchorPara(e, it.anchor, null) !== withMeta || !(t.startsWith('**') && t.endsWith('**'))) {
+        missed.push(`${it.id}#${it.anchor} -> ${withMeta}`);
+      }
+    }
+    expect(missed).toEqual([]);
+    expect([...fallback].sort()).toEqual([
+      'false-doctrines-within-the-churches-of-men-regarding#More_False_Doctrines_-_The_Catholic_Church',
+      'i-am-calling-you-out#Come_Out_of_the_Churches_of_Men',
+      'regarding-the-first-and-second-resurrection#The_First_Resurrection',
+    ]);
+  });
+
   it('opens at the top (-1) for an anchor no heading has, no anchor, or no entry', () => {
     const e = byId.get('regarding-pride');
     expect(answersAnchorPara(e, 'No_Such_Section_Here', M[e.id])).toBe(-1);

@@ -169,3 +169,28 @@ describe('ANSWERS_META', () => {
     expect(embeds).toEqual(['regarding-the-crucifixion@91', 'answers-main-page@4', 'answers-main-page@9']);
   });
 });
+
+/* Related Topics (the shipped `related` field, drawn by WtlbEntryView today). A row opens through
+   the letter registry, keyed 'Answers Only God Can Give::<title>' (index.html __finishVotInit), so
+   each row's title must be the very title of the entry its id names, and no two entries may share
+   one (the registry keeps the last). c72: the Main Page joined the corpus, so the converter no
+   longer drops the site's "Answers Only God Can Give" row on The Volumes of Truth; it is the
+   site's first row there, and it opens the Main Page. */
+describe('ANSWERS related', () => {
+  it('every row opens the entry its id names', () => {
+    const idByTitle = new Map(A.map((e) => [e.title, e.id]));
+    expect(idByTitle.size, 'titles are unique').toBe(A.length);
+    let rows = 0;
+    for (const e of A) for (const r of (e.related || [])) {
+      rows++;
+      expect(idByTitle.get(r.title), `${e.id} -> ${r.title}`).toBe(r.id);
+    }
+    expect(rows).toBe(603);
+  });
+
+  it('The Volumes of Truth leads with the Main Page, as the site does', () => {
+    const tvot = A.find((e) => e.id === 'answers-the-volumes-of-truth');
+    expect(tvot.related[0]).toEqual({ id: 'answers-main-page', title: 'Answers Only God Can Give' });
+    expect(A.find((e) => e.id === 'answers-main-page').title).toBe('Answers Only God Can Give');
+  });
+});
