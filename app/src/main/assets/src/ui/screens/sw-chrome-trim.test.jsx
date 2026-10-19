@@ -334,9 +334,9 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     const bottom = Number(/bottom:\s*calc\((\d+)px/.exec(own)[1]);
     const size = Number(/font-size:\s*var\(--fsc-(\d+)\)/.exec(own)[1]);
     const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(/line-height/.test(own) ? own : ruleOf('.sw-legend'))[1]);
-    // a phone's legend is two lines: the key, then the credit (it needs about 890 px at 13 px and a
-    // phone has about 750 beside ? and hide-UI; the phone screenshot shows it)
-    const lines = compact ? 2 : 1;
+    // the legend is one line on a phone too since w4 (12 px, "far", nowrap: about 670 px against
+    // the 751 beside ? and hide-UI; the w4 band screenshots show it)
+    const lines = 1;
     const legendTop = H - bottom - lines * size * lineHeight;
     // a book label is the fixture book's name or abbreviation as the rail prints it (upper case),
     // in the web's one face: Cinzel is retired from the canvas (sw-ink.js FONT), so the font no

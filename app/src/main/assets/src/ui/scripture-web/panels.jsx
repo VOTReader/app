@@ -135,10 +135,13 @@ export function legendFor(mode, credit) {
   // baseline, a prophecy's fulfilment is the pale thread on top. Last, the
   // credit the OpenBible.info data is owed (Q5), on the same line: it is never
   // a line of its own on the canvas (round 3), so it can never print over the
-  // book labels. My Web draws none of that data, so it carries no credit.
+  // book labels. My Web draws none of that data, so it carries no credit. A
+  // phone's key is one line (w4): the ramp's far end is "far" there (app.css
+  // shows one of the two words).
   return [
     <span className="sw-key sw-key-ramp" key="ramp">
-      <span>nearby</span><i className="sw-key-gradient" aria-hidden="true" /><span>across the canon</span>
+      <span>nearby</span><i className="sw-key-gradient" aria-hidden="true" />
+      <span className="sw-key-long">across the canon</span><span className="sw-key-short">far</span>
     </span>,
     <span className="sw-key" key="cited"><i className="sw-key-tick" aria-hidden="true" />cited in the Volumes</span>,
     <span className="sw-key" key="prophecy"><i className="sw-key-arc" aria-hidden="true" />prophecy fulfilled</span>,

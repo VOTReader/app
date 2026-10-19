@@ -8360,12 +8360,18 @@
       font-family: var(--sw-font); font-size: var(--fsc-14); line-height: 1.35; color: var(--sw-text-muted);
       pointer-events: none;
     }
-    /* a phone's legend is two lines, the key and then the credit (about 890 px of words at 13 px
-       against about 750 beside ? and hide-UI); a little tighter, so it sits under the labels */
+    /* a phone's legend is ONE line, the key and then the credit (w4, r2-06: two lines took the
+       band's foot from the verse numerals): 12 px, the ramp's far end "far" and its gradient
+       shorter, about 670 px of words against the 751 beside ? and hide-UI. It never wraps, so
+       the canvas's rows above its top hold. */
     .sw-root.sw-compact .sw-legend {
       left: 16px; bottom: calc(8px + max(env(safe-area-inset-bottom), var(--inset-bottom, 0px)));
-      font-size: var(--fsc-13); line-height: 1.25; max-width: calc(100% - 140px);
+      font-size: var(--fsc-12); line-height: 1.25; max-width: calc(100% - 140px);
     }
+    .sw-root.sw-compact .sw-legend-line { flex-wrap: nowrap; white-space: nowrap; }
+    .sw-key-short { display: none; }
+    .sw-root.sw-compact .sw-key-long { display: none; }
+    .sw-root.sw-compact .sw-key-short { display: inline; }
     /* hidden, the hide-UI pill says "Show controls" and is wider than the two round buttons */
     .sw-root.sw-chrome-hidden .sw-legend { max-width: calc(100% - 210px); }
     /* THE SEPARATORS. Each item carries its dot in its own 21 px left margin and the line is pulled
@@ -8402,7 +8408,7 @@
       background: linear-gradient(to right, #c252b8 0%, #b054c7 14%, #8f5cd9 30%, #4f70d4 37%, #5c9ec9 47%, #b5474f 58.5%, #c9a16b 72%, #99a84f 86%, #54c25e 100%);
     }
 
-    .sw-root.sw-compact .sw-key-gradient { width: 64px; }
+    .sw-root.sw-compact .sw-key-gradient { width: 48px; }
     .sw-root.sw-compact .sw-key-arc { width: 20px; height: 7px; }
     /* The canvas carried a CC-BY credit line of its own until 2026-09-11; it printed over the
        book labels in landscape. Since Q5 it is the legend's tail (.sw-legend .sw-credit). */

@@ -222,6 +222,25 @@ describe('the chrome\'s CSS (spec 4.1; items 21, 24, 47, 48)', () => {
     expect(left).toBeLessThan(pull);
   });
 
+  /* w4 (r2-06): a phone's legend is ONE line. Two lines (the key, then the credit) took the
+     band's foot from the verse numerals; at 12 px, unwrapped, with the ramp's far end the short
+     word ("far"; "across the canon" on a PC), key and credit fit beside ? and hide-UI (the w4
+     band screenshots measure it). The credit stays the tail. */
+  it('a phone\'s legend is one line: 12 px, unwrapped, the ramp ending "far", the credit last', async () => {
+    expect(rule('.sw-root.sw-compact .sw-legend')).toMatch(/font-size:\s*var\(--fsc-12\)/);
+    expect(rule('.sw-root.sw-compact .sw-legend-line')).toMatch(/flex-wrap:\s*nowrap/);
+    expect(rule('.sw-key-short')).toMatch(/display:\s*none/);
+    expect(rule('.sw-root.sw-compact .sw-key-long')).toMatch(/display:\s*none/);
+    expect(rule('.sw-root.sw-compact .sw-key-short')).toMatch(/display:\s*inline/);
+    const { legendFor } = await import('../scripture-web/panels.jsx');
+    const { container } = render(<div className="sw-legend-line">{legendFor('famous')}</div>);
+    expect(container.querySelector('.sw-key-ramp .sw-key-long').textContent).toBe('across the canon');
+    expect(container.querySelector('.sw-key-ramp .sw-key-short').textContent).toBe('far');
+    const last = container.firstChild.lastElementChild;
+    expect(last.className, 'the credit is the tail').toBe('sw-credit');
+    expect(last.textContent).toBe('Cross-reference data © OpenBible.info (CC-BY)');
+  });
+
   it('no type in the web\'s chrome is under 12 px (item 47)', () => {
     const small = [];
     for (const m of BARE.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
