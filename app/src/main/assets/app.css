@@ -3769,6 +3769,9 @@
     /* ── SEARCH ── */
     .search-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid var(--gold-border); border-radius:6px; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-16); padding:0.45rem 0.75rem; outline:none; transition:border-color 0.2s; }
     .search-input:focus { border-color:var(--gold-dim); }
+    /* role="combobox" (search200 B3) must not bring the app-wide combobox ring and its 4px corners: the box
+       keeps its own focus look, the brighter border above */
+    .search-input:focus-visible { outline:none; border-radius:6px; }
     /* Suppress the UA's own search-cancel × (rendered blue on Android
        WebView, clashing with the gold accent language) — the row already
        provides its own gold ✕ (.srch-clear-btn). */

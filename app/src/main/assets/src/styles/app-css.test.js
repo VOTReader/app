@@ -862,3 +862,13 @@ describe('bottom dock stack (cz1)', () => {
     expect(jrn).not.toContain('body.audio-bar-open .jrn-fab');
   });
 });
+
+/* search200 B3 gave the search box role="combobox" (the ARIA 1.2 pattern), and the app-wide ring for a custom
+   combobox ([role="combobox"]:focus-visible) drew a second gold frame round it, a look it never had. The box
+   keeps its own focus look, the border that brightens (no visible redesign in that round). */
+describe('app.css — the search box keeps its own focus look', () => {
+  it('the combobox ring does not frame the search input', () => {
+    expect(ruleBlock(CSS, '.search-input:focus-visible {')).toMatch(/outline:\s*none;\s*border-radius:\s*6px/);
+    expect(CSS.indexOf('.search-input:focus-visible {'), 'after the app-wide ring, so it wins').toBeGreaterThan(CSS.indexOf('[role="combobox"]:focus-visible { outline: 2px'));
+  });
+});
