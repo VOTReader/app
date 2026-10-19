@@ -1437,6 +1437,13 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(legend).toBeTruthy();
     const keys = [...legend.querySelectorAll('.sw-key')].map((k) => k.textContent);
     expect(keys).toEqual(['Timothy’s notes', 'your links']);
+    // w4 (r2-05; the hub: the CC-BY credit stays on screen, a licence obligation): the credit
+    // is My Web's legend tail too, read, never a line of its own. Through w3 My Web had none.
+    const credit = legend.querySelector('.sw-credit');
+    expect(credit, 'the credit, in the legend').toBeTruthy();
+    expect(credit.textContent).toBe('Cross-reference data © OpenBible.info (CC-BY)');
+    expect(credit.parentElement.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
+    expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
     expect(legend.querySelectorAll('.sw-key-line').length).toBe(2);
     expect(legend.querySelector('.sw-key-pin')).toBeNull();
     expect(legend.querySelector('.sw-key-gradient')).toBeNull();

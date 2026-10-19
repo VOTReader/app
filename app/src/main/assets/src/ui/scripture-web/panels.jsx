@@ -115,6 +115,10 @@ export function legendFor(mode, credit) {
   // with the spec's legend, which has none, and My Web never drew bars.
   // My Web (w3, r2-05): two families, named as the picture names them,
   // Timothy's notes then the reader's links; one line of each family's ink.
+  // Then the credit, as the canon's legend ends (w4): r2-05 draws it there,
+  // My Web's Bible rail is the graph asset's own, and the CC-BY credit stays
+  // on screen wherever the web is (a licence obligation; through w3 My Web
+  // had none, on the reading that it drew none of that data).
   if (mode === 'personal') {
     const words = myWebLegendWords();
     return [
@@ -126,6 +130,7 @@ export function legendFor(mode, credit) {
         <i className="sw-key-line" style={{ background: ink('myWebReader').hex }} aria-hidden="true" />
         {words.yours}
       </span>,
+      <span className="sw-credit" key="credit">{credit || WEB_CREDIT}</span>,
     ];
   }
   // Distance is the only colour law the screen offers (Corbin, 2026-09-10:
@@ -135,9 +140,9 @@ export function legendFor(mode, credit) {
   // baseline, a prophecy's fulfilment is the pale thread on top. Last, the
   // credit the OpenBible.info data is owed (Q5), on the same line: it is never
   // a line of its own on the canvas (round 3), so it can never print over the
-  // book labels. My Web draws none of that data, so it carries no credit. A
-  // phone's key is one line (w4): the ramp's far end is "far" there (app.css
-  // shows one of the two words).
+  // book labels. My Web's legend ends on it too (w4, above). A phone's key is
+  // one line (w4): the ramp's far end is "far" there (app.css shows one of the
+  // two words).
   return [
     <span className="sw-key sw-key-ramp" key="ramp">
       <span>nearby</span><i className="sw-key-gradient" aria-hidden="true" />
