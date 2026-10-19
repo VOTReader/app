@@ -7730,7 +7730,7 @@
       --sw-panel: #1C2527; --sw-panel-edge: #3A4547; --sw-hairline: #2C3537;
       --sw-cite-rule: rgba(196, 164, 105, 0.6);
       --sw-cited: rgba(196, 164, 105, 0.7); --sw-prophecy: rgba(239, 209, 138, 0.9);
-      --sw-font: 'EB Garamond', Georgia, serif;
+      --sw-font: 'SW Garamond', 'EB Garamond', Georgia, serif;
     }
     /* THE GLASS'S INSETS, BY THE FRAME'S OWN EDGES. The web's chrome reads its safe-area
        insets from these four and never from env() directly, so the rotated root
@@ -7968,7 +7968,7 @@
       left: var(--sw-goto-x, calc((100% - var(--sw-goto-inset, 0px)) / 2)); transform: translateX(-50%);
       width: var(--sw-goto-w, min(640px, calc(100% - var(--sw-goto-inset, 0px) - 48px)));
       background: rgba(36, 45, 47, 0.96); border: 1px solid #3A4547; border-radius: 14px;
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: #E9EEEF; font-family: var(--font-body);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: #E9EEEF; font-family: var(--sw-font);
       overflow: hidden;
     }
     /* compact takes the header row (w4; the spec's 64 / 64 at top 8 met Back edge to edge, its
@@ -8001,7 +8001,7 @@
     .sw-goto-icon { flex: none; width: 20px; height: 20px; color: #B7BFC1; }
     .sw-goto-input {
       flex: 1; min-width: 0; height: 100%; padding: 0; background: transparent; border: 0; outline: none;
-      color: #F5F5F3; font-family: var(--font-body); font-size: var(--fsc-20); caret-color: #C4A469;
+      color: #F5F5F3; font-family: var(--sw-font); font-size: var(--fsc-20); caret-color: #C4A469;
     }
     .sw-goto-input::placeholder { color: #959DA0; }
     /* the box is the field (r3-04): the global [role="combobox"] ring would draw a box inside the
@@ -8036,7 +8036,7 @@
     .sw-goto-list + .sw-goto-hint { margin-top: 6px; }
     .sw-goto-chip, .sw-goto-edge {
       position: absolute; z-index: 4; background: #1C2527; border: 1px solid rgba(196, 164, 105, 0.7);
-      border-radius: 6px; color: #E9EEEF; font-family: var(--font-body); white-space: nowrap;
+      border-radius: 6px; color: #E9EEEF; font-family: var(--sw-font); white-space: nowrap;
     }
     .sw-goto-chip {
       left: 0; top: 0; visibility: hidden; pointer-events: none;

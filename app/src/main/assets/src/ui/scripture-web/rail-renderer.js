@@ -30,7 +30,9 @@
 import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
 import { placeRailLabelsSliding } from '../../utils/scripture-web/rail-labels.js';
 import { railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
-import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '../../utils/scripture-web/sw-ink.js';
+import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
+// the shipped Garamond under the web's own name, as the canon's labels (label-engine.js)
+import { WEB_FONT_FAMILY } from '../../utils/scripture-web/label-engine.js';
 
 /** The Volumes rail's height from the top, CSS px (spec §3, My Web: 150 PC, 62 phone). */
 const TOP_RAIL_PC = 150;
@@ -989,7 +991,7 @@ function drawRails(ctx, opts, rails) {
   // the collections: a tick at each band's start, its name above the rail
   const size = nf.size * DPR;
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.font = '500 ' + size + 'px ' + FONT;
+  ctx.font = '500 ' + size + 'px ' + WEB_FONT_FAMILY;
   setTracking(ctx, 0.10 * size);
   // Measure before drawing: collection names are long ("Words To Live By:
   // Part One"), and a name wider than its band times the rows steps down to
@@ -1046,7 +1048,7 @@ function drawRailNames(ctx, opts, rails, placed) {
   if (!placed) return;
   const { DPR } = opts;
   ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
-  ctx.font = '500 ' + placed.size + 'px ' + FONT;
+  ctx.font = '500 ' + placed.size + 'px ' + WEB_FONT_FAMILY;
   setTracking(ctx, 0.10 * placed.size);
   ctx.lineJoin = 'round';
   ctx.lineWidth = 2 * KNOCKOUT * DPR;
@@ -1059,7 +1061,7 @@ function drawRailNames(ctx, opts, rails, placed) {
   // narrow frame: a landscape phone's header sits where it would go)
   if (placed.overline) {
     const osize = 14 * DPR;
-    ctx.font = '500 ' + osize + 'px ' + FONT;
+    ctx.font = '500 ' + osize + 'px ' + WEB_FONT_FAMILY;
     setTracking(ctx, 0.15 * osize);
     ctx.textAlign = 'left';
     ctx.fillStyle = inkCss('volumesOverline');

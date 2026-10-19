@@ -11,7 +11,8 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { INK, FONT } from '../../utils/scripture-web/sw-ink.js';
+import { INK } from '../../utils/scripture-web/sw-ink.js';
+import { WEB_FONT_FAMILY } from '../../utils/scripture-web/label-engine.js';
 import { DISTANCE_RAMP, DISTANCE_RAMP_AT } from '../../utils/scripture-web/palette.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -90,9 +91,22 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
     expect(stops).toEqual(want);
   });
 
-  it('the face is the web\'s one face', () => {
+  /* The DOM's face is the canvas's: 'SW Garamond' is the shipped EB Garamond file the label
+     engine registers itself. 'EB Garamond' by name is the reading-font @font-face index.html
+     switches off for the classic font style, so on default settings the panel, the title and
+     the go-to rendered in the phone's Noto Serif beside canvas labels in Garamond (w4 device
+     check, CSS.getPlatformFontsForNode on the S22). */
+  it('the face is the web\'s one face: the DOM asks for the canvas\'s family', () => {
     const m = /--sw-font:\s*([^;]+);/.exec(body || '');
-    expect(m && m[1].trim()).toBe(FONT);
+    expect(m && m[1].trim()).toBe(WEB_FONT_FAMILY);
+  });
+
+  it('the go-to box, its field and its chips are in the web\'s face, not the reading font', () => {
+    for (const sel of ['.sw-goto', '.sw-goto-input', '.sw-goto-chip, .sw-goto-edge']) {
+      const r = rule(sel);
+      expect(r, sel).toBeTruthy();
+      expect(r, sel).toMatch(/font-family:\s*var\(--sw-font\)/);
+    }
   });
 
   it('every --sw-* colour the panel reads is one of those tokens (no stray hex in the panel rules)', () => {
