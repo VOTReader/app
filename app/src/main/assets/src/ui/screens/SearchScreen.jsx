@@ -67,6 +67,9 @@ const NUMBERED_LETTERS = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'timothy', '
 
 /* The parses that answer with a card of their own (directEntries). */
 const NAV_KINDS = ['ref-bible', 'named-passage', 'ref-book', 'ref-letter'];
+/* The ones that are a reference under any tab (search200 B2 review): a chapter, a named passage, a letter. A bare
+   book name is not: under Volumes, "revelation" and "john" are the words the letters say. */
+const REF_CARD_KINDS = ['ref-bible', 'named-passage', 'ref-letter'];
 
 /* What a held tab is called in a sentence: "No results for “x” in the Scriptures." */
 const TAB_NAME = /** @type {Record<string, string>} */ ({ scriptures: 'the Scriptures', volumes: 'the Volumes' });
@@ -428,12 +431,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
          which a tab or scope change moves at once: keyed live, the groups remounted over the OLD list (long, so
          closed), and the new list, a lone group, arrived under the same key and stayed closed over a blank screen.
          `refParsed`: the parse is held to the tab ("john 3:16" under Volumes is words), but a reference answers
-         under any tab, so the card reads the query across all of it (the parse needs no index). */
+         under any tab, so the card reads the query across all of it (the parse needs no index). Only a
+         reference does (REF_CARD_KINDS): a bare book name under Volumes stays the words it is. */
       const corpus = settings.searchCorpus || 'all';
       const E = pickEngine();
       let refParsed = null;
       if (corpus !== 'all' && (!r.parsed || r.parsed.kind === 'text') && E && typeof E.parse === 'function') {
-        try { const p = E.parse(q, { corpus: 'all' }); if (p && NAV_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
+        try { const p = E.parse(q, { corpus: 'all' }); if (p && REF_CARD_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
       }
       const done = { phase: 'done', memo, parsed: r.parsed, refParsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
       if (!r.error) lastSearch = { memo, allWordsFor, state: done };
@@ -614,7 +618,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // A reference answers under any tab (search200 B2): "john 3:16" typed under Volumes lost
   // its card, because the engine's parse is held to the tab; `refParsed` is the query read
   // across all of it, when the engine's own parse found words.
-  const navParsed = state.parsed && NAV_KINDS.indexOf(state.parsed.kind) >= 0 ? state.parsed : (state.refParsed || null);
+  /* `engineNav`: the ENGINE read a reference, so its words stop at the closest few under the card and the card
+     stands for the row of best matches. A card from `refParsed` sits above the tab's own search, which keeps
+     its Best Matches and its count. */
+  const engineNav = !!(state.parsed && NAV_KINDS.indexOf(state.parsed.kind) >= 0);
+  const navParsed = engineNav ? state.parsed : (state.refParsed || null);
   const directEntries = React.useMemo(() => {
     const p = navParsed;
     if (!p) return [];
@@ -647,10 +655,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // Top results: the best 5 hits shown before the groups whenever there is more
   // than one group, in every corpus. The groups follow the site's order, not
   // relevance, so this row is where relevance leads (only for text queries —
-  // ref queries already have directEntries cards).
+  // a reference the engine read already has its card; one read across every
+  // tab, `refParsed`, sits above the tab's own row, search200 B2 review).
   const topResults = React.useMemo(() => {
     if (!state.results.length) return [];
-    if (directEntries.length > 0) return [];
+    if (engineNav && directEntries.length > 0) return [];
     if (grouped.length <= 1) return [];
     // One card per text: a Holy Days entry reprints its letter word for word, and
     // both took a place in the five.
@@ -665,7 +674,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (top.length === 5) break;
     }
     return top;
-  }, [state.results, grouped.length, directEntries.length]);
+  }, [state.results, grouped.length, engineNav, directEntries.length]);
   /* A SHORT LIST SHOWS EACH RESULT ONCE (search200 B2). Thirty or fewer results open
      every group (renderGroups' defaultOpen) under Best Matches, which showed its five
      twice. The groups hold the rest, and one that gave some up counts them as "more";
@@ -839,7 +848,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   const isDone = !!qTrim && buildInfo.ready && state.phase === 'done';
   /* Under a reference card the words' matches stop at the closest few (search-2), and
      "Found 5+ matches" read as a count of the passage (search200 B5). */
-  const closestOnly = directEntries.length > 0 && state.truncated && allWordsFor !== qTrim;
+  const closestOnly = engineNav && directEntries.length > 0 && state.truncated && allWordsFor !== qTrim;
   const countText = closestOnly ? 'Showing closest matches' : 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
     + (state.results.length === 1 ? 'match' : 'matches') + ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections');
   const scopeIn = searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : '';

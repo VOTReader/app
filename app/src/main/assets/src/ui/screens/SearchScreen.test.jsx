@@ -1500,6 +1500,32 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect([...document.querySelectorAll('.stub-direct')].map((d) => d.textContent)).toEqual(['Volume Two · Letter 5']);
   });
 
+  /* B2 review: the card a reference keeps under Volumes took the tab's Best Matches with it, and a bare book name
+     ("revelation", "john") became a Bible card over a closed contents list. A reference's card sits above the
+     tab's Best Matches; a book name under Volumes is the words it is; and "Showing closest matches" is said only
+     when the engine stopped at the closest few for a card of its own. */
+  it('B2: under Volumes a reference card keeps the Best Matches row, and a bare book name makes no card', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, isDirect }) => (isDirect
+      ? <div className="stub-direct">{entry.__label}</div> : <div className="stub-card">{entry.doc.title}</div>);
+    /** @type {any} */ (window).VotSearchMini.parse = vi.fn((q) => (/3:16/.test(q)
+      ? { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 16 }
+      : { kind: 'ref-book', bookId: 'revelation', bookTitle: 'Revelation' }));
+    const direct = () => [...document.querySelectorAll('.stub-direct')].map((d) => d.textContent);
+    const best = () => [...document.querySelectorAll('.srch-top-results .stub-card')].map((c) => c.textContent);
+    searchReturns({ parsed: { kind: 'text' }, results: letters('v1', 20).concat(letters('v2', 20, 20)) });
+    const r = await typeIn({ ...baseProps(), settings: { searchCorpus: 'volumes' } }, 'revelation');
+    expect(direct(), 'a book name under Volumes is words').toEqual([]);
+    expect(best()).toEqual(['v1-0', 'v1-1', 'v1-2', 'v1-3', 'v1-4']);
+    r.unmount();
+    searchReturns({ parsed: { kind: 'text' }, results: letters('v1', 20).concat(letters('v2', 20, 20)), truncated: true });
+    await typeIn({ ...baseProps(), settings: { searchCorpus: 'volumes' } }, 'john 3:16');
+    expect(direct()).toEqual(['John 3:16']);
+    expect(best(), 'the card sits above the tab’s own row').toEqual(['v1-0', 'v1-1', 'v1-2', 'v1-3', 'v1-4']);
+    expect(document.querySelector('.srch-results-summary').textContent, 'the tab searched every match').toMatch(/^Found 40\+ matches/);
+  });
+
   /* B2: a book scope with the Volumes tab on said "No results in Luke", and "Search everywhere" kept the
      Volumes tab on. The conflict is named, with a way out of each side. */
   it('B2: a book scope under the Volumes tab names the conflict; each way out widens the tab', async () => {
