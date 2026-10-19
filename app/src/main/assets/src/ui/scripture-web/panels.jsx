@@ -98,29 +98,29 @@ export function TipChip({ info, viewport, inset }) {
 export function HowToReadGuide({ onClose, canSearch, credit, mode }) {
   const trapRef = useFocusTrap(true);
   const words = myWebLegendWords();
-  const lines = mode === 'personal' ? (
-    <ul className="sw-guide-body">
-      <li><strong>The Volumes</strong> run along the top, the Bible along the bottom. Drag or pinch either one.</li>
-      <li>The lines are {words.yours} and {words.timothy}; the key tells them apart.</li>
-      <li>Tap a line to read both ends.</li>
-      <li><strong>Reset Volumes</strong> and <strong>Reset Bible</strong> bring a rail back; Reset brings both.</li>
-    </ul>
-  ) : (
-    <ul className="sw-guide-body">
-      <li><strong>Pinch</strong> or scroll to zoom. The farther apart two verses, the taller their arch: drag down to look higher.</li>
-      <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
-      <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
-      {canSearch ? <li><strong>Go to</strong> (the magnifier at the top, or /) jumps to a book, chapter or verse.</li> : null}
-      <li><strong>Reset</strong> brings the whole web back.</li>
-    </ul>
-  );
   return (
     <div className="sw-guide" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="sw-guide-title">
       {/* the words in a document (w4): the root's role="application" stops a screen reader's
           virtual cursor, a document turns it back on; Got it stays a control after it */}
       <div role="document">
         <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
-        {lines}
+        {/* the lines sit between the title and Got it (guide-sky-direction.test.js reads them there) */}
+        {mode === 'personal' ? (
+          <ul className="sw-guide-body">
+            <li><strong>The Volumes</strong> run along the top, the Bible along the bottom. Drag or pinch either one.</li>
+            <li>The lines are {words.yours} and {words.timothy}; the key tells them apart.</li>
+            <li>Tap a line to read both ends.</li>
+            <li><strong>Reset Volumes</strong> and <strong>Reset Bible</strong> bring a rail back; Reset brings both.</li>
+          </ul>
+        ) : (
+          <ul className="sw-guide-body">
+            <li><strong>Pinch</strong> or scroll to zoom. The farther apart two verses, the taller their arch: drag down to look higher.</li>
+            <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
+            <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
+            {canSearch ? <li><strong>Go to</strong> (the magnifier at the top, or /) jumps to a book, chapter or verse.</li> : null}
+            <li><strong>Reset</strong> brings the whole web back.</li>
+          </ul>
+        )}
         <p className="sw-guide-foot">{credit || WEB_CREDIT}</p>
       </div>
       <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>Got it</button>

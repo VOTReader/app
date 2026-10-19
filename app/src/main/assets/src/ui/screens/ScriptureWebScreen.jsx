@@ -327,11 +327,13 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const v = viewRef.current;
     const c = which === 'top' ? camVRef.current : camRef.current;
     if (!c) return;
+    // a running fly would carry on over the reset (w4); resetView flies after this, not before
+    cancelFly();
     c.ppv = fitPPV(c, v.W);
     c.x = c.total / 2;
     clampCamera(c, v.W, zoomCapFor(c));
     schedule();
-  }, [camRef, camVRef, schedule, viewRef, zoomCapFor]);
+  }, [camRef, camVRef, schedule, viewRef, zoomCapFor, cancelFly]);
 
   const resetView = React.useCallback(() => {
     const cam = camRef.current;
@@ -339,8 +341,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // A4 (the navigation stream): Reset flies home, eased (instant under reduced motion), to the
     // whole canon at fit across the whole view, on the baseline: y 0 is explicit, Reset MEANS
     // the baseline whatever clamp a later edit puts after it
-    flyTo({ x0: 0, x1: cam.total, y: 0 }, { insetRight: 0 });
     if (camVRef.current) resetRail('top');
+    flyTo({ x0: 0, x1: cam.total, y: 0 }, { insetRight: 0 });
     focusRef.current = focusState();
     journey.clear();
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
@@ -359,10 +361,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
    * index number two different graphs, so a focus kept across the switch spotlit an unrelated
    * line in the other web, with nothing open for Escape or Back to close (sweep v5, 2026-10-14). */
   const switchMode = React.useCallback((next) => {
+    // w4: a fly under way (a go-to, a Follow, Reset) stops where it is: it drives camRef, which is
+    // My Web's Bible rail too, so it carried on into the other web; and the canon's density hint
+    // goes with the canon (My Web has no density)
+    cancelFly();
+    if (hintTimer.current) { clearTimeout(hintTimer.current); hintTimer.current = 0; }
+    setHint('');
     closeCards();
     journey.clear();
     setMode(next);
-  }, [closeCards, journey]);
+  }, [closeCards, journey, cancelFly]);
 
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset

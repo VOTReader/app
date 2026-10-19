@@ -899,6 +899,47 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(last.focusRange).toBeNull();
     });
 
+    /* w4 interaction hunt: switchMode closed the cards and cleared the trail but left a running fly
+       alone. A go-to fly under way when the reader tapped My Web carried on in My Web, moving the
+       Bible rail's camera (camRef) to the go-to's verse, and the density hint of the canon stayed
+       printed under My Web's title. The switch stops the fly where it is and drops the hint. */
+    it('w4: a fly under way when the reader switches webs stops where it is; the canon\'s hint goes', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen }, threaded);
+      // zoomed in off the middle, then Reset: an eased fly home
+      const root = container.querySelector('.sw-root');
+      for (let k = 0; k < 6; k++) fireEvent.keyDown(root, { key: '+' });
+      for (let k = 0; k < 8; k++) fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(40);
+      fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
+      await settle(60);
+      const a = DRAWN[DRAWN.length - 1].camX;
+      await settle(60);
+      const b = DRAWN[DRAWN.length - 1].camX;
+      expect(Math.abs(b - a), 'PRECONDITION: the fly is under way').toBeGreaterThan(1);
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(1200);
+      // the canon's camera is the Bible rail's (camRef): back on the canon, it reads where the fly was
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      await settle(40);
+      const home = CANON / 2;
+      const x = DRAWN[DRAWN.length - 1].camX;
+      expect(Math.abs(x - home), 'the fly did not carry on home while My Web was up').toBeGreaterThan(1);
+      expect(Math.abs(x - b), 'it stopped about where the switch found it').toBeLessThan(Math.abs(b - a) * 3);
+    });
+
+    it('w4: the density hint does not outlive the switch to My Web', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen }, threaded);
+      const select = container.querySelector('.sw-select');
+      fireEvent.change(select, { target: { value: 'essential' } });
+      await settle(20);
+      expect(container.querySelector('.sw-hint'), 'PRECONDITION: the density switch printed its hint').toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(20);
+      expect(container.querySelector('.sw-hint')).toBeNull();
+    });
+
     /* item 29 (w3, the My Web stream): the list was the first 36 links in store order wherever
        the camera stood, so "Nearby" was not near and link 37 on could be reached only by finding
        it on the canvas. Now every link is listed, the one passing nearest the middle first. */
