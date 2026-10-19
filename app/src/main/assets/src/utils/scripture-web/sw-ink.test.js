@@ -150,6 +150,21 @@ describe('the ink table', () => {
     expect(MYWEB_TAP_CONTEXT).toBe(0.45);
     expect(MYWEB_TAP_CONTEXT).toBeGreaterThanOrEqual(0.30);
     expect(MYWEB_TAP_CONTEXT).toBeLessThanOrEqual(TAP_CONTEXT);
+  });
+
+  it('both recedes, the Scripture Web\'s and My Web\'s, lie in .30-.60 and never take a line to 0', () => {
+    // w4 INK review 2, finding 7: two named recedes, one per view (the split is the hub's call; the
+    // reasons are above and in the README's "Rest of web" row). Each is a recede, never an erase
+    for (const [name, k] of Object.entries({ TAP_CONTEXT, MYWEB_TAP_CONTEXT })) {
+      expect(k, name).toBeGreaterThanOrEqual(0.30);
+      expect(k, name).toBeLessThanOrEqual(0.60);
+      for (const kind of ['lit', 'prophecy', 'cited', 'myWebReader', 'myWebStudy']) {
+        expect(rgba01(kind, k)[3], `${name} x ${kind}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('keeps the other named constants', () => {
     expect(CENTRE_BRIGHT).toBe(1.35);
     expect(CENTRE_WIDTH).toBe(1.25);
     expect(FLYOVER_LEG_WIDTH).toBe(0.7);
