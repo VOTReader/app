@@ -173,6 +173,16 @@ describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
     expect(rule('.sw-row-top')).toMatch(/flex-wrap:\s*wrap/);
   });
 
+  /* w4 review: the loader's Back is the compact topbar's 40 px; the error page (no .sw-compact
+     until w4) drew its Back at 44, so Back grew when a load failed (sw-states.test.jsx). */
+  it('on a phone the error page\'s Back is the topbar\'s compact 40 px, in the topbar\'s own rule', () => {
+    const round = /([^{}]*\.sw-fallback\.sw-compact \.sw-fallback-back[^{}]*)\{([^}]*)\}/.exec(BARE);
+    expect(round, 'a compact rule for the error page\'s Back').toBeTruthy();
+    expect(round[1]).toMatch(/\.sw-root\.sw-compact :is\(\.sw-topbar \.sw-btn-icon/);
+    expect(round[2]).toMatch(/width:\s*40px/);
+    expect(round[2]).toMatch(/height:\s*40px/);
+  });
+
   it('the close X is filled with the panel, so the text that scrolls under it never shows through', () => {
     expect(rule('.sw-sheet-close')).toMatch(/background:\s*var\(--sw-panel\)/);
   });

@@ -181,12 +181,14 @@ export function EmptyWebNotice({ onDismiss }) {
  * @param {string} message
  * @param {() => void} onRetry
  */
-export function loadErrorPanel(message, onRetry, onBack) {
+export function loadErrorPanel(message, onRetry, onBack, compact = false) {
   // It replaces the whole screen, topbar and all, so it carries its own Back (item 24) where the
   // topbar's sits. It says it once, in plain words (w4): the raw message beneath them only said
   // them again, or said them in a programmer's words, so it rides on data-detail for a bug report.
+  // `compact` is the screen's own (use-panel-layout): on a phone its Back is the topbar's 40 px, so
+  // Back keeps its size when the loader gives way to the error (w4 review).
   return (
-    <div className="sw-fallback" data-detail={message || undefined}>
+    <div className={'sw-fallback' + (compact ? ' sw-compact' : '')} data-detail={message || undefined}>
       <button type="button" className="sw-btn sw-btn-icon sw-fallback-back" onClick={onBack} aria-label="Back">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
       </button>

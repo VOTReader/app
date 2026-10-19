@@ -63,6 +63,17 @@ describe('the load error (item 24)', () => {
     expect(onBack).toHaveBeenCalledTimes(1);
   });
 
+  /* w4 review: on the phone the loader's Back is the compact topbar's 40 px, and the error page's
+     was 44, so Back grew when the load failed: the error page carried no .sw-compact. */
+  it('on a phone the error page is compact, and its Back is the 40 px the loader\'s Back is', () => {
+    const { container } = render(loadErrorPanel(FETCH_FAILED, vi.fn(), vi.fn(), true));
+    expect(container.querySelector('.sw-fallback').classList.contains('sw-compact')).toBe(true);
+    cleanup();
+    const pc = render(loadErrorPanel(FETCH_FAILED, vi.fn(), vi.fn()));
+    expect(pc.container.querySelector('.sw-fallback').classList.contains('sw-compact')).toBe(false);
+    // its 40 px: panel-css.test.js reads the rule
+  });
+
   it('the screen: a failed load offers Back, and Back leaves the web', async () => {
     // truthy (ensureScriptureWebData's fast path) but undecodable: a real load failure
     window.SCRIPTURE_WEB_DATA = { count: 0 };

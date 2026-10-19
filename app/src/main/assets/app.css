@@ -7850,8 +7850,10 @@
     .sw-root.sw-compact .sw-btn::after { top: -5px; bottom: -5px; }
     /* Back, ? and hide-UI are round: 44 px on PC, 40 with a 44 hit on a phone. */
     :is(.sw-topbar, .sw-fallback) .sw-btn-icon, .sw-hide-all, .sw-guide-btn { width: 44px; height: 44px; border-radius: 50%; }
-    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn) { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
-    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn)::after { left: -2px; right: -2px; top: -2px; bottom: -2px; }
+    /* the error page replaces the root, topbar and all, and carries its own Back where the topbar's
+       sits: on a phone it is the same 40 px (w4 review), so Back keeps its size when a load fails */
+    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn), .sw-fallback.sw-compact .sw-fallback-back { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn)::after, .sw-fallback.sw-compact .sw-fallback-back::after { left: -2px; right: -2px; top: -2px; bottom: -2px; }
     /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back), in the
        bottom-right corner with ? beside it (spec 4.1: bottom 16 / right 24, a 12 px gap; 8 / 16
        on a phone). Hidden, it says so in words, "Show controls": the label flips with its name,
