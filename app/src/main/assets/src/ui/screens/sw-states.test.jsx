@@ -90,7 +90,16 @@ describe('the load error (item 24)', () => {
     expect(container.querySelector('.sw-loading'), 'the loader').toBeTruthy();
     expect(container.querySelector('.sw-guide'), 'no card over the loader').toBeNull();
     expect(screen.getByRole('button', { name: 'Back' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /how to read this web/i }).getAttribute('aria-expanded')).toBe('false');
+  });
+
+  /* w4 review: with the card waiting for the web, a ? pressed during the load showed nothing, and
+     once the web arrived the card opened late and unasked. The ? waits for the web as the card does. */
+  it('while the web is woven there is no ? to press, so no card can open late and unasked', async () => {
+    const { container } = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); });
+    expect(container.querySelector('.sw-loading'), 'the loader').toBeTruthy();
+    expect(screen.queryByRole('button', { name: /how to read this web/i })).toBeNull();
+    expect(container.querySelector('.sw-guide-btn')).toBeNull();
   });
 
   it('while the web is woven, the density names no count it does not have yet ("Famous", not "Famous · 0")', async () => {

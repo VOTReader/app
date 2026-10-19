@@ -524,10 +524,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       </button>
 
       {/* the how-to-read card's button: the corner above the hide-all
-          button, off the controls strip (which it overflowed on a phone) */}
-      <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideShown ? ' is-on' : '')}
-        onClick={() => (guideShown ? closeGuide() : setGuideOpen(true))}
-        aria-label="How to read this web" aria-expanded={guideShown} aria-haspopup="dialog">?</button>
+          button, off the controls strip (which it overflowed on a phone). It waits for the web
+          as the card does (w4 review: pressed during the load it showed nothing, then opened the
+          card late and unasked when the web arrived) */}
+      {graph && (
+        <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideShown ? ' is-on' : '')}
+          onClick={() => (guideShown ? closeGuide() : setGuideOpen(true))}
+          aria-label="How to read this web" aria-expanded={guideShown} aria-haspopup="dialog">?</button>
+      )}
       {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} />}
       {goTo.box}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
