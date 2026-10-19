@@ -51,7 +51,7 @@ import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
 import { buildTitles, scoreTitles, admitTitles, stripCollections, titleWords } from './titles.js';
-import { alignClasses, alignWeights, alignScore } from './align.js';
+import { alignClasses, alignWeights, alignScore, alignMet } from './align.js';
 import { parseLexicon } from './lexicon.js';
 
 /**
@@ -2370,7 +2370,7 @@ async function search(query, options) {
      best text left under ALIGN_HELD (it is not lifted); a study quoting a verse gives way to the verse, and a text
      held so gives way in originalsFirst only to an original holding the quote as well. On the open benches
      (2026-10-18): tri 577 -> 586 of 600, the 500's open unchanged (381), dropped-word probe 1720 -> 1751. */
-  /** @type {Map<string, {cov: number, start: number, rank: number}>} tier B: the texts holding the quote, slips and all */
+  /** @type {Map<string, {cov: number, start: number, rank: number, met?: Uint8Array}>} tier B: the texts holding the quote, slips and all */
   const alignHeld = new Map();
   /** @type {((id: string) => number)|null} how much of the quote a text holds (align.js cov), for originalsFirst */
   let alignCovOf = null;
@@ -2402,6 +2402,28 @@ async function search(query, options) {
     const tie = ALIGN_TIE + (wAll ? wSmall / wAll : 0);
     /** The most a candidate left under ALIGN_HELD holds: a text holding the quote only that well is not told from it. */
     let under = 0;
+    /** @type {[ArrayLike<any>, number, number]|null} that candidate's tokens and span, for the typed words it holds */
+    let underAt = null;
+    /* A TEXT HOLDING MORE OF THE TYPED WORDS IS NO TIE (search200 R4, 2026-10-18). Two covs within `tie` hold the quote
+       alike only when neither text holds a typed word the other lacks (align.js alignMet): x over y when x holds every
+       content word y holds and more, or the same content words and every small word y holds and more. */
+    /** x against y on one class of typed word (small 1: the stop words, 0: the rest): -1 when y holds one x lacks, 1
+        when x holds all y holds and more, else 0. */
+    const beyond = (/** @type {Uint8Array} */ x, /** @type {Uint8Array|null} */ y, /** @type {number} */ small) => {
+      let more = false;
+      for (let i = 1; i < x.length; i++) {
+        if (cls.stop[i - 1] !== small) continue;
+        const b = y ? y[i] : 0;
+        if (b && !x[i]) return -1;
+        if (x[i] && !b) more = true;
+      }
+      return more ? 1 : 0;
+    };
+    const over = (/** @type {Uint8Array|undefined} */ x, /** @type {Uint8Array|null|undefined} */ y) => {
+      if (!x) return false;
+      const c = beyond(x, y || null, 0);
+      return c ? c > 0 : beyond(x, y || null, 1) > 0;
+    };
     /** @type {Map<string, number>} each verse's own cov, its neighbour's pair aside */
     const single = new Map();
     const alone = (/** @type {string} */ id, /** @type {any} */ t) => {
@@ -2426,6 +2448,8 @@ async function search(query, options) {
       const d = docLookup[id];
       if (!t || !d) continue;
       let a = alignScore(t, typedTokens, w, cls);
+      /** @type {[ArrayLike<any>, number, number]} the tokens and span `a` holds the quote in */
+      let at = [t, a.start, a.end];
       single.set(id, a.cov);
       // two verses run together: the pair holds what neither holds alone (a neighbour holding it alone is the verse
       // remembered, and this one, saying the like, is not lifted by it)
@@ -2441,24 +2465,32 @@ async function search(query, options) {
           const b = alignScore(both, typedTokens, w, cls);
           if (b.cov > a.cov && b.start < x.length && b.end > x.length) {
             a = { cov: b.cov, start: -1, end: -1, first: -1 };
+            at = [both, b.start, b.end];
             // ...the neighbour holding more of the quote than a small word is the rest of it
             if (b.cov - /** @type {number} */ (single.get(id)) > tie) pairOf.set(id, o); else pairOf.delete(id);
           }
         }
       }
       // it opens where the first typed words are (clauses typed in the other order: on the first typed)
-      if (a.cov >= ALIGN_HELD) alignHeld.set(id, { cov: a.cov, start: a.first, rank: 0 });
-      else if (a.cov > under) under = a.cov;
+      if (a.cov >= ALIGN_HELD) alignHeld.set(id, { cov: a.cov, start: a.first, rank: 0, met: alignMet(at[0], at[1], at[2], w, cls) });
+      else if (a.cov > under) { under = a.cov; underAt = at; }
     }
+    const underMet = underAt ? alignMet(underAt[0], underAt[1], underAt[2], w, cls) : null;
     /* Held, and told from the rest: a text holding the quote within a small word of one just under ALIGN_HELD holds it
        no better ("blessed be the name of our lord": three verses and a Blessed hold it in a row with "the" for "our",
        and a verse spreading its words over twice its length holds "our" too), and the words' order stands. */
-    for (const [id, a] of alignHeld) if (a.cov - under <= tie) alignHeld.delete(id);
+    for (const [id, a] of alignHeld) if (a.cov - under <= tie && !over(a.met, underMet)) alignHeld.delete(id);
     if (alignHeld.size) {
       const order = [...alignHeld.keys()].sort((x, y) => {
-        const cx = /** @type {any} */ (alignHeld.get(x)).cov;
-        const cy = /** @type {any} */ (alignHeld.get(y)).cov;
-        return Math.abs(cy - cx) > tie ? cy - cx : scoreMap[y] - scoreMap[x];
+        const hx = /** @type {any} */ (alignHeld.get(x));
+        const hy = /** @type {any} */ (alignHeld.get(y));
+        const cx = hx.cov;
+        const cy = hy.cov;
+        if (Math.abs(cy - cx) > tie) return cy - cx;
+        // within a small word: the text holding more of the typed words first, else the words' order
+        if (cx >= cy && over(hx.met, hy.met)) return -1;
+        if (cy >= cx && over(hy.met, hx.met)) return 1;
+        return scoreMap[y] - scoreMap[x];
       });
       // A study quoting a verse (the KJV's words, or with His name restored) gives way to the verse, its original (DECISIONS 10-14).
       const kindAt = (/** @type {string} */ id) => (docLookup[id] ? docLookup[id].kind : '');
@@ -2817,7 +2849,7 @@ async function search(query, options) {
       const slots = [];
       const kept = [];
       // (what the admission placed keeps its place: a title named, held with its slips too, is no slot)
-      for (let r = 0; r < out.length; r++) if (alignedSo(out[r])) { slots.push(r); kept.push(out[r]); }
+      for (let r = 0; r < out.length; r++) if (alignedSo(out[r]) && !admittedDocs.has(out[r].doc)) { slots.push(r); kept.push(out[r]); }
       const rank = (/** @type {any} */ e) => /** @type {any} */ (alignHeld.get(/** @type {string} */ (idOf.get(e)))).rank;
       kept.sort((x, y) => rank(x) - rank(y));
       for (let s = 0; s < slots.length; s++) out[slots[s]] = kept[s];

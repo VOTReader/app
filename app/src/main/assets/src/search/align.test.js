@@ -3,7 +3,7 @@
    source at cov >= 0.8 and a plausible distractor (one sharing its rarer words) at <= 0.5.
    Pure: every case builds its own classes, so the cases pass in any order. */
 import { describe, it, expect } from 'vitest';
-import { alignScore, alignClasses, alignWeights, ALIGN } from './align.js';
+import { alignScore, alignClasses, alignWeights, alignMet, ALIGN } from './align.js';
 import { kjvEncode } from './tokenize.js';
 import { parseLexicon } from './lexicon.js';
 
@@ -365,5 +365,25 @@ describe('alignClasses: a small word shares no form with a content word (search2
     const content = alignClasses(toks('saying and having'), { stop: STOP, synonyms: SYN });
     expect(at(content, 'said', 0)).toBe(ALIGN.FORM);
     expect(at(content, 'have', 2)).toBe(ALIGN.FORM);
+  });
+});
+
+describe('alignMet: the typed words a span says in the typed order (search200 R4)', () => {
+  const metOf = (/** @type {string} */ q, /** @type {string} */ text, /** @type {number[]} */ idf) => {
+    const words = toks(q);
+    const t = toks(text);
+    return [...alignMet(t, 0, t.length, idf, alignClasses(words, { stop: STOP, synonyms: SYN }))].slice(1).join('');
+  };
+  it('a word typed twice is held twice only where the text says it twice', () => {
+    const idf = [1, 1, 3, 3, 1, 1];
+    expect(metOf('for the hour come for the', 'for the hour has come for the lambs', idf)).toBe('111111');
+    expect(metOf('for the hour come for the', 'for the hour is come for you', idf)).toBe('111110');
+  });
+  it('a word said out of the typed order is not held, the heavier words kept', () => {
+    const idf = [3, 1, 1, 3, 1, 1, 3];
+    expect(metOf('praised be the name of our king', 'praised is the city of our fathers the city that comes in the name of the king', idf)).toBe('1111101');
+  });
+  it('a word spelling two typed words run together holds both', () => {
+    expect(metOf('the sea shore was wide', 'the seashore was wide', [1, 2, 2, 1, 2])).toBe('11111');
   });
 });

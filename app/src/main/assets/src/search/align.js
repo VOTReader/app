@@ -743,3 +743,64 @@ export function alignScore(docIds, qIds, idf, classes) {
   if (!(best > 0) || bestS < 0) return { ...NONE };
   return { cov: Math.min(1, best / total), start: bestS, end: bestE, first: bestF >= 0 ? bestF : bestS };
 }
+
+/**
+ * WHICH TYPED WORDS A SPAN HOLDS (search200 R4, 2026-10-18). Two texts whose covs sit within a small word's weight of
+ * each other hold the quote alike only when neither holds a typed word the other lacks: a text holding every word
+ * another holds and more is not tied with it. The typed words the span says in the typed order, the heaviest such
+ * set (each typed word's weight times its credit): one text word meets one typed word, so a word typed twice is met
+ * twice only where the text says it twice; a word spelling two typed words run together meets both, two words
+ * spelling one typed word meet it. A word said out of the typed order is not held: a verse spreading the quote's
+ * words over twice its length, one of them out of place, holds no more of it than a line saying them in order.
+ * @param {ArrayLike<any>} docIds  the text's tokens @param {number} start @param {number} end  a span (alignScore's)
+ * @param {ArrayLike<number>} idf  each typed word's weight (alignWeights) @param {AlignClasses} classes
+ * @returns {Uint8Array}  1 at each typed position (1-based) the span holds
+ */
+export function alignMet(docIds, start, end, idf, classes) {
+  const m = classes.m;
+  const s = Math.max(0, start);
+  const n = Math.min(end, docIds.length) - s;
+  const met = new Uint8Array(m + 1);
+  if (!(n > 0) || !m) return met;
+  const W = m + 1;
+  const dp = new Float64Array((n + 1) * W);
+  // the move into each cell: 0 the text word unmet, 1 the typed word unmet, 2 met, 3 a word spelling two, 4 two words spelling one
+  const mv = new Uint8Array((n + 1) * W);
+  const g = new Float64Array(W);
+  let prevPre = 0;
+  for (let j = 1; j <= n; j++) {
+    const tok = docIds[s + j - 1];
+    const en = classes.entry(tok);
+    g.fill(0);
+    for (let k = 0; k < en.c.length; k += 2) g[en.c[k]] = en.c[k + 1] * (+idf[en.c[k] - 1] || 0);
+    const sp = j > 1 && prevPre ? classes.splitAt(docIds[s + j - 2], tok) : 0;
+    const r = j * W;
+    const u = r - W;
+    for (let i = 1; i <= m; i++) {
+      let b = dp[u + i];
+      let v = 0;
+      if (dp[r + i - 1] > b) { b = dp[r + i - 1]; v = 1; }
+      if (g[i] > 0 && dp[u + i - 1] + g[i] > b) { b = dp[u + i - 1] + g[i]; v = 2; }
+      if (en.join === i && i > 1) {
+        const t = dp[u + i - 2] + (+idf[i - 2] || 0) + (+idf[i - 1] || 0);
+        if (t > b) { b = t; v = 3; }
+      }
+      if (sp === i && j > 1) {
+        const t = dp[u - W + i - 1] + (+idf[i - 1] || 0);
+        if (t > b) { b = t; v = 4; }
+      }
+      dp[r + i] = b;
+      mv[r + i] = v;
+    }
+    prevPre = en.pre;
+  }
+  for (let j = n, i = m; j > 0 && i > 0;) {
+    const v = mv[j * W + i];
+    if (v === 0) j--;
+    else if (v === 1) i--;
+    else if (v === 2) { met[i] = 1; j--; i--; }
+    else if (v === 3) { met[i] = 1; met[i - 1] = 1; j--; i -= 2; }
+    else { met[i] = 1; j -= 2; i--; }
+  }
+  return met;
+}
