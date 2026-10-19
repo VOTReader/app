@@ -13,7 +13,9 @@ pure pieces are exercised directly.
   aogcg  (2026-10-19, phase 1a) the scripture links the old converter dropped (2-peter after a book,
          passage.aspx, 1Co), the redirect loop guard, the refusal rule (a shipped paragraph may only
          gain {{ref:}} markers), locate_tokens / UTF-16 offsets, and the sidecars blocks_to_paragraphs
-         records beside text that carries no new markup.
+         records beside text that carries no new markup. Round 1 fixes: the refusal rule takes only the
+         emphasis pair a marker closed and reopened (an empty "__" / "****" elsewhere is a change), and
+         a "_" inside a web address prints as "%5F", not "‗" (Main Page :4).
 
 Run: py -3.13 -m unittest test_fetch_answers
 """
@@ -151,6 +153,23 @@ class RefusalRule(unittest.TestCase):
     def test_without_refs_closes_the_run_a_marker_split(self):
         self.assertEqual(fa.without_refs('_Covenant_{{ref:1 Corinthians 5:7-8}}_ of old_'), '_Covenant of old_')
         self.assertEqual(fa.without_refs('**a**{{ref:John 1:1}}** b**'), '**a b**')
+        self.assertEqual(fa.without_refs('**_a_**{{ref:John 1:1}}**_ b_**'), '**_a b_**')
+        # Several markers in a row close and reopen the run once.
+        self.assertEqual(fa.without_refs('_a_{{ref:John 1:1}}{{ref:John 1:2}}_ b_'), '_a b_')
+
+    def test_without_refs_takes_only_the_pair_around_a_marker(self):
+        # A run that ends at a marker and a different one that starts after it stay as written.
+        self.assertEqual(fa.without_refs('_a_{{ref:John 1:1}} **b**'), '_a_ **b**')
+        self.assertEqual(fa.without_refs('_a_{{ref:John 1:1}}**b**'), '_a_**b**')
+        # An empty pair away from any marker is part of the words, not the marker's.
+        self.assertEqual(fa.without_refs('a __ b****{{ref:John 1:1}}'), 'a __ b****')
+
+    def test_an_empty_pair_added_anywhere_else_is_refused(self):
+        # The old rule dropped every "__" and "****" in the paragraph, so this passed as a ref insertion.
+        changed, problems, _f, _s = fa.text_changes(self.path, self._now([
+            'Christ, our _Passover Covenant of old_.', 'Keep the ****feast{{ref:John 3:16}}{{ref:2 Peter 3:16}}.', 'c']))
+        self.assertEqual(changed, [])
+        self.assertEqual([p.split()[:2] for p in problems], [['TEXT', 'holy:1']])
 
     def test_an_inserted_marker_is_the_only_change_allowed(self):
         changed, problems, fields, _size = fa.text_changes(self.path, self._now([

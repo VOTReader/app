@@ -329,6 +329,8 @@ EXT_LINK_RE = re.compile(r'\[(https?://[^\s\]]+)\s+([^\]]*)\]')
 WIKI_LINK_RE = re.compile(r'\[\[([^\]|]+)(?:\|([^\]]*))?\]\]')
 TAG_RE = re.compile(r'<[^>]+>')
 REF_MARK_RE = re.compile(r'\{\{ref:[^}]*\}\}')
+# A run of {{ref:}} markers with the emphasis it may close before it and reopen after it (without_refs).
+REF_SPLIT_RE = re.compile(r'(_\*\*|\*\*|_)?((?:\{\{ref:[^}]*\}\})+)(\*\*_|\*\*|_)?')
 
 
 def split_sections(wikitext):
@@ -2131,11 +2133,19 @@ def print_counts(entries, stats, site_meta):
           '| sister sites:', len(site_meta['sisterSites']))
 
 
+def _drop_marks(m):
+    close, opened = m.group(1) or '', m.group(3) or ''
+    if close and close == opened[::-1]:
+        return ''                       # the run the marker closed and reopened is one run again
+    return close + opened
+
+
 def without_refs(t):
     """Paragraph text with its {{ref:}} markers out. A marker set inside an italic or bold run closes
-    and reopens it ("Covenant_{{ref:1 Corinthians 5:7-8}}_..._"), so the empty pair that leaves
-    ("__", "****") goes too: a literal "_" or "**" in the words is always "‗" / "∗∗" (render_tokens)."""
-    return REF_MARK_RE.sub('', t or '').replace('****', '').replace('__', '')
+    and reopens it ("Covenant_{{ref:1 Corinthians 5:7-8}}_..._", "**a**{{ref:X}}** b**",
+    "**_a_**{{ref:X}}**_ b_**"), so that close-and-reopen pair goes with it, and only that pair: an
+    empty "__" or "****" anywhere else is a real change to the words, and the refusal rule sees it."""
+    return REF_SPLIT_RE.sub(_drop_marks, t or '')
 
 
 def text_changes(against, entries):
