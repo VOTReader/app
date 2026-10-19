@@ -22,6 +22,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { installFlow, shouldOffer, dismiss, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
+import { watchReaderScroll } from '../../utils/reader-hand.js';
 
 const STATE_KEY = 'vot-install-offer';
 
@@ -44,21 +45,6 @@ function _setOnScreen(id, on) {
 export function isInstallCardOnScreen() { return _onScreen.size > 0; }
 /** @param {() => void} cb @returns {() => void} */
 export function subscribeInstallCardOnScreen(cb) { _onScreenSubs.add(cb); return () => { _onScreenSubs.delete(cb); }; }
-
-/* The reader's own hand on the page (search200 UX B1): a drag, a wheel, the scrollbar, a scroll key. A tap
-   is not (the find pill's next and a link jump the page from a tap), and nor is a scroll with no hand near
-   it (a search jump, a restore, autoscroll, read-along's follow). */
-const READER_SCROLL_MS = 1000;
-const SCROLL_KEYS = new Set(['ArrowDown', 'ArrowUp', 'PageDown', 'PageUp', 'Home', 'End', ' ', 'Spacebar']);
-/** @param {Event} e @param {Element} scroller */
-function _isReaderHand(e, scroller) {
-  if (e.type === 'touchmove' || e.type === 'wheel') return true;
-  if (e.type === 'pointerdown') return e.target === scroller;   // the scrollbar is the scroller's own
-  if (e.type !== 'keydown' || !SCROLL_KEYS.has(/** @type {KeyboardEvent} */ (e).key)) return false;
-  const t = /** @type {HTMLElement | null} */ (e.target);
-  return !(t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)));
-}
-const HANDS = ['touchmove', 'wheel', 'pointerdown', 'keydown'];
 
 /** @returns {import('../../utils/install-offer.js').InstallOfferState} */
 function _readState() {
@@ -156,31 +142,26 @@ export function InstallCard({ unitKey, inert = false }) {
 
   // Mark-as-read off leaves no read item: arriving at this chapter's end after scrolling is the finished chapter.
   // The scroll must be the reader's own (search200 UX B1): a search hit near the end lands the end on screen,
-  // and that jump is a look, not a finished chapter. Once the reader has moved this page, its end counts.
+  // and that jump is a look, not a finished chapter. Once the reader has moved this page (utils/reader-hand.js),
+  // its end counts, a fling's momentum included.
   React.useEffect(() => {
     const el = sentinel.current;
     const scroller = el && el.closest('.screen-scroll');
     if (inert || !el || !scroller || typeof IntersectionObserver === 'undefined') return undefined;
-    let handAt = -Infinity;
     let readerScrolled = false;
     let atEnd = false;
     const check = () => { if (atEnd && readerScrolled && scroller.scrollTop > 0) setReachedEnd(unitKey); };
-    const onHand = (/** @type {Event} */ e) => { if (_isReaderHand(e, scroller)) handAt = Date.now(); };
-    const onScroll = () => {
-      if (!readerScrolled && Date.now() - handAt < READER_SCROLL_MS) readerScrolled = true;
-      check();
-    };
+    const stopWatch = watchReaderScroll(scroller, () => { readerScrolled = true; check(); });
     const io = new IntersectionObserver((entries) => {
       if (entries.length) atEnd = entries[entries.length - 1].isIntersecting;
       check();
     });
     io.observe(el);
-    for (const t of HANDS) document.addEventListener(t, onHand, { capture: true, passive: true });
-    scroller.addEventListener('scroll', onScroll, { passive: true });
+    scroller.addEventListener('scroll', check, { passive: true });
     return () => {
       io.disconnect();
-      for (const t of HANDS) document.removeEventListener(t, onHand, true);
-      scroller.removeEventListener('scroll', onScroll);
+      stopWatch();
+      scroller.removeEventListener('scroll', check);
     };
   }, [inert, unitKey]);
 

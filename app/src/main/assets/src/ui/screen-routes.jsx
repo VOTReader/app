@@ -49,7 +49,7 @@ import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
 import { answersSubjectById } from '../utils/answers-shelves.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
-import { searchBackActive, readingPlaceKey, RESULTS_LABEL } from '../utils/search-visit.js';
+import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -412,7 +412,9 @@ export function buildScreenRoutes({
   // chapter took two taps), while the system back returned to the results. When the
   // system back would end at the results (searchBackActive mirrors handleAndroidBack's
   // precedence), the ‹ (navBack) and the back pill both go there, named "results". The
-  // place the hit opened (searchLanding) is a look: the read tracker is off for it.
+  // place the hit opened (searchLanding) is a look: the read tracker is off for it until
+  // the reader reads it (their own scroll, or a stay), when useReadingPositionNav retires
+  // the landing and the tracker comes on like any other read (B1 review).
   const _searchBack = searchBackActive({
     screen, fromSearch, fromSurprise, fromWtlb,
     fromMatthewCh: fromMatthewChRef ? fromMatthewChRef.current : null,
@@ -422,8 +424,7 @@ export function buildScreenRoutes({
   const _backToResults = () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); };
   const _navBack = _searchBack ? { onBack: _backToResults, label: RESULTS_LABEL } : null;
   const _readerBackHint = _searchBack ? { title: RESULTS_LABEL, volumeLabel: null } : backHint;
-  const _searchLook = !!fromSearch && !!searchLanding &&
-    searchLanding === readingPlaceKey({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
+  const _searchLook = isSearchLook({ fromSearch, searchLanding, screen, bookId, chapterNum, letterId, studyId, studyChapterId });
   const _readerMarkAsRead = _searchLook ? false : settings.markAsRead;
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,

@@ -17,9 +17,17 @@
       handler across every state to keep the two in step.
 
    2. The look records no reading progress. useSearch names the place a hit
-      opens (readingPlaceKey, kept in the searchLanding tab field); the
-      catch-all arm skips it and the routes switch the read tracker off for it.
-      Any other reading place is reading again.
+      opens (readingPlaceKey, kept in the searchLanding tab field); while the
+      reader is on it with the breadcrumb live (isSearchLook), the catch-all
+      arm skips it and the routes switch the read tracker off for it. Any other
+      reading place is reading again.
+
+   3. The look ends when the reader reads (B1 review): their own scroll on the
+      page (utils/reader-hand.js), or a stay of SEARCH_LOOK_MS with the app on
+      screen, retires the landing (use-reading-position-nav.js). From then on
+      the place arms and tracks like any other read, so a letter found by
+      search and read to the end is marked read and becomes the resume point.
+      A tap in and out still records nothing.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { COL_BY_LETTER_SC, LETTER_SCREEN_SET } from '../data/scripture-resolution.js';
@@ -45,6 +53,27 @@ export function readingPlaceKey({ screen, bookId, chapterNum, letterId, studyId,
   if (screen === 'bible-study-chapter') return studyId && studyChapterId ? 'bible-study-chapter:' + studyId + ':' + studyChapterId : null;
   if (screen && isLetterScreen(screen)) return letterId ? screen + ':' + letterId : null;
   return null;
+}
+
+/**
+ * A stay on the place a hit opened that ends the look (with the app on screen).
+ * Longer than a brief look (open the hit, see it, go back: the walk's took a
+ * second or two), and no longer than the shortest read the tracker credits
+ * (use-read-tracker.js REQUIRED_FLOOR_MS), so a page that fits the screen and
+ * is read without a scroll still counts at about the time it did before B1.
+ */
+export const SEARCH_LOOK_MS = 8000;
+
+/**
+ * Whether the reader is on the place a search hit opened, with the search
+ * breadcrumb live and the look not yet retired (searchLanding is null once
+ * they read). The arm and the routes' read-tracker gate both ask this.
+ * @param {{ fromSearch?: boolean, searchLanding?: string | null, screen?: string | null, bookId?: string | null,
+ *   chapterNum?: number | string | null, letterId?: string | null, studyId?: string | null, studyChapterId?: string | null }} s
+ * @returns {boolean}
+ */
+export function isSearchLook({ fromSearch, searchLanding, ...place }) {
+  return !!fromSearch && !!searchLanding && searchLanding === readingPlaceKey(place);
 }
 
 /**

@@ -9,7 +9,7 @@
    handler across the whole matrix of breadcrumbs and compares. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { readingPlaceKey, searchBackActive, RESULTS_LABEL } from './search-visit.js';
+import { readingPlaceKey, searchBackActive, isSearchLook, SEARCH_LOOK_MS, RESULTS_LABEL } from './search-visit.js';
 import { useAndroidBack } from '../hooks/use-android-back.js';
 import { modalRegistry } from '../hooks/use-modal-registry.js';
 
@@ -35,6 +35,26 @@ describe('readingPlaceKey — one key per reading place', () => {
     expect(readingPlaceKey({ screen: 'bible-study-chapter', studyId: 'purity', studyChapterId: null })).toBe(null);
     expect(readingPlaceKey({ screen: 'search' })).toBe(null);
     expect(readingPlaceKey({ screen: 'bible-idx', bookId: 'psalms' })).toBe(null);
+  });
+});
+
+/* One answer for the arm (use-reading-position-nav.js) and the routes' read tracker
+   gate (screen-routes.jsx): the reader is on the place a hit opened, with the search
+   breadcrumb live, and has not read it yet (the landing is retired once they do). */
+describe('isSearchLook — the place a hit opened, before the reader reads it', () => {
+  const letter = { screen: 'vot-letter', letterId: 'the-wide-path' };
+  it('is the landing itself, with the breadcrumb live', () => {
+    expect(isSearchLook({ ...letter, fromSearch: true, searchLanding: 'vot-letter:the-wide-path' })).toBe(true);
+  });
+  it('is not a neighbour, a spent breadcrumb, a retired landing or a screen that is not for reading', () => {
+    expect(isSearchLook({ ...letter, letterId: 'the-narrow-way', fromSearch: true, searchLanding: 'vot-letter:the-wide-path' })).toBe(false);
+    expect(isSearchLook({ ...letter, fromSearch: false, searchLanding: 'vot-letter:the-wide-path' })).toBe(false);
+    expect(isSearchLook({ ...letter, fromSearch: true, searchLanding: null })).toBe(false);
+    expect(isSearchLook({ screen: 'search', fromSearch: true, searchLanding: 'vot-letter:the-wide-path' })).toBe(false);
+  });
+  it('a stay that ends the look outlasts a brief look and no more than the shortest read the tracker credits', () => {
+    expect(SEARCH_LOOK_MS).toBeGreaterThanOrEqual(3000);   // the walk's looks: one or two seconds
+    expect(SEARCH_LOOK_MS).toBeLessThanOrEqual(8000);      // use-read-tracker.js REQUIRED_FLOOR_MS
   });
 });
 

@@ -13,7 +13,9 @@
      - the back pill as "‹ Back to results" (backHint), with the same target;
      - markAsReadEnabled false on the place the hit opened (searchLanding), so the
        read tracker records nothing for the look. A neighbour reached by the
-       arrows is reading again (the landing names one place).
+       arrows is reading again (the landing names one place), and so is the
+       place itself once the reader reads it: useReadingPositionNav retires the
+       landing on their own scroll or a stay (B1 review).
    These read the elements' props; nothing is mounted. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { buildScreenRoutes } from './screen-routes.jsx';
@@ -123,6 +125,13 @@ describe('a letter opened from a search hit backs to the results', () => {
   it('records nothing for the look: the read tracker is off on the place the hit opened', () => {
     const { routes } = makeRoutes();
     expect(find(routes['vot-letter'](), G.LetterView).props.markAsReadEnabled).toBe(false);
+  });
+
+  it('once the reader reads the place (the landing retired), the tracker is on and the ‹ still goes to the results', () => {
+    const { routes } = makeRoutes({ searchLanding: null });
+    const v = find(routes['vot-letter'](), G.LetterView);
+    expect(v.props.markAsReadEnabled).toBe(true);
+    expect(v.props.navBack.label).toBe('results');
   });
 
   it('a neighbour reached by the arrows is reading again (the ‹ still goes to the results)', () => {

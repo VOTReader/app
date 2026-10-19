@@ -91,9 +91,14 @@
                                writes it through the returned setter). It
                                names the reading place a search hit opened.
                                While the reader is still there with the
-                               search breadcrumb live, the arm leaves the
-                               cursor alone: the look records no progress.
-                               Any other reading place retires it.
+                               search breadcrumb live (isSearchLook), the arm
+                               leaves the cursor alone: the look records no
+                               progress. Any other reading place retires it,
+                               and so does reading the place itself (B1
+                               review): the reader's own scroll on the page
+                               (utils/reader-hand.js) or a SEARCH_LOOK_MS stay
+                               with the app on screen. The arm then runs for
+                               it, and the routes' read tracker comes on.
 
    RETURNS: {
      prophecyCardStatesRef, saveProphecyCardStates,
@@ -121,7 +126,8 @@
 
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
 import { COL_BY_KEY, COL_BY_LETTER_SC } from '../data/scripture-resolution.js';
-import { readingPlaceKey } from '../utils/search-visit.js';
+import { readingPlaceKey, isSearchLook, SEARCH_LOOK_MS } from '../utils/search-visit.js';
+import { watchReaderScroll } from '../utils/reader-hand.js';
 
 /**
  * Whether `id` names a book on the Scriptures shelves (SCRIPTURE_GENRES, an
@@ -190,6 +196,50 @@ export function useReadingPositionNav({
   // search200 UX B1: the place a search hit opened (see PARAMS above). Per tab,
   // so a tab switch or a cold-boot restore onto the look still records nothing.
   const [searchLanding, setSearchLanding] = typeof tabField === 'function' ? tabField('searchLanding') : [null, null];
+  const lookHere = isSearchLook({ fromSearch, searchLanding, screen, bookId, chapterNum, letterId, studyId, studyChapterId });
+  // ── The look ends when the reader reads (search200 UX B1 review) ──────
+  // The landing used to hold for the whole visit, so a letter found by search
+  // and read to the end got no completion mark, no frontier and no resume
+  // point. The reader's own scroll on the page, or a SEARCH_LOOK_MS stay with
+  // the app on screen, retires it: the arm below then runs for the place, and
+  // the routes' read tracker comes on (isSearchLook turns false). A tap in and
+  // out, or the jump to the hit (no hand near it), still records nothing. Keyed
+  // by the landing, so a tab switch onto another look starts its own clock.
+  const lookKey = lookHere ? searchLanding : null;
+  const setLandingRef = React.useRef(setSearchLanding);
+  setLandingRef.current = setSearchLanding;
+  React.useEffect(() => {
+    if (!lookKey) return undefined;
+    let timer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
+    let stayed = 0;            // ms on screen before the app last went to the background
+    let since = 0;
+    let stopWatch = /** @type {(() => void) | null} */ (null);
+    const pause = () => {
+      if (!timer) return;
+      clearTimeout(timer); timer = null;
+      stayed += Date.now() - since;
+    };
+    const stop = () => {
+      pause();
+      if (stopWatch) { stopWatch(); stopWatch = null; }
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+    const retire = () => {
+      stop();
+      const set = setLandingRef.current;
+      if (set) set(null);
+    };
+    const resume = () => {
+      if (timer || !stopWatch || document.visibilityState === 'hidden') return;
+      since = Date.now();
+      timer = setTimeout(retire, Math.max(0, SEARCH_LOOK_MS - stayed));
+    };
+    function onVisibility() { if (document.visibilityState === 'hidden') pause(); else resume(); }
+    stopWatch = watchReaderScroll(null, retire);
+    document.addEventListener('visibilitychange', onVisibility);
+    resume();
+    return stop;
+  }, [lookKey]);
   // ── Catch-all position arm (owner-reported 2026-07-19) ────────────────
   // Every explicit nav selector arms the reading cursor, but some arrival
   // paths had NO selector: switching to a TAB already sitting on a reading
@@ -213,15 +263,13 @@ export function useReadingPositionNav({
   const studyArmKey = armStudy ? 'bible-study-' + armStudy.slug : null;   // studyReadKey format (goToLastRead slices this prefix)
   React.useEffect(() => {
     // A search hit is a look, not a read (search200 UX B1): its own place arms
-    // nothing while the search breadcrumb is live. Any other reading place (the
-    // arrows, a link, an index pick that spent the breadcrumb) is reading again
-    // and retires the landing. A screen that is not for reading keeps it, for
-    // the return to the same hit.
+    // nothing while the search breadcrumb is live and the reader has not read
+    // it yet. Any other reading place (the arrows, a link, an index pick that
+    // spent the breadcrumb) is reading again and retires the landing. A screen
+    // that is not for reading keeps it, for the return to the same hit.
+    if (lookHere) return;
     const here = readingPlaceKey({ screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-    if (here && searchLanding) {
-      if (fromSearch && here === searchLanding) return;
-      if (setSearchLanding) setSearchLanding(null);
-    }
+    if (here && searchLanding && setSearchLanding) setSearchLanding(null);
     if (screen === 'bible-ch' || screen === 'matthew-ch') {
       const bid = screen === 'matthew-ch' ? 'matthew' : bookId;
       if (!bid || chapterNum == null) return;
@@ -235,8 +283,8 @@ export function useReadingPositionNav({
       if (!col || !letterId) return;
       setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, letterId));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity plus studyArmKey (the study's resolved read key, which turns non-null when the lazy studies land). searchLanding and fromSearch are read, not deps: useSearch sets them in the same batch as the place, and retiring the landing must not re-run the arm on the place that retired it. The setters (setActiveReadKey, setLastReadChapters, setLastReadForVol) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, studyArmKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the PLACE identity plus studyArmKey (the study's resolved read key, which turns non-null when the lazy studies land) plus lookHere (the look ending on the same place — the reader read it — arms it then). searchLanding and fromSearch are read, not deps: useSearch sets them in the same batch as the place, and a neighbour retiring the landing must not re-run the arm on that neighbour (lookHere stays false there). The setters (setActiveReadKey, setLastReadChapters, setLastReadForVol) are recreated per render but read call-time state via closures/refs — including them would re-arm the dwell timer EVERY render (breaking the streak dwell) for zero behavioral gain.
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, studyArmKey, lookHere]);
   // ── Prophecy card expand/collapse state (IDB-backed via ProphecyCardsStore) ─
   // Key format: "chapterId:blockIndex:cardType" → boolean.
   // The ref-cached pattern is preserved so consumers can batch mutations
