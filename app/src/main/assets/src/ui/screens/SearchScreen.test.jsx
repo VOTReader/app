@@ -281,7 +281,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
 
   it('(d) the query input is type="search"', () => {
     render(<SearchScreen {...baseProps()} />);
-    expect(screen.getByPlaceholderText(/Search scriptures/i).getAttribute('type')).toBe('search');
+    expect(screen.getByRole('combobox', { name: 'Search' }).getAttribute('type')).toBe('search');
   });
 
   /* v07-12: the empty state promised study notes and footnotes, which the
@@ -301,7 +301,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
   it('[C8] the query input has an accessible name of its own', () => {
     render(<SearchScreen {...baseProps()} />);
     const input = screen.getByRole('combobox', { name: 'Search' });
-    expect(input.getAttribute('placeholder')).toMatch(/Search scriptures/i);
+    expect(input.getAttribute('placeholder')).toBe('Search everything');
   });
 
   it('[C8] the clear button is named "Clear search", not "✕"', () => {
@@ -777,15 +777,16 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     const summary = document.querySelector('.srch-results-summary');
-    expect(summary.textContent).toContain('5+ matches');
+    // search200 B5: "Found 5+ matches" under the card read as a count of the passage; the five are the closest
+    expect(summary.textContent).toBe('Showing closest matches · Show all');
     const direct = document.querySelector('.stub-direct');
     expect(direct.compareDocumentPosition(summary) & Node.DOCUMENT_POSITION_FOLLOWING, 'the card before the summary').toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Show every match' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Show all' }));
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
     expect(search.mock.calls[search.mock.calls.length - 1][1].allWords).toBe(true);
-    expect(document.querySelector('.srch-results-summary').textContent).toContain('8 matches');
-    expect(screen.queryByRole('button', { name: 'Show every match' })).toBeNull();
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('Found 8 matches');
+    expect(screen.queryByRole('button', { name: 'Show all' })).toBeNull();
     vi.useRealTimers();
   });
 
@@ -1727,5 +1728,31 @@ describe('SearchScreen (search200 UX, track B)', () => {
     /** @type {any} */ (window).getRecentSearches = () => ['mercy'];
     render(<SearchScreen {...baseProps()} settings={{ historyEnabled: true }} />);
     expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Search everything', 'Recent', 'Quick picks']);
+  });
+
+  /* B5 (copy): the placeholder "Search scriptures, volumes, studies…" was cut off on a 360 px phone, and nothing
+     said a reference, a phrase or "quotes" would work. The placeholder names the tab; a hint line says the rest. */
+  it('B5: the placeholder is short and names the tab, and the empty screen hints at a reference, a phrase and quotes', () => {
+    const placeholder = (/** @type {string} */ corpus) => {
+      const r = render(<SearchScreen {...baseProps()} settings={{ searchCorpus: corpus }} />);
+      const out = { ph: box().getAttribute('placeholder'), hint: document.querySelector('.srch-hint') && document.querySelector('.srch-hint').textContent };
+      r.unmount();
+      return out;
+    };
+    const all = placeholder('all');
+    expect(all.ph).toBe('Search everything');
+    expect(placeholder('scriptures').ph).toBe('Search the Scriptures');
+    expect(placeholder('volumes').ph).toBe('Search the Volumes');
+    expect(all.hint).toBe('Try a reference (John 3:16), a phrase, or “exact words” in quotes.');
+    expect(placeholder('volumes').hint, 'on every tab').toBe(all.hint);
+  });
+
+  it('B5: under a reference card, the status region says the closest matches are shown, not a count', async () => {
+    const card = { kind: 'named-passage', bookId: 'matthew', bookTitle: 'Matthew', chapter: 28, label: 'Resurrection' };
+    searchReturns({ parsed: card, parsedTerms: ['resurrection'], results: letters('v1', 5), truncated: true });
+    await typeIn(baseProps(), 'the resurrection');
+    expect(document.querySelector('.srch-results-summary').textContent).toBe('Showing closest matches · Show all');
+    // the card's own label first, as the card reads
+    expect(screen.getByRole('status').textContent).toBe('Matthew 28. Showing closest matches.');
   });
 });

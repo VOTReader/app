@@ -56,6 +56,9 @@ const NAV_KINDS = ['ref-bible', 'named-passage', 'ref-book', 'ref-letter'];
 
 /* What a held tab is called in a sentence: "No results for “x” in the Scriptures." */
 const TAB_NAME = /** @type {Record<string, string>} */ ({ scriptures: 'the Scriptures', volumes: 'the Volumes' });
+/* The box names the tab it searches (search200 B5): "Search scriptures, volumes, studies…"
+   was cut off on a 360 px phone; the empty screen's hint line says what to type. */
+const PLACEHOLDER = /** @type {Record<string, string>} */ ({ all: 'Search everything', scriptures: 'Search the Scriptures', volumes: 'Search the Volumes' });
 
 /**
  * A scope the tab cannot reach (search200 B2): a book of the Bible under the Volumes tab, a collection of the
@@ -820,7 +823,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
      words; a quiet re-rank says the same count again, so it says nothing new. */
   const qTrim = (query || '').trim();
   const isDone = !!qTrim && buildInfo.ready && state.phase === 'done';
-  const countText = 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
+  /* Under a reference card the words' matches stop at the closest few (search-2), and
+     "Found 5+ matches" read as a count of the passage (search200 B5). */
+  const closestOnly = directEntries.length > 0 && state.truncated && allWordsFor !== qTrim;
+  const countText = closestOnly ? 'Showing closest matches' : 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
     + (state.results.length === 1 ? 'match' : 'matches') + ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections');
   const scopeIn = searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : '';
   let liveText = '';
@@ -869,7 +875,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             aria-controls={suggestOpen ? 'srch-suggest-list' : undefined}
             aria-activedescendant={suggestOpen && activeSug >= 0 ? 'srch-sug-' + activeSug : undefined}
             enterKeyHint="search"
-            placeholder="Search scriptures, volumes, studies…"
+            placeholder={PLACEHOLDER[corpus] || PLACEHOLDER.all}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
             onFocus={() => setShowSuggest(suggestions.length > 0 && dismissedFor !== query)}
@@ -995,6 +1001,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                   <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
                 </>
               )}
+              <p className="srch-hint">Try a reference (John 3:16), a phrase, or “exact words” in quotes.</p>
             </div>
             {pickRows}
           </>
@@ -1057,13 +1064,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
-            {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
-            Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
-            {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
-            {directEntries.length > 0 && state.truncated && allWordsFor !== query.trim() && (
+            {closestOnly ? (
               <>
-                {' · '}
-                <button type="button" className="srch-more-link" onClick={() => setAllWordsFor(query.trim())}>Show every match</button>
+                Showing closest matches{' · '}
+                <button type="button" className="srch-more-link" onClick={() => setAllWordsFor(qTrim)}>Show all</button>
+              </>
+            ) : (
+              <>
+                {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
+                Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
+                {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
               </>
             )}
           </div>
