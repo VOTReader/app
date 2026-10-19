@@ -100,3 +100,31 @@ export function placeRailLabelsRanked(boxes, pad, rows = 2, rank, blocked, at, r
   }
   return out;
 }
+
+/**
+ * The law for names that may slide (the Volumes rail, w4): each label may move
+ * right, over its own band, as far as its bound, to take a row: the first row
+ * where it then keeps `pad` from that row's last label. A name that cannot is
+ * -1 (draw the tick, not the name). Through w3 the slide looked only at the
+ * previous name, whichever row it sat on, so on a phone a slide could leave the
+ * next name no room on either row; this asks each row in turn. With every
+ * bound at the label's own centre it is placeRailLabels exactly.
+ *
+ * @param {ReadonlyArray<{x:number, w:number, max:number}>} items  each label's
+ *   centre, width and rightmost centre, left to right (device px)
+ * @param {number} pad  the gap two neighbours on one row must keep
+ * @param {number} [rows=2]
+ * @returns {Array<{row:number, x:number}>}  the row (or -1) and the centre it takes
+ */
+export function placeRailLabelsSliding(items, pad, rows = 2) {
+  const ends = new Array(Math.max(1, rows | 0)).fill(-Infinity);
+  return items.map((it) => {
+    if (!it || !(it.w > 0)) return { row: -1, x: it ? it.x : 0 };
+    const bound = Math.max(it.x, it.max);
+    for (let r = 0; r < ends.length; r++) {
+      const x = Math.max(it.x, ends[r] + pad + it.w / 2);
+      if (x <= bound) { ends[r] = x + it.w / 2; return { row: r, x }; }
+    }
+    return { row: -1, x: it.x };
+  });
+}

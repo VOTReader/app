@@ -28,16 +28,20 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
-import { placeRailLabels } from '../../utils/scripture-web/rail-labels.js';
+import { placeRailLabelsSliding } from '../../utils/scripture-web/rail-labels.js';
 import { railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, FONT, INK } from '../../utils/scripture-web/sw-ink.js';
 
 /** The Volumes rail's height from the top, CSS px (spec §3, My Web: 150 PC, 62 phone). */
 const TOP_RAIL_PC = 150;
-const TOP_RAIL_COMPACT = 62;
+/** w4: the spec's 62 and a second row of names (every collection named on a phone, never dropped). */
+const TOP_RAIL_COMPACT = 74;
 /** The band the Volumes rail's names (and the PC's overline) need above the rail, CSS px. */
 const NAME_BAND_PC = 58;
-const NAME_BAND_COMPACT = 12;
+const NAME_BAND_COMPACT = 24;
+/** The rows' baselines over the Volumes rail, CSS px: the PC's two, and the phone's two (w4). */
+const NAME_ROWS_PC = [14, 30];
+const NAME_ROWS_COMPACT = [4, 16];
 /** A frame this short (CSS px) is the phone's: the compact rail, type and label rows. */
 const COMPACT_H = 500;
 /** Curve tension for the S-curves: how far the control points push out (a share of the gap). */
@@ -812,8 +816,8 @@ function drawRails(ctx, opts, rails) {
 
   // The ticks stay under the names' baseline (fix-review #3): on a PC the
   // names sit 14 px over the rail, clear of 7 px ticks; on the phone the
-  // header leaves a 12 px band and the names sit 4 px over the rail, so the
-  // ticks there rise only 2 px over it and reach below it instead.
+  // header leaves a 24 px band and the lower row sits 4 px over the rail, so
+  // the ticks there rise only 2 px over it and reach below it instead.
   const letterTick = compact ? [2, 2] : [4, 0], bandTick = compact ? [2, 5] : [7, 4];
   // letter ticks, 4 px, once a collection's letters stand apart: each
   // collection has its own pitch (w4, the slots), so each decides for its own
@@ -843,14 +847,15 @@ function drawRails(ctx, opts, rails) {
   setTracking(ctx, 0.10 * size);
   // Measure before drawing: collection names are long ("Words To Live By:
   // Part One"), and a name wider than twice its band is not printed at all.
-  // The rows are then given by the one placement law both rails share
+  // The rows are then given by the placement law both rails share
   // (rail-labels.js): the top row first, the second when the top's last
   // name would be nearer than 5 px, and NO row when neither has room. Every
-  // band keeps its tick either way. Before the law, a name is kept inside the
-  // screen (a band cut by the edge printed its name past it: "VOL I" at
-  // x = 0 on the phone, fix-review #3) and may slide right, over its own
-  // band, to clear its neighbour on the top row rather than drop to the
-  // second alone ("LAMB" by MTAM, fix-review #13).
+  // band keeps its tick either way. A name is kept inside the screen (a band
+  // cut by the edge printed its name past it: "VOL I" at x = 0 on the phone,
+  // fix-review #3) and may slide right, over its own band (half of it), to
+  // take a row rather than drop to the next one ("LAMB" by MTAM, fix-review
+  // #13); w4 asks each row in turn (placeRailLabelsSliding), where the slide
+  // looked only at the previous name and could leave the next one no row.
   const names = [];
   const pad = 5 * DPR, inset = 4 * DPR;
   ctx.strokeStyle = inkCss('volumesTick');
@@ -865,20 +870,19 @@ function drawRails(ctx, opts, rails) {
     const w = ctx.measureText(label).width;
     if (w > span.room * 2) continue;
     const lo = w / 2 + inset, hi = width - w / 2 - inset;
-    let x = lo > hi ? width / 2 : Math.min(hi, Math.max(lo, span.labelX));
-    const prev = names[names.length - 1];
-    const need = prev ? prev.right + pad - (x - w / 2) : 0;
-    if (need > 0 && x + need <= Math.min(hi, span.labelX + span.room / 2)) x += need;
-    names.push({ label, x, left: x - w / 2, right: x + w / 2 });
+    const x = lo > hi ? width / 2 : Math.min(hi, Math.max(lo, span.labelX));
+    names.push({ label, x, w, max: Math.min(hi, span.labelX + span.room / 2) });
   }
-  const rows = placeRailLabels(names, pad, compact ? 1 : 2);
-  // the phone has room for one row (spec §3: names 46-58 on the baseline 58,
-  // the top chrome to 50); a name the row cannot take keeps its tick and
-  // shows on a zoom. The PC's rows sit on 136 and 120 (names 116-136).
-  const rowY = [14, 30];
+  // two rows on both frames: the PC's on 136 and 120 (names 116-136), the
+  // phone's (w4) 4 and 16 px over the rail, so all 21 collections are named at
+  // 740-891 px; through w3 the phone kept one row and dropped five
+  // (VOL VII, WTLB I, BLESSED, TIMOTHY, TRINITY). A name neither row can take
+  // keeps its tick and shows on a zoom.
+  const at = placeRailLabelsSliding(names, pad, 2);
+  const rowY = compact ? NAME_ROWS_COMPACT : NAME_ROWS_PC;
   const placed = [];
   names.forEach((nm, i) => {
-    if (rows[i] >= 0) placed.push({ label: nm.label, x: nm.x, y: rails.topY - (compact ? 4 : rowY[rows[i] ? 1 : 0]) * DPR });
+    if (at[i].row >= 0) placed.push({ label: nm.label, x: at[i].x, y: rails.topY - rowY[at[i].row ? 1 : 0] * DPR });
   });
   setTracking(ctx, 0);
   return { names: placed, size, compact };

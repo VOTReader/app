@@ -1,7 +1,8 @@
 /* rail-renderer — the w3 picture (the r2-05 mockup; spec §3 and §4.2, Q3, Q8).
 
    P1  the rails sit where the spec puts them: the Volumes rail 150 CSS px
-       from the top on a PC, 62 on a phone, never below 0.4 of the baseline.
+       from the top on a PC, 74 on a phone (w4: 62 + a second row of names),
+       never below 0.4 of the baseline.
    P2  a line's ink follows the rails it is anchored to on screen: the
        overview is one ink (personalInk(1)), a thread whose foot sits on a
        zoomed rail takes that rail's depth, a thread whose only foot on screen
@@ -15,9 +16,10 @@
    P3  a chosen link recedes the rest to MYWEB_TAP_CONTEXT, never further.
    P4  the Volumes rail's type: sw-ink's face, 13 / 11 px tracked caps in the
        volumesLabel ink, the rail in volumesRail, and the overline "THE
-       VOLUMES OF TRUTH" on a PC only; the phone's names keep one row. */
+       VOLUMES OF TRUTH" on a PC only; the phone's names take two rows (w4:
+       every collection named, never dropped). */
 import { describe, it, expect } from 'vitest';
-import { buildVotRail } from '../../utils/scripture-web/personal-graph.js';
+import { buildVotRail, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import { drawPersonalWeb, personalInk, railFrame, linkPath, CONTEXT_GLOW_WIDTH, CONTEXT_GLOW_SHARE } from './rail-renderer.js';
 import { css, FONT, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
 
@@ -69,21 +71,23 @@ function glowStrokes(ctx) {
 }
 
 describe('P1 the rails sit where the spec puts them', () => {
-  it('the Volumes rail is 150 CSS px down on a PC and 62 on a phone; the Bible rail keeps the baseline', () => {
+  it('the Volumes rail is 150 CSS px down on a PC and 74 on a phone; the Bible rail keeps the baseline', () => {
     expect(railFrame({ H: 900, DPR: 1 }, 508)).toEqual({ topY: 150, bottomY: 508 });
     const phone = railFrame({ H: 411 * 2.6, DPR: 2.6 }, 319 * 2.6);
-    expect(phone.topY).toBeCloseTo(62 * 2.6, 6);
+    // w4: the spec's 62 and a second 12 px row of names, so every collection is named
+    expect(phone.topY).toBeCloseTo(74 * 2.6, 6);
     expect(phone.bottomY).toBeCloseTo(319 * 2.6, 6);
     // a frame too short for the spec's place keeps the rail above 0.4 of the baseline
     expect(railFrame({ H: 600, DPR: 1 }, 300).topY).toBe(120);
   });
   it('the Volumes rail clears the top chrome whatever its height: its names never print under the header', () => {
-    // a phone header that ends at 60 CSS px (the spec's ends at 50): the names need 12 px over the rail
+    // a phone header that ends at 60 CSS px (the spec's ends at 50): the names' two rows
+    // need 24 px over the rail (w4; one row needed 12)
     const dpr = 2.6;
     const tall = railFrame({ H: 411 * dpr, DPR: dpr, inset: 60 * dpr }, 319 * dpr);
-    expect(tall.topY).toBeCloseTo(72 * dpr, 6);
-    // the spec's own header (to 50) leaves the spec's place (62)
-    expect(railFrame({ H: 411 * dpr, DPR: dpr, inset: 50 * dpr }, 319 * dpr).topY).toBeCloseTo(62 * dpr, 6);
+    expect(tall.topY).toBeCloseTo(84 * dpr, 6);
+    // the spec's own header (to 50) leaves the spec's place (74 with the second row)
+    expect(railFrame({ H: 411 * dpr, DPR: dpr, inset: 50 * dpr }, 319 * dpr).topY).toBeCloseTo(74 * dpr, 6);
     // on a PC the overline and both rows need 58 px: a header to 75 leaves 150
     expect(railFrame({ H: 900, DPR: 1, inset: 75 }, 508).topY).toBe(150);
     expect(railFrame({ H: 900, DPR: 1, inset: 110 }, 508).topY).toBe(168);
@@ -308,8 +312,9 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     expect(names.length).toBe(2);
     for (const t of names) expect(t.font).toContain((11 * dpr) + 'px');
     expect(ctx.texts.some((t) => t.text === 'THE VOLUMES OF TRUTH')).toBe(false);
-    // one row only: a crowded rail whose names take two rows on a PC keeps one on the phone
-    // (the fake measures 7 px a glyph: names a little wider than their bands, so neighbours collide)
+    // two rows on the phone too (w4: every collection named, never dropped; through w3 the
+    // phone kept one row and a crowded rail lost names to it). The fake measures 7 px a
+    // glyph: names a little wider than their bands, so neighbours collide
     const many = (label) => buildVotRail(Array.from({ length: 40 }, (_, k) => ({
       volKey: 'c' + k, label: label + String(k).padStart(2, '0'), short: label + String(k).padStart(2, '0'), items: [{ id: 'x' + k, title: 'X' }],
     })));
@@ -322,12 +327,51 @@ describe('P4 the Volumes rail in the spec\'s type and ink', () => {
     expect(new Set(pc.map((t) => t.y)).size).toBe(2);
     const phoneFrame = Object.assign({}, base, { width: 891 * dpr, height: 411 * dpr, DPR: dpr, base: 319 * dpr });
     const phone = crowd(phoneFrame, 'COLLECT ');       // 58 px bands, 70 px names
-    expect(phone.length).toBeGreaterThan(0);
-    expect(phone.length).toBeLessThan(40);
-    expect(new Set(phone.map((t) => t.y)).size).toBe(1);
-    expect(phone[0].y).toBeCloseTo(58 * dpr, 6);           // spec §3: names 46-58, under the chrome's 50
+    expect(phone.length).toBe(40);
+    expect([...new Set(phone.map((t) => t.y))].sort((p, q) => p - q)).toEqual([58 * dpr, 70 * dpr].map((y) => expect.closeTo(y, 6)));
+    // spec §3 amended (w4): names 37-70 on two rows over the rail at 74, under the chrome's 50
     // fix-review #13: every placed name is one ink, the second row's too
     for (const t of pc) expect(t.fill).toBe(css('volumesLabel'));
+  });
+  it('w4: on a phone every one of the 21 collections is named at the overview, on two rows, none dropped and none over another', () => {
+    // the brief: "every collection named on the phone rail; abbreviate or stack, never
+    // drop". At equal slots (w4) a phone gives each collection 38-42 px and the names
+    // run 37-71 px ("HOLY DAYS"); one row dropped five of them (VOL VII, WTLB I,
+    // BLESSED, TIMOTHY, TRINITY at 891x411). The widths are the web's face as Chrome
+    // measures it at 11 px (rail-label-collision.test.js), scaled by the size the loop sets.
+    const WIDTH_11 = {
+      'VOL I': 32, 'VOL II': 38, 'VOL III': 42, 'VOL IV': 41, 'VOL V': 36, 'VOL VI': 41, 'VOL VII': 45,
+      'REBUKE': 51, 'WTLB I': 44, 'WTLB II': 48, 'BLESSED': 55, 'FLOCK': 41, 'TIMOTHY': 58, 'HOLY DAYS': 70,
+      'MTAM': 38, 'ODDS': 35, 'LAMB': 36, 'SOTD': 33, 'GRACE': 42, 'TRINITY': 51, 'PURITY': 47,
+    };
+    const shorts = ['Vol I', 'Vol II', 'Vol III', 'Vol IV', 'Vol V', 'Vol VI', 'Vol VII', 'Rebuke', 'WTLB I', 'WTLB II',
+      'Blessed', 'Flock', 'Timothy', 'Holy Days', 'MTaM', 'Odds', 'Lamb', 'SotD', 'Grace', 'Trinity', 'Purity'];
+    const all = buildVotRail(shorts.map((s, k) => ({ volKey: 'c' + k, label: s, short: s, items: Array.from({ length: 3 + k * 7 }, (_, i) => ({ id: k + '-' + i, title: 'L' })) })));
+    const upper = shorts.map((s) => s.toUpperCase());
+    for (const [cw, ch, dpr] of [[891, 411, 2.6], [800, 360, 2], [740, 360, 3]]) {
+      const w = cw * dpr;
+      const ctx = recordingCtx();
+      ctx.measureText = (t) => ({ width: WIDTH_11[String(t)] * Number(/([\d.]+)px/.exec(ctx.font)[1]) / 11 });
+      drawPersonalWeb(ctx, null, null, Object.assign({}, base, {
+        width: w, height: ch * dpr, DPR: dpr, base: (ch - 92) * dpr, votRail: all, votX: (u) => (u / railSpan(all)) * w,
+      }));
+      const tag = cw + 'x' + ch;
+      const names = ctx.texts.filter((t) => upper.includes(t.text));
+      expect(names.map((t) => t.text).sort(), tag).toEqual(upper.slice().sort());
+      const ys = [...new Set(names.map((t) => t.y))];
+      expect(ys.length, tag).toBeLessThanOrEqual(2);
+      for (const y of ys) {
+        const row = names.filter((t) => t.y === y).map((t) => {
+          const half = (WIDTH_11[t.text] * dpr) / 2;
+          return { l: t.x - half, r: t.x + half, text: t.text };
+        }).sort((p, q) => p.l - q.l);
+        for (let i = 0; i < row.length; i++) {
+          expect(row[i].l, tag + ' ' + row[i].text).toBeGreaterThanOrEqual(0);
+          expect(row[i].r, tag + ' ' + row[i].text).toBeLessThanOrEqual(w);
+          if (i) expect(row[i].l - row[i - 1].r, tag + ' ' + row[i - 1].text + ' | ' + row[i].text).toBeGreaterThanOrEqual(5 * dpr - 1e-6);
+        }
+      }
+    }
   });
   it('a reader\'s pin under a name never prints over it: the names are painted last, each over a knockout in the canvas ink (fix-review 2 #3)', () => {
     // on the phone the names sit 4 px over the rail and a pin's ring is 5.5 px:

@@ -3,7 +3,7 @@
    their neighbours, and a row a corner button sits over can be refused. With
    one rank for every box it is placeRailLabels exactly. */
 import { describe, it, expect } from 'vitest';
-import { placeRailLabels, placeRailLabelsRanked } from './rail-labels.js';
+import { placeRailLabels, placeRailLabelsRanked, placeRailLabelsSliding } from './rail-labels.js';
 
 function boxes(seed, n) {
   let s = seed;
@@ -102,6 +102,43 @@ describe('placeRailLabelsRanked', () => {
         if (rows[i] < 0 || rows[i] !== rows[j]) continue;
         expect(b[i].right + 5 <= b[j].left || b[j].right + 5 <= b[i].left, i + ' / ' + j).toBe(true);
       }
+    }
+  });
+});
+
+describe('placeRailLabelsSliding (w4: the Volumes rail on a phone names every collection)', () => {
+  it('with no room to slide it is placeRailLabels exactly', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const b = boxes(seed, 30);
+      const items = b.map((x) => ({ x: (x.left + x.right) / 2, w: x.right - x.left, max: (x.left + x.right) / 2 }));
+      expect(placeRailLabelsSliding(items, 5, 2).map((p) => p.row)).toEqual(placeRailLabels(b, 5, 2));
+    }
+  });
+  it('a name slides right, within its bound, to take the first row it then fits, and never past the bound', () => {
+    // a 40 wide name at 50 meets the first row's end at 40: it slides to 65 on row 0
+    const [a, b] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 50, w: 40, max: 70 }], 5, 2);
+    expect(a).toEqual({ row: 0, x: 20 });
+    expect(b).toEqual({ row: 0, x: 65 });
+    // bound at 60: it cannot reach 65, so it takes row 1 where it stands
+    const [, c] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 50, w: 40, max: 60 }], 5, 2);
+    expect(c).toEqual({ row: 1, x: 50 });
+    // neither row: not placed
+    const [, , d] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 22, w: 40, max: 22 }, { x: 24, w: 40, max: 30 }], 5, 2);
+    expect(d.row).toBe(-1);
+  });
+  it('no two names on one row come nearer than the pad, and every slide stays in bound', () => {
+    for (let seed = 1; seed < 40; seed++) {
+      const b = boxes(seed, 30);
+      const items = b.map((x) => { const c = (x.left + x.right) / 2; return { x: c, w: x.right - x.left, max: c + 12 }; });
+      const out = placeRailLabelsSliding(items, 5, 2);
+      const last = [-Infinity, -Infinity];
+      out.forEach((p, i) => {
+        if (p.row < 0) return;
+        expect(p.x).toBeGreaterThanOrEqual(items[i].x);
+        expect(p.x).toBeLessThanOrEqual(items[i].max);
+        expect(p.x - items[i].w / 2).toBeGreaterThanOrEqual(last[p.row] + 5 - 1e-9);
+        last[p.row] = p.x + items[i].w / 2;
+      });
     }
   });
 });
