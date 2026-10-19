@@ -190,6 +190,7 @@
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
 import { readingPlaceKey } from '../utils/search-visit.js';
+import { formsToMark } from '../utils/marked-forms.js';
 
 /**
  * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
@@ -423,10 +424,15 @@ export function useSearch({
   // words the result card marked (the query's own, its synonyms, the engine's
   // matched forms) and the query as typed, for the host's FindInUnit pill
   // ("flood  2 of 3").
-  const excerptAnchor = (doc, terms, entry, letterId, query) => {
+  // ...by the rule the card marks by (search200 UX D6): `stopTyped`, the small words typed, keeps
+  // the engine's forms of them out (formsToMark). The pill counted "whom" and "whoever" in a letter
+  // opened from a lone "who", words its card left unmarked. The landing's excerpt is still cut as
+  // before (below): a hit only such a form found lands where it was found.
+  const excerptAnchor = (doc, terms, entry, letterId, query, stopTyped) => {
     const own = Array.isArray(terms) ? terms : [];
     const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
-    const find = own.length || hit.length ? { terms: own.concat(hit), label: String(query || '').trim() || own.concat(hit)[0] } : null;
+    const marked = own.concat(formsToMark(hit, own, Array.isArray(stopTyped) ? stopTyped : []));
+    const find = marked.length ? { terms: marked, label: String(query || '').trim() || marked[0] } : null;
     // A tapped PLACE (SrchCard's "more places" list) names where in the text it
     // starts, a word start: the landing reads the same 48 chars matchExcerpt cuts.
     // A landing at the text's very start is the engine saying a TITLE was named
@@ -450,8 +456,9 @@ export function useSearch({
     return text ? { type: 'excerpt', text, letterId: letterId || null, find } : null;
   };
 
-  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) @param {string} [query] the query as typed */
-  const handleSearchSelect = (entry, terms, query) => {
+  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) @param {string} [query] the query as typed
+   *  @param {string[]} [stopTyped] the small words typed (SearchScreen state.stopTyped) */
+  const handleSearchSelect = (entry, terms, query, stopTyped) => {
     setFromSearch(true);
     // v01-04: this unit came from search, so its Back returns to search. A Surprise
     // breadcrumb left from earlier outranks fromSearch in the letter screens' Back
@@ -548,7 +555,7 @@ export function useSearch({
       const vm = SRCH_VOL_MAP[doc.volumeId];
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query, stopTyped));
       land({ screen: vm.screen, letterId: doc.letterId });   // no cursor move: the arm skips the landing
       setScreen(vm.screen);
       return;
@@ -562,7 +569,7 @@ export function useSearch({
       const chId = doc.studyChapterId || studyChapterIdByNum(doc.letterId, doc.chapterNum);
       setStudyId(doc.letterId || null);
       setStudyChapterId(chId || null);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId, query));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId, query, stopTyped));
       land({ screen: 'bible-study-chapter', studyId: doc.letterId || null, studyChapterId: chId || null });
       setScreen('bible-study-chapter');
       return;

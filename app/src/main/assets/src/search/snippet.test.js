@@ -337,8 +337,9 @@ describe('findPlaces never comes back empty when the words appear (review of 224
    ("who") marked every word it starts ("whom", "whole"); the typed words in a row
    were marked word by word with gaps between; and an Answers topic's dateline
    ("7/5/10 From The Lord ... Ears to Hear"), which says "Lord" in every topic, was the
-   snippet. These are the card's helpers only: matchExcerpt (the engine's landing)
-   and findPlaces (the reader's find bar) are not the screen's to change.
+   snippet. These are the card's helpers: matchExcerpt (the engine's landing) is not
+   the screen's to change. findPlaces (the reader's find bar) follows the marks since
+   search200 UX D6: it counted "whom" for a typed "who".
    ─────────────────────────────────────────────────────────────────────── */
 describe('search200 B7: marks for what was typed, a run as one, never a dateline', () => {
   /** @type {any} */ let prev;
@@ -360,6 +361,19 @@ describe('search200 B7: marks for what was typed, a run as one, never a dateline
     expect(hits('However the howling, how long', ['how'])).toEqual(['how']);
     // a content word still marks its forms
     expect(hits('He loves and is beloved; love', ['love'])).toEqual(['loves', 'love']);
+  });
+
+  /* search200 UX D6: the reader's find bar in a letter opened from a lone "who" marked and counted "whom" and
+     "whoever" (D:/Swarm/lanes/search200/out/ux/fix-D/find6-before.log), words its card left unmarked. Its
+     places hold the words as the card marks them. */
+  it('D6: the find bar counts a word of the fuller stop list only as itself, as the card marks it', () => {
+    // the whole word each hit starts
+    const words = (/** @type {string} */ t, /** @type {string[]} */ terms) => findPlaces(t, terms, 120)
+      .flatMap((p) => p.hits.map((h) => (t.slice(h.idx).match(/^[\p{L}\p{N}]+/u) || [''])[0]));
+    const t = 'Who is he whom you seek? ' + 'word '.repeat(40) + 'Whoever will, come. ' + 'word '.repeat(40) + 'And who knows?';
+    expect(words(t, ['who'])).toEqual(['Who', 'who']);
+    // a content word still finds its forms
+    expect(words('He loves them. ' + 'word '.repeat(40) + 'Beloved, love one another.', ['love'])).toEqual(['loves', 'love']);
   });
 
   it('the typed words in a row are one mark, joined by spaces or by small words', () => {

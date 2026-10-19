@@ -904,6 +904,23 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ find: { terms: ['flood', 'flooding'], label: 'flood' } }));
   });
 
+  /* Track D (D6): the pill marked "whom" and "whoever" in a letter opened from a lone "who" (find6-before.log
+     under D:/Swarm/lanes/search200/out/ux/fix-D). The engine's forms of a typed small word stay out of what to
+     find, by the rule the card marks by (formsToMark): the pill finds what the card marked. */
+  it('D6: a typed small word finds only itself, as the card marks it', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'who-is-first', text: 'Who is he whom the Lord chose? Whoever will, let him come.' }, terms: ['who', 'whom', 'whoever'] },
+      ['who'], 'who', ['who'],
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['who'], label: 'who' } }));
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'one-body', text: 'Christ who strengthens me, in whom is all strengthening.' }, terms: ['who', 'whom', 'strengthening'] },
+      ['christ', 'strengthens'], 'christ who strengthens me', ['who', 'me'],
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['christ', 'strengthens', 'who', 'strengthening'], label: 'christ who strengthens me' } }));
+  });
+
   it('no match (a title hit, no terms) clears the anchor so a stale verse anchor cannot leak in', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter-title', volumeId: 'vot-two', letterId: 'wide-path', text: '' } }, []); });

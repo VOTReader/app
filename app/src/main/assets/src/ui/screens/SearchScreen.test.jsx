@@ -1864,6 +1864,23 @@ describe('SearchScreen (search200 UX, track B)', () => {
     await typeIn(baseProps(), 'who');
     expect([...new Set(seen)].sort()).toEqual(['best:["who"]', 'v1:["who"]', 'v7:["who"]']);
   });
+
+  /* Track D (D6): the in-text find pill marked "whom" and "whoever" in a letter opened from a lone "who"
+     (D:/Swarm/lanes/search200/out/ux/fix-D/find6-before.log): a tapped card hands on the small words typed,
+     so the landing finds what the card marked. */
+  it('D6: a tapped card hands on the small words typed, with the terms and the query', async () => {
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {},
+      STOP_WORDS_TRIMMED: new Set(['those']), STOP_WORDS: new Set(['those', 'who']) };
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ let tapOn = null;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, onSelect, where }) => { if (where === 'best' && !tapOn) tapOn = () => onSelect(entry); return <div className="stub-card" />; };
+    const onSelect = vi.fn();
+    searchReturns({ parsed: { kind: 'text' }, parsedTerms: ['those', 'who', 'mourn'], results: letters('v7', 6).concat(letters('v1', 3, 6)) });
+    await typeIn({ ...baseProps(), onSelect }, 'those who mourn');
+    act(() => { tapOn(); });
+    expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ doc: expect.objectContaining({ title: 'v7-0' }) }), ['mourn'], 'those who mourn', ['those', 'who']);
+  });
 });
 
 describe('SearchScreen (search200 UX, track D)', () => {

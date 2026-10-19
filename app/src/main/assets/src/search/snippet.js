@@ -571,7 +571,9 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
 /**
  * EVERY place a unit's text matches, the snippet's own included, each with its
  * hits: what the reader's find bar steps through ("2 of 3") and marks, over the
- * text the reading screen renders. Same places as a result card lists.
+ * text the reading screen renders. Same places as a result card lists, by the
+ * marks' rule (search200 UX D6): a word of the fuller stop list counts only as
+ * itself, so a typed "who" no longer marks and counts "whom" and "whoever".
  * @param {string} text
  * @param {string[]} terms
  * @param {number} [maxLen=120]
@@ -579,7 +581,7 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
  */
 export function findPlaces(text, terms, maxLen) {
   maxLen = maxLen || 120;
-  const occ = occurrences(text, terms);
+  const occ = occurrences(text, terms, true);
   if (!occ.length) return [];
   const freq = familyCounts(occ);
   const places = cluster(occ, maxLen, freq);

@@ -784,7 +784,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   // The query's terms ride along so the dispatcher can cut the matched excerpt
   // out of the doc and land the reader ON the passage (use-search.js).
-  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms, (query || '').trim()); };
+  // `state.stopTyped`: the landing's find pill finds what the card marked (search200 UX D6).
+  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms, (query || '').trim(), state.stopTyped); };
 
   // The box keeps the focus: the button that cleared it goes away with the query,
   // and the focus went with it (the keyboard closed under the reader's thumb).
