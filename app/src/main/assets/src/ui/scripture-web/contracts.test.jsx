@@ -36,14 +36,14 @@ const graphWith = (more) => {
 };
 
 /** The camera, the journey and the selection wired as the screen wires them. */
-function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined, make = graph } = {}) {
+function mount({ withCamera = true, mode = 'canonical', personal = null, rails = null, topbar = null, insetFor = undefined, make = graph, animate = undefined } = {}) {
   const g = make();
   const schedule = vi.fn();
   const setAnnounce = vi.fn();
   const hook = renderHook(() => {
     const modeRef = React.useRef(mode);
     const topbarRef = React.useRef(topbar);
-    const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule, topbarRef });
+    const cam = useWebCamera({ graph: g, density: 'famous', modeRef, schedule, topbarRef, animate });
     const journey = useJourney();
     const resumeRef = React.useRef(null);
     const personalRef = React.useRef(personal);
@@ -643,6 +643,89 @@ describe("My Web's two cameras leave the docked panel room at the rails' ends (w
     expect(verseToX(cam.camVRef.current, W, SPAN)).toBeCloseTo(W, 6);
     expect(cam.camRef.current.ppv).toBeCloseTo(4 * (W / TOTAL), 9);
     expect(cam.camVRef.current.ppv).toBeCloseTo(4 * (W / SPAN), 9);
+  });
+});
+
+/* w4 fix round 2 (review, minor 5): closing the panel at a rail's end snapped both rails back inside
+   the view. settleInset clamped My Web's Volumes camera at once ("steps back inside at once"), and
+   the Bible camera's flyTo clamped its first frame with the shrunk slack, so its "ease" was a jump
+   too. Now the slack itself eases from the panel's old edge to the view's, and each camera is
+   clamped with it every frame: a rail's end glides back. Sampled frame by frame through a frame loop's
+   animate (16 ms a frame), as use-frame-scheduler runs it. */
+describe("closing the docked panel at a rail's end eases both rails back inside the view (w4 fix round 2)", () => {
+  const W = 3200, SPAN = 2100, PANEL = 640, DPR = 2;
+  /** A frame loop's one motion, run by hand: a newer motion ends the one running. */
+  const loop = () => {
+    const motions = [];
+    const animate = (step, onEnd) => {
+      const prev = motions.find((m) => m.live);
+      const m = { step, onEnd, live: true };
+      motions.push(m);
+      if (prev) { prev.live = false; if (prev.onEnd) prev.onEnd(false); }
+      return () => { if (m.live) { m.live = false; if (m.onEnd) m.onEnd(false); } };
+    };
+    /** One frame: false once nothing is moving. */
+    const frame = (dt = 16) => {
+      const m = motions.find((x) => x.live);
+      if (!m) return false;
+      if (m.step(dt) === false) { m.live = false; if (m.onEnd) m.onEnd(true); }
+      return true;
+    };
+    return { animate, frame };
+  };
+  const atEnds = (mode) => {
+    const l = loop();
+    const m = mount({ mode, animate: l.animate });
+    const { cam } = m.get();
+    cam.viewRef.current = { W, H: 1800, DPR };
+    cam.camRef.current = { x: 15551, ppv: 4 * (W / TOTAL), total: TOTAL, y: 0 };
+    if (mode === 'personal') cam.camVRef.current = { x: SPAN / 2, ppv: 4 * (W / SPAN), total: SPAN, y: 0 };
+    cam.panelInsetRef.current = { right: PANEL, bottom: 0 };
+    const cams = mode === 'personal' ? [[cam.camRef.current, TOTAL], [cam.camVRef.current, SPAN]] : [[cam.camRef.current, TOTAL]];
+    for (const [c, total] of cams) { c.x = total; clampCamera(c, W, 5000, undefined, cam.slackFor(c)); }
+    return { cam, l, ends: () => cams.map(([c, total]) => verseToX(c, W, total)) };
+  };
+  for (const mode of ['personal', 'canonical']) {
+    it(`${mode === 'personal' ? 'My Web, both rails' : 'the canon'}: the end glides from the panel's old edge to the view's over about 250 ms, no frame a jump`, () => {
+      const { cam, l, ends } = atEnds(mode);
+      const edge = W - PANEL * DPR;
+      for (const x of ends()) expect(x).toBeCloseTo(edge, 6);
+      cam.panelInsetRef.current = { right: 0, bottom: 0 };   // usePanelInset wrote the shrunk inset, then:
+      cam.settleInset(PANEL);
+      // nothing moves until the frame loop runs
+      for (const x of ends()) expect(x).toBeCloseTo(edge, 6);
+      const seen = [ends()];
+      let frames = 0;
+      while (l.frame(16) && frames < 100) { frames++; seen.push(ends()); }
+      const dist = W - edge;
+      seen[0].forEach((_, r) => {
+        const xs = seen.map((e) => e[r]);
+        const steps = xs.slice(1).map((x, i) => x - xs[i]);
+        // it moves outward only, each frame a part of the way (an ease in and out over 250 ms peaks at
+        // 3 x 16 / 250, about a fifth; the jump was all of it), the first one far smaller
+        for (const d of steps) expect(d).toBeGreaterThanOrEqual(-1e-6);
+        expect(Math.max(...steps), `rail ${r}: ${xs.map((x) => Math.round(x)).join(',')}`).toBeLessThan(0.25 * dist);
+        expect(steps[0]).toBeLessThan(0.05 * dist);
+        // and lands at the view's own edge
+        expect(xs[xs.length - 1]).toBeCloseTo(W, 6);
+      });
+      // about 250 ms of frames, then the motion ends
+      expect(frames).toBeGreaterThanOrEqual(12);
+      expect(frames).toBeLessThanOrEqual(20);
+      // the zoom is untouched
+      expect(cam.camRef.current.ppv).toBeCloseTo(4 * (W / TOTAL), 9);
+    });
+  }
+
+  it('a camera already inside the new bound is left where it stands, and no motion starts', () => {
+    const { cam, l } = atEnds('personal');
+    const bible = cam.camRef.current, vols = cam.camVRef.current;
+    bible.x = 15551; vols.x = SPAN / 2;
+    cam.panelInsetRef.current = { right: 0, bottom: 0 };
+    cam.settleInset(PANEL);
+    expect(l.frame()).toBe(false);
+    expect(bible.x).toBe(15551);
+    expect(vols.x).toBe(SPAN / 2);
   });
 });
 

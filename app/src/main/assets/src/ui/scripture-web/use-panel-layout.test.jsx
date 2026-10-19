@@ -106,9 +106,13 @@ describe('the hooks', () => {
       { initialProps: { open: false } });
     rerender({ open: true });
     expect(onShrink).not.toHaveBeenCalled();
+    const docked = panelInsetRef.current.right;
+    expect(docked).toBeGreaterThan(0);
     rerender({ open: true });
     rerender({ open: false });
     expect(onShrink).toHaveBeenCalledTimes(1);
+    // told the inset it had, so the camera's slack eases down from the panel's old edge (w4 fix round 2)
+    expect(onShrink).toHaveBeenCalledWith(docked);
     el.remove();
   });
 });

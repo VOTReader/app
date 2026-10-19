@@ -44,6 +44,9 @@ import { nearbyChapter } from '../../utils/scripture-web/pick.js';
 /** How long the camera must go unmoved to count as at rest (A6): past a fling's last frames and a
  * key's repeat, short enough that Nearby has caught up by the time the eye has. */
 export const SETTLE_MS = 180;
+/** How long a rail's end takes to glide back inside the view once the docked panel closes (w4 fix
+ * round 2): about the panel's own slide, so the web follows the panel out rather than snapping. */
+export const INSET_EASE_MS = 250;
 
 /**
  * Where flyTo takes the camera: a canon x range to frame across the canvas area (edge to edge;
@@ -92,6 +95,9 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   // CSS px the open panel covers (right: docked; bottom: the sheet under 560 px).
   // The panel stream writes it; nothing else does. Zero while no panel is open.
   const panelInsetRef = React.useRef({ right: 0, bottom: 0 });
+  // the slack a closing panel leaves while the cameras ease back inside the view (device px), eased
+  // to the new inset's by settleInset's motion; 0 at rest (w4 fix round 2)
+  const settleSlackRef = React.useRef(0);
 
   /** The vertical frame (web-frame.webFrame) for the current view and mode. */
   const frame = React.useCallback(() => webFrame(viewRef.current, modeRef.current === 'personal'), [modeRef]);
@@ -139,7 +145,8 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   /**
    * The clamp's slack for the docked panel (geometry.clampCamera's `right`), device px: what the
    * panel covers on the right now, or what a fly is told it will (`flyRight`, device px, before the
-   * panel renders), whichever is more. The canon camera has one, and in My Web both rails' cameras
+   * panel renders), or what a closing panel still leaves while the cameras ease back inside
+   * (settleInset), whichever is more. The canon camera has one, and in My Web both rails' cameras
    * (w4: through w3 My Web's rails kept the view's own edges, so the Bible rail's last verses and the
    * Volumes rail's last collections stayed under a docked panel at any zoom). A camera the screen
    * does not hold has none.
@@ -150,7 +157,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     if (!c || (c !== camRef.current && !(modeRef.current === 'personal' && c === camVRef.current))) return 0;
     const v = viewRef.current;
     const now = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
-    return Math.max(now, flyRight > 0 ? flyRight : 0);
+    return Math.max(now, flyRight > 0 ? flyRight : 0, settleSlackRef.current);
   }, [modeRef]);
 
   /** Where a target puts the camera, read against the view and the inset now (CONTRACTS.md §3):
@@ -275,26 +282,48 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   /**
    * The panel stopped covering the right (it closed, or became the bottom sheet): a camera its
    * slack let stand past the view's own bound eases back inside it, at the same zoom, rather than
-   * jumping there at the reader's next drag. usePanelInset calls it once the inset has shrunk. A fly
-   * running already clamps with the new inset every frame, so it is left to land. My Web's Volumes
-   * rail (w4) has no fly: it steps back inside at once, as its per-frame clamp would on the next frame.
+   * jumping there at the reader's next drag. usePanelInset calls it once the inset has shrunk, with
+   * the right inset it had (CSS px). The slack itself eases from that inset to the new one over
+   * INSET_EASE_MS, and every camera past the new bound is clamped with it each frame, so a rail's
+   * end glides from the panel's old edge to the view's (w4 fix round 2: My Web's Volumes rail stepped
+   * back at once, and the canon's fly clamped its first frame with the shrunk slack, so both rails
+   * snapped). Every other clamp (My Web's per frame, the gestures, a fly) reads the same eased slack
+   * through slackFor. With no frame loop, under reduced motion, or with no old inset given, it
+   * steps back at once; a fly running already clamps every frame, so the canon's is left to land.
+   * @param {number} [wasRight]  the right inset the panel covered, CSS px
    */
-  const settleInset = React.useCallback(() => {
-    const cam = camRef.current, v = viewRef.current;
+  const settleInset = React.useCallback((/** @type {number} */ wasRight = 0) => {
+    const v = viewRef.current;
+    if (!v.W) return;
+    const flying = !!flyStopRef.current;
+    const cams = [];
+    const cam = camRef.current;
+    if (cam && !flying) cams.push(cam);
     const cv = modeRef.current === 'personal' ? camVRef.current : null;
-    if (cv && v.W) {
-      const was = cv.x;
-      clampCamera(cv, v.W, zoomCapFor(cv), undefined, slackFor(cv));
-      if (cv.x !== was && schedule) schedule();
+    if (cv) cams.push(cv);
+    const clampNow = (/** @type {any} */ c) => clampCamera(c, v.W, zoomCapFor(c), yFrameFor(c) || undefined, slackFor(c));
+    // the cameras the new bound moves (a half device px is no move)
+    const past = cams.filter((c) => {
+      const to = clampCamera({ x: c.x, ppv: c.ppv, total: c.total, y: c.y }, v.W, zoomCapFor(c), yFrameFor(c) || undefined, slackFor(c));
+      return Math.abs(to.x - c.x) * c.ppv > 0.5;
+    });
+    if (!past.length) return;
+    const now = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
+    const from = (wasRight > 0 ? wasRight : 0) * (v.DPR || 1);
+    if (!animate || flying || prefersReducedMotion() || !(from > now)) {
+      for (const c of past) clampNow(c);
+      if (schedule) schedule();
+      return;
     }
-    if (!cam || !v.W || flyStopRef.current) return;
-    const to = clampCamera({ x: cam.x, ppv: cam.ppv, total: cam.total, y: cam.y }, v.W, zoomCapFor(cam),
-      yFrameFor(cam) || undefined, slackFor(cam));
-    if (!(Math.abs(to.x - cam.x) * cam.ppv > 0.5)) return;
-    // flyTo centres x in the canvas area: what the panel still covers is added back on landing
-    const right = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
-    flyTo({ x: to.x - right / (2 * to.ppv) });
-  }, [zoomCapFor, yFrameFor, slackFor, flyTo, modeRef, schedule]);
+    let t = 0;
+    settleSlackRef.current = from;
+    animate((dt) => {
+      t = Math.min(1, t + dt / INSET_EASE_MS);
+      settleSlackRef.current = t >= 1 ? 0 : now + (from - now) * (1 - easeInOutCubic(t));
+      for (const c of past) clampNow(c);
+      return t < 1;
+    }, () => { settleSlackRef.current = 0; });
+  }, [zoomCapFor, yFrameFor, slackFor, modeRef, schedule, animate]);
 
   // A6: where the camera came to rest. Each drawn frame compares the camera with the last one;
   // a move restarts the wait, and SETTLE_MS without one reads the chapter in the lens.
