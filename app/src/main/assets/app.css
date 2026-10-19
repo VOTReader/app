@@ -3888,8 +3888,12 @@
     .srch-results-summary strong { color:var(--gold-bright); font-weight:600; font-style:normal; }
     .srch-groups { display:block; }
     .srch-group { border-bottom:1px solid var(--gold-border); }
-    /* the heading round a group's header button (search200 B9) takes nothing of its own */
-    .srch-group-h { font:inherit; }
+    /* the heading round a group's header button (search200 B9) takes nothing of its own but its
+       place: it pins at the column top, under the search bar, while its own cards scroll, and the
+       next group's heading pushes it off (search200 UX B10 6; sticky inside its .srch-group). Above
+       the cards, under the suggestions (z-index 10). An open group's band closes with a hairline. */
+    .srch-group-h { font:inherit; position:sticky; top:0; z-index:3; }
+    .srch-group:not(.collapsed) > .srch-group-h { border-bottom:1px solid var(--gold-border); }
     .srch-group-count-inline { color:var(--gold-bright); font-weight:600; letter-spacing:0.1em; }
     .srch-group-header { display:flex; align-items:center; justify-content:space-between; min-height:44px; padding:0 1rem; background:var(--bg2); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); border:none; width:100%; text-align:left; }
     .srch-group-header:active { background:var(--gold-faint); }
@@ -3897,7 +3901,7 @@
     .srch-group-items { display:block; }
     .srch-group.collapsed .srch-group-items { display:none; }
     /* A long group renders its cards a page at a time (SrchGroup). */
-    .srch-group-more { display:block; box-sizing:border-box; width:100%; min-height:44px; padding:0.6rem 1.1rem; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); text-align:center; }
+    .srch-group-more { display:block; box-sizing:border-box; width:100%; min-height:44px; padding:0.6rem 1.1rem; background:none; border:none; border-bottom:1px solid var(--gold-border); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold); text-align:center; }
     .srch-group-more:active { background:var(--gold-faint); }
 
     .srch-card { display:block; width:100%; text-align:left; background:none; border:none; border-bottom:1px solid rgba(200,164,86,0.12); cursor:pointer; padding:0.8rem 1.1rem; transition:background 0.15s; }

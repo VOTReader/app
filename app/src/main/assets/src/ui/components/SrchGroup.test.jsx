@@ -54,18 +54,26 @@ describe('SrchGroup', () => {
     expect(container.querySelector('.srch-group-count-inline').textContent).toBe(' · 400+ verses');
   });
 
-  it('renders a long group a page at a time', () => {
-    const many = Array.from({ length: 120 }, (_, i) => ({ doc: { title: 'L' + i } }));
+  /* search200 UX B10 (6): a group no longer dumps 50 verses at once; it shows 10, then 10 at a
+     time, and the row says how many are left ("SHOW 10 MORE · 382 LEFT"). */
+  it('renders a long group ten at a time, saying how many are left', () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({ doc: { title: 'L' + i } }));
     const { container } = render(<SrchGroup gkey="answers" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} />);
-    expect(container.querySelectorAll('.stub-card')).toHaveLength(50);
+    expect(container.querySelectorAll('.stub-card')).toHaveLength(10);
     const more = container.querySelector('.srch-group-more');
-    expect(more.textContent).toBe('Show 50 more of 70');
+    expect(more.textContent).toBe('Show 10 more · 15 left');
     fireEvent.click(more);
-    expect(container.querySelectorAll('.stub-card')).toHaveLength(100);
-    expect(container.querySelector('.srch-group-more').textContent).toBe('Show 20 more');
+    expect(container.querySelectorAll('.stub-card')).toHaveLength(20);
+    expect(container.querySelector('.srch-group-more').textContent).toBe('Show 5 more');
     fireEvent.click(container.querySelector('.srch-group-more'));
-    expect(container.querySelectorAll('.stub-card')).toHaveLength(120);
+    expect(container.querySelectorAll('.stub-card')).toHaveLength(25);
     expect(container.querySelector('.srch-group-more')).toBeNull();
+  });
+
+  it('says what is left in grouped thousands', () => {
+    const many = Array.from({ length: 1210 }, (_, i) => ({ doc: { title: 'v' + i } }));
+    const { container } = render(<SrchGroup gkey="bible" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} />);
+    expect(container.querySelector('.srch-group-more').textContent).toBe('Show 10 more · 1,200 left');
   });
 
   it('a card keeps its own state when Book order re-sorts the group (keyed by doc, not by index)', () => {
@@ -107,6 +115,18 @@ describe('SrchGroup remembers, for one search, what the reader opened', () => {
     expect(other.container.querySelectorAll('.stub-card')).toHaveLength(0);
   });
 
+  it('paged, it comes back paged as far as the reader took it', () => {
+    const many = Array.from({ length: 45 }, (_, i) => ({ doc: { title: 'L' + i } }));
+    const first = render(<SrchGroup gkey="bible" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} memo="love" />);
+    fireEvent.click(first.container.querySelector('.srch-group-more'));
+    fireEvent.click(first.container.querySelector('.srch-group-more'));
+    expect(first.container.querySelectorAll('.stub-card')).toHaveLength(30);
+    first.unmount();
+    const again = render(<SrchGroup gkey="bible" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} memo="love" />);
+    expect(again.container.querySelectorAll('.stub-card')).toHaveLength(30);
+    expect(again.container.querySelector('.srch-group-more').textContent).toBe('Show 10 more · 15 left');
+  });
+
   /* sr12: Book order opens every group (SearchScreen re-mounts them per order); each order keeps its own memory,
      so a group the reader opened under Relevance is open again after a trip to Book order and back. */
   it('remembers each order on its own: Relevance as the reader left it, Book order open with a short first page', () => {
@@ -116,11 +136,11 @@ describe('SrchGroup remembers, for one search, what the reader opened', () => {
     rel.unmount();
     const book = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} memo="lord" view="book" page={10} />);
     expect(book.container.querySelectorAll('.stub-card')).toHaveLength(10);
-    expect(book.container.querySelector('.srch-group-more').textContent).toBe('Show 20 more');
+    expect(book.container.querySelector('.srch-group-more').textContent).toBe('Show 10 more · 20 left');
     fireEvent.click(book.container.querySelector('.srch-group-header'));   // closed under Book order
     book.unmount();
     const back = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={false} memo="lord" />);
-    expect(back.container.querySelectorAll('.stub-card'), 'Relevance as the reader left it: open').toHaveLength(30);
+    expect(back.container.querySelectorAll('.stub-card'), 'Relevance as the reader left it: open').toHaveLength(10);
     back.unmount();
     const bookAgain = render(<SrchGroup gkey="v7" items={many} terms={[]} onSelect={() => {}} defaultOpen={true} memo="lord" view="book" page={10} />);
     expect(bookAgain.container.querySelectorAll('.stub-card'), 'Book order as the reader left it: closed').toHaveLength(0);

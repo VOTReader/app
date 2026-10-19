@@ -18,8 +18,9 @@ const GROUP_UNIT = {
 
 /* Cards render a page at a time: a group can hold hundreds now that each
    collection keeps its own 400 (Answers holds about 600 topics for "the"), and
-   every card cuts and measures a snippet. */
-export const SRCH_GROUP_PAGE = 50;
+   every card cuts and measures a snippet. Ten, then ten more at a time (search200 UX
+   B10 6): fifty verses at once buried the next group's header a long scroll away. */
+export const SRCH_GROUP_PAGE = 10;
 
 /* A card's key is its doc, not its index: Book order re-sorts a group in place,
    and an index key handed each card another result (its snippet centred on the
@@ -73,7 +74,7 @@ export function SrchGroup({ gkey, items, terms, stopTyped = undefined, onSelect,
           ))}
           {left > 0 ? (
             <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>
-              {left <= SRCH_GROUP_PAGE ? 'Show ' + left + ' more' : 'Show ' + SRCH_GROUP_PAGE + ' more of ' + left.toLocaleString('en-US')}
+              {left <= SRCH_GROUP_PAGE ? 'Show ' + left + ' more' : 'Show ' + SRCH_GROUP_PAGE + ' more · ' + left.toLocaleString('en-US') + ' left'}
             </button>
           ) : null}
         </div>

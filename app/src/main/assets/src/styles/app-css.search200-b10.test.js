@@ -204,3 +204,29 @@ describe('B10 item 5 — the chosen pill is solid antique gold in the light them
     expect(decls('body.light .srch-scope-chip.active')).toEqual({});
   });
 });
+
+describe('B10 item 6 — group headers pin under the search bar while their own cards scroll', () => {
+  it('the heading round each header sticks at the column top (under the search bar) above the cards', () => {
+    const h = decls('.srch-group-h');
+    expect(h.position).toBe('sticky');
+    expect(h.top).toBe('0');
+    expect(Number(h['z-index'])).toBeGreaterThanOrEqual(2);
+    // under the suggestions, which drop over the results
+    expect(Number(h['z-index'])).toBeLessThan(Number(decls('.srch-suggest-anchor')['z-index']));
+  });
+
+  it('its band is solid --bg2, closed by a --gold-border hairline while the group is open', () => {
+    expect(decls('.srch-group-header').background).toBe('var(--bg2)');
+    expect(decls('.srch-group:not(.collapsed) > .srch-group-h')['border-bottom']).toBe('1px solid var(--gold-border)');
+  });
+
+  it('the "show more" row stays a centred 44px Cinzel --fs-10 gold row with a hairline below', () => {
+    const m = decls('.srch-group-more');
+    expect(m['min-height']).toBe('44px');
+    expect(m['text-align']).toBe('center');
+    expect(m['font-size']).toBe('var(--fs-10)');
+    expect(m['letter-spacing']).toBe('0.12em');
+    expect(m.color).toBe('var(--gold)');
+    expect(m['border-bottom']).toBe('1px solid var(--gold-border)');
+  });
+});
