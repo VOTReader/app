@@ -91,22 +91,36 @@ export function TipChip({ info, viewport, inset }) {
  * screen has (digest items 22, 23). The "+" button, the ruler on the left and the bar that
  * jumped are gone, so the card no longer names them; the legend says what the colours are, and the
  * first line what an arch's height is (C22, w3 review).
- * The footer carries the OpenBible.info credit (Q5). `canSearch`: the go-to's button is there. */
-export function HowToReadGuide({ onClose, canSearch, credit }) {
+ * The footer carries the OpenBible.info credit (Q5). `canSearch`: the go-to's button is there.
+ * `mode` 'personal' (w4): My Web's own four lines, its two rails, the reader's links and
+ * Timothy's notes as the legend names them, a tap, and the rails' Reset buttons; the canon's
+ * card told of votes and gold ticks My Web does not draw. */
+export function HowToReadGuide({ onClose, canSearch, credit, mode }) {
   const trapRef = useFocusTrap(true);
+  const words = myWebLegendWords();
+  const lines = mode === 'personal' ? (
+    <ul className="sw-guide-body">
+      <li><strong>The Volumes</strong> run along the top, the Bible along the bottom. Drag or pinch either one.</li>
+      <li>The lines are {words.yours} and {words.timothy}; the key tells them apart.</li>
+      <li>Tap a line to read both ends.</li>
+      <li><strong>Reset Volumes</strong> and <strong>Reset Bible</strong> bring a rail back; Reset brings both.</li>
+    </ul>
+  ) : (
+    <ul className="sw-guide-body">
+      <li><strong>Pinch</strong> or scroll to zoom. The farther apart two verses, the taller their arch: drag down to look higher.</li>
+      <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
+      <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
+      {canSearch ? <li><strong>Go to</strong> (the magnifier at the top, or /) jumps to a book, chapter or verse.</li> : null}
+      <li><strong>Reset</strong> brings the whole web back.</li>
+    </ul>
+  );
   return (
     <div className="sw-guide" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="sw-guide-title">
       {/* the words in a document (w4): the root's role="application" stops a screen reader's
           virtual cursor, a document turns it back on; Got it stays a control after it */}
       <div role="document">
         <div className="sw-guide-title" id="sw-guide-title">How to read this web</div>
-        <ul className="sw-guide-body">
-          <li><strong>Pinch</strong> or scroll to zoom. The farther apart two verses, the taller their arch: drag down to look higher.</li>
-          <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
-          <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
-          {canSearch ? <li><strong>Search</strong> at the top goes straight to a verse.</li> : null}
-          <li><strong>Reset</strong> brings the whole web back.</li>
-        </ul>
+        {lines}
         <p className="sw-guide-foot">{credit || WEB_CREDIT}</p>
       </div>
       <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>Got it</button>

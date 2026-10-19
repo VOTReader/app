@@ -1432,6 +1432,16 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     return r;
   };
 
+  // w4 quality hunt: My Web's ? opened the canon's card (votes, gold ticks); it opens My Web's own
+  it('the ? card in My Web speaks of My Web: its rails and their Reset buttons, no votes', async () => {
+    const { container } = await openMyWeb();
+    fireEvent.click(screen.getByRole('button', { name: /how to read this web/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    const text = container.querySelector('.sw-guide').textContent;
+    expect(text).toMatch(/Reset Volumes/);
+    expect(text).not.toMatch(/votes/);
+  });
+
   // Sweep low (mw10, WCAG 2.5.3): the toggle was named "Show the curated corpus connections", leaving out
   // the words it shows. Its words are now Timothy's notes' one name (digest item 22, w3 panel step 2);
   // the law (the name starts with the words on the button) is the same.

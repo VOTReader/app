@@ -5,7 +5,7 @@
  * something the screen has: pinch or scroll to zoom (and the drag that looks higher, and what an
  * arch's height means: the farther apart its verses, the taller; w3 review, C22), tap a
  * thread (its votes, said once in plain words), the gold ticks of the Volumes' citations,
- * the search that goes to a verse (only when the go-to is there), and Reset. It never names a
+ * the Go to that jumps to a verse (only when the go-to is there), and Reset. It never names a
  * control the screen does not have: the "+" button and the ruler-and-bar it described were
  * retired (item 23). Its footer carries the OpenBible.info credit (Q5). The card is the web's
  * own dark panel in both themes (Q4: panels pinned dark).
@@ -34,14 +34,18 @@ const lines = (card) => [...card.querySelectorAll('li')].map((li) => li.textCont
 afterEach(cleanup);
 
 describe('How to read this web: four or five short lines about controls that exist', () => {
-  it('four lines without the go-to, five with it; the search line comes only with the search', () => {
+  /* w4 quality hunt: the line called the control "Search", which everywhere else is Go to (its
+     aria-label, its tooltip "Go to ( / )", the dialog, the key help). This test pinned the word
+     "search"; its intent, the go-to's line comes only with the go-to, now pins the control's name. */
+  it('four lines without the go-to, five with it; the Go to line comes only with the go-to, by its own name', () => {
     const without = lines(guide());
     expect(without).toHaveLength(4);
-    expect(without.join(' ')).not.toMatch(/search/i);
+    expect(without.join(' ')).not.toMatch(/go to|search/i);
     cleanup();
     const withSearch = lines(guide({ canSearch: true }));
     expect(withSearch).toHaveLength(5);
-    expect(withSearch.filter((s) => /search/i.test(s) && /verse/i.test(s))).toHaveLength(1);
+    expect(withSearch.filter((s) => /\bGo to\b/.test(s) && /book, chapter or verse/.test(s))).toHaveLength(1);
+    expect(withSearch.join(' ')).not.toMatch(/search/i);
   });
 
   it('each line is short (one or two sentences, under 110 characters)', () => {
@@ -94,6 +98,36 @@ describe('How to read this web: four or five short lines about controls that exi
     cleanup();
     foot = guide({ credit: 'Cross-reference data from OpenBible.info' }).querySelector('.sw-guide-foot');
     expect(foot.textContent).toBe('Cross-reference data from OpenBible.info');
+  });
+});
+
+/* w4 quality hunt: My Web opened the canon's card, which told of votes and gold ticks My Web does
+   not draw. My Web's card speaks of what My Web has: the two rails, the reader's links and
+   Timothy's notes (the legend's words), a tap on a line, and the rails' own Reset buttons. */
+describe('the guide in My Web speaks of My Web', () => {
+  const mine = () => lines(guide({ mode: 'personal' }));
+  it('four short lines: the two rails, the two families of lines, a tap, the Reset buttons', () => {
+    const text = mine();
+    expect(text).toHaveLength(4);
+    for (const s of text) {
+      expect(s.length, s).toBeLessThan(110);
+      expect((s.match(/[.!?](\s|$)/g) || []).length, s).toBeLessThanOrEqual(2);
+    }
+    const all = text.join(' ');
+    expect(all).toMatch(/Volumes[^.]*\btop\b[^.]*Bible[^.]*\bbottom\b/);
+    expect(all).toContain('your links');
+    expect(all).toContain('Timothy’s notes');
+    expect(all).toMatch(/\bTap a line\b/);
+    expect(all).toMatch(/Reset Volumes/);
+    expect(all).toMatch(/Reset Bible/);
+  });
+  it('names nothing My Web lacks: no votes, no gold ticks, no Go to, no arch heights', () => {
+    const all = mine().join(' ');
+    expect(all).not.toMatch(/votes?|tick|Go to|search|arch/i);
+  });
+  it('keeps the credit and the browse-mode document', () => {
+    const card = guide({ mode: 'personal' });
+    expect(card.querySelector('[role="document"] .sw-guide-foot').textContent).toBe(WEB_CREDIT);
   });
 });
 
