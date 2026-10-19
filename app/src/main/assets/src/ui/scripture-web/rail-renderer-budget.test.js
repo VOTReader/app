@@ -147,10 +147,11 @@ describe('B2 the context is stroked in a bounded set of inks, both rails\' own e
     const alphas = [...inks].map((k) => Number(k.split('/')[0]));
     expect(Math.max(...alphas)).toBeCloseTo(personalInk(40).context.alpha, 6);
     expect(Math.min(...alphas)).toBeCloseTo(personalInk(1).context.alpha, 6);
-    // the glow under them (w4) takes one ink a rung, no more
+    // the glow under them (w4) takes at most GLOW_LEVELS inks a rung (w4 review: a leg's glow
+    // fades with its far foot's presence, in GLOW_LEVELS steps; through the first pass one a rung)
     const glows = new Set(ctx.c.strokes.filter(glowStroke).map((s) => alphaOf(s.style).toFixed(6) + '/' + s.width.toFixed(6)));
     expect(glows.size).toBeGreaterThan(0);
-    expect(glows.size).toBeLessThanOrEqual(RR.INK_RUNGS);
+    expect(glows.size).toBeLessThanOrEqual(RR.INK_RUNGS * RR.GLOW_LEVELS);
   });
   it('with fly-overs too: at most twice INK_RUNGS stroke inks, the far fly-overs at the overview\'s ink', () => {
     const u = corpus(2648, 11);
@@ -164,10 +165,86 @@ describe('B2 the context is stroked in a bounded set of inks, both rails\' own e
     // the threads hanging from the Volumes rail at 3x are that rail's ink exactly, at full width
     const v3 = personalInk(3).context;
     expect(cs.some((s) => Math.abs(alphaOf(s.style) - v3.alpha) < 1e-6 && Math.abs(s.width - v3.width) < 1e-6)).toBe(true);
-    // the glow (w4) is the anchored rungs' only: at most INK_RUNGS inks, none for a fly-over
+    // the glow (w4) is the anchored rungs' only, none for a fly-over: at most GLOW_LEVELS inks
+    // a rung (w4 review, as above)
     const glows = new Set(ctx.c.strokes.filter(glowStroke).map((s) => alphaOf(s.style).toFixed(6) + '/' + s.width.toFixed(6)));
-    expect(glows.size).toBeLessThanOrEqual(RR.INK_RUNGS);
+    expect(glows.size).toBeLessThanOrEqual(RR.INK_RUNGS * RR.GLOW_LEVELS);
   });
+});
+
+/** A raster of the context's ink, `cell` device px a cell: a stroke covers the cells its path
+ * passes within half its width of, ONCE however often the path crosses them (as the canvas
+ * paints one path), at its alpha, or alpha x width / cell for a line thinner than a cell (its
+ * share of the cell); the cells compose the strokes over them (1 - prod(1 - a)). Only
+ * Timothy's colours count (not the rails, ticks, names or links). @returns {any} */
+function inkCtx(width, height, cell = 3) {
+  const nx = Math.ceil(width / cell), ny = Math.ceil(height / cell);
+  const T = new Float32Array(nx * ny).fill(1);
+  const stamp = new Int32Array(nx * ny);
+  let id = 0;
+  /** @type {Array<Array<[number, number]>>} */ let path = [];
+  /** @type {Array<[number, number]>} */ let cur = [];
+  const st = { strokeStyle: '', lineWidth: 1 };
+  const noop = () => {};
+  return {
+    canvas: {}, fillStyle: '', font: '', textAlign: '', textBaseline: '', lineCap: '', lineJoin: '', letterSpacing: '0px',
+    get strokeStyle() { return st.strokeStyle; }, set strokeStyle(v) { st.strokeStyle = v; },
+    get lineWidth() { return st.lineWidth; }, set lineWidth(v) { st.lineWidth = v; },
+    beginPath() { path = []; }, moveTo(x, y) { cur = [[x, y]]; path.push(cur); }, lineTo(x, y) { cur.push([x, y]); },
+    arc: noop, fill: noop, fillText: noop, strokeText: noop, measureText: (t) => ({ width: String(t).length * 8 }),
+    clearRect: noop, save: noop, restore: noop,
+    stroke() {
+      if (!TIMOTHY.test(st.strokeStyle)) return;
+      id++;
+      const r = Math.max(cell / 2, st.lineWidth / 2), rc = Math.ceil(r / cell);
+      const a = alphaOf(st.strokeStyle) * Math.min(1, st.lineWidth / cell);
+      for (const line of path) {
+        for (let k = 1; k < line.length; k++) {
+          const [x1, y1] = line[k - 1], [x2, y2] = line[k];
+          const n = Math.max(1, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / (cell / 2)));
+          for (let s = 0; s <= n; s++) {
+            const x = x1 + ((x2 - x1) * s) / n, y = y1 + ((y2 - y1) * s) / n;
+            const cx = Math.floor(x / cell), cy = Math.floor(y / cell);
+            for (let dy = -rc; dy <= rc; dy++) {
+              for (let dx = -rc; dx <= rc; dx++) {
+                const gx = cx + dx, gy = cy + dy;
+                if (gx < 0 || gy < 0 || gx >= nx || gy >= ny) continue;
+                const ex = (gx + 0.5) * cell - x, ey = (gy + 0.5) * cell - y;
+                if (ex * ex + ey * ey > r * r) continue;
+                const c = gy * nx + gx;
+                if (stamp[c] === id) continue;
+                stamp[c] = id;
+                T[c] *= 1 - a;
+              }
+            }
+          }
+        }
+      }
+    },
+    /** the summed ink, in device px^2 of full ink */
+    ink() { let s = 0; for (let i = 0; i < T.length; i++) s += 1 - T[i]; return s * cell * cell; },
+  };
+}
+
+describe('B4 a live frame keeps the rest frame\'s ink (w4 review, major 4)', () => {
+  // with the glow off while a gesture was live, the field dropped to about a quarter of its
+  // ink as a pinch began and came back as it ended; the live cap (LIVE_CAP) alone thins only
+  // the densest corridors
+  const u = corpus(2648, 7);
+  for (const [name, zB, cB, zV, cV] of /** @type {Array<[string, number, number, number, number]>} */ ([
+    ['the overview', 1, TOTAL / 2, 1, rail.total / 2],
+    ['the Bible at 10x on the Gospels', 10, 24000, 1, rail.total / 2],
+    ['both rails 4x', 4, 26000, 4, rail.total * 0.4],
+  ])) {
+    it(`${name}: the live frame's summed ink is within 15% of the rest frame's`, () => {
+      const rest = inkCtx(W, H), live = inkCtx(W, H);
+      drawPersonalWeb(rest, null, u, frame(zB, cB, zV, cV));
+      drawPersonalWeb(live, null, u, Object.assign(frame(zB, cB, zV, cV), { capFraction: 0 }));
+      const r = rest.ink(), l = live.ink();
+      expect(r).toBeGreaterThan(0);
+      expect(Math.abs(l - r) / r, `live ${l.toFixed(0)} / rest ${r.toFixed(0)}`).toBeLessThanOrEqual(0.15);
+    });
+  }
 });
 
 describe('B3 the picks prefilter on the drawn feet and pick what is drawn', () => {

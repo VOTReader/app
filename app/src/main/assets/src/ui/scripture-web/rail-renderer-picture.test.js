@@ -153,7 +153,7 @@ describe('P2 a line\'s ink follows the rails it is anchored to on screen', () =>
     expect(alphaOf(near.style)).toBeGreaterThan(overview.alpha * 2);
     expect(Math.abs(alphaOf(near.style) - ten.alpha)).toBeLessThan(0.05);
   });
-  it('w4 (r2-05): the threads with a foot on screen carry a soft glow at rest, once a source, CONTEXT_GLOW_WIDTH past the core at CONTEXT_GLOW_SHARE of its alpha; a fly-over and a live frame none', () => {
+  it('w4 (r2-05): the threads with their feet on screen carry a soft glow, once a source, CONTEXT_GLOW_WIDTH past the core at CONTEXT_GLOW_SHARE of its alpha; a fly-over none, a live frame the same (w4 review)', () => {
     // the fly-over frame above, plus a second footnote thread beside the first
     const deep = Object.assign({}, base, { verseX: (v) => 500 + (v - 50) * 100, votX: (p) => 500 + (p - 10) * 500 });
     const ten = personalInk(10).context;
@@ -170,11 +170,36 @@ describe('P2 a line\'s ink follows the rails it is anchored to on screen', () =>
     // under its cores: the glow is stroked before them
     const at = ctx.strokes.indexOf(glows[0]);
     for (const s of contextStrokes(ctx).filter((x) => x.style.startsWith('rgba(127,179,176,'))) expect(ctx.strokes.indexOf(s)).toBeGreaterThan(at);
-    // while a gesture is live the frame keeps its budget: no glow
+    // a live gesture keeps the same glow (w4 review, major 4: off mid-gesture, the field's
+    // brightness dropped as a pinch began and came back as it ended; the cost is measured
+    // on the walk, e2e-myweb's glow bench)
     const live = recordingCtx();
     drawPersonalWeb(live, null, u, Object.assign({}, deep, { capFraction: 0 }));
-    expect(glowStrokes(live).length).toBe(0);
+    expect(glowStrokes(live).map((s) => [s.style, s.width])).toEqual(glows.map((s) => [s.style, s.width]));
     expect(contextStrokes(live).length).toBeGreaterThan(0);
+  });
+  it('w4 review: a leg (one foot on screen) glows only while its other foot is near, fading with that foot\'s presence, so a corridor of legs off a zoomed rail never fuses into a slab', () => {
+    // both rails 10x (the frame above): a thread with both feet on screen (footnotes), a leg
+    // whose Volumes foot sits just past the right edge (study notes) and one whose Volumes
+    // foot is screens away (Words To Live By)
+    const deep = Object.assign({}, base, { verseX: (v) => 500 + (v - 50) * 100, votX: (p) => 500 + (p - 10) * 500 });
+    const ten = personalInk(10).context;
+    const u = { count: 3, versePos: new Float32Array([50, 52, 53]), votPos: new Float32Array([10, 19, 11.1]), source: new Uint8Array([0, 2, 1]) };
+    const ctx = recordingCtx();
+    drawPersonalWeb(ctx, null, u, deep);
+    const glows = glowStrokes(ctx);
+    const of = (rgb) => glows.filter((s) => s.style.startsWith('rgba(' + rgb + ','));
+    // the anchored thread: the full glow
+    expect(of('127,179,176').length).toBe(1);
+    expect(alphaOf(of('127,179,176')[0].style)).toBeCloseTo(ten.alpha * CONTEXT_GLOW_SHARE, 6);
+    // the far leg: its core, and no glow
+    expect(contextStrokes(ctx).some((s) => s.style.startsWith('rgba(163,196,193,'))).toBe(true);
+    expect(of('163,196,193').length).toBe(0);
+    // the near leg: a glow, fainter than the anchored thread's
+    expect(of('94,156,154').length).toBe(1);
+    const near = alphaOf(of('94,156,154')[0].style);
+    expect(near).toBeGreaterThan(0);
+    expect(near).toBeLessThan(ten.alpha * CONTEXT_GLOW_SHARE - 1e-6);
   });
 });
 

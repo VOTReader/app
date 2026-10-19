@@ -71,6 +71,10 @@ export const FAR_FOOT = 0.12;
 export const LOCAL_FAR_FOOT = 0.03;
 /** A foot's hold on its line's ink fades out over this share of the width past the screen edge. */
 const PRESENCE_FADE = 0.5;
+/** The glow under Timothy's threads follows the nearer-gone foot's presence in this many steps
+ * (w4 review: a leg off a zoomed rail glowed at full, and a corridor of them fused into a
+ * slab); a thread whose far foot has faded keeps its core alone. */
+export const GLOW_LEVELS = 3;
 /** The context's ink is stroked in at most this many rungs of zoom a frame, log-spaced between
  * the two rails' zooms with both ends exact (one batch set per rung, twice with fly-overs).
  * w3's sixteen global steps made 137 strokes at 20x / 3x (fix-review #5). */
@@ -594,7 +598,7 @@ export function layerCap(alpha, f) {
  */
 class ContextBatches {
   constructor() {
-    /** @type {Array<{bin:number, bx:number, tx:number, layer:number, pts:Array<[number, number]>}>} */
+    /** @type {Array<{bin:number, bx:number, tx:number, layer:number, glow:number, pts:Array<[number, number]>}>} */
     this.threads = [];
   }
   /**
@@ -602,9 +606,10 @@ class ContextBatches {
    * @param {number} bx the Bible end's x (device px)
    * @param {number} tx the Volumes end's x (device px)
    * @param {Array<[number, number]>} pts
+   * @param {number} [glow] its glow's step, 0 (none) .. GLOW_LEVELS (full; the default)
    */
-  add(bin, bx, tx, pts) {
-    this.threads.push({ bin: Math.min(CONTEXT_BINS - 1, Math.max(0, bin | 0)), bx, tx, layer: 0, pts });
+  add(bin, bx, tx, pts, glow = GLOW_LEVELS) {
+    this.threads.push({ bin: Math.min(CONTEXT_BINS - 1, Math.max(0, bin | 0)), bx, tx, layer: 0, glow, pts });
   }
   /**
    * @param {CanvasRenderingContext2D} ctx
@@ -612,8 +617,9 @@ class ContextBatches {
    * @param {number} near device px within which two ends count as one line
    * @param {number} [capFraction] 0 = live cap, 1 = full (default)
    * @param {{alpha:number, width:number}|null} [glow] a soft glow under the cores: each bin's
-   *   threads once more as ONE path (so the glow does not pile up where they do), this wide
-   *   (device px) at this alpha; the cores' width is the context's lineWidth as it was
+   *   threads once more as ONE path a glow step (so the glow does not pile up where they do),
+   *   this wide (device px) at this alpha times the step's share; the cores' width is the
+   *   context's lineWidth as it was
    * @returns {number} strokes made
    */
   stroke(ctx, alpha, near, capFraction, glow) {
@@ -652,15 +658,24 @@ class ContextBatches {
       ctx.lineWidth = glow.width;
       for (let i = 0; i < th.length;) {
         const bin = th[i].bin;
-        ctx.strokeStyle = 'rgba(' + MY_WEB_SOURCES[bin].rgb + ',' + glow.alpha + ')';
-        ctx.beginPath();
-        for (; i < th.length && th[i].bin === bin; i++) {
-          const pts = th[i].pts;
-          ctx.moveTo(pts[0][0], pts[0][1]);
-          for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+        let end = i;
+        while (end < th.length && th[end].bin === bin) end++;
+        for (let lv = GLOW_LEVELS; lv >= 1; lv--) {
+          let drawn = false;
+          for (let j = i; j < end; j++) {
+            if (th[j].glow !== lv) continue;
+            if (!drawn) {
+              ctx.strokeStyle = 'rgba(' + MY_WEB_SOURCES[bin].rgb + ',' + (glow.alpha * lv) / GLOW_LEVELS + ')';
+              ctx.beginPath();
+              drawn = true;
+            }
+            const pts = th[j].pts;
+            ctx.moveTo(pts[0][0], pts[0][1]);
+            for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
+          }
+          if (drawn) { ctx.stroke(); n++; }
         }
-        ctx.stroke();
-        n++;
+        i = end;
       }
       ctx.lineWidth = core;
     }
@@ -840,7 +855,8 @@ export function nearestUnderlay(underlay, opts, limit) {
  * a haze where r2-05 shows Timothy's teal plainly, with a glow. The floor is
  * CONTEXT_FLOOR 0.08 and each thread with a foot on screen carries a soft glow,
  * CONTEXT_GLOW_WIDTH past its core at CONTEXT_GLOW_SHARE of its alpha, stroked
- * once a source so it does not pile up; a fly-over has none. The ramp keeps its
+ * once a source so it does not pile up; a fly-over has none, a leg's fades with
+ * its far foot (GLOW_LEVELS), and a live frame keeps it (w4 review). The ramp keeps its
  * shape and still STOPS at the 0.30 plateau (C14: nothing brightens past it),
  * now reached at 5.8x. A floor of 0.14 matched r2-05's brightness better but
  * flattened the structure the walk measures (tools/e2e-myweb.mjs R1a, p95/p50
@@ -1063,22 +1079,25 @@ export function drawPersonalWeb(ctx, personal, underlay, opts) {
       const { a, b, pts } = underlayGeometry(underlay, i, opts, rails);
       if (!pts) continue;
       const fly = /** @type {any} */ (pts).cls === 'fly';
-      const step = (fly ? flyRungs : rungs).of(lineZoom(zB, presence(a[0], width), zV, presence(b[0], width)));
+      const pA = presence(a[0], width), pB = presence(b[0], width);
+      const step = (fly ? flyRungs : rungs).of(lineZoom(zB, pA, zV, pB));
       const key = step * 2 + (fly ? 1 : 0);
       let batch = steps.get(key);
       if (!batch) { batch = new ContextBatches(); steps.set(key, batch); }
-      batch.add(underlay.source ? underlay.source[i] : CONTEXT_BINS - 1, a[0], b[0], pts);
+      batch.add(underlay.source ? underlay.source[i] : CONTEXT_BINS - 1, a[0], b[0], pts,
+        fly ? 0 : Math.round(GLOW_LEVELS * Math.min(pA, pB)));
     }
     ctx.lineCap = 'round';
-    // the soft glow (r2-05, w4) under the threads that hold a foot on
-    // screen, at rest: a live gesture keeps its frames, and a fly-over (no
-    // foot on screen) gets none, so the corridors passing over a zoomed view
-    // never glow into the sky C17 forbids
-    const glowOn = !(opts.capFraction === 0);
+    // the soft glow (r2-05, w4) under the threads whose feet are on screen,
+    // live or at rest (w4 review: off mid-gesture, the field lost about half
+    // its ink as a pinch began and won it back as it ended). A leg's glow
+    // fades with its far foot's presence (GLOW_LEVELS) and a fly-over gets
+    // none, so the corridors off or over a zoomed view never glow into a slab
+    // or the sky C17 forbids.
     for (const key of [...steps.keys()].sort((p, q) => p - q)) {
       const cx = personalInk((key & 1 ? flyRungs : rungs).zoom(key >> 1), opts.contextCeiling).context;
       ctx.lineWidth = cx.width * DPR * (key & 1 ? FLYOVER_LEG_WIDTH : 1);
-      const glow = glowOn && !(key & 1) ? { alpha: cx.glow.alpha * rest, width: ctx.lineWidth + cx.glow.width * DPR } : null;
+      const glow = !(key & 1) ? { alpha: cx.glow.alpha * rest, width: ctx.lineWidth + cx.glow.width * DPR } : null;
       /** @type {ContextBatches} */ (steps.get(key)).stroke(ctx, cx.alpha * rest, ctx.lineWidth * 4, opts.capFraction, glow);
     }
   }
