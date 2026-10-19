@@ -393,6 +393,17 @@ describe('search200 B7: marks for what was typed, a run as one, never a dateline
     expect(hits('He loved them and loves them still', ['love'])).toEqual(['loved', 'loves']);
   });
 
+  /* search200 UX D8: one word said twice with only a space between was one mark, as if typed twice in a row:
+     "sleep drunken" marked "sleep sleep" whole in KJV 1 Thessalonians 5:7 and "drunken are drunken" as two
+     (D:/Swarm/lanes/search200/out/ux/fix-D/join8-before.log). It is two marks, by space or small word alike. */
+  it('D8: one word said twice with only a space between is two marks, as across a small word', () => {
+    const v = 'For they that sleep sleep in the night; and they that be drunken are drunken in the night.';
+    expect(hits(v, ['sleep', 'drunken'])).toEqual(['sleep', 'sleep', 'drunken', 'drunken']);
+    expect(hits('a thousand thousand men', ['thousand'])).toEqual(['thousand', 'thousand']);
+    // two different typed words still join across a space
+    expect(hits('He leads me beside the still waters.', ['still', 'waters'])).toEqual(['still waters']);
+  });
+
   it('a small word the engine matched marks only beside a typed word, once a real word was typed', () => {
     const job = 'He sets on high those who are lowly, And those who mourn are lifted to safety.';
     // the card's terms: the typed real word, then the engine's matched forms ("who")

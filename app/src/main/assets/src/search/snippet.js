@@ -669,14 +669,16 @@ function besideTyped(spans, typed) {
 }
 
 /* THE TYPED WORDS IN A ROW ARE ONE MARK (search200 B7): "still waters" read as two
-   marks with a gap, "faith is the substance" as two words. Two hits join when only
-   spaces lie between them, or, when they are two different typed words, up to three
-   small words (the stop lists); never across punctuation or a word that was not
-   typed, and one word said twice ("loved them and loves") stays two marks. */
+   marks with a gap, "faith is the substance" as two words. Two hits of different typed
+   words join when only spaces lie between them, or up to three small words (the stop
+   lists); never across punctuation or a word that was not typed. One word said twice
+   stays two marks, across small words ("loved them and loves") or only a space: "sleep
+   drunken" marked "sleep sleep" whole in KJV 1 Thessalonians 5:7 (search200 UX D8). */
 /** @param {string} gap  the text between two hits @param {boolean} twoWords  the hits are different typed words */
 function joinsRun(gap, twoWords) {
-  if (!gap || gap.trim() === '') return !!gap;
-  if (!twoWords || !/^\s/.test(gap) || !/\s$/.test(gap)) return false;
+  if (!gap || !twoWords) return false;
+  if (gap.trim() === '') return true;
+  if (!/^\s/.test(gap) || !/\s$/.test(gap)) return false;
   const words = gap.trim().split(/\s+/);
   return words.length <= 3 && words.every((w) => /^[\p{L}'’]+$/u.test(w) && isGlue(w));
 }
