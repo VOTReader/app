@@ -404,6 +404,23 @@ describe('search200 B7: marks for what was typed, a run as one, never a dateline
     expect(hits('He leads me beside the still waters.', ['still', 'waters'])).toEqual(['still waters']);
   });
 
+  /* search200 UX D8: a mark bridged words never typed. A hit was "which typed word" by the longest term it
+     starts with, so two forms or a synonym of ONE typed word read as two words in a row and joined across small
+     words: "holy" marked "Holiest of Holies", "blessed" "Blessed are those who Bless", "righteous" "just as He is
+     righteous" (D:/Swarm/lanes/search200/out/ux/fix-D/bridge8-before.log). A hit is its word's family: the
+     word typed, its forms, its synonyms and archaic twins (familiesOf), and one family twice is no run. */
+  it('D8: the forms and synonyms of one typed word are one word: no run joins them across words never typed', () => {
+    // the card's terms: the typed word, its synonyms, then the engine's matched forms
+    expect(hits('He loved them and loves them still', ['love', 'charity', 'agape', 'loved', 'loves'])).toEqual(['loved', 'loves']);
+    expect(hits('Beloved, love and charity are one', ['love', 'charity', 'agape'])).toEqual(['love', 'charity']);
+    expect(hits('into the Holiest of Holies', ['holy', 'holiest', 'holies'])).toEqual(['Holiest', 'Holies']);
+    expect(hits('Blessed are those who Bless', ['blessed', 'bless'])).toEqual(['Blessed', 'Bless']);
+    expect(hits('just as He is righteous', ['righteous', 'righteousness', 'just', 'justified', 'justification'])).toEqual(['just', 'righteous']);
+    // two typed words, each with its forms, still read as one run
+    expect(hits('the still waters', ['still', 'waters', 'water'])).toEqual(['still waters']);
+    expect(hits('Now faith is the substance of things', ['faith', 'substance', 'faithful'])).toEqual(['faith is the substance']);
+  });
+
   it('a small word the engine matched marks only beside a typed word, once a real word was typed', () => {
     const job = 'He sets on high those who are lowly, And those who mourn are lifted to safety.';
     // the card's terms: the typed real word, then the engine's matched forms ("who")

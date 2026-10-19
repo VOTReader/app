@@ -617,9 +617,17 @@ export function highlightSpans(text, terms, typed) {
   if (whole.length) alts.push('(?:' + whole.join('|') + ')(?![\\p{L}\\p{N}])');
   let re;
   try { re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + alts.join('|') + ')', 'giu'); } catch { return [{ text, hit: false }]; }
-  // which typed word a hit is ("loved" is love's): one word said twice is no run
+  // which typed word a hit is: its word's family ("loved" and "loves" are love's, and so is
+  // its synonym "charity"; familiesOf). One word said twice is no run: by the longest term a
+  // hit starts with alone, "holy" marked "Holiest of Holies" whole (search200 UX D8).
   const byLen = tokens.slice().sort(longerFirst);
-  const tokOf = (/** @type {string} */ s) => { const l = s.toLowerCase(); return byLen.find((t) => l.startsWith(t)) || l; };
+  const fams = familiesOf(terms);
+  const tokOf = (/** @type {string} */ s) => {
+    const l = s.toLowerCase();
+    const t = byLen.find((x) => l.startsWith(x)) || l;
+    const f = fams.get(t);
+    return f ? f.fam : t;
+  };
   /** @type {Array<{text:string, hit:boolean}>} */
   const out = [];
   let last = 0;
