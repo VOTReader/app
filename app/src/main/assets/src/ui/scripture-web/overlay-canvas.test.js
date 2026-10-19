@@ -450,6 +450,24 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     });
   }
 
+  it('phone at the deep span, the legend on its one line: the "+n" pills stay, clear of the chapter numerals (the stack closed its gaps under the legend and the pills went)', () => {
+    const { canvas } = chromeRoot('phone');
+    for (const zoom of [85, 196, 211]) {
+      const { rec, fs } = paint('phone', zoom, ISA53_6, { canvas });
+      const s = fs.v.DPR;
+      const pills = rec.texts().filter((c) => /^\+\d/.test(c.t));
+      expect(pills.length, zoom + 'x: pills').toBeGreaterThan(2);
+      const nums = rec.texts().filter((c) => /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
+      expect(nums.length, zoom + 'x: numerals').toBeGreaterThan(2);
+      const pillFoot = Math.max(...pills.map((c) => c.y)) + 9 * s, numTop = Math.min(...nums.map((c) => textRect(c).y0));
+      expect(numTop - pillFoot, zoom + 'x: the pills end above the numerals').toBeGreaterThanOrEqual(0);
+      // the black fade the stuck "‹ ISAIAH" stands on starts under the pills' row (it took the "+n" there)
+      const fades = rec.calls.filter((c, i) => c.op === 'rect' && rec.calls[i + 1] && rec.calls[i + 1].op === 'fill' && typeof rec.calls[i + 1].fill === 'object' && c.a[1] > fs.view.base);
+      expect(fades.length, zoom + 'x: the fades').toBeGreaterThan(0);
+      for (const f of fades) expect(f.a[1], zoom + 'x: the fade under the pills').toBeGreaterThanOrEqual(pillFoot - 1 * s);
+    }
+  });
+
   it('phone 200x: the ruler runs to the right end, its numerals clear above the corner buttons, and nothing is drawn under them', () => {
     const { canvas, zones } = chromeRoot('phone');
     const { rec, fs } = paint('phone', 207, ISA53_6, { canvas });
@@ -461,6 +479,30 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     const nums = rec.texts().filter((c) => /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
     const right = Math.max(...nums.map((c) => textBox(c).x1));
     expect(right / s, 'a chapter numeral at the right end (the right ' + Math.round((fs.v.W - right) / s) + ' px were empty)').toBeGreaterThan(891 - 90);
+  });
+
+  it('phone, panel open: the corner buttons at the bottom-left cover neither "JOHN" and its numeral 1 at the book start nor "‹ JOHN" stuck at the edge; the ticks run clear of them', () => {
+    const panel = 374;
+    const { canvas, zones } = chromeRoot('phone', { panel });
+    const v = FRAMES.phone, s = v.DPR;
+    const zoom = 85, ppv = geo.fitPPV({ total: g.total }, v.W) * zoom;
+    const john1 = verseOf('john', 1, 1);
+    // John 1:1 30 px in from the left edge (the s08 state), then the frame 60 px inside John
+    for (const [dx, sticky] of [[-30, false], [60, true]]) {
+      const { rec } = paint('phone', zoom, john1 + dx / ppv + (v.W / 2) / ppv, { canvas, panelInset: { right: panel, bottom: 0 } });
+      const texts = rec.texts();
+      const what = (sticky ? 'stuck' : 'at its start') + ': ';
+      const name = texts.find((c) => c.t === 'JOHN');
+      expect(name, what + 'the name: ' + texts.map((c) => c.t).join(' ')).toBeTruthy();
+      if (sticky) expect(texts.some((c) => c.t === '‹'), what + 'its arrow').toBe(true);
+      // at its start the chapter's numeral stands beside the name; stuck, chapter 1 is under the fade
+      const one = texts.find((c) => c.t === '1' && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
+      if (!sticky) expect(one, what + 'the numeral 1').toBeTruthy();
+      for (const c of texts) for (const z of zones) expect(meet(textRect(c), z), what + '"' + c.t + '" under a corner button').toBe(false);
+      const marks = inked(rec, (f) => [css('verseTick'), css('chapterTick'), css('citedDot')].includes(f));
+      expect(marks.length).toBeGreaterThan(20);
+      for (const m of marks) for (const z of zones.slice(0, 2)) expect(meet(m, z), what + 'a tick under a corner button').toBe(false);
+    }
   });
 });
 

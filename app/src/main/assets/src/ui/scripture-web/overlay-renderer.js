@@ -227,10 +227,10 @@ const DEEP_PC = {
 };
 const DEEP_COMPACT = {
   rows: [
-    { k: 'cited', top: 3, h: 4 }, { k: 'pills', top: 11, h: 18 }, { k: 'nums', top: 39.2, h: 20 * CAP },
-    { k: 'ticks', top: 60, h: 12 }, { k: 'dot', top: 73.5, h: 3, opt: true }, { k: 'vnums', top: 77.5, h: 12 * CAP, opt: true },
+    { k: 'cited', top: 3, h: 4 }, { k: 'pills', top: 9, h: 16 }, { k: 'nums', top: 29, h: 20 * CAP },
+    { k: 'ticks', top: 47, h: 12 }, { k: 'dot', top: 61, h: 3, opt: true }, { k: 'vnums', top: 65.5, h: 12 * CAP, opt: true },
   ],
-  end: 92,
+  end: 74,
 };
 
 const smooth = (e0, e1, x) => {
@@ -1182,7 +1182,8 @@ function deepNames(ctx, g, cam, L, v0, v1, grid) {
   }
   // the fades the stuck names stand on (paintDeepFades): their rows, and the solid part of each
   // reserved, so no numeral is placed under it
-  const top = dp.nums.top - 10 * s;
+  // (below the pills' row: on a phone it ends 4 px over the numerals, and the fade took the "+n" there)
+  const top = Math.max(dp.nums.top - 10 * s, dp.pills.top + dp.pills.h + 4 * s);
   const bottom = Math.max(top + 1, Math.min(L.bandBottom, dp.end));
   const solid = FADE_SOLID * FADE_SPAN * s;
   // a name stepped off a corner button carries its solid part with it
