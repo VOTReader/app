@@ -14,7 +14,7 @@
        past the edges, the overview's ink (never less) once they are far, so
        a corridor of them never piles into a saturated ribbon (C17; the
        fix-review #12 floor at the view's depth did, measured on the walk).
-   P3  a chosen link recedes the rest to MYWEB_TAP_CONTEXT, never further.
+   P3  a chosen link recedes the rest to MYWEB_TAP_CONTEXT (My Web's own recede), never further.
    P4  the Volumes rail's type: sw-ink's face, 13 / 11 px tracked caps in the
        volumesLabel ink, the rail in volumesRail, and the overline "THE
        VOLUMES OF TRUTH" on a PC only; the phone's names take two rows (w4:
@@ -24,7 +24,7 @@ import { buildVotRail, railSpan } from '../../utils/scripture-web/personal-graph
 import { drawPersonalWeb, personalInk, railFrame, linkPath, CONTEXT_GLOW_WIDTH, CONTEXT_GLOW_SHARE } from './rail-renderer.js';
 import { css, FONT, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
 
-// My Web's own recede (w4 INK review, finding 6): the Scripture Web's TAP_CONTEXT rose to .60
+// My Web's own recede (w4 INK review finding 6, and the w4 myweb pair): TAP_CONTEXT rose to .60
 const TAP_CONTEXT = MYWEB_TAP_CONTEXT;
 
 const rail = buildVotRail([
@@ -218,7 +218,7 @@ describe('P3 a chosen link recedes the rest to MYWEB_TAP_CONTEXT', () => {
     expect(MYWEB_TAP_CONTEXT).toBe(0.45);
   });
 
-  it('the other links and Timothy\'s threads drop to 0.30 of their ink; the chosen one keeps all of it', () => {
+  it('the other links and Timothy\'s threads drop to 0.45 of their ink; the chosen one keeps all of it', () => {
     const personal = {
       count: 2, aRail: new Uint8Array([0, 0]), bRail: new Uint8Array([1, 1]),
       aPos: new Float32Array([20, 80]), bPos: new Float32Array([3, 15]), kind: new Uint8Array([2, 2]),

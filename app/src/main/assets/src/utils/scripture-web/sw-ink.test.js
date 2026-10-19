@@ -170,6 +170,16 @@ describe('the ink table', () => {
     expect(FLYOVER_LEG_WIDTH).toBe(0.7);
     expect(FONT).toMatch(/^'EB Garamond'/);
   });
+
+  it('My Web recedes by its own constant, MYWEB_TAP_CONTEXT .45, inside .30-.60 and never to 0', () => {
+    // w4 myweb fix round 2: the pair at .30 and .45 with the receded links core only; at .30 the rest
+    // sank near black, at .45 it still reads and the chosen link reads first (w4/myweb/pairs.md).
+    // The INK stream's name and value, so the branches meet on one constant
+    expect(MYWEB_TAP_CONTEXT).toBe(0.45);
+    expect(MYWEB_TAP_CONTEXT).toBeGreaterThanOrEqual(0.30);
+    expect(MYWEB_TAP_CONTEXT).toBeLessThanOrEqual(0.60);
+    for (const kind of ['myWebReader', 'myWebStudy']) expect(rgba01(kind, MYWEB_TAP_CONTEXT)[3], kind).toBeGreaterThan(0);
+  });
 });
 
 describe('the helpers', () => {

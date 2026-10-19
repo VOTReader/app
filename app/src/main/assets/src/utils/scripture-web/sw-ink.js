@@ -142,7 +142,11 @@ export const INK = Object.freeze(TABLE);
 export const TAP_CONTEXT = 0.60;
 /** My Web's own recede (rail-renderer), from TAP_CONTEXT's .45 (w4 INK review, finding 6): the
  * reader's other links share the chosen one's gold, so at .60 the chosen link's lead over them fell
- * from 3.2:1 to 2.2:1 (w4/ink pairs.md); My Web's field is sparse, with no haze to lift. */
+ * from 3.2:1 to 2.2:1 (w4/ink pairs.md); My Web's field is sparse, with no haze to lift.
+ * The value is the w4 myweb stream's own pair too, at .30 and .45 with the receded links drawn core
+ * only (w4/myweb/fix2): at .30 the rest sank near black and the reader lost what lies round the
+ * chosen link; at .45 Timothy's strands and the other links still read, and the chosen link reads
+ * first by its width, its halo and 2.1 times their alpha. Bounded .30-.60 as TAP_CONTEXT is. */
 export const MYWEB_TAP_CONTEXT = 0.45;
 /** The centre chapter's own arcs (a foot inside it), in their own ramp colours (§4.4). */
 export const CENTRE_BRIGHT = 1.35;
