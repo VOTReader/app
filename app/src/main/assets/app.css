@@ -8467,7 +8467,7 @@
     .sw-legend-line > *::before { content: '\00b7'; position: absolute; left: -13px; }
     .sw-key { display: inline-flex; align-items: center; gap: 5px; }
     /* the cited tick (sw-ink `cited`) and the prophecy thread (sw-ink `prophecyKey`: the
-       canvas's prophecy gold, inked up from its .35 so a 1.5 px arc reads, w4 INK item 5), as
+       canvas's prophecy gold, inked up from its .45 so a 1.5 px arc reads, w4 INK item 5), as
        the canvas paints them, a little larger so they read at legend size */
     .sw-key-tick { width: 2px; height: 10px; border-radius: 1px; display: inline-block; background: var(--sw-cited); }
     .sw-key-arc {
