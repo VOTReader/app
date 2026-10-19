@@ -2772,7 +2772,12 @@
        zero-height sticky anchor when there is none), so it takes no room and
        moves nothing when it shows. Frozen chrome sizes (--fsc-*) keep it within
        48px at every Text Size; a gold hairline, not a solid rule, closes it.
-       Not a tap target (MiniTitleBand.jsx). */
+       No tap target, but shown it takes the finger itself (pointer-events
+       auto, here and under the pass-through "Back to" row) and does nothing
+       with it: a band that let touches through opened a "Go to Scripture"
+       card or a footnote it hid, and a long-press selected hidden text.
+       Hidden, it lets every touch through. It is chrome, not text, so it is in
+       the no-selection list below (MiniTitleBand.jsx). */
     .mini-title-anchor { position: sticky; top: 0; z-index: 5; height: 0; }
     .mini-title {
       position: absolute; left: 0; right: 0; top: 100%;
@@ -2785,7 +2790,7 @@
       opacity: 0; transform: translateY(-4px); visibility: hidden;
       transition: opacity 0.15s ease, transform 0.15s ease, visibility 0s linear 0.15s;
     }
-    .mini-title.shown { opacity: 1; transform: none; visibility: visible; transition: opacity 0.15s ease, transform 0.15s ease; }
+    .mini-title.shown { opacity: 1; transform: none; visibility: visible; pointer-events: auto; transition: opacity 0.15s ease, transform 0.15s ease; }
     .mini-title-eyebrow, .mini-title-name {
       max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center;
     }
@@ -7673,7 +7678,7 @@
        pickers, tests) ignore user-select entirely. */
     button, .top-nav, .sheet-handle-row, .fn-sheet-num-row, .sc-sheet-tag,
     .settings-section-label, .bottom-nav-card, .mode-toggle-wrap,
-    .back-hint-row, .tabs-overview-header, .tabs-overview-meta {
+    .back-hint-row, .mini-title, .tabs-overview-header, .tabs-overview-meta {
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     input, textarea { user-select: text; -webkit-user-select: text; }

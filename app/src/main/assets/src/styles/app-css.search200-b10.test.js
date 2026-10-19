@@ -88,6 +88,19 @@ describe('B10 item 1 — the mini title band', () => {
     expect(line['text-overflow']).toBe('ellipsis');
   });
 
+  it('shown, it takes the finger itself, so a tap or long-press on it never reaches a link hidden under it', () => {
+    // A band that let touches through sent a tap on it to whatever it covered: a "Go to
+    // Scripture" card or a footnote marker the reader could not see opened, and a long-press
+    // selected hidden text. Shown, it is opaque to the finger too; hidden, it lets all through.
+    expect(decls('.mini-title.shown')['pointer-events']).toBe('auto');
+    expect(decls('.mini-title')['pointer-events']).toBe('none');
+    // and it is chrome, not text: a long-press on it starts no selection of its own
+    const band = decls('.mini-title');
+    expect(band['user-select']).toBe('none');
+    expect(band['-webkit-user-select']).toBe('none');
+    expect(band['-webkit-touch-callout']).toBe('none');
+  });
+
   it('shows by a ~150ms fade, and not at all when hidden', () => {
     expect(decls('.mini-title').visibility).toBe('hidden');
     expect(decls('.mini-title').opacity).toBe('0');

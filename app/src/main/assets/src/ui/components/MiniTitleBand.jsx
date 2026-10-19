@@ -11,8 +11,11 @@
    - The band hangs from its host (`.mini-title-anchor`, a zero-height sticky
      row, or the sticky `.back-hint-row`) at the host's bottom edge, so it takes
      no room in the page and moves nothing when it shows.
-   - It is no tap target (pointer-events none) and is aria-hidden: the h1 is the
-     page's heading, and this is the same words again, for the eye.
+   - It is no tap target and is aria-hidden: the h1 is the page's heading, and
+     this is the same words again, for the eye. But shown, it takes the finger
+     itself and does nothing with it (app.css `.mini-title.shown`, pointer-events
+     auto): letting touches through opened a "Go to Scripture" card or a footnote
+     it hid, and a long-press selected hidden text. Hidden, it lets them through.
    - It reads where the hero is with an IntersectionObserver on the reading
      column (the `.screen-scroll` it sits in), its top edge moved down to the
      band's own bottom (past the "Back to" row, which covers the hero first): it
