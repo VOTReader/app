@@ -599,17 +599,24 @@ export function spanGain(shortness) {
   return 1 + SHORT_GAIN * shortness;
 }
 
+/** The narrowest half width the span-ink law holds a long thread to, device px: one whole device px
+ *  of line. Under it the shader's thin-line hygiene pays the lost width in alpha, and at the ceiling
+ *  that took a lone low-vote leg on a DPR 1 screen under D1's 0.83 (0.85 x 0.9 = 0.765). */
+export const HAIRLINE_MIN_HALF = 0.5;
+
 /**
  * The half width a long thread is held to: the overview's hairline (widthFit = STROKE_FIT_CSS
  * device px a CSS px), widened by the share of the deep stroke its votes earned (wScale over the
- * lowest vote's, at the voteMix the stroke law has reached), so the lowest-vote leg keeps exactly
- * the overview's hairline at every zoom and the best-voted at most STROKE_DEEP / STROKE_MIN of it.
+ * lowest vote's, at the voteMix the stroke law has reached), so the lowest-vote leg keeps the
+ * overview's hairline at every zoom and the best-voted at most STROKE_DEEP / STROKE_MIN of it;
+ * never under one device px (HAIRLINE_MIN_HALF), so a held leg is always drawn whole (D1).
  * @param {number} widthFit  STROKE_FIT_CSS x dpr, device px
  * @param {number} wScale  the main pass's vote width share (1 at the overview)
  * @param {number} voteMix  ribbonStyle's voteMix
  */
 export function spanFitHalf(widthFit, wScale, voteMix) {
-  return (widthFit * 0.5 * wScale) / (1 + (STROKE_MIN_CSS / STROKE_DEEP_CSS - 1) * voteMix);
+  const fit = (widthFit * 0.5 * wScale) / (1 + (STROKE_MIN_CSS / STROKE_DEEP_CSS - 1) * voteMix);
+  return fit > HAIRLINE_MIN_HALF ? fit : HAIRLINE_MIN_HALF;
 }
 
 /**
@@ -633,7 +640,7 @@ float spanGain(float shortness){
   return 1. + ${glslFloat(SHORT_GAIN)}*shortness;
 }
 float spanFitHalf(float widthFit, float wScale, float voteMix){
-  return widthFit*.5*wScale/mix(1., ${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, voteMix);
+  return max(widthFit*.5*wScale/mix(1., ${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, voteMix), ${glslFloat(HAIRLINE_MIN_HALF)});
 }
 float spanHalfWidth(float halfW, float fitHalf, float shortness){
   return mix(min(halfW, fitHalf), halfW, shortness);

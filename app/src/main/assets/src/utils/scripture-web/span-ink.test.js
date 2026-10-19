@@ -9,6 +9,7 @@
    intent, and the GLSL twin transliterated and run against the JS. */
 import { describe, it, expect } from 'vitest';
 import * as geo from './geometry.js';
+import { SHADER_SOURCE } from '../../ui/scripture-web/web-renderer.js';
 
 const TOTAL = 31102;
 /** GLSL's smoothstep and mix, written here from the GLSL ES 3.00 spec (not imported). */
@@ -83,11 +84,14 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
       expect(long, `strength ${strength}`).toBeCloseTo(geo.STROKE_FIT_CSS * dpr * 0.5 * (wScale / k), 12);
       expect(long).toBeLessThan(short);
     }
-    expect(geo.spanHalfWidth(1, geo.spanFitHalf(geo.STROKE_FIT_CSS, wScaleOf(0.3, 1), 1), 0)).toBeCloseTo(0.45, 12);
+    // on a DPR 1 screen the lowest-vote leg's .45 is under one device px, so it is held to that (D1)
+    expect(geo.spanHalfWidth(1, geo.spanFitHalf(geo.STROKE_FIT_CSS, wScaleOf(0.3, 1), 1), 0)).toBeCloseTo(geo.HAIRLINE_MIN_HALF, 12);
     expect(geo.spanHalfWidth(9, geo.spanFitHalf(geo.STROKE_FIT_CSS, wScaleOf(1, 1), 1), 0)).toBeCloseTo(0.45 / k, 12);
   });
 
   it('fixed per arc: a long, lowest-vote leg is the same hairline at every zoom, and nothing is drawn wider than the stroke law', () => {
+    // DPR 1: the overview's own .45 at fit, held to one whole device px (.5) as soon as the stroke
+    // law reaches it, the same from there to the ceiling (D1: the hygiene never pays alpha at depth)
     const dpr = 1;
     const k = geo.STROKE_MIN_CSS / geo.STROKE_DEEP_CSS;
     for (const zoom of [1, 1.5, 3, 6, 12, 24, 40, 207, 855]) {
@@ -96,8 +100,46 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
       const wScale = mix(1, k, st.voteMix);   // strength .30
       const halfW = st.strokeWidthCss * dpr * 0.5 * wScale;
       const fit = geo.spanFitHalf(geo.STROKE_FIT_CSS * dpr, wScale, st.voteMix);
-      expect(geo.spanHalfWidth(halfW, fit, 0), `zoom ${zoom}`).toBeCloseTo(0.45, 12);
+      expect(geo.spanHalfWidth(halfW, fit, 0), `zoom ${zoom}`).toBeCloseTo(Math.min(halfW, geo.HAIRLINE_MIN_HALF), 12);
+      if (zoom >= 3) expect(geo.spanHalfWidth(halfW, fit, 0), `zoom ${zoom}`).toBe(geo.HAIRLINE_MIN_HALF);
       for (const s of [0, 0.4, 1]) expect(geo.spanHalfWidth(halfW, fit, s)).toBeLessThanOrEqual(halfW + 1e-12);
+    }
+  });
+});
+
+/* ── D1 through the shader's own chain (depth.test.js D1 checks ribbonStyle alone) ── */
+describe('D1 as drawn: a lone, lowest-vote, longest anchored ribbon at the ceiling still clears 3:1', () => {
+  // the worst Distance stop needs an effective alpha of 0.83 on black (design-perf, depth.test.js D1)
+  const AT_CEILING = 141 / 800;   // anchored arcs per CSS px of width, phoneLand
+  const k = geo.STROKE_MIN_CSS / geo.STROKE_DEEP_CSS;
+  /** The vertex shader's alpha chain for one anchored thread at rest (uPx 1), transliterated. */
+  function drawnAlpha(dpr, wCss, strength, span) {
+    const st = geo.ribbonStyle(geo.maxZoomFor(TOTAL, wCss), 1, AT_CEILING);
+    const uPx = 1;
+    const wScale = mix(1, mix(k, 1, (strength - 0.3) / 0.7), st.voteMix);
+    const short = geo.spanShortness(geo.spanT(span, TOTAL));
+    let halfW = st.strokeWidthCss * dpr * 0.5 * wScale;
+    halfW = geo.spanHalfWidth(halfW, geo.spanFitHalf(geo.STROKE_FIT_CSS * dpr, wScale, st.voteMix), short);
+    const thin = Math.min(Math.max(halfW / (0.5 * uPx), 0), 1);
+    const aStrength = mix(strength, 1, st.voteMix);
+    return Math.min(st.alpha * aStrength * geo.spanGain(short), 1) * thin;
+  }
+
+  it('is the chain the shader runs', () => {
+    const v = SHADER_SOURCE.vertex;
+    expect(v).toContain('halfW = spanHalfWidth(halfW, spanFitHalf(uWidthFit, wScale, uVoteMix), shortness);');
+    expect(v).toContain('float thin = clamp(halfW/(.5*uPx), 0., 1.);');
+    expect(v).toContain('min(uAlpha*aStrength*spanGain(shortness), 1.)');
+  });
+
+  it('reaches .83 at DPR 1 and 2.6 for every vote and span, the lowest-vote canon-wide leg included', () => {
+    for (const [dpr, wCss] of [[1, 1600], [1, 800], [2, 800], [2.6, 891]]) {
+      for (const strength of [0.3, 0.5, 1]) {
+        for (const span of [3, 120, 1500, TOTAL - 1]) {
+          expect(drawnAlpha(dpr, wCss, strength, span), `dpr ${dpr} frame ${wCss} strength ${strength} span ${span}`)
+            .toBeGreaterThanOrEqual(0.83);
+        }
+      }
     }
   });
 });
