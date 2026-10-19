@@ -21,10 +21,9 @@
                tapped Timothy thread had no spotlight).
      range     a verse range kept lit, [lo, hi] inclusive verse ids, or null
                (a chapter, a bundle, a verse: today's focusRange).
-     range2    RESERVED, always null: nothing writes it since the bundle sheet's
-               group choosing went (panel stream, 2e4164c40). The shader's
-               uFocusRange2 still reads it; retiring both is a spine and GL
-               change.
+               (A second range, range2, and the shader's uFocusRange2 went in
+               w5: nothing wrote them once the bundle sheet's group choosing
+               went, panel stream 2e4164c40.)
      hover     the thread under a resting pointer, -1 for none. Hover dims
                nothing (C3). Written IN PLACE (the hover rAF, dropHover): it
                changes per pointer move.
@@ -45,7 +44,7 @@
 
 /**
  * @typedef {{ arc: number, prophecy: boolean, underlay: boolean, range: [number, number] | null,
- *   range2: [number, number] | null, hover: number, hoverProphecy: number, hoverUnderlay: boolean,
+ *   hover: number, hoverProphecy: number, hoverUnderlay: boolean,
  *   lit: Int32Array | null,
  *   litKey: string }} Focus
  */
@@ -58,13 +57,12 @@
  */
 export function focusState(patch) {
   /** @type {Focus} */
-  const f = { arc: -1, prophecy: false, range: null, range2: null, hover: -1, hoverProphecy: -1,
+  const f = { arc: -1, prophecy: false, range: null, hover: -1, hoverProphecy: -1,
     underlay: false, hoverUnderlay: false, lit: null, litKey: '' };
   if (patch) Object.assign(f, patch);
   if (f.arc == null) f.arc = -1;
   if (f.hover == null) f.hover = -1;
   if (f.hoverProphecy == null) f.hoverProphecy = -1;
-  if (!f.range2) f.range2 = null;
   if (!f.range) f.range = null;
   f.prophecy = !!f.prophecy;
   f.underlay = !!f.underlay;

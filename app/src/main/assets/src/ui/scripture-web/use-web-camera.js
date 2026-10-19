@@ -90,8 +90,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   const viewRef = React.useRef({ W: 0, H: 0, DPR: 1 });
   // The focus (focus-state.js has the shape and who writes what): replaced
   // whole through focusState()/withLit(), except hover, hoverProphecy and
-  // hoverUnderlay, which the hover rAF writes in place. range2 is reserved and always null
-  // (focus-state.js).
+  // hoverUnderlay, which the hover rAF writes in place.
   const focusRef = React.useRef(/** @type {import('../../utils/scripture-web/focus-state.js').Focus} */ (focusState()));
   // CSS px the open panel covers (right: docked; bottom: the sheet under 560 px).
   // The panel stream writes it; nothing else does. Zero while no panel is open.

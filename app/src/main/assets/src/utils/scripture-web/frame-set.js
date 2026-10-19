@@ -170,24 +170,22 @@ export function prophecySet(g) {
  * @typedef {{ key: string, count: number, from: Uint16Array, to: Uint16Array,
  *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[], pairs: ProphecySet, litKey: string,
  *   hoverArc: number, hoverProphecy: number, focusArc: number, focusProphecy: number,
- *   range: ReadonlyArray<number>, range2: ReadonlyArray<number> }} TopSet
+ *   range: ReadonlyArray<number> }} TopSet
  *   pairs: the prophecySet it was built over (one per graph);
  *   litKey .. focusProphecy: the ask it was built for, as topSetKey reads it (-1 for none);
- *   range, range2: the chosen range and its group as the shader reads them, [lo, hi], or [1, 0]
- *   for none (range2 is none without a range)
+ *   range: the chosen range as the shader reads it, [lo, hi], or [1, 0] for none
  */
 
 /**
  * The key of the frame's top set: what is lit, hovered and chosen (the
  * prophecy class is the graph's own, split only by the chosen range).
  * @param {{ litKey?: string, hoverArc?: number, hoverProphecy?: number, focusArc?: number, focusProphecy?: number,
- *   focusRange?: ArrayLike<number> | null, focusRange2?: ArrayLike<number> | null }} v
+ *   focusRange?: ArrayLike<number> | null }} v
  */
 export function topSetKey(v) {
-  const r = spanOf(v.focusRange), r2 = r[0] <= r[1] ? spanOf(v.focusRange2) : NO_SPAN;
+  const r = spanOf(v.focusRange);
   return (v.litKey || '') + '|' + askOf(v.hoverArc) + '|' + askOf(v.focusArc) + '|' + askOf(v.focusProphecy)
-    + '|' + askOf(v.hoverProphecy) + '|' + (r[0] <= r[1] ? r[0] + '-' + r[1] : '')
-    + '|' + (r2[0] <= r2[1] ? r2[0] + '-' + r2[1] : '');
+    + '|' + askOf(v.hoverProphecy) + '|' + (r[0] <= r[1] ? r[0] + '-' + r[1] : '');
 }
 
 /** One asked-about index as the key reads it: -1 for none. @param {number | null | undefined} x */
@@ -212,14 +210,13 @@ function spanOf(r) {
  * never the chosen one), the chosen thread. `prev` comes back as it is when
  * nothing changed (the ask, field by field) and it was built over the same graph.
  *
- * The range law is the main pass's (web-renderer.js: inRange, pair): a pair
- * with a foot in the chosen range keeps its ink, and with a group chosen
- * (range2) a pair with a foot in each; the rest of the class recedes with a
- * tap (GL review 2026-10-18).
+ * The range law is the main pass's (web-renderer.js: inRange): a pair with a
+ * foot in the chosen range keeps its ink; the rest of the class recedes with
+ * a tap (GL review 2026-10-18).
  * @param {any} g  the decoded graph
  * @param {{ lit?: ArrayLike<number> | null, litKey?: string, hoverArc?: number, hoverProphecy?: number,
- *   focusArc?: number, focusProphecy?: number, focusRange?: ArrayLike<number> | null,
- *   focusRange2?: ArrayLike<number> | null }} v  the frame's view args (webViewArgs)
+ *   focusArc?: number, focusProphecy?: number, focusRange?: ArrayLike<number> | null }} v  the frame's
+ *   view args (webViewArgs)
  * @param {TopSet | null} [prev]
  * @returns {TopSet}
  */
@@ -227,14 +224,11 @@ export function topSet(g, v, prev) {
   const ps = prophecySet(g);
   const range = spanOf(v.focusRange);
   const ranged = range[0] <= range[1];
-  const range2 = ranged ? spanOf(v.focusRange2) : NO_SPAN;
-  const grouped = range2[0] <= range2[1];
   // the same ask, field by field: a frame that changes nothing builds no key (E3)
   if (prev && prev.pairs === ps && prev.litKey === (v.litKey || '')
     && prev.hoverArc === askOf(v.hoverArc) && prev.focusArc === askOf(v.focusArc)
     && prev.focusProphecy === askOf(v.focusProphecy) && prev.hoverProphecy === askOf(v.hoverProphecy)
-    && prev.range[0] === range[0] && prev.range[1] === range[1]
-    && prev.range2[0] === range2[0] && prev.range2[1] === range2[1]) return prev;
+    && prev.range[0] === range[0] && prev.range[1] === range[1]) return prev;
   const key = topSetKey(v);
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
@@ -249,14 +243,11 @@ export function topSet(g, v, prev) {
   const hp = !isArc(v.hoverArc) && isPair(v.hoverProphecy) ? ps.twin[/** @type {number} */ (v.hoverProphecy)] : -1;
   const hoverPair = hp >= 0 && !(chosenPair >= 0 && ps.twin[chosenPair] === hp)
     && !(isArc(v.focusArc) && ps.arcOf[hp] === v.focusArc) ? hp : -1;
-  // the shader's range law over a pair's feet: a foot in the range; with a group, a foot in each
+  // the shader's range law over a pair's feet: a foot in the range
   const keeps = (k) => {
     if (!ranged) return false;
     const a = ps.from[k], b = ps.to[k];
-    const a1 = a >= range[0] && a <= range[1], b1 = b >= range[0] && b <= range[1];
-    if (!grouped) return a1 || b1;
-    const a2 = a >= range2[0] && a <= range2[1], b2 = b >= range2[0] && b <= range2[1];
-    return (a1 && b2) || (b1 && a2);
+    return (a >= range[0] && a <= range[1]) || (b >= range[0] && b <= range[1]);
   };
   const total = ps.unique + arcs.lit.length + arcs.hover.length + arcs.chosen.length
     + (hoverPair >= 0 ? 1 : 0) + (chosenPair >= 0 ? 1 : 0);
@@ -301,7 +292,7 @@ export function topSet(g, v, prev) {
     key, count: total, from, to, fanA, fanB, ranges, pairs: ps, litKey: v.litKey || '',
     hoverArc: askOf(v.hoverArc), hoverProphecy: askOf(v.hoverProphecy),
     focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
-    range, range2,
+    range,
   };
 }
 

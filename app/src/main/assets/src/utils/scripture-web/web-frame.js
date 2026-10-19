@@ -24,7 +24,9 @@ export const RULER_H = 74;
     names fill it with no black above or below the names (w4 review 2: at the build spec's
     H - 212 the band ran 177 px to the legend where r2-01a's runs 134). The deep-zoom band
     (chapter numerals, verse ticks and numerals, the cited dots; +175 natural) closes its gaps
-    to fit above the legend line (stackRows). Phones and My Web keep RULER_H. */
+    to fit above the legend line (stackRows). Phones and My Web keep RULER_H.
+    Ratified in w5: the band lane's c694842d8 set it outside its own file list (it rides with
+    the OV_PC change), and the w4 integration kept it (lanes/sweb/out/w4/integration.md). */
 export const RULER_PC = 180;
 
 /**
@@ -84,7 +86,8 @@ export function webFrame(v, personal) {
  *                  so no reader of focusArc can index g.from with a
  *                  prophecy index
  *   focusProphecy  the chosen prophecy pair's index in g.prophecy, or -1
- *   focusRange, focusRange2  the lit verse range and its chosen group
+ *   focusRange     the lit verse range, [lo, hi] or null (one range: the
+ *                  group pair, focusRange2, went in w5)
  *   hoverArc       the thread under a resting pointer, -1 (it dims nothing)
  *   hoverProphecy  the prophecy pair under it when no arc is, -1
  *   lit, litKey    the lit arc ids (Int32Array or null) and their key; a
@@ -113,7 +116,6 @@ export function webViewArgs(v, cam, f, density, focus) {
     dpr: v.DPR,
     density, rulerDepth: f.ruler,
     focusArc: prophecy ? -1 : focus.arc, focusRange: focus.range,
-    focusRange2: focus.range2 || null,
     focusProphecy: prophecy ? focus.arc : -1,
     hoverArc: focus.hover == null ? -1 : focus.hover,
     hoverProphecy: focus.hoverProphecy == null ? -1 : focus.hoverProphecy,

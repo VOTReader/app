@@ -108,7 +108,6 @@ uniform float uWidthFit;     // the span-ink law's hairline: STROKE_FIT_CSS devi
 uniform float uSegments;     // this run's segment count: the most any thread in it asked for
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
-uniform vec2  uFocusRange2;  // with uFocusRange: a GROUP, one foot in each, lit AND drawn
 uniform float uFocusArc;     // the chosen thread: kept at full ink while the rest recedes
 uniform float uTapFade;      // 0..1: how far the rest has receded to TAP_CONTEXT (a tap only, eased)
 uniform vec2  uCentre;       // the centre chapter, canon x [x0, x1) (x0 >= x1 = none): its own arcs are emphasised
@@ -208,13 +207,7 @@ void main(){
   float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
   float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
   float inRange = (uFocusRange.x <= uFocusRange.y && max(a1, b1) > .5) ? 1. : 0.;
-  // a chosen group: a foot in each range, lit - the bundle the reader
-  // opened is what they asked for.
-  float a2 = step(uFocusRange2.x, a)*step(a, uFocusRange2.y);
-  float b2 = step(uFocusRange2.x, b)*step(b, uFocusRange2.y);
-  float pair = (uFocusRange2.x <= uFocusRange2.y && max(a1*b2, b1*a2) > .5) ? 1. : 0.;
-  float grouped = (uFocusRange2.x <= uFocusRange2.y) ? 1. : 0.;
-  float lit = max(spot, mix(inRange, pair, grouped));
+  float lit = max(spot, inRange);
   // Only a TAP makes the rest of the web recede, and only to TAP_CONTEXT
   // (sw-ink.js): never to black, never for a hover (C3). uTapFade eases it
   // in and out (web-frame.tapFadeStep). What the reader asked for, the
@@ -490,7 +483,7 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
     'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uAlpha', 'uTotal',
-    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uFocusRange2', 'uCentre', 'uCentreT']);
+    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uCentre', 'uCentreT']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
     'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo',
     'uKeyHalf', 'uKey']);
@@ -719,7 +712,7 @@ export function createRenderer(canvas, graph, opts = {}) {
      *   strokeWidth:number, alpha:number, voteMix?:number, dpr?:number,
      *   density:import('../../utils/scripture-web/decode.js').Density,
      *   bg:string,
-     *   focusRange:(number[]|null), focusRange2?:(number[]|null), focusArc:number, hoverArc?:number,
+     *   focusRange:(number[]|null), focusArc:number, hoverArc?:number,
      *   hoverProphecy?:number, focusProphecy?:number, lit?:(ArrayLike<number>|null), litKey?:string, tapFade?:number,
      *   scale?:number,
      *   centre?:(import('../../utils/scripture-web/web-frame.js').CentreChapter|null)}} v
@@ -797,8 +790,6 @@ export function createRenderer(canvas, graph, opts = {}) {
       }
       if (v.focusRange) U.f2('uFocusRange', v.focusRange[0], v.focusRange[1]);
       else U.f2('uFocusRange', 1, 0);
-      if (v.focusRange && v.focusRange2) U.f2('uFocusRange2', v.focusRange2[0], v.focusRange2[1]);
-      else U.f2('uFocusRange2', 1, 0);
 
       gl.bindBuffer(gl.ARRAY_BUFFER, idBuf);
       if (set.serial !== streamSerial && set.count) {

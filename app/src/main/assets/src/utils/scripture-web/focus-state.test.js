@@ -6,7 +6,7 @@ import { focusState, withLit, litKeyOf, prophecyIndexOf, chosenEnds } from './fo
 describe('focusState', () => {
   it('nothing chosen, hovered or lit is the default, with every field present', () => {
     expect(focusState()).toEqual({
-      arc: -1, prophecy: false, underlay: false, range: null, range2: null, hover: -1, hoverProphecy: -1,
+      arc: -1, prophecy: false, underlay: false, range: null, hover: -1, hoverProphecy: -1,
       hoverUnderlay: false, lit: null, litKey: '',
     });
   });
@@ -26,14 +26,15 @@ describe('focusState', () => {
     expect(focusState({ arc: 2 }).underlay).toBe(false);
   });
 
-  it('a patch lands over the defaults and the missing fields stay whole (the old { arc, range } writes dropped range2)', () => {
+  it('a patch lands over the defaults and the missing fields stay whole', () => {
     const f = focusState({ arc: 7 });
     expect(f.arc).toBe(7);
     expect(f.range).toBeNull();
-    expect(f.range2).toBeNull();
     expect(f.hover).toBe(-1);
-    expect(focusState({ range: [3, 9], range2: undefined }).range2).toBeNull();
+    expect(focusState({ range: [3, 9] }).range).toEqual([3, 9]);
     expect(focusState({ arc: undefined }).arc).toBe(-1);
+    // range2 is retired (w5): nothing wrote it since the bundle sheet's group choosing went
+    expect(focusState()).not.toHaveProperty('range2');
   });
 
   it('copies a lit array into an Int32Array and always recomputes its key', () => {

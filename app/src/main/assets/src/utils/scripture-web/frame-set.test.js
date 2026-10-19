@@ -164,39 +164,38 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect(a).not.toBe(none);
     expect(topSet(g, Object.assign({}, v), a)).toBe(a);
     expect(topSet(g, Object.assign({}, v, { hoverArc: 1 }), a)).not.toBe(a);
-    expect(topSetKey(v)).toBe('|2|-1|-1|-1||');
+    expect(topSetKey(v), 'lit | hover | chosen | chosen pair | hovered pair | range (no second range since w5)').toBe('|2|-1|-1|-1|');
     // a graph with no prophecy and nothing asked about: no top pass at all
     const bare = Object.assign(graph(), { prophecy: [] });
     expect(topSet(bare, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }).count).toBe(0);
   });
 
   /* GL review 2026-10-18 (finding 3): the class receded all or nothing. The main pass keeps the
-     ink of a thread with a foot in the chosen range (with a group chosen, a foot in each range:
-     the shader's inRange / pair), so the prophecy class keeps it by the same law. */
+     ink of a thread with a foot in the chosen range (the shader's inRange), so the prophecy
+     class keeps it by the same law. */
   it('a chosen range splits the class: the pairs the shader would keep lit are prophecyInRange, the rest recede', () => {
     const g = graph();
-    const ask = (range, range2, prev) => topSet(g, {
-      lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: range, focusRange2: range2,
+    const ask = (range, prev) => topSet(g, {
+      lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: range,
     }, prev);
     const counts = (s) => [s.ranges[0].count, s.ranges[1].count];
-    const one = ask([55, 65], null);   // pair 0's foot 60
+    const one = ask([55, 65]);   // pair 0's foot 60
     expect(one.ranges[1]).toEqual({ kind: 'prophecyInRange', first: 2, count: 1 });
     expect([one.from[2], one.to[2]]).toEqual([60, 70]);
     expect([...one.from.slice(0, 2)]).toEqual([120, 5]);
-    expect(counts(ask([180, 180], null)), 'inclusive, either foot').toEqual([2, 1]);
-    expect(counts(ask([55, 75], null)), 'both feet in it: one thread').toEqual([2, 1]);
-    // a group: a foot in each range, either way round
-    expect(counts(ask([55, 75], [175, 185])), 'pair 0 has no foot in the group').toEqual([3, 0]);
-    expect(counts(ask([0, 10], [175, 185]))).toEqual([2, 1]);
-    expect(counts(ask([175, 185], [0, 10]))).toEqual([2, 1]);
-    // a group without a range is no group (the shader reads range2 only with a range); none is none
-    expect(counts(ask(null, [175, 185]))).toEqual([3, 0]);
-    expect(counts(ask(null, null))).toEqual([3, 0]);
+    expect(counts(ask([180, 180])), 'inclusive, either foot').toEqual([2, 1]);
+    expect(counts(ask([55, 75])), 'both feet in it: one thread').toEqual([2, 1]);
+    expect(counts(ask(null))).toEqual([3, 0]);
     // the same range is the same set; a new one is new
-    expect(ask([55, 65], null, one)).toBe(one);
-    expect(ask([55, 66], null, one)).not.toBe(one);
-    expect(ask([55, 65], [1, 2], one)).not.toBe(one);
-    expect(topSetKey({ focusRange: [55, 65] })).not.toBe(topSetKey({ focusRange: [55, 65], focusRange2: [1, 2] }));
+    expect(ask([55, 65], one)).toBe(one);
+    expect(ask([55, 66], one)).not.toBe(one);
+    expect(topSetKey({ focusRange: [55, 65] })).not.toBe(topSetKey({ focusRange: [55, 66] }));
+    // the group pair is retired (w5): the set has no second range and a stray one is not read
+    expect(one).not.toHaveProperty('range2');
+    const stray = /** @type {any} */ ({ lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1,
+      focusRange: [55, 75], focusRange2: [175, 185] });
+    expect(counts(topSet(g, stray)), 'a range alone, as if no second were given').toEqual([2, 1]);
+    expect(topSetKey(stray)).toBe(topSetKey({ focusRange: [55, 75] }));
   });
 
   it('pairOf: an arc that joins a pair\'s verses names it; any other arc is not there', () => {
@@ -569,7 +568,7 @@ describe('the top pass on the asset: the class follows the chosen range', () => 
     const i714 = isa7[0] + 13, m122 = chapter('matthew-plain', 1)[0] + 21;
     expect(want.has(Math.min(i714, m122) + ':' + Math.max(i714, m122)), 'PRECONDITION: Isaiah 7:14 to Matthew 1:22 is a pair').toBe(true);
     expect(want.size, 'PRECONDITION: three distinct pairs (the asset gives 7:14 to Matthew 1:18 twice)').toBe(3);
-    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: isa7, focusRange2: null });
+    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: isa7 });
     const [rest, kept] = s.ranges;
     expect(kept.kind).toBe('prophecyInRange');
     expect(kept.count).toBe(want.size);

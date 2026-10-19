@@ -1,7 +1,7 @@
 /* A1 (w2 digest, item 7): while a line is chosen, the receded threads are not targets, so a tap
    on what reads as empty sky beside the chosen line clears instead of choosing a line the reader
    can barely see. The filter is the shader's lit rule (web-renderer.js): the chosen thread, a foot
-   in the chosen range (a foot in each with a chosen group), and the lit set. */
+   in the chosen range, and the lit set. */
 import { describe, it, expect } from 'vitest';
 import { squashFactor, createCamera, clampCamera, footX, arcShape, arcHeightAt } from './geometry.js';
 import { pickArcs, focusedPickFilter } from './pick.js';
@@ -53,11 +53,12 @@ describe('focusedPickFilter: the shader\'s lit rule, as targets', () => {
     const f = focusedPickFilter({ focusArc: 1, focusRange: null, lit: Int32Array.from([2]) });
     expect([0, 1, 2].map((i) => f(i, g.from[i], g.to[i]))).toEqual([false, true, true]);
   });
-  it('a chosen range: a foot in it; with a chosen group, a foot in each', () => {
+  it('a chosen range: a foot in it (the group pair is retired, w5: a stray second range is not read)', () => {
     const r = focusedPickFilter({ focusArc: -1, focusRange: [20, 29] });
     expect([0, 1, 2].map((i) => r(i, g.from[i], g.to[i]))).toEqual([false, false, true]);
-    const pair = focusedPickFilter({ focusArc: -1, focusRange: [0, 9], focusRange2: [30, 39] });
-    expect([0, 1, 2].map((i) => pair(i, g.from[i], g.to[i]))).toEqual([true, false, false]);
+    const stray = /** @type {any} */ ({ focusArc: -1, focusRange: [0, 9], focusRange2: [30, 39] });
+    const one = focusedPickFilter(stray);
+    expect([0, 1, 2].map((i) => one(i, g.from[i], g.to[i]))).toEqual([true, true, false]);
   });
 });
 

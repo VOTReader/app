@@ -232,7 +232,8 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
     expect(get().sel.closePanel).toBe(get().sel.closeCards);
     act(() => { get().sel.closePanel(); });
     expect(get().sel.panel).toBeNull();
-    expect(get().cam.focusRef.current).toMatchObject({ arc: -1, range: null, range2: null, lit: null, litKey: '' });
+    expect(get().cam.focusRef.current).toMatchObject({ arc: -1, range: null, lit: null, litKey: '' });
+    expect(get().cam.focusRef.current, 'range2 is retired (w5): the focus has no second range').not.toHaveProperty('range2');
   });
 });
 

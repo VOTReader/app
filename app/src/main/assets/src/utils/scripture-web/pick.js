@@ -67,14 +67,13 @@ function litSetOf(lit) {
 
 /**
  * Which threads are targets while something is chosen (A1): the ones the shader keeps lit
- * (web-renderer.js, its focus rule) - the chosen thread; a thread with a foot in the chosen range,
- * or with a chosen group inside it, a foot in each; and a thread in the lit set (go-to's fan, verse
- * mode). Null when nothing is chosen (no focusArc, no focusProphecy, no focusRange): then every
+ * (web-renderer.js, its focus rule) - the chosen thread; a thread with a foot in the chosen range;
+ * and a thread in the lit set (go-to's fan, verse mode). Null when nothing is chosen (no focusArc, no focusProphecy, no focusRange): then every
  * thread is a target. A chosen prophecy pair recedes the rest as an arc does (the shader's
  * `chosen` counts it), so it filters too: its own OpenBible arc, when it is one (`g` names it), is
  * the chosen thread. `index` -1 is a prophecy pair that is no arc (pickProphecy): only the range
  * law can keep it.
- * @param {{ focusArc?: number, focusProphecy?: number, focusRange?: (number[]|null), focusRange2?: (number[]|null),
+ * @param {{ focusArc?: number, focusProphecy?: number, focusRange?: (number[]|null),
  *   lit?: (ArrayLike<number>|null) }} view
  * @param {any} [g]  the decoded graph, for a chosen prophecy pair's arc
  * @returns {((index: number, from: number, to: number) => boolean) | null}
@@ -84,7 +83,6 @@ export function focusedPickFilter(view, g) {
   const pair = view.focusProphecy != null ? view.focusProphecy : -1;
   const r = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
   if (arc < 0 && pair < 0 && !r) return null;
-  const r2 = r && view.focusRange2 && view.focusRange2[0] <= view.focusRange2[1] ? view.focusRange2 : null;
   const lit = litSetOf(view.lit);
   const ps = pair >= 0 && g ? prophecySet(g) : null;
   const pairArc = ps && pair < ps.count ? ps.arcOf[pair] : -1;
@@ -92,10 +90,7 @@ export function focusedPickFilter(view, g) {
     if (i >= 0 && (i === arc || i === pairArc)) return true;
     if (i >= 0 && lit && lit.has(i)) return true;
     if (!r) return false;
-    const a1 = from >= r[0] && from <= r[1], b1 = to >= r[0] && to <= r[1];
-    if (!r2) return a1 || b1;
-    const a2 = from >= r2[0] && from <= r2[1], b2 = to >= r2[0] && to <= r2[1];
-    return (a1 && b2) || (b1 && a2);
+    return (from >= r[0] && from <= r[1]) || (to >= r[0] && to <= r[1]);
   };
 }
 
@@ -108,7 +103,7 @@ export function focusedPickFilter(view, g) {
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
  *   localize:number, density:import('./decode.js').Density,
- *   focusArc?:number, focusRange?:(number[]|null), focusRange2?:(number[]|null),
+ *   focusArc?:number, focusRange?:(number[]|null),
  *   lit?:(ArrayLike<number>|null)}} view
  * @param {number} px
  * @param {number} py
@@ -176,7 +171,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, squash:number, focusArc?:number, focusProphecy?:number,
- *   focusRange?:(number[]|null), focusRange2?:(number[]|null), lit?:(ArrayLike<number>|null)}} view
+ *   focusRange?:(number[]|null), lit?:(ArrayLike<number>|null)}} view
  * @param {number} px @param {number} py
  * @param {number} tol  device px
  * @param {number} [limit]

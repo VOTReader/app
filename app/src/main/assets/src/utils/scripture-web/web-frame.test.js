@@ -64,22 +64,22 @@ describe('webViewArgs', () => {
   const f = webFrame(desktop, false);
 
   it('tells the shader the frame, the squash, the localize, the camera height, the dpr and the focus', () => {
-    const focus = focusState({ arc: 7, range: [1, 5], range2: [2, 3], hover: 4, hoverProphecy: 6 });
+    const focus = focusState({ arc: 7, range: [1, 5], hover: 4, hoverProphecy: 6 });
     const a = webViewArgs(desktop, cam, f, 'famous', focus);
     expect(a).toEqual({
       width: 1920, height: 1080, base: f.base, ceil: f.ceil,
       squash: squashFactor(f.ceil, 1920),
       localize: localizeFactor(3 / (1920 / 360)),
       camY: 12, dpr: desktop.DPR, density: 'famous', rulerDepth: f.ruler,
-      focusArc: 7, focusRange: [1, 5], focusRange2: [2, 3],
+      focusArc: 7, focusRange: [1, 5],
       focusProphecy: -1, hoverArc: 4, hoverProphecy: 6, lit: null, litKey: '',
     });
   });
 
-  it('a camera below the baseline draws at height 0, and no second band is null', () => {
+  it('a camera below the baseline draws at height 0, and there is no second range (retired in w5)', () => {
     const a = webViewArgs(desktop, { ...cam, y: -4 }, f, 'essential', { arc: -1, range: null });
     expect(a.camY).toBe(0);
-    expect(a.focusRange2).toBeNull();
+    expect(a).not.toHaveProperty('focusRange2');
     // an old-shape focus (no hover, no lit) still reads as nothing hovered or lit
     expect(a).toMatchObject({ hoverArc: -1, hoverProphecy: -1, lit: null, litKey: '', focusProphecy: -1 });
   });
