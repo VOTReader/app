@@ -27,7 +27,7 @@
    "144,000").
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { isAttribution, answersShortTitle } from './answers-shelves.js';
+import { isAttribution, answersShortTitle, ANSWERS_SUBJECTS } from './answers-shelves.js';
 import { ANSWERS_URL_INDEX } from './answers-url-index.js';
 
 /** What a question wraps around its subject; dropped only in the second pass. */
@@ -60,6 +60,28 @@ function aliasesFor(id) {
     }
   }
   return (_aliasesById.get(id) || []).concat(TOPIC_SYNONYMS[id] ? [TOPIC_SYNONYMS[id]] : []);
+}
+
+/* The app's nine subjects (answers-shelves.js ANSWERS_SUBJECTS) as search words
+   (aogcg brief 3.1): the subjects retire as a browse view, and a reader who
+   remembers one ("The End of This Age") still finds its topics. A subject
+   answers only a query holding EVERY word of its name, joining words aside,
+   so one word of it ("salvation", "lord") still finds only the topics titled
+   with it. topic id -> the word lists of the subjects that file it. */
+const SUBJECT_JOINERS = new Set(['the', 'and', 'a', 'an', 'of', 'his']);
+let _subjectsById = null;
+function subjectWordsFor(id) {
+  if (!_subjectsById) {
+    _subjectsById = new Map();
+    for (const s of ANSWERS_SUBJECTS) {
+      const ws = queryWords(s.title).filter((w) => !SUBJECT_JOINERS.has(w));
+      for (const tid of s.topics) {
+        if (!_subjectsById.has(tid)) _subjectsById.set(tid, []);
+        _subjectsById.get(tid).push(ws);
+      }
+    }
+  }
+  return _subjectsById.get(id) || [];
 }
 
 const HEADER_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
@@ -124,7 +146,7 @@ export function buildAnswersIndex(entries) {
       if (tail.length) passages.push({ paras: tail });
     }
     out.push({ entry, short: answersShortTitle(entry.title), titleFold: answersFold(entry.title),
-      aliasFolds: aliasesFor(entry.id).map((a) => answersFold(a)), passages });
+      aliasFolds: aliasesFor(entry.id).map((a) => answersFold(a)), subjectWords: subjectWordsFor(entry.id), passages });
   }
   return out;
 }
@@ -178,7 +200,8 @@ function runSearch(index, words) {
     // A title match whose passages never use the word still shows how it opens.
     const lead = t.passages.length ? t.passages[0].paras[0] : null;
     const row = { entry: t.entry, short: t.short, hits, firstPara, firstText, leadPara: lead ? lead.index : -1, leadText: lead ? lead.plain : '' };
-    if (all(t.titleFold) || (t.aliasFolds || []).some(all)) topics.push(row);
+    const subject = (t.subjectWords || []).some((ws) => ws.length > 0 && ws.every((w) => words.includes(w)));
+    if (all(t.titleFold) || (t.aliasFolds || []).some(all) || subject) topics.push(row);
     else if (hits) { mentions.push(row); mentionPassages += hits; }
   }
   const q = words.join(' ');

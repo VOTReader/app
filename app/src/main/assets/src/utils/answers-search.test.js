@@ -6,6 +6,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { answersPlainText, answersFold, buildAnswersIndex, searchAnswers, answersSnippet, TOPIC_SYNONYMS } from './answers-search.js';
+import { ANSWERS_SUBJECTS } from './answers-shelves.js';
+import { ANSWERS_URL_INDEX } from './answers-url-index.js';
 
 const topic = (id, title, paragraphs) => ({ id, title, paragraphs: paragraphs.map((text) => ({ align: 'justify', text })) });
 const FIXTURE = [
@@ -145,6 +147,28 @@ describe('on the real corpus', () => {
   it('every synonym names a topic that exists', () => {
     const ids = new Set(ctx.ANSWERS.map((e) => e.id));
     for (const id of Object.keys(TOPIC_SYNONYMS)) expect(ids.has(id), id).toBe(true);
+  });
+
+  /* aogcg 1b (brief 3.1): the nine subjects the app filed topics under are retired as a browse
+     view (phase 2) and live on as search words: a reader who remembers "The End of This Age" still
+     finds its topics. A subject answers only when the query holds its whole name, so one of its
+     words alone ("salvation", "lord") still finds only the topics titled with it. */
+  it('a subject\'s whole name finds every topic it filed; one of its words alone does not', () => {
+    const ids = (q) => searchAnswers(index, q).topics.map((t) => t.entry.id).sort();
+    for (const s of ANSWERS_SUBJECTS) {
+      expect(ids(s.title), s.title).toEqual(expect.arrayContaining(s.topics));
+    }
+    expect(ids('what does the lord say about the end of this age')).toEqual(expect.arrayContaining(ANSWERS_SUBJECTS.find((s) => s.id === 'the-end-of-this-age').topics));
+    expect(ids('salvation')).toEqual(['regarding-salvation']);
+    const words = new Set(ANSWERS_SUBJECTS.flatMap((s) => answersFold(s.title).split(/[^a-z0-9]+/).filter((w) => w.length > 2)));
+    for (const w of words) {
+      const r = searchAnswers(index, w);
+      for (const t of r.topics) {
+        const named = [t.entry.title, ...(TOPIC_SYNONYMS[t.entry.id] ? [TOPIC_SYNONYMS[t.entry.id]] : [])]
+          .concat(Object.keys(ANSWERS_URL_INDEX).filter((k) => ANSWERS_URL_INDEX[k] === t.entry.id));
+        expect(named.some((n) => new RegExp('(^|[^a-z0-9])' + r.words[0]).test(answersFold(n))), `${w} -> ${t.entry.id}`).toBe(true);
+      }
+    }
   });
 
   it('"sabbath" finds The Sabbath first, and the other topics that speak of it', () => {
