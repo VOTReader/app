@@ -95,6 +95,41 @@ describe('ANSWERS_META', () => {
     });
   });
 
+  /* aogcg 1b: the decorations ride BESIDE the words. Every sidecar keyed by paragraph names one
+     the entry has, and the paragraph text carries none of the site's markup, so a highlight keyed
+     on wtlb:<id>:<index> and its text offsets stays where the reader put it. */
+  it('every paragraph-keyed sidecar names a paragraph the entry has', () => {
+    let keys = 0;
+    each((e, m, P) => {
+      for (const field of ['links', 'bareLinks', 'marks', 'notes', 'refMeta', 'attr']) {
+        for (const k of Object.keys(m[field] || {})) {
+          keys++;
+          const i = Number(k);
+          expect(Number.isInteger(i) && String(i) === k && i >= 0 && i < P.length, `${e.id} ${field}[${k}] of ${P.length}`).toBe(true);
+        }
+      }
+    });
+    expect(keys).toBeGreaterThan(0);
+  });
+
+  it('every bare link and note\'s `after` words occur in its paragraph', () => {
+    each((e, m, P) => {
+      for (const field of ['bareLinks', 'notes']) for (const [k, items] of Object.entries(m[field] || {})) {
+        for (const it of items) expect(P[k].text.includes(it.after), `${e.id} ${field}[${k}] ${JSON.stringify(it.after)}`).toBe(true);
+      }
+    });
+  });
+
+  it('no paragraph text carries the site\'s markup (it lives in the sidecars)', () => {
+    const MARKUP = ['<u>', '<u ', '</u>', '<sup', '<span', '<font', '<big', '<small', '<a ', '<br', '[[', ']]', '&nbsp;', '&amp;'];
+    each((e, m, P) => {
+      P.forEach((p, i) => {
+        const hit = MARKUP.find((t) => String(p.text || '').includes(t));
+        expect(hit, `${e.id}:${i}`).toBeUndefined();
+      });
+    });
+  });
+
   it('the site chrome rides beside the corpus', () => {
     expect(SITE.sidebar.length).toBe(24);
     expect(SITE.sisterSites.length).toBe(9);

@@ -4,7 +4,7 @@
 
 import { inertAttr } from '../../utils/inert-attr.js';
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
-import { answersIdForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
+import { answersEndpointForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { blockReadText } from '../../utils/segment-dom-text.js';
@@ -610,12 +610,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   {letter.relatedTopics.map((t, i) => {
                     // An answersonlygodcangive.com row opens the vendored topic
                     // in-app at once — the answers-entry route shows Loading…
-                    // while the corpus arrives; a row the index cannot place
-                    // keeps its external link.
-                    const answersId = !t.link ? answersIdForUrl(t.url) : null;
-                    const openAnswers = answersId && onNavigateToLink
-                      ? () => onNavigateToLink({ type: 'wtlb', screen: 'answers-entry', letterId: answersId }, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel || null })
-                      : answersId && wrappedInAppLink ? () => openAnswersLink(answersLinkForUrl(t.url), wrappedInAppLink) : null;
+                    // while the corpus arrives — at the section its #fragment
+                    // names (aogcg 1b); a row the index cannot place keeps its
+                    // external link.
+                    const answersAt = !t.link ? answersEndpointForUrl(t.url) : null;
+                    const openAnswers = answersAt && onNavigateToLink
+                      ? () => onNavigateToLink(answersAt, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel || null })
+                      : answersAt && wrappedInAppLink ? () => openAnswersLink(answersLinkForUrl(t.url), wrappedInAppLink) : null;
                     return t.link && wrappedInAppLink ? (
                       <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(t.link); }}>{t.label}</a>
                     ) : openAnswers ? (

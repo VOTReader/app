@@ -338,6 +338,11 @@ export function useNavigateToLink({
       setStudyId(null); setStudyChapterId(null);
       if (endpoint.letterId) setLetterId(endpoint.letterId);
       else if (endpoint.entryId) setLetterId(endpoint.entryId);
+      // An endpoint that names its landing (an Answers row's #section, aogcg 1b:
+      // answers-links.js answersEndpointForUrl) sets it, null included, so an
+      // earlier landing on the same entry does not re-fire. One without the field
+      // leaves the tab's anchor as it was.
+      if ('surpriseAnchor' in endpoint) setSurpriseAnchor(endpoint.surpriseAnchor);
       setScreen(endpoint.screen);
     }
   };

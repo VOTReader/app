@@ -432,6 +432,28 @@ describe('useNavigateToLink — every endpoint kind and the prologue', () => {
     expect(p.pushFromLetter.mock.calls[0][0].destSnapshot).toMatchObject({ screen: 'volumes', letterId: null });
   });
 
+  /* aogcg 1b: a letter's answersonlygodcangive.com row names a section (#fragment); the endpoint
+     carries the landing it wants, and the destination lands there (WtlbEntryView, type 'section'). */
+  it('a screen-driven endpoint that carries a surpriseAnchor sets it before the screen', () => {
+    const p = makeParams();
+    const { result } = renderHook(() => useNavigateToLink(p));
+    const anchor = { type: 'section', letterId: 'regarding-pride', anchor: 'For_the_Sake_of_Pride' };
+    act(() => { result.current.navigateToLink({ type: 'wtlb', screen: 'answers-entry', letterId: 'regarding-pride', surpriseAnchor: anchor }); });
+    expect(p.setSurpriseAnchor).toHaveBeenCalledWith(anchor);
+    expect(p.setLetterId).toHaveBeenCalledWith('regarding-pride');
+    expect(p.setScreen).toHaveBeenCalledWith('answers-entry');
+  });
+
+  it('an explicit null surpriseAnchor clears a stale landing; an endpoint without the field leaves it alone', () => {
+    const p = makeParams();
+    const { result } = renderHook(() => useNavigateToLink(p));
+    act(() => { result.current.navigateToLink({ type: 'wtlb', screen: 'answers-entry', letterId: 'regarding-pride', surpriseAnchor: null }); });
+    expect(p.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    p.setSurpriseAnchor.mockClear();
+    act(() => { result.current.navigateToLink({ type: 'wtlb', entryId: 'w-3', screen: 'wtlb-entry' }); });
+    expect(p.setSurpriseAnchor).not.toHaveBeenCalled();
+  });
+
   it('captures the whole source position and the meta overrides into the back-stack entry', () => {
     const p = makeParams({
       screen: 'bible-study-chapter', bookId: 'b', chapterNum: 4, letterId: 'l',

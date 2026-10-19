@@ -48,6 +48,7 @@ import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSo
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
 import { answersSubjectById, answersTopicEntries } from '../utils/answers-shelves.js';
+import { answersSectionAnchor } from '../utils/answers-sections.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
@@ -824,8 +825,10 @@ export function buildScreenRoutes({
   // Open a topic from the Answers landing / a subject / A–Z / a commandment.
   // It goes through the tap-through stack, so the topic shows "‹ Back to …"
   // and Back returns to the exact list (a subject's id rides letterId). A
-  // search hit carries the paragraph it matched, and the topic lands on it.
-  const _openAnswersTopic = (id, anchorText, fromTitle) => {
+  // search hit carries the paragraph it matched, and the topic lands on it;
+  // a link naming a section (a site #fragment, `section`) lands on that
+  // section instead (answers-sections.js, aogcg 1b).
+  const _openAnswersTopic = (id, anchorText, fromTitle, section) => {
     pushFromLetter({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: null, sourceChapterNum: null, sourceStudyId: null, sourceStudyChapterId: null,
@@ -833,7 +836,8 @@ export function buildScreenRoutes({
       destSnapshot: { screen: 'answers-entry', bookId: null, chapterNum: null, letterId: id, studyId: null, studyChapterId: null },
     });
     window.navHandoff.clear('pendingHighlight');
-    setSurpriseAnchor(anchorText ? { type: 'excerpt', text: anchorText, letterId: id } : null);
+    setSurpriseAnchor(section ? answersSectionAnchor(id, section)
+      : anchorText ? { type: 'excerpt', text: anchorText, letterId: id } : null);
     setLetterId(id);
     setActiveReadKey('vol:answers', () => setLastReadForVol('answers', id));
     setScreen('answers-entry');

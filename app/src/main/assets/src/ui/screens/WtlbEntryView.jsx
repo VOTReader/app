@@ -16,6 +16,7 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { answersFiledUnder } from '../../utils/answers-shelves.js';
 import { AnswersContentsLine } from '../components/AnswersContents.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
+import { answersAnchorPara, answersMetaFor } from '../../utils/answers-sections.js';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
@@ -80,6 +81,18 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // its own on every letter change the same way. Declared first: on a change that
   // brings a new landing, the reset runs and then the landing sets the new place.
   React.useEffect(() => { setLandedPara(-1); setLandedOff(null); }, [entry.id]);
+  // A SECTION landing (aogcg 1b): a link to answersonlygodcangive.com/Topic#Section names a heading
+  // by its MediaWiki anchor (answers-sections.js answersAnchorPara: the sections sidecar once loaded,
+  // the topic's own headings until then). The heading comes to the top the way the Contents sheet's
+  // jump brings it (jumpToPara: the same one-shot, reader-initiated write). No heading: the top.
+  React.useEffect(() => {
+    if (!surpriseAnchor || surpriseAnchor.type !== 'section' || surpriseAnchor.letterId !== entry.id) return;
+    const at = answersAnchorPara(entry, surpriseAnchor.anchor, answersMetaFor(entry.id));
+    if (at < 0) return;
+    const timer = setTimeout(() => jumpToPara(at), 150);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id identifies the entry (same contract as the excerpt landing below)
+  }, [surpriseAnchor, entry.id]);
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours

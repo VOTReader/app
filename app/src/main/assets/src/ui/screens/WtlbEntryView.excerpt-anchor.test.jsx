@@ -136,6 +136,46 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
   });
 });
 
+/* aogcg 1b: a link to answersonlygodcangive.com/Topic#Section (a letter's Related Topics row) opens the
+   topic AT that section: the anchor names the site's MediaWiki fragment, resolved against the topic's
+   headings (or its sections sidecar once loaded), and the heading comes to the top the way the
+   Contents sheet's jump brings it there. */
+describe('WtlbEntryView — a section anchor lands on the section the link names', () => {
+  const TOPIC = {
+    id: 'regarding-pride', title: 'Regarding Pride', num: 105,
+    paragraphs: [
+      { align: 'center', text: '**Here is Wisdom**' },
+      { align: 'justify', text: 'Pride goes before destruction.' },
+      { align: 'right', text: '~ [From “Pride” ~ Words To Live By: Part One]' },
+      { align: 'center', text: '**For the Sake of Pride**' },
+      { align: 'justify', text: 'A haughty spirit before a fall.' },
+      { align: 'right', text: '~ [From “Pride” ~ Words To Live By: Part One]' },
+    ],
+    prevEntry: null, nextEntry: null,
+  };
+  const renderTopic = (anchor) => render(
+    <WtlbEntryView entry={TOPIC} volKey="answers" partLabel="Answers" theme="dark" markAsReadEnabled={false} footnotesMode={true}
+      onNavigate={() => {}} onHome={() => {}} surpriseAnchor={anchor} />,
+  );
+
+  it('scrolls the heading the fragment names into view and marks it landed', () => {
+    renderTopic({ type: 'section', letterId: 'regarding-pride', anchor: 'For_the_Sake_of_Pride' });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['wtlb:regarding-pride:3']);
+    expect(document.querySelector('[data-hl-key="wtlb:regarding-pride:3"]').className).toContain('pulse');
+  });
+
+  it('a fragment the topic has no heading for, or one made for another topic, scrolls nothing', () => {
+    renderTopic({ type: 'section', letterId: 'regarding-pride', anchor: 'No_Such_Heading' });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual([]);
+    cleanup();
+    renderTopic({ type: 'section', letterId: 'regarding-faith', anchor: 'For_the_Sake_of_Pride' });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual([]);
+  });
+});
+
 describe('WtlbEntryView — an Answers topic renders before the letters have landed', () => {
   // WTLB_SCRIPTURES rides the VOT corpus; an Answers topic is its own corpus.
   // A restored tab reopened straight onto a topic after a reload threw
