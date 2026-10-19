@@ -183,3 +183,24 @@ describe('B10 item 4 — the order switch stacks at a large Text Size, nothing c
     expect(decls('.srch-corpus-btn', '@container srch-corpus (max-width: 9rem)')['letter-spacing']).toBe('0.06em');
   });
 });
+
+describe('B10 item 5 — the chosen pill is solid antique gold in the light theme', () => {
+  it('a lit corpus pill and a lit order half fill with --gold, their label parchment --bg, their edge --gold', () => {
+    for (const sel of ['body.light .srch-corpus-btn.active', 'body.light .srch-sort-btn.active']) {
+      const d = decls(sel);
+      expect(d.background, sel).toBe('var(--gold)');
+      expect(d.color, sel).toBe('var(--bg)');
+      expect(d['border-color'], sel).toBe('var(--gold)');
+    }
+  });
+
+  it('the dark theme and the unlit pills are as they were', () => {
+    expect(decls('.srch-corpus-btn.active')).toMatchObject({ background: 'var(--gold-faint)', color: 'var(--gold-bright)', 'border-color': 'var(--gold-dim)' });
+    expect(decls('.srch-sort-btn.active')).toMatchObject({ background: 'var(--gold-faint)', color: 'var(--gold-bright)' });
+    expect(decls('.srch-corpus-btn')).toMatchObject({ background: 'transparent', color: 'var(--cream-muted)' });
+  });
+
+  it('the scope chip, a full-width band and not a pill, keeps its own lit state', () => {
+    expect(decls('body.light .srch-scope-chip.active')).toEqual({});
+  });
+});

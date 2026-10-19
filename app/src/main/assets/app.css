@@ -3846,6 +3846,10 @@
     .srch-sort-btn + .srch-sort-btn { border-left:1px solid var(--gold-border); }
     .srch-sort-btn.active { background:var(--gold-faint); color:var(--gold-bright); }
     .srch-sort-btn:active { background:rgba(200,164,86,0.15); }
+    /* search200 UX B10 (5): on parchment the faint gold wash barely told the chosen pill from the
+       others. A lit corpus pill or order half is solid antique gold with a parchment label
+       (#f7f2e8 on #7a5c10, about 5.6:1); the dark theme keeps its wash. */
+    body.light .srch-corpus-btn.active, body.light .srch-sort-btn.active { background:var(--gold); color:var(--bg); border-color:var(--gold); }
     /* The switch stacks when the row cannot hold it on one line (it is 12.3rem wide at every
        Text Size; the 412px row holds 21.9rem at 100%, so this is about 1.7x there, 1.5x on 360px):
        the note takes its own line, RELEVANCE sits over BOOK ORDER in one full-width outline split
