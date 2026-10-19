@@ -93,8 +93,13 @@ export function useWebKeys({
     // every control inside .sw-root: ArrowRight on the density <select> panned the camera and
     // preventDefault cancelled the select's own change, and a Nearby row's arrows panned the web
     // behind the list (sweep v72). Escape is the one key taken from anywhere: it closes the top
-    // layer, or leaves.
-    if (e.key !== 'Escape' && e.target !== e.currentTarget) return;
+    // layer, or leaves. The docked panel's own container is the web's too (w4 quality hunt): it
+    // takes the keyboard when it opens, so after Enter the [ ] + - and arrows the help names went
+    // nowhere. A control inside the panel keeps its own keys.
+    const t = /** @type {any} */ (e.target);
+    const onPanel = !!(t && t !== e.currentTarget && t.classList && t.classList.contains('sw-panel')
+      && typeof e.currentTarget.contains === 'function' && e.currentTarget.contains(t));
+    if (e.key !== 'Escape' && e.target !== e.currentTarget && !onPanel) return;
     // G2: Enter or Space take the line at the centre, [ and ] step through the lines at a verse
     if (goTo && !e.ctrlKey && !e.metaKey && !e.altKey) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo.selectCentre(); return; }

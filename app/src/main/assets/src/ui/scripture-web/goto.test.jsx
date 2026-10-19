@@ -765,6 +765,30 @@ describe("through the web's own keys (use-web-keys.js)", () => {
     fireEvent.keyDown(root, { key: ']' });
     expect(get().sel.detail.index, 'the next line at verse 300').toBe(2);
   });
+
+  /* w4 quality hunt: the panel takes focus when it first opens (web-panel.jsx), and the web's keys
+     only ran with the root itself focused, so after Enter the [ ] + - and arrows the help text
+     promises did nothing. The panel's own container is the web's for its keys; a control inside it
+     keeps its own keys (a row's Enter is the row's). */
+  it('after Enter opens the panel and the panel has the keyboard, ] still steps and + still zooms', () => {
+    const { container, get } = mountWeb({ keys: true, sheet: true, cam: { x: 300, ppv: 8 } });
+    const root = /** @type {HTMLElement} */ (container.querySelector('.sw-root'));
+    root.focus();
+    fireEvent.keyDown(root, { key: 'Enter' });
+    expect(get().sel.detail).toMatchObject({ kind: 'arc', index: 1 });
+    const panel = /** @type {HTMLElement} */ (container.querySelector('.sw-panel'));
+    expect(document.activeElement, 'PRECONDITION: the panel took the keyboard').toBe(panel);
+    fireEvent.keyDown(panel, { key: ']' });
+    expect(get().sel.detail.index, 'the next line at verse 300').toBe(2);
+    const ppv = get().cam.camRef.current.ppv;
+    fireEvent.keyDown(document.activeElement, { key: '+' });
+    expect(get().cam.camRef.current.ppv).toBeGreaterThan(ppv);
+    // a control inside the panel keeps its keys
+    const close = /** @type {HTMLElement} */ (container.querySelector('.sw-sheet-close'));
+    const at = get().sel.detail.index;
+    fireEvent.keyDown(close, { key: ']' });
+    expect(get().sel.detail.index).toBe(at);
+  });
 });
 
 describe('routeOverlayHit (CONTRACTS.md section 4): what a tap on a drawn name does', () => {
