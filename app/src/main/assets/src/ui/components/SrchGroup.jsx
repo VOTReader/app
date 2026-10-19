@@ -37,8 +37,9 @@ function cardKey(entry, i) {
    state, so a group opened under Relevance is open again after a trip to Book order (sr12);
    'book-more' is Book order's second list, the loose matches of a passage search (sr13).
    `more`: some of the group's results sit in Best Matches above it (a short list shows each
-   result once, search200 B2), so its count is of the rest: "1 more letter". */
-export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, more = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
+   result once, search200 B2), so its count is of the rest: "1 more letter".
+   `stopTyped`: the small words typed, handed to each card (SrchCard). */
+export function SrchGroup({ gkey, items, terms, stopTyped = undefined, onSelect, defaultOpen, capped = false, more = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
   const slot = 'group|' + gkey + (view === 'relevance' ? '' : '|' + view);
   const was = recall(memo, slot);
   const [open, setOpen] = React.useState(was ? was.open : defaultOpen !== false);
@@ -68,7 +69,7 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
       {open ? (
         <div className="srch-group-items">
           {items.slice(0, shown).map((entry, i) => (
-            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} memo={memo} where={gkey} />
+            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} stopTyped={stopTyped} onSelect={onSelect} memo={memo} where={gkey} />
           ))}
           {left > 0 ? (
             <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>

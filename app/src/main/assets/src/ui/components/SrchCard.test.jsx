@@ -303,6 +303,35 @@ describe('SrchCard marks a small word only beside a typed one (search200 B7)', (
     expect(placeMarks.length).toBeGreaterThan(0);
     expect(placeMarks.filter((m) => m.toLowerCase() === 'who')).toEqual([]);
   });
+
+  /* search200 B7 review: the engine prefix-matches a typed small word, and its forms came in the card's terms as
+     if typed: "christ who strengthens me" marked "whom all things", a lone "who" marked whom, whoredoms and
+     whosoever. A form that extends a typed stop word (`stopTyped`), or is a letter off it, is no word to mark. */
+  it('a typed stop word’s longer forms are not marked, among real words or alone', () => {
+    const doc = { kind: 'verse', ref: 'Colossians 1:16', text: 'For by Him all things were created, in whom all things consist.' };
+    const mixed = render(<SrchCard entry={{ score: 1, doc, terms: ['whom', 'all', 'things'] }} terms={['things', 'christ', 'strengthens']}
+      stopTyped={['i', 'can', 'do', 'all', 'through', 'who', 'me']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(mixed.container)).toEqual(['all things', 'all things']);
+    mixed.unmount();
+    const lone = { kind: 'verse', ref: 'Revelation 22:17', text: 'Who is he whom the Lord chose? And whosoever will, out of her whoredoms.' };
+    const one = render(<SrchCard entry={{ score: 1, doc: lone, terms: ['who', 'whom', 'whosoever', 'whoredoms'] }} terms={['who']}
+      stopTyped={['who']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(one.container)).toEqual(['Who']);
+  });
+
+  it('a form of a typed real word stays marked, though it starts like a typed stop word', () => {
+    const doc = { kind: 'verse', ref: 'Psalms 1:1', text: 'Who walks in wholeness, all his days.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['wholeness'] }} terms={['whole']}
+      stopTyped={['who']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(container)).toEqual(['wholeness']);
+  });
+
+  it('a word under three letters reaches no forms (the engine never prefix-matches one): a corrected typo stays marked', () => {
+    const doc = { kind: 'verse', ref: 'Psalms 121:4', text: 'He who keeps Israel shall neither slumber nor sleep.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['israel'] }} terms={['keeps', 'isreal']}
+      stopTyped={['is']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(container)).toEqual(['keeps Israel']);
+  });
 });
 
 it('a text only the meaning search found shows the passage it matched, not its opening (path to 500, 2026-10-05)', () => {

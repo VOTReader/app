@@ -25,7 +25,7 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
   // A stop word typed among real words ("faith is the substance") ranks, but is not
   // a word to mark or count as a place (search audit 2026-09-27: the find pill read
   // "1 of 22" on a lone "is").
-  const isStop = (/** @type {string} */ t) => { const toks = kjvEncode(t); return !!stop && toks.length > 0 && toks.every((w) => stop.has(w)); };
+  const isStop = (/** @type {string} */ t) => isStopTerm(t, stop);
   const typed = (parsedTerms || []).some((t) => !isStop(t)) ? (parsedTerms || []).filter((t) => !isStop(t)) : (parsedTerms || []);
   // `run`: the engine found the typed words in a row, one real word among small ones ("for you to embrace me").
   const base = [parsed.phrase, parsed.run].filter(Boolean).concat(typed);
@@ -36,6 +36,25 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
     if (Array.isArray(grp)) grp.forEach((g) => out.add(g));
   }
   return [...out];
+}
+
+/** @param {string} t @param {Set<string>|null|undefined} stop */
+function isStopTerm(t, stop) {
+  const toks = kjvEncode(t);
+  return !!stop && toks.length > 0 && toks.every((w) => stop.has(w));
+}
+
+/**
+ * The small words the reader typed (search200 B7 review), lowercase: a card leaves the engine's
+ * forms of them unmarked ("who" brought "whom"). Pure.
+ * @param {{kind?:string}|null} parsed
+ * @param {string[]} parsedTerms
+ * @param {Set<string>|null} stop
+ * @returns {string[]}
+ */
+export function typedStopWords(parsed, parsedTerms, stop) {
+  if (!parsed || parsed.kind !== 'text' || !stop) return [];
+  return (parsedTerms || []).filter((t) => isStopTerm(t, stop)).map((t) => String(t).toLowerCase());
 }
 
 /* THE WORDS A CARD DOES NOT MARK when real words were typed (search200 B7): the engine's
@@ -418,6 +437,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (stale || (quiet && r.error)) return;
       // SRCH4: include the matched synonyms (when synonym search is on) so the
       // snippet highlights the word that actually surfaced the verse.
+      const stop = markStopWords(/** @type {any} */ (window).VotSearchData);
       const terms = expandSnippetTerms(
         // search-2: under a nav card `parsed` is the CARD's kind, so the
         // snippet terms have to come from the text reading of the same query
@@ -425,8 +445,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         r.textQuery || r.parsed, r.parsedTerms || [],
         /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
         settings.searchSynonyms !== false,
-        markStopWords(/** @type {any} */ (window).VotSearchData),
+        stop,
       );
+      // `stopTyped`: the small words typed, whose engine forms ("whom" for "who") a card leaves unmarked.
+      const stopTyped = typedStopWords(r.textQuery || r.parsed, r.parsedTerms || [], stop);
       /* `memo`: the search this list came from (search200 B2). The groups are keyed by it, not by the live memo,
          which a tab or scope change moves at once: keyed live, the groups remounted over the OLD list (long, so
          closed), and the new list, a lone group, arrived under the same key and stayed closed over a blank screen.
@@ -439,7 +461,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (corpus !== 'all' && (!r.parsed || r.parsed.kind === 'text') && E && typeof E.parse === 'function') {
         try { const p = E.parse(q, { corpus: 'all' }); if (p && REF_CARD_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
       }
-      const done = { phase: 'done', memo, parsed: r.parsed, refParsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
+      const done = { phase: 'done', memo, parsed: r.parsed, refParsed, results: r.results || [], terms, stopTyped, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
       if (!r.error) lastSearch = { memo, allWordsFor, state: done };
       setState(done);
       if (r.meaningLater) rankWithMeaning();
@@ -597,6 +619,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           more={!!g.more}
           capped={capped && cappedGroups.has(g.key)}
           terms={state.terms}
+          stopTyped={state.stopTyped}
           onSelect={handleSelect}
           memo={listMemo}
           view={view}
@@ -1120,7 +1143,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           <div className="srch-top-results">
             <h2 className="srch-section-label">Best Matches</h2>
             {bestRow.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={listMemo} where="best" />
+              <SrchCard key={'top' + i} entry={entry} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} memo={listMemo} where="best" />
             ))}
           </div>
         )}

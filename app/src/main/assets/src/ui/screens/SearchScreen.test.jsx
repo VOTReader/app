@@ -1795,4 +1795,24 @@ describe('SearchScreen (search200 UX, track B)', () => {
     await typeIn(baseProps(), 'those who mourn');
     expect(seen).toEqual(['mourn']);
   });
+
+  /* B7 review: the card leaves out the engine's forms of a typed small word ("who" brought "whom"); it is told
+     which small words were typed, in Best Matches and in the groups alike. */
+  it('B7: each card is told the small words typed, alone or among real words', async () => {
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {},
+      STOP_WORDS_TRIMMED: new Set(['those']), STOP_WORDS: new Set(['those', 'who']) };
+    /** @type {any} */ const seen = [];
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = RealSrchGroup;
+    /** @type {any} */ (globalThis).SrchCard = ({ stopTyped, where }) => { seen.push(where + ':' + JSON.stringify(stopTyped)); return <div className="stub-card" />; };
+    searchReturns({ parsed: { kind: 'text' }, parsedTerms: ['those', 'who', 'mourn'], results: letters('v7', 6).concat(letters('v1', 3, 6)) });
+    const r = await typeIn(baseProps(), 'those who mourn');
+    expect([...new Set(seen)].sort()).toEqual(['best:["those","who"]', 'v1:["those","who"]', 'v7:["those","who"]']);
+    r.unmount();
+    seen.length = 0;
+    searchReturns({ parsed: { kind: 'text' }, parsedTerms: ['who'], results: letters('v7', 6).concat(letters('v1', 3, 6)) });
+    await typeIn(baseProps(), 'who');
+    expect([...new Set(seen)].sort()).toEqual(['best:["who"]', 'v1:["who"]', 'v7:["who"]']);
+  });
 });
