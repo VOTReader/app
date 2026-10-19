@@ -30,19 +30,22 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
     }
   });
 
-  it('a span of up to ten verses is short, one of a book\'s length or more is long, and the ease between has no step', () => {
-    // the bounds, as spans: the ramp's magenta-violet first stretch (palette DISTANCE_RAMP)
+  it('a span of up to ten verses is short, one of a few chapters\' length or more is long, and the ease between has no step', () => {
+    // the bounds, as spans (w4 INK review 2, finding 3): about 10 to 56 verses, the local domes of a
+    // chapter-deep frame (r3-03's); the ease to about 318 laid the 56 to 318-verse arcs, the big
+    // arcs over a 209x frame, as a 2-4x mesh over those domes
     expect(spanAt(geo.SHORT_T0)).toBeGreaterThan(9);
     expect(spanAt(geo.SHORT_T0)).toBeLessThan(11);
-    expect(spanAt(geo.SHORT_T1)).toBeGreaterThan(300);
-    expect(spanAt(geo.SHORT_T1)).toBeLessThan(340);
+    expect(spanAt(geo.SHORT_T1)).toBeGreaterThan(50);
+    expect(spanAt(geo.SHORT_T1)).toBeLessThan(60);
     let prev = 1;
     for (let span = 1; span <= 2000; span++) {
       const s = geo.spanShortness(geo.spanT(span, TOTAL));
       if (span <= 9) expect(s, `span ${span}`).toBe(1);
-      if (span >= 340) expect(s, `span ${span}`).toBe(0);
+      if (span >= 60) expect(s, `span ${span}`).toBe(0);
       expect(s, `span ${span}: never shorter for a wider span`).toBeLessThanOrEqual(prev + 1e-12);
-      expect(prev - s, `span ${span}: eased, never a step (C20)`).toBeLessThan(0.02);
+      // eased, never a step: at most .035 a verse over the 46-verse ease (C20's "gradual, smooth")
+      expect(prev - s, `span ${span}: eased, never a step (C20)`).toBeLessThan(0.04);
       prev = s;
     }
   });

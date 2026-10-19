@@ -37,7 +37,7 @@
 
    The third is the span-ink law (w4 INK, item 2; `spanInkGLSL`): a
    thread's ink weight is its own span's, fixed at every zoom. Short spans
-   are inked up to 1 + SHORT_GAIN times and keep the stroke law's width, so
+   (to about 56 verses) are inked up to 1 + SHORT_GAIN times and keep the stroke law's width, so
    they read first (the violet feet of the overview, the vivid local domes
    deep in); a long thread is held at the overview's hairline, widened by
    its votes alone, so deep in its legs are thin coloured lines. Nothing
@@ -572,14 +572,17 @@ float flyOverWidth(float anchored, float localize, float leg){
 
 /** The distance ramp's exponent: a span's t is pow(span / total, SPAN_T_EXP), the shader's colour input. */
 export const SPAN_T_EXP = 0.40;
-/** The ramp's t over which a thread eases from short (1) to long (0): about 10 verses to 318, the
- *  ramp's magenta to magenta-violet start (palette.DISTANCE_RAMP: its second stop is t 1/9, its
- *  third 2/9). Wider (.25, .30) was tried on the w4 review's ask and refused by the pair: at 209x
- *  the 300 to 1,500-verse threads are the big arcs over the frame, and inked up they laid a violet
- *  mesh over the local domes (upper field lit 55% -> 59% PC, 63% -> 70% phone) for a feet band
- *  that barely moved (magenta-violet 9% -> 13%). */
+/** The ramp's t over which a thread eases from short (1) to long (0): about 10 verses to 56, the
+ *  local domes of a chapter-deep frame (r3-03). Wider (.25, .30) was tried on the w4 review's ask
+ *  and refused by the pair: at 209x the 300 to 1,500-verse threads are the big arcs over the
+ *  frame, and inked up they laid a violet mesh over the local domes (upper field lit 55% -> 59%
+ *  PC, 63% -> 70% phone) for a feet band that barely moved (magenta-violet 9% -> 13%). The w4
+ *  review 2 narrowed it from .16 (about 318 verses) to .08: the 56 to 318-verse arcs were still that
+ *  mesh at 2-4x ink, and held to the hairline they let the domes and the long legs' warm and green
+ *  read (209x: magenta-violet 67% -> 53% of the lit field, warm 7% -> 10%; go-to 53% -> 43%), with
+ *  the overview's feet and baseline glow unchanged (74%, the same lit count; w4/ink pairs.md). */
 export const SHORT_T0 = 0.04;
-export const SHORT_T1 = 0.16;
+export const SHORT_T1 = 0.08;
 /** The shortest spans' extra ink: their alpha times 1 + SHORT_GAIN, clamped to full ink. */
 export const SHORT_GAIN = 4;
 

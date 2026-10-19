@@ -107,7 +107,9 @@ describe('the centre chapter is emphasised, gradually (spec 4.4, C20)', () => {
       expect(at(z, 4).width).toBeCloseTo(CENTRE_WIDTH, 12);
       expect(at(z, 9000), `zoom ${z}: Isaiah 53 to 1 Peter`).toEqual({ bright: 1, width: 1 });
       expect(at(z, 600)).toEqual({ bright: 1, width: 1 });
-      const mid = at(z, 80);
+      // a span inside the ease (10 to 56 verses since the w4 review 2's SHORT_T1 .08) is part lifted
+      expect(at(z, 80)).toEqual({ bright: 1, width: 1 });
+      const mid = at(z, 30);
       expect(mid.bright).toBeGreaterThan(1);
       expect(mid.bright).toBeLessThan(CENTRE_BRIGHT);
     }
