@@ -1761,6 +1761,30 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect(status.textContent).toBe('Searching…');
   });
 
+  /* Track D (D8): "did you mean" was built from the live box, not the text searched: a key typed after "gensis"
+     found nothing put "No results for “gensisx”" on screen before "gensisx" was searched, and a space and a
+     second word took the line away until the next search answered. It names the text the list answers. */
+  it('D8: "did you mean" names the text searched, not a key typed since', async () => {
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: { genesis: 'Genesis' }, SYNONYM_MAP: {} };
+    /** @type {any} */ (window).VotSearchMini.fuzzyBookSuggest = (/** @type {string} */ q) => (/^gen/i.test(q) ? 'genesis' : null);
+    searchReturns({ parsed: { kind: 'text' }, results: [] });
+    const onQueryChange = vi.fn();
+    const props = { ...baseProps(), onQueryChange };
+    const r = await typeIn(props, 'gensis');
+    const line = () => document.querySelector('.srch-did-you-mean');
+    expect(line()?.textContent).toContain('No results for “gensis”');
+    r.rerender(<SearchScreen {...props} query="gensisx" />);
+    expect(line()?.textContent, 'not searched yet').not.toContain('gensisx');
+    expect(line()?.textContent).toContain('No results for “gensis”');
+    r.rerender(<SearchScreen {...props} query="gensis 1" />);
+    expect(line()?.textContent, 'a second word, not searched yet').toContain('No results for “gensis”');
+    act(() => { /** @type {HTMLButtonElement} */ (/** @type {Element} */ (line()).querySelector('button')).click(); });
+    expect(onQueryChange).toHaveBeenCalledWith('Genesis');
+    // an emptied box shows none
+    r.rerender(<SearchScreen {...props} query="" />);
+    expect(line()).toBeNull();
+  });
+
   it('B9: the status region says a stop word, a corrected word, a scope the tab cannot reach and an emoji, as the screen does', async () => {
     const props = baseProps();
     const said = async (/** @type {any} */ extra, /** @type {string} */ q) => {

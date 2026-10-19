@@ -752,9 +752,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // Fuzzy book suggestion for did-you-mean — very conservative.
   // Only fires when the query is a SHORT single-token that plausibly looks
   // like a mistyped book name (≥4 chars, no spaces, no results, no ref parse).
+  // It reads the text the list answers (`state.q`), not the box (search200 UX D8): a key
+  // typed since put "No results for “gensisx”" up before "gensisx" was searched.
   const didYouMean = React.useMemo(() => {
-    if (!state.parsed || state.parsed.kind !== 'text' || state.results.length) return null;
-    const q = (query || '').trim();
+    if (!state.parsed || state.parsed.kind !== 'text' || state.results.length || !(query || '').trim()) return null;
+    const q = (typeof state.q === 'string' ? state.q : query || '').trim();
     if (!q || q.length < 4 || q.length > 15) return null;
     if (/\s/.test(q)) return null; // multi-word: not a book attempt
     if (/[0-9:.,;-]/.test(q)) return null; // has digits/punctuation: already a ref attempt
@@ -763,7 +765,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const disp = window.VotSearchData.BOOK_DISPLAY[guess] || guess;
     if (disp.toLowerCase() === q.toLowerCase()) return null;
     return { original: q, suggestion: disp, rewrite: disp };
-  }, [state.parsed, state.results.length, query]);
+  }, [state.parsed, state.results.length, state.q, query]);
 
   // Recent searches (gated by the existing history privacy toggle). Refresh
   // whenever the box is empty (mount / clear / back-to-empty) so the list also
