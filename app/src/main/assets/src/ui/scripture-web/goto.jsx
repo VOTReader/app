@@ -332,7 +332,8 @@ export function useGoTo(web) {
    */
   const go = React.useCallback((place, how = /** @type {{ push?: boolean, instant?: boolean }} */ ({})) => {
     const push = how.push !== false;
-    if (!graph || !place || !live) return false;
+    // a place is the canon's: My Web's rails hold no verse panel, lit set or edge chips
+    if (!graph || !place || !live || mode === 'personal') return false;
     if (place.kind === 'letter') return !!openPanel({ mode: 'letter', letterKey: place.letterKey });
     if (!camRef.current || !viewRef.current.W) return false;
     // where the reader set out from, read before the panel or the camera changes
@@ -362,7 +363,7 @@ export function useGoTo(web) {
     Promise.resolve(flyTo(frame, how && how.instant ? { reduceMotion: true } : undefined)).then(done, done);
     say(ids ? place.label + ', ' + connectionsText(ids.length) : place.label);
     return true;
-  }, [graph, live, openPanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say]);
+  }, [graph, live, mode, openPanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say]);
 
   // a verse row's text is the Bible corpus's, which loads lazily: a box open before it lands takes
   // the text when it does (review 2026-10-18; the signal hooks/use-lazy-bundles.js reads). The

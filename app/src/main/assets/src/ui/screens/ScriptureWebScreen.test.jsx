@@ -71,7 +71,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 
 import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
-import { ScriptureWebScreen, _resetWebPlace } from './ScriptureWebScreen.jsx';
+import { ScriptureWebScreen, _resetWebPlace, _setWebPlace } from './ScriptureWebScreen.jsx';
 import { LEG_PPV_CSS } from '../scripture-web/overlay-renderer.js';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
 import { webFrame } from '../../utils/scripture-web/web-frame.js';
@@ -1667,5 +1667,43 @@ describe('the docked panel in the web (w3, spec section 3)', () => {
     expect(first.classList.contains('sw-goto-btn'), 'the go-to button leads').toBe(true);
     expect(second.id).toBe('sw-menu');
     expect(controls.lastElementChild.getAttribute('aria-label')).toBe('More controls');
+  });
+});
+
+/* w4 interaction hunt: a reader door ("Show in Scripture Web" on a verse, a footnote's) opened My
+   Web when the reader had last left the web from My Web, because the mode was seeded from the
+   resume point even with a `start` given. go() then dropped the canon's verse panel, lit set and
+   edge chips onto My Web's dual rail. The props doc says a start wins over the resume point. */
+describe('a door in opens the Scripture Web, whatever web the reader last left from', () => {
+  const mountWith = async (props) => {
+    for (const [prop, px] of [['clientWidth', 800], ['clientHeight', 600]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
+    const view = render(<ScriptureWebScreen {...baseProps()} {...props} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    return view;
+  };
+  afterEach(() => {
+    delete HTMLCanvasElement.prototype.clientWidth;
+    delete HTMLCanvasElement.prototype.clientHeight;
+  });
+  const myWebPlace = () => ({ mode: 'personal', cam: { x: 10, ppv: 1, total: 100, y: 0 }, focus: focusStateOf(), detail: null });
+  const focusStateOf = () => ({ arc: -1, hover: -1, range: null, lit: null, litKey: '' });
+
+  it('control: with no start, the resume point holds (back from the reader lands in My Web)', async () => {
+    _setWebPlace(myWebPlace());
+    await mountWith({});
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('My Web');
+  });
+
+  it('a start wins over a My Web resume point: the door opens the canon', async () => {
+    _setWebPlace(myWebPlace());
+    await mountWith({ start: { verse: { bookId: 'john', chapter: 3, verse: 16 } } });
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Scripture Web');
+    // and the resume point is spent, not kept for a later mount
+    cleanup();
+    await mountWith({});
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Scripture Web');
   });
 });

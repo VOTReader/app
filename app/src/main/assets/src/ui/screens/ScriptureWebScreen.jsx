@@ -89,6 +89,8 @@ const CHROME_HIDDEN_KEY = 'vot-sw-chrome-hidden';
 let resumeWeb = null;
 /** Tests only: forget the resume point between cases. */
 export function _resetWebPlace() { resumeWeb = null; }
+/** Tests only: stand a resume point, as leaving for the reader does. @param {any} place */
+export function _setWebPlace(place) { resumeWeb = place; }
 function readChromeHidden() {
   try { return sessionStorage.getItem(CHROME_HIDDEN_KEY) === '1'; } catch (_e) { return false; }
 }
@@ -109,8 +111,11 @@ function readChromeHidden() {
  */
 export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting, start }) {
   // Taken once per mount (a ref survives StrictMode's second render; the module slot does not).
+  // A start wins over it (a door in from the reader): the mode, the camera and the open card all
+  // start fresh on the canon, and the resume point is spent either way. Seeding the mode from it
+  // opened My Web from a verse's "Show in Scripture Web" (w4 interaction hunt).
   const resumeRef = React.useRef(/** @type {any} */ (undefined));
-  if (resumeRef.current === undefined) { resumeRef.current = resumeWeb; resumeWeb = null; }
+  if (resumeRef.current === undefined) { resumeRef.current = start ? null : resumeWeb; resumeWeb = null; }
   const glRef = React.useRef(null);
   const uiRef = React.useRef(null);
   const wrapRef = React.useRef(null);
