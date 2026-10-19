@@ -1144,7 +1144,7 @@ function strokeThread(ctx, underlay, i, opts, rails, halo, alpha, width) {
   }
 }
 
-/** The reader's links: halo pass first so no halo covers a neighbour's core. */
+/** The reader's links: halo pass first so no halo covers a neighbour's core; a receded link (another is chosen) has none. */
 function drawLinks(ctx, personal, opts, rails, L, linkHover, linkFocus, chosen) {
   const { width, DPR } = opts;
 
@@ -1162,6 +1162,9 @@ function drawLinks(ctx, personal, opts, rails, L, linkHover, linkFocus, chosen) 
     const { pts, rgb, thin } = paths[i];
     if (!pts) continue;
     const hot = i === linkHover || i === linkFocus;
+    // while a line is chosen the receded links are drawn core only (w4 review: their
+    // halo widened them into soft gold bands round the one line that should carry one)
+    if (chosen && !hot) continue;
     const dim = (chosen && i !== linkFocus) ? MYWEB_TAP_CONTEXT : 1;
     ctx.strokeStyle = 'rgba(' + rgb + ',' + ((hot ? L.hoverHaloAlpha : L.haloAlpha) * dim) + ')';
     ctx.lineWidth = (hot ? L.hoverHalo : L.halo) * DPR * thin;

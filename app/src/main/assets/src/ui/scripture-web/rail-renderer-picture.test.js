@@ -236,6 +236,31 @@ describe('P3 a chosen link recedes the rest to MYWEB_TAP_CONTEXT', () => {
     expect(alphas[alphas.length - 1]).toBeCloseTo(L.alpha, 6);
     expect(alphaOf(contextStrokes(ctx)[0].style)).toBeCloseTo(personalInk(1).context.alpha * TAP_CONTEXT, 6);
   });
+  it('w4 review: the receded links are drawn core only, no halo; the chosen one keeps its halo, and so does one under the pointer', () => {
+    // their 7 px halo at .16 x TAP_CONTEXT still widened them into soft gold bands
+    // round the chosen line, which is the one line that should carry a halo
+    const personal = {
+      count: 3, aRail: new Uint8Array([0, 0, 0]), bRail: new Uint8Array([1, 1, 1]),
+      aPos: new Float32Array([20, 50, 80]), bPos: new Float32Array([3, 9, 15]), kind: new Uint8Array([2, 2, 2]),
+    };
+    const L = personalInk(1).link;
+    const halos = (ctx) => ctx.strokes.filter((s) => s.style.startsWith('rgba(224,178,90,') && [L.halo, L.hoverHalo].some((w) => Math.abs(s.width - w) < 1e-6));
+    const cores = (ctx) => ctx.strokes.filter((s) => s.style.startsWith('rgba(224,178,90,') && [L.width, L.hoverWidth].some((w) => Math.abs(s.width - w) < 1e-6));
+    const tap = recordingCtx();
+    drawPersonalWeb(tap, personal, null, Object.assign({}, base, { focusIndex: 0 }));
+    expect(halos(tap).length).toBe(1);
+    expect(halos(tap)[0].width).toBeCloseTo(L.hoverHalo, 6);
+    expect(alphaOf(halos(tap)[0].style)).toBeCloseTo(L.hoverHaloAlpha, 6);
+    expect(cores(tap).length).toBe(3);
+    // a receded link under the pointer shows it with its halo
+    const hover = recordingCtx();
+    drawPersonalWeb(hover, personal, null, Object.assign({}, base, { focusIndex: 0, hoverIndex: 2 }));
+    expect(halos(hover).length).toBe(2);
+    // at rest every link keeps its halo
+    const rest = recordingCtx();
+    drawPersonalWeb(rest, personal, null, base);
+    expect(halos(rest).length).toBe(3);
+  });
   const personal2 = {
     count: 2, aRail: new Uint8Array([0, 0]), bRail: new Uint8Array([1, 1]),
     aPos: new Float32Array([20, 80]), bPos: new Float32Array([3, 15]), kind: new Uint8Array([2, 2]),
