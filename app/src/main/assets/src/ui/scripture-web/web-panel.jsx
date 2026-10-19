@@ -38,7 +38,7 @@
 
 import { ConnectionRow } from './connection-row.jsx';
 import {
-  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, followLabelShort,
+  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel,
   verseEndpoint, verseTextFor, WHOLE_WEB,
 } from '../../utils/scripture-web/describe.js';
 import {
@@ -515,8 +515,8 @@ export function WebPanel(props) {
   } else if (mode === 'connection' && model) {
     const farVerse = detail.far === 'to' ? detail.to : detail.from;
     const farEnd = detail.far === 'to' ? detail.b : detail.a;
-    // compact, the short words, so Follow shares "Open in reader"'s row (w4; describe.js)
-    const followWords = (compact ? followLabelShort : followLabel)(farEnd.label);
+    // "Follow to <the far end>", so Follow shares "Open in reader"'s row (w4; describe.js)
+    const followWords = followLabel(farEnd.label);
     const follow = (
       <button type="button" className="sw-link sw-follow" onClick={() => followThread(detail)}
         aria-label={followWords}><span className="sw-follow-label">{metaItems(followWords)}</span> <span aria-hidden="true">›</span></button>

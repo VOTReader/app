@@ -96,14 +96,11 @@ export function chooserAnnouncement(count) {
   return plural(count, 'connection', 'connections') + ' here. Choose one.';
 }
 
-/** The connection's Follow, as spec 4.6 and G1 word it: "Follow to the other end · Luke 1:31". */
+/** The connection's Follow, naming the far end: "Follow to Luke 1:31". It stands under the far
+ * verse, so "the other end" is where it already is: w4, the spec's "Follow to the other end · Luke
+ * 1:31" took a second row of links on a phone (r2-06 has one), and its meta-style dot inside one
+ * gold link read clunky on PC. One wording, both frames. */
 export function followLabel(label) {
-  return 'Follow to the other end · ' + label;
-}
-
-/** The same on a phone (w4): under the far verse "the other end" is where it stands, and the
- * spec's words took a second row of links there (r2-06 has one): "Follow to Luke 1:31". */
-export function followLabelShort(label) {
   return 'Follow to ' + label;
 }
 

@@ -53,15 +53,15 @@ describe('"Nearby" is the Nearby list and nothing else', () => {
   });
 });
 
-describe('Follow names where it goes as the spec words it (spec 4.6, G1; w3 review)', () => {
-  it('"Follow to the other end · <the far end>"', () => {
-    expect(ds.followLabel('Luke 1:31')).toBe('Follow to the other end · Luke 1:31');
-  });
-  /* w4: on a phone the spec's words take a second row of links under the far verse (r2-06 has one
-     row), and that row was what kept "Cited in the Volumes" under the fold. Under the far verse,
-     "the other end" is where it stands; the short words name it and fit beside "Open in reader". */
-  it('on a phone: "Follow to <the far end>"', () => {
-    expect(ds.followLabelShort('Luke 1:31')).toBe('Follow to Luke 1:31');
+/* Follow names where it goes (spec 4.6, G1; w3 review). w4: on a phone "Follow to the other end ·
+   Luke 1:31" took a second row of links under the far verse (r2-06 has one row), and the review
+   found the meta-style dot inside one gold link clunky on PC too. The control stands under the far
+   verse, so "the other end" is where it already is: one wording, on both frames. */
+describe('Follow names where it goes, in one wording on PC and phone (spec 4.6; w4)', () => {
+  it('"Follow to <the far end>"', () => {
+    expect(ds.followLabel('Luke 1:31')).toBe('Follow to Luke 1:31');
+    expect(ds.followLabel('Luke 1:31')).not.toContain('·');
+    expect(ds.followLabelShort, 'one wording: no phone variant').toBeUndefined();
   });
 });
 

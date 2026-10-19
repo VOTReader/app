@@ -483,7 +483,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection sheet opened').toBeTruthy();
       // the camera sits at 15551 = the from foot, so the far foot is `to`: Genesis 2:5101
-      const follow = screen.getByRole('button', { name: /^follow to the other end · genesis 2:5101$/i });
+      const follow = screen.getByRole('button', { name: /^follow to genesis 2:5101$/i });
       /* A3 (w3 navigation): Follow FLIES there, eased over 600-900 ms through the frame loop, so
          the camera is read once the fly has landed (it once jumped, and one frame was enough). */
       const landsAt = async (x) => {
@@ -496,7 +496,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       // centred on the foot, at the verse's middle
       await landsAt(20100.5);
       // and back: the control now names the from foot
-      fireEvent.click(screen.getByRole('button', { name: /^follow to the other end · genesis 2:552$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:552$/i }));
       await landsAt(15551.5);
       // the line stays chosen throughout: the sheet is still up
       expect(container.querySelector('.sw-sheet')).toBeTruthy();
@@ -516,13 +516,13 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         }
         expect(lastCamX()).toBeCloseTo(x, 1);
       };
-      fireEvent.click(screen.getByRole('button', { name: /^follow to the other end · genesis 2:5101$/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
       await landsAt(20100.5);
       expect(container.querySelectorAll('.sw-crumbs li'), 'home, then here').toHaveLength(2);
       fireEvent.click(screen.getByRole('button', { name: 'Back along the trail' }));
       await landsAt(15551.5);
       // reopened from home on landing (the fly's last frame): its Follow names the far foot again
-      const again = /^follow to the other end · genesis 2:5101$/i;
+      const again = /^follow to genesis 2:5101$/i;
       for (let i = 0; i < 50 && !screen.queryByRole('button', { name: again }); i++) {
         await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       }
