@@ -122,8 +122,9 @@ describe('My Web r2 — G1 full resolution', () => {
     expect(rest.calls.glow - ctx0.calls.glow).toBe(1);
     const liveCtx = fakeCtx(); drawPersonalWeb(liveCtx, null, corridor, Object.assign({}, opts, { capFraction: 0 }));
     expect(liveCtx.calls.stroke - ctx0.calls.stroke).toBe(RR.LIVE_CAP + 1);   // LIVE_CAP layers + the shared overflow
-    // a live gesture keeps its frames: no glow until the view is at rest (w4)
-    expect(liveCtx.calls.glow - ctx0.calls.glow).toBe(0);
+    // a live gesture keeps the glow, as at rest (w4 review: drawn only at rest, the
+    // field lost about half its ink as a pinch began and won it back as it ended)
+    expect(liveCtx.calls.glow - ctx0.calls.glow).toBe(1);
     // coverage, not the layer count, is what eases: at f = 0.5 the cap sits where
     // coverage is halfway between the live and the full coverage
     const a = 0.04;
