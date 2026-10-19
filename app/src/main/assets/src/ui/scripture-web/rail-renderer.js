@@ -176,11 +176,18 @@ function railForms(seg) {
  * can take, steps its family down to the next form and the rail is placed
  * again (w4 review: "HOLY DAYS" was dropped at 732 x 360 and 19 of 21 names on
  * a portrait phone; never drop, abbreviate). A family steps down together
- * (Volumes I-VII, WTLB I-II), so one rail never mixes "VOL I" and "V2". Only
- * a name already at its tiniest form is left unprinted (its tick stays): a
- * band cut to a sliver by the screen edge on a zoom.
+ * (Volumes I-VII, WTLB I-II), so one rail never mixes "VOL I" and "V2".
+ *
+ * Only a band wholly in the area decides its family's form (w4 fix round 2:
+ * a band cut to a sliver by the screen edge on a zoom, or by the docked
+ * panel's edge, failed the room test and stepped its whole family down, so a
+ * pan flipped "VOL III | VOL IV | VOL V" to "V3 | V4 | V5 | V6 | V7" and back,
+ * and TIMOTHY read "LT" at the panel). A cut band takes its family's form, or
+ * no name (its tick stays) until enough of it is on screen, and gives way to
+ * the whole bands where the rows are short of room. Only a name already at
+ * its tiniest form is left unprinted for want of room.
  * @param {CanvasRenderingContext2D} ctx  its font and tracking set
- * @param {Array<{span:{labelX:number, room:number}, forms:string[], group:string}>} bands
+ * @param {Array<{span:{x0:number, x1:number, labelX:number, room:number}, forms:string[], group:string}>} bands
  * @param {{width:number, pad:number, inset:number, rows:number}} o
  * @returns {Array<{label:string, x:number, row:number}>}
  */
@@ -192,29 +199,57 @@ function placeRailNames(ctx, bands, o) {
     if (w == null) { w = ctx.measureText(t).width; widths.set(t, w); }
     return w;
   };
+  /** The band's name at its family's form: null when the band has no room for it. */
+  const nameOf = (b, at) => {
+    const t = Math.min(step.get(b.group) || 0, b.forms.length - 1);
+    const label = b.forms[t], w = measure(label);
+    const last = t === b.forms.length - 1;
+    if (w > b.span.room * o.rows) return { fits: false, last };
+    const lo = w / 2 + o.inset, hi = o.width - w / 2 - o.inset;
+    const x = lo > hi ? o.width / 2 : Math.min(hi, Math.max(lo, b.span.labelX));
+    return { fits: true, last, item: { label, x, w, max: Math.min(hi, b.span.labelX + b.span.room / 2), b, at } };
+  };
+  const place = (list) => placeRailLabelsSliding(list, o.pad, o.rows);
+  // half a device px of slack: a fit camera's ends land on 0 and the width, give or take rounding
+  const isWhole = (b) => b.span.x0 >= -0.5 && b.span.x1 <= o.width + 0.5;
+  const named = [];
+  bands.forEach((b, at) => { if (b.forms.length) named.push({ b, at }); });
+  const wholes = named.filter((n) => isWhole(n.b)), cuts = named.filter((n) => !isWhole(n.b));
+  // 1. the bands wholly in the area settle their families' forms
+  let list = [], at = [];
   for (let pass = 0; ; pass++) {
-    const names = [], from = [];
+    list = [];
     const down = new Set();
-    for (const b of bands) {
-      if (!b.forms.length) continue;
-      const t = Math.min(step.get(b.group) || 0, b.forms.length - 1);
-      const label = b.forms[t], w = measure(label);
-      const last = t === b.forms.length - 1;
-      if (w > b.span.room * o.rows) { if (!last) down.add(b.group); continue; }
-      const lo = w / 2 + o.inset, hi = o.width - w / 2 - o.inset;
-      const x = lo > hi ? o.width / 2 : Math.min(hi, Math.max(lo, b.span.labelX));
-      names.push({ label, x, w, max: Math.min(hi, b.span.labelX + b.span.room / 2) });
-      from.push({ b, last });
+    for (const { b, at: k } of wholes) {
+      const n = nameOf(b, k);
+      if (!n.fits) { if (!n.last) down.add(b.group); continue; }
+      list.push(Object.assign(n.item, { last: n.last }));
     }
-    const at = placeRailLabelsSliding(names, o.pad, o.rows);
-    at.forEach((p, i) => { if (p.row < 0 && !from[i].last) down.add(from[i].b.group); });
-    if (!down.size || pass >= 3) {
-      const out = [];
-      names.forEach((nm, i) => { if (at[i].row >= 0) out.push({ label: nm.label, x: at[i].x, row: at[i].row }); });
-      return out;
-    }
+    at = place(list);
+    at.forEach((p, i) => { if (p.row < 0 && !list[i].last) down.add(list[i].b.group); });
+    if (!down.size || pass >= 3) break;
     for (const g of down) step.set(g, (step.get(g) || 0) + 1);
   }
+  // 2. a cut band (at most one at each end) joins at its family's form, and gives
+  // way, one end then both, wherever its name would cost a whole band its row
+  const extra = [];
+  for (const { b, at: k } of cuts) { const n = nameOf(b, k); if (n.fits) extra.push(n.item); }
+  const wholePlaced = at.filter((p) => p.row >= 0).length;
+  const tries = [extra];
+  if (extra.length > 1) extra.forEach((_, j) => tries.push(extra.filter((__, i) => i !== j)));
+  if (extra.length) tries.push([]);
+  for (const ex of tries) {
+    const all = list.concat(ex).sort((p, q) => p.at - q.at);
+    const got = ex.length ? place(all) : at;
+    const seq = ex.length ? all : list;
+    let placed = 0;
+    seq.forEach((nm, i) => { if (got[i].row >= 0 && !ex.includes(nm)) placed++; });
+    if (placed < wholePlaced) continue;
+    const out = [];
+    seq.forEach((nm, i) => { if (got[i].row >= 0) out.push({ label: nm.label, x: got[i].x, row: got[i].row }); });
+    return out;
+  }
+  return [];
 }
 
 /**
@@ -908,7 +943,8 @@ function drawRails(ctx, opts, rails) {
   // review: under it "TIMO..." and "REV" were cut by its edge). The bands keep
   // their width (the rail spans the frame), so the type is the frame's; a band
   // wholly under the panel is unnamed, one cut by its edge is named over what
-  // shows of it, as the screen edge cuts a band on a zoom.
+  // shows of it, as the screen edge cuts a band on a zoom, by its family's form
+  // or not at all (placeRailNames: a cut band never steps its family down).
   const area = opts.areaWidth > 0 ? Math.min(width, opts.areaWidth) : width;
   const inArea = area < width ? Object.assign({}, opts, { width: area }) : opts;
   // the Bible rail (the canon's baseline ink) and the Volumes rail (spec §4.2)

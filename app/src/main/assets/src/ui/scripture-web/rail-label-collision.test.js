@@ -204,10 +204,76 @@ describe('the Volumes rail keeps its names apart (one placement law for both rai
       const names = topRailLabels(ctx, f);
       expect(names.length).toBeGreaterThan(5);
       for (const l of names) expect(l.right, `${wCss}: ${l.text}`).toBeLessThanOrEqual(area + 1e-6);
-      // the bands wholly under the panel go unnamed; every band left of it is named
+      // the bands wholly under the panel go unnamed; every band wholly left of it is named. The
+      // band its edge cuts is named by its family's own form or not at all (w4 fix round 2: it
+      // stepped down to its badge, "LT" or "HD", where no sibling wore one; this pinned it named)
       const slot = f.W / CHAIN.length;
-      const under = CHAIN.filter((_, i) => i * slot >= area).length;
-      expect(names.length, names.map((l) => l.text).join(',')).toBe(CHAIN.length - under);
+      const all = names.map((l) => l.text).join(',');
+      const at = (i) => names.find((l) => formsOf(i).includes(l.text));
+      CHAIN.forEach((_, i) => {
+        if (i * slot >= area) expect(at(i), `${all}: ${CHAIN[i][1]} is under the panel`).toBeUndefined();
+        else if ((i + 1) * slot <= area) expect(at(i), `${all}: ${CHAIN[i][1]} is whole`).toBeTruthy();
+        else if (at(i)) expect(at(i).text, all).toBe(formsOf(i)[0]);
+      });
+    }
+  });
+
+  /* w4 fix round 2 (review, major): panning a zoomed Volumes rail flipped a whole family between
+     its names and its nav badges ("VOL III | VOL IV | VOL V" to "V3 | V4 | V5 | V6 | V7" and
+     back) because a band cut to a sliver by the screen or panel edge failed the room test and
+     stepped its family down, and at the docked panel's edge TIMOTHY read "LT". A cut band never
+     steps its family: it takes its family's form, or none, and its name comes back as the band
+     comes on screen. */
+  const ZOOM = 5, STEPS = 40;
+  const formAt = new Map();
+  // a collection whose badge is its name (MTAM, LAMB) has the one form, 0
+  CHAIN.forEach((_, i) => formsOf(i).forEach((t, k) => { if (!formAt.has(t)) formAt.set(t, { i, k }); }));
+  /** The names of one frame, keyed to their collection and form (0 the name, 1 the badge). */
+  const read = (f, extra) => {
+    const ctx = recordingCtx();
+    drawPersonalWeb(ctx, null, null, Object.assign({}, f.opts, extra));
+    return topRailLabels(ctx, f).map((l) => Object.assign({ text: l.text }, formAt.get(l.text)));
+  };
+  for (const [wCss, hCss, dpr, panel] of /** @type {Array<[number, number, number, number]>} */ ([
+    [1600, 900, 1, 0], [891, 411, 2.6, 0], [732, 360, 2, 0], [1600, 900, 1, 400], [891, 411, 2.6, 300],
+  ])) {
+    it(`${wCss} x ${hCss} @${dpr}${panel ? `, panel ${panel}` : ''}: panning a ${ZOOM}x Volumes rail never flips a family between its names and its badges`, () => {
+      const f = frame(wCss, dpr, hCss);
+      const area = f.W - panel * dpr;
+      const span = rail.span || rail.total;
+      const slot = (f.W * ZOOM) / CHAIN.length;
+      // the precondition: at 5x every slot is wider than any name in any form, so a band wholly
+      // on screen never lacks room and its family has no reason to step down
+      expect(slot).toBeGreaterThan(70 * dpr * 2);
+      let prev = null;
+      for (let s = 0; s < STEPS; s++) {
+        const off = (s / (STEPS - 1)) * (ZOOM - 1) * f.W;
+        const votX = (u) => (u / span) * f.W * ZOOM - off;
+        const names = read(f, Object.assign({ votX }, panel ? { areaWidth: area } : {}));
+        const where = `step ${s}: ` + names.map((n) => n.text).join(' | ');
+        for (const n of names) expect(n.k, where).toBe(0);
+        // every band wholly in the canvas area is named
+        CHAIN.forEach((_, i) => {
+          const x0 = i * slot - off, x1 = (i + 1) * slot - off;
+          if (x0 >= 0 && x1 <= area) expect(names.some((n) => n.i === i), `${where}: ${CHAIN[i][1]} is whole and unnamed`).toBe(true);
+        });
+        // a family keeps its form from one step to the next
+        const fam = new Map(names.map((n) => [CHAIN[n.i][4], n.k]));
+        if (prev) for (const [g, k] of fam) if (prev.has(g)) expect(k, `${where}: ${g} changed form`).toBe(prev.get(g));
+        prev = fam;
+      }
+    });
+  }
+
+  it('with the panel docked at fit, no family takes a tinier form than it has with the panel closed (w4 review: TIMOTHY read LT at the panel\'s edge)', () => {
+    for (const [wCss, hCss, dpr, panel] of /** @type {Array<[number, number, number, number]>} */ ([
+      [1600, 900, 1, 400], [891, 411, 2.6, 300], [732, 360, 2, 280], [891, 411, 2.6, 330], [891, 411, 2.6, 360],
+    ])) {
+      const f = frame(wCss, dpr, hCss);
+      const open = new Map(read(f, {}).map((n) => [CHAIN[n.i][4], n.k]));
+      for (const n of read(f, { areaWidth: f.W - panel * dpr })) {
+        expect(n.k, `${wCss} panel ${panel}: ${n.text}`).toBeLessThanOrEqual(open.get(CHAIN[n.i][4]));
+      }
     }
   });
 
