@@ -12,6 +12,7 @@ import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { INK, FONT } from '../../utils/scripture-web/sw-ink.js';
+import { DISTANCE_RAMP } from '../../utils/scripture-web/palette.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CSS = readFileSync(resolve(here, '..', '..', '..', 'app.css'), 'utf8');
@@ -78,6 +79,14 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
     expect(INK.prophecyKey.hex).toBe(INK.prophecy.hex);
     expect(INK.prophecyKey.alpha).toBeGreaterThanOrEqual(0.85);
     expect(rule('.sw-key-arc')).toMatch(/border:\s*1\.5px solid var\(--sw-prophecy\)/);
+  });
+
+  it('the legend\'s ramp is the shader\'s distance ramp, stop for stop (palette DISTANCE_RAMP)', () => {
+    const m = /linear-gradient\(to right,\s*([^)]*)\)/.exec(rule('.sw-key-gradient') || '');
+    expect(m).not.toBeNull();
+    const stops = m[1].split(',').map((x) => x.trim().toUpperCase());
+    const want = DISTANCE_RAMP.map((c) => '#' + c.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('').toUpperCase());
+    expect(stops).toEqual(want);
   });
 
   it('the face is the web\'s one face', () => {

@@ -18,10 +18,19 @@ import { ink } from './sw-ink.js';
 /**
  * The distance ramp, matched to the source visualization: magenta and violet
  * at the feet, through blue and steel, into red, tan, olive and finally green
- * at the top of the dome. Eight stops, linearly interpolated in the shader.
+ * at the top of the dome. Ten stops, linearly interpolated in the shader.
+ * The magenta-to-violet stretch spans the first three intervals (two stops on
+ * its own line, w4 INK review): with it in one interval, as the eight-stop
+ * ramp had it, spans of about 300 to 3,000 verses took the blue and steel
+ * stops, and the overview's feet read blue (Psalms to Revelation, the bottom
+ * 3% of the dome: magenta-violet 9%, blue 86% of lit pixels, with the
+ * prophecy class off) where r2-01a's glow is magenta-violet (70%, 29%). With
+ * it, 69% and 31%, and the red middle and green canopy stay where they were.
  */
 export const DISTANCE_RAMP = [
   [0.76, 0.32, 0.72],
+  [0.69, 0.33, 0.78],
+  [0.62, 0.34, 0.83],
   [0.56, 0.36, 0.85],
   [0.31, 0.44, 0.83],
   [0.36, 0.62, 0.79],

@@ -573,7 +573,11 @@ float flyOverWidth(float anchored, float localize, float leg){
 /** The distance ramp's exponent: a span's t is pow(span / total, SPAN_T_EXP), the shader's colour input. */
 export const SPAN_T_EXP = 0.40;
 /** The ramp's t over which a thread eases from short (1) to long (0): about 10 verses to 318, the
- *  ramp's magenta-violet first stretch (palette.DISTANCE_RAMP). */
+ *  ramp's magenta to magenta-violet start (palette.DISTANCE_RAMP: its second stop is t 1/9, its
+ *  third 2/9). Wider (.25, .30) was tried on the w4 review's ask and refused by the pair: at 209x
+ *  the 300 to 1,500-verse threads are the big arcs over the frame, and inked up they laid a violet
+ *  mesh over the local domes (upper field lit 55% -> 59% PC, 63% -> 70% phone) for a feet band
+ *  that barely moved (magenta-violet 9% -> 13%). */
 export const SHORT_T0 = 0.04;
 export const SHORT_T1 = 0.16;
 /** The shortest spans' extra ink: their alpha times 1 + SHORT_GAIN, clamped to full ink. */

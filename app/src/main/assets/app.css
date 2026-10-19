@@ -8399,7 +8399,7 @@
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
     .sw-key-gradient {
       width: 120px; height: 4px; border-radius: 2px; display: inline-block; margin: 0 4px;
-      background: linear-gradient(to right, #c252b8, #8f5cd9, #4f70d4, #5c9ec9, #b54750, #c9a06b, #99a84f, #54c25e);
+      background: linear-gradient(to right, #c252b8, #b054c7, #9e57d4, #8f5cd9, #4f70d4, #5c9ec9, #b5474f, #c9a16b, #99a84f, #54c25e);
     }
 
     .sw-root.sw-compact .sw-key-gradient { width: 64px; }
