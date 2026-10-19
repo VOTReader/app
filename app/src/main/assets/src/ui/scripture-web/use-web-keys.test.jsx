@@ -5,7 +5,7 @@
    is a stub here (goto.test.jsx drives the real one through these keys). */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
-import { useWebKeys, WEB_KEYS_HELP } from './use-web-keys.js';
+import { useWebKeys, WEB_KEYS_HELP, MY_WEB_KEYS_HELP } from './use-web-keys.js';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
 
 afterEach(() => { cleanup(); document.body.innerHTML = ''; });
@@ -162,6 +162,12 @@ describe('the help text (G2)', () => {
     for (const w of [/arrow keys/i, /plus and minus/i, /\b0\b/, /Enter or Space/, /\[ and \]/, /slash|\//i, /Control\+K/, /Backspace/, /Escape/]) {
       expect(WEB_KEYS_HELP).toMatch(w);
     }
+  });
+  /* w4 quality hunt: My Web read the canon's help, which promised Enter, [ ] and Go to; there
+     Enter does nothing and / is the app's Search */
+  it("My Web's names its own keys, and none it lacks", () => {
+    for (const w of [/rail you last touched/, /plus and minus/i, /\b0\b/, /Escape/, /Search/]) expect(MY_WEB_KEYS_HELP).toMatch(w);
+    for (const w of [/Enter or Space/, /\[ and \]/, /Go to/, /Control\+K/, /Backspace/]) expect(MY_WEB_KEYS_HELP).not.toMatch(w);
   });
 });
 

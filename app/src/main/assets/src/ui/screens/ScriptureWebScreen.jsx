@@ -57,7 +57,7 @@ import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
 import { usePanelLayout, usePanelInset, collapsedFor } from '../scripture-web/use-panel-layout.js';
 import { WebPanel } from '../scripture-web/web-panel.jsx';
-import { useWebKeys, WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
+import { useWebKeys, WEB_KEYS_HELP, MY_WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
 import { useJourney } from '../scripture-web/use-journey.js';
 import { useGoTo } from '../scripture-web/goto.jsx';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
@@ -518,6 +518,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         ) : null}
       </div>
 
+      {/* the how-to-read card's button: the corner above the hide-all
+          button, off the controls strip (which it overflowed on a phone). It waits for the web
+          as the card does (w4 review: pressed during the load it showed nothing, then opened the
+          card late and unasked when the web arrived). Before the hide-all button in the DOM, as it
+          is drawn left of it (or above it), so Tab crosses the pair left to right (w4 review) */}
+      {graph && (
+        <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideShown ? ' is-on' : '')}
+          onClick={() => (guideShown ? closeGuide() : setGuideOpen(true))}
+          aria-label="How to read this web" aria-expanded={guideShown} aria-haspopup="dialog">?</button>
+      )}
+
       {/* HIDE THE CONTROLS — outside everything it hides, because it is the way
           back; bottom-right, the one free corner on the smallest frame (app.css
           says why). Hidden means the topbar and the strip (the pills, Reset, the
@@ -535,17 +546,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </svg>
         <span className="sw-hide-label">{chromeHidden ? 'Show controls' : 'Hide controls'}</span>
       </button>
-
-      {/* the how-to-read card's button: the corner above the hide-all
-          button, off the controls strip (which it overflowed on a phone). It waits for the web
-          as the card does (w4 review: pressed during the load it showed nothing, then opened the
-          card late and unasked when the web arrived) */}
-      {graph && (
-        <button type="button" className={'sw-btn sw-btn-icon sw-guide-btn' + (guideShown ? ' is-on' : '')}
-          onClick={() => (guideShown ? closeGuide() : setGuideOpen(true))}
-          aria-label="How to read this web" aria-expanded={guideShown} aria-haspopup="dialog">?</button>
-      )}
-      {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} mode={mode} />}
+      {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} mode={mode}
+        home={() => wrapRef.current} />}
       {goTo.box}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
@@ -572,7 +574,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           data-wheel-through="1" onClick={() => resetRail('bottom')}>Reset Bible</button>
       ) : null}
       <div className="sw-live" role="status" aria-live="polite">{announce}</div>
-      <div id="sw-a11y-help" className="sw-sr-only">{WEB_KEYS_HELP}</div>
+      <div id="sw-a11y-help" className="sw-sr-only">{mode === 'personal' ? MY_WEB_KEYS_HELP : WEB_KEYS_HELP}</div>
     </div>
   );
 }

@@ -141,17 +141,20 @@ function Chevron({ open }) {
   );
 }
 
-/** A section with a tracked-caps head; `collapsible` makes the head a disclosure button. */
+/** A section with a tracked-caps head; `collapsible` makes the head a disclosure button. The head
+ * is named in the title's own case (w4 screen-reader hunt): the CSS capitals went into the
+ * accessible name, and some readers spell an all-caps word letter by letter. */
 function Section({ title, collapsible = false, startOpen = true, children, className = '' }) {
   const [open, setOpen] = React.useState(startOpen);
   const shown = !collapsible || open;
+  const name = typeof title === 'string' ? title : undefined;
   return (
     <section className={'sw-sec ' + className}>
       {collapsible ? (
-        <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} aria-label={name} onClick={() => setOpen(!open)}>
           <span className="sw-sec-title">{metaItems(title)}</span><Chevron open={open} />
         </button>
-      ) : <h3 className="sw-sec-head"><span className="sw-sec-title">{metaItems(title)}</span></h3>}
+      ) : <h3 className="sw-sec-head" aria-label={name}><span className="sw-sec-title">{metaItems(title)}</span></h3>}
       {shown ? children : null}
     </section>
   );

@@ -316,12 +316,16 @@ export function listEyebrow(mode, chapter, _lensOn) {
     : 'Nearby connections';
 }
 
-/** The Nearby list's meta line; `count` is the whole list, the chapter row included. */
+/** The Nearby list's meta line; `count` is the whole list, the chapter row included. None at the
+ * density says so, a list that holds them all says how many, and a cut list says how many of how
+ * many (w4 copy hunt: "0 connections · the strongest 0 below", "1 connection · the strongest 1"). */
 export function listMeta(chapter, count) {
-  return chapter
-    ? chapter.connections.toLocaleString() + (chapter.connections === 1 ? ' connection' : ' connections')
-      + ' · the strongest ' + (count - 1) + ' below; the chapter row lists where they all go.'
-    : 'Select a connection to focus it and open its passages.';
+  if (!chapter) return 'Select a connection to focus it and open its passages.';
+  const n = chapter.connections;
+  if (!(n > 0)) return 'No connections at this density.';
+  const shown = Math.max(0, count - 1);
+  if (shown >= n) return plural(n, 'connection', 'connections') + ' below.';
+  return plural(n, 'connection', 'connections') + '; the strongest ' + shown.toLocaleString() + ' below. Open the chapter for all of them.';
 }
 
 /** What the live region says when a hit is chosen. */

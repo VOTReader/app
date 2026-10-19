@@ -32,6 +32,13 @@ export const WEB_KEYS_HELP = 'Drag to move through scripture; pinch or scroll to
   + 'Slash or Control+K opens Go to, for a book, chapter or verse; Backspace goes back to where you were before. '
   + 'Escape closes what is on top, then leaves the web. Nearby opens a keyboard-friendly list.';
 
+/** My Web's #sw-a11y-help (w4 quality hunt: it was the canon's, which promised Enter, [ ] and Go
+ * to, none of which My Web has; there / is the app's Search, so it says so). */
+export const MY_WEB_KEYS_HELP = 'Drag either rail to move along it; pinch or scroll to zoom. '
+  + 'The arrow keys move the rail you last touched, the plus and minus keys zoom it, and 0 resets both. '
+  + 'Tap a line to read both ends. Slash opens the app’s Search. '
+  + 'Escape closes what is on top, then leaves the web. Nearby lists your links.';
+
 const TEXT_FIELD = { INPUT: 1, TEXTAREA: 1, SELECT: 1 };
 
 /**

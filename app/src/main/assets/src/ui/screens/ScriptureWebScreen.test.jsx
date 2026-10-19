@@ -1063,6 +1063,26 @@ describe('how to read this web (landing 13): one card, plain words, once', () =>
     expect(updateSetting).toHaveBeenCalledWith('swGuideSeen', true);
   });
 
+  /* w4 focus hunt: on a first visit the card opens itself with focus on <body>, and closing it
+     handed the keyboard back there, where the web's keys do not reach */
+  it('opened on its own on a first visit: closing it puts the keyboard on the web', async () => {
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
+    const { container } = await mountGuide({ settings: {} });
+    expect(container.querySelector('.sw-guide'), 'PRECONDITION: the card is up').toBeTruthy();
+    fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    expect(document.activeElement).toBe(container.querySelector('.sw-root'));
+  });
+
+  /* w4 quality hunt: Hide controls came before ? in the DOM, though ? is drawn left of it (or
+     above it), so Tab crossed the pair right to left */
+  it('the ? comes before Hide controls in the DOM, as it is drawn', async () => {
+    const { container } = await mountGuide();
+    const pair = Array.from(container.querySelectorAll('.sw-guide-btn, .sw-hide-all'));
+    expect(pair.map((b) => (b.classList.contains('sw-guide-btn') ? '?' : 'hide'))).toEqual(['?', 'hide']);
+  });
+
   it('stays closed for a reader who has seen it; the ? button brings it back and Escape closes it without leaving', async () => {
     const onBack = vi.fn();
     const { container } = await mountGuide({ onBack });
@@ -1472,6 +1492,14 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'My Web' }));
     return r;
   };
+
+  // w4 quality hunt: the screen reader's key help in My Web was the canon's (Enter, [ ], Go to)
+  it("the key help in My Web is My Web's: the rails' keys, not the canon's", async () => {
+    const { container } = await openMyWeb();
+    const help = container.querySelector('#sw-a11y-help').textContent;
+    expect(help).toMatch(/rail you last touched/);
+    expect(help).not.toMatch(/Enter or Space|Go to/);
+  });
 
   // w4 quality hunt: My Web's ? opened the canon's card (votes, gold ticks); it opens My Web's own
   it('the ? card in My Web speaks of My Web: its rails and their Reset buttons, no votes', async () => {

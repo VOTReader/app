@@ -95,8 +95,17 @@ export function TipChip({ info, viewport, inset }) {
  * `mode` 'personal' (w4): My Web's own four lines, its two rails, the reader's links and
  * Timothy's notes as the legend names them, a tap, and the rails' Reset buttons; the canon's
  * card told of votes and gold ticks My Web does not draw. */
-export function HowToReadGuide({ onClose, canSearch, credit, mode }) {
-  const trapRef = useFocusTrap(true);
+export function HowToReadGuide({ onClose, canSearch, credit, mode, home }) {
+  // where focus was as it opened: on a first visit it opens itself with focus nowhere (<body>), and
+  // closing it handed the keyboard back there, where the web's keys do not reach (w4 focus hunt);
+  // then home (the web's root) takes it
+  const openedFrom = React.useRef(typeof document !== 'undefined' ? document.activeElement : null);
+  const trapRef = useFocusTrap(true, {
+    returnFocus: () => {
+      const from = openedFrom.current;
+      return (!from || from === document.body) && typeof home === 'function' ? home() : null;
+    },
+  });
   const words = myWebLegendWords();
   return (
     <div className="sw-guide" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="sw-guide-title">

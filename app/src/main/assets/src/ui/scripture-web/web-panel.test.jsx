@@ -234,6 +234,10 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(more[1].querySelector('.sw-sec-title').textContent).toMatch(/^More from Matthew 1:23 · /);
     expect(more[0].querySelector('.sw-sec-toggle').getAttribute('aria-expanded')).toBe('true');
     expect(more[1].querySelector('.sw-sec-toggle').getAttribute('aria-expanded')).toBe('false');
+    // w4 screen-reader hunt: the CSS capitals went into the name ("MORE FROM GENESIS 3:6"); the
+    // head is named in the title's own case
+    expect(more[0].querySelector('.sw-sec-toggle').getAttribute('aria-label')).toBe(more[0].querySelector('.sw-sec-title').textContent);
+    expect(more[0].querySelector('.sw-sec-toggle').getAttribute('aria-label')).toMatch(/^More from Isaiah 7:14 · /);
     expect(more[0].querySelector('.sw-sort-note').textContent).toBe('Strongest first in each book.');
     // the first book is open; its rows never list the chosen thread
     const rows = more[0].querySelectorAll('.sw-group .sw-row');

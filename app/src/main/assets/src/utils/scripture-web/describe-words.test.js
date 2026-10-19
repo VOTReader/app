@@ -65,6 +65,25 @@ describe('Follow names where it goes, in one wording on PC and phone (spec 4.6; 
   });
 });
 
+/* w4 copy hunt: the Nearby list's meta said "0 connections · the strongest 0 below; the chapter row
+   lists where they all go." on a chapter with none, and "the strongest 1" of one. */
+describe("the Nearby list's meta counts what it lists", () => {
+  const ch = (n) => ({ connections: n, book: { title: 'Obadiah' }, chapter: 1 });
+  it('none at the density says so', () => {
+    expect(ds.listMeta(ch(0), 1)).toBe('No connections at this density.');
+  });
+  it('a list that holds them all says how many, singular at one', () => {
+    expect(ds.listMeta(ch(1), 2)).toBe('1 connection below.');
+    expect(ds.listMeta(ch(12), 13)).toBe('12 connections below.');
+  });
+  it('a cut list says how many of how many, and where the rest are', () => {
+    expect(ds.listMeta(ch(121), 37)).toBe('121 connections; the strongest 36 below. Open the chapter for all of them.');
+  });
+  it('no chapter: the hint to choose', () => {
+    expect(ds.listMeta(null, 0)).toBe('Select a connection to focus it and open its passages.');
+  });
+});
+
 describe('plurals are right at one', () => {
   // was pinned on groupAnnouncement, which went with the bundle sheet's group buttons (w3 review);
   // the same law on the bundle's own words
