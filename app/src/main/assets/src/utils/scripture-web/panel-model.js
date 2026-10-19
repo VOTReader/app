@@ -343,7 +343,8 @@ export const MIN_FRAME = 24;
  * Where flyTo leaves the camera for a target (CONTRACTS.md section 3, its pinned maths): the zoom
  * clamped to [fit, fit x cap], the target at the CANVAS AREA's centre, then the camera's own clamp
  * (geometry.js clampCamera) with the panel's slack: the canon's start stops at the view's left
- * edge, its end at the canvas area's right edge, so what the panel opens is never left under it.
+ * edge, its end the outer tenth inside the canvas area (END_MARGIN), so what the panel opens is
+ * never left under it or on its border.
  * A copy; the camera is not touched.
  * @param {{ x: number, ppv: number, total: number }} cam  ppv in device px a verse
  * @param {number} W  the view's width, device px
@@ -366,7 +367,7 @@ export function landingOf(cam, W, right, target, cap) {
 /**
  * Whether a connection's frame holds both its feet inside the canvas area once flyTo and the clamp
  * have had their say: a thread wider than the area at fit cannot be framed whole (the zoom stops at
- * fit). The clamp's slack lets a frame reach the canon's end inside the area.
+ * fit). The clamp's slack lets a frame reach the canon's end with connectionFrame's margin kept.
  * @param {{ x: number, ppv: number, total: number }} cam
  * @param {number} W @param {number} right  device px
  * @param {{ x0: number, x1: number }} frame  connectionFrame's

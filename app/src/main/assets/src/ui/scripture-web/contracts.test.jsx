@@ -435,16 +435,17 @@ describe("the panel brings what it opens out from under itself, even at the cano
   // where verse v's foot stands across the canvas area: 0 its left edge, 1 the panel's
   const across = (m, v) => verseToX(m.get().cam.camRef.current, W, v + 0.5) / 2 / AREA;
 
-  // the canvas area's right edge stands at the canon's end (the clamp's slack, no further)
+  // where the canon's end stands in the canvas area, CSS px: the area's outer tenth inside its right
+  // edge at most (the clamp's slack and END_MARGIN, no further)
   const areaEnd = (m) => verseToX(m.get().cam.camRef.current, W, TOTAL) / 2;
 
   /* w3 review, round 2 (major): this case once pinned the cure that was worse than the defect. To
      centre Revelation 21:4 from the overview the camera dived to 489x (65 device px a verse), and
      Follow kept that zoom: a curtain of vertical legs, no lit thread's way readable. The dive was
      bounded (the reader's zoom x 4) while the camera's clamp kept the VIEW inside the canon. That
-     clamp now leaves the panel room (geometry.clampCamera's right slack: the canon's end stops at
-     the canvas area's right edge), so nothing dives: the reader's zoom is kept, and the bound's
-     cases read that law now. */
+     clamp now leaves the panel room (geometry.clampCamera's right slack: the canon's end stops the
+     outer tenth inside the canvas area's right edge), so nothing dives: the reader's zoom is kept,
+     and the bound's cases read that law now. */
   it("a verse in Revelation 21 opened at the overview stands in the area at the overview's zoom", () => {
     const REV_21_4 = TOTAL - 45;
     const m = pc({ x: TOTAL / 2, ppv: FIT });
@@ -452,8 +453,8 @@ describe("the panel brings what it opens out from under itself, even at the cano
     expect(m.get().cam.camRef.current.ppv).toBeCloseTo(FIT, 12);
     const f = across(m, REV_21_4);
     expect(f).toBeGreaterThan(0.1);
-    expect(f).toBeLessThan(1);
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(f).toBeLessThanOrEqual(0.9);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
   });
 
   it("a verse in Revelation stands in the area at the reader's zoom, the canon's end at the area's edge", () => {
@@ -464,7 +465,7 @@ describe("the panel brings what it opens out from under itself, even at the cano
     expect(f).toBeGreaterThan(0.1);
     expect(f).toBeLessThan(0.9); // 300 verses from the end at 1 CSS px a verse: 0.69
     expect(m.get().cam.camRef.current.ppv).toBe(2);
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
   });
 
   it('John 3:16 at the zoom the review measured is centred in the area, not left at 888 of 960', () => {
@@ -486,11 +487,11 @@ describe("the panel brings what it opens out from under itself, even at the cano
     expect(near).toBeLessThan(0.9);
     const whole = across(m, TOTAL - 300);
     expect(whole).toBeGreaterThan(0.1);
-    expect(whole).toBeLessThan(1);
+    expect(whole).toBeLessThanOrEqual(0.9);
     act(() => { m.get().sel.followThread(info); });
     const far = across(m, TOTAL - 300);
     expect(far).toBeGreaterThan(0.1);
-    expect(far).toBeLessThan(1); // the canon's end stops it short of the area's centre, never under the panel
+    expect(far).toBeLessThanOrEqual(0.9); // short of the area's centre at the canon's end, clear of the panel
     expect(m.get().cam.camRef.current.ppv).toBeLessThanOrEqual(8);
   });
 
@@ -536,17 +537,18 @@ describe("the panel brings what it opens out from under itself, even at the cano
      flyTo and the gestures) held the VIEW's right edge at the canon's end, so with the panel docked
      the canon's last 640 / ppv verses could never stand in the canvas area. The clamp now has a
      right slack of what the panel covers, and these were it.fails. Each read "0.1 < f < 0.9" of the
-     area; no clamp that keeps the canon's end in the area can put its last verse inside 0.9 at the
-     reader's zoom without leaving blank sky past Revelation, so they read the law the slack makes:
-     inside the area (f < 1, not under the panel), the area's right edge at the canon's end, the
-     reader's zoom kept. Genesis 1:1 stands at the left edge by the same law. */
+     area. With the canon's end stopped AT the area's edge they could only read f < 1, and the w4
+     phone review found Revelation 22:16's foot on the panel's border; the slack now adds the area's
+     outer tenth (END_MARGIN, connectionFrame's margin), so they read their first intent again:
+     inside 0.9 of the area, the canon's end the outer tenth inside it, the reader's zoom kept.
+     Genesis 1:1 stands at the left edge, which the panel never covers. */
   it("Revelation 22:21 opened with the panel open stands in the area at the reader's zoom", () => {
     const m = pc({ x: 18000, ppv: 2 });
     act(() => { m.get().sel.openPanel({ mode: 'verse', verse: TOTAL - 1 }); });
     const f = across(m, TOTAL - 1);
     expect(f).toBeGreaterThan(0.1);
-    expect(f).toBeLessThan(1);
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(f).toBeLessThanOrEqual(0.9);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
     expect(m.get().cam.camRef.current.ppv).toBe(2);
   });
 
@@ -556,8 +558,8 @@ describe("the panel brings what it opens out from under itself, even at the cano
     act(() => { m.get().sel.followRow({ index: 2, hereVerse: 18000, otherVerse: TOTAL - 1 }); });
     const f = across(m, TOTAL - 1);
     expect(f).toBeGreaterThan(0.1);
-    expect(f).toBeLessThan(1);
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(f).toBeLessThanOrEqual(0.9);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
     expect(m.get().cam.camRef.current.ppv).toBe(2);
   });
 
@@ -566,10 +568,10 @@ describe("the panel brings what it opens out from under itself, even at the cano
     const cam = m.get().cam;
     act(() => { m.get().sel.openPanel({ mode: 'verse', verse: TOTAL - 1 }); });
     cam.panelInsetRef.current = { right: 640, bottom: 0 }; // the panel rendered (usePanelInset)
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
     // nothing to settle while the panel still covers the right
     cam.settleInset();
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
     // closed: the view's own edge is the bound again (no frame loop here, so the ease is a jump)
     cam.panelInsetRef.current = { right: 0, bottom: 0 };
     cam.settleInset();
@@ -585,8 +587,8 @@ describe("the panel brings what it opens out from under itself, even at the cano
     act(() => { m.get().sel.followThread(info); });
     const f = across(m, TOTAL - 9);
     expect(f).toBeGreaterThan(0.1);
-    expect(f).toBeLessThan(1);
-    expect(areaEnd(m)).toBeCloseTo(AREA, 6);
+    expect(f).toBeLessThanOrEqual(0.9);
+    expect(areaEnd(m)).toBeCloseTo(0.9 * AREA, 6);
     expect(m.get().cam.camRef.current.ppv).toBe(2);
   });
 });

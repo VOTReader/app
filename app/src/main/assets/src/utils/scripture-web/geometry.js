@@ -777,6 +777,13 @@ export function maxCamY(cam, yf) {
 }
 
 /**
+ * How far inside the canvas area's right edge the canon's last verse may stand while the panel is
+ * docked, a fraction of the area's width: connectionFrame's 10 % side margin, so a thread whose
+ * foot is at the canon's end frames as any other does.
+ */
+export const END_MARGIN = 0.1;
+
+/**
  * Clamp zoom into [fit, maxZoom×fit], pan so the canon can't leave the
  * viewport, and hold y inside [0, maxCamY] — or at 0 when the caller has no
  * y frame. Mutates in place — this runs per gesture frame.
@@ -785,11 +792,14 @@ export function maxCamY(cam, yf) {
  * w3 review's major finding: with the view's own edges as the bound, the
  * canon's last right / ppv verses could never stand in the canvas area the
  * panel leaves). It is slack on the canon's END bound only: the camera may
- * move on until the canon's last verse meets the canvas area's right edge,
- * so the area, not the view, is what holds the canon there; the start keeps
- * the view's left edge, which the panel never covers. At fit that lets the
- * overview slide left by the panel's width. 0 (the default) is the view's
- * own bound, as before.
+ * move on until the canon's last verse stands the area's outer tenth
+ * (END_MARGIN) inside the canvas area's right edge, so the area, not the
+ * view, is what holds the canon there, with the margin connectionFrame
+ * leaves either side of a thread's feet (the w4 phone review's major
+ * finding: stopped AT the edge, Revelation 22:16's foot stood on the panel's
+ * border). The start keeps the view's left edge, which the panel never
+ * covers. At fit that lets the overview slide left by the panel's width and
+ * the margin. 0 (the default) is the view's own bound, as before.
  *
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {number} width — viewport width, device px
@@ -803,7 +813,7 @@ export function clampCamera(cam, width, maxZoom, yf, right) {
   if (!(cam.ppv > 0)) cam.ppv = min;
   cam.ppv = Math.min(Math.max(cam.ppv, min), max);
   const half = width / cam.ppv / 2;
-  const slack = right > 0 ? right / cam.ppv : 0;
+  const slack = right > 0 ? (right + END_MARGIN * Math.max(0, width - right)) / cam.ppv : 0;
   const lo = Math.min(half, cam.total / 2);
   const hi = Math.max(cam.total - half, cam.total / 2) + slack;
   cam.x = Math.min(Math.max(cam.x, lo), hi);

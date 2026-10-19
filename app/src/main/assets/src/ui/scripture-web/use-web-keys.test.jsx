@@ -169,14 +169,15 @@ describe('the help text (G2)', () => {
    right slack, use-web-camera's slackFor): the keys clamp with the same slack as flyTo and the
    gestures, so the arrow keys walk the canon's last verses into the canvas area and stop there. */
 describe('the keys clamp with the panel\'s slack', () => {
-  it('ArrowRight at the canon\'s end stops with its last verse at the area\'s right edge', () => {
+  it('ArrowRight at the canon\'s end stops with its last verse the outer tenth inside the area', () => {
     const cam = { x: 31000, ppv: 2, total: 31102, y: 0 };
     const { keys } = mountKeys({
       camRef: { current: cam }, viewRef: { current: { W: 3200, H: 1800, DPR: 2 } },
       slackFor: (c) => (c === cam ? 1280 : 0),
     });
     for (let i = 0; i < 20; i++) keys().onKeyDown(rootKey('ArrowRight'));
-    expect((31102 - cam.x) * cam.ppv + 3200 / 2).toBeCloseTo(3200 - 1280, 6);
+    // the area is 1920 device px; the canon's end stops END_MARGIN (a tenth) inside it
+    expect((31102 - cam.x) * cam.ppv + 3200 / 2).toBeCloseTo(0.9 * (3200 - 1280), 6);
   });
 
   it('without a slackFor the view\'s own edge is the bound, as before', () => {

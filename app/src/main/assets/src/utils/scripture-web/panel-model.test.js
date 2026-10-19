@@ -304,8 +304,8 @@ describe("the chooser's Zoom to: the tap's chapter only where its threads stand"
 /* The camera's clamp once kept the VIEW inside the canon, so near its end a verse centred at the
    reader's zoom stayed under the docked panel (w3 review), and the panel dived (zoomed in, up to
    the reader's x 4) to bring it out. The clamp now leaves the panel room: its slack lets the canon's
-   end stop at the CANVAS AREA's right edge (geometry.clampCamera's `right`), the area is the view,
-   and nothing dives. These pin the area-as-view law the dive tests (centreTarget, diveLimit) stood
+   end stop the outer tenth inside the CANVAS AREA's right edge (geometry.clampCamera's `right` and
+   END_MARGIN), the area is the view, and nothing dives. These pin the area-as-view law the dive tests (centreTarget, diveLimit) stood
    in for: what the panel opens stands in the area at the reader's own zoom. PC 1600x900 at DPR 1,
    panel 640. */
 describe('framing under the camera clamp: landingOf and frameHolds, with the panel\'s slack', () => {
@@ -324,16 +324,17 @@ describe('framing under the camera clamp: landingOf and frameHolds, with the pan
     expect(cam).toEqual({ x: 15000, ppv: 1, total: T }); // a copy: the camera is not moved
   });
 
-  it('at the canon\'s end the area\'s right edge stops at its last verse: x stands in the area, not under the panel', () => {
+  it('at the canon\'s end its last verse stops the outer tenth inside the area: x stands in the area, not under the panel', () => {
     const cam = { x: 15000, ppv: 1, total: T };
     const x = at(cam, { x: T - 100 }, T - 100);
     expect(x).toBeGreaterThan(AREA / 2);
-    expect(x).toBeLessThan(AREA);
-    expect(at(cam, { x: T - 100 }, T)).toBeCloseTo(AREA, 6);
-    // Revelation's last verse, at the reader's zoom: the area's last pixel, its threads all inward
+    expect(x).toBeLessThan(0.9 * AREA);
+    expect(at(cam, { x: T - 100 }, T)).toBeCloseTo(0.9 * AREA, 6);
+    // Revelation's last verse, at the reader's zoom: just inside the area's outer tenth, clear of the
+    // panel's border (w4 phone review), its threads all inward
     const last = at(cam, { x: T - 0.5 }, T - 0.5);
-    expect(last).toBeGreaterThan(0.9 * AREA);
-    expect(last).toBeLessThan(AREA);
+    expect(last).toBeGreaterThan(0.85 * AREA);
+    expect(last).toBeLessThanOrEqual(0.9 * AREA);
     expect(land(cam, { x: T - 0.5 }).ppv).toBe(1);
     // the canon's start needs no slack: the clamp holds Genesis at the left edge, in the area
     expect(at({ x: T / 2, ppv: fit, total: T }, { x: 70.5 }, 70.5)).toBeGreaterThan(0);
@@ -365,5 +366,25 @@ describe('framing under the camera clamp: landingOf and frameHolds, with the pan
     expect(holds(ISA_7_14, T - 30)).toBe(true); // the clamp's slack lets its frame reach the canon's end
     expect(holds(60, T - 200)).toBe(false); // wider than the area at fit
     expect(pm.frameHolds(cam, W, 0, pm.connectionFrame(60, T - 200), 60, T - 200, cap)).toBe(true); // no panel
+  });
+
+  /* w4 phone review (major): the clamp stopped the canon's last verse exactly at the area's right
+     edge, eating the outer tenth connectionFrame asks for, so Revelation 22:16's foot stood on the
+     panel's border, its dot half under the panel (PC 959.68 of 960, phone 516.9 of 517). */
+  it('Isaiah 11:1 to Revelation 22:16 frames with both feet the outer tenth inside the area, PC and phone', () => {
+    const ISA_11_1 = vid('isaiah', 11, 1), REV_22_16 = vid('revelation', 22, 16);
+    // PC 1600 wide at DPR 1, panel 640; phone landscape 891 at DPR 2.6, panel 374 CSS px
+    for (const [w, right] of [[W, RIGHT], [891 * 2.6, 374 * 2.6]]) {
+      const area = w - right, capW = 44 * T / w;
+      const cam = { x: T / 2, ppv: w / T, total: T };
+      const frame = pm.connectionFrame(ISA_11_1, REV_22_16);
+      expect(pm.frameHolds(cam, w, right, frame, ISA_11_1, REV_22_16, capW)).toBe(true);
+      const c = pm.landingOf(cam, w, right, frame, capW);
+      for (const v of [ISA_11_1, REV_22_16]) {
+        const f = verseToX(c, w, v + 0.5) / area;
+        expect(f).toBeGreaterThanOrEqual(0.1 - 1e-6);
+        expect(f).toBeLessThanOrEqual(0.9 + 1e-6);
+      }
+    }
   });
 });
