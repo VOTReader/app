@@ -7,7 +7,7 @@
    Every sidecar names a place in a paragraph by a UTF-16 offset (what String.prototype indexes),
    and most also carry the words there, so a stale or misplaced offset is caught here, not on screen. */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
@@ -99,5 +99,19 @@ describe('ANSWERS_META', () => {
     expect(SITE.sidebar.length).toBe(24);
     expect(SITE.sisterSites.length).toBe(9);
     expect(SITE.endCard).toBe('This ends Answers Only God Can Give - Topics');
+  });
+
+  it('every image sidecar names a vendored file the service worker precaches', () => {
+    const ASSETS = resolve(DATA, '..', '..');
+    const sw = readFileSync(resolve(ASSETS, 'service-worker.js'), 'utf8');
+    const imgs = Object.entries(M).flatMap(([id, m]) => (m.media || []).filter((x) => x.kind === 'image').map((x) => [id, x]));
+    expect(imgs.map(([id, x]) => `${id}@${x.at}`)).toEqual([
+      'regarding-the-holy-days-of-god@198', 'regarding-the-holy-days-of-god@199',
+      'regarding-the-holidays-of-men@148', 'answers-main-page@-1',
+    ]);
+    for (const [id, x] of imgs) {
+      expect(existsSync(resolve(ASSETS, x.src)), `${id} ${x.src}`).toBe(true);
+      expect(sw.includes(`'./${x.src}'`), `${x.src} in CORE_ASSETS`).toBe(true);
+    }
   });
 });

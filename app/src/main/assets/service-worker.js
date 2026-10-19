@@ -118,6 +118,14 @@ const CORE_ASSETS = [
   './study-lamb-burial.jpg',
   './study-lamb-resurrection.jpg',
   './study-lamb-emmaus.jpg',
+  // 2026-10-19 (aogcg phase 1a): the three images Answers Only God Can Give
+  // shows, vendored from the site capture (media sidecars of kind 'image' in
+  // src/data/answers-meta.js): the chronology chart (Regarding the Holy Days
+  // of God), Man's Holidays vs God's Holy Days (Holy Days and Regarding the
+  // Holidays of Men) and the Main Page banner. Best-effort like the others.
+  './answers-chart-chronology.jpg',
+  './answers-holidays-vs-holy-days.jpg',
+  './answers-banner.jpg',
   './offline.html',
 ];
 
@@ -327,6 +335,9 @@ const ASSET_INTEGRITY = {
    text asset), so an update fetches only what changed. A copy that does not match is never used. */
 // ── BEGIN GENERATED: ASSET_REVISIONS (tools/sync-sw-version.js) ──
 const ASSET_REVISIONS = {
+  './answers-banner.jpg': '44ad6ca52196a96b323473a5387b3e03d9ac6573b5ad30a8a84c1966801df8a8',
+  './answers-chart-chronology.jpg': 'b526c71f82d2b2b4e906d90a300de41200afdc849c9e8ad25804ae7887f5ee52',
+  './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
   './dist/bundle-a-matthew.js': 'b2ed5c2818a82748ca0a0a897d66fa83823fe574ac6ec4a694fe72687dbe665b',
   './dist/bundle-a-vot.js': '9fff43bc99d82d507329d19417616967916a97813d7d2a1dba8cf201da6350e5',
