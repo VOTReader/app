@@ -262,6 +262,27 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(phone.panel.querySelector('.sw-panel-credit').parentElement.classList.contains('sw-panel-body')).toBe(true);
   });
 
+  /* w4 review (s04b phone): scrolled, the pinned close X sat over the Cited head's chevron and left
+     a sliver of it showing under its box. Once the body is scrolled the panel says so, and app.css
+     lays a full-width band under the X, so what scrolls up passes under one clean edge. */
+  it('the panel says when its body is scrolled, and says so no more back at the top or on a new card', () => {
+    const { panel, rerender, props } = mount({ detail: detail(), compact: true });
+    const body = panel.querySelector('.sw-panel-body');
+    const scrollTo = (y) => {
+      Object.defineProperty(body, 'scrollTop', { configurable: true, writable: true, value: y });
+      fireEvent.scroll(body);
+    };
+    expect(panel.hasAttribute('data-scrolled')).toBe(false);
+    scrollTo(120);
+    expect(panel.getAttribute('data-scrolled')).toBe('1');
+    scrollTo(0);
+    expect(panel.hasAttribute('data-scrolled')).toBe(false);
+    scrollTo(120);
+    // a new card starts at its top
+    rerender(<WebPanel {...props} detail={found({ kind: 'verse', verse: JOHN_3_16 })} />);
+    expect(panel.hasAttribute('data-scrolled')).toBe(false);
+  });
+
   /* w4 (the s04 phone shot read "Ps 103:2 › Isa 7:14"): each crumb named the verse under the
      centre when the step was taken, so the whole web read as whatever verse sat mid-canon (Psalm
      103:2) and a book or a chapter read as its first verse. A crumb names the place the trail

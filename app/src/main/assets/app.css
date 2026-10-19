@@ -8166,9 +8166,16 @@
     }
     /* the close X: a 24 px glyph in a 44 px target, top right, clear of the safe area */
     .sw-sheet-close {
-      position: absolute; z-index: 1; top: 10px; right: calc(10px + env(safe-area-inset-right, 0px));
+      position: absolute; z-index: 2; top: 10px; right: calc(10px + env(safe-area-inset-right, 0px));
       min-width: 44px; min-height: 44px; display: flex; align-items: center; justify-content: center;
       background: var(--sw-panel); border: 0; border-radius: 6px; color: var(--sw-text-meta); cursor: pointer;
+    }
+    /* scrolled (web-panel.jsx data-scrolled), a band the panel's width lies under the X, so what
+       scrolls up passes under one clean edge, not half under the X's box (w4 review, s04b phone:
+       a sliver of the Cited chevron showed under it); a short fade, so the edge reads as depth */
+    .sw-panel[data-scrolled]::before {
+      content: ''; position: absolute; z-index: 1; top: 0; left: 0; right: 0; height: 60px;
+      background: linear-gradient(var(--sw-panel) 84%, transparent); pointer-events: none;
     }
     .sw-sheet-close:hover { color: var(--sw-text); }
     .sw-sheet-close:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
@@ -8357,6 +8364,7 @@
     .sw-root.sw-compact .sw-row-btn { height: 40px; }
     .sw-root.sw-compact .sw-row-btn::after { top: -2px; bottom: -2px; }
     .sw-root.sw-compact .sw-sheet-close { top: 4px; }
+    .sw-root.sw-compact .sw-panel[data-scrolled]::before { height: 54px; }
     .sw-root.sw-compact .sw-panel-title { margin-top: 2px; }
     .sw-root.sw-compact .sw-panel-meta { margin-top: 2px; }
     .sw-root.sw-compact .sw-verse + .sw-verse { margin-top: 8px; }

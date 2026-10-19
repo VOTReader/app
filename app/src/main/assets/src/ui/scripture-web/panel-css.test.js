@@ -187,6 +187,25 @@ describe('what the w3 screenshots caught (PC 1600x900, phone 891x411)', () => {
     expect(rule('.sw-sheet-close')).toMatch(/background:\s*var\(--sw-panel\)/);
   });
 
+  /* w4 review (s04b phone): the X's own box hid the top of the Cited head's chevron and left a
+     sliver showing under it. Scrolled, a full-width band lies under the X (web-panel.jsx sets
+     data-scrolled), so what scrolls up passes under one edge the width of the panel. */
+  it('scrolled, a full-width band under the close X: nothing is left half-hidden beside it', () => {
+    const band = rule('.sw-panel[data-scrolled]::before');
+    expect(band, 'the band').toBeTruthy();
+    expect(band).toMatch(/position:\s*absolute/);
+    expect(band).toMatch(/left:\s*0/);
+    expect(band).toMatch(/right:\s*0/);
+    expect(band).toMatch(/var\(--sw-panel\)/);
+    expect(band).toMatch(/pointer-events:\s*none/);
+    const z = (body) => Number(/z-index:\s*(\d+)/.exec(body)[1]);
+    expect(z(rule('.sw-sheet-close'))).toBeGreaterThan(z(band));
+    // it reaches the X's foot: PC top 10 + 44, compact top 4 + 44
+    const h = (body) => Number(/height:\s*(\d+)px/.exec(body)[1]);
+    expect(h(band)).toBeGreaterThanOrEqual(54);
+    expect(h(rule('.sw-root.sw-compact .sw-panel[data-scrolled]::before'))).toBeGreaterThanOrEqual(48);
+  });
+
   /* A META LINE BREAKS ONLY BETWEEN ITS ITEMS AND LEAVES NO "·" HANGING (w3 review round 2, w4).
      The phone verse shot read "48 connections · cited in the Volumes 5 / times"; keeping each item
      whole (84da5587c) then left "48 connections ·" / "cited in the Volumes 5 times". Now each item

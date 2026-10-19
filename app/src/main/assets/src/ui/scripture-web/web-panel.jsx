@@ -403,11 +403,18 @@ export function WebPanel(props) {
   // BEFORE the panel's own focus below, so it remembers where the reader was, not the panel.
   const ref = useFocusTrap(true, { modal: false });
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  // the body scrolled off its top: app.css lays a band under the pinned close X (w4 review)
+  const [scrolled, setScrolled] = React.useState(false);
+  const onBodyScroll = React.useCallback((/** @type {any} */ e) => {
+    const s = e.currentTarget.scrollTop > 1;
+    setScrolled((was) => (was === s ? was : s));
+  }, []);
   const firstRef = React.useRef(true);
   React.useEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
+    setScrolled(false);
     const a = document.activeElement;
     if (firstRef.current || !a || a === document.body) {
       try { el.focus({ preventScroll: true }); } catch (_e) { /* best-effort */ }
@@ -656,13 +663,14 @@ export function WebPanel(props) {
 
   return (
     <div className={containerClass} ref={ref} tabIndex={-1} role="dialog" aria-modal="false" aria-label={label}
-      data-mode={mode} data-lens-on={mode === 'list' ? (lensOn ? '1' : '0') : undefined}>
+      data-mode={mode} data-lens-on={mode === 'list' ? (lensOn ? '1' : '0') : undefined}
+      data-scrolled={scrolled ? '1' : undefined}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label={closeLabel}>
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
-      <div className="sw-panel-body" ref={bodyRef}>
+      <div className="sw-panel-body" ref={bodyRef} onScroll={onBodyScroll}>
         {crumbs ? (
           <nav className="sw-crumbs" aria-label="Your trail">
             <button type="button" className="sw-crumbs-back" onClick={back} aria-label="Back along the trail">
