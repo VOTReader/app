@@ -43,11 +43,13 @@ const rail = buildVotRail(CHAIN.map(([volKey, short, n]) => ({
 })));
 expect(rail.total).toBe(803);
 
-// Chrome 152, Cinzel 600 11px, measureText().width in CSS px (rail-labels-before-*.json).
+// The web's face (EB Garamond 500, sw-ink FONT) at 11 px with no tracking, measureText().width in
+// CSS px, Chrome headless (w4 fix pass, 2026-10-18); the fake adds the tracking the loop sets per
+// glyph, as Chrome's letterSpacing does (VOL I 28.1 + 5 x 1.1 = 33.6, measured with it).
 const WIDTH_11 = {
-  'VOL I': 32, 'VOL II': 38, 'VOL III': 42, 'VOL IV': 41, 'VOL V': 36, 'VOL VI': 41, 'VOL VII': 45,
-  'REBUKE': 51, 'WTLB I': 44, 'WTLB II': 48, 'BLESSED': 55, 'FLOCK': 41, 'TIMOTHY': 58, 'HOLY DAYS': 70,
-  'MTAM': 38, 'ODDS': 35, 'LAMB': 36, 'SOTD': 33, 'GRACE': 42, 'TRINITY': 51, 'PURITY': 47,
+  'VOL I': 28.1, 'VOL II': 31.92, 'VOL III': 35.75, 'VOL IV': 35.62, 'VOL V': 31.79, 'VOL VI': 35.62, 'VOL VII': 39.45,
+  'REBUKE': 43.09, 'WTLB I': 37.17, 'WTLB II': 41, 'BLESSED': 44.33, 'FLOCK': 36.28, 'TIMOTHY': 52.44, 'HOLY DAYS': 59.09,
+  'MTAM': 34.21, 'ODDS': 30.28, 'LAMB': 30.74, 'SOTD': 29.19, 'GRACE': 37.81, 'TRINITY': 46.1, 'PURITY': 40.45,
 };
 const VERSES = 31102;
 
@@ -55,32 +57,33 @@ const VERSES = 31102;
  *  the ticks (moveTo at the tick's top). @returns {any} */
 function recordingCtx() {
   const labels = [], ticks = [];
-  const state = { font: '600 11px Cinzel', textAlign: 'center' };
+  const state = { font: '500 11px serif', textAlign: 'center', letterSpacing: '0px' };
   const fontPx = () => { const m = /(\d+(?:\.\d+)?)px/.exec(state.font); return m ? parseFloat(m[1]) : 11; };
   const width = (text) => {
-    const base = WIDTH_11[text] != null ? WIDTH_11[text] : text.length * 0.7 * 11;   // unmeasured names: 0.7 em per glyph
-    return base * (fontPx() / 11);
+    const base = WIDTH_11[text] != null ? WIDTH_11[text] : text.length * 0.62 * 11;   // unmeasured names: 0.62 em per glyph
+    return base * (fontPx() / 11) + text.length * (parseFloat(state.letterSpacing) || 0);
   };
   const noop = () => {};
   return {
     labels, ticks,
     get font() { return state.font; }, set font(v) { state.font = v; },
     get textAlign() { return state.textAlign; }, set textAlign(v) { state.textAlign = v; },
+    get letterSpacing() { return state.letterSpacing; }, set letterSpacing(v) { state.letterSpacing = v; },
     lineWidth: 0, strokeStyle: '', fillStyle: '', textBaseline: '', lineCap: '', lineJoin: '', globalAlpha: 1,
     beginPath: noop, lineTo: noop, arc: noop, stroke: noop, fill: noop, clearRect: noop, save: noop, restore: noop,
     moveTo(x, y) { ticks.push({ x, y }); },
     measureText: (text) => ({ width: width(String(text)) }),
-    fillText(text, x, y) { const w = width(String(text)); labels.push({ text: String(text), x, y, w, left: x - w / 2, right: x + w / 2 }); },
+    fillText(text, x, y) { const w = width(String(text)); labels.push({ text: String(text), x, y, w, size: fontPx(), left: x - w / 2, right: x + w / 2 }); },
     strokeText() {},   // the names' knockout (drawRailNames): not a label
   };
 }
 
-function frame(widthCss, DPR) {
-  const W = widthCss * DPR, H = 600 * DPR;
+function frame(widthCss, DPR, heightCss = 600) {
+  const W = widthCss * DPR, H = heightCss * DPR;
   return {
     W, H, DPR,
     opts: {
-      width: W, height: H, H, DPR, base: H - 80 * DPR, votRail: rail, verseTotal: VERSES,
+      width: W, height: H, H, DPR, base: H - Math.min(80, heightCss / 4) * DPR, votRail: rail, verseTotal: VERSES,
       verseX: (verse) => (verse / VERSES) * W,                     // the fit camera: the canon spans the frame
       chrome: { isLight: false, fsLabel: 11 }, showUnderlay: false, hoverIndex: -1, focusIndex: -1,
     },
@@ -99,33 +102,46 @@ function sameRowGaps(labels) {
 
 const topRailLabels = (ctx, f) => {
   const rails = railFrame({ H: f.H, DPR: f.DPR }, f.opts.base);
-  return ctx.labels.filter((l) => l.y < rails.topY);      // the Volumes rail's names sit above the top rail line
+  // the Volumes rail's names sit above the top rail line (the PC's overline names the rail, not a collection)
+  return ctx.labels.filter((l) => l.y < rails.topY && l.text !== 'THE VOLUMES OF TRUTH');
 };
 
 describe('the Volumes rail keeps its names apart (one placement law for both rails)', () => {
-  it('1920 x 1080 @1: no two names on one row closer than 5 px — today HOLY DAYS|MTAM are 3 px apart', () => {
-    const f = frame(1920, 1);
-    const ctx = recordingCtx();
-    drawPersonalWeb(ctx, null, null, f.opts);
-    const names = topRailLabels(ctx, f);
-    // The precondition: the rail is populated the way the app populates it (15 names at fit,
-    // measured), so an empty rail cannot pass the distance law for free.
-    expect(names.length, 'names drawn: ' + names.map((l) => l.text).join(',')).toBeGreaterThanOrEqual(14);
-    const gaps = sameRowGaps(names);
-    expect(gaps[0].gap, `closest pair ${gaps[0].a}|${gaps[0].b} at y${gaps[0].y}`).toBeGreaterThanOrEqual(5 * f.DPR);
-  });
+  /* w4 fix pass (review, major 1): a reader must tell the gap between two names from the gap
+     inside one. Tracked caps put about 0.4 em between the words of one name ("HOLY DAYS",
+     "VOL IV"); the pad between names was 5 px, the same, so on a PC "TIMOTHY HOLY DAYS MTAM"
+     read as one string and on the phone "VOL I VOL II VOL III VOL IV" as one line. The law
+     now keeps 0.9 em at least (a name's box ends after its own tracking). */
+  const GAP_EM = 0.9;
+  for (const [wCss, hCss, dpr] of /** @type {Array<[number, number, number]>} */ ([[1920, 1080, 1], [1600, 900, 1], [952, 600, 2], [891, 411, 2.6]])) {
+    it(`${wCss} x ${hCss} @${dpr}: every collection named, and no two names on one row nearer than ${GAP_EM} em`, () => {
+      const f = frame(wCss, dpr, hCss);
+      const ctx = recordingCtx();
+      drawPersonalWeb(ctx, null, null, f.opts);
+      const names = topRailLabels(ctx, f);
+      // the precondition: the rail is populated the way the app populates it, so an empty
+      // rail cannot pass the distance law for free
+      expect(names.length, 'names drawn: ' + names.map((l) => l.text).join(',')).toBe(CHAIN.length);
+      const gaps = sameRowGaps(names);
+      const size = names[0].size;
+      expect(gaps[0].gap, `closest pair ${gaps[0].a}|${gaps[0].b} at y${gaps[0].y}`).toBeGreaterThanOrEqual(GAP_EM * size - 1e-6);
+    });
+  }
 
-  it('952 CSS px wide @2 (the phone in landscape), in device px: the same law — a control here, worst gap today 18 px', () => {
-    /* Cannot fail on today's rule at this frame (30 zoom/pan reads measured, worst 18 device px);
-       it is the phone-frame control for the new law: names must stay (>= 13, measured today)
-       and stay apart. The 1920 case is the one with teeth. */
-    const f = frame(952, 2);
+  it('1600 x 900 @1 (s10): every name stands centred over its slot; HOLY DAYS takes the second row between TIMOTHY and MTAM', () => {
+    const f = frame(1600, 1, 900);
     const ctx = recordingCtx();
     drawPersonalWeb(ctx, null, null, f.opts);
     const names = topRailLabels(ctx, f);
-    expect(names.length, 'names drawn: ' + names.map((l) => l.text).join(',')).toBeGreaterThanOrEqual(13);
-    const gaps = sameRowGaps(names);
-    expect(gaps[0].gap, `closest pair ${gaps[0].a}|${gaps[0].b}`).toBeGreaterThanOrEqual(5 * f.DPR);
+    const slot = f.W / CHAIN.length;
+    CHAIN.forEach(([, short], i) => {
+      const t = names.find((l) => l.text === short.toUpperCase());
+      expect(t, short).toBeTruthy();
+      expect(Math.abs(t.x - (i + 0.5) * slot), short).toBeLessThan(0.5);
+    });
+    const y = (s) => names.find((l) => l.text === s).y;
+    expect(y('HOLY DAYS')).not.toBe(y('TIMOTHY'));
+    expect(y('HOLY DAYS')).not.toBe(y('MTAM'));
   });
 
   it('every visible collection keeps its tick whether or not its name was printed', () => {

@@ -114,15 +114,19 @@ describe('placeRailLabelsSliding (w4: the Volumes rail on a phone names every co
       expect(placeRailLabelsSliding(items, 5, 2).map((p) => p.row)).toEqual(placeRailLabels(b, 5, 2));
     }
   });
-  it('a name slides right, within its bound, to take the first row it then fits, and never past the bound', () => {
-    // a 40 wide name at 50 meets the first row's end at 40: it slides to 65 on row 0
+  it('a name stands centred over its band on any row with room for it there, before it slides (w4 fix-review: names over their slots, r2-05)', () => {
+    // a 40 wide name at 50 meets the first row's end at 40: row 1 has it where it stands,
+    // so it takes row 1 centred (through the first review it slid to 65 on row 0, and on
+    // a PC "TIMOTHY HOLY DAYS MTAM" ran together off their slots)
     const [a, b] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 50, w: 40, max: 70 }], 5, 2);
     expect(a).toEqual({ row: 0, x: 20 });
-    expect(b).toEqual({ row: 0, x: 65 });
-    // bound at 60: it cannot reach 65, so it takes row 1 where it stands
-    const [, c] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 50, w: 40, max: 60 }], 5, 2);
-    expect(c).toEqual({ row: 1, x: 50 });
-    // neither row: not placed
+    expect(b).toEqual({ row: 1, x: 50 });
+  });
+  it('with no row free where it stands, a name slides right within its bound, to the row that needs the least slide, and never past the bound', () => {
+    // row 0 ends at 40 (a), row 1 at 45 (b): c at 50 needs 65 on row 0, 70 on row 1
+    const [, , c] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 25, w: 40, max: 25 }, { x: 50, w: 40, max: 75 }], 5, 2);
+    expect(c).toEqual({ row: 0, x: 65 });
+    // bound at 60: neither row's slide reaches, so it is not placed
     const [, , d] = placeRailLabelsSliding([{ x: 20, w: 40, max: 20 }, { x: 22, w: 40, max: 22 }, { x: 24, w: 40, max: 30 }], 5, 2);
     expect(d.row).toBe(-1);
   });
@@ -137,6 +141,8 @@ describe('placeRailLabelsSliding (w4: the Volumes rail on a phone names every co
         expect(p.x).toBeGreaterThanOrEqual(items[i].x);
         expect(p.x).toBeLessThanOrEqual(items[i].max);
         expect(p.x - items[i].w / 2).toBeGreaterThanOrEqual(last[p.row] + 5 - 1e-9);
+        // a slid name had no row with room where it stands
+        if (p.x > items[i].x) for (const end of last) expect(items[i].x - items[i].w / 2).toBeLessThan(end + 5);
         last[p.row] = p.x + items[i].w / 2;
       });
     }

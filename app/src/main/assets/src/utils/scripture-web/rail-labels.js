@@ -102,13 +102,17 @@ export function placeRailLabelsRanked(boxes, pad, rows = 2, rank, blocked, at, r
 }
 
 /**
- * The law for names that may slide (the Volumes rail, w4): each label may move
- * right, over its own band, as far as its bound, to take a row: the first row
- * where it then keeps `pad` from that row's last label. A name that cannot is
- * -1 (draw the tick, not the name). Through w3 the slide looked only at the
- * previous name, whichever row it sat on, so on a phone a slide could leave the
- * next name no room on either row; this asks each row in turn. With every
- * bound at the label's own centre it is placeRailLabels exactly.
+ * The law for names that may slide (the Volumes rail, w4): a label stands
+ * centred over its band on the first row with room for it there; only when no
+ * row has, it moves right, over its own band, as far as its bound, to the row
+ * that needs the least slide, keeping `pad` from that row's last label. A name
+ * that cannot is -1 (draw the tick, not the name). Through w3 the slide looked
+ * only at the previous name, whichever row it sat on, so on a phone a slide
+ * could leave the next name no room on either row; the first w4 law asked each
+ * row in turn but took the first one a slide reached, so on a PC "TIMOTHY HOLY
+ * DAYS MTAM" slid off their slots into one string while the second row stood
+ * empty (w4 review). With every bound at the label's own centre it is
+ * placeRailLabels exactly.
  *
  * @param {ReadonlyArray<{x:number, w:number, max:number}>} items  each label's
  *   centre, width and rightmost centre, left to right (device px)
@@ -121,10 +125,13 @@ export function placeRailLabelsSliding(items, pad, rows = 2) {
   return items.map((it) => {
     if (!it || !(it.w > 0)) return { row: -1, x: it ? it.x : 0 };
     const bound = Math.max(it.x, it.max);
+    let row = -1, at = Infinity;
     for (let r = 0; r < ends.length; r++) {
       const x = Math.max(it.x, ends[r] + pad + it.w / 2);
-      if (x <= bound) { ends[r] = x + it.w / 2; return { row: r, x }; }
+      if (x <= bound && x < at) { row = r; at = x; }
     }
-    return { row: -1, x: it.x };
+    if (row < 0) return { row: -1, x: it.x };
+    ends[row] = at + it.w / 2;
+    return { row, x: at };
   });
 }

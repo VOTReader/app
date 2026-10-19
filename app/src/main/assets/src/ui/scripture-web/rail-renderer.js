@@ -79,6 +79,10 @@ const EPS_LINK = 0.5;
  * takes CHORD_ARC. */
 const CHORD = 0.45;
 const CHORD_ARC = 0.5;
+/** The least gap between two Volumes names on one row, in em of their type (w4 review): tracked
+ * caps put about 0.4 em between the words of one name ("HOLY DAYS"), so 5 px between names read
+ * as a word space and "TIMOTHY HOLY DAYS MTAM" as one string. */
+export const NAME_GAP_EM = 1;
 /** The cut each Volumes name makes in what lies under it, CSS px either side of its strokes (drawRailNames). */
 const KNOCKOUT = 1.5;
 /** Letter ticks show once letters are this far apart, CSS px. */
@@ -848,8 +852,10 @@ function drawRails(ctx, opts, rails) {
   // Measure before drawing: collection names are long ("Words To Live By:
   // Part One"), and a name wider than twice its band is not printed at all.
   // The rows are then given by the placement law both rails share
-  // (rail-labels.js): the top row first, the second when the top's last
-  // name would be nearer than 5 px, and NO row when neither has room. Every
+  // (rail-labels.js): a name stands centred over its band on the first row
+  // with room for it there, a gap of NAME_GAP_EM from its neighbours (a word
+  // space is 0.4 em), slides on the row needing least only when none has,
+  // and takes NO row when neither has room. Every
   // band keeps its tick either way. A name is kept inside the screen (a band
   // cut by the edge printed its name past it: "VOL I" at x = 0 on the phone,
   // fix-review #3) and may slide right, over its own band (half of it), to
@@ -857,7 +863,7 @@ function drawRails(ctx, opts, rails) {
   // #13); w4 asks each row in turn (placeRailLabelsSliding), where the slide
   // looked only at the previous name and could leave the next one no row.
   const names = [];
-  const pad = 5 * DPR, inset = 4 * DPR;
+  const pad = Math.max(5 * DPR, NAME_GAP_EM * size), inset = 4 * DPR;
   ctx.strokeStyle = inkCss('volumesTick');
   for (const seg of votRail.segments) {
     if (!seg.count) continue;
