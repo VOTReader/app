@@ -738,7 +738,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     <>
       {settings.historyEnabled !== false && recents.length > 0 && (
         <>
-          <div className="srch-section-label">Recent</div>
+          <h2 className="srch-section-label">Recent</h2>
           {confirmRecent != null ? (
             /* W0 (micro-gap b): per-recent removal. Follows the
                ConfirmStrip convention — per-instance useId registration
@@ -772,7 +772,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           )}
         </>
       )}
-      <div className="srch-section-label">Quick picks</div>
+      <h2 className="srch-section-label">Quick picks</h2>
       <div className="srch-quick-row">
         {SRCH_QUICK_PICKS.map((q) => (
           <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
@@ -812,6 +812,36 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       onBack();
     }
   };
+
+  /* WHAT A SCREEN READER HEARS (search200 B9). The only status region was the
+     "Searching…" bar, which came and went with its words, so nothing said the count or
+     that nothing was found (a region that arrives with its text is not read). One region
+     stays in the screen from the first frame and says each step in the screen's own
+     words; a quiet re-rank says the same count again, so it says nothing new. */
+  const qTrim = (query || '').trim();
+  const isDone = !!qTrim && buildInfo.ready && state.phase === 'done';
+  const countText = 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
+    + (state.results.length === 1 ? 'match' : 'matches') + ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections');
+  const scopeIn = searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : '';
+  let liveText = '';
+  if (qTrim && !/[\p{L}\p{N}]/u.test(qTrim)) liveText = 'Type a word, a title or a reference to search.';
+  else if (qTrim && buildInfo.ready && state.phase === 'searching') liveText = 'Searching…';
+  else if (isDone && state.error) liveText = 'Error: ' + state.error;
+  else if (isDone) {
+    const said = directEntries.map((d) => d.__label + '.');
+    if (state.results.length > 0) {
+      if (state.corrections.length > 0) said.push('Showing results for ' + correctedQuery(query, state.corrections) + '.');
+      said.push(countText + '.');
+    }
+    if (letterRefMissing) said.push(letterRefMissing);
+    else if (state.results.length === 0 && directEntries.length === 0) {
+      if (didYouMean) said.push('No results for “' + didYouMean.original + '”. Did you mean ' + didYouMean.suggestion + '?');
+      else if (state.stopWordsOnly) said.push('“' + qTrim + '” is in nearly every verse and letter. Add another word to search.');
+      else if (searchScope && conflict) said.push(scopeLabel + ' is in ' + conflict.home + ', and the ' + conflict.tab + ' tab is on.');
+      else said.push('No results for “' + qTrim + '”' + scopeIn + '.');
+    }
+    liveText = said.join(' ');
+  }
 
   return (
     /* NOT LibraryNav (documented exception): the search input row REPLACES the
@@ -860,6 +890,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       </>
     }>
       <div className="search-screen" ref={screenRef}>
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{liveText}</div>
 
         <div className="srch-corpus-row" role="tablist" aria-label="Search corpus">
           {[
@@ -950,17 +981,17 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             <div className="srch-empty-hero">
               {corpus === 'scriptures' ? (
                 <>
-                  <h3>Search the Scriptures</h3>
+                  <h2>Search the Scriptures</h2>
                   <p>Verses across all 66 books.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
                 </>
               ) : corpus === 'volumes' ? (
                 <>
-                  <h3>Search the Volumes</h3>
+                  <h2>Search the Volumes</h2>
                   <p>Letters, Words To Live By, Answers and Bible studies.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
                 </>
               ) : (
                 <>
-                  <h3>Search everything</h3>
+                  <h2>Search everything</h2>
                   <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
                 </>
               )}
@@ -975,12 +1006,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {/* W0 (micro-gap c): in-flight indicator. role="status" + aria-live
-            polite per the live-region discipline (AutoScrollControl readout
-            precedent); the indeterminate bar animation is near-zeroed by the
-            global prefers-reduced-motion rule. */}
+        {/* W0 (micro-gap c): in-flight indicator; the indeterminate bar animation is
+            near-zeroed by the global prefers-reduced-motion rule. The screen's one status
+            region says "Searching…" (search200 B9), so the bar is for the eye. */}
         {query && buildInfo.ready && state.phase === 'searching' && (
-          <div className="srch-progress srch-searching" role="status" aria-live="polite">
+          <div className="srch-progress srch-searching" aria-hidden="true">
             <span>Searching…</span>
             <div className="srch-progress-bar">
               <div className="srch-progress-bar-fill srch-indeterminate" />
@@ -1055,7 +1085,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {!bookOrder && bestRow.length > 0 && (
           <div className="srch-top-results">
-            <div className="srch-section-label">Best Matches</div>
+            <h2 className="srch-section-label">Best Matches</h2>
             {bestRow.map((entry, i) => (
               <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={listMemo} where="best" />
             ))}
@@ -1064,11 +1094,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {closeSplit ? (
           <>
-            <div className="srch-section-label srch-close-label">Closest matches</div>
+            <h2 className="srch-section-label srch-close-label">Closest matches</h2>
             {renderGroups(closeSplit.close, 'book', false)}
             {showLoose ? (
               <>
-                <div className="srch-section-label srch-loose-label">Partial matches</div>
+                <h2 className="srch-section-label srch-loose-label">Partial matches</h2>
                 {renderGroups(closeSplit.loose, 'book-more', true)}
               </>
             ) : (
@@ -1099,7 +1129,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 </>
               ) : (
                 <>
-                  No results for “{query.trim()}”{searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : ''}.
+                  No results for “{qTrim}”{scopeIn}.
                   {searchScope ? <>{' '}<button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button></> :
                     tabName ? <>{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
                 </>

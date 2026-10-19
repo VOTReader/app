@@ -49,16 +49,20 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
   const left = items.length - shown;
   return (
     <div className={"srch-group" + (open ? '' : ' collapsed')}>
-      <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span>
-          {meta.label}
-          <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {more ? 'more ' : ''}{unit}</span>
-        </span>
-        {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
-            affordance — a real 24px chevron that ROTATES makes the
-            collapse/expand state legible at a glance. */}
-        <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true">▸</span>
-      </button>
+      {/* search200 B9: each group is a heading a screen reader can move by, with its
+          open-close button inside it (the ARIA accordion pattern). */}
+      <h3 className="srch-group-h">
+        <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <span>
+            {meta.label}
+            <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {more ? 'more ' : ''}{unit}</span>
+          </span>
+          {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
+              affordance — a real 24px chevron that ROTATES makes the
+              collapse/expand state legible at a glance. */}
+          <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true">▸</span>
+        </button>
+      </h3>
       {/* A closed group renders no cards: a long result set opens with every
           group closed, and each card cuts and measures a snippet. */}
       {open ? (

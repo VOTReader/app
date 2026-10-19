@@ -7,6 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
+import { SrchGroup as RealSrchGroup } from '../components/SrchGroup.jsx';
 /* Node builtins in an app/src test: this tsconfig has no node types, so the
    three specifiers are ts-ignored (the use-lazy-bundles.test.jsx precedent). */
 // @ts-ignore -- no node types in this tsconfig
@@ -330,11 +331,15 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     const status = screen.getByRole('status');
     expect(status.textContent).toMatch(/Searching/i);
     expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(document.querySelector('.srch-searching'), 'the bar, for the eye').toBeTruthy();
     await act(async () => {
       resolveSearch({ parsed: null, results: [], parsedTerms: [] });
       await Promise.resolve();
     });
-    expect(screen.queryByRole('status')).toBeNull();
+    // search200 B9: the region stays, and says what came of it; the bar goes
+    expect(screen.getByRole('status')).toBe(status);
+    expect(status.textContent).not.toMatch(/Searching/i);
+    expect(document.querySelector('.srch-searching')).toBeNull();
     vi.useRealTimers();
   });
 
@@ -369,7 +374,8 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     await act(async () => { ready(true); for (let i = 0; i < 5; i++) await Promise.resolve(); });
     expect(E.search).toHaveBeenCalledTimes(2);
     expect(lead()).toBe('Keep Watch');
-    expect(screen.queryByRole('status'), 'no "Searching" while it ranks again').toBeNull();
+    expect(document.querySelector('.srch-searching'), 'no "Searching" bar while it ranks again').toBeNull();
+    expect(screen.getByRole('status').textContent, 'nor in the status region').not.toMatch(/Searching/);
     unmount();
 
     // Opened a result before the model was ready, then Back: the kept list ranks again too.
@@ -403,7 +409,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     rerender(<SearchScreen {...props} query="mercy" />);
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
-    const summary = screen.getByText(/Found/i).closest('.srch-results-summary');
+    const summary = document.querySelector('.srch-results-summary');
     expect(summary.textContent).toContain('400+');
     expect(summary.textContent).not.toMatch(/Found 400 matches/);
     vi.useRealTimers();
@@ -433,7 +439,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     rerender(<SearchScreen {...props} query="shepherd" />);
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
-    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('3 sections');
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('3 sections');
     expect(document.querySelectorAll('.srch-filter-chip')).toHaveLength(0);
     expect(document.body.textContent).not.toMatch(/\bWTLB\b/);
     // The corpus row is THE chip row: three pills, once.
@@ -559,7 +565,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     await act(async () => { await Promise.resolve(); });
     const capped = Object.fromEntries([...document.querySelectorAll('.stub-group')].map((g) => [g.getAttribute('data-key'), g.getAttribute('data-capped')]));
     expect(capped).toEqual({ bible: 'true', v7: 'false', matthew: 'true' });
-    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('3+ matches');
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('3+ matches');
     vi.useRealTimers();
   });
 
@@ -958,7 +964,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     rerender(<SearchScreen {...props} query="shepherd" />);
     act(() => { vi.advanceTimersByTime(200); });
     await act(async () => { await Promise.resolve(); });
-    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('1 match');
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('1 match');
     vi.useRealTimers();
   });
 
@@ -1070,13 +1076,13 @@ describe('SearchScreen (W0 micro-gaps)', () => {
       pending.grace({ parsed: null, results: [{ score: 1, doc: { kind: 'verse', ref: 'Eph 2:8', text: 'grace' } }], parsedTerms: [] });
       await Promise.resolve();
     });
-    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('1 match');
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('1 match');
     await act(async () => {
       pending.mercy({ parsed: null, results: [], parsedTerms: [] });
       await Promise.resolve();
     });
     // The stale "mercy" resolution (0 results) must NOT clobber grace's hit.
-    expect(screen.getByText(/Found/i).closest('.srch-results-summary').textContent).toContain('1 match');
+    expect(document.querySelector('.srch-results-summary').textContent).toContain('1 match');
     vi.useRealTimers();
   });
 
@@ -1649,5 +1655,77 @@ describe('SearchScreen (search200 UX, track B)', () => {
   it('B3: an empty box takes the focus as it mounts, so no key typed after the tap is lost', () => {
     render(<SearchScreen {...baseProps()} />);
     expect(document.activeElement).toBe(box());
+  });
+
+  /* B9 (critic): the counts and the no-results line reached no screen reader. The only status region came and went
+     with the "Searching…" bar, and a region that arrives with its words is not read. One stays in the screen from
+     the start and says each step. */
+  it('B9: one polite status region stays in the screen and says each step of a search', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ let resolve;
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => new Promise((res) => { resolve = res; }));
+    const props = baseProps();
+    const r = render(<SearchScreen {...props} />);
+    const status = screen.getByRole('status');
+    expect(status.getAttribute('aria-live')).toBe('polite');
+    expect(status.getAttribute('aria-atomic')).toBe('true');
+    expect(status.textContent, 'quiet before a search').toBe('');
+    r.rerender(<SearchScreen {...props} query="still waters" />);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(screen.getAllByRole('status'), 'one region, not one per message').toEqual([status]);
+    expect(status.textContent).toBe('Searching…');
+    await act(async () => { resolve({ parsed: null, parsedTerms: [], results: letters('v7', 3).concat(letters('v1', 1, 3)) }); await Promise.resolve(); });
+    expect(screen.getAllByRole('status')).toEqual([status]);
+    expect(status.textContent).toBe('Found 4 matches across 2 sections.');
+    searchReturns({ results: [] });
+    r.rerender(<SearchScreen {...props} settings={{ searchCorpus: 'scriptures' }} query="zzyzx" />);
+    await commit();
+    expect(screen.getAllByRole('status')).toEqual([status]);
+    expect(status.textContent).toBe('No results for “zzyzx” in the Scriptures.');
+  });
+
+  it('B9: the status region says a stop word, a corrected word, a scope the tab cannot reach and an emoji, as the screen does', async () => {
+    const props = baseProps();
+    const said = async (/** @type {any} */ extra, /** @type {string} */ q) => {
+      const r = await typeIn({ ...props, ...extra }, q);
+      const text = screen.getByRole('status').textContent;
+      r.unmount();
+      return text;
+    };
+    searchReturns({ parsed: { kind: 'text' }, results: [], stopWordsOnly: true });
+    expect(await said({}, 'the')).toBe('“the” is in nearly every verse and letter. Add another word to search.');
+    searchReturns({ results: letters('v7', 2), corrections: [{ from: 'shephard', to: 'shepherd' }] });
+    expect(await said({}, 'shephard')).toBe('Showing results for shepherd. Found 2 matches across 1 section.');
+    searchReturns({ results: [] });
+    expect(await said({ settings: { searchCorpus: 'volumes' }, searchScope: { bookId: 'luke', label: 'Luke' }, searchContext: { label: 'Luke' } }, 'sparrows'))
+      .toBe('Luke is in the Scriptures, and the Volumes tab is on.');
+    expect(await said({}, '🙏')).toBe('Type a word, a title or a reference to search.');
+  });
+
+  /* B9: the results had no headings to move by: the section labels were divs and a group's header a bare button. */
+  it('B9: the results are headed: each section an h2, each group an h3 over its own open-close button', async () => {
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = RealSrchGroup;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.title}</div>;
+    searchReturns({ results: letters('v7', 30).concat(letters('v1', 10, 30)) });
+    await typeIn(baseProps(), 'headed results');
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Best Matches']);
+    const groups = screen.getAllByRole('heading', { level: 3 });
+    expect(groups).toHaveLength(2);
+    for (const h of groups) {
+      const b = h.querySelector('button.srch-group-header');
+      expect(b, 'the open-close button inside the heading').toBeTruthy();
+      expect(b.getAttribute('aria-expanded')).toBe('false');
+    }
+    expect(groups[0].textContent).toMatch(/^Volume One · 10 letters/);
+    expect(groups[1].textContent).toMatch(/^Volume Seven · 30 letters/);
+  });
+
+  it('B9: the empty screen is headed too: the hero, Recent and Quick picks', () => {
+    /** @type {any} */ (window).getRecentSearches = () => ['mercy'];
+    render(<SearchScreen {...baseProps()} settings={{ historyEnabled: true }} />);
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Search everything', 'Recent', 'Quick picks']);
   });
 });

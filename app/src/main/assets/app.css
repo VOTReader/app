@@ -3833,6 +3833,8 @@
     .srch-results-summary strong { color:var(--gold-bright); font-weight:600; font-style:normal; }
     .srch-groups { display:block; }
     .srch-group { border-bottom:1px solid var(--gold-border); }
+    /* the heading round a group's header button (search200 B9) takes nothing of its own */
+    .srch-group-h { font:inherit; }
     .srch-group-count-inline { color:var(--gold-bright); font-weight:600; letter-spacing:0.1em; }
     .srch-group-header { display:flex; align-items:center; justify-content:space-between; padding:0.5rem 1rem; background:var(--bg2); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); border:none; width:100%; text-align:left; }
     .srch-group-header:active { background:var(--gold-faint); }
@@ -3884,7 +3886,7 @@
     .srch-more-link { background:none; border:none; padding:0.6rem 0.15rem; margin:-0.6rem -0.15rem; color:var(--gold-bright); font:inherit; cursor:pointer; text-decoration:underline; text-underline-offset:0.15em; }
 
     .srch-empty-hero { padding:2rem 1.5rem 1rem; text-align:center; font-family:var(--font-body); color:var(--cream-muted); }
-    .srch-empty-hero h3 { font-family:'Cinzel Decorative',serif; font-size:var(--fs-18); letter-spacing:0.1em; color:var(--gold); font-weight:400; margin-bottom:0.5rem; }
+    .srch-empty-hero h2 { font-family:'Cinzel Decorative',serif; font-size:var(--fs-18); letter-spacing:0.1em; color:var(--gold); font-weight:400; margin-bottom:0.5rem; }
     .srch-empty-hero p { font-size:var(--fs-15); line-height:1.5; }
     .srch-quick-row { display:flex; flex-wrap:wrap; gap:0.45rem; justify-content:center; padding:0.6rem 1rem 1.2rem; }
     .srch-quick-chip { background:var(--gold-faint); border:1px solid var(--gold-border); color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; padding:0.35rem 0.7rem; border-radius:20px; cursor:pointer; }
@@ -3914,7 +3916,7 @@
     .srch-clear-btn { background:none; border:none; color:var(--gold-dim); cursor:pointer; font-size:var(--fs-20); padding:0; min-width:48px; min-height:48px; display:inline-flex; align-items:center; justify-content:center; font-family:'Cinzel',serif; flex-shrink:0; }
     .srch-clear-btn:active { color:var(--gold); }
 
-    .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+    .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-12); font-weight:inherit; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
     /* Book order's two lists on a passage search (sr13): the loose matches start under a rule, as Best Matches ends on one */
     .srch-loose-label, .srch-loose-more { border-top:2px solid var(--gold-border); margin-top:0.3rem; }
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }
