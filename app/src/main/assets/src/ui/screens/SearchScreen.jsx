@@ -38,6 +38,20 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
   return [...out];
 }
 
+/* THE WORDS A CARD DOES NOT MARK when real words were typed (search200 B7): the engine's
+   trimmed stop list (the words it does not search) and the fuller one (who, which, not,
+   all...), which it searches for their meaning but which marked as glue ("those who
+   mourn" marked every "who"). One set per tables object. */
+/** @type {WeakMap<object, Set<string>>} */
+const MARK_STOP = new WeakMap();
+/** @param {any} SD  window.VotSearchData @returns {Set<string>|null} */
+function markStopWords(SD) {
+  if (!SD || (!SD.STOP_WORDS_TRIMMED && !SD.STOP_WORDS)) return null;
+  let s = MARK_STOP.get(SD);
+  if (!s) { s = new Set([...(SD.STOP_WORDS_TRIMMED || []), ...(SD.STOP_WORDS || [])]); MARK_STOP.set(SD, s); }
+  return s;
+}
+
 // MiniSearch is THE engine (the owner A/B'd it against the retired FlexSearch
 // Classic and kept it — typo tolerance, BM25 ranking, recent searches, warm IDB
 // cache). It ships in bundle-d alongside this screen, so it's always loaded by
@@ -408,7 +422,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         r.textQuery || r.parsed, r.parsedTerms || [],
         /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
         settings.searchSynonyms !== false,
-        /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
+        markStopWords(/** @type {any} */ (window).VotSearchData),
       );
       /* `memo`: the search this list came from (search200 B2). The groups are keyed by it, not by the live memo,
          which a tab or scope change moves at once: keyed live, the groups remounted over the OLD list (long, so

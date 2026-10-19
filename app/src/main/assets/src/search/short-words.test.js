@@ -91,7 +91,9 @@ describe('highlight and places: a short word or a stop word marks only itself', 
   const marks = (text, terms) => highlightSpans(text, terms).filter((s) => s.hit).map((s) => s.text);
 
   it('"ye" never marks "Yet", "me" never "men", "the" never "these"', () => {
-    expect(marks('Yet ye shall know me, and the men of these days', ['ye', 'me', 'the'])).toEqual(['ye', 'me', 'the']);
+    // a stop word typed among real words marks only beside one (search200 B7), so "the" is asked alone
+    expect(marks('Yet ye shall know me, and the men of these days', ['ye', 'me', 'the'])).toEqual(['ye', 'me']);
+    expect(marks('Yet ye shall know me, and the men of these days', ['the'])).toEqual(['the']);
   });
 
   it('a longer word still marks its forms whole', () => {

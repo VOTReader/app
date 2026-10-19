@@ -1755,4 +1755,18 @@ describe('SearchScreen (search200 UX, track B)', () => {
     // the card's own label first, as the card reads
     expect(screen.getByRole('status').textContent).toBe('Matthew 28. Showing closest matches.');
   });
+
+  /* B7: the marks dropped only the engine's trimmed stop words, so with real words typed "who" was still marked
+     (and marked "whom"). They drop the fuller list too; the engine still searches by the trimmed one. */
+  it('B7: with real words typed, a word of the fuller stop list is not marked', async () => {
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {},
+      STOP_WORDS_TRIMMED: new Set(['those']), STOP_WORDS: new Set(['those', 'who']) };
+    /** @type {any} */ let seen = null;
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchCard = ({ terms }) => { seen = terms; return <div className="stub-card" />; };
+    searchReturns({ parsed: { kind: 'text' }, parsedTerms: ['those', 'who', 'mourn'], results: letters('v7', 6).concat(letters('v1', 3, 6)) });
+    await typeIn(baseProps(), 'those who mourn');
+    expect(seen).toEqual(['mourn']);
+  });
 });

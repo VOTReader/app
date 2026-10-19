@@ -101,7 +101,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
       </div>
       {locLine && <div className="srch-card-loc">{locLine}</div>}
       <div className="srch-card-snippet">
-        <SrchSnippet text={body || ''} terms={hlTerms} start={titled ? undefined : placeStart} />
+        <SrchSnippet text={body || ''} terms={hlTerms} typed={terms} start={titled ? undefined : placeStart} />
       </div>
     </button>
   );
@@ -128,7 +128,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
             <li key={p.start}>
               <button type="button" className="srch-place" onClick={() => onSelect({ ...entry, placeStart: p.start })}>
                 <span className="srch-place-text">
-                  {sm.highlightSpans(p.clip, hlTerms || []).map((s, i) =>
+                  {sm.highlightSpans(p.clip, hlTerms || [], terms).map((s, i) =>
                     s.hit ? <mark key={i} className="search-highlight">{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>
                   )}
                 </span>

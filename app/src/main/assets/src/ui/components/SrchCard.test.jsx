@@ -7,7 +7,7 @@
    SrchCard must union entry.terms into the highlight list, and must pass
    results WITHOUT entry.terms (direct-ref parses) through unchanged. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SrchCard } from './SrchCard.jsx';
 import { SrchSnippet } from './SrchSnippet.jsx';
@@ -232,6 +232,44 @@ describe('SrchCard for a hit placed where the tap lands (sweep W33)', () => {
     expect(rows[0].textContent).toContain('Honour the Maker');
     fireEvent.click(rows[0]);
     expect(text.slice(picked[0].placeStart).startsWith('Honour the Maker')).toBe(true);
+  });
+});
+
+/* search200 B7: a small word the engine matched ("who", on entry.terms) marked by itself
+   all over a card for "those who mourn"; it marks only beside a typed word. The card hands
+   its snippet and its places the typed words, apart from the engine's forms. */
+describe('SrchCard marks a small word only beside a typed one (search200 B7)', () => {
+  /** @type {any} */ let prev;
+  /** @type {any} */ let REAL;
+  beforeAll(async () => {
+    prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+    REAL = window.VotSearchData;
+  });
+  beforeEach(() => {
+    window.VotSearchData = REAL;
+    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { verse: { label: 'Verse', cls: '' }, letter: { label: 'Letter', cls: '' } };
+    /** @type {any} */ (globalThis).VotSearchMini = { snippet, highlightSpans, morePlaces };
+  });
+  afterEach(() => { window.VotSearchData = prev; });
+  afterAll(() => { window.VotSearchData = prev; });
+
+  it('the snippet: "who mourn" one mark, the stray "who" none', () => {
+    const doc = { kind: 'verse', ref: 'Job 5:11', text: 'He sets on high those who are lowly, And those who mourn are lifted to safety.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['who', 'mourn'] }} terms={['mourn']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(container)).toEqual(['who mourn']);
+  });
+
+  it('the places list: the same rule', () => {
+    const pad = (/** @type {number} */ n) => 'and the word went on. '.repeat(n);
+    const text = pad(3) + 'Blessed are those who mourn. ' + pad(30) + 'those who mourn shall be comforted, who wait. ' + pad(30) + 'who sorrow and mourn. ' + pad(3);
+    const doc = { kind: 'letter', ref: 'Volume One · Letter 3', title: 'Comfort', text, volumeId: 'v1', letterId: 'comfort' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['who', 'mourn'] }} terms={['mourn']} onSelect={() => {}} isDirect={false} />);
+    fireEvent.click(container.querySelector('.srch-places-toggle'));
+    const placeMarks = [...container.querySelectorAll('.srch-place mark')].map((m) => m.textContent);
+    expect(placeMarks.length).toBeGreaterThan(0);
+    expect(placeMarks.filter((m) => m.toLowerCase() === 'who')).toEqual([]);
   });
 });
 
