@@ -114,6 +114,9 @@ export function attachWebGestures(el, deps) {
   // pointers that zoom (their ids). lastTap: the first tap of a possible double, with the undo
   // of what it opened.
   let drag = null, pinch = null, moved = false, lastTap = null;
+  // caught: the press now down stopped a glide (w4 device check). Like a native scroller's
+  // catch it is no tap, and no first tap of a double, however still it lifts.
+  let caught = false;
   // the running fling's stop (deps.animate's), or null
   let stopFling = null;
   const endFling = () => { if (stopFling) { const stop = stopFling; stopFling = null; stop(); } };
@@ -174,7 +177,8 @@ export function attachWebGestures(el, deps) {
     // listeners still see the move — but letting it throw here would abort
     // the handler and leave the gesture dead.
     try { if (el.setPointerCapture) el.setPointerCapture(e.pointerId); } catch (_e) { /* capture is optional */ }
-    // a press catches a gliding web where it is
+    // a press catches a gliding web where it is, and that catch is no tap
+    const gliding = !!stopFling;
     endFling();
     // the first pointer of a new gesture: anything still recorded is a ghost whose up never came
     if (e.isPrimary && pointers.size) { pointers.clear(); drag = null; pinch = null; }
@@ -184,6 +188,7 @@ export function attachWebGestures(el, deps) {
     if (pinch) return;
     if (pointers.size >= 2) { seedPinch(); return; }
     moved = false;
+    caught = gliding;
     const dc = camAt(pt.y);
     drag = { id: e.pointerId, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc,
              lift: liftAt(pt.x, pt.y), slop: slopFor(e.pointerType), samples: [] };
@@ -286,6 +291,9 @@ export function attachWebGestures(el, deps) {
       // a tap on the track jumps there; never a web tap, never a double-tap zoom
       if (!moved) { drag.lift(loc(e).y); schedule(); }
       lastTap = null;
+    } else if (!moved && caught) {
+      // the press only stopped the glide
+      lastTap = null;
     } else if (!moved) {
       const pt = loc(e);
       const now = Date.now();
@@ -306,6 +314,7 @@ export function attachWebGestures(el, deps) {
       fling(drag);
     }
     drag = null;
+    caught = false;
   };
   const cancel = (e) => {
     if (!pointers.has(e.pointerId)) return;

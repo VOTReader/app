@@ -595,4 +595,27 @@ describe('fling inertia (A4)', () => {
     l.frame();
     expect(cam.x).toBe(held);
   });
+
+  /* w4 device check (S22, 3 of 3): the press that caught the glide lifted in place and was read
+     as a tap, so the chooser "The 8 nearest threads" opened. A native scroller's catch is not a
+     tap, and it starts no double-tap either; the next press is a tap as ever. */
+  it('the press that catches the glide is no tap, and starts no double-tap', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    const { handlers } = attach(root, { animate: l.animate, reduceMotion: () => false });
+    flick(root, clock);
+    l.frame(); l.frame();
+    expect(l.running(), 'gliding').toBe(true);
+    clock.t += 30;
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 300, clientY: 300 }));
+    clock.t += 60;
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 301, clientY: 300 }));
+    expect(handlers.tap, 'the catch opened nothing').not.toHaveBeenCalled();
+    clock.t += 80;
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 3, clientX: 301, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 3, clientX: 301, clientY: 300 }));
+    expect(handlers.doubleTap, 'the catch was no first tap').not.toHaveBeenCalled();
+    expect(handlers.tap, 'the press after it is a tap').toHaveBeenCalledTimes(1);
+  });
 });
