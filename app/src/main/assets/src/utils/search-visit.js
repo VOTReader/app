@@ -15,6 +15,9 @@
       breadcrumb — a tap-through stack, a WTLB {{nav}} hop, a Matthew card, a
       Surprise — owns the back first), and search-visit.test.js drives the real
       handler across every state to keep the two in step.
+      The back retraces the reader's own path (Track D): a chapter picked from
+      the chapter index a book-level hit opened (fromSearchIndex) backs to that
+      index, and the index backs to the results.
 
    2. The look records no reading progress. useSearch names the place a hit
       opens (readingPlaceKey, kept in the searchLanding tab field); while the
@@ -79,16 +82,19 @@ export function isSearchLook({ fromSearch, searchLanding, ...place }) {
 /**
  * Whether the reader's back from this screen ends at the search results — the
  * same answer handleAndroidBack gives (use-android-back.js), state for state.
+ * A chapter picked from the index a book-level hit opened (fromSearchIndex,
+ * Track D) backs to that index first, whose own back is the results.
  * @param {{ screen: string | null, fromSearch: boolean, fromSurprise?: boolean, fromWtlb?: string | null,
- *   fromMatthewCh?: any, stackLength?: number, backActive?: boolean }} s
+ *   fromMatthewCh?: any, stackLength?: number, backActive?: boolean, fromSearchIndex?: boolean }} s
  * @returns {boolean}
  */
-export function searchBackActive({ screen, fromSearch, fromSurprise, fromWtlb, fromMatthewCh, stackLength, backActive }) {
+export function searchBackActive({ screen, fromSearch, fromSurprise, fromWtlb, fromMatthewCh, stackLength, backActive, fromSearchIndex }) {
   if (!fromSearch || fromSurprise || !screen) return false;
   // The tap-through stack pops first on every letter-shaped screen (study chapters too).
   if (isLetterShaped(screen) && (stackLength || 0) > 0) return false;
   if (screen === 'bible-ch' || screen === 'matthew-ch') {
     if (backActive) return false;                       // a live tap-through pill wins
+    if (fromSearchIndex) return false;                  // picked from the hit's index: back to that index
     return !(screen === 'bible-ch' && fromWtlb);        // a WTLB {{nav}} hop returns to its entry
   }
   if (screen === 'bible-study-chapter') return true;

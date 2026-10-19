@@ -983,4 +983,19 @@ describe('useSearch — a search hit is a look, not a read (search200 UX B1)', (
     expect(props.setFromWtlb).toHaveBeenCalledWith(null);
     expect(props.setFromMatthewCh).toHaveBeenCalledWith(null);
   });
+
+  // Track D (1): a chapter picked from the index a book-level hit opened backs to that
+  // index (fromSearchIndex, a tab field useSearch owns). Every hit starts that trail over.
+  it('every hit starts over the index trail a book-level hit began', () => {
+    const tabField = makeTabField();
+    const { result } = setup({ tabField });
+    const [, setFromSearchIndex] = tabField('fromSearchIndex');
+    expect(typeof result.current.setFromSearchIndex).toBe('function');
+    expect('fromSearchIndex' in result.current).toBe(true);
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-book', bookId: 'romans' } }); });
+    expect(setFromSearchIndex).toHaveBeenCalledWith(false);
+    setFromSearchIndex.mockClear();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
+    expect(setFromSearchIndex).toHaveBeenCalledWith(false);
+  });
 });

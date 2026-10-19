@@ -97,6 +97,7 @@ import { AboutSeenFlagStore } from '../stores/app-flag-stores.js';
  * @property {string | null} fromWtlb
  * @property {boolean} fromSearch
  * @property {boolean} fromSurprise
+ * @property {boolean} fromSearchIndex
  * @property {string | null} searchLanding
  * @property {string} searchQuery
  * @property {Record<string, any> | null} searchOrigin
@@ -127,6 +128,9 @@ export const DEFAULT_TAB = {
   // The reading place a search hit opened (search200 UX B1, utils/search-visit.js):
   // the look records no reading progress. Written by useSearch, read by the arm.
   searchLanding: null,
+  // The reading place was picked from the chapter index a book-level hit opened
+  // (search200 UX Track D): its back goes to that index, then the results.
+  fromSearchIndex: false,
   searchQuery: '', searchOrigin: null, searchScope: null, searchContext: null,
   navOrigin: null,
   gardenPage: 1,

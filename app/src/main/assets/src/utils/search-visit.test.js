@@ -74,6 +74,10 @@ describe('searchBackActive — when the reader backs to the results', () => {
     expect(searchBackActive({ ...base, screen: 'bible-ch', backActive: true })).toBe(false);
     expect(searchBackActive({ ...base, screen: 'bible-ch', fromWtlb: 'wtlb-one-entry' })).toBe(false);
   });
+  it('is off on a chapter picked from the index a search opened: its back is that index (Track D 1)', () => {
+    expect(searchBackActive({ ...base, screen: 'bible-ch', fromSearchIndex: true })).toBe(false);
+    expect(searchBackActive({ ...base, screen: 'matthew-ch', fromSearchIndex: true })).toBe(false);
+  });
   it('is off on screens that are not for reading (the index screens keep their own back)', () => {
     for (const screen of ['search', 'home', 'bible-idx', 'matthew-idx', 'vot-index']) {
       expect(searchBackActive({ ...base, screen }), screen).toBe(false);
@@ -99,13 +103,14 @@ describe('searchBackActive agrees with the system back on every state', () => {
     'blessed-entry', 'holy-days-entry', 'answers-entry'];
   const states = [];
   for (const screen of SCREENS) {
-    for (let bits = 0; bits < 64; bits++) {
+    for (let bits = 0; bits < 128; bits++) {
       states.push({
         screen,
         fromSearch: !!(bits & 1), fromSurprise: !!(bits & 2),
         fromWtlb: (bits & 4) ? 'wtlb-one-entry' : null,
         fromMatthewCh: (bits & 8) ? { chapterNum: 5 } : null,
         stackLength: (bits & 16) ? 1 : 0, backActive: !!(bits & 32),
+        fromSearchIndex: !!(bits & 64),
       });
     }
   }
@@ -117,7 +122,7 @@ describe('searchBackActive agrees with the system back on every state', () => {
       const props = {
         screen: s.screen, bookId: 'genesis', genreId: null,
         fromSearch: s.fromSearch, fromStudies: false, fromMatthewCh: s.fromMatthewCh, studyId: null,
-        fromWtlb: s.fromWtlb, fromSurprise: s.fromSurprise,
+        fromWtlb: s.fromWtlb, fromSurprise: s.fromSurprise, fromSearchIndex: s.fromSearchIndex,
         tabsOverviewOpen: false, journalEntryId: null,
         fromLetterRef: { current: s.stackLength ? [{ sourceScreen: 'home', destSnapshot: {} }] : [] },
         tapThroughBack: vi.fn(), backActive: s.backActive,
@@ -125,7 +130,7 @@ describe('searchBackActive agrees with the system back on every state', () => {
         setStudyId: vi.fn(), setStudyChapterId: vi.fn(), setJournalEntryId: vi.fn(),
         setFromLetterStack: vi.fn(), setFromSearch: vi.fn(), setFromStudies: vi.fn(),
         setFromWtlb: vi.fn(), setFromMatthewCh: vi.fn(), setFromSurprise: vi.fn(),
-        setTabsOverviewOpen: vi.fn(), setSurpriseAnchor: vi.fn(),
+        setTabsOverviewOpen: vi.fn(), setSurpriseAnchor: vi.fn(), setFromSearchIndex: vi.fn(),
         cancelDwell: vi.fn(), goNavOrigin: vi.fn(), goHome: vi.fn(), goSearchOrigin: vi.fn(),
         goScripturesHome: vi.fn(), goStudiesHome: vi.fn(), goVolumesHome: vi.fn(), goJournalViewer: vi.fn(),
         getStudyById: vi.fn(),
@@ -137,5 +142,82 @@ describe('searchBackActive agrees with the system back on every state', () => {
       if (wentToResults !== searchBackActive(s)) disagree.push({ ...s, handler: wentToResults });
     }
     expect(disagree).toEqual([]);
+  });
+});
+
+/* Track D (1): round 1's "Back to results" skipped the index. A book-level hit
+   ("Open book index") lands on the book's chapter index, whose back goes to the
+   results; a chapter picked there went straight back to the results too, past the
+   index the reader had just used. The reader's back retraces the path instead:
+   chapter -> that index -> results. (fromSearchIndex: the chapter was picked from
+   an index during the search trail; useSearch resets it on every hit.) */
+describe('a chapter picked from the index a search opened backs to that index first', () => {
+  beforeEach(() => {
+    modalRegistry._reset();
+    /** @type {any} */ (window).navHandoff = { clear: vi.fn() };
+    /** @type {any} */ (window).__closeSheet = null;
+  });
+  afterEach(() => {
+    delete window.handleAndroidBack;
+    delete /** @type {any} */ (globalThis).BOOKS;
+    vi.restoreAllMocks();
+  });
+
+  const back = (over) => {
+    const props = {
+      screen: 'bible-ch', bookId: 'romans', genreId: null,
+      fromSearch: true, fromStudies: false, fromMatthewCh: null, studyId: null,
+      fromWtlb: null, fromSurprise: false, fromSearchIndex: true,
+      tabsOverviewOpen: false, journalEntryId: null,
+      fromLetterRef: { current: [] }, tapThroughBack: vi.fn(), backActive: false,
+      setScreen: vi.fn(), setBookId: vi.fn(), setChapterNum: vi.fn(), setLetterId: vi.fn(),
+      setStudyId: vi.fn(), setStudyChapterId: vi.fn(), setJournalEntryId: vi.fn(),
+      setFromLetterStack: vi.fn(), setFromSearch: vi.fn(), setFromStudies: vi.fn(),
+      setFromWtlb: vi.fn(), setFromMatthewCh: vi.fn(), setFromSurprise: vi.fn(),
+      setTabsOverviewOpen: vi.fn(), setSurpriseAnchor: vi.fn(), setFromSearchIndex: vi.fn(),
+      cancelDwell: vi.fn(), goNavOrigin: vi.fn(), goHome: vi.fn(), goSearchOrigin: vi.fn(),
+      goScripturesHome: vi.fn(), goStudiesHome: vi.fn(), goVolumesHome: vi.fn(), goJournalViewer: vi.fn(),
+      getStudyById: vi.fn(),
+      ...over,
+    };
+    const { unmount } = renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    unmount();
+    return props;
+  };
+
+  it('a Bible chapter: back goes to its book index, keeping the search for the back from the index', () => {
+    const p = back({});
+    expect(p.setScreen).toHaveBeenCalledWith('bible-idx');
+    expect(p.setScreen).not.toHaveBeenCalledWith('search');
+    expect(p.setChapterNum).toHaveBeenCalledWith(null);
+    expect(p.setFromSearchIndex).toHaveBeenCalledWith(false);
+    expect(p.setFromSearch).not.toHaveBeenCalledWith(false);
+  });
+
+  it('a one-chapter book too: back goes to the index the reader picked it from, not the genre', () => {
+    /** @type {any} */ (globalThis).BOOKS = { jude: { id: 'jude', chapters: [{ num: 1 }] } };
+    const p = back({ bookId: 'jude', genreId: 'general-epistles' });
+    expect(p.setScreen).toHaveBeenCalledWith('bible-idx');
+    expect(p.goScripturesHome).not.toHaveBeenCalled();
+  });
+
+  it('a Matthew study chapter: back goes to the Matthew index', () => {
+    const p = back({ screen: 'matthew-ch', bookId: 'matthew' });
+    expect(p.setScreen).toHaveBeenCalledWith('matthew-idx');
+    expect(p.setScreen).not.toHaveBeenCalledWith('search');
+    expect(p.setFromSearchIndex).toHaveBeenCalledWith(false);
+  });
+
+  it('then the index backs to the results', () => {
+    for (const screen of ['bible-idx', 'matthew-idx']) {
+      const p = back({ screen, fromSearchIndex: false });
+      expect(p.setScreen, screen).toHaveBeenCalledWith('search');
+    }
+  });
+
+  it('a chapter a hit opened (no index on the way) still backs to the results', () => {
+    const p = back({ fromSearchIndex: false });
+    expect(p.setScreen).toHaveBeenCalledWith('search');
   });
 });

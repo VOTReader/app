@@ -20,6 +20,12 @@
 
    OWNED STATE (returned for render-tree consumers):
      - searchQuery, setSearchQuery   SearchScreen's input binding.
+     - fromSearchIndex,              The reading place was picked from the
+       setFromSearchIndex            chapter index a book-level hit opened
+                                     (search200 UX Track D): its back goes to
+                                     that index, whose back goes to the results.
+                                     Set by the index routes, read by the back
+                                     handler and the routes; every hit resets it.
      - searchScope, setSearchScope   SearchScreen's scope-chip state
                                      (null = global, populated = scoped
                                      to a context).
@@ -141,7 +147,7 @@
                               ('settings') and goSearchOrigin (fallback).
 
    RETURNS: {
-     searchQuery, setSearchQuery,
+     searchQuery, setSearchQuery, fromSearchIndex, setFromSearchIndex,
      searchScope, setSearchScope,
      searchContext,
      goSearch, goSearchOrigin,
@@ -250,6 +256,8 @@ function scopeBookTitle(bookId) {
  *   searchScope: any,
  *   setSearchScope: (v: any) => void,
  *   searchContext: any,
+ *   fromSearchIndex: boolean,
+ *   setFromSearchIndex: (v: boolean) => void,
  *   goSearch: () => void,
  *   goSearchOrigin: () => void,
  *   handleSearchSelect: (entry: any, terms?: string[]) => void,
@@ -285,6 +293,7 @@ export function useSearch({
   const [searchOrigin, setSearchOrigin] = tabField('searchOrigin');
   const [searchScope, setSearchScope] = tabField('searchScope');
   const [searchContext, setSearchContext] = tabField('searchContext');
+  const [fromSearchIndex, setFromSearchIndex] = tabField('fromSearchIndex');
 
   // searchOriginRef so goSearchOrigin's closure reads the latest origin
   // without recreating the function each render (same pattern as the
@@ -461,6 +470,9 @@ export function useSearch({
     // fromMatthewCh sent a hit's letter back to Matthew.
     if (typeof setFromWtlb === 'function') setFromWtlb(null);
     if (typeof setFromMatthewCh === 'function') setFromMatthewCh(null);
+    // Track D: a chapter picked from the index a book-level hit opens backs to that index;
+    // every hit starts that trail over (the index routes set it on a pick).
+    setFromSearchIndex(false);
     // ...and the place the hit opens is a look, not a read (set per branch below).
     const land = (place) => { if (typeof setSearchLanding === 'function') setSearchLanding(place ? readingPlaceKey(place) : null); };
     // Direct parsed reference (from __direct entries)
@@ -587,6 +599,7 @@ export function useSearch({
 
   return {
     searchQuery, setSearchQuery,
+    fromSearchIndex: !!fromSearchIndex, setFromSearchIndex,
     searchScope, setSearchScope,
     searchContext,
     goSearch, goSearchOrigin,

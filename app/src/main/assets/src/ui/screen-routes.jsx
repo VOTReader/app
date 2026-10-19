@@ -196,6 +196,8 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {boolean} backActive
  * @property {{ current: any[] }} fromLetterRef
  * @property {string | null} searchLanding
+ * @property {boolean} [fromSearchIndex]
+ * @property {(v: boolean) => void} [setFromSearchIndex]
  * @property {(volKey: string, entry: any) => any} boundaryConfig
  * @property {import('../hooks/use-tabs.js').Tab['gardenPage']} gardenPage
  * @property {import('../hooks/use-tabs.js').TabSetter<'gardenPage'>} setGardenPage
@@ -265,6 +267,7 @@ export function buildScreenRoutes({
   setFromWtlb,
   // ── Back to results from a search hit (search200 UX B1) ──
   fromWtlb, fromSurprise, backActive, fromLetterRef, searchLanding,
+  fromSearchIndex = false, setFromSearchIndex = undefined,
   // ── Boundary computation (from useReadingChainNav; sees per-volume context) ──
   boundaryConfig,
   // ── Garden ──
@@ -368,6 +371,13 @@ export function buildScreenRoutes({
   // lands on an index), but keeps fromSearch: a book-level search result lands on those
   // indexes, and Back from its chapter still returns to the search.
   const _leaveSurprise = () => { if (typeof setFromSurprise === 'function') setFromSurprise(false); };
+  // Track D: ...and marks the chapter as picked from that index (fromSearchIndex), so its
+  // back goes to the index the reader just used rather than past it to the results; the
+  // index's own back still goes to the results. A pick outside a search marks nothing.
+  const _pickFromIndex = () => { _leaveSurprise(); if (typeof setFromSearchIndex === 'function') setFromSearchIndex(!!fromSearch); };
+  const _fromSearchIndex = !!fromSearch && !!fromSearchIndex;
+  /** The way back to the index a chapter was picked from: that index, the mark spent. @param {() => void} go */
+  const _backToIndex = (go) => () => { if (typeof setFromSearchIndex === 'function') setFromSearchIndex(false); go(); };
   const colIdxProps = (volKey) => {
     const col = COL_BY_KEY.get(volKey);
     const nav = (id) => { _startNewTrail(); setLetterId(id); setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id)); setScreen(col.letterScreen); };
@@ -419,7 +429,7 @@ export function buildScreenRoutes({
     screen, fromSearch, fromSurprise, fromWtlb,
     fromMatthewCh: fromMatthewChRef ? fromMatthewChRef.current : null,
     stackLength: fromLetterRef && Array.isArray(fromLetterRef.current) ? fromLetterRef.current.length : 0,
-    backActive,
+    backActive, fromSearchIndex: _fromSearchIndex,
   });
   const _backToResults = () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); };
   const _navBack = _searchBack ? { onBack: _backToResults, label: RESULTS_LABEL } : null;
@@ -1380,7 +1390,7 @@ export function buildScreenRoutes({
         <ChapterIndex
           book={MATTHEW}
           bibleAudio={bibleAudioFor(MATTHEW.id)}
-          onSelect={(num) => { _leaveSurprise(); selectMatthewCh(num); }}
+          onSelect={(num) => { _pickFromIndex(); selectMatthewCh(num); }}
           onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
           // Wave 0: label names the real destination (Search / Studies /
           // the genre / Scriptures — never "Books").
@@ -1437,7 +1447,7 @@ export function buildScreenRoutes({
         <ChapterIndex
           book={book}
           bibleAudio={bibleAudioFor(book.id)}
-          onSelect={(num) => { _leaveSurprise(); selectBibleCh(num); }}
+          onSelect={(num) => { _pickFromIndex(); selectBibleCh(num); }}
           onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
           backLabel={fromSearch ? RESULTS_LABEL : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
@@ -1466,7 +1476,7 @@ export function buildScreenRoutes({
       <BibleChapterView
         book={book} chapter={chapter}
         bibleAudio={bibleAudioFor(book.id)}
-        onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
+        onIndex={_fromSearchIndex ? _backToIndex(goBibleIdx) : book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
         readTrackKey={getReadKey(bookId, chapterNum)}
@@ -1536,7 +1546,7 @@ export function buildScreenRoutes({
           markRead={markRead}
           getReadKey={getReadKey}
           selectMatthewCh={selectMatthewCh}
-          goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
+          goMatthewIdx={_fromSearchIndex ? _backToIndex(goMatthewIdx) : goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
           goToLetterFromMatthew={goToLetterFromMatthew}
           theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
           backHint={_readerBackHint} tapThroughBack={_navBack ? _navBack.onBack : tapThroughBack} navBack={_navBack}

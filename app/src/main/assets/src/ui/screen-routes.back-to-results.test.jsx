@@ -29,6 +29,7 @@ const STUBS = {
   BibleChapterView: () => null,
   MatthewChapterView: () => null,
   BibleStudyChapterView: () => null,
+  ChapterIndex: () => null,
   ScreenLayout: ({ children }) => children,
   LibraryNav: () => null,
   MATTHEW: { id: 'matthew', title: 'Matthew', chapters: [{ num: 5 }] },
@@ -68,6 +69,7 @@ function makeRoutes(overrides = {}) {
     fromLetterRef: { current: [] }, backActive: false,
     backHint: null, tapThroughBack: vi.fn(),
     searchLanding: 'vot-letter:the-wide-path',
+    fromSearchIndex: false, setFromSearchIndex: vi.fn(),
     setSurpriseAnchor: vi.fn(), surpriseAnchor: null,
     settings: { markAsRead: true }, activeReadKey: null, lastReadLetterMap: {}, lastReadChapters: {}, readItems: {},
     markRead: vi.fn(), unmarkRead: vi.fn(),
@@ -211,5 +213,67 @@ describe('a Matthew study chapter and a study chapter do the same', () => {
     expect(shared.navBack.label).toBe('results');
     expect(shared.backHint).toEqual({ title: 'results', volumeLabel: null });
     expect(shared.markAsReadEnabled).toBe(false);
+  });
+});
+
+/* Track D (1): a book-level hit ("Open book index") lands on the book's chapter
+   index; a chapter picked there went back to the results, skipping the index. The
+   pick marks the chapter as picked from the index (fromSearchIndex); its ‹ then
+   goes to the index (named for the book, no "Back to results" pill), and the
+   index's own back still goes to the results. */
+describe('a chapter picked from the index a search opened backs to that index, then the results', () => {
+  const ROMANS = { id: 'romans', title: 'Romans', chapters: [{ num: 6 }, { num: 7 }] };
+  const JUDE = { id: 'jude', title: 'Jude', chapters: [{ num: 1 }] };
+  const at = (over = {}) => makeRoutes({ screen: 'bible-idx', bookId: 'romans', chapterNum: null, letterId: null, book: ROMANS, searchLanding: null, ...over });
+
+  it('the book index marks a pick made during the search, and its back still names the results', () => {
+    const { routes, props } = at();
+    const idx = find(routes['bible-idx'](), G.ChapterIndex);
+    expect(idx, 'the bible-idx route did not render - this measured nothing').toBeTruthy();
+    expect(idx.props.backLabel).toBe('results');
+    idx.props.onSelect(6);
+    expect(props.setFromSearchIndex).toHaveBeenCalledWith(true);
+    expect(props.selectBibleCh).toHaveBeenCalledWith(6);
+  });
+
+  it('a pick made outside a search marks nothing', () => {
+    const { routes, props } = at({ fromSearch: false });
+    find(routes['bible-idx'](), G.ChapterIndex).props.onSelect(6);
+    expect(props.setFromSearchIndex).not.toHaveBeenCalledWith(true);
+  });
+
+  it('the chapter it opens backs to the index: no results label, no results pill', () => {
+    const { routes, props } = at({ screen: 'bible-ch', chapterNum: 6, chapter: { num: 6 }, fromSearchIndex: true });
+    const v = find(routes['bible-ch'](), G.BibleChapterView);
+    expect(v, 'the bible-ch route did not render - this measured nothing').toBeTruthy();
+    expect(v.props.navBack).toBe(null);
+    expect(v.props.backHint).toBe(null);
+    v.props.onIndex();
+    expect(props.goBibleIdx).toHaveBeenCalled();
+    expect(props.setFromSearchIndex).toHaveBeenCalledWith(false);
+    expect(props.setScreen).not.toHaveBeenCalledWith('search');
+  });
+
+  it('a one-chapter book backs to the index it was picked from too', () => {
+    const { routes, props } = at({ screen: 'bible-ch', bookId: 'jude', book: JUDE, chapterNum: 1, chapter: { num: 1 }, fromSearchIndex: true, genreId: 'general' });
+    find(routes['bible-ch'](), G.BibleChapterView).props.onIndex();
+    expect(props.goBibleIdx).toHaveBeenCalled();
+    expect(props.goScripturesHome).not.toHaveBeenCalled();
+    expect(props.setScreen).not.toHaveBeenCalledWith('scripture-genre');
+  });
+
+  it('the Matthew study index and its chapter do the same', () => {
+    const a = makeRoutes({ screen: 'matthew-idx', bookId: 'matthew', chapterNum: null, letterId: null, searchLanding: null });
+    const idx = find(a.routes['matthew-idx'](), G.ChapterIndex);
+    expect(idx, 'the matthew-idx route did not render - this measured nothing').toBeTruthy();
+    idx.props.onSelect(5);
+    expect(a.props.setFromSearchIndex).toHaveBeenCalledWith(true);
+    expect(a.props.selectMatthewCh).toHaveBeenCalledWith(5);
+    const b = makeRoutes({ screen: 'matthew-ch', bookId: 'matthew', chapterNum: 5, letterId: null, chapter: { num: 5 }, searchLanding: null, fromSearchIndex: true });
+    const v = find(b.routes['matthew-ch'](), G.MatthewChapterView);
+    expect(v.props.navBack).toBe(null);
+    v.props.goMatthewIdx();
+    expect(b.props.goMatthewIdx).toHaveBeenCalled();
+    expect(b.props.setFromSearchIndex).toHaveBeenCalledWith(false);
   });
 });

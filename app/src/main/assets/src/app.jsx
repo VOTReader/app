@@ -598,7 +598,7 @@ function App() {
     searchQuery, setSearchQuery,
     searchScope, setSearchScope,
     searchContext,
-    goSearch, goSearchOrigin,
+    goSearch, goSearchOrigin, fromSearchIndex, setFromSearchIndex,
     handleSearchSelect, handleSearchCommand,
   } = useSearch({
     tabField,
@@ -623,7 +623,7 @@ function App() {
     tabsOverviewOpen, journalEntryId, fromLetterRef, tapThroughBack, backActive,
     setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId, setJournalEntryId,
     setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
-    setTabsOverviewOpen, setSurpriseAnchor,
+    setTabsOverviewOpen, setSurpriseAnchor, fromSearchIndex, setFromSearchIndex, // Track D: a chapter picked from a hit's index backs to it
     cancelDwell, goNavOrigin, goHome, goSearchOrigin, goScripturesHome,
     goStudiesHome, goVolumesHome, goJournalViewer,
     getStudyById,
@@ -701,7 +701,7 @@ function App() {
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
     prophecyCardStatesRef, saveProphecyCardStates,
     fromMatthewChRef, setFromMatthewCh,
-    setFromWtlb, fromWtlb, fromSurprise, backActive, fromLetterRef, searchLanding, // search200 UX B1: the reader's back to results
+    setFromWtlb, fromWtlb, fromSurprise, backActive, fromLetterRef, searchLanding, fromSearchIndex, setFromSearchIndex, // search200 UX B1 + Track D: the reader's back to results
     boundaryConfig,
     gardenPage, setGardenPage,
   }; const ROUTES = buildScreenRoutes(_routeDeps);
