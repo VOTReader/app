@@ -8395,6 +8395,19 @@
     .sw-root.sw-panel-open[data-panel="dock"] .sw-hide-all { right: auto; left: 80px; }
     .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-guide-btn { left: 16px; }
     .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-hide-all { left: 68px; }
+    /* ...but a phone keeps the key's tail, the CC-BY credit (w4 integration; the hub: the credit
+       stays on screen, a licence obligation). Its panel's own credit is last in the scroll, below
+       the fold (ink F8), so the credit alone stays at the canvas area's bottom-right, clear of ?
+       and hide-UI at its bottom-left (16 + 40 + 12 + 40 + 16; the "Show controls" pill is wider),
+       and wraps rather than clip on a phone too narrow for one line. PC pins the panel's credit. */
+    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend {
+      display: block; left: auto; right: calc(var(--sw-panel-w, 42%) + 16px);
+      max-width: calc(100% - var(--sw-panel-w, 42%) - 140px); text-align: right;
+    }
+    .sw-root.sw-compact.sw-chrome-hidden.sw-panel-open[data-panel="dock"] .sw-legend { max-width: calc(100% - var(--sw-panel-w, 42%) - 240px); }
+    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend-line { justify-content: flex-end; }
+    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend-line > :not(.sw-credit) { display: none; }
+    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend .sw-credit { white-space: normal; }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-hide-all { bottom: calc(var(--sw-sheet-h, 60%) + 8px); }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-guide-btn { bottom: calc(var(--sw-sheet-h, 60%) + 60px); }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-controls { bottom: calc(var(--sw-sheet-h, 60%) + 10px); }

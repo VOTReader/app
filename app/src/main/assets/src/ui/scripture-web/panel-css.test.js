@@ -146,6 +146,19 @@ describe('the docked panel (spec section 3)', () => {
     expect(rule('.sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-controls')).toMatch(/\+ 16px - 7px\)/);
   });
 
+  /* w4 integration (hub: the CC-BY credit stays on screen, a licence obligation; ink F8). On a
+     phone the panel's own credit is last in its scroll, below the fold, and the key hides, so no
+     credit showed with a panel open. The legend keeps its tail there, the credit alone, at the
+     canvas area's bottom-right, clear of ? and hide-UI at its bottom-left. */
+  it('on a phone with the panel open, the legend keeps its CC-BY tail at the canvas area\'s foot', () => {
+    const keep = rule('.sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend');
+    expect(keep).toMatch(/display:\s*block/);
+    expect(keep).toMatch(/right:\s*calc\(var\(--sw-panel-w[^)]*\) \+ 16px\)/);
+    expect(rule('.sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend-line > :not(.sw-credit)')).toMatch(/display:\s*none/);
+    // PC pins the panel's own credit at its foot: the key and its tail both hide there
+    expect(rule('.sw-root.sw-panel-open .sw-legend')).toMatch(/display:\s*none/);
+  });
+
   it('? and hide-UI move to the canvas area\'s bottom-left', () => {
     expect(rule('.sw-root.sw-panel-open[data-panel="dock"] .sw-guide-btn')).toMatch(/left:\s*24px/);
     expect(rule('.sw-root.sw-panel-open[data-panel="dock"] .sw-hide-all')).toMatch(/left:\s*80px/);
