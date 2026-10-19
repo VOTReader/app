@@ -90,10 +90,29 @@ describe('the centre chapter is emphasised, gradually (spec 4.4, C20)', () => {
   it('the shader draws a centre arc (a foot in uCentre) wider and brighter by uCentreT, through the ink table\'s numbers', () => {
     expect(SHADER_SOURCE.vertex).toMatch(/uniform vec2\s+uCentre;/);
     expect(SHADER_SOURCE.vertex).toMatch(/uniform float uCentreT;/);
-    expect(SHADER_SOURCE.vertex).toContain('float cT = uCentreT*inCentre;');
+    expect(SHADER_SOURCE.vertex).toContain('float cT = uCentreT*inCentre*shortness;');
     expect(SHADER_SOURCE.vertex).toContain('halfW *= mix(1., ' + geo.glslFloat(CENTRE_WIDTH) + ', cT);');
     // a foot in the half-open range [x0, x1), either foot
     expect(SHADER_SOURCE.vertex).toMatch(/a >= uCentre\.x && a < uCentre\.y\) \|\| \(b >= uCentre\.x && b < uCentre\.y/);
+  });
+
+  it('lifts the centre\'s own LOCAL arcs: a long leg through it is a hairline like any other (w4 INK review)', () => {
+    // the emphasis rides on the span-ink law's shortness, so chapter 53's hundreds of reaches to the
+    // New Testament do not become the widest, brightest fan on the screen at depth
+    expect(SHADER_SOURCE.vertex).toContain('float cT = uCentreT*inCentre*shortness;');
+    const TOTAL = 31102;
+    const at = (z, span) => frame.centreEmphasis(geo.localizeFactor(z), geo.spanShortness(geo.spanT(span, TOTAL)));
+    for (const z of [24, 207, 1711]) {
+      expect(at(z, 4).bright, `zoom ${z}: a local arc`).toBeCloseTo(CENTRE_BRIGHT, 12);
+      expect(at(z, 4).width).toBeCloseTo(CENTRE_WIDTH, 12);
+      expect(at(z, 9000), `zoom ${z}: Isaiah 53 to 1 Peter`).toEqual({ bright: 1, width: 1 });
+      expect(at(z, 600)).toEqual({ bright: 1, width: 1 });
+      const mid = at(z, 80);
+      expect(mid.bright).toBeGreaterThan(1);
+      expect(mid.bright).toBeLessThan(CENTRE_BRIGHT);
+    }
+    // the one-argument twin is the local arc's (shortness 1), as before
+    expect(frame.centreEmphasis(1)).toEqual(frame.centreEmphasis(1, 1));
   });
 
   it('centreEmphasis (the shader\'s twin): 1 below 6x, full from 24x, never a jump of half the emphasis in one + press', () => {

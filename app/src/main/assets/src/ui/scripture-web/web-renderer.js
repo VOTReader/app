@@ -185,9 +185,12 @@ void main(){
   // The centre chapter (spec 4.4, Q2): its own arcs, a foot inside it, are
   // wider and brighter as the reader settles in (uCentreT eases 6x -> 24x);
   // the rest of the web is left exactly as it is (web-frame.centreEmphasis).
+  // Its LOCAL arcs: the lift rides on the span-ink law's shortness, so a long
+  // leg through the chapter stays a hairline like every other (w4 INK review:
+  // Isaiah 53's reaches to the New Testament were the brightest fan on screen).
   float inCentre = (uCentre.x < uCentre.y
     && ((a >= uCentre.x && a < uCentre.y) || (b >= uCentre.x && b < uCentre.y))) ? 1. : 0.;
-  float cT = uCentreT*inCentre;
+  float cT = uCentreT*inCentre*shortness;
   halfW *= mix(1., ${glslFloat(CENTRE_WIDTH)}, cT);
 
   // The chosen and hovered lines are not styled here: the top pass redraws

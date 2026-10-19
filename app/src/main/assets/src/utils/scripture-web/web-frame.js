@@ -167,13 +167,17 @@ export function centreRange(g, cam, width, insetRight, prev) {
 
 /**
  * The centre chapter's emphasis on its own arcs (a foot inside it) at ease t: alpha x bright and
- * width x width, both eased from 1 so no + press is a jump (C20). The shader's twin is in
- * web-renderer.js (uCentreT); the rest of the web is left exactly as it is.
+ * width x width, both eased from 1 so no + press is a jump (C20). Its LOCAL arcs: the ease is
+ * scaled by the thread's span-ink shortness (geometry.spanShortness), so a long leg through the
+ * chapter keeps the hairline every long leg has. The shader's twin is in web-renderer.js
+ * (uCentreT, cT); the rest of the web is left exactly as it is.
  * @param {number} t  CentreChapter.t, 0..1
+ * @param {number} [shortness]  the thread's geometry.spanShortness, 1 (a local arc) by default
  * @returns {{ bright: number, width: number }}
  */
-export function centreEmphasis(t) {
-  const k = t > 0 ? (t < 1 ? t : 1) : 0;
+export function centreEmphasis(t, shortness = 1) {
+  const s = shortness > 0 ? (shortness < 1 ? shortness : 1) : 0;
+  const k = (t > 0 ? (t < 1 ? t : 1) : 0) * s;
   return { bright: 1 + (CENTRE_BRIGHT - 1) * k, width: 1 + (CENTRE_WIDTH - 1) * k };
 }
 
