@@ -1,19 +1,19 @@
 {
- "open": 598,
- "strict": 547,
+ "open": 600,
+ "strict": 549,
  "top5": 600,
  "found": 600,
  "held": 175,
- "fresh": 87,
+ "fresh": 88,
  "styleTier": {
   "exact/easy": 60,
   "exact/medium": 70,
   "exact/hard": 70,
   "misremembered/easy": 60,
   "misremembered/medium": 70,
-  "misremembered/hard": 69,
+  "misremembered/hard": 70,
   "title/easy": 60,
   "title/medium": 70,
-  "title/hard": 69
+  "title/hard": 70
  }
 }
