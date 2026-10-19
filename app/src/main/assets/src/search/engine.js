@@ -50,7 +50,7 @@ import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey 
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
-import { buildTitles, scoreTitles, admitTitles, stripCollections, titleWords } from './titles.js';
+import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords } from './titles.js';
 import { alignClasses, alignWeights, alignScore, alignMet } from './align.js';
 import { parseLexicon } from './lexicon.js';
 
@@ -600,6 +600,75 @@ function runHolders(run) {
     if (at >= 0) out.set(S.ms._documentIds.get(sid), at);
   }
   return out;
+}
+/**
+ * Whether some text holds every one of `words`, each as typed or as a form of it (wordForms, and the index's words
+ * it opens that share its lemma), within `width` tokens of each other: read in the store, in every text the index
+ * finds the rarest of them in, the texts in `mine` (doc ids) aside. null with no store yet (search200 last2).
+ * @param {string[]} words  distinct content words (joined tokens)
+ * @param {number} width
+ * @param {Set<string>} mine
+ * @returns {boolean|null}
+ */
+function holdsTogether(words, width, mine) {
+  const S = storeNow();
+  const n = words.length;
+  if (!S || !n || n > 30) return null;
+  const stop = searchData().STOP_WORDS_TRIMMED;
+  const isStop = (/** @type {string} */ w) => !!stop && stop.has(w);
+  const tree = msIndex._index;
+  /** @type {Uint32Array} each store word's typed words, a bit each */
+  const flag = new Uint32Array(S.words.length);
+  let anchor = 0;
+  let anchorN = Infinity;
+  /** @type {string[]} */ let anchorForms = [];
+  for (let j = 0; j < n; j++) {
+    const w = words[j];
+    const forms = new Set([w]);
+    for (const f of wordForms(w, isStop)) forms.add(f);
+    if (typeof tree.atPrefix === 'function' && w.length >= 3) {
+      const l = lemma(w);
+      for (const k of tree.atPrefix(w).keys()) if (lemma(k) === l) forms.add(k);
+    }
+    let df = 0;
+    for (const f of forms) {
+      for (const key of [f, f + "'s", f.length > 1 && f[f.length - 1] === 's' ? f.slice(0, -1) + "'s" : '']) {
+        const id = key ? S.ids.get(key) : undefined;
+        if (id !== undefined) flag[id] |= 1 << j;
+      }
+      df += docFreq(f);
+    }
+    if (!df) return false;
+    if (df < anchorN) { anchorN = df; anchor = j; anchorForms = [...forms]; }
+  }
+  const all = (1 << n) - 1;
+  const bit = 1 << anchor;
+  /** @type {Set<number>} */ const sids = new Set();
+  for (const f of anchorForms) {
+    const data = tree.get(f);
+    if (data) for (const docs of data.values()) for (const sid of docs.keys()) sids.add(sid);
+  }
+  const T = S.toks;
+  for (const sid of sids) {
+    if (sid >= S.from.length || mine.has(S.ms._documentIds.get(sid))) continue;
+    const a = S.from[sid];
+    const b = S.to[sid];
+    for (let i = a; i < b; i++) {
+      if (!(flag[T[i]] & bit)) continue;
+      // the stretches of `width` holding this anchor word
+      const lo = Math.max(a, i - width + 1);
+      const hi = Math.min(b, i + width);
+      let m = 0;
+      for (let k = lo; k < hi; k++) m |= flag[T[k]];
+      if (m !== all) continue;
+      for (let s = lo; s <= i; s++) {
+        let mm = 0;
+        for (let k = s; k < Math.min(hi, s + width); k++) mm |= flag[T[k]];
+        if (mm === all) return true;
+      }
+    }
+  }
+  return false;
 }
 /** Typed tokens from which a text holding them all in a row leads every text that does not. */
 const RUN_LEAD_MIN = 3;
@@ -2738,7 +2807,26 @@ async function search(query, options) {
      Witnesses", not the heading "The 144,000" in the index of false doctrines. */
   const titledSo = keyword && out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc));
   const admissible = (/** @type {any} */ h) => !(/collection/.test(h.via) && !h.hinted) && !(titledSo && h.kind === 'heading');
-  const admitted = titleIx ? admitTitles(scoreTitles(wanted, { index: titleIx, limit: TITLE_HITS })).filter(admissible) : [];
+  const scored = titleIx ? scoreTitles(wanted, { index: titleIx, limit: TITLE_HITS }) : [];
+  /** @type {any[]} */
+  const admitted = admitTitles(scored).filter(admissible);
+  /* A TITLE TYPED WITH ONE WORD WRONG (search200 last2, 2026-10-18). "chosen to teach" for the letter "Given to Teach":
+     "chosen" is no form, typo or near-synonym of "given", so no title was named and the letter sat fourth, under texts
+     holding the typed words far apart (tri bench n275). titles.js swapTitles reads the title's shape where it fits one
+     title alone; that title joins as one remembered loosely (level 2) where nothing else names a title (none admitted
+     or scored, none named among the first results) and no text but its own holds every typed content word, or a form
+     of it, within the typed words' length and two (quotesNear's stretch). A short quote one word off a title is the
+     quote ("a pillar of salt" is Genesis 19:26, not "A Pillar of Strength"), and a sentence holding the typed words
+     with a word of its own between them is that quote with a word dropped. */
+  if (!admitted.length && titleIx) {
+    const sw = swapTitles(wanted, { index: titleIx, hits: scored.filter(admissible) }).filter(admissible);
+    const mine = new Set(sw.map((h) => h.docId));
+    const namedElse = () => out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc) && !mine.has(/** @type {string} */ (idOf.get(e))));
+    if (sw.length && !namedElse()) {
+      const words = [...new Set(sw[0].typed.filter((w) => !titleIx.skip(w) && w[0] !== '#'))];
+      if (holdsTogether(words, sw[0].typed.length + 2, mine) === false) admitted.push(...sw);
+    }
+  }
   if (admitted.length) {
     /** @type {Map<string, any>} */ const entryOf = new Map();
     for (const e of out) entryOf.set(/** @type {string} */ (idOf.get(e)), e);

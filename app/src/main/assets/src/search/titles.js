@@ -40,6 +40,10 @@
    not admitted. Same-titled reprints and a numbered series ("Part 1", "Part 2") are
    one title for the margin and are admitted together, the closest first.
 
+   ONE WORD WRONG (swapTitles, search200 last2): the title's shape typed with a content
+   word of the reader's own in one place ("chosen to teach" for "Given to Teach"), read
+   only where admitTitles names nothing and the shape fits one title alone.
+
    SEAM: coverage runs through titleCoverage(q, t), replaceable by setTitleCoverage()
    (B4's align.js can take its place). Pure; chrome108-safe; no dependency.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -325,7 +329,7 @@ export function buildTitles(docs, opts) {
     entries.push({
       key, uk, docId: doc.id, title, kind, collection: doc.volumeId || '', tier: kind === 'heading' ? HEADING_TIER : (TIER[doc.kind] ?? 4), start,
       norm, norm3: s3.join(' '), toks: new Set(w), content, lems: content.map(lem), nums: new Set(w.filter(isNum)),
-      series: content.filter((x) => !isNum(x)).join(' '), grams: trigrams(s3.join(' ')),
+      series: content.filter((x) => !isNum(x)).join(' '), grams: trigrams(s3.join(' ')), w3: s3, l3: s3.map(lem),
     });
   };
   const PART_CUT = /\s*(?:\.\.\.|…|:|\s—\s)\s*/;
@@ -406,11 +410,15 @@ export function buildTitles(docs, opts) {
   const byNorm3 = new Map();
   /** @type {Map<string, number[]>} */
   const byGram = new Map();
+  /** @type {Map<number, number[]>} the titles of each length, their lead word off (swapTitles) */
+  const byWords = new Map();
   entries.forEach((e, idx) => {
     for (const [m, k] of [[byNorm, e.norm], [byNorm3, e.norm3]]) { const a = m.get(k); if (a) a.push(idx); else m.set(k, [idx]); }
     for (const g of e.grams) { const a = byGram.get(g); if (a) a.push(idx); else byGram.set(g, [idx]); }
+    const a = byWords.get(e.w3.length);
+    if (a) a.push(idx); else byWords.set(e.w3.length, [idx]);
   });
-  const index = { entries, vocab, groups, weight, maxWeight: Math.log(1 + N), skip, byNorm, byNorm3, byGram };
+  const index = { entries, vocab, groups, weight, maxWeight: Math.log(1 + N), skip, byNorm, byNorm3, byGram, byWords };
   current = index;
   return index;
 }
@@ -453,9 +461,9 @@ function relate(/** @type {any} */ ix, /** @type {string} */ tok) {
  * @property {string} title
  * @property {string} kind
  * @property {number} score  0..1
- * @property {number} level  4 typed, 3 lead word stripped, 2 coverage (or a title part typed), 1 trigram typo
+ * @property {number} level  4 typed, 3 lead word stripped, 2 coverage (or a title part typed, or one word wrong), 1 trigram typo
  * @property {string} collection
- * @property {string} via  typed | lead | part | cover | typo, "+collection" when read with the collection words off
+ * @property {string} via  typed | lead | part | cover | typo | swap, "+collection" when read with the collection words off
  * @property {boolean} hinted  in a collection the query named
  * @property {number} tier
  * @property {number} start  a heading's offset in its doc's text, else -1
@@ -598,4 +606,76 @@ export function admitTitles(hits) {
 const ownTitle = (/** @type {any} */ h) => (h.kind === 'unit' || h.kind === 'chapter' ? 1 : 0);
 function looseOrder(/** @type {any} */ a, /** @type {any} */ b) {
   return (b.hinted ? 1 : 0) - (a.hinted ? 1 : 0) || ownTitle(b) - ownTitle(a) || nameOrder(a, b);
+}
+
+/* A TITLE TYPED WITH ONE WORD WRONG (search200 last2, 2026-10-18). A reader sure of a title's shape and unsure of one
+   of its words types the shape with a word of their own in that word's place: "Given to Teach" as "chosen to teach".
+   The word is no form, typo or near-synonym of the title's, so coverage holds half the typed words and names nothing;
+   BM25 reads two words of three in the letter, and the Answers topics holding all three, far apart, lead it. The
+   title's shape is the evidence: as many words as the title (their lead words off), each in its place the title's
+   own word or a form of it, but for one, where the typed word and the title's are both content words (a small word,
+   a negation or a number changed is another title), with a content word of the title's met beside it. TITLE_SWAP_MIN
+   words or more (a two-word title one word off is one word typed). The weakest reading of all: it names a title only
+   when it is the one reading. One title fits (its reprints, same-titled, are one), in the typed words or with a
+   collection's words taken off (then in that collection only), and scoreTitles named no other. The engine reads it
+   only when admitTitles names nothing, and only when no text holds the typed words together (search()). */
+/** Title words, the lead word off, at least, for a title typed with one word wrong to be read as that title. */
+export const TITLE_SWAP_MIN = 3;
+/** A negation counts as a small word: "attained by human means" is not "Not By Human Means" with one word wrong. */
+const NEGATIONS = new Set(['not', 'no', 'nor', 'never', 'neither', 'none', 'nothing', 'nay', 'naught', 'nought']);
+
+/**
+ * The title the query is with one word wrong, and its same-titled reprints (looseOrder); none when no title, or more
+ * than one, fits, or when `hits` hold another title. Level 2, via "swap" ("+collection" read with its words off).
+ * Each hit holds `swap` (the typed word and the title's) and `typed` (the words read, their lead word off).
+ * @param {string} query
+ * @param {{index?: any, hits?: TitleHit[]}} [opts]  hits: the titles scoreTitles named for the query
+ * @returns {Array<TitleHit & {swap: [string, string], typed: string[]}>}
+ */
+export function swapTitles(query, opts) {
+  const ix = (opts && opts.index) || current;
+  if (!ix || !ix.byWords || typeof query !== 'string') return [];
+  const w = titleWords(query);
+  if (!w.length) return [];
+  /** @type {Map<string, any>} unit -> its best reading */
+  const byUnit = new Map();
+  swapReading(ix, w, null, byUnit);
+  const st = stripCollections(w);
+  if (st && st.w.length) swapReading(ix, st.w, st.hints, byUnit);
+  if (!byUnit.size) return [];
+  const hits = [...byUnit.values()].sort(order);
+  const lead = hits[0];
+  if (hits.some((h) => !sameTitle(h, lead))) return [];
+  if (((opts && opts.hits) || []).some((h) => !sameTitle(h, lead))) return [];
+  return hits.sort(looseOrder);
+}
+
+function swapReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @type {Set<string> | null} */ hints, /** @type {Map<string, any>} */ byUnit) {
+  const w3 = stripLead(w);
+  if (w3.length < TITLE_SWAP_MIN) return;
+  const l3 = w3.map(lem);
+  const content = (/** @type {string} */ x) => !ix.skip(x) && !isNum(x) && !NEGATIONS.has(x);
+  for (const idx of ix.byWords.get(w3.length) || []) {
+    const e = ix.entries[idx];
+    if (hints && !hints.has(e.collection)) continue;
+    let at = -1;
+    let met = false;
+    let k = 0;
+    for (; k < w3.length; k++) {
+      const a = w3[k];
+      const b = e.w3[k];
+      if (a === b || (content(a) && content(b) && l3[k] === e.l3[k])) { if (content(b) || isNum(b)) met = true; continue; }
+      if (at >= 0 || !content(a) || !content(b)) break;
+      at = k;
+    }
+    if (k < w3.length || at < 0 || !met) continue;
+    const hinted = !!hints;
+    const h = {
+      key: e.key, uk: e.uk, docId: e.docId, title: e.title, kind: e.kind, score: TITLE_ADMIT * (e.kind === 'part' ? PART_RATE : 1), level: 2,
+      collection: e.collection, via: hinted ? 'swap+collection' : 'swap', hinted, tier: e.tier, start: e.start, norm: e.norm3, series: e.series,
+      extraNum: 0, literal: (w3.length - 1) / w3.length, swap: [w3[at], e.w3[at]], typed: w3,
+    };
+    const o = byUnit.get(h.uk);
+    if (!o || order(h, o) < 0) byUnit.set(h.uk, h);
+  }
 }
