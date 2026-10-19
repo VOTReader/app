@@ -1865,3 +1865,91 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect([...new Set(seen)].sort()).toEqual(['best:["who"]', 'v1:["who"]', 'v7:["who"]']);
   });
 });
+
+describe('SearchScreen (search200 UX, track D)', () => {
+  const noop = () => {};
+  const baseProps = () => ({
+    query: '', onQueryChange: noop, settings: {}, onSettingsChange: noop,
+    onSelect: noop, onBack: noop, searchScope: null, searchContext: null,
+    onToggleScope: noop, onCommand: noop,
+  });
+  const box = () => /** @type {HTMLInputElement} */ (document.querySelector('input.search-input'));
+  const sel = () => [box().selectionStart, box().selectionEnd];
+  /** The page leaves the screen and comes back (the app to the background and back). */
+  const awayAndBack = () => {
+    for (const v of ['hidden', 'visible']) {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+      act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    }
+  };
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).ScreenLayout = ({ navChildren, children }) => (
+      <div className="screen-scroll">{navChildren}{children}</div>
+    );
+    setScreenGlobals();
+    /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
+    /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = ['Beatitudes'];
+    /** @type {any} */ (window).VotSearchMini = {
+      getState: () => ({ ready: true }),
+      init: () => Promise.resolve(),
+      suggest: () => [],
+      fuzzyBookSuggest: () => null,
+      search: () => Promise.resolve({ parsed: null, results: [], parsedTerms: [] }),
+    };
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
+    /** @type {any} */ (window).getRecentSearches = () => [];
+  });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    delete /** @type {any} */ (document).visibilityState; // the own property goes; the prototype's getter is back
+    delete /** @type {any} */ (window).VotSearchMini;
+    delete /** @type {any} */ (window).VotSearchData;
+    delete /** @type {any} */ (window).getRecentSearches;
+  });
+
+  /* D3: on the APK a query the screen came back with was not selected when the reader went back to it. With the
+     app back from the background on Search (Enter had let the box go), a tap put the caret where the finger
+     landed and the next key went into the query: "Mercy" and an m read "Memrcy" (vot_api34, WebView 113). The
+     tap that goes back to a query the reader has not touched since the screen came takes it whole; the next tap
+     is the reader's own caret, and a query they typed keeps the caret where they put it. */
+  it('D3: the first tap on the query the screen came with selects it whole; the next tap places the caret', () => {
+    render(<SearchScreen {...baseProps()} query="love your enemies" />);
+    act(() => { box().blur(); });
+    box().setSelectionRange(4, 4); // where the finger landed
+    fireEvent.click(box());
+    expect(sel(), 'the tap took the query whole: the next key replaces it').toEqual([0, 17]);
+    box().setSelectionRange(9, 9);
+    fireEvent.click(box());
+    expect(sel(), 'a second tap is the reader placing the caret').toEqual([9, 9]);
+  });
+
+  it('D3: the app back from the background on Search: the tap back into the query selects it whole', () => {
+    render(<SearchScreen {...baseProps()} query="mercy" />);
+    fireEvent.click(box()); // the first tap of the visit, spent
+    act(() => { box().blur(); });
+    awayAndBack();
+    box().setSelectionRange(2, 2);
+    fireEvent.click(box());
+    expect(sel()).toEqual([0, 5]);
+  });
+
+  it('D3: a query the reader typed or changed keeps the caret where the tap puts it', () => {
+    const props = baseProps();
+    const r = render(<SearchScreen {...props} query="mercy" />);
+    r.rerender(<SearchScreen {...props} query="mercy seat" />); // their own edit
+    act(() => { box().blur(); });
+    box().setSelectionRange(5, 5);
+    fireEvent.click(box());
+    expect(sel()).toEqual([5, 5]);
+    cleanup();
+    const r2 = render(<SearchScreen {...props} />);
+    r2.rerender(<SearchScreen {...props} query="grace" />); // typed into an empty box
+    act(() => { box().blur(); });
+    box().setSelectionRange(3, 3);
+    fireEvent.click(box());
+    expect(sel()).toEqual([3, 3]);
+  });
+});

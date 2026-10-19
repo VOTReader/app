@@ -353,10 +353,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
      focus back in its first frames gets it once more, and Chrome, which drops a
      selection made before the box is first laid out (it read 0-0), gets it again
      while the query is still the restored one. */
+  // The query the box came with, until the reader's first tap on it (D3, below).
+  const restoredRef = React.useRef('');
   React.useLayoutEffect(() => {
     const el = inputRef.current;
     if (!el) return undefined;
     const first = el.value;
+    restoredRef.current = first;
     const take = () => {
       if (!el.isConnected) return;
       if (document.activeElement !== el) {
@@ -370,6 +373,29 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const t = setTimeout(take, 80);
     return () => clearTimeout(t);
   }, []);
+
+  /* THE TAP BACK INTO A QUERY THE SCREEN CAME WITH TAKES IT WHOLE (search200 UX D3). On a phone the
+     mount's focus brings no keyboard; the reader taps the box for one. A box that had let the focus go
+     (Enter does, and the app went to the background with it so) took that tap as a caret where the
+     finger landed, and the next key went into the query: "Mercy" and an m read "Memrcy" (vot_api34).
+     The query the screen mounted with, or still held when the app came back on screen, is selected
+     by the reader's first tap on it, so the first key replaces it; the next tap is their own caret,
+     and a query they have typed or changed since is theirs to edit where they tap. */
+  React.useEffect(() => {
+    const onShow = () => {
+      const el = inputRef.current;
+      if (document.visibilityState === 'visible' && el && el.value) restoredRef.current = el.value;
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
+  const tapRestored = (/** @type {{ currentTarget: HTMLInputElement }} */ e) => {
+    const el = e.currentTarget;
+    const restored = restoredRef.current;
+    restoredRef.current = '';
+    if (!restored || el.value !== restored) return;
+    try { el.setSelectionRange(0, restored.length); } catch { el.select(); }
+  };
 
   // Compute suggestions as-you-type. They stay closed for the query they were closed
   // on (a pick, Escape, the clear button) and open again once it changes. A flag
@@ -934,6 +960,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             placeholder={PLACEHOLDER[corpus] || PLACEHOLDER.all}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onClick={tapRestored}
             onFocus={() => setShowSuggest(suggestions.length > 0 && dismissedFor !== query)}
             onBlur={(e) => {
               // A tap that leaves the box closes the list; a tap on one of its options is the list's own.
