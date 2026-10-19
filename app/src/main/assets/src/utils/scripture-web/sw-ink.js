@@ -40,14 +40,15 @@ const TABLE = {
 
   // ── the Volumes in the flagship view (Q1 a: always on) ──────────────────
   cited: { hex: '#C4A469', alpha: 0.70 },                        // cited-in-the-Volumes ticks: 1 DEVICE px wide (min), 5 / 4 px tall, baseline +4..+9
-  // the prophecy class: a pale constellation over the web (r2-01a). The spec's .80 / 1.25 px / .12 glow
-  // were set for 51 pairs; the asset carries 131 distinct, clustered on a few feet (Matthew 1:1 x5,
-  // Isaiah 7:14 x4), and at those numbers Psalms/Isaiah to the Gospels became a solid cream tangle
-  // (GL review 2026-10-18). Retuned to the picture's intent, not its count. In r2-01a's pale gold
-  // (w4 INK item 5): the cream #EADFC4 sank into the field's own tan, a gold of .35 stays distinct
-  // without a tangle, and with no glow it is a crisp line on a phone too, where a glow of a few CSS
-  // px fogged the field round every pair.
-  prophecy: { hex: '#EFD18A', alpha: 0.35 },                     // core: 1 DEVICE px (no CSS width, as cited), no glow; top pass, every density
+  // the prophecy constellation over the web (r2-01a: a few crisp gold arcs). The spec's .80 / 1.25 px
+  // / .12 glow were set for 51 pairs; the asset carries 131 distinct, clustered on a few feet, and all
+  // of them in gold became a solid cream tangle (GL review 2026-10-18), then, at .35 on 1 device px, a
+  // haze of about 2.3:1 no reader could tell from the field (w4 INK review, finding 3). The gold is
+  // now each study chapter's first pair alone (frame-set prophecyLeads: 11 on the asset; the rest
+  // are threads of the field), at the spec's 1.25 CSS px in its legend key's gold, about 4.1:1 over
+  // the field on a PC and 3.2:1 on a phone (w4/ink pairs.md). r2-01a's gold, not the cream #EADFC4
+  // that sank into the field's tan (w4 INK item 5); no glow, which fogged a phone's field.
+  prophecy: { hex: '#EFD18A', alpha: 0.90, width: 1.25 },        // the constellation's core, its legend key's gold (min 1 DEVICE px), no glow; top pass, every density
   prophecyKey: { hex: '#EFD18A', alpha: 0.90 },                  // the legend's arc (app.css --sw-prophecy): the canvas's gold at legend size
 
   // ── the chosen, hovered and lit lines: the top pass (C1, C3) ────────────

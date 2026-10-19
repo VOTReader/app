@@ -14,7 +14,7 @@ import {
 } from './web-renderer.js';
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor, TOP_SEGMENT_MIN,
-  spanInkGLSL, STROKE_FIT_CSS,
+  spanInkGLSL, STROKE_FIT_CSS, spanFitHalf,
 } from '../../utils/scripture-web/geometry.js';
 import { frameSetAt, drawOrder } from '../../utils/scripture-web/frame-set.js';
 import {
@@ -182,7 +182,10 @@ describe('thin lines hold a device px, and the feet do not shimmer at the ceilin
     expect(SHADER_SOURCE.vertex).toMatch(/float aOut = [^;]*\*thin;/);
     expect(SHADER_SOURCE.fragment).toContain('float hw = vHalfW + .5*uFeather;');
     expect(SHADER_SOURCE.fragment).toContain('smoothstep(vHalfW - .5*uFeather, vHalfW + .5*uFeather, d)');
-    expect(TOP_SHADER_SOURCE.fragment).toContain('smoothstep(uCoreHalf - .5*uFeather, uCoreHalf + .5*uFeather, d)');
+    // the top pass: its core held at half a backing px too (a field kind's own width is per thread)
+    expect(TOP_SHADER_SOURCE.fragment).toContain('float thin = clamp(coreHalf/(.5*uFeather), 0., 1.);');
+    expect(TOP_SHADER_SOURCE.fragment).toContain('coreHalf = max(coreHalf, .5*uFeather);');
+    expect(TOP_SHADER_SOURCE.fragment).toContain('smoothstep(coreHalf - .5*uFeather, coreHalf + .5*uFeather, d)');
     expect(SHADER_SOURCE.vertex).not.toContain('halfW + 1.0');
     expect(SHADER_SOURCE.fragment).not.toContain('vHalfW + 1.0');
   });
@@ -538,10 +541,11 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(topLook('chosen', 1, false).ribbon).toBe(inkWidth('chosenHalo') / 2 + 0.5);
   });
 
-  /* GL item 4: the prophecy class. Every g.prophecy pair, always, at every
-     density, drawn first in the top pass (under the lit, hovered and chosen). */
+  /* GL item 4: the prophecy class. The constellation (each study chapter's first pair; w4 INK
+     review), always, at every density, drawn first in the top pass (under the lit, hovered and
+     chosen). The fixture's two pairs open two chapters, so both are the constellation. */
   const prophetic = () => Object.assign(threeArcs(), {
-    prophecy: [{ a: 100, b: 150, studyId: 's', chapterId: 'c' }, { a: 5, b: 180, studyId: 's', chapterId: 'c' }],
+    prophecy: [{ a: 100, b: 150, studyId: 's', chapterId: 'c1' }, { a: 5, b: 180, studyId: 's', chapterId: 'c2' }],
   });
 
   // the class's draws: since GL review finding 4 the pass draws a kind in runs by segment class,
@@ -556,8 +560,9 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     each('uCore', rgba01('prophecy'));
     // no glow (w4 INK item 5): a bare core, nothing fogs the field round a pair
     each('uHalo', [0, 0, 0, 0]);
-    each('uCoreHalf', [0.5]);   // 1 device px at dpr 1
+    each('uCoreHalf', [inkWidth('prophecy') / 2]);   // 1.25 CSS px at dpr 1
     each('uHaloHalf', [0]);
+    each('uField', [0]);
     expect(instancesOf(idle.top)).toBe(2);
     expect(idle.stats.instances).toBe(3);   // stats count the web alone
     expect(idle.stats.draws).toBe(idle.main.length);
@@ -578,11 +583,11 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
   });
 
   it('the core never draws under 1 device px, with no glow; it recedes with a tap, as far as TAP_CONTEXT and no further', () => {
-    const half = topLook('prophecy', 0.5, false);   // the row has no CSS width: 1 device px at any dpr
+    const half = topLook('prophecy', 0.5, false);   // 1.25 CSS px at dpr .5 is under a device px: held at 1
     expect(half.coreHalf).toBe(0.5);
     expect(half.core).toEqual(rgba01('prophecy'));
     const at = topLook('prophecy', 2, false, 0.5);
-    expect(at.coreHalf).toBe(0.5);
+    expect(at.coreHalf).toBe(inkWidth('prophecy'));
     expect(at.core[3]).toBeCloseTo(rgba01('prophecy')[3] * (1 + (TAP_CONTEXT - 1) * 0.5), 12);
     const full = topLook('prophecy', 1, false, 1);
     expect(full.core[3]).toBeCloseTo(rgba01('prophecy')[3] * TAP_CONTEXT, 12);
@@ -594,24 +599,69 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(topLook('hover', 1, false, 1).core).toEqual(rgba01('hover'));
   });
 
-  /* GL review 2026-10-18: at the spec's .80 / 1.25 px / .12 glow (set for 51 pairs) the asset's 131
-     distinct pairs, clustered on a few feet, drew Psalms/Isaiah to the Gospels as a solid cream tangle
-     over the whole dome, against r2-01a's pale constellation. The class sits under what the reader
-     asks about: one device px on every screen, at most half the lit ink. w4 INK item 5: and no glow,
-     which at a few CSS px fogged a phone's field round every pair (the r2-01a pairs). */
-  it('the prophecy class is a pale constellation: 1 device px on every screen, under half the lit ink, no glow', () => {
+  /* GL review 2026-10-18: all 131 distinct pairs in gold at the spec's .80 / 1.25 px / .12 glow drew
+     Psalms/Isaiah to the Gospels as a solid cream tangle; dimmed to .35 at 1 device px they were a
+     haze under 3:1 that no reader could tell from the field (w4 INK review, finding 3). The pale
+     gold is now the constellation alone (frame-set prophecyLeads: 11 arcs on the asset), at the
+     spec's 1.25 CSS px and its legend key's gold, which clears 3:1 on the field (pairs.md); the
+     rest are threads of the field. No glow (w4 INK item 5), and told from the chosen by weight. */
+  it('the constellation: 1.25 CSS px (never under 1 device px), the legend key\'s gold, no glow, lighter than the chosen', () => {
     for (const dpr of [0.5, 1, 2, 2.625, 3]) {
       for (const compact of [false, true]) {
         const look = topLook('prophecy', dpr, compact);
-        expect(look.coreHalf, `dpr ${dpr} compact ${compact}`).toBe(0.5);
+        expect(look.coreHalf, `dpr ${dpr} compact ${compact}`).toBe(Math.max(inkWidth('prophecy', compact) * dpr, 1) / 2);
         expect(look.core[3], `dpr ${dpr} compact ${compact}`).toBe(rgba01('prophecy')[3]);
         expect(look.haloHalf, `dpr ${dpr} compact ${compact}: no glow`).toBe(0);
         expect(look.halo[3]).toBe(0);
         // the ribbon is the core and its feather, no wider
         expect(look.ribbon).toBe(look.coreHalf + 0.5);
+        expect(look.coreHalf, 'under the chosen line\'s weight').toBeLessThan(topLook('chosen', dpr, compact).coreHalf);
       }
     }
-    expect(rgba01('prophecy')[3]).toBeLessThanOrEqual(rgba01('lit')[3] / 2);
+    expect(rgba01('prophecy')).toEqual(rgba01('prophecyKey'));
+    expect(rgba01('prophecy')[3]).toBeGreaterThanOrEqual(0.85);
+  });
+
+  /* w4 INK review, finding 3: a prophecy pair that is not the constellation and no OpenBible arc
+     is drawn as the main pass would draw a thread of its strength 1, never hidden (C18): in the
+     ramp (vField), at the frame's alpha and stroke, under the span-ink and fly-over laws. */
+  it('a pair that is not the constellation is a thread of the field: the ramp, the frame\'s alpha and stroke, the span-ink law', () => {
+    const g = Object.assign(threeArcs(), {
+      prophecy: [{ a: 100, b: 150, studyId: 's', chapterId: 'c1', p: 0 }, { a: 5, b: 180, studyId: 's', chapterId: 'c1', p: 1 }],
+    });
+    const { calls, r } = build(g);
+    const f = frame(r, calls, { alpha: 0.5, strokeWidth: 2, dpr: 1 });
+    expect(instancesOf(f.top)).toBe(2);
+    const fields = f.top.filter((d) => d.u.uField[0] === 1), golds = f.top.filter((d) => d.u.uField[0] === 0);
+    expect(fields.map((d) => d.args[3]).reduce((a, b) => a + b, 0), 'the second pair, a field thread').toBe(1);
+    expect(golds.map((d) => d.args[3]).reduce((a, b) => a + b, 0), 'the first, the constellation').toBe(1);
+    expect(f.top.indexOf(fields[0]), 'the field under the gold').toBeLessThan(f.top.indexOf(golds[0]));
+    const u = fields[0].u;
+    expect(u.uCore[3]).toBe(0.5);
+    expect(u.uHalo).toEqual([0, 0, 0, 0]);
+    expect(u.uCoreHalf).toEqual([1]);
+    expect(u.uFieldHalf).toEqual([1]);
+    expect(u.uFieldFit).toEqual([spanFitHalf(STROKE_FIT_CSS, 1, 0)]);
+    expect(u.uTotal).toEqual([200]);
+    // it recedes with a tap, as the web does
+    const tapped = frame(r, calls, { alpha: 0.5, strokeWidth: 2, dpr: 1, focusArc: 0, tapFade: 1 });
+    const tf = tapped.top.find((d) => d.u.uField[0] === 1);
+    expect(tf.u.uCore[3]).toBeCloseTo(0.5 * TAP_CONTEXT, 12);
+    expect(topLook('prophecyField', 2, false, 0, 1, { alpha: 0.9, strokeWidth: 3, voteMix: 1 })).toMatchObject({
+      coreHalf: 1.5, haloHalf: 0, field: 1, fieldHalf: 1.5, fieldFit: spanFitHalf(STROKE_FIT_CSS * 2, 1, 1),
+    });
+    // the shader: the main pass's span-ink and fly-over GLSL, and its colour from the ramp
+    expect(TOP_SHADER_SOURCE.vertex).toContain(spanInkGLSL);
+    expect(TOP_SHADER_SOURCE.vertex).toContain(flyOverGLSL);
+    expect(TOP_SHADER_SOURCE.vertex).toContain(rampGLSL());
+    expect(TOP_SHADER_SOURCE.vertex).toContain('vRamp = distanceRamp(tSpan);');
+    expect(TOP_SHADER_SOURCE.vertex).toContain('vGain = uField > .5 ? spanGain(shortness) : 1.;');
+    expect(TOP_SHADER_SOURCE.vertex).toContain('spanHalfWidth(uFieldHalf, uFieldFit, shortness)');
+    expect(TOP_SHADER_SOURCE.vertex).toContain(`flyOverWidth(arcAnchored(x0, x1, uRes.x), uFlyLocalize, ${glslFloat(FLYOVER_LEG_WIDTH)})`);
+    expect(TOP_SHADER_SOURCE.fragment).toContain('min(uCore.a*vGain, 1.)*thin');
+    expect(TOP_SHADER_SOURCE.fragment).toContain('vec3 ink = mix(uCore.rgb, vRamp, vField);');
+    // a uniform both stages read would have to agree in precision (highp, mediump): the flag rides a varying
+    expect(TOP_SHADER_SOURCE.fragment).not.toMatch(/uniform float uField\b/);
   });
 
   /* GL review 2026-10-18 (finding 4): the top pass was never culled, so every pair went to the GPU
@@ -676,7 +726,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(TOP_SHADER_SOURCE.vertex).toMatch(/float A = arcShape\(rx,\s*uSquash\)\.y;/);
     expect(TOP_SHADER_SOURCE.vertex).toMatch(/uBase \+ uCamY - hgt/);
     expect(TOP_SHADER_SOURCE.fragment.split('\n')[1]).toBe('precision mediump float;');
-    expect(TOP_SHADER_SOURCE.fragment).toContain('o = vec4(uCore.rgb*core + uHalo.rgb*halo*(1. - core), a);');
+    expect(TOP_SHADER_SOURCE.fragment).toContain('o = vec4(ink*core + uHalo.rgb*halo*(1. - core), a);');
   });
 });
 

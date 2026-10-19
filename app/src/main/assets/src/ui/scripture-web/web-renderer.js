@@ -51,7 +51,7 @@
 
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverGLSL, spanInkGLSL, CLIP_MARGIN, glslFloat, frameHeights,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, STROKE_FIT_CSS, skyLocalize,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, STROKE_FIT_CSS, skyLocalize, spanFitHalf,
 } from '../../utils/scripture-web/geometry.js';
 import {
   CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
@@ -268,10 +268,22 @@ uniform float uCamXHi, uCamXLo;  // the camera's x, split for float32 (the main 
 uniform float uPPV, uBase, uSquash, uCamY;
 uniform float uSegments;
 uniform float uRibbonHalf;   // the ribbon's half width, device px: the wider of core and halo, plus the skirt
+uniform float uTotal;        // verses in the canon (the span-ink law's and the ramp's t)
+uniform float uFlyLocalize;  // the main pass's: the fly-over leg's localize
+uniform float uField;        // 1: a field kind (prophecyField), drawn as an ordinary thread of the web
+uniform float uFieldHalf;    // a field kind: the stroke law's half width, device px (the core's widest)
+uniform float uFieldFit;     // a field kind: the long thread's held half width (geometry.spanFitHalf)
 in uint aFrom; in uint aTo;
 in float aFanA; in float aFanB;
 out float vEdge;
+flat out vec3 vRamp;         // a field kind's colour: the distance ramp at its span
+flat out float vGain;        // a field kind's span-ink gain on alpha (1 for every other kind)
+flat out float vW;           // a field kind's width under the span-ink law and the fly-over leg, over uFieldHalf
+flat out float vField;       // uField, for the fragment stage (a uniform in both stages must agree in precision)
 ${arcShapeGLSL}
+${flyOverGLSL}
+${spanInkGLSL}
+${rampGLSL()}
 void main(){
   float a = float(aFrom), b = float(aTo);
   float x0 = ((a - uCamXHi) + (.5 + aFanA - uCamXLo))*uPPV + uRes.x*.5;
@@ -279,6 +291,17 @@ void main(){
   float rx = (x1 - x0)*.5;
   float left = x0, right = x0 + 2.*max(rx, 0.);
   float A = arcShape(rx, uSquash).y;
+  // A field kind is a thread of the web like any other (w4 INK review: the prophecy pairs that are
+  // not the constellation): the main pass's colour, span-ink and fly-over laws, the same GLSL.
+  float tSpan = spanT(b - a, uTotal);
+  float shortness = spanShortness(tSpan);
+  vRamp = distanceRamp(tSpan);
+  vField = uField;
+  vGain = uField > .5 ? spanGain(shortness) : 1.;
+  vW = uField > .5
+    ? spanHalfWidth(uFieldHalf, uFieldFit, shortness)
+      *flyOverWidth(arcAnchored(x0, x1, uRes.x), uFlyLocalize, ${glslFloat(FLYOVER_LEG_WIDTH)})/max(uFieldHalf, 1e-6)
+    : 1.;
   // always the piece in the window: the segments go where the reader looks
   float m = ${glslFloat(CLIP_MARGIN)};
   float lo = max(left, -m);
@@ -305,15 +328,23 @@ uniform float uHaloHalf;     // the halo's half width, device px (0: none)
 uniform float uFeather;      // one backing px, in full-resolution px (the main pass's uPx)
 uniform vec4  uCore;         // straight rgba
 uniform vec4  uHalo;         // straight rgba, its alpha at the core's edge
-in float vEdge; out vec4 o;
+in float vEdge; flat in vec3 vRamp; flat in float vGain; flat in float vW;
+flat in float vField;        // 1: a field kind, in the ramp's colour of its span (vRamp)
+out vec4 o;
 void main(){
   float d = abs(vEdge)*uRibbon;
-  float core = (1. - smoothstep(uCoreHalf - .5*uFeather, uCoreHalf + .5*uFeather, d))*uCore.a;
+  // a field kind's own width (vW; 1 for every other kind, whose core topLook held already): under
+  // half a backing px it is held there and the lost width paid in alpha (the main pass's hygiene)
+  float coreHalf = uCoreHalf*vW;
+  float thin = clamp(coreHalf/(.5*uFeather), 0., 1.);
+  coreHalf = max(coreHalf, .5*uFeather);
+  float core = (1. - smoothstep(coreHalf - .5*uFeather, coreHalf + .5*uFeather, d))*min(uCore.a*vGain, 1.)*thin;
   // the halo: full under the core, falling softly to nothing at its own edge
-  float h = uHaloHalf > uCoreHalf ? clamp(1. - (d - uCoreHalf)/(uHaloHalf - uCoreHalf), 0., 1.) : 0.;
+  float h = uHaloHalf > coreHalf ? clamp(1. - (d - coreHalf)/(uHaloHalf - coreHalf), 0., 1.) : 0.;
   float halo = h*h*uHalo.a;
   float a = core + halo*(1. - core);
-  o = vec4(uCore.rgb*core + uHalo.rgb*halo*(1. - core), a);   // premultiplied, the core over the halo
+  vec3 ink = mix(uCore.rgb, vRamp, vField);
+  o = vec4(ink*core + uHalo.rgb*halo*(1. - core), a);   // premultiplied, the core over the halo
 }`;
 
 /** The top pass's shader sources, exported for the same proofs. */
@@ -321,9 +352,12 @@ export const TOP_SHADER_SOURCE = { vertex: TOP_VERT, fragment: TOP_FRAG };
 
 /** Each top-pass kind's ink (sw-ink.js rows) and its tessellation cap. */
 const TOP_LOOK = {
-  // the core is 1 device px on every screen (the ink table's prophecy row has no CSS width, and
-  // nothing draws it thinner), with no glow: a crisp gold constellation (r2-01a; w4 INK item 5),
-  // where a glow of a few CSS px fogged a phone's field round every pair; it recedes with a tap
+  // the prophecy pairs that are not the constellation (frame-set prophecyLeads) nor OpenBible arcs:
+  // ordinary threads of the web, in the ramp at the frame's own stroke and alpha (field), at a
+  // strength of 1 (a curated link, the best-voted's ink); they recede with a tap, as the web does
+  prophecyField: { core: '', halo: '', cap: 192, field: true, recedes: true },
+  // the constellation, r2-01a's few crisp gold arcs (w4 INK review): each study chapter's first
+  // pair, never under 1 device px, no glow; it recedes with a tap
   prophecy: { core: 'prophecy', halo: '', cap: 192, minDevicePx: 1, recedes: true },
   // the pairs the chosen range keeps lit (frame-set.topSet): the same ink, and it does not recede
   prophecyInRange: { core: 'prophecy', halo: '', cap: 192, minDevicePx: 1 },
@@ -339,26 +373,45 @@ const TOP_LOOK = {
  * The prophecy class recedes with the rest of the web while a line is
  * chosen (to TAP_CONTEXT at tapFade 1); what the reader asked for does not,
  * nor do the pairs the chosen range keeps lit (prophecyInRange).
+ * A field kind (prophecyField) is drawn as the main pass draws a thread of its strength 1: in the
+ * ramp (the vertex stage's vRamp), at the frame's alpha and stroke (`style`), its width under the
+ * span-ink law and the fly-over leg per thread (vW) and the thin-line hygiene in the fragment stage.
  * @param {string} kind  a frame-set TOP_ORDER kind
  * @param {number} dpr
  * @param {boolean} compact
  * @param {number} [tapFade]  0..1, the frame's (uTapFade)
  * @param {number} [px]  full-resolution px per backing px (E2; 1 at rest)
- * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number }}
+ * @param {{ alpha?: number, strokeWidth?: number, voteMix?: number }} [style]  the frame's ribbonStyle,
+ *   strokeWidth in device px (a field kind's only)
+ * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number,
+ *   field: number, fieldHalf: number, fieldFit: number }}
  */
-export function topLook(kind, dpr, compact, tapFade, px) {
+export function topLook(kind, dpr, compact, tapFade, px, style) {
   const look = TOP_LOOK[kind];
   const d = dpr > 0 ? dpr : 1;
   const p = px > 0 ? px : 1;
+  const fade = look.recedes && tapFade > 0 ? 1 + (TAP_CONTEXT - 1) * (tapFade < 1 ? tapFade : 1) : 1;
+  if (look.field) {
+    const s = style || {};
+    const half = (s.strokeWidth > 0 ? s.strokeWidth : STROKE_FIT_CSS * d) / 2;
+    const fieldFit = spanFitHalf(STROKE_FIT_CSS * d, 1, s.voteMix > 0 ? s.voteMix : 0);
+    const alpha = s.alpha > 0 ? (s.alpha < 1 ? s.alpha : 1) : 0;
+    return {
+      coreHalf: half, haloHalf: 0, core: [0, 0, 0, alpha * fade], halo: [0, 0, 0, 0],
+      ribbon: Math.max(half, 0.5 * p) + 0.5 * p, cap: look.cap, field: 1, fieldHalf: half, fieldFit,
+    };
+  }
   const wide = inkWidth(look.core, compact) * d;
   const half = (look.minDevicePx && wide < look.minDevicePx ? look.minDevicePx : wide) / 2;
   const thin = half >= 0.5 * p ? 1 : half / (0.5 * p);
   const coreHalf = half > 0.5 * p ? half : 0.5 * p;
   const haloHalf = look.halo ? (inkWidth(look.halo, compact) * d) / 2 : 0;
-  const fade = look.recedes && tapFade > 0 ? 1 + (TAP_CONTEXT - 1) * (tapFade < 1 ? tapFade : 1) : 1;
   const core = rgba01(look.core, thin * fade);
   const halo = look.halo ? rgba01(look.halo, fade) : [0, 0, 0, 0];
-  return { coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5 * p, cap: look.cap };
+  return {
+    coreHalf, haloHalf, core, halo, ribbon: Math.max(coreHalf, haloHalf) + 0.5 * p, cap: look.cap,
+    field: 0, fieldHalf: 0, fieldFit: 0,
+  };
 }
 
 function compile(gl, type, src) {
@@ -479,7 +532,8 @@ export function createRenderer(canvas, graph, opts = {}) {
     'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uAlpha', 'uTotal',
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uFocusRange2', 'uCentre', 'uCentreT']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
-    'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo']);
+    'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo',
+    'uTotal', 'uFlyLocalize', 'uField', 'uFieldHalf', 'uFieldFit']);
 
   // The threads, once: their feet and fans in one RGBA32F texture, their
   // votes in an R32F one, ARC_TEX_W a row, fetched by id in the vertex stage
@@ -567,13 +621,17 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.bindVertexArray(vao);
 
   // Each kind's look, rebuilt only when what it reads changes (E3).
-  /** @type {Record<string, {dpr:number, compact:boolean, fade:number, px:number, look:any}>} */
+  /** @type {Record<string, {dpr:number, compact:boolean, fade:number, px:number, a:number, w:number, m:number, look:any}>} */
   const looks = Object.create(null);
-  const lookOf = (kind, dpr, compact, fade, px) => {
+  // a field kind reads the frame's stroke style too (v: alpha, strokeWidth, voteMix); no other does
+  const lookOf = (kind, dpr, compact, fade, px, v) => {
+    const field = !!TOP_LOOK[kind].field;
+    const a = field ? v.alpha : 0, w = field ? v.strokeWidth : 0, m = field ? v.voteMix || 0 : 0;
     const held = looks[kind];
-    if (held && held.dpr === dpr && held.compact === compact && held.fade === fade && held.px === px) return held.look;
-    const look = topLook(kind, dpr, compact, fade, px);
-    looks[kind] = { dpr, compact, fade, px, look };
+    if (held && held.dpr === dpr && held.compact === compact && held.fade === fade && held.px === px
+      && held.a === a && held.w === w && held.m === m) return held.look;
+    const look = topLook(kind, dpr, compact, fade, px, field ? { alpha: a, strokeWidth: w, voteMix: m } : undefined);
+    looks[kind] = { dpr, compact, fade, px, a, w, m, look };
     return look;
   };
   const heights = new Float64Array(2);
@@ -587,7 +645,7 @@ export function createRenderer(canvas, graph, opts = {}) {
    * chosen threads in their ink, the chosen last. Not counted in stats (the
    * main pass's instances are the web; these are a handful drawn again).
    */
-  const drawTop = (v, camX, ppv, camXHi, camY, dpr, tapFade, px) => {
+  const drawTop = (v, camX, ppv, camXHi, camY, dpr, tapFade, px, flyLocalize) => {
     const set = topSet(graph, v, topHeld);
     topHeld = set;
     topStats.instances = 0; topStats.vertices = 0; topStats.draws = 0;
@@ -595,7 +653,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     const compact = isCompact(v.height / dpr);
     for (let k = 0; k < TOP_ORDER.length; k++) {
       const kind = TOP_ORDER[k];
-      topPads[k] = lookOf(kind, dpr, compact, TOP_LOOK[kind].recedes ? tapFade : 0, px).ribbon;
+      topPads[k] = lookOf(kind, dpr, compact, TOP_LOOK[kind].recedes ? tapFade : 0, px, v).ribbon;
     }
     const f = topFrame;
     f.width = v.width; f.base = v.base; f.camX = camX; f.camY = camY; f.ppv = ppv; f.squash = v.squash; f.dpr = dpr;
@@ -622,9 +680,11 @@ export function createRenderer(canvas, graph, opts = {}) {
     TU.f1('uSquash', v.squash);
     TU.f1('uCamY', camY);
     TU.f1('uFeather', px);
+    TU.f1('uTotal', graph.total);
+    TU.f1('uFlyLocalize', flyLocalize);
     for (let ri = 0; ri < drawn.runs.length; ri++) {
       const run = drawn.runs[ri];
-      const look = lookOf(run.kind, dpr, compact, TOP_LOOK[run.kind].recedes ? tapFade : 0, px);
+      const look = lookOf(run.kind, dpr, compact, TOP_LOOK[run.kind].recedes ? tapFade : 0, px, v);
       TU.f1('uSegments', run.segments);
       TU.f1('uRibbonHalf', look.ribbon);
       TU.f1('uRibbon', look.ribbon);
@@ -632,6 +692,9 @@ export function createRenderer(canvas, graph, opts = {}) {
       TU.f1('uHaloHalf', look.haloHalf);
       TU.f4('uCore', look.core);
       TU.f4('uHalo', look.halo);
+      TU.f1('uField', look.field);
+      TU.f1('uFieldHalf', look.fieldHalf);
+      TU.f1('uFieldFit', look.fieldFit);
       pointTop(run.first);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 2 * (run.segments + 1), run.count);
       topStats.instances += run.count;
@@ -757,7 +820,8 @@ export function createRenderer(canvas, graph, opts = {}) {
       // the heights the set was cut by (geometry.frameHeights)
       frameHeights(v.base, camY, dpr, heights);
       U.f2('uFrameH', heights[0], heights[1]);
-      U.f1('uFlyLocalize', skyLocalize(v.localize, camY, v.ceil));
+      const flyLocalize = skyLocalize(v.localize, camY, v.ceil);
+      U.f1('uFlyLocalize', flyLocalize);
       U.f1('uPx', px);
       U.f1('uFeather', px);
       U.f1('uWidth', v.strokeWidth);
@@ -801,7 +865,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       stats.instances = set.count;
       stats.vertices = vertices;
       stats.draws = set.runs;
-      drawTop(v, camX, ppv, camXHi, camY, dpr, tapFade, px);
+      drawTop(v, camX, ppv, camXHi, camY, dpr, tapFade, px, flyLocalize);
       gl.disable(gl.SCISSOR_TEST);
       return stats;
     },

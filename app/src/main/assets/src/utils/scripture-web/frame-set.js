@@ -52,12 +52,17 @@
    smooth gold core under a soft halo at every zoom (GL item 3; digest C1,
    C3, item 10):
 
-     prophecy every prophecy pair (g.prophecy), always, at every density
-              (GL item 4; Q1 a): the Bible Studies' prophecy and its fulfilment;
-              it recedes with a tap, as the main pass's web does
-     prophecyInRange  the pairs the chosen range keeps lit, by the main
+     prophecyField  the prophecy pairs that are not the constellation and
+              not OpenBible arcs (those the main pass draws already): ordinary
+              field threads in the distance ramp (C18: every line drawn); they
+              recede with a tap, as the main pass's web does
+     prophecy the constellation (GL item 4; Q1 a; w4 INK review): each Bible
+              Study chapter's first prophecy pair, by its block p, in gold,
+              always, at every density; it recedes with a tap
+     prophecyInRange  any pair the chosen range keeps lit, by the main
               pass's own law (a foot in the range; with a group, a foot in
-              each): they keep their ink, as the range's own threads do
+              each), in the constellation's gold: they keep their ink, as the
+              range's own threads do
      lit      focus.lit: go-to, verse mode, a chooser row under hover or focus
      hover    the thread under a resting pointer (dims nothing): an arc, or a
               prophecy pair that is none (hoverProphecy)
@@ -84,7 +89,7 @@ import {
 } from './geometry.js';
 
 /** The top pass's kinds, in drawing order: the chosen line last, on top. */
-export const TOP_ORDER = Object.freeze(['prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
+export const TOP_ORDER = Object.freeze(['prophecyField', 'prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
 
 /** Compact mode (the build spec, mockups README.md "Compact mode"): the root at most this tall, CSS px. */
 export const COMPACT_HEIGHT_CSS = 500;
@@ -97,11 +102,14 @@ export function isCompact(heightCss) {
 }
 
 /**
- * @typedef {{ count: number, unique: number, from: Uint16Array, to: Uint16Array, fanA: Float32Array,
- *   fanB: Float32Array, arcOf: Int32Array, twin: Int32Array, pairOf: Map<number, number> }} ProphecySet
+ * @typedef {{ count: number, unique: number, leads: number, from: Uint16Array, to: Uint16Array,
+ *   fanA: Float32Array, fanB: Float32Array, arcOf: Int32Array, twin: Int32Array, lead: Uint8Array,
+ *   pairOf: Map<number, number> }} ProphecySet
  *   from < to: each pair's verse ids in canon order; fanA at from, fanB at to;
  *   twin: the first pair joining the same two verses (k itself when it is the first): a pair given
  *   twice is one thread, drawn and picked once; unique: how many pairs are their own twin;
+ *   lead: 1 for the constellation's pairs (prophecyLeads), always on a pair that is its own twin;
+ *   leads: how many;
  *   arcOf: the OpenBible arc joining the same two verses (the strongest, by votes), or -1;
  *   pairOf: the other way, an arc id to its pair (the first, when two pairs join the same verses)
  */
@@ -160,9 +168,39 @@ export function prophecySet(g) {
       }
     }
   }
-  const set = { count: n, unique, from, to, fanA, fanB, arcOf, twin, pairOf };
+  const lead = prophecyLeads(list, twin);
+  let leads = 0;
+  for (let k = 0; k < n; k++) leads += lead[k];
+  const set = { count: n, unique, leads, from, to, fanA, fanB, arcOf, twin, lead, pairOf };
   if (g && typeof g === 'object') PROPHECY_SETS.set(g, set);
   return set;
+}
+
+/**
+ * The prophecy constellation (w4 INK review; r2-01a): each Bible Study chapter's FIRST pair, by
+ * its block p (its index where it has none), the prophecy the chapter opens with. r2-01a draws a
+ * few bright gold arcs; the asset carries 131 distinct pairs on 11 chapters of one study, and all
+ * 131 in gold knotted Psalms and Isaiah to the Gospels into one pale tangle that shared the
+ * ramp's own tan. The other pairs are drawn as ordinary threads of the web (prophecyField, or the
+ * OpenBible arc they are), still picked as prophecy (C5), never hidden (C18); a chosen range lights
+ * any of them gold (prophecyInRange). A lead given twice marks its first twin, the one drawn.
+ * @param {ReadonlyArray<{studyId?: string, chapterId?: string, p?: number}>} list  g.prophecy
+ * @param {Int32Array} twin  prophecySet's twin
+ * @returns {Uint8Array}  1 for a lead
+ */
+export function prophecyLeads(list, twin) {
+  const n = list.length;
+  const lead = new Uint8Array(n);
+  /** @type {Map<string, number>} */
+  const first = new Map();
+  const blockOf = (k) => (typeof list[k].p === 'number' && list[k].p >= 0 ? list[k].p : Infinity);
+  for (let k = 0; k < n; k++) {
+    const key = (list[k].studyId || '') + '|' + (list[k].chapterId || '');
+    const j = first.get(key);
+    if (j === undefined || blockOf(k) < blockOf(j)) first.set(key, k);
+  }
+  for (const k of first.values()) lead[twin[k]] = 1;
+  return lead;
 }
 
 /**
@@ -258,7 +296,17 @@ export function topSet(g, v, prev) {
     const a2 = a >= range2[0] && a <= range2[1], b2 = b >= range2[0] && b <= range2[1];
     return (a1 && b2) || (b1 && a2);
   };
-  const total = ps.unique + arcs.lit.length + arcs.hover.length + arcs.chosen.length
+  // which class a pair is drawn in (frame-set TOP_ORDER), or '' when only the main pass draws it:
+  // a pair given twice is drawn once (twice, its line would carry double ink)
+  const classOf = (k) => {
+    if (ps.twin[k] !== k) return '';
+    if (keeps(k)) return 'prophecyInRange';
+    if (ps.lead[k]) return 'prophecy';
+    return ps.arcOf[k] < 0 ? 'prophecyField' : '';
+  };
+  let pairs = 0;
+  for (let k = 0; k < ps.count; k++) if (classOf(k)) pairs++;
+  const total = pairs + arcs.lit.length + arcs.hover.length + arcs.chosen.length
     + (hoverPair >= 0 ? 1 : 0) + (chosenPair >= 0 ? 1 : 0);
   const from = new Uint16Array(total), to = new Uint16Array(total);
   const fanA = new Float32Array(total), fanB = new Float32Array(total);
@@ -281,15 +329,8 @@ export function topSet(g, v, prev) {
   };
   for (const kind of TOP_ORDER) {
     const first = at;
-    if (kind === 'prophecy' && ps.unique === ps.count && !ranged) {
-      from.set(ps.from, at); to.set(ps.to, at); fanA.set(ps.fanA, at); fanB.set(ps.fanB, at);
-      at += ps.count;
-    } else if (kind === 'prophecy' || kind === 'prophecyInRange') {
-      // a pair given twice is drawn once: twice, its line would carry double ink
-      const kept = kind === 'prophecyInRange';
-      for (let k = 0; k < ps.count; k++) {
-        if (ps.twin[k] === k && keeps(k) === kept) putPair(k);
-      }
+    if (kind === 'prophecyField' || kind === 'prophecy' || kind === 'prophecyInRange') {
+      for (let k = 0; k < ps.count; k++) if (classOf(k) === kind) putPair(k);
     } else {
       for (const i of arcs[kind]) putArc(i);
     }

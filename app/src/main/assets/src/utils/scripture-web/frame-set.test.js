@@ -11,7 +11,7 @@ import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 import {
-  prophecySet, topSet, topSetKey, topDraws, TOP_CLASSES, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
+  prophecySet, prophecyLeads, topSet, topSetKey, topDraws, TOP_CLASSES, isCompact, COMPACT_HEIGHT_CSS, TOP_ORDER,
   drawOrder, frameSetAt, frameSet, inFrame, RUN_DRAW_VERTICES, ORDER_STEPS, spanStep,
 } from './frame-set.js';
 import * as dec from './decode.js';
@@ -23,7 +23,9 @@ import { webFrame } from './web-frame.js';
 // the visible-set cases scan the whole asset at ten frames: give them the time they take under coverage
 vi.setConfig({ testTimeout: 60000 });
 
-/** A small graph: six arcs over 200 verses, two of them joining the same verses as a prophecy pair. */
+/** A small graph: six arcs over 200 verses, two of them joining the same verses as a prophecy pair.
+ *  Each pair opens its own study chapter, so all three are the constellation (prophecyLeads); the
+ *  cases written before the constellation was cut from the class keep their intent so (w4 INK review). */
 function graph() {
   const from = new Uint16Array([10, 10, 40, 60, 60, 120]);
   const to = new Uint16Array([150, 30, 90, 70, 70, 190]);
@@ -31,12 +33,18 @@ function graph() {
   return {
     total: 200, count: 6, from, to, votes,
     prophecy: [
-      { a: 60, b: 70, studyId: 's', chapterId: 'c' },     // arcs 3 and 4 join these: the stronger (4) is its arc
-      { a: 190, b: 120, studyId: 's', chapterId: 'c' },   // arc 5, given the other way round
-      { a: 5, b: 180, studyId: 's', chapterId: 'c' },     // no arc: its own thread
+      { a: 60, b: 70, studyId: 's', chapterId: 'c1' },     // arcs 3 and 4 join these: the stronger (4) is its arc
+      { a: 190, b: 120, studyId: 's', chapterId: 'c2' },   // arc 5, given the other way round
+      { a: 5, b: 180, studyId: 's', chapterId: 'c3' },     // no arc: its own thread
     ],
   };
 }
+/** the same three pairs in ONE study chapter: pair 0 opens it, the constellation; 1 is an OpenBible
+ *  arc (the main pass draws it); 2 is no arc, a thread of the field */
+const oneChapter = () => Object.assign(graph(), {
+  prophecy: graph().prophecy.map((p) => Object.assign({}, p, { chapterId: 'c' })),
+});
+const rangeOf = (s, kind) => s.ranges.find((r) => r.kind === kind);
 
 describe('prophecySet: the prophecy pairs as threads, on their arc\'s feet when they are one', () => {
   it('maps a pair to the strongest arc joining its verses, in canon order, with that arc\'s fans', () => {
@@ -67,12 +75,52 @@ describe('prophecySet: the prophecy pairs as threads, on their arc\'s feet when 
     expect(ps.unique).toBe(3);
     expect([...ps.twin]).toEqual([0, 1, 2, 2]);
     const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
-    expect(s.ranges[0]).toEqual({ kind: 'prophecy', first: 0, count: 3 });
+    expect(rangeOf(s, 'prophecy')).toEqual({ kind: 'prophecy', first: 0, count: 3 });
     expect([...s.from]).toEqual([60, 120, 5]);
     expect(topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }, s)).toBe(s);
     // CONTROL: the fixture without the twin has none
     expect(prophecySet(graph()).unique).toBe(3);
     expect([...prophecySet(graph()).twin]).toEqual([0, 1, 2]);
+  });
+
+  /* w4 INK review, finding 3: all 131 distinct pairs in one gold were a haze of about 2.3:1, no
+     constellation. The gold is each study chapter's first pair (by its block p); the rest are
+     threads of the field, or the OpenBible arcs they are; nothing is hidden (C18). */
+  it('prophecyLeads: each study chapter\'s first pair by its block p (by order where it has none), marked on the twin drawn', () => {
+    const list = [
+      { a: 1, b: 9, studyId: 's', chapterId: 'x', p: 4 },
+      { a: 2, b: 9, studyId: 's', chapterId: 'x', p: 2 },   // x's first block
+      { a: 3, b: 9, studyId: 's', chapterId: 'y' },          // y: no p, the first given
+      { a: 4, b: 9, studyId: 's', chapterId: 'y' },
+      { a: 5, b: 9, studyId: 't', chapterId: 'x', p: 7 },   // another study's x is its own chapter
+      { a: 2, b: 9, studyId: 'u', chapterId: 'z', p: 0 },   // u/z's first, the twin of pair 1
+    ];
+    const twin = Int32Array.from([0, 1, 2, 3, 4, 1]);
+    expect([...prophecyLeads(list, twin)]).toEqual([0, 1, 1, 0, 1, 0]);
+    expect([...prophecyLeads([], new Int32Array(0))]).toEqual([]);
+  });
+
+  it('a chapter\'s other pairs leave the gold: a field thread when no arc, the main pass\'s own arc when one; a chosen range lights any of them gold', () => {
+    const g = oneChapter();
+    const ps = prophecySet(g);
+    expect([...ps.lead]).toEqual([1, 0, 0]);
+    expect(ps.leads).toBe(1);
+    const none = { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 };
+    const s = topSet(g, none);
+    expect(TOP_ORDER.slice(0, 3)).toEqual(['prophecyField', 'prophecy', 'prophecyInRange']);
+    expect(rangeOf(s, 'prophecyField')).toEqual({ kind: 'prophecyField', first: 0, count: 1 });
+    expect([s.from[0], s.to[0], s.fanA[0], s.fanB[0]], 'pair 2, mid-cell').toEqual([5, 180, 0, 0]);
+    expect(rangeOf(s, 'prophecy')).toEqual({ kind: 'prophecy', first: 1, count: 1 });
+    expect([s.from[1], s.to[1]], 'pair 0, the constellation').toEqual([60, 70]);
+    expect(s.count, 'pair 1 is arc 5, drawn by the main pass alone').toBe(2);
+    // a range with a foot of pair 1 (arc 5) lights it gold over the main pass, as it does the rest
+    const lit = topSet(g, Object.assign({}, none, { focusRange: [188, 192] }));
+    expect(rangeOf(lit, 'prophecyInRange')).toEqual({ kind: 'prophecyInRange', first: 2, count: 1 });
+    expect([lit.from[2], lit.to[2]]).toEqual([120, 190]);
+    // and a foot of pair 2: gold, out of the field
+    const lit2 = topSet(g, Object.assign({}, none, { focusRange: [3, 6] }));
+    expect(rangeOf(lit2, 'prophecyField').count).toBe(0);
+    expect(rangeOf(lit2, 'prophecyInRange').count).toBe(1);
   });
 
   it('is built once per graph, and an empty list is an empty set', () => {
@@ -90,10 +138,10 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
   it('lays the kinds out in TOP_ORDER, each thread on the main pass\'s feet', () => {
     const g = graph();
     const fans = fansOf(g);
-    expect(TOP_ORDER).toEqual(['prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
+    expect(TOP_ORDER).toEqual(['prophecyField', 'prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
     const s = topSet(g, { lit: Int32Array.from([1, 2]), litKey: 'k', hoverArc: 3, focusArc: 0, focusProphecy: -1 });
     expect(s.ranges).toEqual([
-      { kind: 'prophecy', first: 0, count: 3 }, { kind: 'prophecyInRange', first: 3, count: 0 }, { kind: 'lit', first: 3, count: 2 },
+      { kind: 'prophecyField', first: 0, count: 0 }, { kind: 'prophecy', first: 0, count: 3 }, { kind: 'prophecyInRange', first: 3, count: 0 }, { kind: 'lit', first: 3, count: 2 },
       { kind: 'hover', first: 5, count: 1 }, { kind: 'chosen', first: 6, count: 1 },
     ]);
     expect([...s.from]).toEqual([60, 120, 5, 10, 40, 60, 10]);
@@ -106,7 +154,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     const g = graph();
     const ps = prophecySet(g);
     const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
-    expect(s.ranges[0]).toEqual({ kind: 'prophecy', first: 0, count: ps.count });
+    expect(rangeOf(s, 'prophecy')).toEqual({ kind: 'prophecy', first: 0, count: ps.count });
     expect([...s.from.slice(0, 3)]).toEqual([...ps.from]);
     expect([...s.fanA.slice(0, 3)]).toEqual([...ps.fanA]);
     expect([...s.fanB.slice(0, 3)]).toEqual([...ps.fanB]);
@@ -114,7 +162,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
 
   it('a hover on the chosen line is not drawn twice; ids outside the graph are dropped', () => {
     const s = topSet(graph(), { lit: Int32Array.from([-1, 2, 99]), litKey: 'x', hoverArc: 0, focusArc: 0, focusProphecy: -1 });
-    expect(s.ranges.map((r) => r.count)).toEqual([3, 0, 1, 0, 1]);
+    expect(s.ranges.map((r) => r.count)).toEqual([0, 3, 0, 1, 0, 1]);
   });
 
   /* GL review 2026-10-18 (finding 2): 107 of the asset's pairs are no OpenBible arc, so hoverArc
@@ -126,7 +174,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect([s.from[3], s.to[3], s.fanA[3], s.fanB[3]]).toEqual([5, 180, 0, 0]);
     // the chosen pair under the pointer is drawn once, as the chosen
     const chosen = topSet(g, { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 2, focusArc: -1, focusProphecy: 2 });
-    expect(chosen.ranges.map((r) => r.count)).toEqual([3, 0, 0, 0, 1]);
+    expect(chosen.ranges.map((r) => r.count)).toEqual([0, 3, 0, 0, 0, 1]);
     // an arc under the pointer is the hover; the pair beside it is not a second one
     const both = topSet(g, { lit: null, litKey: '', hoverArc: 2, hoverProphecy: 2, focusArc: -1, focusProphecy: -1 });
     expect(both.ranges.find((r) => r.kind === 'hover').count).toBe(1);
@@ -158,7 +206,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     const g = graph();
     const none = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
     expect(none.count).toBe(3);
-    expect(none.ranges.slice(1).every((r) => r.count === 0)).toBe(true);
+    expect(none.ranges.filter((r) => r.kind !== 'prophecy').every((r) => r.count === 0)).toBe(true);
     const v = { lit: null, litKey: '', hoverArc: 2, focusArc: -1, focusProphecy: -1 };
     const a = topSet(g, v, none);
     expect(a).not.toBe(none);
@@ -178,9 +226,9 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     const ask = (range, range2, prev) => topSet(g, {
       lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: range, focusRange2: range2,
     }, prev);
-    const counts = (s) => [s.ranges[0].count, s.ranges[1].count];
+    const counts = (s) => [rangeOf(s, 'prophecy').count, rangeOf(s, 'prophecyInRange').count];
     const one = ask([55, 65], null);   // pair 0's foot 60
-    expect(one.ranges[1]).toEqual({ kind: 'prophecyInRange', first: 2, count: 1 });
+    expect(rangeOf(one, 'prophecyInRange')).toEqual({ kind: 'prophecyInRange', first: 2, count: 1 });
     expect([one.from[2], one.to[2]]).toEqual([60, 70]);
     expect([...one.from.slice(0, 2)]).toEqual([120, 5]);
     expect(counts(ask([180, 180], null)), 'inclusive, either foot').toEqual([2, 1]);
@@ -570,16 +618,46 @@ describe('the top pass on the asset: the class follows the chosen range', () => 
     expect(want.has(Math.min(i714, m122) + ':' + Math.max(i714, m122)), 'PRECONDITION: Isaiah 7:14 to Matthew 1:22 is a pair').toBe(true);
     expect(want.size, 'PRECONDITION: three distinct pairs (the asset gives 7:14 to Matthew 1:18 twice)').toBe(3);
     const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1, focusRange: isa7, focusRange2: null });
-    const [rest, kept] = s.ranges;
-    expect(kept.kind).toBe('prophecyInRange');
+    const kept = rangeOf(s, 'prophecyInRange');
     expect(kept.count).toBe(want.size);
     const got = new Set();
     for (let j = kept.first; j < kept.first + kept.count; j++) got.add(s.from[j] + ':' + s.to[j]);
     expect([...got].sort()).toEqual([...want].sort());
-    expect(rest.count + kept.count, 'the class is whole: every distinct pair, once').toBe(prophecySet(g).unique);
-    for (let j = rest.first; j < rest.first + rest.count; j++) {
-      expect(want.has(s.from[j] + ':' + s.to[j]), 'a receding pair has no foot in Isaiah 7').toBe(false);
+    // the class is whole (C18): every distinct pair once, in the top pass or as the main pass's own arc
+    const ps = prophecySet(g);
+    let arcsOnly = 0;
+    for (let k = 0; k < ps.count; k++) {
+      if (ps.twin[k] === k && !ps.lead[k] && ps.arcOf[k] >= 0 && !want.has(ps.from[k] + ':' + ps.to[k])) arcsOnly++;
     }
+    const field = rangeOf(s, 'prophecyField'), gold = rangeOf(s, 'prophecy');
+    expect(field.count + gold.count + kept.count + arcsOnly, 'every distinct pair, once').toBe(ps.unique);
+    for (const rest of [field, gold]) {
+      for (let j = rest.first; j < rest.first + rest.count; j++) {
+        expect(want.has(s.from[j] + ':' + s.to[j]), 'a receding pair has no foot in Isaiah 7').toBe(false);
+      }
+    }
+  });
+
+  /* w4 INK review, finding 3: the oracle, straight off g.prophecy: one gold arc per study chapter,
+     its lowest block p; every other distinct pair a field thread or an OpenBible arc. */
+  it('the constellation is one pair per study chapter, its first block; the rest are the field\'s', () => {
+    const ps = prophecySet(g);
+    const first = new Map();
+    g.prophecy.forEach((p, k) => {
+      const key = p.studyId + '|' + p.chapterId;
+      const j = first.get(key);
+      const pk = typeof p.p === 'number' ? p.p : Infinity;
+      if (j === undefined || pk < (typeof g.prophecy[j].p === 'number' ? g.prophecy[j].p : Infinity)) first.set(key, k);
+    });
+    const want = new Set([...first.values()].map((k) => ps.twin[k]));
+    expect(ps.leads, 'one per study chapter').toBe(want.size);
+    expect(ps.leads, 'PRECONDITION: the asset\'s 11 chapters of one study').toBe(11);
+    for (let k = 0; k < ps.count; k++) expect(ps.lead[k] === 1, `pair ${k}`).toBe(want.has(k));
+    const s = topSet(g, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 });
+    expect(rangeOf(s, 'prophecy').count).toBe(11);
+    let field = 0;
+    for (let k = 0; k < ps.count; k++) if (ps.twin[k] === k && !ps.lead[k] && ps.arcOf[k] < 0) field++;
+    expect(rangeOf(s, 'prophecyField').count).toBe(field);
   });
 });
 
@@ -758,7 +836,9 @@ describe('topDraws on the asset: the prophecy class culled and drawn near its ow
     for (const dev of devices) {
       const o = of(dev.name + ' overview');
       expect(o.count, `${dev.name}: the overview draws the whole class`).toBe(set.count);
-      expect(o.runs, `${dev.name}: in a few runs`).toBeLessThanOrEqual(9);
+      // in a few runs: since the constellation was cut from the class (w4 INK review) the field and
+      // the gold are two kinds, each in its own few
+      expect(o.runs, `${dev.name}: in a few runs`).toBeLessThanOrEqual(18);
       expect(o.vertices, `${dev.name}: the overview at about half the uncut pass`).toBeLessThan(o.uncut * 0.55);
       for (const name of ['42.9x', 'ceiling', 'sky 42.9x']) {
         const r = of(dev.name + ' ' + name);
