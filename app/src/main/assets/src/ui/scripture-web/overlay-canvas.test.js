@@ -714,6 +714,33 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
       for (const m of marks) for (const z of zones.slice(0, 2)) expect(meet(m, z), what + 'a tick under a corner button').toBe(false);
     }
   });
+
+  /* w4 readdown item 3 (w4/phone/r3/x3-gen-1-1-phone-after.png): Genesis 1:1 chosen, the panel docked, the
+     canon's start about 50 px in from the left edge, so Genesis began under ? and hide-UI and its name
+     gave way to them: the far-left book went unnamed. It stands just right of them, over its own book. */
+  it('phone, panel open: a book that starts under the corner buttons is named just right of them, over its own book', () => {
+    const panel = 374;
+    const { canvas, zones } = chromeRoot('phone', { panel });
+    const v = FRAMES.phone, s = v.DPR;
+    for (const [book, zoom] of [['genesis', 200], ['genesis', 85], ['john', 200]]) {
+      const ppv = geo.fitPPV({ total: g.total }, v.W) * zoom;   // device px a verse
+      const v1 = verseOf(book, 1, 1);
+      const end = verseOf(book, 2, 1);
+      for (const at of [24, 52, 80]) {
+        const { rec } = paint('phone', zoom, v1 + (v.W / 2 - at * s) / ppv, { canvas, panelInset: { right: panel, bottom: 0 } });
+        const what = book + ' ' + zoom + 'x, its start ' + at + ' px in: ';
+        const texts = rec.texts();
+        const full = book.toUpperCase();
+        const name = texts.find((c) => c.t === full || c.t === full.slice(0, 3) || c.t === full.slice(0, 4));
+        expect(name, what + 'the name: ' + texts.map((c) => c.t).join(' ')).toBeTruthy();
+        for (const z of zones) expect(meet(textRect(name), z), what + 'the name under a corner button').toBe(false);
+        // over its own book: from the book's start to the frame's right edge (Genesis 1 alone is wider)
+        const startX = at * s, endX = startX + (end - v1) * ppv;
+        expect(textBox(name).x0, what + 'not before its book').toBeGreaterThanOrEqual(startX - 1e-6);
+        expect(textBox(name).x1 - (name.ls || 0), what + 'inside its first chapter').toBeLessThanOrEqual(Math.max(endX, (v.W - panel) * s));
+      }
+    }
+  });
 });
 
 describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the sticky book', () => {

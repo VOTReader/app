@@ -170,16 +170,19 @@ describe('the Volumes rail keeps its names apart (one placement law for both rai
       expect(over).toBeTruthy();
       expect(ys[ys.length - 1] - 0.7 * 11 * dpr - over.y).toBeGreaterThanOrEqual(5 * dpr - 1e-6);
     }
-    // a PC keeps its 13 px and its two rows
+    // a PC keeps its 13 px, on its one row (w5: a second row is for a frame one row cannot name)
     const pc = frame(1600, 1, 900);
     const ctx = recordingCtx();
     drawPersonalWeb(ctx, null, null, pc.opts);
     const names = topRailLabels(ctx, pc);
     for (const l of names) expect(l.size).toBe(13);
-    expect(new Set(names.map((l) => l.y)).size).toBe(2);
+    expect(new Set(names.map((l) => l.y)).size).toBe(1);
   });
 
-  it('1600 x 900 @1 (s10): every name stands centred over its slot; HOLY DAYS takes the second row between TIMOTHY and MTAM', () => {
+  /* w4 readdown item 3: HOLY DAYS stood raised on a second row over TIMOTHY and MTAM, where r2-05
+     names the rail on one row. One row, every collection by its short name: HOLY DAYS and its
+     neighbours slide over their own slots, either way, to make room. */
+  it('1600 x 900 @1 (s10): one row, every collection by its short name; HOLY DAYS and its neighbours slide over their own slots between TIMOTHY and MTAM', () => {
     const f = frame(1600, 1, 900);
     const ctx = recordingCtx();
     drawPersonalWeb(ctx, null, null, f.opts);
@@ -188,11 +191,27 @@ describe('the Volumes rail keeps its names apart (one placement law for both rai
     CHAIN.forEach(([, short], i) => {
       const t = names.find((l) => l.text === short.toUpperCase());
       expect(t, short).toBeTruthy();
-      expect(Math.abs(t.x - (i + 0.5) * slot), short).toBeLessThan(0.5);
+      // over its own slot: its centre at most half of it from the slot's
+      expect(Math.abs(t.x - (i + 0.5) * slot), short).toBeLessThanOrEqual(slot / 2 + 1e-6);
     });
-    const y = (s) => names.find((l) => l.text === s).y;
-    expect(y('HOLY DAYS')).not.toBe(y('TIMOTHY'));
-    expect(y('HOLY DAYS')).not.toBe(y('MTAM'));
+    expect(new Set(names.map((l) => l.y)).size, 'one row').toBe(1);
+    const x = (s) => names.find((l) => l.text === s).x;
+    expect(x('TIMOTHY')).toBeLessThan(x('HOLY DAYS'));
+    expect(x('HOLY DAYS')).toBeLessThan(x('MTAM'));
+  });
+
+  it('w5: the PC and the landscape phone name every collection on one row, abbreviated only as far as one row needs', () => {
+    for (const [wCss, hCss, dpr] of /** @type {Array<[number, number, number]>} */ ([[1920, 1080, 1], [1600, 900, 1], [891, 411, 2.6]])) {
+      const f = frame(wCss, dpr, hCss);
+      const ctx = recordingCtx();
+      drawPersonalWeb(ctx, null, null, f.opts);
+      const names = topRailLabels(ctx, f);
+      const tag = wCss + ' x ' + hCss + ': ' + names.map((l) => l.text).join(' ');
+      expect(names.length, tag).toBe(CHAIN.length);
+      expect(new Set(names.map((l) => l.y)).size, tag).toBe(1);
+      // a PC needs no abbreviation at all
+      if (wCss >= 1600) names.forEach((l, i) => expect(l.text, tag).toBe(CHAIN[i][1].toUpperCase()));
+    }
   });
 
   it('w4 review: with the panel docked over the right of the frame, every name stands in the canvas area, centred on what it holds of its band', () => {

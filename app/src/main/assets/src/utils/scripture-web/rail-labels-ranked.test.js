@@ -3,7 +3,7 @@
    their neighbours, and a row a corner button sits over can be refused. With
    one rank for every box it is placeRailLabels exactly. */
 import { describe, it, expect } from 'vitest';
-import { placeRailLabels, placeRailLabelsRanked, placeRailLabelsSliding } from './rail-labels.js';
+import { placeRailLabels, placeRailLabelsRanked, placeRailLabelsSliding, placeRailLabelsRow } from './rail-labels.js';
 
 function boxes(seed, n) {
   let s = seed;
@@ -204,5 +204,35 @@ describe('placeRailLabelsSliding (w4: the Volumes rail on a phone names every co
         last[p.row] = p.x + items[i].w / 2;
       });
     }
+  });
+});
+
+describe('placeRailLabelsRow (w5: the Volumes rail on one row)', () => {
+  it('names that fit stand at their own centres', () => {
+    const items = [{ x: 20, w: 20, min: 10, max: 30 }, { x: 60, w: 20, min: 50, max: 70 }, { x: 100, w: 20, min: 90, max: 110 }];
+    expect(placeRailLabelsRow(items, 10)).toEqual([{ row: 0, x: 20 }, { row: 0, x: 60 }, { row: 0, x: 100 }]);
+  });
+  it('a crowded name makes room: its neighbours slide either way, each over its own bounds, a pad apart', () => {
+    // b is 50 wide between a and c: 10 + 25 + 25 + 10 short of room on both sides
+    const items = [{ x: 20, w: 20, min: 10, max: 30 }, { x: 60, w: 50, min: 55, max: 65 }, { x: 100, w: 20, min: 90, max: 110 }];
+    const got = placeRailLabelsRow(items, 10);
+    expect(got.map((p) => p.row)).toEqual([0, 0, 0]);
+    for (let i = 0; i < 3; i++) {
+      expect(got[i].x).toBeGreaterThanOrEqual(items[i].min - 1e-9);
+      expect(got[i].x).toBeLessThanOrEqual(items[i].max + 1e-9);
+    }
+    for (let i = 1; i < 3; i++) expect(got[i].x - got[i - 1].x).toBeGreaterThanOrEqual((items[i].w + items[i - 1].w) / 2 + 10 - 1e-9);
+    expect(got[0].x, 'a moved left to make room').toBeLessThan(20);
+    expect(got[2].x, 'c moved right').toBeGreaterThan(100);
+  });
+  it('a name no slide can seat is -1, and the rest keep their places', () => {
+    const items = [{ x: 20, w: 20, min: 18, max: 22 }, { x: 40, w: 30, min: 38, max: 42 }, { x: 70, w: 20, min: 68, max: 72 }];
+    const got = placeRailLabelsRow(items, 10);
+    expect(got.map((p) => p.row)).toEqual([0, -1, 0]);
+    expect([got[0].x, got[2].x]).toEqual([20, 70]);
+  });
+  it('an item without a min slides right only, as placeRailLabelsSliding on one row', () => {
+    const items = [{ x: 20, w: 20, max: 30 }, { x: 40, w: 20, max: 60 }, { x: 60, w: 20, max: 62 }];
+    expect(placeRailLabelsRow(items, 5)).toEqual(placeRailLabelsSliding(items, 5, 1));
   });
 });

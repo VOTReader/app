@@ -200,3 +200,55 @@ export function placeRailLabelsSliding(items, pad, rows = 2) {
     return { row, x: at };
   });
 }
+
+/**
+ * The Volumes rail on one row (w5): every label on row 0, each centre within
+ * its own bounds (min..max, its band: a label may slide left as well as right
+ * over it, as far as half of it), neighbours `pad` apart, and as near its own
+ * centre as the row allows: a run that crowds packs a pad apart and stands
+ * where its labels' wishes average (least squares), so a name too wide for its
+ * band moves its neighbours either way, not only the names after it. A label
+ * no slide can seat beside those before it is -1, and the rest stand as if it
+ * were not there. A label with no `min` slides right only; with no `min`
+ * anywhere it is placeRailLabelsSliding on one row.
+ *
+ * @param {ReadonlyArray<{x:number, w:number, max:number, min?:number}>} items  left to right (device px)
+ * @param {number} pad
+ * @returns {Array<{row:number, x:number}>}
+ */
+export function placeRailLabelsRow(items, pad) {
+  const out = items.map((it) => ({ row: -1, x: it ? it.x : 0 }));
+  /** Runs packed a pad apart: their labels, each one's offset from the run's first, the bounds
+   * of the first's centre, the sum of the labels' wishes for it, and where it stands.
+   * @type {Array<{ks:number[], offs:number[], lo:number, hi:number, sum:number, s:number}>} */
+  let runs = [];
+  const gap = (a, b) => (items[a].w + items[b].w) / 2 + pad;
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i];
+    if (!it || !(it.w > 0)) continue;
+    const lo = it.min != null ? Math.min(it.min, it.x) : it.x, hi = Math.max(it.x, it.max != null ? it.max : it.x);
+    let run = { ks: [i], offs: [0], lo, hi, sum: it.x, s: it.x };
+    const kept = runs.slice();
+    let seated = true;
+    while (runs.length) {
+      const p = runs[runs.length - 1];
+      const last = p.ks.length - 1;
+      const shift = p.offs[last] + gap(p.ks[last], run.ks[0]);
+      if (run.s >= p.s + shift - 1e-9) break;
+      // the two runs pack into one, a pad apart
+      const m = {
+        ks: p.ks.concat(run.ks), offs: p.offs.concat(run.offs.map((o) => o + shift)),
+        lo: Math.max(p.lo, run.lo - shift), hi: Math.min(p.hi, run.hi - shift),
+        sum: p.sum + run.sum - shift * run.ks.length, s: 0,
+      };
+      runs.pop();
+      if (m.lo > m.hi + 1e-9) { seated = false; break; }
+      m.s = Math.min(m.hi, Math.max(m.lo, m.sum / m.ks.length));
+      run = m;
+    }
+    if (!seated) { runs = kept; continue; }
+    runs.push(run);
+  }
+  for (const r of runs) r.ks.forEach((k, j) => { out[k] = { row: 0, x: r.s + r.offs[j] }; });
+  return out;
+}

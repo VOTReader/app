@@ -28,7 +28,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { MY_WEB_SOURCES, CONTEXT_BINS, myWebLinkColor, MY_WEB_LINK_KINDS } from '../../utils/scripture-web/palette.js';
-import { placeRailLabelsSliding } from '../../utils/scripture-web/rail-labels.js';
+import { placeRailLabelsSliding, placeRailLabelsRow } from '../../utils/scripture-web/rail-labels.js';
 import { railUnit, railSpan } from '../../utils/scripture-web/personal-graph.js';
 import { css as inkCss, MYWEB_TAP_CONTEXT, FLYOVER_LEG_WIDTH, INK } from '../../utils/scripture-web/sw-ink.js';
 // the shipped Garamond under the web's own name, as the canon's labels (label-engine.js)
@@ -188,12 +188,39 @@ function railForms(seg) {
  * no name (its tick stays) until enough of it is on screen, and gives way to
  * the whole bands where the rows are short of room. Only a name already at
  * its tiniest form is left unprinted for want of room.
+ *
+ * One row first (w4 readdown item 3: on a PC HOLY DAYS stood raised on a
+ * second row over TIMOTHY and MTAM, where r2-05 names the rail on one row):
+ * the rail takes the fewest rows, up to the frame's, on which every whole
+ * band is named, abbreviating only as far as that row count needs. A PC and
+ * a landscape phone name all 21 collections on one row; a portrait phone,
+ * which gives each 17-20 px, still stacks them. `least` (the rows the frame
+ * takes with the panel closed) keeps a docked panel from trading the
+ * frame's rows for tinier forms (w4 review: TIMOTHY read LT at its edge).
  * @param {CanvasRenderingContext2D} ctx  its font and tracking set
  * @param {Array<{span:{x0:number, x1:number, labelX:number, room:number}, forms:string[], group:string}>} bands
- * @param {{width:number, pad:number, inset:number, rows:number}} o
- * @returns {Array<{label:string, x:number, row:number}>}
+ * @param {{width:number, pad:number, inset:number, rows:number, least?:number}} o
+ * @returns {{out: Array<{label:string, x:number, row:number}>, rows: number}}
  */
 function placeRailNames(ctx, bands, o) {
+  const most = Math.max(1, o.rows | 0);
+  let got = { out: /** @type {Array<{label:string, x:number, row:number}>} */ ([]), named: false }, rows = Math.min(most, Math.max(1, o.least || 1));
+  for (; rows <= most; rows++) {
+    got = placeRailNamesOn(ctx, bands, Object.assign({}, o, { rows }));
+    if (got.named) break;
+  }
+  return { out: got.out, rows: Math.min(rows, most) };
+}
+
+/**
+ * placeRailNames on a given number of rows: the names, and whether every
+ * whole band is named.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Array<{span:{x0:number, x1:number, labelX:number, room:number}, forms:string[], group:string}>} bands
+ * @param {{width:number, pad:number, inset:number, rows:number}} o
+ * @returns {{out: Array<{label:string, x:number, row:number}>, named: boolean}}
+ */
+function placeRailNamesOn(ctx, bands, o) {
   const step = new Map();
   const widths = new Map();
   const measure = (t) => {
@@ -206,12 +233,19 @@ function placeRailNames(ctx, bands, o) {
     const t = Math.min(step.get(b.group) || 0, b.forms.length - 1);
     const label = b.forms[t], w = measure(label);
     const last = t === b.forms.length - 1;
-    if (w > b.span.room * o.rows) return { fits: false, last };
+    // on one row a name may run past its band by sliding right over it (half of it), and its
+    // neighbours over theirs: the room test is the two rows' test, and the placement decides
+    if (w > b.span.room * Math.max(2, o.rows)) return { fits: false, last };
     const lo = w / 2 + o.inset, hi = o.width - w / 2 - o.inset;
     const x = lo > hi ? o.width / 2 : Math.min(hi, Math.max(lo, b.span.labelX));
-    return { fits: true, last, item: { label, x, w, max: Math.min(hi, b.span.labelX + b.span.room / 2), b, at } };
+    return {
+      fits: true, last,
+      item: { label, x, w, min: Math.max(lo, b.span.labelX - b.span.room / 2), max: Math.min(hi, b.span.labelX + b.span.room / 2), b, at },
+    };
   };
-  const place = (list) => placeRailLabelsSliding(list, o.pad, o.rows);
+  // one row: a crowded name moves its neighbours either way over their bands; on more rows a
+  // name slides right only, to the row needing least (w4)
+  const place = (list) => (o.rows === 1 ? placeRailLabelsRow(list, o.pad) : placeRailLabelsSliding(list, o.pad, o.rows));
   // half a device px of slack: a fit camera's ends land on 0 and the width, give or take rounding
   const isWhole = (b) => b.span.x0 >= -0.5 && b.span.x1 <= o.width + 0.5;
   const named = [];
@@ -228,8 +262,18 @@ function placeRailNames(ctx, bands, o) {
       list.push(Object.assign(n.item, { last: n.last }));
     }
     at = place(list);
-    at.forEach((p, i) => { if (p.row < 0 && !list[i].last) down.add(list[i].b.group); });
-    if (!down.size || pass >= 3) break;
+    at.forEach((p, i) => {
+      if (p.row >= 0) return;
+      if (!list[i].last) { down.add(list[i].b.group); return; }
+      // a name already at its tiniest (MTAM, ODDS) makes room on one row by its nearest
+      // neighbour that can still step down, the left one first
+      if (o.rows !== 1) return;
+      for (let d = 1; d < list.length; d++) {
+        const j = [i - d, i + d].find((k) => k >= 0 && k < list.length && !list[k].last && at[k].row >= 0);
+        if (j != null) { down.add(list[j].b.group); return; }
+      }
+    });
+    if (!down.size || pass >= 8) break;
     for (const g of down) step.set(g, (step.get(g) || 0) + 1);
   }
   // 2. a cut band (at most one at each end) joins at its family's form, and gives
@@ -237,6 +281,7 @@ function placeRailNames(ctx, bands, o) {
   const extra = [];
   for (const { b, at: k } of cuts) { const n = nameOf(b, k); if (n.fits) extra.push(n.item); }
   const wholePlaced = at.filter((p) => p.row >= 0).length;
+  const allNamed = list.length === wholes.length && wholePlaced === wholes.length;
   const tries = [extra];
   if (extra.length > 1) extra.forEach((_, j) => tries.push(extra.filter((__, i) => i !== j)));
   if (extra.length) tries.push([]);
@@ -249,9 +294,9 @@ function placeRailNames(ctx, bands, o) {
     if (placed < wholePlaced) continue;
     const out = [];
     seq.forEach((nm, i) => { if (got[i].row >= 0) out.push({ label: nm.label, x: got[i].x, row: got[i].row }); });
-    return out;
+    return { out, named: allNamed };
   }
-  return [];
+  return { out: [], named: allNamed };
 }
 
 /**
@@ -1007,7 +1052,7 @@ function drawRails(ctx, opts, rails) {
   // take a row rather than drop to the next one ("LAMB" by MTAM, fix-review
   // #13); w4 asks each row in turn (placeRailLabelsSliding), where the slide
   // looked only at the previous name and could leave the next one no row.
-  const bands = [];
+  const bands = [], whole = [];
   const pad = Math.max(5 * DPR, NAME_GAP_EM * size), inset = 4 * DPR;
   ctx.strokeStyle = inkCss('volumesTick');
   for (const seg of votRail.segments) {
@@ -1019,13 +1064,19 @@ function drawRails(ctx, opts, rails) {
     ctx.stroke();
     const shown = inArea === opts ? span : segmentSpan(seg, inArea);
     if (shown && shown.room > 0) bands.push({ span: shown, forms: railForms(seg), group: seg.group || seg.volKey });
+    if (inArea !== opts && span.room > 0) whole.push({ span, forms: railForms(seg), group: seg.group || seg.volKey });
   }
-  // two rows on a PC (136 and 120, names 116-136) and a landscape phone (w4:
-  // 8 and 20 px over the rail), three on a narrow frame (8, 20, 32), so all 21
-  // collections are named from a 360 px portrait phone up; through w3 the
+  // up to two rows on a PC (136 and 120, names 116-136) and a landscape phone
+  // (w4: 8 and 20 px over the rail), three on a narrow frame (8, 20, 32), so all
+  // 21 collections are named from a 360 px portrait phone up; through w3 the
   // phone kept one row and dropped five (VOL VII, WTLB I, BLESSED, TIMOTHY,
-  // TRINITY). A name no row can take in any form keeps its tick and shows on a zoom.
-  const placed = placeRailNames(ctx, bands, { width: area, pad, inset, rows: nf.rows.length })
+  // TRINITY). w5: the fewest of them that names every collection, one on a PC
+  // and a landscape phone (r2-05's one row). A name no row can take in any form
+  // keeps its tick and shows on a zoom. With the panel docked the frame's own
+  // rows, as it takes them closed, are the least the area takes.
+  const o = { width: area, pad, inset, rows: nf.rows.length };
+  const least = whole.length ? placeRailNames(ctx, whole, Object.assign({}, o, { width })).rows : 1;
+  const placed = placeRailNames(ctx, bands, Object.assign(o, { least })).out
     .map((nm) => ({ label: nm.label, x: nm.x, y: rails.topY - nf.rows[nm.row] * DPR }));
   setTracking(ctx, 0);
   return { names: placed, size, overline: nf.overline };

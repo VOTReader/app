@@ -291,6 +291,14 @@ describe('the header keeps clear of the strip and the chips (w4)', () => {
     // set on the title, inherited by its count, its name and the hint; none of them takes it off
     expect(rule('.sw-title')).toMatch(/text-shadow:[^;]*var\(--sw-canvas\)/);
     for (const sel of ['.sw-title h1', '.sw-title p', '.sw-hint']) expect(rule(sel), sel).not.toMatch(/text-shadow/);
+    // w4 readdown item 3: at 3 px and 8 px the s08 phone's gold bundle still read through
+    // "63,418 connections"; a tight ring of the canvas round each glyph (two or more shadows of 2 px
+    // or less, stacked to near solid) under the soft one, as a map's labels are knocked out
+    const shadows = /text-shadow:\s*([^;]+)/.exec(rule('.sw-title'))[1].split(/,(?![^(]*\))/).map((x) => x.trim());
+    expect(shadows.every((x) => /var\(--sw-canvas\)$/.test(x)), shadows.join(' | ')).toBe(true);
+    const blurs = shadows.map((x) => parseFloat(x.split(/\s+/)[2]));
+    expect(blurs.filter((b) => b <= 2).length, 'the tight ring').toBeGreaterThanOrEqual(2);
+    expect(Math.max(...blurs), 'the soft halo').toBeGreaterThanOrEqual(8);
   });
 
   it('beside the docked panel the header stops short of the collapsed strip; a phone wraps its count under the title', () => {

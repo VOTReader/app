@@ -7821,9 +7821,12 @@
     /* min-width 0: beside a docked panel the row's max-width (below) can narrow the title, which
        wraps rather than run under the strip (w4). The canvas's own dark halo, inherited by the
        title, its count and the hint, as the overlay's labels have theirs: a lit gold arc through
-       "63,418 connections" took its worst contrast to 1.79:1 on a phone (w4 quality hunt). */
+       "63,418 connections" took its worst contrast to 1.79:1 on a phone (w4 quality hunt). At 3 and
+       8 px alone the s08 phone's gold bundle still read through the count (w4 readdown item 3): a
+       tight ring of the canvas round each glyph, stacked to near solid, lies under the soft one. */
     .sw-title { position: relative; padding-top: 3px; min-width: 0;
-      text-shadow: 0 0 3px var(--sw-canvas), 0 0 8px var(--sw-canvas); }
+      text-shadow: 0 0 1px var(--sw-canvas), 0 0 2px var(--sw-canvas), 0 0 2px var(--sw-canvas),
+        0 0 4px var(--sw-canvas), 0 0 8px var(--sw-canvas); }
     .sw-title h1 {
       margin: 0; font-family: var(--sw-font); font-size: var(--fsc-24); font-weight: 400;
       line-height: 1.15; color: var(--sw-title);
