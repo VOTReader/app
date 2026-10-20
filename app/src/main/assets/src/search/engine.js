@@ -2948,6 +2948,18 @@ async function search(query, options) {
   const scored = titleIx ? scoreTitles(wanted, { index: titleIx, limit: TITLE_HITS }) : [];
   /** @type {any[]} */
   const admitted = admitTitles(scored).filter(admissible);
+  /* A PHRASE TYPED AS MEANT IS NO TYPO OF A SHORT TITLE (search200 fix1, scope cause 6). The trigram reading (level 1)
+     measures the whole title, and in a short "The X of The Lord" title "of the lord" is most of its trigrams: any short
+     word in X's place read as a typo of X. A level-1 title is named only when no text but its own holds the typed run
+     whole, its lead words aside (runHolders; null when the run is under RUN_MIN or too common to settle it). A typo's
+     word is in no text, so a real typo is still read. */
+  if (admitted.length && admitted[0].level === 1) {
+    let k = 0;
+    while (k < typedTokens.length - 1 && TITLE_LEAD.has(typedTokens[k])) k++;
+    const runHeld = runHolders(typedTokens.slice(k));
+    const mine = new Set(admitted.map((h) => h.docId));
+    if (runHeld && [...runHeld.keys()].some((id) => !mine.has(id))) admitted.length = 0;
+  }
   /* A TITLE TYPED WITH ONE WORD WRONG (search200 last2, 2026-10-18). "chosen to teach" for the letter "Given to Teach":
      "chosen" is no form, typo or near-synonym of "given", so no title was named and the letter sat fourth, under texts
      holding the typed words far apart (tri bench n275). titles.js swapTitles reads the title's shape where it fits one
