@@ -3132,7 +3132,21 @@ async function search(query, options) {
     meaningLater = !sem && semanticStatus().status !== 'ready';
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed({ ...f, id: s.id }); });
+    const wordsFirst = out[0];
     if (sem && sem.length) meaningFirst(out, idOf, sem, namedOr, held, fresh);
+    /* A QUOTE TYPED NEARLY RIGHT KEEPS ITS PLACE OVER AN UNSURE MEANING (search200 fix1, scope cause 5). Kept to a
+       scope that hides the texts holding the typed run whole, the words' best passage held most of the quote
+       (ALIGN_HELD) and the meaning still lifted over it a text the model was not sure of, holding fewer of the typed
+       content words. The words' first goes back first when the meaning's is no sure pick, holds fewer typed content
+       words and is not named. */
+    if (sem && sem.length && wordsFirst && out[0] !== wordsFirst && held >= ALIGN_HELD) {
+      let content = 0;
+      for (const u of units) if (u.literal && u.origin < 31 && !isStopTerm(u.term)) content |= 1 << u.origin;
+      const holds = (/** @type {any} */ e) => popcount((termMask[idOf.get(e) || ''] || 0) & content);
+      const next = sem.find((x) => sem[0].score - x.score > MEANING_SAME);
+      const sure = (!next || sem[0].score - next.score >= MEANING_SURE) && idOf.get(out[0]) === sem[0].id;
+      if (holds(out[0]) < holds(wordsFirst) && !sure && !namedOr(out[0].doc)) { out.splice(out.indexOf(wordsFirst), 1); out.unshift(wordsFirst); }
+    }
     // The meaning re-orders the texts holding less of the quote (B4): those holding it keep their own order.
     if (sem && sem.length && alignHeld.size) {
       const slots = [];
