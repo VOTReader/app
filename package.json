@@ -28,6 +28,7 @@
     "e2e:search": "node tools/e2e-search.mjs",
     "bench:search": "node tools/search-bench.mjs",
     "bench:tri": "node tools/search-bench.mjs --set tri",
+    "bench:hunt": "node tools/search-bench.mjs --set hunt",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",

@@ -38,6 +38,12 @@
    case's sentence is the two-sentence span; a merged Bible misquote names two adjacent verses (uk, uk2) and either
    passes (rules.mjs pairHolds). Titles score at unit level (a study chapter by its chapter title alone, rules.mjs
    titleForms); an Answers section heading at sentence level. SEARCH_BENCH_CASES replaces tri/cases.json and skips fresh.
+
+   HUNT (search200 fix1, 2026-10-19): the fault hunt's 850 queries in 11 families (D:/Swarm/lanes/search200/out/hunt), all
+   open, each with the hunt's verdict (confirmed / disputed by its two judges, or pass); the 14 both judges rejected are out.
+     node tools/search-bench.mjs --set hunt [--json out] [--record]   hunt/cases.json; floor hunt/baseline.json
+   The pass rule above, per case: a scoped case runs once per search in its `modes` (unscoped, a corpus, a book or volume
+   chip), the class cut to what each scope shows, and passes when every run does; a text in its `alt` passes as the target.
    ─────────────────────────────────────────────────────────────────── */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -51,16 +57,18 @@ const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
 const val = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : null; };
 const TRI = val('--set') === 'tri';
-if (val('--set') && !TRI) { console.error('unknown --set ' + val('--set') + ' (only: tri)'); process.exit(2); }
-const BASELINE = path.join(HERE, TRI ? 'search-bench/tri/baseline.json' : 'search-bench/baseline.json');
+const HUNT = val('--set') === 'hunt';
+if (val('--set') && !TRI && !HUNT) { console.error('unknown --set ' + val('--set') + ' (only: tri, hunt)'); process.exit(2); }
+const DIR = TRI ? 'search-bench/tri/' : HUNT ? 'search-bench/hunt/' : 'search-bench/';
+const BASELINE = path.join(HERE, DIR + 'baseline.json');
 const t0 = Date.now();
 
 // SEARCH_BENCH_CASES: another cases file (the fairness audit tries candidate queries on a copy)
-const CASES = process.env.SEARCH_BENCH_CASES || path.join(HERE, TRI ? 'search-bench/tri/cases.json' : 'search-bench/cases.json');
+const CASES = process.env.SEARCH_BENCH_CASES || path.join(HERE, DIR + 'cases.json');
 if (TRI && !fs.existsSync(CASES)) { console.error('no tri cases yet: ' + CASES + ' (frozen after the writers and Gates A-D)'); process.exit(2); }
 const { cases } = JSON.parse(fs.readFileSync(CASES, 'utf8'));
-const FRESH = path.join(HERE, TRI ? 'search-bench/tri/fresh-cases.json' : 'search-bench/fresh-cases.json');
-if (!process.env.SEARCH_BENCH_CASES && fs.existsSync(FRESH)) for (const c of JSON.parse(fs.readFileSync(FRESH, 'utf8')).cases) cases.push({ ...c, held: true, set: 'fresh' });
+const FRESH = path.join(HERE, DIR + 'fresh-cases.json');
+if (!HUNT && !process.env.SEARCH_BENCH_CASES && fs.existsSync(FRESH)) for (const c of JSON.parse(fs.readFileSync(FRESH, 'utf8')).cases) cases.push({ ...c, held: true, set: 'fresh' });
 const { E, initMs, meaning } = await engine();
 const { kjvEncode } = await import(pathToFileURL(path.join(ASSETS, 'src/search/tokenize.js')).href);
 const { excerptLanding } = await import(pathToFileURL(path.join(ASSETS, 'src/utils/excerpt-landing.js')).href);
@@ -167,14 +175,48 @@ function lands(hit, terms, c, section = '') {
   return false;
 }
 
+/** A hunt case's scoped run (`o`: the search's corpus and scope): the class cut to the texts it shows (engine.js inScope),
+    and the tier to beat recomputed (an in-scope reprint is the scope's best when its original is hidden). Null: none shown. */
+function scoped(cls, o) {
+  const s = o.scope || {};
+  const shown = (k) => { const d = K.unitDoc[k] || matthewTwin(k).map((t) => K.unitDoc[t]).find(Boolean);
+    return !d || ((!o.corpus || o.corpus === 'all' || d.corpus === o.corpus) && (!s.bookId || d.bookId === s.bookId) && (!s.volumeId || d.volumeId === s.volumeId)); };
+  const members = new Set([...cls.members].filter(shown));
+  if (!members.size) return null;
+  const pool = [...members].filter((k) => !cls.sectioned.has(k) && !cls.near.has(k));
+  return { ...cls, members, best: Math.min(...(pool.length ? pool : [...members]).map(TIER)) };
+}
+
 // ── run ──
 const out = [];
 const times = [];
 for (const c of cases) {
-  const ts = Date.now();
-  const r = await E.search(c.q, { limit: 6000, perVolume: 400 });
-  times.push(Date.now() - ts);
-  const cls = classOf(c);
+  const clsAll = classOf(c);
+  /** @type {any} */ let o = null;
+  let pass = true; let strict = true; let why = '';
+  // every run of the case. A hunt scoped case asks its scopes (one run per mode, all must pass): its unscoped run gives
+  // the ranks only, as the hunt scored it (scoped-r2/run-scoped.mjs), since the scope is what picks its target.
+  const modes = (HUNT && c.modes) || null;
+  for (const mode of modes || [{}]) {
+    const scope = Object.keys(mode).length > 0;
+    const cls = scope ? scoped(clsAll, mode) : clsAll;
+    if (!cls) continue;
+    const ts = Date.now();
+    const r = await E.search(c.q, { limit: 6000, perVolume: 400, ...mode });
+    times.push(Date.now() - ts);
+    const v = judge(c, r, cls);
+    o = o || v;
+    if (modes && !scope) continue;
+    pass = pass && v.pass; strict = strict && v.strict;
+    why = why || (v.why && v.why + (scope ? ' (' + JSON.stringify(mode) + ')' : ''));
+  }
+  if (!o) { o = { rank: null, next: null, ms: 0 }; pass = strict = false; why = 'no run shows the target'; }
+  o = { ...o, pass, strict, why };
+  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', next: o.next, members: clsAll.members.size, recurring: clsAll.recurring, group: c.group, col: c.col, style: c.style, tier: c.tier, form: c.form, ...(HUNT ? { family: c.family, verdict: c.verdict } : {}), q: c.set === 'fresh' || (TRI && c.held) ? undefined : c.q, pass: o.pass, strict: o.strict, rank: o.rank, top5: !!o.rank && o.rank <= 5, found: !!o.rank, why: o.why, ms: o.ms });
+}
+
+/** One search's verdict for case `c` against its class `cls` (the pass rule of §1-4 above). */
+function judge(c, r, cls) {
   const res = r.results || [];
   const ranks = [];
   res.forEach((h, i) => { if (ranks.length < 1 && cls.members.has(unitKey(h.doc))) ranks.push(i + 1); });
@@ -190,7 +232,9 @@ for (const c of cases) {
     // NAMED COLLECTION (rules.mjs, errata 2026-10-18): the target's own unit leads a query naming its collection
     const own = matthewTwin(c.uk).includes(k) || k === c.uk;
     const named = own && namesCollection(norm(c.q), norm([((unitBlocks[c.uk] || [])[0] || {}).title, c.title, c.sentence].filter(Boolean).join(' ')), c.uk.slice(0, c.uk.indexOf('/')));
-    if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
+    // a hunt case's alt: texts as right as the target (its family's NOTES.md says why); one leading passes
+    if (HUNT && (c.alt || []).some((a) => a === k || matthewTwin(a).includes(k))) pass = true;
+    else if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
     else if (!cls.recurring && !named && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
     // A heading's own text has no heading line: the heading is its title, on the card and atop the page (sr11, t405).
     else if (c.level === 'sentence' && !cls.titled.has(k) && !lands(f.hit, cardTerms(r), c, cls.sectioned.get(k))) why = 'lands off the sentence';
@@ -199,7 +243,7 @@ for (const c of cases) {
   }
   // the rank of the class's next text after the first hit (its reprint, when the original leads)
   const next = f && f.hit ? (res.findIndex((h, i) => i > 0 && cls.members.has(unitKey(h.doc)) && !matthewTwin(unitKey(h.doc)).includes(unitKey(f.hit.doc))) + 1) || null : null;
-  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', next, members: cls.members.size, recurring: cls.recurring, group: c.group, col: c.col, style: c.style, tier: c.tier, form: c.form, q: c.set === 'fresh' || (TRI && c.held) ? undefined : c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
+  return { pass, strict, rank, why, next, ms: times[times.length - 1] };
 }
 
 // ── report ──
@@ -212,6 +256,7 @@ const sorted = times.slice().sort((a, b) => a - b);
 const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
 const fmt = (s) => `${s.pass}/${s.n} pass  (strict ${s.strict}, top5 ${s.top5}, found ${s.found})`;
 if (TRI) triReport();
+if (HUNT) huntReport();
 console.log(`search-bench: ${fmt(all)}`);
 console.log(`  open ${fmt(sum(bench.filter((o) => !o.held)))}`);
 console.log(`  held ${fmt(sum(bench.filter((o) => o.held)))}`);
@@ -281,6 +326,39 @@ function triReport() {
     for (const [k, n] of Object.entries(floor.styleTier || {})) if ((score.styleTier[k] || 0) < n) drops.push(`${k} ${score.styleTier[k] || 0} < ${n}`);
     if (drops.length) { console.error('search-bench tri FAILED: ' + drops.join('; ')); process.exit(1); }
     console.log(`tri floor held (open ${floor.open}, held ${floor.held}${floor.fresh != null ? ', fresh ' + floor.fresh : ''})${score.open > floor.open ? `; open raised by ${score.open - floor.open}: run with --record to keep it` : ''}`);
+  }
+  process.exit(0);
+}
+
+/** The hunt report (search200 fix1): every case open; by family, with how many of the judges' confirmed and disputed
+    faults and of the hunt's own passes pass now; the failures by id. Floors in hunt/baseline.json: the pass count and
+    each family's. */
+function huntReport() {
+  const s = sum(out);
+  console.log(`hunt ${s.pass}/${s.n} (strict ${s.strict}, top5 ${s.top5}, found ${s.found}) · median ${pct(0.5)}/p95 ${pct(0.95)} ms`);
+  console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}; init ${initMs} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  const cell = (rows) => { const t = sum(rows); return t.n ? `${t.pass}/${t.n}` : '-'; };
+  const row = (label, rows) => { const t = sum(rows); console.log('  ' + label.padEnd(14) + `${t.pass}/${t.n}`.padStart(9) + String(t.strict).padStart(8) + String(t.top5).padStart(6) + String(t.found).padStart(7) +
+    ['confirmed', 'disputed', 'pass'].map((v) => cell(rows.filter((o) => o.verdict === v)).padStart(11)).join('')); };
+  console.log('by family'.padEnd(16) + 'pass'.padStart(9) + 'strict'.padStart(8) + 'top5'.padStart(6) + 'found'.padStart(7) + 'confirmed'.padStart(11) + 'disputed'.padStart(11) + 'hunt pass'.padStart(11));
+  const fams = [...new Set(out.map((o) => o.family))].sort();
+  for (const fm of fams) row(fm, out.filter((o) => o.family === fm));
+  row('all', out);
+  if (!flag('--quiet')) {
+    console.log('failures:');
+    for (const o of out.filter((x) => !x.pass)) console.log(`  ${o.id} [${o.family}/${o.verdict}/${o.style}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
+  }
+  if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
+  const score = { pass: s.pass, strict: s.strict, top5: s.top5, found: s.found, family: Object.fromEntries(fams.map((fm) => [fm, sum(out.filter((o) => o.family === fm)).pass])) };
+  if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the hunt floor:', BASELINE); process.exit(0); }
+  if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
+  if (fs.existsSync(BASELINE)) {
+    const floor = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+    const drops = [];
+    if (score.pass < floor.pass) drops.push(`pass ${score.pass} < floor ${floor.pass}`);
+    for (const [k, n] of Object.entries(floor.family || {})) if ((score.family[k] || 0) < n) drops.push(`${k} ${score.family[k] || 0} < ${n}`);
+    if (drops.length) { console.error('search-bench hunt FAILED: ' + drops.join('; ')); process.exit(1); }
+    console.log(`hunt floor held (pass ${floor.pass})${score.pass > floor.pass ? `; raised by ${score.pass - floor.pass}: run with --record to keep it` : ''}`);
   }
   process.exit(0);
 }
