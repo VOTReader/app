@@ -22,7 +22,11 @@ const verses = (/** @type {string[]} */ texts) => [{ heading: '', verses: texts.
 const GLOBALS = {
   BOOKS: {
     john: { id: 'john', title: 'John', chapters: [
-      { num: 1, sections: verses(['Lanterns were hung along the old quay at evening.']) },
+      { num: 1, sections: verses([
+        'Lanterns were hung along the old quay at evening.',
+        // a verse outside the harbor vigil (John 3:1-3) holding a whole query that names it
+        'The keeper of the harbor sang over the gray water in the harbor vigil.',
+      ]) },
       { num: 3, sections: verses([
         'A lantern burned beside the quiet harbor at dusk.',
         'The keeper of the harbor sang over the gray water.',
@@ -163,6 +167,11 @@ describe('a named passage inside a longer query', () => {
 
   it('a name that is itself a reference: only the words beside it are searched', async () => {
     expect(await card('isaiah 3 the keeper of the harbor sang a new song')).toMatchObject({ kind: 'named-passage', bookId: 'isaiah', chapter: 3, text: 'keeper of the harbor sang a new song' });
+  });
+
+  it('two words in a row are no saying of it; a whole query a verse outside it holds is that verse’s', async () => {
+    expect((await card('the gray water of the harbor vigil')).kind).toBe('text');
+    expect((await card('the keeper of the harbor sang over the gray water in the harbor vigil')).kind).toBe('text');
   });
 
   it('words none of its verses holds stay words; a tab reading no Bible reference reads none', async () => {

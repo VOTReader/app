@@ -251,6 +251,9 @@ const PARALLELS = [
 ];
 /** The small words a passage's rest is trimmed of, and that do not count among its words. */
 const SMALL = new Set(['the', 'a', 'an', 'of', 'on', 'in', 'to', 'and', 'from', 'according', 'as', 'is', 'are', 'was', 'about', 'with', 'for', 'by', 'that', 'this']);
+/* A SAYING IS THREE WORDS OR MORE (the settle, the red team's rt1-rules). Two words in a row ("when joshua", "i am",
+   "shall be") sit in some verse of any long passage, so they told no passage apart: "when joshua was by jericho" made
+   the fall of Jericho's card over Joshua 5:13, "i am the passover" Exodus 12's over the letter of that name. */
 /** Words (kjvEncode) enough to be a saying a verse holds: three or more, its small words aside. @param {string[]} run */
 const saying = (run) => run.filter((w) => !SMALL.has(w)).length >= 3;
 /* WORDS ANOTHER VERSE HOLDS ARE THAT VERSE'S (the settle, the red team's rt1-shapes). "john 3 17 for god
@@ -349,9 +352,13 @@ function passageInside(query, opts, facts) {
   }
   if (byKey.get(passageKey(rest)) === np) return card(np, query);
   const run = kjvEncode(rest);
-  if (run.filter((w) => !SMALL.has(w)).length < 2) return null;
+  if (!saying(run)) return null;
   const x = tellings.find((t) => holdsRun(t, run, facts));
   if (!x) return null;
+  // the whole query a verse outside the passage holds in a row is that verse's words ("fed you in the wilderness
+  // with manna", Deuteronomy 8:16, not the manna of Exodus 16)
+  const all = kjvEncode(query);
+  if (!tellings.some((t) => holdsRun(t, all, facts)) && facts.bibleHoldsRun(all)) return null;
   const nameIsRef = /\d/.test(words.slice(best.a, best.b).map((w) => w.w).join(' '));
   return card(x, nameIsRef ? rest : query);
 }
