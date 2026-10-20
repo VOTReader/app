@@ -51,7 +51,7 @@ import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey 
 import { KJV_ALIAS, KJV_ALIAS_BOOKS } from './kjv-alias.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
-import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords } from './titles.js';
+import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords, titleShare } from './titles.js';
 import { alignClasses, alignWeights, alignScore, alignMet } from './align.js';
 import { parseLexicon } from './lexicon.js';
 
@@ -1051,6 +1051,9 @@ const STUDY_REACH = 3;
 /** Named titles read for one the query names more nearly than the first's, and by how much more. */
 const TITLE_REACH = 5;
 const TITLE_NEARER = 0.2;
+/** A text the query names guards against a title typed with one word wrong when its title holds this share of the
+    typed content words' weight (titles.js titleShare): an opening and small words shared name nothing (search200 fix1). */
+const SWAP_NAMED_SHARE = 0.6;
 /** How far down a title typed whole (titleLevel) is looked for, to lead (search200 B1). */
 const TITLE_ORDER_REACH = 30;
 /** A verse first that holds this many typed words in a row keeps its place over a title typed whole. */
@@ -2900,7 +2903,8 @@ async function search(query, options) {
   if (!admitted.length && titleIx) {
     const sw = swapTitles(wanted, { index: titleIx, hits: scored.filter(admissible) }).filter((h) => admissible(h) && h.kind !== 'heading');
     const mine = new Set(sw.map((h) => h.docId));
-    const namedElse = () => out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc) && !mine.has(/** @type {string} */ (idOf.get(e))));
+    const namedElse = () => out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc) && !mine.has(/** @type {string} */ (idOf.get(e)))
+      && titleShare(wanted, e.doc.title, { index: titleIx }) >= SWAP_NAMED_SHARE);
     if (sw.length && !namedElse()) {
       const words = [...new Set(sw[0].typed.filter((w) => !titleIx.skip(w) && w[0] !== '#'))];
       if (holdsTogether(words, sw[0].typed.length + 2, mine) === false) admitted.push(...sw);

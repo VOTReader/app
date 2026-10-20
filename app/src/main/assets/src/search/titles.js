@@ -680,3 +680,22 @@ function swapReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @type
     if (!o || order(h, o) < 0) byUnit.set(h.uk, h);
   }
 }
+
+/**
+ * The share of the typed content words' weight (their rarity among titles, a number as the rarest) a title holds, by
+ * lemma: how much of what was typed the title says (search200 fix1). 1 with nothing to weigh.
+ * @param {string} query
+ * @param {string} title
+ * @param {{index?: any}} [opts]
+ */
+export function titleShare(query, title, opts) {
+  const ix = (opts && opts.index) || current;
+  if (!ix || typeof query !== 'string') return 1;
+  const wt = (/** @type {string} */ x) => (isNum(x) ? ix.maxWeight : ix.weight(lem(x)));
+  const q = titleWords(query).filter((x) => !ix.skip(x));
+  const has = new Set(titleWords(title || '').map(lem));
+  let all = 0;
+  let held = 0;
+  for (const x of q) { all += wt(x); if (has.has(lem(x))) held += wt(x); }
+  return all ? held / all : 1;
+}

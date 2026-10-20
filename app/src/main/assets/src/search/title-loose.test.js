@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
 
-const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'is', 'my', 'to', 'in', 'he', 'that', 'his', 'for', 'i', 'you', 'it', 'are', 'be', 'with', 'all', 'on', 'who', 'by', 'was', 'at', 'so', 'had', 'has', 'have', 'they', 'them', 'their', 'we', 'our', 'me', 'him', 'her', 'she', 'this', 'from', 'or', 'as', 'if', 'than', 'then', 'yet', 'do', 'did', 'does', 'been', 'were', 'said', 'will', 'your', 'shall', 'until', 'before']);
+const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'is', 'my', 'to', 'in', 'he', 'that', 'his', 'for', 'i', 'you', 'it', 'are', 'be', 'with', 'all', 'on', 'who', 'by', 'was', 'at', 'so', 'had', 'has', 'have', 'they', 'them', 'their', 'we', 'our', 'me', 'him', 'her', 'she', 'this', 'from', 'or', 'as', 'if', 'than', 'then', 'yet', 'do', 'did', 'does', 'been', 'were', 'said', 'will', 'your', 'shall', 'until', 'before', 'those']);
 const VOT_DATA = {
   STOP_WORDS_TRIMMED: STOP, SYNONYM_MAP: {},
   BOOK_ABBREVS: {}, BOOK_DISPLAY: {}, NAMED_PASSAGES: [], NAMED_PASSAGE_INDEX: {}, COMMANDS: [], COMMAND_MAP: {},
@@ -24,6 +24,11 @@ const GLOBALS = {
     // a text holding a typed run word for word in its body, and a title holding part of it ("The Dawn of ...")
     { id: 'morning-light', num: 5, title: 'Morning Light', blocks: seg(filler(3) + 'Watch, for the dawn of mercy is coming upon the earth. ' + filler(3)) },
     { id: 'dawn-glory', num: 6, title: 'The Dawn of Glory', blocks: seg(filler(1) + 'The night is far spent; the dawn is near. ' + filler(1)) },
+    // a title remembered with one word of the reader's own ("persevere" for "Labor"), and longer titles opening the same way,
+    // whose texts hold both typed content words, far apart
+    { id: 'lamps-labor', num: 7, title: 'Lamps for Those Who Labor', blocks: seg(filler(2) + 'I give rest to the weary, and strength to the faint. ' + filler(2)) },
+    ...[['wait', 'Wait on Me'], ['watch', 'Watch at Night'], ['mourn', 'Mourn in Zion']].map(([id, end], k) => ({ id: 'lamps-' + id, num: 30 + k,
+      title: 'Lamps for Those Who ' + end, blocks: seg(('Keep your lamps trimmed and burning through the long watches of the night. ' + filler(1) + 'Blessed is he who will persevere. ').repeat(4)) })),
     // texts holding none of the typed content words, so the small words weigh as little as they do in the volumes
     ...Array.from({ length: 12 }, (_, k) => ({ id: 'words-' + k, num: 10 + k, title: 'Words ' + k, blocks: seg(filler(2)) })),
   ],
@@ -53,5 +58,11 @@ describe('a title remembered loosely, against the texts holding its words', () =
     // "The Dawn of Glory" holds three of the four typed words in order; "the dawn of mercy" is a line of another text
     const top = ids(await E.search('the dawn of mercy'));
     expect(top.slice(0, 2)).toEqual(['morning-light', 'dawn-glory']);
+  });
+
+  it('one word wrong: titles sharing only its opening and small words name nothing that guards against it', async () => {
+    // the longer titles hold "lamps for those who" in order (the title lift), but not the typed word that is rare
+    const top = ids(await E.search('lamps for those who persevere'));
+    expect(top[0]).toBe('lamps-labor');
   });
 });
