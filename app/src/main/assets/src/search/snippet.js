@@ -201,6 +201,7 @@ function occurrences(text, terms, marks = false) {
     .sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
   const lower = text.toLowerCase();
   const at = new Map();
+  /** @type {string[]} the terms the text holds nowhere as written */ const unmet = [];
   for (let i = 0; i < expanded.length; i++) {
     const t = expanded[i];
     const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
@@ -211,8 +212,52 @@ function occurrences(text, terms, marks = false) {
       if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(lower[idx + t.length] || ''))) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
       idx = lower.indexOf(t, idx + t.length);
     }
+    if (!n) unmet.push(t);
+  }
+  const joined = unmet.length && APOSTROPHE.test(lower) ? joinedNames(lower) : null;
+  if (joined) {
+    for (const t of unmet) {
+      const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
+      let v = joined.view.indexOf(t);
+      let n = 0;
+      while (v >= 0 && n < 400) {
+        const idx = joined.at(v);
+        const len = joined.at(v + t.length - 1) + 1 - idx;
+        const o = at.get(idx);
+        if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(joined.view[v + t.length] || '')) && (!o || o.len < len)) { at.set(idx, { idx, len, term: f.fam, primary: f.primary }); n++; }
+        v = joined.view.indexOf(t, v + t.length);
+      }
+    }
   }
   return [...at.values()].sort((a, b) => a.idx - b.idx);
+}
+
+/* A NAME WRITTEN WITH AN INNER APOSTROPHE IS ONE WORD HERE TOO (the settle, the red team's rt1-shapes). The tokenizer
+   joins "Tz’va’ot" and "Sha’ul" across their apostrophes (tokenize.js INNER_APOSTROPHE), so a typed "tzvaot" found its
+   letter; the landing and the marks read the text as written and met no "tzvaot" in it, and the letter opened at its
+   top. A term the text holds nowhere as written is looked for with those apostrophes out, as the tokenizer reads them:
+   a clitic after one (a possessive's "s", "t", "ll", "re", "ve", "d", "m") stays apart. */
+const APOSTROPHE = /['’‘ʼ]/;
+const INNER_APOSTROPHE = /(?<=[a-z])['’‘ʼ]([a-z]+)(?![a-z0-9])/g;
+const CLITICS = new Set(['s', 't', 'll', 're', 've', 'd', 'm']);
+/**
+ * `lower` with each inner apostrophe the tokenizer joins a name across taken out (`view`), and where a place in the
+ * view sits in `lower` (`at`); null when it has none.
+ * @param {string} lower
+ * @returns {{ view: string, at: (v: number) => number } | null}
+ */
+function joinedNames(lower) {
+  /** @type {number[]} */ const cut = [];
+  INNER_APOSTROPHE.lastIndex = 0;
+  for (let m = INNER_APOSTROPHE.exec(lower); m; m = INNER_APOSTROPHE.exec(lower)) if (!CLITICS.has(m[1])) cut.push(m.index);
+  if (!cut.length) return null;
+  let view = '';
+  let from = 0;
+  for (const c of cut) { view += lower.slice(from, c); from = c + 1; }
+  view += lower.slice(from);
+  // past each apostrophe taken out before it (the k-th stood at view place cut[k] - k)
+  const at = (/** @type {number} */ v) => { let k = 0; while (k < cut.length && cut[k] - k <= v) k++; return v + k; };
+  return { view, at };
 }
 
 /**

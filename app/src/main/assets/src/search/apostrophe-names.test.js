@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { kjvEncode, kjvEncodeAt } from './tokenize.js';
 import { VotSearchMini } from './engine.js';
+import { matchExcerpt, findPlaces } from './snippet.js';
 
 describe('kjvEncode: an inner apostrophe in a name', () => {
   it('joins the name across its apostrophe, whichever mark is used', () => {
@@ -31,6 +32,24 @@ describe('kjvEncode: an inner apostrophe in a name', () => {
       expect(at.tokens).toEqual(kjvEncode(s));
     }
     expect(kjvEncodeAt('Then Sha’ul went').starts).toEqual([0, 5, 12]);
+  });
+});
+
+describe('the landing and the marks: the one word met where the name is written with its apostrophe', () => {
+  const text = 'Hear the word of YAHUWAH Tz’va’ot, says the prophet. Then Sha’ul went up to the city.';
+  it('matchExcerpt opens on the name as written', () => {
+    expect(matchExcerpt(text, ['tzvaot'])).toMatch(/^Tz’va’ot,/);
+    expect(matchExcerpt(text, ['shaul'])).toMatch(/^Sha’ul went/);
+  });
+
+  it('the find bar marks the whole name', () => {
+    const places = findPlaces(text, ['shaul']);
+    expect(places.length).toBe(1);
+    expect(places[0].hits).toEqual([{ idx: text.indexOf('Sha’ul'), len: 'Sha’ul'.length }]);
+  });
+
+  it('a clitic after the apostrophe stays apart, as the tokens keep it', () => {
+    expect(matchExcerpt('the Lord’s house', ['lords'])).toBe('');
   });
 });
 
