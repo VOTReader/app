@@ -130,11 +130,14 @@ const hasTokenRun = (/** @type {string[]} */ toks, /** @type {string[]} */ run) 
    1st), "The Lord's Table" #8, "lord's supper" put four topics highlighting
    "skillful" and "smoke" above 1 Cor 11:20. Only a word of three letters or more
    that is not a stop word reaches forward now; the rest match whole words. A number
-   is whole too (search200 B2): "100" is not "1000", "144" not "144000". */
+   is whole too (search200 B2): "100" is not "1000", "144" not "144000". A stop word of the full list is a stop
+   word here too (search200 fix1): "who", "can" and "all", kept in a search for their meaning, reached "whole",
+   "canaan" and "altar"; the snippet already marked them whole only. */
 /** @param {string} term */
 function prefixable(term) {
-  const stop = searchData().STOP_WORDS_TRIMMED;
-  return term.length >= 3 && !(stop && stop.has(term)) && !/\d/.test(term);
+  const D = searchData();
+  const stop = (/** @type {Set<string>|undefined} */ s) => !!s && s.has(term);
+  return term.length >= 3 && !stop(D.STOP_WORDS_TRIMMED) && !stop(D.STOP_WORDS) && !/\d/.test(term);
 }
 /** A typed term whose words are all stop words ("the", "me." with its period). */
 function isStopTerm(term) {
