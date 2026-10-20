@@ -50,13 +50,134 @@ function exists(r, facts) {
     && (r.verseEnd == null || has(r.chapterEnd || r.chapter, r.verseEnd));
 }
 
+/* ── A WHOLE REFERENCE IN A SHAPE parseReference DOES NOT READ (the refwords hunt's M5) ──
+   A version spelled out ("john 3:16 king james"), the book in a frame ("the book of ruth chapter 1", "paul's first
+   letter to the corinthians"), "chapter 3 of john verse 16", the numbers in words ("psalm twenty three"), a verse
+   list or a range in words ("john 3 16 17", "romans 8 28 to 30", "genesis 1 through 3"): each was searched as
+   words, and the numbers' words found Ezra's census ("twenty", "three"). refInWords writes such a query in the
+   shape parseReference reads. */
+const ONES = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9 };
+const TEENS = { ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19 };
+const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
+const own = (/** @type {object} */ o, /** @type {string} */ k) => Object.prototype.hasOwnProperty.call(o, k);
+const isNumWord = (/** @type {string} */ t) => own(ONES, t) || own(TEENS, t) || own(TENS, t) || t === 'hundred';
+
 /**
- * A string read whole as a Bible reference the index holds; null otherwise.
- * @param {string} str @param {{corpus?: string}} opts @param {RefFacts} facts
+ * Number words as digits, each number its own token: "twenty three" 23, "one hundred and nineteen" 119, "three
+ * sixteen" 3 16.
+ * @param {string[]} toks
+ * @returns {string[]}
+ */
+export function foldNumberWords(toks) {
+  /** @type {any} */ const O = ONES; /** @type {any} */ const T = TEENS; /** @type {any} */ const X = TENS;
+  const out = [];
+  let i = 0;
+  while (i < toks.length) {
+    let j = i; let v = 0; let got = false;
+    const after = (/** @type {number} */ k) => (toks[k] === 'and' && (own(X, toks[k + 1]) || own(T, toks[k + 1]) || own(O, toks[k + 1])) ? k + 1 : k);
+    if (own(O, toks[j]) && toks[j + 1] === 'hundred') { v = O[toks[j]] * 100; j = after(j + 2); got = true; } else if (toks[j] === 'hundred') { v = 100; j = after(j + 1); got = true; }
+    if (own(X, toks[j])) { v += X[toks[j]]; j++; got = true; if (own(O, toks[j])) { v += O[toks[j]]; j++; } } else if (own(T, toks[j])) { v += T[toks[j]]; j++; got = true; } else if (own(O, toks[j])) { v += O[toks[j]]; j++; got = true; }
+    if (got) { out.push(String(v)); i = j; } else { out.push(toks[i]); i++; }
+  }
+  return out;
+}
+
+const VERSION_TAIL = /\s+\(?(?:the\s+)?(?:new\s+king\s+james|king\s+james|authori[sz]ed|new\s+international|english\s+standard|new\s+american\s+standard|new\s+living|revised\s+standard|new\s+revised\s+standard|american\s+standard|(?:holman\s+)?christian\s+standard|world\s+english|young'?s\s+literal|amplified|the\s+message)(?:\s+(?:version|bible|translation))?\)?$/;
+const FRAME_HEAD = /^(?:the\s+)?(?:(?:holy\s+)?(?:book|gospel|epistle|letter|epistles|letters)\s+(?:of|to|according\s+to)\s+(?:the\s+)?(?:(?:saint|st)\.?\s+)?|(?:(?:paul|peter|john|james|jude)'?s\s+)?(?:(first|second|third|1st|2nd|3rd)\s+)?(?:letter|epistle)\s+to\s+the\s+)/;
+const ORDINAL = /** @type {Record<string, string>} */ ({ first: '1', '1st': '1', second: '2', '2nd': '2', third: '3', '3rd': '3' });
+
+/** The book a token run starts with, and how many tokens name it; null when none does. @param {string[]} toks */
+function bookAt(toks) {
+  for (let n = Math.min(4, toks.length); n >= 1; n--) {
+    const id = resolveBookToken(toks.slice(0, n).join(' '));
+    if (id) return { id, n };
+  }
+  return null;
+}
+
+/**
+ * A whole query (lower case) written in the shape parseReference reads; null when there is nothing to write.
+ * @param {string} lower
+ * @returns {string|null}
+ */
+export function refInWords(lower) {
+  let s = ' ' + lower.replace(/[\u2018\u2019]/g, "'").replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u201C\u201D"]/g, ' ').trim();
+  s = s.replace(VERSION_TAIL, '').trim();
+  const fm = s.match(FRAME_HEAD);
+  if (fm) {
+    // "paul's first letter to the corinthians": the ordinal goes before the book
+    const cand = (fm[1] ? ORDINAL[fm[1]] + ' ' : '') + s.slice(fm[0].length);
+    if (bookAt(cand.split(/\s+/))) s = cand;
+  } else if (/^the\s+/.test(s)) {
+    // "the" before a book named in two words or more ("the song of solomon"): the book typed with its article
+    const rest = s.replace(/^the\s+/, '');
+    const b = bookAt(rest.split(/\s+/));
+    if (b && b.n >= 2) s = rest;
+  }
+  // "chapter 3 of john verse 16" -> "john 3:16"
+  const inv = s.match(/^(?:chapter|ch)\s+(\S+)\s+(?:of|in)\s+(?:the\s+book\s+of\s+|the\s+gospel\s+of\s+)?(.+?)(?:\s*,?\s+(?:verses?|v|vs)\s+(.+))?$/);
+  if (inv) {
+    const b = bookAt(inv[2].split(/\s+/));
+    if (b && b.n === inv[2].split(/\s+/).length) s = inv[2] + ' ' + inv[1] + (inv[3] ? ':' + inv[3] : '');
+  }
+  const toks = s.split(/\s+/).filter(Boolean);
+  if (own(ORDINAL, toks[0] || '')) toks[0] = ORDINAL[toks[0]];
+  const b = bookAt(toks);
+  if (!b) return null;
+  // number words after the book, a hyphen between two of them a space ("twenty-three")
+  let rest = toks.slice(b.n).flatMap((t) => (/^[a-z]+-[a-z]+$/.test(t) && t.split('-').every(isNumWord) ? t.split('-') : [t]));
+  if (rest.some(isNumWord)) rest = foldNumberWords(rest);
+  let r = rest.join(' ')
+    .replace(/\b(?:chapter|chap|ch)\.?\s*(?=\d)/g, '')
+    .replace(/(\d)\s*(?:verses|verse|vv|vs|v)\.?\s*(?=\d)/g, '$1:')
+    .replace(/\s*:\s*/g, ':').trim();
+  // a verse list or range in words: the range holding it, when it runs forward
+  const forward = (/** @type {string} */ m, /** @type {string} */ a, /** @type {string} */ z, /** @type {string} */ out) => (+z > +a ? out : m);
+  r = r.replace(/^(\d+)[: ](\d+)\s*(?:-|to|through|thru|and|&)\s*(\d+)$/, (m, c, v, v2) => forward(m, v, v2, `${c}:${v}-${v2}`));
+  r = r.replace(/^(\d+) (\d+) (\d+)$/, (m, c, v, v2) => forward(m, v, v2, `${c}:${v}-${v2}`));
+  r = r.replace(/^(\d+)\s*(?:to|through|thru|and|&)\s*(\d+)$/, (m, c, c2) => forward(m, c, c2, `${c}-${c2}`));
+  const out = (toks.slice(0, b.n).join(' ') + ' ' + r).trim();
+  return out === lower.trim() ? null : out;
+}
+
+/**
+ * A string read whole as a Bible reference (as typed, else in refInWords' shape), held by the index when `facts`
+ * are given; null otherwise.
+ * @param {string} str @param {{corpus?: string}} opts @param {RefFacts|null} facts
  */
 function bibleRef(str, opts, facts) {
-  const r = parseReference(str, opts);
-  return r && r.kind === 'ref-bible' && exists(r, facts) ? r : null;
+  let r = parseReference(str, opts);
+  if (!r || r.kind !== 'ref-bible') {
+    const s = refInWords(String(str).toLowerCase());
+    if (s) r = parseReference(s, opts);
+  }
+  return r && r.kind === 'ref-bible' && (!facts || exists(r, facts)) ? r : null;
+}
+
+/* A question round a whole reference ("what does romans 6 23 say", "the meaning of matthew 24", "what does the bible
+   say about john 3 16"): its frame is no text's words. */
+const Q_HEAD = /^(?:what\s+(?:does|do|is|did)\s+|what'?s\s+|whats\s+|the\s+meaning\s+of\s+|meaning\s+of\s+|explain\s+|read\s+|show\s+me\s+|open\s+|go\s+to\s+|turn\s+to\s+|look\s+up\s+|where\s+is\s+)/;
+const Q_TAIL = /\s+(?:say|says|mean|means|teach|teaches|about|saying)\??$/;
+const Q_BIBLE = /^(?:what\s+(?:does|do)\s+the\s+(?:bible|scriptures?)\s+say\s+(?:in|about|at|of)\s+)/;
+
+/**
+ * parseReference, and the whole references it does not read: in another shape (refInWords), a book in its frame
+ * ("the book of ruth"), a reference inside a question. It needs no index, as parseReference does not.
+ * @param {string} query
+ * @param {{corpus?: string}} [opts]
+ * @returns {any}
+ */
+export function readReference(query, opts) {
+  const base = parseReference(query, opts);
+  if (!base || base.kind !== 'text') return base;
+  const lower = String(query).trim().toLowerCase();
+  const r = bibleRef(lower, opts || {}, null);
+  if (r) return r;
+  const s = refInWords(lower);
+  if (s) { const b = parseReference(s, opts); if (b && b.kind === 'ref-book') return b; }
+  const m = lower.replace(Q_BIBLE, '').replace(Q_HEAD, '').replace(Q_TAIL, '').trim();
+  if (m !== lower) { const q = bibleRef(m, opts || {}, null); if (q) return q; }
+  return base;
 }
 
 /**

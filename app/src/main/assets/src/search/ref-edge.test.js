@@ -82,3 +82,34 @@ describe('a Bible reference at the start or end of the words', () => {
     expect(r.parsed.kind).toBe('text');
   });
 });
+
+describe('a whole reference in a shape the parser did not read', () => {
+  const card = async (/** @type {string} */ q) => (await VotSearchMini.search(q)).parsed;
+  it('numbers in words, a verse list, a range in words', async () => {
+    expect(await card('john three two')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+    expect(await card('john 3 1 2')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 1, verseEnd: 2 });
+    expect(await card('john 3 1 to 3')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 1, verseEnd: 3 });
+    expect(await card('john 1 through 3')).toMatchObject({ kind: 'ref-bible', chapter: 1, chapterEnd: 3 });
+  });
+
+  it('a frame round the book, the chapter first, a version spelled out', async () => {
+    expect(await card('the gospel of john chapter three verse two')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+    expect(await card('chapter 3 of john verse 2')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+    expect(await card('john 3:2 king james version')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+    expect(await card('the book of isaiah')).toMatchObject({ kind: 'ref-book', bookId: 'isaiah' });
+  });
+
+  it('a question round a reference', async () => {
+    expect(await card('what does john 3 2 say')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+    expect(await card('what does the bible say about john 3')).toMatchObject({ kind: 'ref-bible', chapter: 3 });
+  });
+
+  it('beside words, the shape is read at the edge too; words with a number word stay words', async () => {
+    expect(await card('john 3 1 2 a lantern burned beside the quiet harbor')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 1, verseEnd: 2, text: 'a lantern burned beside the quiet harbor' });
+    expect((await card('john the one who sang')).kind).toBe('text');
+  });
+
+  it('the engine\u2019s parse reads them with no index', () => {
+    expect(VotSearchMini.parse('john three two', { corpus: 'all' })).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+  });
+});

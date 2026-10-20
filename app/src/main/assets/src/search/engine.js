@@ -33,7 +33,7 @@ import { searchData } from './search-data.js';
 import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
-import { edgeReading } from './ref-edge.js';
+import { edgeReading, readReference } from './ref-edge.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
@@ -2066,7 +2066,7 @@ async function search(query, options) {
      because "the index was not built" is otherwise satisfied by a search() that
      stopped building for everything. */
   query = expandContractions(query);
-  let parsed = parseReference(query, { corpus });
+  let parsed = readReference(query, { corpus });
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
   // answered by a direct-nav card built in the UI — skip text search entirely.
@@ -3261,7 +3261,7 @@ export const VotSearchMini = {
   startMeaning: startSemantic,
   whenMeaningReady: semanticReady,
   rebuild,
-  parse: parseReference,
+  parse: readReference,
   search,
   suggest,
   snippet,
