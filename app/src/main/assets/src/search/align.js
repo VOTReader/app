@@ -50,6 +50,10 @@ export const ALIGN = Object.freeze({
   WINDOWS: 4, // an anchor the text repeats opens this many windows: the ones holding the most typed weight
 });
 /** @typedef {Record<keyof typeof ALIGN, number>} AlignK  ALIGN's numbers, any of them overridden */
+/* A WORD TYPED FOR TWO, IN ANOTHER FORM (search200 fix1). Two text words spell a typed word (JOIN) when they spell
+   it exactly, or spell its lemma: "the LORD is near to those who have a broken heart" holds "brokenhearted" typed.
+   Only a typed word this long is read so: a short lemma two small words spell is chance. */
+const SPLIT_FORM_MIN = 6;
 
 /* The register table: words a reader trades for each other without noticing. Each line is one
    group, every member a match for every other; a word in two lines meets both, but the two lines
@@ -285,11 +289,15 @@ export function alignClasses(words, opts) {
   for (let i = 1; i < m; i++) { const j = ws[i - 1] + ws[i]; if (!joins.has(j)) joins.set(j, i + 1); }
   /** @type {Map<string, number>} a typed word a text may split in two -> its position (1-based) */
   const splits = new Map();
+  /** @type {Map<string, number>} ...and the lemma of one of SPLIT_FORM_MIN letters or more ("stout heart": stouthearted) */
+  const splitForms = new Map();
   /** @type {Set<string>} the first halves those splits can start with */
   const heads = new Set();
   for (let i = 0; i < m; i++) {
     if (ws[i].length < 2) continue;
     if (!splits.has(ws[i])) splits.set(ws[i], i + 1);
+    const lw = ws[i].length >= SPLIT_FORM_MIN ? lemma(ws[i]) : '';
+    if (lw.length >= SPLIT_FORM_MIN && !splitForms.has(lw)) splitForms.set(lw, i + 1);
     for (let l = 1; l < ws[i].length; l++) heads.add(ws[i].slice(0, l));
   }
 
@@ -345,7 +353,9 @@ export function alignClasses(words, opts) {
     splitAt(a, b) {
       const x = toWord(a);
       const y = toWord(b);
-      return x && y ? splits.get(x + y) || 0 : 0;
+      if (!x || !y) return 0;
+      const xy = x + y;
+      return splits.get(xy) || (xy.length >= SPLIT_FORM_MIN ? splitForms.get(lemma(xy)) || 0 : 0);
     },
   };
 }
