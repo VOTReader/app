@@ -39,8 +39,9 @@
    passes (rules.mjs pairHolds). Titles score at unit level (a study chapter by its chapter title alone, rules.mjs
    titleForms); an Answers section heading at sentence level. SEARCH_BENCH_CASES replaces tri/cases.json and skips fresh.
 
-   HUNT (search200 fix1, 2026-10-19): the fault hunt's 850 queries in 11 families (D:/Swarm/lanes/search200/out/hunt), all
-   open, each with the hunt's verdict (confirmed / disputed by its two judges, or pass); the 14 both judges rejected are out.
+   HUNT (search200 fix1, 2026-10-19): the fault hunt's 850 queries in 11 families (D:/Swarm/lanes/search200/out/hunt) and
+   the ship1 red team's 174 in 3 more (rt1-rules, rt1-shapes, rt1-editions; out/ship1, 2026-10-20), all open, each with
+   its hunt's verdict (confirmed / disputed by its two judges, or pass); the 16 both judges rejected are out.
      node tools/search-bench.mjs --set hunt [--json out] [--record]   hunt/cases.json; floor hunt/baseline.json
    The pass rule above, per case: a scoped case runs once per search in its `modes` (unscoped, a corpus, a book or volume
    chip), the class cut to what each scope shows, and passes when every run does; a text in its `alt` passes as the target.
