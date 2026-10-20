@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { docs as buildDocs, blocks as buildBlocks, kjvVerses, unitKey, norm, sentences } from './corpus.mjs';
+import { isHeading, isNavigation } from './rules.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const seedArg = process.argv.indexOf('--seed');
@@ -76,7 +77,7 @@ const add = (t) => { targets.push({ id: 't' + String(targets.length + 1).padStar
 function sentenceTarget(pool, { minBlockWords = 10, maxUnits = 3, middle = false, only = false } = {}) {
   for (let tries = 0; tries < 4000; tries++) {
     const b = pick(pool);
-    if (words(b.text) < minBlockWords) continue;
+    if (words(b.text) < minBlockWords || isHeading(b.text) || isNavigation(b.text)) continue; // prose only (rules.mjs)
     let ss = sentences(b.text).filter((s) => { const w = words(s.text); return w >= 8 && w <= 40 && !APPARATUS.test(s.text); });
     if (middle) ss = ss.filter((s) => s.start > b.text.length * 0.3 && s.end < b.text.length * 0.8);
     if (!ss.length) continue;
@@ -232,13 +233,16 @@ for (const t of targets) t.held = held.has(t.id);
 // --replace <targets.json>: keep that file's targets and swap out the invalid ones (an apparatus line), each
 // for the first target of this run with the same group, collection, style and variant not already in it. The
 // kept targets keep their ids, queries and held-out flags (2026-10-05: 26 apparatus targets, --seed 20261006).
+// --ids <id,...> swaps those targets instead, ones a review retired (2026-10-19), and records the seed under redrawn.
 const repArg = process.argv.indexOf('--replace');
 if (repArg > 0) {
   const old = JSON.parse(fs.readFileSync(process.argv[repArg + 1], 'utf8'));
   const have = new Set(old.targets.map((t) => t.uk + '#' + (t.sentence || '')));
+  const idsArg = process.argv.indexOf('--ids');
+  const redraw = idsArg > 0 ? new Set(process.argv[idsArg + 1].split(',')) : null;
   const replaced = [];
   for (const t of old.targets) {
-    if (!(t.sentence && APPARATUS.test(t.sentence))) continue;
+    if (redraw ? !redraw.has(t.id) : !(t.sentence && APPARATUS.test(t.sentence))) continue;
     const fresh = (n) => n.group === t.group && n.col === t.col && (n.variant || null) === (t.variant || null) && !have.has(n.uk + '#' + (n.sentence || ''));
     // Same style first; else any sentence target of the collection, given the old one's style.
     let i = targets.findIndex((n) => fresh(n) && n.style === t.style);
@@ -250,7 +254,9 @@ if (repArg > 0) {
     Object.assign(t, { ...n, id: t.id, held: t.held, replaced: true });
     replaced.push(t.id);
   }
-  old.replacedSeed = seedArg > 0 ? Number(process.argv[seedArg + 1]) : 20261005;
+  const runSeed = seedArg > 0 ? Number(process.argv[seedArg + 1]) : 20261005;
+  if (redraw) (old.redrawn || (old.redrawn = [])).push({ seed: runSeed, ids: replaced });
+  else old.replacedSeed = runSeed;
   fs.writeFileSync(path.join(HERE, 'targets.json'), JSON.stringify(old, null, 1));
   console.log('replaced', replaced.length, replaced.join(' '));
   process.exit(0);

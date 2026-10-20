@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { heldShare, recurring, reprintShown, nearCopy, nearQuote, namesCollection, titleForms, rangeHolds, pairHolds, parallelHolds, namesVerse } from './rules.mjs';
+import { heldShare, recurring, reprintShown, nearCopy, nearQuote, namesCollection, titleForms, rangeHolds, pairHolds, parallelHolds, namesVerse, isHeading, isNavigation } from './rules.mjs';
 
 const w = (s) => s.split(' ');
 const entry = w('do not fear the days ahead for i am with you and i will keep you through the fire and the flood says the lord');
@@ -192,5 +192,39 @@ describe('parallelHolds (errata 2026-10-19, t043 of the 500: a verse holding a v
     expect(namesVerse(n('ask the keeper of the vineyard to send more hands'), 'Hosea 14:3')).toBe(false);
     expect(namesVerse(n('the keeper sent 14 hands'), 'Hosea 14:3')).toBe(false);
     expect(namesVerse(n('the keeper of the vineyard'), undefined)).toBe(false);
+  });
+});
+
+describe('isHeading (errata 2026-10-19, t401 of the 500: a sentence target must be prose)', () => {
+  it('a short block with no sentence end is a heading', () => {
+    expect(isHeading('Leave the Houses of Stone - Part Three')).toBe(true);
+    expect(isHeading('The Second Gate')).toBe(true);
+  });
+  it('a sentence, however short, is prose', () => {
+    expect(isHeading('Leave the houses of stone.')).toBe(false);
+    expect(isHeading('Who among you has heard My voice?')).toBe(false);
+  });
+  it('a long block without a full stop is prose too', () => {
+    expect(isHeading('and the gates were opened wide and the people came in from every road and every field to the feast')).toBe(false);
+  });
+});
+
+describe('isNavigation (errata 2026-10-19, t401 of the 500 redrawn: the site’s links and notes are not prose)', () => {
+  it('a link list, a study link, a footnote, a note, a see-also line or a download link', () => {
+    expect(isNavigation('• Also read: "The Second Gate"; "The Lamp Under the Bushel"')).toBe(true);
+    expect(isNavigation('• ↑ “Lamps” here means the watchmen of the city.')).toBe(true);
+    expect(isNavigation('[2]↑ Compare the second gate [*the old word for gate is a door of the sheep]')).toBe(true);
+    expect(isNavigation('📖 The Second Gate (a study of the watchmen)')).toBe(true);
+    expect(isNavigation('*NOTE: The file can take a while to open on a slow line. Thank you.')).toBe(true);
+    expect(isNavigation('- See: The Second Gate and The Lamp Under the Bushel')).toBe(true);
+    expect(isNavigation('Excerpt from: The Second Gate')).toBe(true);
+    expect(isNavigation('Free PDF of the whole study, here > The Second Gate')).toBe(true);
+  });
+  it('the words themselves are prose, a bullet or a star inside them included', () => {
+    expect(isNavigation('Behold, the second gate is opened, and the watchmen shall see it.')).toBe(false);
+    expect(isNavigation('I see the lamp under the bushel • and I shall lift it up.')).toBe(false);
+    expect(isNavigation('Seek and you shall see the second gate opened.')).toBe(false);
+    expect(isNavigation('See, I have opened the second gate before you.')).toBe(false);
+    expect(isNavigation('• The watchmen opened the second gate. • They lit the lamp under the bushel.')).toBe(false);
   });
 });

@@ -141,6 +141,21 @@ export function nearQuote(/** @type {string[]} */ s, /** @type {string[]} */ v, 
   return false;
 }
 
+/** A heading, not prose (errata 2026-10-19, t401 "Come Out of the Churches of Men - Section Two"): a block of 12 words or
+    fewer with no sentence end. A paraphrase of a heading fits the text it heads, or another text's title, as well, so
+    make-targets.mjs never draws a sentence target from one. */
+export const isHeading = (/** @type {string} */ text) => (String(text).match(/\S+/g) || []).length <= 12 && !/[.!?…]/.test(text);
+
+/** The site's own links and notes, not prose either (errata 2026-10-19, t401's redraw drew "FREE PDF download available,
+    here > ..." and then "• ↑ “Women” in this context refers to the churches of men."): a block opening with a footnote
+    arrow, the study-link book, a see-also, a note or an excerpt label, a bulleted link (no sentence end), or naming a
+    PDF. A bulleted list of sentences is prose (a study's own summary). */
+export function isNavigation(/** @type {string} */ text) {
+  const t = String(text);
+  return /^\s*(?:•\s*)?(?:\[\d+\])?↑|^\s*📖|^\s*(?:•\s*)?-?\s*(?:also see\b|see\s*:)|^\s*\*\s*note\b|^\s*excerpt from\s*:|\bpdf\b/iu.test(t)
+    || (/^\s*•/u.test(t) && !/[.!?…]/.test(t));
+}
+
 /** PARALLEL: does verse text `other` hold verse target `verse` whole? Both normalized with their padding spaces. */
 export const PARALLEL_MIN_WORDS = 8;
 export const parallelHolds = (/** @type {string} */ verse, /** @type {string} */ other) =>
