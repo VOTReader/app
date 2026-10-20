@@ -37,7 +37,7 @@ import { edgeReading, readReference } from './ref-edge.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
-import { kjvEncode, kjvEncodeAt, negationOf } from './tokenize.js';
+import { kjvEncode, kjvEncodeAt, negationOf, PRONOUN_BARE, PRONOUN_PIECE } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
@@ -162,10 +162,18 @@ const notWords = (base) => {
   const b = base.toLowerCase();
   return negationOf(b) === b + ' not' ? base + ' not' : negationOf(b);
 };
+/* A pronoun contraction, bare or written, is spelled out as the reader means it ("youre", "you're" -> "you
+   are"; "im", "I'm" -> "i am"; search200 fix1): typed bare it stayed one typed word, which no text holds
+   whole, so a search for its words counted it once and the typo fixer still had it. kjvEncode reads a text's
+   own the same way (PRONOUN_BARE, PRONOUN_PIECE). A negative one typed bare stays as typed (above). */
+const PRONOUN_WRITTEN = Object.keys(PRONOUN_PIECE).map((piece) => /** @type {[RegExp, string]} */ ([
+  new RegExp('\\b(' + PRONOUN_PIECE[piece][0].join('|') + ")['\\u2019]" + piece + '\\b', 'gi'), ' ' + PRONOUN_PIECE[piece][1]]));
+const PRONOUN_TYPED_BARE = new RegExp('\\b(' + Object.keys(PRONOUN_BARE).join('|') + ')\\b', 'gi');
 /** @param {string} q */
 export function expandContractions(q) {
-  return String(q)
-    .replace(/\b([a-z]+)n['\u2019]t\b/gi, (m, base) => notWords(base));
+  let s = String(q).replace(/\b([a-z]+)n['\u2019]t\b/gi, (m, base) => notWords(base));
+  for (const [re, word] of PRONOUN_WRITTEN) s = s.replace(re, (m, p) => p + word);
+  return s.replace(PRONOUN_TYPED_BARE, (m) => PRONOUN_BARE[m.toLowerCase()]);
 }
 
 /**

@@ -104,7 +104,26 @@ const NT_BASES = NT_BARE_BASES.concat(['wo', 'might', 'ought', 'dare']);
 export function negationOf(base) {
   return base === 'ca' ? 'cannot' : (NT_BASE[base] || base) + ' not';
 }
-/** @typedef {{to: string, split?: string[], tens?: boolean, unit?: string, nt?: boolean, thousands?: boolean}} Fold */
+
+/* A PRONOUN CONTRACTION IS ITS TWO WORDS TOO (search200 fix1). "youre the light of the world" met no
+   text: "youre" is no index term, so the typo fixer made it "your" ("theyre" became "there"), and a text's
+   own "you’re" indexed as "you" + "re", which "you are" never met. Both sides now read one as the reader
+   means it: typed bare it is its two words, and the piece a written one leaves after its pronoun is its
+   word ("you" + "re" is you are). A bare form that is a word of its own is none: "were", "well", "ill",
+   "hell", "shell", "wed", "id", "its", "lets". The engine spells a typed one out (expandContractions). */
+/** A pronoun contraction typed without its apostrophe → its words. */
+export const PRONOUN_BARE = Object.assign(Object.create(null), {
+  youre: 'you are', theyre: 'they are', youve: 'you have', weve: 'we have', theyve: 'they have',
+  ive: 'i have', im: 'i am', youll: 'you will', theyll: 'they will', itll: 'it will',
+});
+/** The piece a written pronoun contraction leaves → [the words it follows, the word it stands for]. */
+export const PRONOUN_PIECE = Object.assign(Object.create(null), {
+  re: [['you', 'we', 'they', 'who', 'what'], 'are'],
+  ve: [['i', 'you', 'we', 'they', 'who', 'would', 'could', 'should', 'might', 'must'], 'have'],
+  ll: [['i', 'you', 'he', 'she', 'it', 'we', 'they', 'that', 'there', 'who', 'what'], 'will'],
+  m: [['i'], 'am'],
+});
+/** @typedef {{to: string, split?: string[], tens?: boolean, unit?: string, nt?: boolean, thousands?: boolean, after?: Object<string,string>}} Fold */
 /**
  * Every token kjvEncode folds, in one table so a plain word costs one lookup (the folds work
  * token by token, never as a scan of the string: a scan of every text for "n't" and " 000"
@@ -125,6 +144,11 @@ const FOLD = (function () {
     m[UNIT_ORDINALS[i]].unit = ordinal(i + 1);
   }
   for (const b of NT_BARE_BASES) m[b + 'nt'] = { to: b + 'nt', split: negationOf(b).split(' ') };
+  for (const w in PRONOUN_BARE) m[w] = { to: w, split: PRONOUN_BARE[w].split(' ') };
+  for (const piece in PRONOUN_PIECE) {
+    const [before, word] = PRONOUN_PIECE[piece];
+    m[piece] = { to: piece, after: Object.assign(Object.create(null), ...before.map((p) => ({ [p]: word }))) };
+  }
   m.t = { to: 't', nt: true };
   m['000'] = { to: '000', thousands: true };
   return m;
@@ -199,6 +223,11 @@ function foldTokens(tokens, out, starts, outStarts) {
         if (w.length > 1) { out.push(w[1]); if (outStarts) outStarts.push(outStarts[outStarts.length - 1]); }
         continue;
       }
+    }
+    if (f.after && out.length) {
+      // the piece a written pronoun contraction leaves after its pronoun: "you" + "re" is you, are
+      const w = f.after[out[out.length - 1]];
+      if (w) { out.push(w); if (outStarts) outStarts.push(/** @type {number[]} */ (starts)[i]); continue; }
     }
     if (f.thousands && out.length && /^\d+$/.test(out[out.length - 1])) { out[out.length - 1] += '000'; continue; }
     if (f.split) {
