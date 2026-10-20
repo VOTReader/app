@@ -19,6 +19,13 @@
                 answers only god can give") asks for that collection's own text: the target's own unit may lead though a
                 better-tier text holds the same words (the original-first and reprint-shown checks yield). A name counts
                 only where the query holds it and the target's title and sentence do not.
+   PARALLEL     (errata 2026-10-19, the 500's t043 Matthew 9:38, b500 review: both its judges call Luke 10:2 a fair
+                answer, "says the same thing almost word for word" and "a parallel the rules could accept") another verse holding a
+                verse target's whole text word for word says the same sentence (Luke 10:2 holds "therefore pray the Lord
+                of the harvest to send out laborers into His harvest"): it answers the verse as a near member, as a near
+                copy does, and the target stays the original. A verse of fewer than 8 words is a formula with no one
+                parallel; a two-verse target is the pair, which no one verse says (counter-case cB07); a query naming
+                the verse (its book, or its chapter and verse: the hunt's refwords family) asks for that verse alone.
    ─────────────────────────────────────────────────────────────────── */
 
 const gram = (w, i) => w[i] + ' ' + w[i + 1] + ' ' + w[i + 2];
@@ -132,6 +139,20 @@ export function nearQuote(/** @type {string[]} */ s, /** @type {string[]} */ v, 
     for (const x of anchors) if (nearCopy(a, b, stop, x)) return true;
   }
   return false;
+}
+
+/** PARALLEL: does verse text `other` hold verse target `verse` whole? Both normalized with their padding spaces. */
+export const PARALLEL_MIN_WORDS = 8;
+export const parallelHolds = (/** @type {string} */ verse, /** @type {string} */ other) =>
+  verse.trim().split(' ').length >= PARALLEL_MIN_WORDS && other.includes(verse);
+
+/** PARALLEL yields to a query naming the verse ("isaiah 38 1 set your house in order"): it holds the verse's book (a
+    psalm for Psalms) or its chapter and verse numbers. `q` normalized with its padding spaces; `ref` as "Isaiah 38:1". */
+export function namesVerse(/** @type {string} */ q, /** @type {string | undefined} */ ref) {
+  const m = /^(.+?)\s+(\d+):(\d+)/.exec(String(ref || ''));
+  if (!m) return false;
+  const book = m[1].toLowerCase();
+  return [book, book === 'psalms' ? 'psalm' : '', m[2] + ' ' + m[3]].some((p) => p && q.includes(' ' + p + ' '));
 }
 
 /** NAMED COLLECTION: the names a reader types for each collection (normalized, as corpus.mjs norm). */

@@ -6,7 +6,7 @@
    its chapter title alone (rules.mjs titleForms), so a title target links it by its short title.
    ─────────────────────────────────────────────────────────────────── */
 import { unitKey, norm } from './corpus.mjs';
-import { heldShare, recurring, nearCopy, nearQuote, titleForms } from './rules.mjs';
+import { heldShare, recurring, nearCopy, nearQuote, titleForms, parallelHolds, namesVerse } from './rules.mjs';
 
 /**
  * @param {{ D: any[], B: any[], KJV: any }} corpus  buildDocs('nkjv'), blocks(), kjvVerses()
@@ -72,6 +72,18 @@ export function makeClasses({ D, B, KJV }) {
     const shared = sharedGrams(w);
     for (const [i, k] of shared) if (k >= 4 && (heldShare(w, verseWords[i]) >= 0.8 || heldShare(verseWords[i], w) >= 0.8)) out.add(verseNorm[i][0]);
     return [...out];
+  };
+  /** PARALLEL (rules.mjs, errata 2026-10-19): the other verses holding verse `uk`'s whole text (Luke 10:2 for Matthew
+      9:38), looked for among the verses holding its first 3-gram. */
+  const parallels = (uk) => {
+    const own = matthewTwin(uk);
+    const d = own.map((k) => unitDoc[k]).find(Boolean) || unitDoc[uk];
+    if (!d) return [];
+    const n = norm(d.text);
+    const w = n.trim().split(' ');
+    const at = w.length >= 3 ? verseGrams.get(w[0] + ' ' + w[1] + ' ' + w[2]) || [] : [];
+    return [...new Set(at.filter((i) => parallelHolds(n, verseNorm[i][1])).map((i) => verseNorm[i][0]))]
+      .filter((k) => !matthewTwin(k).some((t) => own.includes(t) || t === uk));
   };
   // A unit's title, and a study chapter's chapter title alone (rules.mjs titleForms).
   const titleNorm = {};
@@ -156,6 +168,9 @@ export function makeClasses({ D, B, KJV }) {
       for (const k of matthewTwin(c.uk)) members.add(k);
       // a merged Bible misquote (tri bench): two adjacent verses, either of them answers (rules.mjs pairHolds)
       if (c.uk2) for (const k of matthewTwin(c.uk2)) members.add(k);
+      // ...one verse: a verse holding it whole says it too, as a near member (rules.mjs PARALLEL); a pair has none,
+      // and a query naming the verse asks for it alone
+      else if (!namesVerse(norm(c.q || ''), c.ref)) for (const k of parallels(c.uk)) for (const t of matthewTwin(k)) if (!members.has(t)) { members.add(t); near.add(t); }
       return { members, titled, sectioned, near, best: 0, recurring: false };
     }
     if (c.level === 'unit') {

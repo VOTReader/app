@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { heldShare, recurring, reprintShown, nearCopy, nearQuote, namesCollection, titleForms, rangeHolds, pairHolds } from './rules.mjs';
+import { heldShare, recurring, reprintShown, nearCopy, nearQuote, namesCollection, titleForms, rangeHolds, pairHolds, parallelHolds, namesVerse } from './rules.mjs';
 
 const w = (s) => s.split(' ');
 const entry = w('do not fear the days ahead for i am with you and i will keep you through the fire and the flood says the lord');
@@ -163,5 +163,34 @@ describe('namesCollection (errata 2026-10-18, n344: a query naming the target co
   it('a name the title or the quoted sentence holds itself names nothing', () => {
     expect(namesCollection(n('the blessed hope'), n('the blessed hope'), 'blessed')).toBe(false);
     expect(namesCollection(n('i am the answers you seek'), n('i am the answers you seek'), 'answers')).toBe(false);
+  });
+});
+
+describe('parallelHolds (errata 2026-10-19, t043 of the 500: a verse holding a verse target whole says it too)', () => {
+  const n = (s) => ' ' + s + ' ';
+  const target = n('so ask the keeper of the vineyard to send more hands into his vineyard');
+  it('a longer parallel that holds the whole verse word for word', () => {
+    expect(parallelHolds(target, n('and he said the vineyard is wide but the hands are few so ask the keeper of the vineyard to send more hands into his vineyard'))).toBe(true);
+  });
+  it('the same verse repeated elsewhere', () => {
+    expect(parallelHolds(target, target)).toBe(true);
+  });
+  it('a verse holding only part of it, or its words in another order, is no parallel', () => {
+    expect(parallelHolds(target, n('ask the keeper of the vineyard and he will answer you'))).toBe(false);
+    expect(parallelHolds(target, n('send more hands into his vineyard so ask the keeper of the vineyard'))).toBe(false);
+  });
+  it('a short formula has no parallel: too many verses hold it', () => {
+    expect(parallelHolds(n('i am the keeper of the vineyard'), n('thus says he i am the keeper of the vineyard'))).toBe(false);
+  });
+  it('a query naming the verse asks for it, not its words: its book, a psalm, or its chapter and verse', () => {
+    expect(namesVerse(n('hosea 14 3 ask the keeper of the vineyard'), 'Hosea 14:3')).toBe(true);
+    expect(namesVerse(n('psalm 150 2 send more hands'), 'Psalms 150:2')).toBe(true);
+    expect(namesVerse(n('the keeper of the vineyard 14 3'), 'Hosea 14:3')).toBe(true);
+    expect(namesVerse(n('1 samuel ask the keeper'), '1 Samuel 30:2')).toBe(true);
+  });
+  it('words alone, or another number, name no verse', () => {
+    expect(namesVerse(n('ask the keeper of the vineyard to send more hands'), 'Hosea 14:3')).toBe(false);
+    expect(namesVerse(n('the keeper sent 14 hands'), 'Hosea 14:3')).toBe(false);
+    expect(namesVerse(n('the keeper of the vineyard'), undefined)).toBe(false);
   });
 });
