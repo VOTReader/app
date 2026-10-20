@@ -1,6 +1,6 @@
 {
  "pass": 473,
- "strict": 362,
+ "strict": 364,
  "top5": 489,
  "found": 499,
  "style": {
@@ -24,5 +24,5 @@
   "studies": 37,
   "words": 77
  },
- "fresh": 72
+ "fresh": 77
 }
