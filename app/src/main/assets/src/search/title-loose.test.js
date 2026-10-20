@@ -21,6 +21,9 @@ const GLOBALS = {
     { id: 'woven', num: 1, title: 'Woven to Endure', blocks: seg(filler(2) + 'What I make in you shall stand through every storm. ' + filler(2)) },
     // texts holding both typed content words close together, in the other order, again and again (and one in the title)
     ...[2, 3, 4].map((num) => ({ id: 'cloth-' + num, num, title: 'Spun Cloth ' + num, blocks: seg(('All that was made to endure was spun with care in the evening. ' + filler(1)).repeat(3)) })),
+    // a text holding a typed run word for word in its body, and a title holding part of it ("The Dawn of ...")
+    { id: 'morning-light', num: 5, title: 'Morning Light', blocks: seg(filler(3) + 'Watch, for the dawn of mercy is coming upon the earth. ' + filler(3)) },
+    { id: 'dawn-glory', num: 6, title: 'The Dawn of Glory', blocks: seg(filler(1) + 'The night is far spent; the dawn is near. ' + filler(1)) },
     // texts holding none of the typed content words, so the small words weigh as little as they do in the volumes
     ...Array.from({ length: 12 }, (_, k) => ({ id: 'words-' + k, num: 10 + k, title: 'Words ' + k, blocks: seg(filler(2)) })),
   ],
@@ -44,5 +47,11 @@ describe('a title remembered loosely, against the texts holding its words', () =
     // "endure was spun" is another sentence, not "spun to endure" with a word dropped: the title one word off leads
     const top = ids(await E.search('spun to endure'));
     expect(top[0]).toBe('woven');
+  });
+
+  it('a title holding part of the typed run is lifted no higher than the text holding the run word for word', async () => {
+    // "The Dawn of Glory" holds three of the four typed words in order; "the dawn of mercy" is a line of another text
+    const top = ids(await E.search('the dawn of mercy'));
+    expect(top.slice(0, 2)).toEqual(['morning-light', 'dawn-glory']);
   });
 });

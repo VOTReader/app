@@ -724,6 +724,8 @@ function holdsTogether(words, width, mine) {
 }
 /** Typed tokens from which a text holding them all in a row leads every text that does not. */
 const RUN_LEAD_MIN = 3;
+/** A part of a title typed lifts its text to this share of the first text holding the typed run, at most. */
+const PART_UNDER_RUN = 0.99;
 /** The first texts that open on the typed run they hold (their placeStart). */
 const RUN_LAND_REACH = 10;
 /**
@@ -2446,6 +2448,8 @@ async function search(query, options) {
      corrected typo (the run is the engine's guess), nor over a verse a study holds the run of: a study quotes
      Scripture in the KJV or with His name restored, and the verse is its original (DECISIONS 10-14). */
   const heldWhole = Object.keys(runAt);
+  /** The first holder's score, lifted or not: the title lift below lifts a part of a title typed no higher. */
+  let heldTop = 0;
   if (!p.phrase && !corrections.length && typedTokens.length >= RUN_LEAD_MIN && heldWhole.length) {
     let topHeld = 0;
     let topOther = 0;
@@ -2460,6 +2464,7 @@ async function search(query, options) {
       const f = (topOther / topHeld) * 1.05;
       for (const id of heldWhole) if (scoreMap[id] !== undefined) scoreMap[id] *= f;
     }
+    for (const id of heldWhole) if (scoreMap[id] > heldTop) heldTop = scoreMap[id];
   }
   // A quoted phrase: every text shown holds it (the filter below), so the original first.
   if (p.phrase) {
@@ -2474,14 +2479,22 @@ async function search(query, options) {
     const all = titleMatch(t.all, typedTokens, STOP);
     return t.own ? Math.max(all, titleMatch(t.own, typedTokens, STOP)) : all;
   };
-  // A title typed whole, or a run of it, ranks its unit up (ranking.js titleMatch).
+  /* A title typed whole, or a run of it, ranks its unit up (ranking.js titleMatch). A part of a title typed (less
+     than TITLE_EXACT_BOOST) on a text not holding the typed run is lifted no higher than just under the first text
+     that holds it word for word (B3, above), and never lower than its words put it (search200 fix1): "the X of Y"
+     took "The X of Z" x1.98 past the verse saying it, undoing B3, and B5's rule that a quote found keeps above a
+     title remembered loosely came too late to act. */
   if (typedTokens.length) {
     for (let i = 0; i < rankedIds.length; i++) {
       if (spent()) { const r = await pause(); if (r) return r; }
-      const d = docLookup[rankedIds[i]];
+      const id = rankedIds[i];
+      const d = docLookup[id];
       if (!d || !d.title || d.kind === 'verse') continue;
       const tm = titleScore(d);
-      if (tm > 1) scoreMap[rankedIds[i]] *= tm;
+      if (tm <= 1) continue;
+      const lifted = scoreMap[id] * tm;
+      const under = heldTop > 0 && tm < TITLE_EXACT_BOOST && !(id in runAt) && lifted >= heldTop;
+      scoreMap[id] = under ? Math.max(scoreMap[id], heldTop * PART_UNDER_RUN) : lifted;
     }
   }
   // Synonym-only demotion.
