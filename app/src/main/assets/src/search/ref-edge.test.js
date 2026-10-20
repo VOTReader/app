@@ -22,13 +22,14 @@ const GLOBALS = {
         'A lantern burned beside the quiet harbor at dusk.',
         'The keeper of the harbor sang over the gray water.',
         'And the gulls rested upon the long stone wall.',
+        'Whoever watches the harbor keeps the lantern lit.',
       ]) },
     ] },
     isaiah: { id: 'isaiah', title: 'Isaiah', chapters: [{ num: 3, sections: verses(['The keeper of the harbor sang a new song.']) }] },
   },
   LETTERS_V1: [
     // a letter printing the verse with its reference, and a name the Bible never uses
-    { id: 'harbor', num: 1, title: 'Songs at the Harbor', blocks: [{ segments: [{ v: 'It is written in John 3:2, the keeper of the harbor sang over the gray water. So Yahushua keeps the harbor, and the keeper sang.' }] }] },
+    { id: 'harbor', num: 1, title: 'Songs at the Harbor', blocks: [{ segments: [{ v: 'It is written in John 3:2, the keeper of the harbor sang over the gray water. So Yahushua keeps the harbor, and the keeper sang. Whosoever watcheth the harbor shall see the lantern.' }] }] },
   ],
 };
 
@@ -71,6 +72,11 @@ describe('a Bible reference at the start or end of the words', () => {
     expect((await VotSearchMini.search('john 3 2 yahushua keeps the harbor')).parsed.kind).toBe('text');
     expect((await VotSearchMini.search('john 7 2 the keeper of the harbor sang')).parsed.kind).toBe('text');
     expect((await VotSearchMini.search('is 3 the keeper of the harbor sang')).parsed.kind).toBe('text');
+  });
+
+  it('the KJV’s form of a word the Bible holds is the Bible’s word, not an outside one', async () => {
+    const r = await VotSearchMini.search('john 3 4 whosoever watcheth the harbor');
+    expect(r.parsed).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 4, text: 'whosoever watcheth the harbor' });
   });
 
   it('a small word before the reference is prose citing it: the words stay words', async () => {

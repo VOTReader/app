@@ -266,12 +266,15 @@ function refFacts() {
     }
     return false;
   };
+  // the KJV's form of a word the Bible holds is the Bible's ("believeth" believes, "whosoever" whoever): a KJV
+  // paste beside its reference ("... whosoever believeth in him ... john 3 16 kjv") is the verse's own words
+  const kjvForm = (/** @type {string} */ w) => modernForm(w) || (/^(?:wh[a-z]*|how)soever$/.test(w) ? w.replace('soever', 'ever') : null);
   return {
     hasVerse: (book, c, v) => verses.has(book + ':' + c + ':' + v),
     textsHold: termExists,
     bibleHolds: (w) => {
       let held = bible.get(w);
-      if (held === undefined) { held = inVerses(w); bible.set(w, held); }
+      if (held === undefined) { const f = kjvForm(w); held = inVerses(w) || (!!f && inVerses(f)); bible.set(w, held); }
       return held;
     },
   };
