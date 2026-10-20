@@ -282,6 +282,12 @@ function refFacts() {
   // the KJV's form of a word the Bible holds is the Bible's ("believeth" believes, "whosoever" whoever): a KJV
   // paste beside its reference ("... whosoever believeth in him ... john 3 16 kjv") is the verse's own words
   const kjvForm = (/** @type {string} */ w) => modernForm(w) || (/^(?:wh[a-z]*|how)soever$/.test(w) ? w.replace('soever', 'ever') : null);
+  /** A verse's words, by its doc id. @param {string} id */
+  const wordsOf = (id) => {
+    let t = words.get(id);
+    if (!t) { const f = msIndex.getStoredFields(id); t = kjvEncode(String((f && f.text) || '')); words.set(id, t); }
+    return t;
+  };
   return {
     hasVerse: (book, c, v) => verses.has(book + ':' + c + ':' + v),
     textsHold: termExists,
@@ -292,10 +298,35 @@ function refFacts() {
     },
     verseWords: (book, c, v) => {
       const id = verses.get(book + ':' + c + ':' + v);
-      if (!id) return null;
-      let t = words.get(id);
-      if (!t) { const f = msIndex.getStoredFields(id); t = kjvEncode(String((f && f.text) || '')); words.set(id, t); }
-      return t;
+      return id ? wordsOf(id) : null;
+    },
+    // only the verses holding the run's rarest word can hold the run
+    bibleHoldsRun: (run) => {
+      const idx = msIndex._index;
+      if (!run.length || !idx) return false;
+      let fewest = null;
+      let least = Infinity;
+      for (const w of run) {
+        const data = idx.get(w);
+        if (!data) return false;
+        let n = 0;
+        for (const docs of data.values()) n += docs.size;
+        if (n < least) { least = n; fewest = data; }
+      }
+      const ids = msIndex._documentIds;
+      for (const docs of fewest.values()) {
+        for (const sid of docs.keys()) {
+          const f = msIndex._storedFields.get(sid);
+          if (f && f.kind === 'verse' && f.volumeId === 'bible' && hasTokenRun(wordsOf(ids.get(sid)), run)) return true;
+        }
+      }
+      return false;
+    },
+    // a unit's or a study chapter's whole title, not a part of one nor a heading inside a text (titles.js)
+    namesTitle: (query) => {
+      const ix = titlesNow();
+      const at = ix && ix.byNorm.get(titleWords(query).join(' '));
+      return !!at && at.some((/** @type {number} */ i) => ix.entries[i].kind === 'unit' || ix.entries[i].kind === 'chapter');
     },
   };
 }

@@ -24,8 +24,9 @@ import { kjvEncode } from './tokenize.js';
 
 /**
  * What a reading is checked against: the index in use (engine.js refFacts). verseWords is a verse's words
- * (kjvEncode), null when the index has no such verse.
- * @typedef {{ hasVerse: (book: string, chapter: number, verse: number) => boolean, bibleHolds: (word: string) => boolean, textsHold: (word: string) => boolean, verseWords: (book: string, chapter: number, verse: number) => string[]|null }} RefFacts
+ * (kjvEncode), null when the index has no such verse; bibleHoldsRun says a verse of the Bible holds the words
+ * (kjvEncode) in a row; namesTitle says the whole query is a text's whole title.
+ * @typedef {{ hasVerse: (book: string, chapter: number, verse: number) => boolean, bibleHolds: (word: string) => boolean, textsHold: (word: string) => boolean, verseWords: (book: string, chapter: number, verse: number) => string[]|null, bibleHoldsRun: (run: string[]) => boolean, namesTitle: (query: string) => boolean }} RefFacts
  */
 
 /** The longest reference read at an edge, in typed tokens. */
@@ -250,6 +251,17 @@ const PARALLELS = [
 ];
 /** The small words a passage's rest is trimmed of, and that do not count among its words. */
 const SMALL = new Set(['the', 'a', 'an', 'of', 'on', 'in', 'to', 'and', 'from', 'according', 'as', 'is', 'are', 'was', 'about', 'with', 'for', 'by', 'that', 'this']);
+/** Words (kjvEncode) enough to be a saying a verse holds: three or more, its small words aside. @param {string[]} run */
+const saying = (run) => run.filter((w) => !SMALL.has(w)).length >= 3;
+/* WORDS ANOTHER VERSE HOLDS ARE THAT VERSE'S (the settle, the red team's rt1-shapes). "john 3 17 for god
+   so loved the world", "psalm 23 4 the lord is my shepherd i shall not want": the reader quoted a verse and typed its
+   neighbour's number, and the card of the verse typed led the verse quoted. A saying a verse of the Bible holds in a
+   row, and none of the reading's verses does, makes no card: the whole query is searched as words. */
+/**
+ * Words a verse of the Bible holds in a row, and no verse of the reading does: that verse's words, not the reading's.
+ * @param {any} r @param {string[]} run @param {RefFacts} facts
+ */
+const heldElsewhere = (r, run, facts) => saying(run) && !holdsRun(r, run, facts) && facts.bibleHoldsRun(run);
 /** A verse typed inside the passage: the edge reading reads it, its rest no outside word's to refuse. */
 const DEFER = { defer: true };
 /** @type {WeakMap<object, Map<string, any>>} each passage list's names, in passageKey's shape */
@@ -353,6 +365,14 @@ function passageInside(query, opts, facts) {
  * @returns {any}
  */
 export function edgeReading(query, opts, facts) {
+  const r = readEdges(query, opts, facts);
+  /* A text's whole title typed is that text (the settle, the red team's rt1-shapes): "regarding noah ham and canaan
+     genesis 9 20-27" is an Answers topic's title, and the card of the passage it names led the topic. */
+  return r && facts.namesTitle(query) ? null : r;
+}
+
+/** edgeReading's readings, the title aside. @param {string} query @param {{corpus?: string}} opts @param {RefFacts} facts @returns {any} */
+function readEdges(query, opts, facts) {
   const passage = passageInside(query, opts, facts);
   if (passage && passage !== DEFER) return passage;
   const inPassage = passage === DEFER;
@@ -365,7 +385,7 @@ export function edgeReading(query, opts, facts) {
     if (!hasWords(rest) || proseLead(refPart) || saysNumberWords(refPart)) continue;
     const r = bibleRef(refPart, opts, facts);
     if (!r || wordishChapter(r, refPart)) continue;
-    if (!inPassage && outsideWord(rest, facts)) break;
+    if ((!inPassage && outsideWord(rest, facts)) || heldElsewhere(r, kjvEncode(rest), facts)) break;
     return withRest(r, rest);
   }
   // at the end ("the wages of sin is death romans 6:23", "... John 3:16 (KJV)")
@@ -375,7 +395,7 @@ export function edgeReading(query, opts, facts) {
     if (!hasWords(rest) || proseLead(refPart) || saysNumberWords(refPart)) continue;
     const r = bibleRef(refPart, opts, facts);
     if (!r || wordishChapter(r, refPart)) continue;
-    if (!inPassage && outsideWord(rest, facts)) break;
+    if ((!inPassage && outsideWord(rest, facts)) || heldElsewhere(r, kjvEncode(rest), facts)) break;
     return withRest(r, rest);
   }
   return null;

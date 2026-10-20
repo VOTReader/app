@@ -35,6 +35,8 @@ const GLOBALS = {
   LETTERS_V1: [
     // a letter printing the verse with its reference, and a name the Bible never uses
     { id: 'harbor', num: 1, title: 'Songs at the Harbor', blocks: [{ segments: [{ v: 'It is written in John 3:2, the keeper of the harbor sang over the gray water. So Yahushua keeps the harbor, and the keeper sang. Whosoever watcheth the harbor shall see the lantern. They kept the harbor vigil.' }] }] },
+    // a title with a reference in it
+    { id: 'dusk', num: 2, title: 'Lanterns at Dusk (John 3:1)', blocks: [{ segments: [{ v: 'At dusk the lanterns were lit along the quay.' }] }] },
   ],
 };
 
@@ -96,6 +98,18 @@ describe('a Bible reference at the start or end of the words', () => {
   it('a number typed in words beside other words is a word, no chapter or verse', async () => {
     expect((await VotSearchMini.search('john three days the keeper sang')).parsed.kind).toBe('text');
     expect((await VotSearchMini.search('the keeper sang to john three')).parsed.kind).toBe('text');
+  });
+
+  it('words another verse holds in a row, typed beside a verse that does not: that verse’s words, no card', async () => {
+    expect((await VotSearchMini.search('john 3 3 a lantern burned beside the quiet harbor')).parsed.kind).toBe('text');
+    expect((await VotSearchMini.search('a lantern burned beside the quiet harbor john 3 3')).parsed.kind).toBe('text');
+    // the reading that holds them keeps its card, and so does a rest too short to tell
+    expect((await VotSearchMini.search('john 3 a lantern burned beside the quiet harbor')).parsed).toMatchObject({ kind: 'ref-bible', chapter: 3, alsoText: true });
+    expect((await VotSearchMini.search('john 3 3 the harbor')).parsed).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 3, text: 'the harbor' });
+  });
+
+  it('a text’s whole title typed is the title, the reference in it no card', async () => {
+    expect((await VotSearchMini.search('lanterns at dusk john 3 1')).parsed.kind).toBe('text');
   });
 });
 
