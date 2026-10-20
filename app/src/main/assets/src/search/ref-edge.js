@@ -63,6 +63,11 @@ const TEENS = { ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fif
 const TENS = { twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90 };
 const own = (/** @type {object} */ o, /** @type {string} */ k) => Object.prototype.hasOwnProperty.call(o, k);
 const isNumWord = (/** @type {string} */ t) => own(ONES, t) || own(TEENS, t) || own(TENS, t) || t === 'hundred';
+/* ...but only a whole query says its numbers in words (the settle, the red team's rt1-rules). Beside other words a
+   number word is prose's: "job seven sons and three daughters", "daniel three times a day", "judas one of the
+   twelve", "for the father judges no one" made a chapter of a book's name at the query's edge ("job 7", "jude 1"),
+   and its card led the verse the words are. */
+const saysNumberWords = (/** @type {string} */ refPart) => refPart.toLowerCase().split(/[\s-]+/).some(isNumWord);
 
 /**
  * Number words as digits, each number its own token: "twenty three" 23, "one hundred and nineteen" 119, "three
@@ -357,7 +362,7 @@ export function edgeReading(query, opts, facts) {
   for (let k = Math.min(n - 1, EDGE_TOKENS); k >= 2; k--) {
     const refPart = raw.slice(0, k).join(' ').replace(/^[([]+|[)\].,;:!?]+$/g, '');
     const rest = raw.slice(k).join(' ').replace(/^[\s\-\u2010-\u2015:,.;]+/, '');
-    if (!hasWords(rest) || proseLead(refPart)) continue;
+    if (!hasWords(rest) || proseLead(refPart) || saysNumberWords(refPart)) continue;
     const r = bibleRef(refPart, opts, facts);
     if (!r || wordishChapter(r, refPart)) continue;
     if (!inPassage && outsideWord(rest, facts)) break;
@@ -367,7 +372,7 @@ export function edgeReading(query, opts, facts) {
   for (let k = Math.min(n - 1, EDGE_TOKENS); k >= 2; k--) {
     const refPart = raw.slice(n - k).join(' ').replace(/^[([]+|[)\].,;!?]+$/g, '');
     const rest = raw.slice(0, n - k).join(' ').replace(/[\s\-\u2010-\u2015:,;]+$/, '');
-    if (!hasWords(rest) || proseLead(refPart)) continue;
+    if (!hasWords(rest) || proseLead(refPart) || saysNumberWords(refPart)) continue;
     const r = bibleRef(refPart, opts, facts);
     if (!r || wordishChapter(r, refPart)) continue;
     if (!inPassage && outsideWord(rest, facts)) break;

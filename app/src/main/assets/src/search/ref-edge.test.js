@@ -92,6 +92,11 @@ describe('a Bible reference at the start or end of the words', () => {
     const r = await VotSearchMini.search('john 3 2 the keeper of the harbor sang', { corpus: 'volumes' });
     expect(r.parsed.kind).toBe('text');
   });
+
+  it('a number typed in words beside other words is a word, no chapter or verse', async () => {
+    expect((await VotSearchMini.search('john three days the keeper sang')).parsed.kind).toBe('text');
+    expect((await VotSearchMini.search('the keeper sang to john three')).parsed.kind).toBe('text');
+  });
 });
 
 describe('a whole reference in a shape the parser did not read', () => {
