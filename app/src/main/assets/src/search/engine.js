@@ -1185,6 +1185,10 @@ function sentenceSpans(text) {
    holds prints "Jesus" (Luke 7:9): the study's sentence never met its verse's key, and the study led the verse. */
 const RESTORED_NAME = /^(?:yahushua|yeshua|yahshua|yahusha|yeshu)$/;
 const nameAsPrinted = (/** @type {string} */ t) => (RESTORED_NAME.test(t) ? 'jesus' : t);
+/* ...and the Father's, in a verse (search200 fix1): the editions print "The LORD is my shepherd", so a reader's
+   "yahuwah is my shepherd" held no verse's run, and the phrase pass reads a verse with the typed names printed. */
+const RESTORED_FATHER = /^(?:yahuwah|yahweh|yhwh|jehovah|yahuah)$/;
+const namesAsVersePrints = (/** @type {string} */ t) => (RESTORED_FATHER.test(t) ? 'lord' : nameAsPrinted(t));
 /** A sentence's key: its words as the index reads them, His name as printed; null under five words (too common to mean one text). */
 function sentenceKey(s) {
   const toks = kjvEncode(s).map(nameAsPrinted);
@@ -2408,6 +2412,9 @@ async function search(query, options) {
   for (let c = 0; c < corrections.length; c++) fixedTo[corrections[c].from] = corrections[c].to;
   for (const k in modernOf) fixedTo[k] = modernOf[k];
   const typedTokens = joinApostropheS(kjvEncode(wanted).map((t) => fixedTo[t] || t));
+  // the typed run with His names as a verse prints them ("yahuwah is my shepherd": the LORD is), when it differs
+  const printedRun = typedTokens.map(namesAsVersePrints);
+  const typedPrinted = printedRun.some((t, i) => t !== typedTokens[i]) ? printedRun : null;
   const STOP = D.STOP_WORDS_TRIMMED;
   /* THE RUN IN EVERY TEXT HOLDING IT (search200 B3, 2026-10-18). Read in the 500 best-scored texts alone, a run of
      common words in a long letter went unread when more short texts outscored it on its content word, and it was
@@ -2451,15 +2458,31 @@ async function search(query, options) {
       let at = holders ? (holders.has(id) ? /** @type {number} */ (holders.get(id)) : -1) : tokenRunAt(toks, typedTokens);
       const num = typedNum && d.kind === 'verse' ? typedNum : null;
       if (at < 0 && num) at = tokenRunAt(toks, num);
+      const printed = typedPrinted && d.kind === 'verse' ? typedPrinted : null;
+      if (at < 0 && printed) at = tokenRunAt(toks, printed);
       if (at >= 0) { runAt[id] = at; runBoost(id, d); continue; }
       let near = nearPhrase(toks, typedTokens, STOP);
       if (num) near = Math.max(near, nearPhrase(toks, num, STOP));
+      if (printed) near = Math.max(near, nearPhrase(toks, printed, STOP));
       nearOf[id] = near;
       if (near >= NEAR_PHRASE_MIN) scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near;
       // the original before a reprint when both hold the phrase
       if (near >= 0.9 && !keyword && !REPRINT_KINDS.has(d.kind)) scoreMap[id] *= ORIGINAL_BOOST;
     }
     restOfRun();
+    // a verse past the candidates holding the run with His name printed holds the typed run too
+    if (typedPrinted && typedTokens.length >= RUN_MIN) {
+      const inCands = new Set(cands);
+      let k = 0;
+      for (const id of rankedIds) {
+        if ((++k & 255) === 0 && spent()) { const r = await pause(); if (r) return r; }
+        if (inCands.has(id) || id in runAt) continue;
+        const d = docLookup[id];
+        if (!d || d.kind !== 'verse') continue;
+        const at = tokenRunAt(docTokens(id, d), typedPrinted);
+        if (at >= 0) { runAt[id] = at; runBoost(id, d); }
+      }
+    }
   }
   // One word that means anything among small ones ("for you to embrace me"): the texts holding the typed run exactly.
   // The card marks the run, so its excerpt and the landing go to it, not the word's first place (textQuery.run).
