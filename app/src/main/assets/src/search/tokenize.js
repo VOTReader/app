@@ -137,6 +137,16 @@ const NT_BEFORE_T = (function () {
   return m;
 })();
 
+/* A NAME WRITTEN WITH AN INNER APOSTROPHE IS ONE WORD (search200 fix1). The letters write "Sha’ul",
+   "Sh’khinah", "Tz’va’ot" and the editions "Hoshia'na", "Ba‘al": each split into two tokens ("sha" "ul"),
+   so a reader's "shaul" never met them, and the letter holding "Well did My servant Sha’ul" ranked #20.
+   An apostrophe between a letter and letters running to the word's end joins them, unless that tail is an
+   English clitic: the "s" of a possessive, the "t" of a negative contraction, and "ll", "re", "ve", "d", "m"
+   ("you’re", "I’m") stay apart, as their folds read them. */
+const APOSTROPHES = /['’‘ʼ]/;
+const CLITICS = new Set(['s', 't', 'll', 're', 've', 'd', 'm']);
+const INNER_APOSTROPHE = /(?<=[a-z])['’‘ʼ]([a-z]+)(?![a-z0-9])/g;
+
 /**
  * Tokenize + fold a string into normalized tokens.
  * @param {string} str
@@ -150,6 +160,7 @@ export function kjvEncode(str) {
   // ~every field at index time; accented queries still fold. ̀-ͯ are the
   // combining diacritical marks dropped after decomposition.
   if (/[^ -~]/.test(s)) s = s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+  if (APOSTROPHES.test(s)) s = s.replace(INNER_APOSTROPHE, (m, tail) => (CLITICS.has(tail) ? m : tail));
   // A number written with thousands separators is one number: "144,000" is the
   // token 144000, as a reader types it (it split into 144 and 000). A space between
   // the thousands is a separator too ("144 000", joined below), but only before "000":
@@ -248,6 +259,8 @@ export function kjvEncodeAt(str) {
     const at = m.index;
     const w = m[0];
     if (w !== '&' && raw.length && end === at - 1 && thousandsComma(s, at)) raw[raw.length - 1] += w;
+    // an inner apostrophe joins a name's two sides, as kjvEncode reads it ("sha’ul" is shaul)
+    else if (w !== '&' && raw.length && end === at - 1 && APOSTROPHES.test(s[at - 1]) && /^[a-z]+$/.test(w) && !CLITICS.has(w) && /[a-z]$/.test(raw[raw.length - 1])) raw[raw.length - 1] += w;
     else { raw.push(w === '&' ? 'and' : w); rawAt.push(from ? from[at] : at); }
     end = at + w.length;
   }
