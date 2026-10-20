@@ -652,9 +652,11 @@ function runHolders(run) {
 }
 /**
  * Whether some text holds every one of `words`, each as typed or as a form of it (wordForms, and the index's words
- * it opens that share its lemma), within `width` tokens of each other: read in the store, in every text the index
- * finds the rarest of them in, the texts in `mine` (doc ids) aside. null with no store yet (search200 last2).
- * @param {string[]} words  distinct content words (joined tokens)
+ * it opens that share its lemma), within `width` tokens of each other and in the order given: read in the store, in
+ * every text the index finds the rarest of them in, the texts in `mine` (doc ids) aside. null with no store yet
+ * (search200 last2). The words in another order are another sentence, not the typed one with a word dropped ("made
+ * to endure was spun" is no quote of "spun to endure"; search200 fix1).
+ * @param {string[]} words  distinct content words (joined tokens), in the typed order
  * @param {number} width
  * @param {Set<string>} mine
  * @returns {boolean|null}
@@ -710,10 +712,11 @@ function holdsTogether(words, width, mine) {
       let m = 0;
       for (let k = lo; k < hi; k++) m |= flag[T[k]];
       if (m !== all) continue;
+      // ...and in one of them, the words in the order typed
       for (let s = lo; s <= i; s++) {
-        let mm = 0;
-        for (let k = s; k < Math.min(hi, s + width); k++) mm |= flag[T[k]];
-        if (mm === all) return true;
+        let q = 0;
+        for (let k = s; k < Math.min(hi, s + width) && q < n; k++) if (flag[T[k]] & (1 << q)) q++;
+        if (q === n) return true;
       }
     }
   }
@@ -2874,9 +2877,10 @@ async function search(query, options) {
      holding the typed words far apart (tri bench n275). titles.js swapTitles reads the title's shape where it fits one
      title alone; that title joins as one remembered loosely (level 2) where nothing else names a title (none admitted
      or scored, none named among the first results) and no text but its own holds every typed content word, or a form
-     of it, within the typed words' length and two (quotesNear's stretch). A short quote one word off a title is the
-     quote ("a pillar of salt" is Genesis 19:26, not "A Pillar of Strength"), and a sentence holding the typed words
-     with a word of its own between them is that quote with a word dropped. An Answers section heading is not read so
+     of it, in the typed order within the typed words' length and two (quotesNear's stretch). A short quote one word
+     off a title is the quote ("a pillar of salt" is Genesis 19:26, not "A Pillar of Strength"), and a sentence holding
+     the typed words with a word of its own between them is that quote with a word dropped; one holding them in another
+     order is another sentence (search200 fix1). An Answers section heading is not read so
      (review, 2026-10-18): it titles no text, only a stretch of a topic titled otherwise, which hands the lead to the
      letter the section cites; a heading one word off ("a flood of mercy" for the heading "A Flood of Judgment", the
      word its opposite) put first a letter whose title holds none of the typed words. */
