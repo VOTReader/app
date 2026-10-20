@@ -33,6 +33,7 @@ import { searchData } from './search-data.js';
 import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
+import { edgeReading } from './ref-edge.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
@@ -214,6 +215,24 @@ function kjvAliasHits(term) {
   }
   const enc = ALIAS.get(term);
   if (!enc) return null;
+  const verses = verseIds();
+  const refs = enc.split(',');
+  const n = msIndex.documentCount || 1;
+  const score = Math.log(1 + (n - refs.length + 0.5) / (refs.length + 0.5));
+  const out = [];
+  let book = '';
+  for (const r of refs) {
+    const p = r.split('.');
+    // the alias names Matthew's verses by the plain chapter's book id; VERSE_IDS keys them 'matthew' (sweep W29)
+    if (p.length === 3) { book = KJV_ALIAS_BOOKS[parseInt(p.shift() || '', 36)]; if (book === 'matthew-plain') book = 'matthew'; }
+    const id = verses.get(book + ':' + parseInt(p[0], 36) + ':' + parseInt(p[1], 36));
+    if (id) out.push({ id, score, terms: [term] });
+  }
+  return out;
+}
+
+/** Every verse of this index by 'bookId:c:v', read once per index. @returns {Map<string, string>} */
+function verseIds() {
   if (!VERSE_IDS) {
     VERSE_IDS = new Map();
     const ids = msIndex._documentIds;
@@ -224,19 +243,38 @@ function kjvAliasHits(term) {
       if (f.bookId !== 'matthew' || !VERSE_IDS.has(key)) VERSE_IDS.set(key, ids.get(shortId));
     }
   }
-  const refs = enc.split(',');
-  const n = msIndex.documentCount || 1;
-  const score = Math.log(1 + (n - refs.length + 0.5) / (refs.length + 0.5));
-  const out = [];
-  let book = '';
-  for (const r of refs) {
-    const p = r.split('.');
-    // the alias names Matthew's verses by the plain chapter's book id; VERSE_IDS keys them 'matthew' (sweep W29)
-    if (p.length === 3) { book = KJV_ALIAS_BOOKS[parseInt(p.shift() || '', 36)]; if (book === 'matthew-plain') book = 'matthew'; }
-    const id = VERSE_IDS.get(book + ':' + parseInt(p[0], 36) + ':' + parseInt(p[1], 36));
-    if (id) out.push({ id, score, terms: [term] });
-  }
-  return out;
+  return VERSE_IDS;
+}
+
+/* WHAT A REFERENCE TYPED WITH WORDS IS CHECKED AGAINST (search200 fix1, ref-edge.js): the verses this index
+   holds, and whether a word is the Bible's (a verse of the Bible holds it; the Study Bible's restored Matthew is
+   the Volumes' text) or only the other texts'. Each word is read once per index, from the index's own postings. */
+/** @type {{ms: any, bible: Map<string, boolean>}|null} */ let REF_FACTS = null;
+/** @returns {import('./ref-edge.js').RefFacts} */
+function refFacts() {
+  if (!REF_FACTS || REF_FACTS.ms !== msIndex) REF_FACTS = { ms: msIndex, bible: new Map() };
+  const bible = REF_FACTS.bible;
+  const verses = verseIds();
+  const inVerses = (/** @type {string} */ w) => {
+    const data = msIndex._index && msIndex._index.get(w);
+    if (!data) return false;
+    for (const docs of data.values()) {
+      for (const sid of docs.keys()) {
+        const f = msIndex._storedFields.get(sid);
+        if (f && f.kind === 'verse' && f.volumeId === 'bible') return true;
+      }
+    }
+    return false;
+  };
+  return {
+    hasVerse: (book, c, v) => verses.has(book + ':' + c + ':' + v),
+    textsHold: termExists,
+    bibleHolds: (w) => {
+      let held = bible.get(w);
+      if (held === undefined) { held = inVerses(w); bible.set(w, held); }
+      return held;
+    },
+  };
 }
 
 /** A KJV verb's modern form the index holds: seeth -> sees, cometh -> comes, seest -> see, knowest -> know. */
@@ -1820,6 +1858,7 @@ function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
   SHINGLES = null;
   CITED = null;
   VERSE_IDS = null;
+  REF_FACTS = null;
   UNIT_IDS = null;
   LEMMA_CACHE.clear();
   EXCERPT_CACHE.clear();
@@ -2027,7 +2066,7 @@ async function search(query, options) {
      because "the index was not built" is otherwise satisfied by a search() that
      stopped building for everything. */
   query = expandContractions(query);
-  const parsed = parseReference(query, { corpus });
+  let parsed = parseReference(query, { corpus });
   if (!parsed) return { parsed: null, results: [] };
   // Command + structured references (bible / book / letter / named-passage) are
   // answered by a direct-nav card built in the UI — skip text search entirely.
@@ -2039,6 +2078,15 @@ async function search(query, options) {
   await alignLexiconReady();
   // rebuild() dropped the index while this search waited (sweep 2026-10-14 v061): it waits for the new one
   if (!msIndex) return search(query, options);
+  /* A REFERENCE TYPED WITH WORDS (search200 fix1, ref-edge.js): "john 3 16 for god so loved the world" is the
+     verse's card, and the words beside the reference are what is searched under it (`textQ`), not its numbers and
+     book name as words a text must hold. Read here, once the index can say the verse is there. */
+  if (parsed.kind === 'text') {
+    const edge = edgeReading(query, { corpus }, refFacts());
+    if (edge) parsed = edge;
+    if (NAV_ONLY_KINDS.has(parsed.kind) && !parsed.alsoText) return { parsed, results: [], parsedTerms: [], textQuery: null };
+  }
+  const textQ = typeof parsed.text === 'string' && parsed.text.trim() ? parsed.text : query;
 
   /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
      ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
@@ -2076,7 +2124,7 @@ async function search(query, options) {
      readings of one query, and the return carries both. */
   const navAlso = parsed.kind !== 'text';
   const useStop = options.useStopWords !== false;
-  const read = navAlso ? parseTextQuery(query) : parsed;
+  const read = navAlso ? parseTextQuery(textQ) : parsed;
   /* A BARE WORD BESIDE A QUOTED PHRASE IS A WORD THE TEXT HOLDS (sweep 2026-10-14 v001). Only the phrase was
      searched, so '"love one another" brethren' showed every text holding the phrase, ranked and marked as if
      "brethren" was never typed. It narrows the phrase as a +word does (a small word aside); a phrase and word
@@ -2098,7 +2146,7 @@ async function search(query, options) {
      the run; a run no text holds is the small words alone, as before. */
   // (the words as typed: the parse eats "and", "or" and "not" as operators)
   const smallRun = useStop && !quotedRun && !p.phrase && !options._unquoted && !p.must.length && !p.mustNot.length &&
-    terms.length && terms.every(isStopTerm) && kjvEncode(query).length >= SMALL_RUN_MIN ? String(query).trim() : '';
+    terms.length && terms.every(isStopTerm) && kjvEncode(textQ).length >= SMALL_RUN_MIN ? String(textQ).trim() : '';
   const stopOnly = { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };
   if (smallRun) p = { ...p, phrase: smallRun, terms: [] };
   else if (useStop && !quotedRun && terms.length && terms.every(isStopTerm)) return stopOnly;
@@ -2170,7 +2218,7 @@ async function search(query, options) {
      Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
      original boosts to a word the reader excluded; and the -word counted toward the words that make a keyword
      search, so "to the false prophets -x" was searched as a passage. */
-  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(query) : query;
+  const wanted = (p.must && p.must.length) || (p.mustNot && p.mustNot.length) ? wantedQuery(textQ) : textQ;
   /* A word or two is a keyword search, and a word in a title is the strongest sign of
      the text meant ("144000", "false prophets"). More is a passage or a title typed out,
      and the original of a passage comes before the texts that reprint it. */
