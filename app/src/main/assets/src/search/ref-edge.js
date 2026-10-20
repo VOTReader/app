@@ -14,16 +14,18 @@
    it names is a verse there, and no word of the rest is one only the other texts
    use ("psalm 23 with yahushua as my shepherd" asks for a text putting the name
    there, so it stays words). A rest of the words that frame a reference ("bible
-   verse", "in the kjv") makes the card alone.
+   verse", "in the kjv") makes the card alone. A named passage's name inside a
+   longer query makes its card when the rest says the same passage (passageInside).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { parseReference, resolveBookToken } from './ref-parser.js';
+import { parseReference, passageKey, resolveBookToken } from './ref-parser.js';
 import { searchData } from './search-data.js';
 import { kjvEncode } from './tokenize.js';
 
 /**
- * What a reading is checked against: the index in use (engine.js refFacts).
- * @typedef {{ hasVerse: (book: string, chapter: number, verse: number) => boolean, bibleHolds: (word: string) => boolean, textsHold: (word: string) => boolean }} RefFacts
+ * What a reading is checked against: the index in use (engine.js refFacts). verseWords is a verse's words
+ * (kjvEncode), null when the index has no such verse.
+ * @typedef {{ hasVerse: (book: string, chapter: number, verse: number) => boolean, bibleHolds: (word: string) => boolean, textsHold: (word: string) => boolean, verseWords: (book: string, chapter: number, verse: number) => string[]|null }} RefFacts
  */
 
 /** The longest reference read at an edge, in typed tokens. */
@@ -221,14 +223,134 @@ function withRest(r, rest) {
   return restWords(rest).length ? { ...r, alsoText: true, text: rest } : r;
 }
 
+/* ── A NAMED PASSAGE INSIDE A LONGER QUERY (the refwords hunt's P3) ──
+   "the lords prayer in luke", "the shema hear o israel", "parable of the good samaritan who is my neighbor": a
+   passage's name with more words was words, and texts naming it outranked it. The longest name inside the query
+   makes the passage's card when the rest says the same passage: a reference overlapping it (or a parallel telling
+   of it), its book, another of its names, or words one of its verses holds in a row. The whole query is searched
+   under the card, or only the rest when the name is itself a reference ("isaiah 53 by his stripes we are healed").
+   A verse typed inside the passage is left to the edge reading ("the lords prayer matthew 6 9"). */
+/** Where else a passage's sayings are told: [one of its names, book, chapter, first verse, last verse]. */
+const PARALLELS = [
+  ["lord's prayer", 'luke', 11, 2, 4], ['beatitudes', 'luke', 6, 20, 23], ['sermon on the mount', 'luke', 6, 17, 49],
+  ['golden rule', 'luke', 6, 31, 31], ['great commission', 'mark', 16, 15, 18], ['last supper', 'mark', 14, 12, 26],
+  ['last supper', 'luke', 22, 7, 23], ['transfiguration', 'mark', 9, 2, 13], ['transfiguration', 'luke', 9, 28, 36],
+  ['feeding of the 5000', 'mark', 6, 30, 44], ['feeding of the 5000', 'luke', 9, 10, 17], ['feeding of the 5000', 'john', 6, 1, 14],
+  ['parable of the sower', 'mark', 4, 1, 20], ['parable of the sower', 'luke', 8, 4, 15], ['lost sheep', 'matthew', 18, 12, 14],
+  ['ten commandments', 'deuteronomy', 5, 6, 21], ['baptism of jesus', 'mark', 1, 9, 11], ['baptism of jesus', 'luke', 3, 21, 22],
+  ['temptation of christ', 'luke', 4, 1, 13], ['temptation of christ', 'mark', 1, 12, 13], ['triumphal entry', 'mark', 11, 1, 11],
+  ['triumphal entry', 'luke', 19, 28, 40], ['triumphal entry', 'john', 12, 12, 19], ['walking on water', 'mark', 6, 45, 52],
+  ['walking on water', 'john', 6, 16, 21], ['rich young ruler', 'mark', 10, 17, 31], ['rich young ruler', 'luke', 18, 18, 30],
+  ['widows mite', 'luke', 21, 1, 4], ['garden of gethsemane', 'mark', 14, 32, 42], ['garden of gethsemane', 'luke', 22, 39, 46],
+];
+/** The small words a passage's rest is trimmed of, and that do not count among its words. */
+const SMALL = new Set(['the', 'a', 'an', 'of', 'on', 'in', 'to', 'and', 'from', 'according', 'as', 'is', 'are', 'was', 'about', 'with', 'for', 'by', 'that', 'this']);
+/** A verse typed inside the passage: the edge reading reads it, its rest no outside word's to refuse. */
+const DEFER = { defer: true };
+/** @type {WeakMap<object, Map<string, any>>} each passage list's names, in passageKey's shape */
+const PASSAGES_BY_KEY = new WeakMap();
+/** @param {any[]} list */
+function passagesByKey(list) {
+  let byKey = PASSAGES_BY_KEY.get(list);
+  if (!byKey) {
+    byKey = new Map();
+    for (const np of list) for (const k of np.keys || []) { const pk = passageKey(k); if (pk && !byKey.has(pk)) byKey.set(pk, np); }
+    PASSAGES_BY_KEY.set(list, byKey);
+  }
+  return byKey;
+}
+/** The passage and its parallel tellings. @param {any} np @returns {any[]} */
+function tellingsOf(np) {
+  const keys = new Set((np.keys || []).map(passageKey));
+  return [np, ...PARALLELS.filter((p) => keys.has(passageKey(String(p[0])))).map((p) => ({ bookId: p[1], chapter: p[2], verseStart: p[3], verseEnd: p[4] }))];
+}
+/** A reading's verses: its book, first chapter and verse, last chapter and verse. @param {any} x */
+const span = (x) => ({ book: bookKey(x.bookId), c1: x.chapter, v1: x.verseStart || 1, c2: x.chapterEnd || x.chapter, v2: x.verseEnd || (x.verseStart && !x.chapterEnd ? x.verseStart : 999) });
+const upTo = (/** @type {number} */ c, /** @type {number} */ v, /** @type {number} */ c2, /** @type {number} */ v2) => c < c2 || (c === c2 && v <= v2);
+const overlaps = (/** @type {any} */ a, /** @type {any} */ b) => { const A = span(a); const B = span(b); return A.book === B.book && upTo(A.c1, A.v1, B.c2, B.v2) && upTo(B.c1, B.v1, A.c2, A.v2); };
+const inside = (/** @type {any} */ a, /** @type {any} */ b) => { const A = span(a); const B = span(b); return A.book === B.book && upTo(B.c1, B.v1, A.c1, A.v1) && upTo(A.c2, A.v2, B.c2, B.v2); };
+/** Does a verse of the reading hold the words `run`, every one, in a row? @param {any} x @param {string[]} run @param {RefFacts} facts */
+function holdsRun(x, run, facts) {
+  const A = span(x);
+  for (let c = A.c1; c <= A.c2; c++) {
+    for (let v = c === A.c1 ? A.v1 : 1; c < A.c2 || v <= A.v2; v++) {
+      const t = facts.verseWords(A.book, c, v);
+      if (!t) break;
+      for (let i = 0; i + run.length <= t.length; i++) if (run.every((w, k) => t[i + k] === w)) return true;
+    }
+  }
+  return false;
+}
+
 /**
- * A Bible reference at a text query's start or end (the longest first, the start before the end), or null.
+ * A named passage inside the query, its card when the rest says the same passage; DEFER for a verse inside it;
+ * null otherwise.
+ * @param {string} query @param {{corpus?: string}} opts @param {RefFacts} facts
+ * @returns {any}
+ */
+function passageInside(query, opts, facts) {
+  const corpus = (opts && opts.corpus) || 'all';
+  const list = searchData().NAMED_PASSAGES;
+  if ((corpus !== 'all' && corpus !== 'scriptures') || !list || !list.length) return null;
+  const byKey = passagesByKey(list);
+  const raw = String(query).trim().split(/\s+/);
+  /** @type {{w: string, i: number}[]} each word and the typed token it is in */ const words = [];
+  raw.forEach((t, i) => { for (const w of t.toLowerCase().replace(/['‘’]/g, '').split(/[^a-z0-9]+/)) if (w) words.push({ w, i }); });
+  if (words.length < 2) return null;
+  /** @type {{a: number, b: number, np: any}|null} */ let best = null;
+  for (let a = 0; a < words.length; a++) {
+    for (let b = words.length; b > a && (!best || b - a > best.b - best.a); b--) {
+      if (b - a === words.length) continue;   // the whole query: parseReference's own reading
+      const np = byKey.get(passageKey(words.slice(a, b).map((x) => x.w).join(' ')));
+      if (np) best = { a, b, np };
+    }
+  }
+  if (!best) return null;
+  const { np } = best;
+  const ia = words[best.a].i; const ib = words[best.b - 1].i;
+  const restToks = raw.filter((_, i) => i < ia || i > ib);
+  while (restToks.length && SMALL.has(restToks[0].toLowerCase())) restToks.shift();
+  while (restToks.length && SMALL.has(restToks[restToks.length - 1].toLowerCase())) restToks.pop();
+  const rest = restToks.join(' ');
+  const card = (/** @type {any} */ x, /** @type {string} */ text) => ({
+    kind: 'named-passage', bookId: x.bookId, bookTitle: (searchData().BOOK_DISPLAY || {})[x.bookId] || x.bookId,
+    chapter: x.chapter, chapterEnd: x.chapterEnd || null, verseStart: x.verseStart || null, verseEnd: x.verseEnd || null,
+    label: query, alsoText: true, text,
+  });
+  if (!rest) return card(np, query);
+  const tellings = tellingsOf(np);
+  const ref = bibleRef(rest, opts, facts);
+  if (ref) {
+    const x = tellings.find((t) => overlaps(ref, t));
+    if (!x) return null;   // another passage typed: the edge reading reads it as typed
+    return inside(ref, x) && ref.verseStart != null ? DEFER : card(x, query);
+  }
+  const book = parseReference(rest, opts);
+  if (book && book.kind === 'ref-book') {
+    const x = tellings.find((t) => bookKey(t.bookId) === bookKey(book.bookId));
+    return x ? card(x, query) : null;
+  }
+  if (byKey.get(passageKey(rest)) === np) return card(np, query);
+  const run = kjvEncode(rest);
+  if (run.filter((w) => !SMALL.has(w)).length < 2) return null;
+  const x = tellings.find((t) => holdsRun(t, run, facts));
+  if (!x) return null;
+  const nameIsRef = /\d/.test(words.slice(best.a, best.b).map((w) => w.w).join(' '));
+  return card(x, nameIsRef ? rest : query);
+}
+
+/**
+ * A named passage inside a longer query, or a Bible reference at its start or end (the longest first, the start
+ * before the end); null when there is none.
  * @param {string} query  a query parseReference read as words
  * @param {{corpus?: string}} opts  the parse's own (a tab reading no Bible reference reads none here)
  * @param {RefFacts} facts
  * @returns {any}
  */
 export function edgeReading(query, opts, facts) {
+  const passage = passageInside(query, opts, facts);
+  if (passage && passage !== DEFER) return passage;
+  const inPassage = passage === DEFER;
   const raw = String(query).trim().split(/\s+/);
   const n = raw.length;
   // at the start, a citation's brackets off ("(John 3:16) For God so loved")
@@ -238,7 +360,7 @@ export function edgeReading(query, opts, facts) {
     if (!hasWords(rest) || proseLead(refPart)) continue;
     const r = bibleRef(refPart, opts, facts);
     if (!r || wordishChapter(r, refPart)) continue;
-    if (outsideWord(rest, facts)) break;
+    if (!inPassage && outsideWord(rest, facts)) break;
     return withRest(r, rest);
   }
   // at the end ("the wages of sin is death romans 6:23", "... John 3:16 (KJV)")
@@ -248,7 +370,7 @@ export function edgeReading(query, opts, facts) {
     if (!hasWords(rest) || proseLead(refPart)) continue;
     const r = bibleRef(refPart, opts, facts);
     if (!r || wordishChapter(r, refPart)) continue;
-    if (outsideWord(rest, facts)) break;
+    if (!inPassage && outsideWord(rest, facts)) break;
     return withRest(r, rest);
   }
   return null;

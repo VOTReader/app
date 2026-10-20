@@ -248,12 +248,13 @@ function verseIds() {
 
 /* WHAT A REFERENCE TYPED WITH WORDS IS CHECKED AGAINST (search200 fix1, ref-edge.js): the verses this index
    holds, and whether a word is the Bible's (a verse of the Bible holds it; the Study Bible's restored Matthew is
-   the Volumes' text) or only the other texts'. Each word is read once per index, from the index's own postings. */
-/** @type {{ms: any, bible: Map<string, boolean>}|null} */ let REF_FACTS = null;
+   the Volumes' text) or only the other texts', and a verse's words. Each word and verse is read once per index, from
+   the index's own postings and stored text. */
+/** @type {{ms: any, bible: Map<string, boolean>, words: Map<string, string[]>}|null} */ let REF_FACTS = null;
 /** @returns {import('./ref-edge.js').RefFacts} */
 function refFacts() {
-  if (!REF_FACTS || REF_FACTS.ms !== msIndex) REF_FACTS = { ms: msIndex, bible: new Map() };
-  const bible = REF_FACTS.bible;
+  if (!REF_FACTS || REF_FACTS.ms !== msIndex) REF_FACTS = { ms: msIndex, bible: new Map(), words: new Map() };
+  const { bible, words } = REF_FACTS;
   const verses = verseIds();
   const inVerses = (/** @type {string} */ w) => {
     const data = msIndex._index && msIndex._index.get(w);
@@ -276,6 +277,13 @@ function refFacts() {
       let held = bible.get(w);
       if (held === undefined) { const f = kjvForm(w); held = inVerses(w) || (!!f && inVerses(f)); bible.set(w, held); }
       return held;
+    },
+    verseWords: (book, c, v) => {
+      const id = verses.get(book + ':' + c + ':' + v);
+      if (!id) return null;
+      let t = words.get(id);
+      if (!t) { const f = msIndex.getStoredFields(id); t = kjvEncode(String((f && f.text) || '')); words.set(id, t); }
+      return t;
     },
   };
 }

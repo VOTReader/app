@@ -8,7 +8,12 @@ const VOT_DATA = {
   SYNONYM_MAP: {},
   BOOK_ABBREVS: { john: 'john', jn: 'john', isaiah: 'isaiah', is: 'isaiah', isa: 'isaiah' },
   BOOK_DISPLAY: { john: 'John', isaiah: 'Isaiah' },
-  NAMED_PASSAGES: [], NAMED_PASSAGE_INDEX: {}, COMMANDS: [], COMMAND_MAP: {},
+  NAMED_PASSAGES: [
+    { keys: ['the harbor vigil', 'harbor vigil'], bookId: 'john', chapter: 3, verseStart: 1, verseEnd: 3 },
+    { keys: ['walking on water'], bookId: 'isaiah', chapter: 3, verseStart: 1, verseEnd: 1 },   // told again in John 6:16-21 (PARALLELS)
+    { keys: ['isaiah 3'], bookId: 'isaiah', chapter: 3 },
+  ],
+  NAMED_PASSAGE_INDEX: {}, COMMANDS: [], COMMAND_MAP: {},
   VOLUME_TOKEN_MAP: {},
   VOLUME_COLLECTIONS: [{ id: 'v1', screen: 'vot-one-letter', dataVar: 'LETTERS_V1', prefaceVar: null, label: 'Volume One' }],
   OT_BOOK_IDS: ['isaiah'], NT_BOOK_IDS: ['john'], GENRE_GROUPS: {}, WORD_NUMS: {}, ROMAN_NUMS: {},
@@ -29,7 +34,7 @@ const GLOBALS = {
   },
   LETTERS_V1: [
     // a letter printing the verse with its reference, and a name the Bible never uses
-    { id: 'harbor', num: 1, title: 'Songs at the Harbor', blocks: [{ segments: [{ v: 'It is written in John 3:2, the keeper of the harbor sang over the gray water. So Yahushua keeps the harbor, and the keeper sang. Whosoever watcheth the harbor shall see the lantern.' }] }] },
+    { id: 'harbor', num: 1, title: 'Songs at the Harbor', blocks: [{ segments: [{ v: 'It is written in John 3:2, the keeper of the harbor sang over the gray water. So Yahushua keeps the harbor, and the keeper sang. Whosoever watcheth the harbor shall see the lantern. They kept the harbor vigil.' }] }] },
   ],
 };
 
@@ -117,5 +122,32 @@ describe('a whole reference in a shape the parser did not read', () => {
 
   it('the engine\u2019s parse reads them with no index', () => {
     expect(VotSearchMini.parse('john three two', { corpus: 'all' })).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2 });
+  });
+});
+
+describe('a named passage inside a longer query', () => {
+  /** @param {string} q @param {any} [o] */
+  const card = async (q, o) => (await VotSearchMini.search(q, o)).parsed;
+  it('its card when the rest is a reference over it, its book, or words one of its verses holds in a row', async () => {
+    expect(await card('the harbor vigil john 3')).toMatchObject({ kind: 'named-passage', bookId: 'john', chapter: 3, verseStart: 1, verseEnd: 3, text: 'the harbor vigil john 3' });
+    expect(await card('harbor vigil in john')).toMatchObject({ kind: 'named-passage', bookId: 'john', chapter: 3, verseStart: 1, verseEnd: 3 });
+    expect(await card('harbor vigil the gulls rested upon the long stone wall')).toMatchObject({ kind: 'named-passage', chapter: 3, text: 'harbor vigil the gulls rested upon the long stone wall' });
+  });
+
+  it('a parallel telling of it, named by its book', async () => {
+    expect(await card('walking on water in john')).toMatchObject({ kind: 'named-passage', bookId: 'john', chapter: 6, verseStart: 16, verseEnd: 21 });
+  });
+
+  it('a verse typed inside it is that verse\u2019s card, the name what is searched under it', async () => {
+    expect(await card('harbor vigil john 3 2')).toMatchObject({ kind: 'ref-bible', chapter: 3, verseStart: 2, text: 'harbor vigil' });
+  });
+
+  it('a name that is itself a reference: only the words beside it are searched', async () => {
+    expect(await card('isaiah 3 the keeper of the harbor sang a new song')).toMatchObject({ kind: 'named-passage', bookId: 'isaiah', chapter: 3, text: 'keeper of the harbor sang a new song' });
+  });
+
+  it('words none of its verses holds stay words; a tab reading no Bible reference reads none', async () => {
+    expect((await card('harbor vigil a lantern at the quay')).kind).toBe('text');
+    expect((await card('harbor vigil in john', { corpus: 'volumes' })).kind).toBe('text');
   });
 });
