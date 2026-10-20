@@ -37,6 +37,7 @@ import { edgeReading, readReference } from './ref-edge.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
+import { numberReading } from './numbers.js';
 import { kjvEncode, kjvEncodeAt, negationOf, PRONOUN_BARE, PRONOUN_PIECE } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
@@ -2227,6 +2228,24 @@ async function search(query, options) {
       units.push({ term: joined, origin: i, cover: (1 << i) | (1 << (i + 1)), literal: false, joined: true });
       didExpand = true;
     }
+    /* A NUMBER TYPED IN WORDS (search200 fix1): typed words reading as one number ("six hundred sixty six",
+       numbers.js; "twenty four", which kjvEncode reads as 24) are searched as that number too, standing for
+       them all, as a name typed in parts is: one by one, "six" "hundred" never meet a text's 666. */
+    for (let i = 0; i < filtered.length && i < 31; i++) {
+      for (let j = Math.min(filtered.length, i + 9, 31); j > i + 1; j--) {
+        const toks = numberReading(kjvEncode(filtered.slice(i, j).join(' ')));
+        if (toks.length !== 1 || !/^\d+$/.test(toks[0])) continue;
+        if (!had.has(toks[0]) && termExists(toks[0])) {
+          had.add(toks[0]);
+          let cover = 0;
+          for (let k = i; k < j; k++) cover |= 1 << k;
+          units.push({ term: toks[0], origin: i, cover, literal: false, joined: true });
+          didExpand = true;
+        }
+        i = j - 1;
+        break;
+      }
+    }
   }
 
   // One BM25 search per unit; accumulate score + coverage bitmask.
@@ -2420,14 +2439,21 @@ async function search(query, options) {
     const cands = rankedIds.filter((id) => popcount((termMask[id] || 0) & requiredMask) >= needCover)
       .sort((a, b) => scoreMap[b] - scoreMap[a])
       .slice(0, PHRASE_CANDIDATES);
+    /* the typed run with its numbers in digits is a reading of it too, in a verse: the NKJV prints "His number is
+       666" (numbers.js). Read in a letter's "who are the 144,000?" it led the Answers titled for that number. */
+    const numbered = numberReading(typedTokens);
+    const typedNum = numbered.length !== typedTokens.length ? numbered : null;
     for (const id of cands) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
       if (!d) continue;
       const toks = docTokens(id, d);
-      const at = holders ? (holders.has(id) ? /** @type {number} */ (holders.get(id)) : -1) : tokenRunAt(toks, typedTokens);
+      let at = holders ? (holders.has(id) ? /** @type {number} */ (holders.get(id)) : -1) : tokenRunAt(toks, typedTokens);
+      const num = typedNum && d.kind === 'verse' ? typedNum : null;
+      if (at < 0 && num) at = tokenRunAt(toks, num);
       if (at >= 0) { runAt[id] = at; runBoost(id, d); continue; }
-      const near = nearPhrase(toks, typedTokens, STOP);
+      let near = nearPhrase(toks, typedTokens, STOP);
+      if (num) near = Math.max(near, nearPhrase(toks, num, STOP));
       nearOf[id] = near;
       if (near >= NEAR_PHRASE_MIN) scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near;
       // the original before a reprint when both hold the phrase
