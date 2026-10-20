@@ -9,7 +9,7 @@ import { VotSearchMini, expandContractions } from './engine.js';
 describe('kjvEncode: a pronoun contraction', () => {
   it('typed bare is its two words', () => {
     expect(kjvEncode('youre here')).toEqual(['you', 'are', 'here']);
-    expect(kjvEncode('theyre gone, im glad')).toEqual(['they', 'are', 'gone', 'i', 'am', 'glad']);
+    expect(kjvEncode('theyre gone, youve won')).toEqual(['they', 'are', 'gone', 'you', 'have', 'won']);
     expect(kjvEncode('ive seen, weve heard, youll know, itll pass')).toEqual(
       ['i', 'have', 'seen', 'we', 'have', 'heard', 'you', 'will', 'know', 'it', 'will', 'pass']);
   });
@@ -28,6 +28,13 @@ describe('kjvEncode: a pronoun contraction', () => {
     expect(kjvEncode('Ha’re')).toEqual(['ha', 're']);
   });
 
+  it('a bare "im" stays a word: it is "in" one key over ("im the beginning"); written, "I’m" is I am', () => {
+    expect(kjvEncode('im the beginning')).toEqual(['im', 'the', 'beginning']);
+    expect(expandContractions('im the beginning')).toBe('im the beginning');
+    expect(kjvEncode('I’m glad')).toEqual(['i', 'am', 'glad']);
+    expect(expandContractions('I’m glad')).toBe('I am glad');
+  });
+
   it('kjvEncodeAt reads the same tokens', () => {
     for (const s of ['You’re here and theyre gone', "I'm glad we've heard", 'we were well']) {
       expect(kjvEncodeAt(s).tokens).toEqual(kjvEncode(s));
@@ -36,7 +43,7 @@ describe('kjvEncode: a pronoun contraction', () => {
 
   it('the query spells a pronoun contraction out, bare or written; a negative one typed bare stays', () => {
     expect(expandContractions('youre the salt')).toBe('you are the salt');
-    expect(expandContractions('They’re here, Im glad')).toBe('They are here, i am glad');
+    expect(expandContractions('They’re here, Ive come')).toBe('They are here, i have come');
     expect(expandContractions("we've seen it, you'll know")).toBe('we have seen it, you will know');
     expect(expandContractions('we were well, dont go')).toBe('we were well, dont go');
   });

@@ -110,11 +110,13 @@ export function negationOf(base) {
    own "you’re" indexed as "you" + "re", which "you are" never met. Both sides now read one as the reader
    means it: typed bare it is its two words, and the piece a written one leaves after its pronoun is its
    word ("you" + "re" is you are). A bare form that is a word of its own is none: "were", "well", "ill",
-   "hell", "shell", "wed", "id", "its", "lets". The engine spells a typed one out (expandContractions). */
+   "hell", "shell", "wed", "id", "its", "lets". Nor is "im" (the settle, the red team's rt1-rules): it is
+   "in" one key over as often as "I’m", and "im the beginning god created" read as "i am the beginning"
+   led a letter over Genesis 1:1; "I’m" written is I am. The engine spells a typed one out (expandContractions). */
 /** A pronoun contraction typed without its apostrophe → its words. */
 export const PRONOUN_BARE = Object.assign(Object.create(null), {
   youre: 'you are', theyre: 'they are', youve: 'you have', weve: 'we have', theyve: 'they have',
-  ive: 'i have', im: 'i am', youll: 'you will', theyll: 'they will', itll: 'it will',
+  ive: 'i have', youll: 'you will', theyll: 'they will', itll: 'it will',
 });
 /** The piece a written pronoun contraction leaves → [the words it follows, the word it stands for]. */
 export const PRONOUN_PIECE = Object.assign(Object.create(null), {
