@@ -59,6 +59,21 @@ describe('AnswersContentsLine', () => {
     expect(sheet()).toBeNull();
   });
 
+  it('a section that holds no passage (links, videos, a chart) shows no count at all, never a bare 0', () => {
+    const onJump = vi.fn();
+    render(<AnswersContentsLine entry={{ id: 'z', paragraphs: [
+      ...SECTIONED.paragraphs,
+      P('**Bible/Letter Study**', 'center'), P('📖 Grace AND The Law (Bible/Letter Study)'),
+    ] }} onJump={onJump} />);
+    act(() => { fireEvent.click(line()); });
+    const study = rows().find((r) => r.textContent.startsWith('Bible/Letter Study'));
+    expect(study.querySelector('.answers-contents-count')).toBeNull();
+    expect(study.textContent).toBe('Bible/Letter Study');
+    expect(rows()[0].querySelector('.answers-contents-count').textContent).toBe('2');
+    act(() => { fireEvent.click(study); });
+    expect(onJump).toHaveBeenCalledWith(8);     // the section still jumps to its heading
+  });
+
   it('with no named sections, lists the passages by source and jumps to where each begins', () => {
     const onJump = vi.fn();
     render(<AnswersContentsLine entry={PLAIN} onJump={onJump} />);

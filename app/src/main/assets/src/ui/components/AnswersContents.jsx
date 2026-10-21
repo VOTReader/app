@@ -75,7 +75,9 @@ function AnswersContentsSheet({ contents, onJump, onDismiss }) {
               data-autofocus={s === contents.sections[0] ? true : undefined}>
               <span className="answers-contents-row-title">
                 {s.title || 'Opening passages'}
-                <span className="answers-contents-count">{s.passages.length}</span>
+                {/* A section of links, videos or a chart holds no passage: it shows no count, since
+                    "0" read as "nothing here" (Corbin, 2026-10-21). The row still jumps to it. */}
+                {s.passages.length ? <span className="answers-contents-count">{s.passages.length}</span> : null}
               </span>
               {s.passages.length ? (
                 <span className="answers-contents-row-sub">

@@ -47,6 +47,22 @@ describe('answersContents', () => {
     expect(contentsSummary(c)).toBe('2 passages');          // one named section: sections not counted
   });
 
+  it('a bold-italic line closing a poem is the poem\'s words, not a section (Corbin 2026-10-21: "The Only Truth 0")', () => {
+    const c = answersContents({ paragraphs: [
+      P('**The Only Truth**', 'center'),                                         // 0 the excerpt's title
+      P('_For I AM, and have always been,_\n_The Way and The Life,_', 'center'),  // 1 passage starts
+      P('**_YAHUSHUA-YAHUWAH._**', 'center'),                                    // 2 the poem's last line
+      P('~ [From “The Only Truth” ~ Words To Live By: Part Two]', 'right'),      // 3
+      P('**Wonderful**', 'center'),                                              // 4
+      P('"Beloved…"'),                                                           // 5
+      P('~ [From “Wonderful” ~ Words To Live By: Part One]', 'right'),           // 6
+    ] });
+    expect(c.sections.map((s) => [s.title, s.index, s.passages.length])).toEqual([
+      ['The Only Truth', 0, 1], ['Wonderful', 4, 1],
+    ]);
+    expect(c.sections[0].passages[0]).toEqual({ index: 1, title: 'The Only Truth', collection: 'Words To Live By: Part Two' });
+  });
+
   it('an empty or odd entry is an empty contents, never a throw', () => {
     expect(answersContents(null)).toEqual({ sections: [], passages: 0 });
     expect(answersContents({ paragraphs: [P(''), null, P('✦', 'center')] })).toEqual({ sections: [], passages: 0 });
@@ -84,6 +100,15 @@ describe('on the real corpus', () => {
       }
     }
   });
+  it('no section title carries the site\'s emphasis marks, and a poem\'s bold-italic line never heads one', () => {
+    for (const e of ctx.ANSWERS) {
+      for (const s of answersContents(e).sections) {
+        expect(s.title, e.id + ' ' + s.title).not.toMatch(/[_*‗]/);
+      }
+    }
+    const name = answersContents(ctx.ANSWERS.find((e) => e.id === 'the-name-of-the-lord'));
+    expect(name.sections.find((s) => s.title === 'The Only Truth').passages.map((p) => p.title)).toEqual(['The Only Truth']);
+  });
   it('The Coming of The Lord: 54 passages under its named sections', () => {
     const c = answersContents(ctx.ANSWERS.find((e) => e.id === 'the-coming-of-the-lord'));
     expect(c.passages).toBe(54);
@@ -108,6 +133,14 @@ describe('passageTextBefore', () => {
   });
   it('stops at the previous source line / divider', () => {
     expect(passageTextBefore(paras, 7)).toBe('Second passage.');
+  });
+  it('quotes a poem through its closing bold-italic line (that line is not a heading)', () => {
+    expect(passageTextBefore([
+      P('**The Only Truth**', 'center'),
+      P('_For I AM, and have always been,_', 'center'),
+      P('**_YAHUSHUA-YAHUWAH._**', 'center'),
+      P('~ [From “The Only Truth” ~ Words To Live By: Part Two]', 'right'),
+    ], 3)).toBe('For I AM, and have always been, YAHUSHUA-YAHUWAH.');
   });
   it('is empty when there is nothing to quote', () => {
     expect(passageTextBefore(paras, 0)).toBe('');
