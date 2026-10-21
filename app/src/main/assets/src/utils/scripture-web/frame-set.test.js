@@ -214,6 +214,13 @@ describe('compact mode reads the frame\'s height (the spec: the root at most 500
     expect(isCompact(501)).toBe(false);
     expect(isCompact(0)).toBe(false);
   });
+
+  it('the S22 in landscape (780x360) and the 891x411 phone frame are compact; the 1600x900 PC is not', () => {
+    // the near glow's compact reach and share (sw-ink NEAR_GLOW_COMPACT_*) ride on this
+    expect(isCompact(360)).toBe(true);
+    expect(isCompact(411)).toBe(true);
+    expect(isCompact(900)).toBe(false);
+  });
 });
 
 /* The oracle: the top pass samples tau uniformly over the window's piece of

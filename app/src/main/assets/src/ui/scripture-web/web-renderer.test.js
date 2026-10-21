@@ -19,6 +19,7 @@ import {
 import { frameSetAt, drawOrder } from '../../utils/scripture-web/frame-set.js';
 import {
   FLYOVER_LEG_WIDTH, TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, rgba01, inkWidth,
+  NEAR_GLOW_CSS, NEAR_GLOW_COMPACT_CSS, NEAR_GLOW_ALPHA, NEAR_GLOW_COMPACT_ALPHA,
 } from '../../utils/scripture-web/sw-ink.js';
 import {
   DISTANCE_RAMP, rampGLSL, readChromeTokens, cssColorToRGB,
@@ -178,9 +179,10 @@ describe('thin lines hold a device px, and the feet do not shimmer at the ceilin
   it('the half width holds at half a backing px, the lost width paid in alpha, with half a backing px of skirt in both stages', () => {
     expect(SHADER_SOURCE.vertex).toContain('float thin = clamp(halfW/(.5*uPx), 0., 1.);');
     expect(SHADER_SOURCE.vertex).toContain('halfW = max(halfW, .5*uPx);');
-    expect(SHADER_SOURCE.vertex).toContain('float hw = halfW + .5*uPx;');
+    // the skirt sits past the near glow: a long thread has none, so its glowHalf is halfW
+    expect(SHADER_SOURCE.vertex).toContain('float hw = glowHalf + .5*uPx;');
     expect(SHADER_SOURCE.vertex).toMatch(/float aOut = [^;]*\*thin;/);
-    expect(SHADER_SOURCE.fragment).toContain('float hw = vHalfW + .5*uFeather;');
+    expect(SHADER_SOURCE.fragment).toContain('float hw = vInk.x + .5*uFeather;');
     expect(SHADER_SOURCE.fragment).toContain('smoothstep(vHalfW - .5*uFeather, vHalfW + .5*uFeather, d)');
     expect(TOP_SHADER_SOURCE.fragment).toContain('smoothstep(uCoreHalf - .5*uFeather, uCoreHalf + .5*uFeather, d)');
     expect(SHADER_SOURCE.vertex).not.toContain('halfW + 1.0');
@@ -237,6 +239,73 @@ describe('the span-ink law: a thread\'s weight is its own span\'s, at every zoom
   it('inks the short spans up, clamped to full ink before the recede and the centre, so a tap still recedes them', () => {
     expect(V).toContain('float aOut = min(uAlpha*aStrength*spanGain(shortness), 1.)*dim*mix(1., '
       + glslFloat(CENTRE_BRIGHT) + ', cT)*thin;');
+  });
+});
+
+/* The near glow rides on the span's own shortness, the span-ink law's, so it is fixed per arc at every
+   zoom (C14); it takes no zoom, localize, vote or camera term. The ribbon itself is drawn as before:
+   its body is the antialiased edge alone, with no shoulder, so nothing is dimmed. */
+describe('the near glow: per arc, by span, never by zoom; the ribbon itself unchanged', () => {
+  const V = SHADER_SOURCE.vertex, F = SHADER_SOURCE.fragment;
+  /** GLSL's smoothstep, from the GLSL ES 3.00 spec */
+  const smooth = (e0, e1, x) => { const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1); return t * t * (3 - 2 * t); };
+  /** the fragment stage's coverage, in JS (uFeather 1): d px from the centre line */
+  const frag = (d, halfW, glowHalf, glowA) => {
+    const aa = 1 - smooth(halfW - 0.5, halfW + 0.5, d);
+    const g = glowHalf > halfW + 0.01 ? Math.min(Math.max((d - halfW) / (glowHalf - halfW), 0), 1) : 1;
+    return Math.max(aa, (1 - g) * (1 - g) * glowA);
+  };
+
+  it("the vertex stage reaches the glow out by the span's shortness alone, and puts the skirt past it", () => {
+    expect(V).toContain('uniform vec2  uGlow;');
+    expect(V).toContain('float glowHalf = halfW + shortness*uGlow.x;');
+    expect(V).toContain('float hw = glowHalf + .5*uPx;');
+    expect(V).toContain('vInk = vec2(glowHalf, uGlow.y);');
+    // uGlow is the ink table's, sent once a frame: nothing of the zoom, the votes or the camera scales it
+    expect(V.replace(/\/\/[^\n]*/g, '').match(/uGlow\.[xy]/g)).toEqual(['uGlow.x', 'uGlow.y']);
+  });
+
+  it('the body is the antialiased ribbon alone (no shoulder), and the glow is a max over it, never an add', () => {
+    expect(F).toContain('float halo = (1. - g)*(1. - g)*vInk.y;');
+    expect(F).toContain('float a = clamp(vCol.a, 0., 1.)*max(aa, halo);');
+    expect(F).not.toMatch(/uSoft|vInk\.z|coreHalf/);
+    expect(V).not.toMatch(/uSoft|coreHalf/);
+  });
+
+  it("TWIN: full alpha on the centre line; the glow at its share at the ribbon's edge, none at its reach; a long thread is today's", () => {
+    // a short arc: 2 device px of half width, 5 of glow past it
+    expect(frag(0, 2, 7, NEAR_GLOW_ALPHA)).toBe(1);
+    expect(frag(2, 2, 7, NEAR_GLOW_ALPHA)).toBeCloseTo(NEAR_GLOW_ALPHA, 12);
+    expect(frag(7, 2, 7, NEAR_GLOW_ALPHA)).toBe(0);
+    let prev = 1;
+    for (let d = 0; d <= 7.5; d += 0.05) {
+      const a = frag(d, 2, 7, NEAR_GLOW_ALPHA);
+      expect(a, `${d.toFixed(2)} px out: falls, never a second edge`).toBeLessThanOrEqual(prev + 1e-12);
+      prev = a;
+    }
+    // a long leg: no glow (glowHalf is halfW), so its cross-section is the plain antialiased ribbon
+    for (let d = 0; d <= 2.5; d += 0.05) {
+      expect(frag(d, 1.5, 1.5, NEAR_GLOW_ALPHA), `${d.toFixed(2)} px out`).toBeCloseTo(1 - smooth(1, 2, d), 12);
+    }
+  });
+
+  it("the frame sends the ink table's glow in device px and its share: the PC's 5 / 0.65, a compact frame's 2 / 0.5, at every zoom", () => {
+    const { calls, canvas } = recordingGL();
+    const r = /** @type {any} */ (createRenderer(canvas, tinyGraph()));
+    const view = (over) => Object.assign({
+      width: 800, height: 720, base: 260, ceil: 240, squash: squashFactor(240, 800), localize: 1, density: 'famous',
+      camX: 125, camY: 0, ppv: 4, strokeWidth: 2, alpha: 0.5, dpr: 1, bg: '#000', focusRange: null, focusArc: -1,
+    }, over);
+    expect([NEAR_GLOW_CSS, NEAR_GLOW_ALPHA, NEAR_GLOW_COMPACT_CSS, NEAR_GLOW_COMPACT_ALPHA]).toEqual([5, 0.65, 2, 0.5]);
+    const pc = frameOf(r, calls, view({ height: 1200, dpr: 2 }));
+    expect(pc.u(pc.main, 'uGlow')[0]).toEqual([5 * 2, 0.65]);
+    const phone = frameOf(r, calls, view({ height: 900, dpr: 2 }));   // 450 CSS px tall: compact
+    expect(phone.u(phone.main, 'uGlow')[0]).toEqual([2 * 2, 0.5]);
+    // the same at every zoom: a deeper camera sends the same glow
+    const deep = frameOf(r, calls, view({ height: 1200, dpr: 2, ppv: 8, camX: 125 }));
+    expect(deep.u(deep.main, 'uGlow')[0]).toEqual([5 * 2, 0.65]);
+    const deepPhone = frameOf(r, calls, view({ height: 900, dpr: 2, ppv: 8, camX: 125 }));
+    expect(deepPhone.u(deepPhone.main, 'uGlow')[0]).toEqual([2 * 2, 0.5]);
   });
 });
 
@@ -580,7 +649,7 @@ describe('the top pass: the chosen line in gold over everything, the rest recedi
     expect(lit.haloHalf).toBe(0);
     expect(lit.halo[3]).toBe(0);
     expect(lit.core).toEqual(rgba01('lit'));
-    const thin = topLook('lit', 0.5, false);   // 1.5 CSS px at half a device px each: 0.375 px of half width
+    const thin = topLook('lit', 0.3, false);   // 2.5 CSS px at 0.3 device px each: 0.375 px of half width
     expect(thin.coreHalf).toBe(0.5);
     expect(thin.core[3]).toBeCloseTo(rgba01('lit')[3] * 0.75, 12);
     expect(topLook('chosen', 1, false).ribbon).toBe(inkWidth('chosenHalo') / 2 + 0.5);
@@ -874,13 +943,14 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
   });
 
   it('topLook in a gesture: the hold and the skirt are a backing px, the lost width paid in alpha', () => {
-    const lit = topLook('lit', 1, false, 0, 2);   // 0.75 device px of half width under a 1 px hold
+    // the phone's 2 CSS px at 0.75 device px each: 0.75 device px of half width under a 1 px hold
+    const lit = topLook('lit', 0.75, true, 0, 2);
     expect(lit.coreHalf).toBe(1);
     expect(lit.core[3]).toBeCloseTo(rgba01('lit')[3] * 0.75, 12);
     expect(lit.ribbon).toBe(1 + 1);
-    const rest = topLook('lit', 1, false, 0, 1);
-    expect(rest.coreHalf).toBe(inkWidth('lit') / 2);
-    expect(topLook('lit', 1, false, 0)).toEqual(rest);
+    const rest = topLook('lit', 0.75, true, 0, 1);
+    expect(rest.coreHalf).toBe((inkWidth('lit', true) * 0.75) / 2);
+    expect(topLook('lit', 0.75, true, 0)).toEqual(rest);
   });
 });
 

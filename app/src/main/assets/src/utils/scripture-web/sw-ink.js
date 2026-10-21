@@ -74,7 +74,10 @@ const TABLE = {
   hover: { hex: '#FFE7A8', alpha: 1, width: 2 },
   hoverKey: { hex: '#000000', alpha: 0.50, width: 4, widthCompact: 3 },   // 1 CSS px each side, half of one on the phone
   hoverHalo: { hex: '#E0A84E', alpha: 0.22, width: 10 },
-  lit: { hex: '#E8BE6E', alpha: 0.85, width: 1.5 },              // focus.lit rows: go-to, verse mode, a chooser row under hover or focus
+  // focus.lit rows: go-to, verse mode, a chooser row under hover or focus. 2.5 / 2 CSS px since the
+  // near glow (NEAR_GLOW_CSS): at 1.5 the go-to's gold lost its lead over the glowing local arcs
+  // round it (gold lead 1.44 -> 0.92 on PC); 2 on the phone, where 2.5 read heavy
+  lit: { hex: '#E8BE6E', alpha: 0.85, width: 2.5, widthCompact: 2 },
 
   // ── deep zoom wayfinding (§4.3) ─────────────────────────────────────────
   chapterNumeral: { hex: '#B7BFC1', alpha: 1 },                  // 28 / 20 px
@@ -158,6 +161,21 @@ export const CENTRE_BRIGHT = 1.35;
 export const CENTRE_WIDTH = 1.25;
 /** Q3 (ii): a thread with neither foot on screen draws at this share of its width, alpha unchanged. */
 export const FLYOVER_LEG_WIDTH = 0.7;
+/** The near glow: a short span carries a soft halo this far past its ribbon, CSS px, by its
+ *  shortness (geometry.spanShortness), fixed per arc at every zoom, so the near chapter arches stand
+ *  in front of the deep frame's long legs; a long thread has none. Nothing is hidden or dimmed: the
+ *  halo only adds coverage beside a short ribbon, never over it (web-renderer FRAG: a max, not a sum).
+ *  On the 209x Isaiah 53 frame it lifts the near arches over the long legs from 1.13 to about 1.5
+ *  on the PC. */
+export const NEAR_GLOW_CSS = 5;
+/** The halo's alpha at the ribbon's edge, as a share of the ribbon's, falling softly to none at its reach. */
+export const NEAR_GLOW_ALPHA = 0.65;
+/** The phone's (a compact frame, frame-set.isCompact) glow: shorter and lighter. Its frame is about
+ *  half the PC's in CSS px, where 5 px at 0.65 read as a neon mass and took the go-to's gold lead
+ *  from 2.06 to 1.39; at 2 px and 0.5 the gold leads at about 1.54 and the near arches still read
+ *  first (about 1.36). */
+export const NEAR_GLOW_COMPACT_CSS = 2;
+export const NEAR_GLOW_COMPACT_ALPHA = 0.5;
 /** The web's one face, canvas text included (Cinzel is retired from the web). */
 export const FONT = "'EB Garamond', Georgia, serif";
 

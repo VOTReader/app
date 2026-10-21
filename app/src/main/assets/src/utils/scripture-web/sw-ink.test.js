@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 import {
   INK, ink, rgba01, css, inkWidth, inkGLSL,
   TAP_CONTEXT, MYWEB_TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, FONT,
+  NEAR_GLOW_CSS, NEAR_GLOW_COMPACT_CSS, NEAR_GLOW_ALPHA, NEAR_GLOW_COMPACT_ALPHA,
 } from './sw-ink.js';
 
 /** WCAG 2 relative luminance of '#rrggbb'. */
@@ -82,7 +83,9 @@ describe('the ink table', () => {
     expect(inkWidth('hoverKey', true) - inkWidth('hover', true)).toBe(1);
     expect(inkWidth('hoverKey')).toBeLessThan(inkWidth('hoverHalo'));
     expect(INK.hoverHalo).toEqual({ hex: '#E0A84E', alpha: 0.22, width: 10 });
-    expect(INK.lit).toEqual({ hex: '#E8BE6E', alpha: 0.85, width: 1.5 });
+    // 2.5 / 2 CSS px from 1.5, so the go-to's gold keeps its lead over the near glow's arcs round it
+    // (at 1.5 px it lost it, 0.92 on PC)
+    expect(INK.lit).toEqual({ hex: '#E8BE6E', alpha: 0.85, width: 2.5, widthCompact: 2 });
     expect(INK.roots).toEqual({ hex: '#C4A469', alpha: 0.25 });
     expect(INK.myWebReader).toEqual({ hex: '#E0B25A', alpha: 0.95, width: 1.5 });
     expect(INK.panel).toEqual({ hex: '#1C2527', alpha: 1 });
@@ -182,6 +185,21 @@ describe('the ink table', () => {
     expect(FONT).toMatch(/^'EB Garamond'/);
   });
 
+  it('the near glow: 5 CSS px of halo at 0.65 on PC, 2 at 0.5 on a compact frame, under its ribbon', () => {
+    // swept on the 209x Isaiah 53 frame; the phone's shorter, lighter glow gives the go-to's gold its
+    // lead back (1.39 to 1.54) where 5 px at 0.65 read as a neon mass
+    expect(NEAR_GLOW_CSS).toBe(5);
+    expect(NEAR_GLOW_ALPHA).toBe(0.65);
+    expect(NEAR_GLOW_COMPACT_CSS).toBe(2);
+    expect(NEAR_GLOW_COMPACT_ALPHA).toBe(0.5);
+    expect(NEAR_GLOW_COMPACT_CSS).toBeLessThan(NEAR_GLOW_CSS);
+    // its alpha at the ribbon's edge is a share of the ribbon's: never a second core, never a sky (C17)
+    for (const a of [NEAR_GLOW_ALPHA, NEAR_GLOW_COMPACT_ALPHA]) {
+      expect(a).toBeGreaterThan(0);
+      expect(a).toBeLessThan(1);
+    }
+  });
+
   it('My Web recedes by its own constant, MYWEB_TAP_CONTEXT .45, inside .30-.60 and never to 0', () => {
     // w4 myweb fix round 2: the pair at .30 and .45 with the receded links core only; at .30 the rest
     // sank near black, at .45 it still reads and the chosen link reads first (w4/myweb/pairs.md).
@@ -222,7 +240,9 @@ describe('the helpers', () => {
   it('inkWidth picks the compact width on a phone, the PC one otherwise, 0 for an ink with none', () => {
     expect(inkWidth('chosen')).toBe(3);
     expect(inkWidth('chosen', true)).toBe(2.5);
-    expect(inkWidth('lit', true)).toBe(1.5);   // no compact width: the PC one
+    expect(inkWidth('hover', true)).toBe(2);   // no compact width: the PC one
+    expect(inkWidth('lit')).toBe(2.5);
+    expect(inkWidth('lit', true)).toBe(2);
     expect(inkWidth('cited')).toBe(0);
     expect(inkWidth('prophecy', true)).toBe(0);   // 1 device px, the renderer's floor
   });

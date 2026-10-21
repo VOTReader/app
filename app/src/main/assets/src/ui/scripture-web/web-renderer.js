@@ -55,6 +55,7 @@ import {
 } from '../../utils/scripture-web/geometry.js';
 import {
   CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
+  NEAR_GLOW_CSS, NEAR_GLOW_COMPACT_CSS, NEAR_GLOW_ALPHA, NEAR_GLOW_COMPACT_ALPHA,
 } from '../../utils/scripture-web/sw-ink.js';
 import { topSet, topDraws, isCompact, frameSetAt, TOP_ORDER } from '../../utils/scripture-web/frame-set.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
@@ -112,9 +113,11 @@ uniform float uFocusArc;     // the chosen thread: kept at full ink while the re
 uniform float uTapFade;      // 0..1: how far the rest has receded to TAP_CONTEXT (a tap only, eased)
 uniform vec2  uCentre;       // the centre chapter, canon x [x0, x1) (x0 >= x1 = none): its own arcs are emphasised
 uniform float uCentreT;      // the centre's emphasis ease, 0..1 (web-frame CentreChapter.t)
+uniform vec2  uGlow;         // the near glow: its reach past the ribbon at full shortness, device px, and its alpha share
 in uint aId;                 // the thread: one id of the frame's visible set (frame-set.js) per instance
 // colour and half width are one per instance: flat, so nothing is interpolated
-flat out vec4 vCol; out float vEdge; flat out float vHalfW;
+// (vInk: the glow's reach, a half width in device px, and its alpha share)
+flat out vec4 vCol; out float vEdge; flat out float vHalfW; flat out vec2 vInk;
 ${arcShapeGLSL}
 ${arcFrameGLSL}
 ${flyOverGLSL}
@@ -189,7 +192,9 @@ void main(){
   // Isaiah 53's reaches to the New Testament were the brightest fan on screen).
   float inCentre = (uCentre.x < uCentre.y
     && ((a >= uCentre.x && a < uCentre.y) || (b >= uCentre.x && b < uCentre.y))) ? 1. : 0.;
-  float cT = uCentreT*inCentre*shortness;
+  // Its reach is 10 to 56 verses (geometry.centreShortness), inside the span-ink plateau's,
+  // so the 1-4 chapter arches the plateau inks are not lifted past it.
+  float cT = uCentreT*inCentre*centreShortness(tSpan);
   halfW *= mix(1., ${glslFloat(CENTRE_WIDTH)}, cT);
 
   // The chosen and hovered lines are not styled here: the top pass redraws
@@ -202,7 +207,11 @@ void main(){
   // extra width in alpha (thin), so a thin line puts the same ink on screen.
   float thin = clamp(halfW/(.5*uPx), 0., 1.);
   halfW = max(halfW, .5*uPx);
-  float hw = halfW + .5*uPx;                     // + half a backing px of feather skirt: the antialias ramp's own half
+  // The near glow: a short span carries a soft halo uGlow.x past its ribbon, by its shortness,
+  // fixed per arc at every zoom (sw-ink NEAR_GLOW_CSS), so the near chapter arches stand in front
+  // of the long legs; a long thread has none and is drawn exactly as before.
+  float glowHalf = halfW + shortness*uGlow.x;
+  float hw = glowHalf + .5*uPx;                  // + half a backing px of feather skirt: the antialias ramp's own half
   p += vec2(-tg.y, tg.x)*side*hw;
   float a1 = step(uFocusRange.x, a)*step(a, uFocusRange.y);
   float b1 = step(uFocusRange.x, b)*step(b, uFocusRange.y);
@@ -227,6 +236,7 @@ void main(){
   vCol = vec4(col, min(aOut, 1.));
   vEdge = side;
   vHalfW = halfW;
+  vInk = vec2(glowHalf, uGlow.y);
   gl_Position = vec4(p/uRes*2. - 1., 0, 1);
   gl_Position.y = -gl_Position.y;
 }`;
@@ -234,12 +244,16 @@ void main(){
 const FRAG = `#version 300 es
 precision mediump float;
 uniform float uFeather;      // the vertex stage's uPx: one backing px of feather, in full-resolution px
-flat in vec4 vCol; in float vEdge; flat in float vHalfW; out vec4 o;
+flat in vec4 vCol; in float vEdge; flat in float vHalfW; flat in vec2 vInk; out vec4 o;
 void main(){
-  float hw = vHalfW + .5*uFeather;                // the vertex stage's skirt
+  float hw = vInk.x + .5*uFeather;                // the vertex stage's skirt, past the glow
   float d = abs(vEdge)*hw;
   float aa = 1.0 - smoothstep(vHalfW - .5*uFeather, vHalfW + .5*uFeather, d);
-  float a = clamp(vCol.a, 0., 1.)*aa;
+  // the near glow: its share at the ribbon's edge, falling softly to nothing at its reach; the
+  // coverage is the larger of the two, never their sum, so the ribbon itself is never brightened
+  float g = vInk.x > vHalfW + .01 ? clamp((d - vHalfW)/(vInk.x - vHalfW), 0., 1.) : 1.;
+  float halo = (1. - g)*(1. - g)*vInk.y;
+  float a = clamp(vCol.a, 0., 1.)*max(aa, halo);
   o = vec4(vCol.rgb*a, a);                        // premultiplied
 }`;
 
@@ -483,7 +497,7 @@ export function createRenderer(canvas, graph, opts = {}) {
 
   const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
     'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uAlpha', 'uTotal',
-    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uCentre', 'uCentreT']);
+    'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uCentre', 'uCentreT', 'uGlow']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
     'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo',
     'uKeyHalf', 'uKey']);
@@ -774,6 +788,11 @@ export function createRenderer(canvas, graph, opts = {}) {
       U.f1('uAlpha', v.alpha);
       U.f1('uTotal', graph.total);
       U.f1('uVoteMix', v.voteMix || 0);
+      // the near glow's reach in device px and its alpha share: the phone's (a compact frame) is
+      // shorter and lighter (sw-ink NEAR_GLOW_COMPACT_CSS / NEAR_GLOW_COMPACT_ALPHA), the same at every zoom
+      const compactFrame = isCompact(v.height / dpr);
+      U.f2('uGlow', (compactFrame ? NEAR_GLOW_COMPACT_CSS : NEAR_GLOW_CSS) * dpr,
+        compactFrame ? NEAR_GLOW_COMPACT_ALPHA : NEAR_GLOW_ALPHA);
       U.f1('uFocusArc', v.focusArc == null ? -1 : v.focusArc);
       const chosen = (v.focusArc != null && v.focusArc >= 0) || (v.focusProphecy != null && v.focusProphecy >= 0)
         || !!v.focusRange;

@@ -18,7 +18,7 @@ import { describe, it, expect } from 'vitest';
 import {
   arcShape, arcHeightAt, maxZoomFor, PPV_MAX_CSS,
   ribbonStyle, localizeFactor, squashFactor,
-  ALPHA_DEEP, arcPointAt, footX,
+  ALPHA_DEEP, ceilingEase, arcPointAt, footX,
   arcFrameTau, frameSegments, arcPush, frameHeights, TESS_TOL_CSS, TESS_CAP,
 } from './geometry.js';
 
@@ -107,21 +107,41 @@ describe('D1 — a lone ribbon at the ceiling clears 3:1', () => {
   // The screen has one (dark) palette since 2026-09-10, so the law has no
   // theme argument: the light arm these checks once also walked is gone.
   it('reaches 0.85 at the ceiling', () => {
-    const s = ribbonStyle(zMax, 1, AT_CEILING);
+    const s = ribbonStyle(zMax, 1, AT_CEILING, PPV_MAX_CSS);
     expect(s.alpha).toBeGreaterThanOrEqual(0.85);
+  });
+
+  it('reaches 0.85 at the ceiling of the most crowded chapter measured, Isaiah 53', () => {
+    // The Isaiah 53 camera's anchored threads per CSS px at each frame's own 44 px ceiling, 595 on PC
+    // (1600 CSS px, 855x) and 306 on the phone (891, 1536x): over DENSITY_K, so without the ceiling's
+    // ease the law divided the ceiling's alpha by 1.42 / 1.36, to 0.63 / 0.66 (written failing first,
+    // at 0.632). The ceiling is PPV_MAX_CSS CSS px a verse on every frame (Z1).
+    for (const [wCss, per] of [[1600, 595 / 1600], [891, 306 / 891]]) {
+      const s = ribbonStyle(maxZoomFor(TOTAL, wCss), 1, per, PPV_MAX_CSS);
+      expect(s.alpha, `the ${wCss} CSS px frame`).toBeGreaterThanOrEqual(0.85);
+    }
+  });
+
+  it("takes ppvCss as a required argument, so no caller drops the ceiling's ease by leaving it out", () => {
+    // npm run typecheck (checkJs) refuses a three-argument call: the directive below fails the
+    // typecheck if ppvCss ever becomes optional again
+    // @ts-expect-error ppvCss is required
+    const s = ribbonStyle(zMax, 1, AT_CEILING);
+    expect(s.voteMix).toBe(1);
+    expect(ribbonStyle.length).toBe(4);
   });
 
   it('stops letting votes scale alpha at depth, or the weakest arc never gets there', () => {
     // strength floors at 0.30. If alpha still scaled by it, 0.9 x 0.3 = 0.27.
-    expect(ribbonStyle(zMax, 1, AT_CEILING).voteMix).toBe(1);
-    expect(ribbonStyle(1, 0, AT_CEILING).voteMix).toBe(0);
+    expect(ribbonStyle(zMax, 1, AT_CEILING, PPV_MAX_CSS).voteMix).toBe(1);
+    expect(ribbonStyle(1, 0, AT_CEILING, 0).voteMix).toBe(0);
   });
 });
 
 describe('D2 — nothing below the ceiling washes out', () => {
   it('is the old law exactly at overview, whatever the density reads', () => {
-    const a = ribbonStyle(1, 0, 0.0001);
-    const b = ribbonStyle(1, 0, 900);
+    const a = ribbonStyle(1, 0, 0.0001, 0);
+    const b = ribbonStyle(1, 0, 900, 0);
     expect(a.alpha).toBe(0.075);
     expect(a.strokeWidthCss).toBe(0.9);
     // Density must not be able to reach the overview frame at all.
@@ -151,7 +171,7 @@ describe('D2 — nothing below the ceiling washes out', () => {
       { frame: 'desktop1920', per: 4220 / 1920, divisor: 3.92 },
     ];
     for (const c of cases) {
-      const s = ribbonStyle(40, localizeFactor(40), c.per);
+      const s = ribbonStyle(40, localizeFactor(40), c.per, 0);
       expect(ALPHA_DEEP / s.alpha, c.frame + ' 40x crowding divisor').toBeCloseTo(c.divisor, 1);
     }
   });
@@ -159,7 +179,8 @@ describe('D2 — nothing below the ceiling washes out', () => {
   it('clamps that divisor to 1 at every ceiling, so D1 keeps the full value', () => {
     // The measured anchored density at each frame's own 44 px ceiling.
     for (const per of [141 / 800, 59 / 375, 336 / 1920]) {
-      expect(ribbonStyle(1711, 1, per).alpha).toBeCloseTo(ALPHA_DEEP, 12);
+      expect(ribbonStyle(1711, 1, per, 0).alpha).toBeCloseTo(ALPHA_DEEP, 12);
+      expect(ribbonStyle(1711, 1, per, PPV_MAX_CSS).alpha).toBeCloseTo(ALPHA_DEEP, 12);
     }
   });
 
@@ -167,8 +188,78 @@ describe('D2 — nothing below the ceiling washes out', () => {
     // The wash direction is UP. Whatever the crowd reads, the deep alpha is a
     // ceiling, not a floor: an empty frame cannot be brighter than one ribbon.
     for (const per of [0, 1e-9, 0.001, 5, 500]) {
-      expect(ribbonStyle(40, 1, per).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
+      expect(ribbonStyle(40, 1, per, 0).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
+      expect(ribbonStyle(40, 1, per, PPV_MAX_CSS).alpha).toBeLessThanOrEqual(ALPHA_DEEP);
     }
+  });
+});
+
+/* The Isaiah 53 camera (chapter 53 + 13.3 verses) along the zoom: anchored threads per CSS px of
+   width, from the frame-set law itself (Famous): [zoom, per]. */
+const ISAIAH53 = {
+  pc: [[12, 6.649], [13, 6.383], [14, 6.182], [16, 5.769], [18, 5.161], [20, 4.862], [24, 4.575], [30, 4.059],
+    [40, 3.476], [60, 2.934], [80, 2.355], [120, 1.726], [209, 1.113]],
+  phone: [[12, 11.871], [13, 11.432], [14, 11.091], [16, 10.234], [18, 9.171], [20, 8.719], [24, 8.197], [30, 7.267],
+    [40, 6.182], [60, 5.249], [80, 4.163], [120, 3.075], [209, 1.982]],
+};
+
+describe("the ceiling's ease: D1 at every ceiling, and nothing under it moved", () => {
+  it('is 0 to a quarter of PPV_MAX_CSS and 1 at it, eased in log zoom between (C20)', () => {
+    expect(ceilingEase(PPV_MAX_CSS)).toBe(1);
+    expect(ceilingEase(PPV_MAX_CSS / 4)).toBe(0);
+    expect(ceilingEase(1)).toBe(0);
+    expect(ceilingEase(0)).toBe(0);
+    expect(ceilingEase(undefined)).toBe(0);
+    let prev = 0;
+    for (let p = 8; p <= PPV_MAX_CSS; p *= 1.01) {
+      const e = ceilingEase(p);
+      expect(e, `${p.toFixed(2)} CSS px a verse`).toBeGreaterThanOrEqual(prev - 1e-12);
+      expect(e - prev, `${p.toFixed(2)} CSS px a verse: eased, never a step`).toBeLessThan(0.02);
+      prev = e;
+    }
+  });
+
+  it("leaves the 209x frame and D2's 40x frames exactly as they were", () => {
+    // 209x is 10.75 CSS px a verse on PC and 5.99 on the phone, under the ease's 11
+    for (const [wCss, per] of [[1600, 1.113], [891, 1.982]]) {
+      const ppvCss = (209 * wCss) / TOTAL;
+      expect(ribbonStyle(209, 1, per, ppvCss), `${wCss} CSS px`).toEqual(ribbonStyle(209, 1, per, 0));
+    }
+    for (const [wCss, per] of [[800, 4256 / 800], [375, 4316 / 375], [1920, 4220 / 1920]]) {
+      const ppvCss = (40 * wCss) / TOTAL;
+      expect(ribbonStyle(40, localizeFactor(40), per, ppvCss)).toEqual(ribbonStyle(40, localizeFactor(40), per, 0));
+    }
+  });
+
+  it('only ever lifts, and takes the most crowded ceiling to ALPHA_DEEP', () => {
+    for (const per of [0.17, 0.372, 1, 3]) {
+      let prev = 0;
+      for (let p = 4; p <= PPV_MAX_CSS; p *= 1.02) {
+        const a = ribbonStyle(p * TOTAL / 1600, 1, per, p).alpha;
+        expect(a, `per ${per}, ${p.toFixed(2)} CSS px a verse`).toBeGreaterThanOrEqual(ribbonStyle(p * TOTAL / 1600, 1, per, 0).alpha - 1e-12);
+        expect(a, `per ${per}, ${p.toFixed(2)} CSS px a verse: never dims deeper in`).toBeGreaterThanOrEqual(prev - 1e-12);
+        prev = a;
+      }
+      expect(ribbonStyle(PPV_MAX_CSS * TOTAL / 1600, 1, per, PPV_MAX_CSS).alpha, `per ${per}`).toBeCloseTo(ALPHA_DEEP, 9);
+    }
+  });
+});
+
+describe('the 12-24x dip in one line\'s alpha stays as it is', () => {
+  it("a line's alpha dips between 13x and 24x at Isaiah 53 (-15.7% PC, -39.6% phone), back past 60x / 120x", () => {
+    // The crossover from the overview's ramp to the crowd-divided deep value; the frame never darkens
+    // through it (coverage grows), and lifting it would wash the curtain (D2), so it is pinned as is.
+    const dip = (path, wCss) => {
+      let peak = 0, worst = 0;
+      for (const [z, per] of path) {
+        const a = ribbonStyle(z, localizeFactor(z), per, (z * wCss) / TOTAL).alpha;
+        peak = Math.max(peak, a);
+        worst = Math.min(worst, a / peak - 1);
+      }
+      return worst;
+    };
+    expect(dip(ISAIAH53.pc, 1600)).toBeCloseTo(-0.157, 2);
+    expect(dip(ISAIAH53.phone, 891)).toBeCloseTo(-0.396, 2);
   });
 });
 

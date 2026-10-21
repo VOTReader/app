@@ -30,23 +30,45 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
     }
   });
 
-  it('a span of up to ten verses is short, one of a few chapters\' length or more is long, and the ease between has no step', () => {
-    // the bounds, as spans (w4 INK review 2, finding 3): about 10 to 56 verses, the local domes of a
-    // chapter-deep frame (r3-03's); the ease to about 318 laid the 56 to 318-verse arcs, the big
-    // arcs over a 209x frame, as a 2-4x mesh over those domes
-    expect(spanAt(geo.SHORT_T0)).toBeGreaterThan(9);
-    expect(spanAt(geo.SHORT_T0)).toBeLessThan(11);
-    expect(spanAt(geo.SHORT_T1)).toBeGreaterThan(50);
-    expect(spanAt(geo.SHORT_T1)).toBeLessThan(60);
+  it('a span of up to two or three chapters is short, one of about 111 verses or more is long, and the ease between has no step', () => {
+    // the bounds, as spans: full ink to about 65 verses, so the
+    // chapter arches a 209x frame holds read in front of the long legs, eased to none by about 111.
+    // The w4 review 2's ease to about 318 (from .16) laid the 111 to 318-verse arcs, the big arcs over a
+    // 209x frame, as a 2-4x mesh over the domes; that reach stays refused (dead end, geometry.js).
+    expect(spanAt(geo.SHORT_T0)).toBeGreaterThan(60);
+    expect(spanAt(geo.SHORT_T0)).toBeLessThan(70);
+    expect(spanAt(geo.SHORT_T1)).toBeGreaterThan(105);
+    expect(spanAt(geo.SHORT_T1)).toBeLessThan(118);
     let prev = 1;
     for (let span = 1; span <= 2000; span++) {
       const s = geo.spanShortness(geo.spanT(span, TOTAL));
-      if (span <= 9) expect(s, `span ${span}`).toBe(1);
-      if (span >= 60) expect(s, `span ${span}`).toBe(0);
+      if (span <= 65) expect(s, `span ${span}`).toBe(1);
+      if (span >= 112) expect(s, `span ${span}`).toBe(0);
       expect(s, `span ${span}: never shorter for a wider span`).toBeLessThanOrEqual(prev + 1e-12);
-      // eased, never a step: at most .035 a verse over the 46-verse ease (C20's "gradual, smooth")
+      // eased, never a step: at most .033 a verse over the 46-verse ease (C20's "gradual, smooth")
       expect(prev - s, `span ${span}: eased, never a step (C20)`).toBeLessThan(0.04);
       prev = s;
+    }
+  });
+
+  it('the centre chapter\'s lift keeps the w4 reach, about 10 to 56 verses, inside the plateau', () => {
+    // a 1-4 chapter arch through the centre is inked like any other short arc, not lifted past it
+    // (web-frame.centreEmphasis; the w4 INK review's "a long leg through it is a hairline")
+    expect(spanAt(geo.CENTRE_T0)).toBeGreaterThan(9);
+    expect(spanAt(geo.CENTRE_T0)).toBeLessThan(11);
+    expect(spanAt(geo.CENTRE_T1)).toBeGreaterThan(50);
+    expect(spanAt(geo.CENTRE_T1)).toBeLessThan(60);
+    expect(geo.CENTRE_T1).toBeLessThanOrEqual(geo.SHORT_T0);
+    let prev = 1;
+    for (let span = 1; span <= 2000; span++) {
+      const t = geo.spanT(span, TOTAL);
+      const c = geo.centreShortness(t);
+      if (span <= 9) expect(c, `span ${span}`).toBe(1);
+      if (span >= 60) expect(c, `span ${span}`).toBe(0);
+      expect(c, `span ${span}: the lift only where the plateau is full`).toBeLessThanOrEqual(geo.spanShortness(t));
+      expect(c, `span ${span}: never shorter for a wider span`).toBeLessThanOrEqual(prev + 1e-12);
+      expect(prev - c, `span ${span}: eased, never a step (C20)`).toBeLessThan(0.04);
+      prev = c;
     }
   });
 
@@ -59,12 +81,12 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
 
   it('the hairline is the overview\'s own stroke: STROKE_FIT_CSS is ribbonStyle\'s at fit', () => {
     expect(geo.STROKE_FIT_CSS).toBe(0.9);
-    expect(geo.ribbonStyle(1, 0, 0).strokeWidthCss).toBe(geo.STROKE_FIT_CSS);
+    expect(geo.ribbonStyle(1, 0, 0, 0).strokeWidthCss).toBe(geo.STROKE_FIT_CSS);
   });
 
   it('at the overview the cap is neutral on every screen: every thread keeps the stroke law\'s width', () => {
     for (const dpr of [1, 2, 2.6, 3]) {
-      const halfW = geo.ribbonStyle(1, 0, 0).strokeWidthCss * dpr * 0.5;   // wScale 1 at voteMix 0
+      const halfW = geo.ribbonStyle(1, 0, 0, 0).strokeWidthCss * dpr * 0.5;   // wScale 1 at voteMix 0
       const fit = geo.spanFitHalf(geo.STROKE_FIT_CSS * dpr, 1, 0);
       for (const s of [0, 0.3, 1]) expect(geo.spanHalfWidth(halfW, fit, s)).toBeCloseTo(halfW, 12);
     }
@@ -75,7 +97,7 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
     const k = geo.STROKE_MIN_CSS / geo.STROKE_DEEP_CSS;
     // the main pass's own width law at full depth (web-renderer.js): wScale from the votes' strength
     const wScaleOf = (strength, voteMix) => mix(1, mix(k, 1, (strength - 0.3) / 0.7), voteMix);
-    const deep = geo.ribbonStyle(855, 1, 0.17);
+    const deep = geo.ribbonStyle(855, 1, 0.17, geo.PPV_MAX_CSS);
     expect(deep.strokeWidthCss).toBe(geo.STROKE_DEEP_CSS);
     for (const strength of [0.3, 0.5, 1]) {
       const wScale = wScaleOf(strength, 1);
@@ -99,7 +121,7 @@ describe('the span-ink law: short spans read first, long legs are hairlines, fix
     const k = geo.STROKE_MIN_CSS / geo.STROKE_DEEP_CSS;
     for (const zoom of [1, 1.5, 3, 6, 12, 24, 40, 207, 855]) {
       const loc = geo.localizeFactor(zoom);
-      const st = geo.ribbonStyle(zoom, loc, 0.17);
+      const st = geo.ribbonStyle(zoom, loc, 0.17, (zoom * 1600) / TOTAL);
       const wScale = mix(1, k, st.voteMix);   // strength .30
       const halfW = st.strokeWidthCss * dpr * 0.5 * wScale;
       const fit = geo.spanFitHalf(geo.STROKE_FIT_CSS * dpr, wScale, st.voteMix);
@@ -116,8 +138,8 @@ describe('D1 as drawn: a lone, lowest-vote, longest anchored ribbon at the ceili
   const AT_CEILING = 141 / 800;   // anchored arcs per CSS px of width, phoneLand
   const k = geo.STROKE_MIN_CSS / geo.STROKE_DEEP_CSS;
   /** The vertex shader's alpha chain for one anchored thread at rest (uPx 1), transliterated. */
-  function drawnAlpha(dpr, wCss, strength, span) {
-    const st = geo.ribbonStyle(geo.maxZoomFor(TOTAL, wCss), 1, AT_CEILING);
+  function drawnAlpha(dpr, wCss, strength, span, per = AT_CEILING, ppvCss = geo.PPV_MAX_CSS) {
+    const st = geo.ribbonStyle(geo.maxZoomFor(TOTAL, wCss), 1, per, ppvCss);
     const uPx = 1;
     const wScale = mix(1, mix(k, 1, (strength - 0.3) / 0.7), st.voteMix);
     const short = geo.spanShortness(geo.spanT(span, TOTAL));
@@ -145,6 +167,22 @@ describe('D1 as drawn: a lone, lowest-vote, longest anchored ribbon at the ceili
       }
     }
   });
+
+  it('reaches .83 at the most crowded ceiling measured too, Isaiah 53, on its centre line', () => {
+    // the Isaiah 53 camera's anchored threads per CSS px at the 44 px ceiling (depth.test.js D1): before
+    // the ceiling's ease the crowding divisor took this to 0.63 / 0.66. A long thread has no glow and
+    // no shoulder: its body is the plain antialiased ribbon, so the centre line keeps this alpha.
+    for (const [dpr, wCss, per] of [[1, 1600, 595 / 1600], [2.6, 891, 306 / 891]]) {
+      for (const strength of [0.3, 0.5, 1]) {
+        for (const span of [3, 120, 1500, TOTAL - 1]) {
+          expect(drawnAlpha(dpr, wCss, strength, span, per, geo.PPV_MAX_CSS),
+            `dpr ${dpr} frame ${wCss} strength ${strength} span ${span}`).toBeGreaterThanOrEqual(0.83);
+        }
+      }
+    }
+    expect(SHADER_SOURCE.fragment).toContain('float a = clamp(vCol.a, 0., 1.)*max(aa, halo);');
+    expect(SHADER_SOURCE.fragment).not.toContain('uSoft');
+  });
 });
 
 /* ── the GLSL twin: transliterated and run against the JS ── */
@@ -154,8 +192,8 @@ describe('the GLSL span-ink law IS the JS: the twin transliterated and run', () 
       .replace(/float (\w+)\(([^)]*)\)\{/g, (_, name, a) => `function ${name}(${a.replace(/float /g, '')}){`)
       .replace(/\b(pow|abs|min|max)\(/g, 'Math.$1(');
     const allowed = new Set(['function', 'return', 'Math', 'pow', 'abs', 'min', 'max', 'mix', 'smoothstep',
-      'spanT', 'span', 'total', 'spanShortness', 't', 'spanGain', 'shortness', 'spanFitHalf', 'widthFit', 'wScale',
-      'voteMix', 'spanHalfWidth', 'halfW', 'fitHalf']);
+      'spanT', 'span', 'total', 'spanShortness', 'centreShortness', 't', 'spanGain', 'shortness', 'spanFitHalf',
+      'widthFit', 'wScale', 'voteMix', 'spanHalfWidth', 'halfW', 'fitHalf']);
     const idents = js.replace(/\b\d+(\.\d*)?(e[-+]?\d+)?/g, ' ').match(/[A-Za-z_]\w*/g) || [];
     for (const id of idents) {
       if (!allowed.has(id)) {
@@ -164,7 +202,7 @@ describe('the GLSL span-ink law IS the JS: the twin transliterated and run', () 
       }
     }
     return new Function('mix', 'smoothstep',
-      js + '; return {spanT, spanShortness, spanGain, spanFitHalf, spanHalfWidth};')(mix, smoothstep);
+      js + '; return {spanT, spanShortness, centreShortness, spanGain, spanFitHalf, spanHalfWidth};')(mix, smoothstep);
   }
   const near = (got, want, what) => expect(Math.abs(got - want), what).toBeLessThanOrEqual(1e-9 * Math.max(1, Math.abs(want)));
 
@@ -178,6 +216,7 @@ describe('the GLSL span-ink law IS the JS: the twin transliterated and run', () 
       near(twin.spanT(span, TOTAL), t, `spanT ${span}`);
       const short = geo.spanShortness(t);
       near(twin.spanShortness(t), short, `shortness ${span}`);
+      near(twin.centreShortness(t), geo.centreShortness(t), `centre shortness ${span}`);
       near(twin.spanGain(short), geo.spanGain(short), `gain ${span}`);
       const widthFit = 0.9 * (1 + r() * 2), wScale = 0.5 + r() * 0.5, voteMix = r();
       const fit = geo.spanFitHalf(widthFit, wScale, voteMix);

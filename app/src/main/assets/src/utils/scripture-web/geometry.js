@@ -158,18 +158,47 @@ export const STROKE_MIN_CSS = 1.4;
 export const STROKE_FIT_CSS = 0.9;
 
 /**
+ * The zoom over which the crowding divisor eases to 1 before the ceiling, in octaves (doublings) of
+ * zoom below PPV_MAX_CSS. At the ceiling every verse is 44 CSS px wide and the threads leaving it fan
+ * across that cell, so each anchored ribbon is drawn alone whatever the anchored count reads; the
+ * count does not know that. At Isaiah 53 it reads 0.372 a CSS px on PC (855x) and 0.343 on the phone
+ * (1536x), over DENSITY_K, which divided the ceiling's alpha by 1.42 / 1.36 to 0.63 / 0.66, under
+ * D1's 0.83. Two octaves: from 11 CSS px a verse (about 214x on PC, so the 209x frame is untouched)
+ * to 44.
+ */
+export const CEILING_EASE_OCTAVES = 2;
+
+/**
+ * How far the ceiling has taken the crowding divisor to 1: 0 below the last CEILING_EASE_OCTAVES
+ * octaves, 1 at PPV_MAX_CSS CSS px a verse (Z1: the ceiling is that on every frame), eased (C20).
+ * @param {number} ppvCss  CSS px a verse (the camera's ppv over the DPR); 0 or missing: 0
+ */
+export function ceilingEase(ppvCss) {
+  if (!(ppvCss > 0)) return 0;
+  const top = Math.log2(PPV_MAX_CSS);
+  return smoothstep(top - CEILING_EASE_OCTAVES, top, Math.log2(ppvCss));
+}
+
+/**
  * The alpha and stroke law, as ONE export both the screen and the probes
  * read. It used to live inline in ScriptureWebScreen's draw(), where no
  * harness could import it, so every instrument re-typed it and would have
  * silently measured the old law against a new screen.
  *
+ * D1 AT EVERY CEILING: the crowding divisor eases to 1 over the last
+ * CEILING_EASE_OCTAVES before PPV_MAX_CSS (ceilingEase), so an anchored
+ * ribbon reaches ALPHA_DEEP at the ceiling however crowded the chapter
+ * (Isaiah 53 read 0.63 / 0.66 there). The ease only lifts: it never dims a
+ * line. ppvCss is required, so no caller can drop the ease by leaving it out
+ * (typecheck refuses the call); pass 0 where there is no camera.
  *
  * @param {number} zoom - multiple of fit-to-width
  * @param {number} localize - localizeFactor()
  * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
+ * @param {number} ppvCss - CSS px a verse (the camera's ppv over the DPR), for the ceiling's ease
  * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
  */
-export function ribbonStyle(zoom, localize, anchoredPerCssPx) {
+export function ribbonStyle(zoom, localize, anchoredPerCssPx, ppvCss) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
   const alpha = Math.min(0.075 + l2 * 0.028, 0.19);
   const strokeWidthCss = Math.min(STROKE_FIT_CSS + l2 * 0.16, STROKE_DEEP_CSS);
@@ -180,7 +209,8 @@ export function ribbonStyle(zoom, localize, anchoredPerCssPx) {
   // overlaps, so each ribbon is drawn alone and needs the full value; at 40x
   // there are thirty times as many and the same value would be a neon fog.
   const per = anchoredPerCssPx > 0 ? anchoredPerCssPx : 0;
-  const crowd = Math.max(1, Math.pow(per / DENSITY_K, DENSITY_EXP));
+  const crowded = Math.max(1, Math.pow(per / DENSITY_K, DENSITY_EXP));
+  const crowd = crowded + (1 - crowded) * ceilingEase(ppvCss);
   const deep = ALPHA_DEEP / crowd;
   return {
     alpha: alpha + (deep - alpha) * t,
@@ -580,9 +610,16 @@ export const SPAN_T_EXP = 0.40;
  *  review 2 narrowed it from .16 (about 318 verses) to .08: the 56 to 318-verse arcs were still that
  *  mesh at 2-4x ink, and held to the hairline they let the domes and the long legs' warm and green
  *  read (209x: magenta-violet 67% -> 53% of the lit field, warm 7% -> 10%; go-to 53% -> 43%), with
- *  the overview's feet and baseline glow unchanged (74%, the same lit count; w4/ink pairs.md). */
-export const SHORT_T0 = 0.04;
-export const SHORT_T1 = 0.08;
+ *  the overview's feet and baseline glow unchanged (74%, the same lit count; w4/ink pairs.md).
+ *  The plateau holds full ink to about 65 verses (two or three chapters) and eases to none by about
+ *  111, so the chapter arches a 209x frame holds read in front of the long legs (the deep frame's
+ *  curtain); the centre chapter's lift keeps the old 10 to 56-verse reach (CENTRE_T0 / CENTRE_T1). */
+export const SHORT_T0 = 0.085;
+export const SHORT_T1 = 0.105;
+/** The ramp's t over which the centre chapter's lift (web-frame.centreEmphasis) eases out: about 10
+ *  verses to 56, the w4 reach, so a 1-4 chapter arch is inked like any other and not lifted past it. */
+export const CENTRE_T0 = 0.04;
+export const CENTRE_T1 = 0.08;
 /** The shortest spans' extra ink: their alpha times 1 + SHORT_GAIN, clamped to full ink. */
 export const SHORT_GAIN = 4;
 
@@ -596,9 +633,14 @@ export function spanT(span, total) {
   return Math.pow(Math.abs(span) / total, SPAN_T_EXP);
 }
 
-/** How short a thread is, 1 (up to ~10 verses) .. 0 (~318 and more), eased (C20). @param {number} t spanT */
+/** How short a thread is, 1 (up to ~65 verses) .. 0 (~111 and more), eased (C20). @param {number} t spanT */
 export function spanShortness(t) {
   return 1 - smoothstep(SHORT_T0, SHORT_T1, t);
+}
+
+/** The centre chapter's lift by span, 1 (up to ~10 verses) .. 0 (~56 and more). @param {number} t spanT */
+export function centreShortness(t) {
+  return 1 - smoothstep(CENTRE_T0, CENTRE_T1, t);
 }
 
 /** The alpha multiplier of a thread that short: 1 + SHORT_GAIN at the shortest, 1 for a long one. */
@@ -635,13 +677,16 @@ export function spanHalfWidth(halfW, fitHalf, shortness) {
   return held + (halfW - held) * shortness;
 }
 
-/** The same five functions as GLSL ES 3.00, for the vertex shader to inline. */
+/** The same six functions as GLSL ES 3.00, for the vertex shader to inline. */
 export const spanInkGLSL = `
 float spanT(float span, float total){
   return pow(abs(span)/total, ${glslFloat(SPAN_T_EXP)});
 }
 float spanShortness(float t){
   return 1. - smoothstep(${glslFloat(SHORT_T0)}, ${glslFloat(SHORT_T1)}, t);
+}
+float centreShortness(float t){
+  return 1. - smoothstep(${glslFloat(CENTRE_T0)}, ${glslFloat(CENTRE_T1)}, t);
 }
 float spanGain(float shortness){
   return 1. + ${glslFloat(SHORT_GAIN)}*shortness;

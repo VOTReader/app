@@ -390,7 +390,8 @@ export function useWebRenderer({
     // crowding law's: every anchored thread is drawn, so it counts them all.
     const set = frameSet(g, cam, base);
     const perCssPx = base.localize > 0 ? set.anchored / ((v.W || 1) / (v.DPR || 1)) : 0;
-    const style = ribbonStyle(zoom, base.localize, perCssPx);
+    // the ceiling's own ease takes the crowd to 1 (D1 at every ceiling): it reads the CSS px a verse
+    const style = ribbonStyle(zoom, base.localize, perCssPx, cam.ppv / (v.DPR || 1));
     // the convergence pills: how many threads meet at each foot cell
     const bundles = bundlesFor(bundleRef.current, g, cam, base, v, density);
     const centre = centreOf(g, lens, zoom);
