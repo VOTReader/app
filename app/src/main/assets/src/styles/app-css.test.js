@@ -875,3 +875,20 @@ describe('app.css — the search box keeps its own focus look', () => {
     expect(CSS.indexOf('.search-input:focus-visible {'), 'after the app-wide ring, so it wins').toBeGreaterThan(CSS.indexOf('[role="combobox"]:focus-visible { outline: 2px'));
   });
 });
+
+/* Corbin's phone, 2026-10-21: a Format B poem read "Behold,My namealone stands throughout". The spaces were in the
+   DOM (whitespace-only text nodes between <em> and <strong>), but .letter-poetry was display:table, and Chromium and
+   the Android WebView give no layout box to a whitespace-only text child of a table, flex or grid box, so each space
+   drew 0 px wide. A box whose direct children are a paragraph's inline runs must stay a block. */
+describe('app.css — a box that holds a paragraph\'s inline runs never drops the spaces between them', () => {
+  const INLINE_TEXT_HOSTS = ['.letter-poetry'];
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ selectors: m[1].split(',').map((s) => s.trim()), body: m[2] }));
+  for (const host of INLINE_TEXT_HOSTS) {
+    it(host + ' is never a table, flex or grid box', () => {
+      const own = rules.filter((r) => r.selectors.some((s) => s === host || s.endsWith(' ' + host) || s.endsWith('>' + host)));
+      expect(own.length, 'a rule styles ' + host).toBeGreaterThan(0);
+      for (const r of own) expect(r.body, r.selectors.join(', ')).not.toMatch(/display\s*:\s*(inline-)?(table|flex|grid)\b/);
+    });
+  }
+});

@@ -2583,10 +2583,15 @@
     body.light .prophecy-card.pc-vot .prophecy-card-tag { color:rgba(30,60,140,0.85); }
     body.light .prophecy-card.pc-vot .prophecy-card-sublabel { color:rgba(30,60,140,0.6); }
 
-    /* display:table never narrows below its longest word: at a large Text Size
-       a centred heading ("Misinterpretation") ran 76 px past a phone. anywhere
-       lets that word break instead; max-width keeps the table in the column. */
-    .letter-poetry { margin:2.2rem auto; display:table; text-align:center; max-width:100%; overflow-wrap:anywhere; }
+    /* A block shrunk to its lines (width:fit-content) and centred by its auto
+       margins. Never display:table (nor flex or grid): Chromium and the Android
+       WebView give no layout box to a whitespace-only text node that is a direct
+       child of a table box, so the space between two emphasis runs of a Format B
+       poem drew 0 px wide ("Behold,My namealone", Corbin's phone 2026-10-21).
+       A shrink-wrapped box never narrows below its longest word: at a large Text
+       Size a centred heading ("Misinterpretation") ran 76 px past a phone, so
+       anywhere lets that word break, and max-width keeps the box in the column. */
+    .letter-poetry { margin:2.2rem auto; display:block; width:fit-content; text-align:center; max-width:100%; overflow-wrap:anywhere; }
     .poetry-line { font-size:var(--fs-16); line-height:1.9; color:var(--cream); font-style:italic; display:block; white-space:nowrap; }
     @media (max-width:480px) { .poetry-line { font-size:var(--fs-16); white-space:normal; } }
     .stanza-break { height:0.9rem; display:block; }
