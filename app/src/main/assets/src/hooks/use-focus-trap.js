@@ -140,10 +140,13 @@ export function useFocusTrap(active, opts) {
       const i = _trapStack.lastIndexOf(root);
       if (i !== -1) _trapStack.splice(i, 1);
       // Restore focus to where the user was before the dialog opened, or where the dialog says.
+      // preventScroll: giving focus back must not move the page. A sheet that sends the reader
+      // somewhere (an Answers topic's Contents jump) closes AFTER it scrolled, and a plain focus()
+      // scrolled its trigger at the top back into view, so every jump snapped back to the top.
       const ask = returnRef.current;
       const to = (typeof ask === 'function' && ask()) || prev;
       if (to && to.isConnected && document.contains(to)) {
-        try { to.focus(); } catch (_e) { /* best-effort */ }
+        try { to.focus({ preventScroll: true }); } catch (_e) { /* best-effort */ }
       }
     };
   }, [active, modal]);

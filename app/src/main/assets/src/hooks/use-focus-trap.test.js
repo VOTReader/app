@@ -6,7 +6,7 @@
    focus to the pre-open element. All jsdom — the hook deliberately skips
    layout-based visibility probes so these tests are faithful. */
 
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useFocusTrap } from './use-focus-trap.js';
 
@@ -155,6 +155,19 @@ describe('useFocusTrap', () => {
     const hook = mountTrap(root);
     expect(document.activeElement).not.toBe(opener);
     hook.unmount();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('giving focus back on close never scrolls the page (an Answers Contents jump snapped back to the top)', () => {
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    cleanupEls.push(opener);
+    opener.focus();
+    const { root } = buildDialog('h');
+    const hook = mountTrap(root);
+    const spy = vi.spyOn(opener, 'focus');
+    hook.unmount();
+    expect(spy).toHaveBeenCalledWith({ preventScroll: true });
     expect(document.activeElement).toBe(opener);
   });
 
