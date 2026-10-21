@@ -688,7 +688,8 @@ export function useGoTo(web) {
 /**
  * Route a tap on an overlay target (CONTRACTS.md section 4): a book name frames the book, a
  * chapter numeral frames the chapter (about 70 % of the canvas area) and opens its group, a pill
- * opens its group. A camera move is a journey arrival, pushed before the camera moves (the trail
+ * opens its group, and a chip of a pill's fan opens the lines it counts in the panel's exits mode,
+ * moving no camera (exits.js). A camera move is a journey arrival, pushed before the camera moves (the trail
  * asks the go-to where it set out from).
  * @param {import('./overlay-renderer.js').OverlayHit | null} hit
  * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any, insetFor?: Function }} nav
@@ -713,6 +714,12 @@ export function routeOverlayHit(hit, nav) {
   }
   if (hit.kind === 'pill') {
     return typeof nav.openPanel === 'function' && !!nav.openPanel({ mode: 'group', ids: hit.ids, label: hit.label });
+  }
+  if (hit.kind === 'exit') {
+    return typeof nav.openPanel === 'function' && !!nav.openPanel({
+      mode: 'exits', ids: hit.ids, label: hit.label, key: hit.key, side: hit.side, books: [hit.lo, hit.hi],
+      cell: hit.cell || null, area: hit.area || null,
+    });
   }
   return false;
 }

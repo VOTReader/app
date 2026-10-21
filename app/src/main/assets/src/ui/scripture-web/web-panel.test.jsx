@@ -17,6 +17,10 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import * as ds from '../../utils/scripture-web/describe.js';
 import * as pm from '../../utils/scripture-web/panel-model.js';
 import { WebPanel, modeOfDetail, subjectKey, strongestFirst, CITED_SHOWN } from './web-panel.jsx';
+import * as geo from '../../utils/scripture-web/geometry.js';
+import { frameSetAt } from '../../utils/scripture-web/frame-set.js';
+import { webFrame } from '../../utils/scripture-web/web-frame.js';
+import { exitCensus, exitIds, fanGroups, areaLabel } from '../../utils/scripture-web/exits.js';
 import { hereLabel } from './goto.jsx';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -547,5 +551,65 @@ describe('Nearby (list mode) and the focus law', () => {
   it('an empty My Web list says so', () => {
     const { panel } = mount({ listOpen: true, listItems: [], mode: 'personal' });
     expect(panel.querySelector('.sw-list-empty').textContent).toBe('You have no links on the web yet.');
+  });
+});
+
+/* Exits mode: a chip of a "+n" pill's fan (exits.js), on the Isaiah 53 deep frame (s06b, PC), its cell
+   the first twelve verses of Isaiah 54. */
+describe("exits mode: a fan chip's lines, by the book they go to", () => {
+  const V = { W: 1600, H: 900, DPR: 1 };
+  const F = webFrame(V, false);
+  const camX = vid('isaiah', 53, 1) + 13.3, ppv = (V.W / g.total) * 208.8;
+  const set = frameSetAt(g, 'famous', V.W, F.base, geo.squashFactor(F.ceil, V.W), camX, 0, ppv, 1);
+  const cell = { lo: vid('isaiah', 54, 1), hi: vid('isaiah', 54, 12) };
+  const fan = fanGroups(g, exitCensus(g, set, V.W, cell), 5);
+  const grp = fan.right.concat(fan.left).sort((a, b) => b.count - a.count)[0];
+  const ids = exitIds(g, set, V.W, grp.side, grp.lo, grp.hi, cell);
+  const detail = { kind: 'exits', key: 'c' + cell.lo + '-' + cell.hi + ':' + grp.side[0] + ':' + grp.lo + '-' + grp.hi,
+    label: grp.title, side: grp.side, books: [grp.lo, grp.hi], cell, area: { label: areaLabel(g, cell.lo, cell.hi), ...cell }, ids };
+
+  it("the words: 'Leaving the view', the books with the side's arrow, the count from the cell", () => {
+    expect(grp.count).toBeGreaterThan(1);
+    const w = ds.exitsWords(detail);
+    expect(w.over).toBe('Leaving the view');
+    expect(w.title).toBe(grp.side === 'left' ? '\u2039 ' + grp.title : grp.title + ' \u203a');
+    expect(w.meta).toBe(ids.length + ' connections from Isaiah 54:1-12');
+    expect(w.summary).toBe(ids.length + ' connections from Isaiah 54:1-12 go to ' + grp.title + '.');
+    expect(w.title + w.meta, 'ASCII hyphens').not.toMatch(/[\u2013\u2014]/);
+    expect(ds.sheetEyebrow(detail)).toBe('Leaving the view');
+    expect(ds.summaryOf(detail)).toBe(w.summary);
+    expect(ds.exitsWords({ ...detail, ids: [ids[0]] }).summary).toMatch(/^1 connection from .* goes to /);
+  });
+
+  it('exitsModel: by far book in canon order, strongest first in each, the near end the one in the cell', () => {
+    const m = pm.exitsModel(g, detail);
+    expect(m.threads.total, "the chip's count is the panel's").toBe(grp.count);
+    expect(m.zoom).toBe(g.chapterOfVerse[cell.lo]);
+    const books = m.threads.groups.map((x) => x.book);
+    expect(books).toEqual([...books].sort((a, b) => a - b));
+    for (const grpRows of m.threads.groups) {
+      expect(grpRows.book >= grp.lo && grpRows.book <= grp.hi, grpRows.title + ' in the chip').toBe(true);
+      for (let k = 1; k < grpRows.rows.length; k++) expect(grpRows.rows[k].votes).toBeLessThanOrEqual(grpRows.rows[k - 1].votes);
+      for (const r of grpRows.rows) expect(r.hereVerse >= cell.lo && r.hereVerse <= cell.hi).toBe(true);
+    }
+  });
+
+  it('the panel: its head, "Connections · n" the chip\'s count, rows with Open and Follow, the lines lit as it opened', () => {
+    const { panel, byLabel, props } = mount({ detail });
+    expect(modeOfDetail(detail)).toBe('exits');
+    expect(subjectKey('exits', detail, null)).toBe('x:' + detail.key);
+    expect(panel.getAttribute('data-mode')).toBe('exits');
+    expect(panel.querySelector('.sw-panel-over').textContent).toBe('Leaving the view');
+    expect(panel.querySelector('.sw-panel-title').textContent).toBe(ds.exitsWords(detail).title);
+    expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · ' + grp.count);
+    const rows = panel.querySelectorAll('.sw-group .sw-row');
+    expect(rows.length).toBeGreaterThan(0);
+    const follows = byLabel(/^Follow the line from Isaiah 54:/);
+    expect(follows.length).toBe(rows.length);
+    expect(panel.querySelectorAll('.sw-group .sw-row-open').length, 'each row has its Open').toBe(rows.length);
+    fireEvent.click(follows[0]);
+    expect(props.followRow).toHaveBeenCalledWith(expect.objectContaining({ hereVerse: expect.any(Number) }));
+    expect(props.followRow.mock.calls[0][0].hereVerse).toBeGreaterThanOrEqual(cell.lo);
+    expect(props.followRow.mock.calls[0][0].hereVerse).toBeLessThanOrEqual(cell.hi);
   });
 });

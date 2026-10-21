@@ -48,6 +48,8 @@ import {
   canvasFont, fontPx, setFont, measure, boxesMeet, createGrid, placeRanked, ensureWebFont,
 } from '../../utils/scripture-web/label-engine.js';
 import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
+import { frameSet } from '../../utils/scripture-web/frame-set.js';
+import { exitCensus, exitIds, fanGroups, areaLabel } from '../../utils/scripture-web/exits.js';
 
 /**
  * @typedef {object} CanonFrame
@@ -76,14 +78,22 @@ import { drawPersonalWeb, railFrame, segmentSpan } from './rail-renderer.js';
  *                               keep out of the panel
  * @property {OverlayBox[]} [hits]  what the last paint made tappable; the draw copies
  *                               paintCanonOverlay's result here so hitOverlay can read it
+ * @property {any} [ask]         what a column's fan is asked about (focus.ask, use-web-selection.js):
+ *                               a "+n" pill's cell, or a fan chip's (its cell, side and books), or null
+ * @property {Box|null} [fanZone]  the ground of the fan the last paint drew (fanAt reads it)
  */
 
 /**
  * @typedef {{ kind: 'book', book: number }
  *   | { kind: 'chapter', book: number, chapter: number }
- *   | { kind: 'pill', ids: ArrayLike<number>, label: string }} OverlayHit
+ *   | { kind: 'pill', ids: ArrayLike<number>, label: string, cell?: {lo:number, hi:number} }
+ *   | { kind: 'exit', ids: ArrayLike<number>, label: string, key: string, side: 'left'|'right',
+ *       lo: number, hi: number, count: number, cell: {lo:number, hi:number},
+ *       area: {label:string, lo:number, hi:number} }} OverlayHit
  *   book: an index into g.books; chapter: its number (1-based); ids: the OpenBible
- *   arc ids a "+n" pill counts, label: what the panel's group mode is titled
+ *   arc ids a "+n" pill counts, label: what the panel's group mode is titled, cell: its verses;
+ *   exit: a chip of a column's fan (exits.js): the legs it counts, from the cell to the books lo..hi
+ *   on `side`; area: the cell in words
  */
 /** @typedef {{ x0:number, y0:number, x1:number, y1:number, hit: OverlayHit, core?: Box }} OverlayBox
  *   device px: the tap target, at least TAP_MIN CSS px each way; `core` is what is drawn there */
@@ -586,7 +596,9 @@ function layoutOf(ctx, fs) {
  * books at the bottom, etc)").
  * @param {CanvasRenderingContext2D|null} ctx
  * @param {CanonFrame} fs
- * @returns {{marks:number[], altitudeSpan:number, elevator:any, labels:number, badges:any[], hits:OverlayBox[]}}
+ * @returns {{marks:number[], altitudeSpan:number, elevator:any, labels:number, badges:any[], hits:OverlayBox[],
+ *   fan:any[], fanZone:Box|null}}  fan: the column fan's chips as drawn (CSS px, for the walk); fanZone:
+ *   the fan's ground (fanAt)
  */
 export function paintCanonOverlay(ctx, fs) {
   const { g, cam, view, v, chrome, inset } = fs;
@@ -621,7 +633,7 @@ export function paintCanonOverlay(ctx, fs) {
   const altitude = { span: 0 };
   const marks = drawAltitude(ctx, g, cam, Object.assign({}, view, { inset, reserved }), v, chrome, altitude);
   const elevator = drawElevator(ctx, cam, Object.assign({}, view, { inset, reserved, total: g ? g.total : 0 }), v, chrome, fs.yFrame);
-  if (!L) return { marks, altitudeSpan: altitude.span, elevator, labels: 0, badges, hits };
+  if (!L) return { marks, altitudeSpan: altitude.span, elevator, labels: 0, badges, hits, fan: [], fanZone: null };
   for (const b of reserved) grid.add(b);
   // the page's chips over the canvas (CSS px): no label is drawn under one
   const dpr = v.DPR || 1;
@@ -629,6 +641,8 @@ export function paintCanonOverlay(ctx, fs) {
   /** threads labelled this frame: OpenBible ids, and 'p<n>' for a prophecy pair */
   const labelled = new Set();
   const chosen = drawChosen(ctx, g, cam, L, fs, grid, labelled, ch);
+  // a column's fan, asked for: placed before the feet's chips and the far ends, which keep off it
+  const fan = drawFan(ctx, g, cam, L, fs, grid, hits);
   drawPills(ctx, g, cam, L, fs, grid, hits, badges);
   if (g.count > 0 && L.deepT >= 0.5) {
     const memo = memoOf(g);
@@ -636,7 +650,10 @@ export function paintCanonOverlay(ctx, fs) {
     memo.chips = drawChips(ctx, g, cam, L, fs, grid, memo, labelled, quiet);
     if (cam.ppv / L.s >= LEG_PPV_CSS) memo.legs = drawLegs(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.legs, labelled, quiet);
   }
-  return { marks, altitudeSpan: altitude.span, elevator, labels: labelled.size, badges, hits };
+  return {
+    marks, altitudeSpan: altitude.span, elevator, labels: labelled.size, badges, hits,
+    fan: fan ? fan.chips : [], fanZone: fan ? fan.zone : null,
+  };
 }
 
 /**
@@ -1525,17 +1542,200 @@ function drawPills(ctx, g, cam, L, fs, grid, hits, badges) {
     ctx.fillText(text, cx, (y0 + y1) / 2 + 0.05 * h);
     badges.push(Object.assign({ x0: box.x0, x1: box.x1, y0: box.y0, y1: box.y1 }, { cell }));
     const lo = cell.lo, hi = cell.hi;
+    // the cell whose fan is up (exits): the pill wears the lit ink's ring
+    const ask = fs.ask;
+    if (ask && ask.cell && ask.cell.lo === lo && ask.cell.hi === hi) {
+      roundRectPath(ctx, box, h / 2);
+      ctx.lineWidth = 1.5 * s;
+      ctx.strokeStyle = css('lit');
+      ctx.stroke();
+    }
     // counted on the first read only (a tap), and then kept: the walk visits every thread
     /** @type {Int32Array|null} */
     let ids = null;
     /** @type {any} */
     const hit = {
-      kind: 'pill', label: cellLabel(g, cell),
+      kind: 'pill', label: cellLabel(g, cell), cell: { lo, hi },
       get ids() { return ids || (ids = pillIds(g, snap, W, density, lo, hi)); },
     };
     hits.push(tapTarget(box, box, hit, L));
   }
   ctx.restore();
+}
+
+/* ── a column's fan (exits.js) ─────────────────────────────────────────
+   The curtain, read. Deep in, the frame is mostly legs, threads with one
+   foot here and the other in another book; the structure law keeps every
+   one whole, so the overlay says where they go. A "+n" pill's cell asked
+   for (the pill hovered, or its group card open) raises its column's fan:
+   the legs standing there by the book (or run of books) of their far foot,
+   with how many, in two stacks beside the column, left-going on the left
+   and right-going on the right, the nearest destination lowest (altitude IS
+   span), each chip's swatch the distance ramp's colour of its legs' spans
+   (C7: colour is distance). Hovering a chip lights its legs, a tap lists
+   them in the panel's exits mode; neither dims anything (the lit ink over
+   the web, the top pass). */
+
+/** A fan's chips, CSS px: their height, and the gap between them. */
+const EXIT_H = 22, EXIT_H_COMPACT = 20, EXIT_GAP = 6;
+/** A column's fan holds at most this many chips a side (runs of books fold the rest in). */
+export const FAN_MOST = 5, FAN_MOST_COMPACT = 4;
+
+/**
+ * A chip's tap target: the chip grown to TAP_MIN each way about its centre, kept on the canvas area
+ * and above the baseline (the fan stands in the sky: tapTarget's slide into the ruler band is not
+ * its). Device px.
+ * @param {Box} core @param {OverlayHit} hit @param {any} L @returns {OverlayBox}
+ */
+function chipTarget(core, hit, L) {
+  const m = TAP_MIN * L.s;
+  /** @returns {[number, number]} */
+  const grow = (a, b, lo, hi) => {
+    if (b - a < m) { const c = (a + b) / 2; a = c - m / 2; b = c + m / 2; }
+    return [Math.max(lo, a), Math.min(hi, b)];
+  };
+  const [x0, x1] = grow(core.x0, core.x1, 0, L.Wc);
+  const [y0, y1] = grow(core.y0, core.y1, 0, L.base);
+  return { x0, y0, x1, y1, core: { x0: core.x0, x1: core.x1, y0: core.y0, y1: core.y1 }, hit };
+}
+
+/** A chip's pieces: its width and its words' widths, device px. */
+function exitChip(ctx, grp, L, f) {
+  const s = L.s;
+  const arrow = grp.side === 'left' ? '‹' : '›';
+  const count = fmtCount(grp.count);
+  const wa = measure.width(ctx, f.name, arrow), wn = measure.width(ctx, f.name, grp.name), wc = measure.width(ctx, f.count, count);
+  const pad = 8 * s, g1 = 4 * s, sw = 2 * s, g2 = 5 * s;
+  return { w: pad + wa + g1 + sw + g2 + wn + g1 + wc + pad, arrow, count, wa, wn, wc, pad, g1, sw, g2 };
+}
+
+/**
+ * One chip: the pill's ground and border (the lit ink's when it is the one asked for), the arrow
+ * on its side, the swatch, the name and the count. Returns its box, device px.
+ */
+function paintExitChip(ctx, grp, chip, x0, y0, h, L, f, asked) {
+  const s = L.s;
+  const box = { x0, x1: x0 + chip.w, y0, y1: y0 + h };
+  roundRectPath(ctx, box, h / 2);
+  ctx.fillStyle = css('pillFill');
+  ctx.fill();
+  ctx.lineWidth = (asked ? 1.5 : inkWidth('pillBorder')) * s;
+  ctx.strokeStyle = asked ? css('lit') : css('pillBorder');
+  ctx.stroke();
+  const cy = y0 + h / 2 + 0.05 * h;
+  const rgb = distanceRampRGB(grp.t).join(',');
+  const swatch = (x) => {
+    ctx.fillStyle = 'rgba(' + rgb + ',0.95)';
+    ctx.fillRect(x, y0 + h * 0.24, chip.sw, h * 0.52);
+  };
+  const nameInk = css(asked ? 'chipText' : 'pillText');
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  let x = x0 + chip.pad;
+  setFont(ctx, f.name, 0);
+  if (grp.side === 'left') {
+    ctx.fillStyle = css('pillText'); ctx.fillText(chip.arrow, x, cy); x += chip.wa + chip.g1;
+    swatch(x); x += chip.sw + chip.g2;
+    ctx.fillStyle = nameInk; ctx.fillText(grp.name, x, cy); x += chip.wn + chip.g1;
+    setFont(ctx, f.count, 0);
+    ctx.fillStyle = css('textMuted'); ctx.fillText(chip.count, x, cy);
+  } else {
+    ctx.fillStyle = nameInk; ctx.fillText(grp.name, x, cy); x += chip.wn + chip.g1;
+    setFont(ctx, f.count, 0);
+    ctx.fillStyle = css('textMuted'); ctx.fillText(chip.count, x, cy); x += chip.wc + chip.g2;
+    swatch(x); x += chip.sw + chip.g1;
+    setFont(ctx, f.name, 0);
+    ctx.fillStyle = css('pillText'); ctx.fillText(chip.arrow, x, cy);
+  }
+  return box;
+}
+
+/** The view numbers a chip's lazy ids re-ask the frame's visible set with (frame-set.frameSet). */
+const viewSnap = (view) => ({ density: view.density, width: view.width, base: view.base, squash: view.squash, dpr: view.dpr });
+
+/** A chip as the walk reads it (data-exit-fan), CSS px. */
+const chipRecord = (grp, box, s, extra) => Object.assign({
+  side: grp.side, label: grp.name, count: grp.count, lo: grp.lo, hi: grp.hi, books: grp.books, kind: grp.kind, t: Math.round(grp.t * 1000) / 1000,
+  x0: Math.round(box.x0 / s), y0: Math.round(box.y0 / s), x1: Math.round(box.x1 / s), y1: Math.round(box.y1 / s),
+}, extra || null);
+
+/**
+ * A column's fan (see above): for the cell asked for (fs.ask.cell, a "+n" pill's), its legs by
+ * destination in two stacks beside the column, left-going on the left and right-going on the right,
+ * nearest lowest; each chip a tap target of its own (the legs from the cell to those books), and the
+ * ground under the stacks (`zone`) where a resting pointer keeps the fan up. Null when no cell is
+ * asked, the deep band has not begun (deepT < 0.5), the cell is off the canvas area or none of its
+ * threads leaves the frame. The census runs only here, so with no fan up nothing counts.
+ * @returns {null | { chips: any[], zone: Box }}
+ */
+function drawFan(ctx, g, cam, L, fs, grid, hits) {
+  const ask = fs.ask;
+  if (!ask || !ask.cell || !g.count || !(L.deepT >= 0.5) || !fs.view || !(fs.view.width > 0)) return null;
+  const s = L.s, cell = ask.cell;
+  const cx = ((cell.lo + cell.hi + 1) / 2 - cam.x) * cam.ppv + L.W / 2;
+  if (!(cx >= 0 && cx <= L.Wc)) return null;
+  const set = frameSet(g, cam, fs.view);
+  const census = exitCensus(g, set, L.Wc, cell);
+  if (!census.legs) return null;
+  const fan = fanGroups(g, census, L.compact ? FAN_MOST_COMPACT : FAN_MOST);
+  const size = L.compact ? 12 : 13;
+  const f = { name: canvasFont(size, s, 600), count: canvasFont(size, s, 400) };
+  const h = (L.compact ? EXIT_H_COMPACT : EXIT_H) * s, step = h + EXIT_GAP * s;
+  // the lowest chip stands over the feet's chips (drawChips: just over the baseline)
+  const yb = L.base + L.camY - (L.compact ? 30 : 36) * s;
+  const snap = { x: cam.x, y: cam.y, ppv: cam.ppv, total: cam.total };
+  const vs = viewSnap(fs.view), Wc = L.Wc;
+  // a fan's lines stand on its column: they come from the cell, not from the whole frame
+  const area = { label: areaLabel(g, cell.lo, cell.hi), lo: cell.lo, hi: cell.hi };
+  const out = [];
+  let zx0 = cx - 12 * s, zx1 = cx + 12 * s, zy0 = yb;
+  // the stacks' chips that stand in the sky, and the two stacks moved as one block to keep the
+  // gutters at the frame's edges: a column near an edge keeps its fan beside it, and one stack
+  // never slides over the other
+  const stacks = [fan.left, fan.right].map((list) => list.map((grp, k) => ({ grp, k, chip: exitChip(ctx, grp, L, f) }))
+    .filter((c) => yb - c.k * step - h >= L.skyTop));
+  const wl = Math.max(0, ...stacks[0].map((c) => c.chip.w)), wr = Math.max(0, ...stacks[1].map((c) => c.chip.w));
+  const reachL = cx - 8 * s - wl, reachR = cx + 8 * s + wr;
+  const dx = reachL < L.gutter ? L.gutter - reachL : reachR > L.Wc - L.gutter ? L.Wc - L.gutter - reachR : 0;
+  ctx.save();
+  for (const list of stacks) {
+    list.forEach(({ grp, k, chip }) => {
+      const y1 = yb - k * step, y0 = y1 - h;
+      const x0 = grp.side === 'left' ? cx + dx - 8 * s - chip.w : cx + dx + 8 * s;
+      const asked = !!ask.books && ask.side === grp.side && ask.books[0] <= grp.hi && ask.books[1] >= grp.lo;
+      const box = paintExitChip(ctx, grp, chip, x0, y0, h, L, f, asked);
+      grid.add({ x0: box.x0 - 3 * s, x1: box.x1 + 3 * s, y0: box.y0 - 3 * s, y1: box.y1 + 3 * s });
+      zx0 = Math.min(zx0, box.x0); zx1 = Math.max(zx1, box.x1); zy0 = Math.min(zy0, box.y0);
+      /** @type {Int32Array|null} */
+      let ids = null;
+      /** @type {any} */
+      const hit = {
+        kind: 'exit', key: 'c' + cell.lo + '-' + cell.hi + ':' + grp.side[0] + ':' + grp.lo + '-' + grp.hi, side: grp.side,
+        lo: grp.lo, hi: grp.hi, label: grp.title, count: grp.count, cell: { lo: cell.lo, hi: cell.hi }, area,
+        get ids() { return ids || (ids = exitIds(g, frameSet(g, snap, vs), Wc, grp.side, grp.lo, grp.hi, cell)); },
+      };
+      hits.push(chipTarget(box, hit, L));
+      out.push(chipRecord(grp, box, s, asked ? { asked: true } : null));
+    });
+  }
+  ctx.restore();
+  // the fan's ground, from its top chip down past the pills, device px: no tap of its own, a
+  // resting pointer there keeps the fan up on its way from the pill to the chips (fanAt)
+  const zone = { x0: zx0 - 8 * s, x1: zx1 + 8 * s, y0: zy0 - 8 * s, y1: L.dp.pills.top + L.dp.pills.h + 6 * s };
+  return { chips: out, zone };
+}
+
+/**
+ * Whether a CSS-px point is on the ground of the fan the last frame drew (the hover keeps a
+ * hovered pill's fan up there, between the pill and its chips).
+ * @param {CanonFrame|null} fs @param {number} xCss @param {number} yCss
+ */
+export function fanAt(fs, xCss, yCss) {
+  const z = fs && fs.fanZone;
+  if (!z) return false;
+  const dpr = (fs.v && fs.v.DPR) || 1;
+  const px = xCss * dpr, py = yCss * dpr;
+  return px >= z.x0 && px <= z.x1 && py >= z.y0 && py <= z.y1;
 }
 
 /* ── the labels over the baseline ──────────────────────────────────────── */

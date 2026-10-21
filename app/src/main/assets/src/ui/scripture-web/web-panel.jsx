@@ -15,6 +15,8 @@
      verse       one verse: its text, its citations, its threads by book
      group       a chapter or a bundle: its threads by book, then the zoom row
      letter      a letter of the Volumes: the verses it cites
+     exits       a chip of a "+n" pill's fan (exits.js): the lines it counts,
+                 lit, by the book they go to, each with Open and Follow
      myweb       a link of the reader's own or one of Timothy's threads (the
                  endpoint cards, unchanged)
 
@@ -39,10 +41,11 @@
 import { ConnectionRow } from './connection-row.jsx';
 import {
   connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel,
-  verseEndpoint, verseTextFor, WHOLE_WEB,
+  verseEndpoint, verseTextFor, WHOLE_WEB, exitsWords,
 } from '../../utils/scripture-web/describe.js';
 import {
   GROUP_ROWS, verseText, shortRef, connectionModel, verseModel, rangeModel, letterRows, zoomChapterOf, chapterName,
+  exitsModel,
 } from '../../utils/scripture-web/panel-model.js';
 import { refOfVerse } from '../../utils/scripture-web/pick.js';
 import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citations.js';
@@ -107,6 +110,7 @@ export function modeOfDetail(d) {
   if (d.kind === 'verse') return 'verse';
   if (d.kind === 'chapter' || d.kind === 'bundle') return 'group';
   if (d.kind === 'letter') return 'letter';
+  if (d.kind === 'exits') return 'exits';
   return 'myweb';
 }
 
@@ -121,6 +125,7 @@ export function subjectKey(mode, d, choices) {
   if (d.kind === 'chapter') return 'ch:' + d.chapterIndex;
   if (d.kind === 'bundle') return 'b:' + d.lo + '-' + d.hi;
   if (d.kind === 'letter') return 'l:' + d.letterKey;
+  if (d.kind === 'exits') return 'x:' + d.key;
   return d.kind + ':' + d.index;
 }
 
@@ -450,6 +455,7 @@ export function WebPanel(props) {
     if (mode === 'verse') return verseModel(g, detail.verse, Object.assign(opts, { verseEnd: detail.verseEnd }));
     if (mode === 'group') return rangeModel(g, detail.lo, detail.hi, density);
     if (mode === 'letter') return { rows: letterRows(g, detail.letterKey, translation) };
+    if (mode === 'exits') return exitsModel(g, detail);
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the versions are the trigger: the model reads globals they fill
   }, [g, detail, mode, density, translation, bibleV, votV, studiesV]));
@@ -462,8 +468,10 @@ export function WebPanel(props) {
     return () => { live = false; };
   }, [wantStudies]);
 
-  // the lit set this mode keeps (verse mode: the threads it lists); a row lights its own over it
-  const base = mode === 'verse' && model && model.threads ? model.threads.ids : null;
+  // the lit set this mode keeps (verse mode: the threads it lists; exits mode: the lines it counts,
+  // lit when it opened); a row lights its own over it
+  const base = mode === 'verse' && model && model.threads ? model.threads.ids
+    : mode === 'exits' && detail && detail.ids ? detail.ids : null;
   const light = React.useCallback((/** @type {ArrayLike<number> | null} */ ids) => {
     if (webMode === 'personal' || typeof lightThreads !== 'function') return;
     lightThreads(ids && ids.length ? ids : base);
@@ -610,6 +618,25 @@ export function WebPanel(props) {
           ) : <p className="sw-panel-empty">No threads at this density.</p>}
         </Section>
         {webMode !== 'personal' ? <ZoomRow g={g} chapterIndex={model.zoom} zoomTo={zoomTo} /> : null}
+      </React.Fragment>
+    );
+  } else if (mode === 'exits' && model) {
+    // a fan chip's lines (exits.js): where they go, by book, each row's Follow taking the reader to
+    // its far end; the column's chapter on its zoom row, as group mode has
+    const words = exitsWords(detail);
+    const n = model.threads.total;
+    body = (
+      <React.Fragment>
+        <PanelHead over={words.over} title={words.title} meta={words.meta} />
+        <Section title={'Connections · ' + n.toLocaleString()} className="sw-sec-more">
+          {n ? (
+            <React.Fragment>
+              {sortNote}
+              <ThreadGroups groups={model.threads.groups} tagOf={fromTag} translation={translation} rowProps={rowProps} light={light} />
+            </React.Fragment>
+          ) : <p className="sw-panel-empty">No threads at this density.</p>}
+        </Section>
+        {webMode !== 'personal' && model.zoom >= 0 ? <ZoomRow g={g} chapterIndex={model.zoom} zoomTo={zoomTo} /> : null}
       </React.Fragment>
     );
   } else if (mode === 'letter' && model) {

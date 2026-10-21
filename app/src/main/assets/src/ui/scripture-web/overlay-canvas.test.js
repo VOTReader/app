@@ -15,7 +15,14 @@ import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pic
 import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
 import { css, TAP_CONTEXT } from '../../utils/scripture-web/sw-ink.js';
-import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE } from './overlay-renderer.js';
+import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE, FAN_MOST, FAN_MOST_COMPACT, fanAt } from './overlay-renderer.js';
+import { exitCensus } from '../../utils/scripture-web/exits.js';
+
+// the fan's census, spied on (its own law: it runs only while a fan is up)
+vi.mock('../../utils/scripture-web/exits.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return { ...real, exitCensus: vi.fn(real.exitCensus) };
+});
 
 vi.setConfig({ testTimeout: 60000 });
 
@@ -85,7 +92,21 @@ function frameAt(name, zoom, verse, extra = {}) {
     density: 'famous', focusArc: view.focusArc, bundles: { cells: footBundles(g, cam, view, v.DPR) }, lens, lensDim: 1,
     centre: centreOf(g, lens, zoom), panelInset: extra.panelInset || null, keepOut: extra.keepOut || null, hits: [],
   };
+  // a "+n" pill's fan asked for (focus.ask): a function of the frame picks its cell
+  fs.ask = typeof extra.ask === 'function' ? extra.ask(fs) : extra.ask || null;
   return fs;
+}
+
+/** The ask of the frame's brightest "+n" pill on the canvas area (the most threads at one cell). */
+function brightestAsk(fs) {
+  const W = fs.v.W - (fs.panelInset ? fs.panelInset.right * fs.v.DPR : 0);
+  let best = null, n = 0;
+  for (const c of fs.bundles.cells) {
+    const k = c.drawn + (c.hidden || 0);
+    const cx = ((c.lo + c.hi + 1) / 2 - fs.cam.x) * fs.cam.ppv + fs.v.W / 2;
+    if (k > n && cx >= 0 && cx <= W) { n = k; best = c; }
+  }
+  return best ? { key: 'cell:' + best.lo + '-' + best.hi, cell: { lo: best.lo, hi: best.hi }, side: null, books: null } : null;
 }
 function paint(name, zoom, verse, extra) {
   const fs = frameAt(name, zoom, verse, extra);
@@ -1122,17 +1143,23 @@ describe('labelFeed: every drawn thread a reader can see on the frame', () => {
 describe('the tap targets are a finger wide (w3 review: the hit boxes ran 14-30 px tall against 44)', () => {
   const TAP = 44;
   for (const [name, zoom] of [['phone', 1], ['phone', 40], ['phone', 300], ['pc', 1], ['pc', 40]]) {
-    it(name + ' ' + zoom + 'x: every hit box is at least 44 CSS px each way, in the ruler band, around what it names', () => {
-      const { out, fs } = paint(name, zoom, ISA53_6, { panelInset: name === 'pc' ? { right: 400, bottom: 0 } : null });
+    it(name + ' ' + zoom + "x: every hit box is at least 44 CSS px each way, in the ruler band (a fan's chips in the sky), around what it names", () => {
+      // the brightest pill's fan up (deep in), so its chips' targets are held to the same law
+      const { out, fs } = paint(name, zoom, ISA53_6, { panelInset: name === 'pc' ? { right: 400, bottom: 0 } : null, ask: zoom > 1 ? brightestAsk : null });
       const s = fs.v.DPR, Wc = fs.v.W - (name === 'pc' ? 400 * s : 0);
       expect(out.hits.length, 'tap targets').toBeGreaterThan(3);
       const kinds = new Set(out.hits.map((h) => h.hit.kind));
       expect(kinds.has(zoom === 1 ? 'book' : 'chapter')).toBe(true);
+      if (zoom > 1) expect(kinds.has('exit'), "the fan's chips").toBe(true);
       for (const h of out.hits) {
         const what = h.hit.kind + ' ' + (h.hit.chapter || h.hit.book || h.hit.label);
         expect(h.y1 - h.y0, what + ' tall').toBeGreaterThanOrEqual(TAP * s - 1e-6);
         expect(h.x1 - h.x0, what + ' wide').toBeGreaterThanOrEqual(TAP * s - 1e-6);
-        expect(h.y0, what + ' under the baseline').toBeGreaterThanOrEqual(fs.view.base - 1e-6);
+        // a fan's chips stand in the sky, over the baseline (overlay-renderer.js drawFan)
+        if (h.hit.kind === 'exit') {
+          expect(h.y0, what + ' on the canvas').toBeGreaterThanOrEqual(-1e-6);
+          expect(h.y1, what + ' over the baseline').toBeLessThanOrEqual(fs.view.base + 1e-6);
+        } else expect(h.y0, what + ' under the baseline').toBeGreaterThanOrEqual(fs.view.base - 1e-6);
         expect(h.y1, what + ' on the canvas').toBeLessThanOrEqual(fs.v.H + 1e-6);
         expect(h.x0, what).toBeGreaterThanOrEqual(-1e-6);
         expect(h.x1, what + ' left of the panel').toBeLessThanOrEqual(Wc + 1e-6);
@@ -1172,6 +1199,103 @@ describe('the tap targets are a finger wide (w3 review: the hit boxes ran 14-30 
       pairs++;
     }
     expect(pairs, 'neighbouring names whose targets meet').toBeGreaterThan(3);
+  });
+});
+
+describe('a "+n" pill\'s fan (exits.js): its stacks beside the column, the pill ringed, nothing without an ask', () => {
+  const S06B = verseOf('isaiah', 53, 1) + 13;
+  /** paint, with the strokes' ink recorded */
+  const paintInk = (name, zoom, verse, extra) => {
+    const fs = frameAt(name, zoom, verse, extra);
+    const rec = recorder();
+    rec.ctx.stroke = () => rec.calls.push({ op: 'stroke', style: rec.ctx.strokeStyle, lw: rec.ctx.lineWidth });
+    const out = paintCanonOverlay(rec.ctx, fs);
+    fs.hits = out.hits;
+    fs.fanZone = out.fanZone;
+    return { fs, rec, out };
+  };
+  const meet = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+  for (const [name, zoom, verse] of [['pc', 208.8, S06B], ['phone', 211, S06B], ['pc', 40, ISA53_6], ['phone', 40, ISA53_6]]) {
+    it(name + ' ' + zoom + 'x: the stacks stay inside the gutters, clear of the pills and of each other, nearest lowest', () => {
+      const { out, fs } = paintInk(name, zoom, verse, { ask: brightestAsk });
+      const s = fs.v.DPR, Wc = fs.v.W / s;
+      const most = name === 'phone' ? FAN_MOST_COMPACT : FAN_MOST;
+      expect(out.fan.length, 'a fan is up').toBeGreaterThan(0);
+      for (const side of ['left', 'right']) {
+        const stack = out.fan.filter((c) => c.side === side);
+        expect(stack.length, side).toBeLessThanOrEqual(most);
+        for (let k = 1; k < stack.length; k++) {
+          expect(stack[k].y1, side + ' chip ' + k + ' over the one before').toBeLessThanOrEqual(stack[k - 1].y0);
+          // nearest lowest: each chip up the stack names books farther from the column
+          if (side === 'left') expect(stack[k].hi).toBeLessThan(stack[k - 1].lo);
+          else expect(stack[k].lo).toBeGreaterThan(stack[k - 1].hi);
+        }
+      }
+      for (const c of out.fan) {
+        expect(c.x0, c.label + ' inside the left gutter').toBeGreaterThanOrEqual(16 - 1);
+        expect(c.x1, c.label + ' inside the right gutter').toBeLessThanOrEqual(Wc - 16 + 1);
+        expect(c.y1 * s, c.label + ' over the baseline').toBeLessThanOrEqual(fs.view.base + 1e-6);
+        for (const b of out.badges) {
+          expect(meet({ x0: c.x0 * s, x1: c.x1 * s, y0: c.y0 * s, y1: c.y1 * s }, b), c.label + ' clear of a pill').toBe(false);
+        }
+        for (const d of out.fan) if (d !== c) expect(meet(c, d), c.label + ' clear of ' + d.label).toBe(false);
+        expect(c.label, 'ASCII hyphens').not.toMatch(/[\u2013\u2014]/);
+      }
+      // left-going chips on the left of right-going ones
+      const L = out.fan.filter((c) => c.side === 'left'), R = out.fan.filter((c) => c.side === 'right');
+      if (L.length && R.length) expect(Math.max(...L.map((c) => c.x1))).toBeLessThanOrEqual(Math.min(...R.map((c) => c.x0)));
+      // the fan's ground holds its chips (a resting pointer there keeps it up)
+      for (const c of out.fan) expect(fanAt(fs, (c.x0 + c.x1) / 2, (c.y0 + c.y1) / 2)).toBe(true);
+      // its chips' tap targets go to the chip: the middle of each finds its own hit
+      const exits = out.hits.filter((h) => h.hit.kind === 'exit');
+      expect(exits.length).toBe(out.fan.length);
+      for (const h of exits) {
+        const hit = hitOverlay(fs, (h.core.x0 + h.core.x1) / 2 / s, (h.core.y0 + h.core.y1) / 2 / s);
+        expect(hit).toBe(h.hit);
+        expect(h.hit.ids.length, h.hit.label + ": the chip's count is its lines'").toBe(h.hit.count);
+      }
+    });
+  }
+
+  it('the pill wears the lit ring while its fan is up, and only then', () => {
+    const lit = css('lit');
+    const up = paintInk('pc', 208.8, S06B, { ask: brightestAsk });
+    expect(up.rec.calls.filter((c) => c.op === 'stroke' && c.style === lit).length, 'the pill, ringed').toBe(1);
+    const rest = paintInk('pc', 208.8, S06B);
+    expect(rest.rec.calls.filter((c) => c.op === 'stroke' && c.style === lit).length).toBe(0);
+    expect(rest.out.fan).toEqual([]);
+    expect(rest.out.fanZone).toBe(null);
+  });
+
+  it('no fan before the deep band is half in (deepT < 0.5, under about 4.7x)', () => {
+    for (const zoom of [3, 4.3]) {
+      const { out } = paintInk('pc', zoom, ISA53_6, { ask: { key: 'cell:x', cell: { lo: ISA53_6, hi: ISA53_6 + 2 }, side: null, books: null } });
+      expect(out.fan, zoom + 'x').toEqual([]);
+      expect(out.hits.some((h) => h.hit.kind === 'exit'), zoom + 'x').toBe(false);
+    }
+  });
+
+  it('with no ask up the census never runs; a fan up counts its cell once a frame', () => {
+    vi.mocked(exitCensus).mockClear();
+    paintInk('pc', 208.8, S06B);
+    paintInk('phone', 40, ISA53_6);
+    expect(exitCensus).not.toHaveBeenCalled();
+    paintInk('pc', 208.8, S06B, { ask: brightestAsk });
+    expect(exitCensus).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(exitCensus).mock.calls[0][3]).toMatchObject({ lo: expect.any(Number), hi: expect.any(Number) });
+  });
+
+  it("a pill's hit names its cell; a fan chip asked for wears the lit ring", () => {
+    const { out, fs } = paintInk('pc', 208.8, S06B, { ask: brightestAsk });
+    const pill = out.hits.find((h) => h.hit.kind === 'pill' && h.hit.cell && h.hit.cell.lo === fs.ask.cell.lo);
+    expect(pill, "the asked pill's hit").toBeTruthy();
+    const chip = out.hits.find((h) => h.hit.kind === 'exit').hit;
+    const asked = paintInk('pc', 208.8, S06B, { ask: (f) => Object.assign(brightestAsk(f), { side: chip.side, books: [chip.lo, chip.hi] }) });
+    const ringed = asked.out.fan.filter((c) => c.asked);
+    expect(ringed.length).toBe(1);
+    expect([ringed[0].side, ringed[0].lo, ringed[0].hi]).toEqual([chip.side, chip.lo, chip.hi]);
+    expect(asked.rec.calls.filter((c) => c.op === 'stroke' && c.style === css('lit')).length, 'the pill and the chip').toBe(2);
   });
 });
 

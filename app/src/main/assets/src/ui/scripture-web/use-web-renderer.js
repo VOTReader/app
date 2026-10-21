@@ -444,8 +444,12 @@ export function useWebRenderer({
     // what the open panel covers (the panel writes it; labels keep out)
     fs.centre = centre; fs.panelInset = panelInsetRef.current;
     fs.keepOut = (keepOutRef && keepOutRef.current) || null;
+    // what a "+n" pill's fan is asked about (its cell, a fan chip's books: use-web-selection.js);
+    // the overlay counts the column's legs only while one is up (exits.js)
+    fs.ask = focusRef.current.ask || null;
     const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, fs);
     fs.hits = painted.hits;
+    fs.fanZone = painted.fanZone;
     overlayFrameRef.current = fs;
     elevatorRef.current = painted.elevator;
     badgeBoxesRef.current = painted.badges;
@@ -458,6 +462,8 @@ export function useWebRenderer({
     }
     // the walk's window on the badges (device px boxes), like __swContextCeiling: unset in the app
     if (walkOn()) globalThis.__swBadgeBoxes = badgeBoxesRef.current;
+    // and on the column fan (CSS px chips, as drawn): written only for a walk
+    if (wrap && walkOn()) put(wrap, attrs, 'data-exit-fan', painted.fan.length ? JSON.stringify(painted.fan) : '');
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow,
     chromeRef, personalRef, topbarRef, uiRef, wrapRef, glRef, panelInsetRef, keepOutRef, schedule, settleLater]);
 

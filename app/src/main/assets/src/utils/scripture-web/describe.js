@@ -283,8 +283,26 @@ export function prophecyMeta(info) {
   return arcLine(Object.assign({}, info, { prophecy: true, votes: info.index >= 0 ? info.votes : 0 }));
 }
 
+/**
+ * The words of an exits card (a chip of a "+n" pill's fan, exits.js; the panel's exits mode): the
+ * lines leaving the view from the pill's column for the books the chip names, "Leaving the view",
+ * "Hosea - Acts ›", "46 connections from Isaiah 54:1-17" (ASCII hyphens: Permanent Rule 1).
+ * @param {any} info  an exits card: { ids, label, side, area }
+ * @returns {{ over: string, title: string, meta: string, summary: string }}
+ */
+export function exitsWords(info) {
+  const n = info.ids ? info.ids.length : 0;
+  const lines = plural(n, 'connection', 'connections');
+  const label = info.label || '';
+  const title = info.side === 'left' ? '‹ ' + label : info.side === 'right' ? label + ' ›' : label;
+  const from = info.area && info.area.label ? ' from ' + info.area.label : '';
+  return { over: 'Leaving the view', title, meta: lines + from,
+    summary: lines + from + (n === 1 ? ' goes to ' : ' go to ') + label + '.' };
+}
+
 /** The panel's eyebrow (its overline, and its aria-label's head). */
 export function sheetEyebrow(info) {
+  if (info.kind === 'exits') return exitsWords(info).over;
   return info.kind === 'link' ? 'Your link'
     : info.kind === 'underlay' ? 'Timothy’s note'
     : info.kind === 'arc' ? 'Connection'
@@ -295,6 +313,7 @@ export function sheetEyebrow(info) {
 
 /** The panel's meta line. */
 export function sheetMeta(info) {
+  if (info.kind === 'exits') return exitsWords(info).meta;
   return info.kind === 'arc'
     ? arcLine(info)
     : info.kind === 'letter' ? info.collectionName
@@ -330,6 +349,7 @@ export function listMeta(chapter, count) {
 
 /** What the live region says when a hit is chosen. */
 export function summaryOf(found) {
+  if (found.kind === 'exits') return exitsWords(found).summary;
   if (found.kind === 'link') {
     return endpointLabel(found.source) + ' and ' + endpointLabel(found.target) + ', your link.';
   }

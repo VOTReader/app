@@ -44,7 +44,7 @@ import {
   describeFound, summaryOf, chooserAnnouncement, followAnnouncement,
 } from '../../utils/scripture-web/describe.js';
 import { pickPersonalLinks, pickUnderlayLinks, nearestLinks, nearestUnderlay } from './rail-renderer.js';
-import { hitOverlay } from './overlay-renderer.js';
+import { hitOverlay, fanAt } from './overlay-renderer.js';
 import { routeOverlayHit } from './goto.jsx';
 
 /**
@@ -56,7 +56,11 @@ import { routeOverlayHit } from './goto.jsx';
  * @typedef {{ mode: 'connection', arc: number, prophecy?: boolean }
  *   | { mode: 'verse', verse: number, verseEnd?: number }
  *   | { mode: 'group', ids: ArrayLike<number>, label: string, chapter?: number }
- *   | { mode: 'letter', letterKey: string }} PanelSpec
+ *   | { mode: 'letter', letterKey: string }
+ *   | { mode: 'exits', ids: ArrayLike<number>, label: string, key: string, side?: 'left'|'right'|null,
+ *       books?: [number, number]|null, cell?: {lo:number, hi:number}|null, area?: {label:string, lo:number, hi:number}|null }} PanelSpec
+ *   exits: a chip of a "+n" pill's fan (exits.js): the lines it counts, from its cell to the books
+ *   it names on its side, lit and listed by the book they go to
  */
 /**
  * What is open: the spec in the panel's terms and the described payload today's cards render
@@ -75,10 +79,23 @@ import { routeOverlayHit } from './goto.jsx';
  * flag to what openPanel does.
  * @type {Readonly<Record<PanelSpec['mode'], boolean>>}
  */
-export const PANEL_MODES = Object.freeze({ connection: true, verse: true, group: true, letter: true });
+export const PANEL_MODES = Object.freeze({ connection: true, verse: true, group: true, letter: true, exits: true });
 
 /** A verse card's last verse: its range's end, or the verse. @param {any} found */
 const endOf = (found) => (found.verseEnd > found.verse ? found.verseEnd : found.verse);
+
+/**
+ * What a fan's hit asks (focus-state.js ExitAsk): a "+n" pill its column's fan; a fan's chip its
+ * column and the books its lines go to, on its side.
+ * @param {any} hit  an overlay hit: 'pill' (with a cell) or 'exit'
+ * @returns {import('../../utils/scripture-web/focus-state.js').ExitAsk}
+ */
+export function askOfHit(hit) {
+  if (hit.kind === 'pill') {
+    return { key: 'cell:' + hit.cell.lo + '-' + hit.cell.hi, cell: { lo: hit.cell.lo, hi: hit.cell.hi }, side: null, books: null };
+  }
+  return { key: hit.key, cell: hit.cell ? { lo: hit.cell.lo, hi: hit.cell.hi } : null, side: hit.side || null, books: [hit.lo, hit.hi] };
+}
 
 /**
  * The open card in the panel's terms. Pure, so the mapping is pinned without a mount.
@@ -106,6 +123,10 @@ export function panelOf(detail, choices, choiceChapter = -1) {
       return { spec: { mode: 'group', ids: [], label: detail.book ? detail.book.title + ' ' + detail.chapter : '', chapter: detail.chapterIndex }, info: detail };
     }
     if (k === 'bundle') return { spec: { mode: 'group', ids: [], label: detail.label || '' }, info: detail };
+    if (k === 'exits') {
+      return { spec: { mode: 'exits', ids: detail.ids, label: detail.label, key: detail.key, side: detail.side,
+        books: detail.books, cell: detail.cell, area: detail.area }, info: detail };
+    }
     if (k === 'link' || k === 'underlay') return { spec: { mode: 'connection', arc: detail.index, myWeb: k }, info: detail };
     return null;
   }
@@ -203,14 +224,47 @@ export function useWebSelection({
      web out from under it, so each one drops it (sw1 B4: it stayed put over different lines). */
   const tipOnRef = React.useRef(false);
   React.useEffect(() => { tipOnRef.current = !!tip; }, [tip]);
+
+  /* The fan's hover (exits.js): a resting pointer on a "+n" pill raises its column's fan and lights
+     nothing (a 239-leg gold column is a flood; the fan already says where the lines go); on a fan's
+     chip it lights the lines that chip counts. Both are a preview: what was lit and asked before
+     comes back when the pointer leaves. Neither dims anything (the lit ink only, no range: C3, a
+     hover never isolates). */
+  /** Preview a fan's hit; false when it is what is asked already. @param {any} hit */
+  const previewAsk = React.useCallback((hit) => {
+    const f = focusRef.current;
+    const ask = askOfHit(hit);
+    if (f.ask && f.ask.key === ask.key) return false;
+    const prev = f.ask && f.ask.hover ? f.ask.prev : { lit: f.lit, ask: f.ask || null };
+    focusRef.current = focusState(Object.assign({}, f, {
+      hover: -1, hoverProphecy: -1, hoverUnderlay: false,
+      // a pill lights nothing: the lit set stays the one the preview stands over
+      lit: hit.kind === 'pill' ? prev.lit : hit.ids,
+      ask: Object.assign(ask, { hover: true, prev }),
+    }));
+    return true;
+  }, [focusRef]);
+  /** End the preview: the lit set and the ask it stood in for come back. False when none was up. */
+  const endPreview = React.useCallback(() => {
+    const f = focusRef.current;
+    if (!f.ask || !f.ask.hover) return false;
+    const prev = f.ask.prev || { lit: null, ask: null };
+    focusRef.current = focusState(Object.assign({}, f, { lit: prev.lit, ask: prev.ask }));
+    return true;
+  }, [focusRef]);
+
+  /** Let go of what is hovered (a thread, a pair, the fan's preview); true when the fan's preview
+   * was up, so the caller redraws for it as it does for a hovered thread. */
   const dropHover = React.useCallback(() => {
     if (hoverRafRef.current) { cancelAnimationFrame(hoverRafRef.current); hoverRafRef.current = 0; }
     hoverPointRef.current = null;
+    const previewed = endPreview();
     focusRef.current.hover = -1;
     focusRef.current.hoverProphecy = -1;
     focusRef.current.hoverUnderlay = false;
     if (tipOnRef.current) { tipOnRef.current = false; setTip(null); }
-  }, [focusRef]);
+    return previewed;
+  }, [focusRef, endPreview]);
 
   /**
    * The elevator's lift (landing 14): for a pointer going down on the track
@@ -410,6 +464,10 @@ export function useWebSelection({
       : found.kind === 'link' || found.kind === 'underlay' ? { arc: found.index, underlay: found.kind === 'underlay' }
       : found.kind === 'verse' ? { range: [found.verse, endOf(found)],
         lit: g ? arcsTouching(g, found.verse, endOf(found), density, 0) : null }
+      // a fan chip's card lights its lines and keeps its column's fan up; no range, so nothing
+      // recedes (C3: the lit ink only, every other line as it was)
+      : found.kind === 'exits' ? { lit: found.ids,
+        ask: { key: found.key, cell: found.cell || null, side: found.side || null, books: found.books || null } }
       : { range: found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null });
     setTip(null);
     setChoices(null);
@@ -431,8 +489,7 @@ export function useWebSelection({
       if (v && v.W && inset && ((inset.right > 0 && cx >= v.W / dpr - inset.right) ||
           (inset.bottom > 0 && cy >= v.H / dpr - inset.bottom))) {
         const had = focusRef.current.hover !== -1;
-        dropHover();
-        if (had) schedule();
+        if (dropHover() || had) schedule();
         return;
       }
     }
@@ -442,6 +499,21 @@ export function useWebSelection({
       hoverRafRef.current = 0;
       const point = hoverPointRef.current;
       if (!point) return;
+      // the fan first (a "+n" pill, a fan's chip): they preview what they ask; on the fan's ground
+      // the fan stays up, and nothing under it is hovered
+      if (mode !== 'personal') {
+        const ofs = overlayFrameRef ? overlayFrameRef.current : null;
+        const oh = hitOverlay(ofs, point.cx, point.cy);
+        if (oh && (oh.kind === 'exit' || (oh.kind === 'pill' && oh.cell))) {
+          const was = focusRef.current.hover !== -1 || focusRef.current.hoverProphecy !== -1;
+          if (previewAsk(oh) || was) schedule();
+          if (tipOnRef.current) setTip(null);
+          return;
+        }
+        const f0 = focusRef.current;
+        if (f0.ask && f0.ask.hover && f0.ask.cell && fanAt(ofs, point.cx, point.cy)) return;
+        if (endPreview()) schedule();
+      }
       const found = describe(hitAt(point.cx, point.cy));
       // a thread under the pointer lights: an OpenBible arc, or on My Web a
       // reader's link or a Timothy thread (fix-review #11), in its own list
@@ -463,7 +535,7 @@ export function useWebSelection({
         return { info: found, x: point.cx, y: point.cy };
       });
     });
-  }, [describe, hitAt, schedule, focusRef, insetFor, viewRef, dropHover]);
+  }, [describe, hitAt, schedule, focusRef, insetFor, viewRef, dropHover, mode, overlayFrameRef, previewAsk, endPreview]);
 
   React.useEffect(() => () => {
     if (hoverRafRef.current) cancelAnimationFrame(hoverRafRef.current);
@@ -540,6 +612,15 @@ export function useWebSelection({
       }
       return false;
     }
+    if (spec.mode === 'exits') {
+      // a fan chip's lines: lit, listed by the book they go to (web-panel.jsx), each with Open and
+      // Follow. The list is the one it opened with; the camera stays where the reader is
+      const ids = Array.from(spec.ids || []).filter((i) => i >= 0 && i < g.count);
+      if (!ids.length || !spec.key) return false;
+      commitFound({ kind: 'exits', key: spec.key, label: spec.label || '', side: spec.side || null,
+        books: spec.books || null, cell: spec.cell || null, area: spec.area || null, ids: Int32Array.from(ids) }, via);
+      return true;
+    }
     return false;
   }, [graph, describe, commitFound, focusRef, dropHover, schedule, setAnnounce]);
 
@@ -561,7 +642,16 @@ export function useWebSelection({
     // pill: overlay-renderer.js hitOverlay), before any line under it; the
     // navigation stream routes it (goto.jsx). Nothing records boxes yet: null.
     const overlayHit = hitOverlay(overlayFrameRef ? overlayFrameRef.current : null, cx, cy);
-    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey, insetFor })) return;
+    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey, insetFor })) {
+      // a pill's tap opens its group as it always has; with a cell it keeps its column's fan up
+      // while that card is open (the phone's way to the fan): closing it, the empty-space clear and
+      // any other card let it go (focusState), a fan chip's card asks the same cell
+      if (overlayHit.kind === 'pill' && overlayHit.cell) {
+        focusRef.current = focusState(Object.assign({}, focusRef.current, { ask: askOfHit(overlayHit) }));
+        schedule();
+      }
+      return;
+    }
     const candidates = hitCandidatesAt(cx, cy);
     const described = candidates.map(describe).filter(Boolean);
     if (!described.length) {
@@ -622,8 +712,7 @@ export function useWebSelection({
   /** The mouse left the web, or is over the chrome: what it hovered goes (gestures.js). */
   const leave = React.useCallback(() => {
     const had = focusRef.current.hover !== -1 || focusRef.current.hoverProphecy !== -1 || !!focusRef.current.hoverUnderlay;
-    dropHover();
-    if (had) schedule();
+    if (dropHover() || had) schedule();
   }, [focusRef, dropHover, schedule]);
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, leave, snapshot }; }, [hover, tap, doubleTap, leave, snapshot]);
 

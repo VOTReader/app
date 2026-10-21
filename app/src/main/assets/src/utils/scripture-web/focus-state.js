@@ -46,7 +46,16 @@
  * @typedef {{ arc: number, prophecy: boolean, underlay: boolean, range: [number, number] | null,
  *   hover: number, hoverProphecy: number, hoverUnderlay: boolean,
  *   lit: Int32Array | null,
- *   litKey: string }} Focus
+ *   litKey: string, ask?: ExitAsk | null }} Focus
+ */
+/**
+ * What a column's fan is asked about (exits.js; the overlay's drawFan reads it), never set by
+ * focusState's defaults, so every new choice lets it go: a "+n" pill's `cell` (its column's fan, the
+ * pill hovered or its group card open), or a fan's chip (its cell, its `side` and the `books` its
+ * legs' far feet stand in). `hover` marks a resting pointer's preview, `prev` the lit set and ask it
+ * stands in for.
+ * @typedef {{ key: string, cell: {lo:number, hi:number} | null, side: 'left'|'right' | null,
+ *   books: [number, number] | null, hover?: boolean, prev?: { lit: Int32Array | null, ask: any } }} ExitAsk
  */
 
 /**

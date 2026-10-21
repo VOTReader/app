@@ -199,6 +199,8 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
     const valid = {
       connection: { mode: 'connection', arc: 1 }, verse: { mode: 'verse', verse: 100 },
       group: { mode: 'group', ids: [1], label: '' }, letter: { mode: 'letter', letterKey: 'two/the-wide-path' },
+      // exits (exits.js): a "+n" pill's fan chip, its lines by where they go
+      exits: { mode: 'exits', ids: [1], label: 'Genesis', key: 'c0-30:r:0-0', side: 'right', books: [0, 0], cell: { lo: 0, hi: 30 } },
     };
     expect(Object.keys(PANEL_MODES).sort()).toEqual(Object.keys(valid).sort());
     expect(PANEL_MODES.letter, 'letter mode landed with the panel stream').toBe(true);

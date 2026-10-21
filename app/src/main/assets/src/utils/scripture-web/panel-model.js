@@ -282,6 +282,40 @@ export function rangeModel(g, lo, hi, density) {
 }
 
 /**
+ * Exits mode (a chip of a "+n" pill's fan, exits.js): the lines it counts, grouped by the book of
+ * their FAR end in canonical order, strongest first in each (then in canon order), each row with its
+ * Open and Follow. Its lines stand on the pill's cell: the near end is the one in the cell (both in:
+ * the lower); without a cell, the side says it (on the 'left' the far end is the lower, g.from). The
+ * zoom row flies to the cell's chapter (-1: none).
+ * @param {any} g
+ * @param {{ ids: ArrayLike<number>, side?: 'left'|'right'|null, cell?: {lo:number, hi:number}|null }} detail
+ * @returns {{ threads: { total: number, groups: ThreadGroup[], ids: number[] }, zoom: number }}
+ */
+export function exitsModel(g, detail) {
+  /** @type {Map<number, ThreadRow[]>} */
+  const byBook = new Map();
+  const ids = [];
+  const cell = detail.cell || null;
+  for (const i of Array.from(detail.ids || [])) {
+    if (!(i >= 0 && i < g.count)) continue;
+    const a = g.from[i], b = g.to[i];
+    const here = cell ? (a >= cell.lo && a <= cell.hi ? a : b) : detail.side === 'left' ? b : a;
+    const other = here === a ? b : a;
+    const ref = refOfVerse(g, other);
+    const book = g.chapters[ref.chapterIndex][0];
+    if (!byBook.has(book)) byBook.set(book, []);
+    /** @type {ThreadRow[]} */ (byBook.get(book)).push({ index: i, here: refOfVerse(g, here), hereVerse: here, other: ref, otherVerse: other, votes: g.votes[i] });
+    ids.push(i);
+  }
+  const groups = [...byBook.keys()].sort((x, y) => x - y).map((book) => {
+    const rows = /** @type {ThreadRow[]} */ (byBook.get(book));
+    rows.sort((x, y) => y.votes - x.votes || x.otherVerse - y.otherVerse);
+    return { book, title: g.books[book].title, rows };
+  });
+  return { threads: { total: ids.length, groups, ids }, zoom: cell ? g.chapterOfVerse[cell.lo] : -1 };
+}
+
+/**
  * The verses a letter cites, one row per cited passage in the order it cites them (its first
  * citation of each), each with its text now. A passage is a verse-to-verseEnd pair, the same key
  * describe.js letterOf counts as `passages`, so the list's header and the live region agree.
