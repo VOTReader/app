@@ -8910,7 +8910,7 @@
 .ans-h2,.ans-az-letter{font-weight:400;font-size:min(var(--fs-24),8vw);line-height:1.25;color:var(--cream);margin:0;text-wrap:balance}
 .ans-row-title,.ans-lede,.ans-tab,.ans-num,.ans-search-input{font-size:min(var(--fs-18),7vw);line-height:1.35}
 .ans-row-sub,.ans-meta,.ans-metarow,.ans-chip,.ans-textbtn,.ans-count,.ans-note,.ans-src,.ans-contents-line,.ans-hit-src,.ans-credit,.ans-figcap{font-size:min(var(--fs-15),5.6vw);line-height:1.45}
-.ans-label{font-family:'Cinzel',serif;font-weight:400;font-size:min(var(--fs-13),3.6vw);line-height:1.4;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim);margin:0}
+.ans-label{font-family:'Cinzel',serif;font-weight:400;font-size:clamp(var(--fs-12),3.6vw,var(--fs-13));line-height:1.4;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim);margin:0}
 .ans-lead,.ans-lede,.ans-meta,.ans-metarow,.ans-row-sub,.ans-count,.ans-note,.ans-hit-src,.ans-credit,.ans-figcap,.ans-src{color:var(--cream-muted)}
 .ans-num,.ans-chev,.ans-ico{color:var(--gold)}
 .ans-metarow,.ans-note,.ans-hit-src,.ans-src{font-style:italic}

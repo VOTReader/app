@@ -798,9 +798,10 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
       if (ls) expect(Number(ls[1])).toBeLessThanOrEqual(0.18);
     }
   });
-  it('the Answers label (Cinzel, .14em) holds 12 px or more from 334 px up: min(--fs-13, 3.6vw)', () => {
+  // Below 334 px, 3.6vw alone fell under the 12 px floor for spaced capitals (the Browse review, 10-22).
+  it('the Answers label (Cinzel, .14em) never drops under 12 px: clamp(--fs-12, 3.6vw, --fs-13)', () => {
     const block = ruleBlock(CSS, '.ans-label{');
-    expect(block).toMatch(/font-size:\s*min\(var\(--fs-13\),\s*3\.6vw\)/);
+    expect(block).toMatch(/font-size:\s*clamp\(var\(--fs-12\),\s*3\.6vw,\s*var\(--fs-13\)\)/);
     expect(block).toMatch(/letter-spacing:\s*\.14em/);
   });
   it('the letter hero eyebrow never drops under 12 px on a phone', () => {
