@@ -52,7 +52,7 @@ import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey 
 import { kjvTwin, twinView, kjvReading, twinTokens, twinSentences, twinOnly, twinHolders, loadKjvTwin, kjvTwinReady, kjvTwinStatus, onKjvTwin, setKjvTwin, setKjvTwinSource } from './kjv-twin.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler } from './index-transfer.js';
-import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords, titleShare } from './titles.js';
+import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords, titleShare, nearWords } from './titles.js';
 import { alignClasses, alignWeights, alignScore, alignMet } from './align.js';
 import { parseLexicon } from './lexicon.js';
 
@@ -1648,14 +1648,18 @@ function citedVerse(after, words, need) {
  * @param {string[]} keyWords  the query's words as a key reads them
  * @param {number} need
  * @param {boolean} cite  the reader typed the quote's words in a row: the verse it cites is its original
+ * @param {((has: (x: string) => boolean) => boolean) | null} [rare]  do the typed words a sentence holds (`has`, a typed
+ *   word or one of its alts) weigh enough (originalsFirst)
  * @returns {string[]|null}
  */
-function sentenceOriginal(text, ex, at, O, lower, keyWords, need, cite) {
+function sentenceOriginal(text, ex, at, O, lower, keyWords, need, cite, rare = null) {
   if (at < 0) return null;
   for (const sp of sentenceSpans(text)) {
     if (sp.end < at || sp.start > at + ex.length) continue;
     const k = sentenceKey(sp.text);
-    if (!k || keyWords.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need) continue;
+    if (!k) continue;
+    if (keyWords.filter((w) => (' ' + k + ' ').indexOf(' ' + w + ' ') >= 0).length < need ||
+      (rare && !rare((x) => (' ' + k + ' ').indexOf(' ' + nameAsPrinted(x) + ' ') >= 0))) continue;
     const l = lower(O.get(k));
     if (l.length) return l;
     if (!cite) continue;
@@ -1688,6 +1692,19 @@ function meantSentence(text, start, ex, at, words) {
   }
   return best && best.text.length > 2 ? { text: best.text.slice(1, -1), start: best.start + 1 } : null;
 }
+/** Each typed word's synonyms and forms as the search read them (its units not as typed), and the near-synonyms a
+    title meets it by (titles.js nearWords: "holy" for "sacred", the title "Regarding The Holy Days of God"), encoded. */
+function typedAlts(/** @type {Array<{term:string, origin:number, literal?:boolean, joined?:boolean}>} */ units, /** @type {string[]} */ filtered) {
+  /** @type {Map<string, string[]>} */ const m = new Map();
+  const add = (/** @type {string} */ w, /** @type {string[]} */ alt) => m.set(w, (m.get(w) || []).concat(alt));
+  for (const u of units) {
+    if (u.literal || u.joined || filtered[u.origin] === undefined) continue;
+    const alt = kjvEncode(u.term);
+    for (const w of kjvEncode(filtered[u.origin])) add(w, alt);
+  }
+  for (const t of filtered) for (const w of kjvEncode(t)) add(w, nearWords(w).flatMap((x) => kjvEncode(x)));
+  return m;
+}
 /**
  * Move each original ahead of a reprint of it near the top (in place).
  * @param {Array<{score:number, doc:any, terms?:string[], meaningStart?:number}>} out  ranked, best first (meaningStart: meaningFirst's matched passage)
@@ -1700,8 +1717,9 @@ function meantSentence(text, start, ex, at, words) {
  * @param {{has: (id:string) => boolean, cov: (id:string) => number}|null} [aligned]  B4's texts holding the quote with
  *   its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an original
  *   holding ALIGN_HELD of the quote as well
+ * @param {Map<string, string[]>|null} [alts]  each typed word's synonyms, forms and title near-synonyms (typedAlts, encoded)
  */
-function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null) {
+function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null, alts = null) {
   if (!terms.length) return;
   let O;
   try { O = originals(); } catch { return; }
@@ -1710,6 +1728,24 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
   const words = [...new Set(terms.flatMap((t) => kjvEncode(t)))];
   const keyWords = words.map(nameAsPrinted);
   const need = Math.min(3, Math.ceil(words.length / 2));
+  /* ONE COMMON WORD IS NO SENTENCE OF THE QUERY (search200 fix1, 2026-10-19). Where one typed word is enough for
+     `need` (a query of one or two words), the commoner word decided: an Answers topic its title names by the rare
+     word reprints a letter's line holding the common one ("people"), and the letter led the topic (hunt topical M4).
+     There the matched sentence (or window) holds half the typed words' rarity (log(1+N/df)) as well; a word the
+     index lacks weighs as the rarest (df 1), not nothing: "144" of "144 thousand" (the index holds 144000 whole).
+     A typed word counts held where a synonym or form the search read for it is, or a near-synonym a title meets it by
+     ("holy days" for "the sacred days"). */
+  let rare = null;
+  if (need <= 1) {
+    const n = (msIndex && msIndex.documentCount) || 1;
+    const wt = words.map((w) => Math.log(1 + n / Math.max(1, docFreq(w))));
+    const all = wt.reduce((a, x) => a + x, 0);
+    rare = (/** @type {(x: string) => boolean} */ has) => {
+      let h = 0;
+      words.forEach((w, i) => { if (has(w) || (alts && (alts.get(w) || []).some(has))) h += wt[i]; });
+      return h >= 0.5 * all;
+    };
+  }
   /* AN ORIGINAL HOLDING THE RUN UP TO A WORD'S FORM (search200 R1, 2026-10-18). A reprint holding the typed run whole
      gives way only to an original holding it as well (B3, below), and "as well" read the words as typed: an Answers
      topic printing a letter's line with one word in another form ("My prophets" where the letter says "My prophet")
@@ -1755,13 +1791,13 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       const k = f.filter((x) => (e.doc.kind === 'bible-study' && D.get(x).kind === 'verse') || asWell(x, D.get(x), whole));
       return k.length ? k : null;
     };
-    let found = keep(sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted));
+    let found = keep(sentenceOriginal(e.doc.text, ex, at, O, lower, keyWords, need, quoted, rare));
     // A reprint the model found is read where it matched, when that sentence holds more of the query than the
     // excerpt's does and names an original of its own (sr11 t324): the excerpt is the stretch thickest with typed
     // words, and in an Answers topic that was a line of another letter it quotes, which then led the search.
     if (typeof e.meaningStart === 'number' && e.meaningStart >= 0 && at >= 0) {
       const m = meantSentence(e.doc.text, e.meaningStart, ex, at, words);
-      const f = m && keep(sentenceOriginal(e.doc.text, m.text, m.start, O, lower, keyWords, need, quoted));
+      const f = m && keep(sentenceOriginal(e.doc.text, m.text, m.start, O, lower, keyWords, need, quoted, rare));
       if (m && f) { found = f; ex = m.text; at = m.start; }
     }
     // A quote held nearly word for word sits where its small words are too ("blessed be the name of our lord":
@@ -1770,14 +1806,14 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       const ex2 = matchExcerpt(e.doc.text, typed);
       const at2 = ex2 ? e.doc.text.indexOf(ex2) : -1;
       if (at2 >= 0 && at2 !== at) {
-        found = keep(sentenceOriginal(e.doc.text, ex2, at2, O, lower, keyWords, need, true));
+        found = keep(sentenceOriginal(e.doc.text, ex2, at2, O, lower, keyWords, need, true, rare));
         if (found) { ex = ex2; at = at2; }
       }
     }
     if (!found && at >= 0) {
       // The matched place, a little either side (its edge words may be cut), by its shingles.
       const win = kjvEncode(e.doc.text.slice(Math.max(0, at - 40), at + ex.length + 40)).slice(1, -1);
-      if (words.filter((w) => win.indexOf(w) >= 0).length >= need) {
+      if (words.filter((w) => win.indexOf(w) >= 0).length >= need && (!rare || rare((x) => win.indexOf(x) >= 0))) {
         /** @type {Map<string, number>} */ const votes = new Map();
         eachShingle(win, (h) => { for (const x of lower(/** @type {Map<number, string[]>} */ (SHINGLES).get(h))) votes.set(x, (votes.get(x) || 0) + 1); });
         for (const [x, n] of votes) if (n < 2) votes.delete(x);   // two runs shared, not one stray run at the window's edge
@@ -3429,7 +3465,7 @@ async function search(query, options) {
   };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
     admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens,
-    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf } : null);
+    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf } : null, typedAlts(units, filtered));
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {

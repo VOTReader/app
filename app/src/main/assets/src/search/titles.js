@@ -375,12 +375,16 @@ export function buildTitles(docs, opts) {
   // synonym groups, by lemma
   /** @type {Map<string, number[]>} */
   const groups = new Map();
+  /** @type {string[][]} each group's words */
+  const members = [];
   let gid = 0;
   const addGroup = (/** @type {string[]} */ words) => {
     const id = gid++;
+    members.push([]);
     for (const x of words) {
       const toks = titleWords(x);
       if (toks.length !== 1) continue;
+      members[id].push(toks[0]);
       const l = lem(toks[0]);
       const a = groups.get(l);
       if (!a) groups.set(l, [id]); else if (a.indexOf(id) < 0) a.push(id);
@@ -418,7 +422,7 @@ export function buildTitles(docs, opts) {
     const a = byWords.get(e.w3.length);
     if (a) a.push(idx); else byWords.set(e.w3.length, [idx]);
   });
-  const index = { entries, vocab, groups, weight, maxWeight: Math.log(1 + N), skip, byNorm, byNorm3, byGram, byWords };
+  const index = { entries, vocab, groups, members, weight, maxWeight: Math.log(1 + N), skip, byNorm, byNorm3, byGram, byWords };
   current = index;
   return index;
 }
@@ -426,6 +430,15 @@ export function buildTitles(docs, opts) {
 let current = null;
 /** The index scoreTitles uses by default (the last built). */
 export function titleIndex() { return current; }
+
+/** The near-synonyms a typed word meets a title word by (CREDIT.synonym: TITLE_SYNONYMS and SYNONYM_MAP's groups). */
+export function nearWords(/** @type {string} */ tok) {
+  const gs = current && current.groups.get(lem(tok));
+  if (!gs) return [];
+  /** @type {string[]} */ const out = [];
+  for (const g of gs) for (const w of current.members[g]) if (w !== tok && out.indexOf(w) < 0) out.push(w);
+  return out;
+}
 
 /** The unit a doc opens (tools/search-bench/corpus.mjs unitKey): a study chapter by its chapter id. */
 function unitKeyOf(/** @type {any} */ doc) {
