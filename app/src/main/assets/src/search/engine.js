@@ -2449,6 +2449,9 @@ async function search(query, options) {
   // the typed run with His names as a verse prints them ("yahuwah is my shepherd": the LORD is), when it differs
   const printedRun = typedTokens.map(namesAsVersePrints);
   const typedPrinted = printedRun.some((t, i) => t !== typedTokens[i]) ? printedRun : null;
+  // the typed run with each number written in words as its digits (numbers.js), when it differs
+  const numbered = numberReading(typedTokens);
+  const typedNum = numbered.length !== typedTokens.length ? numbered : null;
   const STOP = D.STOP_WORDS_TRIMMED;
   /* THE RUN IN EVERY TEXT HOLDING IT (search200 B3, 2026-10-18). Read in the 500 best-scored texts alone, a run of
      common words in a long letter went unread when more short texts outscored it on its content word, and it was
@@ -2482,8 +2485,6 @@ async function search(query, options) {
       .slice(0, PHRASE_CANDIDATES);
     /* the typed run with its numbers in digits is a reading of it too, in a verse: the NKJV prints "His number is
        666" (numbers.js). Read in a letter's "who are the 144,000?" it led the Answers titled for that number. */
-    const numbered = numberReading(typedTokens);
-    const typedNum = numbered.length !== typedTokens.length ? numbered : null;
     for (const id of cands) {
       if (spent()) { const r = await pause(); if (r) return r; }
       const d = docLookup[id];
@@ -2570,8 +2571,12 @@ async function search(query, options) {
   /** How the query names a text's title (ranking.js titleMatch); a study chapter's by its own title too. */
   const titleScore = (/** @type {any} */ d) => {
     const t = titleToks(d);
-    const all = titleMatch(t.all, typedTokens, STOP);
-    return t.own ? Math.max(all, titleMatch(t.own, typedTokens, STOP)) : all;
+    const read = (/** @type {string[]} */ q) => {
+      const all = titleMatch(t.all, q, STOP);
+      return t.own ? Math.max(all, titleMatch(t.own, q, STOP)) : all;
+    };
+    // a title's number typed in words names it as its digits do ("the one hundred forty four thousand witnesses")
+    return typedNum ? Math.max(read(typedTokens), read(typedNum)) : read(typedTokens);
   };
   /* A title typed whole, or a run of it, ranks its unit up (ranking.js titleMatch). A part of a title typed (less
      than TITLE_EXACT_BOOST) on a text not holding the typed run is lifted no higher than just under the first text
@@ -2910,7 +2915,8 @@ async function search(query, options) {
   const levelOf = (/** @type {any} */ d) => {
     if (!d.title || d.kind === 'verse') return 0;
     const t = titleToks(d);
-    return Math.max(titleLevel(t.all, typedTokens), t.own ? titleLevel(t.own, typedTokens) : 0);
+    const read = (/** @type {string[]} */ q) => Math.max(titleLevel(t.all, q), t.own ? titleLevel(t.own, q) : 0);
+    return typedNum ? Math.max(read(typedTokens), read(typedNum)) : read(typedTokens);
   };
   let typedTitle = -1;
   if (out.length > 1 && typedTokens.length) {
