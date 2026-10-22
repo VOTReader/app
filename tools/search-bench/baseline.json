@@ -1,10 +1,10 @@
 {
- "pass": 473,
- "strict": 364,
- "top5": 489,
+ "pass": 474,
+ "strict": 365,
+ "top5": 490,
  "found": 499,
  "style": {
-  "crossover": 39,
+  "crossover": 40,
   "exact": 76,
   "firstwords": 25,
   "gist": 29,
@@ -18,7 +18,7 @@
  },
  "group": {
   "answers": 56,
-  "bible": 106,
+  "bible": 107,
   "cross": 16,
   "letters": 181,
   "studies": 37,
