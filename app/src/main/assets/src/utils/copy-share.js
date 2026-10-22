@@ -114,11 +114,15 @@ export function shareText(text) {
  * (PlatformBridge.shareImage); a browser that can share files gets navigator.share with it; one that
  * cannot, or whose share fails for any reason but the reader closing it, saves the PNG instead
  * (PlatformBridge.saveToFile, the app's one download path). Never rejects.
+ * Pass the PNG made when the card was painted (`ready`) so navigator.share runs inside the tap
+ * itself: a share called after toBlob's callback can outlive the tap's activation (a slow phone,
+ * Safari) and be refused with NotAllowedError, which would save the PNG instead of sharing it.
  * @param {HTMLCanvasElement} canvas
  * @param {string} name the file's name
+ * @param {Blob | null} [ready] the canvas's PNG, made ahead
  * @returns {Promise<ImageShareOutcome>}
  */
-export function shareCanvasImage(canvas, name) {
+export function shareCanvasImage(canvas, name, ready) {
   const PB = typeof PlatformBridge !== 'undefined' ? PlatformBridge : null;
   if (PB && PB.isAndroid === true) {
     try {
@@ -136,10 +140,9 @@ export function shareCanvasImage(canvas, name) {
     w.__onExportComplete = (/** @type {string} */ r) => { w.__onExportComplete = null; resolve(r === 'ok' ? 'saved' : 'failed'); };
     try { PB.saveToFile(name, blob); } catch (_e) { w.__onExportComplete = null; resolve('failed'); }
   });
-  return new Promise((resolve) => {
-    try { canvas.toBlob((b) => resolve(b), 'image/png'); } catch (_e) { resolve(null); }
-  }).then((blob) => {
-    if (!blob) return /** @type {ImageShareOutcome} */ ('failed');
+  /** @param {Blob | null} blob @returns {Promise<ImageShareOutcome>} */
+  const withBlob = (blob) => {
+    if (!blob) return Promise.resolve(/** @type {ImageShareOutcome} */ ('failed'));
     const nav = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator) : null;
     let file = null;
     try { file = new File([/** @type {Blob} */ (blob)], name, { type: 'image/png' }); } catch (_e) { file = null; }
@@ -153,7 +156,11 @@ export function shareCanvasImage(canvas, name) {
       () => /** @type {ImageShareOutcome} */ ('shared'),
       (err) => (err && err.name === 'AbortError' ? /** @type {ImageShareOutcome} */ ('cancelled') : saveInstead(/** @type {Blob} */ (blob))),
     );
-  });
+  };
+  if (ready) return withBlob(ready);
+  return new Promise((resolve) => {
+    try { canvas.toBlob((b) => resolve(b), 'image/png'); } catch (_e) { resolve(null); }
+  }).then((blob) => withBlob(/** @type {Blob | null} */ (blob)));
 }
 
 /**

@@ -8908,7 +8908,7 @@
 .ans-display.is-long{font-size:min(var(--fs-30),8vw);line-height:1.15;letter-spacing:0}
 .ans-line{display:block}
 .ans-h2,.ans-az-letter{font-weight:400;font-size:min(var(--fs-24),8vw);line-height:1.25;color:var(--cream);margin:0;text-wrap:balance}
-.ans-row-title,.ans-lede,.ans-tab,.ans-num,.ans-search-input{font-size:min(var(--fs-18),7vw);line-height:1.35}
+.ans-row-title,.ans-lede,.ans-tab,.ans-btn,.ans-num,.ans-search-input{font-size:min(var(--fs-18),7vw);line-height:1.35}
 .ans-row-sub,.ans-meta,.ans-metarow,.ans-chip,.ans-textbtn,.ans-count,.ans-note,.ans-src,.ans-contents-line,.ans-hit-src,.ans-credit,.ans-figcap{font-size:min(var(--fs-15),5.6vw);line-height:1.45}
 .ans-label{font-family:'Cinzel',serif;font-weight:400;font-size:clamp(var(--fsc-12),3.6vw,var(--fs-13));line-height:1.4;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim);margin:0}
 .ans-lead,.ans-lede,.ans-meta,.ans-metarow,.ans-row-sub,.ans-count,.ans-note,.ans-hit-src,.ans-credit,.ans-figcap,.ans-src{color:var(--cream-muted)}
@@ -8980,8 +8980,8 @@
 /* Tabs and landing sections */
 .ans-tabs{display:flex;margin-top:32px;border-bottom:1px solid var(--border)}
 .ans-tab{position:relative;flex:1;min-height:48px;text-align:center;color:var(--cream-muted)}
-.ans-tab[aria-selected=true]{color:var(--cream)}
-.ans-tab[aria-selected=true]::after,.ans-az-key[aria-current=true]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold)}
+.ans-tab:is([aria-selected=true],[aria-checked=true]){color:var(--cream)}
+.ans-tab:is([aria-selected=true],[aria-checked=true])::after,.ans-az-key[aria-current=true]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold)}
 .ans-sechead,.ans-az-head{align-items:baseline}
 .ans-sechead{margin:40px 0 8px}
 .ans-count{white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -9062,6 +9062,11 @@ u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underl
 /* Sheets */
 .select-sheet.ans-sheet{padding:8px 24px calc(var(--inset-bottom,0px) + 28px);text-align:left}
 .ans-sheet.is-tall{height:calc(100vh - var(--dock-under-nav));max-height:none}
+/* O6 Share as a card: the 4:5 preview as large as leaves the theme control and Share in view; never under 220 wide
+   (a phone held sideways: the sheet scrolls), so the card the reader shares is always the card they see */
+.ans-card{display:block;width:100%;max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));height:auto;margin:16px auto 0;border:1px solid var(--border);border-radius:12px;box-sizing:border-box}
+.ans-btn{display:flex;align-items:center;justify-content:center;width:100%;min-height:48px;margin-top:16px;padding:6px 16px;border:1px solid var(--gold-border);border-radius:12px;background:var(--gold-faint);color:var(--gold);box-sizing:border-box}
+.ans-btn:disabled{opacity:.45;cursor:default}
 .ans-sheet-head{position:sticky;top:-8px;z-index:1;padding-bottom:8px;background:var(--bg3);border-bottom:1px solid var(--border)}
 .ans-toc-sec{position:relative;min-height:52px}
 .ans-toc-sec.is-current::before{content:"";position:absolute;left:-24px;top:0;bottom:0;width:3px;background:var(--gold)}

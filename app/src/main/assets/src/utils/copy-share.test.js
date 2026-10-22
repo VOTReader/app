@@ -233,6 +233,17 @@ describe('shareCanvasImage (the Answers share card, AOGCG O6)', () => {
     expect(await shareCanvasImage(canvas(), 'answer-card.png')).toBe('failed');
   });
 
+  it('a PNG made ahead (when the card was painted) is shared inside the tap, with no wait on toBlob', async () => {
+    const share = vi.fn(() => Promise.resolve());
+    setShare(share);
+    setCanShare(true);
+    const c = canvas();
+    const out = shareCanvasImage(c, 'answer-card.png', blob);
+    expect(share).toHaveBeenCalledTimes(1); // synchronously, before any await
+    expect(c.toBlob).not.toHaveBeenCalled();
+    expect(await out).toBe('shared');
+  });
+
   it('a canvas that cannot give its PNG fails, never throws', async () => {
     const c = canvas();
     c.toBlob = vi.fn(() => { throw new Error('tainted'); });

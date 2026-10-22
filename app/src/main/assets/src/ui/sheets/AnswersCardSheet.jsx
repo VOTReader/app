@@ -19,7 +19,7 @@
 
 import { AnsSheet } from './AnswersSheets.jsx';
 import {
-  ANSWERS_CARD_THEMES, ANSWERS_CARD_MAX_WORDS, ANSWERS_CARD_W, ANSWERS_CARD_H, answersCardWords, answersCardLayout,
+  ANSWERS_CARD_THEMES, ANSWERS_CARD_MAX_WORDS, ANSWERS_CARD_W, ANSWERS_CARD_H, ANSWERS_CARD_SITE, answersCardWords, answersCardLayout,
 } from '../../utils/answers-extras.js';
 import { shareCanvasImage } from '../../utils/copy-share.js';
 
@@ -73,20 +73,32 @@ export function AnswersCardSheet({ card, onClose }) {
   const [themeId, setThemeId] = React.useState(_theme);
   const [busy, setBusy] = React.useState(false);
   const canvasRef = React.useRef(/** @type {HTMLCanvasElement | null} */ (null));
+  // The PNG of what the preview shows, made as it is painted, so Share hands it over inside the tap.
+  const pngRef = React.useRef(/** @type {Blob | null} */ (null));
   const words = answersCardWords(card.passage);
   const fits = words > 0 && words <= ANSWERS_CARD_MAX_WORDS;
   const theme = ANSWERS_CARD_THEMES.find((t) => t.id === themeId) || ANSWERS_CARD_THEMES[0];
   React.useEffect(() => { _theme = themeId; }, [themeId]);
   React.useEffect(() => {
     const c = canvasRef.current;
+    pngRef.current = null;
     if (!c || !fits) return undefined;
     const family = cardFamily();
     let live = true;
-    drawAnswersCard(c, card, theme, family);
-    // The serif may still be on its way: paint again once it is in.
+    const paint = () => {
+      pngRef.current = null;
+      if (!drawAnswersCard(c, card, theme, family)) return;
+      try { c.toBlob((b) => { if (live) pngRef.current = b; }, 'image/png'); } catch (_e) { /* Share makes it then */ }
+    };
+    paint();
+    // The faces may still be on their way: the passage's, the citation and date's italic, the site
+    // line's. Paint again once all three are in (a face never shown yet would draw as the fallback).
+    // Each is asked for with the words it draws, so a face split by unicode-range loads every part used.
     const fonts = typeof document !== 'undefined' ? /** @type {any} */ (document).fonts : null;
     if (fonts && typeof fonts.load === 'function') {
-      fonts.load('60px ' + family).then(() => { if (live) drawAnswersCard(c, card, theme, family); }, () => {});
+      const faces = [['60px ', card.passage], ['italic 34px ', card.cite + ' ' + card.date], ['30px ', ANSWERS_CARD_SITE]]
+        .map(([f, text]) => Promise.resolve(fonts.load(f + family, text || ' ')).catch(() => null));
+      Promise.all(faces).then(() => { if (live) paint(); });
     }
     return () => { live = false; };
   }, [card, theme, fits]);
@@ -94,42 +106,48 @@ export function AnswersCardSheet({ card, onClose }) {
     const c = canvasRef.current;
     if (!c || busy || !fits) return;
     setBusy(true);
-    shareCanvasImage(c, 'answer-card.png').then((outcome) => {
+    shareCanvasImage(c, 'answer-card.png', pngRef.current).then((outcome) => {
       setBusy(false);
       const say = outcome === 'saved' ? 'Card saved as an image.' : outcome === 'failed' ? 'Couldn’t share the card.' : '';
       if (say && typeof showToast === 'function') showToast({ id: 'vot-toast-copy', className: 'vot-toast', text: say });
       if (outcome === 'shared' || outcome === 'saved') onClose();
     });
   };
+  // A radio group (one of three, repainting the one card): arrows step and wrap, Home and End jump, focus follows.
   const onKey = (/** @type {any} */ e) => {
-    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
-    e.preventDefault();
-    const i = ANSWERS_CARD_THEMES.indexOf(theme);
     const n = ANSWERS_CARD_THEMES.length;
-    setThemeId(ANSWERS_CARD_THEMES[(i + (e.key === 'ArrowRight' ? 1 : n - 1)) % n].id);
+    const i = ANSWERS_CARD_THEMES.indexOf(theme);
+    const step = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: n - 1, ArrowUp: n - 1 }[/** @type {'ArrowRight'} */ (e.key)];
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : step ? (i + step) % n : -1;
+    if (j < 0) return;
+    e.preventDefault();
+    setThemeId(ANSWERS_CARD_THEMES[j].id);
+    const next = e.currentTarget.parentNode && e.currentTarget.parentNode.children[j];
+    if (next && typeof next.focus === 'function') next.focus();
   };
-  // The sheet fills the screen under the top bar, and the card is as large as leaves the theme control and Share in view.
+  // The sheet fills the screen under the top bar, and the card is as large as leaves the theme control and Share in
+  // view (app.css .ans-card); on a short screen (a phone held sideways) it keeps a readable size and the sheet scrolls.
+  // Over 80 words there is no card: no theme control, and the sheet only as tall as its message.
   return (
-    <AnsSheet label="Share as a card" tall onClose={onClose} head={<p className="ans-label">Share as a card</p>}>
-      <div className="ans-tabs" role="tablist" aria-label="Card theme">
-        {ANSWERS_CARD_THEMES.map((t) => (
-          <button key={t.id} type="button" className="ans-tab" role="tab" aria-selected={t.id === themeId} aria-controls="ans-card"
-            tabIndex={t.id === themeId ? 0 : -1} onClick={() => setThemeId(t.id)} onKeyDown={onKey}>{t.label}</button>
-        ))}
-      </div>
+    <AnsSheet label="Share as a card" tall={fits} onClose={onClose} head={<p className="ans-label">Share as a card</p>}>
       {fits ? (
-        <canvas id="ans-card" ref={canvasRef} width={ANSWERS_CARD_W} height={ANSWERS_CARD_H} role="img"
-          aria-label={card.passage + ' ' + card.cite + (card.date ? ' ' + card.date : '')}
-          style={{ display: 'block', width: '100%', maxWidth: 'calc((100vh - var(--dock-under-nav) - 310px) * 0.8)', height: 'auto', margin: '16px auto 0', borderRadius: 12, border: '1px solid var(--border)', boxSizing: 'border-box' }} />
+        <div className="ans-tabs" role="radiogroup" aria-label="Card theme">
+          {ANSWERS_CARD_THEMES.map((t) => (
+            <button key={t.id} type="button" className="ans-tab" role="radio" aria-checked={t.id === themeId}
+              tabIndex={t.id === themeId ? 0 : -1} onClick={() => setThemeId(t.id)} onKeyDown={onKey}>{t.label}</button>
+          ))}
+        </div>
+      ) : null}
+      {fits ? (
+        <canvas ref={canvasRef} className="ans-card" width={ANSWERS_CARD_W} height={ANSWERS_CARD_H} role="img"
+          aria-label={card.passage + ' ' + card.cite + (card.date ? ' ' + card.date : '')} />
       ) : (
-        <div id="ans-card" role="status">
+        <div role="status">
           <p className="ans-empty">Choose a shorter passage</p>
           <p className="ans-note">{'A card holds ' + ANSWERS_CARD_MAX_WORDS + ' words at most; this passage has ' + words + '.'}</p>
         </div>
       )}
-      <div className="copy-fallback-actions">
-        <button type="button" className="copy-fallback-btn primary" disabled={!fits || busy} style={fits ? undefined : { opacity: 0.45 }} onClick={share}>Share</button>
-      </div>
+      <button type="button" className="ans-btn" disabled={!fits || busy} onClick={share}>Share</button>
     </AnsSheet>
   );
 }

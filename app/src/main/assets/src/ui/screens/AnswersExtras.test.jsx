@@ -101,15 +101,65 @@ describe('Share as a card (O6)', () => {
     const daily = document.querySelector('.ans-daily');
     fireEvent.click(within(daily.querySelector('.ans-daily-head')).getByLabelText('Share as a card'));
     const sheet = screen.getByRole('dialog', { name: 'Share as a card' });
-    expect([...sheet.querySelectorAll('[role="tab"]')].map((t) => [t.textContent, t.getAttribute('aria-selected')]))
+    // One choice of three that repaints the card: a radio group (a tablist would want panels to show).
+    const group = within(sheet).getByRole('radiogroup', { name: 'Card theme' });
+    expect([...group.querySelectorAll('[role="radio"]')].map((t) => [t.textContent, t.getAttribute('aria-checked')]))
       .toEqual([['Parchment', 'true'], ['Ink', 'false'], ['Night', 'false']]);
     const card = sheet.querySelector('canvas');
     expect([card.width, card.height]).toEqual([1080, 1350]);
+    // Sized by its class (app.css .ans-card), so the token and theme checks see it.
+    expect(card.className).toBe('ans-card');
+    expect(card.getAttribute('style')).toBeNull();
     // The preview names what it shows: the excerpt verbatim, its source, its date.
     expect(card.getAttribute('aria-label')).toMatch(/^"For I am a Great King!.*God Eternal!" “The Alarm of War” · Volume \w+ 7\/5\/10$/);
-    fireEvent.keyDown(sheet.querySelector('[role="tab"]'), { key: 'ArrowLeft' });
-    expect(sheet.querySelector('[aria-selected="true"]').textContent).toBe('Night');
-    expect(within(sheet).getByText('Share').disabled).toBe(false);
+    fireEvent.keyDown(group.querySelector('[role="radio"]'), { key: 'ArrowLeft' });
+    expect(group.querySelector('[aria-checked="true"]').textContent).toBe('Night');
+    fireEvent.keyDown(group.querySelector('[aria-checked="true"]'), { key: 'Home' });
+    expect(group.querySelector('[aria-checked="true"]').textContent).toBe('Parchment');
+    fireEvent.keyDown(group.querySelector('[aria-checked="true"]'), { key: 'End' });
+    expect(group.querySelector('[aria-checked="true"]').textContent).toBe('Night');
+    // An Answers button, on the Answers type scale (the kit's copy button grew to 42px at Text Size 3).
+    const share = within(sheet).getByText('Share');
+    expect(share.className).toBe('ans-btn');
+    expect(share.disabled).toBe(false);
+  });
+
+  it('every face the card draws in is loaded before the repaint: the passage, the italic citation and date, the site line', async () => {
+    const load = vi.fn(() => Promise.resolve([]));
+    const had = Object.getOwnPropertyDescriptor(document, 'fonts');
+    Object.defineProperty(document, 'fonts', { value: { load }, configurable: true });
+    try {
+      render(<AnswersCardSheet card={{ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '1/2/03' }} onClose={noop} />);
+      await act(async () => {});
+      // Each with the words it draws, so a face split by unicode-range (the app's glyph subset) loads every part.
+      expect(load.mock.calls.map((c) => c.join(' | ')).sort()).toEqual([
+        '30px serif | answersonlygodcangive.com', '60px serif | I AM The Lord.', 'italic 34px serif | “Title” · Volume 1 1/2/03']);
+    } finally {
+      if (had) Object.defineProperty(document, 'fonts', had); else delete document.fonts;
+    }
+  });
+
+  it('on the web the PNG is made when the card is painted, so Share opens the share sheet inside the tap', () => {
+    const blob = new Blob(['png'], { type: 'image/png' });
+    const ctx2d = { fillRect: vi.fn(), fillText: vi.fn(), measureText: (s) => ({ width: s.length * 10 }) };
+    const getContext = vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(ctx2d);
+    const toBlob = vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation((cb) => cb(blob));
+    const share = vi.fn(() => new Promise(() => {}));
+    Object.defineProperty(navigator, 'share', { value: share, configurable: true, writable: true });
+    Object.defineProperty(navigator, 'canShare', { value: () => true, configurable: true, writable: true });
+    try {
+      render(<AnswersCardSheet card={{ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '' }} onClose={noop} />);
+      const made = toBlob.mock.calls.length;
+      expect(made).toBeGreaterThan(0);
+      fireEvent.click(screen.getByText('Share'));
+      // Called in the click itself, not after a toBlob callback: the tap's activation is still live.
+      expect(share).toHaveBeenCalledTimes(1);
+      expect(share.mock.calls[0][0].files[0].type).toBe('image/png');
+      expect(toBlob.mock.calls.length).toBe(made);
+    } finally {
+      getContext.mockRestore(); toBlob.mockRestore();
+      delete navigator.share; delete navigator.canShare;
+    }
   });
 
   it('a passage over 80 words is refused, never cut', () => {
@@ -118,7 +168,10 @@ describe('Share as a card (O6)', () => {
     expect(screen.getByText('Choose a shorter passage')).toBeTruthy();
     expect(screen.getByText('A card holds 80 words at most; this passage has 81.')).toBeTruthy();
     expect(document.querySelector('canvas')).toBeNull();
+    // No card to theme, so no theme control; the dimmed look is the class's :disabled rule, not inline.
+    expect(document.querySelector('[role="radiogroup"]')).toBeNull();
     expect(screen.getByText('Share').disabled).toBe(true);
+    expect(screen.getByText('Share').getAttribute('style')).toBeNull();
   });
 
   it('Share hands the drawn card to the phone and closes; a refusal says so and stays open', async () => {
