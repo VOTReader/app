@@ -8415,6 +8415,15 @@
     .sw-root.sw-compact :is(.sw-cite-source, .sw-sort-note) { font-size: calc(var(--fsc-13) * var(--sw-ts)); }
     .sw-root.sw-compact .sw-row-text { font-size: calc(var(--fsc-14) * var(--sw-ts)); }
     .sw-root.sw-compact .sw-panel-credit { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
+    /* A compact SHEET (under 560 px wide and 500 tall) hides the legend, and its credit sat only at
+       the end of the scroll (w5 minor). The CC-BY line is a licence obligation, so there it sticks to
+       the sheet's foot while the rest scrolls; still last in the flow, so nothing moves under it. */
+    .sw-root.sw-compact[data-panel="sheet"] .sw-panel-body > .sw-panel-credit {
+      position: sticky; bottom: 0; z-index: 1;
+      margin: 0 calc(-20px - var(--sw-safe-right)) 0 -20px;
+      padding: 8px calc(20px + var(--sw-safe-right)) calc(8px + var(--sw-safe-bottom)) 20px;
+      background: var(--sw-panel); border-top: 1px solid var(--sw-hairline);
+    }
     .sw-root.sw-compact .sw-sec { margin-top: 10px; padding-top: 2px; }
     .sw-root.sw-compact :is(.sw-sec.sw-verses, .sw-links.sw-sec) { padding-top: 0; }
     .sw-root.sw-compact :is(.sw-row, .sw-row-main) { min-height: 60px; }

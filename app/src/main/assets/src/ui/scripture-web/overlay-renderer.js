@@ -691,8 +691,13 @@ export function paintMyWebOverlay(ctx, fs) {
 /** The top scrim behind the header (#21): the spec's #000 at .65 to transparent, 0-104 / 0-64. */
 function drawScrim(ctx, L) {
   if (!(L.inset > 0)) return;
-  const h = Math.max((L.compact ? 64 : 104) * L.s, L.inset + 16 * L.s);
-  const gr = gradient(ctx, 0, 0, 0, h, [[0, css('scrim')], [0.55, css('scrim', 0.6)], [1, css('scrim', 0)]]);
+  // A phone's header is one row ("The Scripture Web  63,418 connections") with its count at about
+  // 0.6 of the old 64 px ramp, where the scrim had fallen to .36 and a lit gold bundle read through
+  // the count at two thirds of its ink (w5 minor: s08 phone). There the dark end holds to the
+  // header's bottom (L.inset) and only then fades, over 24 px; PC's taller ramp is as it was.
+  const h = L.compact ? Math.max(64 * L.s, L.inset + 24 * L.s) : Math.max(104 * L.s, L.inset + 16 * L.s);
+  const hold = L.compact ? Math.min(0.85, L.inset / h) : 0.55;
+  const gr = gradient(ctx, 0, 0, 0, h, [[0, css('scrim')], [hold, css('scrim', L.compact ? 0.9 : 0.6)], [1, css('scrim', 0)]]);
   if (!gr) return;
   ctx.fillStyle = gr;
   ctx.beginPath(); ctx.rect(0, 0, L.W, h); ctx.fill();

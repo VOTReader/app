@@ -1481,3 +1481,36 @@ describe('the verse zoom: one verse fills the frame, every link its own labelled
     expect(rec.texts().map((c) => c.t).join(' '), 'no text source, no words').not.toContain('loved');
   });
 });
+
+/* w5 minor (s08 phone): the count in a phone's one-row header sat where the top scrim had fallen to
+   .36, so a lit gold bundle read through it. On a compact frame the dark end now holds to the
+   header's bottom (the inset) before it fades; PC keeps its ramp. */
+describe("the top scrim holds under a phone's header", () => {
+  const stopsOf = (name) => {
+    const fs = frameAt(name, 40, ISA53_6);
+    const rec = recorder();
+    const grads = [];
+    rec.ctx.createLinearGradient = (x0, y0, x1, y1) => {
+      const gr = { y1, stops: [], addColorStop(o, c) { this.stops.push([o, c]); } };
+      grads.push(gr); return gr;
+    };
+    rec.ctx.translate = () => {}; rec.ctx.rotate = () => {}; rec.ctx.clip = () => {};
+    paintCanonOverlay(rec.ctx, fs);
+    // the scrim is the gradient that starts at the scrim's own dark end
+    const g0 = grads.find((g) => g.stops.length && g.stops[0][1] === css('scrim'));
+    return { fs, g0 };
+  };
+  const alphaOf = (c) => parseFloat(/,([\d.]+)\)$/.exec(c)[1]);
+  it('phone: at the header\'s bottom the scrim is still at 0.9 of its dark end', () => {
+    const { fs, g0 } = stopsOf('phone');
+    expect(g0, 'the scrim was drawn').toBeTruthy();
+    const hold = g0.stops[1];
+    expect(hold[0] * g0.y1).toBeCloseTo(fs.inset, 6);
+    expect(alphaOf(hold[1])).toBeCloseTo(0.65 * 0.9, 3);
+  });
+  it('pc: the ramp is as it was', () => {
+    const { g0 } = stopsOf('pc');
+    expect(g0.stops[1][0]).toBe(0.55);
+    expect(alphaOf(g0.stops[1][1])).toBeCloseTo(0.65 * 0.6, 3);
+  });
+});
