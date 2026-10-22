@@ -19,7 +19,7 @@
    container + document, so they can only be exercised by rendering the
    component and dispatching real events. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { ScreenLayout } from './ScreenLayout.jsx';
 
@@ -189,6 +189,31 @@ describe('ScreenLayout pager wiring', () => {
   it('still registers .screen-scroll as __scrollEl on the pager path', () => {
     const { container } = render(<SL hideTabsBtn navChildren={null} pager={pager}>x</SL>);
     expect(/** @type {any} */ (globalThis).__scrollEl).toBe(container.querySelector('.screen-scroll'));
+  });
+
+  it('the first-run tip stays on the unit it showed on, and is gone after Next (U15: the visit keys it)', () => {
+    vi.useFakeTimers();
+    const store = (o) => ({ subscribe: () => () => {}, getVersion: () => 1, ...o });
+    let flag = false, ver = 0;
+    const subs = new Set();
+    Object.assign(window, {
+      AnnotationStore: store({ all: () => ({}) }), NoteStore: store({ count: () => 0 }), BookmarkStore: store({ count: () => 0 }),
+      TourController: store({ getState: () => ({ active: false }), highlightWords: () => 'Press and hold' }),
+      AnnHintDismissedFlagStore: { is: () => flag, set: () => { flag = true; ver++; subs.forEach((cb) => cb()); }, subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); }, getVersion: () => ver },
+    });
+    try {
+      const r = render(<SL hideTabsBtn navChildren={null} pager={pager} placeKey="answers:a">x</SL>);
+      act(() => { vi.advanceTimersByTime(2600); });
+      expect(document.querySelector('.ann-hint-pill'), 'shown on the first topic').toBeTruthy();
+      act(() => { vi.advanceTimersByTime(4000); });
+      expect(document.querySelector('.ann-hint-pill'), 'and still there on it').toBeTruthy();
+      r.rerender(<SL hideTabsBtn navChildren={null} pager={pager} placeKey="answers:b">x</SL>);
+      act(() => { vi.advanceTimersByTime(4000); });
+      expect(document.querySelector('.ann-hint-pill'), 'not on the next one').toBeNull();
+    } finally {
+      vi.useRealTimers();
+      for (const k of ['AnnotationStore', 'NoteStore', 'BookmarkStore', 'TourController', 'AnnHintDismissedFlagStore']) delete window[k];
+    }
   });
 
   it('pre-mounts both peeks at rest (parked off-screen at CSS ±100%)', () => {
