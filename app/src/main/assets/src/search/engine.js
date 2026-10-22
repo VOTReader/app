@@ -3083,8 +3083,10 @@ async function search(query, options) {
       }
       single.set(id, a.cov);
       // two verses run together: the pair holds what neither holds alone (a neighbour holding it alone is the verse
-      // remembered, and this one, saying the like, is not lifted by it)
-      if (d.kind === 'verse' && a.cov < ALIGN_HELD) {
+      // remembered, and this one, saying the like, is not lifted by it). A verse aligned only for its near phrase
+      // (nearAdded) is held on its own words: "nor in the son of man" joined to the verse before it held "the sing of
+      // the son of man" and led it; the verse the quote starts in is held with it, and it comes after (search200 fix2)
+      if (d.kind === 'verse' && a.cov < ALIGN_HELD && !nearAdded.has(id)) {
         for (const by of [-1, 1]) {
           const o = besideVerse(id, d, by);
           const ot = o ? toksOf(o) : null;
