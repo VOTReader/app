@@ -27,8 +27,8 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   // Each block's `key` is the bare data-index LetterView/WtlbEntryView end
   // their hlKey in, so a stored "letter:id:N:start-end" target prefix-matches
   // the rendered block. A Format B entry renders its references the way its
-  // route does (footnote numbers for Holy Days and Answers, "(Ref)" cites for
-  // WTLB and The Blessed).
+  // route does (footnote numbers for Holy Days, "(Ref)" cites for WTLB, The
+  // Blessed and Answers).
   const collectionLabel = target.collection || item.collection;
   const blocks = React.useMemo(() => {
     const col = typeof COLLECTIONS !== 'undefined' && collectionLabel

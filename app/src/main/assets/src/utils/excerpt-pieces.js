@@ -32,10 +32,10 @@ import { formatBDomPieces, formatBRefScan } from './format-b-dom-text.js';
 const SEAM = { text: '', seam: true };
 
 /* The collections whose entry route renders Format B in footnotesMode:
-   screen-routes.jsx passes footnotesMode={true} to the Holy Days and Answers
-   entry routes, while WTLB and The Blessed show each reference as a "(Ref)"
-   cite. */
-const FOOTNOTE_MODE_VOLKEYS = new Set(['holydays', 'answers']);
+   screen-routes.jsx passes footnotesMode={true} to the Holy Days entry route
+   only. WTLB, The Blessed and Answers show each reference as a "(Ref)" cite
+   (an Answers topic since AOGCG U6: footnotesMode={false}). */
+const FOOTNOTE_MODE_VOLKEYS = new Set(['holydays']);
 
 /**
  * Whether the reader renders this collection's Format B references as
