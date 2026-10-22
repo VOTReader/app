@@ -18,8 +18,9 @@ const GROUP_UNIT = {
 
 /* Cards render a page at a time: a group can hold hundreds now that each
    collection keeps its own 400 (Answers holds about 600 topics for "the"), and
-   every card cuts and measures a snippet. */
-export const SRCH_GROUP_PAGE = 50;
+   every card cuts and measures a snippet. Ten, then ten more at a time (search200 UX
+   B10 6): fifty verses at once buried the next group's header a long scroll away. */
+export const SRCH_GROUP_PAGE = 10;
 
 /* A card's key is its doc, not its index: Book order re-sorts a group in place,
    and an index key handed each card another result (its snippet centred on the
@@ -35,8 +36,11 @@ function cardKey(entry, i) {
    `view` is the order the screen shows ('relevance' | 'book'): Book order opens every
    group with a short first `page`, and each order remembers its own open and paged
    state, so a group opened under Relevance is open again after a trip to Book order (sr12);
-   'book-more' is Book order's second list, the loose matches of a passage search (sr13). */
-export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
+   'book-more' is Book order's second list, the loose matches of a passage search (sr13).
+   `more`: some of the group's results sit in Best Matches above it (a short list shows each
+   result once, search200 B2), so its count is of the rest: "1 more letter".
+   `stopTyped`: the small words typed, handed to each card (SrchCard). */
+export function SrchGroup({ gkey, items, terms, stopTyped = undefined, onSelect, defaultOpen, capped = false, more = false, memo = '', view = 'relevance', page = SRCH_GROUP_PAGE }) {
   const slot = 'group|' + gkey + (view === 'relevance' ? '' : '|' + view);
   const was = recall(memo, slot);
   const [open, setOpen] = React.useState(was ? was.open : defaultOpen !== false);
@@ -47,26 +51,30 @@ export function SrchGroup({ gkey, items, terms, onSelect, defaultOpen, capped = 
   const left = items.length - shown;
   return (
     <div className={"srch-group" + (open ? '' : ' collapsed')}>
-      <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        <span>
-          {meta.label}
-          <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {unit}</span>
-        </span>
-        {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
-            affordance — a real 24px chevron that ROTATES makes the
-            collapse/expand state legible at a glance. */}
-        <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true">▸</span>
-      </button>
+      {/* search200 B9: each group is a heading a screen reader can move by, with its
+          open-close button inside it (the ARIA accordion pattern). */}
+      <h3 className="srch-group-h">
+        <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+          <span>
+            {meta.label}
+            <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {more ? 'more ' : ''}{unit}</span>
+          </span>
+          {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
+              affordance — a real 24px chevron that ROTATES makes the
+              collapse/expand state legible at a glance. */}
+          <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true">▸</span>
+        </button>
+      </h3>
       {/* A closed group renders no cards: a long result set opens with every
           group closed, and each card cuts and measures a snippet. */}
       {open ? (
         <div className="srch-group-items">
           {items.slice(0, shown).map((entry, i) => (
-            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} onSelect={onSelect} memo={memo} where={gkey} />
+            <SrchCard key={cardKey(entry, i)} entry={entry} terms={terms} stopTyped={stopTyped} onSelect={onSelect} memo={memo} where={gkey} />
           ))}
           {left > 0 ? (
             <button type="button" className="srch-group-more" onClick={() => setShown((n) => n + SRCH_GROUP_PAGE)}>
-              {left <= SRCH_GROUP_PAGE ? 'Show ' + left + ' more' : 'Show ' + SRCH_GROUP_PAGE + ' more of ' + left.toLocaleString('en-US')}
+              {left <= SRCH_GROUP_PAGE ? 'Show ' + left + ' more' : 'Show ' + SRCH_GROUP_PAGE + ' more · ' + left.toLocaleString('en-US') + ' left'}
             </button>
           ) : null}
         </div>

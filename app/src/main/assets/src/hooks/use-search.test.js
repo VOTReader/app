@@ -161,8 +161,11 @@ const baseProps = () => ({
   setFromSearch: vi.fn(),
   setFromSurprise: vi.fn(),
   setGenreId: vi.fn(),
-  setActiveReadKey: vi.fn(),
+  setActiveReadKey: vi.fn(),     // no longer a param (B1): kept so a call would still be seen
   setLastReadForVol: vi.fn(),
+  setSearchLanding: vi.fn(),
+  setFromWtlb: vi.fn(),
+  setFromMatthewCh: vi.fn(),
   handleSurprise: vi.fn(),
   goSettings: vi.fn(),
   goHome: vi.fn(),
@@ -529,7 +532,8 @@ describe('useSearch — handleSearchSelect (__direct refs)', () => {
     }); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setScreen).toHaveBeenCalledWith('vol-two-letter');
-    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:two', expect.any(Function));
+    // search200 UX B1: a hit is a look, not a read — the cursor is left alone.
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
   });
 
   it('ref-letter resolves letterNum → letterId via srchResolveLetterId', () => {
@@ -616,7 +620,8 @@ describe('useSearch — handleSearchSelect (Orama doc results)', () => {
     act(() => { result.current.handleSearchSelect({ doc: { kind, volumeId: 'vot-two', letterId: 'wide-path' } }); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setScreen).toHaveBeenCalledWith('vol-two-letter');
-    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:two', expect.any(Function));
+    // search200 UX B1: a hit is a look, not a read — the cursor is left alone.
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
   });
 
   it('letter-kind no-ops when volumeId unknown', () => {
@@ -841,6 +846,30 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     expect(props.setLetterId).toHaveBeenCalledWith('vengeance');
   });
 
+  /* A title named opens at the title (search200 B5, the S22 look): the engine opens a text found by its title at its
+     start (placeStart 0), and the landing says so, so the reader opens at the top, not at a find place below it. */
+  it('a landing at the text\'s start (a title named) opens the unit at its top', () => {
+    const text = 'Beloved, hear Me. Much later: God speaks about the Sabbath.';
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['sabbath'], placeStart: 0 },
+      ['god', 'speaks', 'sabbath'],
+    ); });
+    expect(calls, 'the snippet window is not consulted').toEqual([]);
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ type: 'excerpt', text: text.slice(0, 48), top: true, letterId: 'vengeance' }));
+  });
+
+  it('a landing anywhere else is no top landing', () => {
+    const text = 'Beloved, hear Me. Much later: God speaks about the Sabbath.';
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['sabbath'], placeStart: text.indexOf('God') },
+      ['sabbath'],
+    ); });
+    const seen = props.setSurpriseAnchor.mock.calls;
+    expect(seen[seen.length - 1][0].top).toBeUndefined();
+  });
+
   it('a place start outside the text falls back to the query\'s own excerpt', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect(
@@ -875,6 +904,23 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ find: { terms: ['flood', 'flooding'], label: 'flood' } }));
   });
 
+  /* Track D (D6): the pill marked "whom" and "whoever" in a letter opened from a lone "who" (find6-before.log
+     under D:/Swarm/lanes/search200/out/ux/fix-D). The engine's forms of a typed small word stay out of what to
+     find, by the rule the card marks by (formsToMark): the pill finds what the card marked. */
+  it('D6: a typed small word finds only itself, as the card marks it', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'who-is-first', text: 'Who is he whom the Lord chose? Whoever will, let him come.' }, terms: ['who', 'whom', 'whoever'] },
+      ['who'], 'who', ['who'],
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['who'], label: 'who' } }));
+    act(() => { result.current.handleSearchSelect(
+      { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'one-body', text: 'Christ who strengthens me, in whom is all strengthening.' }, terms: ['who', 'whom', 'strengthening'] },
+      ['christ', 'strengthens'], 'christ who strengthens me', ['who', 'me'],
+    ); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['christ', 'strengthens', 'who', 'strengthening'], label: 'christ who strengthens me' } }));
+  });
+
   it('no match (a title hit, no terms) clears the anchor so a stale verse anchor cannot leak in', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter-title', volumeId: 'vot-two', letterId: 'wide-path', text: '' } }, []); });
@@ -894,5 +940,79 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'wide-path', text: 'x' } }, ['x']); });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+  });
+});
+
+/* search200 UX B1: a search hit is a look, not a read. Opening one used to move
+   the reading cursor (the index's "current" mark and the resume dot) onto it, so
+   a brief look became where the reader was. The hit now names the place it
+   opens (searchLanding): the catch-all arm in use-reading-position-nav skips
+   that place, and the routes switch the read tracker off for it. A hit also
+   starts a new trail for the breadcrumbs only an older path set (fromWtlb,
+   fromMatthewCh), which outranked fromSearch in the reader's back. */
+describe('useSearch — a search hit is a look, not a read (search200 UX B1)', () => {
+  it('a letter-shaped hit moves no cursor and names its place', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'wtlb', volumeId: 'vot-two', letterId: 'wide-path', text: '' } }, []); });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(props.setLastReadForVol).not.toHaveBeenCalled();
+    expect(props.setSearchLanding).toHaveBeenCalledWith('vol-two-letter:wide-path');
+  });
+
+  it('a parsed letter reference moves no cursor and names its place', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-letter', volumeId: 'vot-two', letterId: 'wide-path' } }); });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(props.setLastReadForVol).not.toHaveBeenCalled();
+    expect(props.setSearchLanding).toHaveBeenCalledWith('vol-two-letter:wide-path');
+  });
+
+  it('a verse hit names its chapter (a Bible book, and the Matthew study by its chapter)', () => {
+    const a = setup();
+    act(() => { a.result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1, verseNum: 3 } }); });
+    expect(a.props.setSearchLanding).toHaveBeenCalledWith('bible-ch:genesis:1');
+    const b = setup();
+    act(() => { b.result.current.handleSearchSelect({ doc: { kind: 'study-note', bookId: 'matthew', chapterNum: 5 } }); });
+    expect(b.props.setSearchLanding).toHaveBeenCalledWith('matthew-ch:5');
+  });
+
+  it('a parsed Bible reference names its chapter', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, __corpus: 'scriptures', ref: { kind: 'ref-bible', bookId: 'matthew', chapter: 5, verseStart: 3 } }); });
+    expect(props.setSearchLanding).toHaveBeenCalledWith('bible-ch:matthew-plain:5');
+  });
+
+  it('a study hit names its study chapter', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'bible-study', letterId: 'purity', studyChapterId: 'purity-ch1', chapterNum: 1, text: '' } }, []); });
+    expect(props.setSearchLanding).toHaveBeenCalledWith('bible-study-chapter:purity:purity-ch1');
+  });
+
+  it('a book reference lands on an index, which is no reading place: the landing is cleared', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-book', bookId: 'genesis' } }); });
+    expect(props.setSearchLanding).toHaveBeenCalledWith(null);
+  });
+
+  it('clears the older breadcrumbs that outranked fromSearch in the reader back', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
+    expect(props.setFromWtlb).toHaveBeenCalledWith(null);
+    expect(props.setFromMatthewCh).toHaveBeenCalledWith(null);
+  });
+
+  // Track D (1): a chapter picked from the index a book-level hit opened backs to that
+  // index (fromSearchIndex, a tab field useSearch owns). Every hit starts that trail over.
+  it('every hit starts over the index trail a book-level hit began', () => {
+    const tabField = makeTabField();
+    const { result } = setup({ tabField });
+    const [, setFromSearchIndex] = tabField('fromSearchIndex');
+    expect(typeof result.current.setFromSearchIndex).toBe('function');
+    expect('fromSearchIndex' in result.current).toBe(true);
+    act(() => { result.current.handleSearchSelect({ __direct: true, ref: { kind: 'ref-book', bookId: 'romans' } }); });
+    expect(setFromSearchIndex).toHaveBeenCalledWith(false);
+    setFromSearchIndex.mockClear();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'genesis', chapterNum: 1 } }); });
+    expect(setFromSearchIndex).toHaveBeenCalledWith(false);
   });
 });

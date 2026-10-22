@@ -57,18 +57,22 @@ describe('the Scripture Web controls float over the canvas, with no panel behind
     expect(body).not.toMatch(/border-radius/);
   });
 
-  /* Round 3 (Corbin, 2026-09-11): the credit left the canvas — it printed over the book labels
-     in landscape — and About carries the CC-BY line. Its rule goes with it: a rule for an
-     element nothing renders is the dead CSS the css-tokens gate exists to keep out. */
-  it('the canvas credit has no rule left in app.css (the attribution is About\'s)', () => {
-    const raw = fs.readFileSync(CSS, 'utf8');
-    const stripped = raw.replace(/\/\*[\s\S]*?\*\//g, '');
-    /* The stripper proven on the file that carries the hazard: a history comment still
-       names `.sw-credit`, so raw must contain it and stripped must not — and stripped must
-       still be the stylesheet (a stripper that ate the file would satisfy the absence). */
-    expect(raw).toMatch(/\.sw-credit\b/);
+  /* Round 3 (Corbin, 2026-09-11): the credit left the canvas. It was a line of its own,
+     absolutely placed with a hand-measured offset, and it printed over the book labels in
+     landscape. Q5 (w3 panel step 2) brings it back as the legend's tail; the law is the same with
+     the credit present: no rule gives it a place of its own (no position, no offset, no
+     transform), so it can only be where the legend's line is, and the canvas's labels end above
+     that line (sw-chrome-trim.test.jsx reads them against it). */
+  it('the credit flows in the legend: no rule places it on its own', () => {
+    const stripped = fs.readFileSync(CSS, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    // the stripper did not eat the stylesheet (an empty one would satisfy every absence below)
     expect(stripped).toMatch(/\.sw-live\s*\{/);
-    expect(stripped).not.toMatch(/\.sw-credit\b/);
+    const rules = [...stripped.matchAll(/([^{}]*\.sw-credit\b[^{}]*)\{([^}]*)\}/g)];
+    expect(rules.length, 'a .sw-credit rule').toBeGreaterThan(0);
+    for (const [, sel, body] of rules) {
+      expect(sel.trim(), 'inside the legend').toMatch(/\.sw-legend\b[^,]*\.sw-credit\b/);
+      expect(body, sel.trim() + ' places nothing').not.toMatch(/(?:^|[;\s])(position|top|bottom|left|right|inset|transform)\s*:/);
+    }
   });
 
   /* The hide button hides the interactive chrome and KEEPS the legend: the one rule that hides

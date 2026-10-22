@@ -11,6 +11,21 @@
                 which breaks a third of its 3-grams: 80% of its words AND of its content words in order, within a
                 stretch at most 4 words longer (sr11 t276, 2026-10-15). Such a text answers the sentence too but is no
                 original of it (Corbin 10-14: a phrase that recurs has no single original).
+   NEAR QUOTE   (errata 2026-10-18, a blind 3-judge review of tri m246, 3 of 3) a sentence quoting a verse with a word or
+                two changed ("seek, and you shall find" for the NKJV's "you will find") breaks too many 3-grams for the
+                80% rule but holds the verse by NEAR COPY's measure, or the verse holds it. Such a verse answers the
+                sentence as a near member: any holder of a recurring line counts, and the class's original is unchanged.
+   NAMED COLLECTION  (errata 2026-10-18, tri n344, 3 of 3) a query naming the target's collection ("capital punishment
+                answers only god can give") asks for that collection's own text: the target's own unit may lead though a
+                better-tier text holds the same words (the original-first and reprint-shown checks yield). A name counts
+                only where the query holds it and the target's title and sentence do not.
+   PARALLEL     (errata 2026-10-19, the 500's t043 Matthew 9:38, b500 review: both its judges call Luke 10:2 a fair
+                answer, "says the same thing almost word for word" and "a parallel the rules could accept") another verse holding a
+                verse target's whole text word for word says the same sentence (Luke 10:2 holds "therefore pray the Lord
+                of the harvest to send out laborers into His harvest"): it answers the verse as a near member, as a near
+                copy does, and the target stays the original. A verse of fewer than 8 words is a formula with no one
+                parallel; a two-verse target is the pair, which no one verse says (counter-case cB07); a query naming
+                the verse (its book, or its chapter and verse: the hunt's refwords family) asks for that verse alone.
    ─────────────────────────────────────────────────────────────────── */
 
 const gram = (w, i) => w[i] + ' ' + w[i + 1] + ' ' + w[i + 2];
@@ -92,4 +107,86 @@ export function nearCopy(sentence, text, stop, anchor) {
     }
   }
   return false;
+}
+
+/* SHORT TITLE (tri bench, PLAN 1.6, fixed before any tri run): a study chapter is "Study — Chapter" on its card, and
+   a reader types the chapter's own title. classOf files a study chapter under both, so a title target links it by the
+   part after the first " — " ("Without Spot or Blemish" is a v4 letter and a Lamb of God chapter). Other units keep
+   their one title. */
+/** The titles a unit is filed under: its whole title, and for a study chapter the chapter title alone. */
+export function titleForms(/** @type {string} */ title, /** @type {boolean} */ isStudy) {
+  const t = String(title || '');
+  if (!isStudy) return [t];
+  const at = t.indexOf(' — ');
+  const short = at >= 0 ? t.slice(at + 3).trim() : '';
+  return short ? [t, short] : [t];
+}
+
+/** Does a Bible card's range ({chapter, chapterEnd, verseStart, verseEnd}) hold chapter:verse? (cardPasses, same book) */
+export function rangeHolds(p, chapter, verse) {
+  if (chapter < p.chapter || chapter > (p.chapterEnd || p.chapter)) return false;
+  return !p.verseStart || (verse >= p.verseStart && verse <= (p.verseEnd || p.verseStart));
+}
+
+/** A merged Bible misquote's target is two adjacent verses of one chapter (verse, verse2): a card holding either passes. */
+export const pairHolds = (p, c) => rangeHolds(p, c.chapter, c.verse) || (c.verse2 != null && rangeHolds(p, c.chapter, c.verse2));
+
+/** NEAR QUOTE: does sentence `s` hold verse `v` with a word or two changed, or `v` hold `s` (nearCopy either way, at
+    the two rarest content words the pair shares; `rank` orders words rarest first)? Normalized word arrays. */
+export function nearQuote(/** @type {string[]} */ s, /** @type {string[]} */ v, /** @type {Set<string>} */ stop, /** @type {(w: string) => number} */ rank) {
+  for (const [a, b] of [[v, s], [s, v]]) {
+    const anchors = [...new Set(a)].filter((x) => !stop.has(x) && b.includes(x)).sort((x, y) => rank(x) - rank(y) || (x < y ? -1 : 1)).slice(0, 2);
+    for (const x of anchors) if (nearCopy(a, b, stop, x)) return true;
+  }
+  return false;
+}
+
+/** A heading, not prose (errata 2026-10-19, t401 "Come Out of the Churches of Men - Section Two"): a block of 12 words or
+    fewer with no sentence end. A paraphrase of a heading fits the text it heads, or another text's title, as well, so
+    make-targets.mjs never draws a sentence target from one. */
+export const isHeading = (/** @type {string} */ text) => (String(text).match(/\S+/g) || []).length <= 12 && !/[.!?…]/.test(text);
+
+/** The site's own links and notes, not prose either (errata 2026-10-19, t401's redraw drew "FREE PDF download available,
+    here > ..." and then "• ↑ “Women” in this context refers to the churches of men."): a block opening with a footnote
+    arrow, the study-link book, a see-also, a note or an excerpt label, a bulleted link (no sentence end), or naming a
+    PDF. A bulleted list of sentences is prose (a study's own summary). */
+export function isNavigation(/** @type {string} */ text) {
+  const t = String(text);
+  return /^\s*(?:•\s*)?(?:\[\d+\])?↑|^\s*📖|^\s*(?:•\s*)?-?\s*(?:also see\b|see\s*:)|^\s*\*\s*note\b|^\s*excerpt from\s*:|\bpdf\b/iu.test(t)
+    || (/^\s*•/u.test(t) && !/[.!?…]/.test(t));
+}
+
+/** PARALLEL: does verse text `other` hold verse target `verse` whole? Both normalized with their padding spaces. */
+export const PARALLEL_MIN_WORDS = 8;
+export const parallelHolds = (/** @type {string} */ verse, /** @type {string} */ other) =>
+  verse.trim().split(' ').length >= PARALLEL_MIN_WORDS && other.includes(verse);
+
+/** PARALLEL yields to a query naming the verse ("isaiah 38 1 set your house in order"): it holds the verse's book (a
+    psalm for Psalms) or its chapter and verse numbers. `q` normalized with its padding spaces; `ref` as "Isaiah 38:1". */
+export function namesVerse(/** @type {string} */ q, /** @type {string | undefined} */ ref) {
+  const m = /^(.+?)\s+(\d+):(\d+)/.exec(String(ref || ''));
+  if (!m) return false;
+  const book = m[1].toLowerCase();
+  return [book, book === 'psalms' ? 'psalm' : '', m[2] + ' ' + m[3]].some((p) => p && q.includes(' ' + p + ' '));
+}
+
+/** NAMED COLLECTION: the names a reader types for each collection (normalized, as corpus.mjs norm). */
+const VOL = ['one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+export const COLLECTION_NAMES = {
+  ...Object.fromEntries(VOL.map((w, i) => ['v' + (i + 1), ['volume ' + w, 'volume ' + (i + 1), 'vol ' + w, 'vol ' + (i + 1), 'v' + (i + 1)]])),
+  timothy: ['letters from timothy'],
+  flock: ['little flock', 'lords little flock'],
+  rebuke: ['the lords rebuke', 'lords rebuke', 'rebuke'],
+  wtlb1: ['words to live by', 'wtlb'],
+  wtlb2: ['words to live by', 'wtlb'],
+  blessed: ['the blessed'],
+  holydays: ['holy days'],
+  'bible-studies': ['bible study', 'bible studies', 'study', 'studies'],
+  answers: ['answers only god can give', 'answers'],
+};
+
+/** Does query `q` name collection `col` where `own` (the target's title and sentence) does not? Both normalized
+    with their padding spaces (" a b "). */
+export function namesCollection(/** @type {string} */ q, /** @type {string} */ own, /** @type {string} */ col) {
+  return (COLLECTION_NAMES[col] || []).some((p) => q.includes(' ' + p + ' ') && !own.includes(' ' + p + ' '));
 }

@@ -36,6 +36,13 @@
  *   C    control: with 0 links and context OFF the band is empty (coverage <=
  *        CONTROL_MAX); a reading off a canvas that draws something else is
  *        not a reading of the context
+ *   G    (--glow, information) the cost of the soft glow under Timothy's
+ *        threads (w4 review, minor 7): the draw's own time over about 30
+ *        frames held live by zero-delta wheels (the glow is drawn live since
+ *        the review) and over hover moves at rest, at the overview, with the
+ *        glow and without it (the walk's knob __swContextGlow = false), in
+ *        ABAB order, p50 of each; the ratio is printed against GLOW_COST
+ *        (1.3: past it the glow should be cached)
  *
  * EXIT: 0 pass, 1 fail, 2 nothing-to-check (the screen never drew), 3 harness.
  * A named defect outranks nothing-to-check, decided at the exit and nowhere
@@ -47,6 +54,7 @@
  *
  * Run from the repo root on a clean tree:
  *   node tools/e2e-myweb.mjs [--frames phoneLand,phone,desktop] [--out DIR] [--perf]
+ *   node tools/e2e-myweb.mjs --glow --frames phoneLand,pixelLand   (the G arm alone)
  */
 import puppeteer from 'puppeteer';
 import { execSync } from 'node:child_process';
@@ -59,8 +67,10 @@ const has = (k) => process.argv.includes('--' + k);
 const num = (k, d) => { const v = process.env[k]; return v === undefined ? d : Number(v); };
 const OUT = arg('out', null);
 const PERF = has('perf');
+const GLOW = has('glow');
 const FRAMES = {
   phoneLand: { w: 800, h: 360, dpr: 2, mobile: true, rewardArm: true },
+  pixelLand: { w: 891, h: 411, dpr: 2.6, mobile: true, rewardArm: true },
   phone: { w: 426, h: 952, dpr: 2, mobile: true, rewardArm: false },
   desktop: { w: 1920, h: 1080, dpr: 2, mobile: false, rewardArm: true },
 };
@@ -76,6 +86,7 @@ const LINK_CORE = num('MYWEB_LINK_CORE', 210);      // main 197-205 on the three
 const CONTEXT_P50 = num('MYWEB_CONTEXT_P50', 60);   // main 10; prototype 16-49 (the arm is the PAIR with LINK_CORE)
 const PANEL_COVER = num('MYWEB_PANEL_COVER', 0.45); // fraction of band rows; main ~1.0 at 800x360
 const CONTROL_MAX = num('MYWEB_CONTROL_MAX', 0.04); // main 0.0036 (426x952), 0.0296 (800x360: rail ticks)
+const GLOW_COST = num('MYWEB_GLOW_COST', 1.3);      // G: the glow's draw-time ratio past which it should be cached (w4 review)
 /* R5 ceilings: min-of-two p50 rAF ms during a 1.5 s pan, per frame and state,
    measured with NO getImageData before the timing (a read-back canvas is
    demoted to software raster and times the demotion). REGISTERED PER RENDERER
@@ -147,6 +158,34 @@ const clickIfPresent = (page, label) => page.evaluate((l) => {
   if (!b) return false; b.click(); return true;
 }, label);
 
+/** A top control as a reader reaches it (w4): on a frame whose controls collapse to the
+ *  "More controls" menu (spec section 3's collapse rule: a canvas under 1000 px, so the phone
+ *  frames), through that menu; the walk's own labels are unchanged. need: as clickLabel, wait
+ *  for it (or the menu) and throw when neither carries it. label: a prefix, or a RegExp. */
+async function control(page, label, need) {
+  const re = label instanceof RegExp ? label.source : null;
+  const src = finder.toString();
+  const click = (l) => page.evaluate((x, r, f) => { const b = (new Function('return ' + f)())(x, r); if (!b) return false; b.click(); return true; }, String(l), l === label ? re : null, src);
+  if (need) {
+    await page.waitForFunction((x, r, f) => { const g = new Function('return ' + f)(); return !!g(x, r) || !!g('More controls', null); },
+      { timeout: NAV_MS }, String(label), re, src);
+  }
+  if (await click(label)) { await sleep(150); await closeMenu(page); return true; }
+  if (await click('More controls')) {
+    await sleep(250);
+    const ok = await click(label);
+    await sleep(150);
+    await closeMenu(page);
+    if (ok) return true;
+  }
+  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  return false;
+}
+async function closeMenu(page) {
+  const open = await page.evaluate(() => { const b = document.querySelector('[aria-label="More controls"]'); return !!b && b.getAttribute('aria-expanded') === 'true'; });
+  if (open) { await clickIfPresent(page, 'More controls'); await sleep(200); }
+}
+
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS });
@@ -169,9 +208,13 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
-  await clickLabel(page, 'My web');
+  // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
+  // button is "Got it" ('Dismiss' is the empty notice's x)
+  await clickIfPresent(page, 'Got it'); await sleep(300);
+  await control(page, 'My Web', true);
   await sleep(600);
-  await clickIfPresent(page, 'Reset the view');
+  await clickIfPresent(page, 'Got it'); await sleep(300);
+  await control(page, 'Reset the view');
   await sleep(900);
   return true;
 }
@@ -187,7 +230,22 @@ async function zoom3(page, tag) {
   let ratio = 1;
   if (hasBtn) { for (let i = 0; i < 3; i++) { await clickLabel(page, 'Zoom in'); await sleep(450); } ratio = (await readPpv(page)) / p0; }
   else {
-    const c = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+    // the Bible rail's half of the band: camFor splits the two cameras at the drawn rails' midline (fix-review #7),
+    // which sits 15 CSS px BELOW the canvas's centre at 1920x1080 (rails at 150 and 961), so a wheel at the centre
+    // drove the Volumes camera and data-ppv-css (the Bible's) never moved (the w3 tree, before #7, failed the
+    // same way; the base did not). The point is the first in that half,
+    // from the middle of the screen out, with a canvas under it (the empty notice is chrome: the wheel ignores it)
+    const c = await page.evaluate(() => {
+      const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(), root = document.querySelector('.sw-root');
+      const r = JSON.parse((root && root.getAttribute('data-rails')) || 'null'), top = root ? root.getBoundingClientRect().top : b.top;
+      if (!r) return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+      const mid = top + (r.topY + r.bottomY) / 2, low = top + r.bottomY;
+      for (const fy of [0.5, 0.3, 0.7, 0.15, 0.85]) for (const fx of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const x = b.left + b.width * fx, y = mid + (low - mid) * fy, el = document.elementFromPoint(x, y);
+        if (el && el.tagName === 'CANVAS') return { x, y };
+      }
+      return { x: b.left + b.width / 2, y: mid + (low - mid) / 2 };
+    });
     await page.mouse.move(c.x, c.y);
     for (let i = 0; i < 24 && ratio < ZOOM_TARGET * 0.97; i++) { await page.mouse.wheel({ deltaY: -280 }); await sleep(250); ratio = (await readPpv(page)) / p0; }
   }
@@ -235,9 +293,9 @@ function diffStats(on, off) {
 }
 async function readBoth(page) {
   const on = await page.evaluate(MEASURE);
-  await clickLabel(page, /^Corpus context/); await sleep(500);
+  await control(page, /^Timothy’s notes/, true); await sleep(500);
   const off = await page.evaluate(MEASURE);
-  await clickLabel(page, /^Corpus context/); await sleep(500);
+  await control(page, /^Timothy’s notes/, true); await sleep(500);
   return { on, off, ctx: diffStats(on, off) };
 }
 const COUNTERS = () => {
@@ -313,6 +371,46 @@ async function perfArm(page, tag, state, ceiling) {
   if (ceiling == null) { fails.push(`${tag} R5 ${state}: min-of-two draw p50 ${min} ms against NO ceiling: this renderer is not registered in R5_CEILINGS (the Verifier registers it from three runs at the landing tip)`); return; }
   if (min > ceiling) fails.push(`${tag} R5 ${state}: min-of-two draw p50 ${min} ms > ceiling ${ceiling} ms`);
 }
+/** G: the draw's own time over `n` draws, glow on or off. 'live': zero-delta wheels over the
+    canvas, a frame apart (each holds the gesture live, so the glow is timed where the review
+    turned it on); 'hover': pointer moves with no button across the band at rest. */
+async function glowPass(page, off, kind, n) {
+  await page.evaluate((o) => { /** @type {any} */ (globalThis).__swContextGlow = o ? false : undefined; }, off);
+  await sleep(900);   // past any live hold and its fade
+  await page.evaluate(() => { const c = window.__sw2d; if (c) { c.stroke = 0; c.clear = 0; c.draws = []; c.t0 = 0; c.tLast = 0; } });
+  const box = await page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { x: b.left, y: b.top, w: b.width, h: b.height }; });
+  if (kind === 'live') {
+    await page.evaluate(async (count, bx) => {
+      const el = document.querySelector('.sw-canvas-ui');
+      const two = () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      for (let i = 0; i < count; i++) {
+        el.dispatchEvent(new WheelEvent('wheel', { deltaY: 0, deltaX: 0, clientX: bx.x + bx.w / 2, clientY: bx.y + bx.h / 2, bubbles: true, cancelable: true }));
+        await two();
+      }
+    }, n, box);
+  } else {
+    for (let i = 0; i < n; i++) {
+      // a sweep along the middle of the band, where the threads are densest
+      await page.mouse.move(box.x + box.w * (0.08 + (0.84 * (i % 30)) / 30), box.y + box.h * (0.45 + 0.1 * Math.sin(i)));
+      await sleep(34);
+    }
+  }
+  await sleep(200);
+  const d = await page.evaluate(() => (window.__sw2d ? window.__sw2d.draws.slice().sort((a, b) => a - b) : []));
+  const q = (p) => (d.length ? +d[Math.min(d.length - 1, Math.floor(d.length * p))].toFixed(2) : NaN);
+  return { n: d.length, p50: q(0.5), p95: q(0.95) };
+}
+async function glowArm(page, tag) {
+  for (const kind of ['live', 'hover']) {
+    const on = [], off = [];
+    // ABAB, so a drift over the arm falls on both sides
+    for (let r = 0; r < 2; r++) { on.push(await glowPass(page, false, kind, 30)); off.push(await glowPass(page, true, kind, 30)); }
+    const p50 = (xs) => { const v = xs.map((x) => x.p50).filter(Number.isFinite).sort((a, b) => a - b); return v.length ? v[0] : NaN; };
+    const a = p50(on), b = p50(off), ratio = b > 0 ? a / b : NaN;
+    note(`${tag} G glow ${kind} at the overview: draw p50 with the glow ${on.map((x) => x.p50).join('/')} ms (n ${on.map((x) => x.n).join('/')}, p95 ${on.map((x) => x.p95).join('/')}), without ${off.map((x) => x.p50).join('/')} ms (n ${off.map((x) => x.n).join('/')}, p95 ${off.map((x) => x.p95).join('/')}); min-of-two ${a} / ${b} = ${Number.isFinite(ratio) ? ratio.toFixed(2) : 'n/a'}x (cache the glow past ${GLOW_COST}x)`);
+  }
+  await page.evaluate(() => { /** @type {any} */ (globalThis).__swContextGlow = undefined; });
+}
 async function makeLink(page, route, verseIdx, ref) {
   await goHome(page);
   for (const step of route) { await clickLabel(page, step); await sleep(450); }
@@ -357,19 +455,25 @@ async function walk(page, url, fname) {
   const f = FRAMES[fname];
   const tag = `[${fname} ${f.w}x${f.h}]`;
   await page.setViewport({ width: f.w, height: f.h, deviceScaleFactor: f.dpr, isMobile: f.mobile, hasTouch: f.mobile });
-  if (PERF) await page.evaluateOnNewDocument(COUNTERS);
+  if (PERF || GLOW) await page.evaluateOnNewDocument(COUNTERS);
   await boot(page, url);
   if (!(await toMyWeb(page))) {
     nothingToCheck = `${tag} the web could not be drawn (.sw-fallback); no canvas to read`;
     return;
   }
+  if (GLOW) {
+    // the G arm alone: timing before any pixel read, as R5 does
+    await clickIfPresent(page, 'Dismiss'); await sleep(300);
+    await glowArm(page, tag);
+    return;
+  }
   if (PERF) {
     // TIMING FIRST, PIXELS AFTER: getImageData demotes the canvas (note 3b).
     await perfArm(page, tag, 'overview', R5 ? R5.overview : null);
-    await clickIfPresent(page, 'Reset the view'); await sleep(500);
+    await control(page, 'Reset the view'); await sleep(500);
     await zoom3(page, tag);
     await perfArm(page, tag, 'three zoom steps', R5 && R5[fname] != null ? R5[fname] : null);
-    await clickIfPresent(page, 'Reset the view'); await sleep(700);
+    await control(page, 'Reset the view'); await sleep(700);
   }
   await shot(page, `${fname}-0links-overview`);
   const zero = await readBoth(page);

@@ -1286,6 +1286,11 @@ describe('export → wipe → import → reload round-trip (real stores + fake I
   }
 
   beforeEach(async () => {
+    // A test that ended in hydrateAllStores() still has each store's rebase flush in flight
+    // (cached-store.js _rebaseAndPromote → _save). Landing after the wipe, it refills the fresh
+    // database, and this test's first save merges the last test's newer records in (shuffle-night
+    // 2026-10-17, seed 20261017: the round-trip test read 'Backup note' for 'Note A').
+    await flushAll();
     IDBAdapter._resetForTests();
     await deleteVotreaderDb();
     localStorage.clear();

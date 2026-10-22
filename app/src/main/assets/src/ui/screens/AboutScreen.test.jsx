@@ -103,3 +103,19 @@ describe('AboutScreen — the Songs of the Letters credit (L8)', () => {
     delete /** @type {any} */ (globalThis).SongCatalog;
   });
 });
+
+/* The CC-BY obligation for the Scripture Web's cross-reference dataset (OpenBible.info). About
+   carries it on its first page; since Q5 the web carries it too (the legend's tail, the panel's
+   footer, the guide's footer), and none of those replaces this one. */
+describe('AboutScreen — the OpenBible.info credit', () => {
+  it('names the dataset, links it and states the licence on the first page', () => {
+    setupGlobals();
+    const { container } = renderAbout();
+    const credit = [...container.querySelectorAll('.about-credit')].find((p) => /OpenBible/.test(p.textContent));
+    expect(credit, 'the OpenBible.info credit line').toBeTruthy();
+    expect(credit.textContent.replace(/\s+/g, ' ').trim()).toBe('Cross-reference data from OpenBible.info, used under CC-BY.');
+    const link = credit.querySelector('a');
+    expect(link.getAttribute('href')).toBe('https://www.openbible.info/labs/cross-references/');
+    expect(link.getAttribute('rel')).toMatch(/noopener/);
+  });
+});

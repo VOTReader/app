@@ -44,6 +44,10 @@ vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
     }),
   };
 });
+vi.mock('../../utils/scripture-web/geometry.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return { ...real, deepZoomFor: vi.fn(real.deepZoomFor) };
+});
 vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
   const real = await importOriginal();
   return {
@@ -56,9 +60,14 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
       // a line ends up unwitnessed. Recording is additive; no other case reads it.
       draw: (opts) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
-          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim });
+          focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim,
+          centre: opts && opts.centre, tapFade: opts && opts.tapFade, focusProphecy: opts && opts.focusProphecy,
+          hoverProphecy: opts && opts.hoverProphecy });
         return { instances: 0, draws: 0 };
       },
+      // My Web's ground (refactor.md #10): one clear, recorded so a case can
+      // tell the last GL call was the ground and not a thread pass
+      clear: (bg) => { DRAWN.push({ clear: true, bg }); },
       dispose: vi.fn(),
     })),
   };
@@ -66,8 +75,17 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 
 import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
-import { ScriptureWebScreen, _resetWebPlace } from './ScriptureWebScreen.jsx';
+import { ScriptureWebScreen, _resetWebPlace, _setWebPlace } from './ScriptureWebScreen.jsx';
+import { LEG_PPV_CSS } from '../scripture-web/overlay-renderer.js';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
+import { webFrame } from '../../utils/scripture-web/web-frame.js';
+import { footX, arcShape, squashFactor, deepZoomFor, maxZoomFor } from '../../utils/scripture-web/geometry.js';
+
+/* The verse zoom (Corbin 2026-10-21) moved the camera's ceiling from the tap rule (44 CSS px a verse,
+   maxZoomFor) to one verse 0.8 of the frame (deepZoomFor). The cases that read pixels AT the tap rule
+   (a tap on a thread's body, the hover chip, the ruler's foot names, the sky's heights) still pin that
+   depth, where flights land: capAtTapRule() puts the ceiling back there for one case. */
+const capAtTapRule = () => { vi.mocked(deepZoomFor).mockImplementation(maxZoomFor); };
 
 const baseProps = () => ({
   // swGuideSeen: the how-to-read card (landing 13) opens on a first visit and
@@ -89,6 +107,7 @@ afterEach(() => {
   setViewport(ORIG_W, ORIG_H);
   delete window.screen.orientation;
   vi.useRealTimers();
+  vi.mocked(deepZoomFor).mockReset();
 });
 
 describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000', () => {
@@ -210,17 +229,20 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(zoomText(container)).not.toBe('Overview');
   });
 
-  it('stops at 44 CSS px per verse — 1,711x here, never 4000x', async () => {
+  it('stops at one verse 0.8 of the frame — 24,882x here (the verse zoom), never 4000x', async () => {
     const { container } = await mount();
     for (let i = 0; i < 40; i++) await press('+');
-    // maxZoomFor(31102, 800) = 1710.61 -> the label rounds to 1711x.
-    expect(zoomText(container)).toBe('1711x');
+    // deepZoomFor(31102, 800) = 0.8 x 31102 = 24881.6 -> the label rounds to 24882x (the tap rule's
+    // maxZoomFor = 1710.61 is no longer the camera's ceiling: Corbin 2026-10-21, the verse zoom).
+    expect(zoomText(container)).toBe('24882x');
   });
 
   it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
     const { container } = await mount();
     for (let i = 0; i < 40; i++) await press('+');
-    expect(container.querySelector('.sw-live').textContent).toBe('Zoomed all the way in');
+    // the words, trimmed: a repeat of the same words toggles a trailing no-break space so the
+    // region is read again (w3 panel step 2, sw-chrome-header.test.jsx)
+    expect(container.querySelector('.sw-live').textContent.trim()).toBe('Zoomed all the way in');
   });
 
   /* ── the density is the reader's choice at every zoom (w-sw-zoom-pan, item 2) ──
@@ -251,7 +273,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('RED today: at the ceiling the web is STILL drawn Famous — the control reads Famous, every frame past 22 px/verse drew Famous, nothing was announced', async () => {
       const { container } = await mount();
       await toCeiling();
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       expect(shown(), 'the density control').toBe('famous');
       const deep = DRAWN.filter((d) => d.ppv / d.dpr >= 22);
       expect(deep.length, 'frames drawn past 22 CSS px per verse').toBeGreaterThan(0);
@@ -260,6 +282,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
 
     it('RED today: at the ceiling a thread that exists only in Famous (7 votes) is tappable and brings up its connection card', async () => {
+      capAtTapRule();
       /* One 7-vote link, 15548 -> 15555, sitting AFTER the Essential prefix of its bucket
          (off20 = 0, off10 = 1): at Essential the picker walks zero entries and the tap finds
          nothing; at Famous it finds the link. The + key zooms about the frame's centre, so
@@ -288,9 +311,85 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(sheet.textContent).toMatch(/Isaiah/);
     });
 
+    /* GL item 4: a prophecy pair is drawn always, so it is tappable. This one joins verses no
+       OpenBible arc joins (107 of the asset's 132 pairs are such), so the graph has no arcs at all:
+       the tap can only find it through the prophecy class. The apex is computed from the frame the
+       screen draws (webFrame) and the law (arcShape over the pair's own feet). */
+    it('a tap on a prophecy pair that is no arc chooses it: the draw names it, the card reads "Prophecy fulfilled"', async () => {
+      const foretold = () => Object.assign(graph(), { prophecy: [{ a: 1000, b: 30000, studyId: 's', chapterId: 'c' }] });
+      const { container } = await mount({}, foretold);
+      const f = webFrame({ W: FRAME_CSS, H: 360, DPR: 1 });
+      const cam = { x: CANON / 2, ppv: FRAME_CSS / CANON, total: CANON };
+      const x0 = footX(cam, FRAME_CSS, 1000, 0), x1 = footX(cam, FRAME_CSS, 30000, 0);
+      const { A } = arcShape((x1 - x0) / 2, squashFactor(f.ceil, FRAME_CSS));
+      const cx = (x0 + x1) / 2, cy = f.base - A;
+      expect(DRAWN[DRAWN.length - 1].camX, 'PRECONDITION: the overview camera').toBeCloseTo(CANON / 2, 6);
+      const root = container.querySelector('.sw-root');
+      const down = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy });
+      const up = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy });
+      await act(async () => { root.dispatchEvent(down); root.dispatchEvent(up); await new Promise((r) => setTimeout(r, 40)); });
+      const last = DRAWN.filter((d) => !d.clear).pop();
+      expect(last.focusProphecy).toBe(0);
+      expect(last.focusArc).toBe(-1);
+      const sheet = container.querySelector('.sw-sheet');
+      expect(sheet, 'the connection card opened for the pair').toBeTruthy();
+      expect(sheet.textContent).toMatch(/Prophecy fulfilled · 29,000 verses apart/);
+      // CONTROL: 30 px under the line there is nothing to choose
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+      const down2 = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy + 30 });
+      const up2 = new PointerEvent('pointerup', { bubbles: true, cancelable: true, pointerId: 8, pointerType: 'touch', clientX: cx, clientY: cy + 30 });
+      await act(async () => { root.dispatchEvent(down2); root.dispatchEvent(up2); await new Promise((r) => setTimeout(r, 40)); });
+      expect(container.querySelector('.sw-sheet')).toBeNull();
+      expect(DRAWN.filter((d) => !d.clear).pop().focusProphecy).toBe(-1);
+    });
+
+    /* GL review 2026-10-18 (finding 2): a hover on a lone prophecy pair (no OpenBible arc, 107 of
+       the asset's) drew no highlight, since hoverArc can only name an arc; its chip read "weight 0";
+       and from one lone pair to the next within 4 px the chip kept the first, as both read index -1.
+       Two pairs about the same centre, the second 3 px higher at its apex. */
+    it('a hover on a prophecy pair that is no arc lights it (hoverProphecy), its chip reads "Prophecy fulfilled", and the next pair 3 px on takes the chip', async () => {
+      const f = webFrame({ W: FRAME_CSS, H: 360, DPR: 1 });
+      const cam = { x: CANON / 2, ppv: FRAME_CSS / CANON, total: CANON };
+      const squash = squashFactor(f.ceil, FRAME_CSS);
+      const d = Math.ceil(3 / (cam.ppv * squash));
+      const pairs = [{ a: 1000, b: 30000, studyId: 's', chapterId: 'c' }, { a: 1000 - d, b: 30000 + d, studyId: 's', chapterId: 'c' }];
+      const apex = (p) => {
+        const x0 = footX(cam, FRAME_CSS, p.a, 0), x1 = footX(cam, FRAME_CSS, p.b, 0);
+        return { cx: (x0 + x1) / 2, cy: f.base - arcShape((x1 - x0) / 2, squash).A };
+      };
+      const [pa, pb] = pairs.map(apex);
+      expect(pa.cy - pb.cy, 'PRECONDITION: the second apex is 3 px over the first').toBeGreaterThanOrEqual(3);
+      expect(pa.cy - pb.cy).toBeLessThan(4);
+      expect(Math.abs(pa.cx - pb.cx)).toBeLessThan(0.5);
+      const { container } = await mount({}, () => Object.assign(graph(), { prophecy: pairs }));
+      const root = container.querySelector('.sw-root');
+      const move = async (x, y) => {
+        await act(async () => {
+          root.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, cancelable: true, pointerId: 22, pointerType: 'mouse', clientX: x, clientY: y }));
+          // two frames: the hover's (the pick, the chip) and the draw it schedules
+          await new Promise((r) => setTimeout(r, 80));
+        });
+      };
+      await move(pa.cx, pa.cy);
+      const tip = container.querySelector('.sw-tip');
+      expect(tip, 'a resting mouse on the pair shows its chip').toBeTruthy();
+      expect(tip.textContent).toMatch(/Prophecy fulfilled · 29,000 verses apart/);
+      expect(tip.textContent).not.toMatch(/weight/);
+      expect(DRAWN.filter((d2) => !d2.clear).pop().hoverProphecy, 'the hovered pair is drawn in the hover ink').toBe(0);
+      await move(pb.cx, pb.cy);
+      expect(container.querySelector('.sw-tip').textContent).toMatch(new RegExp('Prophecy fulfilled · ' + (29000 + 2 * d).toLocaleString() + ' verses apart'));
+      expect(DRAWN.filter((d2) => !d2.clear).pop().hoverProphecy).toBe(1);
+      // CONTROL: off every line the hover lets go
+      await move(pa.cx, pa.cy + 40);
+      expect(container.querySelector('.sw-tip')).toBeNull();
+      expect(DRAWN.filter((d2) => !d2.clear).pop().hoverProphecy).toBe(-1);
+    });
+
     /* sw1 B4 (audit-web 10-05): the hover chip was set only by a resting mouse and cleared by nothing
        that moved the web, so after a key pan or a drag it named a line that was no longer under it. */
     it('the hover chip drops when the web moves under it: a key pan, then a drag', async () => {
+      capAtTapRule();
       const linked = () => Object.assign(graph(), {
         count: 1,
         books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],
@@ -392,22 +491,57 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('the sheet offers Follow to the far foot; pressing it centres the camera there and the control turns to the other end', async () => {
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       expect(lastCamX()).toBeCloseTo(CANON / 2, 0);
       await pickNearby();
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection sheet opened').toBeTruthy();
       // the camera sits at 15551 = the from foot, so the far foot is `to`: Genesis 2:5101
-      const follow = screen.getByRole('button', { name: /follow the line to genesis 2:5101/i });
+      const follow = screen.getByRole('button', { name: /^follow to genesis 2:5101$/i });
+      /* A3 (w3 navigation): Follow FLIES there, eased over 600-900 ms through the frame loop, so
+         the camera is read once the fly has landed (it once jumped, and one frame was enough). */
+      const landsAt = async (x) => {
+        for (let i = 0; i < 80 && Math.abs(lastCamX() - x) > 0.05; i++) {
+          await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+        }
+        expect(lastCamX()).toBeCloseTo(x, 1);
+      };
       fireEvent.click(follow);
-      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-      expect(lastCamX()).toBeCloseTo(20100, 0);
+      // centred on the foot, at the verse's middle
+      await landsAt(20100.5);
       // and back: the control now names the from foot
-      fireEvent.click(screen.getByRole('button', { name: /follow the line to genesis 2:552/i }));
-      await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
-      expect(lastCamX()).toBeCloseTo(15551, 0);
+      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:552$/i }));
+      await landsAt(15551.5);
       // the line stays chosen throughout: the sheet is still up
       expect(container.querySelector('.sw-sheet')).toBeTruthy();
+    });
+
+    /* Integration (w3): the panel's trail Back called journey.back(), which flies home and reopens
+       the line on landing (use-journey.js), and then flew on its own to the crumb's verse: the second
+       fly took over the first, so the line was never reopened from home and the camera stopped at
+       the verse's edge, not its foot. Back is the journey's alone. */
+    it("the trail's Back flies home to the foot and opens the line again from there", async () => {
+      const { container } = await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      await pickNearby();
+      const landsAt = async (x) => {
+        for (let i = 0; i < 80 && Math.abs(lastCamX() - x) > 0.05; i++) {
+          await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+        }
+        expect(lastCamX()).toBeCloseTo(x, 1);
+      };
+      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
+      await landsAt(20100.5);
+      expect(container.querySelectorAll('.sw-crumbs li'), 'home, then here').toHaveLength(2);
+      fireEvent.click(screen.getByRole('button', { name: 'Back along the trail' }));
+      await landsAt(15551.5);
+      // reopened from home on landing (the fly's last frame): its Follow names the far foot again
+      const again = /^follow to genesis 2:5101$/i;
+      for (let i = 0; i < 50 && !screen.queryByRole('button', { name: again }); i++) {
+        await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      }
+      expect(screen.getByRole('button', { name: again })).toBeTruthy();
+      expect(container.querySelector('.sw-crumbs'), 'home: the trail is done').toBeNull();
     });
 
     /* sw1 B1 (audit-web 10-05): the card's x closed the card but left the line focused, so the shader kept
@@ -426,6 +560,28 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(last.focusRange).toBeNull();
     });
 
+    /* GL item 5: a chosen line makes the rest of the web recede to TAP_CONTEXT (the shader's uTapFade), eased
+       over about 180 ms rather than snapped, and the close brings it back the same way. */
+    it('choosing a line eases the rest of the web back (tapFade 0 to 1 over frames), and closing eases it in again', async () => {
+      await mount({}, threaded);
+      for (let i = 0; i < 40; i++) await pressFrame('+');
+      expect(DRAWN[DRAWN.length - 1].tapFade, 'PRECONDITION: nothing chosen, nothing receded').toBe(0);
+      let mark = DRAWN.length;
+      await pickNearby();
+      await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+      expect(DRAWN[DRAWN.length - 1].focusArc, 'PRECONDITION: the line is chosen').toBe(0);
+      let fades = DRAWN.slice(mark).filter((d) => !d.clear).map((d) => d.tapFade);
+      expect(fades[fades.length - 1]).toBe(1);
+      expect(fades.some((f) => f > 0 && f < 1), 'a frame between: eased, not snapped').toBe(true);
+      for (let i = 1; i < fades.length; i++) expect(fades[i]).toBeGreaterThanOrEqual(fades[i - 1]);
+      mark = DRAWN.length;
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      await act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+      fades = DRAWN.slice(mark).filter((d) => !d.clear).map((d) => d.tapFade);
+      expect(fades[fades.length - 1]).toBe(0);
+      expect(fades.some((f) => f > 0 && f < 1), 'a frame between on the way back').toBe(true);
+    });
+
     /* sw1 B3 (audit-web 10-05): opening a verse unmounts the web, and its camera, focus and card lived only in
        refs, so Back from the reader landed at fit with nothing chosen. */
     it('coming back from a verse opened on the card keeps the zoom, the place, the chosen line and its card', async () => {
@@ -435,7 +591,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await pickNearby();
       const before = DRAWN[DRAWN.length - 1];
       expect(before.focusArc, 'PRECONDITION: a line is chosen').toBe(0);
-      const go = [...first.container.querySelectorAll('.sw-card')].find((b) => !b.disabled);
+      const go = [...first.container.querySelectorAll('.sw-sheet button')]
+        .find((b) => /^Open .* in the reader$/.test(b.getAttribute('aria-label') || ''));
       expect(go, 'PRECONDITION: the card offers a verse to open').toBeTruthy();
       fireEvent.click(go);
       expect(opened.length).toBe(1);
@@ -458,15 +615,25 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     /* sw1 (audit-web 10-05): under the baseline each chapter's bar is as TALL as the chapter is long, and was
        drawn 0.8 of the chapter WIDE, so zoomed in a long chapter (Psalm 119) became a large grey block. */
     it('the chapter-length bars stay thin at every zoom below the verse ticks (their height is the length)', async () => {
+      // w3: the overview ruler hands over to the deep band at 5x-6.5x, so the bars are read
+      // at 3 presses (4.1x, the overview's own) and at 6 (16.8x, where only the deep band's
+      // chapter ticks are left): nothing tall is ever wide
       await mount({}, threaded);
-      for (let i = 0; i < 6; i++) await pressFrame('+');
-      const dpr = DRAWN[DRAWN.length - 1].dpr;
-      const bars = RECTS.filter((r) => r.h > 4 * dpr);
-      expect(bars.length, 'PRECONDITION: the bars were drawn').toBeGreaterThan(0);
-      expect(Math.max(...bars.map((r) => r.w))).toBeLessThanOrEqual(3 * dpr);
+      let pressed = 0;
+      for (const presses of [3, 6]) {
+        for (; pressed < presses - 1; pressed++) await pressFrame('+');
+        RECTS.length = 0;          // read the one frame at this zoom
+        await pressFrame('+');
+        pressed++;
+        const dpr = DRAWN[DRAWN.length - 1].dpr;
+        const bars = RECTS.filter((r) => r.h > 4 * dpr);
+        expect(bars.length, 'PRECONDITION: the bars were drawn at ' + presses + ' presses').toBeGreaterThan(0);
+        expect(Math.max(...bars.map((r) => r.w)), presses + ' presses').toBeLessThanOrEqual(3 * dpr);
+      }
     });
 
     it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {
+      capAtTapRule();
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(zoomText(container)).toBe('1711x');
@@ -484,19 +651,25 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(container.querySelector('.sw-root').getAttribute('data-thread-labels'), 'the count of body labels drawn is published for the walks').toBe('1');
     });
 
-    it('CONTROL: in the middle band the far foot is off-screen and NO body label is written; the labels belong to the verse-numeral zoom', async () => {
+    /* w3 (the canvas stream; build spec §4.3): from about 6x a chip at each foot names both ends
+       ("Gen 2:552 · Gen 2:5101"), so in the middle band the far foot is already named, at the foot.
+       What still belongs to the verse-numeral zoom (LEG_PPV_CSS) is the far end written alone
+       beside the leg. This CONTROL pinned "no label at all under 30 px a verse"; its intent, that
+       the leg labels wait for the verse numerals, is what it pins now. */
+    it('CONTROL: in the middle band the far foot is off-screen and is named in the chip at its near foot, never beside the leg; the leg labels belong to the verse-numeral zoom', async () => {
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 12; i++) await pressFrame('+');
       const last = DRAWN[DRAWN.length - 1];
       const ppvCss = last.ppv / last.dpr;
-      // the far foot (4,549 verses off) leaves the 800 px frame past 0.088 px/verse; verse numerals begin at 30
+      // the far foot (4,549 verses off) leaves the 800 px frame past 0.088 px/verse
       expect(ppvCss, 'precondition: the far foot is off-screen at this zoom (' + zoomText(container) + ')').toBeGreaterThan(0.2);
-      expect(ppvCss, 'precondition: not yet the verse-numeral band').toBeLessThan(30);
+      expect(ppvCss, 'precondition: not yet the verse-numeral band').toBeLessThan(LEG_PPV_CSS);
       TEXTS.length = 0;
       await pressFrame('ArrowLeft');
       expect(TEXTS.length, 'precondition: a frame was painted').toBeGreaterThan(0);
-      expect(TEXTS.some((t) => /Gen 2:5101|Gen 2:552/.test(t)), 'no body label in the middle band; texts: ' + TEXTS.slice(-8).join(' | ')).toBe(false);
-      expect(container.querySelector('.sw-root').getAttribute('data-thread-labels')).toBe('0');
+      expect(TEXTS, 'the chip at the near foot names both ends; texts: ' + TEXTS.slice(-8).join(' | ')).toContain('Gen 2:552 · Gen 2:5101');
+      expect(TEXTS.some((t) => /→|←/.test(t)), 'no far end written beside the leg in the middle band; texts: ' + TEXTS.slice(-8).join(' | ')).toBe(false);
+      expect(container.querySelector('.sw-root').getAttribute('data-thread-labels'), 'one thread labelled, once').toBe('1');
     });
   });
 
@@ -530,7 +703,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('at the ceiling ArrowUp raises the camera (drawn AND published), ArrowDown brings it back to 0', async () => {
       const { container } = await mount({}, wide);
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       for (let i = 0; i < 10; i++) await pressFrame('ArrowUp');
       // RED if the key handler drops its y frame, or the draw stops carrying camY
       expect(lastCamY()).toBeGreaterThan(0);
@@ -546,55 +719,62 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(lastCamY(), 'precondition: raised on the canon web').toBeGreaterThan(0);
       fireEvent.click(screen.getByRole('button', { name: /my web/i }));
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
-      expect(lastCamY()).toBe(0);
+      // My Web's GL surface is the ground alone (refactor.md #10): no thread
+      // pass runs, so nothing can be drawn up in a sky
+      expect(DRAWN[DRAWN.length - 1].clear).toBe(true);
       expect(shownCamY(container)).toBe(0);
     });
   });
 
-  describe('the lens (landing 10): past the overview the chapter under the centre is published and handed to the renderer', () => {
+  /* Q2 retired the lens (the rest of the web at 0.35 from 6x): nothing dims as the reader zooms, and
+     the chapter under the centre is emphasised instead (spec 4.4). These cases pinned lens/lensDim on the
+     draw; rewritten to the centre chapter the renderer is handed now (CONTRACTS.md section 5). */
+  describe('the centre chapter (Q2, the lens retired): past the overview the chapter under the centre is published and handed to the renderer', () => {
     const pressFrame = async (key) => {
       fireEvent.keyDown(document.querySelector('.sw-root'), { key });
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     };
     const shownLens = (container) => container.querySelector('.sw-root').getAttribute('data-lens');
 
-    it('CONTROL: at the overview there is no lens - data-lens empty, the draw carries null', async () => {
+    it('CONTROL: at the overview there is no centre chapter - data-lens empty, the draw carries null', async () => {
       const { container } = await mount();
       expect(zoomText(container)).toBe('Overview');
       expect(shownLens(container)).toBe('');
-      expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
+      expect(DRAWN[DRAWN.length - 1].centre).toBeNull();
     });
 
-    it('at the ceiling the lens is the chapter under the centre (the one chapter here): published as "lo-hi" and drawn', async () => {
+    it('at the ceiling the centre is the chapter under it (the one chapter here): published as "lo-hi", drawn at full emphasis, and no draw carries a dim', async () => {
       const { container } = await mount();
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       expect(shownLens(container)).toBe('0-' + (CANON - 1));
-      expect(DRAWN[DRAWN.length - 1].lens).toEqual([0, CANON - 1]);
-      // sw1: fully set in by the ceiling; on the way, one + press past 6x is a step, not the whole drop
-      expect(DRAWN[DRAWN.length - 1].lensDim).toBeCloseTo(0.35, 6);
+      expect(DRAWN[DRAWN.length - 1].centre).toEqual({ chapterIndex: 0, book: 0, chapter: 1, x0: 0, x1: CANON, t: 1 });
+      // nothing dims with zoom: the lens's share is gone from every draw
+      expect(DRAWN.every((d) => d.clear || (d.lens === undefined && d.lensDim === undefined))).toBe(true);
     });
 
-    it('the lens eases in: the first frame past 6x keeps most of the ink (sw1)', async () => {
+    it('the emphasis eases in: the first frame past 6x is a step of it, not the whole (C20)', async () => {
       await mount();
-      let firstLensed = null;
-      for (let i = 0; i < 12 && !firstLensed; i++) {
+      let first = null;
+      for (let i = 0; i < 12 && !first; i++) {
         await pressFrame('+');
         const last = DRAWN[DRAWN.length - 1];
-        if (last.lens) firstLensed = last;
+        if (last.centre) first = last;
       }
-      expect(firstLensed, 'PRECONDITION: a press reached the lens').toBeTruthy();
-      expect(firstLensed.lensDim).toBeGreaterThan(0.75);
+      expect(first, 'PRECONDITION: a press reached the centre chapter').toBeTruthy();
+      expect(first.centre.t).toBeGreaterThanOrEqual(0);
+      expect(first.centre.t).toBeLessThan(0.4);
     });
 
-    it('My Web has no lens: switching at the ceiling clears data-lens and the draw carries null', async () => {
+    it('My Web has no centre chapter: switching at the ceiling clears data-lens and the GL surface is the ground alone', async () => {
       const { container } = await mount();
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(shownLens(container), 'precondition: lit on the canon web').toBe('0-' + (CANON - 1));
+      expect(shownLens(container), 'precondition: a centre on the canon web').toBe('0-' + (CANON - 1));
       fireEvent.click(screen.getByRole('button', { name: /my web/i }));
       await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
       expect(shownLens(container)).toBe('');
-      expect(DRAWN[DRAWN.length - 1].lens).toBeNull();
+      // the GL surface is the ground alone (#10): no thread pass, no centre
+      expect(DRAWN[DRAWN.length - 1].clear).toBe(true);
     });
   });
 
@@ -628,6 +808,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
 
     it('risen at the ceiling, the ruler names a chapter (30 verses of span crown 422 px up; ten ArrowUps lift 312)', async () => {
+      capAtTapRule();
       const { container } = await mount({}, wide);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(attr(container, 'data-elevator'), 'precondition: a sky to climb').toBe('0.0000');
@@ -686,7 +867,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
   });
 
-  /* ── sweep 2026-10-14 (batch 3): what the Scripture / My web switch, the Volumes rail and the
+  /* ── sweep 2026-10-14 (batch 3): what the Scripture / My Web switch, the Volumes rail and the
      controls inside .sw-root each own. My Web is built from LinkStore and the Volumes from
      COLLECTIONS / READING_CHAIN / colLetterArr, all free globals the setup file does not carry;
      the top-level afterEach unstubs them. */
@@ -717,7 +898,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
         source: { type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: 5, label: 'Genesis 1:5' },
         target: { type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: 900, label: 'Genesis 1:900' } }]);
       const { container } = await mount({ settings: seen }, threaded);
-      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
       fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
       await settle(20);
@@ -734,13 +915,101 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(last.focusRange).toBeNull();
     });
 
+    /* w4 interaction hunt: switchMode closed the cards and cleared the trail but left a running fly
+       alone. A go-to fly under way when the reader tapped My Web carried on in My Web, moving the
+       Bible rail's camera (camRef) to the go-to's verse, and the density hint of the canon stayed
+       printed under My Web's title. The switch stops the fly where it is and drops the hint. */
+    it('w4: a fly under way when the reader switches webs stops where it is; the canon\'s hint goes', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen }, threaded);
+      // zoomed in off the middle, then Reset: an eased fly home
+      const root = container.querySelector('.sw-root');
+      for (let k = 0; k < 6; k++) fireEvent.keyDown(root, { key: '+' });
+      for (let k = 0; k < 8; k++) fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(40);
+      const home = CANON / 2;
+      const a = DRAWN[DRAWN.length - 1].camX;
+      expect(Math.abs(a - home), 'PRECONDITION: off the middle before Reset').toBeGreaterThan(10);
+      fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
+      // the first frame the fly has moved (polled in short steps, so a loaded machine's slow
+      // frames cannot make the window miss it), and it is not home yet
+      let b = a;
+      for (let i = 0; i < 200 && Math.abs(b - a) <= 1; i++) { await settle(5); b = DRAWN[DRAWN.length - 1].camX; }
+      expect(Math.abs(b - a), 'PRECONDITION: the fly is under way').toBeGreaterThan(1);
+      expect(Math.abs(b - home), 'PRECONDITION: and not home yet').toBeGreaterThan(1);
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(1200);
+      // the canon's camera is the Bible rail's (camRef): back on the canon, it reads where the fly was
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      await settle(40);
+      const x = DRAWN[DRAWN.length - 1].camX;
+      expect(Math.abs(x - home), 'the fly did not carry on home while My Web was up').toBeGreaterThan(1);
+      expect(Math.abs(x - b), 'it stopped about where the switch found it').toBeLessThan(Math.max(1, Math.abs(home - a) / 4));
+    });
+
+    /* w4 device check (finding 8, d19): My Web's Bible rail is the canon's camera (camRef), so it
+       opened at the canon's 12x round 2 Samuel, the reader's links running flat off the frame
+       until Reset Bible. Each web keeps its own camera: My Web's Bible rail opens at fit the first
+       time, and the canon's zoom and place are back on the return. */
+    it('w4: My Web opens its Bible rail at fit, and the canon\'s zoom is back on the return', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen }, threaded);
+      const root = container.querySelector('.sw-root');
+      const ppv = () => Number(root.getAttribute('data-ppv-css'));
+      const fit = ppv();
+      for (let k = 0; k < 10; k++) fireEvent.keyDown(root, { key: '+' });
+      for (let k = 0; k < 8; k++) fireEvent.keyDown(root, { key: 'ArrowRight' });
+      await settle(40);
+      const zoomed = ppv(), xz = DRAWN[DRAWN.length - 1].camX;
+      expect(zoomed / fit, 'PRECONDITION: the canon zoomed in').toBeGreaterThan(3);
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(60);
+      expect(ppv() / fit, 'My Web\'s Bible rail at fit, not the canon\'s zoom').toBeCloseTo(1, 2);
+      fireEvent.click(screen.getByRole('button', { name: 'Scripture' }));
+      await settle(60);
+      expect(ppv() / zoomed, 'the canon\'s zoom is back').toBeCloseTo(1, 2);
+      expect(DRAWN[DRAWN.length - 1].camX, 'and its place').toBeCloseTo(xz, 1);
+    });
+
+    it('w4: the density hint does not outlive the switch to My Web', async () => {
+      stubMyWeb();
+      const { container } = await mount({ settings: seen }, threaded);
+      const select = container.querySelector('.sw-select');
+      fireEvent.change(select, { target: { value: 'essential' } });
+      await settle(20);
+      expect(container.querySelector('.sw-hint'), 'PRECONDITION: the density switch printed its hint').toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(20);
+      expect(container.querySelector('.sw-hint')).toBeNull();
+    });
+
+    /* item 29 (w3, the My Web stream): the list was the first 36 links in store order wherever
+       the camera stood, so "Nearby" was not near and link 37 on could be reached only by finding
+       it on the canvas. Now every link is listed, the one passing nearest the middle first. */
+    it('item 29: My Web lists every link, nearest the middle of the view first', async () => {
+      const at = (v) => ({ type: 'bible', bookId: 'genesis-plain', chapter: 1, verse: v, label: 'Genesis 1:' + v });
+      stubMyWeb(Array.from({ length: 40 }, (_, i) => ({ id: 'n' + i, source: at(1 + i * 770), target: at(31 + i * 770) })));
+      const { container } = await mount({ settings: seen });
+      // the switch reads "My Web" (the panel stream's one vocabulary for the web's words)
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
+      await settle(60);
+      fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
+      await settle(20);
+      const rows = [...container.querySelectorAll('.sw-list .sw-choice-row')];
+      expect(rows.length, 'every link, not the first 36').toBe(40);
+      // the overview's centre is verse 15,551: link 20 (15,401) is nearest, then 21, then 19
+      expect(rows[0].textContent).toMatch(/Genesis 1:15401\b/);
+      expect(rows[1].textContent).toMatch(/Genesis 1:16171\b/);
+      expect(rows[2].textContent).toMatch(/Genesis 1:14631\b/);
+    });
+
     /* v55: the keys drive the rail last touched, but the live region always read the camera's x
        as a Bible verse id. On the Volumes rail x is a rail position (0..5 here), so ArrowRight
        announced "Genesis 1:4" while the reader moved through Rebuke. */
     it('v55: an arrow key on the Volumes rail announces the Volumes node there, never a Bible verse', async () => {
       stubMyWeb();
       const { container } = await mount({ settings: seen });
-      fireEvent.click(screen.getByRole('button', { name: 'My web' }));
+      fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
       await settle(60);
       const root = container.querySelector('.sw-root');
       const live = () => container.querySelector('.sw-live').textContent;
@@ -754,8 +1023,10 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       fireEvent.keyDown(root, { key: 'ArrowRight' });
       await settle(20);
       expect(live(), 'the top rail is not a Bible verse').not.toMatch(/Genesis/);
-      // the camera sits at the fitted centre of the five-letter rail: position 2.5 rounds to 3
-      expect(live()).toBe('The Fourth, Rebuke');
+      // the camera sits at the fitted centre of the five-letter rail, position 2.5: the middle of
+      // the third letter, whose foot the rail draws there (votRailX(i + 0.5)). w4 names the letter
+      // under the middle; through w3 Math.round named the fourth, half a letter off its foot.
+      expect(live()).toBe('The Third, Rebuke');
     });
 
     /* v72: onKeyDown sits on .sw-root and read every keydown that bubbled up to it. A keyboard
@@ -827,11 +1098,32 @@ describe('how to read this web (landing 13): one card, plain words, once', () =>
     expect(card, 'the card is up for a reader who has not seen it').toBeTruthy();
     expect(card.getAttribute('role')).toBe('dialog');
     expect(card.textContent).toMatch(/How to read this web/);
-    expect(card.querySelectorAll('li').length).toBeGreaterThanOrEqual(5);
+    // four short lines, five with the go-to (w3 panel step 2, item 22; guide-words.test.jsx pins them)
+    expect(card.querySelectorAll('li').length).toBeGreaterThanOrEqual(4);
     fireEvent.click(screen.getByRole('button', { name: /got it/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(container.querySelector('.sw-guide')).toBeNull();
     expect(updateSetting).toHaveBeenCalledWith('swGuideSeen', true);
+  });
+
+  /* w4 focus hunt: on a first visit the card opens itself with focus on <body>, and closing it
+     handed the keyboard back there, where the web's keys do not reach */
+  it('opened on its own on a first visit: closing it puts the keyboard on the web', async () => {
+    if (document.activeElement instanceof HTMLElement && document.activeElement !== document.body) document.activeElement.blur();
+    const { container } = await mountGuide({ settings: {} });
+    expect(container.querySelector('.sw-guide'), 'PRECONDITION: the card is up').toBeTruthy();
+    fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    expect(container.querySelector('.sw-guide')).toBeNull();
+    expect(document.activeElement).toBe(container.querySelector('.sw-root'));
+  });
+
+  /* w4 quality hunt: Hide controls came before ? in the DOM, though ? is drawn left of it (or
+     above it), so Tab crossed the pair right to left */
+  it('the ? comes before Hide controls in the DOM, as it is drawn', async () => {
+    const { container } = await mountGuide();
+    const pair = Array.from(container.querySelectorAll('.sw-guide-btn, .sw-hide-all'));
+    expect(pair.map((b) => (b.classList.contains('sw-guide-btn') ? '?' : 'hide'))).toEqual(['?', 'hide']);
   });
 
   it('stays closed for a reader who has seen it; the ? button brings it back and Escape closes it without leaving', async () => {
@@ -913,8 +1205,8 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     if (prevDecode) vi.mocked(decodeGraph).mockImplementation(prevDecode);
   });
 
-  // Sweep mw12: My Web's list is the reader's links in store order (up to 36), wherever the camera is;
-  // its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
+  // Sweep mw12: My Web's list is the reader's links (every one, nearest the middle first since w3
+  // item 29); its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
   it('on My Web the list says what it is: your links, with no "nearby" and no "at this location"', async () => {
     const { container } = await mountList();
     fireEvent.click(screen.getByRole('button', { name: /my web/i }));
@@ -942,7 +1234,9 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     expect(rows[2].textContent).toMatch(/7 votes/);
   });
 
-  it('past the overview the header says Under the lens, and choosing the chapter row opens its sheet', async () => {
+  // "Under the lens" retired (digest item 22: "Nearby" means one thing); the header still names the
+  // chapter the list reads past the overview, which is what this case is about.
+  it('past the overview the header names the chapter it reads, and choosing the chapter row opens its sheet', async () => {
     const { container } = await mountList();
     const root = container.querySelector('.sw-root');
     for (let i = 0; i < 12; i++) {
@@ -953,7 +1247,7 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
     expect(list.getAttribute('data-lens-on')).toBe('1');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Under the lens · Genesis 1/);
+    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toMatch(/^Nearby · Genesis 1/);
     fireEvent.click(list.querySelector('.sw-choice-chapter'));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     expect(container.querySelector('.sw-list')).toBeNull();
@@ -1016,23 +1310,25 @@ describe('the Nearby list reads the lens (landing 15)', () => {
     }
   });
 
-  /* v03-03: the panels focused their close button on mount and nothing more:
-     Tab walked out into the page behind, and closing dropped focus on body. */
-  it('(v03-03) Tab stays inside an open panel and closing it hands focus back to the web', async () => {
+  /* v03-03: the panels focused their close button on mount and nothing more, and closing dropped
+     focus on body. w3 (digest #46, spec 4.6): the docked panel is a non-modal dialog beside the web,
+     so it keeps no trap; it still takes focus on open and hands it back on close. */
+  it('(v03-03) an open panel takes focus, does not trap Tab, and closing it hands focus back to the web', async () => {
     const { container } = await mountList();
     const root = container.querySelector('.sw-root');
     root.focus();
     fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
     const list = container.querySelector('.sw-list');
+    expect(list.getAttribute('role')).toBe('dialog');
+    expect(list.getAttribute('aria-modal')).toBe('false');
     const buttons = [...list.querySelectorAll('button')];
-    // sw1: the panel itself takes focus (no focus ring on its x after a tap); Tab steps in
+    // sw1: the panel itself takes focus (no focus ring on its x after a tap)
     expect(document.activeElement).toBe(list);
-    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
-    expect(document.activeElement).toBe(buttons[0]);
     buttons[buttons.length - 1].focus();
-    fireEvent.keyDown(document.activeElement, { key: 'Tab' });
-    expect(document.activeElement, 'Tab from the last row wraps to the first').toBe(buttons[0]);
+    // no trap: Tab from the last row is the browser's own (not cancelled, not wrapped)
+    expect(fireEvent.keyDown(document.activeElement, { key: 'Tab' }), 'Tab is not cancelled').toBe(true);
+    expect(document.activeElement).toBe(buttons[buttons.length - 1]);
     fireEvent.click(buttons[0]);
     await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     expect(container.querySelector('.sw-list')).toBeNull();
@@ -1058,7 +1354,7 @@ describe('scripture-web-5 — Try again re-decodes the graph', () => {
   });
 });
 
-describe('landscape, always — a portrait viewport is rotated, and nothing asks the reader to turn', () => {
+describe('landscape on a phone — a portrait phone is rotated, and nothing asks the reader to turn', () => {
   /* This block used to be scripture-web-6, which asserted that a rejected
      lock produced a "Best in landscape" note and an UN-rotated root. That is
      the behaviour the owner asked to be removed (2026-09-10: "landscape by
@@ -1080,18 +1376,59 @@ describe('landscape, always — a portrait viewport is rotated, and nothing asks
     expect(document.querySelector('.sw-orientation-note')).toBeNull();
   });
 
-  it('rotates a portrait viewport on a FINE pointer too — the touch-only gate is gone', async () => {
-    /* The old code rotated only when `(pointer: coarse)` matched, so a
-       portrait viewport on a mouse-driven device showed the note instead. The
-       owner's rule has no pointer clause: any portrait viewport rotates. */
+  /* w4 device check (S22, Chrome): lock() ran in the same commit as immersive mode's
+     requestFullscreen, before the page was fullscreen, so Chrome refused it ("The page needs
+     to be fullscreen") and it was never asked again. The phone stayed portrait under the CSS
+     rotation, with the keyboard and the fullscreen toast sideways. The lock is asked again
+     once fullscreen is in place; the rotation is only the fallback for a refusal there. */
+  it('asks for the lock again once the page is fullscreen', async () => {
+    setViewport(400, 800);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
+    let full = null;
+    Object.defineProperty(document, 'fullscreenElement', { get: () => full, configurable: true });
+    const lock = vi.fn(() => (full ? Promise.resolve() : Promise.reject(new Error('SecurityError: needs fullscreen'))));
+    window.screen.orientation = { lock, unlock: () => {} };
+    try {
+      render(<ScriptureWebScreen {...baseProps()} />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(lock).toHaveBeenCalledTimes(1);
+      full = document.documentElement;
+      await act(async () => { document.dispatchEvent(new Event('fullscreenchange')); await Promise.resolve(); });
+      expect(lock, 'asked again inside fullscreen').toHaveBeenCalledTimes(2);
+      expect(lock).toHaveBeenLastCalledWith('landscape');
+      // once is enough: a later fullscreenchange (leaving) does not ask again
+      await act(async () => { document.dispatchEvent(new Event('fullscreenchange')); await Promise.resolve(); });
+      expect(lock).toHaveBeenCalledTimes(2);
+    } finally {
+      delete document.fullscreenElement;
+    }
+  });
+
+  /* Was 'rotates a portrait viewport on a FINE pointer too — the touch-only gate is gone'.
+     Corbin's "landscape by default, no rotate option" (09-10) was said of the phone; turning a
+     desktop or tablet window on its side went further than his words, and Q11 (decided, the w1
+     digest's G3) puts the gate back: the forced rotation is for coarse-pointer phones only. The
+     case keeps its intent (which viewports rotate is pinned) with the decided answer. */
+  it('does NOT rotate a portrait window on a FINE pointer (Q11: phones only)', async () => {
     setViewport(400, 800);
     vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: false, media: q, addEventListener() {}, removeEventListener() {} })));
-    window.screen.orientation = { lock: () => Promise.reject(new Error('not supported')) };
+    window.screen.orientation = { lock: vi.fn(() => Promise.reject(new Error('not supported'))) };
 
     const { container } = render(<ScriptureWebScreen {...baseProps()} />);
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
 
-    expect(container.querySelector('.sw-root.sw-rotated')).toBeTruthy();
+    expect(container.querySelector('.sw-root')).toBeTruthy();
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeNull();
+    expect(window.screen.orientation.lock, 'no lock asked for either').not.toHaveBeenCalled();
+  });
+
+  it('does NOT rotate a portrait tablet: a coarse pointer, but a short side past a phone’s', async () => {
+    setViewport(820, 1180);
+    vi.stubGlobal('matchMedia', vi.fn((q) => ({ matches: true, media: q, addEventListener() {}, removeEventListener() {} })));
+    window.screen.orientation = { lock: () => Promise.reject(new Error('not supported')) };
+    const { container } = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(container.querySelector('.sw-root.sw-rotated')).toBeNull();
   });
 
   it('does NOT rotate a landscape viewport — the control for the two above', async () => {
@@ -1195,16 +1532,35 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     // an explicit settings object still describes a reader who has seen the how-to-read card
     props = Object.assign({}, props, { settings: Object.assign({ swGuideSeen: true }, props && props.settings) });
     const r = render(<ScriptureWebScreen {...baseProps()} {...props} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'My web' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'My Web' }));
     return r;
   };
 
+  // w4 quality hunt: the screen reader's key help in My Web was the canon's (Enter, [ ], Go to)
+  it("the key help in My Web is My Web's: the rails' keys, not the canon's", async () => {
+    const { container } = await openMyWeb();
+    const help = container.querySelector('#sw-a11y-help').textContent;
+    expect(help).toMatch(/rail you last touched/);
+    expect(help).not.toMatch(/Enter or Space|Go to/);
+  });
+
+  // w4 quality hunt: My Web's ? opened the canon's card (votes, gold ticks); it opens My Web's own
+  it('the ? card in My Web speaks of My Web: its rails and their Reset buttons, no votes', async () => {
+    const { container } = await openMyWeb();
+    fireEvent.click(screen.getByRole('button', { name: /how to read this web/i }));
+    await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    const text = container.querySelector('.sw-guide').textContent;
+    expect(text).toMatch(/Reset Volumes/);
+    expect(text).not.toMatch(/votes/);
+  });
+
   // Sweep low (mw10, WCAG 2.5.3): the toggle was named "Show the curated corpus connections", leaving out
-  // the words it shows, "Corpus context".
-  it('the Corpus context toggle is named starting with the words it shows', async () => {
+  // the words it shows. Its words are now Timothy's notes' one name (digest item 22, w3 panel step 2);
+  // the law (the name starts with the words on the button) is the same.
+  it('the Timothy’s notes toggle is named starting with the words it shows', async () => {
     await openMyWeb();
-    const btn = await screen.findByRole('button', { name: /^Corpus context/ });
-    expect(btn.textContent.startsWith('Corpus context')).toBe(true);
+    const btn = await screen.findByRole('button', { name: /^Timothy’s notes/ });
+    expect(btn.textContent.startsWith('Timothy’s notes')).toBe(true);
   });
 
   // ── My Web visual (design-perf, 2026-09-10; note: myweb-visual-design.md) ──
@@ -1220,22 +1576,31 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(sub.textContent).toMatch(/\bLink\b/);
   });
 
-  it('R4 in My Web the legend names the two families, yours first, a pin per shape and a bar per source; never the canon axis or the distance ramp', async () => {
-    // 1b (design-myweb-colour.md, 5): the reader's links are the point of My
-    // Web, so "yours" leads with the three shapes and their pins; Timothy's
-    // four sources follow with a bar each. Canon hue is retired here.
+  it('R4 in My Web the legend names the two families, Timothy’s notes then your links, one line each; never the canon axis, the distance ramp or chapter length', async () => {
+    // w3 rewrote R4 to its intent (digest §5, r2-05): the legend still names
+    // the two families and never the canon's colour law, but the picture's
+    // order and words are "Timothy's notes · your links", one line of each
+    // family's ink. The reader's links are one gold now (their shape is the
+    // pin on the canvas, not a legend entry) and Timothy's sources one
+    // teal-silver family, so the 1b pins and per-source bars are retired; My
+    // Web draws no chapter bars, so the histogram key goes too.
     await openMyWeb();
     const legend = document.querySelector('.sw-legend');
     expect(legend).toBeTruthy();
-    const text = legend.textContent;
-    expect(text.indexOf('yours')).toBeGreaterThanOrEqual(0);
-    expect(text.indexOf('yours')).toBeLessThan(text.indexOf('Timothy'));
-    for (const w of ['within scripture', 'within the Volumes', 'across', 'footnotes', 'study notes', 'studies', 'Words To Live By']) expect(text).toContain(w);
-    expect(legend.querySelectorAll('.sw-key-pin').length).toBe(3);
-    expect(legend.querySelectorAll('.sw-key-pin.is-ring, .sw-key-pin.is-dot, .sw-key-pin.is-ring-dot').length).toBe(3);
-    expect(legend.querySelectorAll('.sw-key-line').length).toBe(4);
+    const keys = [...legend.querySelectorAll('.sw-key')].map((k) => k.textContent);
+    expect(keys).toEqual(['Timothy’s notes', 'your links']);
+    // w4 (r2-05; the hub: the CC-BY credit stays on screen, a licence obligation): the credit
+    // is My Web's legend tail too, read, never a line of its own. Through w3 My Web had none.
+    const credit = legend.querySelector('.sw-credit');
+    expect(credit, 'the credit, in the legend').toBeTruthy();
+    expect(credit.textContent).toBe('Cross-reference data © OpenBible.info (CC-BY)');
+    expect(credit.parentElement.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
+    expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
+    expect(legend.querySelectorAll('.sw-key-line').length).toBe(2);
+    expect(legend.querySelector('.sw-key-pin')).toBeNull();
     expect(legend.querySelector('.sw-key-gradient')).toBeNull();
-    expect(text).not.toMatch(/Genesis|Revelation|across the canon|nearby/);
+    expect(legend.querySelector('.sw-key-hist')).toBeNull();
+    expect(legend.textContent).not.toMatch(/Genesis|Revelation|across the canon|nearby|chapter length/);
   });
 
   it('offers a Dismiss control on the notice', async () => {
@@ -1301,7 +1666,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     expect(onBack).not.toHaveBeenCalled();
   });
 
-  it('returns focus to the My web segment button, not to the body', async () => {
+  it('returns focus to the My Web segment button, not to the body', async () => {
     // The notice is the only thing that was focused; without this the next
     // Tab starts from the top of the document and a keyboard reader is
     // dropped out of the control they were using.
@@ -1309,6 +1674,173 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const close = screen.getByRole('button', { name: 'Dismiss' });
     close.focus();
     fireEvent.click(close);
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'My web' }));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'My Web' }));
+  });
+});
+
+/* w3, the docked panel in the web (spec section 3): the root's own size decides where the panel
+   docks, what it covers (--sw-panel-w / --sw-sheet-h beside the inset) and whether the controls
+   collapse to the more button. jsdom lays nothing out, so the ROOT is sized here (its clientWidth
+   and clientHeight), as the canvas is in the blocks above. */
+describe('the docked panel in the web (w3, spec section 3)', () => {
+  const two = () => ({
+    total: 31102, count: 2, buckets: [{ off: 0, len: 2, off20: 2, off10: 2, segments: 8, chunks: [[100, 20100]] }],
+    books: [{ id: 'genesis-plain', title: 'Genesis', abbr: 'Gen' }],
+    chapters: [[0, 1, 0, 31102]], chapterOfVerse: new Uint16Array(31102),
+    from: new Uint16Array([100, 200]), to: new Uint16Array([20100, 300]), votes: new Int16Array([7, 30]),
+    votEdges: [], prophecy: [], votLinks: [], chunkSize: 256,
+  });
+  let prevDecode = null;
+  const mountAt = async (w, h) => {
+    for (const [prop, px] of [['clientWidth', w], ['clientHeight', h]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+      Object.defineProperty(HTMLDivElement.prototype, prop, {
+        configurable: true, get() { return this.classList.contains('sw-root') ? px : 0; },
+      });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 2 };
+    if (!prevDecode) prevDecode = vi.mocked(decodeGraph).getMockImplementation();
+    vi.mocked(decodeGraph).mockImplementation(() => two());
+    const view = render(<ScriptureWebScreen {...baseProps()} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+    return { ...view, root: view.container.querySelector('.sw-root') };
+  };
+  afterEach(() => {
+    for (const prop of ['clientWidth', 'clientHeight']) {
+      delete HTMLCanvasElement.prototype[prop];
+      delete HTMLDivElement.prototype[prop];
+    }
+    if (prevDecode) vi.mocked(decodeGraph).mockImplementation(prevDecode);
+  });
+  const wait = (ms) => act(async () => { await new Promise((r) => setTimeout(r, ms)); });
+
+  it('PC 1600x900: the panel docks right at 640 px, and its 960 px canvas area collapses the controls', async () => {
+    const { root } = await mountAt(1600, 900);
+    expect(root.classList.contains('sw-collapse'), 'closed: the whole 1600 px is canvas').toBe(false);
+    expect(screen.queryByRole('button', { name: 'More controls' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBe('dock');
+    expect(root.classList.contains('sw-panel-open')).toBe(true);
+    expect(root.style.getPropertyValue('--sw-panel-w')).toBe('640px');
+    expect(root.classList.contains('sw-collapse'), '1600 - 640 = 960 < 1000').toBe(true);
+    expect(root.classList.contains('sw-compact')).toBe(false);
+    fireEvent.keyDown(root, { key: 'Escape' });
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBeNull();
+    expect(root.classList.contains('sw-collapse')).toBe(false);
+  });
+
+  /* w4 (interaction hunt): at 768x1024 the collapsed strip sat over the title ("Web" under the
+     go-to); there the strip drops under the header (use-panel-layout's stackedFor; app.css) */
+  it('a tablet 768x1024: docked, the strip stacks under the header; at 1600 it does not', async () => {
+    const { root } = await mountAt(768, 1024);
+    expect(root.classList.contains('sw-stack'), 'closed').toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBe('dock');
+    expect(root.classList.contains('sw-stack'), '768 - 420 = 348 px of canvas').toBe(true);
+    fireEvent.keyDown(root, { key: 'Escape' });
+    await wait(30);
+    expect(root.classList.contains('sw-stack')).toBe(false);
+  });
+
+  it('phone landscape 891x411: compact, docked right at 374 px, the controls behind the more button', async () => {
+    const { root, container } = await mountAt(891, 411);
+    expect(root.classList.contains('sw-compact')).toBe(true);
+    expect(root.classList.contains('sw-collapse')).toBe(true);
+    const more = screen.getByRole('button', { name: 'More controls' });
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(more.getAttribute('aria-controls')).toBe('sw-menu');
+    // the menu holds every control (hidden by CSS until it opens)
+    const menu = container.querySelector('#sw-menu');
+    expect(menu.textContent).toMatch(/Scripture/);
+    expect(menu.textContent).toMatch(/Nearby/);
+    expect(menu.textContent).toMatch(/Reset/);
+    fireEvent.click(more);
+    expect(root.classList.contains('sw-menu-open')).toBe(true);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    // Escape in the menu closes the menu only, and focus goes back to the more button
+    const nearby = screen.getByRole('button', { name: /^nearby$/i });
+    nearby.focus();
+    fireEvent.keyDown(nearby, { key: 'Escape' });
+    expect(root.classList.contains('sw-menu-open')).toBe(false);
+    expect(document.activeElement).toBe(more);
+    // a control in the menu acts and closes it
+    fireEvent.click(more);
+    fireEvent.click(nearby);
+    await wait(30);
+    expect(root.classList.contains('sw-menu-open')).toBe(false);
+    expect(root.getAttribute('data-panel')).toBe('dock');
+    expect(root.style.getPropertyValue('--sw-panel-w')).toBe('374px');
+    expect(container.querySelector('.sw-list')).toBeTruthy();
+  });
+
+  it('a press outside the controls closes the menu', async () => {
+    const { root } = await mountAt(891, 411);
+    fireEvent.click(screen.getByRole('button', { name: 'More controls' }));
+    expect(root.classList.contains('sw-menu-open')).toBe(true);
+    fireEvent.pointerDown(document.body);
+    await wait(0);
+    expect(root.classList.contains('sw-menu-open')).toBe(false);
+  });
+
+  it('below 560 px the panel is a bottom sheet of the measured height', async () => {
+    const { root } = await mountAt(500, 800);
+    expect(root.classList.contains('sw-narrow')).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: /^nearby$/i }));
+    await wait(30);
+    expect(root.getAttribute('data-panel')).toBe('sheet');
+    expect(root.style.getPropertyValue('--sw-sheet-h')).toBe('480px');
+  });
+
+  it('the go-to slot stays first in the controls (CONTRACTS.md section 9), the menu after it', async () => {
+    const { container } = await mountAt(891, 411);
+    const controls = container.querySelector('.sw-controls');
+    // the go-to's search button fills the slot (goto.jsx, the navigation stream), the menu follows
+    // it, the more button ends the row (this test once pinned the empty slot: the menu leading)
+    const [first, second] = controls.children;
+    expect(first.classList.contains('sw-goto-btn'), 'the go-to button leads').toBe(true);
+    expect(second.id).toBe('sw-menu');
+    expect(controls.lastElementChild.getAttribute('aria-label')).toBe('More controls');
+  });
+});
+
+/* w4 interaction hunt: a reader door ("Show in Scripture Web" on a verse, a footnote's) opened My
+   Web when the reader had last left the web from My Web, because the mode was seeded from the
+   resume point even with a `start` given. go() then dropped the canon's verse panel, lit set and
+   edge chips onto My Web's dual rail. The props doc says a start wins over the resume point. */
+describe('a door in opens the Scripture Web, whatever web the reader last left from', () => {
+  const mountWith = async (props) => {
+    for (const [prop, px] of [['clientWidth', 800], ['clientHeight', 600]]) {
+      Object.defineProperty(HTMLCanvasElement.prototype, prop, { configurable: true, get() { return px; } });
+    }
+    window.SCRIPTURE_WEB_DATA = { ok: true, count: 1 };
+    const view = render(<ScriptureWebScreen {...baseProps()} {...props} />);
+    await act(async () => { await new Promise((r) => setTimeout(r, 30)); });
+    return view;
+  };
+  afterEach(() => {
+    delete HTMLCanvasElement.prototype.clientWidth;
+    delete HTMLCanvasElement.prototype.clientHeight;
+  });
+  const myWebPlace = () => ({ mode: 'personal', cam: { x: 10, ppv: 1, total: 100, y: 0 }, focus: focusStateOf(), detail: null });
+  const focusStateOf = () => ({ arc: -1, hover: -1, range: null, lit: null, litKey: '' });
+
+  it('control: with no start, the resume point holds (back from the reader lands in My Web)', async () => {
+    _setWebPlace(myWebPlace());
+    await mountWith({});
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('My Web');
+  });
+
+  it('a start wins over a My Web resume point: the door opens the canon', async () => {
+    _setWebPlace(myWebPlace());
+    await mountWith({ start: { verse: { bookId: 'john', chapter: 3, verse: 16 } } });
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Scripture Web');
+    // and the resume point is spent, not kept for a later mount
+    cleanup();
+    await mountWith({});
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('The Scripture Web');
   });
 });

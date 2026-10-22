@@ -27,6 +27,12 @@
    so "wept" reaches weep and "weep" reaches wept. Left out on purpose, for the
    other word each form also is: ground (grind), left (leave), lay (lie), tore
    (tear, of weeping), born (bear, of animals). */
+/* The King James "-soever" words and the modern "-ever" ones, both ways ("whosoever believes in Him": the NKJV's
+   "whoever"). A table of its own keys, as IRREGULAR. */
+const SOEVER = Object.create(null);
+for (const [kjv, modern] of [['whosoever', 'whoever'], ['whomsoever', 'whomever'], ['whatsoever', 'whatever'],
+  ['wheresoever', 'wherever'], ['whensoever', 'whenever'], ['howsoever', 'however']]) { SOEVER[kjv] = modern; SOEVER[modern] = kjv; }
+
 /* A table of its own keys: a plain object gave 'constructor' Object's function as its forms (sweep W24). */
 const IRREGULAR = Object.assign(Object.create(null), {
   weep: ['wept'], flee: ['fled'], speak: ['spake', 'spoke', 'spoken'], give: ['gave', 'given'],
@@ -135,6 +141,8 @@ export function wordForms(word, isStop) {
   };
   // The word as a base too: "weep" reaches wept, "sin" reaches sinned.
   for (const f of inflect(w)) push(f);
+  // The King James "-soever" and the modern "-ever" are one word: whosoever and whoever, whatsoever and whatever.
+  if (SOEVER[w]) push(SOEVER[w]);
   for (const b of bases(w)) {
     if (NOT_A_BASE.has(b) || (isStop && isStop(b))) continue;
     for (const f of inflect(b)) push(f);

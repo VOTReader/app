@@ -11,10 +11,14 @@
    of the chapter ("Verse 16 · 3 connections"), each row the other end's
    reference, its verse in the reader's translation, and its tier.
    Data: utils/scripture-web/chapter-connections.js (the Famous view's
-   threads, the same ranking the map uses).
+   threads, the same ranking the map uses). Each row is the docked panel's
+   own ConnectionRow (connection-row.jsx) in its fallback skin, so the map
+   and the list draw one row (digest B1).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { chapterConnections } from '../../utils/scripture-web/chapter-connections.js';
+import { ConnectionRow } from './connection-row.jsx';
+import { WEB_CREDIT } from '../../utils/scripture-web/describe.js';
 
 const plural = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
 
@@ -32,9 +36,11 @@ export function _resetFallbackPlace() { resumeChapter = null; }
 
 /**
  * @param {{ graph: any, initialChapter: number, onOpen: (ref: any) => void,
- *   onRetry: () => void, onBack: () => void, verseText: (ref: any) => string }} props
+ *   onRetry: () => void, onBack: () => void, verseText: (ref: any) => string,
+ *   onMyWeb?: () => void }} props
+ *   onMyWeb: My web draws in Canvas2D, so it opens without WebGL2 (w3 item 31)
  */
-export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText }) {
+export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText, onMyWeb }) {
   const [ci, setCi] = React.useState(() => {
     const at = resumeChapter;
     resumeChapter = null;
@@ -59,7 +65,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       <div className="swf-head">
         {/* the list covers the screen's chrome, so the way back sits at the top, not after 500 rows */}
         <button type="button" className="swf-back" onClick={onBack} aria-label="Go back">‹ Back</button>
-        <h1 className="swf-title">Scripture Web</h1>
+        <h1 className="swf-title">The Scripture Web</h1>
         <div className="swf-sub">Connections from {label}</div>
       </div>
       <div className="swf-stepper" role="group" aria-label="Chapter">
@@ -77,6 +83,7 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
       <div className="swf-note">
         <span>The map can’t be drawn on this device right now.</span>
         <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onRetry(); }}>Try again</button>
+        {onMyWeb && <button type="button" className="swf-retry" onClick={() => { resumeChapter = ci; onMyWeb(); }}>My Web</button>}
       </div>
       <div className="swf-count-row">
         <h2 className="swf-h2">Connected passages</h2>
@@ -90,21 +97,19 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
           </div>
           <ul className="swf-rows">
             {grp.rows.map((row) => (
-              <li key={row.index}>
-                <button type="button" className="swf-row" onClick={() => { resumeChapter = ci; onOpen(row.other); }}
-                  aria-label={row.other.label + (row.tier === 'essential' ? ', essential' : ', famous')}>
-                  <span className="swf-row-top">
-                    <span className="swf-ref">{row.other.label}</span>
-                    <span className="swf-tier">{row.tier === 'essential' ? 'Essential' : 'Famous'}</span>
-                  </span>
-                  <span className="swf-snip">{verseText(row.other)}</span>
-                </button>
-              </li>
+              <ConnectionRow key={row.index} skin="fallback"
+                title={row.other.label} tag={row.tier === 'essential' ? 'Essential' : 'Famous'}
+                text={verseText(row.other)}
+                onMain={() => { resumeChapter = ci; onOpen(row.other); }}
+                mainLabel={row.other.label + (row.tier === 'essential' ? ', essential' : ', famous')} />
             ))}
           </ul>
         </section>
       ))}
       {data.total === 0 && <div className="swf-empty">Nothing in the Famous view connects to {label}.</div>}
+      {/* the CC-BY credit (w4): every face of the web credits OpenBible.info's data, a licence
+          obligation, and this one lists that data chapter by chapter */}
+      <p className="swf-credit">{graph.attribution || WEB_CREDIT}</p>
     </div>
   );
 }

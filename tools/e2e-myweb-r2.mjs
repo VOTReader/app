@@ -19,6 +19,13 @@
  *                     A stack of streaks reads high whatever its density; a fan
  *                     of diagonals reads low; a saturated blob has no edges and
  *                     drops out. (v3, the gate)
+ *        ribbon       of band pixels, the share at full ink (a channel >= 140:
+ *                     several context threads stacked on one pixel at depth
+ *                     ink). Information (fix-review #6/#12): horiz cannot tell
+ *                     a corridor of fly-overs piled into a saturated ribbon
+ *                     from the same corridor drawn line by line (both read
+ *                     about 0.73 at 800x360 on the w3 path); ribbon can
+ *                     (0.139 against 0.060).
  *      PASS: horiz <= STREAK_HORIZ[frame] (registered per frame at measured
  *      plus margin, the way R5 ceilings are keyed; main reads the BEFORE).
  *   O  overview shot at rest, for the byte-wise comparison between tips.
@@ -31,8 +38,14 @@
  *      book. At every notch the thread's endpoints and stroke class come from
  *      the tree's own exported geometry (verseToX, threadPath) fed the
  *      published cameras. Registered: the largest per-notch endpoint
- *      displacement in CSS px, and that the thread is never null and never
- *      changes stroke class (rise-only vs rise+run) between adjacent notches.
+ *      displacement in CSS px, that the thread is never null, and THE SMEAR
+ *      (fix-review #6, the w3 path shape): at no notch does an on-screen run
+ *      of it flatter than 4 deg (2 deg for a fly-over, no foot on screen) span
+ *      more than a third of the width, the unit tests' G2 law read on the
+ *      published cameras. Its class (anchored / leg / fly) is printed as
+ *      information: a foot leaving the screen changes it, legitimately. (The
+ *      r2 rise / level-run classification read pts.rise, which the w3 path
+ *      no longer has, so every leg read 'rise'; it is retired.)
  *      Each notch's capture is taken while the gesture is still LIVE (inside
  *      the 150 ms hold, data-cap-fraction 0): what a moving finger sees.
  *   R  release: from the overview one wheel notch over the Bible rail at the
@@ -62,8 +75,8 @@
  *      width while data-ppv-css (the Bible camera) does not move; then wheel
  *      over the bottom rail until Isaiah fills >= 60 % while data-ppv-vot does
  *      not move. Endpoints THROUGH THE REAL UI: the pointer scans the Isaiah
- *      band 6 px above the bottom rail until the hover card reads "Corpus
- *      connection" with an Isaiah verse; then the Rebuke band 6 px below the
+ *      band 6 px above the bottom rail until the hover card reads "Timothy's
+ *      note" (w3 "Timothy's thread", r2 "Corpus connection") with an Isaiah verse; then the Rebuke band 6 px below the
  *      top rail until the card's third line (the Volume the passage sits in)
  *      reads Rebuke. Then the pills:
  *      "Reset the Volumes rail" returns only the top camera to fit; "Reset the
@@ -73,7 +86,7 @@
  *      at its first assertion, which is the RED.
  *
  * USAGE
- *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,desktop] [--arms O,S,T,C] [--out DIR] [--before TREE]
+ *   node tools/e2e-myweb-r2.mjs [--frames phoneLand,pixelLand,desktop] [--arms O,S,T,C] [--out DIR] [--before TREE]
  *   --before TREE serves THAT tree (its own tools/e2e-read-serve.mjs, its own
  *   git status) and measures it with this file's instruments: the BEFORE
  *   number comes from the same exported code as the AFTER. Both trees must be
@@ -92,15 +105,32 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const OWN = resolve(HERE, '..');
 const TREE = resolve(arg('before', OWN));
 const OUT = arg('out', '');
-const FRAME_LIST = arg('frames', 'phoneLand,desktop').split(',');
+const FRAME_LIST = arg('frames', 'phoneLand,pixelLand,desktop').split(',');
 const NAV_MS = 60000;
 /* v3 gate. Measured 2026-09-11 on the RTX 5080 with this instrument: main
    ce710380 reads 0.874 (800x360) / 0.900 (1920x1080); the tip ae30374e reads
    0.365 / 0.219. The gate sits at the midpoint so a regression halfway back to
    the streak field fails. The phone frame's 0.365 is its geometry, not a
    defect: a 144 px gap under 800 px puts a thread crossing 500 px at 16 deg. */
-const STREAK_HORIZ = { phoneLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
+const STREAK_HORIZ = { phoneLand: 0.45, pixelLand: 0.45, desktop: 0.35 };   // per frame: measured tip + margin; main fails both
+/* pixelLand (fix-review #6) starts at phoneLand's gate: the same phone geometry (a 411 px frame's gap under
+   891 px), registered from its first measured run. */
 const NOTCHES = 22;
+/* arm C's smear law (fix-review #6): the flattest on-screen run allowed, as a share of the width */
+const FLAT_DEG = { leg: 4, fly: 2 };
+const FLAT_SHARE = 1 / 3;
+/** The widest on-screen run of a polyline flatter than deg degrees, device px (rail-renderer-r2.test's flatRun). */
+function flatRun(pts, width, deg) {
+  const tan = Math.tan((deg * Math.PI) / 180);
+  let best = 0, from = null;
+  for (let i = 1; i < pts.length; i++) {
+    const [x1, y1] = pts[i - 1], [x2, y2] = pts[i];
+    const inside = Math.min(x1, x2) >= 0 && Math.max(x1, x2) <= width;
+    const flat = Math.abs(x2 - x1) > 1e-9 && Math.abs(y2 - y1) / Math.abs(x2 - x1) < tan;
+    if (inside && flat) { if (from == null) from = Math.min(x1, x2); best = Math.max(best, Math.max(x1, x2) - from); } else from = null;
+  }
+  return best;
+}
 const ARMS = arg('arms', 'R,O,S,T,C').split(',');
 const BAND_FILL = 0.6;
 // arm R launch classifier: an accelerated release frame draws in 5-8 ms here;
@@ -127,6 +157,7 @@ if (OUT) mkdirSync(OUT, { recursive: true });
 
 const FRAMES = {
   phoneLand: { w: 800, h: 360, dpr: 2, mobile: true },
+  pixelLand: { w: 891, h: 411, dpr: 2.6, mobile: true },     // the owner's Pixel 9 Pro, landscape
   desktop: { w: 1920, h: 1080, dpr: 2, mobile: false },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -142,6 +173,30 @@ async function clickLabel(page, label) {
   await page.evaluate((l, s) => (new Function('return ' + s)())(l).click(), label, finder.toString());
 }
 const clickIfPresent = (page, label) => page.evaluate((l, s) => { const b = (new Function('return ' + s)())(l); if (!b) return false; b.click(); return true; }, label, finder.toString());
+/** A top control as a reader reaches it (w4): on a frame whose controls collapse to the
+ *  "More controls" menu (spec section 3's collapse rule: a canvas under 1000 px, so every
+ *  phone frame), through that menu; the walk's own labels are unchanged. need: wait for it
+ *  (or the menu) and throw when neither carries it, as clickLabel did. */
+async function control(page, label, need) {
+  if (need) {
+    await page.waitForFunction((l, s) => { const f = new Function('return ' + s)(); return !!f(l) || !!f('More controls'); },
+      { timeout: NAV_MS }, label, finder.toString());
+  }
+  if (await clickIfPresent(page, label)) { await sleep(150); await closeMenu(page); return true; }
+  if (await clickIfPresent(page, 'More controls')) {
+    await sleep(250);
+    const ok = await clickIfPresent(page, label);
+    await sleep(150);
+    await closeMenu(page);
+    if (ok) return true;
+  }
+  if (need) throw new Error('no control "' + label + '", on screen or in the More controls menu');
+  return false;
+}
+async function closeMenu(page) {
+  const open = await page.evaluate(() => { const b = document.querySelector('[aria-label="More controls"]'); return !!b && b.getAttribute('aria-expanded') === 'true'; });
+  if (open) { await clickIfPresent(page, 'More controls'); await sleep(200); }
+}
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS });
@@ -154,15 +209,23 @@ async function toMyWeb(page) {
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
-  await clickLabel(page, 'My web'); await sleep(800);
+  // the first-run guide ("How to read this web") opens on a fresh context and covers the band; its
+  // button is "Got it" ('Dismiss' is the empty notice's x)
+  await clickIfPresent(page, 'Got it'); await sleep(300);
+  await control(page, 'My Web', true); await sleep(800);
+  await clickIfPresent(page, 'Got it'); await sleep(300);
   await clickIfPresent(page, 'Dismiss'); await sleep(300);
-  await clickIfPresent(page, 'Reset the view'); await sleep(700);
+  await control(page, 'Reset the view'); await sleep(700);
   return true;
 }
 const attr = (page, k) => page.evaluate((k) => (document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute(k), k);
 const rails = (page) => page.evaluate(() => JSON.parse((document.querySelector('.sw-root') || { getAttribute: () => null }).getAttribute('data-rails') || 'null'));
 const ppv = async (page) => ({ b: Number(await attr(page, 'data-ppv-css')), v: Number(await attr(page, 'data-ppv-vot')) });
 const canvasRect = (page) => page.evaluate(() => { const b = document.querySelector('.sw-canvas-ui').getBoundingClientRect(); return { l: b.left, t: b.top, w: b.width, h: b.height }; });
+// a Timothy thread's hover card (today "Timothy's note"; w3 said "Timothy's thread", r2 "Corpus connection")
+const THREAD_CARD = /Timothy.s (note|thread)|Corpus connection/i;
+// its third line: "<source> · <Volume>" from w3, the Volume alone before
+const volumeOf = (meta) => String(meta || '').replace(/^.*·\s*/, '');
 const tipText = (page) => page.evaluate(() => {
   const t = document.querySelector('.sw-tip'); if (!t) return null;
   const q = (c) => { const e = t.querySelector(c); return e ? e.textContent.trim() : ''; };
@@ -182,7 +245,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
   const lum = new Float32Array(W * H);
   for (let i = 0, p = 0; i < lum.length; i++, p += 4) lum[i] = d[p] + d[p + 1] + d[p + 2];
   const R = 8;
-  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0;
+  let streakRows = 0, nLit = 0, nAniso = 0, nEdge = 0, nHoriz = 0, nRibbon = 0;
   for (let y = y0; y < y1; y++) {
     let row = 0;
     for (let x = 0; x < W; x++) {
@@ -196,6 +259,7 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
       }
       if (!lit[y * W + x]) continue;
       row++; nLit++;
+      { const p = (y * W + x) * 4; if (Math.max(d[p], d[p + 1], d[p + 2]) >= 140) nRibbon++; }
       if (x < R || x >= W - R || y < R || y >= H - R) continue;
       const hx = lit[y * W + x - R] && lit[y * W + x + R];
       const vy = lit[(y - R) * W + x] || lit[(y + R) * W + x];
@@ -203,14 +267,14 @@ const streak = (page, b64) => page.evaluate(async (b64, y0f, y1f) => {
     }
     if (row / W >= 0.6) streakRows++;
   }
-  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3) };
+  return { rows: y1 - y0, rowFraction: +(streakRows / (y1 - y0)).toFixed(3), litPixels: nLit, aniso: +(nAniso / Math.max(1, nLit)).toFixed(3), edgePixels: nEdge, horiz: +(nHoriz / Math.max(1, nEdge)).toFixed(3), ribbon: +(nRibbon / Math.max(1, (y1 - y0) * W)).toFixed(4) };
 }, b64, 0.22, 0.80);
 
 async function shot(page, name) { if (OUT) await page.screenshot({ path: resolve(OUT, name + '.png') }); }
 
 /** Wheel over one rail at a band's centre until the band spans >= frac of the width. */
 async function zoomBandTo(page, c, r0, which, label, frac) {
-  for (let i = 0; i < 40; i++) {
+  for (let i = 0; i < 60; i++) {     // 40 ran out before Revelation spanned 60 % at 891x411
     const r = await rails(page);
     if (!r) return { ok: false, why: 'data-rails not published' };
     const bands = which === 'top' ? r.top : r.bottom;
@@ -237,8 +301,8 @@ async function hoverEndpoint(page, c, r, which, band, want) {
     await page.mouse.move(x, y); await sleep(120);
     const t = await tipText(page);
     last = t;
-    if (t && /Corpus connection/i.test(t.eyebrow)) {
-      const text = which === 'top' ? t.meta : t.ref;
+    if (t && THREAD_CARD.test(t.eyebrow)) {
+      const text = which === 'top' ? volumeOf(t.meta) : t.ref;
       if (want.test(text)) return { ok: true, x: Math.round(x - c.l), card: t, tries: i + 1 };
     }
   }
@@ -255,9 +319,9 @@ async function armS(page, tag, fname, c, r0) {
   await shot(page, `${fname}-S-psalms-10x`);
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
   const gate = STREAK_HORIZ[fname];
-  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px)`);
+  note(`${tag} S: Bible ${(p1.b / p0.b).toFixed(1)}x (Volumes ${(p1.v / p0.v || 1).toFixed(1)}x): horiz ${s.horiz} (edges ${s.edgePixels}, gate <= ${gate}); rowFraction ${s.rowFraction}, aniso ${s.aniso} (lit ${s.litPixels} px), ribbon ${s.ribbon}`);
   if (!(s.horiz <= gate)) fails.push(`${tag} S: horiz ${s.horiz} > ${gate}: the zoomed context reads as a horizontal streak field`);
-  await clickIfPresent(page, 'Reset the view'); await sleep(600);
+  await control(page, 'Reset the view'); await sleep(600);
   return s;
 }
 
@@ -285,7 +349,7 @@ async function pairing(page, tag, fname, c, r0, topLabel, bottomLabel, topWant, 
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(250);
   await shot(page, `${fname}-T${suffix}-${topLabel}-${bottomLabel}`.replace(/\s+/g, '_'));
   const s = await streak(page, await page.screenshot({ encoding: 'base64' }));
-  note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}`);
+  note(`${tag} T${suffix}: streak horiz ${s.horiz} (edges ${s.edgePixels}), rowFraction ${s.rowFraction}, aniso ${s.aniso}, ribbon ${s.ribbon}`);
   if (!(s.horiz <= STREAK_HORIZ[fname])) fails.push(`${tag} T${suffix}: horiz ${s.horiz} > ${STREAK_HORIZ[fname]} with both rails zoomed`);
   return { t, b, after, before };
 }
@@ -304,25 +368,27 @@ async function armC(page, tag, fname, c, r0, f) {
     const x = c.l + mid + half * (((i * 0.618) % 1) * 2 - 1);
     await page.mouse.move(x, c.t + r1.bottomY - 6); await sleep(120);
     const tip = await tipText(page);
-    if (tip && /Corpus connection/i.test(tip.eyebrow) && Number.isFinite(tip.verse) && Number.isFinite(tip.vot)) found = tip;
+    if (tip && THREAD_CARD.test(tip.eyebrow) && Number.isFinite(tip.verse) && Number.isFinite(tip.vot)) found = tip;
   }
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(200);
   if (!found) { fails.push(`${tag} C: no corpus thread within 14 px of the bottom rail near the centre of Isaiah`); return; }
   const book = found.ref.replace(/\s+\d+:\d+.*$/, '');
   note(`${tag} C: following "${found.ref}" ↕ "${found.alt}" (${found.meta}); verse ${found.verse}, vot ${found.vot}`);
-  await clickLabel(page, 'Reset the view'); await sleep(600);
+  await control(page, 'Reset the view', true); await sleep(600);
   const W = c.w * f.dpr;
   const read = async () => {
     const r = await rails(page);
     const topY = r.topY * f.dpr, bottomY = r.bottomY * f.dpr;
     const a = /** @type {[number, number]} */ ([law.verseToX(r.cam, W, found.verse), bottomY]);
     const bb = /** @type {[number, number]} */ ([law.verseToX(r.camV, W, found.vot), topY]);
-    const pts = law.threadPath(a, bb, true, { width: W, gap: bottomY - topY, n: 12 });
-    return { ax: +(a[0] / f.dpr).toFixed(1), bx: +(bb[0] / f.dpr).toFixed(1), drawn: !!pts, cls: pts ? (pts.rise >= 0 ? 'rise+run' : 'rise') : 'none', r };
+    const pts = law.threadPath(a, bb, true, { width: W, gap: bottomY - topY, n: 48 });
+    const cls = pts ? (pts.cls || 'curve') : 'none';
+    const flat = pts ? flatRun(pts, W, cls === 'fly' ? FLAT_DEG.fly : FLAT_DEG.leg) / W : 0;
+    return { ax: +(a[0] / f.dpr).toFixed(1), bx: +(bb[0] / f.dpr).toFixed(1), drawn: !!pts, cls, flat: +flat.toFixed(3), r };
   };
   const strip = async (which, label) => {
     let prev = await read();
-    let maxDisp = 0, nulls = 0, classChanges = 0, at = -1;
+    let maxDisp = 0, nulls = 0, classChanges = 0, at = -1, flattest = prev.flat, flatAt = 0;
     const rows = [{ notch: 0, ...prev }];
     for (let i = 1; i <= NOTCHES; i++) {
       const r = prev.r;
@@ -342,19 +408,20 @@ async function armC(page, tag, fname, c, r0, f) {
       if (disp > maxDisp) { maxDisp = disp; at = i; }
       if (!cur.drawn) nulls++;
       if (cur.cls !== prev.cls) classChanges++;
+      if (cur.flat > flattest) { flattest = cur.flat; flatAt = i; }
       rows.push({ notch: i, ...cur, disp: +disp.toFixed(1) });
       prev = cur;
     }
     const p = await ppv(page);
-    note(`${tag} C ${which} rail, ${NOTCHES} notches at ${label}: largest per-notch endpoint displacement ${maxDisp.toFixed(1)} CSS px (notch ${at}); drawn at every notch: ${nulls === 0 ? 'yes' : 'NO (' + nulls + ' null)'}; stroke class changes: ${classChanges}; endpoints notch 0 -> ${NOTCHES}: bottom x ${rows[0].ax} -> ${prev.ax}, top x ${rows[0].bx} -> ${prev.bx}; cameras now Bible ${(p.b / rows[0].r.cam.ppv * f.dpr).toFixed(1)}x Volumes ${(p.v / rows[0].r.camV.ppv * f.dpr).toFixed(1)}x`);
+    note(`${tag} C ${which} rail, ${NOTCHES} notches at ${label}: largest per-notch endpoint displacement ${maxDisp.toFixed(1)} CSS px (notch ${at}); drawn at every notch: ${nulls === 0 ? 'yes' : 'NO (' + nulls + ' null)'}; flattest on-screen run ${(flattest * 100).toFixed(1)} % of the width (notch ${flatAt}, gate <= ${(FLAT_SHARE * 100).toFixed(1)} %); class changes ${classChanges} (information: ${[...new Set(rows.map((x) => x.cls))].join(' / ')}); endpoints notch 0 -> ${NOTCHES}: bottom x ${rows[0].ax} -> ${prev.ax}, top x ${rows[0].bx} -> ${prev.bx}; cameras now Bible ${(p.b / rows[0].r.cam.ppv * f.dpr).toFixed(1)}x Volumes ${(p.v / rows[0].r.camV.ppv * f.dpr).toFixed(1)}x`);
     if (nulls) fails.push(`${tag} C ${which}: the thread vanished at ${nulls} notches`);
-    if (classChanges) fails.push(`${tag} C ${which}: the thread changed stroke class ${classChanges} times between adjacent notches`);
+    if (flattest > FLAT_SHARE) fails.push(`${tag} C ${which}: at notch ${flatAt} an on-screen run of the thread flatter than ${FLAT_DEG.leg} deg (${FLAT_DEG.fly} for a fly-over) spans ${(flattest * 100).toFixed(1)} % of the width: the smear`);
     if (OUT) writeFileSync(resolve(OUT, `${fname}-C-${which}.json`), JSON.stringify(rows.map(({ r, ...rest }) => rest), null, 1));
     return maxDisp;
   };
-  await strip('top', found.meta);
+  await strip('top', volumeOf(found.meta));
   await strip('bottom', book);
-  await clickIfPresent(page, 'Reset the view'); await sleep(400);
+  await control(page, 'Reset the view'); await sleep(400);
 }
 
 /** Arm R: the release fade, measured in the Matthew corridor. */
@@ -363,7 +430,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
   // bottom rail (the Study Bible notes), the densest ink on the overview
   const band = r0.bottom.find((b) => b.label === 'Matthew');
   if (!band) { fails.push(`${tag} R: no Matthew band published`); return; }
-  await clickIfPresent(page, 'Reset the view'); await sleep(500);
+  await control(page, 'Reset the view'); await sleep(500);
   await page.mouse.move(c.l + 8, c.t + 8); await sleep(300);
   // THE INSTRUMENT is data-cap-fraction read every animation frame: the
   // fraction the screen drew that frame (0 live, 1 full, between = fading).
@@ -436,7 +503,7 @@ async function armR(page, tag, fname, c, r0, attempt) {
     : `${tag} R: UNRESOLVED: ${fading.length} fading frames and a ${jumpGap} ms tick gap into full (cadence ${cadence} ms): the sampler could not have seen a 250 ms fade; not a pass`);
   else if (!(fadeSpan >= 100)) fails.push(`${tag} R: the fade spanned ${fadeSpan} ms of frames, under 100: not a visible span`);
   if (falls) fails.push(`${tag} R: the cap fraction fell ${falls} times during the release: not monotone`);
-  await clickIfPresent(page, 'Reset the view'); await sleep(300);
+  await control(page, 'Reset the view'); await sleep(300);
   return 'ok';
 }
 
@@ -465,13 +532,13 @@ async function walk(page, url, fname, attempt) {
     note(`${tag} T1 pill "Reset the Volumes rail": Volumes ${(q.v / p1.before.v).toFixed(2)}x of fit, Bible ${(q.b / p1.before.b).toFixed(1)}x held`);
     if (!topBack) fails.push(`${tag} T1: the Volumes pill did not return the top camera to fit`);
     if (!bibleHeld) fails.push(`${tag} T1: the Volumes pill moved the Bible camera`);
-    await clickLabel(page, 'Reset the view'); await sleep(500);
+    await control(page, 'Reset the view', true); await sleep(500);
     const z = await ppv(page);
     if (!(Math.abs(z.b - p1.before.b) <= p1.before.b * 0.01 && Math.abs(z.v - p1.before.v) <= p1.before.v * 0.01)) fails.push(`${tag} T1: "Reset the view" did not return both cameras to fit (${JSON.stringify(z)} vs ${JSON.stringify(p1.before)})`);
   }
-  await clickIfPresent(page, 'Reset the view'); await sleep(500);
+  await control(page, 'Reset the view'); await sleep(500);
   await pairing(page, tag, fname, c, r0, 'Vol I', 'Revelation', /^Vol I$/, /^Revelation\b/, '2');
-  await clickIfPresent(page, 'Reset the view'); await sleep(300);
+  await control(page, 'Reset the view'); await sleep(300);
 }
 
 let browser, own;

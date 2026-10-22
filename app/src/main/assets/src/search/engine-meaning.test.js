@@ -32,10 +32,12 @@ const HARVEST = HARVEST_OPEN + 'The towers are many in that city. '.repeat(6) + 
 const HEADING = 'From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord’s Little Flock, and For All Those Who Have Ears to Hear';
 const OBEY = 'Hear Me, O children: honor your father and your mother in all things that are right. Says The Lord. 3/2/06 ' +
   HEADING.replace('The Lord, Our God', 'YahuShua HaMashiach, Our Lord') + ' Thus says The Lord: My sons and daughters, walk in My ways and live.';
-// an Answers topic reprinting two letters: the typed words sit thickest in the first's short line, the model matched the second
+// an Answers topic reprinting two letters: the typed words sit thickest in the first's short line, the model matched the second.
+// The excerpts sit apart, as in the topics (search200 B4's alignment, on by default, read two lines run together as one
+// passage holding the typed words)
 const KEEPERS = 'Thus says The Lord: Blessed are those who keep My Sabbath and My Commandments, for they are Mine.';
 const WISDOM = 'For those who love Me obey My Commandments, and those who remember My Sabbaths honor Me and shall know Wisdom.';
-const SABBATH = 'Many have asked about the day of rest. ' + KEEPERS + ' ✦ ' + WISDOM + ' ✦';
+const SABBATH = 'Many have asked about the day of rest. ' + KEEPERS + ' ✦ ' + 'The fields lie still under the evening sky. '.repeat(3) + WISDOM + ' ✦';
 const WATCH = 'Stay awake through the night and guard the door, for the master returns at an hour no one expects. ✦ 1/29/05 ' + HEADING + ' The towers of the proud shall fall.';
 const GLOBALS = {
   BOOKS: {},
@@ -49,6 +51,8 @@ const GLOBALS = {
     { id: 'obey', num: 7, title: 'Obey God', blocks: [{ segments: [{ v: OBEY }] }] },
     { id: 'keepers', num: 8, title: 'The Keepers', blocks: [{ segments: [{ v: KEEPERS }] }] },
     { id: 'wisdom', num: 9, title: 'The Word of Wisdom', blocks: [{ segments: [{ v: 'The fields lie still under the evening sky. '.repeat(12) + WISDOM }] }] },
+    // a title, and a sentence past the first ones saying a word of its collection's name
+    { id: 'strayed', num: 10, title: 'The Fold', blocks: [{ segments: [{ v: 'Where does a shepherd spend his days? Pray in like manner. For the one who strays from the flock shall not be forsaken.' }] }] },
   ],
   ANSWERS: [
     { id: 'fields', num: 1, title: 'Regarding Fields', paragraphs: [{ text: TOPIC_OPEN + VINEYARD }] },
@@ -211,7 +215,8 @@ describe('meaning first', () => {
     said.near = 'silver';
     const r = await first('remember now your creator in the days of your youth');
     expect(r.doc.letterId).toBe('creator');
-    expect(r.placeStart).toBeUndefined();
+    // it opens on the words typed (search200 B3: the run's own sentence), never on the passage the model preferred
+    expect(r.placeStart).toBe(STARTS.creator);
   });
 
   /* THE MODEL SURE, UNSURE, AND WHERE IT LANDS (search sr10, 2026-10-14). Its clear first leads even
@@ -237,6 +242,17 @@ describe('meaning first', () => {
     const r = await first('bring sheaves into the barn before rain comes');
     expect(r.doc.letterId).toBe('harvest');
     expect(r.placeStart).toBe(HARVEST.indexOf('Gather My sheaves'));
+  });
+
+  /* A TEXT FOUND BY ITS TITLE OPENS AT THE TITLE, THE MODEL ON (search200 R1, the S22 look, 2026-10-18). A title typed
+     with its collection's name led and opened at its top (B5), and the meaning's landing then moved every opened text to
+     the sentence holding the most typed words: the reader landed a few lines down, on a body sentence that says one of
+     the words typed, and the card quoted that sentence. */
+  it('a text found by its title and collection opens at its top, not on a sentence saying a word typed', async () => {
+    said.near = 'garment';
+    const r = await first('the fold volume one');
+    expect(r.doc.letterId).toBe('strayed');
+    expect(r.placeStart).toBe(0);
   });
 
   /* THE READER'S FILTERS HOLD FOR WHAT THE MEANING ADDS (sweep W1, 2026-10-13). The model's best

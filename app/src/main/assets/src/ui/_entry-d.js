@@ -301,6 +301,12 @@ import { AudioSongsScreen, songsFrameTitle } from './screens/AudioSongsScreen.js
 // components) already live — adds no new bundle, no new script tag.
 import { App } from '../app.jsx';
 
+// The search's substitution lexicon (search200 B7, engine.js): fetched beside the index on its first build,
+// kept offline by the service worker (CORE_ASSETS), packaged in the APK (tools/check-apk-assets.js).
+VotSearchMini.setAlignLexiconSource('search-lexicon.json');
+// Every verse's KJV wording, read beside the reader's edition (search200 fix1 "ed", kjv-twin.js): loaded the same way.
+VotSearchMini.setKjvTwinSource('search-kjv-twin.json');
+
 // ── Expose every public symbol on window ────────────────────────────────
 // Bridges the ES-module Cluster D to its classic-script consumers (the
 // inline App() block in index.html + the lexical-mirror script before

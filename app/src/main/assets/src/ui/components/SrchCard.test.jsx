@@ -7,7 +7,7 @@
    SrchCard must union entry.terms into the highlight list, and must pass
    results WITHOUT entry.terms (direct-ref parses) through unchanged. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SrchCard } from './SrchCard.jsx';
 import { SrchSnippet } from './SrchSnippet.jsx';
@@ -193,6 +193,38 @@ describe('SrchCard for a Bible study chapter', () => {
   });
 });
 
+/* search200 B6 (polish): a letter found by its title showed no mark anywhere when its body never says the words
+   ("the watchman" opens The Watchman, whose text says "watchmen" or nothing). The headline marks them. */
+describe('SrchCard marks the typed words in a title headline (search200 B6)', () => {
+  const letterDoc = { kind: 'letter', title: 'The Watchman', ref: 'Volume Three · Letter 12', text: 'Behold, I have set you over My people as a guard.', volumeId: 'v3', letterId: 'watchman' };
+  beforeEach(() => { /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { letter: { label: 'Letter', cls: '' }, verse: { label: 'Verse', cls: '' } }; });
+  const refMarks = (/** @type {HTMLElement} */ c) => [...c.querySelectorAll('.srch-card-ref mark')].map((m) => m.textContent);
+
+  it('a title that holds the typed word marks it, and the headline still reads whole', () => {
+    const { container } = render(<SrchCard entry={{ score: 1, doc: letterDoc, terms: [] }} terms={['watchman']} onSelect={() => {}} isDirect={false} />);
+    expect(refMarks(container)).toEqual(['Watchman']);
+    expect(container.querySelector('.srch-card-ref').textContent).toBe('The Watchman');
+  });
+
+  it('a misspelling marks the title word the engine matched', () => {
+    const { container } = render(<SrchCard entry={{ score: 1, doc: letterDoc, terms: ['watchman'] }} terms={['wachman']} onSelect={() => {}} isDirect={false} />);
+    expect(refMarks(container)).toEqual(['Watchman']);
+  });
+
+  it('a verse reference is a place, not a title: "psalms" marks nothing in "Psalms 23:1"', () => {
+    const doc = { kind: 'verse', ref: 'Psalms 23:1', text: 'The LORD is my shepherd; I shall not want.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: [] }} terms={['psalms']} onSelect={() => {}} isDirect={false} />);
+    expect(refMarks(container)).toEqual([]);
+  });
+
+  it('a title without the typed words is plain, and the body keeps its marks', () => {
+    const { container } = render(<SrchCard entry={{ score: 1, doc: letterDoc, terms: [] }} terms={['guard']} onSelect={() => {}} isDirect={false} />);
+    expect(container.querySelector('.srch-card-ref').textContent).toBe('The Watchman');
+    expect(refMarks(container)).toEqual([]);
+    expect(marks(container)).toEqual(['guard']);
+  });
+});
+
 /* sweep W33 (2026-10-13): a placed card quoted the densest window of the typed words anywhere after placeStart, so
    it could show a passage the tap does not open. It quotes the window that opens at placeStart, and the place it no
    longer shows is offered under it. */
@@ -232,6 +264,73 @@ describe('SrchCard for a hit placed where the tap lands (sweep W33)', () => {
     expect(rows[0].textContent).toContain('Honour the Maker');
     fireEvent.click(rows[0]);
     expect(text.slice(picked[0].placeStart).startsWith('Honour the Maker')).toBe(true);
+  });
+});
+
+/* search200 B7: a small word the engine matched ("who", on entry.terms) marked by itself
+   all over a card for "those who mourn"; it marks only beside a typed word. The card hands
+   its snippet and its places the typed words, apart from the engine's forms. */
+describe('SrchCard marks a small word only beside a typed one (search200 B7)', () => {
+  /** @type {any} */ let prev;
+  /** @type {any} */ let REAL;
+  beforeAll(async () => {
+    prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+    REAL = window.VotSearchData;
+  });
+  beforeEach(() => {
+    window.VotSearchData = REAL;
+    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { verse: { label: 'Verse', cls: '' }, letter: { label: 'Letter', cls: '' } };
+    /** @type {any} */ (globalThis).VotSearchMini = { snippet, highlightSpans, morePlaces };
+  });
+  afterEach(() => { window.VotSearchData = prev; });
+  afterAll(() => { window.VotSearchData = prev; });
+
+  it('the snippet: "who mourn" one mark, the stray "who" none', () => {
+    const doc = { kind: 'verse', ref: 'Job 5:11', text: 'He sets on high those who are lowly, And those who mourn are lifted to safety.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['who', 'mourn'] }} terms={['mourn']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(container)).toEqual(['who mourn']);
+  });
+
+  it('the places list: the same rule', () => {
+    const pad = (/** @type {number} */ n) => 'and the word went on. '.repeat(n);
+    const text = pad(3) + 'Blessed are those who mourn. ' + pad(30) + 'those who mourn shall be comforted, who wait. ' + pad(30) + 'who sorrow and mourn. ' + pad(3);
+    const doc = { kind: 'letter', ref: 'Volume One · Letter 3', title: 'Comfort', text, volumeId: 'v1', letterId: 'comfort' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['who', 'mourn'] }} terms={['mourn']} onSelect={() => {}} isDirect={false} />);
+    fireEvent.click(container.querySelector('.srch-places-toggle'));
+    const placeMarks = [...container.querySelectorAll('.srch-place mark')].map((m) => m.textContent);
+    expect(placeMarks.length).toBeGreaterThan(0);
+    expect(placeMarks.filter((m) => m.toLowerCase() === 'who')).toEqual([]);
+  });
+
+  /* search200 B7 review: the engine prefix-matches a typed small word, and its forms came in the card's terms as
+     if typed: "christ who strengthens me" marked "whom all things", a lone "who" marked whom, whoredoms and
+     whosoever. A form that extends a typed stop word (`stopTyped`), or is a letter off it, is no word to mark. */
+  it('a typed stop word’s longer forms are not marked, among real words or alone', () => {
+    const doc = { kind: 'verse', ref: 'Colossians 1:16', text: 'For by Him all things were created, in whom all things consist.' };
+    const mixed = render(<SrchCard entry={{ score: 1, doc, terms: ['whom', 'all', 'things'] }} terms={['things', 'christ', 'strengthens']}
+      stopTyped={['i', 'can', 'do', 'all', 'through', 'who', 'me']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(mixed.container)).toEqual(['all things', 'all things']);
+    mixed.unmount();
+    const lone = { kind: 'verse', ref: 'Revelation 22:17', text: 'Who is he whom the Lord chose? And whosoever will, out of her whoredoms.' };
+    const one = render(<SrchCard entry={{ score: 1, doc: lone, terms: ['who', 'whom', 'whosoever', 'whoredoms'] }} terms={['who']}
+      stopTyped={['who']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(one.container)).toEqual(['Who']);
+  });
+
+  it('a form of a typed real word stays marked, though it starts like a typed stop word', () => {
+    const doc = { kind: 'verse', ref: 'Psalms 1:1', text: 'Who walks in wholeness, all his days.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['wholeness'] }} terms={['whole']}
+      stopTyped={['who']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(container)).toEqual(['wholeness']);
+  });
+
+  it('a word under three letters reaches no forms (the engine never prefix-matches one): a corrected typo stays marked', () => {
+    const doc = { kind: 'verse', ref: 'Psalms 121:4', text: 'He who keeps Israel shall neither slumber nor sleep.' };
+    const { container } = render(<SrchCard entry={{ score: 1, doc, terms: ['israel'] }} terms={['keeps', 'isreal']}
+      stopTyped={['is']} onSelect={() => {}} isDirect={false} />);
+    expect(marks(container)).toEqual(['keeps Israel']);
   });
 });
 

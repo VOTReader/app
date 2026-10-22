@@ -3,7 +3,7 @@
    each tagged Essential or Famous. A fixture graph with a known bucket makes
    every expectation exact. */
 import { describe, it, expect } from 'vitest';
-import { chapterConnections, startChapter } from './chapter-connections.js';
+import { chapterConnections, startChapter, webChapter } from './chapter-connections.js';
 
 // Numbers 21 (ids 0-9), John 3 (ids 10-45: 3:14 = 23, 3:16 = 25), Romans 5 (ids 46-66: 5:5 = 50, 5:8 = 53, 5:10 = 55, 5:15 = 60)
 const books = [{ id: 'numbers', title: 'Numbers', abbr: 'Num' }, { id: 'john', title: 'John', abbr: 'John' }, { id: 'romans', title: 'Romans', abbr: 'Rom' }];
@@ -49,5 +49,21 @@ describe('startChapter', () => {
     expect(startChapter(g, 'romans', 99)).toBe(1);
     expect(startChapter(g, null, null)).toBe(1);
     expect(startChapter(/** @type {any} */ ({ books: [books[0]], chapters: [[0, 21, 0, 10]] }), null, null)).toBe(0);
+  });
+});
+
+/* w4 interaction hunt: a context lost for good put the list at History's chapter or John 3, wherever
+   the reader was in the web. The live web's own place: the open card's, else the camera's. */
+describe('webChapter: where a live web was, for the list that replaces it', () => {
+  it("the open card's verse: a verse, a chapter, a connection's near end", () => {
+    expect(webChapter(g, { kind: 'verse', verse: 53 }, null, 0)).toBe(2);
+    expect(webChapter(g, { kind: 'chapter', lo: 10, hi: 45 }, null, 0)).toBe(1);
+    expect(webChapter(g, { kind: 'arc', from: 25, to: 53, far: 'to' }, null, 0), 'the near end, John 3:16').toBe(1);
+    expect(webChapter(g, { kind: 'arc', from: 25, to: 53, far: 'from' }, null, 0)).toBe(2);
+  });
+  it("nothing open: the camera's chapter; nothing known: -1", () => {
+    expect(webChapter(g, null, { x: 50, ppv: 100, total: 67, y: 0 }, 800)).toBe(2);
+    expect(webChapter(g, null, null, 0)).toBe(-1);
+    expect(webChapter(null, { kind: 'verse', verse: 3 }, null, 0)).toBe(-1);
   });
 });

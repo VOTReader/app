@@ -1,44 +1,44 @@
 {
-  "measured": "2026-09-27T03:07:04.208Z",
-  "sha": "8ca098d1",
-  "sourceHash": "91168258100fb27b",
+  "measured": "2026-10-22T21:07:59.823Z",
+  "sha": "f008b26b4",
+  "sourceHash": "f1e02be2bfa3098a",
   "device": {
     "renderer": "ANGLE (Qualcomm, Adreno (TM) 730, OpenGL ES 3.2)",
     "viewport": {
-      "w": 360,
-      "h": 780,
+      "w": 780,
+      "h": 360,
       "dpr": 3
     },
-    "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36"
+    "ua": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/155.0.0.0 Mobile Safari/537.36"
   },
   "scenes": {
     "fit": {
-      "frames": 140,
+      "frames": 176,
       "median": 16.7,
-      "p90": 17.5,
-      "max": 233.8,
-      "fps": 46.7
+      "p90": 16.8,
+      "max": 75.5,
+      "fps": 58.7
     },
     "mid": {
-      "frames": 170,
+      "frames": 173,
       "median": 16.7,
       "p90": 16.8,
-      "max": 92.6,
-      "fps": 56.7
+      "max": 76,
+      "fps": 57.7
     },
     "ceiling": {
-      "frames": 177,
+      "frames": 173,
       "median": 16.7,
       "p90": 16.8,
-      "max": 33.4,
-      "fps": 59
+      "max": 74.9,
+      "fps": 57.7
     },
     "ceilingUp": {
-      "frames": 175,
+      "frames": 173,
       "median": 16.7,
       "p90": 16.8,
-      "max": 75.2,
-      "fps": 58.3
+      "max": 74.8,
+      "fps": 57.7
     }
   }
 }

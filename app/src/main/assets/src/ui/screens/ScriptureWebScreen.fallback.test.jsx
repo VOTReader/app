@@ -6,7 +6,7 @@
    The renderer is mocked to return null, which is exactly what createRenderer
    does when getContext('webgl2') fails; the graph is a small exact fixture. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, fireEvent, act } from '@testing-library/react';
+import { render, fireEvent, act, screen } from '@testing-library/react';
 
 const books = [{ id: 'numbers', title: 'Numbers', abbr: 'Num' }, { id: 'john', title: 'John', abbr: 'John' }, { id: 'romans', title: 'Romans', abbr: 'Rom' }];
 const FIXTURE = () => {
@@ -33,9 +33,12 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
 import { _resetFallbackPlace } from '../scripture-web/WebFallbackList.jsx';
 
+const realGetContext = HTMLCanvasElement.prototype.getContext;
 afterEach(() => {
+  HTMLCanvasElement.prototype.getContext = realGetContext;
   _resetFallbackPlace();   // a followed row sets where the next list opens (n6-05)
   delete window.SCRIPTURE_WEB_DATA;
+  delete /** @type {any} */ (globalThis).__swWalk;
   delete /** @type {any} */ (globalThis).HistoryStore;
   delete /** @type {any} */ (HTMLCanvasElement.prototype).clientWidth;
   delete /** @type {any} */ (HTMLCanvasElement.prototype).clientHeight;
@@ -102,5 +105,39 @@ describe('Scripture Web without WebGL2: the web read as a list (A7)', () => {
     expect(buttons.indexOf(back)).toBe(0);
     act(() => { fireEvent.click(back); });
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  /* item 31 (w3, the My Web stream): My Web draws in Canvas2D, but a device without WebGL2 got
+     only this list, with no way to the reader's own links; the renderer effect also returned
+     before the camera and the canvas size, so nothing could draw there. The list offers My web,
+     My web draws its rails with no GL renderer, and Scripture goes back to the list. */
+  it('item 31: My web opens from the list and draws without WebGL2; Scripture returns to the list', async () => {
+    // a 2D context that takes every call (jsdom has none); the GL path stays null (mocked)
+    const fake2d = () => new Proxy(/** @type {any} */ ({}), {
+      get: (t, k) => (k in t ? t[k] : k === 'measureText' ? () => ({ width: 10 }) : () => {}),
+      set: (t, k, val) => { t[k] = val; return true; },
+    });
+    HTMLCanvasElement.prototype.getContext = /** @type {any} */ (function (kind) { return kind === '2d' ? fake2d() : null; });
+    // the rails' JSON is published only while a walk reads the frame (use-web-renderer walkOn, E3)
+    /** @type {any} */ (globalThis).__swWalk = {};
+    const { container } = await mountWithoutWebGL();
+    const open = [...container.querySelectorAll('.sw-fallback-list button')].find((b) => b.textContent === 'My Web');
+    expect(open, 'the list offers My Web').toBeTruthy();
+    act(() => { fireEvent.click(open); });
+    for (let i = 0; i < 30 && !container.querySelector('.sw-root[data-rails]'); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    }
+    expect(container.querySelector('.sw-fallback-list')).toBeNull();
+    const root = container.querySelector('.sw-root');
+    expect(root, 'My web is up').toBeTruthy();
+    expect(/** @type {HTMLCanvasElement} */ (container.querySelector('.sw-canvas-ui')).width, 'the overlay canvas is sized to the frame').toBe(400);
+    const rails = JSON.parse(root.getAttribute('data-rails') || 'null');
+    expect(rails, 'the frame drew the rails').toBeTruthy();
+    expect(rails.bottom.map((b) => b.label)).toEqual(['Numbers', 'John', 'Romans']);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Scripture' })); });
+    for (let i = 0; i < 30 && !container.querySelector('.sw-fallback-list'); i++) {
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+    }
+    expect(container.querySelector('.sw-fallback-list'), 'Scripture without WebGL2 is the list again').toBeTruthy();
   });
 });

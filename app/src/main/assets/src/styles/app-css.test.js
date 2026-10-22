@@ -143,19 +143,22 @@ describe('app.css — Scripture Web panel scrolling (scripture-web-2/8)', () => 
     expect(block).toContain('touch-action: pan-y');
     expect(block).toContain('overscroll-behavior: contain');
   });
-  it('a rotated phone caps panels against the rotated root (100vw tall), not the physical viewport', () => {
-    // The base rules cap these in vh (52vh / 46vh / 62vh) against the
-    // PHYSICAL viewport height, but `.sw-root.sw-rotated` is `height: 100vw`
-    // — so at depth the panel is sized taller than the instrument and
-    // overflows before touch-action ever gets a chance to help.
-    const sheetBlock = ruleBlock(CSS, '.sw-root.sw-rotated .sw-sheet');
-    expect(sheetBlock).not.toBeNull();
-    expect(sheetBlock).toContain('max-height: 46vw');
-    // .sw-choice and .sw-list share one comma-joined rule (not ruleBlock —
-    // the selector list itself, not a declaration, is what's being pinned).
+  it('a rotated phone sizes panels against the rotated root (100vw tall), not the physical viewport', () => {
+    // `.sw-root.sw-rotated` is `height: 100vw`, so a panel capped in vh against
+    // the PHYSICAL viewport is taller than the instrument and overflows before
+    // touch-action ever gets a chance to help. The docked panel (w3, rewritten
+    // to that intent: the old floating panels' 46vw / 62vw caps went with
+    // them) takes no viewport unit at all: it is top 0 / bottom 0 of the root,
+    // the rotated root's own height, and the sheet's height is --sw-sheet-h,
+    // measured from the root's own box (use-panel-layout.js).
+    const dock = ruleBlock(CSS, '.sw-panel, .sw-sheet, .sw-choice, .sw-list');
+    expect(dock).not.toBeNull();
+    expect(dock).toMatch(/\btop:\s*0;/);
+    expect(dock).toMatch(/\bbottom:\s*0;/);
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-    expect(bare).toMatch(
-      /\.sw-root\.sw-rotated \.sw-choice,\s*\.sw-root\.sw-rotated \.sw-list\s*\{\s*max-height:\s*62vw;\s*\}/);
+    expect(bare, 'no panel is capped in vh').not.toMatch(/\.sw-(?:panel|sheet|choice|list)\b[^{}]*\{[^}]*max-height:\s*[\d.]+vh/);
+    const sheet = ruleBlock(CSS, '.sw-root[data-panel="sheet"] .sw-panel');
+    expect(sheet).toMatch(/height:\s*var\(--sw-sheet-h/);
   });
 });
 
@@ -861,4 +864,31 @@ describe('bottom dock stack (cz1)', () => {
     expect(jrn).toContain('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px));');
     expect(jrn).not.toContain('body.audio-bar-open .jrn-fab');
   });
+});
+
+/* search200 B3 gave the search box role="combobox" (the ARIA 1.2 pattern), and the app-wide ring for a custom
+   combobox ([role="combobox"]:focus-visible) drew a second gold frame round it, a look it never had. The box
+   keeps its own focus look, the border that brightens (no visible redesign in that round). */
+describe('app.css — the search box keeps its own focus look', () => {
+  it('the combobox ring does not frame the search input', () => {
+    expect(ruleBlock(CSS, '.search-input:focus-visible {')).toMatch(/outline:\s*none;\s*border-radius:\s*6px/);
+    expect(CSS.indexOf('.search-input:focus-visible {'), 'after the app-wide ring, so it wins').toBeGreaterThan(CSS.indexOf('[role="combobox"]:focus-visible { outline: 2px'));
+  });
+});
+
+/* Corbin's phone, 2026-10-21: a Format B poem read "Behold,My namealone stands throughout". The spaces were in the
+   DOM (whitespace-only text nodes between <em> and <strong>), but .letter-poetry was display:table, and Chromium and
+   the Android WebView give no layout box to a whitespace-only text child of a table, flex or grid box, so each space
+   drew 0 px wide. A box whose direct children are a paragraph's inline runs must stay a block. */
+describe('app.css — a box that holds a paragraph\'s inline runs never drops the spaces between them', () => {
+  const INLINE_TEXT_HOSTS = ['.letter-poetry'];
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ selectors: m[1].split(',').map((s) => s.trim()), body: m[2] }));
+  for (const host of INLINE_TEXT_HOSTS) {
+    it(host + ' is never a table, flex or grid box', () => {
+      const own = rules.filter((r) => r.selectors.some((s) => s === host || s.endsWith(' ' + host) || s.endsWith('>' + host)));
+      expect(own.length, 'a rule styles ' + host).toBeGreaterThan(0);
+      for (const r of own) expect(r.body, r.selectors.join(', ')).not.toMatch(/display\s*:\s*(inline-)?(table|flex|grid)\b/);
+    });
+  }
 });

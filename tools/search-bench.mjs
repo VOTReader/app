@@ -15,7 +15,8 @@
         Matthew Study and plain Matthew c:v as
         one, a unit-level target's own unit and its same-titled reprints.
      3. It is the class's ORIGINAL: no member of a better tier exists (letters > Words To Live By and
-        The Blessed > Holy Days > studies > Answers; the verse itself for a verse).
+        The Blessed > Holy Days > studies > Answers; the verse itself for a verse). A query naming the target's
+        collection asks for that text itself: the target's own unit may lead (rules.mjs NAMED COLLECTION).
      4. Sentence targets: the landing the screen makes (use-search.js excerptAnchor: matchExcerpt over
         the card's terms, then excerpt-landing.js excerptLanding over the unit's blocks) is the block
         holding the sentence, and the excerpt overlaps the sentence. A verse lands on itself.
@@ -29,24 +30,47 @@
      node tools/search-bench.mjs --json out   also write every case's outcome
      node tools/search-bench.mjs --record     write the score as the new floor (search-bench/baseline.json)
    Exit 1 when the pass count falls below the recorded floor, or any style or collection loses ground.
+
+   TRI (search200, 2026-10-18; PLAN 1.6): 200 exact, 200 misremembered and 200 title cases, each tiered easy, medium,
+   hard from its query alone (tri/check-tri.mjs), plus held (counted, never printed) and fresh (tri/fresh-cases.json).
+     node tools/search-bench.mjs --set tri [--json out] [--record]   tri/cases.json (+ tri/fresh-cases.json); floor tri/baseline.json
+     node tools/search-bench.mjs --set tri --show-sealed-ids        also print the held and fresh failures by id (never while tuning)
+   The pass rule above is unchanged. Exact and misremembered score at sentence or verse level; a boundary or merged
+   case's sentence is the two-sentence span; a merged Bible misquote names two adjacent verses (uk, uk2) and either
+   passes (rules.mjs pairHolds). Titles score at unit level (a study chapter by its chapter title alone, rules.mjs
+   titleForms); an Answers section heading at sentence level. SEARCH_BENCH_CASES replaces tri/cases.json and skips fresh.
+
+   HUNT (search200 fix1, 2026-10-19): the fault hunt's 850 queries in 11 families (D:/Swarm/lanes/search200/out/hunt) and
+   the ship1 red team's 174 in 3 more (rt1-rules, rt1-shapes, rt1-editions; out/ship1, 2026-10-20), all open, each with
+   its hunt's verdict (confirmed / disputed by its two judges, or pass); the 16 both judges rejected are out.
+     node tools/search-bench.mjs --set hunt [--json out] [--record]   hunt/cases.json; floor hunt/baseline.json
+   The pass rule above, per case: a scoped case runs once per search in its `modes` (unscoped, a corpus, a book or volume
+   chip), the class cut to what each scope shows, and passes when every run does; a text in its `alt` passes as the target.
    ─────────────────────────────────────────────────────────────────── */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { docs as buildDocs, blocks as buildBlocks, engine, kjvVerses, unitKey, norm, ASSETS } from './search-bench/corpus.mjs';
-import { heldShare, recurring, reprintShown, nearCopy } from './search-bench/rules.mjs';
+import { reprintShown, pairHolds, namesCollection } from './search-bench/rules.mjs';
+import { makeClasses } from './search-bench/classes.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
 const flag = (f) => argv.includes(f);
 const val = (f) => { const i = argv.indexOf(f); return i >= 0 ? argv[i + 1] : null; };
-const BASELINE = path.join(HERE, 'search-bench/baseline.json');
+const TRI = val('--set') === 'tri';
+const HUNT = val('--set') === 'hunt';
+if (val('--set') && !TRI && !HUNT) { console.error('unknown --set ' + val('--set') + ' (only: tri, hunt)'); process.exit(2); }
+const DIR = TRI ? 'search-bench/tri/' : HUNT ? 'search-bench/hunt/' : 'search-bench/';
+const BASELINE = path.join(HERE, DIR + 'baseline.json');
 const t0 = Date.now();
 
 // SEARCH_BENCH_CASES: another cases file (the fairness audit tries candidate queries on a copy)
-const { cases } = JSON.parse(fs.readFileSync(process.env.SEARCH_BENCH_CASES || path.join(HERE, 'search-bench/cases.json'), 'utf8'));
-const FRESH = path.join(HERE, 'search-bench/fresh-cases.json');
-if (!process.env.SEARCH_BENCH_CASES && fs.existsSync(FRESH)) for (const c of JSON.parse(fs.readFileSync(FRESH, 'utf8')).cases) cases.push({ ...c, held: true, set: 'fresh' });
+const CASES = process.env.SEARCH_BENCH_CASES || path.join(HERE, DIR + 'cases.json');
+if (TRI && !fs.existsSync(CASES)) { console.error('no tri cases yet: ' + CASES + ' (frozen after the writers and Gates A-D)'); process.exit(2); }
+const { cases } = JSON.parse(fs.readFileSync(CASES, 'utf8'));
+const FRESH = path.join(HERE, DIR + 'fresh-cases.json');
+if (!HUNT && !process.env.SEARCH_BENCH_CASES && fs.existsSync(FRESH)) for (const c of JSON.parse(fs.readFileSync(FRESH, 'utf8')).cases) cases.push({ ...c, held: true, set: 'fresh' });
 const { E, initMs, meaning } = await engine();
 const { kjvEncode } = await import(pathToFileURL(path.join(ASSETS, 'src/search/tokenize.js')).href);
 const { excerptLanding } = await import(pathToFileURL(path.join(ASSETS, 'src/utils/excerpt-landing.js')).href);
@@ -54,158 +78,10 @@ const D = await buildDocs('nkjv');
 const B = await buildBlocks();
 const g = /** @type {any} */ (globalThis);
 
-// ── unit tables ──
-const unitBlocks = {};
-for (const b of B) (unitBlocks[b.uk] || (unitBlocks[b.uk] = [])).push(b);
-const unitDoc = {};
-for (const d of D) { const k = unitKey(d); if (!unitDoc[k]) unitDoc[k] = d; }
-const TIER = (uk) => {
-  const col = uk.slice(0, uk.indexOf('/'));
-  if (col === 'bible' || col === 'matthew-study') return 0;
-  if (/^(v[1-7]|timothy|flock|rebuke)$/.test(col)) return 0;
-  if (col === 'wtlb1' || col === 'wtlb2' || col === 'blessed') return 1;
-  if (col === 'holydays') return 2;
-  if (col === 'bible-studies') return 3;
-  return 4; // answers
-};
-const proseKeys = Object.keys(unitBlocks);
-const proseNorm = proseKeys.map((k) => norm(unitBlocks[k].map((b) => b.text).join(' ')));
-/** Units holding the sentence: word for word, or a near copy holding 80% of its word 3-grams (search-plan.md §3). */
-const holders = (sentence) => {
-  const n = norm(sentence); const w = n.trim().split(' ');
-  const grams = []; for (let i = 0; i + 3 <= w.length; i++) grams.push(' ' + w.slice(i, i + 3).join(' ') + ' ');
-  const probes = w.length >= 5 ? [0, (w.length - 5) >> 1, w.length - 5].map((i) => ' ' + w.slice(i, i + 5).join(' ') + ' ') : [n];
-  const out = [];
-  proseNorm.forEach((t, i) => {
-    if (t.includes(n)) { out.push(proseKeys[i]); return; }
-    if (grams.length < 4) return;
-    // ...in one place: the 3-grams around a probe's hit, not anywhere in a long letter ("and follow me" is in most).
-    for (const p of probes) for (let at = t.indexOf(p); at >= 0; at = t.indexOf(p, at + 1)) {
-      const win = t.slice(Math.max(0, at - n.length), at + p.length + n.length);
-      if (grams.filter((g) => win.includes(g)).length >= 0.8 * grams.length) { out.push(proseKeys[i]); return; }
-    }
-  });
-  return out;
-};
-// A prose sentence that quotes Scripture has the verse as its original (a study or Answers line
-// that is Luke 23:15 word for word): verses whose text holds the sentence, or that it holds whole.
-const verseNorm = D.filter((d) => d.kind === 'verse').map((d) => [unitKey(d), norm(d.text)]);
-// ...in the KJV wording too (a study quotes 1 John 5:3 as "His commandments are not grievous").
+// ── the equivalence classes (search-bench/classes.mjs: the rules of §2-3 above, shared with the tri bench's gates) ──
 const KJV = kjvVerses();
-for (const [book, chs] of Object.entries(KJV)) for (const [ch, vs] of Object.entries(chs)) for (const v of vs) verseNorm.push(['bible/' + book + ':' + ch + ':' + v.n, norm(v.text)]);
-for (let i = verseNorm.length - 1; i >= 0; i--) if (verseNorm[i][1].split(' ').length < 8) verseNorm.splice(i, 1);
-// ...with His name restored too: a study quotes Luke 7:9 as "When YahuShua heard these things".
-const named = (t) => t.replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ').replace(/ (?:yahushua|yeshua|yahshua|yahusha|yeshu) /g, ' jesus ');
-// ...or as a near copy, the same 80%-of-3-grams rule as a prose holder, either way round (a study quotes Acts 20:16 as
-// "for he hurried" where the KJV has "for he hasted"; a sentence holds a verse with a word changed). sr11, 2026-10-15.
-const verseWords = verseNorm.map(([, t]) => t.trim().split(' '));
-const verseGrams = new Map();
-verseWords.forEach((w, i) => { for (let j = 0; j + 3 <= w.length; j++) { const g = w[j] + ' ' + w[j + 1] + ' ' + w[j + 2]; const a = verseGrams.get(g); if (!a) verseGrams.set(g, [i]); else if (a[a.length - 1] !== i) a.push(i); } });
-const versesQuoted = (sentence) => {
-  const n = named(norm(sentence));
-  const out = new Set(verseNorm.filter(([, t]) => t.includes(n) || n.includes(t)).map(([k]) => k));
-  const w = n.trim().split(' ');
-  const shared = new Map();
-  for (const g of new Set(w.slice(0, -2).map((x, j) => x + ' ' + w[j + 1] + ' ' + w[j + 2]))) for (const i of verseGrams.get(g) || []) shared.set(i, (shared.get(i) || 0) + 1);
-  for (const [i, k] of shared) if (k >= 4 && (heldShare(w, verseWords[i]) >= 0.8 || heldShare(verseWords[i], w) >= 0.8)) out.add(verseNorm[i][0]);
-  return [...out];
-};
-const titleNorm = {};
-for (const k of proseKeys) { const t = norm(unitBlocks[k][0].title); (titleNorm[t] || (titleNorm[t] = [])).push(k); }
-const matthewTwin = (uk) => {
-  const m = /^(?:bible\/matthew(?:-plain)?|matthew-study\/matthew):(\d+):(\d+)$/.exec(uk);
-  return m ? ['bible/matthew-plain:' + m[1] + ':' + m[2], 'matthew-study/matthew:' + m[1] + ':' + m[2]] : [uk];
-};
-
-// CONTAINMENT (rules.mjs): the texts holding 80% of a whole-text target asked for by its subject. Candidates first: texts holding 80% of its
-// distinct words found in under a tenth of the texts, then the 3-gram window rule on those.
-const proseWords = proseNorm.map((t) => t.trim().split(' '));
-const wordUnits = new Map();
-proseWords.forEach((ws, i) => { for (const x of new Set(ws)) { const a = wordUnits.get(x); if (a) a.push(i); else wordUnits.set(x, [i]); } });
-const containers = (uk) => {
-  const at = proseKeys.indexOf(uk);
-  if (at < 0) return [];
-  const rare = [...new Set(proseWords[at])].filter((x) => wordUnits.get(x).length < proseKeys.length / 10);
-  const n = new Map();
-  for (const x of rare) for (const i of wordUnits.get(x)) if (i !== at) n.set(i, (n.get(i) || 0) + 1);
-  return [...n].filter(([i, k]) => k >= 0.8 * rare.length && heldShare(proseWords[at], proseWords[i]) >= 0.8).map(([i]) => proseKeys[i]);
-};
-/** Texts holding the sentence with a word or two changed (rules.mjs NEAR COPY), looked for at its two rarest words. */
-const nearCopies = (sentence) => {
-  const w = norm(sentence).trim().split(' ');
-  const stop = g.VotSearchData.STOP_WORDS_TRIMMED;
-  const rare = [...new Set(w)].filter((x) => wordUnits.has(x)).sort((a, b) => wordUnits.get(a).length - wordUnits.get(b).length).slice(0, 2);
-  const out = new Set();
-  for (const x of rare) for (const i of wordUnits.get(x)) if (!out.has(proseKeys[i]) && nearCopy(w, proseWords[i], stop, x)) out.add(proseKeys[i]);
-  return out;
-};
-/* AN ANSWERS HEADING OVER ONE CITED EXCERPT (sr11, 2026-10-15). A topic labels a passage it reprints with a heading of
-   its own words ("The Religions of Men Are an Abomination to The Lord" heads three passages of "The Truth Absolute" ~
-   Volume 3), and the citation closing the section names the text it comes from. That text is the heading's original
-   (Corbin, DECISIONS 10-14: the original first, the reprint second). The section runs to the next ✦; one text cited. */
-const CITE_LINE = /^~\s*\[From\s*[“"](.+)[”"]\s*~\s*(.+?)\]\s*$/;
-const CITE_COL = { "the lord's rebuke": 'rebuke', 'words to live by: part one': 'wtlb1', 'words to live by: part two': 'wtlb2',
-  "letters to the lord's little flock": 'flock', 'letters from timothy': 'timothy', 'the blessed': 'blessed' };
-/** The text a heading's section reprints and that section's passages (normalized), or null. */
-function sectionOf(c) {
-  const bl = unitBlocks[c.uk] || [];
-  const at = bl.findIndex((b) => b.idx === c.blockIdx);
-  // a heading: a short block of its own
-  if (at < 0 || c.sentence.length > 160 || bl[at].text.trim() !== c.sentence.trim()) return null;
-  const cites = new Set();
-  const parts = [];
-  for (let i = at + 1; i < bl.length && bl[i].text.trim() !== '✦'; i++) {
-    const m = CITE_LINE.exec(bl[i].text.trim());
-    if (m) cites.add(norm(m[1]) + '|' + m[2].trim().toLowerCase().replace(/[’‘]/g, "'"));
-    else parts.push(bl[i].text);
-  }
-  if (cites.size !== 1) return null;
-  const [t, vol] = [...cites][0].split('|');
-  const v = /^volume (\d)$/.exec(vol);
-  const col = v ? 'v' + v[1] : CITE_COL[vol];
-  const keys = (titleNorm[t] || []).filter((k) => k.startsWith(col + '/'));
-  return keys.length === 1 ? { key: keys[0], text: norm(parts.join(' ')) } : null;
-}
-const isVerseKey = (k) => /^(bible|matthew-study)\//.test(k);
-const isLetterKey = (k) => /^(v[1-7]|timothy|flock|rebuke)\//.test(k);
-
-/** The target's equivalence class, the tier its original sits in, and whether it has one original at all. */
-function classOf(c) {
-  const members = new Set();
-  /** members a heading target names by their own title: opening one is arriving under the heading */
-  const titled = new Set();
-  /** @type {Map<string, string>} the text a heading's section reprints -> the section's passages (sectionOf) */
-  const sectioned = new Map();
-  /** members holding the sentence with a word or two changed: they answer it, and are no original of it */
-  const near = new Set();
-  if (c.level === 'verse') {
-    for (const k of matthewTwin(c.uk)) members.add(k);
-    return { members, titled, sectioned, near, best: 0, recurring: false };
-  }
-  if (c.level === 'unit') {
-    members.add(c.uk);
-    for (const k of titleNorm[norm(c.title)] || []) members.add(k);
-    // ...by its subject, any copy of it answers; a title names its own text (same-titled reprints above)
-    if (c.style === 'unitgist') for (const k of containers(c.uk)) members.add(k);
-  } else {
-    for (const k of holders(c.sentence)) members.add(k);
-    for (const k of nearCopies(c.sentence)) if (!members.has(k)) { members.add(k); near.add(k); }
-    if (c.level === 'sentence') for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
-    // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
-    const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());
-    if (cited) for (const k of titleNorm[norm(cited[1])] || []) members.add(k);
-    // So does a heading that is a text's own title, with or without a note after it ("Stop Lying to Your Children
-    // (Regarding Santa, the Easter Bunny...)" heads the Words To Live By entry the topic reprints under it).
-    const head = norm(c.sentence.trim().replace(/\s*\([^()]*\)$/, ''));
-    if (head.trim().split(' ').length >= 3) for (const k of titleNorm[head] || []) if (k !== c.uk) { members.add(k); titled.add(k); }
-    // And a heading over one cited excerpt has the text it cites.
-    const sec = c.col === 'answers' ? sectionOf(c) : null;
-    if (sec && sec.key !== c.uk) { members.add(sec.key); sectioned.set(sec.key, sec.text); }
-    members.add(c.uk);
-  }
-  // The text a heading's section cites answers it as well, but does not outrank the heading: its words are the topic's own.
-  return { members, titled, sectioned, near, best: Math.min(...[...members].filter((k) => !sectioned.has(k) && !near.has(k)).map(TIER)), recurring: recurring(members, isVerseKey, isLetterKey) };
-}
+const K = makeClasses({ D, B, KJV });
+const { unitBlocks, TIER, proseKeys, proseNorm, holders, matthewTwin, classOf } = K;
 
 /* FAIR TO ASK? (path to 500, step 3, 2026-10-05). `--audit <out.json>`: for every case, the texts outside its
    equivalence class that hold the typed words word for word (prose units, and every verse in the NKJV and the KJV).
@@ -253,8 +129,8 @@ const cardPasses = (f, c) => {
   if (f.card === 'bible' && c.level === 'verse') {
     const p = f.p;
     const book = p.bookId === 'matthew-plain' ? 'matthew' : p.bookId;
-    if (book !== c.bookId || c.chapter < p.chapter || c.chapter > (p.chapterEnd || p.chapter)) return false;
-    return !p.verseStart || (c.verse >= p.verseStart && c.verse <= (p.verseEnd || p.verseStart));
+    // the card's range holds the verse (or either verse of a merged pair, tri)
+    return book === c.bookId && pairHolds(p, c);
   }
   if (f.card === 'letter' && c.level === 'unit') {
     const L = (g[(g.VotSearchData.VOLUME_COLLECTIONS.find((v) => v.id === c.col) || {}).dataVar] || []).find((l) => l.id === c.unit);
@@ -301,14 +177,48 @@ function lands(hit, terms, c, section = '') {
   return false;
 }
 
+/** A hunt case's scoped run (`o`: the search's corpus and scope): the class cut to the texts it shows (engine.js inScope),
+    and the tier to beat recomputed (an in-scope reprint is the scope's best when its original is hidden). Null: none shown. */
+function scoped(cls, o) {
+  const s = o.scope || {};
+  const shown = (k) => { const d = K.unitDoc[k] || matthewTwin(k).map((t) => K.unitDoc[t]).find(Boolean);
+    return !d || ((!o.corpus || o.corpus === 'all' || d.corpus === o.corpus) && (!s.bookId || d.bookId === s.bookId) && (!s.volumeId || d.volumeId === s.volumeId)); };
+  const members = new Set([...cls.members].filter(shown));
+  if (!members.size) return null;
+  const pool = [...members].filter((k) => !cls.sectioned.has(k) && !cls.near.has(k));
+  return { ...cls, members, best: Math.min(...(pool.length ? pool : [...members]).map(TIER)) };
+}
+
 // ── run ──
 const out = [];
 const times = [];
 for (const c of cases) {
-  const ts = Date.now();
-  const r = await E.search(c.q, { limit: 6000, perVolume: 400 });
-  times.push(Date.now() - ts);
-  const cls = classOf(c);
+  const clsAll = classOf(c);
+  /** @type {any} */ let o = null;
+  let pass = true; let strict = true; let why = '';
+  // every run of the case. A hunt scoped case asks its scopes (one run per mode, all must pass): its unscoped run gives
+  // the ranks only, as the hunt scored it (scoped-r2/run-scoped.mjs), since the scope is what picks its target.
+  const modes = (HUNT && c.modes) || null;
+  for (const mode of modes || [{}]) {
+    const scope = Object.keys(mode).length > 0;
+    const cls = scope ? scoped(clsAll, mode) : clsAll;
+    if (!cls) continue;
+    const ts = Date.now();
+    const r = await E.search(c.q, { limit: 6000, perVolume: 400, ...mode });
+    times.push(Date.now() - ts);
+    const v = judge(c, r, cls);
+    o = o || v;
+    if (modes && !scope) continue;
+    pass = pass && v.pass; strict = strict && v.strict;
+    why = why || (v.why && v.why + (scope ? ' (' + JSON.stringify(mode) + ')' : ''));
+  }
+  if (!o) { o = { rank: null, next: null, ms: 0 }; pass = strict = false; why = 'no run shows the target'; }
+  o = { ...o, pass, strict, why };
+  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', next: o.next, members: clsAll.members.size, recurring: clsAll.recurring, group: c.group, col: c.col, style: c.style, tier: c.tier, form: c.form, ...(HUNT ? { family: c.family, verdict: c.verdict } : {}), q: c.set === 'fresh' || (TRI && c.held) ? undefined : c.q, pass: o.pass, strict: o.strict, rank: o.rank, top5: !!o.rank && o.rank <= 5, found: !!o.rank, why: o.why, ms: o.ms });
+}
+
+/** One search's verdict for case `c` against its class `cls` (the pass rule of §1-4 above). */
+function judge(c, r, cls) {
   const res = r.results || [];
   const ranks = [];
   res.forEach((h, i) => { if (ranks.length < 1 && cls.members.has(unitKey(h.doc))) ranks.push(i + 1); });
@@ -321,16 +231,21 @@ for (const c of cases) {
     const k = unitKey(f.hit.doc);
     const card = (d) => (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
     const twin = (a, b) => matthewTwin(a).includes(b);
-    if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
-    else if (!cls.recurring && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
+    // NAMED COLLECTION (rules.mjs, errata 2026-10-18): the target's own unit leads a query naming its collection
+    const own = matthewTwin(c.uk).includes(k) || k === c.uk;
+    const named = own && namesCollection(norm(c.q), norm([((unitBlocks[c.uk] || [])[0] || {}).title, c.title, c.sentence].filter(Boolean).join(' ')), c.uk.slice(0, c.uk.indexOf('/')));
+    // a hunt case's alt: texts as right as the target (its family's NOTES.md says why); one leading passes
+    if (HUNT && (c.alt || []).some((a) => a === k || matthewTwin(a).includes(k))) pass = true;
+    else if (!cls.members.has(k)) why = 'first hit is not the target (' + (f.hit.doc.ref || k) + ')';
+    else if (!cls.recurring && !named && TIER(k) > cls.best) why = 'a reprint leads the original (' + (f.hit.doc.ref || k) + ')';
     // A heading's own text has no heading line: the heading is its title, on the card and atop the page (sr11, t405).
     else if (c.level === 'sentence' && !cls.titled.has(k) && !lands(f.hit, cardTerms(r), c, cls.sectioned.get(k))) why = 'lands off the sentence';
-    else if (!cls.recurring && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.sectioned.has(k) || cls.near.has(k) ? cls.members : new Set([...cls.members].filter((x) => !cls.sectioned.has(x) && !cls.near.has(x))), k, twin)) why = 'its reprint is not in the Best Matches';
-    else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk; }
+    else if (!cls.recurring && !named && !reprintShown(res.map((h) => ({ key: unitKey(h.doc), card: card(h.doc) })), cls.sectioned.has(k) || cls.near.has(k) ? cls.members : new Set([...cls.members].filter((x) => !cls.sectioned.has(x) && !cls.near.has(x))), k, twin)) why = 'its reprint is not in the Best Matches';
+    else { pass = true; strict = matthewTwin(c.uk).includes(k) || k === c.uk || (!!c.uk2 && (matthewTwin(c.uk2).includes(k) || k === c.uk2)); }
   }
   // the rank of the class's next text after the first hit (its reprint, when the original leads)
   const next = f && f.hit ? (res.findIndex((h, i) => i > 0 && cls.members.has(unitKey(h.doc)) && !matthewTwin(unitKey(h.doc)).includes(unitKey(f.hit.doc))) + 1) || null : null;
-  out.push({ id: c.id, held: !!c.held, set: c.set || 'bench', next, members: cls.members.size, recurring: cls.recurring, group: c.group, col: c.col, style: c.style, q: c.set === 'fresh' ? undefined : c.q, pass, strict, rank, top5: !!rank && rank <= 5, found: !!rank, why, ms: times[times.length - 1] });
+  return { pass, strict, rank, why, next, ms: times[times.length - 1] };
 }
 
 // ── report ──
@@ -342,6 +257,8 @@ const all = sum(bench);
 const sorted = times.slice().sort((a, b) => a - b);
 const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
 const fmt = (s) => `${s.pass}/${s.n} pass  (strict ${s.strict}, top5 ${s.top5}, found ${s.found})`;
+if (TRI) triReport();
+if (HUNT) huntReport();
 console.log(`search-bench: ${fmt(all)}`);
 console.log(`  open ${fmt(sum(bench.filter((o) => !o.held)))}`);
 console.log(`  held ${fmt(sum(bench.filter((o) => o.held)))}`);
@@ -368,4 +285,83 @@ if (fs.existsSync(BASELINE)) {
   for (const sec of ['style', 'group']) for (const [k, n] of Object.entries(floor[sec] || {})) if ((score[sec][k] || 0) < n) drops.push(`${sec} ${k} ${score[sec][k] || 0} < ${n}`);
   if (drops.length) { console.error('search-bench FAILED: ' + drops.join('; ')); process.exit(1); }
   console.log(`floor held (pass ${floor.pass})${score.pass > floor.pass ? `; raised by ${score.pass - floor.pass}: run with --record to keep it` : ''}`);
+}
+
+/** The tri report (PLAN 1.6): open, held and fresh on one line, then style x tier, style x collection group, the
+    open failures by id and form, and (--show-sealed-ids only) the sealed failures by id. Floors in tri/baseline.json. */
+function triReport() {
+  const TIERS = ['easy', 'medium', 'hard'];
+  const open = out.filter((o) => !o.held);
+  const held = out.filter((o) => o.held && o.set !== 'fresh');
+  const sealedFresh = out.filter((o) => o.set === 'fresh');
+  const so = sum(open); const sh = sum(held); const sf = sum(sealedFresh);
+  console.log(`tri open ${so.pass}/${so.n} (strict ${so.strict}, top5 ${so.top5}, found ${so.found}) · held ${sh.pass}/${sh.n} · fresh ${sealedFresh.length ? sf.pass + '/' + sf.n : '-'} · median ${pct(0.5)}/p95 ${pct(0.95)} ms`);
+  console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}; init ${initMs} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  const styles = [...new Set(out.map((o) => o.style))].sort();
+  const cell = (rows) => { const s = sum(rows); return s.n ? `${s.pass}/${s.n}` : '-'; };
+  const row = (label, o, h, f) => { const s = sum(o); console.log('  ' + label.padEnd(22) + `${s.pass}/${s.n}`.padStart(8) + String(s.strict).padStart(8) + String(s.top5).padStart(6) + String(s.found).padStart(7) + cell(h).padStart(9) + cell(f).padStart(8)); };
+  const head = (t) => console.log(t.padEnd(24) + 'open'.padStart(8) + 'strict'.padStart(8) + 'top5'.padStart(6) + 'found'.padStart(7) + 'held'.padStart(9) + 'fresh'.padStart(8));
+  head('by style x tier');
+  for (const st of styles) for (const t of TIERS) { const f = (o) => o.style === st && o.tier === t; row(st + '/' + t, open.filter(f), held.filter(f), sealedFresh.filter(f)); }
+  head('by style x group');
+  for (const st of styles) for (const gr of [...new Set(out.filter((o) => o.style === st).map((o) => o.group))].sort()) { const f = (o) => o.style === st && o.group === gr; row(st + '/' + gr, open.filter(f), held.filter(f), sealedFresh.filter(f)); }
+  // sanity (PLAN 1.7 step 6): does the pass rate fall from easy to hard? Printed, never used to re-tier.
+  const rate = (st, t) => { const s = sum(open.filter((o) => o.style === st && o.tier === t)); return s.n ? Math.round((100 * s.pass) / s.n) : null; };
+  console.log('sanity (open pass %, easy/medium/hard): ' + styles.map((st) => { const r = TIERS.map((t) => rate(st, t)); return `${st} ${r.map((x) => (x == null ? '-' : x)).join('/')}${r[0] >= r[1] && r[1] >= r[2] ? '' : ' (not falling)'}`; }).join('; '));
+  if (!flag('--quiet')) {
+    console.log('failures (open cases only):');
+    for (const o of open.filter((x) => !x.pass)) console.log(`  ${o.id} [${o.style}/${o.tier}/${o.form}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
+    const ids = (rows) => rows.filter((x) => !x.pass).map((x) => x.id).sort().join(' ') || '-';
+    // the sealed ids only on request (search200 fix2): a builder reading this report never sees which unseen cases fail
+    if (flag('--show-sealed-ids')) console.log('sealed failures (ids only): held ' + ids(held) + '; fresh ' + ids(sealedFresh));
+  }
+  if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
+  const styleTier = {};
+  for (const st of styles) for (const t of TIERS) { const s = sum(open.filter((o) => o.style === st && o.tier === t)); if (s.n) styleTier[st + '/' + t] = s.pass; }
+  const score = { open: so.pass, strict: so.strict, top5: so.top5, found: so.found, held: sh.pass, ...(sealedFresh.length ? { fresh: sf.pass } : {}), styleTier };
+  if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the tri floor:', BASELINE); process.exit(0); }
+  if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
+  if (fs.existsSync(BASELINE)) {
+    const floor = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+    const drops = [];
+    for (const k of ['open', 'held']) if (floor[k] != null && score[k] < floor[k]) drops.push(`${k} ${score[k]} < floor ${floor[k]}`);
+    if (floor.fresh != null && sealedFresh.length && score.fresh < floor.fresh) drops.push(`fresh ${score.fresh} < floor ${floor.fresh}`);
+    for (const [k, n] of Object.entries(floor.styleTier || {})) if ((score.styleTier[k] || 0) < n) drops.push(`${k} ${score.styleTier[k] || 0} < ${n}`);
+    if (drops.length) { console.error('search-bench tri FAILED: ' + drops.join('; ')); process.exit(1); }
+    console.log(`tri floor held (open ${floor.open}, held ${floor.held}${floor.fresh != null ? ', fresh ' + floor.fresh : ''})${score.open > floor.open ? `; open raised by ${score.open - floor.open}: run with --record to keep it` : ''}`);
+  }
+  process.exit(0);
+}
+
+/** The hunt report (search200 fix1): every case open; by family, with how many of the judges' confirmed and disputed
+    faults and of the hunt's own passes pass now; the failures by id. Floors in hunt/baseline.json: the pass count and
+    each family's. */
+function huntReport() {
+  const s = sum(out);
+  console.log(`hunt ${s.pass}/${s.n} (strict ${s.strict}, top5 ${s.top5}, found ${s.found}) · median ${pct(0.5)}/p95 ${pct(0.95)} ms`);
+  console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}; init ${initMs} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
+  const cell = (rows) => { const t = sum(rows); return t.n ? `${t.pass}/${t.n}` : '-'; };
+  const row = (label, rows) => { const t = sum(rows); console.log('  ' + label.padEnd(14) + `${t.pass}/${t.n}`.padStart(9) + String(t.strict).padStart(8) + String(t.top5).padStart(6) + String(t.found).padStart(7) +
+    ['confirmed', 'disputed', 'pass'].map((v) => cell(rows.filter((o) => o.verdict === v)).padStart(11)).join('')); };
+  console.log('by family'.padEnd(16) + 'pass'.padStart(9) + 'strict'.padStart(8) + 'top5'.padStart(6) + 'found'.padStart(7) + 'confirmed'.padStart(11) + 'disputed'.padStart(11) + 'hunt pass'.padStart(11));
+  const fams = [...new Set(out.map((o) => o.family))].sort();
+  for (const fm of fams) row(fm, out.filter((o) => o.family === fm));
+  row('all', out);
+  if (!flag('--quiet')) {
+    console.log('failures:');
+    for (const o of out.filter((x) => !x.pass)) console.log(`  ${o.id} [${o.family}/${o.verdict}/${o.style}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
+  }
+  if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
+  const score = { pass: s.pass, strict: s.strict, top5: s.top5, found: s.found, family: Object.fromEntries(fams.map((fm) => [fm, sum(out.filter((o) => o.family === fm)).pass])) };
+  if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the hunt floor:', BASELINE); process.exit(0); }
+  if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
+  if (fs.existsSync(BASELINE)) {
+    const floor = JSON.parse(fs.readFileSync(BASELINE, 'utf8'));
+    const drops = [];
+    if (score.pass < floor.pass) drops.push(`pass ${score.pass} < floor ${floor.pass}`);
+    for (const [k, n] of Object.entries(floor.family || {})) if ((score.family[k] || 0) < n) drops.push(`${k} ${score.family[k] || 0} < ${n}`);
+    if (drops.length) { console.error('search-bench hunt FAILED: ' + drops.join('; ')); process.exit(1); }
+    console.log(`hunt floor held (pass ${floor.pass})${score.pass > floor.pass ? `; raised by ${score.pass - floor.pass}: run with --record to keep it` : ''}`);
+  }
+  process.exit(0);
 }

@@ -132,6 +132,11 @@ setup effect.
 - **Cleanup:** none — the next build overwrites it
 - **Consumers:** `ui/components/LetterSongs.jsx` (a letter page's SONGS FROM THIS LETTER card opens a song or the letter's verbatim songs, the `sung:<key>` list; Back returns to that letter, the back pill naming it); `ui/screens/SettingsScreen.jsx` (K1: Listening → "Songs kept on this phone · Manage ›" opens the Kept list; Back returns to Settings); `ui/components/SongDeskParts.jsx` (K2: the desk's song title and "Song page ›" open the playing song's page); `utils/audio-player.js` (K3: the offline "This song isn't on this phone" toast's "Kept songs ›" opens the Kept list)
 
+### `__openScriptureWeb`
+- **Setter:** `ui/screen-routes.jsx` (`buildScreenRoutes`, reassigned every build like `__openSongs`: `(start, opts) => boolean`). `start` is the Scripture Web's start prop (CONTRACTS.md section 8 of the w3 rebuild: `{ verse: { bookId, chapter, verse } }`, `{ book, chapter? }`, `{ letterKey }`), or `'this-letter'` for the page's own letter, entry or study chapter (`activeVolKey/activeLetter.id`, or `study:<studyId>/<studyChapterId>`; none on Hidden Manna). It writes the navHandoff slot `webStart`, makes the page the navOrigin (chaining the one there), and opens `scripture-web`; the web's route hands `webStart` to the screen as `start` while the web is up, and every build on another screen clears it, so the web opened later from the Library opens where it was. `opts.check` answers whether there is a door here without going. Returns false when there is nothing to open, and for a letter while the web's panel has no letter mode (`ui/scripture-web/use-web-selection.js` `PANEL_MODES.letter`, false until the panel stream lands it), so the letter door stays hidden rather than open the web at its old place
+- **Cleanup:** none — the next build overwrites it
+- **Consumers:** `ui/sheets/SelectionToolbar.jsx` (the "Scripture Web" action: "Show in Scripture Web" on a Bible verse selection, "See this letter's scriptures" on a letter, entry or study chapter); `ui/components/FootnoteSheet.jsx` (a scripture footnote's "Show in Scripture Web", its reference read by `utils/scripture-web/ref-parse.js` `webStartOfRef`)
+
 ---
 
 ## 4. Reading-state bridges
@@ -290,7 +295,8 @@ lifetime rule as §8.
 
 - `__votCorpus` / `__loadVotCorpus` — `index.html:268-269`. Consumers:
   `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,
-  `progress-stats.js`, `search/engine.js` (init loads every corpus before it builds the index), and
+  `progress-stats.js`, `search/engine.js` (init loads every corpus before it builds the index),
+  `scripture-web/use-personal-web.js` (My Web rebuilds its Volumes rail on the version), and
   every VOT-rendering `*Home.jsx`/`*Screen.jsx`.
 - `__matthewCorpus` / `__loadMatthewCorpus` — `index.html:265-266`. Consumers:
   `screen-routes.jsx`, `use-navigate-to-link.js`, `use-surprise.js`,

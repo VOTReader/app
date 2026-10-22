@@ -108,10 +108,13 @@ describe('foot bundles: what the law hides at each cell, counted once per foot',
   });
 });
 
-describe('a chosen group is drawn and spotlit by a pair of ranges, in the shader and the picker', () => {
-  it('the shader carries the second range and lights a thread only with a foot in each', () => {
-    expect(SHADER_SOURCE.vertex).toMatch(/uniform vec2\s+uFocusRange2/);
-    expect(SHADER_SOURCE.vertex).toMatch(/uFocusRange2\.x <= uFocusRange2\.y/);
+/* The pair of ranges went in w5: nothing chose a group once the bundle sheet's group choosing
+   went (panel stream, 2e4164c40), so the shader's second range was always empty. */
+describe('a chosen range is one range, in the shader and the picker (the group pair is retired)', () => {
+  it('the shader carries no second range', () => {
+    expect(SHADER_SOURCE.vertex).not.toMatch(/uFocusRange2/);
+    expect(SHADER_SOURCE.fragment).not.toMatch(/uFocusRange2/);
+    expect(SHADER_SOURCE.vertex).toMatch(/uniform vec2\s+uFocusRange;/);
   });
 
 });

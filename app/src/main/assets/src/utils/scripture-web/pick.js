@@ -15,19 +15,29 @@
    shader draws with. There are THREE of them, and geometry.js owns all.
    Height (geometry.arcShape, the half-ellipse of a thread's own span, its
    feet at geometry.footX) — or arcs become untappable exactly where they
-   look tappable. Visibility (geometry.arcAnchored + flyOverDim) — or
-   the reverse: at full localize an arc with neither foot near the viewport
-   paints alpha 0, and picking it silently focuses a line nobody can see.
-   Nothing is hidden (the structure law, 2026-09-21): every thread crossing
+   look tappable. A fly-over (geometry.arcAnchored + flyOverWidth) only
+   thins, its alpha unchanged, so no thread the shader draws is refused a
+   tap for it. Nothing is hidden (the structure law, 2026-09-21): every thread crossing
    the frame is drawn and pickable, so there is no third law. Visible equals
-   pickable, in both directions.
+   pickable, in both directions: the picker, the label pass and the pills
+   read the frame's visible set (frame-set.frameSet, E1), the set the
+   renderer draws, so a thread whose body never reaches the frame is
+   neither drawn nor tapped, labelled or counted.
+
+   One exception, and it is the reader's own choice (A1, w2 digest item 7):
+   while a thread or a range is chosen, the rest recede to the tap context
+   and step back as targets too (focusedPickFilter). A tap beside the chosen
+   line then lands on what reads as empty sky, and empty sky clears the
+   choice; once it clears, every thread is a target again.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  arcAnchored, arcDistance, arcShape, arcHeightAt, flyOverDim, verseToX, xToVerse, footX,
-  FLYOVER_MARGIN, LOCALIZE_START, skyLocalize,
+  arcAnchored, arcDistance, arcShape, arcHeightAt, verseToX, xToVerse, footX,
+  FLYOVER_MARGIN, LOCALIZE_START,
 } from './geometry.js';
 import { bucketDrawCount, fansOf } from './decode.js';
+import { walkDrawnRuns } from './chunk-walk.js';
+import { prophecySet, frameSet, inFrame, drawOrder } from './frame-set.js';
 
 /**
  * Nearest arc to a screen point.
@@ -46,15 +56,55 @@ export function pickArc(g, cam, view, px, py, tol) {
   return pickArcs(g, cam, view, px, py, tol, 1)[0] || null;
 }
 
+/** The lit sets already turned into lookups, by the (never mutated) array focus-state hands over. */
+const LIT_SETS = new WeakMap();
+function litSetOf(lit) {
+  if (!lit || !lit.length) return null;
+  let set = LIT_SETS.get(lit);
+  if (!set) { set = new Set(lit); LIT_SETS.set(lit, set); }
+  return set;
+}
+
+/**
+ * Which threads are targets while something is chosen (A1): the ones the shader keeps lit
+ * (web-renderer.js, its focus rule) - the chosen thread; a thread with a foot in the chosen range;
+ * and a thread in the lit set (go-to's fan, verse mode). Null when nothing is chosen (no focusArc, no focusProphecy, no focusRange): then every
+ * thread is a target. A chosen prophecy pair recedes the rest as an arc does (the shader's
+ * `chosen` counts it), so it filters too: its own OpenBible arc, when it is one (`g` names it), is
+ * the chosen thread. `index` -1 is a prophecy pair that is no arc (pickProphecy): only the range
+ * law can keep it.
+ * @param {{ focusArc?: number, focusProphecy?: number, focusRange?: (number[]|null),
+ *   lit?: (ArrayLike<number>|null) }} view
+ * @param {any} [g]  the decoded graph, for a chosen prophecy pair's arc
+ * @returns {((index: number, from: number, to: number) => boolean) | null}
+ */
+export function focusedPickFilter(view, g) {
+  const arc = view.focusArc != null ? view.focusArc : -1;
+  const pair = view.focusProphecy != null ? view.focusProphecy : -1;
+  const r = view.focusRange && view.focusRange[0] <= view.focusRange[1] ? view.focusRange : null;
+  if (arc < 0 && pair < 0 && !r) return null;
+  const lit = litSetOf(view.lit);
+  const ps = pair >= 0 && g ? prophecySet(g) : null;
+  const pairArc = ps && pair < ps.count ? ps.arcOf[pair] : -1;
+  return (i, from, to) => {
+    if (i >= 0 && (i === arc || i === pairArc)) return true;
+    if (i >= 0 && lit && lit.has(i)) return true;
+    if (!r) return false;
+    return (from >= r[0] && from <= r[1]) || (to >= r[0] && to <= r[1]);
+  };
+}
+
 /**
  * Nearest arcs to a screen point, retaining a small candidate set so dense
  * crossings can be disambiguated instead of silently choosing one line.
+ * While something is chosen only the lit threads are candidates (focusedPickFilter).
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {{width:number, base:number, ceil:number, squash:number,
  *   localize:number, density:import('./decode.js').Density,
- *   focusArc?:number, focusRange?:(number[]|null)}} view
+ *   focusArc?:number, focusRange?:(number[]|null),
+ *   lit?:(ArrayLike<number>|null)}} view
  * @param {number} px
  * @param {number} py
  * @param {number} tol
@@ -62,7 +112,7 @@ export function pickArc(g, cam, view, px, py, tol) {
  * @returns {Array<{ index:number, distance:number, from:number, to:number, votes:number }>}
  */
 export function pickArcs(g, cam, view, px, py, tol, limit) {
-  const { width, squash, localize, density } = view;
+  const { width, squash, density } = view;
   // The baseline as DRAWN: the camera's y shifts the whole picture down the
   // frame, so the curve the finger meets stands cam.y below the frame's base.
   const base = view.base + (cam.y > 0 ? cam.y : 0);
@@ -73,29 +123,24 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const verseAtPoint = xToVerse(cam, width, px);
   // a verse of slack for the chunk cull: a foot stands anywhere in its verse's cell (footX)
   const verseTolerance = tol / ppv + 1;
+  const chunkSize = g.chunkSize || 256;
+  const lo = verseAtPoint - verseTolerance, hi = verseAtPoint + verseTolerance;
+  // the frame's visible set (E1): a thread the renderer did not draw is not there to tap
+  const set = frameSet(g, cam, view);
+  const target = focusedPickFilter(view, g);
 
   for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkSize = g.chunkSize || 256;
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < verseAtPoint - verseTolerance || ext[0] > verseAtPoint + verseTolerance)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
+    walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
+        if (!inFrame(set, i)) continue;
+        if (target && !target(i, g.from[i], g.to[i])) continue;
         // the feet as drawn: in their verses' cells, by rank (geometry.footX)
         const x0 = footX(cam, width, g.from[i], fanA[i]);
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         // Cheap x-range reject before any ellipse maths.
         if (x1 < px - tol || x0 > px + tol) continue;
-        // Pickable iff painted. `width` is device px — the shader's uRes.x
-        // frame — so this is the fly-over fade the GPU applies, evaluated
-        // exactly. Only a full zero is skipped: an arc still showing the
-        // partial fly-over floor is dim, but it is there to be tapped.
-        const anchored = arcAnchored(x0, x1, width);
-        if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
+        // Pickable iff painted: a fly-over draws thinner, never fainter
+        // (geometry.flyOverWidth), so it is there to be tapped.
         // the curve as the shader draws it: the half-ellipse of its own span
         const { A } = arcShape((x1 - x0) * 0.5, squash);
         const d = arcDistance(px, py, x0, x1, base, A, tol);
@@ -107,54 +152,209 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
         });
         if (best.length > cap) best.pop();
       }
-    }
+    });
   }
   return best;
 }
 
 /**
- * The drawn threads whose span crosses the frame, in draw order: the set a
- * label pass walks (Corbin's brief, 2026-09-11: "when zoomed close, each
- * line shows its source and target beside it"). The same loop as pickArcs
- * without the distance test — the density prefix, the chunk extents and the
- * fly-over law — so a label is written for a line the reader can see and
- * never for one the shader skipped.
+ * The prophecy class under a point (GL item 4): every g.prophecy pair is
+ * drawn, always, at every density, by the top pass (web-renderer.js) on the
+ * feet frame-set.prophecySet gives it, so it is pickable on the same curve.
+ * A hit names the pair (`prophecy`, an index into g.prophecy) and the
+ * OpenBible arc that joins the same verses (`index`, or -1 when none: 107 of
+ * the asset's 132 pairs). Nearest first. While a line is chosen the class
+ * recedes with the rest (frame-set.topSet) and steps back as targets too
+ * (A1): only the chosen pair, a pair whose arc is a target
+ * (focusedPickFilter) and the pairs the chosen range keeps lit are found.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
- * @param {{width:number, localize:number, density:import('./decode.js').Density, ceil?:number}} view
+ * @param {{width:number, base:number, squash:number, focusArc?:number, focusProphecy?:number,
+ *   focusRange?:(number[]|null), lit?:(ArrayLike<number>|null)}} view
+ * @param {number} px @param {number} py
+ * @param {number} tol  device px
+ * @param {number} [limit]
+ * @returns {Array<{ prophecy:number, index:number, distance:number, from:number, to:number, votes:number }>}
+ */
+export function pickProphecy(g, cam, view, px, py, tol, limit) {
+  const ps = prophecySet(g);
+  if (!ps.count) return [];
+  const { width, squash } = view;
+  const base = view.base + (cam.y > 0 ? cam.y : 0);
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const best = [];
+  const target = focusedPickFilter(view, g);
+  const chosen = view.focusProphecy != null ? view.focusProphecy : -1;
+  for (let k = 0; k < ps.count; k++) {
+    if (ps.twin[k] !== k) continue;   // a pair given twice is one thread, found as the first
+    if (target && k !== chosen && !target(ps.arcOf[k], ps.from[k], ps.to[k])) continue;
+    const x0 = footX(cam, width, ps.from[k], ps.fanA[k]);
+    const x1 = footX(cam, width, ps.to[k], ps.fanB[k]);
+    if (x1 < px - tol || x0 > px + tol) continue;
+    const { A } = arcShape((x1 - x0) * 0.5, squash);
+    const d = arcDistance(px, py, x0, x1, base, A, tol);
+    if (d >= tol || (best.length === cap && d >= best[best.length - 1].distance)) continue;
+    let at = best.length;
+    while (at > 0 && best[at - 1].distance > d) at--;
+    const i = ps.arcOf[k];
+    best.splice(at, 0, { prophecy: k, index: i, distance: d, from: ps.from[k], to: ps.to[k], votes: i >= 0 ? g.votes[i] : 0 });
+    if (best.length > cap) best.pop();
+  }
+  return best;
+}
+
+/**
+ * The threads under a point, the tap's and the hover's candidate set: the
+ * drawn arcs (pickArcs), an arc that is a prophecy pair flagged with it
+ * (`prophecy`, its index in g.prophecy; -1 otherwise), and the prophecy pairs
+ * the arcs did not bring (no arc, or one outside the density) as threads of
+ * their own. Nearest first, at most `limit`.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, ceil:number, squash:number,
+ *   localize:number, density:import('./decode.js').Density}} view
+ * @param {number} px @param {number} py
+ * @param {number} tol  device px
+ * @param {number} [limit]
+ * @returns {Array<{ index:number, prophecy:number, distance:number, from:number, to:number, votes:number }>}
+ */
+export function pickThreads(g, cam, view, px, py, tol, limit) {
+  // the ruler band is the ruler's: the renderer scissors every thread pass at
+  // the ruler's top (view.base, whatever cam.y), so a line sunk through it by
+  // a camera looking up is not drawn there and is not picked there either
+  if (py > view.base + tol) return [];
+  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const ps = prophecySet(g);
+  const hits = pickArcs(g, cam, view, px, py, tol, cap).map((h) => {
+    const k = ps.pairOf.get(h.index);
+    return Object.assign(h, { prophecy: k === undefined ? -1 : k });
+  });
+  for (const p of pickProphecy(g, cam, view, px, py, tol, cap)) {
+    if (!hits.some((h) => h.prophecy === p.prophecy || (p.index >= 0 && h.index === p.index))) hits.push(p);
+  }
+  hits.sort((a, b) => a.distance - b.distance);
+  return hits.slice(0, cap);
+}
+
+/**
+ * The drawn threads, in draw order: the set a label pass walks (Corbin's
+ * brief, 2026-09-11: "when zoomed close, each line shows its source and
+ * target beside it"). It IS the frame's visible set (frame-set.frameSet,
+ * the renderer's), widest first, so a label is written for a line the
+ * reader can see and never for one the shader skipped.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, dpr?:number}} view
  * @param {number} limit — at most this many, so a dense screen bounds its own pass
  * @returns {number[]} instance indices
  */
 export function visibleArcs(g, cam, view, limit) {
-  const { width, localize, density } = view;
-  const { fanA, fanB } = fansOf(g);
-  // a verse of slack each side: a foot stands anywhere in its verse's cell (footX)
-  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
+  const set = frameSet(g, cam, view);
+  const n = set.count < limit ? set.count : Math.max(0, Math.floor(limit));
+  const out = new Array(n);
+  for (let k = 0; k < n; k++) out[k] = set.list[k];
+  return out;
+}
+
+/**
+ * @typedef {{ i:number, x0:number, x1:number, A:number, fromOn:boolean, toOn:boolean, anchored:boolean }} FeedThread
+ *   i: the instance; x0, x1: its feet as drawn (footX), device px; A: its apex
+ *   height (arcShape); fromOn / toOn: that foot stands on the frame (0..width);
+ *   anchored: the shader's word (arcAnchored, a foot within the margin)
+ */
+
+/**
+ * The label pass's feed for one frame (digest C2: "a label engine fed from
+ * the visible list"): every drawn thread a reader can see on this frame, in
+ * draw order, each with its feet and apex so the labeller ranks and places
+ * without walking the curve again. Seen means some point of its drawn body
+ * is in the sky - x in [0, width], y between the sky's top (view.inset) and
+ * the baseline - which the half-ellipse answers in closed form: over the
+ * frame's x range the height runs from its lower end to the apex (or the
+ * higher end, when the apex is off the frame), and that range must meet
+ * [camY, base + camY - inset]. A foot on the frame at camY 0 is always seen.
+ *
+ * This replaces walking visibleArcs for labels: that list is the CROSSING
+ * set in bucket order, cut at a limit, so at the ceiling the label pass
+ * stopped among fly-overs whose bodies were in the sky far above the frame
+ * and labelled 22 of the 86 threads on screen (digest item 3). Here nothing
+ * is cut by order: fly-overs (both feet off the frame) come only when asked
+ * for, and only those whose bodies are in the frame.
+ *
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, inset?:number}} view
+ * @param {{ flyovers?: boolean, limit?: number }} [opts]  flyovers: include threads with
+ *   neither foot on the frame; limit: a safety cap (default 50,000)
+ * @returns {FeedThread[]}
+ */
+export function labelFeed(g, cam, view, opts) {
+  /** @type {FeedThread[]} */
   const out = [];
+  const width = view.width;
+  eachLabelThread(g, cam, view, opts, (i, x0, x1, A, fromOn, toOn) => {
+    out.push({ i, x0, x1, A, fromOn, toOn, anchored: arcAnchored(x0, x1, width) === 1 });
+  });
+  return out;
+}
+
+/**
+ * labelFeed's walk without the list: `visit(i, x0, x1, A, fromOn, toOn)` for
+ * every thread labelFeed would hold, in the same order, with nothing made
+ * per thread. The overlay's chip pass ranks every foot on the frame this way
+ * (some 17,000 threads at 6x) and keeps the few dozen that can win, so the
+ * thousands that cannot cost no object. Returns how many it visited.
+ * @param {import('./decode.js').ScriptureGraph} g
+ * @param {{x:number, y?:number, ppv:number, total:number}} cam
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, inset?:number}} view
+ * @param {{ flyovers?: boolean, limit?: number }|null|undefined} opts  as labelFeed's
+ * @param {(i:number, x0:number, x1:number, A:number, fromOn:boolean, toOn:boolean) => void} visit
+ * @returns {number}
+ */
+export function eachLabelThread(g, cam, view, opts, visit) {
+  const { width, squash, density } = view;
+  if (!g || !g.count || !(width > 0)) return 0;
+  const inset = view.inset > 0 ? view.inset : 0;
+  const camY = cam.y > 0 ? cam.y : 0;
+  // the sky, as heights above the DRAWN baseline (base + camY)
+  const hLow = camY, hHigh = view.base + camY - inset;
+  if (!(hHigh > hLow)) return 0;
+  const flyovers = !!(opts && opts.flyovers);
+  const limit = opts && opts.limit > 0 ? opts.limit : 50000;
+  const { fanA, fanB } = fansOf(g);
+  const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
+  const chunkSize = g.chunkSize || 256;
+  let n = 0;
   for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkSize = g.chunkSize || 256;
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < lo || ext[0] > hi)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
+    const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
-        // the feet as drawn (geometry.footX): the shader's own anchoring test
         const x0 = footX(cam, width, g.from[i], fanA[i]);
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         if (x1 < 0 || x0 > width) continue;
-        const anchored = arcAnchored(x0, x1, width);
-        if (flyOverDim(anchored, skyLocalize(localize, cam.y, view.ceil)) === 0) continue;
-        out.push(i);
-        if (out.length >= limit) return out;
+        const fromOn = x0 >= 0 && x0 <= width, toOn = x1 >= 0 && x1 <= width;
+        if (!fromOn && !toOn && !flyovers) continue;
+        const { A } = arcShape((x1 - x0) * 0.5, squash);
+        // a foot on the frame with the camera on the baseline is always seen (height 0 there,
+        // the sky's floor); every other thread asks the curve
+        if (!((fromOn || toOn) && hLow <= 0)) {
+          const xa = x0 > 0 ? x0 : 0, xb = x1 < width ? x1 : width;
+          const ha = arcHeightAt(xa, x0, x1, A), hb = arcHeightAt(xb, x0, x1, A);
+          const cx = (x0 + x1) * 0.5;
+          const hMax = cx >= xa && cx <= xb ? A : (ha > hb ? ha : hb);
+          const hMin = ha < hb ? ha : hb;
+          if (hMax < hLow || hMin > hHigh) continue;
+        }
+        visit(i, x0, x1, A, fromOn, toOn);
+        if (++n >= limit) return true;
       }
-    }
+      return false;
+    });
+    if (full) break;
   }
-  return out;
+  return n;
 }
 
 /**
@@ -401,10 +601,13 @@ export function refOfVerse(g, verseId) {
 }
 
 /**
- * The lens: the chapter under the frame's centre, as a verse range, once the
- * reader is past the overview (LOCALIZE_START x fit); null at the overview,
- * where the dome is the picture. The shader lights this range at full ink
- * and dims the rest to LENS_CONTEXT while nothing is tapped.
+ * The chapter under the frame's centre, as a verse range, once the reader is
+ * past the overview (LOCALIZE_START x fit); null at the overview, where the
+ * dome is the picture. It dims nothing: the lens that kept the rest at 0.35
+ * is retired (Q2). The Nearby list and the screen's list eyebrow read it;
+ * the emphasised centre chapter is web-frame.centreRange (the canvas area's
+ * centre, with a hold), which agrees with this whenever no panel is open
+ * and the camera is not inside a hold.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
@@ -423,10 +626,10 @@ export function lensRange(g, cam, width) {
 }
 
 /**
- * The chapter the Nearby list reads (landing 15): the lens's chapter once
+ * The chapter the Nearby list reads (landing 15): lensRange's chapter once
  * the reader is past the overview, else the chapter under the frame's
- * centre - the same verse either way (cam.x IS the centre), so the list and
- * the lit chapter never disagree. -1 for an empty graph.
+ * centre - the same verse either way (cam.x IS the centre). -1 for an
+ * empty graph.
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
  * @param {number} width - device px
@@ -474,7 +677,7 @@ export function chapterRange(g, chapterIndex) {
  * Every thread is drawn; what converges is counted: at each in-view FOOT
  * CELL the anchored threads with a foot there are a bundle with a count
  * pill. These passes produce those numbers for the badge layer, over the
- * same visible chunks and the same feet (geometry.footX) the shader uses,
+ * frame's visible set and the same feet (geometry.footX) the shader uses,
  * so a pill counts exactly what is drawn there.
  */
 
@@ -498,16 +701,21 @@ export const BUNDLE_VERSE_PPV_CSS = 26;
  * Cells are verses once a verse is BUNDLE_VERSE_PPV_CSS wide, else chapters,
  * adjacent chapters merged left to right until a cell is BUNDLE_MIN_CSS wide
  * (a badge must be readable and tappable). A thread counts once per cell
- * that holds a foot of it.
+ * that holds a foot of it: every thread of the density anchored to the frame
+ * (arcAnchored on its drawn feet), whatever its body - the count its sheet
+ * (bundleGroups) and the crowding law (countAnchored) read, so in the sky
+ * too (C14). Until GL review 2026-10-18 (finding 7) it counted only the
+ * frame's visible set, which in the sky drops a thread whose body passes
+ * under the frame: the pill read 274 where its sheet listed 1,044.
  *
  * @param {import('./decode.js').ScriptureGraph} g
  * @param {{x:number, ppv:number, total:number}} cam
- * @param {{width:number, density:import('./decode.js').Density}} view
+ * @param {{width:number, base:number, squash:number, density:import('./decode.js').Density, dpr?:number}} view
  * @param {number} dpr
  * @returns {FootBundle[]}
  */
 export function footBundles(g, cam, view, dpr) {
-  const { width, density } = view;
+  const { width } = view;
   const ppvCss = cam.ppv / (dpr || 1);
   const minVerses = (BUNDLE_MIN_CSS * (dpr || 1)) / cam.ppv;
   const lo = Math.max(0, Math.floor(xToVerse(cam, width, -FLYOVER_MARGIN)));
@@ -539,29 +747,22 @@ export function footBundles(g, cam, view, dpr) {
   for (let c = 0; c < cells.length; c++) {
     for (let v = cells[c].lo; v <= cells[c].hi; v++) if (v - first >= 0 && v - first < span) cellOf[v - first] = c;
   }
-  const { fanA, fanB } = fansOf(g);
   const half = width / 2, camX = cam.x, ppv = cam.ppv;
-  const chunkSize = g.chunkSize || 256;
-  for (const bucket of g.buckets) {
-    const draw = bucketDrawCount(bucket, density);
-    const chunks = bucket.chunks || [];
-    const chunkCount = Math.ceil(draw / chunkSize);
-    for (let c = 0; c < chunkCount; c++) {
-      const ext = chunks[c];
-      if (ext && (ext[1] < first || ext[0] > first + span - 1)) continue;
-      const start = bucket.off + c * chunkSize;
-      const end = Math.min(start + chunkSize, bucket.off + draw);
-      for (let i = start; i < end; i++) {
-        const a = g.from[i], b = g.to[i];
-        const ca = a - first >= 0 && a - first < span ? cellOf[a - first] : -1;
-        const cb = b - first >= 0 && b - first < span ? cellOf[b - first] : -1;
-        if (ca < 0 && cb < 0) continue;
-        // the feet as drawn (geometry.footX): anchored is the shader's word
-        if (!arcAnchored(footX(cam, width, a, fanA[i]), footX(cam, width, b, fanB[i]), width)) continue;
-        if (ca >= 0) cells[ca].drawn++;
-        if (cb >= 0 && cb !== ca) cells[cb].drawn++;
-      }
-    }
+  // the density's threads (the visible set's own order, E1), walked by the feet that stand in the cells
+  const { ids, fx0, fx1, footStart, foot } = drawOrder(g, view.density);
+  const cellAt = (v) => (v - first >= 0 && v - first < span ? cellOf[v - first] : -1);
+  const end = footStart[first + span];
+  for (let j = footStart[first]; j < end; j++) {
+    const rank = foot[j] >> 1;
+    const i = ids[rank];
+    const ca = cellAt(g.from[i]), cb = cellAt(g.to[i]);
+    // a thread with both feet in one cell counts once, at its from-foot
+    const isTo = (foot[j] & 1) === 1;
+    if (isTo && cb === ca) continue;
+    // the feet as drawn (geometry.footX): anchored is the shader's word
+    if (!arcAnchored((fx0[rank] - camX) * ppv + half, (fx1[rank] - camX) * ppv + half, width)) continue;
+    const c = isTo ? cb : ca;
+    if (c >= 0) cells[c].drawn++;
   }
   for (const cell of cells) cell.x = ((cell.lo + cell.hi + 1) / 2 - camX) * ppv + half;
   return cells;

@@ -1454,7 +1454,7 @@ function compressRanges(nums) {
  * @param {any} data — the decoded SCRIPTURE_WEB_DATA object
  * @param {object} [opts]
  * @param {(b64: string) => Uint8Array} [opts.decode] — base64 → bytes
- * @returns {{ errors: string[], warnings: string[], count: number }}
+ * @returns {{ errors: string[], warnings: string[], count: number, sites?: number }}
  */
 export function validateScriptureWeb(data, opts = {}) {
   const errors = [];
@@ -1571,7 +1571,65 @@ export function validateScriptureWeb(data, opts = {}) {
   if (dupes > 1) errors.push(`${file}: ${dupes} duplicate pairs total`);
   if (tierBreaks > 1) errors.push(`${file}: ${tierBreaks} arcs total in the wrong density tier`);
 
-  // VOT edges must land on real verses and name a resolvable destination.
+  // The Volumes' citations (votCites; encodeCites in tools/scripture-web-cites.mjs):
+  // every site on a real verse with a known kind and block, a range inside its
+  // own chapter, and no Hidden Manna anywhere (it is never publicly indexed).
+  const CITE_COLLECTIONS = new Set(['one', 'two', 'three', 'four', 'five', 'six', 'seven',
+    'timothy', 'flock', 'rebuke', 'wtlb1', 'wtlb2', 'blessed', 'holydays', 'studies']);
+  const PARTS = new Set(['intro', 'ot', 'nt', 'vot']);
+  const chapterEnd = new Int32Array(data.total);
+  for (const [, , start, verses] of data.chapters) {
+    for (let v = start; v < start + verses && v < data.total; v++) chapterEnd[v] = start + verses - 1;
+  }
+  const isIdx = (x) => Number.isInteger(x) && x >= 0;
+  const inRange = (v) => isIdx(v) && v < data.total;
+  let siteErrors = 0, citeRowErrors = 0, sites = 0;
+  const rowKeys = new Set();
+  const firstBad = (msg) => { if (siteErrors + citeRowErrors === 1) errors.push(`${file}: ${msg}`); };
+  for (const row of Array.isArray(data.votCites) ? data.votCites : []) {
+    const okRow = row && typeof row.c === 'string' && CITE_COLLECTIONS.has(row.c)
+      && typeof row.id === 'string' && row.id && typeof row.t === 'string' && Array.isArray(row.s)
+      && (row.c !== 'studies' || (typeof row.sid === 'string' && row.sid));
+    if (!okRow) { citeRowErrors++; firstBad(`votCites row ${JSON.stringify(row).slice(0, 80)} is malformed (or names Hidden Manna)`); continue; }
+    const key = row.c === 'studies' ? `study:${row.sid}/${row.id}` : `${row.c}/${row.id}`;
+    if (rowKeys.has(key)) { citeRowErrors++; firstBad(`votCites lists ${key} twice`); }
+    rowKeys.add(key);
+    for (const s of row.s) {
+      sites++;
+      const [v, k, p, extra, sub, ve] = Array.isArray(s) ? s : [];
+      const okExtra = extra == null || typeof extra === 'string' || isIdx(extra)
+        || (Array.isArray(extra) && extra.length === 2 && isIdx(extra[0]) && extra[1] > 0);
+      const okSub = sub == null || (Array.isArray(sub) && sub.length === 2 && PARTS.has(sub[0]) && isIdx(sub[1]));
+      const okVe = ve == null || (inRange(v) && Number.isInteger(ve) && ve > v && ve <= chapterEnd[v]);
+      if (!Array.isArray(s) || !inRange(v) || !(isIdx(k) && k <= 3) || !isIdx(p) || !okExtra || !okSub || !okVe) {
+        siteErrors++;
+        firstBad(`votCites ${key}: bad site ${JSON.stringify(s)}`);
+      }
+    }
+  }
+  if (siteErrors + citeRowErrors > 1) errors.push(`${file}: ${citeRowErrors} bad votCites rows, ${siteErrors} bad sites in all`);
+  if (data.votCites && !Array.isArray(data.votCites)) errors.push(`${file}: votCites must be an array`);
+  // A Holy Days entry mirrors a letter of another public collection.
+  for (const [from, to] of Object.entries(data.mirrors || {})) {
+    const [vol] = String(to).split('/');
+    if (!String(from).startsWith('holydays/') || !CITE_COLLECTIONS.has(vol) || vol === 'studies' || !String(to).includes('/')) {
+      errors.push(`${file}: mirror ${from} -> ${to} must map a Holy Days entry to a public letter`);
+      break;
+    }
+  }
+  // The Bible Studies' prophecy pairs and letter-links (encodeStudyLinks).
+  let linkErrors = 0;
+  for (const row of Array.isArray(data.studyLinks) ? data.studyLinks : []) {
+    if (!row || typeof row.sid !== 'string' || typeof row.id !== 'string') { linkErrors++; continue; }
+    for (const t of row.pr || []) if (!(Array.isArray(t) && isIdx(t[0]) && inRange(t[1]) && inRange(t[2]))) linkErrors++;
+    for (const t of row.l || []) {
+      if (!(Array.isArray(t) && isIdx(t[0]) && CITE_COLLECTIONS.has(t[1]) && t[1] !== 'studies'
+        && typeof t[2] === 'string' && t[2])) linkErrors++;
+    }
+  }
+  if (linkErrors) errors.push(`${file}: ${linkErrors} studyLinks entries are malformed, out of range or name Hidden Manna`);
+
+  // A pre-2026-10 asset carries flat votEdges / prophecy instead.
   let edgeErrors = 0;
   for (const e of data.votEdges || []) {
     if (!(e.v >= 0 && e.v < data.total)) { edgeErrors++; continue; }
@@ -1586,7 +1644,7 @@ export function validateScriptureWeb(data, opts = {}) {
     }
   }
 
-  return { errors, warnings, count: n };
+  return { errors, warnings, count: n, sites };
 }
 
 export function validateAgainstReference(books, reference, opts = {}) {
@@ -2628,7 +2686,8 @@ function runCli() {
         totals.warnings += r.warnings.length;
         totals.items += r.count;
         console.log(`  ${r.count.toLocaleString()} cross-references + ` +
-          `${(data.votEdges || []).length} VOT edges checked — ` +
+          `${(r.sites || (data.votEdges || []).length).toLocaleString()} Volumes citation sites ` +
+          `(${(data.votCites || []).length} letters) checked — ` +
           `${r.errors.length === 0 ? 'OK' : 'FAIL'}`);
       }
     }

@@ -53,7 +53,7 @@ function bareInts(glsl) {
   return stripped.match(/\b\d+\b/g) || [];
 }
 
-const TEMPLATES = ['arcShapeGLSL', 'flyOverGLSL'];
+const TEMPLATES = ['arcShapeGLSL', 'arcFrameGLSL', 'flyOverGLSL', 'spanInkGLSL'];
 function templateBody(name) {
   const m = SOURCE.match(new RegExp('export const ' + name + ' = `([\\s\\S]*?)`;'));
   if (!m) throw new Error('glsl-float.test: could not find the ' + name + ' template in geometry.js');
@@ -93,16 +93,51 @@ describe('every constant interpolated into the GLSL templates routes through gls
     expect(rawSites('float k = ${FAN_FLOOR} + ${1 - FAN_FLOOR}*x;')).toEqual(['FAN_FLOOR', '1 - FAN_FLOOR']);
   });
 
-  it('has no raw interpolation in arcShapeGLSL or flyOverGLSL — THIS is the case with teeth today', () => {
+  it('has no raw interpolation in arcShapeGLSL, arcFrameGLSL, flyOverGLSL or spanInkGLSL — THIS is the case with teeth today', () => {
     for (const name of TEMPLATES) {
       expect({ template: name, raw: rawSites(templateBody(name)) }).toEqual({ template: name, raw: [] });
     }
   });
 
-  it('is not reading an empty region: the two constants the shaders inline are seen as sites (arcShapeGLSL carries none since the structure law)', () => {
+  it('is not reading an empty region: the constants the templates inline are seen as sites (arcShapeGLSL carries none since the structure law; the fly-over floor is retired, its leg share a parameter; the frame law carries the clip margin, E1)', () => {
     const seen = new Set(TEMPLATES.flatMap((name) => allSites(templateBody(name)).map((s) => s.replace(/^glslFloat\(|\)$/g, '').trim())));
-    for (const want of ['FLYOVER_MARGIN', 'FLYOVER_FLOOR']) {
+    // (and the span-ink law's constants, w4 INK item 2)
+    for (const want of ['FLYOVER_MARGIN', 'CLIP_MARGIN', 'Math.PI', 'HALF_PI', 'SPAN_T_EXP', 'SHORT_GAIN']) {
       expect([...seen]).toContain(want);
+    }
+  });
+});
+
+/* The renderer's own templates (GL item 7). Before this case the vertex
+   stage carried two raw interpolations, `${CLIP_MARGIN}.` (a literal that
+   compiled only while CLIP_MARGIN stayed whole) and the stroke ratio
+   `${STROKE_MIN_CSS / STROKE_DEEP_CSS}` (one that would break the day it
+   came out whole). Every site in a `#version 300 es` template in
+   web-renderer.js routes through glslFloat, or is one of the shared GLSL
+   blocks (themselves checked above or generated). */
+const RENDERER = fs.readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../ui/scripture-web/web-renderer.js'), 'utf8');
+const SHARED_BLOCKS = /^(arcShapeGLSL|arcFrameGLSL|flyOverGLSL|spanInkGLSL|rampGLSL\(\)|inkGLSL\([^)]*\))$/;
+function rendererTemplates() {
+  return [...RENDERER.matchAll(/const (\w+) = `(#version 300 es[\s\S]*?)`;/g)].map((m) => ({ name: m[1], body: m[2] }));
+}
+
+describe("every constant interpolated into the renderer's shader templates routes through glslFloat", () => {
+  /* Restated for E1 (GL step 2): the clip margin left the vertex stage for
+     the shared frame law (geometry.arcFrameGLSL, a TEMPLATE above), so this
+     region check now finds the stroke ratio, the other site this case was
+     written for, and the shared frame law's block. */
+  it('is not reading an empty region: the vertex and fragment templates are found, and the stroke ratio and the frame law are seen as sites', () => {
+    const names = rendererTemplates().map((t) => t.name);
+    expect(names).toEqual(expect.arrayContaining(['VERT', 'FRAG']));
+    const vert = rendererTemplates().find((t) => t.name === 'VERT');
+    expect(allSites(vert.body)).toContain('glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)');
+    expect(allSites(vert.body)).toContain('arcFrameGLSL');
+  });
+
+  it('has no raw interpolation in any of them', () => {
+    for (const t of rendererTemplates()) {
+      const raw = rawSites(t.body).filter((s) => !SHARED_BLOCKS.test(s));
+      expect({ template: t.name, raw }).toEqual({ template: t.name, raw: [] });
     }
   });
 });
@@ -112,8 +147,10 @@ describe('the emitted GLSL carries no bare integer literal', () => {
     expect(bareInts('float f = 1; float g = 2.; float h = 1e-3; float i = .5; vec2 x0;')).toEqual(['1']);
   });
 
-  it('flyOverGLSL and arcShapeGLSL: none — CANNOT FAIL TODAY (every constant carries a fraction); it is the property the routing case above protects, and it goes red the day a whole number is tuned in past the helper', () => {
+  it('flyOverGLSL, arcShapeGLSL and arcFrameGLSL: none — CANNOT FAIL TODAY (every constant carries a fraction); it is the property the routing case above protects, and it goes red the day a whole number is tuned in past the helper', () => {
     expect(bareInts(geo.flyOverGLSL)).toEqual([]);
     expect(bareInts(geo.arcShapeGLSL)).toEqual([]);
+    expect(bareInts(geo.arcFrameGLSL)).toEqual([]);
+    expect(bareInts(geo.spanInkGLSL)).toEqual([]);
   });
 });

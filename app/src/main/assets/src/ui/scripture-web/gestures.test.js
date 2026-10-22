@@ -9,7 +9,7 @@
  * use it directly rather than the MouseEvent-plus-defineProperty fallback
  * older jsdom would have needed.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { attachWebGestures, SW_CHROME_SELECTOR, isChromeTarget } from './gestures.js';
 import { createCamera, clampCamera, zoomAbout, xToVerse } from '../../utils/scripture-web/geometry.js';
 
@@ -21,15 +21,14 @@ function makeDom() {
   list.className = 'sw-list';
   const listBtn = document.createElement('button');
   list.appendChild(listBtn);
-  const goto = document.createElement('div');
-  goto.className = 'sw-goto';
+  // a bare input outside any `.sw-*` wrapper: the selector's `input` entry
+  // must catch it alone (the `.sw-goto` field it once sat in is gone)
   const input = document.createElement('input');
-  goto.appendChild(input);
   const choice = document.createElement('div');
   choice.className = 'sw-choice';
-  root.append(list, goto, choice);
+  root.append(list, input, choice);
   document.body.appendChild(root);
-  return { root, list, listBtn, goto, input, choice };
+  return { root, list, listBtn, input, choice };
 }
 
 function pointerEvent(type, opts) {
@@ -112,10 +111,9 @@ describe('the elevator (landing 14): a pointer down on the track drives the lift
 
 describe('SW_CHROME_SELECTOR / isChromeTarget', () => {
   it('matches every declared chrome surface, including nested controls', () => {
-    const { list, listBtn, goto, input, choice } = makeDom();
+    const { list, listBtn, input, choice } = makeDom();
     expect(isChromeTarget(list)).toBe(true);
     expect(isChromeTarget(listBtn)).toBe(true);
-    expect(isChromeTarget(goto)).toBe(true);
     expect(isChromeTarget(input)).toBe(true);
     expect(isChromeTarget(choice)).toBe(true);
   });
@@ -217,19 +215,19 @@ describe('a swipe across the canon is not a tap (w-sw-zoom-pan, item 1)', () => 
     expect(handlers.tap).not.toHaveBeenCalled();
   });
 
-  it('CONTROL — a real tap (no motion) still taps, and a 2 px tremor is still a tap', () => {
+  it('CONTROL: a real tap (no motion) still taps, and a fingertip tremor inside its slop is still a tap', () => {
     const { root } = makeDom();
     root.setPointerCapture = vi.fn();
     const { handlers } = attach(root);
     root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
     root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 200 }));
     expect(handlers.tap).toHaveBeenCalledTimes(1);
-    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
-    root.dispatchEvent(pointerEvent('pointermove', { clientX: 301, clientY: 202 }));
-    root.dispatchEvent(pointerEvent('pointerup', { clientX: 301, clientY: 202 }));
-    /* 400 ms apart would be two taps; the harness fires them within a tick, so the second lands
-       as a double-tap — either way the tremor did not become a drag, which is what this pins. */
-    expect(handlers.tap.mock.calls.length + handlers.doubleTap.mock.calls.length).toBe(2);
+    // far from the first tap, so it is a second tap and not a double
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 600, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 601, clientY: 202 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 601, clientY: 202 }));
+    expect(handlers.tap).toHaveBeenCalledTimes(2);
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
   });
 });
 
@@ -262,6 +260,22 @@ describe('pointers that went down on a control never steer the canvas (W52)', ()
     const { handlers } = attach(root);
     root.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 420, clientY: 200 }));
     expect(handlers.hover).toHaveBeenCalledWith(420, 200);
+  });
+
+  it('a mouse over the chrome (a control, the topbar) hovers nothing under it and lets go of what it hovered; leaving the web lets go too', () => {
+    const { root, listBtn } = makeDom();
+    const { handlers } = attach(root);
+    handlers.leave = vi.fn();
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 420, clientY: 200 }));
+    expect(handlers.hover).toHaveBeenCalledTimes(1);
+    listBtn.dispatchEvent(pointerEvent('pointermove', { pointerId: 7, pointerType: 'mouse', clientX: 100, clientY: 50 }));
+    expect(handlers.hover, 'the web under a button is not hovered').toHaveBeenCalledTimes(1);
+    expect(handlers.leave).toHaveBeenCalledTimes(1);
+    root.dispatchEvent(pointerEvent('pointerleave', { pointerId: 7, pointerType: 'mouse', bubbles: false }));
+    expect(handlers.leave).toHaveBeenCalledTimes(2);
+    // a finger's leave (it lifted) is not a mouse leaving
+    root.dispatchEvent(pointerEvent('pointerleave', { pointerId: 8, pointerType: 'touch', bubbles: false }));
+    expect(handlers.leave).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -318,5 +332,290 @@ describe('a pinch that ends with one finger still down hands the pan to that fin
     root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 4, clientX: 500, clientY: 300 }));
     root.dispatchEvent(pointerEvent('pointerup', { pointerId: 4, clientX: 500, clientY: 300 }));
     expect(handlers.tap).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* A1 (w2 digest, items 6-8): taps that land. A fingertip wanders further than a mouse, so the
+   slop is the pointer's own; a double-tap is two taps close together, and it takes back what its
+   first tap opened; a third finger never steers a pinch; every wheel reads in pixels and a
+   sideways one pans. */
+describe('the slop is the pointer\'s own (A1)', () => {
+  for (const [type, inside, outside] of /** @type {Array<[string, number, number]>} */ ([['touch', 9, 12], ['pen', 5, 8], ['mouse', 2, 5]])) {
+    it(`${type}: ${inside} px is a tap and moves nothing; ${outside} px is a drag and no tap`, () => {
+      const { root } = makeDom();
+      root.setPointerCapture = vi.fn();
+      const { cam, handlers } = attach(root);
+      const x0 = cam.x;
+      root.dispatchEvent(pointerEvent('pointerdown', { pointerType: type, clientX: 300, clientY: 200 }));
+      root.dispatchEvent(pointerEvent('pointermove', { pointerType: type, clientX: 300 + inside, clientY: 200 }));
+      expect(cam.x, 'inside the slop the camera holds still').toBe(x0);
+      root.dispatchEvent(pointerEvent('pointerup', { pointerType: type, clientX: 300 + inside, clientY: 200 }));
+      expect(handlers.tap).toHaveBeenCalledTimes(1);
+      root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, pointerType: type, clientX: 700, clientY: 200 }));
+      root.dispatchEvent(pointerEvent('pointermove', { pointerId: 2, pointerType: type, clientX: 700 - outside, clientY: 200 }));
+      expect(cam.x - x0, 'past the slop the pan catches up to the finger, from the press').toBeCloseTo(outside / 10, 6);
+      root.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, pointerType: type, clientX: 700 - outside, clientY: 200 }));
+      expect(handlers.tap).toHaveBeenCalledTimes(1);
+      expect(handlers.doubleTap).not.toHaveBeenCalled();
+    });
+  }
+});
+
+describe('a double-tap is two taps close together, and it takes back its first tap (A1)', () => {
+  it('two quick taps within 24 px zoom there, and the first tap\'s card is rolled back', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const undo = vi.fn();
+    const snapshot = vi.fn(() => undo);
+    const { handlers } = attach(root);
+    /** @type {any} */ (handlers).snapshot = snapshot;
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 200 }));
+    expect(snapshot, 'what was open is kept before the first tap opens anything').toHaveBeenCalledTimes(1);
+    expect(handlers.tap).toHaveBeenCalledWith(300, 200);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 312, clientY: 210 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 312, clientY: 210 }));
+    expect(undo, 'the double takes back the card its first tap opened').toHaveBeenCalledTimes(1);
+    expect(handlers.doubleTap).toHaveBeenCalledWith(312, 210);
+    expect(handlers.tap).toHaveBeenCalledTimes(1);
+  });
+
+  it('two quick taps far apart are two taps on two lines, and nothing is rolled back', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const undo = vi.fn();
+    const { handlers } = attach(root);
+    /** @type {any} */ (handlers).snapshot = () => undo;
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 340, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 340, clientY: 200 }));
+    expect(handlers.tap).toHaveBeenCalledTimes(2);
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
+    expect(undo).not.toHaveBeenCalled();
+  });
+
+  it('a slow second tap is a tap again', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { handlers } = attach(root);
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(1000);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 200 }));
+    now.mockReturnValue(1400);
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 200 }));
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 200 }));
+    now.mockRestore();
+    expect(handlers.tap).toHaveBeenCalledTimes(2);
+    expect(handlers.doubleTap).not.toHaveBeenCalled();
+  });
+});
+
+describe('a third finger never steers a pinch (A1)', () => {
+  it('a third finger down and moving changes nothing; the two pinching fingers still zoom about their centre', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { cam, handlers } = attach(root);
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 400, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 600, clientY: 300 }));
+    const x0 = cam.x, ppv0 = cam.ppv;
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 3, clientX: 100, clientY: 500 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 3, clientX: 300, clientY: 500 }));
+    expect(cam.x, 'the third finger pans nothing').toBe(x0);
+    expect(cam.ppv, 'nor zooms').toBe(ppv0);
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 1, clientX: 300, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 2, clientX: 700, clientY: 300 }));
+    expect(cam.ppv / ppv0, 'the two fingers spread from 200 to 400 px: twice the zoom').toBeCloseTo(2, 6);
+    expect(cam.x, 'about the same centre').toBeCloseTo(x0, 6);
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 3, clientX: 300, clientY: 500 }));
+    expect(handlers.tap, 'the third finger lifting is no tap').not.toHaveBeenCalled();
+  });
+
+  it('a pinch finger lifting with a third still down: the two left pinch on from where they are, with no jump', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const { cam, handlers } = attach(root);
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 1, clientX: 400, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 600, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 3, clientX: 800, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 1, clientX: 400, clientY: 300 }));
+    const x0 = cam.x, ppv0 = cam.ppv;
+    expect(ppv0, 'no zoom happened yet').toBe(10);
+    // fingers 2 and 3 (200 px apart, centre 700) spread to 400 px about the same centre
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 2, clientX: 500, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointermove', { pointerId: 3, clientX: 900, clientY: 300 }));
+    expect(cam.ppv / ppv0).toBeCloseTo(2, 6);
+    // the verse under x 700 stays under it: (700 - 500) / 10 = 20 verses right of x0 at the start
+    expect(cam.x).toBeCloseTo(x0 + 20 - 200 / 20, 6);
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 500, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 3, clientX: 900, clientY: 300 }));
+    expect(handlers.tap).not.toHaveBeenCalled();
+  });
+});
+
+describe('the wheel reads in pixels, and a sideways wheel pans (A1)', () => {
+  const wheelAt = (root, init) => {
+    const ev = new WheelEvent('wheel', { bubbles: true, cancelable: true, clientX: 500, clientY: 300, ...init });
+    root.dispatchEvent(ev);
+    return ev;
+  };
+  it('three wheel lines (deltaMode 1) zoom as their 48 px would', () => {
+    const ra = makeDom().root, rb = makeDom().root;
+    const a = attach(ra), b = attach(rb);
+    wheelAt(ra, { deltaY: 48 });
+    wheelAt(rb, { deltaY: 3, deltaMode: 1 });
+    expect(b.cam.ppv).toBeCloseTo(a.cam.ppv, 9);
+    expect(b.cam.ppv).toBeLessThan(10);
+  });
+  it('a page wheel (deltaMode 2) is held to one big notch, not a leap to the floor', () => {
+    const { root } = makeDom();
+    const { cam } = attach(root);
+    wheelAt(root, { deltaY: 1, deltaMode: 2 });
+    expect(cam.ppv).toBeCloseTo(10 * Math.exp(-300 * 0.0021), 6);
+  });
+  it('deltaX pans along the canon by its pixels and does not zoom', () => {
+    const { root } = makeDom();
+    const { cam, schedule } = attach(root);
+    const x0 = cam.x;
+    const ev = wheelAt(root, { deltaX: 50, deltaY: 4 });
+    expect(ev.defaultPrevented).toBe(true);
+    expect(cam.ppv).toBe(10);
+    expect(cam.x - x0, '50 px at 10 px a verse').toBeCloseTo(5, 6);
+    expect(schedule).toHaveBeenCalled();
+  });
+  it('shift+wheel pans as deltaX does', () => {
+    const { root } = makeDom();
+    const { cam } = attach(root);
+    const x0 = cam.x;
+    wheelAt(root, { deltaY: -30, shiftKey: true });
+    expect(cam.ppv).toBe(10);
+    expect(cam.x - x0).toBeCloseTo(-3, 6);
+  });
+  it('a trackpad pinch (ctrlKey) zooms even when it carries some sideways travel', () => {
+    const { root } = makeDom();
+    const { cam } = attach(root);
+    wheelAt(root, { deltaX: 20, deltaY: -10, ctrlKey: true });
+    expect(cam.ppv).toBeCloseTo(10 * Math.exp(0.11), 6);
+  });
+});
+
+/* A4: a drag let go while moving glides on and slows, through the frame loop's one motion
+   (deps.animate); never under reduced motion, never from a finger that stopped before it lifted. */
+describe('fling inertia (A4)', () => {
+  /** A frame loop the test steps: animate keeps the one motion, frame() runs it once. */
+  function loop() {
+    let m = null;
+    const animate = vi.fn((step, onEnd) => {
+      const prev = m; const cur = { step, onEnd }; m = cur;
+      if (prev && prev.onEnd) prev.onEnd(false);
+      return () => { if (m === cur) { m = null; if (cur.onEnd) cur.onEnd(false); } };
+    });
+    const frame = (ms = 16) => {
+      const cur = m;
+      if (!cur) return false;
+      const more = cur.step(ms) !== false;
+      if (m === cur && !more) { m = null; if (cur.onEnd) cur.onEnd(true); }
+      return !!m;
+    };
+    return { animate, frame, running: () => !!m };
+  }
+  /** A flick: down at x 600, moves of 30 px every 10 ms to the left, up at the last. */
+  function flick(root, clock, steps = 6, dx = -30, dt = 10) {
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 600, clientY: 300 }));
+    let x = 600;
+    for (let i = 0; i < steps; i++) {
+      clock.t += dt; x += dx;
+      root.dispatchEvent(pointerEvent('pointermove', { clientX: x, clientY: 300 }));
+    }
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: x, clientY: 300 }));
+    return x;
+  }
+  let clock;
+  beforeEach(() => {
+    clock = { t: 5000 };
+    vi.spyOn(performance, 'now').mockImplementation(() => clock.t);
+  });
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('a flick glides on in the same direction, slowing, and stops', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    const { cam, handlers } = attach(root, { animate: l.animate, reduceMotion: () => false });
+    const x0 = cam.x;
+    flick(root, clock);
+    const released = cam.x;
+    expect(released - x0, 'the drag itself: 180 px left is 18 verses right').toBeCloseTo(18, 6);
+    expect(l.animate).toHaveBeenCalledTimes(1);
+    const steps = [];
+    let last = cam.x, n = 0;
+    while (l.frame() && n++ < 500) { steps.push(cam.x - last); last = cam.x; }
+    expect(cam.x, 'it glided on').toBeGreaterThan(released + 5);
+    expect(steps.every((d) => d >= 0), 'the same way the finger went').toBe(true);
+    expect(steps[steps.length - 1], 'slowing').toBeLessThan(steps[0]);
+    expect(l.running(), 'and stopped').toBe(false);
+    expect(handlers.tap).not.toHaveBeenCalled();
+  });
+
+  it('none under reduced motion', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    attach(root, { animate: l.animate, reduceMotion: () => true });
+    flick(root, clock);
+    expect(l.animate).not.toHaveBeenCalled();
+  });
+
+  it('none from a finger that stopped before it lifted, or that crept', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    attach(root, { animate: l.animate, reduceMotion: () => false });
+    root.dispatchEvent(pointerEvent('pointerdown', { clientX: 600, clientY: 300 }));
+    clock.t += 10;
+    root.dispatchEvent(pointerEvent('pointermove', { clientX: 500, clientY: 300 }));
+    clock.t += 250;    // held still, then lifted
+    root.dispatchEvent(pointerEvent('pointerup', { clientX: 500, clientY: 300 }));
+    expect(l.animate).not.toHaveBeenCalled();
+    flick(root, clock, 6, -2, 40);   // a slow creep: 0.05 px a ms
+    expect(l.animate).not.toHaveBeenCalled();
+  });
+
+  it('a press catches the gliding web where it is', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    const { cam } = attach(root, { animate: l.animate, reduceMotion: () => false });
+    flick(root, clock);
+    l.frame(); l.frame();
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 300, clientY: 300 }));
+    expect(l.running(), 'the press ended the glide').toBe(false);
+    const held = cam.x;
+    l.frame();
+    expect(cam.x).toBe(held);
+  });
+
+  /* w4 device check (S22, 3 of 3): the press that caught the glide lifted in place and was read
+     as a tap, so the chooser "The 8 nearest threads" opened. A native scroller's catch is not a
+     tap, and it starts no double-tap either; the next press is a tap as ever. */
+  it('the press that catches the glide is no tap, and starts no double-tap', () => {
+    const { root } = makeDom();
+    root.setPointerCapture = vi.fn();
+    const l = loop();
+    const { handlers } = attach(root, { animate: l.animate, reduceMotion: () => false });
+    flick(root, clock);
+    l.frame(); l.frame();
+    expect(l.running(), 'gliding').toBe(true);
+    clock.t += 30;
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 2, clientX: 300, clientY: 300 }));
+    clock.t += 60;
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 2, clientX: 301, clientY: 300 }));
+    expect(handlers.tap, 'the catch opened nothing').not.toHaveBeenCalled();
+    clock.t += 80;
+    root.dispatchEvent(pointerEvent('pointerdown', { pointerId: 3, clientX: 301, clientY: 300 }));
+    root.dispatchEvent(pointerEvent('pointerup', { pointerId: 3, clientX: 301, clientY: 300 }));
+    expect(handlers.doubleTap, 'the catch was no first tap').not.toHaveBeenCalled();
+    expect(handlers.tap, 'the press after it is a tap').toHaveBeenCalledTimes(1);
   });
 });

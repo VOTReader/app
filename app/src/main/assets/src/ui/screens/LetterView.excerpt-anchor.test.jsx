@@ -127,6 +127,23 @@ describe('LetterView — an excerpt anchor lands on the block that holds it', ()
     expect(scrolled).toEqual(['letter:the-wide-path:2']);
   });
 
+  /* A title named opens at the title (search200 B5, the S22 look): a landing at the text's start (`top`) scrolls the
+     page to its top, where the title is; no block is landed on or sought, though its head is the first block's words. */
+  it('a landing at the top scrolls the page to the top: no block, no seek', () => {
+    globalThis.ScreenLayout = ({ children, navChildren }) => <div className="screen-scroll">{navChildren}{children}</div>;
+    const tops = [];
+    Element.prototype.scrollTo = function (o) { tops.push(o && o.top); };
+    try {
+      renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'Beloved, the wide path is crowded and its gate', top: true, letterId: 'the-wide-path' } });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(scrolled).toEqual([]);
+      expect(tops).toEqual([0]);
+      expect(seekToSeen.every((v) => v == null)).toBe(true);
+    } finally {
+      delete Element.prototype.scrollTo;
+    }
+  });
+
   it('the landing fades: seekTo is withdrawn after the flash so a later Listen does not re-seek', () => {
     renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'still small voice' } });
     act(() => { vi.advanceTimersByTime(200); });

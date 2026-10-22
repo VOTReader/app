@@ -9,13 +9,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   VOT_TYPES, baseKey, buildVotRail, placeEndpoint, buildPersonalGraph,
-  buildCuratedUnderlay,
+  buildCuratedUnderlay, linkIndexById, unplacedReason,
+  RAIL_SLOTS, railUnit, railPosition, railSpan,
 } from './personal-graph.js';
 
 // Bottom rail: 2 books x 2 chapters x 10 verses, matching the geometry tests.
 const CHAPTER_START = {
   'alpha:1': 0, 'alpha:2': 10, 'beta:1': 20, 'beta:2': 30,
-  'matthew-plain:1': 40, 'matthew-plain:4': 50,
+  'matthew-plain:1': 40, 'matthew-plain:4': 50, 'matthew-plain:22': 60,
 };
 const verseIdOf = (bookId, chapter, verse) => {
   const start = CHAPTER_START[bookId + ':' + chapter];
@@ -30,13 +31,16 @@ const votRail = buildVotRail([
 const ctx = { verseIdOf, votRail };
 
 describe('buildVotRail', () => {
-  it('lays collections out in reading order with contiguous segments', () => {
+  // w4: each segment also carries its slot on the rail (u0, uw: the rail's
+  // own unit, RAIL_SLOTS 'equal', every collection the densest one's width)
+  it('lays collections out in reading order with contiguous segments, each in an equal slot', () => {
     expect(votRail.total).toBe(4);
     expect(votRail.segments).toEqual([
-      { volKey: 'one', label: 'Volume One', short: 'Volume One', start: 0, count: 2 },
-      { volKey: 'wtlb1', label: 'Words To Live By', short: 'Words To Live By', start: 2, count: 1 },
-      { volKey: 'blessed', label: 'The Blessed', short: 'The Blessed', start: 3, count: 1 },
+      { volKey: 'one', label: 'Volume One', short: 'Volume One', start: 0, count: 2, u0: 0, uw: 2 },
+      { volKey: 'wtlb1', label: 'Words To Live By', short: 'Words To Live By', start: 2, count: 1, u0: 2, uw: 2 },
+      { volKey: 'blessed', label: 'The Blessed', short: 'The Blessed', start: 3, count: 1, u0: 4, uw: 2 },
     ]);
+    expect(votRail.span).toBe(6);
   });
 
   it('indexes by scoped key AND bare id (endpoints often omit the volume)', () => {
@@ -48,6 +52,80 @@ describe('buildVotRail', () => {
     const empty = buildVotRail([]);
     expect(empty.total).toBe(0);
     expect(empty.segments).toEqual([]);
+    expect(railSpan(empty)).toBe(0);
+  });
+});
+
+describe('the rail slots (w4, r2-05: one fan per Volume)', () => {
+  const items = (n, tag) => Array.from({ length: n }, (_, i) => ({ id: tag + i, title: tag + i }));
+  const cols = [
+    { volKey: 'one', label: 'Volume One', items: items(16, 'a') },
+    { volKey: 'two', label: 'Volume Two', items: items(4, 'b') },
+    { volKey: 'empty', label: 'Not Yet', items: [] },
+    { volKey: 'three', label: 'Volume Three', items: items(1, 'c') },
+  ];
+  const slots = (rail) => rail.segments.map((s) => [s.u0, s.uw]);
+
+  it('ships the equal slots', () => {
+    expect(RAIL_SLOTS).toBe('equal');
+  });
+
+  it('by count is the w3 rail exactly: one unit a letter', () => {
+    const r = buildVotRail(cols, 'count');
+    expect(slots(r)).toEqual([[0, 16], [16, 4], [20, 0], [20, 1]]);
+    expect(r.span).toBe(r.total);
+    for (const p of [0, 3.5, 16, 20.5, 21]) expect(railUnit(r, p)).toBeCloseTo(p, 12);
+  });
+
+  it('by square root and equal, the densest collection keeps one unit a letter and the rest widen', () => {
+    // the scale puts the densest collection's letter at one unit, so the
+    // zoom ceiling (44 CSS px a unit) still reveals every letter
+    expect(slots(buildVotRail(cols, 'sqrt'))).toEqual([[0, 16], [16, 8], [24, 0], [24, 4]]);
+    const eq = buildVotRail(cols, 'equal');
+    expect(slots(eq)).toEqual([[0, 16], [16, 16], [32, 0], [32, 16]]);
+    for (const s of eq.segments) if (s.count) expect(s.uw / s.count).toBeGreaterThanOrEqual(1);
+  });
+
+  it('keeps the reading order: the map is increasing and every letter sits inside its own slot', () => {
+    for (const law of /** @type {const} */ (['count', 'sqrt', 'equal'])) {
+      const r = buildVotRail(cols, law);
+      let last = -Infinity;
+      for (let p = -2; p <= r.total + 2; p += 0.25) {
+        const u = railUnit(r, p);
+        expect(u).toBeGreaterThan(last);
+        last = u;
+      }
+      for (const s of r.segments) {
+        for (let i = 0; i < s.count; i++) {
+          const u = railUnit(r, s.start + i + 0.5);
+          expect(u).toBeGreaterThan(s.u0);
+          expect(u).toBeLessThan(s.u0 + s.uw);
+        }
+      }
+    }
+  });
+
+  it("spreads a collection's letters evenly over its slot", () => {
+    const r = buildVotRail(cols, 'equal');
+    // Volume Two: 4 letters in 16 units, 4 apart, the first's middle at 18
+    expect([0, 1, 2, 3].map((i) => railUnit(r, 16 + i + 0.5))).toEqual([18, 22, 26, 30]);
+    // Volume Three's one letter fills its slot after the empty collection
+    expect(railUnit(r, 20.5)).toBe(40);
+  });
+
+  it("railPosition is railUnit's inverse, past the ends too", () => {
+    for (const law of /** @type {const} */ (['count', 'sqrt', 'equal'])) {
+      const r = buildVotRail(cols, law);
+      for (let p = -1.5; p <= r.total + 1.5; p += 0.5) expect(railPosition(r, railUnit(r, p))).toBeCloseTo(p, 9);
+    }
+  });
+
+  it('a rail without slots (or none at all) is one unit a letter', () => {
+    const bare = { total: 5, segments: [{ start: 0, count: 5 }] };
+    expect(railUnit(/** @type {any} */ (bare), 2.5)).toBe(2.5);
+    expect(railPosition(/** @type {any} */ (bare), 2.5)).toBe(2.5);
+    expect(railSpan(/** @type {any} */ (bare))).toBe(5);
+    expect(railUnit(null, 3)).toBe(3);
   });
 });
 
@@ -108,7 +186,7 @@ describe('placeEndpoint — all endpoint types', () => {
       ['letter', { type: 'letter', key: 'letter:the-wide-path:2', letterId: 'the-wide-path' }, 0],
       ['wtlb', { type: 'wtlb', key: 'wtlb:matters-of-the-heart:0', entryId: 'matters-of-the-heart' }, 2],
       ['blessed', { type: 'blessed', key: 'wtlb:blessed-are-those-who-seek-me:0', entryId: 'blessed-are-those-who-seek-me' }, 3],
-      ['holy-days', { type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty' }, 1],
+      ['holy-days', { type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty', volKey: 'one' }, 1],
       ['study-letter', { type: 'study-letter', key: 'letter:duty:0', letterId: 'duty' }, 1],
       ['journal', { type: 'journal', key: 'journal:the-wide-path:0', entryId: 'the-wide-path' }, 0],
     ];
@@ -225,5 +303,145 @@ describe('curated underlay', () => {
 
   it('is empty when there is no rail yet', () => {
     expect(buildCuratedUnderlay([{ v: 1, volKey: 'one', letterId: 'duty' }], {}).count).toBe(0);
+  });
+});
+
+/* ── w3 My Web stream: the correctness pack (REDs first, 2026-10-18) ────────
+   Item 25: 23 letter ids are shared between collections (Holy Days carries
+   letters from the Volumes; WTLB and The Blessed share entry ids), and the
+   bare-id lookup is first-writer-wins, so a link into the later collection
+   landed on the earlier one's letter. The endpoint names its collection
+   (nav-index writes `collection`, and now `volKey`); the rail resolves that
+   scope before the bare id. Item 26: the Study Bible's key fuses
+   "<book>-<chapter>" and puts the verse THIRD ("study:matthew-22:11"), and
+   the key-only path read the verse slot as the chapter. */
+describe('w3 placement: every endpoint lands on its own letter and verse', () => {
+  const shared = buildVotRail([
+    { volKey: 'one', label: 'Volume One', items: [{ id: 'intro', title: 'Intro' }, { id: 'duty', title: 'Duty' }] },
+    { volKey: 'two', label: 'Volume Two', items: [{ id: 'intro', title: 'Intro (II)' }] },
+    { volKey: 'wtlb1', label: 'Words To Live By: Part One', items: [{ id: 'introduction', title: 'Introduction' }] },
+    { volKey: 'blessed', label: 'The Blessed', items: [{ id: 'introduction', title: 'Introduction (Blessed)' }] },
+    { volKey: 'holydays', label: 'Holy Days', items: [{ id: 'duty', title: 'Duty (Holy Days)' }] },
+    { volKey: 'study-lamb-of-god', label: 'The Lamb of God', items: [{ id: 'intro', title: 'Lamb ch1' }] },
+  ]);
+  const sctx = { verseIdOf, votRail: shared };
+  const at = (ep) => { const p = placeEndpoint(ep, sctx); return p && p.pos; };
+
+  it('item 25: a shared id resolves through the collection the endpoint names, not the first writer', () => {
+    // nav-index endpoints carry the collection LABEL (and, from w3, its volKey)
+    expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro', collection: 'Volume Two' })).toBe(2);
+    expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro', volKey: 'two' })).toBe(2);
+    expect(at({ type: 'blessed', key: 'wtlb:introduction:0', entryId: 'introduction', collection: 'The Blessed' })).toBe(4);
+    // the endpoint's own type names the collection when nothing else does
+    expect(at({ type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty' })).toBe(5);
+    expect(at({ type: 'blessed', key: 'wtlb:introduction:0', entryId: 'introduction' })).toBe(4);
+    // a study chapter rides its study's segment
+    expect(at({ type: 'study-letter', key: 'letter:intro:0', letterId: 'intro', studyId: 'lamb-of-god' })).toBe(6);
+    // the first writer still answers an endpoint that names nothing
+    expect(at({ type: 'letter', key: 'letter:intro:0', letterId: 'intro' })).toBe(0);
+    // a named collection the rail does not hold falls back to the bare id rather than losing the link
+    expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty', collection: 'Gone Volume' })).toBe(1);
+  });
+
+  it("fix-review #10: an endpoint that names its scope is placed there or nowhere, never on another collection's same id", () => {
+    // a Volume that does not hold the id
+    expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty', volKey: 'two' })).toBeNull();
+    // a study not on the rail yet (the studies load lazily; the web rebuilds when they land)
+    expect(at({ type: 'study-letter', key: 'letter:intro:0', letterId: 'intro', studyId: 'not-loaded' })).toBeNull();
+    // a type that names its collection, on a rail without it
+    expect(placeEndpoint({ type: 'holy-days', key: 'wtlb:duty:0', entryId: 'duty' }, ctx)).toBeNull();
+    // the bare id is the answer only when the endpoint names no scope at all
+    expect(at({ type: 'letter', key: 'letter:duty:0', letterId: 'duty' })).toBe(1);
+    // and such a link is counted as skipped, not drawn to the wrong letter
+    const g = buildPersonalGraph([{ id: 'x', source: { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 },
+      target: { type: 'letter', key: 'letter:duty:0', letterId: 'duty', volKey: 'two' } }], sctx);
+    expect(g.count).toBe(0);
+    expect(g.skipped).toBe(1);
+  });
+
+  it('item 26: a key-only study endpoint reads "<book>-<chapter>" then the verse', () => {
+    expect(placeEndpoint({ type: 'study', key: 'study:matthew-22:11' }, ctx)).toMatchObject({ rail: 'bible', pos: 70 });
+    // the chapter-level key (verse slot 0) is the chapter's first verse
+    expect(placeEndpoint({ type: 'study', key: 'study:matthew-4:0' }, ctx)).toMatchObject({ rail: 'bible', pos: 50 });
+    // a fused bookId with no verse field takes the verse from the key
+    expect(placeEndpoint({ type: 'study', key: 'study:matthew-22:11', bookId: 'matthew-22' }, ctx)).toMatchObject({ rail: 'bible', pos: 70 });
+    // a bible key is unchanged: book, chapter, verse
+    expect(placeEndpoint({ type: 'bible', key: 'bible:beta:2:3' }, ctx)).toMatchObject({ rail: 'bible', pos: 32 });
+  });
+});
+
+describe('fix-review 2 #6: a link not on the web says why: waiting for its corpus, or naming what the web has no place for', () => {
+  const loaded = buildVotRail([
+    { volKey: 'one', label: 'Volume One', items: [{ id: 'duty', title: 'Duty' }] },
+    { volKey: 'two', label: 'Volume Two', items: [] },                       // its letters have not landed
+    { volKey: 'study-lamb-of-god', label: 'The Lamb of God', items: [{ id: 'intro', title: 'Lamb ch1' }] },
+  ]);
+  const noStudies = buildVotRail([{ volKey: 'one', label: 'Volume One', items: [{ id: 'duty', title: 'Duty' }] }]);
+  const why = (ep, rail) => unplacedReason(ep, { verseIdOf, votRail: rail });
+  it('pending: the corpus, its collection or the studies have not landed', () => {
+    expect(why({ type: 'letter', letterId: 'duty', volKey: 'one' }, buildVotRail([]))).toBe('pending');
+    expect(why({ type: 'letter', letterId: 'duty', volKey: 'one' }, null)).toBe('pending');
+    expect(why({ type: 'letter', letterId: 'x', volKey: 'two' }, loaded)).toBe('pending');
+    expect(why({ type: 'study-letter', letterId: 'intro', studyId: 'lamb-of-god' }, noStudies)).toBe('pending');
+    // a bare id while a collection is still empty
+    expect(why({ type: 'letter', letterId: 'gone' }, loaded)).toBe('pending');
+  });
+  it('unknown: the scope is on the web without the id, or names nothing the web holds', () => {
+    expect(why({ type: 'letter', letterId: 'gone', volKey: 'one' }, loaded)).toBe('unknown');
+    // the walk's seeding: a volKey no collection has ("volume-one" for "one"), on a loaded web
+    expect(why({ type: 'letter', letterId: 'duty', volKey: 'volume-one' }, noStudies)).toBe('unknown');
+    // a study the loaded studies do not hold
+    expect(why({ type: 'study-letter', letterId: 'intro', studyId: 'renamed' }, loaded)).toBe('unknown');
+    expect(why({ type: 'letter', letterId: 'gone' }, noStudies)).toBe('unknown');
+    // the Bible rail is whole from the first frame, so a verse it cannot place never arrives
+    expect(why({ type: 'bible', bookId: 'nope', chapter: 1, verse: 1 }, loaded)).toBe('unknown');
+    expect(why(null, loaded)).toBe('unknown');
+    expect(why({ type: 'nonsense' }, loaded)).toBe('unknown');
+  });
+  it('buildPersonalGraph counts the waiting ones apart: a link waits only when every side it could not place waits', () => {
+    const src = { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 };
+    const g = buildPersonalGraph([
+      { id: 'a', source: src, target: { type: 'letter', letterId: 'x', volKey: 'two' } },          // waits for Vol II
+      { id: 'b', source: src, target: { type: 'letter', letterId: 'duty', volKey: 'volume-one' } },  // never placed
+      { id: 'c', source: { type: 'bible', bookId: 'nope', chapter: 1 }, target: { type: 'letter', letterId: 'x', volKey: 'two' } },
+      { id: 'd', source: src, target: { type: 'letter', letterId: 'duty', volKey: 'one' } },         // placed
+    ], { verseIdOf, votRail: loaded });
+    expect(g.count).toBe(1);
+    expect(g.skipped).toBe(3);
+    expect(g.pending).toBe(1);
+  });
+});
+
+describe('w3 counts: a record is drawn and counted once', () => {
+  it('a link record the store holds twice (same id) is one link, and not a skipped one', () => {
+    const one = { id: 'L1', source: { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 }, target: { type: 'letter', letterId: 'duty' } };
+    const g = buildPersonalGraph([one, Object.assign({}, one), { id: 'L2', source: one.source, target: { type: 'letter', letterId: 'gone' } }], ctx);
+    expect(g.count).toBe(1);
+    expect(g.skipped).toBe(1);
+  });
+
+  it('two links between the same two places are both the reader’s, so both stay', () => {
+    const a = { type: 'bible', bookId: 'alpha', chapter: 1, verse: 1 }, b = { type: 'letter', letterId: 'duty' };
+    expect(buildPersonalGraph([{ id: 'x', source: a, target: b }, { id: 'y', source: b, target: a }], ctx).count).toBe(2);
+  });
+
+  it('a curated edge listed twice is one thread: the count is the threads drawn', () => {
+    const u = buildCuratedUnderlay([
+      { v: 5, kind: 'footnote', volKey: 'one', letterId: 'duty' },
+      { v: 5, kind: 'votNote', volKey: 'one', letterId: 'duty' },
+      { v: 6, kind: 'footnote', volKey: 'one', letterId: 'duty' },
+    ], ctx);
+    expect(u.count).toBe(2);
+    expect(Array.from(u.versePos)).toEqual([5, 6]);
+  });
+
+  it('item 30: a link is found again by its id, whatever its index became', () => {
+    const mk = (id, verse) => ({ id, source: { type: 'bible', bookId: 'alpha', chapter: 1, verse }, target: { type: 'letter', letterId: 'duty' } });
+    const before = buildPersonalGraph([mk('a', 1), mk('b', 2), mk('c', 3)], ctx);
+    const after = buildPersonalGraph([mk('b', 2), mk('c', 3)], ctx);
+    expect(linkIndexById(before, 'c')).toBe(2);
+    expect(linkIndexById(after, 'c')).toBe(1);
+    expect(linkIndexById(after, 'a')).toBe(-1);
+    expect(linkIndexById(null, 'a')).toBe(-1);
   });
 });

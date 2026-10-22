@@ -78,6 +78,9 @@ describe('Scripture Web: the pointer map reads the root\'s own box (v2p8)', () =
     const was = { w: window.innerWidth, h: window.innerHeight };
     Object.defineProperty(window, 'innerWidth', { configurable: true, value: 360 });
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 780 });
+    // main turns only a phone (Q11, use-forced-landscape.js wantsRotation): a coarse primary pointer
+    const mm = window.matchMedia;
+    window.matchMedia = /** @type {any} */ ((q) => ({ matches: /coarse/.test(q), media: q, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} }));
     try {
       const { root, loc } = await mountWeb();
       expect(root.classList.contains('sw-rotated'), 'the web is turned').toBe(true);
@@ -90,6 +93,7 @@ describe('Scripture Web: the pointer map reads the root\'s own box (v2p8)', () =
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: was.w });
       Object.defineProperty(window, 'innerHeight', { configurable: true, value: was.h });
+      window.matchMedia = mm;
     }
   });
 

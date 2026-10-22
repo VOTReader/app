@@ -35,9 +35,10 @@
 */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, fireEvent } from '@testing-library/react';
 import { useReadingPositionNav } from './use-reading-position-nav.js';
 import { ProphecyCardsStore } from '../stores/prophecy-cards-store.js';
+import { SEARCH_LOOK_MS } from '../utils/search-visit.js';
 
 // The code under test imports these; the test stubs them as globals (bridge-imports, v15-code-health-04).
 vi.mock('../data/scripture-resolution.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get COL_BY_KEY() { return /** @type {any} */ (globalThis).COL_BY_KEY; }, get COL_BY_LETTER_SC() { return /** @type {any} */ (globalThis).COL_BY_LETTER_SC; } }; });
@@ -551,5 +552,181 @@ describe('useReadingPositionNav — catch-all position arm', () => {
     rerender({ ...props, chapterNum: 3 });
     expect(props.setActiveReadKey).toHaveBeenCalledTimes(2);
     expect(props.setActiveReadKey.mock.calls[1][0]).toBe('proverbs');
+  });
+});
+
+/* search200 UX B1: a search hit is a look, not a read. useSearch names the place a
+   hit opens (the searchLanding tab field, declared here); while the reader is still
+   on that place with the search breadcrumb live, the arm leaves the cursor alone
+   (the index's "current" mark, the resume dot, the streak dwell). Any other reading
+   place is reading again: it arms as before and retires the landing. */
+describe('useReadingPositionNav — a search landing is not armed (search200 UX B1)', () => {
+  let _prevColByLetterSc;
+  beforeEach(() => {
+    _prevColByLetterSc = window.COL_BY_LETTER_SC;
+    window.COL_BY_LETTER_SC = new Map([['vot-letter', { volKey: 'two', letterScreen: 'vot-letter' }]]);
+  });
+  afterEach(() => { window.COL_BY_LETTER_SC = _prevColByLetterSc; });
+
+  /** A tabField whose searchLanding starts at `landing`; the setter records and stores. */
+  const tabFieldWith = (landing) => {
+    const store = { searchLanding: landing };
+    const setters = {};
+    const tf = (key) => {
+      if (!setters[key]) setters[key] = vi.fn((v) => { store[key] = typeof v === 'function' ? v(store[key]) : v; });
+      return [store[key], setters[key]];
+    };
+    tf.setters = setters;
+    return tf;
+  };
+
+  it('the letter a hit opened arms nothing', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    const { props } = setup({ tabField, fromSearch: true, screen: 'vot-letter', letterId: 'grafted-in' });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(props.setLastReadLetterMap).not.toHaveBeenCalled();
+  });
+
+  it('the chapter a hit opened arms nothing', () => {
+    const tabField = tabFieldWith('bible-ch:proverbs:2');
+    const { props } = setup({ tabField, fromSearch: true, screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+  });
+
+  it('the next chapter is reading again: it arms once and retires the landing', () => {
+    const tabField = tabFieldWith('bible-ch:proverbs:2');
+    const props = { ...baseProps(), tabField, fromSearch: true, screen: 'bible-ch', bookId: 'proverbs', chapterNum: 2 };
+    const { rerender } = renderHook((p) => useReadingPositionNav(p), { initialProps: props });
+    rerender({ ...props, chapterNum: 3 });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    expect(props.setActiveReadKey.mock.calls[0][0]).toBe('proverbs');
+    expect(tabField.setters.searchLanding).toHaveBeenCalledWith(null);
+  });
+
+  it('the same place reached with the search breadcrumb spent (an index pick) is a read', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    const { props } = setup({ tabField, fromSearch: false, screen: 'vot-letter', letterId: 'grafted-in' });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    expect(tabField.setters.searchLanding).toHaveBeenCalledWith(null);
+  });
+
+  it('a screen that is not for reading leaves the landing for the return to the hit', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    setup({ tabField, fromSearch: false, screen: 'search' });
+    expect(tabField.setters.searchLanding).not.toHaveBeenCalled();
+  });
+
+  it('returns the landing and its setter for useSearch and the routes', () => {
+    const tabField = tabFieldWith('vot-letter:grafted-in');
+    const { result } = setup({ tabField, fromSearch: true, screen: 'vot-letter', letterId: 'grafted-in' });
+    expect(result.current.searchLanding).toBe('vot-letter:grafted-in');
+    expect(typeof result.current.setSearchLanding).toBe('function');
+  });
+});
+
+/* search200 UX B1 review: the look ends when the reader reads. The landing used to
+   hold for the whole visit, so a letter found by search and read to the end got no
+   resume point (and the routes kept its read tracker off): the same read reached from
+   the library counted. Now the reader's own scroll on the page (a drag, a wheel, a
+   scroll key, the scrollbar), or staying SEARCH_LOOK_MS on it with the app on screen,
+   retires the landing; the place then arms like any other. A tap in and out, or the
+   jump to the hit (a scroll with no hand near it), still records nothing. */
+describe('useReadingPositionNav — the look ends when the reader reads (search200 UX B1 review)', () => {
+  let _prevColByLetterSc; let page; let vis;
+  beforeEach(() => {
+    _prevColByLetterSc = window.COL_BY_LETTER_SC;
+    window.COL_BY_LETTER_SC = new Map([['vot-letter', { volKey: 'two', letterScreen: 'vot-letter' }]]);
+    page = document.createElement('div');
+    page.className = 'screen-scroll';
+    document.body.appendChild(page);
+    vis = 'visible';
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => vis });
+  });
+  afterEach(() => {
+    window.COL_BY_LETTER_SC = _prevColByLetterSc;
+    page.remove();
+    Reflect.deleteProperty(document, 'visibilityState');   // the own stub; jsdom's getter is back
+    vi.useRealTimers();
+  });
+
+  /** The hook on the letter a hit opened, with a live searchLanding tab field (its setter re-renders). */
+  const onTheLanding = (over = {}) => {
+    const props = { ...baseProps(), fromSearch: true, screen: 'vot-letter', letterId: 'grafted-in', ...over };
+    const landing = { current: /** @type {string | null} */ (null) };
+    const view = renderHook((p) => {
+      const field = React.useState(/** @type {string | null} */ ('vot-letter:grafted-in'));
+      landing.current = field[0];
+      return useReadingPositionNav({ ...p, tabField: (key) => (key === 'searchLanding' ? field : [null, null]) });
+    }, { initialProps: props });
+    return { ...view, props, landing };
+  };
+  /** The arm's cursor write, run the way useReadingDwell runs it. */
+  const committedLetter = (props) => {
+    const [key, commit] = props.setActiveReadKey.mock.calls[0];
+    commit();
+    const update = props.setLastReadLetterMap.mock.calls[0][0];
+    return { key, map: update({}) };
+  };
+
+  it('the reader\'s own scroll ends the look: the letter becomes the resume point', () => {
+    const { props, landing } = onTheLanding();
+    expect(props.setActiveReadKey, 'the landing itself').not.toHaveBeenCalled();
+    act(() => { fireEvent.touchMove(page); fireEvent.scroll(page); });
+    expect(landing.current, 'the landing retired').toBe(null);
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+    expect(committedLetter(props)).toEqual({ key: 'vol:two', map: { two: 'grafted-in' } });
+  });
+
+  it('staying on the page ends the look too (SEARCH_LOOK_MS with the app on screen)', () => {
+    vi.useFakeTimers();
+    const { props, landing } = onTheLanding();
+    act(() => { vi.advanceTimersByTime(SEARCH_LOOK_MS - 1); });
+    expect(props.setActiveReadKey, 'still a look').not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(landing.current).toBe(null);
+    expect(committedLetter(props).key).toBe('vol:two');
+  });
+
+  it('time with the app in the background is not a stay', () => {
+    vi.useFakeTimers();
+    const { props } = onTheLanding();
+    act(() => { vi.advanceTimersByTime(SEARCH_LOOK_MS / 2); });
+    act(() => { vis = 'hidden'; document.dispatchEvent(new Event('visibilitychange')); });
+    act(() => { vi.advanceTimersByTime(SEARCH_LOOK_MS * 4); });
+    expect(props.setActiveReadKey, 'backgrounded').not.toHaveBeenCalled();
+    act(() => { vis = 'visible'; document.dispatchEvent(new Event('visibilitychange')); });
+    act(() => { vi.advanceTimersByTime(SEARCH_LOOK_MS / 2 - 1); });
+    expect(props.setActiveReadKey, 'the two halves are not yet the whole').not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1); });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('a tap in and out records nothing: the jump to the hit, a short stay, then away', () => {
+    vi.useFakeTimers();
+    const { props, landing, rerender } = onTheLanding();
+    act(() => { fireEvent.scroll(page); });                        // the jump to the hit: no hand near it
+    act(() => { vi.advanceTimersByTime(SEARCH_LOOK_MS - 1000); });
+    rerender({ ...props, screen: 'search', letterId: 'grafted-in' });   // back to the results
+    act(() => { vi.advanceTimersByTime(SEARCH_LOOK_MS * 2); });
+    act(() => { fireEvent.touchMove(page); fireEvent.scroll(page); });  // the results' own scroll
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    expect(landing.current, 'kept for the return to the same hit').toBe('vot-letter:grafted-in');
+  });
+
+  it('the look ends once: later scrolls on the same place do not arm it again', () => {
+    const { props } = onTheLanding();
+    act(() => { fireEvent.touchMove(page); fireEvent.scroll(page); });
+    act(() => { fireEvent.wheel(page); fireEvent.scroll(page); });
+    expect(props.setActiveReadKey).toHaveBeenCalledTimes(1);
+  });
+
+  it('a peek clone\'s scroll (a swipe toward the next letter) is not the page\'s', () => {
+    const { props } = onTheLanding();
+    const peek = document.createElement('div'); peek.setAttribute('inert', '');
+    const clone = document.createElement('div'); clone.className = 'screen-scroll';
+    peek.appendChild(clone); document.body.appendChild(peek);
+    act(() => { fireEvent.touchMove(clone); fireEvent.scroll(clone); });
+    expect(props.setActiveReadKey).not.toHaveBeenCalled();
+    peek.remove();
   });
 });

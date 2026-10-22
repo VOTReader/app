@@ -16,7 +16,23 @@
 import { isAttribution } from './answers-shelves.js';
 
 const HEADING_RE = /^\*\*([^*]+)\*\*$/;
+const ALL_ITALIC_RE = /^_[\s\S]*_$/;
 const SOURCE_RE = /^~ \[From ["“”](.+?)["“”]\s*~\s*(.+?)\]$/;
+
+/**
+ * The heading a paragraph is, or null: a centred line that is bold from end to end, unless its words are
+ * italic too. The site never italicises a heading; the corpus's bold-italic centred lines (three) close
+ * poems ("**_YAHUSHUA-YAHUWAH._**"), and reading one as a heading split a passage from its own title, so
+ * the sheet showed "The Only Truth 0" over a row named "_YAHUSHUA-YAHUWAH._" (Corbin, 2026-10-21).
+ * @param {{ text?: string, align?: string } | null | undefined} p
+ * @param {string} text the paragraph's text, trimmed
+ * @returns {string | null} the heading's words
+ */
+function headingOf(p, text) {
+  if (!p || p.align !== 'center') return null;
+  const h = HEADING_RE.exec(text);
+  return h && !ALL_ITALIC_RE.test(h[1]) ? h[1] : null;
+}
 
 /**
  * @typedef {{ index: number, title: string, collection: string }} ContentsPassage
@@ -45,9 +61,9 @@ export function answersContents(entry) {
   paras.forEach((p, i) => {
     const text = p && typeof p.text === 'string' ? p.text.trim() : '';
     if (!text) return;
-    const h = p.align === 'center' ? HEADING_RE.exec(text) : null;
+    const h = headingOf(p, text);
     if (h) {
-      current = { title: h[1].replace(/‗/g, '_').trim(), index: i, passages: [] };
+      current = { title: h.replace(/‗/g, '_').trim(), index: i, passages: [] };
       sections.push(current);
       start = -1;
       return;
@@ -114,7 +130,7 @@ export function passageSource(paragraphs, from, to) {
     const text = p && typeof p.text === 'string' ? p.text.trim() : '';
     if (!text) continue;
     if (isAttribution(text)) return i >= to ? answersSource(text) : null;
-    if (i > from && p.align === 'center' && HEADING_RE.test(text)) return null;
+    if (i > from && headingOf(p, text)) return null;
   }
   return null;
 }
@@ -127,7 +143,7 @@ export function passageSource(paragraphs, from, to) {
  */
 export function isQuotedWords(p) {
   const text = p && typeof p.text === 'string' ? p.text.trim() : '';
-  return !!text && !isAttribution(text) && text !== '✦' && !(p.align === 'center' && HEADING_RE.test(text));
+  return !!text && !isAttribution(text) && text !== '✦' && !headingOf(p, text);
 }
 
 const HEADER_LINE_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
@@ -149,7 +165,7 @@ export function passageTextBefore(paragraphs, sourceIndex) {
     const p = paras[i];
     const text = p && typeof p.text === 'string' ? p.text.trim() : '';
     if (!text) continue;
-    if (isAttribution(text) || text === '✦' || (p.align === 'center' && HEADING_RE.test(text))) break;
+    if (isAttribution(text) || text === '✦' || headingOf(p, text)) break;
     if (HEADER_LINE_RE.test(text)) continue;
     out.unshift(text);
   }

@@ -19,6 +19,87 @@ function wholeOnly(t) {
   return t.length <= 2 || !!(stop && stop.has(t));
 }
 
+/* THE MARKS' RULE (search200 B7): a word of the FULLER stop list marks only itself
+   too. The engine searches "who", "not", "how" for their meaning (the trimmed list
+   above is the words it does not search), and they marked every word they start:
+   "who" marked "whom" and "whole", "not" marked "nothing". A form the engine did
+   match comes in the card's own terms (entry.terms) and is marked as itself. The
+   engine's landing (matchExcerpt) keeps wholeOnly: the screen's marks must not
+   move the search. */
+/** @param {string} t  lowercase */
+function wholeOnlyMark(t) {
+  if (wholeOnly(t)) return true;
+  const full = searchData().STOP_WORDS;
+  return !!(full && full.has(t));
+}
+
+/** A small word a run of typed words may hold between two of them ("faith is the substance"). */
+/** @param {string} w */
+function isGlue(w) {
+  const d = searchData();
+  const t = w.toLowerCase();
+  return !!((d.STOP_WORDS && d.STOP_WORDS.has(t)) || (d.STOP_WORDS_TRIMMED && d.STOP_WORDS_TRIMMED.has(t)));
+}
+
+/* AN ANSWERS DATELINE IS NOT CONTENT (search200 B7). A topic gathers words given on
+   many dates, each headed "7/5/10 From The Lord, Our God and Savior The Word of The
+   Lord Spoken to Timothy For All Those Who Have Ears to Hear": the Lord in every
+   topic, so a card for "lord" quoted a dateline. A header is a date, "from" within
+   40 characters of it ("1/18/06 An Exhortation from Timothy"), and, before the next
+   date and within 320 characters, "Ears to Hear" (or, in the few that stop there,
+   "Spoken to Timothy"); a short line before the FIRST one is the topic's title ("The
+   Name of The Lord"), which the card's headline already shows. */
+const DATE_AT = /(?<![\p{N}/])\d{1,2}\/\d{1,2}\/\d{2,4}(?![\p{N}/])/gu;
+const DATE_IN = /(?<![\p{N}/])\d{1,2}\/\d{1,2}\/\d{2,4}(?![\p{N}/])/u;
+const FROM_NEAR = /(?:^|[^\p{L}])from\s/u;
+const HEAD_REACH = 320;
+const HEAD_ENDS = ['ears to hear', 'spoken to timothy'];
+const TITLE_REACH = 100;
+/** The last text asked about: one card asks four times (its hits, its window, its places). */
+let headMemo = { text: '', ranges: /** @type {Array<{ start: number, end: number }>} */ ([]) };
+/**
+ * @param {string} text
+ * @returns {Array<{ start: number, end: number }>}
+ */
+function headerRanges(text) {
+  if (!text || text.indexOf('/') < 0) return [];
+  if (headMemo.text === text) return headMemo.ranges;
+  const lower = text.toLowerCase();
+  const out = [];
+  if (HEAD_ENDS.some((k) => lower.indexOf(k) >= 0)) {
+    DATE_AT.lastIndex = 0;
+    let m;
+    while ((m = DATE_AT.exec(text)) !== null) {
+      const after = m.index + m[0].length;
+      if (!FROM_NEAR.test(lower.slice(after, after + 40))) continue;
+      // the header is this date's: it stops at the next date
+      const reach = lower.slice(after, m.index + HEAD_REACH);
+      const nextDate = DATE_IN.exec(reach);
+      const within = nextDate ? reach.slice(0, nextDate.index) : reach;
+      let end = -1;
+      for (const k of HEAD_ENDS) { const i = within.indexOf(k); if (i >= 0) { end = after + i + k.length; break; } }
+      if (end < 0) continue;
+      out.push({ start: out.length || m.index > TITLE_REACH ? m.index : 0, end });
+      DATE_AT.lastIndex = end;
+    }
+  }
+  headMemo = { text, ranges: out };
+  return out;
+}
+
+/** Where the words start when `at` falls in a dateline (or the text opens on one): past it. */
+/** @param {string} text @param {number} at */
+function pastHeader(text, at) {
+  for (const h of headerRanges(text)) {
+    if (at >= h.start && at < h.end) {
+      let i = h.end;
+      while (i < text.length && !WORD_CHAR.test(text[i])) i++;
+      return i < text.length ? i : at;
+    }
+  }
+  return at;
+}
+
 /* Whole words only (2026-09-22). The engine tokenises on word boundaries, so a term
    found INSIDE another word ("one" in "everyone", "love" in "Beloved") is never what
    it matched on. A hit starts where a word starts and is marked to the word's end
@@ -111,14 +192,16 @@ const FAMILY_CACHE = new Map();
  * @param {string[]} terms
  * @returns {Array<{ idx: number, len: number, term: string, primary: boolean, form?: boolean }>}
  */
-function occurrences(text, terms) {
+function occurrences(text, terms, marks = false) {
   if (!text || !terms || !terms.length) return [];
+  const whole = marks ? wholeOnlyMark : wholeOnly;
   const fams = familiesOf(terms);
   const expanded = [...fams.keys()]
     .filter((t) => t.length >= 2)
     .sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
   const lower = text.toLowerCase();
   const at = new Map();
+  /** @type {string[]} the terms the text holds nowhere as written */ const unmet = [];
   for (let i = 0; i < expanded.length; i++) {
     const t = expanded[i];
     const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
@@ -126,11 +209,70 @@ function occurrences(text, terms) {
     let n = 0;
     while (idx >= 0 && n < 400) {
       // longer terms come later, so the last write at a position is the longest
-      if (startsWord(lower, idx) && !(wholeOnly(t) && WORD_CHAR.test(lower[idx + t.length] || ''))) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
+      if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(lower[idx + t.length] || ''))) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
       idx = lower.indexOf(t, idx + t.length);
+    }
+    if (!n) unmet.push(t);
+  }
+  const joined = unmet.length && APOSTROPHE.test(lower) ? joinedNames(lower) : null;
+  if (joined) {
+    for (const t of unmet) {
+      const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
+      let v = joined.view.indexOf(t);
+      let n = 0;
+      while (v >= 0 && n < 400) {
+        const idx = joined.at(v);
+        const len = joined.at(v + t.length - 1) + 1 - idx;
+        const o = at.get(idx);
+        if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(joined.view[v + t.length] || '')) && (!o || o.len < len)) { at.set(idx, { idx, len, term: f.fam, primary: f.primary }); n++; }
+        v = joined.view.indexOf(t, v + t.length);
+      }
     }
   }
   return [...at.values()].sort((a, b) => a.idx - b.idx);
+}
+
+/* A NAME WRITTEN WITH AN INNER APOSTROPHE IS ONE WORD HERE TOO (the settle, the red team's rt1-shapes). The tokenizer
+   joins "Tz’va’ot" and "Sha’ul" across their apostrophes (tokenize.js INNER_APOSTROPHE), so a typed "tzvaot" found its
+   letter; the landing and the marks read the text as written and met no "tzvaot" in it, and the letter opened at its
+   top. A term the text holds nowhere as written is looked for with those apostrophes out, as the tokenizer reads them:
+   a clitic after one (a possessive's "s", "t", "ll", "re", "ve", "d", "m") stays apart. */
+const APOSTROPHE = /['’‘ʼ]/;
+const INNER_APOSTROPHE = /(?<=[a-z])['’‘ʼ]([a-z]+)(?![a-z0-9])/g;
+const CLITICS = new Set(['s', 't', 'll', 're', 've', 'd', 'm']);
+/**
+ * `lower` with each inner apostrophe the tokenizer joins a name across taken out (`view`), and where a place in the
+ * view sits in `lower` (`at`); null when it has none.
+ * @param {string} lower
+ * @returns {{ view: string, at: (v: number) => number } | null}
+ */
+function joinedNames(lower) {
+  /** @type {number[]} */ const cut = [];
+  INNER_APOSTROPHE.lastIndex = 0;
+  for (let m = INNER_APOSTROPHE.exec(lower); m; m = INNER_APOSTROPHE.exec(lower)) if (!CLITICS.has(m[1])) cut.push(m.index);
+  if (!cut.length) return null;
+  let view = '';
+  let from = 0;
+  for (const c of cut) { view += lower.slice(from, c); from = c + 1; }
+  view += lower.slice(from);
+  // past each apostrophe taken out before it (the k-th stood at view place cut[k] - k)
+  const at = (/** @type {number} */ v) => { let k = 0; while (k < cut.length && cut[k] - k <= v) k++; return v + k; };
+  return { view, at };
+}
+
+/**
+ * The hits a result CARD shows (search200 B7): the marks' rule for stop words, and no
+ * hit inside an Answers dateline unless only a dateline holds the words.
+ * @param {string} text
+ * @param {string[]} terms
+ */
+function cardOccurrences(text, terms) {
+  const occ = occurrences(text, terms, true);
+  if (!occ.length) return occ;
+  const heads = headerRanges(text);
+  if (!heads.length) return occ;
+  const body = occ.filter((o) => !heads.some((h) => o.idx >= h.start && o.idx < h.end));
+  return body.length ? body : occ;
 }
 
 /** How often each word family occurs: the rarer a query word is in THIS text, the
@@ -216,8 +358,9 @@ function bestIn(occ, maxLen) {
 export function snippet(text, terms, maxLen) {
   maxLen = maxLen || 180;
   if (!text) return '';
-  const m = bestMatch(text, terms, maxLen);
+  const m = bestIn(cardOccurrences(text, terms), maxLen);
   if (!m) {
+    if (pastHeader(text, 0) > 0) return snippetAt(text, 0, maxLen);
     if (text.length <= maxLen) return text;
     return text.slice(0, closeBetweenWords(text, 0, maxLen, 0)) + '…';
   }
@@ -237,7 +380,7 @@ export function snippet(text, terms, maxLen) {
 export function snippetAt(text, start, maxLen) {
   maxLen = maxLen || 180;
   if (!text) return '';
-  start = Math.max(0, Math.min(start, text.length));
+  start = pastHeader(text, Math.max(0, Math.min(start, text.length)));
   const end = closeBetweenWords(text, start, Math.min(text.length, start + maxLen), start);
   const clip = text.slice(start, end).trim();
   return end < text.length ? clip + '…' : clip;
@@ -260,6 +403,15 @@ function clipAround(text, m, maxLen) {
   // the last hit is a whole word too ("love" found in "loved" keeps the "d")
   let matchEnd = m.start + m.span;
   while (insideWord(text, matchEnd)) matchEnd++;
+  // a card's window is the words, never an Answers dateline before or after them (search200 B7)
+  for (const h of headerRanges(text)) {
+    if (start < h.end && h.end <= m.start) {
+      start = h.end;
+      while (start < m.start && !WORD_CHAR.test(text[start])) start++;
+      end = Math.max(end, Math.min(text.length, start + maxLen));
+    }
+    if (h.start >= matchEnd && h.start < end) end = h.start;
+  }
   start = openBetweenWords(text, start, m.start);
   end = closeBetweenWords(text, start, Math.max(end, matchEnd), matchEnd);
   let clip = text.slice(start, end).trim();
@@ -422,7 +574,7 @@ const SHOWN_FROM = 60;
  */
 export function morePlaces(text, terms, maxLen, shownAt) {
   maxLen = maxLen || 120;
-  const occ = occurrences(text, terms);
+  const occ = cardOccurrences(text, terms);
   if (!occ.length) return [];
   const freq = familyCounts(occ);
   if (typeof shownAt === 'number') return placesBesides(text, occ, freq, maxLen, shownAt);
@@ -464,7 +616,9 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
 /**
  * EVERY place a unit's text matches, the snippet's own included, each with its
  * hits: what the reader's find bar steps through ("2 of 3") and marks, over the
- * text the reading screen renders. Same places as a result card lists.
+ * text the reading screen renders. Same places as a result card lists, by the
+ * marks' rule (search200 UX D6): a word of the fuller stop list counts only as
+ * itself, so a typed "who" no longer marks and counts "whom" and "whoever".
  * @param {string} text
  * @param {string[]} terms
  * @param {number} [maxLen=120]
@@ -472,7 +626,7 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
  */
 export function findPlaces(text, terms, maxLen) {
   maxLen = maxLen || 120;
-  const occ = occurrences(text, terms);
+  const occ = occurrences(text, terms, true);
   if (!occ.length) return [];
   const freq = familyCounts(occ);
   const places = cluster(occ, maxLen, freq);
@@ -483,9 +637,10 @@ export function findPlaces(text, terms, maxLen) {
  * Split text into {text, hit} spans for rendering — hit spans get <mark>.
  * @param {string} text
  * @param {string[]} terms
+ * @param {string[]} [typed]  the words the reader typed, when `terms` adds the engine's forms
  * @returns {Array<{text:string, hit:boolean}>}
  */
-export function highlightSpans(text, terms) {
+export function highlightSpans(text, terms, typed) {
   if (!text) return [{ text: '', hit: false }];
   if (!terms || !terms.length) return [{ text, hit: false }];
   const expanded = expandArchaicTerms(terms);
@@ -495,26 +650,115 @@ export function highlightSpans(text, terms) {
     if (t && t.length >= 2) tokens.push(t);
   }
   if (!tokens.length) return [{ text, hit: false }];
-  const escape = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // a phrase's words may wrap or sit two spaces apart in the text
+  const escape = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
   const longerFirst = (/** @type {string} */ a, /** @type {string} */ b) => b.length - a.length;
   // a hit starts a word and runs to its end: "love" marks "loves" whole, never "Be-love-d";
-  // a short word or a stop word marks only itself ("ye", never "Yet")
-  const reach = tokens.filter((t) => !wholeOnly(t)).map(escape).sort(longerFirst);
-  const whole = tokens.filter(wholeOnly).map(escape).sort(longerFirst);
+  // a short word or a stop word marks only itself ("ye", never "Yet"; "who", never "whom")
+  const reach = tokens.filter((t) => !wholeOnlyMark(t)).map(escape).sort(longerFirst);
+  const whole = tokens.filter(wholeOnlyMark).map(escape).sort(longerFirst);
   const alts = [];
   if (reach.length) alts.push('(?:' + reach.join('|') + ')[\\p{L}\\p{N}]*');
   if (whole.length) alts.push('(?:' + whole.join('|') + ')(?![\\p{L}\\p{N}])');
   let re;
   try { re = new RegExp('(?<![\\p{L}\\p{N}])(?:' + alts.join('|') + ')', 'giu'); } catch { return [{ text, hit: false }]; }
+  // which typed word a hit is (search200 UX D8): a word the reader typed is its own word, so
+  // "king of kings" typed whole is one mark; what search added for it is its word's family
+  // ("loved" and "loves" are a typed love's, and so is its synonym "charity"; familiesOf). One
+  // word said twice is no run: by the longest term a hit starts with alone, "holy" marked
+  // "Holiest of Holies" whole; by family alone, "king of kings" marked "KING" and "KINGS".
+  const byLen = tokens.slice().sort(longerFirst);
+  const fams = familiesOf(terms);
+  const own = typedOwn(typed && typed.length ? typed : terms);
+  const tokOf = (/** @type {string} */ s) => {
+    const l = s.toLowerCase();
+    const t = byLen.find((x) => l.startsWith(x)) || l;
+    if (own.has(t)) return t;
+    const f = fams.get(t);
+    return f ? f.fam : t;
+  };
+  /** @type {Array<{text:string, hit:boolean}>} */
   const out = [];
   let last = 0;
+  let lastTok = '';
   let m;
   while ((m = re.exec(text)) !== null) {
-    if (m.index > last) out.push({ text: text.slice(last, m.index), hit: false });
-    out.push({ text: m[0], hit: true });
+    const gap = text.slice(last, m.index);
+    const prev = out[out.length - 1];
+    const tok = tokOf(m[0]);
+    if (prev && prev.hit && joinsRun(gap, tok !== lastTok)) prev.text += gap + m[0];
+    else {
+      if (gap) out.push({ text: gap, hit: false });
+      out.push({ text: m[0], hit: true });
+    }
+    lastTok = tok;
     last = m.index + m[0].length;
     if (m.index === re.lastIndex) re.lastIndex++;
   }
   if (last < text.length) out.push({ text: text.slice(last), hit: false });
-  return out.length ? out : [{ text, hit: false }];
+  return out.length ? besideTyped(out, typed && typed.length ? typed : terms) : [{ text, hit: false }];
+}
+
+/**
+ * The words the reader typed, out of a card's typed list (search200 UX D8 review). The screen
+ * hands the typed words with the synonym table's words for them after (SearchScreen
+ * expandSnippetTerms: "righteous" brings "just", "justified"), so a word that table gives for
+ * an earlier typed word is that word's synonym, not one the reader typed: "just as He is
+ * righteous" stays two marks for a lone "righteous".
+ * @param {string[]} typed
+ * @returns {Set<string>}
+ */
+function typedOwn(typed) {
+  const SYN = /** @type {Record<string, string[]>} */ (searchData().SYNONYM_MAP || {});
+  /** @type {Set<string>} */
+  const own = new Set();
+  for (const t of typed) {
+    const w = String(t || '').toLowerCase().trim();
+    if (!w || own.has(w)) continue;
+    let added = false;
+    for (const x of own) if (SYN[x] && SYN[x].indexOf(w) >= 0) { added = true; break; }
+    if (!added) own.add(w);
+  }
+  return own;
+}
+
+/* A SMALL WORD MARKS ONLY BESIDE A TYPED ONE (search200 B7). Once a real word was typed,
+   a mark holding only small words (the stop lists) is no mark: "those who mourn" marked
+   every "who" in the text; it marks "who mourn". A card's terms carry the engine's matched
+   forms too, so the typed words come apart (`typed`); when only small words were typed
+   ("who") they are the search, and every one marks. */
+/** @param {string} t */
+function hasRealWord(t) {
+  return String(t).split(/[^\p{L}\p{N}'’]+/u).some((w) => !!w && !isGlue(w));
+}
+/**
+ * @param {Array<{text:string, hit:boolean}>} spans
+ * @param {string[]} typed
+ */
+function besideTyped(spans, typed) {
+  if (!typed.some(hasRealWord)) return spans;
+  /** @type {Array<{text:string, hit:boolean}>} */
+  const out = [];
+  for (const s of spans) {
+    if (s.hit && hasRealWord(s.text)) { out.push(s); continue; }
+    const prev = out[out.length - 1];
+    if (prev && !prev.hit) prev.text += s.text;
+    else out.push({ text: s.text, hit: false });
+  }
+  return out;
+}
+
+/* THE TYPED WORDS IN A ROW ARE ONE MARK (search200 B7): "still waters" read as two
+   marks with a gap, "faith is the substance" as two words. Two hits of different typed
+   words join when only spaces lie between them, or up to three small words (the stop
+   lists); never across punctuation or a word that was not typed. One word said twice
+   stays two marks, across small words ("loved them and loves") or only a space: "sleep
+   drunken" marked "sleep sleep" whole in KJV 1 Thessalonians 5:7 (search200 UX D8). */
+/** @param {string} gap  the text between two hits @param {boolean} twoWords  the hits are different typed words */
+function joinsRun(gap, twoWords) {
+  if (!gap || !twoWords) return false;
+  if (gap.trim() === '') return true;
+  if (!/^\s/.test(gap) || !/\s$/.test(gap)) return false;
+  const words = gap.trim().split(/\s+/);
+  return words.length <= 3 && words.every((w) => /^[\p{L}'’]+$/u.test(w) && isGlue(w));
 }

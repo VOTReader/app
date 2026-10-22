@@ -1,0 +1,134 @@
+// @ts-nocheck
+/* Where the docked panel sits and what it covers (spec section 3, Q12) and the inset's one writer
+   (CONTRACTS.md section 5): the numbers, then the hooks on a root of a given size. */
+import { describe, it, expect, vi } from 'vitest';
+import { renderHook } from '@testing-library/react';
+import {
+  panelLayout, insetOf, collapsedFor, stackedFor, usePanelLayout, usePanelInset, SHEET_BELOW, COLLAPSE_BELOW,
+} from './use-panel-layout.js';
+
+describe('panelLayout: the spec\'s numbers from the root\'s own box', () => {
+  it('PC: clamp(420px, 40vw, 780px)', () => {
+    expect(panelLayout(1600, 900)).toMatchObject({ panelW: 640, compact: false, sheet: false, narrow: false, gutter: 24 });
+    expect(panelLayout(1920, 1080).panelW).toBe(768); // spec 3: "768 at 1920"
+    expect(panelLayout(2560, 1440).panelW).toBe(780);
+    expect(panelLayout(900, 700).panelW).toBe(420);
+  });
+
+  it('compact (root height <= 500): max(340px, 42vw); phone landscape 891x411 docks right', () => {
+    expect(panelLayout(891, 411)).toMatchObject({ panelW: 374, compact: true, sheet: false, gutter: 16 }); // "374 at 891"
+    expect(panelLayout(640, 360).panelW).toBe(340);
+    expect(panelLayout(1600, 500).compact).toBe(true);
+    expect(panelLayout(1600, 501).compact).toBe(false);
+  });
+
+  it('below 560 px wide it is a bottom sheet the width of the root', () => {
+    const l = panelLayout(SHEET_BELOW - 1, 800);
+    expect(l).toMatchObject({ sheet: true, narrow: true, panelW: SHEET_BELOW - 1, sheetH: 480 });
+    expect(panelLayout(SHEET_BELOW, 800)).toMatchObject({ sheet: false, narrow: true });
+    expect(panelLayout(400, 1200).sheetH).toBe(560);
+  });
+
+  it('an unmeasured root has no layout', () => {
+    expect(panelLayout(0, 600)).toBeNull();
+    expect(panelLayout(800, 0)).toBeNull();
+  });
+});
+
+describe('insetOf and collapsedFor', () => {
+  it('the inset is the docked width, or the sheet height, and nothing while closed', () => {
+    expect(insetOf(panelLayout(1600, 900), true)).toEqual({ right: 640, bottom: 0 });
+    expect(insetOf(panelLayout(1600, 900), false)).toEqual({ right: 0, bottom: 0 });
+    expect(insetOf(panelLayout(500, 800), true)).toEqual({ right: 0, bottom: 480 });
+    expect(insetOf(null, true)).toEqual({ right: 0, bottom: 0 });
+  });
+
+  it('the controls collapse while the canvas area is under 1000 px', () => {
+    expect(collapsedFor(panelLayout(1920, 1080), true)).toBe(false); // 1152 px of canvas
+    expect(collapsedFor(panelLayout(1600, 900), true)).toBe(true);   // 960: spec 3's rule, not r2-02's picture
+    expect(collapsedFor(panelLayout(1600, 900), false)).toBe(false);
+    expect(collapsedFor(panelLayout(COLLAPSE_BELOW - 1, 700), false)).toBe(true);
+    expect(collapsedFor(panelLayout(891, 411), true)).toBe(true);
+    expect(collapsedFor(null, true)).toBe(false);
+  });
+
+  /* w4 (device and interaction hunts): beside a docked panel on a tablet the canvas area is too
+     narrow for the header and the collapsed strip side by side (768x1024: the go-to covered "Web"),
+     so the strip drops under the header; a phone's header wraps its count first (780x360 fits) */
+  it('the strip stacks under the header only where the two cannot sit side by side', () => {
+    expect(stackedFor(panelLayout(768, 1024), true), '348 px of canvas').toBe(true);
+    expect(stackedFor(panelLayout(820, 1180), true), '400').toBe(true);
+    expect(stackedFor(panelLayout(1024, 768), true), '604').toBe(false);
+    expect(stackedFor(panelLayout(768, 1024), false), 'closed').toBe(false);
+    expect(stackedFor(panelLayout(780, 360), true), 'the S22: 440, the count wraps instead').toBe(false);
+    expect(stackedFor(panelLayout(891, 411), true)).toBe(false);
+    expect(stackedFor(panelLayout(667, 375), true), 'a small phone: 327').toBe(true);
+    expect(stackedFor(panelLayout(500, 900), true), 'a sheet').toBe(false);
+    expect(stackedFor(panelLayout(SHEET_BELOW, 900), true), 'narrow: the strip is at the bottom').toBe(false);
+    expect(stackedFor(null, true)).toBe(false);
+  });
+});
+
+/** A root element of a given size (jsdom lays nothing out). */
+function rootOf(w, h) {
+  const el = document.createElement('div');
+  Object.defineProperty(el, 'clientWidth', { configurable: true, get: () => w });
+  Object.defineProperty(el, 'clientHeight', { configurable: true, get: () => h });
+  document.body.appendChild(el);
+  return el;
+}
+
+describe('the hooks', () => {
+  it('usePanelLayout reads the root, and insetFor says what the panel WILL cover', () => {
+    const wrapRef = { current: rootOf(1600, 900) };
+    const { result } = renderHook(() => usePanelLayout(wrapRef));
+    expect(result.current.layout).toMatchObject({ w: 1600, h: 900, panelW: 640 });
+    expect(result.current.insetFor()).toEqual({ right: 640, bottom: 0 });
+    wrapRef.current.remove();
+  });
+
+  it('usePanelInset writes the inset on open and close, schedules a frame on a change, and sets --sw-panel-w', () => {
+    const el = rootOf(1600, 900);
+    const wrapRef = { current: el };
+    const panelInsetRef = { current: { right: 0, bottom: 0 } };
+    const schedule = vi.fn();
+    const layout = panelLayout(1600, 900);
+    const { rerender } = renderHook(({ open }) => usePanelInset({ layout, open, panelInsetRef, wrapRef, schedule }),
+      { initialProps: { open: false } });
+    expect(panelInsetRef.current).toEqual({ right: 0, bottom: 0 });
+    expect(schedule).not.toHaveBeenCalled();
+    expect(el.style.getPropertyValue('--sw-panel-w')).toBe('640px');
+    rerender({ open: true });
+    expect(panelInsetRef.current).toEqual({ right: 640, bottom: 0 });
+    expect(schedule).toHaveBeenCalledTimes(1);
+    rerender({ open: true });
+    expect(schedule).toHaveBeenCalledTimes(1); // no change, no frame
+    rerender({ open: false });
+    expect(panelInsetRef.current).toEqual({ right: 0, bottom: 0 });
+    expect(schedule).toHaveBeenCalledTimes(2);
+    el.remove();
+  });
+
+  /* The camera's clamp leaves the docked panel room past the canon's end (its right slack); once the
+     panel stops covering the right, the camera may stand past the view's own bound. onShrink tells
+     the camera, so it eases back inside instead of jumping at the reader's next drag. */
+  it('usePanelInset calls onShrink after the right inset shrinks, never as it grows', () => {
+    const el = rootOf(1600, 900);
+    const wrapRef = { current: el };
+    const panelInsetRef = { current: { right: 0, bottom: 0 } };
+    const onShrink = vi.fn(() => { expect(panelInsetRef.current.right).toBe(0); });
+    const layout = panelLayout(1600, 900);
+    const { rerender } = renderHook(({ open }) => usePanelInset({ layout, open, panelInsetRef, wrapRef, schedule: vi.fn(), onShrink }),
+      { initialProps: { open: false } });
+    rerender({ open: true });
+    expect(onShrink).not.toHaveBeenCalled();
+    const docked = panelInsetRef.current.right;
+    expect(docked).toBeGreaterThan(0);
+    rerender({ open: true });
+    rerender({ open: false });
+    expect(onShrink).toHaveBeenCalledTimes(1);
+    // told the inset it had, so the camera's slack eases down from the panel's old edge (w4 fix round 2)
+    expect(onShrink).toHaveBeenCalledWith(docked);
+    el.remove();
+  });
+});

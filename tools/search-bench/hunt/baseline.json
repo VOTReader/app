@@ -1,0 +1,23 @@
+{
+ "pass": 910,
+ "strict": 892,
+ "top5": 974,
+ "found": 1053,
+ "family": {
+  "parallel": 59,
+  "paraphrase": 65,
+  "redteam": 70,
+  "refwords": 68,
+  "reprintpairs": 53,
+  "rt1-editions": 50,
+  "rt1-rules": 54,
+  "rt1-shapes": 47,
+  "rt2": 65,
+  "scoped": 69,
+  "short": 77,
+  "slip": 70,
+  "titles": 66,
+  "topical": 24,
+  "wording": 73
+ }
+}

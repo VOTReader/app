@@ -15,6 +15,8 @@ import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
+import { BackHintPill } from '../components/BackHintPill.jsx';
+import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -44,7 +46,7 @@ export function prophecyCardKeysOf(letter) {
   return keys;
 }
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
@@ -58,6 +60,14 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   React.useEffect(() => { setExpandSignal(0); setAllExpanded(true); }, [letter.id]);
 
   const mainRef = React.useRef(null);
+  /* search200 UX B10 (1): a landing mid-letter names the letter in a band pinned under
+     the top bar once this hero has scrolled away (MiniTitleBand). Its eyebrow is the
+     hero's own; an inert peek draws none. */
+  const heroRef = React.useRef(null);
+  const position = (studyMode ? (letter.num === 0 ? "Preface" : `Chapter ${letter.num}`) : (letter.num === 0 ? "Preface" : `Letter ${letter.num}`));
+  const miniTitle = inert ? null : (
+    <MiniTitleBand heroRef={heroRef} eyebrow={(volumeLabel ? volumeLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
+  );
   /* The title is what the reader says before the body's first timed row
      (ReadAlongHighlight's lead-in, 2026-09-22). */
 
@@ -190,6 +200,15 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     if (!surpriseAnchor || surpriseAnchor.type !== "excerpt") return;
     // Made for another unit (the follower or the arrows moved on; the anchor did not): not ours.
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== letter.id) return;
+    // A title named (search200 B5, the S22 look): the landing is the letter's top, where its title is. No
+    // block is landed on, pulsed or sought, though the excerpt (the text's first words) would find one.
+    if (surpriseAnchor.top) {
+      const topTimer = setTimeout(() => {
+        const sc = mainRef.current && mainRef.current.closest(".screen-scroll");
+        if (sc && typeof sc.scrollTo === "function") sc.scrollTo({ top: 0, behavior: scrollBehavior() });
+      }, 150);
+      return () => clearTimeout(topTimer);
+    }
     // The excerpt comes from the search index's flattened text (a search hit's
     // matched words, matchExcerpt). Its HEAD is what must sit inside one block:
     // it starts at the matched word and may run past the block's end, so
@@ -308,7 +327,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         // (the misattribution class) for any caller that forgets the prop.
         // Every route now passes volumeLabel explicitly, so this only fires
         // for a future caller, and it says the one thing that is always true.
-        onBack: onHome, backLabel: volumeLabel || "Library",
+        // navBack (search200 UX B1): from a search hit the ‹ returns to the results
+        // (screen-routes' searchBackActive), named so; the collection still heads the page.
+        onBack: navBack ? navBack.onBack : onHome, backLabel: navBack ? navBack.label : (volumeLabel || "Library"),
         arrows: {
           onPrev: () => letter.prevLetter ? onNavigate(letter.prevLetter.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => letter.nextLetter ? onNavigate(letter.nextLetter.id) : onNextBoundary && onNextBoundary(),
@@ -321,16 +342,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      {backHint && (
-        <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
-            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
-            <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
-          </button>
-        </div>
-      )}
+      <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
+      {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
-      <header className="hero">
+      <header className="hero" ref={heroRef}>
         <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />
         <div className="hero-content">
           {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is

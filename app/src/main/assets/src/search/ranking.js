@@ -92,7 +92,7 @@ export const FORM_WEIGHT = 0.7;
 export const NEAR_PHRASE_MIN = 0.5;
 /** A title typed whole; the leading words a title opens with that readers leave off. */
 export const TITLE_EXACT_BOOST = 3;
-const TITLE_LEAD = new Set(['regarding', 'the', 'a', 'an']);
+export const TITLE_LEAD = new Set(['regarding', 'the', 'a', 'an']);
 /** The original over a reprint when both hold the typed words together: a letter, a
  *  verse, a Words To Live By or a Blessed entry over the Answers topic, Holy Days
  *  entry or Bible study that quotes it (they are compilations of the letters and
@@ -243,6 +243,9 @@ export const TITLE_QUERY_MIN = 0.75;
  * @returns {number}
  */
 export function titleMatch(titleToks, qTokens, stop) {
+  titleToks = titleNumbers(titleToks);
+  qTokens = titleNumbers(qTokens);
+  if (otherNumber(titleToks, qTokens)) return 1;
   let inOrder = titleInOrder(titleToks, qTokens);
   // A run of small words in a long title is no title named: "openly from the beginning" quotes a letter, not
   // "...That Purposed from the Beginning Shall Be Done..." ("not by human power" still names "Not By Human Means").
@@ -255,6 +258,30 @@ export function titleMatch(titleToks, qTokens, stop) {
       && tt.filter((w) => ql.has(w)).length < 0.5 * tt.length) inOrder = 1;
   }
   return stop && inOrder < TITLE_EXACT_BOOST ? Math.max(inOrder, titleWords(titleToks, qTokens, stop)) : inOrder;
+}
+/** A number token, a cardinal or an ordinal ("6", "144000", "6th"; kjvEncode reads "six" as 6). */
+const NUMBER_TOKEN = /^\d+(?:st|nd|rd|th)?$/;
+/**
+ * A titled series names its part by its number (search200 B2): a title that holds numbers is
+ * not named by a number it does not hold, however many of its other words were typed ("seeds
+ * part 6" is not "Seeds Part Five"; it is "Seeds Parts Five and Six").
+ * @param {string[]} titleToks @param {string[]} qTokens
+ */
+function otherNumber(titleToks, qTokens) {
+  if (!titleToks || !qTokens) return false;
+  const tn = titleToks.filter((w) => NUMBER_TOKEN.test(w));
+  if (!tn.length) return false;
+  return qTokens.some((w) => NUMBER_TOKEN.test(w) && tn.indexOf(w) < 0);
+}
+/**
+ * Words as titles are compared: "one" is 1, as kjvEncode reads every other number word. The
+ * index keeps "one" a word (tokenize.js), but a title's "Part One" or "Section One" is typed
+ * "part 1" as often, and "Part Two" must not be "part 1".
+ * @param {string[]} toks
+ * @returns {string[]}
+ */
+function titleNumbers(toks) {
+  return toks && toks.indexOf('one') >= 0 ? toks.map((w) => (w === 'one' ? '1' : w)) : toks;
 }
 /** A title's content words met in any order, by lemma: TITLE_BAG_RATE of the in-order score. */
 export const TITLE_BAG_RATE = 0.9;
@@ -273,14 +300,37 @@ function titleWords(/** @type {string[]} */ titleToks, /** @type {string[]} */ q
   if (joinApostropheS(qTokens).filter((w) => !TITLE_LEAD.has(w) && !tl.has(lemma(w))).length > 1) return 1;
   return 1 + (TITLE_EXACT_BOOST - 1) * TITLE_BAG_RATE * (0.5 + 0.5 * q.length / t.length);
 }
+/** A title's or a query's words with the lead words a title opens with taken off (the last word stays). */
+const stripLead = (/** @type {string[]} */ x) => { let i = 0; while (i < x.length - 1 && TITLE_LEAD.has(x[i])) i++; return x.slice(i); };
+const sameWords = (/** @type {string[]} */ a, /** @type {string[]} */ b) => a.length === b.length && a.every((w, i) => w === b[i]);
+/** The title typed as written: TITLE_LEVEL_TYPED. */
+export const TITLE_LEVEL_TYPED = 4;
+/** The title typed with its leading Regarding / The / A / An left off, or put on: TITLE_LEVEL_LEAD. */
+export const TITLE_LEVEL_LEAD = 3;
+/**
+ * How exactly the typed words are a title (search200 B1, 2026-10-18): TITLE_LEVEL_TYPED when they are
+ * the title as written (case, punctuation and a possessive's apostrophe aside), TITLE_LEVEL_LEAD when
+ * they are once a leading Regarding / The / A / An is taken off both, else 0. titleMatch scores both
+ * x TITLE_EXACT_BOOST, so "Fasting" and "Regarding Fasting" tied and body BM25 settled it: the dense
+ * Answers topic led the letter whose title the reader typed (weak-spots T1, 21 sweep failures).
+ * @param {string[]} titleToks
+ * @param {string[]} qTokens
+ * @returns {number}
+ */
+export function titleLevel(titleToks, qTokens) {
+  if (!titleToks || !titleToks.length || !qTokens || !qTokens.length) return 0;
+  const t = joinApostropheS(titleNumbers(titleToks));
+  const q = joinApostropheS(titleNumbers(qTokens));
+  if (sameWords(t, q)) return TITLE_LEVEL_TYPED;
+  return sameWords(stripLead(t), stripLead(q)) ? TITLE_LEVEL_LEAD : 0;
+}
 function titleInOrder(/** @type {string[]} */ titleToks, /** @type {string[]} */ qTokens) {
   if (!titleToks || !titleToks.length || !qTokens || !qTokens.length) return 1;
   const t = joinApostropheS(titleToks);
   const q = joinApostropheS(qTokens);
-  const strip = (/** @type {string[]} */ x) => { let i = 0; while (i < x.length - 1 && TITLE_LEAD.has(x[i])) i++; return x.slice(i); };
-  const tt = strip(t);
-  const qq = strip(q);
-  if (tt.length === qq.length && tt.every((w, i) => w === qq[i])) return TITLE_EXACT_BOOST;
+  const tt = stripLead(t);
+  const qq = stripLead(q);
+  if (sameWords(tt, qq)) return TITLE_EXACT_BOOST;
   if (q.length < 2) return 1;
   const common = commonInOrder(q, t);
   if (common < 2) return 1;

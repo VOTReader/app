@@ -8,7 +8,8 @@
      - browser only: never in the APK, an installed app, Firefox desktop or
        an in-app browser;
      - after a finished chapter (a read item, or the reader scrolled to
-       this chapter's end with mark-as-read off);
+       this chapter's end with mark-as-read off: their own scroll, not a
+       search jump that lands there, search200 UX B1);
      - one place a session; Maybe later (or the X) snoozes it 21 days,
        Don't ask again or three dismissals end it; an install ends it.
    Chromium that handed over beforeinstallprompt gets a real INSTALL
@@ -21,6 +22,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { installFlow, shouldOffer, dismiss, hasInstallPrompt, wasInstalled, subscribeInstall, promptInstall } from '../../utils/install-offer.js';
+import { watchReaderScroll } from '../../utils/reader-hand.js';
 
 const STATE_KEY = 'vot-install-offer';
 
@@ -28,6 +30,21 @@ const STATE_KEY = 'vot-install-offer';
 let _sessionUnit = /** @type {string | null} */ (null);
 /** Tests only. */
 export function _resetInstallCardSession() { _sessionUnit = null; }
+
+/* On screen (search200 UX B1): the long-press tip (AnnotationHint) waits while a card is in view, or the
+   pill sits on the card's heading (both live at the bottom of a chapter's end). One id per card in view. */
+const _onScreen = new Set();
+const _onScreenSubs = new Set();
+/** @param {string} id @param {boolean} on */
+function _setOnScreen(id, on) {
+  if (on === _onScreen.has(id)) return;
+  if (on) _onScreen.add(id); else _onScreen.delete(id);
+  _onScreenSubs.forEach((cb) => cb());
+}
+/** Whether an install card is on screen now. */
+export function isInstallCardOnScreen() { return _onScreen.size > 0; }
+/** @param {() => void} cb @returns {() => void} */
+export function subscribeInstallCardOnScreen(cb) { _onScreenSubs.add(cb); return () => { _onScreenSubs.delete(cb); }; }
 
 /** @returns {import('../../utils/install-offer.js').InstallOfferState} */
 function _readState() {
@@ -111,26 +128,55 @@ export function InstallCard({ unitKey, inert = false }) {
   const [state, setState] = React.useState(_readState);
   const [stepsFor, setStepsFor] = React.useState(/** @type {string | null} */ (null));
   const [gone, setGone] = React.useState(false);
-  const [reachedEnd, setReachedEnd] = React.useState(false);
+  // The unit whose end the reader scrolled to (null until one): another unit's end is not this one's.
+  const [reachedEnd, setReachedEnd] = React.useState(/** @type {string | null} */ (null));
   const sentinel = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const cardRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const cardId = React.useId();
 
   const flow = inert ? null : _flow();
-  const engaged = reachedEnd || _readCount() > 0;
+  const engaged = reachedEnd === unitKey || _readCount() > 0;
   const otherUnit = _sessionUnit != null && _sessionUnit !== unitKey;
   const installed = React.useSyncExternalStore(subscribeInstall, wasInstalled);
   const show = !gone && !installed && !otherUnit && shouldOffer(state, { flow, engaged, shownThisSession: false, now: Date.now() });
 
   // Mark-as-read off leaves no read item: arriving at this chapter's end after scrolling is the finished chapter.
+  // The scroll must be the reader's own (search200 UX B1): a search hit near the end lands the end on screen,
+  // and that jump is a look, not a finished chapter. Once the reader has moved this page (utils/reader-hand.js),
+  // its end counts, a fling's momentum included.
   React.useEffect(() => {
     const el = sentinel.current;
-    if (inert || !el || typeof IntersectionObserver === 'undefined') return undefined;
+    const scroller = el && el.closest('.screen-scroll');
+    if (inert || !el || !scroller || typeof IntersectionObserver === 'undefined') return undefined;
+    let readerScrolled = false;
+    let atEnd = false;
+    const check = () => { if (atEnd && readerScrolled && scroller.scrollTop > 0) setReachedEnd(unitKey); };
+    const stopWatch = watchReaderScroll(scroller, () => { readerScrolled = true; check(); });
     const io = new IntersectionObserver((entries) => {
-      const scroller = el.closest('.screen-scroll');
-      if (entries.some((e) => e.isIntersecting) && scroller && scroller.scrollTop > 0) setReachedEnd(true);
+      if (entries.length) atEnd = entries[entries.length - 1].isIntersecting;
+      check();
     });
     io.observe(el);
-    return () => io.disconnect();
-  }, [inert]);
+    scroller.addEventListener('scroll', check, { passive: true });
+    return () => {
+      io.disconnect();
+      stopWatch();
+      scroller.removeEventListener('scroll', check);
+    };
+  }, [inert, unitKey]);
+
+  // On screen for the long-press tip: the card in view (or, without an observer, the card shown).
+  React.useEffect(() => {
+    const el = cardRef.current;
+    if (!show || !el) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      _setOnScreen(cardId, true);
+      return () => _setOnScreen(cardId, false);
+    }
+    const io = new IntersectionObserver((entries) => { if (entries.length) _setOnScreen(cardId, entries[entries.length - 1].isIntersecting); });
+    io.observe(el);
+    return () => { io.disconnect(); _setOnScreen(cardId, false); };
+  }, [show, cardId]);
 
   // One place a session: the card claims the session when it is on screen (or at once without an observer).
   React.useEffect(() => {
@@ -174,7 +220,7 @@ export function InstallCard({ unitKey, inert = false }) {
     <>
       <div ref={sentinel} className="install-card-sentinel" aria-hidden="true" />
       {show && (
-        <section className="install-card" aria-labelledby={'install-card-title-' + unitKey}>
+        <section ref={cardRef} className="install-card" aria-labelledby={'install-card-title-' + unitKey}>
           <button type="button" className="install-card-close" onClick={() => end('later')} aria-label="Not now">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
           </button>

@@ -48,6 +48,28 @@ function blockAwareText(frag) {
   return parts.join('');
 }
 
+/** The Scripture Web's door for a selection (the navigation stream, w3; the digest's A2): a Bible
+    verse opens the web on the selection's first verse ("Show in Scripture Web"), a letter, entry
+    or study chapter opens its scriptures ("See this letter's scriptures", letter mode). The routes
+    say whether the page has one (window.__openScriptureWeb's check, screen-routes.jsx); null when
+    it has none, or nothing registered the bridge.
+    @param {any} selInfo
+    @returns {{ start: any, label: string } | null} */
+function webDoorOf(selInfo) {
+  const open = typeof window !== 'undefined' ? /** @type {any} */ (window).__openScriptureWeb : null;
+  if (!selInfo || typeof open !== 'function') return null;
+  const key = selInfo.hlKey || (selInfo.multiSpans && selInfo.multiSpans[0] ? selInfo.multiSpans[0].key : '') || '';
+  const m = /^bible:([^:]+):(\d+):(\d+)$/.exec(key);
+  if (m) {
+    const start = { verse: { bookId: m[1], chapter: Number(m[2]), verse: Number(m[3]) } };
+    return open(start, { check: true }) ? { start, label: 'Show in Scripture Web' } : null;
+  }
+  if (/^(letter|wtlb):/.test(key)) {
+    return open('this-letter', { check: true }) ? { start: 'this-letter', label: 'See this letter\u2019s scriptures' } : null;
+  }
+  return null;
+}
+
 /* The reference a shared or repeated passage carries (passageLabel: "John
    3:16-18", "John 3:36-4:2") and the reader's translation after it
    (translationTag, n6-10) live in utils/passage-copy.js with Copy's: one
@@ -1282,6 +1304,16 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   };
   React.useEffect(() => () => onShareRelease(), []);
 
+  // The Scripture Web's door: the web opens on the selection (webDoorOf, above); Back returns here.
+  const webDoor = webDoorOf(selInfo);
+  const handleWeb = React.useCallback(() => {
+    const d = webDoorOf(selInfo);
+    if (!d) return;
+    window.getSelection().removeAllRanges();
+    setVisible(false);
+    /** @type {any} */ (window).__openScriptureWeb(d.start);
+  }, [selInfo]);
+
   const handleSearch = React.useCallback(() => {
     if (!selInfo) return;
     const text = selInfo.text;
@@ -1648,6 +1680,19 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           <span>Bookmark</span>
         </button>
       </div>
+      {/* The Scripture Web's door: its own full-width row under the six actions, outlined like
+          Listen from here (as a seventh action the grid of three laid out 3/3/1, review of
+          2026-10-18). The icon is the web itself: two threads crossing over the canon's line. */}
+      {webDoor && (
+        <div className="sel-toolbar-row sel-toolbar-web">
+          <button type="button" className="sel-web-btn" data-door="web" onClick={handleWeb}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+              <path d="M2 17.5h20M3 17.5a6 11 0 0 1 12 0M9 17.5a6 9 0 0 1 12 0" />
+            </svg>
+            <span>{webDoor.label}</span>
+          </button>
+        </div>
+      )}
       </>
       )}
     </div>

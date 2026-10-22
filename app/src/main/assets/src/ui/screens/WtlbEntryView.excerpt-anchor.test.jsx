@@ -105,6 +105,23 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(seekToSeen.at(-1)).toBe(null);
   });
 
+  /* A title named opens at the title (search200 B5, the S22 look): a landing at the text's start (`top`). */
+  it('a landing at the top scrolls the page to the top: no paragraph, no pulse, no seek', () => {
+    globalThis.ScreenLayout = ({ children, navChildren }) => <div className="screen-scroll">{navChildren}{children}</div>;
+    const tops = [];
+    Element.prototype.scrollTo = function (o) { tops.push(o && o.top); };
+    try {
+      renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'Man lives not by bread alone but by every word.', top: true, letterId: ENTRY.id } });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(scrolled).toEqual([]);
+      expect(tops).toEqual([0]);
+      expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:0"]').className).not.toContain('pulse');
+      expect(seekToSeen.every((v) => v == null)).toBe(true);
+    } finally {
+      delete Element.prototype.scrollTo;
+    }
+  });
+
   it('an anchor made for ANOTHER entry is ignored', () => {
     renderEntry({ surpriseAnchor: { type: 'excerpt', text: 'All who are weary', letterId: 'some-other-entry' } });
     act(() => { vi.advanceTimersByTime(200); });

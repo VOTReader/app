@@ -1,3 +1,4 @@
+// @ts-nocheck — reads app.css through node:fs (the typecheck has no node types), as sw-chrome-header.test.jsx does
 /* RED for Corbin's trim: four things must NOT render, one thing MUST.
  * ═══════════════════════════════════════════════════════════════════════
  * Corbin, from a screenshot of live My Web at desktop width: "Make sure for
@@ -19,13 +20,16 @@
  * jsdom) and draw() returns before touching the renderer on a 0 px frame —
  * with an unsized canvas the "hard-wires distance" case below would pass
  * vacuously on a renderer that was never asked to draw. The mocked renderer
- * records every draw's opts, because colorMode travels per draw() call, not
- * through createRenderer(). The precondition case comes first and doubles as
- * the anti-vacuity guard for everything after it.
+ * records every draw's opts, because a colour choice would travel per draw()
+ * call, not through createRenderer(). The precondition case comes first and
+ * doubles as the anti-vacuity guard for everything after it.
  */
 import React from 'react';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, act, fireEvent, cleanup } from '@testing-library/react';
+import { readFileSync } from 'node:fs';
+import { resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DRAWN = [];
 vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
@@ -38,13 +42,15 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
     ...real,
     createRenderer: vi.fn(() => ({
       gl: {}, contextLost: false, stats: { instances: 0, draws: 0 },
-      draw: (opts) => { DRAWN.push({ colorMode: opts && opts.colorMode, density: opts && opts.density }); return { instances: 0, draws: 0 }; },
+      draw: (opts) => { DRAWN.push({ hasColorMode: !!opts && 'colorMode' in opts, density: opts && opts.density }); return { instances: 0, draws: 0 }; },
+      clear: vi.fn(),
       dispose: vi.fn(),
     })),
   };
 });
 
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { SHADER_SOURCE } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 
 const CANON = 31102;
@@ -134,10 +140,54 @@ describe('the Scripture Web chrome, trimmed', () => {
     expect(screen.queryByLabelText('Zoom in')).toBeNull();
   });
 
-  it('renders NO "Go to" — deletion is the fix for a control that did not function', async () => {
+  /* Was 'renders NO "Go to" — deletion is the fix for a control that did not function'.
+     Corbin's words were "get rid of the 'go to' or fix it" (the w1 digest A2: flip this case
+     together with a working-control test). The navigation stream (w3) fixed it, so the law
+     keeps its intent: no Go to that does nothing. The old dead "Go to" pill is still gone, and
+     the search button there is opens a box that answers what is typed and closes again. */
+  it('renders no dead "Go to": the search button that replaced it opens a working box', async () => {
+    // the app's own book table (bundle-d ships it beside the web): the box reads names through it
+    const prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
     const { container } = await mount();
     expect(screen.queryByRole('button', { name: /^go to$/i })).toBeNull();
+    expect(container.querySelector('.sw-goto'), 'no box until asked').toBeNull();
+    const btn = screen.getByRole('button', { name: /go to a book, chapter or verse/i });
+    expect(btn.closest('.sw-controls').firstElementChild, 'first in the control row (spec 4.1)').toBe(btn);
+    fireEvent.click(btn);
+    const box = container.querySelector('.sw-goto');
+    expect(box).toBeTruthy();
+    const input = box.querySelector('input');
+    fireEvent.change(input, { target: { value: 'Genesis' } });
+    expect(box.querySelectorAll('.sw-goto-row').length, 'it answers what is typed').toBeGreaterThan(0);
+    fireEvent.keyDown(input, { key: 'Escape' });
     expect(container.querySelector('.sw-goto')).toBeNull();
+    window.VotSearchData = prev;
+  });
+
+  /* w4 (the phone stream): on the phone the open box takes the header row and Back stays beside
+     it. Back is then the box's way out, as Escape and the Android Back are (the box is the top
+     layer): a tap on it closed the box (the press outside) and the click then left the web, so
+     one tap threw a reader who only meant to put the search away out to the Library. */
+  it('Back with the box open puts the box away and stays on the web; the next Back leaves', async () => {
+    const prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+    const onBack = vi.fn();
+    const { container } = await mount({ onBack });
+    fireEvent.click(screen.getByRole('button', { name: /go to a book, chapter or verse/i }));
+    expect(container.querySelector('.sw-goto')).toBeTruthy();
+    const back = screen.getByRole('button', { name: 'Back' });
+    // a tap: the press, then the click
+    fireEvent.pointerDown(back);
+    fireEvent.click(back);
+    expect(container.querySelector('.sw-goto'), 'the box is put away').toBeNull();
+    expect(onBack, 'and the web stays').not.toHaveBeenCalled();
+    fireEvent.pointerDown(back);
+    fireEvent.click(back);
+    expect(onBack, 'with nothing open, Back leaves').toHaveBeenCalledTimes(1);
+    window.VotSearchData = prev;
   });
 
   it('renders NO colour-mode select — distance is the only law, hard-wired', async () => {
@@ -149,24 +199,37 @@ describe('the Scripture Web chrome, trimmed', () => {
     await mount();
     expect(DRAWN.length).toBeGreaterThan(0);
     /* A select that is hidden but still wired would let a stale stored value
-       paint testament; every frame this screen asks for says distance. */
-    expect(DRAWN.map((d) => d.colorMode)).toEqual(DRAWN.map(() => 'distance'));
+       paint testament. The testament and genre laws are gone from the shader
+       (distance is its one colour), and no frame this screen asks for carries
+       a colour mode for a stale value to ride in on. */
+    expect(SHADER_SOURCE.vertex).toContain('vec3 col = distanceRamp(');
+    expect(SHADER_SOURCE.vertex).not.toMatch(/uColorMode|testamentColor|genreColor/);
+    expect(DRAWN.map((d) => d.hasColorMode)).toEqual(DRAWN.map(() => false));
   });
 
   it('has ONE hide-all control, and it hides the chrome and shows it again', async () => {
     const { container } = await mount();
     const btn = screen.getByLabelText(HIDE_ALL);
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    /* w3 panel step 2 (the a11y pass): the toggle carries a visible label that flips with its
+       name, "Hide controls" / "Show controls", in place of a constant name plus aria-pressed
+       (both at once would read "Show controls, pressed"). The law is the same: ONE control, the
+       same element both ways, outside what it hides, saying which way it goes. */
+    expect(btn.getAttribute('aria-label')).toBe('Hide controls');
+    expect(btn.textContent).toBe('Hide controls');
+    expect(btn.hasAttribute('aria-pressed')).toBe(false);
 
     fireEvent.click(btn);
     expect(container.querySelector('.sw-root.sw-chrome-hidden')).toBeTruthy();
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelectorAll('.sw-hide-all')).toHaveLength(1);
+    expect(container.querySelector('.sw-hide-all')).toBe(btn);
+    expect(btn.getAttribute('aria-label')).toBe('Show controls');
+    expect(btn.textContent).toBe('Show controls');
     /* The button is the way back, so it must not be inside what it hides. */
     expect(btn.closest('.sw-topbar, .sw-controls, .sw-legend, .sw-credit')).toBeNull();
 
     fireEvent.click(btn);
     expect(container.querySelector('.sw-root.sw-chrome-hidden')).toBeNull();
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    expect(btn.getAttribute('aria-label')).toBe('Hide controls');
   });
 
   it('remembers hidden for the SESSION, not the profile', async () => {
@@ -213,14 +276,20 @@ describe('the Scripture Web chrome, trimmed', () => {
  * painted at all before the hidden case asks whether it survives. */
 describe('the Scripture Web chrome, round 3 — the credit goes, the hide button keeps the legend and the rail', () => {
   const CALLS = [];
-  const fake2d = () => new Proxy({}, {
-    get(_t, prop) {
-      if (prop === 'measureText') return (s) => { CALLS.push(['measureText', s]); return { width: 20 }; };
-      if (prop === 'canvas') return null;
-      return (...a) => { CALLS.push([String(prop), ...a]); };
-    },
-    set() { return true; },
-  });
+  // the context's font rides on each fillText (call[4]), so a label's foot can be read back
+  const fake2d = () => {
+    const state = { font: '' };
+    return new Proxy({}, {
+      get(_t, prop) {
+        if (prop === 'measureText') return (s) => { CALLS.push(['measureText', s]); return { width: 20 }; };
+        if (prop === 'canvas') return null;
+        if (prop === 'font') return state.font;
+        if (prop === 'fillText') return (...a) => { CALLS.push(['fillText', a[0], a[1], a[2], state.font]); };
+        return (...a) => { CALLS.push([String(prop), ...a]); };
+      },
+      set(_t, prop, value) { if (prop === 'font') state.font = String(value); return true; },
+    });
+  };
   const labelsPainted = () => CALLS.filter((c) => c[0] === 'fillText').map((c) => String(c[1]));
   const waitForLabel = async () => {
     for (let i = 0; i < 60 && !labelsPainted().some((s) => /^gen/i.test(s)); i++) {
@@ -256,10 +325,52 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(labels.some((s) => /^gen/i.test(s)), 'a Genesis label: ' + JSON.stringify(labels.slice(0, 6))).toBe(true);
   });
 
-  it('renders NO credit line on the canvas — the attribution lives on About', async () => {
+  /* Q5 (w3 panel step 2) brings the credit back, as the legend's tail and never as a line of
+     its own: round 3's law ("nothing prints over the book labels") with the credit present. It
+     is the legend's last item, read (not aria-hidden), and every book label the canvas paints
+     ends above the legend's line. The legend's top is the stylesheet's own numbers (its bottom
+     offset plus one line), read from app.css; that it is one line on a phone and a PC is the
+     screenshots' (D:/Swarm/lanes/sweb/out/w3/chrome). */
+  it('the credit is the legend\'s tail, read, and every book label ends above the legend', async () => {
     const { container } = await mount();
-    expect(container.querySelector('.sw-credit')).toBeNull();
-    expect(screen.queryByText(/OpenBible/i)).toBeNull();
+    const labels = await waitForLabel();
+    expect(labels.some((s) => /^gen/i.test(s)), 'PRECONDITION: the rail painted').toBe(true);
+    const legend = container.querySelector('.sw-legend');
+    const credit = legend && legend.querySelector('.sw-credit');
+    expect(credit, 'the credit, in the legend').toBeTruthy();
+    expect(credit.parentElement.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
+    expect(credit.textContent).toBe('Cross-reference data \u00a9 OpenBible.info (CC-BY)');
+    expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
+
+    const here = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(resolve(here, '../../../app.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const ruleOf = (sel) => {
+      const esc = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const m = new RegExp('(?:^|[{}\\n])\\s*' + esc + '\\s*\\{([^}]*)\\}').exec(css);
+      if (!m) throw new Error('no `' + sel + ' {` rule in app.css');
+      return m[1];
+    };
+    const H = SIZES.find((s) => s[0] === 'clientHeight')[1];
+    // a root 500 px tall or less is .sw-compact (use-panel-layout.js); jsdom gives the root no box,
+    // so the canvas's height stands in for it
+    const compact = H <= 500;
+    const own = ruleOf(compact ? '.sw-root.sw-compact .sw-legend' : '.sw-legend');
+    const bottom = Number(/bottom:\s*calc\((\d+)px/.exec(own)[1]);
+    const size = Number(/font-size:\s*var\(--fsc-(\d+)\)/.exec(own)[1]);
+    const lineHeight = Number(/line-height:\s*([\d.]+)/.exec(/line-height/.test(own) ? own : ruleOf('.sw-legend'))[1]);
+    // a phone's legend is one line where it fits since w4 (12 px, "far": about 670 px against the
+    // 751 beside ? and hide-UI on the 891 px phone) and wraps to two where it does not, as on this
+    // 800 px frame (660 beside them; tools/e2e-sw-legend.mjs measures it): the labels clear two
+    const lines = compact ? 2 : 1;
+    const legendTop = H - bottom - lines * size * lineHeight;
+    // a book label is the fixture book's name or abbreviation as the rail prints it (upper case),
+    // in the web's one face: Cinzel is retired from the canvas (sw-ink.js FONT), so the font no
+    // longer tells a book label from the other canvas text
+    const books = CALLS.filter((c) => c[0] === 'fillText' && /^(GENESIS|GEN)$/.test(String(c[1])) && /EB Garamond/.test(String(c[4])));
+    expect(books.length, 'book labels recorded, with their font').toBeGreaterThan(0);
+    const foot = (c) => Number(c[3]) + Number((/(\d+(?:\.\d+)?)px/.exec(String(c[4])) || [0, 0])[1]);
+    const lowest = Math.max(...books.map(foot));
+    expect(lowest, 'the lowest book label\'s foot against the legend\'s top, ' + legendTop).toBeLessThanOrEqual(legendTop);
   });
 
   /* The hide itself repaints nothing (the canvas is not cleared by a CSS class), so the
@@ -309,17 +420,20 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     expect(sub.textContent).not.toMatch(/ of /);
   });
 
-  /* Item 5's bottom half. drawRuler and drawRulerOnly each carried a copy of
-     the book-name block; both now call drawBookNames(), which places names
-     through placeRailLabels — the law the top rail adopted in the same batch.
+  /* Item 5's bottom half, rewritten to the w4 band (r2-01a): the canon's names
+     stand on ONE row (a second row is retired), placed through the ranked
+     law (rail-labels.js placeRailLabelsRanked) a word (NAME_GAP, 14 px) apart.
      This case witnesses that the bottom rail actually routes through the law
-     (a bite that pins every name to the top row reddens it); the law's own
-     shape is pinned in rail-label-collision.test.js. Geometry: three 600-verse
-     books at W = 800 are 15.4 px wide each, so with the recorder's fixed 20 px
-     measureText only the abbreviations qualify and neighbours overlap by ~5 px
-     — GEN takes the top row, EXO the second, and LEV clears GEN by 10.9 px and
-     returns to the top row. */
-  it('the bottom rail places colliding book names on two rows through the shared law', async () => {
+     (a bite that prints a colliding name, or opens a second row, reddens it);
+     the law's own shape is pinned in rail-labels-ranked.test.js. Geometry:
+     three 600-verse books at W = 800 are 15.4 px wide each, so with the
+     recorder's fixed 20 px measureText EXO overlaps GEN by 4.6 px and LEV
+     stands 10.8 px from it: GEN, a major book, takes its
+     place first. Since the w4 review 2 a name a few pixels short of the word
+     slides along its own book (LUKE beside JOHN): LEV slides 3.2 px right, to a
+     word from GEN with its centre still over Leviticus, and EXO, which has no
+     such place over its own book, is left out (rewritten to that intent). */
+  it('the bottom rail places the book names on one row through the shared law: a name with no room over its own book is left out, one a few pixels short slides', async () => {
     const CANON = 31102, START = 15000, SPAN = 600;
     const three = graph();
     three.books = [
@@ -331,7 +445,7 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
     three.total = CANON;
     vi.mocked(decodeGraph).mockReturnValueOnce(/** @type {any} */ (three));
     await mount();
-    for (let i = 0; i < 60 && !labelsPainted().some((s) => s === 'LEV'); i++) {
+    for (let i = 0; i < 60 && !labelsPainted().some((s) => s === 'GEN'); i++) {
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     }
     const yOf = (label) => {
@@ -339,9 +453,14 @@ describe('the Scripture Web chrome, round 3 — the credit goes, the hide button
       expect(hits.length, label + ' was painted').toBeGreaterThan(0);
       return hits[hits.length - 1][3];
     };
-    const yGen = yOf('GEN'), yExo = yOf('EXO'), yLev = yOf('LEV');
-    const DPR = Math.min(window.devicePixelRatio || 1, 3);
-    expect(yExo - yGen, 'EXO one row below GEN').toBe(14 * DPR);
-    expect(yLev, 'LEV back on the top row').toBe(yGen);
+    const yGen = yOf('GEN');
+    const painted = CALLS.filter((c) => c[0] === 'fillText' && ['GEN', 'EXO', 'LEV', 'GENESIS', 'EXODUS', 'LEVITICUS'].includes(c[1]));
+    expect(new Set(painted.map((c) => c[3])).size, 'one row').toBe(1);
+    expect(painted[0][3]).toBe(yGen);
+    expect(labelsPainted().filter((t) => t === 'EXO' || t === 'EXODUS'), 'EXO collides with GEN wherever it stands over Exodus: left out').toEqual([]);
+    const xOf = (label) => CALLS.filter((c) => c[0] === 'fillText' && c[1] === label).pop()[2];
+    const dx = xOf('LEV') - xOf('GEN');
+    expect(dx, 'LEV a word (14 px) clear of GEN: it slid').toBeGreaterThanOrEqual(20 + 14 - 1e-6);
+    expect(dx, "LEV's centre still over Leviticus (2.5 books from GEN's centre at most)").toBeLessThanOrEqual(2.5 * 15.4);
   });
 });

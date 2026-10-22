@@ -133,6 +133,12 @@ describe('WtlbEntryView scripture sheet — modal registry [C1]', () => {
     // The documented trap (use-modal-registry.js header): a per-modal Escape
     // listener races the app-level dispatcher and one press both dismisses
     // AND navigates back.
+    // jsdom builds its selector engine on a document's first selector call
+    // (querySelector, closest, matches), and that engine adds its own keydown
+    // listener to the window. Warm it first: otherwise the count depends on
+    // whether a test that ran earlier in this worker already called one
+    // (shuffled suite, seed 20261022, VOT_VITEST_FAST=1).
+    document.body.closest('body');
     const spy = vi.spyOn(window, 'addEventListener');
     renderEntry();
     openSheet();
@@ -166,5 +172,18 @@ describe('WtlbEntryView back affordance [C3]', () => {
   it('keeps the old wording only when no part label exists at all', () => {
     renderEntry({ partLabel: null });
     expect(backBtn().getAttribute('aria-label')).toBe('Back to Index');
+  });
+});
+
+/* search200 UX B1: navBack from a search hit — see LetterView.labels.test.jsx. */
+describe('WtlbEntryView — the ‹ goes back to the results from a search hit (search200 UX B1)', () => {
+  const backBtn = () => document.querySelector('.nav-back-icon');
+  it('names the results and goes there', () => {
+    const onHome = vi.fn(), onResults = vi.fn();
+    renderEntry({ onHome, navBack: { onBack: onResults, label: 'results' } });
+    expect(backBtn().getAttribute('aria-label')).toBe('Back to results');
+    fireEvent.click(backBtn());
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect(onHome).not.toHaveBeenCalled();
   });
 });

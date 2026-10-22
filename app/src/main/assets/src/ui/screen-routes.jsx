@@ -49,6 +49,8 @@ import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
 import { answersSubjectById } from '../utils/answers-shelves.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
+import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
+import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -146,7 +148,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {() => void} handleSurprise
  * @property {(id: string, clearGenre?: boolean) => void} handleScriptureSelect
  * @property {(id: any) => void} handleVolumeSelect
- * @property {(entry: any, terms?: string[], query?: string) => void} handleSearchSelect
+ * @property {(entry: any, terms?: string[], query?: string, stopTyped?: string[]) => void} handleSearchSelect
  * @property {(action: any) => void} handleSearchCommand
  * @property {(num: number) => void} selectMatthewCh
  * @property {(num: number) => void} selectBibleCh
@@ -190,6 +192,13 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {{ current: { chapterNum: number; }; }} fromMatthewChRef
  * @property {import('../hooks/use-tabs.js').TabSetter<'fromMatthewCh'>} setFromMatthewCh
  * @property {import('../hooks/use-tabs.js').TabSetter<'fromWtlb'>} setFromWtlb
+ * @property {import('../hooks/use-tabs.js').Tab['fromWtlb']} fromWtlb
+ * @property {import('../hooks/use-tabs.js').Tab['fromSurprise']} fromSurprise
+ * @property {boolean} backActive
+ * @property {{ current: any[] }} fromLetterRef
+ * @property {string | null} searchLanding
+ * @property {boolean} [fromSearchIndex]
+ * @property {(v: boolean) => void} [setFromSearchIndex]
  * @property {(volKey: string, entry: any) => any} boundaryConfig
  * @property {import('../hooks/use-tabs.js').Tab['gardenPage']} gardenPage
  * @property {import('../hooks/use-tabs.js').TabSetter<'gardenPage'>} setGardenPage
@@ -257,6 +266,9 @@ export function buildScreenRoutes({
   fromMatthewChRef, setFromMatthewCh,
   // ── App-state needed by built-in helpers (sharedViewProps / _navToChapter) ──
   setFromWtlb,
+  // ── Back to results from a search hit (search200 UX B1) ──
+  fromWtlb, fromSurprise, backActive, fromLetterRef, searchLanding,
+  fromSearchIndex = false, setFromSearchIndex = undefined,
   // ── Boundary computation (from useReadingChainNav; sees per-volume context) ──
   boundaryConfig,
   // ── Garden ──
@@ -360,6 +372,13 @@ export function buildScreenRoutes({
   // lands on an index), but keeps fromSearch: a book-level search result lands on those
   // indexes, and Back from its chapter still returns to the search.
   const _leaveSurprise = () => { if (typeof setFromSurprise === 'function') setFromSurprise(false); };
+  // Track D: ...and marks the chapter as picked from that index (fromSearchIndex), so its
+  // back goes to the index the reader just used rather than past it to the results; the
+  // index's own back still goes to the results. A pick outside a search marks nothing.
+  const _pickFromIndex = () => { _leaveSurprise(); if (typeof setFromSearchIndex === 'function') setFromSearchIndex(!!fromSearch); };
+  const _fromSearchIndex = !!fromSearch && !!fromSearchIndex;
+  /** The way back to the index a chapter was picked from: that index, the mark spent. @param {() => void} go */
+  const _backToIndex = (go) => () => { if (typeof setFromSearchIndex === 'function') setFromSearchIndex(false); go(); };
   const colIdxProps = (volKey) => {
     const col = COL_BY_KEY.get(volKey);
     const nav = (id) => { _startNewTrail(); setLetterId(id); setActiveReadKey('vol:' + volKey, () => setLastReadForVol(volKey, id)); setScreen(col.letterScreen); };
@@ -399,14 +418,34 @@ export function buildScreenRoutes({
     onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
     theme, onThemeChange: setTheme,
   });
+  // Back to results (search200 UX B1). From a search hit the reader's ‹ went to the
+  // parent index (a letter could never get back to its results by the arrows; a Bible
+  // chapter took two taps), while the system back returned to the results. When the
+  // system back would end at the results (searchBackActive mirrors handleAndroidBack's
+  // precedence), the ‹ (navBack) and the back pill both go there, named "results". The
+  // place the hit opened (searchLanding) is a look: the read tracker is off for it until
+  // the reader reads it (their own scroll, or a stay), when useReadingPositionNav retires
+  // the landing and the tracker comes on like any other read (B1 review).
+  const _searchBack = searchBackActive({
+    screen, fromSearch, fromSurprise, fromWtlb,
+    fromMatthewCh: fromMatthewChRef ? fromMatthewChRef.current : null,
+    stackLength: fromLetterRef && Array.isArray(fromLetterRef.current) ? fromLetterRef.current.length : 0,
+    backActive, fromSearchIndex: _fromSearchIndex,
+  });
+  const _backToResults = () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); };
+  const _navBack = _searchBack ? { onBack: _backToResults, label: RESULTS_LABEL } : null;
+  // `plain`: "results" is a word, not a title, so the pill reads it in its label's case (Track D).
+  const _readerBackHint = _searchBack ? { title: RESULTS_LABEL, volumeLabel: null, plain: true } : backHint;
+  const _searchLook = isSearchLook({ fromSearch, searchLanding, screen, bookId, chapterNum, letterId, studyId, studyChapterId });
+  const _readerMarkAsRead = _searchLook ? false : settings.markAsRead;
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
-    onInAppLink: openInAppLetter, backHint,
+    onInAppLink: openInAppLetter, backHint: _readerBackHint, navBack: _navBack,
     onNavigateToLink: navigateToLink,
     onLinkOpen: openLinkSidebar,
-    onBack: () => window.handleAndroidBack && window.handleAndroidBack(),
-    markAsReadEnabled: settings.markAsRead,
+    onBack: _navBack ? _navBack.onBack : () => window.handleAndroidBack && window.handleAndroidBack(),
+    markAsReadEnabled: _readerMarkAsRead,
     // Read-along (ui/components/ReadAlongHighlight.jsx). Two independent
     // gates: the sentence wash, and the follow-scroll that writes scrollTop
     // under the lease. Both default ON — an absent key must not silently
@@ -563,6 +602,33 @@ export function buildScreenRoutes({
     }
     _openSongs(frames, { screen, letterId, label: label || (screen === 'home' ? '' : _audioTextFrom(screen)) });
   };
+
+  // The doors into the Scripture Web (the navigation stream, w3): the reader's menus open the web at
+  // a place (CONTRACTS.md section 8's start: { verse }, { book, chapter? }, { letterKey }, or
+  // 'this-letter' for the page's own letter, entry or study chapter; opts.check asks whether
+  // there is a door here without going: Hidden Manna has none, being reached only through the
+  // Matthew study chain). The page becomes the way
+  // back (the web's Back is goNavOrigin), and the start rides navHandoff 'webStart' into the route
+  // below, which hands it to the screen while the web is up; anywhere else it is spent, so the web
+  // opened later from the Library opens where it was. Reassigned every build, like __openSongs.
+  window.__openScriptureWeb = (start, opts) => {
+    let to = start;
+    if (start === 'this-letter') {
+      to = screen === 'bible-study-chapter' && studyId && studyChapterId
+        ? { letterKey: 'study:' + studyId + '/' + studyChapterId }
+        : activeVolKey && activeVolKey !== 'hm' && activeLetter && activeLetter.id ? { letterKey: activeVolKey + '/' + activeLetter.id } : null;
+    }
+    if (!to || typeof to !== 'object') return false;
+    // a letter is a door only once the web's panel has letter mode (PANEL_MODES): before that the
+    // web would open at its old place and name nothing of the letter, so the toolbar hides it
+    if (to.letterKey && !PANEL_MODES.letter) return false;
+    if (opts && opts.check) return true;
+    window.navHandoff.set('webStart', to);
+    setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId, returnOrigin: navOrigin || null });
+    setScreen('scripture-web');
+    return true;
+  };
+  if (screen !== 'scripture-web' && window.navHandoff) window.navHandoff.clear('webStart');
 
   // Q8.3: VOT corpus is lazy-loaded as bundle-a-vot.js. Until it arrives,
   // every VOT route (indexes + letter views + WTLB entries + Holy Days +
@@ -1353,11 +1419,11 @@ export function buildScreenRoutes({
         <ChapterIndex
           book={MATTHEW}
           bibleAudio={bibleAudioFor(MATTHEW.id)}
-          onSelect={(num) => { _leaveSurprise(); selectMatthewCh(num); }}
+          onSelect={(num) => { _pickFromIndex(); selectMatthewCh(num); }}
           onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
           // Wave 0: label names the real destination (Search / Studies /
           // the genre / Scriptures — never "Books").
-          backLabel={fromSearch ? 'Search' : fromStudies ? 'Studies' : _idxGenre ? _idxGenre.label : 'Scriptures'}
+          backLabel={fromSearch ? RESULTS_LABEL : fromStudies ? 'Studies' : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
@@ -1410,9 +1476,9 @@ export function buildScreenRoutes({
         <ChapterIndex
           book={book}
           bibleAudio={bibleAudioFor(book.id)}
-          onSelect={(num) => { _leaveSurprise(); selectBibleCh(num); }}
+          onSelect={(num) => { _pickFromIndex(); selectBibleCh(num); }}
           onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
-          backLabel={fromSearch ? 'Search' : _idxGenre ? _idxGenre.label : 'Scriptures'}
+          backLabel={fromSearch ? RESULTS_LABEL : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}
           onSettings={goSettings}
@@ -1439,11 +1505,11 @@ export function buildScreenRoutes({
       <BibleChapterView
         book={book} chapter={chapter}
         bibleAudio={bibleAudioFor(book.id)}
-        onIndex={book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
+        onIndex={_fromSearchIndex ? _backToIndex(goBibleIdx) : book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}
         onNavigate={(num) => { setSurpriseAnchor(null); selectBibleCh(num); }}
         onMarkRead={(payload) => markRead(bookId, chapterNum, payload)}
         readTrackKey={getReadKey(bookId, chapterNum)}
-        markAsReadEnabled={settings.markAsRead}
+        markAsReadEnabled={_readerMarkAsRead}
         translation={settings.translation}
         restoredNames={settings.restoredNames}
         showChapterTitle={settings.showChapterTitle !== false}
@@ -1463,7 +1529,7 @@ export function buildScreenRoutes({
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}
         surpriseAnchor={surpriseAnchor}
-        backHint={backHint} onTapThroughBack={tapThroughBack}
+        backHint={_readerBackHint} onTapThroughBack={_navBack ? _navBack.onBack : tapThroughBack} navBack={_navBack}
         onLinkOpen={openLinkSidebar}
         readAlongOn={sharedViewProps.readAlongOn}
         readAlongFollow={sharedViewProps.readAlongFollow}
@@ -1509,10 +1575,11 @@ export function buildScreenRoutes({
           markRead={markRead}
           getReadKey={getReadKey}
           selectMatthewCh={selectMatthewCh}
-          goMatthewIdx={goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
+          goMatthewIdx={_fromSearchIndex ? _backToIndex(goMatthewIdx) : goMatthewIdx} goSearch={goSearch} goSettings={goSettings} goHistory={goHistory}
           goToLetterFromMatthew={goToLetterFromMatthew}
           theme={theme} setTheme={setTheme} surpriseAnchor={surpriseAnchor}
-          backHint={backHint} tapThroughBack={tapThroughBack}
+          backHint={_readerBackHint} tapThroughBack={_navBack ? _navBack.onBack : tapThroughBack} navBack={_navBack}
+          markAsReadEnabled={_readerMarkAsRead}
           openLinkSidebar={openLinkSidebar}
           onNavigateToLink={navigateToLink}
         />
@@ -1680,6 +1747,7 @@ export function buildScreenRoutes({
           onBack={() => navOrigin ? goNavOrigin() : setScreen('library')}
           settings={settings}
           updateSetting={updateSetting}
+          start={(window.navHandoff && window.navHandoff.peek('webStart')) || undefined}
         />
       );
     },

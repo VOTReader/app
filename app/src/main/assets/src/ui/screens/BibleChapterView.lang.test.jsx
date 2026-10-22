@@ -6,7 +6,7 @@
    the edition's script lands, translateVerse answers with the English NKJV, and
    those verses must not claim to be Spanish. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 
@@ -78,5 +78,20 @@ describe('BibleChapterView — lang on a Spanish edition\'s verses (es1)', () =>
   it('leaves English editions to the page\'s own language', () => {
     const { container } = render(view('nkjv'));
     expect(container.querySelector('#v-16').hasAttribute('lang')).toBe(false);
+  });
+});
+
+/* search200 UX B1: navBack from a search hit — see LetterView.labels.test.jsx. A
+   verse hit on a Bible chapter took two taps (chapter, then the book index's back). */
+describe('BibleChapterView — the ‹ goes back to the results from a search hit (search200 UX B1)', () => {
+  it('names the results and goes there, not to the book index', () => {
+    const onIndex = vi.fn(), onResults = vi.fn();
+    render(<BibleChapterView book={JOHN} chapter={JOHN.chapters[0]} translation="nkjv" theme="dark"
+      markAsReadEnabled={false} onNavigate={() => {}} onIndex={onIndex} navBack={{ onBack: onResults, label: 'results' }} />);
+    const back = document.querySelector('.nav-back-icon');
+    expect(back.getAttribute('aria-label')).toBe('Back to results');
+    fireEvent.click(back);
+    expect(onResults).toHaveBeenCalledTimes(1);
+    expect(onIndex).not.toHaveBeenCalled();
   });
 });

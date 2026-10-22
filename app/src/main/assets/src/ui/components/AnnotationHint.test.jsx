@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { AnnotationHint } from './AnnotationHint.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { InstallCard, _resetInstallCardSession } from './InstallCard.jsx';
 import * as TS from '../../utils/tour-steps.js';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -261,5 +262,73 @@ describe('AnnotationHint — yields to the tour and the audio bar (journey F2.1)
     expect(code, 'CONTROL: the stripper removed it').not.toMatch(/highlight, note, or bookmark/);
     expect(code, 'CONTROL: the stripped text is still the program').toMatch(/highlightWords\(\)/);
     expect(code).not.toMatch(/Hold your finger|A small bar appears|Highlight, or Note/);
+  });
+});
+
+/* search200 UX B1: on a first reader open the pill sat on the install card's heading (both live at the
+   bottom of the end of a chapter). The pill waits while the card is on screen and comes when it goes.
+   The REAL InstallCard is mounted beside it, as the real AudioPlayer is above: a stubbed "visible" flag
+   would prove the pill reads a stub. */
+describe('AnnotationHint — waits while the install card is on screen (search200 UX B1)', () => {
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+  let ios;
+  class FakeIO {
+    constructor(cb) { this.cb = cb; this.els = []; ios.push(this); }
+    observe(el) { this.els.push(el); }
+    unobserve(el) { this.els = this.els.filter((e) => e !== el); }
+    disconnect() { this.els = []; }
+  }
+  const onScreen = (el, on) => act(() => { for (const io of ios.slice()) if (io.els.includes(el)) io.cb([{ target: el, isIntersecting: on }]); });
+  beforeEach(() => {
+    ios = [];
+    Object.defineProperty(window.navigator, 'userAgent', { configurable: true, get: () => IPHONE });
+    globalThis.StateStore = { get: () => ({ readItems: { 'v1:genesis:1': 1 } }), subscribe: () => () => {}, getVersion: () => 1 };
+    globalThis.StorageHealth = { _isStandalone: () => false };
+    globalThis.PlatformBridge = { isAndroid: false };
+    localStorage.removeItem('vot-install-offer');
+    _resetInstallCardSession();
+  });
+  afterEach(() => {
+    cleanup();
+    delete window.navigator.userAgent;
+    delete globalThis.StateStore; delete globalThis.StorageHealth; delete globalThis.PlatformBridge;
+    delete globalThis.IntersectionObserver;
+    localStorage.removeItem('vot-install-offer');
+  });
+  const pill = () => document.querySelector('.ann-hint-pill');
+
+  it('holds while the card is in view, and comes when the reader scrolls it away', () => {
+    globalThis.IntersectionObserver = FakeIO;
+    setupStores();
+    render(<><InstallCard unitKey="genesis:1" /><AnnotationHint /></>);
+    const section = document.querySelector('.install-card');
+    expect(section, 'PRECONDITION: the card is shown').toBeTruthy();
+    onScreen(section, true);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(pill(), 'the card is on screen: no pill').toBeNull();
+    onScreen(section, false);
+    expect(pill(), 'the card scrolled away: the pill comes').toBeTruthy();
+    onScreen(section, true);
+    expect(pill(), 'the card is back on screen: the pill waits again').toBeNull();
+  });
+
+  it('holds while the card is up, and comes once the reader puts it away', () => {
+    setupStores();
+    render(<><InstallCard unitKey="genesis:1" /><AnnotationHint /></>);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(document.querySelector('.install-card'), 'PRECONDITION: the card is up').toBeTruthy();
+    expect(pill(), 'the card is up: no pill').toBeNull();
+    act(() => { fireEvent.click(document.querySelector('.install-card-later')); });
+    expect(document.querySelector('.install-card')).toBeNull();
+    expect(pill(), 'Maybe later: the pill comes').toBeTruthy();
+  });
+
+  it('CONTROL: a card below the fold does not hold the pill', () => {
+    globalThis.IntersectionObserver = FakeIO;
+    setupStores();
+    render(<><InstallCard unitKey="genesis:1" /><AnnotationHint /></>);
+    expect(document.querySelector('.install-card'), 'PRECONDITION: the card is shown').toBeTruthy();
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(pill()).toBeTruthy();
   });
 });

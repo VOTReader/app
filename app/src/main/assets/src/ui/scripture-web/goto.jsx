@@ -1,0 +1,725 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   goto — the Scripture Web's go-to (search a book, chapter or verse) and
+   what a tap on a drawn name does. Cluster F (bundle-d), used by
+   ui/screens/ScriptureWebScreen.jsx and ui/scripture-web/use-web-selection.js.
+   The navigation stream owns this file (CONTRACTS.md section 10).
+   ═══════════════════════════════════════════════════════════════════════
+
+   Two contracts other streams call (CONTRACTS.md sections 4 and 9):
+
+     useGoTo(web)   the go-to's state and its two render nodes. `button` is
+                    the header slot: the screen renders it first inside the
+                    chrome's control row (the 40 px search button, spec 4.1);
+                    `box` is everything the go-to puts over the canvas: the
+                    box itself while it is open (spec 4.5), the chip naming
+                    the verse it went to ("John 3:16 · 64 connections"), and
+                    the edge chips naming where lit threads go off the frame
+                    ("‹ Genesis 22:2", tap = Follow). Null at rest, so the
+                    DOM is as it was until the reader asks.
+     routeOverlayHit(hit, nav)
+                    what a tap on something the overlay drew does: a book
+                    name frames the book, a chapter numeral frames the chapter
+                    and opens its group, a "+n" pill opens its group; true
+                    when it handled the tap, so the tap stops before the line
+                    picking. Each camera move is a journey arrival.
+
+   The box reads what is typed through the app's own reference parser
+   (utils/scripture-web/ref-parse.js over search/ref-parser.js: no parser of
+   its own). Enter closes it and the camera eases there (flyTo, 600-900 ms,
+   instant under reduced motion): a book fills the canvas area, a chapter
+   about 70 % of it with its group open, a verse the five chapters around it
+   with its threads lit and the panel in verse mode. The keys the web's root
+   takes for it (use-web-keys.js): / and Ctrl+K open it, Escape closes it
+   first, Enter or Space choose the line at the centre (selectCentre), [ and ]
+   step through the lines at the chosen verse (step).
+
+   The chips ride the camera: the frame loop's onFrame places them in the
+   frame the web moved in (DOM style, never React state per frame); React
+   state changes only when what they name changes.
+
+   start (CONTRACTS.md section 8) is consumed once per mount, as soon as the
+   camera exists: the web opens on that place, instantly, over the resume
+   point. */
+
+import { goToRows, frameOf, startPlace, bookPlace, chapterPlace, chapterIndexOf, bookSpan } from '../../utils/scripture-web/ref-parse.js';
+import { arcsTouching, nearbyThreads, refOfVerse, verseToX, xToVerse } from '../../utils/scripture-web/pick.js';
+import { fitPPV } from '../../utils/scripture-web/geometry.js';
+import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
+import { WHOLE_WEB } from '../../utils/scripture-web/describe.js';
+
+/**
+ * @typedef {{ button: any, box: any, isOpen: boolean, open: (query?: string) => void, close: () => void,
+ *   selectCentre: () => boolean, step: (dir: number) => boolean, back: () => boolean }} GoTo
+ *   button  the header slot's node (null: nothing in the header)
+ *   box     what the go-to puts over the canvas (null: nothing)
+ *   open    opens the box, optionally with a query typed in; close closes it
+ *   selectCentre, step, back (additive, for use-web-keys.js): Enter / Space, [ ] and Backspace
+ */
+
+/** The hint under the rows (spec 4.5). */
+export const GOTO_HINT = 'Try “Isaiah 53”, “Romans”, “Gen 1:1”';
+/** At most this many rows: PC, and the phone (its keyboard takes the rest). */
+export const GOTO_ROWS = 5;
+export const GOTO_ROWS_COMPACT = 3;
+
+/** The PC box (spec 4.5): its width, its top, its field's height, and the gutter it keeps. */
+export const GOTO_BOX_W = 640;
+export const GOTO_BOX_TOP = 24;
+const GOTO_FIELD_H = 56;
+const GOTO_GUTTER = 24;
+/** Narrower than this between the title and the control row, the box drops under them. */
+export const GOTO_BOX_MIN = 480;
+/** The verse chip (CSS px): its gap from the foot it names, and the room it keeps from the area's edges. */
+const CHIP_GAP = 10;
+const CHIP_GUTTER = 8;
+/** The page's own controls the verse chip keeps off when they stand in its row (w4: over a sheet it
+ * ran under hide-UI, "Isaiah 53:5 · 27 connecti…"). */
+const CHIP_KEEP_OFF = '.sw-hide-all, .sw-guide-btn, .sw-controls';
+
+/**
+ * The boxes of CHIP_KEEP_OFF in the root, CSS px: from the offsets, not the client rects, so a turned
+ * root (.sw-rotated) reads its own axes. A control not laid out (display none, or jsdom) has none.
+ * @param {HTMLElement | null | undefined} root
+ * @returns {{ x0: number, x1: number, y0: number, y1: number }[]}
+ */
+function keepOffBoxes(root) {
+  const out = [];
+  if (!root || typeof root.querySelectorAll !== 'function') return out;
+  for (const el of root.querySelectorAll(CHIP_KEEP_OFF)) {
+    const b = /** @type {HTMLElement} */ (el);
+    const w = b.offsetWidth, h = b.offsetHeight;
+    if (!(w > 0) || !(h > 0)) continue;
+    let x = 0, y = 0, n = /** @type {any} */ (b);
+    while (n && n !== root) { x += n.offsetLeft; y += n.offsetTop; n = n.offsetParent; }
+    if (n === root) out.push({ x0: x, x1: x + w, y0: y, y1: y + h });
+  }
+  return out;
+}
+
+/**
+ * Where the PC box sits (spec 4.5, r3-04): 640 px at top 24, centred over the canvas area, and
+ * clear of the chrome in its band. It sits in the gap between the title block and the control row,
+ * moved along when the canvas area's centre would put it over either; where that gap is under
+ * 480 px (1366 and the other laptop widths), it drops under the chrome at the canvas area's
+ * width. The review of 2026-10-18 found it centred over the canvas area at every width, over the
+ * search button that opens it and half of "Scripture" below about 1900 px. Pure, so the rule is
+ * pinned without a layout; CSS px in the root's own frame (transform-free, so a rotated root too).
+ * @param {{ W: number, inset?: number,
+ *   chrome: Array<{ l: number, t: number, r: number, b: number } | null> }} m
+ *   W the root's width; inset the panel's (right); chrome the title block and the control row
+ *   (null or empty: not shown)
+ * @returns {{ x: number, w: number, top: number }}  x the box's centre
+ */
+export function gotoBoxPlace({ W, inset, chrome }) {
+  const right = Math.max(0, W - (inset || 0));
+  const mid = right / 2;
+  let lo = 0, hi = right, under = 0;
+  for (const c of chrome || []) {
+    if (!c || !(c.r > c.l) || !(c.b > c.t)) continue;
+    // only what shares the box's band at the top; the rows below it fall clear of the chrome
+    if (c.b <= GOTO_BOX_TOP || c.t >= GOTO_BOX_TOP + GOTO_FIELD_H) continue;
+    under = Math.max(under, c.b);
+    if ((c.l + c.r) / 2 <= mid) lo = Math.max(lo, c.r);
+    else hi = Math.min(hi, c.l);
+  }
+  const gap = hi - lo - 2 * GOTO_GUTTER;
+  if (gap >= GOTO_BOX_MIN) {
+    const w = Math.min(GOTO_BOX_W, gap);
+    return { x: Math.min(Math.max(mid, lo + GOTO_GUTTER + w / 2), hi - GOTO_GUTTER - w / 2), w, top: GOTO_BOX_TOP };
+  }
+  return { x: mid, w: Math.max(0, Math.min(GOTO_BOX_W, right - 2 * GOTO_GUTTER)), top: under ? under + 8 : GOTO_BOX_TOP };
+}
+
+/** An element's box in its offset parent (the root), or null when it is not laid out. */
+function offsetBox(el) {
+  if (!el || !el.offsetParent) return null;
+  return { l: el.offsetLeft, t: el.offsetTop, r: el.offsetLeft + el.offsetWidth, b: el.offsetTop + el.offsetHeight };
+}
+
+/** The lazy Bible corpus's signal (window.__bibleCorpus), typeof-guarded: inert where it is absent. */
+const subscribeBible = (cb) => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.subscribe(cb) : () => {});
+const bibleCorpusVersion = () => (typeof window.__bibleCorpus !== 'undefined' ? window.__bibleCorpus.getVersion() : 0);
+
+/** "64 connections", "1 connection". */
+export function connectionsText(n) {
+  return n.toLocaleString() + (n === 1 ? ' connection' : ' connections');
+}
+
+const NO_GOTO = Object.freeze({
+  button: null, box: null, isOpen: false,
+  open() {}, close() {}, selectCentre() { return false; }, step() { return false; }, back() { return false; },
+});
+
+/**
+ * What a journey crumb reopens on Back, from what is open now: the panel's spec (with the lit
+ * threads, when there are any), or null when nothing is open, so Back closes whatever a later step
+ * opened. A card no spec reopens (a bundle's sheet, a My Web card) counts as nothing: Back closes
+ * it rather than leave a panel up over a view that no longer shows it. Pure, for its own tests.
+ * @param {any} panel  use-web-selection.js's panel ({ spec, info } | null)
+ * @param {ArrayLike<number> | null} lit  focus.lit
+ * @returns {any}  a PanelSpec (plus `lit`), or null
+ */
+export function reopenOf(panel, lit) {
+  const spec = panel && panel.spec;
+  if (!spec || spec.myWeb) return null;
+  if (spec.mode === 'group' && !(spec.ids && spec.ids.length) && !(spec.chapter >= 0)) return null;
+  return lit && lit.length ? Object.assign({}, spec, { lit }) : spec;
+}
+
+/** Nearly this share of the canon in view is the whole web, so a crumb from it says so. */
+const WHOLE_WEB_SHARE = 0.9;
+
+/**
+ * What a journey crumb calls where the reader is (here): the whole web at the rest view (the
+ * camera at fit, or nearly all of the canon in view), else the smallest of the book, the chapter
+ * or the verse at the centre that the view holds whole. Back read "Back to Psalms 103:2" on its
+ * way to the whole canon, and the trail showed the same (review 2026-10-18). Pure, for its tests.
+ * @param {any} g  the graph
+ * @param {[number, number]} span  the canon x the view holds, [x0, x1]
+ * @param {number} verse  the verse at the centre
+ * @param {boolean} atFit  the camera is at fit (the rest view)
+ * @returns {string}
+ */
+export function hereLabel(g, span, verse, atFit) {
+  const w = Math.min(g.total, span[1]) - Math.max(0, span[0]);
+  if (atFit || w >= WHOLE_WEB_SHARE * g.total) return WHOLE_WEB;
+  const r = refOfVerse(g, verse);
+  const ch = g.chapters[r.chapterIndex];
+  if (w < ch[3]) return r.label;
+  const b = bookSpan(g, ch[0]);
+  return b && w >= b[1] - b[0] + 1 ? r.bookTitle : r.bookTitle + ' ' + r.chapter;
+}
+
+/**
+ * The go-to. `web` is what it needs from the screen (CONTRACTS.md section 9): the graph, flyTo,
+ * openPanel, the journey, lightThreads, the live region's setAnnounce and the start prop; and
+ * (the navigation stream's additions on its own call line) closePanel and panel (what is open,
+ * so a journey crumb records it), the density and mode, the camera's refs and viewFor, the frame
+ * loop's onFrame and the root. keepOutRef and schedule (the integration's): the verse chip's box,
+ * CSS px, is written to keepOutRef ([box], or null while no chip shows) so the overlay's labels keep
+ * off it, and a frame is asked for whenever the box changes, so a still camera repaints once.
+ * insetFor (the screen's usePanelLayout, w4): what the panel will cover once open, CSS px, so a
+ * place is framed beside the panel it opens even before that panel renders (an instant fly, the
+ * door's start or reduced motion, read an inset of 0 and landed the verse at the panel's edge).
+ * @param {{ graph?: any, flyTo?: Function, openPanel?: Function, journey?: any,
+ *   lightThreads?: Function, setAnnounce?: Function, start?: any, closePanel?: Function, panel?: any,
+ *   density?: any, mode?: string, camRef?: any, viewRef?: any, focusRef?: any, panelInsetRef?: any,
+ *   viewFor?: Function, onFrame?: Function, rootRef?: any, keepOutRef?: any, schedule?: Function,
+ *   insetFor?: Function }} web
+ * @returns {GoTo}
+ */
+export function useGoTo(web) {
+  const {
+    graph, flyTo, openPanel, journey, lightThreads, setAnnounce, start, closePanel, panel,
+    density, mode, camRef, viewRef, focusRef, panelInsetRef, viewFor, onFrame, rootRef, keepOutRef, schedule,
+    insetFor,
+  } = web || {};
+  // what is open, read when a crumb is recorded (here), not when this render ran
+  const panelRef = React.useRef(panel);
+  panelRef.current = panel;
+  const live = !!(camRef && viewRef && focusRef && flyTo && openPanel);
+  const [isOpen, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState('');
+  const [sel, setSel] = React.useState(0);
+  const [chip, setChip] = React.useState(/** @type {null | { lo: number, hi: number, label: string, count: number, litKey: string, ids: Int32Array }} */ (null));
+  const [edges, setEdges] = React.useState(/** @type {{ left: any, right: any }} */ ({ left: null, right: null }));
+  const inputRef = React.useRef(null);
+  // the box is a dialog: Tab stays in it, and focus goes home when it closes (useFocusTrap,
+  // the app's free-global hook; dialog-focus-contract.test.js). Home is where homeRef says: the
+  // web once a place is chosen (choose), the opener on Escape (close); else the trap's own, the
+  // element that had focus when the box opened. Left to the trap alone, a place chosen from the
+  // search button sent the keyboard back to the button after choose had sent it to the web, and
+  // a panel opening in the same commit took the button as where its own close goes (review
+  // 2026-10-18): the arrows, Enter and Backspace then went to the button
+  const homeRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const boxRef = useFocusTrap(isOpen, { returnFocus: () => homeRef.current });
+  const buttonRef = React.useRef(null);
+  const openerRef = React.useRef(null);
+  const chipRef = React.useRef(chip);
+  chipRef.current = chip;
+  const chipElRef = React.useRef(null);
+  const edgeKeyRef = React.useRef('|');
+  const stepRef = React.useRef({ verse: -1, list: /** @type {number[]} */ ([]) });
+  const startedRef = React.useRef(false);
+
+  const say = React.useCallback((s) => { if (typeof setAnnounce === 'function') setAnnounce(s); }, [setAnnounce]);
+
+  /** The canvas area beside the panel, device px. */
+  const area = React.useCallback(() => {
+    const v = viewRef.current;
+    const inset = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
+    return Math.max(1, v.W - inset * (v.DPR || 1));
+  }, [viewRef, panelInsetRef]);
+
+  /** The verse at the canvas area's centre. */
+  const centreVerse = React.useCallback(() => {
+    const cam = camRef.current, v = viewRef.current;
+    const c = Math.floor(xToVerse(cam, v.W, area() / 2));
+    return Math.max(0, Math.min(graph.total - 1, c));
+  }, [camRef, viewRef, area, graph]);
+
+  /** Where the reader is, as a journey entry: the go-to's lit verse or else the centre verse, the
+   * span in view, and what is open there (reopenOf): Back opens it again, or closes what a later
+   * step opened when nothing was. */
+  const here = React.useCallback(() => {
+    const cam = camRef.current, v = viewRef.current;
+    if (!graph || !cam || !v.W) return null;
+    const c = chipRef.current;
+    const f = focusRef.current;
+    const lit = c && f.litKey === c.litKey;
+    const verse = lit ? c.lo : centreVerse();
+    /** @type {[number, number]} */
+    const span = [xToVerse(cam, v.W, 0), xToVerse(cam, v.W, area())];
+    return {
+      verse, label: lit ? c.label : hereLabel(graph, span, verse, cam.ppv <= fitPPV(cam, v.W) * 1.001),
+      span, open: reopenOf(panelRef.current, f.lit),
+    };
+  }, [graph, camRef, viewRef, focusRef, centreVerse, area]);
+
+  // the journey's Back reopens through the panel API, and asks here where a trail sets out from
+  React.useEffect(() => {
+    if (journey && typeof journey.connect === 'function') journey.connect({ openPanel, closePanel, lightThreads, here });
+  }, [journey, openPanel, closePanel, lightThreads, here]);
+
+  const close = React.useCallback(() => {
+    setOpen(false);
+    const back = openerRef.current;
+    openerRef.current = null;
+    const root = rootRef && rootRef.current;
+    const to = back && back.isConnected && back !== document.body ? back : root;
+    homeRef.current = to || null;
+    if (to && typeof to.focus === 'function') to.focus();
+  }, [rootRef]);
+
+  const open = React.useCallback((q = '') => {
+    if (!live || mode === 'personal') return;
+    if (!isOpen) {
+      // opened from nowhere (no focus on the page): the web itself is where focus goes home to
+      const root = rootRef && rootRef.current;
+      const a = document.activeElement;
+      if ((!a || a === document.body) && root && typeof root.focus === 'function') root.focus({ preventScroll: true });
+      openerRef.current = document.activeElement;
+      homeRef.current = null;
+    }
+    setQuery(typeof q === 'string' ? q : '');
+    setSel(0);
+    setOpen(true);
+  }, [live, mode, isOpen, rootRef]);
+
+  // the box takes the keyboard when it opens
+  React.useEffect(() => {
+    if (isOpen && inputRef.current) inputRef.current.focus();
+  }, [isOpen]);
+
+  // where the PC box sits (gotoBoxPlace), measured before it paints and again when the window
+  // resizes, so it keeps clear of the title and the control row; compact mode's place is the CSS
+  // rule's (spec 4.5: 64 px in from each side at top 8). Unmeasured (no layout): the CSS default.
+  const [place, setPlace] = React.useState(/** @type {null | { x: number, w: number, top: number }} */ (null));
+  const insetNow = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
+  const measure = React.useCallback(() => {
+    const root = rootRef && rootRef.current;
+    const W = root ? root.clientWidth : 0;
+    const v = viewRef && viewRef.current;
+    const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
+    const next = W > 0 && !compact ? gotoBoxPlace({
+      W, inset: (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0,
+      chrome: [offsetBox(root.querySelector('.sw-topbar')), offsetBox(root.querySelector('.sw-controls'))],
+    }) : null;
+    setPlace((was) => (was && next && was.x === next.x && was.w === next.w && was.top === next.top ? was : next));
+  }, [rootRef, viewRef, panelInsetRef]);
+  React.useLayoutEffect(() => {
+    if (!isOpen) return undefined;
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [isOpen, insetNow, measure]);
+
+  // a press anywhere outside the box (and its button) closes it; Back (data-sw-goto-back) is the
+  // box's own way out on the phone, and its click closes it (w4: the press closed the box and the
+  // click then left the web)
+  React.useEffect(() => {
+    if (!isOpen) return undefined;
+    const onDown = (e) => {
+      const t = e.target;
+      if (boxRef.current && boxRef.current.contains(t)) return;
+      if (buttonRef.current && buttonRef.current.contains(t)) return;
+      if (t && typeof t.closest === 'function' && t.closest('[data-sw-goto-back]')) return;
+      setOpen(false);
+      openerRef.current = null;
+    };
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
+  }, [isOpen, boxRef]);
+
+  /**
+   * Take the reader to a place: the panel and the lit set first (so the panel slides in while
+   * the camera flies and the fly lands beside it), the journey before the camera moves (its
+   * origin is where the camera still is), then the fly; the verse chip once it lands.
+   * @param {any} place  ref-parse's Place, or { kind: 'letter', letterKey }
+   * @param {{ push?: boolean, instant?: boolean }} [how]
+   */
+  const go = React.useCallback((place, how = /** @type {{ push?: boolean, instant?: boolean }} */ ({})) => {
+    const push = how.push !== false;
+    // a place is the canon's: My Web's rails hold no verse panel, lit set or edge chips
+    if (!graph || !place || !live || mode === 'personal') return false;
+    if (place.kind === 'letter') return !!openPanel({ mode: 'letter', letterKey: place.letterKey });
+    if (!camRef.current || !viewRef.current.W) return false;
+    // where the reader set out from, read before the panel or the camera changes
+    const origin = push ? here() : null;
+    const frame = frameOf(graph, place);
+    const lights = place.kind === 'verse' || place.kind === 'range';
+    const ids = lights ? Int32Array.from(arcsTouching(graph, place.lo, place.hi, density, 0)) : null;
+    let entryOpen;
+    if (place.kind === 'chapter') {
+      entryOpen = { mode: 'group', chapter: place.chapterIndex };
+      openPanel(entryOpen);
+    } else if (lights) {
+      // a range opens on the range (w4: verse mode on its first verse lit that verse's threads over
+      // the range's, so the chip never came and the count said was not the count lit)
+      const spec = place.hi > place.lo ? { mode: 'verse', verse: place.lo, verseEnd: place.hi } : { mode: 'verse', verse: place.lo };
+      entryOpen = Object.assign({}, spec, { lit: ids });
+      openPanel(spec);
+      if (lightThreads) lightThreads(ids);
+    } else {
+      // a book opens nothing, so what was open closes, its lit set with it (w4: John 3:16's panel
+      // stayed docked over Romans); Back opens it again (the origin, read above, keeps it)
+      entryOpen = null;
+      if (typeof closePanel === 'function') closePanel();
+    }
+    setChip(null);
+    if (push && journey) {
+      journey.push({ verse: place.lo, label: place.label, open: entryOpen, span: [frame.x0, frame.x1] }, origin);
+    }
+    const litKey = ids ? litKeyOf(ids) : '';
+    const done = () => {
+      if (ids && focusRef.current.litKey === litKey) {
+        setChip({ lo: place.lo, hi: place.hi, label: place.label, count: ids.length, litKey, ids });
+      }
+    };
+    // framed in the canvas area the panel will leave (insetFor), told now: an instant fly lands
+    // before the panel renders, and a book's closes it
+    /** @type {any} */
+    const fly = how && how.instant ? { reduceMotion: true } : {};
+    const cover = place.kind === 'book' ? { right: 0, bottom: 0 } : typeof insetFor === 'function' ? insetFor() : null;
+    if (cover) { fly.insetRight = cover.right; fly.insetBottom = cover.bottom; }
+    Promise.resolve(flyTo(frame, fly)).then(done, done);
+    say(ids ? place.label + ', ' + connectionsText(ids.length) : place.label);
+    return true;
+  }, [graph, live, mode, openPanel, closePanel, camRef, viewRef, density, lightThreads, journey, here, focusRef, flyTo, say, insetFor]);
+
+  // a verse row's text is the Bible corpus's, which loads lazily: a box open before it lands takes
+  // the text when it does (review 2026-10-18; the signal hooks/use-lazy-bundles.js reads). The
+  // version is a dependency the memo's body never names: verseTextFor reads the corpus itself
+  const bibleVersion = React.useSyncExternalStore(subscribeBible, bibleCorpusVersion);
+  const rows = React.useMemo(() => {
+    if (!isOpen || !graph) return [];
+    const v = viewRef && viewRef.current;
+    const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
+    return goToRows(graph, query, { density, limit: compact ? GOTO_ROWS_COMPACT : GOTO_ROWS });
+  }, [isOpen, graph, query, density, viewRef, bibleVersion]); // eslint-disable-line react-hooks/exhaustive-deps
+  const selAt = rows.length ? Math.min(sel, rows.length - 1) : -1;
+  // the chosen row stays in view: a keyboard that leaves less than three rows scrolls the list
+  React.useLayoutEffect(() => {
+    if (!isOpen || selAt < 0 || !boxRef.current) return;
+    const el = boxRef.current.querySelector('#sw-goto-opt-' + selAt);
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest' });
+  }, [isOpen, selAt, rows, boxRef]);
+
+  const choose = React.useCallback((row) => {
+    if (!row) return;
+    setOpen(false);
+    openerRef.current = null;
+    const root = rootRef && rootRef.current;
+    // the web has the keyboard after a go-to, and keeps it when the box's trap lets go (homeRef)
+    homeRef.current = root || null;
+    if (root && typeof root.focus === 'function') root.focus();
+    go(row.place);
+  }, [go, rootRef]);
+
+  const onInputKey = React.useCallback((e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (rows.length) setSel((selAt + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (selAt >= 0) choose(rows[selAt]);
+      else if (query.trim()) say('No book, chapter or verse called ' + query.trim());
+    } else if (e.key === 'Escape') {
+      // the box is the top layer: Escape closes it and goes no further (not the panel, not the web)
+      e.preventDefault(); e.stopPropagation();
+      close();
+    }
+  }, [rows, selAt, choose, query, say, close]);
+
+  /** Enter / Space: the line at the centre - the drawn thread with a foot nearest the canvas
+   * area's centre, the strongest among the nearest. */
+  const selectCentre = React.useCallback(() => {
+    if (!graph || !live || !camRef.current || !viewRef.current.W || mode === 'personal') return false;
+    const cam = camRef.current, v = viewRef.current;
+    const c = centreVerse() + 0.5;
+    const lo = Math.max(0, Math.floor(xToVerse(cam, v.W, 0))), hi = Math.min(graph.total - 1, Math.ceil(xToVerse(cam, v.W, area())));
+    let best = -1, bestD = Infinity, bestW = -Infinity;
+    for (const i of arcsTouching(graph, lo, hi, density, 0)) {
+      const d = Math.min(Math.abs(graph.from[i] + 0.5 - c), Math.abs(graph.to[i] + 0.5 - c));
+      if (d < bestD || (d === bestD && graph.votes[i] > bestW)) { best = i; bestD = d; bestW = graph.votes[i]; }
+    }
+    if (best < 0) { say('No line in view'); return false; }
+    return !!openPanel({ mode: 'connection', arc: best });
+  }, [graph, live, camRef, viewRef, mode, centreVerse, area, density, say, openPanel]);
+
+  /** [ and ]: the next or the previous line at the chosen verse (a verse open, or the end of the
+   * chosen line nearer the centre, or else the centre verse), the strongest first. */
+  const step = React.useCallback((dir) => {
+    if (!graph || !live || !camRef.current || !viewRef.current.W || mode === 'personal') return false;
+    const f = focusRef.current;
+    const s = stepRef.current;
+    let verse;
+    if (f.arc >= 0 && s.verse >= 0 && s.list.indexOf(f.arc) >= 0) verse = s.verse;
+    else if (f.arc >= 0 && f.arc < graph.count) {
+      const c = centreVerse(), a = graph.from[f.arc], b = graph.to[f.arc];
+      verse = Math.abs(a - c) <= Math.abs(b - c) ? a : b;
+    } else if (f.range && f.range[0] === f.range[1]) verse = f.range[0];
+    else verse = centreVerse();
+    const list = s.verse === verse && s.list.length ? s.list : nearbyThreads(graph, verse, verse, density, 0);
+    stepRef.current = { verse, list };
+    if (!list.length) { say('No lines at ' + refOfVerse(graph, verse).label); return false; }
+    const at = list.indexOf(f.arc);
+    const next = at < 0 ? (dir > 0 ? 0 : list.length - 1) : (at + (dir > 0 ? 1 : list.length - 1)) % list.length;
+    return !!openPanel({ mode: 'connection', arc: list[next] });
+  }, [graph, live, camRef, viewRef, mode, focusRef, centreVerse, density, say, openPanel]);
+
+  /** An edge chip's tap: Follow that thread off the frame - the camera goes to its far end at the
+   * same zoom, and the line opens there (on landing, so its own Follow names the way back). */
+  const follow = React.useCallback((side) => {
+    const e = edges[side];
+    if (!e || !graph || !live) return;
+    const open = { mode: 'connection', arc: e.arc };
+    if (journey) journey.push({ verse: e.verse, label: e.label, open }, here());
+    // the chip goes once that end is in view, and the keyboard with it to the body (review
+    // 2026-10-18): it goes home to the web first, which does not scroll the page
+    const root = rootRef && rootRef.current;
+    if (root && typeof root.focus === 'function') root.focus({ preventScroll: true });
+    // and the line opens where it lands, not framed again (w4: framing both feet zoomed far out)
+    Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(open, { frame: false }); }, () => {});
+  }, [edges, graph, live, journey, here, flyTo, openPanel, rootRef]);
+
+  /** Backspace on the web: one step back along the trail (journey.back, which reopens what was
+   * open there), named for the screen reader. Nothing called journey.back before (the review of
+   * 2026-10-18); the panel's own Back control is the panel stream's (CONTRACTS.md ledger). */
+  const back = React.useCallback(() => {
+    if (!journey || !live || mode === 'personal') return false;
+    const s = journey.stack;
+    if (!s || s.length < 2) { say('Nothing to go back to'); return false; }
+    const to = journey.back();
+    if (to) say('Back to ' + to.label);
+    return !!to;
+  }, [journey, live, mode, say]);
+
+  /** The verse chip's box (CSS px) for the overlay, or null; a frame when it changed. */
+  const keepOut = React.useCallback((b) => {
+    if (!keepOutRef) return;
+    const was = keepOutRef.current && keepOutRef.current[0];
+    if (!was && !b) return;
+    if (was && b && was.x0 === b.x0 && was.x1 === b.x1 && was.y0 === b.y0 && was.y1 === b.y1) return;
+    keepOutRef.current = b ? [b] : null;
+    if (typeof schedule === 'function') schedule();
+  }, [keepOutRef, schedule]);
+  // the chip goes with the screen
+  React.useEffect(() => () => { if (keepOutRef) keepOutRef.current = null; }, [keepOutRef]);
+
+  /** One frame's placing: the verse chip at its verse's foot, the edge chips' names. */
+  const placeChips = React.useCallback(() => {
+    const cam = camRef && camRef.current, v = viewRef && viewRef.current;
+    if (!graph || !cam || !v || !v.W || !focusRef) return;
+    const dpr = v.DPR || 1;
+    const f = focusRef.current;
+    const right = area();
+    const c = chipRef.current;
+    let kept = null;
+    if (c && f.litKey !== c.litKey) { chipRef.current = null; setChip(null); }
+    else if (c && chipElRef.current && viewFor) {
+      const va = viewFor();
+      const x = verseToX(cam, v.W, (c.lo + c.hi + 1) / 2) / dpr;
+      // at the verse's foot, but never under the panel (CONTRACTS.md section 5: chips keep out of
+      // panelInsetRef): over a bottom sheet the chip stands on the sheet's top edge
+      const sheetTop = v.H / dpr - ((panelInsetRef && panelInsetRef.current && panelInsetRef.current.bottom) || 0);
+      const y = Math.min((va.base + (va.camY || 0)) / dpr, sheetTop);
+      const el = chipElRef.current;
+      // on the foot's right; short of room there before the area's edge (the canon's end stands
+      // the outer tenth inside it with the panel docked), on the foot's left, and judged on the
+      // box it takes, so it never runs under the panel (w4 review: "Revelation 2" at its border)
+      const w = el.offsetWidth, h = el.offsetHeight, ty = Math.round(y - 12);
+      // and never under the page's own controls in its row (w4): one right of the foot is the
+      // chip's right bound, one left of it its left bound
+      let edge = right / dpr - CHIP_GUTTER, floor = CHIP_GUTTER;
+      for (const o of keepOffBoxes(rootRef && rootRef.current)) {
+        if (o.y1 <= ty - h || o.y0 >= ty) continue;
+        if ((o.x0 + o.x1) / 2 >= x) edge = Math.min(edge, o.x0 - CHIP_GUTTER);
+        else floor = Math.max(floor, o.x1 + CHIP_GUTTER);
+      }
+      let tx = Math.max(floor, Math.round(x + CHIP_GAP));
+      if (tx + w > edge) tx = Math.max(floor, Math.round(x - CHIP_GAP - w));
+      el.style.transform = 'translate(' + tx + 'px,' + ty + 'px) translateY(-100%)';
+      const shown = x >= 0 && x <= right / dpr && tx + w <= edge && y <= v.H / dpr;
+      el.style.visibility = shown ? 'visible' : 'hidden';
+      // the overlay's labels keep off it (its foot chip would print under it: "John 3:16 · J…")
+      if (shown) kept = { x0: tx, x1: tx + w, y0: ty - el.offsetHeight, y1: ty };
+    }
+    keepOut(kept);
+    let left = null, rightEnd = null;
+    const lit = f.lit;
+    if (lit && lit.length) {
+      const vl = xToVerse(cam, v.W, 0), vr = xToVerse(cam, v.W, right);
+      for (let k = 0; k < lit.length; k++) {
+        const i = lit[k];
+        if (!(i >= 0 && i < graph.count)) continue;
+        const a = graph.from[i] + 0.5, b = graph.to[i] + 0.5;
+        const aIn = a >= vl && a <= vr, bIn = b >= vl && b <= vr;
+        if (aIn === bIn) continue;
+        const out = aIn ? graph.to[i] : graph.from[i];
+        const w = graph.votes[i];
+        if (out + 0.5 < vl) { if (!left || w > left.w) left = { arc: i, verse: out, w }; }
+        else if (!rightEnd || w > rightEnd.w) rightEnd = { arc: i, verse: out, w };
+      }
+    }
+    const key = (left ? left.arc + ':' + left.verse : '') + '|' + (rightEnd ? rightEnd.arc + ':' + rightEnd.verse : '');
+    if (key !== edgeKeyRef.current) {
+      edgeKeyRef.current = key;
+      const named = (e) => (e ? { arc: e.arc, verse: e.verse, label: refOfVerse(graph, e.verse).label } : null);
+      setEdges({ left: named(left), right: named(rightEnd) });
+    }
+  }, [graph, camRef, viewRef, focusRef, area, viewFor, panelInsetRef, keepOut, rootRef]);
+
+  /** The start prop, once: as soon as the camera exists. */
+  const tryStart = React.useCallback(() => {
+    if (startedRef.current || !start || !graph || !live || !camRef.current || !viewRef.current.W) return;
+    startedRef.current = true;
+    const p = startPlace(graph, start);
+    if (p) go(p, { push: false, instant: true });
+  }, [start, graph, live, camRef, viewRef, go]);
+  React.useEffect(() => { tryStart(); }, [tryStart]);
+
+  const latest = React.useRef({ placeChips, tryStart });
+  latest.current = { placeChips, tryStart };
+  React.useEffect(() => {
+    if (typeof onFrame !== 'function') return undefined;
+    return onFrame(() => { latest.current.tryStart(); latest.current.placeChips(); });
+  }, [onFrame]);
+  // a chip just mounted is placed before it paints
+  React.useLayoutEffect(() => { if (chip) placeChips(); }, [chip, placeChips]);
+
+  if (!live) return NO_GOTO;
+
+  const button = mode === 'personal' ? null : (
+    <button type="button" ref={buttonRef} className="sw-btn sw-btn-icon sw-goto-btn"
+      aria-label="Go to a book, chapter or verse" title="Go to ( / )" aria-haspopup="dialog" aria-expanded={isOpen}
+      onClick={() => (isOpen ? close() : open())}>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20.5 20.5" />
+      </svg>
+    </button>
+  );
+
+  const v = viewRef.current;
+  const compact = !!(v && v.H && v.H / (v.DPR || 1) <= 500);
+  const inset = (panelInsetRef && panelInsetRef.current && panelInsetRef.current.right) || 0;
+  const optId = (k) => 'sw-goto-opt-' + k;
+  const boxStyle = /** @type {any} */ ({ '--sw-goto-inset': inset + 'px' });
+  if (place && !compact) {
+    boxStyle['--sw-goto-x'] = place.x + 'px';
+    boxStyle['--sw-goto-w'] = place.w + 'px';
+    boxStyle['--sw-goto-top'] = place.top + 'px';
+  }
+  const theBox = isOpen ? (
+    <div className={'sw-goto' + (compact ? ' is-compact' : '')} ref={boxRef} role="dialog" aria-modal="true" aria-label="Go to"
+      style={boxStyle}>
+      <div className="sw-goto-field">
+        <svg className="sw-goto-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+          <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20.5 20.5" />
+        </svg>
+        <input ref={inputRef} className="sw-goto-input" type="text" value={query}
+          placeholder="Book, chapter or verse" aria-label="Go to a book, chapter or verse"
+          role="combobox" aria-expanded={rows.length > 0} aria-controls="sw-goto-list" aria-autocomplete="list"
+          aria-activedescendant={selAt >= 0 ? optId(selAt) : undefined}
+          autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} enterKeyHint="go"
+          onChange={(e) => { setQuery(e.target.value); setSel(0); }} onKeyDown={onInputKey} />
+      </div>
+      {rows.length ? (
+        <ul id="sw-goto-list" className="sw-goto-list" role="listbox" aria-label="Places">
+          {rows.map((row, k) => (
+            <li key={row.key} id={optId(k)} role="option" aria-selected={k === selAt}
+              className={'sw-goto-row' + (k === selAt ? ' is-sel' : '')}
+              onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setSel(k)} onClick={() => choose(row)}>
+              <span className="sw-goto-ref">{row.label}</span>
+              {row.sub ? <span className="sw-goto-sub">{' · ' + row.sub}</span> : null}
+              {row.text ? <span className="sw-goto-text">{' — ' + row.text}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {/* the phone's keyboard leaves room for the rows or the hint: it says what to type until
+          there is something to choose (w4) */}
+      {compact && rows.length ? null : <div className="sw-goto-hint">{GOTO_HINT}</div>}
+    </div>
+  ) : null;
+
+  const theChip = chip ? (
+    <div className={'sw-goto-chip' + (compact ? ' is-compact' : '')} ref={chipElRef} aria-hidden="true">
+      {chip.label + ' · ' + connectionsText(chip.count)}
+    </div>
+  ) : null;
+  const edgeChip = (side) => {
+    const e = edges[side];
+    if (!e) return null;
+    return (
+      <button type="button" className={'sw-goto-edge sw-goto-edge-' + side + (compact ? ' is-compact' : '')} onClick={() => follow(side)}
+        style={side === 'right' ? { right: 'calc(' + inset + 'px + var(--sw-goto-gutter, 24px))' } : undefined}
+        aria-label={'Follow the line to ' + e.label}>
+        {side === 'left' ? '‹ ' + e.label : e.label + ' ›'}
+      </button>
+    );
+  };
+  const box = theBox || theChip || edges.left || edges.right
+    ? <>{theBox}{theChip}{edgeChip('left')}{edgeChip('right')}</> : null;
+
+  return { button, box, isOpen, open, close, selectCentre, step, back };
+}
+
+/**
+ * Route a tap on an overlay target (CONTRACTS.md section 4): a book name frames the book, a
+ * chapter numeral frames the chapter (about 70 % of the canvas area) and opens its group, a pill
+ * opens its group, and a chip of a pill's fan opens the lines it counts in the panel's exits mode,
+ * moving no camera (exits.js). A camera move is a journey arrival, pushed before the camera moves (the trail
+ * asks the go-to where it set out from).
+ * @param {import('./overlay-renderer.js').OverlayHit | null} hit
+ * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any, insetFor?: Function }} nav
+ *   insetFor: what the panel a chapter opens will cover, CSS px, so it is framed beside it (w4)
+ * @returns {boolean} whether the tap was handled
+ */
+export function routeOverlayHit(hit, nav) {
+  if (!hit || !nav || !nav.graph) return false;
+  const g = nav.graph;
+  if (hit.kind === 'book' || hit.kind === 'chapter') {
+    const ci = hit.kind === 'chapter' ? chapterIndexOf(g, hit.book, hit.chapter) : -1;
+    if (hit.kind === 'chapter' && ci < 0) return false;
+    const place = hit.kind === 'book' ? bookPlace(g, hit.book) : chapterPlace(g, ci);
+    if (!place) return false;
+    const frame = frameOf(g, place);
+    const open = hit.kind === 'chapter' ? { mode: 'group', chapter: ci } : undefined;
+    if (nav.journey) nav.journey.push({ verse: place.lo, label: place.label, open, span: [frame.x0, frame.x1] });
+    if (open && typeof nav.openPanel === 'function') nav.openPanel(open);
+    const cover = open && typeof nav.insetFor === 'function' ? nav.insetFor() : null;
+    if (typeof nav.flyTo === 'function') nav.flyTo(frame, cover ? { insetRight: cover.right, insetBottom: cover.bottom } : undefined);
+    return true;
+  }
+  if (hit.kind === 'pill') {
+    return typeof nav.openPanel === 'function' && !!nav.openPanel({ mode: 'group', ids: hit.ids, label: hit.label });
+  }
+  if (hit.kind === 'exit') {
+    return typeof nav.openPanel === 'function' && !!nav.openPanel({
+      mode: 'exits', ids: hit.ids, label: hit.label, key: hit.key, side: hit.side, books: [hit.lo, hit.hi],
+      cell: hit.cell || null, area: hit.area || null,
+    });
+  }
+  return false;
+}

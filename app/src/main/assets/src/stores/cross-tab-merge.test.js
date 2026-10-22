@@ -394,16 +394,20 @@ describe('[D4] vot-state protected — the ledger merges, the session does not',
    DiagnosticLog. The shim (vitest.setup.js) makes every other test take the
    merge path; this is the ONLY coverage of the fallback (TEST5). */
 describe('STOR5 — no navigator.locks: blind-write fallback + one-shot trace', () => {
-  let origLocks; let origDiag;
+  let origLocks; let origDiag; let hadDiag;
   beforeEach(() => {
     origLocks = navigator.locks;
     /** @type {any} */ (navigator).locks = undefined; // Web Locks API absent
+    hadDiag = 'DiagnosticLog' in globalThis;
     origDiag = /** @type {any} */ (globalThis).DiagnosticLog;
     /** @type {any} */ (globalThis).DiagnosticLog = { warn: vi.fn(), error: vi.fn(), time: vi.fn() };
   });
   afterEach(() => {
     /** @type {any} */ (navigator).locks = origLocks;
-    /** @type {any} */ (globalThis).DiagnosticLog = origDiag;
+    // Put the global back as found: left in place as undefined, the module mock above would hand every later
+    // test an undefined DiagnosticLog (the shuffled order that ran one after this one rejected in storage-health)
+    if (hadDiag) /** @type {any} */ (globalThis).DiagnosticLog = origDiag;
+    else delete (/** @type {any} */ (globalThis)).DiagnosticLog;
   });
 
   it('still persists the cache (blind write) and traces exactly once per store', async () => {

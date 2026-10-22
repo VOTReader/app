@@ -1,9 +1,11 @@
 /* Engine ↔ cache integration: proves init() WARM-RESTORES a serialized index
-   (the 30× perf path) instead of rebuilding. Separate file so it gets its own
-   isolated engine-module instance (the engine holds module-level state). The
+   (the 30× perf path) instead of rebuilding. The engine holds module-level
+   state, so each test imports a fresh engine over a fresh warm cache: no test
+   leans on running first (shuffle-night 2026-10-16, seed 20261016: the rebuild
+   test ran first, dropped the cache, and the restore test saw cached:false). The
    warm index lives in the Cache API since 2026-10-11 (search/cache.js), so an
    in-memory CacheStorage stands in for the browser's. */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 /** CacheStorage in memory, the shape search/cache.js uses. */
@@ -26,7 +28,6 @@ import MiniSearch from './vendor/minisearch.js';
 import { buildMiniSearchOptions } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { saveCached, dataSignature } from './cache.js';
-import { VotSearchMini } from './engine.js';
 
 const VOT_DATA = {
   STOP_WORDS_TRIMMED: new Set(['the', 'is', 'my', 'of', 'and']),
@@ -49,7 +50,8 @@ const GLOBALS = {
 describe('engine warm-cache restore', () => {
   let prevData;
   let prevCaches;
-  beforeAll(async () => {
+  let VotSearchMini;
+  beforeEach(async () => {
     prevCaches = /** @type {any} */ (globalThis).caches;
     /** @type {any} */ (globalThis).caches = memoryCaches();
     prevData = window.VotSearchData;
@@ -60,8 +62,10 @@ describe('engine warm-cache restore', () => {
     const ms = new MiniSearch(buildMiniSearchOptions());
     ms.addAll(buildDocs({ translation: 'nkjv' }));
     await saveCached(dataSignature('nkjv'), JSON.stringify(ms));
+    vi.resetModules();
+    VotSearchMini = (await import('./engine.js')).VotSearchMini;
   });
-  afterAll(() => {
+  afterEach(() => {
     /** @type {any} */ (globalThis).caches = prevCaches;
     window.VotSearchData = prevData;
     for (const k of Object.keys(GLOBALS)) delete globalThis[k];
@@ -79,6 +83,8 @@ describe('engine warm-cache restore', () => {
   /* "Rebuild the index" dropped the warm cache without waiting (sweep 2026-10-14 v100): the build it started read
      the cache before the delete landed and swapped the same index back in, so nothing was built again. */
   it('rebuild() builds the index again instead of restoring the cache it drops', async () => {
+    await VotSearchMini.init();
+    expect(VotSearchMini.getStats().cached).toBe(true);   // the warm restore the listener taps "Rebuild" on
     const cs = /** @type {any} */ (globalThis).caches;
     const del = cs.delete;
     cs.delete = async (/** @type {string} */ name) => { await new Promise((r) => setTimeout(r, 20)); return del(name); };

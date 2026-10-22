@@ -4,6 +4,8 @@
 
 import { kjvEncode } from '../../search/tokenize.js';
 import { applyCorrections } from '../../search/query-parse.js';
+import { foldReprints } from '../components/srch-reprints.js';
+import { cardPassage } from '../components/SrchCard.jsx';
 
 /**
  * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
@@ -25,7 +27,7 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
   // A stop word typed among real words ("faith is the substance") ranks, but is not
   // a word to mark or count as a place (search audit 2026-09-27: the find pill read
   // "1 of 22" on a lone "is").
-  const isStop = (/** @type {string} */ t) => { const toks = kjvEncode(t); return !!stop && toks.length > 0 && toks.every((w) => stop.has(w)); };
+  const isStop = (/** @type {string} */ t) => isStopTerm(t, stop);
   const typed = (parsedTerms || []).some((t) => !isStop(t)) ? (parsedTerms || []).filter((t) => !isStop(t)) : (parsedTerms || []);
   // `run`: the engine found the typed words in a row, one real word among small ones ("for you to embrace me").
   const base = [parsed.phrase, parsed.run].filter(Boolean).concat(typed);
@@ -36,6 +38,39 @@ export function expandSnippetTerms(parsed, parsedTerms, synMap, synonymsOn, stop
     if (Array.isArray(grp)) grp.forEach((g) => out.add(g));
   }
   return [...out];
+}
+
+/** @param {string} t @param {Set<string>|null|undefined} stop */
+function isStopTerm(t, stop) {
+  const toks = kjvEncode(t);
+  return !!stop && toks.length > 0 && toks.every((w) => stop.has(w));
+}
+
+/**
+ * The small words the reader typed (search200 B7 review), lowercase: a card leaves the engine's
+ * forms of them unmarked ("who" brought "whom"). Pure.
+ * @param {{kind?:string}|null} parsed
+ * @param {string[]} parsedTerms
+ * @param {Set<string>|null} stop
+ * @returns {string[]}
+ */
+export function typedStopWords(parsed, parsedTerms, stop) {
+  if (!parsed || parsed.kind !== 'text' || !stop) return [];
+  return (parsedTerms || []).filter((t) => isStopTerm(t, stop)).map((t) => String(t).toLowerCase());
+}
+
+/* THE WORDS A CARD DOES NOT MARK when real words were typed (search200 B7): the engine's
+   trimmed stop list (the words it does not search) and the fuller one (who, which, not,
+   all...), which it searches for their meaning but which marked as glue ("those who
+   mourn" marked every "who"). One set per tables object. */
+/** @type {WeakMap<object, Set<string>>} */
+const MARK_STOP = new WeakMap();
+/** @param {any} SD  window.VotSearchData @returns {Set<string>|null} */
+function markStopWords(SD) {
+  if (!SD || (!SD.STOP_WORDS_TRIMMED && !SD.STOP_WORDS)) return null;
+  let s = MARK_STOP.get(SD);
+  if (!s) { s = new Set([...(SD.STOP_WORDS_TRIMMED || []), ...(SD.STOP_WORDS || [])]); MARK_STOP.set(SD, s); }
+  return s;
 }
 
 // MiniSearch is THE engine (the owner A/B'd it against the retired FlexSearch
@@ -50,6 +85,33 @@ function pickEngine() {
    made a card for Volume Two's Letter 55, which does not exist, and the tap did nothing;
    "volume 7 letter 99" the same. The numbered collections, in the site's order. */
 const NUMBERED_LETTERS = ['v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7', 'timothy', 'flock', 'rebuke'];
+
+/* The parses that answer with a card of their own (directEntries). */
+const NAV_KINDS = ['ref-bible', 'named-passage', 'ref-book', 'ref-letter'];
+/* The ones that are a reference under any tab (search200 B2 review): a chapter, a named passage, a letter. A bare
+   book name is not: under Volumes, "revelation" and "john" are the words the letters say. */
+const REF_CARD_KINDS = ['ref-bible', 'named-passage', 'ref-letter'];
+
+/* What a held tab is called in a sentence: "No results for “x” in the Scriptures." */
+const TAB_NAME = /** @type {Record<string, string>} */ ({ scriptures: 'the Scriptures', volumes: 'the Volumes' });
+/* The box names the tab it searches (search200 B5): "Search scriptures, volumes, studies…"
+   was cut off on a 360 px phone; the empty screen's hint line says what to type. */
+const PLACEHOLDER = /** @type {Record<string, string>} */ ({ all: 'Search everything', scriptures: 'Search the Scriptures', volumes: 'Search the Volumes' });
+
+/**
+ * A scope the tab cannot reach (search200 B2): a book of the Bible under the Volumes tab, a collection of the
+ * Volumes under the Scriptures tab. Luke under Volumes said "No results in Luke". The Matthew study is a book and
+ * a collection at once, so it is never one. Pure.
+ * @param {any} scope  the search scope ({kind:'book', bookId} | {kind:'volume', volumeId})
+ * @param {string} corpus  the tab
+ * @returns {{ home: string, tab: string } | null}
+ */
+export function scopeConflict(scope, corpus) {
+  if (!scope) return null;
+  if (corpus === 'volumes' && scope.bookId && scope.bookId !== 'matthew') return { home: 'the Scriptures', tab: 'Volumes' };
+  if (corpus === 'scriptures' && scope.volumeId && String(scope.volumeId).indexOf('matthew') !== 0) return { home: 'the Volumes', tab: 'Scriptures' };
+  return null;
+}
 
 /**
  * The cards a letter reference offers, each naming the letter's title: the letter
@@ -285,26 +347,88 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     return () => { cancelled = true; };
   }, [translation]);
 
-  // Focus input on mount
-  React.useEffect(() => {
-    const t = setTimeout(() => {if (inputRef.current) inputRef.current.focus();}, 80);
+  /* THE BOX TAKES THE FOCUS AS IT MOUNTS (search200 B3). An 80 ms timer lost the keys
+     typed after the tap that opened the screen ("love your enemies" read "ove your
+     enemies"), and a query restored with the screen took the cursor at its end, so
+     typing appended to it. The focus comes in the commit that mounts the box; a
+     restored query is selected, so the first key replaces it. A screen that took the
+     focus back in its first frames gets it once more, and Chrome, which drops a
+     selection made before the box is first laid out (it read 0-0), gets it again
+     while the query is still the restored one. */
+  // The query the box came with, until the reader's first tap on it (D3, below).
+  const restoredRef = React.useRef('');
+  React.useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el) return undefined;
+    const first = el.value;
+    restoredRef.current = first;
+    const take = () => {
+      if (!el.isConnected) return;
+      if (document.activeElement !== el) {
+        try { el.focus({ preventScroll: true }); } catch { el.focus(); }
+      }
+      if (first && el.value === first && el.selectionStart === el.selectionEnd) {
+        try { el.setSelectionRange(0, first.length); } catch { el.select(); }
+      }
+    };
+    take();
+    const t = setTimeout(take, 80);
     return () => clearTimeout(t);
   }, []);
+
+  /* THE TAP BACK INTO A QUERY THE SCREEN CAME WITH TAKES IT WHOLE (search200 UX D3). On a phone the
+     mount's focus brings no keyboard; the reader taps the box for one. A box that had let the focus go
+     (Enter does, and the app went to the background with it so) took that tap as a caret where the
+     finger landed, and the next key went into the query: "Mercy" and an m read "Memrcy" (vot_api34).
+     The query the screen mounted with, or still held when the app came back on screen, is selected
+     by the reader's first tap on it, so the first key replaces it; the next tap is their own caret,
+     and a query they have typed or changed since is theirs to edit where they tap. */
+  React.useEffect(() => {
+    const onShow = () => {
+      const el = inputRef.current;
+      if (document.visibilityState === 'visible' && el && el.value) restoredRef.current = el.value;
+    };
+    document.addEventListener('visibilitychange', onShow);
+    return () => document.removeEventListener('visibilitychange', onShow);
+  }, []);
+  const tapRestored = (/** @type {{ currentTarget: HTMLInputElement }} */ e) => {
+    const el = e.currentTarget;
+    const restored = restoredRef.current;
+    restoredRef.current = '';
+    if (!restored || el.value !== restored) return;
+    try { el.setSelectionRange(0, restored.length); } catch { el.select(); }
+  };
 
   // Compute suggestions as-you-type. They stay closed for the query they were closed
   // on (a pick, Escape, the clear button) and open again once it changes. A flag
   // reset on every query change reopened them on the pick itself, which changes
   // the query (search audit 2026-09-27).
   const [dismissedFor, setDismissedFor] = React.useState(/** @type {string|null} */ (null));
+  // The option the arrow keys are on (search200 B3), -1 for none: the box keeps the focus, and names it.
+  const [activeSug, setActiveSug] = React.useState(-1);
   React.useEffect(() => {
     const q = (query || '').trim();
+    setActiveSug(-1);
     if (!q || q.length < 1 || q.length > 40) {setSuggestions([]);setShowSuggest(false);return;}
     const E = pickEngine();
     if (!E) return;
-    const s = E.suggest(q, { max: 8 });
+    /* A suggestion that would search the box's own words offers nothing (search200 UX D4): typed whole, a
+       named passage's name opened its own entry over the passage card the search put at the top, whose
+       "Named passage — open" strip sat half under the list. It is left out; the rest still open the list. */
+    const own = q.toLowerCase().replace(/\s+/g, ' ');
+    const s = E.suggest(q, { max: 9 }).filter((x) => String(x.query || '').trim().toLowerCase().replace(/\s+/g, ' ') !== own).slice(0, 8);
     setSuggestions(s);
     setShowSuggest(s.length > 0 && !buildInfo.building && dismissedFor !== query);
   }, [query, buildInfo.building, dismissedFor]);
+  const suggestOpen = showSuggest && suggestions.length > 0;
+  /** Close the list; `dismiss`: and keep it closed for this query (Enter, Escape), where a blur or a scroll
+   *  lets the box open it again. */
+  const closeSuggest = (/** @type {boolean} */ dismiss) => {
+    setShowSuggest(false);
+    setActiveSug(-1);
+    if (dismiss) setDismissedFor(query);
+  };
+  const suggestRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
 
   // Run search with debounce — one box, one index, everything included.
   React.useEffect(() => {
@@ -345,6 +469,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (stale || (quiet && r.error)) return;
       // SRCH4: include the matched synonyms (when synonym search is on) so the
       // snippet highlights the word that actually surfaced the verse.
+      const stop = markStopWords(/** @type {any} */ (window).VotSearchData);
       const terms = expandSnippetTerms(
         // search-2: under a nav card `parsed` is the CARD's kind, so the
         // snippet terms have to come from the text reading of the same query
@@ -352,15 +477,30 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         r.textQuery || r.parsed, r.parsedTerms || [],
         /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
         settings.searchSynonyms !== false,
-        /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.STOP_WORDS_TRIMMED,
+        stop,
       );
-      const done = { phase: 'done', parsed: r.parsed, results: r.results || [], terms, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
+      // `stopTyped`: the small words typed, whose engine forms ("whom" for "who") a card leaves unmarked.
+      const stopTyped = typedStopWords(r.textQuery || r.parsed, r.parsedTerms || [], stop);
+      /* `memo`: the search this list came from (search200 B2). The groups are keyed by it, not by the live memo,
+         which a tab or scope change moves at once: keyed live, the groups remounted over the OLD list (long, so
+         closed), and the new list, a lone group, arrived under the same key and stayed closed over a blank screen.
+         `refParsed`: the parse is held to the tab ("john 3:16" under Volumes is words), but a reference answers
+         under any tab, so the card reads the query across all of it (the parse needs no index). Only a
+         reference does (REF_CARD_KINDS): a bare book name under Volumes stays the words it is. */
+      const corpus = settings.searchCorpus || 'all';
+      const E = pickEngine();
+      let refParsed = null;
+      if (corpus !== 'all' && (!r.parsed || r.parsed.kind === 'text') && E && typeof E.parse === 'function') {
+        try { const p = E.parse(q, { corpus: 'all' }); if (p && REF_CARD_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
+      }
+      // `q`: the text this list answers (search200 B9 review); the box can be ahead of it, a key typed since.
+      const done = { phase: 'done', memo, q, parsed: r.parsed, refParsed, results: r.results || [], terms, stopTyped, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
       if (!r.error) lastSearch = { memo, allWordsFor, state: done };
       setState(done);
       if (r.meaningLater) rankWithMeaning();
     }).catch((err) => {
       if (stale || quiet) return;
-      setState({ phase: 'done', parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
+      setState({ phase: 'done', memo, q, parsed: null, results: [], terms: [], error: err?.message || String(err), total: 0, capped: [], truncated: false, corrections: [] });
     });
     const rankWithMeaning = () => {
       const E = pickEngine();
@@ -385,6 +525,43 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query, buildInfo.ready, settings.translation, settings.searchUseStopWords, settings.searchSynonyms, settings.searchCorpus, searchScope, allWordsFor, memo]);
+
+  // The search the list on screen came from (see `done` above): its groups' keys and their memory.
+  const listMemo = state.memo || memo;
+
+  /* A NEW SEARCH LANDS AT THE TOP (search200 B2). Refining a query while scrolled down
+     showed the new list from mid-list ("forgive one another" scrolled to 500, refined to
+     "seventy times": the new list opened at 680). A list from a new search is a screen
+     landing, the one-shot write LetterView makes on its own landing; it yields to
+     scroll-restore, the lease's writer for a list resumed on Back (use-autoscroll.js), and
+     a quiet re-rank or "Show every match" keeps the search, so it keeps the place. */
+  const screenRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
+  const landedFor = React.useRef(resumed ? memo : '');
+  const landedAt = React.useRef(0);
+  React.useEffect(() => {
+    const m = state.memo || '';
+    if (!m || m === landedFor.current) return;
+    landedFor.current = m;
+    if (document.body.classList.contains('scroll-restoring')) return;
+    const sc = screenRef.current && screenRef.current.closest('.screen-scroll');
+    if (sc && typeof sc.scrollTo === 'function') { landedAt.current = Date.now(); sc.scrollTo({ top: 0 }); }
+  }, [state.memo]);
+
+  /* THE SUGGESTIONS CLOSE WHEN THE RESULTS SCROLL (search200 B3): left open, the list sat
+     over the controls under it and caught their taps. The landing above is not the
+     reader's scroll: a refined query lands while its suggestions are open. */
+  React.useEffect(() => {
+    if (!suggestOpen) return undefined;
+    const sc = screenRef.current && screenRef.current.closest('.screen-scroll');
+    if (!sc) return undefined;
+    const onScroll = () => {
+      if (Date.now() - landedAt.current < 300) return;
+      setShowSuggest(false);
+      setActiveSug(-1);
+    };
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    return () => sc.removeEventListener('scroll', onScroll);
+  }, [suggestOpen]);
 
   // Handle command-kind parsed results
   React.useEffect(() => {
@@ -459,22 +636,25 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   /** One list of collections. `view` names the order and the list (each remembers its own open groups);
       `capped`: the list can say a collection holds more than it shows ("400+"), which a close list never does. */
-  const renderGroups = (/** @type {Array<{key: string, items: any[]}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
+  const renderGroups = (/** @type {Array<{key: string, items: any[], more?: boolean}>} */ groups, /** @type {string} */ view, /** @type {boolean} */ capped) => (
     <div className="srch-groups">
       {groups.map((g) => (
         <SrchGroup
-          /* Keyed by the search: narrowed to Scriptures, the one group left
-             opens as a lone group does, not closed as the All list had it.
-             And by the order: each order opens with its own state, and the
-             group remembers each (a group opened under Relevance is open
-             again after a trip to Book order). */
-          key={g.key + '|' + memo + '|' + view}
+          /* Keyed by the search the list came from (state.memo, search200 B2):
+             narrowed to Scriptures, the one group left opens as a lone group
+             does, not closed as the All list had it. And by the order: each
+             order opens with its own state, and the group remembers each (a
+             group opened under Relevance is open again after a trip to Book
+             order). */
+          key={g.key + '|' + listMemo + '|' + view}
           gkey={g.key}
           items={g.items}
+          more={!!g.more}
           capped={capped && cappedGroups.has(g.key)}
           terms={state.terms}
+          stopTyped={state.stopTyped}
           onSelect={handleSelect}
-          memo={memo}
+          memo={listMemo}
           view={view}
           /* Book order opens every collection with its first ten, so a phone
              draws a few cards per collection, not fifty each. */
@@ -491,71 +671,98 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   );
 
   // Build "direct" fake entries from parsed ref/passage/book (shown at top before results).
-  // Engine-gated: Scriptures corpus shows only bible/book/named-passage refs;
-  // Volumes corpus shows only letter refs. No crossover.
+  // A reference answers under any tab (search200 B2): "john 3:16" typed under Volumes lost
+  // its card, because the engine's parse is held to the tab; `refParsed` is the query read
+  // across all of it, when the engine's own parse found words.
+  /* `engineNav`: the ENGINE read a reference, so its words stop at the closest few under the card and the card
+     stands for the row of best matches. A card from `refParsed` sits above the tab's own search, which keeps
+     its Best Matches and its count. */
+  const engineNav = !!(state.parsed && NAV_KINDS.indexOf(state.parsed.kind) >= 0);
+  const navParsed = engineNav ? state.parsed : (state.refParsed || null);
   const directEntries = React.useMemo(() => {
-    const p = state.parsed;
+    const p = navParsed;
     if (!p) return [];
     const curCorpus = settings.searchCorpus || 'all';
-    const allowBible = curCorpus === 'all' || curCorpus === 'scriptures';
-    const allowLetter = curCorpus === 'all' || curCorpus === 'volumes';
     const out = [];
-    if ((p.kind === 'ref-bible' || p.kind === 'named-passage') && allowBible) {
+    if (p.kind === 'ref-bible' || p.kind === 'named-passage') {
       // A range across chapters names both ends, "John 14:1-16:33" (sweep W32); a chapter range is "Matthew 5-7".
       const lbl = p.bookTitle + ' ' + (p.chapterEnd && p.verseStart
         ? p.chapter + ':' + p.verseStart + '-' + p.chapterEnd + (p.verseEnd ? ':' + p.verseEnd : '')
         : p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : ''));
       out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter', ref: p });
-    } else if (p.kind === 'ref-letter' && allowLetter) {
+    } else if (p.kind === 'ref-letter') {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
       for (const c of lr.cards) out.push({ __direct: true, __corpus: curCorpus, ...c });
-    } else if (p.kind === 'ref-book' && allowBible) {
+    } else if (p.kind === 'ref-book') {
       out.push({ __direct: true, __corpus: curCorpus, __label: p.bookTitle, __sub: 'Open book index', ref: p });
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: the collections' letters load with the index, and the cards read them off window.
-  }, [state.parsed, settings.searchCorpus, buildInfo.ready]);
+  }, [navParsed, settings.searchCorpus, buildInfo.ready]);
 
   // A letter reference to a letter that is not there says so, instead of a card that does nothing.
   const letterRefMissing = React.useMemo(() => {
-    const p = state.parsed;
-    if (!p || p.kind !== 'ref-letter' || (settings.searchCorpus || 'all') === 'scriptures') return null;
+    const p = navParsed;
+    if (!p || p.kind !== 'ref-letter') return null;
     return letterRefCards(p, /** @type {any} */ (window).VotSearchData, window).missing;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: as above, the letters load with the index.
-  }, [state.parsed, settings.searchCorpus, buildInfo.ready]);
+  }, [navParsed, buildInfo.ready]);
 
   // Top results: the best 5 hits shown before the groups whenever there is more
   // than one group, in every corpus. The groups follow the site's order, not
   // relevance, so this row is where relevance leads (only for text queries —
-  // ref queries already have directEntries cards).
-  const topResults = React.useMemo(() => {
+  // a reference the engine read already has its card; one read across every
+  // tab, `refParsed`, sits above the tab's own row, search200 B2 review).
+  const topCards = React.useMemo(() => {
     if (!state.results.length) return [];
-    if (directEntries.length > 0) return [];
+    if (engineNav && directEntries.length > 0) return [];
     if (grouped.length <= 1) return [];
     // One card per text: a Holy Days entry reprints its letter word for word, and
-    // both took a place in the five.
+    // both took a place in the five. A reprint of another standing whose shown passage
+    // is the card's folds under it as "Also in N places" (srch-reprints.js, search200 UX
+    // B10 2); a copy the fold cannot read (the same name and opening) is left out.
     const seen = new Set();
-    const top = [];
-    for (const r of state.results) {
-      const d = r.doc || {};
-      const k = (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
-      if (seen.has(k)) continue;
-      seen.add(k);
-      top.push(r);
-      if (top.length === 5) break;
-    }
-    return top;
-  }, [state.results, grouped.length, directEntries.length]);
+    return foldReprints(state.results, (e) => cardPassage(e, state.terms, state.stopTyped), state.terms, {
+      take: 5,
+      reach: 30,
+      skip: (r) => {
+        const d = r.doc || {};
+        const k = (d.title || d.ref || '') + '|' + String(d.text || '').slice(0, 80);
+        if (seen.has(k)) return true;
+        seen.add(k);
+        return false;
+      },
+    });
+  }, [state.results, state.terms, state.stopTyped, grouped.length, engineNav, directEntries.length]);
+  /* A SHORT LIST SHOWS EACH RESULT ONCE (search200 B2). Thirty or fewer results open
+     every group (renderGroups' defaultOpen) under Best Matches, which showed its five
+     twice. The groups hold the rest, and one that gave some up counts them as "more";
+     when the five are the whole list, the open groups are the list, with no row above.
+     A reprint folded under a card is in Best Matches too. */
+  const restGroups = React.useMemo(() => {
+    if (bookOrder || !topCards.length || state.results.length > 30) return null;
+    const inTop = new Set(topCards.flatMap((c) => [c.entry].concat(c.also)));
+    return visibleGroups
+      .map((g) => { const items = g.items.filter((e) => !inTop.has(e)); return { key: g.key, items, more: items.length < g.items.length }; })
+      .filter((g) => g.items.length > 0);
+  }, [bookOrder, topCards, state.results.length, visibleGroups]);
+  const bestRow = restGroups && restGroups.length === 0 ? [] : topCards;
+  const listGroups = restGroups && restGroups.length > 0 ? restGroups : visibleGroups;
+  /* A section whose results all sit in Best Matches has no header under it (search200 B2 review): "Found 21
+     matches across 8 sections" stood over three for "tittle". The summary then says the matches alone. */
+  const sectionsListed = !(restGroups && restGroups.length > 0 && restGroups.length < grouped.length);
   // The switch matters when some group has two or more results to order, or when
   // there is a Best Matches row for Book order to set aside.
-  const sortToggleVisible = topResults.length > 0 || visibleGroups.some((g) => g.items.length > 1);
+  const sortToggleVisible = bestRow.length > 0 || visibleGroups.some((g) => g.items.length > 1);
 
   // Fuzzy book suggestion for did-you-mean — very conservative.
   // Only fires when the query is a SHORT single-token that plausibly looks
   // like a mistyped book name (≥4 chars, no spaces, no results, no ref parse).
+  // It reads the text the list answers (`state.q`), not the box (search200 UX D8): a key
+  // typed since put "No results for “gensisx”" up before "gensisx" was searched.
   const didYouMean = React.useMemo(() => {
-    if (!state.parsed || state.parsed.kind !== 'text' || state.results.length) return null;
-    const q = (query || '').trim();
+    if (!state.parsed || state.parsed.kind !== 'text' || state.results.length || !(query || '').trim()) return null;
+    const q = (typeof state.q === 'string' ? state.q : query || '').trim();
     if (!q || q.length < 4 || q.length > 15) return null;
     if (/\s/.test(q)) return null; // multi-word: not a book attempt
     if (/[0-9:.,;-]/.test(q)) return null; // has digits/punctuation: already a ref attempt
@@ -564,7 +771,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const disp = window.VotSearchData.BOOK_DISPLAY[guess] || guess;
     if (disp.toLowerCase() === q.toLowerCase()) return null;
     return { original: q, suggestion: disp, rewrite: disp };
-  }, [state.parsed, state.results.length, query]);
+  }, [state.parsed, state.results.length, state.q, query]);
 
   // Recent searches (gated by the existing history privacy toggle). Refresh
   // whenever the box is empty (mount / clear / back-to-empty) so the list also
@@ -585,34 +792,157 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   // The query's terms ride along so the dispatcher can cut the matched excerpt
   // out of the doc and land the reader ON the passage (use-search.js).
-  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms, (query || '').trim()); };
+  // `state.stopTyped`: the landing's find pill finds what the card marked (search200 UX D6).
+  const handleSelect = (entry) => { recordSearch(); onSelect(entry, state.terms, (query || '').trim(), state.stopTyped); };
 
   // The box keeps the focus: the button that cleared it goes away with the query,
   // and the focus went with it (the keyboard closed under the reader's thumb).
   const clearQuery = () => {
     onQueryChange('');
     setShowSuggest(false);
+    setActiveSug(-1);
     setDismissedFor('');
     if (inputRef.current) inputRef.current.focus();
   };
 
+  /* A pick is a search, as Enter is: the keyboard goes down so the results it brings
+     are not under it (search200 B3). */
   const fireSuggestion = (sug) => {
     setDismissedFor(sug.query);
     onQueryChange(sug.query);
     setShowSuggest(false);
+    setActiveSug(-1);
+    if (inputRef.current) inputRef.current.blur();
   };
 
+  // The tab in use, and the one tap out of it (search200 B2).
+  const corpus = settings.searchCorpus || 'all';
+  const tabName = TAB_NAME[corpus] || null;
+  const searchAll = () => onSettingsChange('searchCorpus', 'all');
+  // Everywhere is no scope AND every text: the Volumes tab kept on found nothing in Luke's words again.
+  const searchEverywhere = () => { onToggleScope(); if (corpus !== 'all') searchAll(); };
+  const conflict = scopeConflict(searchScope, corpus);
+  const scopeLabel = (searchContext && searchContext.label) || (searchScope && searchScope.label) || '';
+
+  /* The recent searches and the quick picks: the empty screen's way in, and the no-results
+     screen's way on (search200 B2: it was one grey line). */
+  const pickRows = (
+    <>
+      {settings.historyEnabled !== false && recents.length > 0 && (
+        <>
+          <h2 className="srch-section-label">Recent</h2>
+          {confirmRecent != null ? (
+            /* W0 (micro-gap b): per-recent removal. Follows the
+               ConfirmStrip convention — per-instance useId registration
+               (back dismisses the confirm, not the screen), "remove"
+               vocabulary (the stored query list is recoverable by
+               searching again, so this is not a "delete"). The strip
+               replaces the chips row, the LinkCard actions-row swap
+               pattern. */
+            <ConfirmStrip
+              question={'Remove “' + confirmRecent + '” from recent searches?'}
+              yesLabel="Yes, remove"
+              onCancel={() => setConfirmRecent(null)}
+              onConfirm={() => {
+                if (typeof window.removeRecentSearch === 'function') setRecents(window.removeRecentSearch(confirmRecent));
+                setConfirmRecent(null);
+              }}
+            />
+          ) : (
+            <div className="srch-quick-row">
+              {recents.slice(0, 12).map((r) => (
+                <span key={r} className="srch-quick-chip-wrap">
+                  <button className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
+                  <button
+                    className="srch-chip-remove"
+                    aria-label={'Remove recent search ' + r}
+                    onClick={() => setConfirmRecent(r)}
+                  >{"✕"}</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+      <h2 className="srch-section-label">Quick picks</h2>
+      <div className="srch-quick-row">
+        {SRCH_QUICK_PICKS.map((q) => (
+          <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
+        ))}
+      </div>
+    </>
+  );
+
   const handleKey = (e) => {
-    if (e.key === 'Enter') { recordSearch(); return; }
-    if (e.key === 'Escape') {
+    // A keyboard still composing a word (an IME) owns its keys, Enter among them.
+    if (e.nativeEvent && e.nativeEvent.isComposing) return;
+    const key = e.key;
+    // The arrow keys walk the suggestions (search200 B3), round from either end; the box keeps the focus.
+    if (key === 'ArrowDown' || key === 'ArrowUp') {
+      const n = suggestions.length;
+      if (!n) return;
+      e.preventDefault();
+      if (!suggestOpen) { setShowSuggest(true); setActiveSug(key === 'ArrowDown' ? 0 : n - 1); return; }
+      setActiveSug((a) => (key === 'ArrowDown' ? (a + 1) % n : (a <= 0 ? n - 1 : a - 1)));
+      return;
+    }
+    if (key === 'Enter') {
+      if (suggestOpen && activeSug >= 0 && suggestions[activeSug]) { e.preventDefault(); fireSuggestion(suggestions[activeSug]); return; }
+      // Enter is the search done (search200 B3): the list closes, and the box lets go of the
+      // focus, so the keyboard stops covering about 40% of the results.
+      recordSearch();
+      closeSuggest(true);
+      if (inputRef.current) inputRef.current.blur();
+      return;
+    }
+    if (key === 'Escape') {
       // A search box clears itself on Escape as well: closing the suggestions
       // emptied the query.
       e.preventDefault();
-      if (showSuggest) {setShowSuggest(false);setDismissedFor(query);} else
+      if (showSuggest) {closeSuggest(true);} else
       if (query) {clearQuery();} else
       onBack();
     }
   };
+
+  /* WHAT A SCREEN READER HEARS (search200 B9). The only status region was the
+     "Searching…" bar, which came and went with its words, so nothing said the count or
+     that nothing was found (a region that arrives with its text is not read). One region
+     stays in the screen from the first frame and says each step in the screen's own
+     words; a quiet re-rank says the same count again, so it says nothing new. */
+  const qTrim = (query || '').trim();
+  const isDone = !!qTrim && buildInfo.ready && state.phase === 'done';
+  /* Under a reference card the words' matches stop at the closest few (search-2), and
+     "Found 5+ matches" read as a count of the passage (search200 B5). */
+  const closestOnly = engineNav && directEntries.length > 0 && state.truncated && allWordsFor !== qTrim;
+  const countText = closestOnly ? 'Showing closest matches' : 'Found ' + matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated) + ' '
+    + (state.results.length === 1 ? 'match' : 'matches') + (sectionsListed ? ' across ' + grouped.length + ' ' + (grouped.length === 1 ? 'section' : 'sections') : '');
+  const scopeIn = searchScope && searchContext ? ' in ' + searchContext.label : tabName ? ' in ' + tabName : '';
+  /* A VERDICT NAMES THE TEXT SEARCHED (search200 B9 review). In the 140 ms before a key's
+     search runs, the box is ahead of the list: built from the box, the region said "No
+     results for “zzyzxqw”" for text not searched yet, at each key. `answered` is the text
+     the list answers; text still waiting for its search is "Searching…", said once. */
+  const answered = typeof state.q === 'string' ? state.q : qTrim;
+  const pending = isDone && answered !== qTrim && qTrim.replace(/[^\p{L}\p{N}]/gu, '').length >= 2;
+  let liveText = '';
+  if (qTrim && !/[\p{L}\p{N}]/u.test(qTrim)) liveText = 'Type a word, a title or a reference to search.';
+  else if (qTrim && buildInfo.ready && (state.phase === 'searching' || pending)) liveText = 'Searching…';
+  else if (isDone && state.error) liveText = 'Error: ' + state.error;
+  else if (isDone) {
+    const said = directEntries.map((d) => d.__label + '.');
+    if (state.results.length > 0) {
+      if (state.corrections.length > 0) said.push('Showing results for ' + correctedQuery(query, state.corrections) + '.');
+      said.push(countText + '.');
+    }
+    if (letterRefMissing) said.push(letterRefMissing);
+    else if (state.results.length === 0 && directEntries.length === 0) {
+      if (didYouMean) said.push('No results for “' + didYouMean.original + '”. Did you mean ' + didYouMean.suggestion + '?');
+      else if (state.stopWordsOnly) said.push('“' + answered + '” is in nearly every verse and letter. Add another word to search.');
+      else if (searchScope && conflict) said.push(scopeLabel + ' is in ' + conflict.home + ', and the ' + conflict.tab + ' tab is on.');
+      else said.push('No results for “' + answered + '”' + scopeIn + '.');
+    }
+    liveText = said.join(' ');
+  }
 
   return (
     /* NOT LibraryNav (documented exception): the search input row REPLACES the
@@ -626,15 +956,31 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               placeholder — which a screen reader stops announcing the moment
               a character is typed, and which nothing announces on a field
               restored with a query already in it. */}
+          {/* search200 B3: a combobox over the suggestions' listbox (the ARIA 1.2
+              pattern): the focus stays in the box, which names the option the
+              arrow keys are on. */}
           <input
             ref={inputRef}
             className="search-input"
             type="search"
+            role="combobox"
             aria-label="Search"
-            placeholder="Search scriptures, volumes, studies…"
+            aria-autocomplete="list"
+            aria-expanded={suggestOpen}
+            aria-controls={suggestOpen ? 'srch-suggest-list' : undefined}
+            aria-activedescendant={suggestOpen && activeSug >= 0 ? 'srch-sug-' + activeSug : undefined}
+            enterKeyHint="search"
+            placeholder={PLACEHOLDER[corpus] || PLACEHOLDER.all}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
+            onClick={tapRestored}
             onFocus={() => setShowSuggest(suggestions.length > 0 && dismissedFor !== query)}
+            onBlur={(e) => {
+              // A tap that leaves the box closes the list; a tap on one of its options is the list's own.
+              const to = /** @type {Node|null} */ (e.relatedTarget);
+              if (to && suggestRef.current && suggestRef.current.contains(to)) return;
+              closeSuggest(false);
+            }}
             onKeyDown={handleKey}
             autoComplete="off"
             autoCorrect="off"
@@ -645,7 +991,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         </div>
       </>
     }>
-      <div className="search-screen">
+      <div className="search-screen" ref={screenRef}>
+        <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">{liveText}</div>
 
         <div className="srch-corpus-row" role="tablist" aria-label="Search corpus">
           {[
@@ -703,10 +1050,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {showSuggest && suggestions.length > 0 && (
-          <div className="srch-suggest-anchor"><div className="srch-suggest">
+        {suggestOpen && (
+          <div className="srch-suggest-anchor"><div className="srch-suggest" id="srch-suggest-list" role="listbox" aria-label="Suggestions" ref={suggestRef}>
             {suggestions.map((s, i) => (
-              <button key={i} className="srch-suggest-item" onMouseDown={(e) => {e.preventDefault();fireSuggestion(s);}}>
+              /* A click picks (search200 B3): a screen reader's activation and a keyboard's
+                 send no mousedown. The mousedown only keeps the focus in the box. */
+              <button
+                key={i}
+                type="button"
+                id={'srch-sug-' + i}
+                role="option"
+                aria-selected={i === activeSug}
+                tabIndex={-1}
+                className={'srch-suggest-item' + (i === activeSug ? ' active' : '')}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => fireSuggestion(s)}
+              >
                 <span className="srch-suggest-kind">{s.kind}</span>
                 <span className="srch-suggest-label">{s.label}</span>
                 {s.hint && <span className="srch-suggest-hint">{s.hint}</span>}
@@ -719,52 +1078,28 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {!query && buildInfo.ready && (
           <>
+            {/* The hero names the tab in use (search200 B2): a saved Scriptures tab sat lit
+                under "Search everything". */}
             <div className="srch-empty-hero">
-              <h3>Search everything</h3>
-              <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
+              {corpus === 'scriptures' ? (
+                <>
+                  <h2>Search the Scriptures</h2>
+                  <p>Verses across all 66 books.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
+                </>
+              ) : corpus === 'volumes' ? (
+                <>
+                  <h2>Search the Volumes</h2>
+                  <p>Letters, Words To Live By, Answers and Bible studies.{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></p>
+                </>
+              ) : (
+                <>
+                  <h2>Search everything</h2>
+                  <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
+                </>
+              )}
+              <p className="srch-hint">Try a reference (John 3:16), a phrase, or “exact words” in quotes.</p>
             </div>
-            {settings.historyEnabled !== false && recents.length > 0 && (
-              <>
-                <div className="srch-section-label">Recent</div>
-                {confirmRecent != null ? (
-                  /* W0 (micro-gap b): per-recent removal. Follows the
-                     ConfirmStrip convention — per-instance useId registration
-                     (back dismisses the confirm, not the screen), "remove"
-                     vocabulary (the stored query list is recoverable by
-                     searching again, so this is not a "delete"). The strip
-                     replaces the chips row, the LinkCard actions-row swap
-                     pattern. */
-                  <ConfirmStrip
-                    question={'Remove “' + confirmRecent + '” from recent searches?'}
-                    yesLabel="Yes, remove"
-                    onCancel={() => setConfirmRecent(null)}
-                    onConfirm={() => {
-                      if (typeof window.removeRecentSearch === 'function') setRecents(window.removeRecentSearch(confirmRecent));
-                      setConfirmRecent(null);
-                    }}
-                  />
-                ) : (
-                  <div className="srch-quick-row">
-                    {recents.slice(0, 12).map((r) => (
-                      <span key={r} className="srch-quick-chip-wrap">
-                        <button className="srch-quick-chip" onClick={() => onQueryChange(r)}>{r}</button>
-                        <button
-                          className="srch-chip-remove"
-                          aria-label={'Remove recent search ' + r}
-                          onClick={() => setConfirmRecent(r)}
-                        >{"✕"}</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-            <div className="srch-section-label">Quick picks</div>
-            <div className="srch-quick-row">
-              {SRCH_QUICK_PICKS.map((q) => (
-                <button key={q} className="srch-quick-chip" onClick={() => onQueryChange(q.toLowerCase())}>{q}</button>
-              ))}
-            </div>
+            {pickRows}
           </>
         )}
 
@@ -774,12 +1109,11 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {/* W0 (micro-gap c): in-flight indicator. role="status" + aria-live
-            polite per the live-region discipline (AutoScrollControl readout
-            precedent); the indeterminate bar animation is near-zeroed by the
-            global prefers-reduced-motion rule. */}
+        {/* W0 (micro-gap c): in-flight indicator; the indeterminate bar animation is
+            near-zeroed by the global prefers-reduced-motion rule. The screen's one status
+            region says "Searching…" (search200 B9), so the bar is for the eye. */}
         {query && buildInfo.ready && state.phase === 'searching' && (
-          <div className="srch-progress srch-searching" role="status" aria-live="polite">
+          <div className="srch-progress srch-searching" aria-hidden="true">
             <span>Searching…</span>
             <div className="srch-progress-bar">
               <div className="srch-progress-bar-fill srch-indeterminate" />
@@ -826,13 +1160,16 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length > 0 && (
           <div className="srch-results-summary">
-            {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
-            Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
-            {" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong>
-            {directEntries.length > 0 && state.truncated && allWordsFor !== query.trim() && (
+            {closestOnly ? (
               <>
-                {' · '}
-                <button type="button" className="srch-more-link" onClick={() => setAllWordsFor(query.trim())}>Show every match</button>
+                Showing closest matches{' · '}
+                <button type="button" className="srch-more-link" onClick={() => setAllWordsFor(qTrim)}>Show all</button>
+              </>
+            ) : (
+              <>
+                {/* W0 (micro-gap a): at the engine cap the count is a floor — "400+", not "400". */}
+                Found <strong>{matchCountLabel(state.results.length, state.capped.length > 0 || state.truncated)} {state.results.length === 1 ? "match" : "matches"}</strong>
+                {sectionsListed ? <>{" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong></> : null}
               </>
             )}
           </div>
@@ -852,22 +1189,22 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </div>
         )}
 
-        {!bookOrder && topResults.length > 0 && (
+        {!bookOrder && bestRow.length > 0 && (
           <div className="srch-top-results">
-            <div className="srch-section-label">Best Matches</div>
-            {topResults.map((entry, i) => (
-              <SrchCard key={'top' + i} entry={entry} terms={state.terms} onSelect={handleSelect} memo={memo} where="best" />
+            <h2 className="srch-section-label">Best Matches</h2>
+            {bestRow.map((c, i) => (
+              <SrchCard key={'top' + i} entry={c.entry} also={c.also.length ? c.also : undefined} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} memo={listMemo} where="best" />
             ))}
           </div>
         )}
 
         {closeSplit ? (
           <>
-            <div className="srch-section-label srch-close-label">Closest matches</div>
+            <h2 className="srch-section-label srch-close-label">Closest matches</h2>
             {renderGroups(closeSplit.close, 'book', false)}
             {showLoose ? (
               <>
-                <div className="srch-section-label srch-loose-label">Partial matches</div>
+                <h2 className="srch-section-label srch-loose-label">Partial matches</h2>
                 {renderGroups(closeSplit.loose, 'book-more', true)}
               </>
             ) : (
@@ -876,19 +1213,39 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               </button>
             )}
           </>
-        ) : visibleGroups.length > 0 && renderGroups(visibleGroups, bookOrder ? 'book' : 'relevance', true)}
+        ) : listGroups.length > 0 && renderGroups(listGroups, bookOrder ? 'book' : 'relevance', true)}
 
         {query && state.phase === 'done' && letterRefMissing && (
           <div className="srch-corrected">{letterRefMissing}</div>
         )}
 
         {query && buildInfo.ready && state.phase === 'done' && state.results.length === 0 && directEntries.length === 0 && !didYouMean && !letterRefMissing && (
-          <div className="search-no-results">
-            {state.stopWordsOnly ?
-            <>“{query.trim()}” is in nearly every verse and letter. Add another word to search.</> :
-            <>No results for “{query.trim()}”{searchScope && searchContext ? ' in ' + searchContext.label : ''}.</>}
-            {searchScope && !state.stopWordsOnly ? <>{' '}<button type="button" className="srch-more-link" onClick={onToggleScope}>Search everywhere</button></> : null}
-          </div>
+          /* No results says where it looked and offers a way on (search200 B2): the tab or the
+             scope it was held to, a scope the tab cannot reach, a tip, and the picks. */
+          <>
+            <div className={'search-no-results' + (state.stopWordsOnly ? '' : ' has-picks')}>
+              {state.stopWordsOnly ? (
+                <>“{answered}” is in nearly every verse and letter. Add another word to search.</>
+              ) : searchScope && conflict ? (
+                <>
+                  {scopeLabel} is in {conflict.home}, and the {conflict.tab} tab is on.{' '}
+                  <button type="button" className="srch-more-link" onClick={searchAll}>Search {scopeLabel}</button>
+                  {' · '}
+                  <button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button>
+                </>
+              ) : (
+                <>
+                  No results for “{answered}”{scopeIn}.
+                  {searchScope ? <>{' '}<button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button></> :
+                    tabName ? <>{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
+                </>
+              )}
+              {state.stopWordsOnly || (searchScope && conflict) ? null : (
+                <span className="srch-no-results-tip">Check the spelling, try fewer words, or type a reference such as John 3:16.</span>
+              )}
+            </div>
+            {state.stopWordsOnly ? null : pickRows}
+          </>
         )}
 
         {/* Nothing to search for: an emoji or punctuation alone left a blank screen. */}

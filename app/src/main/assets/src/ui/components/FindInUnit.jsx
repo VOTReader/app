@@ -4,7 +4,8 @@
    A unit opened from search (a letter, a WTLB / Blessed / Holy Days entry,
    an Answers topic, a study chapter) marks every place the search words
    appear and carries a small pill to step between them: "flood  2 of 3
-   ‹ › ×" (Brianna, 2026-09-26). The result card already lists the places;
+   ‹ › ×" (Brianna, 2026-09-26); at the unit's top, before a step, it counts
+   them: "flood  3 places ‹ › ×". The result card already lists the places;
    this is the same list, on the page.
 
    WHAT IT READS. The unit's own reading blocks as rendered: the elements
@@ -299,7 +300,8 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
         if (ranges.length) places.push({ start: p.start, span: p.span, ranges });
       }
       placesRef.current = places;
-      if (first) { first = false; curRef.current = placeAt(places, locate(flat, anchor.text)); }
+      // A landing at the unit's top (a title named, search200 B5) is on no place: none is current until a step.
+      if (first) { first = false; curRef.current = anchor.top ? -1 : placeAt(places, locate(flat, anchor.text)); }
       else if (curRef.current >= places.length) curRef.current = Math.max(0, places.length - 1);
       setCount(places.length);
       setCur(curRef.current);
@@ -319,8 +321,9 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     const scroller = root.closest('.screen-scroll');
     const handsOn = () => clearInterval(settle);
     const HANDS = ['pointerdown', 'touchstart', 'wheel', 'keydown'];
-    for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
-    settle = setInterval(() => {
+    // A landing at the top has no place to bring into view: the page stays at the title.
+    if (!anchor.top) for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
+    if (!anchor.top) settle = setInterval(() => {
       tries++;
       const busy = document.body.classList.contains('scroll-restoring') || document.body.classList.contains('autoscroll-running');
       const top = scroller ? scroller.scrollTop : 0;
@@ -355,19 +358,23 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
   const go = (/** @type {number} */ delta) => {
     const places = placesRef.current;
     if (!places.length || !mainRef.current) return;
-    curRef.current = (curRef.current + delta + places.length) % places.length;
+    // from the top (no place current), › goes to the first place and ‹ to the last
+    const from = curRef.current < 0 ? (delta > 0 ? -1 : 0) : curRef.current;
+    curRef.current = (from + delta + places.length) % places.length;
     setCur(curRef.current);
     mark(places, curRef.current);
     reveal(mainRef.current, places[curRef.current]);
   };
 
   if (!active || !count || typeof document === 'undefined' || !document.body) return null;
+  // At the top (no place current) the pill counts the places: "0 of 3" read as none found (search200 UX B6).
+  const counted = cur < 0 ? count + (count === 1 ? ' place' : ' places') : (cur + 1) + ' of ' + count;
   return ReactDOM.createPortal(
     <div className="find-pill" role="toolbar" aria-label={'Search words in this ' + noun}>
       <span className="find-pill-word">{find.label || find.terms[0]}</span>
-      <span className="find-pill-count" role="status" aria-live="polite">{(cur + 1) + ' of ' + count}</span>
-      <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2} onClick={() => go(-1)}>‹</button>
-      <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2} onClick={() => go(1)}>›</button>
+      <span className="find-pill-count" role="status" aria-live="polite">{counted}</span>
+      <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2 && cur >= 0} onClick={() => go(-1)}>‹</button>
+      <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2 && cur >= 0} onClick={() => go(1)}>›</button>
       <button type="button" className="find-pill-btn find-pill-close" aria-label="Close" onClick={() => setClosed(true)}>×</button>
     </div>,
     document.body

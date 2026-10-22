@@ -53,11 +53,11 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                     .
                   </p>
                   {/* CC-BY obligation for the Scripture Web's cross-reference
-                      dataset. THIS IS THE ONE VISIBLE ATTRIBUTION: the Scripture
-                      Web canvas carried its own line until 2026-09-11, when it
-                      printed over the book labels in landscape and Corbin had it
-                      removed. Do not remove this line without equivalent credit
-                      somewhere the reader can see it. */}
+                      dataset. The web carries it too since Q5 (w3, 2026-10-18): the
+                      legend's tail, the panel's footer and the guide's footer, never
+                      a line of its own on the canvas (that one printed over the book
+                      labels in landscape, 2026-09-11). This is the app's own credits
+                      page; keep the line (AboutScreen.test.jsx pins it). */}
                   <p className="about-credit">
                     Cross-reference data from{" "}
                     <a href="https://www.openbible.info/labs/cross-references/" target="_blank" rel="noopener noreferrer"><em>OpenBible.info</em></a>

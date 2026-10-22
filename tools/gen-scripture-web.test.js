@@ -4,7 +4,9 @@
  * These pin the contracts the renderer and the app-side decoder depend on:
  * the 66-book map (including the matthew-plain alias trap), verse-id round
  * trips against the real corpus, unordered dedupe with max-votes, the baked
- * bucket/density layout, and the delta encode/decode inverse.
+ * bucket/density layout, and the delta encode/decode inverse. The Volumes'
+ * citations (tools/scripture-web-cites.mjs) are pinned by
+ * tools/scripture-web-cites.test.js.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
@@ -15,7 +17,7 @@ import {
   TSK_BOOK_IDS, CANON_ORDER, CANON_ABBREVS, SPAN_BUCKETS, BUCKET_SEGMENTS,
   DENSITY_TIERS, CHUNK_SIZE, buildVerseTable, parseTskRef, verseIdOf,
   parseTsk, bucketOf, layoutPairs, deltaEncode, deltaDecode,
-  toBase64, fromBase64, extractInlineRefs, extractVotNotes,
+  toBase64, fromBase64,
 } from './scripture-web-lib.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -274,69 +276,5 @@ describe('delta encoding', () => {
       expect(dfrom[i]).toBeLessThanOrEqual(0xffff);
       expect(span[i]).toBeLessThanOrEqual(0xffff);
     }
-  });
-});
-
-describe('corpus edge extraction', () => {
-  it('pulls every {{ref:}} token out of Format B text', () => {
-    const text = 'Plain {{ref:Matthew 4:4}} and {{ref:Isaiah 40:13; Romans 11:34}} end.';
-    expect(extractInlineRefs(text)).toEqual(['Matthew 4:4', 'Isaiah 40:13; Romans 11:34']);
-    expect(extractInlineRefs('no refs here')).toEqual([]);
-  });
-
-  it('anchors a votNote to its chapter-relative ref and resolves the letter', () => {
-    const t = corpusTable();
-    const matthew = { chapters: [{ num: 1, votNotes: [
-      { ref: '1:18-21', vol: 'Volume Two', letter: 'Some Letter' },
-    ] }] };
-    const { edges } = extractVotNotes(matthew, t,
-      () => ({ volKey: 'two', letterId: 'some-letter' }));
-    expect(edges).toHaveLength(1);
-    expect(edges[0].volKey).toBe('two');
-    expect(edges[0].kind).toBe('votNote');
-    expect(edges[0].v).toBe(verseIdOf({ bookId: 'matthew-plain', chapter: 1, verse: 18 }, t, null));
-  });
-
-  it('consults the resolver for a note whose vol is null (the album row)', () => {
-    // ch5's note points at The Blessed as an ALBUM, so the PDF gives it no
-    // volume and the importer stored `vol: null`. Requiring `vol` here made
-    // the generator drop an edge the app itself resolves.
-    const t = corpusTable();
-    const matthew = { chapters: [{ num: 5, votNotes: [
-      { ref: '5:1-11', vol: null, letter: 'The Blessed: More Declarations…' },
-    ] }] };
-    const seen = [];
-    const { edges, unresolved } = extractVotNotes(matthew, t, (vol, letter) => {
-      seen.push([vol, letter]);
-      return { volKey: 'blessed', letterId: 'introduction' };
-    });
-    expect(seen).toEqual([[null, 'The Blessed: More Declarations…']]);
-    expect(edges).toHaveLength(1);
-    expect(edges[0].letterId).toBe('introduction');
-    expect(unresolved).toHaveLength(0);
-  });
-
-  it('names the letter when a note cites one the corpus does not carry', () => {
-    // These are real: the Study Bible cites letters that were never imported.
-    // The message must say so, not read like data corruption.
-    const t = corpusTable();
-    const matthew = { chapters: [{ num: 26, votNotes: [
-      { ref: '26:28', vol: 'The Promise', letter: 'The Promise' },
-    ] }] };
-    const { edges, unresolved } = extractVotNotes(matthew, t, () => null);
-    expect(edges).toHaveLength(0);
-    expect(unresolved[0]).toContain('absent from the corpus');
-    expect(unresolved[0]).toContain('The Promise');
-    expect(unresolved[0]).toContain('26:28');
-  });
-
-  it('reports an unresolvable votNote instead of inventing a target', () => {
-    const t = corpusTable();
-    const matthew = { chapters: [{ num: 10, votNotes: [
-      { ref: '10:9', vol: 'Nowhere', letter: 'Nothing' },
-    ] }] };
-    const { edges, unresolved } = extractVotNotes(matthew, t, () => null);
-    expect(edges).toHaveLength(0);
-    expect(unresolved).toHaveLength(1);
   });
 });

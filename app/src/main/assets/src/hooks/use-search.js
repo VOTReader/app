@@ -20,6 +20,12 @@
 
    OWNED STATE (returned for render-tree consumers):
      - searchQuery, setSearchQuery   SearchScreen's input binding.
+     - fromSearchIndex,              The reading place was picked from the
+       setFromSearchIndex            chapter index a book-level hit opened
+                                     (search200 UX Track D): its back goes to
+                                     that index, whose back goes to the results.
+                                     Set by the index routes, read by the back
+                                     handler and the routes; every hit resets it.
      - searchScope, setSearchScope   SearchScreen's scope-chip state
                                      (null = global, populated = scoped
                                      to a context).
@@ -29,11 +35,11 @@
                                      scope-chip label.
 
    OWNED HELPERS (internal):
-     - srchVolLookup(searchVolId) → { screen, lastReadFn, activeKey }
+     - srchVolLookup(searchVolId) → { screen }
                                   Resolves a search-result's volumeId
-                                  to its letter screen + last-read
-                                  bookkeeping. Reads COL_BY_SEARCH_ID
-                                  (cross-bundle module global).
+                                  to its letter screen. Reads
+                                  COL_BY_SEARCH_ID (cross-bundle module
+                                  global).
      - SRCH_VOL_MAP               Proxy facade over srchVolLookup; used
                                   by handleSearchSelect / handleSearchCommand
                                   as a dict-style lookup. Kept as a
@@ -87,9 +93,9 @@
        extraction: useSurprise). Passed in as a PARAM and called from
        handleSearchCommand's 'random' action.
      - goSettings, goHome — useNav-owned (P7b). Passed in as PARAMS.
-     - setLastReadForVol — App-local last-read coordination (planned
-       extraction: useReadingPositionNav). Passed in as a PARAM.
-     - setActiveReadKey — useReadingDwell-owned (P6f). Passed as PARAM.
+     - The reading cursor. A hit no longer moves it (search200 UX B1):
+       it names its place through setSearchLanding (useReadingPositionNav
+       owns that tab field) and the catch-all arm skips the place.
 
    PARAMS (single object, flat):
      tabField                 Per-tab field accessor (from useTabs).
@@ -118,12 +124,21 @@
                               entry, and a stale genreId would misroute
                               a later index-level Back into a genre
                               visited in an earlier session leg.
-     setActiveReadKey         From useReadingDwell. Used by
-                              handleSearchSelect to set the dwell-timer
-                              gate when navigating into a letter.
-     setLastReadForVol        From App() (a #5 useReadingPositionNav
-                              candidate). Used by handleSearchSelect
-                              via srchVolLookup's lastReadFn closure.
+     setSearchLanding         From useReadingPositionNav (search200 UX
+                              B1). handleSearchSelect names the reading
+                              place a hit opens (readingPlaceKey); the
+                              catch-all arm leaves the cursor alone
+                              there and the routes switch the read
+                              tracker off, so the look records no
+                              progress. Null for a book (an index).
+                              (The hit used to arm the cursor itself
+                              through setActiveReadKey; it no longer
+                              touches it.)
+     setFromWtlb,             Breadcrumbs only an older path sets (a
+       setFromMatthewCh       WTLB {{nav}} hop, a Matthew card). They
+                              outrank fromSearch in the reader's back,
+                              so a stale one sent a hit's back to an
+                              old entry; a hit starts a new trail.
      handleSurprise           From App() (a #6 dissolution → useSurprise
                               candidate). Called by handleSearchCommand
                               for the 'random' action — cross-domain
@@ -132,7 +147,7 @@
                               ('settings') and goSearchOrigin (fallback).
 
    RETURNS: {
-     searchQuery, setSearchQuery,
+     searchQuery, setSearchQuery, fromSearchIndex, setFromSearchIndex,
      searchScope, setSearchScope,
      searchContext,
      goSearch, goSearchOrigin,
@@ -174,6 +189,8 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+import { readingPlaceKey } from '../utils/search-visit.js';
+import { formsToMark } from '../utils/marked-forms.js';
 
 /**
  * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
@@ -227,8 +244,9 @@ function scopeBookTitle(bookId) {
  *   setFromSearch: (v: any) => void,
  *   setFromSurprise?: (v: boolean) => void,
  *   setGenreId: (v: any) => void,
- *   setActiveReadKey: (key: string, commitFn?: (() => void) | null) => void,
- *   setLastReadForVol: (volKey: string, letterId: string) => void,
+ *   setSearchLanding?: (v: string | null) => void,
+ *   setFromWtlb?: (v: string | null) => void,
+ *   setFromMatthewCh?: (v: any) => void,
  *   handleSurprise: () => void,
  *   goSettings: () => void,
  *   goHome: () => void
@@ -239,6 +257,8 @@ function scopeBookTitle(bookId) {
  *   searchScope: any,
  *   setSearchScope: (v: any) => void,
  *   searchContext: any,
+ *   fromSearchIndex: boolean,
+ *   setFromSearchIndex: (v: boolean) => void,
  *   goSearch: () => void,
  *   goSearchOrigin: () => void,
  *   handleSearchSelect: (entry: any, terms?: string[]) => void,
@@ -266,7 +286,7 @@ export function useSearch({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   setScreen, setBookId, setChapterNum, setLetterId,
   setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise, setGenreId,
-  setActiveReadKey, setLastReadForVol,
+  setSearchLanding, setFromWtlb, setFromMatthewCh,
   handleSurprise, goSettings, goHome,
 }) {
   // ── Search tabFields (per-tab state) ────────────────────────────────────
@@ -274,6 +294,7 @@ export function useSearch({
   const [searchOrigin, setSearchOrigin] = tabField('searchOrigin');
   const [searchScope, setSearchScope] = tabField('searchScope');
   const [searchContext, setSearchContext] = tabField('searchContext');
+  const [fromSearchIndex, setFromSearchIndex] = tabField('fromSearchIndex');
 
   // searchOriginRef so goSearchOrigin's closure reads the latest origin
   // without recreating the function each render (same pattern as the
@@ -352,11 +373,7 @@ export function useSearch({
   const srchVolLookup = (searchVolId) => {
     const col = COL_BY_SEARCH_ID.get(searchVolId);
     if (!col) return null;
-    return {
-      screen: col.letterScreen,
-      lastReadFn: (id) => setLastReadForVol(col.volKey, id),
-      activeKey: 'vol:' + col.volKey,
-    };
+    return { screen: col.letterScreen };
   };
   // Compat alias — same shape as the old inline Proxy so call-site
   // semantics in handleSearchSelect / handleSearchCommand are identical.
@@ -407,14 +424,23 @@ export function useSearch({
   // words the result card marked (the query's own, its synonyms, the engine's
   // matched forms) and the query as typed, for the host's FindInUnit pill
   // ("flood  2 of 3").
-  const excerptAnchor = (doc, terms, entry, letterId, query) => {
+  // ...by the rule the card marks by (search200 UX D6): `stopTyped`, the small words typed, keeps
+  // the engine's forms of them out (formsToMark). The pill counted "whom" and "whoever" in a letter
+  // opened from a lone "who", words its card left unmarked. The landing's excerpt is still cut as
+  // before (below): a hit only such a form found lands where it was found.
+  const excerptAnchor = (doc, terms, entry, letterId, query, stopTyped) => {
     const own = Array.isArray(terms) ? terms : [];
     const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
-    const find = own.length || hit.length ? { terms: own.concat(hit), label: String(query || '').trim() || own.concat(hit)[0] } : null;
+    const marked = own.concat(formsToMark(hit, own, Array.isArray(stopTyped) ? stopTyped : []));
+    const find = marked.length ? { terms: marked, label: String(query || '').trim() || marked[0] } : null;
     // A tapped PLACE (SrchCard's "more places" list) names where in the text it
     // starts, a word start: the landing reads the same 48 chars matchExcerpt cuts.
+    // A landing at the text's very start is the engine saying a TITLE was named
+    // (search200 B5, the S22 look): `top` opens the unit at its top, where the
+    // title is, and the find pill counts the places without landing on one.
     if (entry && typeof entry.placeStart === 'number' && doc && doc.text && entry.placeStart >= 0 && entry.placeStart < doc.text.length) {
-      return { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null, find };
+      const a = { type: 'excerpt', text: doc.text.slice(entry.placeStart, entry.placeStart + 48), letterId: letterId || null, find };
+      return entry.placeStart === 0 ? { ...a, top: true } : a;
     }
     const sm = /** @type {any} */ (window).VotSearchMini;
     if (!sm || typeof sm.matchExcerpt !== 'function' || !doc || !doc.text) return null;
@@ -430,8 +456,9 @@ export function useSearch({
     return text ? { type: 'excerpt', text, letterId: letterId || null, find } : null;
   };
 
-  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) @param {string} [query] the query as typed */
-  const handleSearchSelect = (entry, terms, query) => {
+  /** @param {any} entry @param {string[]} [terms] the query terms (SearchScreen state.terms) @param {string} [query] the query as typed
+   *  @param {string[]} [stopTyped] the small words typed (SearchScreen state.stopTyped) */
+  const handleSearchSelect = (entry, terms, query, stopTyped) => {
     setFromSearch(true);
     // v01-04: this unit came from search, so its Back returns to search. A Surprise
     // breadcrumb left from earlier outranks fromSearch in the letter screens' Back
@@ -444,6 +471,17 @@ export function useSearch({
     // into the corpus; clear it here (once, top-level) so a later
     // index-level Back can't misroute into a genre never visited this leg.
     setGenreId(null);
+    // search200 UX B1: a new trail for the breadcrumbs only an older path sets.
+    // They outrank fromSearch in the reader's back: a fromWtlb left by a WTLB
+    // entry's {{nav}} hop sent a hit's Bible chapter back to that entry, and a
+    // fromMatthewCh sent a hit's letter back to Matthew.
+    if (typeof setFromWtlb === 'function') setFromWtlb(null);
+    if (typeof setFromMatthewCh === 'function') setFromMatthewCh(null);
+    // Track D: a chapter picked from the index a book-level hit opens backs to that index;
+    // every hit starts that trail over (the index routes set it on a pick).
+    setFromSearchIndex(false);
+    // ...and the place the hit opens is a look, not a read (set per branch below).
+    const land = (place) => { if (typeof setSearchLanding === 'function') setSearchLanding(place ? readingPlaceKey(place) : null); };
     // Direct parsed reference (from __direct entries)
     if (entry && entry.__direct && entry.ref) {
       const r = entry.ref;
@@ -467,6 +505,7 @@ export function useSearch({
         } else {
           setSurpriseAnchor(null);
         }
+        land({ screen: effectiveBookId === 'matthew' ? 'matthew-ch' : 'bible-ch', bookId: effectiveBookId, chapterNum: r.chapter });
         setScreen(effectiveBookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
         return;
       }
@@ -477,8 +516,7 @@ export function useSearch({
         if (!lid) return;
         setLetterId(lid);
         setSurpriseAnchor(null);   // a reference names the letter, not a place in it
-        if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(lid));
-        else vm.lastReadFn(lid);
+        land({ screen: vm.screen, letterId: lid });   // no cursor move: the arm skips the landing
         setScreen(vm.screen);
         return;
       }
@@ -489,6 +527,7 @@ export function useSearch({
         r.bookId;
         setBookId(effectiveBookId);
         setChapterNum(null);
+        land(null);   // an index is no reading place; a chapter picked from it is a read
         setScreen(effectiveBookId === 'matthew' ? 'matthew-idx' : 'bible-idx');
         return;
       }
@@ -508,6 +547,7 @@ export function useSearch({
       } else {
         setSurpriseAnchor(null);
       }
+      land({ screen: doc.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch', bookId: doc.bookId, chapterNum: doc.chapterNum });
       setScreen(doc.bookId === 'matthew' ? 'matthew-ch' : 'bible-ch');
       return;
     }
@@ -515,9 +555,8 @@ export function useSearch({
       const vm = SRCH_VOL_MAP[doc.volumeId];
       if (!vm || !doc.letterId) return;
       setLetterId(doc.letterId);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query));
-      if (vm.activeKey) setActiveReadKey(vm.activeKey, () => vm.lastReadFn(doc.letterId));
-      else vm.lastReadFn(doc.letterId);
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query, stopTyped));
+      land({ screen: vm.screen, letterId: doc.letterId });   // no cursor move: the arm skips the landing
       setScreen(vm.screen);
       return;
     }
@@ -530,7 +569,8 @@ export function useSearch({
       const chId = doc.studyChapterId || studyChapterIdByNum(doc.letterId, doc.chapterNum);
       setStudyId(doc.letterId || null);
       setStudyChapterId(chId || null);
-      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId, query));
+      setSurpriseAnchor(excerptAnchor(doc, terms, entry, chId, query, stopTyped));
+      land({ screen: 'bible-study-chapter', studyId: doc.letterId || null, studyChapterId: chId || null });
       setScreen('bible-study-chapter');
       return;
     }
@@ -566,6 +606,7 @@ export function useSearch({
 
   return {
     searchQuery, setSearchQuery,
+    fromSearchIndex: !!fromSearchIndex, setFromSearchIndex,
     searchScope, setSearchScope,
     searchContext,
     goSearch, goSearchOrigin,

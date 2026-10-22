@@ -89,7 +89,13 @@ const BUDGETS = [
   // Garden + the search tables, the Scripture Web, the Personal Study + journal + Studies screens, the
   // Listening Library) fold back into this bundle: 663,792 -> 1,313,034. The ceiling is the SUM of the five
   // old ceilings (718,300 + 357,600 + 101,200 + 193,600 + 88,100), so the merge claims no new room.
-  { file: 'bundle-d.js', measured: 1313034, max: 1458800 },   // every screen/sheet/util (bundles e-h folded in by lz1)
+  // 2026-10-18, the Scripture Web w3 integration (branch sweb): six feature streams on one spine - the GL top pass,
+  // prophecy class and frame set; the canvas label engine, wayfinding and cited strip; My Web's S-curve fans and
+  // rails; the go-to, flyTo's ease, the journey and the doors; the docked panel and its modes. Measured per stream
+  // on its own branch against the spine's 1,367,470: GL +25.9 KB, canvas +31.1 KB, My Web +13.0 KB, navigation
+  // +28.0 KB (the panel's +35 KB lands next, inside this room). All of it is the feature's own code; nothing
+  // pulled in a library. Re-baselined UP by the same rule: 1,460,091 x 1.15 = 1,679,104.7 -> the hundred above.
+  { file: 'bundle-d.js', measured: 1460091, max: 1679200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
   { file: 'bundle-w.js', measured: 7967, max: 9200 },
@@ -101,7 +107,12 @@ const BUDGETS = [
   // beside each bundle. Re-baselined DOWN to what stays render-blocking: 285,867 x 1.15 -> 328,800.
   // 2026-10-13, lz1: tools/split-lazy-css.mjs is retired and its four screens-X.min.css sheets come back here:
   // 370,199 B. Ceiling = the sum of the five old ceilings (328,800 + 9,400 + 17,700 + 17,600 + 13,200), no new room.
-  { file: 'app.min.css', measured: 370199, max: 386700 },   // render-blocking <link> in index.html
+  // 2026-10-18, the Scripture Web w3 integration (branch sweb): the docked panel's .sw block (its modes, its
+  // ink, the collapsed controls, the one-line legend) met the go-to's and My Web's rules and crossed the ceiling
+  // by 1,000 B at 387,700 B. All of it is the web's own chrome; nothing new is imported. Re-baselined UP by
+  // the bundle-d rule: 387,700 x 1.15 = 445,855 -> the hundred above. (Moving the .sw rules out of the
+  // render-blocking sheet is the real saving, and a separate change.)
+  { file: 'app.min.css', measured: 387700, max: 445900 },   // render-blocking <link> in index.html
   // Branch v2 (mw4, 2026-10-14): the v2 shell and the design kit's stylesheet (kit + screens + shell), which replaces
   // app.min.css as the render-blocking <link> on v2. Ceilings ~+15 % over the first build; they grow as screens land.
   // zv1 (Notes + journal editor + place registry) 40,619 B; mw5 (+ Home, 0a/0b): 49,926 B, nothing pulled in (icons

@@ -1,7 +1,10 @@
 /**
  * gen-scripture-web — builds the Scripture Web graph asset.
  *
- *   node tools/gen-scripture-web.mjs
+ *   node tools/gen-scripture-web.mjs              write the asset
+ *   node tools/gen-scripture-web.mjs --check      fail when the shipped asset is stale
+ *   node tools/gen-scripture-web.mjs --measure    also print the citation encodings' sizes
+ *   node tools/gen-scripture-web.mjs --verbose    list every corpus problem
  *
  * Inputs:
  *   tools/vendor/openbible-cross-references/cross_references.txt
@@ -18,21 +21,33 @@
  *   base64-encoded little-endian typed arrays pre-sorted into the LOD/density
  *   layout (span bucket → votes tier → x). GENERATED FILE — never hand-edit.
  *
- * The pure pipeline lives in tools/scripture-web-lib.mjs (unit-tested by
- * tools/gen-scripture-web.test.js). This shell only does I/O + corpus loading.
+ * The pure pipeline lives in tools/scripture-web-lib.mjs (the verse table and
+ * the TSK layout) and tools/scripture-web-cites.mjs (the Volumes' citations),
+ * unit-tested by tools/gen-scripture-web.test.js and
+ * tools/scripture-web-cites.test.js. This shell only does I/O + corpus loading.
  */
-import { readFileSync, writeFileSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { gzipSync } from 'zlib';
 import { runInNewContext } from 'vm';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import {
   buildVerseTable, parseTsk, layoutPairs, deltaEncode, toBase64,
-  extractVotNotes, extractInlineRefs,
   CANON_ABBREVS, SPAN_BUCKETS, DENSITY_TIERS, CHUNK_SIZE,
 } from './scripture-web-lib.mjs';
-import { COLLECTIONS, parseRefStr, splitCompoundRef, findBook }
+import {
+  extractCites, groupCites, encodeCites, encodeStudyLinks, holyDaysMirrors, shortStudyTitle,
+  makeRefParts, ENTRY_COLLECTIONS,
+} from './scripture-web-cites.mjs';
+import {
+  excerptFor, siteCite, CITE_KINDS, COLLECTION_ORDER,
+} from '../app/src/main/assets/src/utils/scripture-web/vot-citations.js';
+import { COLLECTIONS, splitCompoundRef, findBook }
   from '../app/src/main/assets/src/data/scripture-resolution.js';
 
+const CHECK = process.argv.includes('--check');       // regenerate in memory, compare, write nothing
+const MEASURE = process.argv.includes('--measure');   // print the citation encodings' sizes
+const VERBOSE = process.argv.includes('--verbose');   // list every corpus problem
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
 const DATA = resolve(ASSETS, 'src', 'data');
@@ -59,38 +74,7 @@ console.log(`canon: ${table.books.length} books, ${table.chapters.length} chapte
 // same shim validate-schemas.js uses for its corpus-wide ref resolution pass.
 if (typeof globalThis.window === 'undefined') globalThis.window = globalThis;
 globalThis.window.__ALL_BOOKS = booksById;
-/** parseRefStr output + findBook → {bookId, chapter, verse|null} or null. */
-const resolveParsed = (p) => {
-  if (!p) return null;
-  const key = findBook(p.rawBook);        // returns the BOOK KEY string
-  if (!key) return null;
-  const bookId = key === 'matthew' ? 'matthew-plain' : key;
-  return { bookId, chapter: p.chapter, verse: p.verse == null ? null : p.verse };
-};
-/**
- * Ref strings in the corpus occasionally carry prose the parser can't eat:
- * a leading gloss ("(which means \"God with us\") - Matthew 1:23") or a bare
- * translation tag with no parentheses ("Amos 3:7 CJB"). Yield the raw string
- * first, then progressively-trimmed candidates. parseRefStr stays untouched —
- * its single-object return is a pinned contract.
- */
-function refCandidates(raw) {
-  const s = String(raw).trim();
-  const out = [s];
-  const dash = s.lastIndexOf(' - ');
-  if (dash > 0) out.push(s.slice(dash + 3).trim());
-  const bareTag = /^(.*?)[\s]+[A-Z]{2,6}$/.exec(s);
-  if (bareTag) out.push(bareTag[1].trim());
-  return out;
-}
-/** Compound-aware parse: one entry per passage, book carried across parts. */
-function parseAppRefAll(raw) {
-  for (const cand of refCandidates(raw)) {
-    const parts = splitCompoundRef(cand).map((p) => resolveParsed(p.parsed)).filter(Boolean);
-    if (parts.length) return parts;
-  }
-  return [];
-}
+const parseAppRefAll = makeRefParts(splitCompoundRef, findBook);
 
 // ── 2. TSK cross-references ──────────────────────────────────────────────────
 const tskText = readFileSync(resolve(VENDOR, 'cross_references.txt'), 'utf8');
@@ -112,7 +96,7 @@ for (const [i, b] of layout.buckets.entries()) {
     `essential=${b.off20} famous=${b.off10} segs=${b.segments} chunks=${b.chunks.length}`);
 }
 
-// ── 3. VOT corpus edges ──────────────────────────────────────────────────────
+// ── 3. the Volumes' citations ────────────────────────────────────────────────
 const COLLECTION_FILES = {
   one: 'volume-one.js', two: 'volume-two.js', three: 'volume-three.js',
   four: 'volume-four.js', five: 'volume-five.js', six: 'volume-six.js',
@@ -122,7 +106,8 @@ const COLLECTION_FILES = {
   holydays: 'holy-days.js', hm: 'hidden-manna.js',
 };
 const collections = new Map();               // volKey -> { col, letters }
-const titleIndex = new Map();                // "<label norm>::<title norm>" -> {volKey, letterId}
+const letterOrder = new Map();               // "volKey/id" -> reading position in its collection
+const titleIndex = new Map();                // "<volKey>::<title norm>" -> {volKey, letterId}
 const labelToVolKey = new Map();
 const norm = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 for (const col of COLLECTIONS) {
@@ -133,16 +118,18 @@ for (const col of COLLECTIONS) {
   const letters = [];
   const main = ctx[col.globalName];
   if (Array.isArray(main)) letters.push(...main);
-  if (col.prefaceGlobal && ctx[col.prefaceGlobal]) letters.push(ctx[col.prefaceGlobal]);
+  const preface = col.prefaceGlobal ? ctx[col.prefaceGlobal] : null;
+  if (preface) letters.push(preface);
   collections.set(col.volKey, { col, letters });
   for (const label of [col.registryLabel, col.label]) {
     if (label) labelToVolKey.set(norm(label), col.volKey);
   }
-  for (const letter of letters) {
-    if (letter && letter.id && letter.title) {
-      titleIndex.set(`${col.volKey}::${norm(letter.title)}`, { volKey: col.volKey, letterId: letter.id });
-    }
-  }
+  // a preface is read first; the letters follow in their array order
+  letters.forEach((letter, i) => {
+    if (!letter || !letter.id) return;
+    letterOrder.set(`${col.volKey}/${letter.id}`, letter === preface ? 0 : i + 1);
+    if (letter.title) titleIndex.set(`${col.volKey}::${norm(letter.title)}`, { volKey: col.volKey, letterId: letter.id });
+  });
 }
 /**
  * Mirror the app's own votNote resolution (index.html __finishVotInit +
@@ -174,133 +161,113 @@ const resolveLetter = (volLabel, letterTitle) => {
   for (const [key, hit] of titleIndex) if (key.endsWith(want)) return hit;
   return null;
 };
+const resolveCollection = (label) => labelToVolKey.get(norm(label)) || null;
+const resolveScreen = (screen) => (COLLECTIONS.find((c) => c.letterScreen === screen) || {}).volKey || null;
 
-const bibleEdges = [];
-const votLinks = [];
-const prophecy = [];
-const problems = [];
+const { value: MATTHEW } = loadGlobal('matthew.js', 'MATTHEW');
+const { value: BIBLE_STUDIES } = loadGlobal('bible-studies.js', 'BIBLE_STUDIES');
 
-// 3a. Matthew Study Bible votNotes (Bible→VOT)
-{
-  const { value: MATTHEW } = loadGlobal('matthew.js', 'MATTHEW');
-  const { edges, unresolved } = extractVotNotes(MATTHEW, table, resolveLetter);
-  bibleEdges.push(...edges);
-  problems.push(...unresolved.map((u) => `matthew: ${u}`));
-  console.log(`votNotes: ${edges.length} edges, ${unresolved.length} unresolved`);
-}
+// Hidden Manna is reachable only through the Matthew study chain, never from
+// a public index (CLAUDE.md): the Web's "Cited in the Volumes" is one, so its
+// letters are left out here, not filtered later.
+const cites = extractCites({
+  collections, studies: BIBLE_STUDIES, matthew: MATTHEW, table,
+  refParts: parseAppRefAll, resolveLetter, resolveCollection, resolveScreen, skip: new Set(['hm']),
+});
+const c = cites.counts;
+console.log(`sites: ${cites.sites.length} (votNote ${c.votNote}, footnote ${c.footnote}, ` +
+  `study ${c.study} incl. ${c.studyPlain} plain source lines, wtlb ${c.wtlb}; ` +
+  `${c.skipped} Hidden Manna notes left out)`);
+console.log(`votNote quotes located: ${c.quoteWhole} whole + ${c.quoteHead} by their opening words` +
+  (c.quoteMissing ? `, ${c.quoteMissing} not found (${c.quoteTwin} open where the letter cites the verse ` +
+    'itself, the rest at the letter\'s first block)' : ''));
 
-// 3b. Format A scripture footnotes (VOT→Bible) — compound refs decomposed so
-// a "Psalm 2:12; Isaiah 8:13-14" footnote yields one edge per passage.
-function require_vid(p) {
-  const ch = table.chapterStart.get(`${p.bookId}:${p.chapter}`);
-  if (!ch) return -1;
-  const v = p.verse == null ? 1 : Math.min(p.verse, ch.verses);
-  return ch.start + (v - 1);
-}
-{
-  let total = 0;
-  for (const [volKey, { letters }] of collections) {
-    for (const letter of letters || []) {
-      if (!letter || !letter.footnotes) continue;
-      for (const fn of Object.values(letter.footnotes)) {
-        if (!fn || fn.type !== 'scripture' || !fn.ref) continue;
-        const parts = parseAppRefAll(fn.ref);
-        if (!parts.length) { problems.push(`${volKey}/${letter.id}: ${fn.ref}`); continue; }
-        for (const p of parts) {
-          const vid = require_vid(p);
-          if (vid >= 0) { bibleEdges.push({ v: vid, kind: 'footnote', volKey, letterId: letter.id }); total++; }
-          else problems.push(`${volKey}/${letter.id}: ${fn.ref}`);
-        }
-      }
-    }
+const studyOrder = new Map();               // "studyId/chapterId" -> {order, title, studyTitle}
+BIBLE_STUDIES.forEach((study, si) => (study.chapters || []).forEach((ch, ci) => {
+  studyOrder.set(`${study.id}/${ch.id}`, {
+    order: si * 1000 + ci, title: ch.title || study.title, studyTitle: shortStudyTitle(study.title),
+  });
+}));
+const COLLECTION_RANK = (volKey) => {
+  const i = COLLECTION_ORDER.indexOf(volKey);
+  return (i < 0 ? COLLECTION_ORDER.length : i) * 1e6;
+};
+const describe = (key, t) => {
+  if (t.studyId) {
+    const s = studyOrder.get(`${t.studyId}/${t.chapterId}`);
+    return s ? { order: COLLECTION_RANK('studies') + s.order, title: s.title } : null;
   }
-  console.log(`footnotes: ${total} edges`);
-}
-
-// 3c. Bible Studies — {{ref:}} tokens, prophecy pairs, letter-links
+  const id = t.letterId || t.entryId;
+  const pos = letterOrder.get(`${t.volKey}/${id}`);
+  if (pos == null) return null;
+  const entry = collections.get(t.volKey).letters.find((l) => l && l.id === id);
+  return { order: COLLECTION_RANK(t.volKey) + pos, title: String(entry.title || '') };
+};
+const grouped = groupCites(cites.sites, describe);
+const votCites = encodeCites(grouped.entries);
+for (const row of votCites) if (row.c === 'studies') row.st = studyOrder.get(`${row.sid}/${row.id}`).studyTitle;
 {
-  const { value: BIBLE_STUDIES } = loadGlobal('bible-studies.js', 'BIBLE_STUDIES');
-  let refCount = 0, pairCount = 0, linkCount = 0;
-  const refsIn = (blocks) => {
-    const out = [];
-    for (const b of blocks || []) {
-      for (const seg of b.segments || []) out.push(...extractInlineRefs(seg.v || ''));
-      for (const line of b.lines || []) for (const seg of line) out.push(...extractInlineRefs(seg.v || ''));
-    }
-    return out;
-  };
-  const vidsOfRef = (raw) => parseAppRefAll(raw).map(require_vid).filter((v) => v >= 0);
-  const vidOfRef = (raw) => { const v = vidsOfRef(raw); return v.length ? v[0] : -1; };
-  for (const study of BIBLE_STUDIES) {
-    for (const ch of study.chapters || []) {
-      const allRefs = [];
-      allRefs.push(...refsIn(ch.blocks));
-      for (const b of ch.blocks || []) {
-        if (b.type === 'prophecy-group') {
-          const ot = refsIn(b.ot && b.ot.blocks);
-          const nt = refsIn(b.nt && b.nt.blocks);
-          const vot = refsIn(b.vot && b.vot.blocks);
-          allRefs.push(...ot, ...nt, ...vot);
-          const a = ot.length ? vidOfRef(ot[0]) : -1;
-          const c = nt.length ? vidOfRef(nt[0]) : -1;
-          if (a >= 0 && c >= 0) { prophecy.push({ a, b: c, studyId: study.id, chapterId: ch.id }); pairCount++; }
-        }
-        for (const seg of b.segments || []) {
-          if (seg.t === 'letter-link' && seg.link && seg.link.collection) {
-            const volKey = labelToVolKey.get(norm(seg.link.collection));
-            const letterId = seg.letterId
-              || (seg.link.letterTitle && volKey
-                  && (titleIndex.get(`${volKey}::${norm(seg.link.letterTitle)}`) || {}).letterId);
-            if (volKey && letterId) {
-              votLinks.push({ kind: 'studyLetter', studyId: study.id, chapterId: ch.id, volKey, letterId });
-              linkCount++;
-            } else problems.push(`study letter-link unresolved: ${study.id}/${ch.id} -> ${seg.link.collection}`);
-          }
-        }
-      }
-      for (const raw of allRefs) {
-        const vids = vidsOfRef(raw);
-        if (!vids.length) { problems.push(`study ref unresolved: ${study.id}/${ch.id}: ${raw}`); continue; }
-        for (const vid of vids) {
-          bibleEdges.push({ v: vid, kind: 'study', studyId: study.id, chapterId: ch.id });
-          refCount++;
-        }
-      }
-    }
-  }
-  console.log(`studies: ${refCount} refs, ${pairCount} prophecy pairs, ${linkCount} letter-links`);
+  const distinct = cites.sites.length - grouped.duplicateSites;
+  console.log(`citations: ${grouped.entries.length} letters/chapters, ${grouped.edges} edges, one per ` +
+    `verse and letter (${distinct} distinct sites, ${distinct - grouped.edges} of them a letter's second ` +
+    `or later cite of a verse; ${grouped.duplicateSites} identical sites folded)`);
 }
 
-// 3d. Format B inline {{ref:}} (WTLB One/Two, The Blessed, Holy Days)
-{
-  let count = 0;
-  for (const volKey of ['wtlb1', 'wtlb2', 'blessed', 'holydays']) {
-    const entry = collections.get(volKey);
-    if (!entry) continue;
-    for (const item of entry.letters) {
-      if (!item || !item.id) continue;
-      for (const para of item.paragraphs || []) {
-        for (const raw of extractInlineRefs(para.text || '')) {
-          const vids = parseAppRefAll(raw).map(require_vid).filter((v) => v >= 0);
-          if (!vids.length) { problems.push(`${volKey}/${item.id}: ${raw}`); continue; }
-          for (const vid of vids) { bibleEdges.push({ v: vid, kind: 'wtlb', volKey, entryId: item.id }); count++; }
-        }
-      }
-    }
-  }
-  console.log(`format-b refs: ${count} edges`);
-}
+const hd = holyDaysMirrors(collections.get('holydays').letters, collections, resolveCollection);
+console.log(`holy days: ${Object.keys(hd.mirrors).length} entries mirror their source, ${hd.missing.length} unmatched`);
+for (const m of hd.missing) console.log(`  unmatched ${m}`);
 
-console.log(`VOT edges total: ${bibleEdges.length} bible-edges, ` +
-  `${prophecy.length} prophecy pairs, ${votLinks.length} vot-links, ${problems.length} problems`);
+const { prophecy, votLinks, problems } = cites;
+const studyLinks = encodeStudyLinks(prophecy, votLinks, (sid, id) => studyOrder.get(`${sid}/${id}`).order);
+console.log(`prophecy pairs: ${prophecy.length}; study letter-links: ${votLinks.length}; problems: ${problems.length}`);
+/** What each problem kind means (they are corpus facts, not generator failures). */
+const PROBLEM_KINDS = {
+  'votNote-letter': 'Study Bible note cites a letter absent from the corpus',
+  'votNote-ref': 'Study Bible note with an unreadable verse ref',
+  'votNote-quote': 'Study Bible note whose quotation is not in its letter',
+  'footnote-ref': 'scripture footnote whose ref does not parse',
+  'footnote-orphan': 'scripture footnote no block marks',
+  'study-ref': 'study {{ref:}} that does not parse',
+  'study-letter-link': 'study letter-link to a letter not in the corpus',
+  'study-letter-link-label': 'study letter-link labelled with the wrong collection',
+  'prophecy-incomplete': 'prophecy group without an Old or New Testament passage',
+  'wtlb-ref': 'Format B {{ref:}} that does not parse',
+};
 if (problems.length) {
-  console.log('problems (first 15):');
-  for (const p of problems.slice(0, 15)) console.log(`  ${p}`);
+  const byKind = {};
+  for (const p of problems) byKind[p.kind] = (byKind[p.kind] || 0) + 1;
+  for (const [k, n] of Object.entries(byKind)) console.log(`  ${n} x ${PROBLEM_KINDS[k] || k}`);
+  if (VERBOSE) for (const p of problems) console.log(`    ${p.kind}: ${p.where}: ${p.what}`);
+  else console.log('  (--verbose lists them)');
 }
+
+// Every anchor must open on words: an empty excerpt means the anchor and the
+// text domain disagree, a generator bug (never ship it).
+const corpusFor = {
+  letter: (volKey, id) => ((collections.get(volKey) || {}).letters || []).find((l) => l && l.id === id) || null,
+  studyChapter: (studyId, chapterId) => {
+    const s = BIBLE_STUDIES.find((x) => x.id === studyId);
+    return (s && (s.chapters || []).find((ch) => ch.id === chapterId)) || null;
+  },
+};
+let emptyExcerpts = 0;
+const excerptOf = (row, site) => {
+  const key = row.c === 'studies' ? `study:${row.sid}/${row.id}` : `${row.c}/${row.id}`;
+  return excerptFor(corpusFor, key, site[2], siteCite(site));
+};
+for (const row of votCites) {
+  for (const site of row.s) {
+    if (!excerptOf(row, site)) {
+      emptyExcerpts++;
+      console.log(`  EMPTY excerpt: ${row.c}/${row.id} ${JSON.stringify(site)}`);
+    }
+  }
+}
+if (emptyExcerpts) { console.error(`${emptyExcerpts} citation anchors resolve to no text`); process.exit(1); }
 
 // ── 4. emit ──────────────────────────────────────────────────────────────────
 const out = {
-  version: 1,
+  version: 2,
   attribution: 'Cross-reference data © OpenBible.info (CC-BY)',
   total: table.total,
   count: layout.from.length,
@@ -315,14 +282,14 @@ const out = {
   dfrom64: toBase64(delta.dfrom),
   span64: toBase64(delta.span),
   votes64: toBase64(layout.votes),
-  votEdges: bibleEdges,
-  prophecy,
-  votLinks,
+  votCites,
+  mirrors: hd.mirrors,
+  studyLinks,
 };
 
 const header = `/* ═══════════════════════════════════════════════════════════════════════
    scripture-web-data.js — GENERATED by tools/gen-scripture-web.mjs. DO NOT EDIT.
-   Regenerate: node tools/gen-scripture-web.mjs
+   Regenerate: node tools/gen-scripture-web.mjs   (freshness: --check)
    Cross-reference data © OpenBible.info (https://www.openbible.info/labs/
    cross-references/), Creative Commons Attribution (CC-BY). Attribution is
    REQUIRED wherever this data is displayed. Source vendored at
@@ -332,9 +299,71 @@ const header = `/* ════════════════════�
    (from = running sum of dfrom; to = from + span). See layoutPairs() and
    deltaDecode() in tools/scripture-web-lib.mjs — the app-side decoder in
    src/utils/scripture-web/decode.js must stay identical to deltaDecode().
+   votCites: the Volumes' citations of scripture, one row per letter in
+   reading order, each site an anchor (block, footnote / inline ref / quoted
+   span), never text — the words are read from the loaded corpus at runtime.
+   mirrors: Holy Days entry -> the letter it re-presents. studyLinks: the
+   Bible Studies' prophecy pairs and letter-links. encodeCites() and
+   encodeStudyLinks() in tools/scripture-web-cites.mjs document the shapes;
+   src/utils/scripture-web/decode.js + vot-citations.js read them.
    ═══════════════════════════════════════════════════════════════════════ */
 `;
 const outPath = resolve(DATA, 'scripture-web-data.js');
-writeFileSync(outPath, header + 'var SCRIPTURE_WEB_DATA = ' + JSON.stringify(out) + ';\n');
+const text = header + 'var SCRIPTURE_WEB_DATA = ' + JSON.stringify(out) + ';\n';
+
+if (MEASURE) {
+  const gz = (s) => gzipSync(Buffer.from(s), { level: 9 }).length;
+  const size = (label, value) => {
+    const json = JSON.stringify(value);
+    console.log(`  ${label.padEnd(46)} ${String(json.length).padStart(8)} B raw ${String(gz(json)).padStart(7)} B gzip`);
+  };
+  console.log('measure (the citation field alone, JSON):');
+  // E0: the 2026-08 shape — one flat object per site, no anchors
+  const legacy = [];
+  for (const row of votCites) {
+    for (const site of row.s) {
+      const kind = CITE_KINDS[site[1]];
+      if (row.c === 'studies') legacy.push({ v: site[0], kind, studyId: row.sid, chapterId: row.id });
+      else legacy.push(ENTRY_COLLECTIONS.has(row.c)
+        ? { v: site[0], kind, volKey: row.c, entryId: row.id }
+        : { v: site[0], kind, volKey: row.c, letterId: row.id });
+    }
+  }
+  size(`E0 flat, no anchors (${legacy.length} objects)`, legacy);
+  // E1: flat, deduped by (verse, letter), anchors in `at`
+  const flat = [];
+  for (const row of votCites) {
+    const byV = new Map();
+    for (const site of row.s) {
+      if (!byV.has(site[0])) {
+        const base = row.c === 'studies' ? { v: site[0], studyId: row.sid, chapterId: row.id }
+          : { v: site[0], volKey: row.c, [ENTRY_COLLECTIONS.has(row.c) ? 'entryId' : 'letterId']: row.id };
+        byV.set(site[0], { ...base, kind: CITE_KINDS[site[1]], at: [] });
+        flat.push(byV.get(site[0]));
+      }
+      byV.get(site[0]).at.push(site.slice(1));
+    }
+  }
+  size(`E1 flat per edge + anchors (${flat.length} objects)`, flat);
+  size('E2 grouped by letter + anchors (shipped)', votCites);
+  const withText = votCites.map((row) => ({ ...row, s: row.s.map((site) => [...site, excerptOf(row, site)]) }));
+  size('E3 E2 + embedded excerpt text', withText);
+  size('E2 without titles (t, st)', votCites.map(({ t, st, ...row }) => row));
+  size('E1 + titles', flat.map((e) => ({ ...e, title: describe('', e).title })));
+  console.log('  study links:');
+  size(`prophecy + votLinks as objects (${prophecy.length} + ${votLinks.length})`, { prophecy, votLinks });
+  size('studyLinks grouped (shipped)', studyLinks);
+  const rawOld = existsSync(outPath) ? readFileSync(outPath) : null;
+  if (rawOld) console.log(`  asset on disk: ${rawOld.length} B raw, ${gzipSync(rawOld, { level: 9 }).length} B gzip`);
+  console.log(`  asset as generated: ${Buffer.byteLength(text)} B raw, ${gz(text)} B gzip`);
+}
+
+if (CHECK) {
+  const onDisk = existsSync(outPath) ? readFileSync(outPath, 'utf8') : '';
+  if (onDisk === text) { console.log(`fresh: ${outPath}`); process.exit(0); }
+  console.error(`STALE: ${outPath} differs from what the corpus generates — run node tools/gen-scripture-web.mjs`);
+  process.exit(1);
+}
+writeFileSync(outPath, text);
 const bytes = readFileSync(outPath).length;
 console.log(`wrote ${outPath} (${(bytes / 1024 / 1024).toFixed(2)} MB)`);

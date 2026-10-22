@@ -220,3 +220,26 @@ describe('LetterView — a study chapter\'s recording gets the Listen pill (ruli
     expect(warmed).toEqual([]);
   });
 });
+
+/* search200 UX B1: from a search hit the reader's ‹ goes back to the results. The
+   routes hand the view navBack ({ onBack, label }) for that visit; the ‹ then names
+   the results and goes there, instead of the collection's index. */
+describe('LetterView — the ‹ goes back to the results from a search hit (search200 UX B1)', () => {
+  it('names the results and goes there', () => {
+    let home = 0, results = 0;
+    renderLetter({ volumeLabel: 'Volume Five', onHome: () => { home++; }, navBack: { onBack: () => { results++; }, label: 'results' } });
+    expect(backBtn().getAttribute('aria-label')).toBe('Back to results');
+    fireEvent.click(backBtn());
+    expect(results).toBe(1);
+    expect(home).toBe(0);
+    expect(eyebrow()).toContain('Volume Five');   // the collection still names the letter
+  });
+
+  it('without one, the ‹ is the index of the collection, as before', () => {
+    let home = 0;
+    renderLetter({ volumeLabel: 'Volume Five', onHome: () => { home++; }, navBack: null });
+    expect(backBtn().getAttribute('aria-label')).toBe('Back to Volume Five');
+    fireEvent.click(backBtn());
+    expect(home).toBe(1);
+  });
+});

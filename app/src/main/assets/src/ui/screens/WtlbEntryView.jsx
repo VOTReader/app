@@ -17,6 +17,8 @@ import { answersFiledUnder } from '../../utils/answers-shelves.js';
 import { AnswersContentsLine } from '../components/AnswersContents.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
+import { BackHintPill } from '../components/BackHintPill.jsx';
+import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -26,7 +28,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, navBack = null, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
   const [scriptureRef, setScriptureRef] = React.useState(null);
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
   // the resolved {type:'bible'} endpoint through navigateToLink (verse flash
@@ -51,13 +53,20 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // the paragraph comes to the top of the scroller, clear of a sticky "Back to" pill when one
   // is showing (measured, not guessed), and glows like a search landing. One-shot and
   // reader-initiated, the same class of write as that landing.
+  /* search200 UX B10 (1): an entry landed on mid-way names itself in a band pinned under
+     the top bar once this hero has scrolled away (MiniTitleBand), in the hero's words. */
+  const heroRef = React.useRef(null);
+  const miniTitle = inert ? null : (
+    <MiniTitleBand heroRef={heroRef} pageKey={entry.id} title={entry.title}
+      eyebrow={(volKey === 'answers' ? ['Answers', answersFiledUnder(entry)] : [partLabel, entry.num]).filter((x) => x != null && x !== '').join(' · ')} />
+  );
   const jumpTimerRef = React.useRef(/** @type {any} */ (null));
   React.useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
   const jumpToPara = React.useCallback((/** @type {number} */ index) => {
     const el = wtlbMainRef.current && /** @type {HTMLElement|null} */ (wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, index)}"]`));
     if (!el) return;
-    const hint = document.querySelector('.back-hint-row');
-    el.style.scrollMarginTop = ((hint ? hint.getBoundingClientRect().height : 0) + 16) + 'px';
+    // past the "Back to" row and the mini title band under it (search200 UX B10)
+    el.style.scrollMarginTop = (stickyCover(el) + 16) + 'px';
     el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
     setLandedPara(index);
     setLandedOff(null);
@@ -74,6 +83,15 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   React.useEffect(() => {
     if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours
+    // A title named (search200 B5, the S22 look): the landing is the entry's top, where its title is. No
+    // paragraph is landed on, pulsed or sought, though the excerpt (the text's first words) would find one.
+    if (surpriseAnchor.top) {
+      const topTimer = setTimeout(() => {
+        const sc = wtlbMainRef.current && wtlbMainRef.current.closest('.screen-scroll');
+        if (sc && typeof sc.scrollTo === 'function') sc.scrollTo({ top: 0, behavior: scrollBehavior() });
+      }, 150);
+      return () => clearTimeout(topTimer);
+    }
     const squash = (s) => String(s || '').replace(/\{\{[^}]+\}\}/g, ' ').replace(/\s+/g, ' ').trim();
     // (excerptLanding: head then TAIL at every length — the engine's cut can
     // open with the previous paragraph's last words, read-along find 2026-09-22.)
@@ -427,7 +445,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         // its book). 'Index' described a generic noun, not a place — the
         // index this returns to is Part One / Part Two / The Blessed /
         // Regarding The Holy Days, which partLabel already carries.
-        onBack: onHome, backLabel: partLabel || 'Index',
+        // navBack (search200 UX B1): from a search hit the ‹ returns to the results.
+        onBack: navBack ? navBack.onBack : onHome, backLabel: navBack ? navBack.label : (partLabel || 'Index'),
         arrows: {
           onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),
@@ -440,16 +459,10 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      {backHint && (
-        <div className="back-hint-row">
-          <button className="back-hint-pill" onClick={onBack} aria-label={'Back to ' + (backHint.volumeLabel ? backHint.volumeLabel + ' · ' : '') + backHint.title}>
-            <span className="back-hint-lead"><span className="back-hint-arrow">‹</span>Back to</span>{' '}
-            <span className="back-hint-title">{backHint.volumeLabel ? `${backHint.volumeLabel} · ${backHint.title}` : backHint.title}</span>
-          </button>
-        </div>
-      )}
+      <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
+      {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
-      <header className="hero">
+      <header className="hero" ref={heroRef}>
         <div className="hero-bg vol" />
         <div className="hero-content">
           {/* An Answers topic's num is only its place on the site's page list;

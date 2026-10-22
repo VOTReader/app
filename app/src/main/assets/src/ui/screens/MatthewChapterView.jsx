@@ -46,6 +46,8 @@ export function MatthewChapterView({
   theme, setTheme, surpriseAnchor,
   backHint, tapThroughBack,
   openLinkSidebar, onNavigateToLink,
+  // search200 UX B1: the results back and the tracker switch for a search hit's look
+  navBack = null, markAsReadEnabled,
 }) {
   if (!chapter) return null;
   // Chain-aware boundaries: when entered via Studies (fromStudies=true),
@@ -71,7 +73,7 @@ export function MatthewChapterView({
         onNavigate={(num) => { setSurpriseAnchor(null); selectMatthewCh(num); }}
         onMarkRead={(payload) => markRead('matthew', chapterNum, payload)}
         readTrackKey={getReadKey ? getReadKey('matthew', chapterNum) : undefined}
-        markAsReadEnabled={settings.markAsRead}
+        markAsReadEnabled={markAsReadEnabled === undefined ? settings.markAsRead : markAsReadEnabled}
         prevBoundary={chainPrev ? { short: studyShortTitle(chainPrev.title), title: studyShortTitle(chainPrev.title) } : null}
         onPrevBoundary={chainPrev ? () => { setFromStudies(true); goToChainEntryLast(chainPrev.slug)(); } : null}
         nextBoundary={chainNext ? { short: studyShortTitle(chainNext.title), title: studyShortTitle(chainNext.title) } : null}
@@ -82,7 +84,7 @@ export function MatthewChapterView({
         theme={theme} onThemeChange={setTheme}
         surpriseAnchor={surpriseAnchor}
         onVotLetterClick={goToLetterFromMatthew}
-        backHint={backHint} onTapThroughBack={tapThroughBack}
+        backHint={backHint} onTapThroughBack={tapThroughBack} navBack={navBack}
         onLinkOpen={openLinkSidebar}
         onNavigateToLink={onNavigateToLink}
       />

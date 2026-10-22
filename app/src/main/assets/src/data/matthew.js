@@ -6,7 +6,7 @@ var MATTHEW = {
   "title": "Matthew",
   "subtitle": "The Gospel According to Matthew",
   "votEdition": true,
-  "_dataVersion": "2026-05-03",
+  "_dataVersion": "2026-10-20",
   "preface": {
     "title": "Preface",
     "blocks": [
@@ -2792,6 +2792,10 @@ var MATTHEW = {
         },
         {
           "ref": "11:13-14",
+          "cite": "Malachi 4:4-6"
+        },
+        {
+          "ref": "11:13-14",
           "cite": "These verses have a two-fold fulfillment: First through John the Baptist (Matthew 11:14); then in the Day of The Lord, through the 144,000 (The Volumes of Truth, Volume Three, “The Last Trump”)"
         },
         {
@@ -4440,7 +4444,7 @@ var MATTHEW = {
       "scriptures": [
         {
           "ref": "16:18",
-          "cite": "The word \"church\" is a translation of the Greek word \"ekklesia,\" which is defined as \"an assembly\""
+          "cite": "The word \"church\" is a translation of the Greek word \"ekklesia,\" which is defined as \"an assembly\" or \"called-out ones.\" The word \"church\" does not refer to a building or denomination, but a people. In the Bible, the word \"church\" refers to The Lord's body or body of believers, the Messianic community (Ephesians 1:22, 1 Corinthians 12:13); and also the Bride (John 3:29; Revelation 21:9, 22:17)."
         },
         {
           "ref": "16:4",
@@ -4482,7 +4486,7 @@ var MATTHEW = {
           "ref": "16:6, 11-12",
           "vol": "Volume Two",
           "letter": "Do This in Remembrance of Me",
-          "excerpt": "For those without the gate retain their sin, for they hold fast to malice and have not yet departed from wickedness. Yet the hearts of the first election are filled with compassion and a sincere desire to walk in My ways, having called upon My name in sincerity and in truth, as they bring forth new works meet for repentance. For where there are righteous works, there are also those who seek to spoil them for the sake of pride and envy. And where there is pure knowledge, there are also those who defile it among *women. Take heed, therefore, and remember My teaching: Beware of the leaven of the Pharisees and the Sadducees. For their like still exists today; only their names and vesture have changed."
+          "excerpt": "For those without the gate retain their sin, for they hold fast to malice and have not yet departed from wickedness. Yet the hearts of the first election are filled with compassion and a sincere desire to walk in My ways, having called upon My name in sincerity and in truth, as they bring forth new works meet for repentance. For where there are righteous works, there are also those who seek to spoil them for the sake of pride and envy. And where there is pure knowledge, there are also those who defile it among *women. Take heed, therefore, and remember My teaching: Beware of the leaven of the Pharisees and the Sadducees. For their like still exists today; only their names and vesture have changed. (\"Women\" in this context refers to the churches of men.)"
         },
         {
           "ref": "16:6, 11-12",
@@ -6586,7 +6590,7 @@ var MATTHEW = {
         },
         {
           "ref": "22:30",
-          "cite": "John 3:2"
+          "cite": "1 John 3:2"
         },
         {
           "ref": "22:32",
@@ -7769,12 +7773,6 @@ var MATTHEW = {
           "excerpt": "Thus says The Lord: Behold, the time has come. It is time for great things to be shown in the heavens above and upon the earth beneath, for the flood gates to be opened and the storehouses emptied, for all that is hidden to be uncovered and that which slumbers to be awakened. For it is written: It shall come to pass in the last days, says The Lord, that I will pour out My spirit on all flesh, and your sons and your daughters shall prophesy, your old men shall dream dreams, your young men shall see visions. Also on My menservants and on My maidservants, I will pour out My spirit in those days. And I will show wonders in the heavens above and in the earth beneath, blood and fire and pillars of smoke. The sun shall be turned into darkness and the moon into blood, at the coming of the Great and Terrible Day of The Lord. And it shall come to pass that whoever calls on the name of The Lord shall be saved. For in Mount Zion and in Jerusalem there shall be deliverance, among the remnant whom The Lord shall call. I tell you the truth, this Scripture is fulfilled, even now, as you read these words, and is also to come."
         },
         {
-          "ref": "24:14-30",
-          "vol": "Letters to The Lord's Little Flock",
-          "letter": "The Way of The Lord Is Equal",
-          "excerpt": "Thus says The Lord: Little flock, how is it you say within yourselves the way of The Lord is not equal? How is it you feel as though upon this servant I have poured a bounty, yet you remain desolate?... Little flock, My ways are equal, yet the ways of My people remain unequal. For I have indeed poured out My life for you, yet each one must decide how deeply they drink. Do you not see? My blessings are equal for all who receive of My blessings, and My grace sufficient for all who trust in Me. Thus among those who come to Me, one is not favored over another, nor is My love bestowed by measure. Rather it is you who receive by measure, resisting on account of all these deceitful weights, trust which remains altogether lacking. Therefore do not confuse My love with the calling I have purposed for another, nor compare the gifts of the Spirit with The Blessing. For those I have called to serve shall indeed be given gifts, each in accordance with their faith and My will. And those who receive the greater gifts shall also bear the greater burden, even in the heat of the Day. Therefore, again I say to you, The Lord’s ways are indeed equal, yet the ways of men remain unequal. Yet those who grab hold of their First Love with all their heart, with all their mind, with all their strength and with all their soul, shall never go hungry, nor shall they thirst anymore; nor shall the heat of the noonday sun do them any harm. Yea, even all their tears shall be wiped away in the house of The Lord."
-        },
-        {
           "ref": "24:21",
           "vol": "Volume Seven",
           "letter": "The Voice of The Almighty God",
@@ -8527,6 +8525,12 @@ var MATTHEW = {
           "excerpt": "Thus says The Lord to His servants: Have I not called to each one of you, saying, 'Serve Me'? Yet you hesitate. Behold, I have spoken to you on many occasions, even placing it upon your hearts, yet you procrastinate, sitting upon your hands, saying within yourselves, 'Tomorrow I will serve God; later I will pick up the trumpet.' Thus you are no watchmen. Yet for this reason, I have called you out. Know you not, that one in league with My watchman has by association become the same? Therefore I spoke to you, saying, 'Beloved, come and walk with Me this far.' Yet you answered, 'How far?!' I have said, 'Do this.' Yet what have you done? How is it you stand up, yet begrudgingly? Where is your joy in service? Where is the sound of My name put forth in power, with steadfast belief and unwavering trust? Beloved, serve Me as I have loved you, and do so rejoicing as you go, for I am with you. And I shall surely provide all you need, even as I have done from the beginning, says The Lord."
         },
         {
+          "ref": "25:14-30",
+          "vol": "Letters to The Lord's Little Flock",
+          "letter": "The Way of The Lord Is Equal",
+          "excerpt": "Thus says The Lord: Little flock, how is it you say within yourselves the way of The Lord is not equal? How is it you feel as though upon this servant I have poured a bounty, yet you remain desolate?... Little flock, My ways are equal, yet the ways of My people remain unequal. For I have indeed poured out My life for you, yet each one must decide how deeply they drink. Do you not see? My blessings are equal for all who receive of My blessings, and My grace sufficient for all who trust in Me. Thus among those who come to Me, one is not favored over another, nor is My love bestowed by measure. Rather it is you who receive by measure, resisting on account of all these deceitful weights, trust which remains altogether lacking. Therefore do not confuse My love with the calling I have purposed for another, nor compare the gifts of the Spirit with The Blessing. For those I have called to serve shall indeed be given gifts, each in accordance with their faith and My will. And those who receive the greater gifts shall also bear the greater burden, even in the heat of the Day. Therefore, again I say to you, The Lord’s ways are indeed equal, yet the ways of men remain unequal. Yet those who grab hold of their First Love with all their heart, with all their mind, with all their strength and with all their soul, shall never go hungry, nor shall they thirst anymore; nor shall the heat of the noonday sun do them any harm. Yea, even all their tears shall be wiped away in the house of The Lord."
+        },
+        {
           "ref": "25:18, 24-25",
           "vol": "Volume Seven",
           "letter": "I Am Calling You Out! (Part 1)",
@@ -8594,8 +8598,8 @@ var MATTHEW = {
         },
         {
           "ref": "25:34-45",
-          "vol": "Letters to The Lord's Little Flock",
-          "letter": "Serve Me as I Have Loved You, Says The Lord",
+          "vol": "Words To Live By: Part Two",
+          "letter": "Serve Me As I Have Loved You",
           "excerpt": "From this field I have called a select few, to be My examples; not according to their own righteousness, nor by their own strength or intellect, but according to My Word and by My spirit which dwells within them. These have forsaken everything for the sake of their Shepherd. They follow Me wheresoever I go. They listen to My voice and heed the call, and will by no means follow another. Therefore, you also shall strive to be My examples; beloved ones, serve Me as I have loved you. And remember, whatsoever you do for another, you have done it for Me. And whatsoever you do to another, whether in goodness or in malice, you have done it also to Me, says The Lord."
         },
         {

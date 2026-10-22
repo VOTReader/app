@@ -32,6 +32,20 @@ describe('SettingsScreen — the dice and the reading marker rows carry their on
     expect(desc).not.toMatch(/\bdot\b/i);
   });
 
+  /* search200 UX D7: the row said the marker "follows you the moment you open any chapter or letter", but one
+     opened from a search is a look and moves nothing until the reader reads it: their own scroll on the page,
+     or a stay of 8 seconds (utils/search-visit.js SEARCH_LOOK_MS). */
+  it('D7: the marker row says a place opened from a search counts once you read it, by your scroll or 8 seconds', () => {
+    renderSettings();
+    const r = row('Reading Position Marker');
+    fireEvent.click(r.querySelector('.settings-info-btn'));
+    const desc = r.querySelector('.settings-row-desc').textContent;
+    expect(desc).not.toMatch(/the moment you open/);
+    expect(desc).toMatch(/search/);
+    expect(desc).toMatch(/scroll/);
+    expect(desc).toMatch(/8 seconds/);
+  });
+
   it('typing "marker" into Find settings still reaches the row', () => {
     renderSettings({}, {}, { expandGroups: false });
     fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'marker' } });

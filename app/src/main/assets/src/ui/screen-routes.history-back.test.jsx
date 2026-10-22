@@ -286,7 +286,7 @@ describe('screen-routes — matthew-idx onBack mirrors hardware-back (hub parity
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
     expect(props.setScreen).toHaveBeenCalledWith('search');
     expect(props.setScreen).not.toHaveBeenCalledWith('scripture-genre');
-    expect(el.props.backLabel).toBe('Search');
+    expect(el.props.backLabel).toBe('results');   // search200 UX B1: "Back to results", as in the reader
   });
 });
 
@@ -304,7 +304,7 @@ describe('screen-routes — bible-idx onBack consumes fromSearch', () => {
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
     expect(props.setScreen).toHaveBeenCalledWith('search');
     expect(props.setScreen).not.toHaveBeenCalledWith('scripture-genre');
-    expect(el.props.backLabel).toBe('Search');
+    expect(el.props.backLabel).toBe('results');   // search200 UX B1: "Back to results", as in the reader
   });
 
   it('back with an active genre (no fromSearch) still returns to scripture-genre', () => {

@@ -107,6 +107,12 @@
                                         through useRefMirror for call-time
                                         reads (the []-deps effect closure
                                         would otherwise freeze them).
+     fromSearchIndex,                 — useSearch's tab field (search200 UX
+       setFromSearchIndex               Track D): a chapter picked from the index
+                                        a book-level hit opened backs to that
+                                        index, not past it to the results.
+                                        Mirrored like the rest; absent (older
+                                        callers, tests) reads as false.
      tabsOverviewOpen                 — App()-local state; also mirrored.
      journalEntryId                   — App()-local useState; mirrored (the
                                         journalEntryIdRef fix — see above).
@@ -176,6 +182,7 @@ import {
  */
 export function useAndroidBack({
   screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
+  fromSearchIndex = false, setFromSearchIndex = undefined,
   tabsOverviewOpen, journalEntryId, fromLetterRef, tapThroughBack, backActive,
   setScreen, setBookId, setChapterNum, setLetterId, setStudyId, setStudyChapterId, setJournalEntryId,
   setFromLetterStack, setFromSearch, setFromStudies, setFromWtlb, setFromMatthewCh, setFromSurprise,
@@ -198,6 +205,7 @@ export function useAndroidBack({
   const studyIdRef = useRefMirror(studyId);
   const fromWtlbRef = useRefMirror(fromWtlb);
   const fromSurpriseRef = useRefMirror(fromSurprise);
+  const fromSearchIndexRef = useRefMirror(fromSearchIndex);
   const tabsOverviewOpenRef = useRefMirror(tabsOverviewOpen);
   const journalEntryIdRef = useRefMirror(journalEntryId);
   // The cross-screen back target + its handler, mirrored so the mount-only
@@ -341,7 +349,9 @@ export function useAndroidBack({
       // stack its opener pushed, else the letter-screen rule (indexScreen).
       if (s === "answers-home") {goHome();return "true";} else
       if (s === "answers-subject" || s === "answers-az") {setScreen("answers-home");return "true";} else
-      if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {setChapterNum(null);setScreen("matthew-idx");}return "true";} else
+      // Track D: a chapter picked from the index a book-level hit opened (fromSearchIndex) backs
+      // to that index, which backs to the results; one a hit opened backs to the results.
+      if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current && !fromSearchIndexRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {if (fromSearchIndexRef.current && setFromSearchIndex) setFromSearchIndex(false);setChapterNum(null);setScreen("matthew-idx");}return "true";} else
       // Wave 0 (P1-13 + matthew-idx hub parity): fromSearch is armed on
       // book-level search results too (ref-book lands on the -idx screens),
       // but was previously consumed only on chapter screens — a stale flag
@@ -353,7 +363,7 @@ export function useAndroidBack({
       if (s === "studies-home") {goHome();return "true";} else
       if (s === "bible-study-index") {goStudiesHome();return "true";} else
       if (s === "bible-study-chapter") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");return "true";}const cur = getStudyByIdRef.current(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
-      if (s === "bible-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {const bid = bookIdRef.current;
+      if (s === "bible-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current && fromSearchIndexRef.current) {if (setFromSearchIndex) setFromSearchIndex(false);setChapterNum(null);setScreen("bible-idx");return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {const bid = bookIdRef.current;
         /* Q8 lazy: BOOKS lives in bundle-a-bible. If the user is on bible-ch
            via saved-tab cold-boot before __loadBibleCorpus resolves, BOOKS
            is undeclared and a bare BOOKS[bid] throws ReferenceError (optional
@@ -385,7 +395,7 @@ export function useAndroidBack({
       goHome();return "true";
     };
     return () => {delete window.handleAndroidBack;};
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/tabsOverviewOpenRef/journalEntryIdRef/backActiveRef/tapThroughBackRef + getStudyByIdRef (W37) + fromLetterRef from useFromLetterStack — all 15 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: handler reads ALL nav state through useRefMirror refs (screenRef/bookIdRef/genreIdRef/fromSearchRef/fromStudiesRef/fromMatthewChRef/studyIdRef/fromWtlbRef/fromSurpriseRef/fromSearchIndexRef/tabsOverviewOpenRef/journalEntryIdRef/backActiveRef/tapThroughBackRef + getStudyByIdRef (W37) + fromLetterRef from useFromLetterStack — all 16 read via .current inside the handler, call-time fresh); useState setters are stable; nav-helper params (goHome/goNavOrigin/goSearchOrigin/goScripturesHome/goStudiesHome/goVolumesHome/goJournalViewer) close only over stable setters and refs (audited app.jsx:509-905); cancelDwell same shape. Re-running on dep changes would pointlessly re-wire window.handleAndroidBack. See file header §"Call-time mirrors".
   }, []);
 
   /* ═══════════════════════════════════════════════════════════════════════

@@ -43,6 +43,10 @@
      notesReturnCtx     {tab, drilledNbId, backPill?: {title, origin?} | null} | null
         writer: NotesIndexScreen / screen-routes (drill into a notebook)
         reader: NotesIndexScreen (peek on render; clear on mount)
+     webStart           the Scripture Web's start ({verse} | {book, chapter?} | {letterKey}) | null
+        writer: screen-routes window.__openScriptureWeb (a door from the reader)
+        reader: screen-routes' scripture-web route (peek on render: the screen's start prop)
+        cleared by: screen-routes, on every build while another screen is up
 
    (Removed in D2: `pendingLinkExcerpt` — it was write-only dead code, set by
    use-navigate-to-link with no reader anywhere.)

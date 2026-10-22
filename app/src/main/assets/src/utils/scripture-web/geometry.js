@@ -28,53 +28,36 @@
    verse's own cell in the order of their far ends (footX), so a sheaf is a
    sheaf and not one stem.
 
-   The second law here is the fly-over fade: at depth an arc with neither
-   foot near the viewport recedes to FLYOVER_FLOOR (never zero), and the
-   picker applies the same test (`flyOverGLSL`; arcAnchored + flyOverDim).
+   The second law here is the fly-over leg (Q3 ii): at depth an arc with
+   neither foot near the viewport draws thinner, at FLYOVER_LEG_WIDTH of its
+   width (sw-ink.js), its alpha unchanged (`flyOverGLSL`; arcAnchored +
+   flyOverWidth). Nothing dims as the reader zooms (Q2): the lens that kept
+   the rest of the web at 0.35 is retired, and the chapter under the centre
+   is emphasised instead (web-frame.centreRange, the shader's uCentre).
+
+   The third is the span-ink law (w4 INK, item 2; `spanInkGLSL`): a
+   thread's ink weight is its own span's, fixed at every zoom. Short spans
+   (to about 56 verses) are inked up to 1 + SHORT_GAIN times and keep the stroke law's width, so
+   they read first (the violet feet of the overview, the vivid local domes
+   deep in); a long thread is held at the overview's hairline, widened by
+   its votes alone, so deep in its legs are thin coloured lines. Nothing
+   brightens or dims with the zoom that was not already the stroke law's.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
- * THE LENS (structure-law.md, landing 10; Corbin 2026-09-21: every line
- * drawn, and "someway somehow navigate them and understand them"). Past
- * LOCALIZE_START, with nothing tapped, the chapter under the frame's centre
- * is at full ink and every other thread at this share of its alpha: still
- * drawn, still tappable, still counted, never summed into a wall. Panning
- * slides the lens; a tap takes over (the tap's own 0.05 dim); Reset clears.
- * The one taste number of the lens; 1 turns it off.
+ * Retired with the lens (Q2, 2026-10: nothing dims as the reader zooms). The
+ * lens kept every thread outside the chapter under the centre at 0.35 of its
+ * ink; the centre chapter is now emphasised instead and the rest is left
+ * exactly as it was. This returns 1 for every range so the one remaining
+ * caller (overlay-renderer.js's pills, canvas-owned) dims nothing; it goes
+ * when that call does (CONTRACTS.md section 5).
+ * @param {number} _lo @param {number} _hi - inclusive verse range
+ * @param {(number[]|null)} _lens
+ * @param {number} [_share]
+ * @returns {number} 1
  */
-export const LENS_CONTEXT = 0.35;
-
-/**
- * The lens applied to a verse range (a foot cell's count, a label): 1 with
- * no lens or when the range touches it, else LENS_CONTEXT - the same share
- * the shader leaves a thread outside the lens. The counts at the feet are
- * information about every thread, so they dim with the web, never vanish.
- * @param {number} lo @param {number} hi - inclusive verse range
- * @param {(number[]|null)} lens - pick.lensRange()
- */
-export function lensDimFor(lo, hi, lens, share = LENS_CONTEXT) {
-  // no lens, or the shader's own "off" spelling (lo > hi, uLens = (1, 0))
-  if (!lens || !(lens[0] <= lens[1])) return 1;
-  return hi >= lens[0] && lo <= lens[1] ? 1 : share;
-}
-
-/** Zoom (x fit) at which the lens has fully set in: the localize span's end, about three + presses
- * past LOCALIZE_START, so no single press (x1.6) is a visible jump (sw1, 2026-10-05). */
-export const LENS_FULL = 24;
-
-/**
- * What a thread outside the lens keeps of its alpha at this zoom. The lens used to switch fully on
- * at LOCALIZE_START, so one + press dropped every other chapter from full ink to LENS_CONTEXT (the
- * audit measured the frame's mean brightness halving between 4.1x and 6.6x). It now eases in over
- * the log-zoom from LOCALIZE_START to LENS_FULL: 1 at 6x, LENS_CONTEXT from 24x. Lenses never dim
- * anything to zero, so what is drawn, tapped and counted is unchanged.
- * @param {number} zoom - current scale as a multiple of fit-to-width
- * @returns {number} LENS_CONTEXT..1
- */
-export function lensShareAt(zoom) {
-  if (!(zoom > LOCALIZE_START)) return 1;
-  const t = (Math.log2(zoom) - Math.log2(LOCALIZE_START)) / (Math.log2(LENS_FULL) - Math.log2(LOCALIZE_START));
-  return 1 - (1 - LENS_CONTEXT) * (t > 1 ? 1 : t);
+export function lensDimFor(_lo, _hi, _lens, _share) {
+  return 1;
 }
 
 /** Zoom (× fit) at which the semicircle→ceiling crossover starts and ends. */
@@ -83,7 +66,7 @@ export const LOCALIZE_END = 24;
 
 /**
  * How far the semicircle→ceiling crossover has progressed, and how strongly
- * fly-over arcs are faded. 0 at overview, 1 once zoomed well in.
+ * fly-over arcs thin to their legs. 0 at overview, 1 once zoomed well in.
  * @param {number} zoom — current scale as a multiple of fit-to-width
  * @returns {number} 0..1
  */
@@ -115,14 +98,19 @@ export function squashFactor(ceil, width) {
   return Math.min(MAX_STRETCH, ceil / (width / 2));
 }
 
-/** CSS px per verse at which one verse is a comfortable tap target. */
+/** CSS px per verse at which one verse is a comfortable tap target: THE TAP RULE. It was the
+ *  camera's ceiling until the verse zoom (sweb-z1, Corbin 2026-10-21: "zoom way, way, way in. All
+ *  the way to a single linked verse"); it stays the laws' reference (the ceiling's ease, the
+ *  density law's measurements, D1) and the deepest a flight lands, while the reader's own zoom goes
+ *  on to VERSE_FILL. (The build renames it PPV_TAP_CSS and maxZoomFor tapZoomFor.) */
 export const PPV_MAX_CSS = 44;
 
 /**
- * The zoom ceiling, as a RELATION rather than a constant: the reader may
- * zoom until one verse is PPV_MAX_CSS wide, and no further, because past that
- * nothing new can separate - every arc leaving a verse shares one foot at
- * every zoom, so more magnification only zooms into a void.
+ * The tap rule as a zoom (PPV_MAX_CSS wide verses), a RELATION on the frame: the laws' reference
+ * and the deepest a flight (go-to, a chosen connection, a chapter numeral) lands unless the reader
+ * is already deeper (flightCapOf). No longer the camera's ceiling: past it a verse's threads keep
+ * separating, because each leaves from its own foot across the verse's cell (footX), so a verse's
+ * sheaf opens into one leg per link (deepZoomFor).
  *
  * @param {number} total - verses in the canon
  * @param {number} widthCss - viewport width in CSS px
@@ -133,6 +121,38 @@ export function maxZoomFor(total, widthCss) {
   const t = total > 0 ? total : 1;
   const z = (PPV_MAX_CSS * t) / w;
   return z > 1 ? z : 1;
+}
+
+/** The share of the frame's width one verse fills at the camera's ceiling (the verse zoom). */
+export const VERSE_FILL = 0.8;
+
+/**
+ * THE CAMERA'S CEILING (the verse zoom): one verse VERSE_FILL of the frame's width, on every frame
+ * (phone, PC, either orientation), so the zoom is VERSE_FILL x total whatever the width. Never under
+ * the tap rule (a frame narrower than PPV_MAX_CSS / VERSE_FILL, 55 CSS px, keeps it).
+ * @param {number} total - verses in the canon
+ * @param {number} widthCss - viewport width in CSS px
+ * @returns {number} multiple of fit-to-width
+ */
+export function deepZoomFor(total, widthCss) {
+  const t = total > 0 ? total : 1;
+  const z = VERSE_FILL * t;
+  const tap = maxZoomFor(total, widthCss);
+  return z > tap ? z : tap;
+}
+
+/**
+ * The deepest a flight may land (go-to, a chosen connection, a chapter or book name): the tap rule,
+ * or the reader's own zoom when they are deeper, so a flight never dives past the tap rule on its
+ * own and never pulls a reader out of the depth they chose; under the camera's ceiling always.
+ * @param {number} total @param {number} widthCss
+ * @param {number} zoomNow - the camera's zoom now, a multiple of fit
+ * @returns {number} multiple of fit-to-width
+ */
+export function flightCapFor(total, widthCss, zoomNow) {
+  const tap = maxZoomFor(total, widthCss), deep = deepZoomFor(total, widthCss);
+  const z = zoomNow > tap ? zoomNow : tap;
+  return z < deep ? z : deep;
 }
 
 /**
@@ -170,23 +190,55 @@ export const STROKE_DEEP_CSS = 2.4;
 /** Narrowest stroke at depth, CSS px - the floor a 0.30-strength arc gets. */
 export const STROKE_MIN_CSS = 1.4;
 
+/** The overview's stroke, CSS px: ribbonStyle's at fit, and the hairline the span-ink law holds a
+ *  long thread to at every zoom (its votes widen it deep in, by STROKE_DEEP_CSS / STROKE_MIN_CSS at most). */
+export const STROKE_FIT_CSS = 0.9;
+
+/**
+ * The zoom over which the crowding divisor eases to 1 before the ceiling, in octaves (doublings) of
+ * zoom below PPV_MAX_CSS. At the ceiling every verse is 44 CSS px wide and the threads leaving it fan
+ * across that cell, so each anchored ribbon is drawn alone whatever the anchored count reads; the
+ * count does not know that. At Isaiah 53 it reads 0.372 a CSS px on PC (855x) and 0.343 on the phone
+ * (1536x), over DENSITY_K, which divided the ceiling's alpha by 1.42 / 1.36 to 0.63 / 0.66, under
+ * D1's 0.83. Two octaves: from 11 CSS px a verse (about 214x on PC, so the 209x frame is untouched)
+ * to 44.
+ */
+export const CEILING_EASE_OCTAVES = 2;
+
+/**
+ * How far the ceiling has taken the crowding divisor to 1: 0 below the last CEILING_EASE_OCTAVES
+ * octaves, 1 at PPV_MAX_CSS CSS px a verse (Z1: the ceiling is that on every frame), eased (C20).
+ * @param {number} ppvCss  CSS px a verse (the camera's ppv over the DPR); 0 or missing: 0
+ */
+export function ceilingEase(ppvCss) {
+  if (!(ppvCss > 0)) return 0;
+  const top = Math.log2(PPV_MAX_CSS);
+  return smoothstep(top - CEILING_EASE_OCTAVES, top, Math.log2(ppvCss));
+}
+
 /**
  * The alpha and stroke law, as ONE export both the screen and the probes
  * read. It used to live inline in ScriptureWebScreen's draw(), where no
  * harness could import it, so every instrument re-typed it and would have
  * silently measured the old law against a new screen.
  *
+ * D1 AT EVERY CEILING: the crowding divisor eases to 1 over the last
+ * CEILING_EASE_OCTAVES before PPV_MAX_CSS (ceilingEase), so an anchored
+ * ribbon reaches ALPHA_DEEP at the ceiling however crowded the chapter
+ * (Isaiah 53 read 0.63 / 0.66 there). The ease only lifts: it never dims a
+ * line. ppvCss is required, so no caller can drop the ease by leaving it out
+ * (typecheck refuses the call); pass 0 where there is no camera.
  *
  * @param {number} zoom - multiple of fit-to-width
  * @param {number} localize - localizeFactor()
- * @param {boolean} light - parchment theme
  * @param {number} anchoredPerCssPx - anchored arcs per CSS px of viewport width
+ * @param {number} ppvCss - CSS px a verse (the camera's ppv over the DPR), for the ceiling's ease
  * @returns {{alpha:number, strokeWidthCss:number, voteMix:number}}
  */
-export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
+export function ribbonStyle(zoom, localize, anchoredPerCssPx, ppvCss) {
   const l2 = Math.log2(zoom > 0 ? zoom : 1);
-  const alpha = Math.min(0.075 + l2 * 0.028, light ? 0.42 : 0.19);
-  const strokeWidthCss = Math.min(0.9 + l2 * 0.16, STROKE_DEEP_CSS);
+  const alpha = Math.min(0.075 + l2 * 0.028, 0.19);
+  const strokeWidthCss = Math.min(STROKE_FIT_CSS + l2 * 0.16, STROKE_DEEP_CSS);
   const t = smoothstep(0.55, 1, localize);
   if (!(t > 0)) return { alpha, strokeWidthCss, voteMix: 0 };
   // Crowding, not zoom, is what decides whether the deep value washes: at the
@@ -194,7 +246,8 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
   // overlaps, so each ribbon is drawn alone and needs the full value; at 40x
   // there are thirty times as many and the same value would be a neon fog.
   const per = anchoredPerCssPx > 0 ? anchoredPerCssPx : 0;
-  const crowd = Math.max(1, Math.pow(per / DENSITY_K, DENSITY_EXP));
+  const crowded = Math.max(1, Math.pow(per / DENSITY_K, DENSITY_EXP));
+  const crowd = crowded + (1 - crowded) * ceilingEase(ppvCss);
   const deep = ALPHA_DEEP / crowd;
   return {
     alpha: alpha + (deep - alpha) * t,
@@ -203,84 +256,214 @@ export function ribbonStyle(zoom, localize, light, anchoredPerCssPx) {
   };
 }
 
+/** How far outside the viewport a thread's body still counts as in the frame,
+ *  device px: the tessellation reaches this far past each side and the top. */
+export const CLIP_MARGIN = 32;
+
 /**
- * The piece of an arc worth tessellating, in device px.
- *
- * At overview this is the whole arc, so the 1x frame cannot move. As the
- * reader localizes it closes onto the viewport, because a 440,000 px arc
- * spending 47 of its 48 segments off screen is what draws the visible piece
- * as one straight chord. Clipping changes only WHERE the samples land, never
- * the curve they land on.
- *
- * @param {number} x0 @param {number} x1 - feet, device px
- * @param {number} width - viewport width, device px
- * @param {number} localize - localizeFactor()
- * @returns {[number, number]} the parameter window, device px
+ * Farthest the drawn ribbon's centre may stray from the true curve, CSS px,
+ * at every zoom (E1). The samples are pushed out from the ellipse's centre
+ * (arcPush) so the chords straddle the curve, and the segment count is the
+ * fewest that keep both the pushed samples and the chords' middles inside
+ * this bound (frameSegments).
  */
-export function visibleWindow(x0, x1, width, localize) {
-  const lo = Math.min(x0, x1);
-  const hi = Math.max(x0, x1);
-  const a = lo + (Math.max(lo, -CLIP_MARGIN) - lo) * localize;
-  const b = hi + (Math.min(hi, width + CLIP_MARGIN) - hi) * localize;
-  return [a, b < a ? a : b];
+export const TESS_TOL_CSS = 0.25;
+/** Most segments one thread may take (a safety rail: the frame bounds the
+ *  count well under it, ~45 for a 1600 px frame at the overview). */
+export const TESS_CAP = 255;
+/** How far below the ruler's top a body still counts as in the frame, CSS px:
+ *  the scissor's own device px plus the widest ribbon's half and skirt. */
+export const FRAME_PAD_LOW_CSS = 3;
+
+/**
+ * The heights a thread's body must reach to touch the frame, device px above
+ * its baseline as drawn (base + camY): from the ruler's top (the scissor at
+ * base, less FRAME_PAD_LOW_CSS) up to the frame's top (plus CLIP_MARGIN).
+ * @param {number} base - the frame's baseline row, device px
+ * @param {number} camY - the camera's height, device px (0 at the baseline)
+ * @param {number} dpr
+ * @param {number[] | Float64Array} [out] - receives [hLo, hHi] (a fresh array when not given)
+ * @returns {number[] | Float64Array} [hLo, hHi]
+ */
+export function frameHeights(base, camY, dpr, out) {
+  const y = camY > 0 ? camY : 0;
+  const o = out || [0, 0];
+  o[0] = y - FRAME_PAD_LOW_CSS * (dpr > 0 ? dpr : 1);
+  o[1] = base + y + CLIP_MARGIN;
+  return o;
 }
 
-/** How far outside the viewport the tessellation window still reaches. */
-export const CLIP_MARGIN = 32;
-/**
- * Most segments one draw may use. It binds only on wide frames: phoneLand at
- * its ceiling asks for 68. At 96 the desktop ceiling still drew a 24.4 CSS px
- * segment against S3's 24, so the cap was what missed the target, not the law.
- */
-export const SEGMENT_CAP = 128;
-
-/** Farthest a drawn chord may stray from the true curve, CSS px. */
-export const CHORD_TOL_CSS = 0.5;
-
-/** Longest on-screen straight segment we aim for, CSS px. */
-export const SEGMENT_TARGET_CSS = 16;
+const HALF_PI = Math.PI / 2;
 
 /**
- * Segments to tessellate one draw range with: enough that no on-screen
- * piece of any arc in the range shows a chord. At overview it is the
- * asset's own count, so the 1x frame cannot move. Localized, the parameter
- * runs over the piece the window holds (visibleWindow) and two rules bound
- * the count. (1) LENGTH: no on-screen segment longer than
- * SEGMENT_TARGET_CSS over what the frame can hold of an arc - the window's
- * width plus a leg's height at each end. (2) CURVATURE: sampling uniformly
- * in the parameter, a step of dTau strays at most max(R, A) dTau^2 / 8
- * from its chord; over a window narrower than the arc the parameter range
- * shrinks as the arc widens (acos(1 - w/r) past r = w/2), so the bound is
- * the arc the window just holds, pi sqrt(max(1, squash) w / (16 tol)),
- * whatever the range's widest span. A leg steeper than the frame is
- * straight to within a pixel and needs nothing more.
+ * THE PIECE OF A THREAD THE FRAME SHOWS (E1): its parameter interval
+ * [out[0], out[1]] (0..pi, the ellipse's angle from the left foot, as
+ * arcPointAt reads it), or false when no part of its body touches the frame.
  *
- * @param {number} bucketSegments - the asset's own per-bucket count
- * @param {number} localize - localizeFactor()
- * @param {number} maxRx - largest half-span in the range, device px
- * @param {number} ceil - usable height above the baseline, device px
+ * The frame is x in [-CLIP_MARGIN, width + CLIP_MARGIN] and a height in
+ * [hLo, hHi] (frameHeights). The x window cuts the parameter at the window's
+ * edges; the heights cut each leg: the left leg runs [td, tc] and the right
+ * [pi - tc, pi - td], where sin(tc) = hHi / A and sin(td) = hLo / A (the
+ * whole arch when it is lower than the frame's top; from the foot when the
+ * baseline is in the frame). The interval is the hull of the two legs' cut
+ * pieces: a thread whose crown climbs past the frame's top with both legs in
+ * it is sampled across its crown too, which costs segments and never draws
+ * anything wrong. This is the height-aware cull: a thread whose span crosses
+ * the frame while its body passes far above or below it is not drawn,
+ * counted, labelled or picked, because nothing of it is there to see.
+ *
+ * Every parameter comes from 2 asin(sqrt(u / 2)), the stable form of
+ * acos(1 - u) (arcTauOf), which loses the small angles a foot needs to
+ * float32 at the ceiling. MUST stay identical to arcFrameTau in
+ * arcFrameGLSL below.
+ *
+ * @param {number} x0 @param {number} x1 - the feet, device px (footX), x0 left
  * @param {number} width - viewport width, device px
- * @param {number} dpr - device pixel ratio, so the targets are in CSS px
+ * @param {number} A - apex height (arcShape)
+ * @param {number} hLo @param {number} hHi - frameHeights()
+ * @param {number[] | Float64Array} out - receives the interval
+ * @returns {boolean}
+ */
+export function arcFrameTau(x0, x1, width, A, hLo, hHi, out) {
+  const r = (x1 - x0) * 0.5;
+  const m = CLIP_MARGIN;
+  if (!(r > 0) || x1 < -m || x0 > width + m || !(A > 0) || hLo > A || hHi < 0) return false;
+  // the whole arch in the frame (every overview thread): what the cuts below give, without them
+  if (x0 >= -m && x1 <= width + m && A <= hHi && hLo <= 0) { out[0] = 0; out[1] = Math.PI; return true; }
+  // THE VERSE ZOOM'S FEET (sweb-z1): a foot inside the window is its end of the curve exactly (0 or
+  // pi), and a cut is read from the foot on its own side of the crown (ua + ua1 = 1, ub + ub1 = 1,
+  // each share computed from its own foot), so no parameter near a foot is asin of a share near 0 or 1.
+  // A GPU's asin is not exact there: about 1e-4 of the parameter, 2 px at 44 CSS px a verse and
+  // hundreds deep in, where the legs stood off the baseline with their feet cut away.
+  const ua = (-m - x0) / (2 * r), ua1 = (x1 + m) / (2 * r);
+  const ub = (x1 - width - m) / (2 * r), ub1 = (width + m - x0) / (2 * r);
+  const ta = ua <= 0 ? 0 : (ua <= ua1 ? 2 * Math.asin(Math.sqrt(ua)) : Math.PI - 2 * Math.asin(Math.sqrt(ua1)));
+  const tb = ub <= 0 ? Math.PI : (ub <= ub1 ? Math.PI - 2 * Math.asin(Math.sqrt(ub)) : 2 * Math.asin(Math.sqrt(ub1)));
+  const tc = hHi >= A ? HALF_PI : Math.asin(hHi / A);
+  const td = hLo > 0 ? Math.asin(hLo / A) : 0;
+  const l0 = ta > td ? ta : td, l1 = tb < tc ? tb : tc;
+  const r0 = ta > Math.PI - tc ? ta : Math.PI - tc, r1 = tb < Math.PI - td ? tb : Math.PI - td;
+  const left = l1 >= l0, right = r1 >= r0;
+  if (!left && !right) return false;
+  out[0] = left ? l0 : r0;
+  out[1] = right ? r1 : l1;
+  return true;
+}
+
+/**
+ * Segments for one thread's piece in the frame (E1): chosen by its own
+ * on-screen size at every zoom, so no drawn point strays more than
+ * TESS_TOL_CSS from the true curve. Exact, not a small-angle estimate: the
+ * half-ellipse is the affine image of a half-circle, which keeps chords,
+ * midpoints and parallel tangents, so a step dTau in its parameter strays
+ * from its chord by (1 - cos(dTau / 2)) times the centre's distance to the
+ * tangent there, r A / |r'| <= max(r, A). Pushing every sample out from the
+ * centre by arcPush(dTau) = tan^2(dTau / 4) of its own distance puts the
+ * samples outside and the chords' middles inside by the same amount, at
+ * most tan^2(dTau / 4) max(r, A); so dTau = 4 atan(sqrt(tol / max(r, A))).
+ * The S3 sweep in depth.test.js measures it against an independent
+ * point-to-ellipse oracle. A thread smaller than the tolerance takes one
+ * segment.
+ * @param {number} t0 @param {number} t1 - arcFrameTau's interval
+ * @param {number} r - half the span on screen, device px
+ * @param {number} A - apex height, device px
+ * @param {number} dpr
+ * @returns {number} 1..TESS_CAP
+ */
+export function frameSegments(t0, t1, r, A, dpr) {
+  const m = r > A ? r : A;
+  if (!(m > 0)) return 1;
+  const tol = TESS_TOL_CSS * (dpr > 0 ? dpr : 1);
+  const n = Math.ceil((t1 - t0) / (4 * Math.atan(Math.sqrt(tol / m))));
+  return n < 1 ? 1 : (n > TESS_CAP ? TESS_CAP : n);
+}
+
+/**
+ * How far a sample is pushed out from the ellipse's centre, as a share of
+ * its own distance from it: tan^2(dTau / 4) for a parameter step dTau, so
+ * each chord straddles the curve instead of cutting inside it
+ * (frameSegments has the derivation). MUST stay identical to arcPush in
+ * arcFrameGLSL below.
+ * @param {number} dTau
+ */
+export function arcPush(dTau) {
+  const t = Math.tan(dTau * 0.25);
+  return t * t;
+}
+
+/**
+ * The same two laws as GLSL ES 3.00, for the main pass's vertex stage
+ * (web-renderer.js) to inline; web-renderer.test.js asserts it does, and
+ * structure-law.test.js transliterates this text and runs it against the JS.
+ */
+export const arcFrameGLSL = `
+vec2 arcFrameTau(float x0, float x1, float width, float A, float hLo, float hHi){
+  float r = (x1 - x0)*.5;
+  float m = ${glslFloat(CLIP_MARGIN)};
+  if (r <= 0. || x1 < -m || x0 > width + m || A <= 0. || hLo > A || hHi < 0.) return vec2(1., 0.);
+  if (x0 >= -m && x1 <= width + m && A <= hHi && hLo <= 0.) return vec2(0., ${glslFloat(Math.PI)});
+  float ua = (-m - x0)/(2.*r), ua1 = (x1 + m)/(2.*r);
+  float ub = (x1 - width - m)/(2.*r), ub1 = (width + m - x0)/(2.*r);
+  float ta = ua <= 0. ? 0. : (ua <= ua1 ? 2.*asin(sqrt(ua)) : ${glslFloat(Math.PI)} - 2.*asin(sqrt(ua1)));
+  float tb = ub <= 0. ? ${glslFloat(Math.PI)} : (ub <= ub1 ? ${glslFloat(Math.PI)} - 2.*asin(sqrt(ub)) : 2.*asin(sqrt(ub1)));
+  float tc = hHi >= A ? ${glslFloat(HALF_PI)} : asin(hHi/A);
+  float td = hLo > 0. ? asin(hLo/A) : 0.;
+  float l0 = max(ta, td), l1 = min(tb, tc);
+  float r0 = max(ta, ${glslFloat(Math.PI)} - tc), r1 = min(tb, ${glslFloat(Math.PI)} - td);
+  bool left = l1 >= l0, right = r1 >= r0;
+  if (!left && !right) return vec2(1., 0.);
+  return vec2(left ? l0 : r0, right ? r1 : l1);
+}
+float arcPush(float dTau){
+  float t = tan(dTau*.25);
+  return t*t;
+}`;
+/** The top pass's chord tolerance, CSS px: the chosen line is 3 px of gold
+ *  under a soft halo, and a 0.5 px chord reads on it as a facet. */
+export const TOP_CHORD_TOL_CSS = 0.1;
+/** The top pass's longest segment, CSS px, over the parameter's widest step. */
+export const TOP_SEGMENT_CSS = 10;
+/** The top pass's fewest segments for a thread on screen. */
+export const TOP_SEGMENT_MIN = 16;
+
+/**
+ * Segments for ONE thread in the top pass (web-renderer.js: the chosen,
+ * hovered and lit lines, the prophecy class), so its visible piece shows no
+ * facet. The top pass always clips the parameter to the window's x range
+ * and samples it uniformly; two bounds, the larger wins, then the cap:
+ *   BEND: a parameter step dTau strays at most max(R, A) dTau^2 / 8 from its
+ *     chord, so the window's parameter span over sqrt(8 tol / max(R, A));
+ *   LENGTH: the curve's speed is at most max(R, A) per unit of parameter, so
+ *     the span times that over TOP_SEGMENT_CSS.
+ * A caller drawing several threads in one draw takes the largest (the
+ * renderer caps a set: 512 for the one chosen or hovered line, less for a
+ * set). A thread with nothing in the window gets TOP_SEGMENT_MIN.
+ *
+ * @param {number} x0 @param {number} x1 - the feet, device px (footX)
+ * @param {number} width - viewport width, device px
  * @param {number} squash - squashFactor()
+ * @param {number} dpr - device px per CSS px
+ * @param {number} cap - most segments
  * @returns {number}
  */
-export function segmentsFor(bucketSegments, localize, maxRx, ceil, width, dpr, squash) {
-  const base = bucketSegments > 0 ? bucketSegments : 8;
-  if (!(localize > 0)) return base;
+export function topSegmentsFor(x0, x1, width, squash, dpr, cap) {
   const d = dpr > 0 ? dpr : 1;
-  const r = maxRx > 0 ? maxRx : 0;
-  const s = squash > 0 ? squash : 1;
-  const win = width + 2 * CLIP_MARGIN;
-  const leg = Math.min(ceil, r * s);
-  const byLength = Math.ceil((Math.min(2 * r, win) + 2 * leg) / d / SEGMENT_TARGET_CSS);
-  const tol = CHORD_TOL_CSS * d;
-  const rEff = Math.min(r, win / 2);
-  const byCurve = Math.ceil(Math.PI * Math.sqrt((Math.max(1, s) * rEff) / (8 * tol)));
-  const want = byLength > byCurve ? byLength : byCurve;
-  const capped = want < 8 ? 8 : (want > SEGMENT_CAP ? SEGMENT_CAP : want);
-  const n = Math.round(base + (capped - base) * localize);
-  return n < 8 ? 8 : n;
+  const left = Math.min(x0, x1), right = Math.max(x0, x1);
+  const rx = (right - left) / 2;
+  const top = cap > TOP_SEGMENT_MIN ? cap : TOP_SEGMENT_MIN;
+  if (!(rx > 0)) return TOP_SEGMENT_MIN;
+  const lo = Math.max(left, -CLIP_MARGIN), hi = Math.min(right, width + CLIP_MARGIN);
+  if (!(hi > lo)) return TOP_SEGMENT_MIN;
+  // arcShape(rx, squash) inline, so a frame's top pass allocates nothing
+  const R = rx, A = rx * (squash > 0 ? squash : 1);
+  const span = arcTauOf(hi, left, right) - arcTauOf(lo, left, right);
+  const bound = Math.max(R, A, 1);
+  const byBend = span * Math.sqrt(bound / (8 * TOP_CHORD_TOL_CSS * d));
+  const byLength = (span * bound) / (TOP_SEGMENT_CSS * d);
+  const want = Math.ceil(byBend > byLength ? byBend : byLength);
+  return want < TOP_SEGMENT_MIN ? TOP_SEGMENT_MIN : (want > top ? top : want);
 }
+
 /**
  * THE drawn curve of a thread, as two radii: R, the horizontal radius (half
  * its span on screen) and A, its apex height, R x squash. The half-ellipse
@@ -307,7 +490,10 @@ export function arcShape(rx, squash) {
 export function arcTauOf(x, left, right) {
   const rx = (right - left) / 2;
   if (!(rx > 0)) return 0;
-  return Math.acos(clamp1(1 - (x - left) / rx));
+  // acos(1 - 2 s) as 2 asin(sqrt(s)), s read from the nearer foot and a foot exact (the verse zoom:
+  // a GPU's acos near 1 cut the chosen leg's foot away at million-px radii, as arcFrameTau's asin did)
+  const sl = (x - left) / (2 * rx), sr = (right - x) / (2 * rx);
+  return sl <= 0 ? 0 : (sr <= 0 ? Math.PI : (sl <= sr ? 2 * Math.asin(Math.sqrt(sl)) : Math.PI - 2 * Math.asin(Math.sqrt(sr))));
 }
 
 /**
@@ -348,7 +534,7 @@ function clamp1(v) { return v < -1 ? -1 : (v > 1 ? 1 : v); }
  *
  * GLSL ES 3.00 has no int->float conversion, so `${X}` with X = 1 emits
  * `float f = 1;` and the shader fails to compile. Measured by the Verifier
- * through the real compiler (ANGLE): FLYOVER_FLOOR = 0.35 links; = 1 fails
+ * through the real compiler (ANGLE): the retired FLYOVER_FLOOR = 0.35 linked; = 1 failed
  * with "cannot convert from 'const int' to 'highp float'"; and = 1.0 fails
  * IDENTICALLY, because String(1.0) is '1'. The value's own spelling cannot
  * be trusted, so the literal is formatted here. A `${X}.` suffix is the same
@@ -379,7 +565,8 @@ vec2 arcShape(float rx, float squash){
 float arcTau(float x, float left, float right){
   float rx = (right - left)*.5;
   if (rx <= 0.) return 0.;
-  return acos(clamp(1. - (x - left)/rx, -1., 1.));
+  float sl = (x - left)/(2.*rx), sr = (right - x)/(2.*rx);
+  return sl <= 0. ? 0. : (sr <= 0. ? ${glslFloat(Math.PI)} : (sl <= sr ? 2.*asin(sqrt(sl)) : ${glslFloat(Math.PI)} - 2.*asin(sqrt(sr))));
 }
 void arcAt(float tau, float left, float right, float A, out float x, out float h, out vec2 tg){
   float r = max((right - left)*.5, 0.);
@@ -392,27 +579,6 @@ void arcAt(float tau, float left, float right, float A, out float x, out float h
  * its arc to the passage on screen. Device px, matching uRes.x's frame.
  */
 export const FLYOVER_MARGIN = 24;
-
-/**
- * The alpha a fly-over settles at once the reader has localized. NEVER ZERO.
- *
- * It used to fall from 0.10 to exactly 0 at full depth, so that hundreds of
- * long arcs' flattened apexes stopped smearing the view -- and the owner met
- * the other face of that law: "what you're trying to zoom into and tap
- * disappears as you get closer" (2026-09-10). Zooming into a line's middle is
- * exactly what carries both its feet out of the frame, so the line being
- * chased became a fly-over and vanished on arrival. The owner's rule: a line
- * crossing the viewport must not vanish as zoom increases.
- *
- * 0.35 is a first setting, not a measured optimum: visibly present and
- * tappable on a thin line over black, still clearly below an anchored arc so
- * the clutter case survives in a weaker form. design-perf tunes it with the
- * S-metrics they already hold. The literal rule ("never decrease with zoom")
- * is satisfiable only by deleting fly-over dimming altogether, because zoom is
- * what turns an anchored arc into a fly-over; this keeps the dimming and bans
- * the disappearance.
- */
-export const FLYOVER_FLOOR = 0.35;
 
 /**
  * 1 when either foot of an arc is within `margin` of the viewport, else 0.
@@ -431,20 +597,24 @@ export function arcAnchored(x0, x1, width, margin = FLYOVER_MARGIN) {
 }
 
 /**
- * The alpha multiplier the shader applies to a fly-over: 1 while the reader
- * is at overview, falling to FLYOVER_FLOOR as they localize, and NO FURTHER.
- * It no longer reaches 0 -- see FLYOVER_FLOOR for why -- so the shader's
- * `dim <= 0` cull is never fed by this law, and every fly-over stays
- * pickable at its on-screen midpoint.
+ * The width multiplier the shader applies to a fly-over (Q3 ii): 1 while the
+ * reader is at the overview, easing to `leg` (sw-ink FLYOVER_LEG_WIDTH, 0.7)
+ * for a thread with neither foot near the viewport as they localize. Its
+ * ALPHA is left alone: the old law faded fly-overs to a floor, and a line
+ * zoomed into the middle of (both feet carried off screen) is exactly the
+ * line the reader is chasing. Thinner legs let the anchored weave read
+ * without taking any line away. `leg` is a parameter, not an import, so this
+ * module stays free of the ink table (sw-ink.js imports glslFloat from here).
  *
- * MUST stay identical to flyOverGLSL below and to the shader that inlines it.
+ * MUST stay identical to flyOverWidth in flyOverGLSL below.
  *
- * @param {number} anchored — arcAnchored(), 0 or 1
- * @param {number} localize — localizeFactor()
+ * @param {number} anchored - arcAnchored(), 0 or 1
+ * @param {number} localize - the fly-over's localize (skyLocalize)
+ * @param {number} leg - the fly-over's share of its width, 0..1
  */
-export function flyOverDim(anchored, localize) {
-  const floored = FLYOVER_FLOOR + (1 - FLYOVER_FLOOR) * anchored;
-  return 1 + (floored - 1) * localize;
+export function flyOverWidth(anchored, localize, leg) {
+  const target = leg + (1 - leg) * anchored;
+  return 1 + (target - 1) * localize;
 }
 
 /** GLSL's smoothstep, for the two laws that must mirror the shader exactly. */
@@ -464,9 +634,114 @@ float arcAnchored(float x0, float x1, float width){
   return max(step(-m, x0)*step(x0, width + m),
              step(-m, x1)*step(x1, width + m));
 }
-float flyOverDim(float anchored, float localize){
-  float flyFloor = ${glslFloat(FLYOVER_FLOOR)};
-  return mix(1., mix(flyFloor, 1., anchored), localize);
+float flyOverWidth(float anchored, float localize, float leg){
+  return mix(1., mix(leg, 1., anchored), localize);
+}`;
+
+/* ── THE SPAN-INK LAW (w4 INK, item 2) ─────────────────────────────────────
+   Q3 (ii): short spans read first. The r2-01a picture pools its violet at the
+   feet and the r3-03 picture keeps vivid local domes deep in, with the long
+   threads' legs thin coloured lines through them; the stroke law alone drew
+   every thread alike, so the many long legs out-inked the short arcs they
+   cross. The weight is a constant of the arc (its span), never of the zoom
+   (C14, dead end 3), and nothing is hidden or capped in height (C18). */
+
+/** The distance ramp's exponent: a span's t is pow(span / total, SPAN_T_EXP), the shader's colour input. */
+export const SPAN_T_EXP = 0.40;
+/** The ramp's t over which a thread eases from short (1) to long (0): about 10 verses to 56, the
+ *  local domes of a chapter-deep frame (r3-03). Wider (.25, .30) was tried on the w4 review's ask
+ *  and refused by the pair: at 209x the 300 to 1,500-verse threads are the big arcs over the
+ *  frame, and inked up they laid a violet mesh over the local domes (upper field lit 55% -> 59%
+ *  PC, 63% -> 70% phone) for a feet band that barely moved (magenta-violet 9% -> 13%). The w4
+ *  review 2 narrowed it from .16 (about 318 verses) to .08: the 56 to 318-verse arcs were still that
+ *  mesh at 2-4x ink, and held to the hairline they let the domes and the long legs' warm and green
+ *  read (209x: magenta-violet 67% -> 53% of the lit field, warm 7% -> 10%; go-to 53% -> 43%), with
+ *  the overview's feet and baseline glow unchanged (74%, the same lit count; w4/ink pairs.md).
+ *  The plateau holds full ink to about 65 verses (two or three chapters) and eases to none by about
+ *  111, so the chapter arches a 209x frame holds read in front of the long legs (the deep frame's
+ *  curtain); the centre chapter's lift keeps the old 10 to 56-verse reach (CENTRE_T0 / CENTRE_T1). */
+export const SHORT_T0 = 0.085;
+export const SHORT_T1 = 0.105;
+/** The ramp's t over which the centre chapter's lift (web-frame.centreEmphasis) eases out: about 10
+ *  verses to 56, the w4 reach, so a 1-4 chapter arch is inked like any other and not lifted past it. */
+export const CENTRE_T0 = 0.04;
+export const CENTRE_T1 = 0.08;
+/** The shortest spans' extra ink: their alpha times 1 + SHORT_GAIN, clamped to full ink. */
+export const SHORT_GAIN = 4;
+
+/**
+ * A span's place on the distance ramp, 0..1: the t the shader colours it by.
+ * MUST stay identical to spanT in spanInkGLSL below (span-ink.test.js runs the twin).
+ * @param {number} span  to - from, verses (either sign)
+ * @param {number} total  verses in the canon
+ */
+export function spanT(span, total) {
+  return Math.pow(Math.abs(span) / total, SPAN_T_EXP);
+}
+
+/** How short a thread is, 1 (up to ~65 verses) .. 0 (~111 and more), eased (C20). @param {number} t spanT */
+export function spanShortness(t) {
+  return 1 - smoothstep(SHORT_T0, SHORT_T1, t);
+}
+
+/** The centre chapter's lift by span, 1 (up to ~10 verses) .. 0 (~56 and more). @param {number} t spanT */
+export function centreShortness(t) {
+  return 1 - smoothstep(CENTRE_T0, CENTRE_T1, t);
+}
+
+/** The alpha multiplier of a thread that short: 1 + SHORT_GAIN at the shortest, 1 for a long one. */
+export function spanGain(shortness) {
+  return 1 + SHORT_GAIN * shortness;
+}
+
+/** The narrowest half width the span-ink law holds a long thread to, device px: one whole device px
+ *  of line. Under it the shader's thin-line hygiene pays the lost width in alpha, and at the ceiling
+ *  that took a lone low-vote leg on a DPR 1 screen under D1's 0.83 (0.85 x 0.9 = 0.765). */
+export const HAIRLINE_MIN_HALF = 0.5;
+
+/**
+ * The half width a long thread is held to: the overview's hairline (widthFit = STROKE_FIT_CSS
+ * device px a CSS px), widened by the share of the deep stroke its votes earned (wScale over the
+ * lowest vote's, at the voteMix the stroke law has reached), so the lowest-vote leg keeps the
+ * overview's hairline at every zoom and the best-voted at most STROKE_DEEP / STROKE_MIN of it;
+ * never under one device px (HAIRLINE_MIN_HALF), so a held leg is always drawn whole (D1).
+ * @param {number} widthFit  STROKE_FIT_CSS x dpr, device px
+ * @param {number} wScale  the main pass's vote width share (1 at the overview)
+ * @param {number} voteMix  ribbonStyle's voteMix
+ */
+export function spanFitHalf(widthFit, wScale, voteMix) {
+  const fit = (widthFit * 0.5 * wScale) / (1 + (STROKE_MIN_CSS / STROKE_DEEP_CSS - 1) * voteMix);
+  return fit > HAIRLINE_MIN_HALF ? fit : HAIRLINE_MIN_HALF;
+}
+
+/**
+ * A thread's half width under the law: a short one keeps the stroke law's (halfW), a long one is
+ * held to fitHalf, eased between by its shortness. Never wider than halfW.
+ */
+export function spanHalfWidth(halfW, fitHalf, shortness) {
+  const held = halfW < fitHalf ? halfW : fitHalf;
+  return held + (halfW - held) * shortness;
+}
+
+/** The same six functions as GLSL ES 3.00, for the vertex shader to inline. */
+export const spanInkGLSL = `
+float spanT(float span, float total){
+  return pow(abs(span)/total, ${glslFloat(SPAN_T_EXP)});
+}
+float spanShortness(float t){
+  return 1. - smoothstep(${glslFloat(SHORT_T0)}, ${glslFloat(SHORT_T1)}, t);
+}
+float centreShortness(float t){
+  return 1. - smoothstep(${glslFloat(CENTRE_T0)}, ${glslFloat(CENTRE_T1)}, t);
+}
+float spanGain(float shortness){
+  return 1. + ${glslFloat(SHORT_GAIN)}*shortness;
+}
+float spanFitHalf(float widthFit, float wScale, float voteMix){
+  return max(widthFit*.5*wScale/mix(1., ${glslFloat(STROKE_MIN_CSS / STROKE_DEEP_CSS)}, voteMix), ${glslFloat(HAIRLINE_MIN_HALF)});
+}
+float spanHalfWidth(float halfW, float fitHalf, float shortness){
+  return mix(min(halfW, fitHalf), halfW, shortness);
 }`;
 
 /**
@@ -544,8 +819,8 @@ export function apexMaxPx(cam, yf) {
  * THE SKY (structure-law.md, landing 9). As the reader rises off the
  * baseline, the fly-over law lets go: a thread whose feet are both out of
  * frame is what the sky is made of, so at the ceiling's height it keeps its
- * full alpha. Linear in the camera's height over the frame's ceiling; only
- * the fly-over dim reads this - the clip of the samples onto the viewport
+ * full width. Linear in the camera's height over the frame's ceiling; only
+ * the fly-over leg reads this - the clip of the samples onto the viewport
  * and the ribbon's alpha law keep the zoom's own localize, or the sky would
  * draw a visible piece as one chord.
  * @param {number} localize - localizeFactor(zoom)
@@ -593,23 +868,49 @@ export function maxCamY(cam, yf) {
 }
 
 /**
+ * How far inside the canvas area's edges the canon's first and last verses may stand while the
+ * panel is docked, a fraction of the area's width: connectionFrame's 10 % side margin, so a thread
+ * whose foot is at either end of the canon frames as any other does.
+ */
+export const END_MARGIN = 0.1;
+
+/**
  * Clamp zoom into [fit, maxZoom×fit], pan so the canon can't leave the
  * viewport, and hold y inside [0, maxCamY] — or at 0 when the caller has no
  * y frame. Mutates in place — this runs per gesture frame.
+ *
+ * `right` is what the docked panel covers on the view's right, device px (the
+ * w3 review's major finding: with the view's own edges as the bound, the
+ * canon's last right / ppv verses could never stand in the canvas area the
+ * panel leaves). It is slack on the canon's END bound: the camera may
+ * move on until the canon's last verse stands the area's outer tenth
+ * (END_MARGIN) inside the canvas area's right edge, so the area, not the
+ * view, is what holds the canon there, with the margin connectionFrame
+ * leaves either side of a thread's feet (the w4 phone review's major
+ * finding: stopped AT the edge, Revelation 22:16's foot stood on the panel's
+ * border). The start takes the same outer tenth inside the view's left
+ * edge, which the panel never covers (round 2: Genesis 1:1's foot stood
+ * against the screen's edge, its dot clipped). At fit that lets the
+ * overview slide left by the panel's width and the margin, or right by the
+ * margin. 0 (the default) is the view's own bound, as before.
  *
  * @param {{x:number, y?:number, ppv:number, total:number}} cam
  * @param {number} width — viewport width, device px
  * @param {number} maxZoom — multiple of fit
  * @param {YFrame} [yf] - absent: a 1-D camera
+ * @param {number} [right] - device px the panel covers on the right (0: none)
  */
-export function clampCamera(cam, width, maxZoom, yf) {
+export function clampCamera(cam, width, maxZoom, yf, right) {
   const min = fitPPV(cam, width);
   const max = min * (maxZoom || 5000);
   if (!(cam.ppv > 0)) cam.ppv = min;
   cam.ppv = Math.min(Math.max(cam.ppv, min), max);
   const half = width / cam.ppv / 2;
-  cam.x = (half * 2 >= cam.total) ? cam.total / 2
-    : Math.min(Math.max(cam.x, half), cam.total - half);
+  const margin = right > 0 ? END_MARGIN * Math.max(0, width - right) / cam.ppv : 0;
+  const slack = right > 0 ? right / cam.ppv + margin : 0;
+  const lo = Math.min(half, cam.total / 2) - margin;
+  const hi = Math.max(cam.total - half, cam.total / 2) + slack;
+  cam.x = Math.min(Math.max(cam.x, lo), hi);
   const top = yf ? maxCamY(cam, yf) : 0;
   cam.y = !(cam.y > 0) ? 0 : (cam.y > top ? top : cam.y);
   return cam;
@@ -666,8 +967,9 @@ export function rotatePointer(clientX, clientY, physicalWidth) {
  * @param {number} factor — multiplicative zoom (>1 zooms in)
  * @param {YFrame} [yf] - the y frame, when the camera has one
  * @param {number} [anchorY] - device px from the frame's top to hold still, in the sky
+ * @param {number} [right] - the panel's slack, device px (clampCamera)
  */
-export function zoomAbout(cam, width, anchorX, factor, maxZoom, yf, anchorY) {
+export function zoomAbout(cam, width, anchorX, factor, maxZoom, yf, anchorY, right) {
   const verse = xToVerse(cam, width, anchorX);
   const min = fitPPV(cam, width);
   const max = min * (maxZoom || 5000);
@@ -678,7 +980,7 @@ export function zoomAbout(cam, width, anchorX, factor, maxZoom, yf, anchorY) {
   if (yf && y0 > 0 && typeof anchorY === 'number') {
     cam.y = (ppv1 / ppv0) * (yf.base + y0 - anchorY) + anchorY - yf.base;
   }
-  clampCamera(cam, width, maxZoom, yf);
+  clampCamera(cam, width, maxZoom, yf, right);
   cam.x = verse - (anchorX - width / 2) / cam.ppv;
-  return clampCamera(cam, width, maxZoom, yf);
+  return clampCamera(cam, width, maxZoom, yf, right);
 }

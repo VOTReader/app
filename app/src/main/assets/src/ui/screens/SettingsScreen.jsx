@@ -1082,9 +1082,11 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             {/* Named for what it does, not its shape (2026-09-10): the marker was a pulsing dot,
                 then a bookmark ribbon, now text lines with a pointer (w-marker-icon); the row, the
                 control's accessible name and the tour's settings stop all say "Reading Position Marker". */}
+            {/* A place opened from a search is a look until the reader reads it: their own scroll, or a
+                stay of SEARCH_LOOK_MS, 8 s (utils/search-visit.js; search200 UX D7). */}
             <SettingsRow
               label="Reading Position Marker"
-              desc="Shows where you left off reading, in the top bar; tap it to go back. It follows you the moment you open any chapter or letter."
+              desc="Shows where you left off reading, in the top bar; tap it to go back. It moves to each chapter or letter you open. One opened from a search is just a look until you read it: scroll it yourself, or stay on it 8 seconds."
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />

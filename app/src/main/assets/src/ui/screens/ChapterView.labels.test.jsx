@@ -15,7 +15,7 @@
 */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import { ChapterView } from './ChapterView.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 
@@ -111,5 +111,18 @@ describe('ChapterView — every label follows the book it was handed', () => {
     renderCh(book({ id: 'mark', title: 'Mark' }));
     const back = document.querySelector('.nav-back-icon');
     expect(back.getAttribute('aria-label')).toBe('Back to Mark');
+  });
+});
+
+/* search200 UX B1: navBack from a search hit — see LetterView.labels.test.jsx. */
+describe('ChapterView — the ‹ goes back to the results from a search hit (search200 UX B1)', () => {
+  it('names the results and goes there, not to the book index', () => {
+    let idx = 0, results = 0;
+    renderCh(book(), 2, { onIndex: () => { idx++; }, navBack: { onBack: () => { results++; }, label: 'results' } });
+    const back = document.querySelector('.nav-back-icon');
+    expect(back.getAttribute('aria-label')).toBe('Back to results');
+    fireEvent.click(back);
+    expect(results).toBe(1);
+    expect(idx).toBe(0);
   });
 });
