@@ -699,6 +699,47 @@ export function captureTargetEl() {
   return document.getElementById('root') || document.body;
 }
 
+/**
+ * Hide, in html2canvas's CLONE, every in-flow block that lies wholly off the
+ * screen (pf1, 2026-10-22). A thumbnail shows one screen of a reader, but
+ * html2canvas parses the whole cloned tree and measures every word (every
+ * character, with the letter-spacing nudge below) before it paints; a long
+ * letter's offscreen text was most of a capture: 1.19 s of a 1.2 s render on
+ * the S22 for a 20k-character letter, 0.49 s with this, and the same picture.
+ * html2canvas never descends into a visibility:hidden element, and hidden
+ * keeps the layout box, so nothing moves and every scroll offset still holds.
+ * Walks down only through elements that reach the screen; positioned
+ * (absolute/fixed/sticky) elements are left alone.
+ *
+ * @param {Document} doc       - the cloned document (scroll already restored)
+ * @param {number} [margin]    - CSS px kept beyond each screen edge
+ * @returns {number} how many elements were hidden
+ */
+export function hideOffscreenInClone(doc, margin = 200) {
+  const view = doc && doc.defaultView;
+  if (!view || !doc.body) return 0;
+  const vh = view.innerHeight || 0;
+  if (vh <= 0) return 0;
+  let hidden = 0;
+  /** @param {Element} el */
+  const walk = (el) => {
+    for (const child of Array.from(el.children)) {
+      const r = child.getBoundingClientRect();
+      if (r.height > 0 && (r.bottom < -margin || r.top > vh + margin)) {
+        const pos = view.getComputedStyle(child).position;
+        if (pos === 'static' || pos === 'relative') {
+          /** @type {HTMLElement} */ (child).style.visibility = 'hidden';
+          hidden++;
+          continue;
+        }
+      }
+      if (child.children.length) walk(child);
+    }
+  };
+  walk(doc.body);
+  return hidden;
+}
+
 /** @type {Promise<any> | null} */
 let _h2cPromise = null;
 /**
@@ -791,6 +832,8 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
             clonedDoc.head.appendChild(st);
           }
         } catch (_e) { /* style injection failed — render proceeds as before */ }
+        // Offscreen text is never painted into the card; skip its measuring.
+        try { hideOffscreenInClone(clonedDoc); } catch (_e) { /* render the full clone */ }
         return undefined;
       },
       // PERF-1: capture at scale 1, NOT devicePixelRatio×2. The result is downscaled to
