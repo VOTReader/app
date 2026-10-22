@@ -284,7 +284,7 @@ describe('AnswersHome — A–Z (f05)', () => {
 
   /* The last letter is too short to reach the strip at the end of the list: the scroll reader saw V
      there and took the strip off the W just tapped. Geometry is stubbed: jsdom lays nothing out. */
-  it('a tapped last letter stays current while the list sits at its end', async () => {
+  it('a tapped last letter stays current through a long travel and at the end, until the reader moves the page', async () => {
     window.ScreenLayout = ({ navChildren, children }) => <div className="screen-scroll">{navChildren}{children}</div>;
     const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0; });
     const into = vi.fn();
@@ -306,17 +306,18 @@ describe('AnswersHome — A–Z (f05)', () => {
       const key = (L) => [...document.querySelectorAll('.ans-az-key')].find((k) => k.textContent === L);
       fireEvent.click(key('W'));
       expect(into).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
-      // Long after the jump's travel time: only being at the end keeps W.
-      const now = Date.now();
-      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 5000);
-      act(() => { scroller.dispatchEvent(new Event('scroll')); });
+      // The smooth travel from the top takes over a second (12k px on a phone); every frame of it, and the end, read W.
+      const t0 = Date.now();
+      const clock = vi.spyOn(Date, 'now');
+      for (const [t, ms] of [[1000, 400], [3000, 1300], [4200, 1700]]) { clock.mockReturnValue(t0 + ms); top = t; act(() => { scroller.dispatchEvent(new Event('scroll')); }); }
+      clock.mockRestore();
       expect(key('W').getAttribute('aria-current')).toBe('true');
       expect(key('V').getAttribute('aria-current')).toBeNull();
-      // Scrolled back up by hand, the page's own letter wins again.
+      // A finger on the page: its own letter wins again.
+      fireEvent.touchStart(scroller);
       top = 3000;
       act(() => { scroller.dispatchEvent(new Event('scroll')); });
       expect(key('V').getAttribute('aria-current')).toBe('true');
-      clock.mockRestore();
     } finally {
       raf.mockRestore();
       delete Element.prototype.scrollIntoView;

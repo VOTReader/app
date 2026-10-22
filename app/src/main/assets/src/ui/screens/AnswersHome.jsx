@@ -188,9 +188,9 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
   const [atEnd, setAtEnd] = React.useState(false);
   const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const stripRef = React.useRef(/** @type {HTMLElement | null} */ (null));
-  // A tapped key holds while the page travels to it, and while the page sits at its end: a last
-  // letter too short to reach the strip (W) would otherwise read as the one above it (V).
-  const pin = React.useRef(/** @type {{ L: string, t: number } | null} */ (null));
+  // A tapped key holds while the page travels to it and wherever that ends, until the reader moves the
+  // page: a last letter too short to reach the strip (W) would otherwise read as the one above it (V).
+  const pin = React.useRef(/** @type {string | null} */ (null));
   // The current letter only READS the page's scroll (no scrollTop is written here): the last
   // letter head at or above the strip's foot.
   React.useEffect(() => {
@@ -207,18 +207,20 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
         if (s.getBoundingClientRect().top <= line) now = s.getAttribute('data-az');
         else break;
       }
-      const p = pin.current;
-      if (p) {
-        const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
-        if (now === p.L) pin.current = null;
-        else if (atEnd || Date.now() - p.t < 1000) now = p.L;
-        else pin.current = null;
-      }
+      if (pin.current) now = pin.current;
       if (now) setCur(now);
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(read); };
+    // The reader's own hand on the page (a finger, the wheel, a key, the scrollbar) lets the page lead again.
+    const unpin = () => { pin.current = null; };
+    const MOVES = ['touchstart', 'wheel', 'pointerdown', 'keydown'];
     scroller.addEventListener('scroll', onScroll, { passive: true });
-    return () => { scroller.removeEventListener('scroll', onScroll); if (raf) cancelAnimationFrame(raf); };
+    for (const t of MOVES) scroller.addEventListener(t, unpin, { passive: true });
+    return () => {
+      scroller.removeEventListener('scroll', onScroll);
+      for (const t of MOVES) scroller.removeEventListener(t, unpin);
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
   // The strip keeps the current key in view by scrolling ITSELF sideways (its own scrollLeft).
   React.useEffect(() => {
@@ -238,7 +240,7 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
   const jump = (L) => {
     const el = rootRef.current && rootRef.current.querySelector(`section[data-az="${L}"]`);
     if (!el) return;
-    pin.current = { L, t: Date.now() };
+    pin.current = L;
     el.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
     setCur(L);
   };
