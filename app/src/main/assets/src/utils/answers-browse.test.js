@@ -198,6 +198,20 @@ describe('search words (f06)', () => {
       .toBe('6~of 46~categories~· False Doctrines index');
     expect(show(answersSearchSum({ matches: 73, groups: new Array(22) }))).toBe('In Answers~· 73~matches in 22~topics');
   });
+  it('only the False Doctrines index counts categories; other pages of prose count sections', () => {
+    // Regarding the Trinity and the Mormons page have no source lines either: they are not indexes.
+    expect(show(answersSearchSub(A, { entry: E('regarding-the-church-of-jesus-christ-of-latter-day-saints-mormons'), n: 1, total: 2, prose: true })))
+      .toBe('1~of 2~sections~· 4~· The churches');
+    // One section (or one passage) to the page: "1 of 1" says nothing, so it is a match.
+    expect(show(answersSearchSub(A, { entry: E('regarding-the-trinity'), n: 1, total: 1, prose: true })))
+      .toBe('1~match~· 5~· Scripture & doctrine');
+    expect(show(answersSearchSub(A, { entry: E('regarding-the-united-church-of-god'), n: 1, total: 1, prose: false })))
+      .toBe('1~match~· 4~· The churches');
+  });
+  it('a title-only result is not "0 matches"', () => {
+    expect(show(answersSearchSum({ matches: 0, groups: new Array(1) }))).toBe('In Answers~· 1~topic by its title');
+    expect(show(answersSearchSum({ matches: 0, groups: new Array(3) }))).toBe('In Answers~· 3~topics by their titles');
+  });
   it('a hit\'s source line: title, collection, date', () => {
     const e = E('god-speaks-about-the-sabbath');
     const src = e.paragraphs.findIndex((p) => String(p.text).startsWith('~ [From “You Shall Not Desecrate the Sabbath”'));

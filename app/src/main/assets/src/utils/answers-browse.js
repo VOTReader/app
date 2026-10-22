@@ -521,19 +521,25 @@ export function answersMediaSummary(idx) {
 
 /** "In Answers · 73 matches in 22 topics": the header is the sum of the groups under it. */
 export function answersSearchSum(r) {
-  return 'In Answers' + SEP + pl(r.matches, 'match') + ' in ' + pl(r.groups.length, 'topic');
+  const k = r.groups.length;
+  // Only titles hold the words ("main page"): "0 matches" would read as nothing found.
+  if (!r.matches) return 'In Answers' + SEP + pl(k, 'topic') + (k === 1 ? ' by its title' : ' by their titles');
+  return 'In Answers' + SEP + pl(r.matches, 'match') + ' in ' + pl(k, 'topic');
 }
 
 /**
  * A search group's sub: "18 of 19 passages · The Fourth Commandment", "6 of 46 categories · False
- * Doctrines index", or "Title match · Other Topics" when only the title holds the words.
+ * Doctrines index", "1 of 2 sections" on another page of prose, "1 match" on a page of one passage
+ * or section, or "Title match · Other Topics" when only the title holds the words.
  * @param {any[]} entries ANSWERS
  * @param {{ entry: any, n: number, total: number, prose: boolean }} g
  */
 export function answersSearchSub(entries, g) {
   const place = answersPlaceOf(entries, g.entry.id);
   if (!g.n) return 'Title match' + SEP + place;
-  return g.n + NBSP + 'of ' + pl(g.total, g.prose ? 'category' : 'passage') + SEP + place;
+  if (g.total === 1) return pl(g.n, 'match') + SEP + place;
+  const unit = !g.prose ? 'passage' : (g.entry.id === ANSWERS_FD_INDEX_ID ? 'category' : 'section');
+  return g.n + NBSP + 'of ' + pl(g.total, unit) + SEP + place;
 }
 
 /**
