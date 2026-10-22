@@ -1,6 +1,6 @@
 {
- "pass": 968,
- "strict": 943,
+ "pass": 969,
+ "strict": 944,
  "top5": 1020,
  "found": 1098,
  "family": {
@@ -8,7 +8,7 @@
   "paraphrase": 67,
   "redteam": 70,
   "refwords": 68,
-  "reprintpairs": 58,
+  "reprintpairs": 59,
   "rt1-editions": 50,
   "rt1-rules": 55,
   "rt1-shapes": 47,
