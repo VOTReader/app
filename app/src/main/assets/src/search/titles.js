@@ -446,13 +446,16 @@ function unitKeyOf(/** @type {any} */ doc) {
   return (doc.volumeId || '') + '/' + (doc.letterId || doc.id);
 }
 
-/** A typed word's credit against each title word it can meet. A word the search's index holds (`known`) is the word
-    typed, no typo of another ("fame" is no slip for "name"; search200 fix1). */
+/** A typed word's credit against each title word it can meet (`rel`). A word the search's index holds (`known`) is the
+    word typed, no typo of another ("fame" is no slip for "name"; search200 fix1): its typos are `slips`, met only
+    beside another word of the same title (slipsBeside; search200 fix2). `full` is its credits with its slips. */
 function relate(/** @type {any} */ ix, /** @type {string} */ tok, /** @type {((w: string) => boolean) | null} */ known) {
   /** @type {Map<string, number>} */
   const rel = new Map();
+  /** @type {Map<string, number> | null} */
+  let slips = null;
   if (ix.vocab.has(tok)) rel.set(tok, CREDIT.same);
-  if (isNum(tok)) return rel;
+  if (isNum(tok)) return { rel, slips, full: rel };
   const l = lemma(tok);
   const gs = ix.groups.get(l);
   const word = !!known && known(tok);
@@ -464,8 +467,28 @@ function relate(/** @type {any} */ ix, /** @type {string} */ tok, /** @type {((w
     else if (gs && info.groups && gs.some((g) => info.groups.indexOf(g) >= 0)) c = CREDIT.synonym;
     else if (stemClose(tok, v)) c = CREDIT.stem;
     if (c) rel.set(v, c);
+    if (word && c < CREDIT.typo && typoClose(tok, v)) (slips || (slips = new Map())).set(v, CREDIT.typo);
   }
-  return rel;
+  /** @type {Map<string, number>} */
+  let full = rel;
+  if (slips) { full = new Map(rel); slips.forEach((c, v) => full.set(v, c)); }
+  return { rel, slips, full };
+}
+
+/* A REAL WORD BESIDE A TITLE'S OWN WORDS IS A SLIP OF ITS WORD (search200 fix2). A slip often lands on a real word:
+   "the holy fame" for "The Holy Flame", "born gain" for "Born Again". A word the index holds meets a title word as a
+   typo (its slips) only in a title another typed word meets as itself or a form; alone, or beside words the title
+   lacks, it is the word typed ("fame" names no "In My Name"). */
+/**
+ * The typed words as one title meets them: a known word's slips join its credits beside another word of this title.
+ * @param {Array<{tok: string, wt: number, rel: Map<string, number>, slips: Map<string, number> | null, full: Map<string, number>}>} q
+ * @param {Array<{tok: string, wt: number}>} t  the title's content words
+ */
+function slipsBeside(q, t) {
+  if (!q.some((x) => x.slips && t.some((y) => /** @type {Map<string, number>} */ (x.slips).has(y.tok)))) return q;
+  const own = (/** @type {any} */ x) => t.some((y) => (x.rel.get(y.tok) || 0) >= CREDIT.lemma);
+  return q.map((x) => (x.slips && t.some((y) => /** @type {Map<string, number>} */ (x.slips).has(y.tok)) && q.some((o) => o !== x && own(o))
+    ? { tok: x.tok, wt: x.wt, rel: x.full, slips: null, full: x.full } : x));
 }
 
 /**
@@ -491,7 +514,7 @@ function relate(/** @type {any} */ ix, /** @type {string} */ tok, /** @type {((w
  * The titles a query names, best first, one per unit.
  * @param {string} query
  * @param {{index?: any, limit?: number, known?: (w: string) => boolean}} [opts]  known: is a typed word a word of the
- *   search's index (then it meets no title word as a typo)
+ *   search's index (then it meets a title word as a typo only beside another word of that title)
  * @returns {TitleHit[]}
  */
 export function scoreTitles(query, opts) {
@@ -502,7 +525,7 @@ export function scoreTitles(query, opts) {
   if (!w.length) return [];
   /** @type {Map<number, any>} entry -> its best reading */
   const best = new Map();
-  /** @type {Map<string, Map<string, number>>} */
+  /** @type {Map<string, any>} */
   const rels = new Map();
   const known = (opts && opts.known) || null;
   scoreReading(ix, w, null, best, rels, known);
@@ -527,7 +550,7 @@ function nameOrder(/** @type {any} */ a, /** @type {any} */ b) {
   return (b.hinted ? 1 : 0) - (a.hinted ? 1 : 0) || whole(b) - whole(a) || b.literal - a.literal || a.tier - b.tier || order(a, b);
 }
 
-function scoreReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @type {Set<string> | null} */ hints, /** @type {Map<number, any>} */ best, /** @type {Map<string, Map<string, number>>} */ rels, /** @type {((w: string) => boolean) | null} */ known) {
+function scoreReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @type {Set<string> | null} */ hints, /** @type {Map<number, any>} */ best, /** @type {Map<string, any>} */ rels, /** @type {((w: string) => boolean) | null} */ known) {
   const qNums = new Set(w.filter(isNum));
   const keep = (/** @type {number} */ idx, /** @type {number} */ score, /** @type {number} */ level, /** @type {string} */ via) => {
     const e = ix.entries[idx];
@@ -565,17 +588,18 @@ function scoreReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @typ
   if (!content.length) content = w3;
   content = content.filter((x, i) => content.indexOf(x) === i);
   const q = content.map((tok) => {
-    let rel = rels.get(tok);
-    if (!rel) { rel = relate(ix, tok, known); rels.set(tok, rel); }
+    let r = rels.get(tok);
+    if (!r) { r = relate(ix, tok, known); rels.set(tok, r); }
     // a number typed is as telling as the rarest word: "part two" is no title without a 2
-    return { tok, wt: isNum(tok) ? ix.maxWeight : ix.weight(lem(tok)), rel };
+    return { tok, wt: isNum(tok) ? ix.maxWeight : ix.weight(lem(tok)), rel: r.rel, slips: r.slips, full: r.full };
   });
   /** @type {Set<number>} */
   const cands = new Set();
   for (const x of q) for (const v of x.rel.keys()) for (const idx of ix.vocab.get(v).titles) cands.add(idx);
   for (const idx of cands) {
     const e = ix.entries[idx];
-    const cov = coverFn(q, qNums.size ? e.items : e.plainItems);
+    const items = qNums.size ? e.items : e.plainItems;
+    const cov = coverFn(slipsBeside(q, items), items);
     if ((cov.unmet || 0) > TITLE_UNMET_MAX || w3.length > e.words + TITLE_EXTRA_WORDS) continue;
     const ord = 0.92 + 0.08 * cov.order;
     let s = 0;
