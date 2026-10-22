@@ -1543,6 +1543,25 @@ function docLemmas(/** @type {string} */ id, /** @type {string} */ text) {
   }
   return lem;
 }
+/** A study or Holy Days text below an Answers topic holds what the topic does of the query: STUDY_HELD of the rarity
+    (log(1+N/df)) of the typed words the topic holds, its title included (search200 fix1). */
+const STUDY_HELD = 0.75;
+function holdsTopic(/** @type {string} */ id, /** @type {any} */ d, /** @type {string} */ fid, /** @type {any} */ f, /** @type {string[]} */ words) {
+  const tl = new Set(docLemmas(id, d.text || ''));
+  for (const x of titleToks(d).all) tl.add(lemma(x));
+  const cl = new Set(docLemmas(fid, f.text || ''));
+  const n = (msIndex && msIndex.documentCount) || 1;
+  let need = 0;
+  let got = 0;
+  for (const w of new Set(words)) {
+    const l = lemma(w);
+    if (!tl.has(l)) continue;
+    const wt = Math.log(1 + n / Math.max(1, docFreq(w)));
+    need += wt;
+    if (cl.has(l)) got += wt;
+  }
+  return !need || got >= STUDY_HELD * need;
+}
 /** The original `src` holds the query as well as its reprint's passage does (`share`): a reprint words some passages its own way. */
 function holdsAsWell(/** @type {string} */ src, /** @type {ReturnType<typeof passageQuery>} */ pq, /** @type {number} */ share) {
   const f = /** @type {Map<string, any>} */ (ORIGINAL_DOCS).get(src);
@@ -1794,17 +1813,24 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
       // A topic holding none of it (the model found it) is no measure: any text below held "as much" (sr11, 2026-10-15).
+      // A topic its title names by a typed word gives way to a study or Holy Days text only, holding what the topic holds
+      // of the rarer typed words (search200 fix1): a verse or letter below holding one or two typed words, or a study
+      // holding the common ones, took the place of "Regarding Demons" for "what about demons". A topic its title does not
+      // name still gives way to any original below holding the query as well: the letter or verse a quote is from.
+      // So does a topic its title names, when the reader typed a run of its words (RUN_MIN or more, NEAR_PHRASE_MIN
+      // held in a row): a quote's opening words find the letter it is from first ("for the great and terrible day of the").
       const id = idOf.get(e) || '';
       const pq = passageQuery(words);
       const share = eachWording(docLemmas(id, e.doc.text || ''), (t) => bestWindow(pq.query, t, pq.span));
       const own = near(id, e.doc);
+      const titled = !(typed.length >= RUN_MIN && own >= NEAR_PHRASE_MIN) && titleToks(e.doc).all.some((x) => words.some((w) => lemma(w) === lemma(x)));
       for (let r = i + 1; r < Math.min(out.length, i + 1 + STUDY_REACH); r++) {
         const f = out[r];
         const t = ORIGINAL_TIER[f.doc.kind];
-        if (t === undefined || t >= tier || !f.doc.text) continue;
+        if (t === undefined || t >= tier || (titled && t < ORIGINAL_TIER['holy-day']) || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
         if (share > 0 && eachWording(docLemmas(fid, f.doc.text), (t) => bestWindow(pq.query, t, pq.span)) >= share - REPRINT_COST && asWell(fid, f.doc, own) &&
-          (!holds || holds.cov(fid) >= ALIGN_HELD)) {
+          (!holds || holds.cov(fid) >= ALIGN_HELD) && (!titled || holdsTopic(id, e.doc, fid, f.doc, words))) {
           out.splice(r, 1);
           out.splice(i, 0, f);
           i++;
