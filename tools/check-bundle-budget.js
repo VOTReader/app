@@ -157,8 +157,9 @@ const BUDGETS = [
   { file: 'src/data/answers.js', measured: 2507577, max: 2862000 },
   // The Answers sidecars (ANSWERS_META, same converter, c72 2026-10-19): what the
   // site shows beyond the words (sections, links, media, attributions, underlines),
-  // keyed by entry id, lazy (utils/sync-loaders.js loadAnswersMeta). +15 %.
-  { file: 'src/data/answers-meta.js', measured: 359363, max: 413300 },
+  // keyed by entry id, lazy (utils/sync-loaders.js loadAnswersMeta). +15 % over the 359,363 B it measured when the row
+  // landed; the shipped file (phase 1 complete) measures 367,773. The ceiling is unchanged.
+  { file: 'src/data/answers-meta.js', measured: 367773, max: 413300 },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';
