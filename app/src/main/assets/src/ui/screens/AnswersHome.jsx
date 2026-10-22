@@ -34,6 +34,7 @@ import {
 } from '../../utils/answers-browse.js';
 import { buildAnswersIndex, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
 import { passageTextBefore } from '../../utils/answers-contents.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { MoreQuestionsSheet, CommandmentSheet, AboutSheet } from '../sheets/AnswersSheets.jsx';
 
@@ -54,6 +55,20 @@ function rememberQuery(q) {
   const t = String(q || '').trim();
   if (t.length < 2) return;
   writeRecent([t].concat(readRecent().filter((x) => x.toLowerCase() !== t.toLowerCase())).slice(0, 5));
+}
+
+/* The search index and the day's pool cost tens of ms on a phone; the corpus and its sidecars are
+   fixed arrays once loaded, so each is built once per array, not on every landing mount. */
+let _index = { of: /** @type {any} */ (null), v: /** @type {any} */ (null) };
+function indexOf(list) {
+  if (!list.length) return [];
+  if (_index.of !== list) _index = { of: list, v: buildAnswersIndex(list) };
+  return _index.v;
+}
+let _pool = { of: /** @type {any} */ (null), meta: /** @type {any} */ (null), v: /** @type {any} */ (null) };
+function dailyPoolOf(entries, meta) {
+  if (_pool.of !== entries || _pool.meta !== meta) _pool = { of: entries, meta, v: answersDailyPool(entries, meta) };
+  return _pool.v;
 }
 
 /** "Volume 7" → "Volume Seven", the registry's label a letter tap resolves by (as the topic page's source lines). */
@@ -115,7 +130,7 @@ function usePlaceholder(inputRef) {
  * that date: its dated header, every quote paragraph, its source; Read in context, Open to an answer.
  */
 function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter }) {
-  const pool = React.useMemo(() => answersDailyPool(entries, meta), [entries, meta]);
+  const pool = React.useMemo(() => dailyPoolOf(entries, meta), [entries, meta]);
   const [open, setOpen] = React.useState(_landing.dailyOpen);
   React.useEffect(() => { _landing.dailyOpen = open; }, [open]);
   const pick = answersDailyPick(pool, now || new Date());
@@ -173,6 +188,9 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
   const [atEnd, setAtEnd] = React.useState(false);
   const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const stripRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  // A tapped key holds while the page travels to it, and while the page sits at its end: a last
+  // letter too short to reach the strip (W) would otherwise read as the one above it (V).
+  const pin = React.useRef(/** @type {{ L: string, t: number } | null} */ (null));
   // The current letter only READS the page's scroll (no scrollTop is written here): the last
   // letter head at or above the strip's foot.
   React.useEffect(() => {
@@ -188,6 +206,13 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
       for (const s of root.querySelectorAll('section[data-az]')) {
         if (s.getBoundingClientRect().top <= line) now = s.getAttribute('data-az');
         else break;
+      }
+      const p = pin.current;
+      if (p) {
+        const atEnd = scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+        if (now === p.L) pin.current = null;
+        else if (atEnd || Date.now() - p.t < 1000) now = p.L;
+        else pin.current = null;
       }
       if (now) setCur(now);
     };
@@ -213,8 +238,8 @@ function AZPanel({ entries, meta, isRead, onOpenTopic }) {
   const jump = (L) => {
     const el = rootRef.current && rootRef.current.querySelector(`section[data-az="${L}"]`);
     if (!el) return;
-    const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    el.scrollIntoView({ block: 'start', behavior: reduce ? 'auto' : 'smooth' });
+    pin.current = { L, t: Date.now() };
+    el.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
     setCur(L);
   };
   return (
@@ -310,82 +335,21 @@ function Results({ entries, results, titleOnly, query, onOpenTopic, onSearchLibr
   );
 }
 
-/**
- * @param {{ entries: any[] | null, site?: any, isRead?: (id: string) => boolean, pathOn?: boolean, pathLast?: string | null,
- *   fontScale?: any, now?: Date, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
- *   onThemeChange?: any, onOpenTopic: Function, onOpenGroup?: (key: string) => void, onOpenMedia?: () => void,
- *   onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void, onOpenLetter?: (target: any) => void }} props
- */
-export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, now, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
-  onOpenTopic, onOpenGroup, onOpenMedia, onSearchLibrary, onGoToRef, onOpenLetter }) {
-  const meta = useAnswersMeta();
-  const loaded = Array.isArray(entries) && entries.length > 0;
-  const list = React.useMemo(() => (loaded ? /** @type {any[]} */ (entries) : []), [loaded, entries]);
-  const isRead = React.useCallback((id) => !!(pathOn && isReadRaw && isReadRaw(id)), [pathOn, isReadRaw]);
-  const [query, setQuery] = React.useState(_landing.query);
-  const [tab, setTab] = React.useState(_landing.tab);
-  const [sheet, setSheet] = React.useState(/** @type {AnswersSheetState} */ (_landing.sheet));
-  const [focused, setFocused] = React.useState(false);
-  const [recent, setRecent] = React.useState(readRecent);
-  React.useEffect(() => { _landing.query = query; _landing.tab = tab; _landing.sheet = sheet; }, [query, tab, sheet]);
-  const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
-  const placeholder = usePlaceholder(inputRef);
-  const ts2 = answersLayoutClass(fontScale, false).includes('ans-ts2');
-
-  const byId = React.useMemo(() => new Map(list.map((e) => [e.id, e])), [list]);
-  const shelves = React.useMemo(() => answersBrowseShelves(list), [list]);
-  const order = React.useMemo(() => answersSiteOrder(list), [list]);
-  const posOf = React.useMemo(() => { const m = new Map(order.map((e, i) => [e.id, i])); return (id) => (m.has(id) ? m.get(id) : 1e6); }, [order]);
-  const index = React.useMemo(() => buildAnswersIndex(list), [list]);
-  const opts = React.useMemo(() => ({ pos: posOf, sections: (id) => (meta && meta[id] && meta[id].sections) || null }), [posOf, meta]);
-  const deferred = React.useDeferredValue(query);
-  const q = query.trim();
-  const isQuery = q.length >= 2;
-  const results = React.useMemo(() => (loaded && deferred.trim().length >= 2 ? answersSearch(index, deferred, opts) : null), [loaded, index, deferred, opts]);
-  const pending = isQuery && deferred.trim() !== q;
-  const titleOnly = React.useMemo(() => (pending && loaded ? answersTitleMatches(index, query, opts) : null), [pending, loaded, index, query, opts]);
-  const recentMode = focused && !q && recent.length > 0;
-  const media = React.useMemo(() => (loaded && meta ? answersMediaIndex(list, meta) : null), [loaded, list, meta]);
-
-  // Back with a query typed clears it before it leaves the screen (Android Back order, §2.5).
-  React.useEffect(() => {
-    if (!query) return undefined;
-    const fn = () => { setQuery(''); return true; };
-    window.__screenBack = fn;
-    return () => { if (window.__screenBack === fn) window.__screenBack = null; };
-  }, [query]);
-  const handleNavBack = () => { if (query) setQuery(''); else onBack(); };
-  const closeSheet = React.useCallback(() => setSheet(null), []);
-  const openTopic = (id, anchor, from) => onOpenTopic(id, anchor || null, from || 'Answers');
-  const chip = (id) => openTopic(id, null, 'Answers');
-
+/** Contents (f01, f02): the site's sidebar in its order. A memo, so typing in the field above never re-renders it. */
+const Contents = React.memo(/** @param {any} props */ function Contents(props) {
+  const { loaded, byId, shelves, meta, isRead, media, site, onOpenTopic, onOpenGroup, onOpenMedia, setSheet } = props;
+  const openTopic = (id) => onOpenTopic(id, null, 'Answers');
+  const openSheet = (s) => { if (loaded) setSheet(s); };
   const sub = (e) => (
     <>{answersRowSub(e, meta && meta[e.id])}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>
   );
   const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
-
-  // The reading path (f01 #8): Continue in the site's order; off in Settings, always the start.
-  let path = null;
-  if (loaded && main) {
-    const st = pathOn ? answersPathState(list, isRead, pathLast) : { kind: 'start', entry: main, n: 0 };
-    const topics = order.length - 1;
-    if (st.kind === 'continue') {
-      path = { title: <>Continue: <LeadTitle title={st.entry.title} /></>, sub: st.n + NBSP + 'of ' + topics + NBSP + 'topics' + SEP + 'in the site’s order', id: st.entry.id };
-    } else if (st.kind === 'again') {
-      path = { title: 'Start again at the beginning', sub: 'Main Page' + SEP + 'in the site’s order', id: main.id };
-    } else {
-      path = { title: 'Start at the beginning', sub: ['Main Page', answersSizeWords(main, meta && meta[main.id])].filter(Boolean).join(SEP), id: main.id };
-    }
-  }
-
   const cmdShelves = shelves.commandments;
   const cmdTotal = cmdShelves.reduce((a, s) => a + s.topics.length, 0);
   const groupTotal = shelves.groups.reduce((a, s) => a + s.topics.length, 0);
   const fdEntry = byId.get(ANSWERS_FD_INDEX_ID) || null;
   const fdMeta = meta && meta[ANSWERS_FD_INDEX_ID];
   const tstlHead = shelves.groups.length ? shelves.groups[0].label.replace(/^\d+\.\s*/, '') : 'Thus Says The Lord...';
-  const openSheet = (s) => { if (loaded) setSheet(s); };
-  const cmdShelf = sheet && sheet.kind === 'cmd' ? cmdShelves.find((s) => s.num === sheet.n) : null;
 
   const tablets = ANSWERS_COMMANDMENTS.map((c, i) => {
     const s = cmdShelves[i];
@@ -400,7 +364,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
     );
   });
 
-  const contents = (
+  return (
     <div role="tabpanel" id="ans-panel-c" aria-labelledby="ans-tab-c">
       <AnsRow title="Main Page" sub={main ? sub(main) : null} onClick={() => openTopic(ANSWERS_MAIN_PAGE_ID)} />
       <div className="ans-sechead"><h2 className="ans-h2">The Ten Commandments</h2>{loaded ? <span className="ans-count">{pl(cmdTotal, 'topic')}</span> : null}</div>
@@ -442,9 +406,82 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
       ) : null}
     </div>
   );
+});
 
+/**
+ * @param {{ entries: any[] | null, site?: any, isRead?: (id: string) => boolean, pathOn?: boolean, pathLast?: string | null,
+ *   fontScale?: any, now?: Date, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
+ *   onThemeChange?: any, onOpenTopic: Function, onOpenGroup?: (key: string) => void, onOpenMedia?: () => void,
+ *   onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void, onOpenLetter?: (target: any) => void }} props
+ */
+export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, now, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
+  onOpenTopic, onOpenGroup, onOpenMedia, onSearchLibrary, onGoToRef, onOpenLetter }) {
+  const meta = useAnswersMeta();
+  const loaded = Array.isArray(entries) && entries.length > 0;
+  const list = React.useMemo(() => (loaded ? /** @type {any[]} */ (entries) : []), [loaded, entries]);
+  const isRead = React.useCallback((id) => !!(pathOn && isReadRaw && isReadRaw(id)), [pathOn, isReadRaw]);
+  const [query, setQuery] = React.useState(_landing.query);
+  const [tab, setTab] = React.useState(_landing.tab);
+  const [sheet, setSheet] = React.useState(/** @type {AnswersSheetState} */ (_landing.sheet));
+  const [focused, setFocused] = React.useState(false);
+  const [recent, setRecent] = React.useState(readRecent);
+  React.useEffect(() => { _landing.query = query; _landing.tab = tab; _landing.sheet = sheet; }, [query, tab, sheet]);
+  const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
+  const placeholder = usePlaceholder(inputRef);
+  const ts2 = answersLayoutClass(fontScale, false).includes('ans-ts2');
+
+  const byId = React.useMemo(() => new Map(list.map((e) => [e.id, e])), [list]);
+  const shelves = React.useMemo(() => answersBrowseShelves(list), [list]);
+  const order = React.useMemo(() => answersSiteOrder(list), [list]);
+  const posOf = React.useMemo(() => { const m = new Map(order.map((e, i) => [e.id, i])); return (id) => (m.has(id) ? m.get(id) : 1e6); }, [order]);
+  const index = React.useMemo(() => indexOf(list), [list]);
+  const opts = React.useMemo(() => ({ pos: posOf, sections: (id) => (meta && meta[id] && meta[id].sections) || null }), [posOf, meta]);
+  const deferred = React.useDeferredValue(query);
+  const q = query.trim();
+  const isQuery = q.length >= 2;
+  const results = React.useMemo(() => (loaded && deferred.trim().length >= 2 ? answersSearch(index, deferred, opts) : null), [loaded, index, deferred, opts]);
+  const pending = isQuery && deferred.trim() !== q;
+  const titleOnly = React.useMemo(() => (pending && loaded ? answersTitleMatches(index, query, opts) : null), [pending, loaded, index, query, opts]);
+  const recentMode = focused && !q && recent.length > 0;
+  const media = React.useMemo(() => (loaded && meta ? answersMediaIndex(list, meta) : null), [loaded, list, meta]);
+
+  // Back with a query typed clears it before it leaves the screen (Android Back order, §2.5).
+  React.useEffect(() => {
+    if (!query) return undefined;
+    const fn = () => { setQuery(''); return true; };
+    window.__screenBack = fn;
+    return () => { if (window.__screenBack === fn) window.__screenBack = null; };
+  }, [query]);
+  const handleNavBack = () => { if (query) setQuery(''); else onBack(); };
+  const closeSheet = React.useCallback(() => setSheet(null), []);
+  const openTopic = (id, anchor, from) => onOpenTopic(id, anchor || null, from || 'Answers');
+  const chip = (id) => openTopic(id, null, 'Answers');
+
+  const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
+
+  // The reading path (f01 #8): Continue in the site's order; off in Settings, always the start.
+  let path = null;
+  if (loaded && main) {
+    const st = pathOn ? answersPathState(list, isRead, pathLast) : { kind: 'start', entry: main, n: 0 };
+    const topics = order.length - 1;
+    if (st.kind === 'continue') {
+      path = { title: <>Continue: <LeadTitle title={st.entry.title} /></>, sub: st.n + NBSP + 'of ' + topics + NBSP + 'topics' + SEP + 'in the site’s order', id: st.entry.id };
+    } else if (st.kind === 'again') {
+      path = { title: 'Start again at the beginning', sub: 'Main Page' + SEP + 'in the site’s order', id: main.id };
+    } else {
+      path = { title: 'Start at the beginning', sub: ['Main Page', answersSizeWords(main, meta && meta[main.id])].filter(Boolean).join(SEP), id: main.id };
+    }
+  }
+
+  const openSheet = (s) => { if (loaded) setSheet(s); };
+  const cmdShelf = sheet && sheet.kind === 'cmd' ? shelves.commandments.find((s) => s.num === sheet.n) : null;
+  const contents = <Contents loaded={loaded} byId={byId} shelves={shelves} meta={meta} isRead={isRead} media={media} site={site}
+    onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} onOpenMedia={onOpenMedia} setSheet={setSheet} />;
+
+  // A saved A–Z tab waits for the corpus: until then Contents shows, so it is the selected tab.
+  const az = tab === 'az' && loaded;
   const onTabKey = (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(tab === 'az' ? 'contents' : 'az'); }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(az ? 'contents' : 'az'); }
   };
 
   return (
@@ -508,12 +545,12 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
         </div>
         <div className="ans-landing-b">
           <div className="ans-tabs" role="tablist" aria-label="Browse Answers">
-            <button type="button" className="ans-tab" role="tab" id="ans-tab-c" aria-controls="ans-panel-c" aria-selected={tab !== 'az'}
-              tabIndex={tab === 'az' ? -1 : 0} onClick={() => setTab('contents')} onKeyDown={onTabKey}>Contents</button>
-            <button type="button" className="ans-tab" role="tab" id="ans-tab-az" aria-controls="ans-panel-az" aria-selected={tab === 'az'}
-              tabIndex={tab === 'az' ? 0 : -1} onClick={() => setTab('az')} onKeyDown={onTabKey}>A–Z</button>
+            <button type="button" className="ans-tab" role="tab" id="ans-tab-c" aria-controls="ans-panel-c" aria-selected={!az}
+              tabIndex={az ? -1 : 0} onClick={() => setTab('contents')} onKeyDown={onTabKey}>Contents</button>
+            <button type="button" className="ans-tab" role="tab" id="ans-tab-az" aria-controls="ans-panel-az" aria-selected={az}
+              tabIndex={az ? 0 : -1} onClick={() => setTab('az')} onKeyDown={onTabKey}>A–Z</button>
           </div>
-          {tab === 'az' && loaded ? (
+          {az ? (
             <div role="tabpanel" id="ans-panel-az" aria-labelledby="ans-tab-az">
               <AZPanel entries={list} meta={meta} isRead={isRead} onOpenTopic={openTopic} />
             </div>

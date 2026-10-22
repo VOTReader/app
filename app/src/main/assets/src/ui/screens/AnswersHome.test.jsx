@@ -281,6 +281,57 @@ describe('AnswersHome — A–Z (f05)', () => {
     expect(keys.filter((k) => k.disabled).map((k) => k.textContent)).toEqual(['Q', 'X', 'Y', 'Z']);
     expect(NB(panel.querySelector('.ans-row .ans-row-sub').textContent)).toBe('2 · Prophets, witnesses & gifts · 22 passages');
   });
+
+  /* The last letter is too short to reach the strip at the end of the list: the scroll reader saw V
+     there and took the strip off the W just tapped. Geometry is stubbed: jsdom lays nothing out. */
+  it('a tapped last letter stays current while the list sits at its end', async () => {
+    window.ScreenLayout = ({ navChildren, children }) => <div className="screen-scroll">{navChildren}{children}</div>;
+    const raf = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb) => { cb(0); return 0; });
+    const into = vi.fn();
+    Element.prototype.scrollIntoView = into;
+    try {
+      render(<AnswersHome {...base} />);
+      fireEvent.click(screen.getByRole('tab', { name: 'A–Z' }));
+      const scroller = document.querySelector('.screen-scroll');
+      Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 5000 });
+      Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 800 });
+      let top = 4200;                                              // at its end
+      Object.defineProperty(scroller, 'scrollTop', { configurable: true, get: () => top, set: (v) => { top = v; } });
+      const rect = (top) => () => ({ top, bottom: top + 40, left: 0, right: 0, width: 0, height: 40, x: 0, y: top });
+      document.querySelector('.ans-az-strip').getBoundingClientRect = rect(0);
+      for (const s of document.querySelectorAll('section[data-az]')) {
+        const L = s.getAttribute('data-az');
+        s.getBoundingClientRect = rect(L === 'W' ? 300 : (L < 'W' || L === '#' ? -100 : 900)); // V is the last head above the strip
+      }
+      const key = (L) => [...document.querySelectorAll('.ans-az-key')].find((k) => k.textContent === L);
+      fireEvent.click(key('W'));
+      expect(into).toHaveBeenCalledWith({ block: 'start', behavior: 'smooth' });
+      // Long after the jump's travel time: only being at the end keeps W.
+      const now = Date.now();
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 5000);
+      act(() => { scroller.dispatchEvent(new Event('scroll')); });
+      expect(key('W').getAttribute('aria-current')).toBe('true');
+      expect(key('V').getAttribute('aria-current')).toBeNull();
+      // Scrolled back up by hand, the page's own letter wins again.
+      top = 3000;
+      act(() => { scroller.dispatchEvent(new Event('scroll')); });
+      expect(key('V').getAttribute('aria-current')).toBe('true');
+      clock.mockRestore();
+    } finally {
+      raf.mockRestore();
+      delete Element.prototype.scrollIntoView;
+    }
+  });
+
+  it('a saved A–Z tab, while answers.js loads, leaves Contents the selected tab', () => {
+    const first = render(<AnswersHome {...base} />);
+    fireEvent.click(screen.getByRole('tab', { name: 'A–Z' }));
+    first.unmount();                                                // the tab is kept for the next visit
+    render(<AnswersHome {...base} entries={null} />);
+    expect(screen.getByRole('tab', { name: 'Contents' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'A–Z' }).getAttribute('aria-selected')).toBe('false');
+    expect(document.getElementById('ans-panel-c')).toBeTruthy();
+  });
 });
 
 describe('AnswersShelf — a group of the site (f04, f04b)', () => {
@@ -311,6 +362,13 @@ describe('AnswersShelf — a group of the site (f04, f04b)', () => {
 });
 
 describe('AnswersMedia — Charts & videos (f13)', () => {
+  it('says Loading… while the sidecars load, and says so if they never arrive (no blank page)', async () => {
+    window.ANSWERS_META = undefined;                                 // no loader in this host: the load resolves empty
+    render(<AnswersMedia {...base} />);
+    expect(document.querySelector('.ans-page [role="status"]').textContent).toBe('Loading…');
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(document.querySelector('.ans-page [role="status"]').textContent).toBe('Couldn’t load the list of charts and videos.');
+  });
   it('lists every chart, video, playlist, channel, audio and PDF; only charts stay in the app', () => {
     render(<AnswersMedia {...base} />);
     expect(texts('.ans-sechead .ans-h2')).toEqual(['Charts', 'Videos', 'Playlists', 'Audio & PDF']);
