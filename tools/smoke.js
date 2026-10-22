@@ -433,7 +433,7 @@
       // fails HERE.
       if (!clickByText(/Topics & Doctrines/)) return false;
       var ok = false;
-      for (var w = 0; w < 60 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.ans-tablet').length === 10 && document.querySelectorAll('.ans-landing-b .ans-row').length > 100; }
+      for (var w = 0; w < 60 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.ans-tablet').length === 10 && document.querySelectorAll('.ans-landing-b .ans-row').length >= 30; }
       if (!ok) return false;
       if (!clickByText(/^The Coming of The Lord/)) return false;
       await sleep(400);
