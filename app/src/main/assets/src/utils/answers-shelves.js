@@ -6,7 +6,7 @@
    ANSWERS_COMMANDMENTS — the Ten Commandments tablets. The TOPICS under each
    commandment are NOT listed here: answersonlygodcangive.com files them itself
    (entry.group "Commandment N", written by tools/fetch-answers.py), and
-   answersCommandmentTopics reads that filing. Each row carries only its short
+   answersSiteShelves (answers-site.js) reads that filing. Each row carries only its short
    tablet label and its verse, copied verbatim from the app's NKJV (books.js,
    Exodus 20) — answers-shelves.test.js holds every verse to that text.
 
@@ -177,11 +177,6 @@ export function answersTopicEntries(entries) {
   return _topics;
 }
 
-const SUBJECT_BY_ID = new Map(ANSWERS_SUBJECTS.map((s) => [s.id, s]));
-
-/** A subject row by id, or null (a saved tab can name one this build dropped). */
-export function answersSubjectById(id) { return SUBJECT_BY_ID.get(id) || null; }
-
 const SUBJECT_OF_TOPIC = new Map();
 ANSWERS_SUBJECTS.forEach((s) => s.topics.forEach((id) => SUBJECT_OF_TOPIC.set(id, s)));
 
@@ -194,12 +189,6 @@ export function answersFiledUnder(entry) {
   }
   const s = entry && SUBJECT_OF_TOPIC.get(entry.id);
   return s ? s.title : '';
-}
-
-/** The site's own filing for one commandment, in the site's order. */
-export function answersCommandmentTopics(entries, n) {
-  const group = 'Commandment ' + n;
-  return (entries || []).filter((e) => e && e.group === group);
 }
 
 /** Passages in a topic = its "~ [From …]" attribution lines (0 for a page of prose). */

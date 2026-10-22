@@ -10,8 +10,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import {
-  ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersCommandmentTopics, answersPassageCount,
-  answersShortTitle, answersSortKey, answersIndexLetter, answersSubjectById,
+  ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersPassageCount,
+  answersShortTitle, answersSortKey, answersIndexLetter,
   answersTopicEntries, ANSWERS_MAIN_PAGE_ID,
 } from './answers-shelves.js';
 
@@ -46,10 +46,9 @@ describe('ANSWERS_SUBJECTS — every topic has exactly one home on the landing',
     expect(placed.size).toBe(ANSWERS.length);
   });
 
-  it('has nine subjects with unique ids, each findable by id', () => {
+  it('has nine subjects with unique ids', () => {
     expect(ANSWERS_SUBJECTS.length).toBe(9);
-    for (const s of ANSWERS_SUBJECTS) expect(answersSubjectById(s.id)).toBe(s);
-    expect(answersSubjectById('no-such-subject')).toBeNull();
+    expect(new Set(ANSWERS_SUBJECTS.map((s) => s.id)).size).toBe(9);
   });
 });
 
@@ -57,7 +56,7 @@ describe('ANSWERS_COMMANDMENTS — the tablets', () => {
   it('are the ten, in order, and every one files at least one of the site\'s topics', () => {
     expect(ANSWERS_COMMANDMENTS.map((c) => c.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     for (const c of ANSWERS_COMMANDMENTS) {
-      expect(answersCommandmentTopics(ANSWERS, c.n).length, c.numeral).toBeGreaterThan(0);
+      expect(ANSWERS.filter((e) => e.group === 'Commandment ' + c.n).length, c.numeral).toBeGreaterThan(0);
     }
   });
 
