@@ -1,7 +1,10 @@
 /* THE ORIGINAL OF A LINE ITS REPRINT CUT (search200 sealed2, 2026-10-22). Corbin (DECISIONS 10-14): the original first,
    its reprint second, both shown. The panel's unsealed misses of that kind, each on a fixture shaped like its texts:
    - a Words To Live By entry cut from two letters, the reader typing a line of one of them: the letter holding the
-     line leads, though the entry draws as much on the other letter.
+     line leads, though the entry draws as much on the other letter;
+   - an entry's line is its letter's with two small words cut ("I have indeed written it, even on tablets of stone"),
+     and the reader types the entry's words: the letter, holding every typed word in order with those two between,
+     leads.
    Fixture texts only (no benchmark query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
@@ -77,5 +80,10 @@ describe('the original of a line its reprint cut (sealed2)', () => {
   it('an entry cut from two letters: the letter holding the typed line leads, the entry next', async () => {
     const top = ids(await E.search('and when does my servant become a prophet'));
     expect(top.slice(0, 2)).toEqual(['prophet-letter', 'a-prophet']);
+  });
+
+  it('an entry cutting two small words from its letter\'s line, typed as the entry words it: the letter leads, the entry next', async () => {
+    const top = ids(await E.search('i have written it on tablets of stone'));
+    expect(top.slice(0, 2)).toEqual(['stone-letter', 'only-witness']);
   });
 });

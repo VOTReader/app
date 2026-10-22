@@ -119,6 +119,19 @@ function tokenRunAt(toks, run) {
   }
   return -1;
 }
+/** True when `toks` holds every token of `run` in order within a stretch of at most `width` tokens. */
+function runWithin(/** @type {string[]} */ toks, /** @type {string[]} */ run, /** @type {number} */ width) {
+  if (!run.length) return true;
+  for (let i = 0; i < toks.length; i++) {
+    if (toks[i] !== run[0]) continue;
+    let j = 1;
+    for (let k = i + 1, end = Math.min(toks.length, i + width); k < end && j < run.length; k++) if (toks[k] === run[j]) j++;
+    if (j === run.length) return true;
+  }
+  return false;
+}
+/** Words a reprint may have cut from its original's line that the original still holds the typed run with (asWell). */
+const RUN_CUT = 2;
 /** True when `run` occurs in `toks` as consecutive tokens (an empty run always does). */
 const hasTokenRun = (/** @type {string[]} */ toks, /** @type {string[]} */ run) => tokenRunAt(toks, run) >= 0;
 
@@ -1795,12 +1808,20 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
      gives way only to an original holding it as well (B3, below), and "as well" read the words as typed: an Answers
      topic printing a letter's line with one word in another form ("My prophets" where the letter says "My prophet")
      held the run, the letter did not, and the topic led its original. An original holding every typed word in a row,
-     each as typed or in another form of it (passage.js lemma), holds it as well. */
+     each as typed or in another form of it (passage.js lemma), holds it as well.
+     ...OR WITH THE WORDS ITS REPRINT CUT (search200 sealed2, 2026-10-22). A Words To Live By entry prints a letter's line
+     with a small word or two cut ("I have written it on tablets of stone", where the letter says "For I have indeed
+     written it, even on tablets of stone"): the reader typing the entry's words held its run whole, the letter did not,
+     and the entry led its original. An original holding every typed word in order, so, within RUN_CUT words more than
+     were typed, holds it as well. */
   const typedLemmas = typed.map(lemma);
   /** Does text `x` hold the typed words as nearly as a reprint holding `own` of them in a row (near, 0..1)? */
-  const asWell = (/** @type {string} */ x, /** @type {any} */ d, /** @type {number} */ own) => near(x, d) >= own - 0.1 ||
-    (own >= 1 && typedLemmas.length >= RUN_MIN && !!d && !!d.text &&
-      tokenRunAt(joinApostropheS(withKjv(msIndex, msIndex._idToShortId.get(x), kjvEncode(d.text))).map(lemma), typedLemmas) >= 0);
+  const asWell = (/** @type {string} */ x, /** @type {any} */ d, /** @type {number} */ own) => {
+    if (near(x, d) >= own - 0.1) return true;
+    if (!(own >= 1 && typedLemmas.length >= RUN_MIN && !!d && !!d.text)) return false;
+    const t = joinApostropheS(withKjv(msIndex, msIndex._idToShortId.get(x), kjvEncode(d.text))).map(lemma);
+    return tokenRunAt(t, typedLemmas) >= 0 || runWithin(t, typedLemmas, typedLemmas.length + RUN_CUT);
+  };
   for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
     const e = out[i];
     const tier = ORIGINAL_TIER[e.doc.kind];
