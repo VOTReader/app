@@ -9045,6 +9045,7 @@
 .ans-orn.is-minor::before,.ans-orn.is-minor::after{display:none}
 u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underline-offset:.28em;text-decoration-color:var(--cream-muted)}
 .ans-reading .ans-alsosee{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);line-height:1.35} /* line-height: A31 */
+.ans-alsosee.is-multi{line-height:max(48px,1.35em)}.ans-alsosee.is-multi .ans-tb{padding-block:13px} /* several names: 48px rows, and each name's words a 45px+ box line by line (a name split over two lines has no 14px band: its ::before gets no width), still inline, "; " between */
 .ans-alsosee .ans-chev{margin-left:auto}
 .ans-reading .ans-linkrow,.ans-media{display:flex;align-items:center;gap:16px;min-height:76px;margin:0;padding:10px 0;border-bottom:1px solid var(--border);color:var(--cream)}
 .ans-linkrow[data-sub]::after,.ans-media-sub{content:attr(data-sub);display:block;color:var(--cream-muted);font-size:min(var(--fs-15),5.6vw)}
