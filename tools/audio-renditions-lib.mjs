@@ -47,7 +47,7 @@ export function readerFromFilename(name) {
  * chapters) and the TSOT New Testament (Bible chapters).
  */
 export const NON_LETTER_ROOT =
-  /^(AI Songs of the Letters|The Gospel of John Movie Audio|17\. Bible-Letter Studies|18\. TSOT New Testament)/;
+  /^(AI Songs of the Letters|The Gospel of John Movie Audio|(\d+\. )?Bible-Letter Studies|(\d+\. )?TSOT New Testament)/;
 
 /** Is this listing path a letter-side mp3? */
 export function isLetterAudio(path) {
@@ -64,7 +64,8 @@ export function isLetterAudio(path) {
  * the AI songs. A stolen id is a real recording that reaches nothing, which
  * looks exactly like a dropped one.
  */
-export const STUDY_ROOT = /^17\. Bible-Letter Studies\//;
+// The folder number is Tim's ordering, not part of the rule: he renumbered 17 -> 18 by 2026-10-21 (align al8).
+export const STUDY_ROOT = /^(\d+\. )?Bible-Letter Studies\//;
 
 /** Title text reduced to what survives punctuation, case and spacing drift:
  *  the archive writes "Purity Part One_Purity is Important to God_1.1-1.4"
