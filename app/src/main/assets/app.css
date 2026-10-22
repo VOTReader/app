@@ -7628,7 +7628,7 @@
     .top-nav { gap: 1.92px; padding: 11.2px 8px 11.2px; padding-top: calc(var(--inset-top, 0px) + 11.2px); }
     .nav-home { font-size: var(--fsc-12); padding: 7.2px 8.8px; }
     .nav-back-icon { font-size: var(--fsc-36); padding: 0 5.6px; min-width: 44px; }
-    .nav-theme-btn, .nav-search-btn { padding: 8px; }
+    .nav-theme-btn, .nav-search-btn, .nav-more-btn { padding: 8px; }  /* the ⋯ button too: its 0.5rem grew the bar with Text Size, under the fixed --dock-nav-bottom */
     .reading-dot-nav { width: 40px; height: 40px; }
     .tabs-nav-btn { font-size: var(--fsc-11); padding: 5.6px 8px; gap: 4px; margin-left: 2.4px; }
     .nav-arrows { gap: 4.8px; }

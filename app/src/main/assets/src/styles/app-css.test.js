@@ -756,6 +756,8 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
   });
   it('the ⋯ button and every menu row are at least 44 px', () => {
     expect(ruleBlock(CSS, '.nav-more-btn {')).toMatch(/min-width:\s*44px;[^}]*min-height:\s*44px/);
+    // pinned with the other bar icons: a rem padding grew the bar with Text Size, under the fixed --dock-nav-bottom
+    expect(bare).toMatch(/\.nav-theme-btn, \.nav-search-btn, \.nav-more-btn \{\s*padding:\s*8px;\s*\}/);
     expect(ruleBlock(CSS, '.more-menu-item {')).toMatch(/min-height:\s*48px/);
     expect(ruleBlock(CSS, '.more-menu-row {')).toMatch(/min-height:\s*52px/);
     // 48 x 48 since L3 (zones, 2026-10-05; tools/e2e-phone-fit.mjs T1): A−/A+ measured 46 x 40.
