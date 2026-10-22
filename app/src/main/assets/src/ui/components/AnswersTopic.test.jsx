@@ -5,8 +5,9 @@
    and a highlight made on the plain page re-paints on the same words once the decorations are in.
    Five paragraphs from the real corpus, one per decoration: an inline link, an underline, a note
    marker (the fused "Jesus1"), a bare-link glyph and a callout. */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, fireEvent } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, cleanup, fireEvent, act } from '@testing-library/react';
+import { useAnswersMetaState } from './AnswersParts.jsx';
 import * as ReactDOM from 'react-dom';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -147,6 +148,47 @@ describe('AnswersTopic — a mark survives Fold and find', () => {
 
     fireEvent.click(document.querySelector('.ans-rail input[role="switch"]')); // Fold off under find: nothing moves
     expect(seen).toBe(2);
+  });
+});
+
+describe('AnswersTopic — the hero\'s "Loading contents…" ends', () => {
+  const E = byId.get('regarding-the-holy-days-of-god');
+  const hero = (props) => {
+    render(<AnswersTopic entry={E} entries={A} site={null} ready={true} ts2={false} landedPara={-1} mainRef={{ current: null }}
+      isRead={() => false} pathOn={false} findOn={false} act={{ cite() {}, jump() {}, source() {}, letter() {} }} nav={{}} {...props} />);
+    const p = document.querySelector('.ans-hero .ans-meta');
+    return p ? p.textContent : null;
+  };
+  it('while the sidecars load; never once they are in without this topic\'s row, or could not load', () => {
+    expect(hero({ meta: null, metaAll: null })).toBe('Loading contents…');
+    cleanup();
+    expect(hero({ meta: null, metaAll: { other: {} } })).toBeNull();
+    cleanup();
+    expect(hero({ meta: null, metaAll: null, metaFailed: true })).toBeNull();
+    cleanup();
+    expect(hero({ meta: M[E.id], metaAll: M }).split(String.fromCharCode(160)).join(' ')).toContain('26 passages');
+  });
+
+  it('the sidecars are tried once more 3 s after a load that left none, then reported failed', async () => {
+    vi.useFakeTimers();
+    try {
+      delete window.ANSWERS_META; // no loader in this host: each load resolves empty
+      const seen = [];
+      function Probe() { const s = useAnswersMetaState(true); seen.push(s[1]); return null; }
+      render(<Probe />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      expect(seen[seen.length - 1]).toBe(false); // not yet: one more try
+      window.ANSWERS_META = M; // it lands on the second try
+      await act(async () => { vi.advanceTimersByTime(3000); await Promise.resolve(); await Promise.resolve(); });
+      expect(seen[seen.length - 1]).toBe(false);
+      cleanup();
+      delete window.ANSWERS_META;
+      seen.length = 0;
+      render(<Probe />);
+      await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+      await act(async () => { vi.advanceTimersByTime(3000); await Promise.resolve(); await Promise.resolve(); });
+      expect(seen[seen.length - 1]).toBe(true);
+    } finally { vi.useRealTimers(); delete window.ANSWERS_META; }
   });
 });
 

@@ -17,7 +17,7 @@ import { FindInUnit } from '../components/FindInUnit.jsx';
 import { wtlbHlKey, wtlbHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { AnswersTopic, answersHeadCover, answersHlDomChanged } from '../components/AnswersTopic.jsx';
-import { AnsIcon, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
+import { AnsIcon, useAnswersMetaState, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { answersAnchorPara, answersMetaFor } from '../../utils/answers-sections.js';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
@@ -37,7 +37,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // until ANSWERS_META lands: the body waits up to 300 ms for it, then paints plain and is decorated
   // in place when it arrives.
   const isAns = volKey === 'answers';
-  const ansMetaAll = useAnswersMeta(isAns);
+  const [ansMetaAll, ansMetaFailed] = useAnswersMetaState(isAns);
   const ansMeta = ansMetaAll ? ansMetaAll[entry.id] || null : null;
   const [ansWaited, setAnsWaited] = React.useState(false);
   React.useEffect(() => {
@@ -488,7 +488,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   const srcMeta = { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null };
   const ansPage = isAns ? (
     <AnswersTopic
-      entry={entry} entries={answers ? answers.entries : null} meta={ansMeta} metaAll={ansMetaAll}
+      entry={entry} entries={answers ? answers.entries : null} meta={ansMeta} metaAll={ansMetaAll} metaFailed={ansMetaFailed}
       site={typeof ANSWERS_SITE_META !== 'undefined' ? ANSWERS_SITE_META : null}
       ready={ansReady} inert={inert} ts2={answersLayoutClass(fontScale, false).includes('ans-ts2')} landedPara={landedPara}
       mainRef={wtlbMainRef} isRead={(answers && answers.isRead) || (() => false)} pathOn={!!(answers && answers.pathOn)}

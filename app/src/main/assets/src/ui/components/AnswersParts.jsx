@@ -113,15 +113,31 @@ export function AnsRow({ title, sub, onClick, href, num, icon, one, label, haspo
  * @returns {Record<string, any> | null}
  */
 export function useAnswersMeta(enabled = true) {
+  return useAnswersMetaState(enabled)[0];
+}
+
+/**
+ * The sidecars and whether they failed: a load that leaves no ANSWERS_META (offline, a 404) is
+ * tried once more 3 s on (the loader forgets a failed load), then reported failed.
+ * @param {boolean} [enabled]
+ * @returns {[Record<string, any> | null, boolean]}
+ */
+export function useAnswersMetaState(enabled = true) {
   const read = () => (typeof window !== 'undefined' && /** @type {any} */ (window).ANSWERS_META) || null;
   const [meta, setMeta] = React.useState(read);
+  const [tries, setTries] = React.useState(0);
   React.useEffect(() => {
-    if (meta || !enabled) return undefined;
-    let live = true;
-    loadAnswersMeta().then(() => { if (live && read()) setMeta(read()); });
-    return () => { live = false; };
-  }, [meta, enabled]);
-  return enabled ? meta : null;
+    if (meta || !enabled || tries > 1) return undefined;
+    let live = true, t = /** @type {any} */ (0);
+    loadAnswersMeta().then(() => {
+      if (!live) return;
+      if (read()) setMeta(read());
+      else if (tries) setTries(2);
+      else t = setTimeout(() => setTries(1), 3000);
+    });
+    return () => { live = false; clearTimeout(t); };
+  }, [meta, enabled, tries]);
+  return [enabled ? meta : null, enabled && !meta && tries > 1];
 }
 
 /* The reading path (f01 #8, U16): the topic finished last, kept on this device only. The landing's

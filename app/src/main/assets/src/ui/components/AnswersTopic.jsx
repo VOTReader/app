@@ -262,10 +262,10 @@ function closesPassage(entry, meta, i) {
 /* ── Hero (f07, f11) ──────────────────────────────────────────────── */
 
 /**
- * @param {{ entry: any, entries: any[] | null, meta: any, heroRef: any, onEyebrow: (shelf: any) => void,
+ * @param {{ entry: any, entries: any[] | null, meta: any, pending: boolean, heroRef: any, onEyebrow: (shelf: any) => void,
  *   onContents: () => void, h1: any }} props
  */
-function Hero({ entry, entries, meta, heroRef, onEyebrow, onContents, h1 }) {
+function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1 }) {
   const eb = entries ? answersEyebrow(entries, entry) : null;
   const cl = meta ? answersContentsLine(entry, meta) : null;
   return (
@@ -276,7 +276,8 @@ function Hero({ entry, entries, meta, heroRef, onEyebrow, onContents, h1 }) {
           ? <a className="ans-eyebrow ans-label" href="#" onClick={(e) => { e.preventDefault(); onEyebrow(eb.shelf); }}>{eb.text}<Chev /></a>
           : <p className="ans-label">{eb.text}</p>) : null}
         {h1 || <h1 className={'ans-display' + (answersLongTitle(entry) ? ' is-long' : '')}>{entry.title}</h1>}
-        <p className="ans-meta">{meta ? answersHeroMeta(entry, meta) : <em>Loading contents…</em>}</p>
+        {/* no line once the sidecars are in without this topic's row, or could not load */}
+        {meta ? <p className="ans-meta">{answersHeroMeta(entry, meta)}</p> : pending ? <p className="ans-meta"><em>Loading contents…</em></p> : null}
         {cl ? (
           <button type="button" className="ans-contents-line" aria-haspopup="dialog" onClick={onContents}>
             <span className="ans-names">{cl.names}</span><span className="ans-more">{cl.more}<Chev /></span>
@@ -310,13 +311,13 @@ function writeFold(id, on) {
  */
 
 /**
- * @param {{ entry: any, entries: any[] | null, meta: any, metaAll: any, site: any, ready: boolean, inert?: boolean,
+ * @param {{ entry: any, entries: any[] | null, meta: any, metaAll: any, metaFailed?: boolean, site: any, ready: boolean, inert?: boolean,
  *   ts2: boolean, landedPara: number, mainRef: any, isRead: (id: string) => boolean, pathOn: boolean, findOn: boolean,
  *   act: AnswersTopicActions, nav: any }} props
  *   nav, the route's hand-offs: { openTopic(id, anchor), openGroup(key), openLanding(), openStudy(id, url),
  *   searchLibrary(q), goToRef(ref) }
  */
-export function AnswersTopic({ entry, entries, meta, metaAll, site, ready, inert, ts2, landedPara, mainRef, isRead, pathOn, findOn, act, nav }) {
+export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, ready, inert, ts2, landedPara, mainRef, isRead, pathOn, findOn, act, nav }) {
   const heroRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const [sheet, setSheet] = React.useState(/** @type {any} */ (null));
   const [cur, setCur] = React.useState(0);
@@ -600,7 +601,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, site, ready, inert
         ) : null}
         <div className="ans-topic-main" ref={mainRef} data-copy-key={'wtlb:' + entry.id} data-mark-entry={'wtlb:' + entry.id + ':'}
           data-mark-blocks={entry.paragraphs.length} onClick={(e) => onTap(e, null)} onKeyDown={(e) => onTap(e, null)}>
-          <Hero entry={entry} entries={entries} meta={meta} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} />
+          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} />
           <div className="ans-reading">{body}</div>
           {/* Reading-end sentinel: end of body text, before the foot. */}
           <div className="reading-end" />
