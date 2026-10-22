@@ -221,6 +221,7 @@ describe('describeTab', () => {
       expect(describeTab({ screen: 'answers-group', letterId: 'other' }).title).toBe('Other Topics');
       expect(describeTab({ screen: 'answers-group', letterId: 'gone' }).title).toBe('Answers');
       expect(describeTab({ screen: 'answers-media' }).title).toBe('Charts & videos');
+      expect(describeTab({ screen: 'answers-saved' })).toEqual({ title: 'Saved answers', subtitle: 'Answers Only God Can Give', resolved: true });
       // The retired screens are named for where they reopen (answers-retired.js).
       expect(describeTab({ screen: 'answers-az' }).title).toBe('Answers');
       expect(describeTab({ screen: 'answers-subject', letterId: 'walking-with-god' }).title).toBe('The walk of faith');
@@ -237,7 +238,7 @@ describe('describeTab', () => {
         'search', 'history', 'settings', 'about', 'library', 'my-progress',
         'journal-home', 'journal-viewer', 'journal-editor', 'notes-index',
         'links-index', 'bookmarks-index', 'highlights-index', 'home',
-        'answers-home', 'answers-az', 'answers-subject', 'answers-group', 'answers-media',
+        'answers-home', 'answers-az', 'answers-subject', 'answers-group', 'answers-media', 'answers-saved',
       ];
       for (const screen of corpusIndependent) {
         const d = describeTab({ screen });

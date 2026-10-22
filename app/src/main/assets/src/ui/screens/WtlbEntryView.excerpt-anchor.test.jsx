@@ -87,6 +87,15 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(seekOffsetSeen.at(-1)).toBe(0);
   });
 
+  it('a saved mark names its paragraph (Saved answers, O5): words a page repeats land on that copy, not the first', () => {
+    const twice = { ...ENTRY, paragraphs: [...ENTRY.paragraphs, { align: 'justify', text: ENTRY.paragraphs[0].text }] };
+    renderEntry({ entry: twice, surpriseAnchor: { type: 'excerpt', text: twice.paragraphs[2].text, letterId: ENTRY.id, para: 2 } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['wtlb:matters-of-the-heart:2']);
+    expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:2"]').className).toContain('pulse');
+    expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:0"]').className).not.toContain('pulse');
+  });
+
   it('moving to the next entry inside the 4 s does not carry the pulse or the seek there (v01-03)', () => {
     // Improvement sweep 2026-09-22, v01-reading-03: the entry changes in the SAME instance, the
     // anchor (made for the old entry) is skipped by the letterId guard - which returned before

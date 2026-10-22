@@ -9002,6 +9002,7 @@
 .ans-hit-snip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--fs-18);line-height:1.6;color:var(--cream-dim)} /* r2: dim, so group titles lead; the term stays --cream 600 */
 .ans-hit-snip mark{background:none;color:var(--cream);font-weight:600}
 .ans-hit-src{display:block;margin-top:4px}
+.ans-hit-note{color:var(--cream-dim)} /* O5: a note's own words, under the words it is on */
 
 /* Topic hero */
 .ans-hero{padding:12px 0 16px;border-bottom:1px solid var(--border)}

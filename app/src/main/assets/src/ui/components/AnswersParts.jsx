@@ -14,6 +14,7 @@
 import { h, Fragment } from '../jsx-h.js';
 import { NBSP, answersLeadSplit } from '../../utils/answers-browse.js';
 import { loadAnswersMeta } from '../../utils/sync-loaders.js';
+import { answersSaved } from '../../utils/answers-extras.js';
 
 /** 24 × 24 outline paths (§2.4). */
 export const ANS_ICONS = Object.freeze({
@@ -35,6 +36,7 @@ export const ANS_ICONS = Object.freeze({
   list: 'M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01',
   zoom: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5L20 20M8 10.5h5M10.5 8v5',
   link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  bookmark: 'M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z',
 });
 
 /**
@@ -138,6 +140,27 @@ export function useAnswersMetaState(enabled = true) {
     return () => { live = false; clearTimeout(t); };
   }, [meta, enabled, tries]);
   return [enabled ? meta : null, enabled && !meta && tries > 1];
+}
+
+/**
+ * Saved answers (O5): the reader's marks and notes on Answers, live (AnnotationStore and NoteStore,
+ * on this device only), grouped by topic in the site's order (answers-extras.js answersSaved).
+ * @param {any[] | null} entries ANSWERS
+ * @returns {import('../../utils/answers-extras.js').AnswersSaved}
+ */
+export function useAnswersSaved(entries) {
+  const has = typeof AnnotationStore !== 'undefined' && typeof NoteStore !== 'undefined';
+  const subscribe = React.useCallback((/** @type {() => void} */ cb) => {
+    if (!has) return () => {};
+    const a = AnnotationStore.subscribe(cb);
+    const b = NoteStore.subscribe(cb);
+    return () => { a(); b(); };
+  }, [has]);
+  const ver = React.useSyncExternalStore(subscribe, () => (has ? AnnotationStore.getVersion() + ':' + NoteStore.getVersion() : ''));
+  return React.useMemo(() => answersSaved(entries, has ? AnnotationStore.all() : null,
+    (gid) => { const n = has ? NoteStore.get(gid) : null; return (n && n.body) || ''; }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ver is the stores' version: a new one means new marks
+  [entries, ver, has]);
 }
 
 /* The reading path (f01 #8, U16): the topic finished last, kept on this device only. The landing's

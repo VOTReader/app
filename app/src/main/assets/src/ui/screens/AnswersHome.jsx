@@ -35,11 +35,12 @@ import {
   answersOpenablePool, answersPathState, answersMediaIndex, answersMediaSummary, answersTopSections,
   answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain,
 } from '../../utils/answers-browse.js';
-import { buildAnswersIndex, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
+import { answersIndexOf, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
+import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { MoreQuestionsSheet, CommandmentSheet, AboutSheet } from '../sheets/AnswersSheets.jsx';
+import { answersSavedSum } from '../../utils/answers-extras.js';
 
 /** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | null} AnswersSheetState */
 
@@ -60,14 +61,9 @@ function rememberQuery(q) {
   writeRecent([t].concat(readRecent().filter((x) => x.toLowerCase() !== t.toLowerCase())).slice(0, 5));
 }
 
-/* The search index and the day's pool cost tens of ms on a phone; the corpus and its sidecars are
-   fixed arrays once loaded, so each is built once per array, not on every landing mount. */
-let _index = { of: /** @type {any} */ (null), v: /** @type {any} */ (null) };
-function indexOf(list) {
-  if (!list.length) return [];
-  if (_index.of !== list) _index = { of: list, v: buildAnswersIndex(list) };
-  return _index.v;
-}
+/* The day's pool costs tens of ms on a phone; the corpus and its sidecars are fixed arrays once
+   loaded, so it is built once per array, not on every landing mount (the search index likewise:
+   answersIndexOf). */
 let _pool = { of: /** @type {any} */ (null), meta: /** @type {any} */ (null), v: /** @type {any} */ (null) };
 function dailyPoolOf(entries, meta) {
   if (_pool.of !== entries || _pool.meta !== meta) _pool = { of: entries, meta, v: answersDailyPool(entries, meta) };
@@ -343,7 +339,7 @@ function Results({ entries, results, titleOnly, query, onOpenTopic, onSearchLibr
 
 /** Contents (f01, f02): the site's sidebar in its order. A memo, so typing in the field above never re-renders it. */
 const Contents = React.memo(/** @param {any} props */ function Contents(props) {
-  const { loaded, byId, shelves, meta, isRead, media, site, onOpenTopic, onOpenGroup, onOpenMedia, setSheet } = props;
+  const { loaded, byId, shelves, meta, isRead, media, saved, site, onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, setSheet } = props;
   const openTopic = (id) => onOpenTopic(id, null, 'Answers');
   const openSheet = (s) => { if (loaded) setSheet(s); };
   const sub = (e) => (
@@ -401,6 +397,7 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
           ) : null}
           <div className="ans-tools">
             <AnsRow icon="chart" title="Charts & videos" sub={answersMediaSummary(media)} onClick={() => onOpenMedia && onOpenMedia()} />
+            {saved && onOpenSaved ? <AnsRow icon="bookmark" title="Saved answers" sub={saved} onClick={() => onOpenSaved()} /> : null}
           </div>
           {site ? (
             <p className="ans-credit">
@@ -418,10 +415,10 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
  * @param {{ entries: any[] | null, site?: any, isRead?: (id: string) => boolean, pathOn?: boolean, pathLast?: string | null,
  *   fontScale?: any, now?: Date, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
  *   onThemeChange?: any, onOpenTopic: Function, onOpenGroup?: (key: string) => void, onOpenMedia?: () => void,
- *   onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void, onOpenLetter?: (target: any) => void }} props
+ *   onOpenSaved?: () => void, onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void, onOpenLetter?: (target: any) => void }} props
  */
 export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, now, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
-  onOpenTopic, onOpenGroup, onOpenMedia, onSearchLibrary, onGoToRef, onOpenLetter }) {
+  onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, onSearchLibrary, onGoToRef, onOpenLetter }) {
   const meta = useAnswersMeta();
   const loaded = Array.isArray(entries) && entries.length > 0;
   const list = React.useMemo(() => (loaded ? /** @type {any[]} */ (entries) : []), [loaded, entries]);
@@ -440,7 +437,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const shelves = React.useMemo(() => answersBrowseShelves(list), [list]);
   const order = React.useMemo(() => answersSiteOrder(list), [list]);
   const posOf = React.useMemo(() => { const m = new Map(order.map((e, i) => [e.id, i])); return (id) => (m.has(id) ? m.get(id) : 1e6); }, [order]);
-  const index = React.useMemo(() => indexOf(list), [list]);
+  const index = React.useMemo(() => answersIndexOf(list), [list]);
   const opts = React.useMemo(() => ({ pos: posOf, sections: (id) => (meta && meta[id] && meta[id].sections) || null }), [posOf, meta]);
   const deferred = React.useDeferredValue(query);
   const q = query.trim();
@@ -450,6 +447,8 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const titleOnly = React.useMemo(() => (pending && loaded ? answersTitleMatches(index, query, opts) : null), [pending, loaded, index, query, opts]);
   const recentMode = focused && !q && recent.length > 0;
   const media = React.useMemo(() => (loaded && meta ? answersMediaIndex(list, meta) : null), [loaded, list, meta]);
+  // O5: the Tools row counts the reader's marks live, and shows only when there are any.
+  const savedSum = answersSavedSum(useAnswersSaved(loaded ? list : null));
 
   // Back with a query typed clears it before it leaves the screen (Android Back order, §2.5).
   React.useEffect(() => {
@@ -481,8 +480,8 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
 
   const openSheet = (s) => { if (loaded) setSheet(s); };
   const cmdShelf = sheet && sheet.kind === 'cmd' ? shelves.commandments.find((s) => s.num === sheet.n) : null;
-  const contents = <Contents loaded={loaded} byId={byId} shelves={shelves} meta={meta} isRead={isRead} media={media} site={site}
-    onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} onOpenMedia={onOpenMedia} setSheet={setSheet} />;
+  const contents = <Contents loaded={loaded} byId={byId} shelves={shelves} meta={meta} isRead={isRead} media={media} saved={savedSum} site={site}
+    onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} onOpenMedia={onOpenMedia} onOpenSaved={onOpenSaved} setSheet={setSheet} />;
 
   // A saved A–Z tab waits for the corpus: until then Contents shows, so it is the selected tab.
   const az = tab === 'az' && loaded;

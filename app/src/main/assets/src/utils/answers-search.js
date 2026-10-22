@@ -159,6 +159,16 @@ export function buildAnswersIndex(entries) {
   return out;
 }
 
+/* The index costs tens of ms on a phone and the corpus is a fixed array once loaded, so it is built
+   once per array for every screen that reads it (the landing's search, Saved answers, a card's source). */
+let _index = { of: /** @type {any} */ (null), v: /** @type {ReturnType<typeof buildAnswersIndex>} */ ([]) };
+/** @param {any[]} list ANSWERS */
+export function answersIndexOf(list) {
+  if (!list || !list.length) return [];
+  if (_index.of !== list) _index = { of: list, v: buildAnswersIndex(list) };
+  return _index.v;
+}
+
 /**
  * @typedef {object} AnswersSearchGroup
  * @property {any} entry

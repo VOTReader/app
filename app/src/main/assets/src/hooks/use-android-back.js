@@ -37,7 +37,7 @@
    │  7. search                                → goSearchOrigin            │
    │  8. scripture-genre                       → goScripturesHome          │
    │  9. scriptures-home / volumes-home        → goHome                    │
-   │     · answers-home → goHome; answers-group / -media → answers-home     │
+   │     · answers-home → goHome; answers-group/-media/-saved → the landing│
    │ 10. matthew-ch / -idx, bible-study-* ,     → context-aware (fromSearch │
    │     bible-ch / -idx                          / fromStudies / fromWtlb │
    │                                              / single-chapter book …) │
@@ -345,10 +345,10 @@ export function useAndroidBack({
       if (s === "volumes-home") {goHome();return "true";} else
       // Answers: the landing is also the collection's indexScreen, so it must be
       // matched BEFORE the index-screen rule below sends it to Volumes. A shelf and
-      // Charts & videos (and the retired subject / A–Z screens) step back to the landing; a topic unwinds by the tap-through
+      // Charts & videos, Saved answers (and the retired subject / A–Z screens) step back to the landing; a topic unwinds by the tap-through
       // stack its opener pushed, else the letter-screen rule (indexScreen).
       if (s === "answers-home") {goHome();return "true";} else
-      if (s === "answers-group" || s === "answers-media" || s === "answers-subject" || s === "answers-az") {setScreen("answers-home");return "true";} else
+      if (s === "answers-group" || s === "answers-media" || s === "answers-saved" || s === "answers-subject" || s === "answers-az") {setScreen("answers-home");return "true";} else
       // Track D: a chapter picked from the index a book-level hit opened (fromSearchIndex) backs
       // to that index, which backs to the results; one a hit opened backs to the results.
       if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current && !fromSearchIndexRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {if (fromSearchIndexRef.current && setFromSearchIndex) setFromSearchIndex(false);setChapterNum(null);setScreen("matthew-idx");}return "true";} else

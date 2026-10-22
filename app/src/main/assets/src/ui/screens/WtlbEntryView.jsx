@@ -152,7 +152,10 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     // open with the previous paragraph's last words, read-along find 2026-09-22.)
     const excerpt = squash(surpriseAnchor.text);
     const paras = entry.paragraphs || [];
-    const { index: found, off } = excerptLanding(excerpt, paras.map((p) => squash(p && p.text)), surpriseAnchor.find && surpriseAnchor.find.terms);
+    // A saved mark names its paragraph (Saved answers, O5): that one, not the first with the same words.
+    const para = surpriseAnchor.para;
+    const { index: found, off } = Number.isInteger(para) && para >= 0 && para < paras.length ? { index: para, off: null }
+      : excerptLanding(excerpt, paras.map((p) => squash(p && p.text)), surpriseAnchor.find && surpriseAnchor.find.terms);
     if (found < 0) return;
     setLandedPara(found);
     setLandedOff(off);

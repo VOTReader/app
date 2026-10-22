@@ -51,6 +51,7 @@ import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
 import { AnswersShelf } from './screens/AnswersShelf.jsx';
 import { AnswersMedia } from './screens/AnswersMedia.jsx';
+import { AnswersSaved } from './screens/AnswersSaved.jsx';
 import { readAnswersPath, writeAnswersPath } from './components/AnswersParts.jsx';
 import { ANSWERS_SUBJECT_GROUP, isAnswersGroupKey } from '../utils/answers-retired.js';
 import { answersSectionAnchor } from '../utils/answers-sections.js';
@@ -850,6 +851,7 @@ export function buildScreenRoutes({
       onBack={goHome}
       onOpenGroup={_openAnswersGroup}
       onOpenMedia={() => setScreen('answers-media')}
+      onOpenSaved={() => setScreen('answers-saved')}
       onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
       onOpenLetter={(target) => openInAppLetter(target, { sourceLetterTitle: 'Answers', sourceVolumeLabel: null })}
       onGoToRef={(ref) => {
@@ -865,7 +867,8 @@ export function buildScreenRoutes({
   // a link naming a section (a site #fragment, `section`) lands on that
   // section instead (answers-sections.js, aogcg 1b).
   // find (U8): a passage search hit also presets find-in-topic to its query (FindInUnit's pill).
-  const _openAnswersTopic = (id, anchorText, fromTitle, section, find) => {
+  // para (Saved answers, O5): the paragraph itself, so a mark on words a topic repeats lands on its own copy.
+  const _openAnswersTopic = (id, anchorText, fromTitle, section, find, para) => {
     pushFromLetter({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: null, sourceChapterNum: null, sourceStudyId: null, sourceStudyChapterId: null,
@@ -874,7 +877,7 @@ export function buildScreenRoutes({
     });
     window.navHandoff.clear('pendingHighlight');
     setSurpriseAnchor(section ? answersSectionAnchor(id, section)
-      : anchorText ? { type: 'excerpt', text: anchorText, letterId: id, ...(find ? { find } : {}) } : null);
+      : anchorText ? { type: 'excerpt', text: anchorText, letterId: id, ...(find ? { find } : {}), ...(Number.isInteger(para) ? { para } : {}) } : null);
     setLetterId(id);
     setActiveReadKey('vol:answers', () => setLastReadForVol('answers', id));
     setScreen('answers-entry');
@@ -1747,6 +1750,10 @@ export function buildScreenRoutes({
     'answers-group': () => _wrapAnswers((entries) => _answersShelf(entries, letterId)),
     'answers-media': () => _wrapAnswers((entries) => (
       <AnswersMedia {..._answersNavProps} entries={entries} site={_answersSite()} fontScale={settings.fontScale} onBack={() => setScreen('answers-home')} />
+    )),
+    // O5: the reader's highlights and notes in Answers, by topic in the site's order.
+    'answers-saved': () => _wrapAnswers((entries) => (
+      <AnswersSaved {..._answersNavProps} entries={entries} fontScale={settings.fontScale} onBack={() => setScreen('answers-home')} />
     )),
     // Retired by the AOGCG redesign (answers-retired.js): a place saved on the nine subjects or the
     // old A–Z screen opens where its topics live now (use-saved-state rewrites the record itself).

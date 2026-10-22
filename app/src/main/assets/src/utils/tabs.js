@@ -105,6 +105,7 @@ export function describeTab(tab) {
       : { title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
   }
   if (s === 'answers-media') return { title: 'Charts & videos', subtitle: 'Answers Only God Can Give', resolved: true };
+  if (s === 'answers-saved') return { title: 'Saved answers', subtitle: 'Answers Only God Can Give', resolved: true };
   // The retired subject and A–Z screens are named for where they reopen (answers-retired.js).
   if (s === 'answers-subject' || s === 'answers-az') return describeTab(answersRetiredPlace({ ...tab }));
 
