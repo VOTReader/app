@@ -87,7 +87,8 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
               (answers-home) rather than the website; the landing's About sheet links the site. */}
           {onOpenAnswers ? (
             <button type="button" className="chapter-card-btn" onClick={onOpenAnswers}>
-              <span className="chapter-card-num">{list.length + 1}</span>
+              {/* Numbered after the studies, once they are all in (a "1" while they load would be a lie). */}
+              <span className="chapter-card-num">{studiesLoading || studiesError ? '' : list.length + 1}</span>
               <div className="chapter-card-divider" />
               <div className="chapter-card-info">
                 <div className="chapter-card-label">Topics & Doctrines</div>

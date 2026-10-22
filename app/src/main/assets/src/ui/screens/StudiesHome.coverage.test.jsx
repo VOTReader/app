@@ -107,3 +107,18 @@ describe('StudiesHome -- the read-along badge', () => {
     expect(badgeOf('Purity').textContent).toBe('No recording');
   });
 });
+
+describe('StudiesHome -- the Answers row (U14)', () => {
+  const answersNum = () => [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Answers Only God Can Give')).querySelector('.chapter-card-num').textContent;
+  const props = { onRetry: noop, onSelectStudy: noop, onOpenAnswers: noop, onBack: noop, onSearch: noop, onHistory: noop, onSettings: noop, theme: 'dark', onThemeChange: noop };
+  it('is numbered after the studies once they are in, and not "1" while they load or after they fail', () => {
+    const a = render(<StudiesHome {...props} studies={STUDIES} studiesLoading={false} studiesError={null} />);
+    expect(answersNum()).toBe('4');
+    a.unmount();
+    const b = render(<StudiesHome {...props} studies={null} studiesLoading studiesError={null} />);
+    expect(answersNum()).toBe('');
+    b.unmount();
+    render(<StudiesHome {...props} studies={null} studiesLoading={false} studiesError="offline" />);
+    expect(answersNum()).toBe('');
+  });
+});

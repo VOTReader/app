@@ -46,7 +46,7 @@ import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../util
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
-import { AnswersHome } from './screens/AnswersHome.jsx';
+import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
 import { AnswersShelf } from './screens/AnswersShelf.jsx';
 import { AnswersMedia } from './screens/AnswersMedia.jsx';
 import { readAnswersPath, writeAnswersPath } from './components/AnswersParts.jsx';
@@ -1496,7 +1496,7 @@ export function buildScreenRoutes({
             selectStudy(slug);
           }
         }}
-        onOpenAnswers={() => { _startNewTrail(); setScreen('answers-home'); }}
+        onOpenAnswers={() => { _startNewTrail(); resetAnswersLanding(); setScreen('answers-home'); }}
         onBack={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
