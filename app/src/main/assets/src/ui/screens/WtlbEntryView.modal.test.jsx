@@ -133,6 +133,12 @@ describe('WtlbEntryView scripture sheet — modal registry [C1]', () => {
     // The documented trap (use-modal-registry.js header): a per-modal Escape
     // listener races the app-level dispatcher and one press both dismisses
     // AND navigates back.
+    // jsdom builds its selector engine on a document's first selector call
+    // (querySelector, closest, matches), and that engine adds its own keydown
+    // listener to the window. Warm it first: otherwise the count depends on
+    // whether a test that ran earlier in this worker already called one
+    // (shuffled suite, seed 20261022, VOT_VITEST_FAST=1).
+    document.body.closest('body');
     const spy = vi.spyOn(window, 'addEventListener');
     renderEntry();
     openSheet();
