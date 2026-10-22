@@ -74,6 +74,17 @@ const NAV_ONLY_KINDS = new Set(['ref-bible', 'ref-letter', 'command']);
  */
 const NAV_TEXT_LIMIT = 5;
 
+/* A TEXT DESCRIBED, NOT QUOTED (search200 sealed2, 2026-10-22). A reader describing a text opens with what it is and how it
+   speaks ("letter saying now is the time for servants watchmen and trumpet", the panel's unsealed t498; "the part where
+   your own measure comes back to you"), and those words are none of the text's: "letter" and "saying" weighed as
+   subject words, and texts holding them led the one holding what the letter says. A query opening with a text's kind
+   (letter, passage, part, entry, verse, section) and a telling word (saying, says, that says, explaining, describing,
+   telling, where, about) is searched as what follows, two words or more. A kind typed alone ("the letter sent") is a
+   word of a title, and stays. */
+const DESCRIBED = /^\s*(?:the\s+|a\s+)?(?:letter|passage|part|entry|verse|section)\s+(?:saying|says|that\s+says|explaining|explains|describing|telling|where|about)\s+(?=\S+\s+\S)/i;
+/** A query with its describing opening left off (DESCRIBED). */
+const undescribed = (/** @type {string} */ q) => q.replace(DESCRIBED, '');
+
 /* Typo tolerance is a FALLBACK (2026-09-22). MiniSearch rounds fuzzy 0.2 to ONE edit
    on a three-letter word, so a correctly spelled "one" also matched "owe" and "gone",
    "son" matched "sun", "peace" matched "place": verses the reader never asked for, with
@@ -2399,7 +2410,8 @@ async function search(query, options) {
     if (edge) parsed = edge;
     if (NAV_ONLY_KINDS.has(parsed.kind) && !parsed.alsoText) return { parsed, results: [], parsedTerms: [], textQuery: null };
   }
-  const textQ = typeof parsed.text === 'string' && parsed.text.trim() ? parsed.text : query;
+  const typedQ = typeof parsed.text === 'string' && parsed.text.trim() ? parsed.text : query;
+  const textQ = undescribed(typedQ);
 
   /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
      ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
@@ -2438,7 +2450,7 @@ async function search(query, options) {
      readings of one query, and the return carries both. */
   const navAlso = parsed.kind !== 'text';
   const useStop = options.useStopWords !== false;
-  const read = navAlso ? parseTextQuery(textQ) : parsed;
+  const read = navAlso || textQ !== typedQ ? parseTextQuery(textQ) : parsed;
   /* A BARE WORD BESIDE A QUOTED PHRASE IS A WORD THE TEXT HOLDS (sweep 2026-10-14 v001). Only the phrase was
      searched, so '"love one another" brethren' showed every text holding the phrase, ranked and marked as if
      "brethren" was never typed. It narrows the phrase as a +word does (a small word aside); a phrase and word
