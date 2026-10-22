@@ -799,9 +799,11 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     }
   });
   // Below 334 px, 3.6vw alone fell under the 12 px floor for spaced capitals (the Browse review, 10-22).
-  it('the Answers label (Cinzel, .14em) never drops under 12 px: clamp(--fs-12, 3.6vw, --fs-13)', () => {
+  // The floor is the FIXED 12 px (--fsc-12): --fs-12 follows Text Size, so at Text Size 3 it made every
+  // label 36 px (the Topic stage's f07-ts3 capture; the design caps it at 3.6vw, 12.96 px at 360).
+  it('the Answers label (Cinzel, .14em) never drops under 12 px nor grows with Text Size: clamp(--fsc-12, 3.6vw, --fs-13)', () => {
     const block = ruleBlock(CSS, '.ans-label{');
-    expect(block).toMatch(/font-size:\s*clamp\(var\(--fs-12\),\s*3\.6vw,\s*var\(--fs-13\)\)/);
+    expect(block).toMatch(/font-size:\s*clamp\(var\(--fsc-12\),\s*3\.6vw,\s*var\(--fs-13\)\)/);
     expect(block).toMatch(/letter-spacing:\s*\.14em/);
   });
   it('the letter hero eyebrow never drops under 12 px on a phone', () => {
