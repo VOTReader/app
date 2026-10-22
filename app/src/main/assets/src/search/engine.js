@@ -2699,6 +2699,33 @@ async function search(query, options) {
       }
     }
   }
+  /* A QUOTE TYPED ONE WORD OFF, WHEREVER IT RANKS (search200 fix1, scope cause 1). The pass above grades a run one
+     word off in the PHRASE_CANDIDATES best-scored texts alone, a cut drawn over every collection before any scope: a
+     verse quoting the typed words with one swapped, outscored by hundreds of texts thick with them, was never graded
+     ("the god of this nation israel": Acts 13:17 was #501). Each typed word in turn is the slip, and the run on its
+     longer side is read from the token store (runHolders, as B3 reads the whole run); a text holding it and the
+     pass's own cover is graded too. */
+  if (!p.phrase && required > 1 && typedTokens.length >= RUN_MIN + 1) {
+    const needCover = required >= 3 ? required - 1 : required;
+    const graded = new Set();
+    for (let k = 0; k < typedTokens.length; k++) {
+      const left = typedTokens.slice(0, k);
+      const right = typedTokens.slice(k + 1);
+      const side = left.length >= right.length ? left : right;
+      if (side.length < RUN_MIN || side.every((t) => STOP.has(t))) continue;
+      const hs = runHolders(side);
+      if (!hs) continue;
+      for (const id of hs.keys()) {
+        if (graded.has(id) || id in nearOf || scoreMap[id] === undefined) continue;
+        if (popcount((termMask[id] || 0) & requiredMask) < needCover) continue;
+        graded.add(id);
+        const d = docLookup[id];
+        if (!d) continue;
+        const near = eachWording(docTokens(id, d), (t) => nearPhrase(t, typedTokens, STOP));
+        if (near >= NEAR_PHRASE_MIN) { nearOf[id] = near; scoreMap[id] *= 1 + (PHRASE_BOOST - 1) * near * near; }
+      }
+    }
+  }
   // One word that means anything among small ones ("for you to embrace me"): the texts holding the typed run exactly.
   // The card marks the run, so its excerpt and the landing go to it, not the word's first place (textQuery.run).
   let run = '';
@@ -2910,6 +2937,14 @@ async function search(query, options) {
     }
     const inGated = new Set(gated);
     const cands = pool(rankedIds, ALIGN_CANDIDATES, (id) => inGated.has(id), (id) => massOf(id, maskOwn(id)) >= ALIGN_MASS);
+    /* ...and every text graded near the phrase is aligned, past the cut and the gate (search200 fix1, cause 1). A text
+       added so may be held, but is never the near miss (`under`): the wider list lifts a text, and never drops one the
+       gated texts alone would hold ("happy is the lord god of": Luke 1:68, never gated, tied every held verse). */
+    /** @type {Set<string>} */ const nearAdded = new Set();
+    {
+      const inCands = new Set(cands);
+      for (const id in nearOf) if (nearOf[id] >= NEAR_PHRASE_MIN && !inCands.has(id) && scoreMap[id] !== undefined) { cands.push(id); nearAdded.add(id); }
+    }
     const w = alignWeights(typedTokens, df, n);
     for (let i = 0; i < typedTokens.length; i++) if (lostTok.has(typedTokens[i]) && !STOP.has(typedTokens[i])) w[i] = 0;
     const cls = alignClasses(typedTokens, { stop: STOP, id: (t) => AS.ids.get(t), word: (x) => AS.words[x], lexicon: ALIGN_LEXICON });
@@ -3001,7 +3036,7 @@ async function search(query, options) {
       }
       // it opens where the first typed words are (clauses typed in the other order: on the first typed)
       if (a.cov >= ALIGN_HELD) alignHeld.set(id, { cov: a.cov, start: a.first, rank: 0, met: alignMet(at[0], at[1], at[2], w, cls) });
-      else if (a.cov > under) { under = a.cov; underAt = at; }
+      else if (a.cov > under && !nearAdded.has(id)) { under = a.cov; underAt = at; }
     }
     const underMet = underAt ? alignMet(underAt[0], underAt[1], underAt[2], w, cls) : null;
     /* Held, and told from the rest: a text holding the quote within a small word of one just under ALIGN_HELD holds it
