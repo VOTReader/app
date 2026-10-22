@@ -1958,6 +1958,36 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
+  it('a selection across two passages is cited by the passage it starts in', async () => {
+    const w = /** @type {any} */ (window);
+    w.ANSWERS = [{ id: 'there-is-no-other', title: 'THERE IS NO OTHER', paragraphs: [
+      { text: 'For I am a Great King! Says The Lord.' }, { text: '~ [From “The Alarm of War” ~ Volume 7]' },
+      { text: 'Be still, and know.' }, { text: '~ [From “A Second Letter” ~ Volume 3]' }] }];
+    const ps = ['For I am a Great King! Says The Lord.', '~ [From “The Alarm of War” ~ Volume 7]', 'Be still, and know.']
+      .map((t, i) => readingContainer('wtlb:there-is-no-other:' + i, t));
+    mount();
+    const r = document.createRange();
+    r.setStart(/** @type {any} */ (ps[0].firstChild), 4);
+    r.setEnd(/** @type {any} */ (ps[2].firstChild), 9);
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    stubSelection(r);
+    act(() => { fire(ps[0], 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => { fire(ps[2], 'pointerup', { clientX: 80, clientY: 5 }); await new Promise((res) => setTimeout(res, 250)); });
+    act(() => { /** @type {HTMLElement} */ (door(/** @type {HTMLElement} */ (document.querySelector('.sel-toolbar')))).click(); });
+    const label = document.querySelector('[role="dialog"][aria-label="Share as a card"] canvas').getAttribute('aria-label');
+    expect(label.startsWith('I am a Great King!')).toBe(true);
+    expect(label.endsWith('“The Alarm of War” · Volume 7')).toBe(true);
+    expect(label).not.toContain('A Second Letter');
+  });
+
+  it('not on a selection with no words in it (nothing to set on a card)', async () => {
+    const c = readingContainer('wtlb:there-is-no-other:0', '** __ **');
+    mount();
+    const tb = await raise(c, 0, 8);
+    expect(tb).not.toBeNull();
+    expect(door(tb)).toBeNull();
+  });
+
   it('not on Words To Live By, a letter, or before the Answers corpus is in', async () => {
     const w = readingContainer('wtlb:devotion:1', 'Words To Live By');
     mount();

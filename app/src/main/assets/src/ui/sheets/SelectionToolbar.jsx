@@ -6,7 +6,7 @@ import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { AnswersCardSheet } from './AnswersCardSheet.jsx';
-import { answersIsTopicKey, answersCardFor } from '../../utils/answers-extras.js';
+import { answersIsTopicKey, answersCardFor, answersCardWords } from '../../utils/answers-extras.js';
 import { answersIndexOf } from '../../utils/answers-search.js';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
@@ -1332,7 +1332,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
 
   // AOGCG O6, Share as a card: offered on a passage of an Answers topic. Its citation and date are the
   // passage's own (the source line that closes it, the header that dates it: answers-extras.js).
-  const cardKey = answersCardKey(selInfo);
+  // Not on a selection with no words in it (only marks or a cite's brackets): a card would have nothing to show.
+  const cardKey = answersCardKey(selInfo) && answersCardWords((selInfo.share && selInfo.share.body) || selInfo.text) > 0;
   const handleCard = React.useCallback(() => {
     const k = answersCardKey(selInfo);
     if (!k || !selInfo) return;
