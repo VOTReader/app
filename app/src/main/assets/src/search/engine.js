@@ -82,8 +82,16 @@ const NAV_TEXT_LIMIT = 5;
    telling, where, about) is searched as what follows, two words or more. A kind typed alone ("the letter sent") is a
    word of a title, and stays. */
 const DESCRIBED = /^\s*(?:the\s+|a\s+)?(?:letter|passage|part|entry|verse|section)\s+(?:saying|says|that\s+says|explaining|explains|describing|telling|where|about)\s+(?=\S+\s+\S)/i;
-/** A query with its describing opening left off (DESCRIBED). */
-const undescribed = (/** @type {string} */ q) => q.replace(DESCRIBED, '');
+/* ...but what follows may tell what the text is about, not what it says: "the letter where the lord speaks about
+   tithing" asks for the letter titled Tithing, and "the lord speaks about tithing", searched as the text's own words,
+   led a text where the Lord speaks and tithing is named in passing (the sealed2 red team, rt3-30..33). A speaking word
+   and "about" (of, on, concerning, regarding), up to three words in, tell a subject: the query is searched as typed. */
+const SUBJECT_TOLD = /^(?:\S+\s+){0,3}?(?:speaks?|spoke|speaking|talks?|talked|talking|teach(?:es)?|taught|writes?|wrote|tells?|told|explains?|explained|warns?|warned|discuss(?:es)?|discussed)\s+(?:about|of|on|concerning|regarding)\s+\S/i;
+/** A query with its describing opening left off (DESCRIBED), unless what follows tells a subject (SUBJECT_TOLD). */
+const undescribed = (/** @type {string} */ q) => {
+  const rest = q.replace(DESCRIBED, '');
+  return rest !== q && SUBJECT_TOLD.test(rest) ? q : rest;
+};
 
 /* Typo tolerance is a FALLBACK (2026-09-22). MiniSearch rounds fuzzy 0.2 to ONE edit
    on a three-letter word, so a correctly spelled "one" also matched "owe" and "gone",

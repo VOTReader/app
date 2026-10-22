@@ -56,6 +56,13 @@ describe('a text described, not quoted (sealed2)', () => {
     expect(r.parsedTerms).not.toContain('saying');
   });
 
+  it('"the letter where the lord speaks about ..." tells a subject, not the text\'s words: searched as typed', async () => {
+    // (the sealed2 red team, rt3-30..33) read as the Lord's words, "the lord speaks about tithing" led a text where the
+    // Lord speaks and tithing is named in passing, over the letter titled Tithing
+    const r = await E.search('the letter where the lord speaks about tithing');
+    expect(r.parsedTerms).toContain('letter');
+  });
+
   it('a text\'s kind typed with no telling word is searched as typed', async () => {
     const r = await E.search('the letter sent');
     expect(ids(r)[0]).toBe('letter-letter');
