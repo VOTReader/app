@@ -2805,6 +2805,19 @@ async function search(query, options) {
     const sep = t.indexOf(TWIN_SEP);
     return sep < 0 ? t : t.slice(0, sep);
   };
+  /** THE RUN SHOWN FIRST (below): the verses of `held` holding the run in their KJV wording alone (`inKjv`) go just
+      under the lowest text of its own among `held` holding it in the words it shows (their own order kept). */
+  const shownFirst = (/** @type {string[]} */ held, /** @type {Set<string>} */ inKjv) => {
+    if (!inKjv.size) return;
+    let low = Infinity;
+    for (const id of held) {
+      const d = docLookup[id];
+      if (!inKjv.has(id) && d && !REPRINT_KINDS.has(d.kind) && scoreMap[id] < low) low = scoreMap[id];
+    }
+    let high = 0;
+    for (const id of inKjv) if (scoreMap[id] > high) high = scoreMap[id];
+    if (low < Infinity && high >= low) { const f = (low * PART_UNDER_RUN) / high; for (const id of inKjv) scoreMap[id] *= f; }
+  };
   /** @type {Set<string>} the holders holding the run in a verse's KJV wording alone */
   const runInKjv = new Set();
   for (const id of heldWhole) {
@@ -2832,16 +2845,7 @@ async function search(query, options) {
        verse's card shows other words ("I saw a star fall from Heaven" opens a Words To Live By entry; Revelation 9:1
        says it in the KJV, "fallen" in the NKJV). A reprint holding it (Answers, a study, a holy day) quotes the KJV:
        its verse is its original, and keeps its place (originalsFirst). */
-    if (runInKjv.size) {
-      let low = Infinity;
-      for (const id of heldWhole) {
-        const d = docLookup[id];
-        if (!runInKjv.has(id) && d && !REPRINT_KINDS.has(d.kind) && scoreMap[id] < low) low = scoreMap[id];
-      }
-      let high = 0;
-      for (const id of runInKjv) if (scoreMap[id] > high) high = scoreMap[id];
-      if (low < Infinity && high >= low) { const f = (low * PART_UNDER_RUN) / high; for (const id of runInKjv) scoreMap[id] *= f; }
-    }
+    shownFirst(heldWhole, runInKjv);
     for (const id of heldWhole) if (scoreMap[id] > heldTop) heldTop = scoreMap[id];
   }
   // A quoted phrase: every text shown holds it (the filter below), so the original first.
@@ -2849,6 +2853,23 @@ async function search(query, options) {
     for (let i = 0; i < rankedIds.length; i++) {
       const d = docLookup[rankedIds[i]];
       if (d && !REPRINT_KINDS.has(d.kind)) scoreMap[rankedIds[i]] *= ORIGINAL_BOOST;
+    }
+    /* ...and shown first where it is read (search200 fix2): THE RUN SHOWN FIRST holds for a quoted phrase as for a
+       typed run, among the best-scored PHRASE_CANDIDATES. "and it was so" in quotes opened on 2 Kings 12:10, whose
+       KJV wording says it ("So it was" in the NKJV), over Genesis 1:7, whose card says it. */
+    const run = twinNow() ? joinApostropheS(kjvEncode(p.phrase)) : [];
+    if (run.length) {
+      const top = rankedIds.slice().sort((a, b) => scoreMap[b] - scoreMap[a]).slice(0, PHRASE_CANDIDATES);
+      /** @type {string[]} */ const held = [];
+      /** @type {Set<string>} */ const inKjv = new Set();
+      for (const id of top) {
+        const d = docLookup[id];
+        const at = d ? tokenRunAt(docTokens(id, d), run) : -1;
+        if (at < 0) continue;
+        held.push(id);
+        if (d.kind === 'verse' && at >= ownTokens(id, d).length) inKjv.add(id);
+      }
+      shownFirst(held, inKjv);
     }
   }
   /** How the query names a text's title (ranking.js titleMatch); a study chapter's by its own title too. */
