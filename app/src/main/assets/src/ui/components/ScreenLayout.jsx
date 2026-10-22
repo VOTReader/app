@@ -40,9 +40,10 @@ function applySavedScrollToEl(el, saved) {
 
 /**
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
- *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean }} props
+ *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean,
+ *   className?: string }} props  className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2)
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '' }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -306,7 +307,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   const Nav = landmarks ? 'nav' : 'div';
   const Main = landmarks ? 'main' : 'div';
   return (
-    <div className="screen-layout">
+    <div className={className ? 'screen-layout ' + className : 'screen-layout'}>
       <Nav className="top-nav">
         {navChildren}
         <ResumeReadingNavBtn />
