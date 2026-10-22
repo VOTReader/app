@@ -98,14 +98,19 @@ export function squashFactor(ceil, width) {
   return Math.min(MAX_STRETCH, ceil / (width / 2));
 }
 
-/** CSS px per verse at which one verse is a comfortable tap target. */
+/** CSS px per verse at which one verse is a comfortable tap target: THE TAP RULE. It was the
+ *  camera's ceiling until the verse zoom (sweb-z1, Corbin 2026-10-21: "zoom way, way, way in. All
+ *  the way to a single linked verse"); it stays the laws' reference (the ceiling's ease, the
+ *  density law's measurements, D1) and the deepest a flight lands, while the reader's own zoom goes
+ *  on to VERSE_FILL. (The build renames it PPV_TAP_CSS and maxZoomFor tapZoomFor.) */
 export const PPV_MAX_CSS = 44;
 
 /**
- * The zoom ceiling, as a RELATION rather than a constant: the reader may
- * zoom until one verse is PPV_MAX_CSS wide, and no further, because past that
- * nothing new can separate - every arc leaving a verse shares one foot at
- * every zoom, so more magnification only zooms into a void.
+ * The tap rule as a zoom (PPV_MAX_CSS wide verses), a RELATION on the frame: the laws' reference
+ * and the deepest a flight (go-to, a chosen connection, a chapter numeral) lands unless the reader
+ * is already deeper (flightCapOf). No longer the camera's ceiling: past it a verse's threads keep
+ * separating, because each leaves from its own foot across the verse's cell (footX), so a verse's
+ * sheaf opens into one leg per link (deepZoomFor).
  *
  * @param {number} total - verses in the canon
  * @param {number} widthCss - viewport width in CSS px
@@ -116,6 +121,38 @@ export function maxZoomFor(total, widthCss) {
   const t = total > 0 ? total : 1;
   const z = (PPV_MAX_CSS * t) / w;
   return z > 1 ? z : 1;
+}
+
+/** The share of the frame's width one verse fills at the camera's ceiling (the verse zoom). */
+export const VERSE_FILL = 0.8;
+
+/**
+ * THE CAMERA'S CEILING (the verse zoom): one verse VERSE_FILL of the frame's width, on every frame
+ * (phone, PC, either orientation), so the zoom is VERSE_FILL x total whatever the width. Never under
+ * the tap rule (a frame narrower than PPV_MAX_CSS / VERSE_FILL, 55 CSS px, keeps it).
+ * @param {number} total - verses in the canon
+ * @param {number} widthCss - viewport width in CSS px
+ * @returns {number} multiple of fit-to-width
+ */
+export function deepZoomFor(total, widthCss) {
+  const t = total > 0 ? total : 1;
+  const z = VERSE_FILL * t;
+  const tap = maxZoomFor(total, widthCss);
+  return z > tap ? z : tap;
+}
+
+/**
+ * The deepest a flight may land (go-to, a chosen connection, a chapter or book name): the tap rule,
+ * or the reader's own zoom when they are deeper, so a flight never dives past the tap rule on its
+ * own and never pulls a reader out of the depth they chose; under the camera's ceiling always.
+ * @param {number} total @param {number} widthCss
+ * @param {number} zoomNow - the camera's zoom now, a multiple of fit
+ * @returns {number} multiple of fit-to-width
+ */
+export function flightCapFor(total, widthCss, zoomNow) {
+  const tap = maxZoomFor(total, widthCss), deep = deepZoomFor(total, widthCss);
+  const z = zoomNow > tap ? zoomNow : tap;
+  return z < deep ? z : deep;
 }
 
 /**
@@ -293,10 +330,15 @@ export function arcFrameTau(x0, x1, width, A, hLo, hHi, out) {
   if (!(r > 0) || x1 < -m || x0 > width + m || !(A > 0) || hLo > A || hHi < 0) return false;
   // the whole arch in the frame (every overview thread): what the cuts below give, without them
   if (x0 >= -m && x1 <= width + m && A <= hHi && hLo <= 0) { out[0] = 0; out[1] = Math.PI; return true; }
-  const ua = ((x0 > -m ? x0 : -m) - x0) / (2 * r);
-  const ub = ((x1 < width + m ? x1 : width + m) - x0) / (2 * r);
-  const ta = 2 * Math.asin(Math.sqrt(ua < 0 ? 0 : (ua > 1 ? 1 : ua)));
-  const tb = 2 * Math.asin(Math.sqrt(ub < 0 ? 0 : (ub > 1 ? 1 : ub)));
+  // THE VERSE ZOOM'S FEET (sweb-z1): a foot inside the window is its end of the curve exactly (0 or
+  // pi), and a cut is read from the foot on its own side of the crown (ua + ua1 = 1, ub + ub1 = 1,
+  // each share computed from its own foot), so no parameter near a foot is asin of a share near 0 or 1.
+  // A GPU's asin is not exact there: about 1e-4 of the parameter, 2 px at 44 CSS px a verse and
+  // hundreds deep in, where the legs stood off the baseline with their feet cut away.
+  const ua = (-m - x0) / (2 * r), ua1 = (x1 + m) / (2 * r);
+  const ub = (x1 - width - m) / (2 * r), ub1 = (width + m - x0) / (2 * r);
+  const ta = ua <= 0 ? 0 : (ua <= ua1 ? 2 * Math.asin(Math.sqrt(ua)) : Math.PI - 2 * Math.asin(Math.sqrt(ua1)));
+  const tb = ub <= 0 ? Math.PI : (ub <= ub1 ? Math.PI - 2 * Math.asin(Math.sqrt(ub)) : 2 * Math.asin(Math.sqrt(ub1)));
   const tc = hHi >= A ? HALF_PI : Math.asin(hHi / A);
   const td = hLo > 0 ? Math.asin(hLo / A) : 0;
   const l0 = ta > td ? ta : td, l1 = tb < tc ? tb : tc;
@@ -360,10 +402,10 @@ vec2 arcFrameTau(float x0, float x1, float width, float A, float hLo, float hHi)
   float m = ${glslFloat(CLIP_MARGIN)};
   if (r <= 0. || x1 < -m || x0 > width + m || A <= 0. || hLo > A || hHi < 0.) return vec2(1., 0.);
   if (x0 >= -m && x1 <= width + m && A <= hHi && hLo <= 0.) return vec2(0., ${glslFloat(Math.PI)});
-  float ua = (max(x0, -m) - x0)/(2.*r);
-  float ub = (min(x1, width + m) - x0)/(2.*r);
-  float ta = 2.*asin(sqrt(clamp(ua, 0., 1.)));
-  float tb = 2.*asin(sqrt(clamp(ub, 0., 1.)));
+  float ua = (-m - x0)/(2.*r), ua1 = (x1 + m)/(2.*r);
+  float ub = (x1 - width - m)/(2.*r), ub1 = (width + m - x0)/(2.*r);
+  float ta = ua <= 0. ? 0. : (ua <= ua1 ? 2.*asin(sqrt(ua)) : ${glslFloat(Math.PI)} - 2.*asin(sqrt(ua1)));
+  float tb = ub <= 0. ? ${glslFloat(Math.PI)} : (ub <= ub1 ? ${glslFloat(Math.PI)} - 2.*asin(sqrt(ub)) : 2.*asin(sqrt(ub1)));
   float tc = hHi >= A ? ${glslFloat(HALF_PI)} : asin(hHi/A);
   float td = hLo > 0. ? asin(hLo/A) : 0.;
   float l0 = max(ta, td), l1 = min(tb, tc);
@@ -448,7 +490,10 @@ export function arcShape(rx, squash) {
 export function arcTauOf(x, left, right) {
   const rx = (right - left) / 2;
   if (!(rx > 0)) return 0;
-  return Math.acos(clamp1(1 - (x - left) / rx));
+  // acos(1 - 2 s) as 2 asin(sqrt(s)), s read from the nearer foot and a foot exact (the verse zoom:
+  // a GPU's acos near 1 cut the chosen leg's foot away at million-px radii, as arcFrameTau's asin did)
+  const sl = (x - left) / (2 * rx), sr = (right - x) / (2 * rx);
+  return sl <= 0 ? 0 : (sr <= 0 ? Math.PI : (sl <= sr ? 2 * Math.asin(Math.sqrt(sl)) : Math.PI - 2 * Math.asin(Math.sqrt(sr))));
 }
 
 /**
@@ -520,7 +565,8 @@ vec2 arcShape(float rx, float squash){
 float arcTau(float x, float left, float right){
   float rx = (right - left)*.5;
   if (rx <= 0.) return 0.;
-  return acos(clamp(1. - (x - left)/rx, -1., 1.));
+  float sl = (x - left)/(2.*rx), sr = (right - x)/(2.*rx);
+  return sl <= 0. ? 0. : (sr <= 0. ? ${glslFloat(Math.PI)} : (sl <= sr ? 2.*asin(sqrt(sl)) : ${glslFloat(Math.PI)} - 2.*asin(sqrt(sr))));
 }
 void arcAt(float tau, float left, float right, float A, out float x, out float h, out vec2 tg){
   float r = max((right - left)*.5, 0.);

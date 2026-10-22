@@ -47,12 +47,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { clampCamera, fitPPV, xToVerse, zoomAbout } from '../../utils/scripture-web/geometry.js';
-import { lensRange } from '../../utils/scripture-web/pick.js';
+import { lensRange, refOfVerse } from '../../utils/scripture-web/pick.js';
 import { DENSITY_STEPS } from '../scripture-web/web-renderer.js';
 import { useWebCamera } from '../scripture-web/use-web-camera.js';
 import { useFrameScheduler } from '../scripture-web/use-frame-scheduler.js';
 import { useForcedLandscape } from '../scripture-web/use-forced-landscape.js';
-import { useWebGraph, useChromeTokens, useWebRenderer } from '../scripture-web/use-web-renderer.js';
+import { useWebGraph, useChromeTokens, useWebRenderer, walkOn } from '../scripture-web/use-web-renderer.js';
+import { placeOfRef } from '../../utils/scripture-web/ref-parse.js';
+import { parseReference } from '../../search/ref-parser.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
 import { useWebSelection } from '../scripture-web/use-web-selection.js';
 import { usePanelLayout, usePanelInset, collapsedFor, stackedFor } from '../scripture-web/use-panel-layout.js';
@@ -192,6 +194,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
     frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt, slackFor, settleInset,
   } = useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate, onFrame });
+  // the walks' camera door (a driven browser only, walkOn): a reference's first verse, the camera,
+  // and flyTo, so a walk frames a verse at an exact zoom (sweb-z1 prototype; BRIDGES.md in the build)
+  React.useEffect(() => {
+    if (!walkOn() || !graph) return undefined;
+    const w = /** @type {any} */ (globalThis);
+    w.__swVerse = (/** @type {string} */ text) => {
+      const p = placeOfRef(graph, parseReference(text, { corpus: 'scriptures' }));
+      return p ? p.lo : -1;
+    };
+    w.__swCam = () => { const c = camRef.current, v = viewRef.current; return c && { x: c.x, y: c.y, ppv: c.ppv, total: c.total, W: v.W, DPR: v.DPR }; };
+    w.__swFly = (/** @type {any} */ t, /** @type {any} */ o) => flyTo(t, o);
+    w.__swGraph = graph;
+    return () => { delete w.__swVerse; delete w.__swCam; delete w.__swFly; delete w.__swGraph; };
+  }, [graph, flyTo, camRef, viewRef]);
   const theme = settings && settings.theme;
 
   // the canvas's colours, re-read when the theme flips (use-web-renderer.js)
@@ -235,10 +251,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // (with the targets it drew) that the tap test reads
   // the go-to's verse chip over the canvas (CSS px boxes, goto.jsx writes them): the overlay's labels keep off it
   const keepOutRef = React.useRef(/** @type {any} */ (null));
+  // a verse's text for the verse zoom's plates (overlay-renderer drawPlates), in the reader's own Bible
+  const textOfRef = React.useRef(/** @type {any} */ (null));
+  const translation = settings && settings.translation;
+  textOfRef.current = React.useMemo(() => (graph
+    ? (/** @type {number} */ v) => verseText(refOfVerse(graph, v), translation)
+    : null), [graph, translation]);
   const { noWebGL, glLost, glRetry, retryGL, railZoom, elevatorRef, badgeBoxesRef, overlayFrameRef } = useWebRenderer({
     graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
     camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
-    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef,
+    chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef, textOfRef,
   });
   // without WebGL2 the canon web is read as a list; My Web draws in Canvas2D
   // and stays up (w3 item 31)
@@ -290,7 +312,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   }, [menuOpen]);
   /** A control in the menu closes the menu as it acts. @param {() => void} act */
   const fromMenu = (act) => () => { act(); setMenuOpen(false); };
-  const translation = settings && settings.translation;
 
   // the go-to (goto.jsx): its header slot (goTo.button, first in the control
   // row) and what it puts over the canvas (goTo.box: the box, its verse chip, its edge chips)

@@ -44,6 +44,10 @@ vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
     }),
   };
 });
+vi.mock('../../utils/scripture-web/geometry.js', async (importOriginal) => {
+  const real = await importOriginal();
+  return { ...real, deepZoomFor: vi.fn(real.deepZoomFor) };
+});
 vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
   const real = await importOriginal();
   return {
@@ -75,7 +79,13 @@ import { ScriptureWebScreen, _resetWebPlace, _setWebPlace } from './ScriptureWeb
 import { LEG_PPV_CSS } from '../scripture-web/overlay-renderer.js';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
 import { webFrame } from '../../utils/scripture-web/web-frame.js';
-import { footX, arcShape, squashFactor } from '../../utils/scripture-web/geometry.js';
+import { footX, arcShape, squashFactor, deepZoomFor, maxZoomFor } from '../../utils/scripture-web/geometry.js';
+
+/* The verse zoom (Corbin 2026-10-21) moved the camera's ceiling from the tap rule (44 CSS px a verse,
+   maxZoomFor) to one verse 0.8 of the frame (deepZoomFor). The cases that read pixels AT the tap rule
+   (a tap on a thread's body, the hover chip, the ruler's foot names, the sky's heights) still pin that
+   depth, where flights land: capAtTapRule() puts the ceiling back there for one case. */
+const capAtTapRule = () => { vi.mocked(deepZoomFor).mockImplementation(maxZoomFor); };
 
 const baseProps = () => ({
   // swGuideSeen: the how-to-read card (landing 13) opens on a first visit and
@@ -97,6 +107,7 @@ afterEach(() => {
   setViewport(ORIG_W, ORIG_H);
   delete window.screen.orientation;
   vi.useRealTimers();
+  vi.mocked(deepZoomFor).mockReset();
 });
 
 describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000', () => {
@@ -218,11 +229,12 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     expect(zoomText(container)).not.toBe('Overview');
   });
 
-  it('stops at 44 CSS px per verse — 1,711x here, never 4000x', async () => {
+  it('stops at one verse 0.8 of the frame — 24,882x here (the verse zoom), never 4000x', async () => {
     const { container } = await mount();
     for (let i = 0; i < 40; i++) await press('+');
-    // maxZoomFor(31102, 800) = 1710.61 -> the label rounds to 1711x.
-    expect(zoomText(container)).toBe('1711x');
+    // deepZoomFor(31102, 800) = 0.8 x 31102 = 24881.6 -> the label rounds to 24882x (the tap rule's
+    // maxZoomFor = 1710.61 is no longer the camera's ceiling: Corbin 2026-10-21, the verse zoom).
+    expect(zoomText(container)).toBe('24882x');
   });
 
   it('A1 — says so through .sw-live instead of doing nothing silently', async () => {
@@ -261,7 +273,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('RED today: at the ceiling the web is STILL drawn Famous — the control reads Famous, every frame past 22 px/verse drew Famous, nothing was announced', async () => {
       const { container } = await mount();
       await toCeiling();
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       expect(shown(), 'the density control').toBe('famous');
       const deep = DRAWN.filter((d) => d.ppv / d.dpr >= 22);
       expect(deep.length, 'frames drawn past 22 CSS px per verse').toBeGreaterThan(0);
@@ -270,6 +282,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
 
     it('RED today: at the ceiling a thread that exists only in Famous (7 votes) is tappable and brings up its connection card', async () => {
+      capAtTapRule();
       /* One 7-vote link, 15548 -> 15555, sitting AFTER the Essential prefix of its bucket
          (off20 = 0, off10 = 1): at Essential the picker walks zero entries and the tap finds
          nothing; at Famous it finds the link. The + key zooms about the frame's centre, so
@@ -376,6 +389,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     /* sw1 B4 (audit-web 10-05): the hover chip was set only by a resting mouse and cleared by nothing
        that moved the web, so after a key pan or a drag it named a line that was no longer under it. */
     it('the hover chip drops when the web moves under it: a key pan, then a drag', async () => {
+      capAtTapRule();
       const linked = () => Object.assign(graph(), {
         count: 1,
         books: [{ id: 'isaiah', title: 'Isaiah', abbr: 'Isa', start: 15000 }],
@@ -477,7 +491,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('the sheet offers Follow to the far foot; pressing it centres the camera there and the control turns to the other end', async () => {
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       expect(lastCamX()).toBeCloseTo(CANON / 2, 0);
       await pickNearby();
       const sheet = container.querySelector('.sw-sheet');
@@ -619,6 +633,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
 
     it('at the ceiling the off-screen foot of the line is written on its body, and the on-screen foot reads off the ruler (book, chapter, verse)', async () => {
+      capAtTapRule();
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(zoomText(container)).toBe('1711x');
@@ -688,7 +703,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('at the ceiling ArrowUp raises the camera (drawn AND published), ArrowDown brings it back to 0', async () => {
       const { container } = await mount({}, wide);
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       for (let i = 0; i < 10; i++) await pressFrame('ArrowUp');
       // RED if the key handler drops its y frame, or the draw stops carrying camY
       expect(lastCamY()).toBeGreaterThan(0);
@@ -731,7 +746,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('at the ceiling the centre is the chapter under it (the one chapter here): published as "lo-hi", drawn at full emphasis, and no draw carries a dim', async () => {
       const { container } = await mount();
       for (let i = 0; i < 40; i++) await pressFrame('+');
-      expect(zoomText(container)).toBe('1711x');
+      expect(zoomText(container)).toBe('24882x');
       expect(shownLens(container)).toBe('0-' + (CANON - 1));
       expect(DRAWN[DRAWN.length - 1].centre).toEqual({ chapterIndex: 0, book: 0, chapter: 1, x0: 0, x1: CANON, t: 1 });
       // nothing dims with zoom: the lens's share is gone from every draw
@@ -793,6 +808,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
 
     it('risen at the ceiling, the ruler names a chapter (30 verses of span crown 422 px up; ten ArrowUps lift 312)', async () => {
+      capAtTapRule();
       const { container } = await mount({}, wide);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(attr(container, 'data-elevator'), 'precondition: a sky to climb').toBe('0.0000');

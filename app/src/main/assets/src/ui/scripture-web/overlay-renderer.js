@@ -36,7 +36,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
-  verseToX, xToVerse, arcShape, arcHeightAt, arcAnchored, footX, fitPPV, maxCamY, ALTITUDE_MARKS, spanAtHeight,
+  verseToX, xToVerse, arcShape, arcHeightAt, arcAnchored, footX, fitPPV, maxCamY, ALTITUDE_MARKS, spanAtHeight, spanT,
 } from '../../utils/scripture-web/geometry.js';
 import { refOfVerse, labelFeed, eachLabelThread } from '../../utils/scripture-web/pick.js';
 import { fansOf, bucketDrawCount } from '../../utils/scripture-web/decode.js';
@@ -89,7 +89,8 @@ import { exitCensus, exitIds, fanGroups, areaLabel } from '../../utils/scripture
  *   | { kind: 'pill', ids: ArrayLike<number>, label: string, cell?: {lo:number, hi:number} }
  *   | { kind: 'exit', ids: ArrayLike<number>, label: string, key: string, side: 'left'|'right',
  *       lo: number, hi: number, count: number, cell: {lo:number, hi:number},
- *       area: {label:string, lo:number, hi:number} }} OverlayHit
+ *       area: {label:string, lo:number, hi:number} }
+ *   | { kind: 'thread', index: number }} OverlayHit
  *   book: an index into g.books; chapter: its number (1-based); ids: the OpenBible
  *   arc ids a "+n" pill counts, label: what the panel's group mode is titled, cell: its verses;
  *   exit: a chip of a column's fan (exits.js): the legs it counts, from the cell to the books lo..hi
@@ -97,7 +98,7 @@ import { exitCensus, exitIds, fanGroups, areaLabel } from '../../utils/scripture
  */
 /** @typedef {{ x0:number, y0:number, x1:number, y1:number, hit: OverlayHit, core?: Box }} OverlayBox
  *   device px: the tap target, at least TAP_MIN CSS px each way; `core` is what is drawn there */
-/** @typedef {{ x0:number, y0:number, x1:number, y1:number }} Box  device px */
+/** @typedef {{ x0:number, y0:number, x1:number, y1:number, ax?:number, ay?:number, ang?:number }} Box  device px (ax, ay, ang: a comb tag's anchor and angle) */
 
 /**
  * What the overlay drew under a CSS-px point, for the tap path: the tap tries it
@@ -408,14 +409,14 @@ export function citedInk(share, ref) {
  * The label pass's memory per graph: the chips and leg labels placed last frame (hysteresis),
  * and the chip keepers and the leg feed of the last camera, so a frame that did not move (a
  * hover, a font) reuses them.
- * @typedef {{ chips: Map<any, number>, legs: Map<any, number>,
+ * @typedef {{ chips: Map<any, number>, legs: Map<any, number>, comb: Map<any, number>,
  *   chipCache: {key: string, recs: ChipFoot[]}|null, feedCache: {key: string, feed: any[]}|null }} LabelMemo
  */
 /** @type {WeakMap<object, LabelMemo>} */
 const MEMO = new WeakMap();
 const memoOf = (g) => {
   let m = MEMO.get(g);
-  if (!m) { m = { chips: new Map(), legs: new Map(), chipCache: null, feedCache: null }; MEMO.set(g, m); }
+  if (!m) { m = { chips: new Map(), legs: new Map(), comb: new Map(), chipCache: null, feedCache: null }; MEMO.set(g, m); }
   return m;
 };
 
@@ -578,7 +579,11 @@ function layoutOf(ctx, fs) {
   const dpSpec = compact ? DEEP_COMPACT : DEEP_PC;
   const dp = toDevice(stackRows(dpSpec.rows, dpSpec.end, (bandBottom - base) / s), base, s);
   const inset = fs.inset > 0 ? fs.inset : 0;
+  // the verse zoom (sweb-z1): past the tap rule the band's text and the labels hand over, by CSS px a verse
+  const ppvCss = cam.ppv / s;
+  const plateT = smooth(PLATE_FROM, PLATE_FULL, ppvCss), combT = smooth(COMB_FROM, COMB_FULL, ppvCss);
   return {
+    ppvCss, plateT, combT,
     s, W, H, Wc, base, camY: cam.y > 0 ? cam.y : 0, compact, zoom, deepT, zones, bandBottom, ov, dp,
     sz: compact ? SIZES.compact : SIZES.pc, inset, skyTop: inset + 8 * s, gutter: GUTTER * s,
     bg: (fs.chrome && fs.chrome.bg) || '#000000',
@@ -620,7 +625,9 @@ export function paintCanonOverlay(ctx, fs) {
     drawBaseline(ctx, L);
     drawCited(ctx, g, cam, L, holes);
     drawOverview(ctx, g, cam, L, 1 - L.deepT, hits, holes);
-    drawDeep(ctx, g, cam, L, L.deepT, fs.centre, grid, hits);
+    // the verse zoom: the deep band's numerals, ticks and names give way to the verses' own text
+    drawDeep(ctx, g, cam, L, L.deepT * (1 - L.plateT), fs.centre, grid, hits);
+    if (L.plateT > 0.01) drawPlates(ctx, g, cam, L, fs, grid);
     // the centre chapter's wash over the band it marks: over the sticky names' fades (no dark box
     // in the gold) and with its gold top edge over the baseline
     drawCentreWash(ctx, cam, L, fs.centre);
@@ -647,8 +654,13 @@ export function paintCanonOverlay(ctx, fs) {
   if (g.count > 0 && L.deepT >= 0.5) {
     const memo = memoOf(g);
     const quiet = chosen ? LABEL_RECEDE : 1;
-    memo.chips = drawChips(ctx, g, cam, L, fs, grid, memo, labelled, quiet);
-    if (cam.ppv / L.s >= LEG_PPV_CSS) memo.legs = drawLegs(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.legs, labelled, quiet);
+    // the verse zoom: the comb names every leg along itself first; the chips and the leg columns
+    // hand over to it (they name what it has not placed, fading out as it comes in)
+    if (L.combT > 0.01) memo.comb = drawComb(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.comb, labelled, hits, quiet * L.combT);
+    if (L.combT < 0.99) {
+      memo.chips = drawChips(ctx, g, cam, L, fs, grid, memo, labelled, quiet * (1 - L.combT));
+      if (cam.ppv / L.s >= LEG_PPV_CSS) memo.legs = drawLegs(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.legs, labelled, quiet * (1 - L.combT));
+    }
   }
   return {
     marks, altitudeSpan: altitude.span, elevator, labels: labelled.size, badges, hits,
@@ -1322,6 +1334,268 @@ function paintDeepNames(ctx, L, names) {
     }
   }
   setFont(ctx, names.font, 0);
+}
+
+
+/* ── THE VERSE ZOOM (sweb-z1) ───────────────────────────────────────────────
+   Corbin, 2026-10-21: "I feel like we should be able to zoom way, way, way in. All the way to a
+   single linked verse". Past the tap rule (44 CSS px a verse) the camera goes on to one verse 0.8
+   of the frame (geometry.deepZoomFor), and every thread keeps the structure law: a verse's threads
+   leave from their own feet across its cell (footX), so its sheaf opens into one near-vertical leg
+   per link. Two things take over from the tap rule's furniture as it opens:
+   - THE PLATE: the band's chapter numerals, ticks, dots, verse numerals and book names give way to
+     each verse's own text in its cell, headed by its number in gold (a running head "PSALMS 139"
+     over the verse that holds the frame), wrapped to the cell and set as large as it fits;
+   - THE COMB: the chips at the feet and the leg columns give way to each leg's far end written
+     ALONG it, from just over its foot (a dot in the thread's own colour), in canon order across the
+     cell because the feet are (decode.fansOf); up to three tiers up the leg where neighbours stand
+     close. Every tag is a tap target for its thread (hit kind 'thread').
+   The laws do not move: the alpha, stroke, span-ink and density laws are flat past the tap rule
+   (each clamps at or before it), and the tap rule stays their reference. */
+
+/** CSS px a verse over which the plate eases in (and the deep band's furniture out). */
+export const PLATE_FROM = 96;
+export const PLATE_FULL = 144;
+/** CSS px a verse over which the comb eases in (and the chips and leg columns out). */
+export const COMB_FROM = 72;
+export const COMB_FULL = 112;
+/** The plate's type, CSS px: the largest that holds the verse, down to the floor (then cut with "…"). */
+const PLATE_TYPE = { pc: { min: 13, max: 26, head: 13 }, compact: { min: 12, max: 17, head: 12 } };
+/** The plate's padding inside a verse's cell, CSS px, and its line height, em. */
+const PLATE_PAD = 12;
+const PLATE_LEAD = 1.3;
+/** A cell narrower than this (CSS px) carries no plate: its divider only. */
+const PLATE_MIN_CSS = 40;
+/** A cell this share of the canvas area or more is the one the frame holds: its running head, the rest dimmed. */
+const PLATE_HOLD = 0.45;
+/** The comb: a tag starts this high over the baseline (CSS px), this far beside its leg, in up to this many tiers. */
+const COMB_H0 = 12;
+const COMB_GAP = 3;
+const COMB_TIERS = 3;
+/** The foot's dot at the verse zoom, CSS px radius. */
+const FOOT_DOT = 2.5;
+
+/** @type {WeakMap<object, {fn: any, map: Map<number, string>}>} the verses' text, per graph and per reader's Bible */
+const TEXTS = new WeakMap();
+/** One verse's text for the plate (fs.textOf, the screen's: the reader's own translation), '' until the corpus lands. */
+function plateText(g, fs, v) {
+  const fn = fs && fs.textOf;
+  if (typeof fn !== 'function') return '';
+  let c = TEXTS.get(g);
+  if (!c || c.fn !== fn) { c = { fn, map: new Map() }; TEXTS.set(g, c); }
+  let t = c.map.get(v);
+  if (t === undefined) {
+    t = String(fn(v) || '').replace(/\s+/g, ' ').trim();
+    if (t) c.map.set(v, t);
+  }
+  return t;
+}
+
+/** Words into lines no wider than `width` (device px), the first after `indent`; at most `rows`
+ *  lines, the last cut with "…" when `cut`, else null when they need more. */
+function wrapWords(ctx, font, words, width, indent, rows, cut) {
+  const lines = [];
+  let line = '', avail = width - indent;
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    const t = line ? line + ' ' + w : w;
+    if (!line || measure.width(ctx, font, t) <= avail) { line = t; continue; }
+    lines.push(line);
+    if (lines.length >= rows) {
+      if (!cut) return null;
+      let last = lines[rows - 1];
+      const room = rows === 1 ? width - indent : width;
+      while (last.indexOf(' ') > 0 && measure.width(ctx, font, last + ' …') > room) last = last.replace(/\s*\S+$/, '');
+      lines[rows - 1] = last + ' …';
+      return lines;
+    }
+    line = w; avail = width;
+  }
+  if (line) lines.push(line);
+  return lines.length > rows ? null : lines;
+}
+
+/** @type {WeakMap<object, Map<string, any>>} the plates' layouts, per graph: a verse at a cell width, rows and type */
+const PLATES = new WeakMap();
+
+/**
+ * The plates (the verse zoom): each verse on the frame wide enough gets its text in its own cell
+ * under the pills, a thin divider at each cell's edge. Laid out on the whole cell and clipped to the
+ * canvas area less the corner buttons, so a plate never reflows as the reader pans.
+ */
+function drawPlates(ctx, g, cam, L, fs, grid) {
+  const { s, W, Wc, dp, compact } = L;
+  const t = L.plateT;
+  const type = compact ? PLATE_TYPE.compact : PLATE_TYPE.pc;
+  const top = dp.pills.top + dp.pills.h + 6 * s;
+  const bottom = Math.min(L.bandBottom, dp.end) - 3 * s;
+  if (!(bottom - top > 10 * s)) return;
+  const v0 = Math.max(0, Math.floor(xToVerse(cam, W, 0)));
+  const v1 = Math.min(g.total - 1, Math.ceil(xToVerse(cam, W, Wc)));
+  const pad = PLATE_PAD * s;
+  let layouts = PLATES.get(g);
+  if (!layouts) { layouts = new Map(); PLATES.set(g, layouts); }
+  if (layouts.size > 400) layouts.clear();
+  ctx.save();
+  // the canvas area less the corner buttons' zones
+  ctx.beginPath();
+  ctx.rect(0, top - 2 * s, Wc, bottom - top + 4 * s);
+  for (const z of L.zones) if (z.x0 < Wc) ctx.rect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
+  ctx.clip('evenodd');
+  // the dividers, at every cell's edge
+  ctx.globalAlpha = t;
+  ctx.fillStyle = css('verseTick');
+  const tw = Math.max(1, Math.round(s));
+  for (let v = v0; v <= v1 + 1; v++) {
+    const x = Math.round(verseToX(cam, W, v));
+    if (x >= 0 && x <= Wc) ctx.fillRect(x, top, tw, bottom - top);
+  }
+  const cells = [];
+  for (let v = v0; v <= v1; v++) {
+    const x0 = verseToX(cam, W, v), x1 = verseToX(cam, W, v + 1);
+    if (x1 - x0 < PLATE_MIN_CSS * s || x1 < 0 || x0 > Wc) continue;
+    cells.push({ v, x0, x1 });
+  }
+  const hold = cells.find((c) => c.x1 - c.x0 >= PLATE_HOLD * Wc && (c.x0 + c.x1) / 2 > 0 && (c.x0 + c.x1) / 2 < Wc) || null;
+  for (const c of cells) {
+    const r = refOfVerse(g, c.v);
+    const body = plateText(g, fs, c.v);
+    const isHold = c === hold;
+    // the number: "23", or "140:1" where a chapter starts; the held verse names its chapter (a running
+    // head over it, or on a phone's short band its reference in place of the number)
+    const num = r.verse === 1 ? r.chapter + ':1' : String(r.verse);
+    const head = isHold && !compact ? String(r.bookTitle).toUpperCase() + ' ' + r.chapter : '';
+    const prefix = isHold && compact ? spaced(r.abbr) + ' ' + r.chapter + ':' + r.verse : num;
+    const width = c.x1 - c.x0 - 2 * pad;
+    const key = [c.v, Math.round(width), Math.round(bottom - top), compact ? 1 : 0, head ? 1 : 0, prefix, body.length].join('|');
+    let lay = layouts.get(key);
+    if (!lay) {
+      const words = body ? body.split(' ') : [];
+      const headH = head ? fontPx(type.head, s) * 1.7 : 0;
+      for (let size = type.max; size >= type.min; size--) {
+        const font = canvasFont(size, s), numFont = canvasFont(size, s, 600);
+        const lh = fontPx(size, s) * PLATE_LEAD;
+        const rows = Math.max(1, Math.floor((bottom - top - headH) / lh));
+        const indent = measure.width(ctx, numFont, prefix) + fontPx(size, s) * 0.45;
+        const lines = wrapWords(ctx, font, words, width, indent, rows, size === type.min);
+        if (lines) { lay = { size, font, numFont, lh, indent, lines, headH }; break; }
+      }
+      layouts.set(key, lay);
+    }
+    if (!lay) continue;
+    ctx.globalAlpha = t * (hold && !isHold ? 0.5 : 1);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const lx = c.x0 + pad;
+    let y = top;
+    if (head) {
+      const hf = canvasFont(type.head, s, 500);
+      setFont(ctx, hf, 0.12 * fontPx(type.head, s));
+      ctx.fillStyle = css('centreNumeral');
+      ctx.fillText(head, Math.max(lx, L.gutter), y + fontPx(type.head, s) * CAP + 2 * s);
+      setFont(ctx, hf, 0);
+      y += lay.headH;
+    }
+    const capY = fontPx(lay.size, s) * 0.95;
+    setFont(ctx, lay.numFont, 0);
+    ctx.fillStyle = css('centreNumeral');
+    ctx.fillText(prefix, lx, y + capY);
+    setFont(ctx, lay.font, 0);
+    ctx.fillStyle = css('textBody', 0.92);
+    for (let k = 0; k < lay.lines.length; k++) {
+      ctx.fillText(lay.lines[k], lx + (k === 0 ? lay.indent : 0), y + capY + k * lay.lh);
+    }
+  }
+  ctx.restore();
+  // the plates' ground is the verses': nothing else is written on it
+  grid.add({ x0: 0, x1: Wc, y0: top, y1: bottom });
+}
+
+/** The comb's slots for one foot's tag, `w` long: up its leg from COMB_H0 in tiers, each a rotated
+ *  box along the leg's chord over the tag's height ({x0..y1}: its bounds; ax, ay, ang: how it is drawn). */
+function combSlots(f, side, w, thick, L) {
+  const { s, Wc, base, camY } = L;
+  const yb = base + camY;
+  const R = (f.x1 - f.x0) / 2, cx = (f.x0 + f.x1) / 2, A = f.A;
+  const legX = (h) => {
+    const u = Math.sqrt(Math.max(0, 1 - (h / A) * (h / A)));
+    return side ? cx + R * u : cx - R * u;
+  };
+  const out = [];
+  for (let k = 0; k < COMB_TIERS; k++) {
+    const h = COMB_H0 * s + k * (w + 14 * s);
+    if (!(h + w < A * 0.97)) break;
+    const xa = legX(h), xb = legX(h + w);
+    let dx = xb - xa, dy = -w;
+    const len = Math.hypot(dx, dy);
+    dx /= len; dy /= len;
+    // a leg leaning past about 25 degrees over the tag is a dome's shoulder, not a leg: no tag along it
+    if (Math.abs(dx) > 0.42) break;
+    const nx = -dy, ny = dx;    // the leg's right-hand normal on screen: the side the glyphs stand on
+    const ax = xa + nx * COMB_GAP * s, ay = yb - h + ny * COMB_GAP * s;
+    const xs = [ax, ax + dx * w, ax + nx * thick, ax + dx * w + nx * thick];
+    const ys = [ay, ay + dy * w, ay + ny * thick, ay + dy * w + ny * thick];
+    const box = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys), ax, ay, ang: Math.atan2(dy, dx) };
+    out.push(box.x0 < 2 * s || box.x1 > Wc - 2 * s || box.y0 < L.skyTop || box.y1 > yb ? null : box);
+  }
+  return out;
+}
+
+/**
+ * THE COMB (the verse zoom): every foot on the frame gets a dot in its thread's colour, and its far
+ * end written along its leg. Ranked as the chips are (the centre chapter's threads, then votes),
+ * remembered frame to frame; a tag is a tap target for its thread. Returns the memory.
+ */
+function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha) {
+  const { s, Wc, base, camY, sz } = L;
+  const yb = base + camY;
+  const font = canvasFont(sz.leg, s), fpx = fontPx(sz.leg, s);
+  const thick = fpx * 1.05;
+  const centre = fs.centre;
+  const cands = [];
+  ctx.save();
+  // the feet's dots first, under every tag
+  ctx.globalAlpha = alpha;
+  for (const f of feed) {
+    const rgb = distanceRampRGB(spanT(g.to[f.i] - g.from[f.i], g.total));
+    for (const side of [0, 1]) {
+      if (!(side ? f.toOn : f.fromOn)) continue;
+      const fx = side ? f.x1 : f.x0;
+      if (fx < 0 || fx > Wc) continue;
+      ctx.fillStyle = 'rgb(' + rgb.join(',') + ')';
+      ctx.beginPath(); ctx.arc(fx, yb, FOOT_DOT * s, 0, Math.PI * 2); ctx.fill();
+      const near = side ? g.to[f.i] : g.from[f.i], far = side ? g.from[f.i] : g.to[f.i];
+      const inCentre = !!centre && near >= centre.x0 && near < centre.x1;
+      /** @type {any} */
+      const c = { key: f.i * 2 + side, i: f.i, tier: inCentre ? 1 : 2, score: g.votes ? g.votes[f.i] : 0, text: '', slots: null };
+      c.slots = () => {
+        c.text = shortRef(g, far);
+        return combSlots(f, side, measure.width(ctx, font, c.text), thick, L);
+      };
+      cands.push(c);
+    }
+  }
+  const res = placeRanked(cands, memo,
+    (b) => !grid.hits(b, 1.5 * s),
+    (b, c) => { grid.add(b); labelled.add(c.i); });
+  setFont(ctx, font, 0);
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  const fill = css('textBody', 0.88);
+  for (const p of res.placed) {
+    // a comb tag's box carries its anchor and angle (combSlots)
+    const b = /** @type {{ x0:number, y0:number, x1:number, y1:number, ax:number, ay:number, ang:number }} */ (p.box);
+    ctx.save();
+    ctx.translate(b.ax, b.ay);
+    ctx.rotate(b.ang);
+    haloText(ctx, p.cand.text, 0, -fpx * 0.08, fill, L);
+    ctx.restore();
+    const cx = (b.x0 + b.x1) / 2, half = Math.max((b.x1 - b.x0) / 2, (TAP_MIN * s) / 2);
+    hits.push({ x0: cx - half, x1: cx + half, y0: b.y0 - 4 * s, y1: b.y1 + 4 * s, core: { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 },
+      hit: { kind: 'thread', index: p.cand.i } });
+  }
+  ctx.restore();
+  return res.memory;
 }
 
 /* ── the chosen line ───────────────────────────────────────────────────── */

@@ -4,7 +4,7 @@
    the dome sits or what the shader is told shows up here first. */
 import { describe, it, expect } from 'vitest';
 import { webFrame, webViewArgs, webYFrame, maxZoomOf, centreOf, RULER_H, RULER_PC, tapFadeStep, TAP_FADE_MS } from './web-frame.js';
-import { MAX_STRETCH, squashFactor, localizeFactor, maxZoomFor } from './geometry.js';
+import { MAX_STRETCH, squashFactor, localizeFactor, maxZoomFor, deepZoomFor } from './geometry.js';
 import { focusState, withLit } from './focus-state.js';
 
 const phone = { W: 1080, H: 2340, DPR: 3 };      // 360 x 780 CSS: narrow
@@ -135,7 +135,10 @@ describe('webYFrame and maxZoomOf', () => {
 
   it('the zoom ceiling reads the CSS width; before the graph lands it is 4000', () => {
     expect(maxZoomOf(null, phone)).toBe(4000);
-    expect(maxZoomOf({ total: 31000 }, phone)).toBe(maxZoomFor(31000, 360));
+    // the verse zoom: one verse 0.8 of the frame (24,800x for 31,000 verses on any frame)...
+    expect(maxZoomOf({ total: 31000 }, phone)).toBe(deepZoomFor(31000, 360));
+    expect(maxZoomOf({ total: 31000 }, phone)).toBeCloseTo(0.8 * 31000, 6);
+    // ...never under the tap rule: a 1 px frame keeps maxZoomFor's 44 px a verse
     expect(maxZoomOf({ total: 31000 }, { W: 0, H: 0, DPR: 0 })).toBe(maxZoomFor(31000, 1));
   });
 });

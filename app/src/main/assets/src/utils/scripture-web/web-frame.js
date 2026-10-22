@@ -10,7 +10,7 @@
    arguments and return plain objects, so web-frame.test.js pins them. */
 
 import {
-  fitPPV, localizeFactor, squashFactor, MAX_STRETCH, maxZoomFor, LOCALIZE_START,
+  fitPPV, localizeFactor, squashFactor, MAX_STRETCH, deepZoomFor, flightCapFor, LOCALIZE_START,
 } from './geometry.js';
 import { CENTRE_BRIGHT, CENTRE_WIDTH } from './sw-ink.js';
 
@@ -30,18 +30,33 @@ export const RULER_H = 74;
 export const RULER_PC = 180;
 
 /**
- * The zoom ceiling, from the frame rather than from a constant. 44 CSS px
- * per verse is the point past which nothing new can separate - every arc
- * leaving a verse shares one foot at every zoom - so the old fixed 4000 was
- * 247 CSS px per verse on a 1920 px desktop, 5.6x into a void, and about
- * right on a 375 px phone only by accident. 4000 is kept for the moment
+ * The zoom ceiling, from the frame rather than from a constant: the verse zoom (geometry
+ * deepZoomFor), one verse VERSE_FILL of the frame's width. It was the tap rule's 44 CSS px a verse
+ * while every arc leaving a verse was thought to share one foot; they do not (footX spreads them
+ * across the verse's cell), so past 44 each link separates into its own leg and label, and the
+ * reader may go on to a single linked verse (Corbin 2026-10-21). 4000 is kept for the moment
  * before the graph lands.
  * @param {{ total: number } | null | undefined} graph
  * @param {View} v
  * @returns {number}
  */
 export function maxZoomOf(graph, v) {
-  return graph ? maxZoomFor(graph.total, (v.W || 1) / (v.DPR || 1)) : 4000;
+  return graph ? deepZoomFor(graph.total, (v.W || 1) / (v.DPR || 1)) : 4000;
+}
+
+/**
+ * The deepest a flight lands on this frame (geometry.flightCapFor): the tap rule (44 CSS px a
+ * verse), or the camera's zoom now when the reader is deeper. 4000 before the graph lands.
+ * @param {{ total: number } | null | undefined} graph
+ * @param {View} v
+ * @param {{ ppv: number, total: number } | null | undefined} cam
+ * @returns {number}
+ */
+export function flightCapOf(graph, v, cam) {
+  if (!graph) return 4000;
+  const w = v.W || 1;
+  const zoom = cam && cam.ppv > 0 ? cam.ppv / (w / graph.total) : 1;
+  return flightCapFor(graph.total, w / (v.DPR || 1), zoom);
 }
 
 /**

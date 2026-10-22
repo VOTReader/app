@@ -35,7 +35,7 @@
 
 import { maxSpanOf } from '../../utils/scripture-web/decode.js';
 import { maxZoomFor, fitPPV, clampCamera } from '../../utils/scripture-web/geometry.js';
-import { webFrame, webViewArgs, webYFrame, maxZoomOf } from '../../utils/scripture-web/web-frame.js';
+import { webFrame, webViewArgs, webYFrame, maxZoomOf, flightCapOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { flyPath, flyMs, easeInOutCubic } from '../../utils/scripture-web/fly-path.js';
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
@@ -108,14 +108,15 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     [density, frame],
   );
 
-  /** The ceiling for whichever camera is asked about: the Bible's is a
-   * relation on the canon (44 CSS px a verse); the Volumes' the same
-   * relation on its own rail. */
+  /** The ceiling for whichever camera is asked about: the canon web's is the verse zoom (one verse
+   * 0.8 of the frame, web-frame maxZoomOf); My Web's rails keep the tap rule (44 CSS px a verse, a
+   * Volumes collection on its own rail), where a deeper rail shows nothing more. */
   const zoomCapFor = React.useCallback((c) => {
     const v = viewRef.current;
     if (c && c === camVRef.current) return maxZoomFor(c.total, (v.W || 1) / (v.DPR || 1));
+    if (modeRef.current === 'personal' && graph) return maxZoomFor(graph.total, (v.W || 1) / (v.DPR || 1));
     return maxZoomOf(graph, v);
-  }, [graph]);
+  }, [graph, modeRef]);
 
   /** The widest thread's span, verses: the y camera's ceiling reads the law
    * at it. Once per graph. */
@@ -169,18 +170,21 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     const areaW = Math.max(1, v.W - right);
     const fit = fitPPV(cam, v.W);
     const cap = zoomCapFor(cam);
-    let ppv = cam.ppv, cx;
+    let ppv = cam.ppv, cx, top = cap;
     if ('x0' in target && target.x1 > target.x0) {
       ppv = areaW / (target.x1 - target.x0);
       cx = (target.x0 + target.x1) / 2;
+      // a framed place (a go-to, a chosen connection, a chapter) lands no deeper than the tap rule,
+      // or than the reader already is (the verse zoom is the reader's own, web-frame flightCapOf)
+      top = Math.min(cap, flightCapOf(graph, v, cam));
     } else if ('x' in target && Number.isFinite(target.x)) {
       if (target.zoom > 0) ppv = fit * target.zoom;
       cx = target.x;
     } else {
       return null;
     }
-    return { cx, ppv: Math.min(Math.max(ppv, fit), fit * cap), right, areaW, cap };
-  }, [zoomCapFor]);
+    return { cx, ppv: Math.min(Math.max(ppv, fit), fit * top), right, areaW, cap };
+  }, [zoomCapFor, graph]);
 
   /** Put the camera at a destination: the arrival every fly ends on, exactly. */
   const land = React.useCallback((cam, d, target) => {

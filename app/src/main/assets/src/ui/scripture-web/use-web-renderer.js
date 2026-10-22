@@ -230,7 +230,7 @@ export function useChromeTokens(theme, schedule) {
 export function useWebRenderer({
   graph, mode, density, setLoadError, resumeRef, glRef, uiRef, wrapRef, topbarRef,
   camRef, camVRef, viewRef, focusRef, panelInsetRef, viewFor, zoomCapFor, yFrameFor,
-  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef,
+  chromeRef, personalRef, railOpts, drawRef, schedule, capFractionNow, slackFor, keepOutRef, textOfRef,
 }) {
   // read by the resize, which lives in the GL effect and must not re-run for it
   const slackRef = React.useRef(slackFor);
@@ -447,6 +447,8 @@ export function useWebRenderer({
     // what a "+n" pill's fan is asked about (its cell, a fan chip's books: use-web-selection.js);
     // the overlay counts the column's legs only while one is up (exits.js)
     fs.ask = focusRef.current.ask || null;
+    // a verse's text for the verse zoom's plates (the screen's: the reader's own Bible), or none
+    fs.textOf = (textOfRef && textOfRef.current) || null;
     const painted = paintCanonOverlay(uic ? uic.getContext('2d') : null, fs);
     fs.hits = painted.hits;
     fs.fanZone = painted.fanZone;
@@ -465,7 +467,7 @@ export function useWebRenderer({
     // and on the column fan (CSS px chips, as drawn): written only for a walk
     if (wrap && walkOn()) put(wrap, attrs, 'data-exit-fan', painted.fan.length ? JSON.stringify(painted.fan) : '');
   }, [graph, camRef, viewRef, mode, zoomCapFor, camVRef, viewFor, density, focusRef, yFrameFor, railOpts, capFractionNow,
-    chromeRef, personalRef, topbarRef, uiRef, wrapRef, glRef, panelInsetRef, keepOutRef, schedule, settleLater]);
+    chromeRef, personalRef, topbarRef, uiRef, wrapRef, glRef, panelInsetRef, keepOutRef, textOfRef, schedule, settleLater]);
 
   React.useEffect(() => { drawRef.current = draw; schedule(); }, [draw, schedule, drawRef]);
   // the settle timer goes with the screen

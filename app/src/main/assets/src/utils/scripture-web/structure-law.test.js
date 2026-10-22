@@ -544,12 +544,12 @@ describe('the GLSL arcShape / arcTau / arcAt ARE the JS: the twin transliterated
       .replace(/float arcTau\(([^)]*)\)/, (_, a) => `function arcTau(${a.replace(/float /g, '')})`)
       .replace(/void arcAt\(([^)]*)\)/s, (_, a) => `function arcAt(${a.replace(/\s+/g, ' ').replace(/out (float|vec2) \w+,?/g, '').replace(/float /g, '').replace(/,\s*$/, '')})`)
       .replace(/\b(float|vec2) (\w+) =/g, 'let $2 =')
-      .replace(/\b(sin|cos|acos|max|min|sqrt)\(/g, 'Math.$1(');
+      .replace(/\b(sin|cos|acos|asin|max|min|sqrt)\(/g, 'Math.$1(');
     js = js.replace(/(function arcAt\([^)]*\)\{)/, '$1 let x, h, tg;');
     js = js.replace(/(\n\}\s*)$/, '\n  return {x, h, tg};$1');
     js = js.replace(/\.x\b/g, '[0]').replace(/\.y\b/g, '[1]');
     const allowed = new Set(['const', 'function', 'arcShape', 'arcTau', 'arcAt', 'rx', 'squash', 'r', 's', 'let', 'return',
-      'vec2', 'clamp', 'Math', 'max', 'min', 'sin', 'cos', 'acos', 'sqrt', 'x', 'left', 'right', 'if', 'tau', 'A', 'h', 'tg', 'ARC_PI', 'true', 'false']);
+      'vec2', 'clamp', 'Math', 'max', 'min', 'sin', 'cos', 'acos', 'asin', 'sqrt', 'x', 'left', 'right', 'if', 'tau', 'A', 'h', 'tg', 'ARC_PI', 'true', 'false', 'sl', 'sr']);
     const idents = js.replace(/\b\d+(\.\d*)?(e[-+]?\d+)?/g, ' ').match(/[A-Za-z_]\w*/g) || [];
     for (const id of idents) {
       if (!allowed.has(id)) {
@@ -620,7 +620,7 @@ describe('the GLSL arcShape / arcTau / arcAt ARE the JS: the twin transliterated
   });
 
   it('BITES: a GLSL built-in the transliteration does not know is refused, not miscompared', () => {
-    expect(() => twinOf(geo.arcShapeGLSL.replace('acos(', 'smoothstep(0., 1., '))).toThrow(/smoothstep/);
+    expect(() => twinOf(geo.arcShapeGLSL.replace('asin(', 'smoothstep(0., 1., '))).toThrow(/smoothstep/);
   });
 });
 
@@ -633,7 +633,7 @@ describe('the GLSL arcFrameTau / arcPush ARE the JS: the frame twin transliterat
       .replace(/\b(float|vec2|bool) (\w+) =/g, 'let $2 =')
       .replace(/\b(asin|sqrt|tan|max|min)\(/g, 'Math.$1(');
     const allowed = new Set(['function', 'arcFrameTau', 'arcPush', 'x0', 'x1', 'width', 'A', 'hLo', 'hHi', 'r', 'm',
-      'ua', 'ub', 'ta', 'tb', 'tc', 'td', 'l0', 'l1', 'r0', 'r1', 'left', 'right', 'dTau', 't', 'let', 'return', 'if',
+      'ua', 'ub', 'ua1', 'ub1', 'ta', 'tb', 'tc', 'td', 'l0', 'l1', 'r0', 'r1', 'left', 'right', 'dTau', 't', 'let', 'return', 'if',
       'vec2', 'clamp', 'Math', 'max', 'min', 'asin', 'sqrt', 'tan']);
     const idents = js.replace(/\b\d+(\.\d*)?(e[-+]?\d+)?/g, ' ').match(/[A-Za-z_]\w*/g) || [];
     for (const id of idents) {

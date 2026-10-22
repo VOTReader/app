@@ -29,7 +29,9 @@ vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
 });
 vi.mock('../../utils/scripture-web/geometry.js', async (importOriginal) => {
   const real = await importOriginal();
-  return { ...real, ribbonStyle: vi.fn(real.ribbonStyle) };
+  // D1 is a law at the tap rule (44 CSS px a verse): the camera's ceiling is held there, as it was
+  // before the verse zoom moved it to one verse (deepZoomFor, Corbin 2026-10-21)
+  return { ...real, ribbonStyle: vi.fn(real.ribbonStyle), deepZoomFor: vi.fn(real.maxZoomFor) };
 });
 vi.mock('../../utils/scripture-web/frame-set.js', async (importOriginal) => {
   const real = await importOriginal();

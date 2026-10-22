@@ -8,6 +8,7 @@
  * and these fail loudly instead.
  */
 import { describe, it, expect } from 'vitest';
+import * as geo from './geometry.js';
 import {
   LOCALIZE_START, LOCALIZE_END, lensDimFor, MAX_STRETCH, FLYOVER_MARGIN,
   localizeFactor, squashFactor, arcDistance, arcHeightAt,
@@ -628,5 +629,30 @@ describe('the lens is retired: nothing dims with zoom', () => {
     expect(lensDimFor(10, 20, [100, 200])).toBe(1);
     expect(lensDimFor(150, 160, [100, 200], 0.5)).toBe(1);
     expect(lensDimFor(1, 2, null)).toBe(1);
+  });
+});
+
+describe('the verse zoom: the camera ceiling, the flight cap and exact feet (Corbin 2026-10-21)', () => {
+  it('deepZoomFor is one verse 0.8 of the frame on every width, never under the tap rule', () => {
+    for (const w of [360, 412, 800, 1920]) {
+      expect(geo.deepZoomFor(31102, w)).toBeCloseTo(0.8 * 31102, 6);
+      expect(geo.deepZoomFor(31102, w)).toBeGreaterThanOrEqual(geo.maxZoomFor(31102, w));
+    }
+    expect(geo.deepZoomFor(31102, 1)).toBe(geo.maxZoomFor(31102, 1));
+  });
+  it('flightCapFor lands at the tap rule, or at the reader\'s own depth when deeper, never past the ceiling', () => {
+    const tap = geo.maxZoomFor(31102, 800), deep = geo.deepZoomFor(31102, 800);
+    expect(geo.flightCapFor(31102, 800, 10)).toBe(tap);
+    expect(geo.flightCapFor(31102, 800, 5000)).toBe(5000);
+    expect(geo.flightCapFor(31102, 800, 1e9)).toBe(deep);
+  });
+  it('arcTauOf is exact at the feet and symmetric, at a million-px radius too', () => {
+    for (const [l, r] of [[0, 100], [12.5, 2e6 + 12.5]]) {
+      expect(geo.arcTauOf(l, l, r)).toBe(0);
+      expect(geo.arcTauOf(r, l, r)).toBe(Math.PI);
+      expect(geo.arcTauOf((l + r) / 2, l, r)).toBeCloseTo(Math.PI / 2, 12);
+      const d = (r - l) * 1e-3;
+      expect(geo.arcTauOf(l + d, l, r) + geo.arcTauOf(r - d, l, r)).toBeCloseTo(Math.PI, 12);
+    }
   });
 });

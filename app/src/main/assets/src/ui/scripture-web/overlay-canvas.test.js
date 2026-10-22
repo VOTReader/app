@@ -1422,3 +1422,62 @@ describe('the sky\'s live altitude readout', () => {
     }
   });
 });
+
+/* THE VERSE ZOOM (Corbin 2026-10-21: "zoom way, way, way in. All the way to a single linked verse").
+   Past the tap rule the camera goes on to one verse 0.8 of the frame (geometry.deepZoomFor); there
+   each link leaves from its own foot across the verse's cell, the comb writes every far end along its
+   leg as a tap target for that thread, and the verse's own words stand in the band. */
+describe('the verse zoom: one verse fills the frame, every link its own labelled leg', () => {
+  const JOHN3_16 = verseOf('john', 3, 16);
+  const deep = (name) => geo.deepZoomFor(g.total, FRAMES[name].W / FRAMES[name].DPR);
+  const paintDeep = (name, verse, extra = {}) => {
+    const fs = frameAt(name, deep(name), verse, extra);
+    const rec = recorder();
+    rec.ctx.translate = () => {}; rec.ctx.rotate = () => {}; rec.ctx.clip = () => {};
+    const out = paintCanonOverlay(rec.ctx, fs);
+    fs.hits = out.hits;
+    return { fs, rec, out };
+  };
+  const overlap = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+
+  for (const name of ['pc', 'phone']) {
+    it(`${name}: at one verse the comb labels John 3:16's links, no two tags overlap, and a tag taps its own thread`, () => {
+      const { fs, out } = paintDeep(name, JOHN3_16 + 0.5);
+      const ppvCss = fs.cam.ppv / FRAMES[name].DPR;
+      expect(ppvCss, 'the verse fills 0.8 of the frame').toBeCloseTo(0.8 * FRAMES[name].W / FRAMES[name].DPR, 6);
+      const threads = out.hits.filter((h) => h.hit && h.hit.kind === 'thread');
+      expect(threads.length, 'the comb writes far ends along the legs').toBeGreaterThan(3);
+      for (const t of threads) {
+        const i = t.hit.index;
+        expect(i >= 0 && i < g.count, 'a tag names a real thread').toBe(true);
+        // the verse fills 0.8 of the frame, so its neighbours show a tenth each at the edges
+        const near = (v) => Math.abs(v - JOHN3_16) <= 1;
+        expect(near(g.from[i]) || near(g.to[i]), 'a tag on screen belongs to a verse on screen').toBe(true);
+      }
+      for (let a = 0; a < threads.length; a++) {
+        for (let b = a + 1; b < threads.length; b++) {
+          expect(overlap(threads[a].core, threads[b].core), `tags ${a} and ${b} overlap`).toBe(false);
+        }
+      }
+      const t = threads[0];
+      const hit = hitOverlay(fs, (t.core.x0 + t.core.x1) / 2 / FRAMES[name].DPR, (t.core.y0 + t.core.y1) / 2 / FRAMES[name].DPR);
+      expect(hit && hit.kind, 'a tap on a tag reaches its thread').toBe('thread');
+      expect(hit.index).toBe(t.hit.index);
+    });
+  }
+
+  it("the verse's own words stand in the band at one verse", () => {
+    const words = 'For God so loved the world that He gave His only begotten Son';
+    const { rec } = paintDeep('pc', JOHN3_16 + 0.5, {});
+    const withText = (() => {
+      const fs = frameAt('pc', deep('pc'), JOHN3_16 + 0.5);
+      fs.textOf = (v) => (v === JOHN3_16 ? words : '');
+      const r = recorder(); r.ctx.translate = () => {}; r.ctx.rotate = () => {}; r.ctx.clip = () => {};
+      paintCanonOverlay(r.ctx, fs);
+      return r;
+    })();
+    const drawn = withText.texts().map((c) => c.t).join(' ');
+    expect(drawn).toContain('loved');
+    expect(rec.texts().map((c) => c.t).join(' '), 'no text source, no words').not.toContain('loved');
+  });
+});

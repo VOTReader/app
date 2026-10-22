@@ -38,7 +38,7 @@ import {
 import {
   connectionFrame, chapterFrame, frameHolds, chapterAtX, chooserChapter, FEET_BAND,
 } from '../../utils/scripture-web/panel-model.js';
-import { maxZoomOf } from '../../utils/scripture-web/web-frame.js';
+import { maxZoomOf, flightCapOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
 import {
   describeFound, summaryOf, chooserAnnouncement, followAnnouncement,
@@ -425,7 +425,7 @@ export function useWebSelection({
     if (found.kind === 'arc') {
       const { right, opts } = coverNow();
       const frame = connectionFrame(found.from, found.to);
-      if (frameHolds(cam, v.W, right, frame, found.from, found.to, maxZoomOf(graph, v))) { flyTo(frame, opts); return; }
+      if (frameHolds(cam, v.W, right, frame, found.from, found.to, flightCapOf(graph, v, cam))) { flyTo(frame, opts); return; }
       bringIn((found.far === 'to' ? found.from : found.to) + 0.5);
       return;
     }
@@ -642,6 +642,13 @@ export function useWebSelection({
     // pill: overlay-renderer.js hitOverlay), before any line under it; the
     // navigation stream routes it (goto.jsx). Nothing records boxes yet: null.
     const overlayHit = hitOverlay(overlayFrameRef ? overlayFrameRef.current : null, cx, cy);
+    // the verse zoom's comb: a far end written along its leg is its thread, chosen as a tap on the leg is
+    if (overlayHit && overlayHit.kind === 'thread' && graph && overlayHit.index >= 0 && overlayHit.index < graph.count) {
+      const i = overlayHit.index;
+      const found = describe({ kind: 'arc', distance: 0,
+        hit: { index: i, from: graph.from[i], to: graph.to[i], votes: graph.votes ? graph.votes[i] : 0 } });
+      if (found) { commitFound(found); return; }
+    }
     if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey, insetFor })) {
       // a pill's tap opens its group as it always has; with a cell it keeps its column's fan up
       // while that card is open (the phone's way to the fan): closing it, the empty-space clear and
