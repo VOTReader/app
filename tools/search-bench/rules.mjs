@@ -26,6 +26,13 @@
                 copy does, and the target stays the original. A verse of fewer than 8 words is a formula with no one
                 parallel; a two-verse target is the pair, which no one verse says (counter-case cB07); a query naming
                 the verse (its book, or its chapter and verse: the hunt's refwords family) asks for that verse alone.
+                (errata 2026-10-22, the panel on the 500's sealed f001, both judges) for a query in the KJV's words (a
+                crossover/kjv case) the verse's KJV wording is read too: Ezra 2:64 and Nehemiah 7:66 are one sentence
+                word for word in the KJV, and the NKJV reorders the first words of one (classes.mjs parallels).
+   QUOTED BLOCK (errata 2026-10-22, the panel on the 500's sealed f064 and f091, both judges of each) a block target's
+                sentence quoting a verse (as a sentence target's would: word for word, 80% of 3-grams, or NEAR QUOTE)
+                has that verse answer a gist of the block as a near member; the block stays the original. A sentence
+                target's quoted verse is its original, as before.
    ─────────────────────────────────────────────────────────────────── */
 
 const gram = (w, i) => w[i] + ' ' + w[i + 1] + ' ' + w[i + 2];

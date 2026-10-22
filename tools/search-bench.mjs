@@ -46,6 +46,12 @@
      node tools/search-bench.mjs --set hunt [--json out] [--record]   hunt/cases.json; floor hunt/baseline.json
    The pass rule above, per case: a scoped case runs once per search in its `modes` (unscoped, a corpus, a book or volume
    chip), the class cut to what each scope shows, and passes when every run does; a text in its `alt` passes as the target.
+
+   UNSEALED (search200 sealed2, 2026-10-22): the sealed cases still failing after fix2 (37: the 500's 7 held and 23
+   fresh, the tri's 5 held and 2 fresh) went to a judge panel and are OPEN now (set 'unsealed', origin, panel; a case
+   both judges corrected carries its errata, search-bench/errata.md). They sit in cases.json with held false and score
+   on their own line, so open (400, 600) stays comparable and held and fresh are the sealed cases left (93 and 77, 175
+   and 88) until the writers' replacements are added. Their failures print with the open ones; their floor is their own.
    ─────────────────────────────────────────────────────────────────── */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -251,8 +257,9 @@ function judge(c, r, cls) {
 // ── report ──
 const sum = (rows) => ({ n: rows.length, pass: rows.filter((o) => o.pass).length, strict: rows.filter((o) => o.strict).length, top5: rows.filter((o) => o.top5).length, found: rows.filter((o) => o.found).length });
 const by = (rows, k) => Object.fromEntries([...new Set(rows.map((o) => o[k]))].sort().map((v) => [v, sum(rows.filter((o) => o[k] === v))]));
-const bench = out.filter((o) => o.set !== 'fresh');
+const bench = out.filter((o) => o.set !== 'fresh' && o.set !== 'unsealed');
 const fresh = out.filter((o) => o.set === 'fresh');
+const unsealed = out.filter((o) => o.set === 'unsealed');
 const all = sum(bench);
 const sorted = times.slice().sort((a, b) => a - b);
 const pct = (p) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))];
@@ -263,18 +270,19 @@ console.log(`search-bench: ${fmt(all)}`);
 console.log(`  open ${fmt(sum(bench.filter((o) => !o.held)))}`);
 console.log(`  held ${fmt(sum(bench.filter((o) => o.held)))}`);
 if (fresh.length) console.log(`  fresh ${fmt(sum(fresh))}  (sealed, another writer)`);
+if (unsealed.length) console.log(`  unsealed ${fmt(sum(unsealed))}  (open since 2026-10-22: the panel's failing sealed cases, scored apart)`);
 console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}`);
 console.log(`  init ${initMs} ms, query median ${pct(0.5)} ms, p95 ${pct(0.95)} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
 const table = (title, o) => { console.log(title); for (const [k, s] of Object.entries(o)) console.log('  ' + k.padEnd(16) + String(s.pass).padStart(4) + ' /' + String(s.n).padStart(4) + '   top5 ' + String(s.top5).padStart(3) + '  found ' + String(s.found).padStart(3)); };
 table('by style', by(bench, 'style'));
 table('by collection', by(bench, 'group'));
 if (!flag('--quiet')) {
-  console.log('failures (open cases only):');
-  for (const o of out.filter((x) => !x.pass && !x.held)) console.log(`  ${o.id} [${o.style}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
+  console.log('failures (open cases only; unsealed marked):');
+  for (const o of out.filter((x) => !x.pass && !x.held)) console.log(`  ${o.id}${o.set === 'unsealed' ? ' (unsealed)' : ''} [${o.style}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
 }
 if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
 
-const score = { pass: all.pass, strict: all.strict, top5: all.top5, found: all.found, style: Object.fromEntries(Object.entries(by(bench, 'style')).map(([k, s]) => [k, s.pass])), group: Object.fromEntries(Object.entries(by(bench, 'group')).map(([k, s]) => [k, s.pass])), ...(fresh.length ? { fresh: sum(fresh).pass } : {}) };
+const score = { pass: all.pass, strict: all.strict, top5: all.top5, found: all.found, style: Object.fromEntries(Object.entries(by(bench, 'style')).map(([k, s]) => [k, s.pass])), group: Object.fromEntries(Object.entries(by(bench, 'group')).map(([k, s]) => [k, s.pass])), ...(fresh.length ? { fresh: sum(fresh).pass } : {}), ...(unsealed.length ? { unsealed: sum(unsealed).pass } : {}) };
 if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the floor:', BASELINE); process.exit(0); }
 if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
 if (fs.existsSync(BASELINE)) {
@@ -282,6 +290,7 @@ if (fs.existsSync(BASELINE)) {
   const drops = [];
   if (score.pass < floor.pass) drops.push(`pass ${score.pass} < floor ${floor.pass}`);
   if (floor.fresh != null && fresh.length && score.fresh < floor.fresh) drops.push(`fresh ${score.fresh} < floor ${floor.fresh}`);
+  if (floor.unsealed != null && unsealed.length && score.unsealed < floor.unsealed) drops.push(`unsealed ${score.unsealed} < floor ${floor.unsealed}`);
   for (const sec of ['style', 'group']) for (const [k, n] of Object.entries(floor[sec] || {})) if ((score[sec][k] || 0) < n) drops.push(`${sec} ${k} ${score[sec][k] || 0} < ${n}`);
   if (drops.length) { console.error('search-bench FAILED: ' + drops.join('; ')); process.exit(1); }
   console.log(`floor held (pass ${floor.pass})${score.pass > floor.pass ? `; raised by ${score.pass - floor.pass}: run with --record to keep it` : ''}`);
@@ -291,11 +300,12 @@ if (fs.existsSync(BASELINE)) {
     open failures by id and form, and (--show-sealed-ids only) the sealed failures by id. Floors in tri/baseline.json. */
 function triReport() {
   const TIERS = ['easy', 'medium', 'hard'];
-  const open = out.filter((o) => !o.held);
+  const open = out.filter((o) => !o.held && o.set !== 'unsealed');
   const held = out.filter((o) => o.held && o.set !== 'fresh');
   const sealedFresh = out.filter((o) => o.set === 'fresh');
-  const so = sum(open); const sh = sum(held); const sf = sum(sealedFresh);
-  console.log(`tri open ${so.pass}/${so.n} (strict ${so.strict}, top5 ${so.top5}, found ${so.found}) · held ${sh.pass}/${sh.n} · fresh ${sealedFresh.length ? sf.pass + '/' + sf.n : '-'} · median ${pct(0.5)}/p95 ${pct(0.95)} ms`);
+  const unsealedT = out.filter((o) => o.set === 'unsealed');
+  const so = sum(open); const sh = sum(held); const sf = sum(sealedFresh); const su = sum(unsealedT);
+  console.log(`tri open ${so.pass}/${so.n} (strict ${so.strict}, top5 ${so.top5}, found ${so.found}) · held ${sh.pass}/${sh.n} · fresh ${sealedFresh.length ? sf.pass + '/' + sf.n : '-'}${unsealedT.length ? ` · unsealed ${su.pass}/${su.n}` : ''} · median ${pct(0.5)}/p95 ${pct(0.95)} ms`);
   console.log(`  meaning model: ${meaning.status}${meaning.failure ? ' (' + meaning.failure + ')' : ''}; init ${initMs} ms, max ${sorted[sorted.length - 1]} ms, total ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   const styles = [...new Set(out.map((o) => o.style))].sort();
   const cell = (rows) => { const s = sum(rows); return s.n ? `${s.pass}/${s.n}` : '-'; };
@@ -311,6 +321,9 @@ function triReport() {
   if (!flag('--quiet')) {
     console.log('failures (open cases only):');
     for (const o of open.filter((x) => !x.pass)) console.log(`  ${o.id} [${o.style}/${o.tier}/${o.form}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
+    // the unsealed cases are open: their failures print by query too, apart from the open 600's
+    if (unsealedT.length) console.log(`unsealed failures (open since 2026-10-22; ${su.n - su.pass} of ${su.n}):`);
+    for (const o of unsealedT.filter((x) => !x.pass)) console.log(`  ${o.id} [${o.style}/${o.tier}/${o.form}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
     const ids = (rows) => rows.filter((x) => !x.pass).map((x) => x.id).sort().join(' ') || '-';
     // the sealed ids only on request (search200 fix2): a builder reading this report never sees which unseen cases fail
     if (flag('--show-sealed-ids')) console.log('sealed failures (ids only): held ' + ids(held) + '; fresh ' + ids(sealedFresh));
@@ -318,7 +331,7 @@ function triReport() {
   if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
   const styleTier = {};
   for (const st of styles) for (const t of TIERS) { const s = sum(open.filter((o) => o.style === st && o.tier === t)); if (s.n) styleTier[st + '/' + t] = s.pass; }
-  const score = { open: so.pass, strict: so.strict, top5: so.top5, found: so.found, held: sh.pass, ...(sealedFresh.length ? { fresh: sf.pass } : {}), styleTier };
+  const score = { open: so.pass, strict: so.strict, top5: so.top5, found: so.found, held: sh.pass, ...(sealedFresh.length ? { fresh: sf.pass } : {}), ...(unsealedT.length ? { unsealed: su.pass } : {}), styleTier };
   if (flag('--record')) { fs.writeFileSync(BASELINE, JSON.stringify(score, null, 1) + '\n'); console.log('recorded the tri floor:', BASELINE); process.exit(0); }
   if (!out.length) { console.error('NOTHING-CHECKED'); process.exit(1); }
   if (fs.existsSync(BASELINE)) {
@@ -326,6 +339,7 @@ function triReport() {
     const drops = [];
     for (const k of ['open', 'held']) if (floor[k] != null && score[k] < floor[k]) drops.push(`${k} ${score[k]} < floor ${floor[k]}`);
     if (floor.fresh != null && sealedFresh.length && score.fresh < floor.fresh) drops.push(`fresh ${score.fresh} < floor ${floor.fresh}`);
+    if (floor.unsealed != null && unsealedT.length && score.unsealed < floor.unsealed) drops.push(`unsealed ${score.unsealed} < floor ${floor.unsealed}`);
     for (const [k, n] of Object.entries(floor.styleTier || {})) if ((score.styleTier[k] || 0) < n) drops.push(`${k} ${score.styleTier[k] || 0} < ${n}`);
     if (drops.length) { console.error('search-bench tri FAILED: ' + drops.join('; ')); process.exit(1); }
     console.log(`tri floor held (open ${floor.open}, held ${floor.held}${floor.fresh != null ? ', fresh ' + floor.fresh : ''})${score.open > floor.open ? `; open raised by ${score.open - floor.open}: run with --record to keep it` : ''}`);

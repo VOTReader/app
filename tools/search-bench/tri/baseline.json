@@ -5,6 +5,7 @@
  "found": 600,
  "held": 175,
  "fresh": 88,
+ "unsealed": 1,
  "styleTier": {
   "exact/easy": 60,
   "exact/medium": 70,

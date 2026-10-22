@@ -7,11 +7,11 @@
   "fresh/exact/medium": 10,
   "fresh/exact/hard": 10,
   "fresh/misremembered/easy": 10,
-  "fresh/misremembered/medium": 10,
+  "fresh/misremembered/medium": 9,
   "fresh/misremembered/hard": 10,
   "fresh/title/easy": 10,
   "fresh/title/medium": 10,
-  "fresh/title/hard": 10
+  "fresh/title/hard": 9
  },
  "cases": [
   {
@@ -815,24 +815,6 @@
    "from": "their reed to splinter beneath them, and they too shall be pierced!"
   },
   {
-   "id": "m274",
-   "style": "misremembered",
-   "tier": "medium",
-   "form": "two-three-slips",
-   "group": "studies",
-   "col": "bible-studies",
-   "collection": "Bible / Letter Studies",
-   "level": "sentence",
-   "uk": "bible-studies/grace-and-the-law-ch6",
-   "unit": "grace-and-the-law-ch6",
-   "title": "Grace AND The Law (Bible/Letter Study) — VERSES OFTEN STUMBLED OVER:",
-   "num": 6,
-   "blockIdx": 8,
-   "sentence": "The Old Covenant required animals to be sacrificed as a representation of the atonement of sin that had come and would come through YahuShua HaMashiach (Jesus The Christ).",
-   "q": "required animals to be offered as a symbol of the atonement for sin",
-   "from": "required animals to be sacrificed as a representation of the atonement of sin"
-  },
-  {
    "id": "m321",
    "style": "misremembered",
    "tier": "medium",
@@ -1603,23 +1585,6 @@
    "num": 16,
    "q": "let all in the earth be brought into deep and utter silence",
    "replaces": "n227"
-  },
-  {
-   "id": "n291",
-   "style": "title",
-   "tier": "hard",
-   "form": "words-wrong",
-   "group": "wtlb",
-   "col": "wtlb2",
-   "collection": "Words To Live By: Part Two",
-   "level": "unit",
-   "titleCol": "wtlb2",
-   "uk": "wtlb2/against-god",
-   "unit": "against-god",
-   "title": "Against God",
-   "fullTitle": "Against God",
-   "num": 28,
-   "q": "opposing god"
   },
   {
    "id": "n255",

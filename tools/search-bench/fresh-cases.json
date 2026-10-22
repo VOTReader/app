@@ -2,23 +2,6 @@
  "written": "one blind writer, Codex GPT-6 Sol, 2026-10-15 (fresh-brief.md); targets: make-fresh.mjs from seed 20261015",
  "cases": [
   {
-   "id": "f001",
-   "held": true,
-   "set": "fresh",
-   "group": "bible",
-   "col": "bible",
-   "style": "crossover",
-   "variant": "kjv",
-   "level": "verse",
-   "uk": "bible/nehemiah:7:66",
-   "ref": "Nehemiah 7:66",
-   "bookId": "nehemiah",
-   "chapter": 7,
-   "verse": 66,
-   "sentence": "Altogether the whole assembly was forty-two thousand three hundred and sixty,",
-   "q": "forty and two thousand three hundred and threescore"
-  },
-  {
    "id": "f002",
    "held": true,
    "set": "fresh",
@@ -248,38 +231,6 @@
    "verse": 9,
    "sentence": "Is not Calno like Carchemish? Is not Hamath like Arpad? Is not Samaria like Damascus?",
    "q": "he compares calno carchemish and other conquered cities"
-  },
-  {
-   "id": "f016",
-   "held": true,
-   "set": "fresh",
-   "group": "bible",
-   "col": "bible",
-   "style": "paraphrase",
-   "level": "verse",
-   "uk": "bible/2samuel:22:47",
-   "ref": "2 Samuel 22:47",
-   "bookId": "2samuel",
-   "chapter": 22,
-   "verse": 47,
-   "sentence": "“The LORD lives! Blessed be my Rock! Let God be exalted, The Rock of my salvation!",
-   "q": "god is alive and he is my saving rock"
-  },
-  {
-   "id": "f017",
-   "held": true,
-   "set": "fresh",
-   "group": "bible",
-   "col": "bible",
-   "style": "paraphrase",
-   "level": "verse",
-   "uk": "bible/proverbs:8:29",
-   "ref": "Proverbs 8:29",
-   "bookId": "proverbs",
-   "chapter": 8,
-   "verse": 29,
-   "sentence": "When He assigned to the sea its limit, So that the waters would not transgress His command, When He marked out the foundations of the earth,",
-   "q": "god set a boundary for the sea when he made earth"
   },
   {
    "id": "f018",
@@ -543,21 +494,6 @@
    "q": "the thirsty man who bears scars of his passion"
   },
   {
-   "id": "f035",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "v4",
-   "style": "gist",
-   "level": "block",
-   "uk": "v4/mistranslation-and-misinterpretation-leading-to-great-obscurity-among-many-faces",
-   "unit": "mistranslation-and-misinterpretation-leading-to-great-obscurity-among-many-faces",
-   "title": "Mistranslation and Misinterpretation Leading to Great Obscurity among Many Faces",
-   "blockIdx": 6,
-   "sentence": "For I tell you the truth, the translations of men are greatly erred, which leads to an even greater misinterpretation of My Word by the churches of men, who seek not the Truth as it is but long for that which is malleable, embracing only that which yields to their own perverse desires and expectations.",
-   "q": "the part about flawed translations and churches bending scripture to fit desires"
-  },
-  {
    "id": "f036",
    "held": true,
    "set": "fresh",
@@ -586,21 +522,6 @@
    "blockIdx": 0,
    "sentence": "How then shall they receive ears to hear?",
    "q": "how then shall they receive ears to hear"
-  },
-  {
-   "id": "f038",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "v7",
-   "style": "middle",
-   "level": "sentence",
-   "uk": "v7/blow-the-trumpet-sound-the-alarm",
-   "unit": "blow-the-trumpet-sound-the-alarm",
-   "title": "Blow the Trumpet, Sound the Alarm",
-   "blockIdx": 1,
-   "sentence": "For I shall be with you and dwell in you like a flame of fire.",
-   "q": "dwell in you like a flame of fire"
   },
   {
    "id": "f039",
@@ -723,81 +644,6 @@
    "q": "obey my voice and hear the sound of this trumpet"
   },
   {
-   "id": "f047",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "timothy",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "timothy/the-parable-of-the-great-landowner-and-his-beloved-sheep",
-   "unit": "the-parable-of-the-great-landowner-and-his-beloved-sheep",
-   "title": "The Parable of The Great Landowner and His Beloved Sheep",
-   "blockIdx": 1,
-   "sentence": "Behold, many wolves were there also, stealing his sheep and killing his lambs.",
-   "q": "wild animals were taking the man's sheep and killing their young"
-  },
-  {
-   "id": "f048",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "rebuke",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "rebuke/the-cup-of-the-wrath-of-my-fury-is-come-to-the-full",
-   "unit": "the-cup-of-the-wrath-of-my-fury-is-come-to-the-full",
-   "title": "THE CUP OF THE WRATH OF MY FURY IS COME TO THE FULL",
-   "blockIdx": 6,
-   "sentence": "Shall you forsake The Moral Law, in the name of grace and Him crucified, that you might provoke Me to anger?!",
-   "q": "why ignore gods commands just because jesus died for you"
-  },
-  {
-   "id": "f049",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "flock",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "flock/set-your-house-in-order",
-   "unit": "set-your-house-in-order",
-   "title": "Set Your House in Order",
-   "blockIdx": 2,
-   "sentence": "Yet the father is the head of his daughter, and the friend is only to lend an ear.",
-   "q": "a friend can listen but a father guides his own daughter"
-  },
-  {
-   "id": "f050",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "v2",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "v2/seven-hills",
-   "unit": "seven-hills",
-   "title": "To the Church Who Dwells in the Midst Of and Sits Upon Seven Hills",
-   "blockIdx": 25,
-   "sentence": "For you are an estranged woman, who knows not that she is accursed.",
-   "q": "the church is estranged from god and doesn't know it's cursed"
-  },
-  {
-   "id": "f051",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "rebuke",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "rebuke/enemies-of-the-lord-come-forth",
-   "unit": "enemies-of-the-lord-come-forth",
-   "title": "Enemies of The Lord, Come Forth",
-   "blockIdx": 1,
-   "sentence": "Come out to conquer and seek your Prize, all you men of false valor!...",
-   "q": "he challenges the fake heroes who think they can win"
-  },
-  {
    "id": "f052",
    "held": true,
    "set": "fresh",
@@ -886,32 +732,6 @@
    "q": "the pair of lampstands"
   },
   {
-   "id": "f058",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "v5",
-   "style": "title",
-   "level": "unit",
-   "uk": "v5/prophets-hananiah",
-   "unit": "prophets-hananiah",
-   "title": "Prophets Hananiah",
-   "q": "the prophet hananiah"
-  },
-  {
-   "id": "f059",
-   "held": true,
-   "set": "fresh",
-   "group": "letters",
-   "col": "v2",
-   "style": "title",
-   "level": "unit",
-   "uk": "v2/do-this-in-remembrance",
-   "unit": "do-this-in-remembrance",
-   "title": "Do This in Remembrance of Me",
-   "q": "remember me at passover"
-  },
-  {
    "id": "f060",
    "held": true,
    "set": "fresh",
@@ -927,36 +747,6 @@
    "q": "that which was hidden is brougth into the open"
   },
   {
-   "id": "f061",
-   "held": true,
-   "set": "fresh",
-   "group": "words",
-   "col": "wtlb2",
-   "style": "exact",
-   "level": "sentence",
-   "uk": "wtlb2/the-only-faithful-and-true-witness",
-   "unit": "the-only-faithful-and-true-witness",
-   "title": "The Only Faithful and True Witness",
-   "blockIdx": 0,
-   "sentence": "I have written it on tablets of stone And within the heart of man, and within The pages of My Book it is made plain; Thus they are without excuse...",
-   "q": "i have written it on tablets of stone"
-  },
-  {
-   "id": "f062",
-   "held": true,
-   "set": "fresh",
-   "group": "words",
-   "col": "wtlb2",
-   "style": "exact",
-   "level": "sentence",
-   "uk": "wtlb2/it-is-time",
-   "unit": "it-is-time",
-   "title": "It Is Time",
-   "blockIdx": 3,
-   "sentence": "It is time for My watchmen to proclaim The acceptable year of The Lord and the Day of Vengeance of The Lord their God...",
-   "q": "proclaim the acceptable year of the lord and the day of vengeance"
-  },
-  {
    "id": "f063",
    "held": true,
    "set": "fresh",
@@ -970,21 +760,6 @@
    "blockIdx": 1,
    "sentence": "By no means shall they be able To keep their head above water, Nor shall their strength deliver Them in the Day of Troubles...",
    "q": "keep their head above water nor shall their strength deliver"
-  },
-  {
-   "id": "f064",
-   "held": true,
-   "set": "fresh",
-   "group": "words",
-   "col": "wtlb2",
-   "style": "gist",
-   "level": "block",
-   "uk": "wtlb2/labor-of-love",
-   "unit": "labor-of-love",
-   "title": "Labor of Love",
-   "blockIdx": 0,
-   "sentence": "For it is written: According to the judgment with which you judge shall you be judged, and with the measure you use shall it be measured back to you.",
-   "q": "the part where your own measure of judgment comes back to you"
   },
   {
    "id": "f065",
@@ -1062,21 +837,6 @@
    "q": "if you dismiss even one teaching you reject gods whole message"
   },
   {
-   "id": "f070",
-   "held": true,
-   "set": "fresh",
-   "group": "words",
-   "col": "blessed",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "blessed/blessed-are-those-who-serve-me-as-i-have-loved-them",
-   "unit": "blessed-are-those-who-serve-me-as-i-have-loved-them",
-   "title": "Blessed Are Those Who Serve Me as I Have Loved Them",
-   "blockIdx": 0,
-   "sentence": "Blessed are all those who love And obey The Son, For they shall be delivered.",
-   "q": "people who follow and love gods son will be saved"
-  },
-  {
    "id": "f071",
    "held": true,
    "set": "fresh",
@@ -1135,19 +895,6 @@
    "q": "blessed for walking in his ways"
   },
   {
-   "id": "f075",
-   "held": true,
-   "set": "fresh",
-   "group": "words",
-   "col": "blessed",
-   "style": "title",
-   "level": "unit",
-   "uk": "blessed/blessed-are-those-who-receive-of-me",
-   "unit": "blessed-are-those-who-receive-of-me",
-   "title": "Blessed Are Those Who Receive of Me",
-   "q": "blessed are those who welcome me"
-  },
-  {
    "id": "f076",
    "held": true,
    "set": "fresh",
@@ -1161,21 +908,6 @@
    "blockIdx": 2,
    "sentence": "It is time to fall into Me unreservedly; Or to depart, and walk through dry places...",
    "q": "it is time to fall into me unresrevedly"
-  },
-  {
-   "id": "f077",
-   "held": true,
-   "set": "fresh",
-   "group": "answers",
-   "col": "answers",
-   "style": "exact",
-   "level": "sentence",
-   "uk": "answers/regarding-the-second-death",
-   "unit": "regarding-the-second-death",
-   "title": "Regarding the Second Death",
-   "blockIdx": 33,
-   "sentence": "For these did not seek out My Salvation which came down in the flesh, they wanted no part with Him who was sent; they refused to accept Me as I truly am.\"",
-   "q": "they refused to accept me as i truly am"
   },
   {
    "id": "f078",
@@ -1371,21 +1103,6 @@
    "q": "you also ought to wash one another's feet"
   },
   {
-   "id": "f091",
-   "held": true,
-   "set": "fresh",
-   "group": "studies",
-   "col": "bible-studies",
-   "style": "gist",
-   "level": "block",
-   "uk": "bible-studies/more-than-a-man-ch22",
-   "unit": "more-than-a-man-ch22",
-   "title": "YAHUSHUA More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy (Extensive Bible/Letter Study) — Late Tuesday Night / Early Wednesday Morning, Passover",
-   "blockIdx": 4,
-   "sentence": "For the mouth of the wicked and the mouth Of the deceitful have opened against Me, They have spoken against Me with a lying tongue; They have also surrounded Me with words of hatred, And fought against Me without a cause; In return for My love they are My accusers, But I give Myself to prayer.",
-   "q": "the part where accusers repay love with hatred and prayer"
-  },
-  {
    "id": "f092",
    "held": true,
    "set": "fresh",
@@ -1416,21 +1133,6 @@
    "q": "the word of god spread and the number of disciples grew greatly"
   },
   {
-   "id": "f094",
-   "held": true,
-   "set": "fresh",
-   "group": "studies",
-   "col": "bible-studies",
-   "style": "paraphrase",
-   "level": "sentence",
-   "uk": "bible-studies/more-than-a-man-ch24",
-   "unit": "more-than-a-man-ch24",
-   "title": "YAHUSHUA More Than a Man: YahuShua Is The Fulfillment of All Messianic Prophecy (Extensive Bible/Letter Study) — Wednesday Morning and Afternoon, Passover",
-   "blockIdx": 9,
-   "sentence": "Pilate said to them, “Shall I crucify your King?”",
-   "q": "pilate asks the crowd whether they really want their king crucified"
-  },
-  {
    "id": "f095",
    "held": true,
    "set": "fresh",
@@ -1444,19 +1146,6 @@
    "blockIdx": 17,
    "sentence": "And YahuShua said, “Neither do I condemn you; go, and from now on sin no more.”",
    "q": "YahuShua said Neither"
-  },
-  {
-   "id": "f096",
-   "held": true,
-   "set": "fresh",
-   "group": "studies",
-   "col": "bible-studies",
-   "style": "title",
-   "level": "unit",
-   "uk": "bible-studies/grace-and-the-law-ch2",
-   "unit": "grace-and-the-law-ch2",
-   "title": "Grace AND The Law (Bible/Letter Study) — Do We Then Nullify The Law Through Faith?:",
-   "q": "grace and law does faith cancel the law"
   },
   {
    "id": "f097",
@@ -1483,32 +1172,6 @@
    "unit": "judgment-of-god",
    "title": "The Judgment of God Is True and Without Question, Yet the Error of the People Is Great",
    "q": "whether executing murderers is right and cremated people can rise"
-  },
-  {
-   "id": "f099",
-   "held": true,
-   "set": "fresh",
-   "group": "cross",
-   "col": "v5",
-   "style": "unitgist",
-   "level": "unit",
-   "uk": "v5/tear-down-every-whitewashed-wall-of-abomination",
-   "unit": "tear-down-every-whitewashed-wall-of-abomination",
-   "title": "Tear Down Every Whitewashed Wall of Abomination",
-   "q": "clearing idols from believers homes and worship"
-  },
-  {
-   "id": "f100",
-   "held": true,
-   "set": "fresh",
-   "group": "cross",
-   "col": "v1",
-   "style": "unitgist",
-   "level": "unit",
-   "uk": "v1/the-signs-of-the-coming-of-the-son-of-man",
-   "unit": "the-signs-of-the-coming-of-the-son-of-man",
-   "title": "The Signs of the Coming of The Son of Man",
-   "q": "storms earthquakes and changed hearts before jesus returns"
   }
  ]
 }

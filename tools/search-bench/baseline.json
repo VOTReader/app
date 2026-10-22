@@ -1,8 +1,8 @@
 {
  "pass": 474,
  "strict": 365,
- "top5": 490,
- "found": 499,
+ "top5": 485,
+ "found": 492,
  "style": {
   "crossover": 40,
   "exact": 76,
@@ -24,5 +24,6 @@
   "studies": 37,
   "words": 77
  },
- "fresh": 77
+ "fresh": 77,
+ "unsealed": 6
 }

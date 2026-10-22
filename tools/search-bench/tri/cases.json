@@ -12,15 +12,20 @@
   "open/title/easy": 60,
   "open/title/medium": 70,
   "open/title/hard": 70,
-  "held/exact/easy": 20,
-  "held/exact/medium": 20,
+  "held/exact/easy": 19,
+  "unsealed/exact/easy": 1,
+  "held/exact/medium": 19,
+  "unsealed/exact/medium": 1,
   "held/exact/hard": 20,
   "held/misremembered/easy": 20,
   "held/misremembered/medium": 20,
   "held/misremembered/hard": 20,
   "held/title/easy": 20,
-  "held/title/medium": 20,
-  "held/title/hard": 20
+  "held/title/medium": 19,
+  "unsealed/title/medium": 1,
+  "held/title/hard": 18,
+  "unsealed/title/hard": 3,
+  "unsealed/misremembered/medium": 1
  },
  "cases": [
   {
@@ -11911,7 +11916,20 @@
    "blockIdx": 0,
    "sentence": "Therefore, judge no more by human standards, discern by right standards, according to My love and the knowledge you have received in Me.",
    "q": "\"judge no more by human standards, discern by right standards,\"",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "errata/errata",
+   "errata": {
+    "date": "2026-10-22",
+    "near": [
+     "v4/from-betrayal-to-victory",
+     "answers/regarding-judas-iscariot",
+     "answers/regarding-the-mistranslation-and-misinterpretation-of-the-scriptures"
+    ],
+    "log": "errata.md (sealed2)"
+   }
   },
   {
    "id": "e218",
@@ -12349,7 +12367,11 @@
    "blockIdx": 1,
    "sentence": "And when does My servant become a prophet?",
    "q": "and when does my servant become a prophet",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "valid/valid"
   },
   {
    "id": "e315",
@@ -14803,7 +14825,12 @@
    "fullTitle": "Gifts of the Spirit",
    "num": 76,
    "q": "gifts of spirit",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "errata/unfair",
+   "note": "panel split (judge 1 errata, judge 2 unfair): kept open as written; errata.md (sealed2) has both reasons"
   },
   {
    "id": "n013",
@@ -14840,7 +14867,12 @@
    "fullTitle": "Worthless Images",
    "num": 42,
    "q": "worthless idols",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "errata/unfair",
+   "note": "panel split (judge 1 errata, judge 2 unfair): kept open as written; errata.md (sealed2) has both reasons"
   },
   {
    "id": "n135",
@@ -15182,7 +15214,58 @@
    "title": "The Trumpet Call of God",
    "sentence": "The Trumpet Call of God",
    "q": "the trumpet blast of god",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "unfair/valid",
+   "note": "panel split (judge 1 unfair, judge 2 valid): kept open as written; errata.md (sealed2) has both reasons"
+  },
+  {
+   "id": "m274",
+   "style": "misremembered",
+   "tier": "medium",
+   "form": "two-three-slips",
+   "group": "studies",
+   "col": "bible-studies",
+   "collection": "Bible / Letter Studies",
+   "level": "sentence",
+   "uk": "bible-studies/grace-and-the-law-ch6",
+   "unit": "grace-and-the-law-ch6",
+   "title": "Grace AND The Law (Bible/Letter Study) — VERSES OFTEN STUMBLED OVER:",
+   "num": 6,
+   "blockIdx": 8,
+   "sentence": "The Old Covenant required animals to be sacrificed as a representation of the atonement of sin that had come and would come through YahuShua HaMashiach (Jesus The Christ).",
+   "q": "required animals to be offered as a symbol of the atonement for sin",
+   "from": "required animals to be sacrificed as a representation of the atonement of sin",
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "fresh",
+   "panel": "valid/valid"
+  },
+  {
+   "id": "n291",
+   "style": "title",
+   "tier": "hard",
+   "form": "words-wrong",
+   "group": "wtlb",
+   "col": "wtlb2",
+   "collection": "Words To Live By: Part Two",
+   "level": "unit",
+   "titleCol": "wtlb2",
+   "uk": "wtlb2/against-god",
+   "unit": "against-god",
+   "title": "Against God",
+   "fullTitle": "Against God",
+   "num": 28,
+   "q": "opposing god",
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "fresh",
+   "panel": "valid/unfair",
+   "note": "panel split (judge 1 valid, judge 2 unfair): kept open as written; errata.md (sealed2) has both reasons"
   }
  ]
 }
