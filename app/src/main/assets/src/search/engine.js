@@ -1829,6 +1829,30 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       entry = { score: e.score, doc: reshapeDoc(D.get(id)), terms: e.terms || [] };
       idOf.set(entry, id);
     }
+    /* THE VERSE IT QUOTES STAYS ABOVE IT (search200 fix1, the hunt bench). A verse holding the quote as well as the
+       reprint is the original's own original, so the lift does not put the original over it ("what is truth": John
+       18:38 sat between an Answers topic and John 18:37, the verse the topic's sentence names, and 18:37 was lifted
+       over it). The verses ranked between the reprint and the original, or within ORIGINAL_REACH of an original
+       brought in from outside, that hold the quote the way the original had to (B4's fit, else near and asWell)
+       and at least as nearly as the original does, by each measure, move up with it and stay above it, in their own
+       order. A verse holding less of it is no original of it: a query of small words ("the presence of the lord is
+       an", "he is risen the from the") finds many verses holding most of it, and they stay below. */
+    const end = j > i ? j : Math.min(out.length, ORIGINAL_REACH);
+    const oid = idOf.get(entry) || '';
+    const oNear = near(oid, entry.doc);
+    const oCov = holds ? holds.cov(oid) : 0;
+    const verses = [];
+    for (let r = i + 1; r < end; r++) {
+      const v = out[r];
+      if (v.doc.kind !== 'verse') continue;
+      const vid = idOf.get(v) || '';
+      const vNear = near(vid, v.doc);
+      if (vNear < oNear) continue;
+      if (holds ? holds.has(vid) && holds.cov(vid) >= Math.max(ALIGN_HELD, oCov) : vNear >= NEAR_PHRASE_MIN && asWell(vid, v.doc, whole)) verses.push(v);
+    }
+    for (const v of verses) out.splice(out.indexOf(v), 1);
+    out.splice(i, 0, ...verses);
+    i += verses.length;
     out.splice(i, 0, entry);
     i++;   // the reprint now sits under it
   }
