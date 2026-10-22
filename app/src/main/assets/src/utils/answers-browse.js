@@ -155,16 +155,21 @@ export function shelfLabel(shelf) {
   return l.endsWith(':') ? l.slice(0, -1) : l;
 }
 
+/** The short names the browse screens give the index and the unnumbered shelf, and the numbered groups' shared head. */
+export const ANSWERS_FD_INDEX_SHORT = 'False Doctrines index';
+export const ANSWERS_OTHER_LABEL = 'Other Topics';
+export const ANSWERS_TSTL_HEAD = 'Thus Says The Lord...';
+
 /**
  * Where a topic sits on the site, in the words a row's sub uses.
  * @param {any[]} entries ANSWERS
  * @param {string} id
  */
 export function answersPlaceOf(entries, id) {
-  if (id === ANSWERS_FD_INDEX_ID) return 'False Doctrines index';
+  if (id === ANSWERS_FD_INDEX_ID) return ANSWERS_FD_INDEX_SHORT;
   if (id === ANSWERS_MAIN_PAGE_ID) return 'Main Page';
   const s = answersSiteShelfOf(entries, id);
-  if (!s) return 'Other Topics';
+  if (!s) return ANSWERS_OTHER_LABEL;
   if (s.kind === 'commandment') return `The ${ANSWERS_COMMANDMENTS[/** @type {number} */ (s.num) - 1].ordinal} Commandment`;
   if (s.kind === 'tstl') return s.num + SEP + s.short;
   return shelfLabel(s);
@@ -460,7 +465,7 @@ export function answersMediaIndex(entries, metaAll) {
 /** The short name a media item's topic goes by on the media page. */
 export function answersMediaPlace(entries, id, shortTitle) {
   if (id === ANSWERS_MAIN_PAGE_ID) return 'Main Page';
-  if (id === ANSWERS_FD_INDEX_ID) return 'False Doctrines index';
+  if (id === ANSWERS_FD_INDEX_ID) return ANSWERS_FD_INDEX_SHORT;
   const e = (entries || []).find((x) => x && x.id === id);
   return e ? shortTitle(e.title) : '';
 }

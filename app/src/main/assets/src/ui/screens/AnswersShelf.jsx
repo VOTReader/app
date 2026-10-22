@@ -17,7 +17,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { h, Fragment } from '../jsx-h.js';
-import { NBSP, SEP, pl, answersRowSub, answersShelfByKey } from '../../utils/answers-browse.js';
+import { NBSP, SEP, pl, answersRowSub, answersShelfByKey, ANSWERS_OTHER_LABEL } from '../../utils/answers-browse.js';
 import { ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU } from '../../utils/answers-site.js';
 import { AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
 
@@ -33,7 +33,7 @@ export function AnswersShelf({ entries, groupKey, isRead: isReadRaw, pathOn = tr
   const shelf = found ? found.shelf : null;
   const topics = found ? found.topics : [];
   const isGroup = !!(shelf && shelf.kind === 'tstl');
-  const title = isGroup ? shelf.short : 'Other Topics';
+  const title = isGroup ? shelf.short : ANSWERS_OTHER_LABEL;
   const read = topics.filter((e) => isRead(e.id)).length;
   const first = topics.find((e) => !isRead(e.id));
   const start = read && first ? first : topics[0];

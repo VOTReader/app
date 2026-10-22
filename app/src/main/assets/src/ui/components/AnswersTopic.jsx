@@ -27,7 +27,7 @@ import { h, Fragment } from '../jsx-h.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from './AnswersParts.jsx';
 import { FoldRow, TocRows, AnswersContentsSheet } from './AnswersContents.jsx';
 import { AnsSheet, ChartViewer, CommandmentSheet } from '../sheets/AnswersSheets.jsx';
-import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey } from '../../utils/answers-browse.js';
+import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey, ANSWERS_FD_INDEX_SHORT } from '../../utils/answers-browse.js';
 import { ANSWERS_MAIN_PAGE_ID, answersShortTitle, answersPassageCount } from '../../utils/answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteNav, answersSiteShelfOf } from '../../utils/answers-site.js';
 import {
@@ -730,7 +730,7 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
   // a section link names its page; a letter link its collection
   const moreRow = (r, key) => {
     const e = r.id ? byId.get(r.id) : null;
-    const sub = e ? 'In ' + (r.id === ANSWERS_FD_INDEX_ID ? 'the False Doctrines index' : answersShortTitle(e.title)) : ((r.letter && r.letter.collection) || 'Letter');
+    const sub = e ? 'In ' + (r.id === ANSWERS_FD_INDEX_ID ? 'the ' + ANSWERS_FD_INDEX_SHORT : answersShortTitle(e.title)) : ((r.letter && r.letter.collection) || 'Letter');
     const go = () => {
       if (r.id) nav.openTopic(r.id, r.anchor || null);
       else if (r.letter) onLetter({ collection: r.letter.collection, letterTitle: r.letter.title });

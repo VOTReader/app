@@ -33,7 +33,7 @@ import {
   NBSP, SEP, pl, ANSWERS_QUESTIONS, ANSWERS_AZ_KEYS, ANSWERS_TAGLINE, answersRowSub, answersSizeWords, answersBrowseShelves,
   answersPlaceOf, answersAZGroups, answersSourceParts, answersInlinePieces, answersDailyPool, answersDailyPick,
   answersOpenablePool, answersPathState, answersMediaIndex, answersMediaSummary, answersTopSections,
-  answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain,
+  answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain, ANSWERS_TSTL_HEAD,
 } from '../../utils/answers-browse.js';
 import { answersIndexOf, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
 import { passageTextBefore } from '../../utils/answers-contents.js';
@@ -361,7 +361,7 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
   const groupTotal = shelves.groups.reduce((a, s) => a + s.topics.length, 0);
   const fdEntry = byId.get(ANSWERS_FD_INDEX_ID) || null;
   const fdMeta = meta && meta[ANSWERS_FD_INDEX_ID];
-  const tstlHead = shelves.groups.length ? shelves.groups[0].label.replace(/^\d+\.\s*/, '') : 'Thus Says The Lord...';
+  const tstlHead = shelves.groups.length ? shelves.groups[0].label.replace(/^\d+\.\s*/, '') : ANSWERS_TSTL_HEAD;
 
   const tablets = ANSWERS_COMMANDMENTS.map((c, i) => {
     const s = cmdShelves[i];
