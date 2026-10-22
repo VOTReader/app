@@ -160,6 +160,22 @@ describe('AnnotationHint', () => {
     expect(screen.queryByText(HINT_TEXT)).toBeNull();
   });
 
+  /* U15 (AOGCG, 2026-10-22): the coach mark shows at most once per install. Shown and left alone
+     (no ✕, no long-press, no mark), it used to come back on every reading screen and every boot. */
+  it('shows at most once per install: shown once, it stays for that screen, then never again', () => {
+    setupStores();
+    const first = render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(screen.getByText(HINT_TEXT)).toBeTruthy();
+    expect(window.AnnHintDismissedFlagStore.is(), 'recorded the moment it is shown').toBe(true);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(screen.getByText(HINT_TEXT), 'and still there on this screen').toBeTruthy();
+    first.unmount();
+    render(<AnnotationHint />);                              // the next reading screen, or a cold boot
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(screen.queryByText(HINT_TEXT)).toBeNull();
+  });
+
   it('never renders when the dismissal flag is already set at boot', () => {
     setupStores({ hintDismissed: true });                    // dismissed last session
     render(<AnnotationHint />);
