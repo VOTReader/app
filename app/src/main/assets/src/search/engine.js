@@ -1281,7 +1281,43 @@ const nameAsPrinted = (/** @type {string} */ t) => (RESTORED_NAME.test(t) ? 'jes
 /* ...and the Father's, in a verse (search200 fix1): the editions print "The LORD is my shepherd", so a reader's
    "yahuwah is my shepherd" held no verse's run, and the phrase pass reads a verse with the typed names printed. */
 const RESTORED_FATHER = /^(?:yahuwah|yahweh|yhwh|jehovah|yahuah)$/;
-const namesAsVersePrints = (/** @type {string} */ t) => (RESTORED_FATHER.test(t) ? 'lord' : nameAsPrinted(t));
+/* ...and the Anointed's (search200 fix2): "the love of mashiach" is "the love of Christ" in a verse. */
+const RESTORED_ANOINTED = /^(?:hamashiach|mashiach)$/;
+const namesAsVersePrints = (/** @type {string} */ t) => {
+  const n = restoredNameOf(t);
+  return RESTORED_FATHER.test(n) ? 'lord' : RESTORED_ANOINTED.test(n) ? 'christ' : nameAsPrinted(n);
+};
+/* HIS NAMES, RESTORED OR PRINTED, ARE ONE NAME (search200 fix2). The editions print "Jesus", "Christ", "LORD"
+   and "God"; the Volumes print "YahuShua", "HaMashiach" and "YAHUWAH". A typed name met only the texts printing
+   it as typed (the synonym groups reach the others at half weight and demote a text found only so), so "for the
+   love of mashiach constraineth us" led a letter holding "Mashiach" and "love" over 2 Corinthians 5:14 ("the
+   love of Christ"), and "jesus christ is king" led Hebrews 13:8 over the letter "YahuShua HaMashiach Is King".
+   A typed name is searched as each of its other forms too, at full weight under its own word, as a name typed in
+   parts is. "lord" and "god" typed reach no restored form: they are in nearly every text, and the Volumes print
+   them as well. */
+const NAME_FORMS = Object.assign(Object.create(null), {
+  yahushua: ['jesus'], yeshua: ['yahushua', 'jesus'], yahshua: ['yahushua', 'jesus'], yahusha: ['yahushua', 'jesus'],
+  jesus: ['yahushua'],
+  hamashiach: ['christ', 'mashiach'], mashiach: ['hamashiach', 'christ'], christ: ['hamashiach', 'mashiach'],
+  yahuwah: ['lord', 'god'], yahweh: ['yahuwah', 'lord', 'god'], yhwh: ['yahuwah', 'lord', 'god'],
+  jehovah: ['yahuwah', 'lord', 'god'], yahuah: ['yahuwah', 'lord', 'god'],
+});
+/** One form for each of His names, restored or printed ("jesus" and "yeshua" are yahushua, "christ" hamashiach,
+    "jehovah" yahuwah; "lord" and "god" stay), for a title read against the typed words. */
+function oneName(/** @type {string} */ t) {
+  const n = restoredNameOf(t);
+  const f = NAME_FORMS[n];
+  if (!f) return t;
+  return RESTORED_FATHER.test(n) ? 'yahuwah' : n === 'christ' || RESTORED_ANOINTED.test(n) ? 'hamashiach' : 'yahushua';
+}
+/** A restored name typed as a possessive without its apostrophe ("yahuwahs", "yahushuas") → the name; else the word. */
+function restoredNameOf(/** @type {string} */ t) {
+  if (t.length > 4 && t.endsWith('s') && !NAME_FORMS[t]) {
+    const n = t.slice(0, -1);
+    if (n !== 'jesus' && n !== 'christ' && NAME_FORMS[n]) return n;
+  }
+  return t;
+}
 /** A sentence's key: its words as the index reads them, His name as printed; null under five words (too common to mean one text). */
 function sentenceKey(s) {
   return tokensKey(kjvEncode(s));
@@ -2431,6 +2467,19 @@ async function search(query, options) {
       units.push({ term: joined, origin: i, cover: (1 << i) | (1 << (i + 1)), literal: false, joined: true });
       didExpand = true;
     }
+    // His names: each typed name is searched as its other forms too, under its own word (NAME_FORMS)
+    for (let i = 0; i < filtered.length && i < 31; i++) {
+      const toks = kjvEncode(filtered[i]);
+      if (toks.length !== 1) continue;
+      const n = restoredNameOf(toks[0]);
+      if (!NAME_FORMS[n]) continue;
+      for (const f of (n === toks[0] ? [] : [n]).concat(NAME_FORMS[n])) {
+        if (had.has(f) || !termExists(f)) continue;
+        had.add(f);
+        units.push({ term: f, origin: i, literal: false, joined: true });
+        didExpand = true;
+      }
+    }
     /* A NUMBER TYPED IN WORDS (search200 fix1): typed words reading as one number ("six hundred sixty six",
        numbers.js; "twenty four", which kjvEncode reads as 24) are searched as that number too, standing for
        them all, as a name typed in parts is: one by one, "six" "hundred" never meet a text's 666. */
@@ -2803,11 +2852,18 @@ async function search(query, options) {
     }
   }
   /** How the query names a text's title (ranking.js titleMatch); a study chapter's by its own title too. */
+  /* ...His names in it as one name, restored or printed (search200 fix2): "jesus christ is king" names the letter
+     "YahuShua HaMashiach Is King" whole, not its last two words. */
+  const namedTyped = typedTokens.some((t) => NAME_FORMS[restoredNameOf(t)]);
+  const titleOf = (/** @type {string[]} */ tt, /** @type {string[]} */ q) => {
+    const m = titleMatch(tt, q, STOP);
+    return namedTyped ? Math.max(m, titleMatch(tt.map(oneName), q.map(oneName), STOP)) : m;
+  };
   const titleScore = (/** @type {any} */ d) => {
     const t = titleToks(d);
     const read = (/** @type {string[]} */ q) => {
-      const all = titleMatch(t.all, q, STOP);
-      return t.own ? Math.max(all, titleMatch(t.own, q, STOP)) : all;
+      const all = titleOf(t.all, q);
+      return t.own ? Math.max(all, titleOf(t.own, q)) : all;
     };
     // a title's number typed in words names it as its digits do ("the one hundred forty four thousand witnesses")
     return typedNum ? Math.max(read(typedTokens), read(typedNum)) : read(typedTokens);
