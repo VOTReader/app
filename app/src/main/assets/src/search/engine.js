@@ -955,7 +955,7 @@ function docFreq(term) {
    of it holding most of the typed words, not on its first ("every preacher speaks blasphemy and
    every church altar is corrupted" opened a sentence above "blasphemy is heard from every pulpit"). */
 const LAND_REACH = 3;
-const LAND_MARGIN = 0.1;
+const LAND_MARGIN = 0.06;
 /** The sentences of a matched passage read for the one the typed words point at. */
 const LAND_SENTENCES = 3;
 /**
