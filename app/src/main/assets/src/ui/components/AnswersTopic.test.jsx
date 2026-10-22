@@ -16,6 +16,8 @@ import { runInNewContext } from 'node:vm';
 import { AnswersPara, AnswersTopic } from './AnswersTopic.jsx';
 import { answersParaPlan, answersPlainOf, answersHeroMeta, answersFoldable, answersTocRows } from '../../utils/answers-topic.js';
 import { applyDOMHighlights } from '../../renderer/annotation-engine.jsx';
+import { answersShelfByKey } from '../../utils/answers-browse.js';
+import { answersSiteShelfOf } from '../../utils/answers-site.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
 const ctx = {};
@@ -200,5 +202,17 @@ describe('AnswersTopic — hero words (f07)', () => {
     expect(NB(answersHeroMeta(byId.get('regarding-the-trinity'), M['regarding-the-trinity']))).toBe('See: 6 links');
     expect(NB(answersHeroMeta(byId.get('answers-main-page'), M['answers-main-page'])))
       .toBe('12 passages · ~12 min · 6 sections · 2 videos · downloads · YouTube channel');
+  });
+});
+
+describe('AnswersTopic — "All topics in this group" counts what its shelf shows', () => {
+  it('an Other Topics member says 16 topics, the shelf\'s own count (the page outside the site\'s menu included)', () => {
+    const other = answersShelfByKey(A, 'other');
+    const member = other.topics.find((e) => answersSiteShelfOf(A, e.id) && answersSiteShelfOf(A, e.id).kind === 'other');
+    render(<AnswersTopic entry={member} entries={A} meta={M[member.id]} metaAll={M} site={null} ready={true} ts2={false} landedPara={-1}
+      mainRef={{ current: null }} isRead={() => false} pathOn={false} findOn={false} act={{ cite() {}, jump() {}, source() {}, letter() {} }} nav={{}} />);
+    const row = [...document.querySelectorAll('.ans-foot .ans-row')].find((r) => r.textContent.includes('All topics in this group'));
+    expect(other.topics.length).toBe(16);
+    expect(row.textContent.split(String.fromCharCode(160)).join(' ')).toContain('16 topics');
   });
 });

@@ -27,7 +27,7 @@ import { h, Fragment } from '../jsx-h.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from './AnswersParts.jsx';
 import { FoldRow, TocRows, AnswersContentsSheet } from './AnswersContents.jsx';
 import { AnsSheet, ChartViewer, CommandmentSheet } from '../sheets/AnswersSheets.jsx';
-import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections } from '../../utils/answers-browse.js';
+import { SEP, NBSP, pl, answersRowSub, answersPlaceOf, answersLeadSplit, answersTopSections, answersShelfByKey } from '../../utils/answers-browse.js';
 import { ANSWERS_MAIN_PAGE_ID, answersShortTitle, answersPassageCount } from '../../utils/answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteNav, answersSiteShelfOf } from '../../utils/answers-site.js';
 import {
@@ -809,7 +809,10 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
       if (ext) rows.push(<KRow key="x" kicker="Proceed to:" title={ext.title} href={ext.url} />);
       const shelf = answersSiteShelfOf(entries, entry.id);
       if (shelf && shelf.kind !== 'index' && !main) {
-        rows.push(<AnsRow key="g" title="All topics in this group" sub={answersPlaceOf(entries, entry.id) + SEP + pl(shelf.topics.length, 'topic')} onClick={() => onShelf(shelf)} />);
+        // the count the shelf it opens shows (Other Topics lists the page outside the site's menu too)
+        const browse = shelf.kind === 'commandment' ? null : answersShelfByKey(entries, shelf.kind === 'other' ? 'other' : String(shelf.num));
+        const n = (browse ? browse.topics : shelf.topics).length;
+        rows.push(<AnsRow key="g" title="All topics in this group" sub={answersPlaceOf(entries, entry.id) + SEP + pl(n, 'topic')} onClick={() => onShelf(shelf)} />);
       }
       if (!main && !fd) rows.push(<a key="h" className="ans-textbtn" href="#" onClick={(e) => { e.preventDefault(); nav.openTopic(ANSWERS_MAIN_PAGE_ID, null); }}>Home: Main Page<Chev /></a>);
       parts.push(
