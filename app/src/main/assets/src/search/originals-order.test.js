@@ -4,6 +4,8 @@
    - a verse a letter quotes, ranked between a topic reprinting the letter and the letter: the letter was lifted over
      the verse, and the verse holding the quote as well is the letter's own original; a verse holding it less nearly
      than the letter (a typed word it lacks) is not, and stays below;
+   - a verse leading on the typed run, and another verse holding the typed words in order (a saying worded twice)
+     ranked below the letters quoting the first: it is shown second;
    Fixture texts only (no benchmark query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
@@ -33,9 +35,16 @@ const GLOBALS = {
       { num: 31, sections: [{ heading: '', verses: [
         { n: 1, text: 'The lamp of the upright shines, but the lamp of the wicked shall be put out.' },
         { n: 2, text: 'A good name is better than fine oil, and the day of death than the day of birth.' },
+        { n: 4, text: 'He shall gather the wheat into the barn, and burn the chaff with fire.' },
         { n: 6, text: 'Tremble, for the presence of the King is near.' },
         { n: 7, text: 'The cup of the faithful overflowed, but the cup of the scoffer is dry.' },
         { n: 9, text: 'The torches of the upright shine, but the torch of the wicked shall be put out.' },
+      ] }] },
+    ] },
+    ecclesiastes: { id: 'ecclesiastes', title: 'Ecclesiastes', chapters: [
+      { num: 3, sections: [{ heading: '', verses: [
+        { n: 1, text: 'He will gather the wheat into His barn with a winnowing fan.' },
+        { n: 2, text: 'A time to plant, and a time to pluck up what is planted.' },
       ] }] },
     ] },
   },
@@ -43,6 +52,8 @@ const GLOBALS = {
     { id: 'torch-letter', num: 32, title: 'The Night of the Proud', blocks: [para(filler(12) + TORCH + ' ' + filler(12))] },
     { id: 'cup-letter', num: 31, title: 'The House of the Humble', blocks: [para(filler(12) + CUP + ' ' + filler(12))] },
     { id: 'storm-letter', num: 30, title: 'The Storm', blocks: [para(filler(12) + PRESENCE + ' ' + filler(12))] },
+    // six letters quoting one verse word for word, which another verse words nearly alike
+    ...[10, 11, 12, 13, 14, 15].map((num) => ({ id: 'harvest-letter-' + num, num, title: 'Harvest ' + num, blocks: [para(filler(1) + 'It is written, He will gather the wheat into His barn with a winnowing fan. ' + filler(1))] })),
     { id: 'lamp-letter', num: 3, title: 'The Night of the Wicked', blocks: [para(filler(12) + LAMP + ' ' + filler(12))] },
   ],
   ANSWERS: [
@@ -70,6 +81,11 @@ describe('the original first, and the verse it quotes above it (search200 fix2)'
   it('a verse ranked between a topic and the letter it reprints, holding the quote as the letter does, stays above the letter', async () => {
     // the topic (its title and two prints) leads, the verse next, the letter below: the letter comes up, under the verse
     expect(ids(await E.search('the lamp of the upright shines')).slice(0, 3)).toEqual(['Proverbs 31:1', 'lamp-letter', 'lamp-topic']);
+  });
+
+  it('a verse wording the typed run as the leading verse does is shown second, over the letters quoting the first', async () => {
+    // Ecclesiastes 3:1 leads, the six letters quoting it next: Proverbs 31:4 holds the typed words in order too, and comes up second
+    expect(ids(await E.search('gather the wheat into his barn')).slice(0, 2)).toEqual(['Ecclesiastes 3:1', 'Proverbs 31:4']);
   });
 
   it('a verse holding the typed words less nearly than the letter does (a word of them it lacks) stays below the letter', async () => {

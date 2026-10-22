@@ -3464,6 +3464,30 @@ async function search(query, options) {
     if (c >= 0) /** @type {any} */ (e).placeStart = c;
   }
   if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), landedByTitle);
+  /* THE SAME WORDS IN ANOTHER VERSE, SHOWN SECOND (search200 fix2, the hunt bench). A verse leading on the typed run
+     is often one of two that word it alike (a saying a gospel repeats, a proverb said twice), and the letters quoting
+     the first filled Best Matches: the other verse sat below them, unseen. One or two other verses holding the typed
+     words in order, nearly in a row, and neither the leader nor its neighbour: the first of them comes up second. */
+  if (out.length > 2 && out[0].doc.kind === 'verse' && typedTokens.length >= RUN_MIN) {
+    const fid = idOf.get(out[0]) || '';
+    const fd = out[0].doc;
+    const bk = (/** @type {any} */ d) => (d.bookId === 'matthew-plain' ? 'matthew' : d.bookId);
+    const content = typedTokens.filter((t) => !STOP.has(t));
+    const inOrder = (/** @type {string[]} */ toks) => { let k = 0; for (const t of toks) if (k < content.length && t === content[k]) k++; return k === content.length; };
+    if (((nearOf[fid] || 0) >= 0.9 || fid in runAt) && content.length >= 2) {
+      const par = [];
+      for (let r = 1; r < Math.min(out.length, REPRINT_REACH) && par.length <= 2; r++) {
+        const d = out[r].doc;
+        if (d.kind !== 'verse') continue;
+        if (bk(d) === bk(fd) && d.chapterNum === fd.chapterNum && Math.abs(d.verseNum - fd.verseNum) <= 1) continue;
+        const id = idOf.get(out[r]) || '';
+        if ((nearOf[id] || 0) < NEAR_PHRASE_MIN && !(id in runAt)) continue;
+        if (!inOrder(docTokens(id, d))) continue;
+        par.push(r);
+      }
+      if (par.length && par.length <= 2 && par[0] >= BEST_SHOWN) out.splice(1, 0, out.splice(par[0], 1)[0]);
+    }
+  }
   // ...by the passage the screen lands on: the card marks the phrase or the typed run with the words (textQuery.run).
   // A title named first was found by no passage: its same-titled reprints were admitted beside it.
   if ((!out.length || !titleTop.has(out[0])) && reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))),
