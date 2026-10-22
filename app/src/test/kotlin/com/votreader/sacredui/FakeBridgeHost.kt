@@ -110,6 +110,13 @@ class FakeBridgeHost(
         shareSheetCalls.add(text)
     }
 
+    /** Records the base64 of every launchImageShareSheet call (the Answers share card), in order. */
+    val imageShareCalls: MutableList<String> = mutableListOf()
+
+    override fun launchImageShareSheet(pngBase64: String) {
+        imageShareCalls.add(pngBase64)
+    }
+
     override fun hasAudioPermission(): Boolean = hasAudioPermissionValue
 
     override fun captureScreenshot(topCropDp: Int, maxDim: Int, jpegQuality: Int): String {

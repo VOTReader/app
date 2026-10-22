@@ -109,6 +109,20 @@
             </intent-filter>
         </activity>
 
+        <!-- The Answers share card (AOGCG O6): MainActivity.launchImageShareSheet writes the card the page drew into
+             cache/shared/ and offers it to the share sheet as a content:// URI. Not exported; an app the reader picks
+             gets read access to that one URI for that one share (grantUriPermissions + FLAG_GRANT_READ_URI_PERMISSION).
+             res/xml/share_paths.xml names the only folder it can serve. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
+
         <!-- Started (never bound) service, launched only from our own process by
              AudioKeepAliveService.setActive — exported="false". -->
         <service

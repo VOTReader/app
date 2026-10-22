@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The one folder the share FileProvider (AndroidManifest.xml) may serve: cache/shared/, where
+     MainActivity.launchImageShareSheet writes the Answers share card. Nothing else in the app's
+     storage is reachable through it. -->
+<paths>
+    <cache-path name="shared" path="shared/" />
+</paths>

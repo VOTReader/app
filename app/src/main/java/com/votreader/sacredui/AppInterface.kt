@@ -493,6 +493,19 @@ class AppInterface(
         return true
     }
 
+    /**
+     * The Answers share card (AOGCG O6): the page draws the card on a canvas and hands its PNG here as base64, for the
+     * phone's share sheet. True = the sheet is on its way; false = refused (empty, or longer than [MAX_SHARE_IMAGE_CHARS]),
+     * and the page says it could not share. The host decodes it into the app's cache and offers it through its
+     * FileProvider; nothing leaves the phone unless the reader picks an app in the sheet.
+     */
+    @JavascriptInterface
+    fun shareImage(pngBase64: String?): Boolean {
+        val body = pngBase64?.takeIf { it.isNotBlank() && it.length <= MAX_SHARE_IMAGE_CHARS } ?: return false
+        host.postToUi { host.launchImageShareSheet(body) }
+        return true
+    }
+
     // ─── v3 streaming backup (BACKUP-STREAMING-PLAN P3) ──────────────────
     // GB-scale export/import. The binary framing lives in StorageManager (a
     // native mirror of src/utils/backup-container.js); these
@@ -891,5 +904,8 @@ class AppInterface(
     companion object {
         /** The longest text one share carries (sh1): about 200 KB as UTF-16, far under the binder's 1 MB buffer. */
         const val MAX_SHARE_CHARS = 100_000
+
+        /** The largest card one share carries, as base64: about 6 MB of PNG (a 1080 x 1350 card is well under 1 MB). */
+        const val MAX_SHARE_IMAGE_CHARS = 8_000_000
     }
 }

@@ -59,6 +59,7 @@ const METHODS = [
   'getCrashLog',
   'clearGardenCache',
   'shareText',
+  'shareImage',
   'setImmersiveMode',
   'haptic',
   'isAndroid',
@@ -107,6 +108,7 @@ function mockAndroidBridge() {
     getCrashLog: vi.fn(() => '[{"ts":0,"tag":"x","msg":"y"}]'),
     clearGardenCache: vi.fn(),
     shareText: vi.fn(() => true),
+    shareImage: vi.fn(() => true),
     setImmersiveMode: vi.fn(),
     haptic: vi.fn(),
   };
@@ -220,6 +222,8 @@ describe('PlatformBridge — Android impl (passthrough)', () => {
     ['v3ImportVerify', [], 'ok'],
     // sh1: the phone's share sheet answers whether it took the text.
     ['shareText', ['Blessed are the meek\nMatthew 5:5 (NKJV)'], true],
+    // AOGCG O6: the share card's PNG (base64); the phone answers whether it took it.
+    ['shareImage', ['iVBORw0KGgo='], true],
   ];
   it.each(valueCases)('value method %s returns native result and forwards args %o', async (name, args, expected) => {
     let result = bridge[name](...args);
@@ -284,6 +288,7 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   });
   it('shareText never takes the text on web (navigator.share is copy-share’s own path)', () => {
     expect(bridge.shareText('Blessed are the meek')).toBe(false);
+    expect(bridge.shareImage('iVBORw0KGgo=')).toBe(false);
     expect(warnSpy).not.toHaveBeenCalled();
   });
   it('the journal-3 2a recovery verbs are inert on web', () => {
@@ -630,6 +635,17 @@ describe('PlatformBridge — Web saveToFile (Blob + anchor → __onExportComplet
     expect(createObjectURLSpy.mock.calls[0][0].type).toBe('text/markdown');
     bridge.saveToFile('backup.json', '{}');
     expect(createObjectURLSpy.mock.calls[1][0].type).toBe('application/json');
+  });
+
+  // AOGCG O6: the Answers share card is saved as a PNG where the browser cannot share it.
+  it('a .png name downloads the card Blob as image/png, its bytes whole', () => {
+    /** @type {any} */ (globalThis.window).__onExportComplete = vi.fn();
+    const png = new Blob(['\x89PNG'], { type: 'image/png' });
+    bridge.saveToFile('answer-card.png', png);
+    const saved = createObjectURLSpy.mock.calls[0][0];
+    expect(saved.type).toBe('image/png');
+    expect(saved.size).toBe(png.size);
+    expect(/** @type {any} */ (globalThis.window).__onExportComplete).toHaveBeenCalledWith('ok');
   });
 
   it('reports "error:<reason>" via __onExportComplete when Blob construction throws', () => {

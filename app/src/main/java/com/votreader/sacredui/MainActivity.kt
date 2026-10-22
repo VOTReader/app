@@ -2,6 +2,7 @@ package com.votreader.sacredui
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -41,6 +42,7 @@ import androidx.activity.viewModels
 import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.net.toUri
@@ -345,6 +347,26 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             Timber.w(e, "Share sheet launch failed")
         }
     }
+    // The Answers share card (O6; AppInterface.shareImage checked the size). One file, overwritten by the next card, in
+    // the cache (never backed up, cleared by the system under pressure); the FileProvider grants the chosen app read
+    // access to that one URI for this share only.
+    override fun launchImageShareSheet(pngBase64: String) {
+        try {
+            val bytes = Base64.decode(pngBase64, Base64.DEFAULT)
+            val dir = File(cacheDir, SHARE_CACHE_DIR).apply { mkdirs() }
+            val file = File(dir, "answer-card.png")
+            file.writeBytes(bytes)
+            val uri = FileProvider.getUriForFile(this, "$packageName.share", file)
+            val send = Intent(Intent.ACTION_SEND)
+                .setType("image/png")
+                .putExtra(Intent.EXTRA_STREAM, uri)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            send.clipData = ClipData.newRawUri(null, uri)
+            startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+        } catch (e: Exception) {
+            Timber.w(e, "Image share sheet launch failed")
+        }
+    }
     override fun hasAudioPermission(): Boolean = ContextCompat.checkSelfPermission(
         this, Manifest.permission.RECORD_AUDIO
     ) == PackageManager.PERMISSION_GRANTED
@@ -379,6 +401,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // on a healthy boot, short enough that a page which loads but never signals
         // ready still un-sticks well before the 5 s absolute hatch.
         private const val PAGE_FINISHED_SPLASH_FALLBACK_MS = 1_500L
+
+        // The cache folder the share card is written to; res/xml/share_paths.xml exposes exactly this one.
+        private const val SHARE_CACHE_DIR = "shared"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
