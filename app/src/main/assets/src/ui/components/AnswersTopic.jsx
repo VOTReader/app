@@ -134,11 +134,13 @@ function trimRange(raw, from) {
 }
 
 /**
- * One keyed paragraph, decorated as its plan says (answersParaPlan).
+ * One keyed paragraph, decorated as its plan says (answersParaPlan). Memoised: a landing's pulse
+ * (on, then off 4 s later) re-renders the one paragraph it names, not every paragraph's plan.
+ */
+const Para = React.memo(/**
  * @param {{ entry: any, meta: any, metaAll: any, byId: Map<string, any>, i: number, landed: boolean, first: boolean,
  *   ts2: boolean, secIdx: number | null }} props
- */
-function Para({ entry, meta, metaAll, byId, i, landed, first, ts2, secIdx }) {
+ */ function Para({ entry, meta, metaAll, byId, i, landed, first, ts2, secIdx }) {
   const p = entry.paragraphs[i] || {};
   const raw = String(p.text || '');
   const plan = answersParaPlan(entry, meta, i);
@@ -249,7 +251,7 @@ function Para({ entry, meta, metaAll, byId, i, landed, first, ts2, secIdx }) {
       );
     }
   }
-}
+});
 
 /** Whether paragraph i closes a passage (a source line, an ornament, a heading): the next one starts one. */
 function closesPassage(entry, meta, i) {
