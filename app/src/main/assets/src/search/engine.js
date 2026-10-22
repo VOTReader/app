@@ -3185,7 +3185,7 @@ async function search(query, options) {
      Witnesses", not the heading "The 144,000" in the index of false doctrines. */
   const titledSo = keyword && out.slice(0, TITLE_REACH).some((e) => e.doc.kind !== 'verse' && named(e.doc));
   const admissible = (/** @type {any} */ h) => !(/collection/.test(h.via) && !h.hinted) && !(titledSo && h.kind === 'heading');
-  const scored = titleIx ? scoreTitles(wanted, { index: titleIx, limit: TITLE_HITS }) : [];
+  const scored = titleIx ? scoreTitles(wanted, { index: titleIx, limit: TITLE_HITS, known: termExists }) : [];
   /** @type {any[]} */
   const admitted = admitTitles(scored).filter(admissible);
   /* A PHRASE TYPED AS MEANT IS NO TYPO OF A SHORT TITLE (search200 fix1, scope cause 6). The trigram reading (level 1)

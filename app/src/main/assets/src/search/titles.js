@@ -433,19 +433,21 @@ function unitKeyOf(/** @type {any} */ doc) {
   return (doc.volumeId || '') + '/' + (doc.letterId || doc.id);
 }
 
-/** A typed word's credit against each title word it can meet. */
-function relate(/** @type {any} */ ix, /** @type {string} */ tok) {
+/** A typed word's credit against each title word it can meet. A word the search's index holds (`known`) is the word
+    typed, no typo of another ("fame" is no slip for "name"; search200 fix1). */
+function relate(/** @type {any} */ ix, /** @type {string} */ tok, /** @type {((w: string) => boolean) | null} */ known) {
   /** @type {Map<string, number>} */
   const rel = new Map();
   if (ix.vocab.has(tok)) rel.set(tok, CREDIT.same);
   if (isNum(tok)) return rel;
   const l = lemma(tok);
   const gs = ix.groups.get(l);
+  const word = !!known && known(tok);
   for (const [v, info] of ix.vocab) {
     if (v === tok || info.num) continue;
     let c = 0;
     if (info.lem === l) c = CREDIT.lemma;
-    else if (typoClose(tok, v)) c = CREDIT.typo;
+    else if (!word && typoClose(tok, v)) c = CREDIT.typo;
     else if (gs && info.groups && gs.some((g) => info.groups.indexOf(g) >= 0)) c = CREDIT.synonym;
     else if (stemClose(tok, v)) c = CREDIT.stem;
     if (c) rel.set(v, c);
@@ -475,7 +477,8 @@ function relate(/** @type {any} */ ix, /** @type {string} */ tok) {
 /**
  * The titles a query names, best first, one per unit.
  * @param {string} query
- * @param {{index?: any, limit?: number}} [opts]
+ * @param {{index?: any, limit?: number, known?: (w: string) => boolean}} [opts]  known: is a typed word a word of the
+ *   search's index (then it meets no title word as a typo)
  * @returns {TitleHit[]}
  */
 export function scoreTitles(query, opts) {
@@ -488,9 +491,10 @@ export function scoreTitles(query, opts) {
   const best = new Map();
   /** @type {Map<string, Map<string, number>>} */
   const rels = new Map();
-  scoreReading(ix, w, null, best, rels);
+  const known = (opts && opts.known) || null;
+  scoreReading(ix, w, null, best, rels, known);
   const st = stripCollections(w);
-  if (st && st.w.length) scoreReading(ix, st.w, st.hints, best, rels);
+  if (st && st.w.length) scoreReading(ix, st.w, st.hints, best, rels, known);
   /** @type {Map<string, any>} */
   const byUnit = new Map();
   for (const h of best.values()) { const o = byUnit.get(h.uk); if (!o || order(h, o) < 0) byUnit.set(h.uk, h); }
@@ -510,7 +514,7 @@ function nameOrder(/** @type {any} */ a, /** @type {any} */ b) {
   return (b.hinted ? 1 : 0) - (a.hinted ? 1 : 0) || whole(b) - whole(a) || b.literal - a.literal || a.tier - b.tier || order(a, b);
 }
 
-function scoreReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @type {Set<string> | null} */ hints, /** @type {Map<number, any>} */ best, /** @type {Map<string, Map<string, number>>} */ rels) {
+function scoreReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @type {Set<string> | null} */ hints, /** @type {Map<number, any>} */ best, /** @type {Map<string, Map<string, number>>} */ rels, /** @type {((w: string) => boolean) | null} */ known) {
   const qNums = new Set(w.filter(isNum));
   const keep = (/** @type {number} */ idx, /** @type {number} */ score, /** @type {number} */ level, /** @type {string} */ via) => {
     const e = ix.entries[idx];
@@ -549,7 +553,7 @@ function scoreReading(/** @type {any} */ ix, /** @type {string[]} */ w, /** @typ
   content = content.filter((x, i) => content.indexOf(x) === i);
   const q = content.map((tok) => {
     let rel = rels.get(tok);
-    if (!rel) { rel = relate(ix, tok); rels.set(tok, rel); }
+    if (!rel) { rel = relate(ix, tok, known); rels.set(tok, rel); }
     // a number typed is as telling as the rarest word: "part two" is no title without a 2
     return { tok, wt: isNum(tok) ? ix.maxWeight : ix.weight(lem(tok)), rel };
   });
