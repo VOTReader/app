@@ -41,6 +41,16 @@ import { wtlbHlKey } from '../../utils/hl-keys.js';
 /** The pictures' own sizes, so a figure holds its place before it decodes. */
 const IMG_WH = { 'answers-chart-chronology.jpg': [2000, 1545], 'answers-holidays-vs-holy-days.jpg': [1472, 960], 'answers-banner.jpg': [1200, 304] };
 
+/**
+ * The page's keyed paragraphs were mounted anew (the body painted, decorated, folded or unfolded):
+ * the annotation pass runs again over them (use-dom-annotation-sync), so the reader's marks are on them.
+ */
+export function answersHlDomChanged() {
+  const w = /** @type {any} */ (window);
+  w.__hlDomV = (w.__hlDomV || 0) + 1;
+  window.dispatchEvent(new Event('vot-hl-dom'));
+}
+
 /** How much of the page's top the running head covers (0 on desktop, where it is hidden). */
 export function answersHeadCover() {
   const rh = typeof document !== 'undefined' ? /** @type {HTMLElement | null} */ (document.querySelector('.ans-runhead')) : null;
@@ -332,6 +342,15 @@ export function AnswersTopic({ entry, entries, meta, metaAll, site, ready, inert
   const main = entry.id === ANSWERS_MAIN_PAGE_ID;
   const tcRow = rows.find((r) => r.trumpet);
   const tcAt = tcRow ? tcRow.at : entry.paragraphs.length;
+
+  // Fold on or off moves every paragraph into or out of its section's div.ans-fold, so React mounts
+  // them anew and the marks painted inside them go with the old ones: say so, and the pass re-paints.
+  const foldedRef = React.useRef(folded);
+  React.useEffect(() => {
+    if (foldedRef.current === folded) return;
+    foldedRef.current = folded;
+    if (!inert && ready) answersHlDomChanged();
+  }, [folded, inert, ready]);
 
   /* The running head: shown on scroll up once the hero has gone; its section and bar follow the page. */
   React.useEffect(() => {

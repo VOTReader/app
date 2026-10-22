@@ -6,14 +6,14 @@
    Five paragraphs from the real corpus, one per decoration: an inline link, an underline, a note
    marker (the fused "Jesus1"), a bare-link glyph and a callout. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, cleanup } from '@testing-library/react';
+import { render, cleanup, fireEvent } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { AnswersPara } from './AnswersTopic.jsx';
-import { answersParaPlan, answersPlainOf, answersHeroMeta } from '../../utils/answers-topic.js';
+import { AnswersPara, AnswersTopic } from './AnswersTopic.jsx';
+import { answersParaPlan, answersPlainOf, answersHeroMeta, answersFoldable, answersTocRows } from '../../utils/answers-topic.js';
 import { applyDOMHighlights } from '../../renderer/annotation-engine.jsx';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
@@ -94,6 +94,59 @@ describe('AnswersTopic — D3: decorations never change a paragraph\'s text', ()
     const sup = el.querySelector('sup.ans-note-ref');
     expect(sup.textContent).toBe('1');
     expect(sup.previousSibling.textContent.endsWith('Jesus')).toBe(true);
+  });
+});
+
+/* Fold (f10) moves a long topic's paragraphs into and out of their sections' <div class="ans-fold">,
+   so React mounts them anew and whatever the annotation engine painted inside them is gone. The page
+   says so (window.__hlDomV + 'vot-hl-dom', the signal use-dom-annotation-sync re-runs its pass on), so
+   the reader's marks are on the new paragraphs: on the Fold switch, and when find-in-topic lifts it. */
+describe('AnswersTopic — a mark survives Fold and find', () => {
+  const FE = A.find((e) => answersFoldable(M[e.id]) && answersTocRows(e, M[e.id]).length >= 3);
+  const rows = answersTocRows(FE, M[FE.id]);
+  // a plain paragraph inside the second section (folded away when Fold is on)
+  const at = (() => {
+    for (let i = rows[1].at + 1; i < rows[2].at; i++) if (answersParaPlan(FE, M[FE.id], i).kind === 'p') return i;
+    throw new Error('no paragraph');
+  })();
+  const key = 'wtlb:' + FE.id + ':' + at;
+  let seen, onDom;
+  beforeEach(() => {
+    seen = 0;
+    // the pass as use-dom-annotation-sync runs it on the signal
+    onDom = () => { seen++; applyDOMHighlights(); };
+    window.addEventListener('vot-hl-dom', onDom);
+    try { localStorage.removeItem('vot-answers-fold'); } catch (_e) { /* none */ }
+  });
+  afterEach(() => { window.removeEventListener('vot-hl-dom', onDom); try { localStorage.removeItem('vot-answers-fold'); } catch (_e) { /* none */ } });
+
+  const page = (findOn) => (
+    <AnswersTopic entry={FE} entries={A} meta={M[FE.id]} metaAll={M} site={null} ready={true} ts2={false} landedPara={-1}
+      mainRef={{ current: null }} isRead={() => false} pathOn={false} findOn={findOn} act={{ cite() {}, jump() {}, source() {}, letter() {} }} nav={{}} />
+  );
+  const el = () => document.querySelector('[data-hl-key="' + key + '"]');
+
+  it('re-paints a highlight after the Fold switch and after find lifts the fold', () => {
+    const r = render(page(false));
+    const words = el().textContent.slice(0, 12);
+    store[key] = [{ id: 'h', groupId: 'h', kind: 'highlight', color: 'yellow', start: 0, end: 12, created: 1, text: words }];
+    applyDOMHighlights();
+    expect(painted(el())).toBe(words);
+    const v0 = window.__hlDomV || 0;
+
+    fireEvent.click(document.querySelector('.ans-rail input[role="switch"]'));
+    expect(el().closest('.ans-fold')).toBeTruthy();
+    expect(seen).toBe(1);
+    expect(window.__hlDomV).toBe(v0 + 1);
+    expect(painted(el())).toBe(words);
+
+    r.rerender(page(true)); // a passage hit's find-in-topic opens every section
+    expect(el().closest('.ans-fold')).toBeNull();
+    expect(seen).toBe(2);
+    expect(painted(el())).toBe(words);
+
+    fireEvent.click(document.querySelector('.ans-rail input[role="switch"]')); // Fold off under find: nothing moves
+    expect(seen).toBe(2);
   });
 });
 

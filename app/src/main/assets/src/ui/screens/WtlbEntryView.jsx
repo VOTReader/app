@@ -16,7 +16,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { wtlbHlKey, wtlbHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { AnswersTopic, answersHeadCover } from '../components/AnswersTopic.jsx';
+import { AnswersTopic, answersHeadCover, answersHlDomChanged } from '../components/AnswersTopic.jsx';
 import { AnsIcon, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { answersAnchorPara, answersMetaFor } from '../../utils/answers-sections.js';
@@ -52,9 +52,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // the body's keyed paragraphs mount late (and again decorated): the annotation pass re-runs over them
   React.useEffect(() => {
     if (!isAns || inert || !ansReady) return;
-    const w = /** @type {any} */ (window);
-    w.__hlDomV = (w.__hlDomV || 0) + 1;
-    window.dispatchEvent(new Event('vot-hl-dom'));
+    answersHlDomChanged();
   }, [isAns, inert, ansReady, ansDecorated, entry.id]);
   const [scriptureRef, setScriptureRef] = React.useState(null);
   // The site's own translation for the open cite (refMeta, O2): it opens the HCSB there.
