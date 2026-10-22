@@ -89,6 +89,9 @@ const SIDEBAR = [
 /** The sidebar's 24 headings in order, word for word (ANSWERS_SITE_META.sidebar). */
 export const ANSWERS_SIDEBAR = Object.freeze(SIDEBAR.map((r) => r[0]));
 
+/** The twelve numbered groups' short names (ours), by number: ANSWERS_GROUP_SHORT[5] = 'Scripture & doctrine'. */
+export const ANSWERS_GROUP_SHORT = Object.freeze([null].concat(SIDEBAR.slice(11, 23).map((r) => r[2])));
+
 /**
  * @typedef {object} AnswersShelf
  * @property {number} n  1..24, the heading's place in the sidebar (siteGroup.n)

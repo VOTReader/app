@@ -9,8 +9,12 @@ import {
   NBSP, SEP, pl, answersLeadSplit, isDateHead, dateOfHead, answersMinutes, answersMediaKinds, answersSizeWords,
   answersRowSub, answersPlaceOf, answersBrowseShelves, answersShelfByKey, ANSWERS_QUESTIONS, answersAZGroups,
   answersSourceParts, answersInlinePieces, answersWordCount, answersDailyPool, answersDayNumber, answersDailyPick,
-  answersOpenablePool, answersPathState, answersMediaIndex,
+  answersOpenablePool, answersPathState, answersMediaIndex, ANSWERS_TAGLINE, answersDomain, answersMediaTitle, answersMediaLines,
+  answersMediaSource, answersMediaSub, answersMediaSummary, answersSearchSum, answersSearchSub, answersHitSource, answersClosest,
 } from './answers-browse.js';
+import { answersShortTitle } from './answers-shelves.js';
+import { ANSWERS_SUBJECT_GROUP, isAnswersGroupKey, answersRetiredPlace } from './answers-retired.js';
+import { ANSWERS_GROUP_SHORT } from './answers-site.js';
 import { answersSiteOrder } from './answers-site.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -160,5 +164,58 @@ describe('on the real corpus', () => {
     ]);
     for (const v of mi.videos) expect(String(v.url)).toMatch(/^https:\/\/(www\.)?youtube\.com\/|^https:\/\/youtu\.be\//);
     for (const c of mi.charts) expect(c.ids.length).toBeGreaterThan(0);
+  });
+});
+
+describe('Charts & videos words (f13)', () => {
+  const idx = answersMediaIndex(A, M);
+  it('a label is the site\'s, less the ▶️ its playlists open with; a PDF\'s extra lines come apart', () => {
+    expect(idx.lists.map(answersMediaTitle)[1]).toBe('The Lord Speaks About The Sabbath (Video-Playlist)');
+    const pdf = idx.files.find((m) => m.id === 'the-name-of-the-lord');
+    expect(answersMediaTitle(pdf)).toBe('YAHUSHUA More Than a Man - Bible/Letter Study');
+    expect(answersMediaLines(pdf)).toEqual(['Section Two: YahuShua The Messiah, The Son of God', 'Page 51 (PDF pg 52) "The Name of The Messiah Is YahuShua"']);
+  });
+  it('where each opens, in a word, and the landing row\'s summary', () => {
+    expect(show(answersMediaSub(idx.videos[0], 'Main Page'))).toBe('Main Page~· YouTube');
+    expect(answersMediaSource(idx.lists[0])).toBe('youtube.com/c/AnswersOnlyGodCanGive');
+    expect(answersMediaSource(idx.lists[1])).toBe('');
+    expect(idx.files.map(answersMediaSource)).toEqual(['PDF', 'Dropbox', 'Bandcamp', 'PDF', 'Bandcamp', 'PDF', 'PDF']);
+    expect(show(answersMediaSummary(idx))).toBe('2~charts, 4~videos, 11~playlists and more');
+    expect(answersDomain('https://www.thevolumesoftruth.com/Main_Page')).toBe('thevolumesoftruth.com');
+    expect(answersDomain('https://open.spotify.com/show/x?si=1')).toBe('open.spotify.com');
+  });
+  it('the tagline the landing paints before answers.js lands is the site\'s, word for word', () => {
+    expect(ANSWERS_TAGLINE).toBe(ctx.ANSWERS_SITE_META.tagline);
+  });
+});
+
+describe('search words (f06)', () => {
+  const g = { entry: E('god-speaks-about-the-sabbath'), n: 18, total: 19, prose: false };
+  it('a group\'s sub, the header, a title-only match and an index of categories', () => {
+    expect(show(answersSearchSub(A, g))).toBe('18~of 19~passages~· The Fourth Commandment');
+    expect(show(answersSearchSub(A, { ...g, n: 0 }))).toBe('Title match~· The Fourth Commandment');
+    expect(show(answersSearchSub(A, { entry: E('false-doctrines-within-the-churches-of-men-regarding'), n: 6, total: 46, prose: true })))
+      .toBe('6~of 46~categories~· False Doctrines index');
+    expect(show(answersSearchSum({ matches: 73, groups: new Array(22) }))).toBe('In Answers~· 73~matches in 22~topics');
+  });
+  it('a hit\'s source line: title, collection, date', () => {
+    const e = E('god-speaks-about-the-sabbath');
+    const src = e.paragraphs.findIndex((p) => String(p.text).startsWith('~ [From “You Shall Not Desecrate the Sabbath”'));
+    expect(show(answersHitSource(e, { src, date: '3/29/06', sec: '' }, (t) => t))).toBe('“You Shall Not Desecrate the Sabbath”~· Volume 3~· 3/29/06');
+    expect(answersHitSource(e, { src: -1, date: '', sec: 'The Catholic Church' }, (t) => t)).toBe('The Catholic Church');
+  });
+  it('closest topics for a typo; none for noise', () => {
+    expect(answersClosest(A, 'sabath', answersShortTitle).map((e) => e.id)).toContain('god-speaks-about-the-sabbath');
+    expect(answersClosest(A, 'zzqq', answersShortTitle)).toEqual([]);
+  });
+});
+
+describe('the retired screens (answers-retired.js)', () => {
+  it('a subject that is one of the site\'s groups maps to it; the group keys are 1-12 and other', () => {
+    for (const k of Object.values(ANSWERS_SUBJECT_GROUP)) expect(isAnswersGroupKey(k)).toBe(true);
+    expect(ANSWERS_GROUP_SHORT[ANSWERS_SUBJECT_GROUP['walking-with-god']]).toBe('The walk of faith');
+    expect(['0', '13', '1.5', '', null, 'x'].map(isAnswersGroupKey)).toEqual([false, false, false, false, false, false]);
+    expect(answersRetiredPlace({ screen: 'answers-subject', letterId: 'marriage-family-and-body' })).toEqual({ screen: 'answers-group', letterId: '11' });
+    expect(answersRetiredPlace({ screen: 'answers-entry', letterId: 'x' })).toEqual({ screen: 'answers-entry', letterId: 'x' });
   });
 });

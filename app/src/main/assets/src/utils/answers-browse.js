@@ -31,7 +31,10 @@ export const NBSP = '\u00a0';
 /** The separator between the parts of a sub line, bound to the word before it (A29). */
 export const SEP = '\u00a0· ';
 
-const PLURAL = { category: 'categories', match: 'matches', passage: 'passages' };
+const PLURAL = { category: 'categories', match: 'matches', passage: 'passages', 'more topic': 'more topics' };
+
+/** The site's tagline, word for word (ANSWERS_SITE_META.tagline), for the landing's first paint before answers.js lands. */
+export const ANSWERS_TAGLINE = 'The Lord Sets the Record Straight Concerning a Variety of Topics, Doctrines and Traditions';
 
 /** "1 topic", "16 topics", "46 categories": the number bound to its word. */
 export function pl(n, word) {
@@ -460,4 +463,121 @@ export function answersMediaPlace(entries, id, shortTitle) {
   if (id === ANSWERS_FD_INDEX_ID) return 'False Doctrines index';
   const e = (entries || []).find((x) => x && x.id === id);
   return e ? shortTitle(e.title) : '';
+}
+
+/** A web address's host without "www.": "https://www.youtube.com/x" → "youtube.com". */
+export function answersDomain(url) {
+  const s = String(url || '');
+  const at = s.indexOf('//');
+  let host = (at >= 0 ? s.slice(at + 2) : s).split('/')[0].split('?')[0].toLowerCase();
+  if (host.startsWith('www.')) host = host.slice(4);
+  return host;
+}
+
+/** The site's own label for a media item, word for word, less the "▶️" its playlist labels open with (the row's disc stands in). */
+export function answersMediaTitle(m) {
+  let t = String((m && m.title) || '').split('\n')[0];
+  for (const lead of ['▶️ ', '▶ ']) if (t.startsWith(lead)) t = t.slice(lead.length);
+  return t.trim();
+}
+
+/** The lines a media label carries under its first ("- Section Two: …"), without their dashes. */
+export function answersMediaLines(m) {
+  return String((m && m.title) || '').split('\n').slice(1)
+    .map((l) => (l.startsWith('- ') ? l.slice(2) : l).trim()).filter(Boolean);
+}
+
+/** Where a media item opens, in a word: "YouTube", "Bandcamp", "PDF", "Dropbox", or a channel's address. */
+export function answersMediaSource(m) {
+  const url = String((m && m.url) || '');
+  const host = answersDomain(url);
+  if (m && m.kind === 'channel') {
+    const at = url.indexOf('//');
+    const rest = (at >= 0 ? url.slice(at + 2) : url).split('?')[0];
+    const path = rest.slice(rest.indexOf('/') < 0 ? rest.length : rest.indexOf('/'));
+    return host + (path.endsWith('/') ? path.slice(0, -1) : path);
+  }
+  if (m && m.kind === 'playlist') return '';
+  if (url.toLowerCase().split('?')[0].endsWith('.pdf')) return 'PDF';
+  if (host.endsWith('youtube.com') || host === 'youtu.be') return 'YouTube';
+  if (host.endsWith('bandcamp.com')) return 'Bandcamp';
+  if (host.endsWith('dropbox.com')) return 'Dropbox';
+  return host;
+}
+
+/** A media row's sub: its topic, then where it opens. */
+export function answersMediaSub(m, place) {
+  return [place, answersMediaSource(m)].filter(Boolean).join(SEP);
+}
+
+/** The landing's Charts & videos row: "2 charts, 4 videos, 11 playlists and more". */
+export function answersMediaSummary(idx) {
+  if (!idx) return '';
+  const playlists = idx.lists.filter((/** @type {any} */ m) => m.kind === 'playlist').length;
+  return `${pl(idx.charts.length, 'chart')}, ${pl(idx.videos.length, 'video')}, ${pl(playlists, 'playlist')} and more`;
+}
+
+/* ── Search words ─────────────────────────────────────────────────── */
+
+/** "In Answers · 73 matches in 22 topics": the header is the sum of the groups under it. */
+export function answersSearchSum(r) {
+  return 'In Answers' + SEP + pl(r.matches, 'match') + ' in ' + pl(r.groups.length, 'topic');
+}
+
+/**
+ * A search group's sub: "18 of 19 passages · The Fourth Commandment", "6 of 46 categories · False
+ * Doctrines index", or "Title match · Other Topics" when only the title holds the words.
+ * @param {any[]} entries ANSWERS
+ * @param {{ entry: any, n: number, total: number, prose: boolean }} g
+ */
+export function answersSearchSub(entries, g) {
+  const place = answersPlaceOf(entries, g.entry.id);
+  if (!g.n) return 'Title match' + SEP + place;
+  return g.n + NBSP + 'of ' + pl(g.total, g.prose ? 'category' : 'passage') + SEP + place;
+}
+
+/**
+ * The source line under a hit: "“Pentecost” · Volume 6 · 3/29/06", a category's name on a page of
+ * prose, or the passage's own closing line ("From: Poured Out").
+ * @param {any} entry
+ * @param {{ src: number, date: string, sec: string } | null} first
+ * @param {(t: string) => string} plain
+ */
+export function answersHitSource(entry, first, plain) {
+  if (!first) return '';
+  if (first.sec) return first.sec;
+  const p = first.src >= 0 && entry && entry.paragraphs ? entry.paragraphs[first.src] : null;
+  if (!p) return first.date || '';
+  const sp = answersSourceParts(p.text);
+  return (sp ? [sp.title, sp.collection, first.date] : [plain(p.text), first.date]).filter(Boolean).join(SEP);
+}
+
+/** Three-letter runs of a folded string, for "Closest topics". */
+function trigrams(s) {
+  const t = ' ' + String(s || '').toLowerCase().split('').filter((c) => (c >= 'a' && c <= 'z') || c === ' ').join('') + ' ';
+  const out = new Set();
+  for (let i = 0; i + 3 <= t.length; i++) out.add(t.slice(i, i + 3));
+  return out;
+}
+
+/**
+ * Up to `max` topics whose short title looks most like a query that found nothing (a typo:
+ * "sabath" → The Sabbath), best first; none when nothing is close.
+ * @param {any[]} entries ANSWERS
+ * @param {string} query
+ * @param {(t: string) => string} shortTitle
+ * @param {number} [max]
+ */
+export function answersClosest(entries, query, shortTitle, max = 3) {
+  const q = trigrams(query);
+  if (q.size < 2) return [];
+  const scored = [];
+  for (const e of answersTopicEntries(entries)) {
+    const t = trigrams(shortTitle(e.title));
+    let shared = 0;
+    for (const g of q) if (t.has(g)) shared++;
+    const score = shared / q.size;
+    if (score >= 0.4) scored.push({ e, score });
+  }
+  return scored.sort((a, b) => b.score - a.score).slice(0, max).map((x) => x.e);
 }

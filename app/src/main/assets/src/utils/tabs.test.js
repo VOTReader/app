@@ -215,11 +215,16 @@ describe('describeTab', () => {
       } finally { delete g.SCRIPTURE_GENRES; }
     });
 
-    it('names the Answers screens, a subject by its own title', () => {
+    it('names the Answers screens, a shelf by our short name under the site\'s label', () => {
       expect(describeTab({ screen: 'answers-home' })).toEqual({ title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true });
-      expect(describeTab({ screen: 'answers-az' }).title).toBe('Every Topic, A–Z');
-      expect(describeTab({ screen: 'answers-subject', letterId: 'the-end-of-this-age' }).title).toBe('The End of This Age');
-      expect(describeTab({ screen: 'answers-subject', letterId: 'gone' }).title).toBe('Answers');
+      expect(describeTab({ screen: 'answers-group', letterId: '5' })).toEqual({ title: 'Scripture & doctrine', subtitle: '5. Thus Says The Lord...', resolved: true });
+      expect(describeTab({ screen: 'answers-group', letterId: 'other' }).title).toBe('Other Topics');
+      expect(describeTab({ screen: 'answers-group', letterId: 'gone' }).title).toBe('Answers');
+      expect(describeTab({ screen: 'answers-media' }).title).toBe('Charts & videos');
+      // The retired screens are named for where they reopen (answers-retired.js).
+      expect(describeTab({ screen: 'answers-az' }).title).toBe('Answers');
+      expect(describeTab({ screen: 'answers-subject', letterId: 'walking-with-god' }).title).toBe('The walk of faith');
+      expect(describeTab({ screen: 'answers-subject', letterId: 'the-end-of-this-age' }).title).toBe('Answers');
     });
 
     it('enumerates EVERY corpus-independent route — none but home itself may label "Home"', () => {
@@ -232,7 +237,7 @@ describe('describeTab', () => {
         'search', 'history', 'settings', 'about', 'library', 'my-progress',
         'journal-home', 'journal-viewer', 'journal-editor', 'notes-index',
         'links-index', 'bookmarks-index', 'highlights-index', 'home',
-        'answers-home', 'answers-az', 'answers-subject',
+        'answers-home', 'answers-az', 'answers-subject', 'answers-group', 'answers-media',
       ];
       for (const screen of corpusIndependent) {
         const d = describeTab({ screen });

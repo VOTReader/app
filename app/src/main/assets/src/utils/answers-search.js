@@ -3,9 +3,10 @@
    about…" box. Pure functions over the ANSWERS corpus; no DOM, no React.
    ═══════════════════════════════════════════════════════════════════════
    A topic page is a run of PASSAGES, each ending in its "~ [From …]"
-   attribution. A query finds:
-     - topics whose TITLE holds every word   → "The topic" cards
-     - passages whose TEXT holds every word  → counted per topic
+   attribution. A query finds, per topic (answersSearch, one group each):
+     - whether its TITLE holds every word    → title matches lead
+     - the passages whose TEXT holds every word → counted, then the site's order
+   (U2, the AOGCG Browse stage: no topic is ranked by its passage count).
    A word matches at a word start ("pray" finds prayer, praying), case- and
    curly-quote-insensitive. Dated header lines ("From The Lord, Our God and
    Savior…") and the attribution line itself are not searched: "spoken of"
@@ -117,7 +118,9 @@ function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function wordRe(word, flags) { return new RegExp('(^|[^a-z0-9])' + escapeRe(word), flags || ''); }
 
 /**
- * One-time index: per topic, its folded title and its passages' searchable text.
+ * One-time index: per topic, its folded title and its passages' searchable text. A passage
+ * remembers the source line that closes it (`src`, -1 for the words after the last one or a
+ * page of prose) and the date its header carries.
  * @param {any[]} entries ANSWERS
  */
 export function buildAnswersIndex(entries) {
@@ -125,100 +128,167 @@ export function buildAnswersIndex(entries) {
   for (const entry of entries || []) {
     if (!entry || !Array.isArray(entry.paragraphs)) continue;
     const passages = [];
-    let cur = { paras: [] };
+    let cur = { paras: [], src: -1, date: '' };
     entry.paragraphs.forEach((p, i) => {
       const raw = p && p.text;
       if (isAttribution(raw)) {
-        if (cur.paras.length) passages.push(cur);
-        cur = { paras: [] };
+        if (cur.paras.length) passages.push({ ...cur, src: i });
+        cur = { paras: [], src: -1, date: '' };
         return;
       }
-      if (typeof raw !== 'string' || HEADER_RE.test(raw) || DIVIDER_RE.test(raw)) return;
+      if (typeof raw === 'string' && HEADER_RE.test(raw)) { if (!cur.date) cur.date = raw.slice(1, raw.indexOf('_', 1)); return; }
+      if (typeof raw !== 'string' || DIVIDER_RE.test(raw)) return;
       const plain = answersPlainText(raw);
       if (plain) cur.paras.push({ index: i, plain, fold: answersFold(plain) });
     });
     // A page of prose with no attributions still searches as one passage. After the last
-    // attribution, the passage is searched too (sweep W31: "Why withhold, My son?" closes three
-    // topics, unsearchable), but not the link section many topics close with.
-    if (cur.paras.length && passages.length === 0) passages.push(cur);
+    // attribution, a passage its own "From: Poured Out" line closes is a passage too (sweep W31:
+    // "Why withhold, My son?" closes three topics, unsearchable); the notes and the link section
+    // many topics close with are not ("N of M passages" counts what The Lord says).
+    const prose = passages.length === 0;
+    if (cur.paras.length && prose) passages.push(cur);
     else {
-      const tail = cur.paras.filter((p) => !NAV_PARA_RE.test(entry.paragraphs[p.index].text));
-      if (tail.length) passages.push({ paras: tail });
+      let k = cur.paras.length - 1;
+      while (k >= 0 && !isSourceLine(cur.paras[k].plain)) k--;
+      const tail = cur.paras.slice(0, Math.max(k, 0)).filter((p) => !NAV_PARA_RE.test(entry.paragraphs[p.index].text));
+      if (k > 0 && tail.length) passages.push({ paras: tail, src: cur.paras[k].index, date: cur.date });
     }
     out.push({ entry, short: answersShortTitle(entry.title), titleFold: answersFold(entry.title),
-      aliasFolds: aliasesFor(entry.id).map((a) => answersFold(a)), subjectWords: subjectWordsFor(entry.id), passages });
+      aliasFolds: aliasesFor(entry.id).map((a) => answersFold(a)), subjectWords: subjectWordsFor(entry.id), passages, prose });
   }
   return out;
 }
 
 /**
+ * @typedef {object} AnswersSearchGroup
+ * @property {any} entry
+ * @property {number} n         passages (a page of prose: its level-1 sections) holding every word
+ * @property {number} total     the passages (or sections) the topic has
+ * @property {boolean} titleHit its title, an alternate name of the site's, or a retired subject's whole name holds every word
+ * @property {boolean} prose    a page with no source lines (the False Doctrines index): n counts its sections
+ * @property {{ index: number, src: number, date: string, sec: string } | null} first  the first matching paragraph
+ * @property {number} pos       its place in the site's order
+ */
+
+/**
+ * The search box: one group per topic that answers, TITLE MATCHES FIRST, THEN THE SITE'S
+ * ORDER (U2: no topic is ranked by how much it says). A group counts the passages that hold
+ * every word; the header's total is the sum of the groups (`matches`).
+ * A question that finds no title as typed runs again without its QUESTION_WORDS.
  * @param {ReturnType<typeof buildAnswersIndex>} index
  * @param {string} query
- * @returns {null | { words: string[], topics: any[], mentions: any[], mentionPassages: number }}
- *   topics   — title matches: { entry, short, hits, firstPara, firstText }
- *   mentions — every other topic with a matching passage, most hits first
+ * @param {{ pos?: (id: string) => number, sections?: (id: string) => any[] | null }} [opts]
+ *   pos: a topic's place in the site's order; sections: a page's sidecar sections, for prose
+ * @returns {null | { words: string[], groups: AnswersSearchGroup[], matches: number }}
  */
-export function searchAnswers(index, query) {
+export function answersSearch(index, query, opts) {
   const words = queryWords(query);
   if (!words.length) return null;
-  const full = runSearch(index, words);
-  if (full.topics.length) return full;
-  // A question: try again with only its subject words, and keep that when it finds a topic
-  // (or when the question as typed found nothing at all).
+  const full = searchPass(index, words, opts || {});
+  if (full.groups.some((g) => g.titleHit)) return full;
   const core = words.filter((w) => !QUESTION_WORDS.has(w));
   if (!core.length || core.length === words.length) return full;
-  const lean = runSearch(index, core);
-  return (lean.topics.length || (!full.mentions.length && lean.mentions.length)) ? lean : full;
+  const lean = searchPass(index, core, opts || {});
+  return (lean.groups.some((g) => g.titleHit) || (!full.groups.length && lean.groups.length)) ? lean : full;
 }
 
 /**
- * One pass: topics whose title (or an alternate name) holds every word, then every other
- * topic whose passages do.
+ * Only the title matches, at once (the full text waits for the deferred pass: f06d).
  * @param {ReturnType<typeof buildAnswersIndex>} index
- * @param {string[]} words folded query words
+ * @param {string} query
+ * @param {{ pos?: (id: string) => number }} [opts]
+ * @returns {AnswersSearchGroup[]}
  */
-function runSearch(index, words) {
+export function answersTitleMatches(index, query, opts) {
+  const words = queryWords(query);
+  if (!words.length) return [];
+  const pass = (ws) => (index || []).filter((t) => titleHolds(t, ws)).map((t) => group(t, 0, 0, true, null, opts || {}));
+  const full = pass(words);
+  const core = words.filter((w) => !QUESTION_WORDS.has(w));
+  const out = full.length || !core.length || core.length === words.length ? full : pass(core);
+  return out.sort((a, b) => a.pos - b.pos);
+}
+
+function titleHolds(t, words) {
   const res = words.map((w) => wordRe(w));
   const all = (s) => res.every((re) => re.test(s));
-  const topics = [];
-  const mentions = [];
-  let mentionPassages = 0;
-  for (const t of index || []) {
-    let hits = 0;
-    let firstPara = -1;
-    let firstText = '';
-    for (const psg of t.passages) {
-      if (!all(psg.paras.map((p) => p.fold).join(' '))) continue;
-      hits++;
-      if (firstPara < 0) {
-        // Land on the paragraph that holds the first word (a phrase can span two).
-        const at = psg.paras.find((p) => res[0].test(p.fold)) || psg.paras[0];
-        firstPara = at.index;
-        firstText = at.plain;
-      }
-    }
-    // A title match whose passages never use the word still shows how it opens.
-    const lead = t.passages.length ? t.passages[0].paras[0] : null;
-    const row = { entry: t.entry, short: t.short, hits, firstPara, firstText, leadPara: lead ? lead.index : -1, leadText: lead ? lead.plain : '' };
-    const subject = (t.subjectWords || []).some((ws) => ws.length > 0 && ws.every((w) => words.includes(w)));
-    if (all(t.titleFold) || (t.aliasFolds || []).some(all) || subject) topics.push(row);
-    else if (hits) { mentions.push(row); mentionPassages += hits; }
-  }
-  const q = words.join(' ');
-  topics.sort((a, b) => (answersFold(b.short).startsWith(q) ? 1 : 0) - (answersFold(a.short).startsWith(q) ? 1 : 0) || b.hits - a.hits);
-  mentions.sort((a, b) => b.hits - a.hits || a.short.localeCompare(b.short));
-  return { words, topics, mentions, mentionPassages };
+  const subject = (t.subjectWords || []).some((ws) => ws.length > 0 && ws.every((w) => words.includes(w)));
+  return all(t.titleFold) || (t.aliasFolds || []).some(all) || subject;
+}
+
+function group(t, n, total, titleHit, first, opts) {
+  const pos = typeof opts.pos === 'function' ? opts.pos(t.entry.id) : 0;
+  return { entry: t.entry, n, total, titleHit, prose: !!t.prose, first, pos: Number.isFinite(pos) ? pos : 1e6 };
 }
 
 /**
- * A window of `plain` around the first matching word, as segments to render
- * with the matches marked. Cut at word boundaries, "…" where it was cut.
+ * One pass over the index with these folded words.
+ * @param {ReturnType<typeof buildAnswersIndex>} index
+ * @param {string[]} words
+ * @param {{ pos?: (id: string) => number, sections?: (id: string) => any[] | null }} opts
+ */
+function searchPass(index, words, opts) {
+  const res = words.map((w) => wordRe(w));
+  const all = (s) => res.every((re) => re.test(s));
+  /** @type {AnswersSearchGroup[]} */
+  const groups = [];
+  for (const t of index || []) {
+    let n = 0, total = 0;
+    /** @type {AnswersSearchGroup['first']} */
+    let first = null;
+    if (t.prose) {
+      // A page of prose counts its level-1 sections (the index's categories) that hold every word.
+      const tops = ((typeof opts.sections === 'function' && opts.sections(t.entry.id)) || []).filter((s) => s.level === 1);
+      const secs = tops.filter((s) => !String(s.title || '').startsWith('Be a Part of The Trumpet Call'));
+      const paras = t.passages.length ? t.passages[0].paras : [];
+      if (secs.length) {
+        total = secs.length;
+        secs.forEach((s) => {
+          const next = tops[tops.indexOf(s) + 1];
+          const end = next ? next.at : Infinity;
+          const inSec = paras.filter((p) => p.index >= s.at && p.index < end);
+          if (!inSec.length || !all(inSec.map((p) => p.fold).join(' '))) return;
+          n++;
+          if (!first) {
+            const at = inSec.find((p) => res[0].test(p.fold)) || inSec[0];
+            first = { index: at.index, src: -1, date: '', sec: s.title };
+          }
+        });
+      } else if (paras.length && all(paras.map((p) => p.fold).join(' '))) {
+        n = 1; total = 1;
+        const at = paras.find((p) => res[0].test(p.fold)) || paras[0];
+        first = { index: at.index, src: -1, date: '', sec: '' };
+      }
+    } else {
+      // "N of M passages": M counts the passages a source line closes.
+      total = t.passages.length;
+      for (const psg of t.passages) {
+        if (!all(psg.paras.map((p) => p.fold).join(' '))) continue;
+        n++;
+        if (!first) {
+          // Land on the paragraph that holds the first word (a phrase can span two).
+          const at = psg.paras.find((p) => res[0].test(p.fold)) || psg.paras[0];
+          first = { index: at.index, src: psg.src, date: psg.date || '', sec: '' };
+        }
+      }
+    }
+    const titleHit = titleHolds(t, words);
+    if (n || titleHit) groups.push(group(t, n, total, titleHit, first, opts));
+  }
+  groups.sort((a, b) => (Number(b.titleHit) - Number(a.titleHit)) || (a.pos - b.pos));
+  return { words, groups, matches: groups.reduce((s, g) => s + g.n, 0) };
+}
+
+/**
+ * A hit's words as segments to render with the matches marked: the paragraph from at most
+ * `before` characters ahead of the first matching word (cut at a word start, "…" in front);
+ * the end is left to the 3-line clamp.
  * @param {string} plain
  * @param {string[]} words folded query words
- * @param {number} [radius]
+ * @param {number} [before]
  * @returns {{ text: string, hit: boolean }[]}
  */
-export function answersSnippet(plain, words, radius = 90) {
+export function answersSnippet(plain, words, before = 40) {
   const text = String(plain || '');
   const fold = answersFold(text);
   let first = -1;
@@ -230,17 +300,13 @@ export function answersSnippet(plain, words, radius = 90) {
     }
   }
   let start = 0;
-  let end = text.length;
-  if (first >= 0 && text.length > radius * 2.4) {
-    start = Math.max(0, first - radius);
-    end = Math.min(text.length, first + Math.round(radius * 1.4));
-    if (start > 0) { const sp = text.indexOf(' ', start); if (sp > 0 && sp < first) start = sp + 1; }
-    if (end < text.length) { const sp = text.lastIndexOf(' ', end); if (sp > first) end = sp; }
-  } else if (first < 0 && text.length > radius * 2.4) {
-    end = text.lastIndexOf(' ', radius * 2) > 0 ? text.lastIndexOf(' ', radius * 2) : radius * 2;
+  if (first > before) {
+    start = first - before;
+    const sp = text.indexOf(' ', start);
+    if (sp !== -1 && sp < first) start = sp + 1;
   }
-  const cut = text.slice(start, end);
-  const cutFold = fold.slice(start, end);
+  const cut = text.slice(start);
+  const cutFold = fold.slice(start);
   const segs = [];
   if (start > 0) segs.push({ text: '…', hit: false });
   const marks = [];
@@ -249,10 +315,8 @@ export function answersSnippet(plain, words, radius = 90) {
     let m;
     while ((m = re.exec(cutFold))) {
       const s = m.index + m[1].length;
-      // Mark the whole word the prefix begins.
-      let e = s + w.length;
-      while (e < cutFold.length && /[a-z0-9']/.test(cutFold[e])) e++;
-      marks.push([s, e]);
+      // Mark the term itself where a word begins with it ("<mark>Sabbath</mark>s", f06).
+      marks.push([s, s + w.length]);
       if (re.lastIndex === m.index) re.lastIndex++;
     }
   }
@@ -265,6 +329,20 @@ export function answersSnippet(plain, words, radius = 90) {
     pos = e;
   }
   if (pos < cut.length) segs.push({ text: cut.slice(pos), hit: false });
-  if (end < text.length) segs.push({ text: '…', hit: false });
   return segs;
+}
+
+/** A passage's closing line in the site's other form: "From: Poured Out", "Excerpt from: …". */
+function isSourceLine(plain) {
+  const s = String(plain || '');
+  return s.startsWith('From:') || s.startsWith('Excerpt from:');
+}
+
+/**
+ * A prose paragraph's lines joined with " · " for a snippet: the False Doctrines entries put one
+ * title per line, and joined by spaces they would run together ("…Another MessiahGod Speaks…").
+ * @param {string} text
+ */
+export function answersPlainLines(text) {
+  return String(text || '').split('\n').map((l) => answersPlainText(l)).filter(Boolean).join(' · ');
 }

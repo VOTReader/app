@@ -1421,6 +1421,10 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-auto-restore',             // utils/data-safety.js AUTO_RESTORE_KEY
   'vot-restored-note',            // utils/data-safety.js RESTORED_NOTE_KEY
   'vot-ls-cleanup-done',          // LS_CLEANUP_DONE_KEY below
+  // AOGCG (2026-10-22): the Answers landing's reading path (the topic finished last) and its
+  // recent searches, both kept on this device only (ui/components/AnswersParts.jsx, AnswersHome.jsx).
+  'vot-answers-path',
+  'vot-answers-recent',
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */

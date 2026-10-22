@@ -99,13 +99,24 @@ describe('_validateTabState — 13 coercion rules', () => {
     }
   });
 
-  // ── Answers: a subject tab needs its subject id (it rides letterId) ──
-  describe('answers-subject + no letterId → the Answers landing', () => {
-    it('coerces a subject tab that lost its id to the landing, not Home', () => {
+  // ── Answers: the retired subject and A–Z screens (AOGCG Browse stage, answers-retired.js) ──
+  describe('a retired Answers screen reopens where its topics live now', () => {
+    it('a subject tab that lost its id opens the landing, not Home', () => {
       expect(validate({ screen: 'answers-subject' }).screen).toBe('answers-home');
     });
-    it('passes a subject tab with its id through unchanged', () => {
-      expect(validate({ screen: 'answers-subject', letterId: 'walking-with-god' }).screen).toBe('answers-subject');
+    it('a subject that is one of the site\'s groups opens that group\'s shelf', () => {
+      expect(validate({ screen: 'answers-subject', letterId: 'walking-with-god' })).toMatchObject({ screen: 'answers-group', letterId: '10' });
+      expect(validate({ screen: 'answers-subject', letterId: 'churches-and-doctrines-of-men' })).toMatchObject({ screen: 'answers-group', letterId: '4' });
+    });
+    it('any other subject, and the old A–Z screen, open the landing', () => {
+      expect(validate({ screen: 'answers-subject', letterId: 'the-end-of-this-age' })).toMatchObject({ screen: 'answers-home', letterId: null });
+      expect(validate({ screen: 'answers-az' }).screen).toBe('answers-home');
+    });
+    it('a shelf keeps its key; one without a known key opens the landing', () => {
+      expect(validate({ screen: 'answers-group', letterId: '5' })).toMatchObject({ screen: 'answers-group', letterId: '5' });
+      expect(validate({ screen: 'answers-group', letterId: 'other' }).screen).toBe('answers-group');
+      expect(validate({ screen: 'answers-group', letterId: '13' }).screen).toBe('answers-home');
+      expect(validate({ screen: 'answers-group' }).screen).toBe('answers-home');
     });
   });
 
