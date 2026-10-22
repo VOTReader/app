@@ -2091,17 +2091,24 @@ function reprintSecond(out, terms, idOf, allowed) {
       if (/[.!?]\s*$/.test(s)) break;
     }
   }
-  // a reprint of the passage's own words: the first text below holding a run of them
+  /* a reprint of the passage's own words: the first text below holding a run of them, the one holding the most of its
+     runs first (search200 sealed2, 2026-10-22: a letter sharing only the sentence's last words, "for they have refused
+     to accept Me as I truly am", came up second, and the Answers topic reprinting the whole sentence stayed at #12) */
   let slot = 1;
   if (toks.length >= 5) {
     const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
     const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
-    for (let r = 1; r < Math.min(out.length, REPRINT_REACH); r++) {
+    let best = 0;
+    let most = 0;
+    for (let r = 1; r < Math.min(out.length, REPRINT_REACH) && most < res.length; r++) {
       const t = out[r].doc.text;
       if (!t || out[r].doc.kind === 'verse') continue;
-      if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); slot = 2; break; }
+      let n = 0;
+      for (const re of res) if (re.test(t)) n++;
+      if (n > most) { most = n; best = r; }
     }
+    if (best) { if (best > 1) out.splice(1, 0, out.splice(best, 1)[0]); slot = 2; }
   }
   if (topic) return citedNext(out, st, slot, /** @type {Map<any, string>} */ (idOf), /** @type {(doc:any) => boolean} */ (allowed));
   if (!verses.length || !idOf || !allowed) return false;

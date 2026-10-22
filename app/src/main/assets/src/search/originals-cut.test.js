@@ -4,7 +4,9 @@
      line leads, though the entry draws as much on the other letter;
    - an entry's line is its letter's with two small words cut ("I have indeed written it, even on tablets of stone"),
      and the reader types the entry's words: the letter, holding every typed word in order with those two between,
-     leads.
+     leads;
+   - a letter leads and another letter shares only the end of its sentence ("they have refused to accept Me as I truly
+     am"): the reprint holding the whole sentence comes up second, not the letter holding its last words.
    Fixture texts only (no benchmark query). */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini as E } from './engine.js';
@@ -85,5 +87,10 @@ describe('the original of a line its reprint cut (sealed2)', () => {
   it('an entry cutting two small words from its letter\'s line, typed as the entry words it: the letter leads, the entry next', async () => {
     const top = ids(await E.search('i have written it on tablets of stone'));
     expect(top.slice(0, 2)).toEqual(['stone-letter', 'only-witness']);
+  });
+
+  it('a letter first: the reprint holding its whole sentence comes up second, not a letter holding the sentence\'s end', async () => {
+    const top = ids(await E.search('they refused to accept me as i truly am'));
+    expect(top.slice(0, 2)).toEqual(['cup-letter', 'second-death']);
   });
 });
