@@ -30,6 +30,9 @@ describe('Saved answers (O5)', () => {
     expect(answersKeyParts('letter:the-one-who-stays-lets:3')).toBeNull();
     expect(answersKeyParts('wtlb:x:-1')).toBeNull();
     expect(answersKeyParts('wtlb:x:two')).toBeNull();
+    // Number() reads all of these as numbers; a paragraph index is digits and nothing else.
+    for (const bad of ['wtlb:x:', 'wtlb:x: 3', 'wtlb:x:1e2', 'wtlb:x:0x1', 'wtlb:x:3.0']) expect(answersKeyParts(bad)).toBeNull();
+    expect(answersKeyParts('wtlb:x:0')).toEqual({ id: 'x', index: 0 });
     expect(answersIsTopicKey(A, 'wtlb:god-speaks-about-the-sabbath:12')).toEqual({ id: 'god-speaks-about-the-sabbath', index: 12 });
     expect(answersIsTopicKey(A, 'wtlb:devotion:3')).toBeNull();
     expect(answersIsTopicKey(null, 'wtlb:god-speaks-about-the-sabbath:12')).toBeNull();

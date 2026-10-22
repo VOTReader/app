@@ -31,9 +31,11 @@ export function answersKeyParts(key) {
   const s = String(key || '');
   if (!s.startsWith('wtlb:')) return null;
   const at = s.lastIndexOf(':');
-  const index = Number(s.slice(at + 1));
-  if (at <= 5 || !Number.isInteger(index) || index < 0) return null;
-  return { id: s.slice(5, at), index };
+  const tail = s.slice(at + 1);
+  // Digits and nothing else: Number() also reads '', ' 3', '1e2' and '0x1' as numbers.
+  if (at <= 5 || !tail || tail.length > 9) return null;
+  for (let i = 0; i < tail.length; i++) if (tail[i] < '0' || tail[i] > '9') return null;
+  return { id: s.slice(5, at), index: Number(tail) };
 }
 
 /** @type {{ of: any, ids: Set<string> }} */
