@@ -96,8 +96,12 @@ describe('AnswersTopic — a Contents jump (U4)', () => {
     render(<AnswersTopic entry={HD} entries={A} meta={M[HD.id]} metaAll={M} site={null} ready={true} ts2={false} landedPara={-1}
       mainRef={mainRef} isRead={() => false} pathOn={true} findOn={false} act={act2} nav={{}} />);
     fireEvent.click(document.querySelector('.ans-contents-line'));
-    expect(document.querySelector('.ans-sheet')).toBeTruthy();
-    fireEvent.click(document.querySelectorAll('.ans-toc-sec')[2]);
+    const sh = document.querySelector('.ans-sheet');
+    expect(sh).toBeTruthy();
+    // the sheet's own row: the desktop rail (in the page, so first in document order) lists the same rows
+    const row = sh.querySelectorAll('.ans-toc-sec')[2];
+    expect(row.closest('.ans-rail')).toBeNull();
+    fireEvent.click(row);
     expect(seen).toEqual([]); // not yet: the sheet closes first
     act(() => { vi.advanceTimersByTime(40); });
     expect(seen.length).toBe(1);
