@@ -35,6 +35,14 @@ describe('wordForms', () => {
     expect(forms('spake')).toEqual(expect.arrayContaining(['speak', 'spoke', 'spoken']));
   });
 
+  it('reads the King James "-soever" and the modern "-ever" as one word, both ways', () => {
+    expect(forms('whosoever')).toContain('whoever');
+    expect(forms('whoever')).toContain('whosoever');
+    expect(forms('whatsoever')).toContain('whatever');
+    expect(forms('wheresoever')).toContain('wherever');
+    expect(forms('ever')).toEqual([]);
+  });
+
   it('leaves out what the typed word\'s own prefix search already reaches', () => {
     expect(forms('flood')).toEqual([]); // floods, flooded, flooding all start with "flood"
     expect(forms('love')).toEqual(['loving']);
