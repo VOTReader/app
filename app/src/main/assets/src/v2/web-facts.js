@@ -31,5 +31,32 @@ export function webRoute(ep, env = g) {
   return null;
 }
 
+/**
+ * The doors into the web (mw13; sweb's w4 v2-handoff section 4, main's screen-routes __openScriptureWeb): the route that
+ * opens the web at `start` (main's CONTRACTS section 8: { verse }, { book, chapter? } or { letterKey }), or null with no
+ * start. The web reads a start once per route (WebScreen), so Back to it later resumes where the reader was.
+ * @param {any} start @returns {Record<string, any> | null}
+ */
+export function webDoor(start) {
+  return start && typeof start === 'object' ? { place: 'scripture-web', start } : null;
+}
+
+/** A reference's start (main's webStartOfRef, bundle-d: its first passage as a verse, chapter or book), or null when it
+ *  names no Bible place or bundle-d is absent. @param {string | null | undefined} ref @param {any} [env] */
+export function webStartOfRef(ref, env = g) {
+  return ref && typeof env.webStartOfRef === 'function' ? env.webStartOfRef(ref) || null : null;
+}
+
+/** A letter's or entry's start (main's letterKey: volKey + '/' + id); Hidden Manna has none (main: reached only through
+ *  the Matthew study chain), nor a preface. @param {string} volKey @param {any} letter */
+export function letterWebStart(volKey, letter) {
+  return volKey && volKey !== 'hm' && letter && letter.id ? { letterKey: volKey + '/' + letter.id } : null;
+}
+
+/** A study chapter's start (main's 'study:<study>/<chapter>'). @param {string} studyId @param {string} chapterId */
+export function studyWebStart(studyId, chapterId) {
+  return studyId && chapterId ? { letterKey: 'study:' + studyId + '/' + chapterId } : null;
+}
+
 /** What a gate boot of 5e hands main's screen: the guide seen, Famous (main's default), nothing saved. */
 export const GATE_WEB_SETTINGS = Object.freeze({ swGuideSeen: true, webDensity: 'famous' });

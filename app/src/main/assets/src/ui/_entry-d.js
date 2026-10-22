@@ -260,6 +260,7 @@ import { TourOverlay } from './components/TourOverlay.jsx';
 import { VotSearchMini } from '../search/engine.js';
 import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
 import { ScriptureWebScreen, ensureScriptureWebData } from './screens/ScriptureWebScreen.jsx';
+import { webStartOfRef } from '../utils/scripture-web/ref-parse.js';
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
 import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
@@ -406,7 +407,7 @@ Object.assign(window, {
   TourOverlay,
   VotSearchMini,
   getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches,
-  ScriptureWebScreen, ensureScriptureWebData,
+  ScriptureWebScreen, ensureScriptureWebData, webStartOfRef,
   MyProgressScreen,
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
   HistoryScreen,

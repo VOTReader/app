@@ -57,13 +57,13 @@ afterEach(() => {
 });
 
 describe('the rows (each only where it applies)', () => {
-  it('a letter: Find in this letter and Auto-scroll; no song and no page on the site, so nothing else', async () => {
+  it('a letter: Find in this letter, Auto-scroll, See this letter’s scriptures (mw13); no song and no page on the site', async () => {
     installCorpus();
     const { container } = render(<Bar place="letter" route={{ place: 'letter', collection: 'one', n: 1 }} />);
     await settle();
     await click(more(container));
     expect(container.querySelector('.sheet.mor .sh').textContent).toBe('The Wide Path');
-    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this letter', 'Auto-scroll']);
+    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this letter', 'Auto-scroll', 'See this letter’s scriptures']);
     expect(more(container).getAttribute('aria-expanded')).toBe('true');
   });
 
@@ -72,7 +72,7 @@ describe('the rows (each only where it applies)', () => {
     const { container } = render(<Bar place="letter" route={ENTRY_76} />);
     await settle();
     await click(more(container));
-    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this entry', 'Auto-scroll', 'Copy website link']);
+    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this entry', 'Auto-scroll', 'Copy website link', 'See this letter’s scriptures']);
     expect(rowNamed(container, 'Copy website link').querySelector('.s').textContent).toBe('thevolumesoftruth.com');
     expect(siteName(ELECT_LINK)).toBe('thevolumesoftruth.com');
   });
@@ -90,10 +90,26 @@ describe('the rows (each only where it applies)', () => {
     const { container } = render(<Bar place="bible-chapter" route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{ translation: 'nkjv' }} />);
     await click(more(container));
     expect(container.querySelector('.sheet.mor .sh').textContent).toBe('John 3');
-    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this chapter', 'Auto-scroll', 'Bible translation']);
+    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this chapter', 'Auto-scroll', 'Bible translation', 'Show in Scripture Web']);
     const tr = rowNamed(container, 'Bible translation');
     expect(tr.querySelector('.s').textContent).toBe('NKJV · New King James Version');
     expect(tr.querySelector('.chev')).toBeTruthy();
+  });
+
+  it("Show in Scripture Web opens the web at this chapter, and See this letter's scriptures at the letter's citations (mw13)", async () => {
+    const go = vi.fn();
+    const r = render(<Bar place="bible-chapter" route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} go={go} />);
+    await click(more(r.container));
+    await click(rowNamed(r.container, 'Show in Scripture Web'));
+    expect(go).toHaveBeenCalledWith({ place: 'scripture-web', start: { book: 'john', chapter: 3 } });
+    cleanup();
+    installCorpus();
+    const go2 = vi.fn();
+    const l = render(<Bar place="letter" route={{ place: 'letter', collection: 'one', n: 1 }} go={go2} />);
+    await settle();
+    await click(more(l.container));
+    await click(rowNamed(l.container, 'See this letter’s scriptures'));
+    expect(go2).toHaveBeenCalledWith({ place: 'scripture-web', start: { letterKey: expect.stringMatching(/^one\//) } });
   });
 
   it("names the reader's translation from main's list", async () => {
@@ -199,7 +215,7 @@ describe('Hear it sung (main\'s song catalog, verbatim songs only)', () => {
     await settle();
     expect(g.SongCatalog.load).toHaveBeenCalledTimes(1);
     await click(more(container));
-    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this entry', 'Auto-scroll', 'Hear it sung', 'Copy website link']);
+    expect(texts(container, '.sheet.mor .srow .t')).toEqual(['Find in this entry', 'Auto-scroll', 'Hear it sung', 'Copy website link', 'See this letter’s scriptures']);
     expect(rowNamed(container, 'Hear it sung').querySelector('.s').textContent).toBe('Songs that sing its words');
     await click(rowNamed(container, 'Hear it sung'));
     expect(g.AudioPlayer.playSongs).toHaveBeenCalledWith({ ids: ['s1', 's2'], startId: 's1', label: 'Elect and Precious' });

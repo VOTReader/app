@@ -166,7 +166,11 @@ const BUDGETS = [
   // myweb mw12 2026-10-16: 117,584 B. The build-out since (zones' search/notes sheets, mw10 answers.css, mw11's reading
   // fonts' @font-face list, mw12's journal heading + quote ~0.9 KB) is each screen's own small sheet, nothing pulled in
   // (no app.min.css rule, no font inlined: woff2 stay external). Ceiling ~+15%: 135 KB, still far under app.min.css.
-  { file: 'v2.min.css', measured: 117584, max: 135000 },
+  // myweb mw13 2026-10-22: 147,639 B. scripture-web.css takes main's whole current Scripture Web block (app.css
+  // 7716-8738 after sweb W3-W5: the docked panel, go-to, trail, rows, compact density, the list without WebGL2): 15.9 KB
+  // -> 42.9 KB minified; ~2.5 KB more came with the main merge's sheets. Nothing pulled in (no font, no app.min.css).
+  // Ceiling ~+15%: 169 KB, still far under app.min.css (370 KB).
+  { file: 'v2.min.css', measured: 147639, max: 169000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.

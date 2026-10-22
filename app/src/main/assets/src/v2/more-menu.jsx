@@ -22,6 +22,13 @@ const TOAST_MS = 2600;
  *   copy?: { link: string, reference: string } }} MoreItem
  */
 
+/** The Scripture Web's door (mw13; main's "Show in Scripture Web" / "See this letter's scriptures"): opens the web at the
+ *  page's place; none on a gate boot (design's ... pictures predate it). @param {any} route webDoor's, or null
+ *  @param {string} t @param {(r: any) => void} [go] @param {any} [gate] */
+export function webItem(route, t, go, gate = null) {
+  return route && go && !gate ? { id: 'web', icon: 'lines', t, s: 'The Scripture Web', run: () => go(route) } : null;
+}
+
 /** "thevolumesoftruth.com": the site a link goes to, under "Copy website link" (main's siteName). @param {string} link */
 export function siteName(link) {
   try { return new URL(link).host.replace(/^www\./, ''); } catch (_e) { return ''; }

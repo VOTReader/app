@@ -36,7 +36,8 @@ import { REPEAT_TIMES } from '../../utils/listen-from.js';
 import { LetterReadAlong } from '../player/read-along.jsx';
 import { landingOf, markWords, unmarkWords, placeAtThird } from '../search-landing.js';
 import { whenPainted } from '../gate.js';
-import { MoreButton, findItem, autoScrollItem, sungItem, copyLinkItem, useVerbatimSongs } from '../more-menu.jsx';
+import { MoreButton, findItem, autoScrollItem, sungItem, copyLinkItem, useVerbatimSongs, webItem } from '../more-menu.jsx';
+import { webDoor, letterWebStart } from '../web-facts.js';
 import { keySiteLink } from '../../utils/passage-copy.js';
 import { LetterFoot } from './LetterFoot.jsx';
 import { LinkPicker } from './LinkPicker.jsx';
@@ -386,6 +387,10 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     setRefOpen(null);
     findChapterRoute(parsed).then((r) => { if (r && onGo) onGo(r); });
   };
+  const openWeb = (route) => {
+    setRefOpen(null);
+    if (onGo) onGo(route);
+  };
   const readLink = (link, url) => {
     setRefOpen(null);
     openLetterLink(link, url, onGo);
@@ -614,7 +619,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
       )}
       {refOpen && (
         <RefSheet open={refOpen} letter={letter} items={items} desktop={desktop} onClose={closeRef}
-          onGo={live ? goToRef : closeRef} onRead={live ? readLink : closeRef}
+          onGo={live ? goToRef : closeRef} onRead={live ? readLink : closeRef} onWeb={live ? openWeb : null}
           onStep={(num) => setRefOpen({ kind: 'fn', num })} />
       )}
       <LayerToast text={toast && toast.text} icon={toast && toast.icon} act={toast && toast.act} onAct={toast && toast.onAct} />
@@ -716,10 +721,11 @@ export function LetterBookmark({ route, gate, item = null, noun = 'letter', mark
 
 /**
  * The letter's ... (1h; more-menu.jsx): Find in this letter / entry / topic, Auto-scroll, Hear it sung (only with a song
- * that sings its words), Copy website link (only where the site has the page: keySiteLink of main's page key).
- * @param {{ route: any, gate?: any, open?: (sheet: string) => void, desktop: boolean }} props
+ * that sings its words), Copy website link (only where the site has the page: keySiteLink of main's page key), See this
+ * letter's scriptures (mw13: the Scripture Web on its citations; main's, not on Hidden Manna, Answers or a preface).
+ * @param {{ route: any, gate?: any, open?: (sheet: string) => void, desktop: boolean, go?: (...routes: any[]) => void }} props
  */
-function LetterMore({ route, gate, open, desktop }) {
+function LetterMore({ route, gate, open, desktop, go }) {
   const col = collectionOf(route.collection);
   const letters = useLetters(col);
   const letter = letters && col ? (route.preface ? prefaceOf(col) : letterAt(letters, route.n)) : null;
@@ -731,17 +737,19 @@ function LetterMore({ route, gate, open, desktop }) {
       autoScrollItem(open, gate),
       sungItem(songs, title),
       letter ? copyLinkItem(keySiteLink(letterBookmarkKey(letter))) : null,
+      route.preface || !col || col.volKey === 'answers' ? null
+        : webItem(webDoor(letterWebStart(col.volKey, letter)), 'See this letter\u2019s scriptures', go, gate),
     ]} />
   );
 }
 
-/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ route: any, gate?: any, open?: (sheet: string) => void, desktop: boolean }} ctx */
-function letterActions({ route, gate, open, desktop }) {
+/** The letter's top bar: Bookmark, Aa (the shell's Text and theme sheet), More. @param {{ route: any, gate?: any, open?: (sheet: string) => void, desktop: boolean, go?: (...routes: any[]) => void }} ctx */
+function letterActions({ route, gate, open, desktop, go }) {
   return (
     <>
       <LetterBookmark route={route} gate={gate} />
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
-      <LetterMore route={route} gate={gate} open={open} desktop={desktop} />
+      <LetterMore route={route} gate={gate} open={open} desktop={desktop} go={go} />
     </>
   );
 }

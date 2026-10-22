@@ -20,7 +20,8 @@ import { TOAST_MS, useMainMarks } from './LetterScreen.jsx';
 import { ChapterListenPill, chapterAudio, startChapter } from '../player/listen.jsx';
 import { ChapterReadAlong } from '../player/read-along.jsx';
 import { translationOptions, translationRow } from '../reading-settings.js';
-import { MoreButton, findItem, autoScrollItem } from '../more-menu.jsx';
+import { MoreButton, findItem, autoScrollItem, webItem } from '../more-menu.jsx';
+import { webDoor } from '../web-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 /** @type {string[]} */
@@ -233,6 +234,7 @@ function chapterActions({ route, go, desktop, gate, facts, open }) {
         findItem('chapter', open),
         autoScrollItem(open, gate),
         translationItem((facts && facts.translation) || 'nkjv', go),
+        webItem(webDoor({ book: route.book, chapter: Number(route.chapter) }), 'Show in Scripture Web', go, gate),
       ]} />
     </>
   );

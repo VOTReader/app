@@ -7,7 +7,11 @@
    else the web leaves. It is a bare place: on the phone it covers the window as main's does; the laptop keeps its rail
    and the web fills the pane beside it (scripture-web.css). Main loads both corpora as the web opens (the Bible's for
    the verse previews, the letters' for My web), here too. A gate boot (5e) hands it the picture's settings, writes and
-   loads nothing more, and is ready once the web has drawn. */
+   loads nothing more, and is ready once the web has drawn.
+   A door (mw13: a reference's or footnote's "Show in Scripture Web", a page's ... row) opens it with route.start, main's
+   start prop ({ verse }, { book, chapter? }, { letterKey }). Main reads a start once per mount and a start wins over its
+   resume point, so it is spent once per route OBJECT: Back from a verse the web opened remounts the web with the same
+   route, and it then resumes where the reader was, as main's spent navHandoff 'webStart' does. */
 import { definePlace } from '../places.js';
 import { pushBackStep } from '../Sheet.jsx';
 import { savedSettings, writeSetting } from '../settings-pages.js';
@@ -15,9 +19,20 @@ import { webRoute, GATE_WEB_SETTINGS } from '../web-facts.js';
 
 const g = /** @type {any} */ (globalThis);
 
+/** The routes whose start the web has had. */
+const spent = new WeakSet();
+
+/** A route's start the first time the web mounts with it, else undefined. @param {any} route */
+export function takeStart(route) {
+  if (!route || !route.start || typeof route.start !== 'object' || spent.has(route)) return undefined;
+  spent.add(route);
+  return route.start;
+}
+
 /** @param {import('../places.js').PlaceProps} props */
-export function WebScreen({ gate, go, pop, onReady }) {
+export function WebScreen({ route, gate, go, pop, onReady }) {
   const Main = g.ScriptureWebScreen;
+  const [start] = React.useState(() => takeStart(route));
   const hostRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   const [settings, setSettings] = React.useState(() => (gate ? { ...GATE_WEB_SETTINGS } : savedSettings()));
 
@@ -64,7 +79,7 @@ export function WebScreen({ gate, go, pop, onReady }) {
   if (typeof Main !== 'function') return <div className="sw-host" ref={hostRef} />;
   return (
     <div className="sw-host" ref={hostRef}>
-      <Main navigateToLink={navigateToLink} onBack={pop} settings={settings} updateSetting={updateSetting} />
+      <Main navigateToLink={navigateToLink} onBack={pop} settings={settings} updateSetting={updateSetting} start={start} />
     </div>
   );
 }

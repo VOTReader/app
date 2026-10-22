@@ -13,6 +13,7 @@ import { Sheet } from '../Sheet.jsx';
 import { passages, translationOf, noteWords, versePieces } from '../footnotes.js';
 import { splitIntoVerses } from '../../utils/scripture-parse.js';
 import { useBibleCorpus } from '../corpus.js';
+import { webDoor, webStartOfRef } from '../web-facts.js';
 
 /** A verse's words, numbered when it is several verses (the kit's .vn). @param {{ text: string, cite: string }} props */
 function VerseText({ text, cite }) {
@@ -77,6 +78,18 @@ function Passages({ cite, letter, onGo }) {
   );
 }
 
+/** The reference's door into the Scripture Web (mw13; main's FootnoteSheet "Show in Scripture Web"): its first passage,
+ *  as a verse, chapter or book; nothing when it names no Bible place. @param {{ cite: string, onWeb?: ((route: any) => void) | null }} props */
+function WebDoor({ cite, onWeb }) {
+  const route = onWeb ? webDoor(webStartOfRef(cite)) : null;
+  if (!route || !onWeb) return null;
+  return (
+    <button type="button" className="textbtn sm" onClick={() => onWeb(route)}>
+      Show in Scripture Web<Icon name="chev" />
+    </button>
+  );
+}
+
 /**
  * A note footnote: its words, the collection its letter is in, and "Read <letter>" (else its web page).
  * @param {{ fn: import('../footnotes.js').Footnote, onRead: (link: any, url?: string) => void }} props
@@ -106,14 +119,16 @@ function Note({ fn, onRead }) {
  * The sheet. `open` is { kind: 'ref', ref } or { kind: 'fn', num }; `items` the letter's footnotes in order.
  * @param {{ open: { kind: 'ref', ref: string } | { kind: 'fn', num: string }, letter: any,
  *   items: import('../footnotes.js').FootnoteItem[], desktop?: boolean, onClose: () => void,
- *   onGo: (parsed: any) => void, onRead: (link: any, url?: string) => void, onStep: (num: string) => void }} props
+ *   onGo: (parsed: any) => void, onRead: (link: any, url?: string) => void, onStep: (num: string) => void,
+ *   onWeb?: ((route: any) => void) | null }} props  onWeb opens the web at a Scripture reference (null: no door)
  */
-export function RefSheet({ open, letter, items, desktop = false, onClose, onGo, onRead, onStep }) {
+export function RefSheet({ open, letter, items, desktop = false, onClose, onGo, onRead, onStep, onWeb = null }) {
   if (open.kind === 'ref') {
     return (
       <Sheet kind="ref" label={'Scripture ' + open.ref} desktop={desktop} closeX onClose={onClose}>
         <span className="overline">Scripture</span>
         <Passages cite={open.ref} letter={letter} onGo={onGo} />
+        <WebDoor cite={open.ref} onWeb={onWeb} />
       </Sheet>
     );
   }
@@ -138,6 +153,7 @@ export function RefSheet({ open, letter, items, desktop = false, onClose, onGo, 
       {fn.type === 'scripture' && fn.ref ? (
         <>
           <Passages cite={fn.ref} letter={letter} onGo={onGo} />
+          <WebDoor cite={fn.ref} onWeb={onWeb} />
           {fn.seeAlso && fn.seeAlso.letterTitle ? (
             <button type="button" className="textbtn sm" onClick={() => onRead(fn.seeAlso)}>
               Also see {fn.seeAlso.label || fn.seeAlso.letterTitle}<Icon name="chev" />

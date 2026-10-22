@@ -20,7 +20,8 @@
 import { Icon } from '../Icon.jsx';
 import { LetterBlock } from '../letter-text.jsx';
 import { LetterScreen, LetterBookmark } from './LetterScreen.jsx';
-import { MoreButton, findItem, autoScrollItem, copyLinkItem } from '../more-menu.jsx';
+import { MoreButton, findItem, autoScrollItem, copyLinkItem, webItem } from '../more-menu.jsx';
+import { webDoor, studyWebStart } from '../web-facts.js';
 import { keySiteLink } from '../../utils/passage-copy.js';
 import { definePlace } from '../places.js';
 import { paraKey } from '../marks.js';
@@ -224,9 +225,11 @@ export function StudyChapterScreen({ route, gate, go, replace, onReady, desktop,
  * site: main's pageSiteLink of LetterView's 'letter:<id>'), then 5f's "Collapse all cards" / "Open all cards". No Hear it
  * sung: main hides a study's songs (LetterView studyMode). A Matthew chapter's is main's More there (dz18 5i): Copy website
  * link first ('study:matthew-<n>'), then Find and Auto-scroll; it has no cards.
- * @param {{ route: any, gate?: any, desktop: boolean, open?: (name: string, opts?: Record<string, any>) => void }} props
+ * mw13: then See this chapter's scriptures (the Scripture Web on its citations; not Matthew's, as on main).
+ * @param {{ route: any, gate?: any, desktop: boolean, open?: (name: string, opts?: Record<string, any>) => void,
+ *   go?: (...routes: any[]) => void }} props
  */
-function StudyMore({ route, gate, desktop, open }) {
+function StudyMore({ route, gate, desktop, open, go }) {
   const found = chapterFor(route);
   const chapter = found ? found.chapter : null;
   const keys = chapter ? chapterCardKeys(chapter) : [];
@@ -241,14 +244,17 @@ function StudyMore({ route, gate, desktop, open }) {
   const find = findItem('chapter', open);
   const auto = autoScrollItem(open, gate);
   const title = !chapter ? '' : matthew ? 'Matthew ' + chapter.num : curly(chapter.title);
-  return <MoreButton title={title} desktop={desktop} gate={gate} items={matthew ? [link, find, auto] : [find, auto, link, cards]} />;
+  const web = matthew || !chapter ? null
+    : webItem(webDoor(studyWebStart(route.study, chapter.id)), 'See this chapter\u2019s scriptures', go, gate);
+  return <MoreButton title={title} desktop={desktop} gate={gate} items={matthew ? [link, find, auto] : [find, auto, link, cards, web]} />;
 }
 
 /**
  * The chapter's top bar: Bookmark (main's 'letter:<chapter>'), Aa, More.
- * @param {{ route: any, gate?: any, desktop: boolean, open?: (name: string, opts?: Record<string, any>) => void }} ctx
+ * @param {{ route: any, gate?: any, desktop: boolean, open?: (name: string, opts?: Record<string, any>) => void,
+ *   go?: (...routes: any[]) => void }} ctx
  */
-function studyChapterActions({ route, gate, open, desktop }) {
+function studyChapterActions({ route, gate, open, desktop, go }) {
   const found = chapterFor(route);
   const chapter = found ? found.chapter : null;
   // a Matthew chapter keeps main's own bookmark ('study:matthew-5', "Matthew 5 (Study)")
@@ -257,7 +263,7 @@ function studyChapterActions({ route, gate, open, desktop }) {
     <>
       <LetterBookmark route={route} gate={gate} item={chapter} noun="chapter" mark={mark} />
       <button type="button" className="ic" aria-label="Text and theme" onClick={() => open && open('text-and-theme')}><Icon name="aa" /></button>
-      <StudyMore route={route} gate={gate} desktop={desktop} open={open} />
+      <StudyMore route={route} gate={gate} desktop={desktop} open={open} go={go} />
     </>
   );
 }

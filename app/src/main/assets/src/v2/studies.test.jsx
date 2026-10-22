@@ -375,7 +375,7 @@ describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
     const { container } = render(<V2App gateId={null} />);
     await waitFor(() => expect(container.querySelector('.pgrp')).not.toBe(null));
     await click(container.querySelector('.tb [aria-label="More"]'));
-    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Copy website link', 'Collapse all cards']);
+    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Copy website link', 'Collapse all cards', 'See this chapter’s scriptures']);
     expect(menuRow('Copy website link').querySelector('.s').textContent).toBe('thevolumesoftruth.com');
     await click(menuRow('Copy website link'));
     await act(() => new Promise((r) => { setTimeout(r, 30); }));
@@ -413,7 +413,7 @@ describe("a study's chapter (5d) and its prophecy cards (5f)", () => {
     expect(store.getAll()).toEqual({});
     expect(cardsOf(container).map((c) => c.open)).toEqual([false, true, true]);
     await click(container.querySelector('.tb [aria-label="More"]'));
-    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Open all cards']);
+    expect(menuRows()).toEqual(['Find in this chapter', 'Auto-scroll', 'Open all cards', 'See this chapter’s scriptures']);
     await click(menuRow('Open all cards'));
     expect(cardsOf(container).map((c) => c.open)).toEqual([true, true, true]);
     expect(store.setAll).toHaveBeenLastCalledWith({ [CH2 + ':0:ot']: true, [CH2 + ':0:nt']: true, [CH2 + ':0:vot']: true });

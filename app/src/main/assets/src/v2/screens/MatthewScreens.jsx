@@ -330,7 +330,8 @@ export function MatthewChapter({ study, ch, gate, go, replace, onReady, desktop,
       <StudyNotesSwitch mode={view.mode} onPick={view.setMode} />
       {refOpen && (
         <RefSheet open={refOpen} letter={{ nkjv: g.MATTHEW_NKJV || null }} items={[]} desktop={desktop} onClose={closeRef}
-          onGo={live ? goToRef : closeRef} onRead={closeRef} onStep={() => {}} />
+          onGo={live ? goToRef : closeRef} onRead={closeRef} onStep={() => {}}
+          onWeb={live ? (r) => { setRefOpen(null); go(r); } : null} />
       )}
       <LayerToast text={toast && toast.text} icon={toast && toast.icon} />
     </div>
