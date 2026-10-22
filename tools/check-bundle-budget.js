@@ -95,6 +95,10 @@ const BUDGETS = [
   // on its own branch against the spine's 1,367,470: GL +25.9 KB, canvas +31.1 KB, My Web +13.0 KB, navigation
   // +28.0 KB (the panel's +35 KB lands next, inside this room). All of it is the feature's own code; nothing
   // pulled in a library. Re-baselined UP by the same rule: 1,460,091 x 1.15 = 1,679,104.7 -> the hundred above.
+  // 2026-10-22, AOGCG Extras: build:d compiles every JSX element to one injected short factory
+  // (src/ui/jsx-inject.js) instead of "React.createElement": 1,678,740 -> 1,599,529 (-79,211 B), no
+  // behaviour change (smoke:ci PASS). The ceiling is not loosened and not lowered: the Answers stages spend
+  // part of the room, and what is left stays unclaimed.
   { file: 'bundle-d.js', measured: 1460091, max: 1679200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.

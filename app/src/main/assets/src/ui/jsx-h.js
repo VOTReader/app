@@ -5,6 +5,8 @@
    letter at every element instead of 19 characters ("React.createElement"). The AOGCG Answers stages
    added some 2,000 elements to bundle-d.js; this holds it inside its budget ceiling
    (tools/check-bundle-budget.js) without changing what any element does. React is a global before any
-   bundle runs (index.html, bundle-a), and vitest.setup.js makes it one for the tests. */
+   bundle runs (index.html, bundle-a), and vitest.setup.js makes it one for the tests.
+   Since 2026-10-22 build:d gives EVERY file the same saving (jsx-inject.js, --inject), so a new
+   file needs no pragma; the files that carry one keep it, and it changes nothing for them. */
 export const h = React.createElement;
 export const Fragment = React.Fragment;
