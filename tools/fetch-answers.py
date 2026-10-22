@@ -44,7 +44,9 @@ occurrence of that slice, counted from 0) re-anchor them if they ever drift.
   relatedMore  [{id, title, anchor, url, pos[, letter]}]  full-URL Related Topics links
   relatedGroups [{label, items: [{id, title[, anchor]}]}]  (Regarding The Ten Commandments)
   refMeta      {"n": [{i, version, siteUrl}]}  the translation the site cites (non-NKJV only)
-  marks        {"n": {u: [[at, len]], big: [[at, len, px]], small: [[at, len]], indent: k}}
+  marks        {"n": {u: [[at, len]], big: [[at, len, px]], small: [[at, len]], indent: k, br1: [at]}}
+                                br1: each line break the site does not draw (the second of a pair
+                                whose markup is one <br /> and a source newline: a couplet)
   notes        {"n": [{marker, at, after, note}]}  <sup> markers and the paragraph they point at
   attr         {"n": {wording, title, url, inApp}}  every source line (wording only when not "From")
   words        reading length
@@ -503,7 +505,8 @@ class Parser(HTMLParser):
             self.blocks.append(Block('hr'))
         elif tag == 'br':
             if self.cur is not None:
-                self.cur.runs.append(['\n', False, False, None, None])
+                # deco 'br': this "\n" is a line break the site draws (a source newline draws none)
+                self.cur.runs.append(['\n', False, False, None, {'br': 1}])
         elif tag in ('b', 'strong'):
             self.bold += 1
         elif tag in ('i', 'em'):
@@ -589,10 +592,14 @@ def style_key(bold, ital):
     return ('b' if bold else '') + ('i' if ital else '')
 
 
-def render_tokens(tokens):
-    """tokens: [('t', text, style) | ('ref', ref)] -> Format B text (balanced markers per line)."""
-    lines, cur = [], []
-    for tok in tokens:
+def render_tokens(tokens, brs=None):
+    """tokens: [('t', text, style) | ('ref', ref)] -> Format B text (balanced markers per line).
+    With `brs` (the indexes of the tokens that are a <br />), returns (text, br1): br1 the offsets of
+    each "\\n" the site does not draw, the second of a "\\n\\n" pair whose site markup is ONE <br />
+    plus a source newline (a couplet). The text keeps both characters, so no offset moves; the app
+    draws one break there (marks.br1, AOGCG round 2 must-fix 1)."""
+    lines, cur, kinds = [], [], []  # kinds[k]: whether the break after lines[k] is a <br />
+    for ti, tok in enumerate(tokens):
         if tok[0] == 'ref':
             cur.append(tok)
             continue
@@ -600,6 +607,7 @@ def render_tokens(tokens):
         for i, part in enumerate(parts):
             if i > 0:
                 lines.append(cur)
+                kinds.append(brs is not None and ti in brs)
                 cur = []
             if part:
                 cur.append(('t', part, tok[2]))
@@ -638,7 +646,38 @@ def render_tokens(tokens):
         out_lines.append(s)
     text = '\n'.join(out_lines)
     text = re.sub(r'\n{3,}', '\n\n', text).strip('\n').strip()
-    return text
+    if brs is None:
+        return text
+    return text, _single_breaks(out_lines, kinds, text)
+
+
+def _single_breaks(out_lines, kinds, text):
+    """render_tokens' join and collapse again, line by line, keeping each break's origin: where the
+    site draws one break (one <br /> in a run of breaks the text writes as "\\n\\n"), the offset of
+    the second "\\n". [] whenever the rebuild disagrees with the text (never expected)."""
+    out, br1, k = '', [], 0
+    first = next((i for i, ln in enumerate(out_lines) if ln), None)
+    if first is None:
+        return []
+    out = out_lines[first]
+    i = first + 1
+    while i < len(out_lines):
+        n, b = 0, 0
+        j = i
+        while j < len(out_lines):  # the breaks after line j-1, through empty lines, to the next words
+            n += 1
+            b += 1 if kinds[j - 1] else 0
+            if out_lines[j]:
+                break
+            j += 1
+        if j >= len(out_lines):
+            break  # trailing breaks: stripped
+        nl = min(n, 2)
+        if nl == 2 and b == 1:
+            br1.append(len(out) + 1)
+        out += '\n' * nl + out_lines[j]
+        i = j + 1
+    return br1 if out == text else []
 
 
 def _piece_core(part):
@@ -1044,7 +1083,7 @@ def blocks_to_paragraphs(blocks, bitly, matcher, stats, side=None):
                 stats['topic_links'] += 1
             tokens.append(('t', text, style_key(bold, ital)))
             meta.append({'deco': deco, 'link': link})
-        text = render_tokens(tokens)
+        text, br1 = render_tokens(tokens, {k for k, m in enumerate(meta) if (m.get('deco') or {}).get('br')})
         imgs = [r[3][4:] for r in b.runs if r[3] and r[3].startswith('img:')]
         if not text:
             for f in imgs:
@@ -1062,11 +1101,12 @@ def blocks_to_paragraphs(blocks, bitly, matcher, stats, side=None):
             align = 'justify'
         if b.kind == 'li':
             text = '• ' + text
+            br1 = [x + 2 for x in br1]
         n = len(paras)
         paras.append({'align': align, 'text': text})
         for f in imgs:
             side['media'].append(image_item(f, sec_title, n))
-        decorate(n, text, tokens, meta, b, side, stats, sec_title, 2 if b.kind == 'li' else 0)
+        decorate(n, text, tokens, meta, b, side, stats, sec_title, 2 if b.kind == 'li' else 0, br1)
         # A source line the site writes another way ("**Excerpt from:** Poured Out").
         mm = NONSTD_ATTR_RE.match(text)
         if mm and align == 'center':
@@ -1106,9 +1146,10 @@ def image_item(f, title, at):
     return it
 
 
-def decorate(n, out, tokens, meta, block, side, stats, sec_title, start):
-    """Record paragraph n's sidecars (links, bare links, underline, sizes, notes, refs, embeds) by where
-    each token's words landed in `out`, the paragraph's final text. The text itself is not touched."""
+def decorate(n, out, tokens, meta, block, side, stats, sec_title, start, br1=None):
+    """Record paragraph n's sidecars (links, bare links, underline, sizes, notes, refs, embeds, the
+    breaks the site does not draw) by where each token's words landed in `out`, the paragraph's final
+    text. The text itself is not touched."""
     loc, misses = locate_tokens(out, tokens, start)
     stats['locate_miss'] += misses
     u16 = U16(out)
@@ -1189,6 +1230,9 @@ def decorate(n, out, tokens, meta, block, side, stats, sec_title, start):
         mk['small'] = [[u16(s), u16(e) - u16(s)] for s, e in small]
     if block.pad:
         mk['indent'] = max(1, round(block.pad / 30))
+    if br1:
+        mk['br1'] = [u16(x) for x in br1]
+        stats['br1'] = stats.get('br1', 0) + len(br1)
     if mk:
         side['marks'][n] = mk
 
@@ -2124,6 +2168,7 @@ def print_counts(entries, stats, site_meta):
     for k in sorted(pages):
         print('  pages %-34s %d' % (k, len(pages[k])))
     print('  <u> runs carried                         %d' % stats['u_runs'])
+    print('  single breaks (marks.br1)                %d' % stats.get('br1', 0))
     print('  refMeta versions:', dict(stats['refmeta_versions'].most_common()))
     print('  attribution wording (standard lines):', dict(stats['attr_wording'].most_common()))
     print('  non-standard source lines (%d):' % len(stats['attr_nonstd']))

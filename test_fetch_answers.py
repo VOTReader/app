@@ -213,6 +213,15 @@ class LocateTokens(unittest.TestCase):
         self.assertEqual(misses, 0)
         self.assertEqual([out[s:e] for s, e in loc[1][1]], [LiteralMarkers.URL.replace('_', '%5F')])
 
+    def test_a_couplet_keeps_both_newlines_and_names_the_one_the_site_does_not_draw(self):
+        # "line one<br />\nline two": one <br /> then a source newline. The text keeps "\n\n" (offsets
+        # hold); br1 names the second "\n", which the app draws as nothing (marks.br1).
+        tokens = [('t', 'line one', ''), ('t', '\n', ''), ('t', '\nline two', ''), ('t', '\n', ''), ('t', '\n', ''), ('t', 'three', '')]
+        text, br1 = fa.render_tokens(tokens, {1, 3, 4})
+        self.assertEqual(text, 'line one\n\nline two\n\nthree')
+        self.assertEqual(text, fa.render_tokens(tokens))
+        self.assertEqual(br1, [len('line one\n')])  # the pair after "line two" is two <br />: both draw
+
     def test_utf16_offsets_count_an_astral_character_twice(self):
         u = fa.U16('a\U0001D50Ab c')
         self.assertEqual([u(0), u(1), u(2), u(3)], [0, 1, 3, 4])
