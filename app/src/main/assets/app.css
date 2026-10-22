@@ -9110,14 +9110,19 @@ u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underl
 .ans-ts2 .ans-tablet{flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;min-height:56px} /* justify: A25 */
 .ans-ts2 .ans-tablet .ans-num{flex:0 0 max(40px,2.4em);font-size:min(var(--fs-18),7vw)} /* r2: 2.4em holds "VIII" (about 2em), so every label starts on one line */
 
-/* Desktop */
+/* Desktop. The rail shows at 1024 and up only (A13) */
+.ans-rail{display:none}
 @media (min-width:600px){.ans-reading .is-justify{text-align:justify;hyphens:auto}}
 @media (min-width:1024px){
   .screen-layout.ans-wide{--col-max:1120px}
   .ans-landing{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:64px;padding:16px 48px 48px}
-  .ans-rail{position:sticky;top:24px;align-self:start} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
-  .ans-topic{display:grid;grid-template-columns:17rem minmax(0,70ch);gap:3rem;justify-content:center}
-  .ans-rail{max-height:calc(100vh - var(--dock-under-nav) - 48px);overflow:auto}
+  .ans-rail{display:block;position:sticky;top:24px;align-self:start;max-height:calc(100vh - var(--dock-under-nav) - 48px);overflow:auto} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
+  /* the rail and gap stop at their Text Size 1 sizes (17rem and 3rem of the 18px root): in rem they grew with Text Size and
+     took the column (1.6: 490px rail; 3: 918px, a 0px column). From Text Size 2 the page is one column, as on a phone:
+     the rail's titles no longer fit it, and the hero's Contents line opens the Contents sheet */
+  .ans-topic{display:grid;grid-template-columns:min(17rem,306px) minmax(0,70ch);gap:min(3rem,54px);justify-content:center}
+  .ans-ts2 :is(.ans-topic,.ans-landing){display:block} /* the landing too: its two columns overflowed 1280 at Text Size 3 */
+  .ans-ts2 .ans-rail{display:none}
   .ans-rail .ans-toc-sec{padding-left:12px}
   .ans-rail .ans-toc-sec.is-current::before{left:0}
   .ans-runhead{display:none}
@@ -9185,8 +9190,8 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 .ans-rail-track{position:relative;height:2px;margin:8px 0;background:var(--border)}
 .ans-rail-track .ans-runhead-bar{bottom:0}
 .ans-rail .ans-toc-sec{min-height:48px;padding-top:6px;padding-bottom:6px} /* r2 */
-.ans-rail .ans-row-title{font-size:min(var(--fs-15),5.6vw);line-height:1.45}
-@media (max-width:1023px){.ans-rail{display:none}}
+/* (the rail titles' 15/1.45 is in the type block) */
+/* (the rail is display:none under 1024: the Desktop block's base rule) */
 
 /* A14. Landing tools rows (Charts & videos, Saved answers): margin-top 32 (spec 2.3) */
 .ans-tools{margin-top:32px}
