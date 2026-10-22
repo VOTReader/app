@@ -208,10 +208,14 @@ describe('AnswersHome — search (f06)', () => {
     fireEvent.click(screen.getByText('Show 14 more topics'));
     expect(document.querySelectorAll('.ans-results .ans-row').length).toBe(22);
     fireEvent.click(document.querySelector('.ans-hit'));
-    const [id, anchor, from] = onOpenTopic.mock.calls[0];
+    const [id, anchor, from, section, find] = onOpenTopic.mock.calls[0];
     expect(id).toBe('god-speaks-about-the-sabbath');
     expect(anchor.toLowerCase()).toContain('sabbath');
     expect(from).toBe('Answers');
+    // U8: the topic opens on the passage with find-in-topic preset to the query (the words the hit marked)
+    expect(section).toBeNull();
+    expect(find.label).toBe('sabbath');
+    expect(find.terms).toContain('sabbath');
   });
 
   it('Back with a question typed clears it before leaving the screen', () => {

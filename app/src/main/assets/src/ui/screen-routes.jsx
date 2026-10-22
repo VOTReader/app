@@ -864,7 +864,8 @@ export function buildScreenRoutes({
   // search hit carries the paragraph it matched, and the topic lands on it;
   // a link naming a section (a site #fragment, `section`) lands on that
   // section instead (answers-sections.js, aogcg 1b).
-  const _openAnswersTopic = (id, anchorText, fromTitle, section) => {
+  // find (U8): a passage search hit also presets find-in-topic to its query (FindInUnit's pill).
+  const _openAnswersTopic = (id, anchorText, fromTitle, section, find) => {
     pushFromLetter({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: null, sourceChapterNum: null, sourceStudyId: null, sourceStudyChapterId: null,
@@ -873,7 +874,7 @@ export function buildScreenRoutes({
     });
     window.navHandoff.clear('pendingHighlight');
     setSurpriseAnchor(section ? answersSectionAnchor(id, section)
-      : anchorText ? { type: 'excerpt', text: anchorText, letterId: id } : null);
+      : anchorText ? { type: 'excerpt', text: anchorText, letterId: id, ...(find ? { find } : {}) } : null);
     setLetterId(id);
     setActiveReadKey('vol:answers', () => setLastReadForVol('answers', id));
     setScreen('answers-entry');

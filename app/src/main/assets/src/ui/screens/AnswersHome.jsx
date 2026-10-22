@@ -307,7 +307,8 @@ function Results({ entries, results, titleOnly, query, onOpenTopic, onSearchLibr
   const shown = all ? groups : groups.slice(0, GROUPS_SHOWN);
   const more = groups.length - shown.length;
   const paraText = (g) => (g.first ? g.entry.paragraphs[g.first.index].text : null);
-  const open = (g) => { rememberQuery(q); onOpenTopic(g.entry.id, paraText(g), 'Answers'); };
+  // a passage hit opens on its paragraph with find-in-topic preset to the query (U8): the words the hit marked
+  const open = (g) => { rememberQuery(q); onOpenTopic(g.entry.id, paraText(g), 'Answers', null, words.length ? { terms: words, label: q.trim() } : null); };
   return (
     <div className="ans-results">
       <div className="ans-results-sum">
@@ -459,7 +460,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   }, [query]);
   const handleNavBack = () => { if (query) setQuery(''); else onBack(); };
   const closeSheet = React.useCallback(() => setSheet(null), []);
-  const openTopic = (id, anchor, from) => onOpenTopic(id, anchor || null, from || 'Answers');
+  const openTopic = (id, anchor, from, section, find) => (find ? onOpenTopic(id, anchor || null, from || 'Answers', section || null, find) : onOpenTopic(id, anchor || null, from || 'Answers'));
   const chip = (id) => openTopic(id, null, 'Answers');
 
   const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
