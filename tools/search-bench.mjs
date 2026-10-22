@@ -34,6 +34,7 @@
    TRI (search200, 2026-10-18; PLAN 1.6): 200 exact, 200 misremembered and 200 title cases, each tiered easy, medium,
    hard from its query alone (tri/check-tri.mjs), plus held (counted, never printed) and fresh (tri/fresh-cases.json).
      node tools/search-bench.mjs --set tri [--json out] [--record]   tri/cases.json (+ tri/fresh-cases.json); floor tri/baseline.json
+     node tools/search-bench.mjs --set tri --show-sealed-ids        also print the held and fresh failures by id (never while tuning)
    The pass rule above is unchanged. Exact and misremembered score at sentence or verse level; a boundary or merged
    case's sentence is the two-sentence span; a merged Bible misquote names two adjacent verses (uk, uk2) and either
    passes (rules.mjs pairHolds). Titles score at unit level (a study chapter by its chapter title alone, rules.mjs
@@ -287,7 +288,7 @@ if (fs.existsSync(BASELINE)) {
 }
 
 /** The tri report (PLAN 1.6): open, held and fresh on one line, then style x tier, style x collection group, the
-    open failures by id and form, and the sealed failures by id only. Floors in tri/baseline.json. */
+    open failures by id and form, and (--show-sealed-ids only) the sealed failures by id. Floors in tri/baseline.json. */
 function triReport() {
   const TIERS = ['easy', 'medium', 'hard'];
   const open = out.filter((o) => !o.held);
@@ -311,7 +312,8 @@ function triReport() {
     console.log('failures (open cases only):');
     for (const o of open.filter((x) => !x.pass)) console.log(`  ${o.id} [${o.style}/${o.tier}/${o.form}/${o.col}] ${JSON.stringify(o.q)} -> ${o.why}${o.rank ? ' (target at #' + o.rank + ')' : ' (not found)'}`);
     const ids = (rows) => rows.filter((x) => !x.pass).map((x) => x.id).sort().join(' ') || '-';
-    console.log('sealed failures (ids only): held ' + ids(held) + '; fresh ' + ids(sealedFresh));
+    // the sealed ids only on request (search200 fix2): a builder reading this report never sees which unseen cases fail
+    if (flag('--show-sealed-ids')) console.log('sealed failures (ids only): held ' + ids(held) + '; fresh ' + ids(sealedFresh));
   }
   if (val('--json')) fs.writeFileSync(val('--json'), JSON.stringify(out, null, 1));
   const styleTier = {};
