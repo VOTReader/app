@@ -4,7 +4,8 @@
  "counts": {
   "targets": 1139,
   "cases": 870,
-  "reserves": 269
+  "reserves": 262,
+  "unsealed": 7
  },
  "targets": [
   {
@@ -1942,7 +1943,7 @@
   {
    "id": "e064",
    "split": "held",
-   "reserve": true,
+   "reserve": false,
    "style": "exact",
    "tier": "medium",
    "form": "start",
@@ -1967,7 +1968,9 @@
     "swappable": 3,
     "typed": 1
    },
-   "packet": "exact-medium-r01"
+   "packet": "exact-medium-r01",
+   "replaces": "e301",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "e065",
@@ -6567,7 +6570,7 @@
   },
   {
    "id": "e215",
-   "split": "held",
+   "split": "unsealed",
    "reserve": false,
    "style": "exact",
    "tier": "easy",
@@ -6593,7 +6596,8 @@
     "swappable": 1,
     "typed": 1
    },
-   "packet": "exact-easy-01"
+   "packet": "exact-easy-01",
+   "unsealedFrom": "held"
   },
   {
    "id": "e216",
@@ -7184,7 +7188,7 @@
   {
    "id": "e235",
    "split": "held",
-   "reserve": true,
+   "reserve": false,
    "style": "exact",
    "tier": "easy",
    "form": "pasted-quoted",
@@ -7210,7 +7214,9 @@
     "swappable": 1,
     "typed": 1
    },
-   "packet": "exact-easy-r01"
+   "packet": "exact-easy-r01",
+   "replaces": "e215",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "e236",
@@ -9227,7 +9233,7 @@
   },
   {
    "id": "e301",
-   "split": "held",
+   "split": "unsealed",
    "reserve": false,
    "style": "exact",
    "tier": "medium",
@@ -9253,7 +9259,8 @@
     "swappable": 0,
     "typed": 1
    },
-   "packet": "exact-medium-01"
+   "packet": "exact-medium-01",
+   "unsealedFrom": "held"
   },
   {
    "id": "e302",
@@ -19427,7 +19434,7 @@
   {
    "id": "m255",
    "split": "fresh",
-   "reserve": true,
+   "reserve": false,
    "style": "misremembered",
    "tier": "medium",
    "form": "two-three-slips",
@@ -19452,7 +19459,9 @@
     "swappable": 2,
     "typed": 1
    },
-   "packet": "misremembered-medium-01"
+   "packet": "misremembered-medium-01",
+   "replaces": "m274",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "m256",
@@ -20002,7 +20011,7 @@
   },
   {
    "id": "m274",
-   "split": "fresh",
+   "split": "unsealed",
    "reserve": false,
    "style": "misremembered",
    "tier": "medium",
@@ -20028,7 +20037,8 @@
     "swappable": 0,
     "typed": 1
    },
-   "packet": "misremembered-medium-01"
+   "packet": "misremembered-medium-01",
+   "unsealedFrom": "fresh"
   },
   {
    "id": "m275",
@@ -24238,7 +24248,7 @@
   },
   {
    "id": "n032",
-   "split": "held",
+   "split": "unsealed",
    "reserve": false,
    "style": "title",
    "tier": "hard",
@@ -24264,7 +24274,8 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-hard-01"
+   "packet": "title-hard-01",
+   "unsealedFrom": "held"
   },
   {
    "id": "n033",
@@ -24419,7 +24430,7 @@
   {
    "id": "n038",
    "split": "fresh",
-   "reserve": true,
+   "reserve": false,
    "style": "title",
    "tier": "hard",
    "form": "reordered",
@@ -24444,7 +24455,9 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-hard-01"
+   "packet": "title-hard-01",
+   "replaces": "n291",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "n039",
@@ -24600,7 +24613,7 @@
   {
    "id": "n044",
    "split": "held",
-   "reserve": true,
+   "reserve": false,
    "style": "title",
    "tier": "hard",
    "form": "words-wrong",
@@ -24625,7 +24638,9 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-hard-r01"
+   "packet": "title-hard-r01",
+   "replaces": "n032",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "n045",
@@ -28145,7 +28160,7 @@
   {
    "id": "n162",
    "split": "held",
-   "reserve": true,
+   "reserve": false,
    "style": "title",
    "tier": "hard",
    "form": "words-wrong",
@@ -28171,7 +28186,9 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-hard-r01"
+   "packet": "title-hard-r01",
+   "replaces": "n377",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "n163",
@@ -32018,7 +32035,7 @@
   },
   {
    "id": "n291",
-   "split": "fresh",
+   "split": "unsealed",
    "reserve": false,
    "style": "title",
    "tier": "hard",
@@ -32044,7 +32061,8 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-hard-01"
+   "packet": "title-hard-01",
+   "unsealedFrom": "fresh"
   },
   {
    "id": "n292",
@@ -32799,7 +32817,7 @@
   {
    "id": "n317",
    "split": "held",
-   "reserve": true,
+   "reserve": false,
    "style": "title",
    "tier": "medium",
    "form": "word-dropped",
@@ -32824,7 +32842,9 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-medium-r01"
+   "packet": "title-medium-r01",
+   "replaces": "n335",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "n318",
@@ -33338,7 +33358,7 @@
   },
   {
    "id": "n335",
-   "split": "held",
+   "split": "unsealed",
    "reserve": false,
    "style": "title",
    "tier": "medium",
@@ -33364,7 +33384,8 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-medium-01"
+   "packet": "title-medium-01",
+   "unsealedFrom": "held"
   },
   {
    "id": "n336",
@@ -34599,7 +34620,7 @@
   },
   {
    "id": "n377",
-   "split": "held",
+   "split": "unsealed",
    "reserve": false,
    "style": "title",
    "tier": "hard",
@@ -34625,7 +34646,8 @@
     "punct": false,
     "classSize": 1
    },
-   "packet": "title-hard-01"
+   "packet": "title-hard-01",
+   "unsealedFrom": "held"
   },
   {
    "id": "n378",
