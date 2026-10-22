@@ -1885,7 +1885,7 @@ The good pleasure of Your will...`},{align:"center",text:"I give myself away..."
 
 
 
-From the farthest reaches of creation tothe deepest depths of the earth, below the foundations, from beyond time and space shall the sound of My voice come forth! IT SHALL RESOUND LOUDLY! I SHALL BE HEARD!
+From the farthest reaches of creation to the deepest depths of the earth, below the foundations, from beyond time and space shall the sound of My voice come forth! IT SHALL RESOUND LOUDLY! I SHALL BE HEARD!
 
 Even within the hearts of men shall My voice burst forth, rushing through their veins, causing each of their members to tingle, a great and wonderful shudder within their spirits to the purging of their souls!
 
