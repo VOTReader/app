@@ -198,3 +198,30 @@ describe('check-apk-assets — the search lexicon a loader names (search200 B7)'
     expect(r.stderr).toContain('search-lexicon.json');
   });
 });
+
+/* search200 fix1 "ed": every verse's KJV wording is fetched the same way, named by
+   VotSearchMini.setKjvTwinSource('search-kjv-twin.json'), a file at the assets root. */
+const LOADER_WITH_TWIN = LOADER_LITERAL + `
+VotSearchMini.setKjvTwinSource('search-kjv-twin.json');
+`;
+
+describe('check-apk-assets — the KJV wording file a loader names (search200 fix1)', { timeout: SPAWN_TIMEOUT_MS }, () => {
+  it('counts the file among the assets it checks', () => {
+    const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_WITH_TWIN, rootFiles: ['search-kjv-twin.json'] }));
+    expect(r.status, r.all).toBe(0);
+    expect(r.stdout).toMatch(/\[apk-assets\] OK — 2 runtime-injected/);
+  });
+
+  it('FAILS when the ignore list would leave the file out of the APK', () => {
+    const gradle = GRADLE_WITH_BLOCK.replace('"app.jsx"', '"app.jsx", "*.json"');
+    const r = runGate(mirror({ gradle, loader: LOADER_WITH_TWIN, rootFiles: ['search-kjv-twin.json'] }));
+    expect(r.status, r.all).toBe(1);
+    expect(r.stderr).toContain('search-kjv-twin.json');
+  });
+
+  it('FAILS when the file it names is not on disk', () => {
+    const r = runGate(mirror({ gradle: GRADLE_WITH_BLOCK, loader: LOADER_WITH_TWIN }));
+    expect(r.status, r.all).toBe(1);
+    expect(r.stderr).toContain('search-kjv-twin.json');
+  });
+});

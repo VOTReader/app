@@ -104,8 +104,18 @@ export async function engine() {
   // B7's substitution lexicon, credited inside the alignment: the one the app ships (search-lexicon.json) by default,
   // as the app runs; SEARCH_LEXICON=off none, or a comma list of lexicon files (a builder's --out) to measure
   if (E.setAlignLexicon) E.setAlignLexicon(await lexicons(process.env.SEARCH_LEXICON ?? 'shipped'));
+  // every verse's KJV wording read beside the NKJV (kjv-twin.js), the file the app ships, as the app runs;
+  // SEARCH_KJV=off none
+  if (E.setKjvTwin) E.setKjvTwin(await kjvTwin(process.env.SEARCH_KJV ?? 'shipped'));
   const meaning = await startMeaning();
   return { E, initMs: Date.now() - t0, meaning };
+}
+
+/** The KJV wording the app ships (search-kjv-twin.json), parsed; null for 'off'. */
+export async function kjvTwin(/** @type {string} */ spec) {
+  if (spec === 'off') return null;
+  const { parseKjvTwin } = await import(pathToFileURL(path.join(ASSETS, 'src/search/kjv-twin.js')).href);
+  return parseKjvTwin(JSON.parse(fs.readFileSync(path.join(ASSETS, 'search-kjv-twin.json'), 'utf8')));
 }
 
 /** B7's substitution lexicons, parsed: 'shipped' (the app's, search-lexicon.json), 'off' or '' none, else a comma

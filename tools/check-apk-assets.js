@@ -21,7 +21,8 @@
  * gate could not see before, which would have let a "dead weight" exclusion
  * of audio-sync.js break read-along on the APK with every gate green. A third,
  * since search200 B7: `setAlignLexiconSource('search-lexicon.json')`, the
- * search's substitution lexicon, fetched (not injected) beside the index.
+ * search's substitution lexicon, fetched (not injected) beside the index; and
+ * `setKjvTwinSource('search-kjv-twin.json')`, every verse's KJV wording, alike.
  *
  * Run: node tools/check-apk-assets.js
  * Exits non-zero (and explains) when a needed asset would be excluded.
@@ -70,6 +71,10 @@ function collectInjectedPaths() {
       // substitution lexicon (search200 B7), fetched beside the index; without it
       // a quote with a traded word is ranked as if the lexicon did not exist.
       for (const m of src.matchAll(/setAlignLexiconSource\(\s*['"]([^'"]+)['"]\s*\)/g)) found.add(m[1]);
+      // VotSearchMini.setKjvTwinSource('search-kjv-twin.json') — every verse's KJV
+      // wording (search200 fix1 "ed"), fetched the same way; without it a verse is
+      // searched in the reader's edition alone.
+      for (const m of src.matchAll(/setKjvTwinSource\(\s*['"]([^'"]+)['"]\s*\)/g)) found.add(m[1]);
     }
   };
   walk(ASSETS);

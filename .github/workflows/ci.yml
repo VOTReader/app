@@ -598,10 +598,10 @@ jobs:
       # open, held, fresh or any style x tier falls below tools/search-bench/tri/baseline.json.
       - name: Tri benchmark (exact, misremembered, titles)
         run: npm run bench:tri
-      # src/search/kjv-alias.js is generated from data/bible-kjv.js and the indexed texts:
-      # a corpus change that leaves it stale fails here (rebuild: node tools/build-kjv-alias.mjs).
-      - name: KJV alias is current
-        run: node tools/build-kjv-alias.mjs --check
+      # search-kjv-twin.json (every verse's KJV wording, for the search) is generated from data/bible-kjv.js:
+      # a change that leaves it stale fails here (rebuild: node tools/build-kjv-twin.mjs).
+      - name: KJV wording is current
+        run: node tools/build-kjv-twin.mjs --check
 
   build:
     name: build + syntax-check

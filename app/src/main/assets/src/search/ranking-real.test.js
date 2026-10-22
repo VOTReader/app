@@ -5,6 +5,7 @@
    which have no title, pulled the average title under one word. */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { VotSearchMini } from './engine.js';
+import { encodeKjvTwin, parseKjvTwin } from './kjv-twin.js';
 
 const STOP = new Set(['the', 'of', 'and', 'is', 'my', 'a', 'to', 'in', 'he', 'that', 'his', 'for', 'i', 'you', 'it', 'not', 'will', 'shall', 'like', 'no', 'man', 'but', 'me', 'by', 'am']);
 const VOT_DATA = {
@@ -25,7 +26,7 @@ const GLOBALS = {
   // Matthew twice, as the corpus has it: the Study Bible (The Volumes) and the plain chapter (Scriptures)
   MATTHEW: { chapters: [{ num: 7, title: 'Matthew 7', verses: [{ n: 1, text: '“' + JUDGE }] }] },
   BOOKS: {
-    // the NKJV says "begot"; the KJV, which a reader may remember, says "begat" (kjv-alias.js)
+    // the NKJV says "begot"; the KJV, which a reader may remember, says "begat" (KJV_TWIN below, kjv-twin.js)
     genesis: { id: 'genesis', title: 'Genesis', chapters: [{ num: 5, sections: [{ heading: '', verses: [{ n: 3, text: 'And Adam lived one hundred and thirty years, and begot a son in his own likeness, after his image, and named him Seth.' }] }] }] },
     'matthew-plain': { id: 'matthew-plain', title: 'Matthew', chapters: [
       // the KJV's "begat" and its "Emmanuel" (a word only Matthew holds) find these (sweep W29)
@@ -63,6 +64,24 @@ const GLOBALS = {
   ],
 };
 const refs = (r) => r.results.map((x) => x.doc.ref + (x.doc.kind === 'verse' ? '' : ' · ' + x.doc.title));
+/** The KJV's wording of the fixture's verses (every verse before them a stand-in), as kjv-twin.js reads it. */
+const kjvBible = (/** @type {Record<string, string>} */ at) => {
+  /** @type {Record<string, Record<number, Array<{n: number, text: string}>>>} */ const B = {};
+  for (const [key, text] of Object.entries(at)) {
+    const [book, c, v] = key.split(':');
+    const chs = B[book] || (B[book] = {});
+    for (let i = 1; i <= Number(c); i++) chs[i] = chs[i] || [{ n: 1, text: 'stand in' }];
+    const vs = chs[Number(c)];
+    while (vs.length < Number(v)) vs.push({ n: vs.length + 1, text: 'stand in' });
+    vs[Number(v) - 1] = { n: Number(v), text };
+  }
+  return B;
+};
+const KJV_TWIN = parseKjvTwin(encodeKjvTwin(kjvBible({
+  'genesis:5:3': 'And Adam lived an hundred and thirty years, and begat a son in his own likeness, after his image; and called his name Seth:',
+  'matthew-plain:1:2': 'Abraham begat Isaac; and Isaac begat Jacob; and Jacob begat Judas and his brethren;',
+  'matthew-plain:1:23': 'Behold, a virgin shall be with child, and shall bring forth a son, and they shall call his name Emmanuel, which being interpreted is, God with us.',
+}), 'fixture'));
 
 describe('ranking on the audit\u2019s cases', () => {
   let prev;
@@ -71,8 +90,10 @@ describe('ranking on the audit\u2019s cases', () => {
     window.VotSearchData = VOT_DATA;
     for (const k of Object.keys(GLOBALS)) globalThis[k] = GLOBALS[k];
     await VotSearchMini.init();
+    VotSearchMini.setKjvTwin(KJV_TWIN);
   });
   afterAll(() => {
+    VotSearchMini.setKjvTwin(null);
     window.VotSearchData = prev;
     for (const k of Object.keys(GLOBALS)) delete globalThis[k];
   });
@@ -162,11 +183,11 @@ describe('ranking on the audit\u2019s cases', () => {
 
   it('a KJV word no indexed text holds finds the verse the KJV holds it in, and is never "corrected"', async () => {
     const r = await VotSearchMini.search('begat');
-    expect(refs(r)[0]).toBe('Genesis 5:3');
+    expect(refs(r)).toContain('Genesis 5:3');
     expect(r.corrections || []).toEqual([]);
   });
 
-  // sweep W29 (2026-10-13): the alias names Matthew's verses 'matthew-plain', the index keys them 'matthew'
+  // sweep W29 (2026-10-13): the KJV names Matthew's verses 'matthew-plain'
   it('a KJV word finds its Matthew verses too, and a word only Matthew holds finds Matthew', async () => {
     expect(refs(await VotSearchMini.search('begat'))).toContain('Matthew 1:2');
     expect(refs(await VotSearchMini.search('emmanuel'))[0]).toBe('Matthew 1:23');
