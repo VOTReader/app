@@ -1,12 +1,16 @@
 // @ts-nocheck — node:vm corpus loading and partial fixture shapes, as AnswersHome.test.jsx
-/* answers-extras — Saved answers (O5) on the real corpus and its sidecars. */
+/* answers-extras — Saved answers (O5) and Share as a card (O6) on the real corpus and its sidecars. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { answersKeyParts, answersIsTopicKey, answersSaved, answersSavedSum, answersParaSource } from './answers-extras.js';
+import {
+  answersKeyParts, answersIsTopicKey, answersSaved, answersSavedSum, answersParaSource, answersCardFor, answersCardWords,
+  answersShownText, answersWrap, answersCardLayout, ANSWERS_CARD_THEMES, ANSWERS_CARD_MAX_WORDS, ANSWERS_CARD_SITE,
+} from './answers-extras.js';
 import { answersIndexOf, answersSearch } from './answers-search.js';
+import { answersDailyPool } from './answers-browse.js';
 import { answersSiteOrder } from './answers-site.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -14,6 +18,8 @@ const ctx = {};
 runInNewContext(readFileSync(resolve(DATA, 'answers.js'), 'utf8') + ';this.A=ANSWERS;', ctx);
 runInNewContext(readFileSync(resolve(DATA, 'answers-meta.js'), 'utf8') + ';this.M=ANSWERS_META;', ctx);
 const A = ctx.A;
+const META = ctx.M;
+const byId = (id) => A.find((e) => e.id === id);
 const NB = (s) => s.replace(/\u00a0/g, ' ');
 
 const mark = (gid, start, text, kind = 'highlight', extra = {}) => ({ id: gid + '-' + start, groupId: gid, kind, color: 'yellow', start, end: start + text.length, text, ...extra });
@@ -75,5 +81,62 @@ describe('Saved answers (O5)', () => {
     const item = idx.find((t) => t.entry === g.entry);
     expect(answersParaSource(item, g.first.index, null)).toEqual(g.first);
     expect(answersParaSource(item, g.first.index, null)).toEqual({ index: 2, src: 10, date: '3/29/06', sec: '' });
+  });
+});
+
+describe('Share as a card (O6)', () => {
+  const idx = answersIndexOf(A);
+  const itemOf = (e) => idx.find((t) => t.entry === e);
+
+  it('cites the source line that closes the passage, with its date; a page of prose cites its section and title', () => {
+    const e = byId('god-speaks-about-the-sabbath');
+    expect(answersCardFor(e, itemOf(e), 2, '  Remember the Sabbath day  ', META[e.id].sections))
+      .toEqual({ passage: 'Remember the Sabbath day', cite: '“You Shall Not Desecrate the Sabbath” · Volume 3', date: '3/29/06' });
+    const fd = byId('false-doctrines-within-the-churches-of-men-regarding');
+    const card = answersCardFor(fd, itemOf(fd), 10, 'x', META[fd.id].sections);
+    expect(card.cite).toBe('Capital Punishment · ' + fd.title);
+    expect(card.date).toBe('');
+  });
+
+  it('every Answer of the day fits a card (80 words at most), by the pool\'s own count', () => {
+    const pool = answersDailyPool(A, META);
+    expect(pool.length).toBeGreaterThan(300);
+    for (const p of pool) {
+      const e = byId(p.id);
+      const words = p.quote.map((i) => answersShownText(e.paragraphs[i].text)).join('\n');
+      expect(answersCardWords(words)).toBeLessThanOrEqual(ANSWERS_CARD_MAX_WORDS);
+    }
+  });
+
+  it('shows a paragraph as the page draws it: marks out, a cite as (X), its breaks kept', () => {
+    expect(answersShownText('**Thus says** _The Lord_ {{ref:John 3:16}}\nsecond line')).toBe('Thus says The Lord (John 3:16)\nsecond line');
+    expect(answersCardWords('one two\nthree')).toBe(3);
+    expect(answersCardWords(Array(81).fill('w').join(' '))).toBe(81);
+  });
+
+  it('wraps at word boundaries, keeps hard breaks, never splits a word', () => {
+    const m = (s) => s.length * 10;
+    expect(answersWrap('aa bb cc dd', 50, m)).toEqual(['aa bb', 'cc dd']);
+    expect(answersWrap('a\n\nb', 100, m)).toEqual(['a', '', 'b']);
+    expect(answersWrap('supercalifragilistic x', 50, m)).toEqual(['supercalifragilistic', 'x']);
+  });
+
+  it('lays the passage out large when short and smaller when long, always above the foot, the site last', () => {
+    const measurer = (font) => { const px = parseInt(font.replace('italic ', ''), 10); return (s) => s.length * px * 0.5; };
+    const short = answersCardLayout({ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '1/2/03' }, measurer, 'serif');
+    const long = answersCardLayout({ passage: Array(80).fill('righteousness').join(' '), cite: '“Title” · Volume 1', date: '' }, measurer, 'serif');
+    expect(short.size).toBe(60);
+    expect(long.size).toBeLessThan(60);
+    for (const L of [short, long]) {
+      expect(L.lines[L.lines.length - 1].y).toBeLessThan(L.rule);
+      expect(L.foot[L.foot.length - 1]).toMatchObject({ text: ANSWERS_CARD_SITE, gold: true });
+      expect(L.foot.every((f) => f.y > L.rule && f.y <= L.H - L.pad)).toBe(true);
+    }
+    expect(short.foot.map((f) => f.text)).toEqual(['“Title” · Volume 1', '1/2/03', ANSWERS_CARD_SITE]);
+    expect(long.foot.map((f) => f.text)).toEqual(['“Title” · Volume 1', ANSWERS_CARD_SITE]);
+  });
+
+  it('three themes: Parchment, Ink, Night', () => {
+    expect(ANSWERS_CARD_THEMES.map((t) => t.label)).toEqual(['Parchment', 'Ink', 'Night']);
   });
 });

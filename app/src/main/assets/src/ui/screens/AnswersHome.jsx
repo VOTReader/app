@@ -40,9 +40,10 @@ import { passageTextBefore } from '../../utils/answers-contents.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { MoreQuestionsSheet, CommandmentSheet, AboutSheet } from '../sheets/AnswersSheets.jsx';
-import { answersSavedSum } from '../../utils/answers-extras.js';
+import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
+import { answersSavedSum, answersCardFor, answersShownText } from '../../utils/answers-extras.js';
 
-/** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | null} AnswersSheetState */
+/** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | { kind: 'card', card: any } | null} AnswersSheetState */
 
 let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), dailyOpen: false, all: false };
 export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, dailyOpen: false, all: false }; }
@@ -128,7 +129,7 @@ function usePlaceholder(inputRef) {
  * The Answer of the day (f01 #9-13): one whole excerpt by the local date, the same for everyone on
  * that date: its dated header, every quote paragraph, its source; Read in context, Open to an answer.
  */
-function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter }) {
+function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter, onShare }) {
   const pool = React.useMemo(() => dailyPoolOf(entries, meta), [entries, meta]);
   const [open, setOpen] = React.useState(_landing.dailyOpen);
   React.useEffect(() => { _landing.dailyOpen = open; }, [open]);
@@ -146,6 +147,12 @@ function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter }) {
     const excerpt = passageTextBefore(P, pick.attr);
     onOpenLetter(excerpt ? { collection, letterTitle: title, excerpt } : { collection, letterTitle: title });
   };
+  // O6: today's excerpt as a card, its words as the page shows them, its source and date its own.
+  const share = () => {
+    const item = answersIndexOf(entries).find((t) => t.entry === e);
+    const words = pick.quote.map((i) => answersShownText(P[i].text)).join('\n');
+    onShare(answersCardFor(e, item, pick.quote[0], words, ((meta && meta[pick.id]) || {}).sections));
+  };
   const randomAnswer = () => {
     const all = answersOpenablePool(entries, meta);
     if (!all.length) return;
@@ -155,7 +162,10 @@ function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter }) {
   };
   return (
     <section className={'ans-daily' + (open ? ' is-open' : '')} aria-labelledby="ans-daily-h">
-      <div className="ans-daily-head"><h2 className="ans-h2" id="ans-daily-h">Answer of the day</h2></div>
+      <div className="ans-daily-head">
+        <h2 className="ans-h2" id="ans-daily-h">Answer of the day</h2>
+        {onShare ? <button type="button" className="ans-iconbtn" aria-label="Share as a card" aria-haspopup="dialog" onClick={share}><AnsIcon name="share" /></button> : null}
+      </div>
       {pick.head >= 0 ? <p className="ans-metarow"><Inline text={P[pick.head].text} /></p> : null}
       <blockquote className="ans-quote">
         {pick.quote.map((i, k) => (k ? <React.Fragment key={i}><br /><Inline text={P[i].text} /></React.Fragment> : <Inline key={i} text={P[i].text} />))}
@@ -544,7 +554,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
               {path ? (
                 <div className="ans-path"><AnsRow title={path.title} sub={path.sub} onClick={() => openTopic(path.id)} /></div>
               ) : null}
-              {loaded && meta ? <DailyAnswer entries={list} byId={byId} meta={meta} now={now} onOpenTopic={openTopic} onOpenLetter={onOpenLetter} /> : null}
+              {loaded && meta ? <DailyAnswer entries={list} byId={byId} meta={meta} now={now} onOpenTopic={openTopic} onOpenLetter={onOpenLetter} onShare={(card) => setSheet({ kind: 'card', card })} /> : null}
             </>
           )}
         </div>
@@ -565,6 +575,7 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
       {sheet && sheet.kind === 'more' && loaded ? <MoreQuestionsSheet byId={byId} meta={meta} onOpenTopic={openTopic} onClose={closeSheet} tall={ts2} /> : null}
       {cmdShelf ? <CommandmentSheet shelf={cmdShelf} meta={meta} isRead={isRead} onOpenTopic={openTopic} onGoToRef={onGoToRef} onClose={closeSheet} tall={ts2} /> : null}
       {sheet && sheet.kind === 'about' && site ? <AboutSheet site={site} onOpenTopic={openTopic} onClose={closeSheet} /> : null}
+      {sheet && sheet.kind === 'card' && loaded ? <AnswersCardSheet card={sheet.card} onClose={closeSheet} /> : null}
     </ScreenLayout>
   );
 }

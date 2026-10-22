@@ -1,7 +1,7 @@
 /* copy-share — the outcome words are the contract SelectionToolbar and
    NoteSheet act on (A15). Every path resolves; nothing rejects. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { copyText, shareText, copyFromSelection } from './copy-share.js';
+import { copyText, shareText, copyFromSelection, shareCanvasImage } from './copy-share.js';
 
 /** @type {PropertyDescriptor | undefined} */ let origClipboard;
 /** @type {PropertyDescriptor | undefined} */ let origShare;
@@ -176,5 +176,66 @@ describe('copyFromSelection (the Try again path)', () => {
     /** @type {any} */ (document).execCommand = vi.fn(() => { throw new Error('nope'); });
     setClipboard({ writeText: rejectWith('NotAllowedError') });
     await expect(copyFromSelection(null, 'Hope')).resolves.toBe('failed');
+  });
+});
+
+describe('shareCanvasImage (the Answers share card, AOGCG O6)', () => {
+  /** @type {any} */ let origCanShare;
+  beforeEach(() => { origCanShare = Object.getOwnPropertyDescriptor(navigator, 'canShare'); });
+  afterEach(() => {
+    if (origCanShare) Object.defineProperty(navigator, 'canShare', origCanShare);
+    else delete /** @type {any} */ (navigator).canShare;
+    delete /** @type {any} */ (window).PlatformBridge;
+    delete /** @type {any} */ (window).__onExportComplete;
+  });
+  const blob = new Blob(['png'], { type: 'image/png' });
+  const canvas = () => /** @type {any} */ ({
+    toDataURL: vi.fn(() => 'data:image/png;base64,QUJD'),
+    toBlob: vi.fn((/** @type {any} */ cb) => cb(blob)),
+  });
+  /** @param {boolean} ok */
+  const setCanShare = (ok) => Object.defineProperty(navigator, 'canShare', { value: vi.fn(() => ok), writable: true, configurable: true });
+
+  it('the Android app takes the PNG as base64 through the bridge, and nothing else is tried', async () => {
+    const shareImage = vi.fn(() => true);
+    /** @type {any} */ (window).PlatformBridge = { isAndroid: true, shareImage, saveToFile: vi.fn() };
+    const c = canvas();
+    expect(await shareCanvasImage(c, 'answer-card.png')).toBe('shared');
+    expect(shareImage).toHaveBeenCalledWith('QUJD');
+    expect(c.toBlob).not.toHaveBeenCalled();
+    shareImage.mockReturnValue(false);
+    expect(await shareCanvasImage(c, 'answer-card.png')).toBe('failed');
+  });
+
+  it('a browser that can share files gets the PNG as a file; closing the sheet is quiet', async () => {
+    const share = vi.fn(() => Promise.resolve());
+    setShare(share);
+    setCanShare(true);
+    expect(await shareCanvasImage(canvas(), 'answer-card.png')).toBe('shared');
+    const arg = /** @type {any} */ (share.mock.calls[0])[0];
+    expect(arg.files[0].name).toBe('answer-card.png');
+    expect(arg.files[0].type).toBe('image/png');
+    setShare(rejectWith('AbortError'));
+    expect(await shareCanvasImage(canvas(), 'answer-card.png')).toBe('cancelled');
+  });
+
+  it('with no file share, or a share that fails, the PNG is saved through the app\'s one download path', async () => {
+    const saveToFile = vi.fn(() => /** @type {any} */ (window).__onExportComplete('ok'));
+    /** @type {any} */ (window).PlatformBridge = { isAndroid: false, saveToFile };
+    setCanShare(false);
+    expect(await shareCanvasImage(canvas(), 'answer-card.png')).toBe('saved');
+    expect(saveToFile).toHaveBeenCalledWith('answer-card.png', blob);
+    setCanShare(true);
+    setShare(rejectWith('NotAllowedError'));
+    expect(await shareCanvasImage(canvas(), 'answer-card.png')).toBe('saved');
+    saveToFile.mockImplementation(() => /** @type {any} */ (window).__onExportComplete('error:quota'));
+    setCanShare(false);
+    expect(await shareCanvasImage(canvas(), 'answer-card.png')).toBe('failed');
+  });
+
+  it('a canvas that cannot give its PNG fails, never throws', async () => {
+    const c = canvas();
+    c.toBlob = vi.fn(() => { throw new Error('tainted'); });
+    expect(await shareCanvasImage(c, 'answer-card.png')).toBe('failed');
   });
 });

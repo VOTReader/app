@@ -106,6 +106,56 @@ export function shareText(text) {
   );
 }
 
+/** @typedef {'shared' | 'cancelled' | 'saved' | 'failed'} ImageShareOutcome */
+
+/**
+ * A card drawn on the device (AnswersCardSheet) to the phone's share sheet, and only there or to the
+ * reader's downloads: nothing is sent anywhere else. The Android app takes the PNG through the bridge
+ * (PlatformBridge.shareImage); a browser that can share files gets navigator.share with it; one that
+ * cannot, or whose share fails for any reason but the reader closing it, saves the PNG instead
+ * (PlatformBridge.saveToFile, the app's one download path). Never rejects.
+ * @param {HTMLCanvasElement} canvas
+ * @param {string} name the file's name
+ * @returns {Promise<ImageShareOutcome>}
+ */
+export function shareCanvasImage(canvas, name) {
+  const PB = typeof PlatformBridge !== 'undefined' ? PlatformBridge : null;
+  if (PB && PB.isAndroid === true) {
+    try {
+      const url = canvas.toDataURL('image/png');
+      const ok = typeof PB.shareImage === 'function' && PB.shareImage(url.slice(url.indexOf(',') + 1)) === true;
+      return Promise.resolve(ok ? 'shared' : 'failed');
+    } catch (_e) {
+      return Promise.resolve('failed');
+    }
+  }
+  /** @param {Blob} blob @returns {Promise<ImageShareOutcome>} */
+  const saveInstead = (blob) => new Promise((resolve) => {
+    if (!PB || typeof PB.saveToFile !== 'function') { resolve('failed'); return; }
+    const w = /** @type {any} */ (window);
+    w.__onExportComplete = (/** @type {string} */ r) => { w.__onExportComplete = null; resolve(r === 'ok' ? 'saved' : 'failed'); };
+    try { PB.saveToFile(name, blob); } catch (_e) { w.__onExportComplete = null; resolve('failed'); }
+  });
+  return new Promise((resolve) => {
+    try { canvas.toBlob((b) => resolve(b), 'image/png'); } catch (_e) { resolve(null); }
+  }).then((blob) => {
+    if (!blob) return /** @type {ImageShareOutcome} */ ('failed');
+    const nav = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator) : null;
+    let file = null;
+    try { file = new File([/** @type {Blob} */ (blob)], name, { type: 'image/png' }); } catch (_e) { file = null; }
+    let can = false;
+    try { can = !!(file && nav && typeof nav.share === 'function' && typeof nav.canShare === 'function' && nav.canShare({ files: [file] })); } catch (_e) { can = false; }
+    if (!can) return saveInstead(/** @type {Blob} */ (blob));
+    /** @type {Promise<void>} */
+    let pending;
+    try { pending = Promise.resolve(nav.share({ files: [file] })); } catch (e) { pending = Promise.reject(e); }
+    return pending.then(
+      () => /** @type {ImageShareOutcome} */ ('shared'),
+      (err) => (err && err.name === 'AbortError' ? /** @type {ImageShareOutcome} */ ('cancelled') : saveInstead(/** @type {Blob} */ (blob))),
+    );
+  });
+}
+
 /**
  * The "Try again" path. Call it synchronously from the tap handler with
  * `field`'s text selected: execCommand('copy') copies the live selection

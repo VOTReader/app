@@ -5,6 +5,9 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
+import { AnswersCardSheet } from './AnswersCardSheet.jsx';
+import { answersIsTopicKey, answersCardFor } from '../../utils/answers-extras.js';
+import { answersIndexOf } from '../../utils/answers-search.js';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
 import { passageCopy, passageLabel, translationTag, readingBlocksIn, quotedPassage } from '../../utils/passage-copy.js';
@@ -46,6 +49,15 @@ function blockAwareText(frag) {
     parts.push(n.textContent);
   }
   return parts.join('');
+}
+
+/** AOGCG O6: the Answers topic paragraph a selection starts in, or null off Answers.
+    @param {any} selInfo
+    @returns {{ id: string, index: number } | null} */
+function answersCardKey(selInfo) {
+  if (!selInfo || typeof ANSWERS === 'undefined') return null;
+  const key = selInfo.hlKey || (selInfo.multiSpans && selInfo.multiSpans[0] ? selInfo.multiSpans[0].key : '');
+  return answersIsTopicKey(ANSWERS, key);
 }
 
 /** The Scripture Web's door for a selection (the navigation stream, w3; the digest's A2): a Bible
@@ -305,6 +317,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // A15: the passage a Copy / Share could not deliver ({ text, verb }), kept
   // on screen by CopyFallbackSheet after the toolbar itself has closed.
   const [copyFallback, setCopyFallback] = React.useState(/** @type {{ text: string, verb: 'copy' | 'share' } | null} */ (null));
+  // AOGCG O6: the share card a passage of an Answers topic became, its sheet open once the toolbar has closed.
+  const [card, setCard] = React.useState(/** @type {import('../../utils/answers-extras.js').AnswersCard | null} */ (null));
   // cp2: holding Share (or right-clicking it, or its context-menu key) offers
   // the website link too; a tap sends the app's.
   const [choosingLink, setChoosingLink] = React.useState(false);
@@ -658,13 +672,15 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // glued ("captiveThat you may").
       const selShare = (() => {
         // cp4: quoted, as Copy's is, whenever it is named.
-        if (copied) return { text: copied.reference ? quotedPassage(copied.body) : copied.body, keys: copied.keys, reference: copied.reference, siteText: copied.link ? copied.text : '' };
+        // body: the words alone, unquoted and unnamed (a share card's passage, AOGCG O6).
+        if (copied) return { text: copied.reference ? quotedPassage(copied.body) : copied.body, body: copied.body, keys: copied.keys, reference: copied.reference, siteText: copied.link ? copied.text : '' };
         try {
           const frag = range.cloneContents();
           frag.querySelectorAll('.fn-ref, .hl-note-icon, .verse-num').forEach(function(el) { el.remove(); });
-          return { text: blockAwareText(frag).trim() || text, keys: [], reference: '', siteText: '' };
+          const words = blockAwareText(frag).trim() || text;
+          return { text: words, body: words, keys: [], reference: '', siteText: '' };
         } catch (_e) {
-          return { text, keys: [], reference: '', siteText: '' };
+          return { text, body: text, keys: [], reference: '', siteText: '' };
         }
       })();
       const selShareText = selShare.text;
@@ -1314,6 +1330,21 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     /** @type {any} */ (window).__openScriptureWeb(d.start);
   }, [selInfo]);
 
+  // AOGCG O6, Share as a card: offered on a passage of an Answers topic. Its citation and date are the
+  // passage's own (the source line that closes it, the header that dates it: answers-extras.js).
+  const cardKey = answersCardKey(selInfo);
+  const handleCard = React.useCallback(() => {
+    const k = answersCardKey(selInfo);
+    if (!k || !selInfo) return;
+    const entry = ANSWERS.find((/** @type {any} */ e) => e.id === k.id);
+    const item = answersIndexOf(ANSWERS).find((t) => t.entry === entry);
+    const meta = typeof ANSWERS_META !== 'undefined' && ANSWERS_META ? ANSWERS_META[k.id] : null;
+    const words = (selInfo.share && selInfo.share.body) || selInfo.text;
+    window.getSelection().removeAllRanges();
+    setVisible(false);
+    setCard(answersCardFor(entry, item, k.index, words, meta && meta.sections));
+  }, [selInfo]);
+
   const handleSearch = React.useCallback(() => {
     if (!selInfo) return;
     const text = selInfo.text;
@@ -1454,6 +1485,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     if (typeof onBookmarkRequest === 'function') onBookmarkRequest(storedKey);
   }, [selInfo, onBookmarkRequest]);
 
+  if (card) return <AnswersCardSheet card={card} onClose={() => setCard(null)} />;
   if (copyFallback) {
     return (
       <CopyFallbackSheet
@@ -1690,6 +1722,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
               <path d="M2 17.5h20M3 17.5a6 11 0 0 1 12 0M9 17.5a6 9 0 0 1 12 0" />
             </svg>
             <span>{webDoor.label}</span>
+          </button>
+        </div>
+      )}
+      {/* AOGCG O6: a passage of an Answers topic as a typographic card, in the same outlined full-width row. */}
+      {cardKey && (
+        <div className="sel-toolbar-row sel-toolbar-web">
+          <button type="button" className="sel-web-btn" data-door="card" aria-haspopup="dialog" onClick={handleCard}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M12 4v11M8 8l4-4 4 4M5 13v6h14v-6" />
+            </svg>
+            <span>Share as a card</span>
           </button>
         </div>
       )}

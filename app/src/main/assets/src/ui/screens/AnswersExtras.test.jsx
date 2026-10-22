@@ -1,7 +1,8 @@
 // @ts-nocheck — free-var globals installed on window, same shape as AnswersHome.test.jsx
-/* The AOGCG Extras on the real corpus: Saved answers (O5: the screen and the landing's Tools row). */
+/* The AOGCG Extras on the real corpus: Saved answers (O5: the screen and the landing's Tools row) and
+   Share as a card (O6: the Answer of the day's share button, the sheet, the 80-word rule). */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, act, within } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AnswersHome, resetAnswersLanding } from './AnswersHome.jsx';
 import { AnswersSaved } from './AnswersSaved.jsx';
+import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
 const ctx = {};
@@ -89,5 +91,50 @@ describe('Saved answers (O5)', () => {
     expect(row().previousElementSibling.querySelector('.ans-row-title').textContent).toBe('Charts & videos');
     fireEvent.click(row());
     expect(onOpenSaved).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('Share as a card (O6)', () => {
+  it('the Answer of the day\'s share button opens the card: Parchment · Ink · Night, the preview, Share', () => {
+    stores({});
+    render(<AnswersHome {...nav} entries={ANSWERS} site={SITE} isRead={() => false} onOpenTopic={noop} now={new Date(2026, 4, 17, 12)} />);
+    const daily = document.querySelector('.ans-daily');
+    fireEvent.click(within(daily.querySelector('.ans-daily-head')).getByLabelText('Share as a card'));
+    const sheet = screen.getByRole('dialog', { name: 'Share as a card' });
+    expect([...sheet.querySelectorAll('[role="tab"]')].map((t) => [t.textContent, t.getAttribute('aria-selected')]))
+      .toEqual([['Parchment', 'true'], ['Ink', 'false'], ['Night', 'false']]);
+    const card = sheet.querySelector('canvas');
+    expect([card.width, card.height]).toEqual([1080, 1350]);
+    // The preview names what it shows: the excerpt verbatim, its source, its date.
+    expect(card.getAttribute('aria-label')).toMatch(/^"For I am a Great King!.*God Eternal!" “The Alarm of War” · Volume \w+ 7\/5\/10$/);
+    fireEvent.keyDown(sheet.querySelector('[role="tab"]'), { key: 'ArrowLeft' });
+    expect(sheet.querySelector('[aria-selected="true"]').textContent).toBe('Night');
+    expect(within(sheet).getByText('Share').disabled).toBe(false);
+  });
+
+  it('a passage over 80 words is refused, never cut', () => {
+    const passage = Array(81).fill('word').join(' ');
+    render(<AnswersCardSheet card={{ passage, cite: '“Title” · Volume 1', date: '' }} onClose={noop} />);
+    expect(screen.getByText('Choose a shorter passage')).toBeTruthy();
+    expect(screen.getByText('A card holds 80 words at most; this passage has 81.')).toBeTruthy();
+    expect(document.querySelector('canvas')).toBeNull();
+    expect(screen.getByText('Share').disabled).toBe(true);
+  });
+
+  it('Share hands the drawn card to the phone and closes; a refusal says so and stays open', async () => {
+    const shareImage = vi.fn(() => true);
+    window.PlatformBridge = { isAndroid: true, shareImage };
+    window.showToast = vi.fn();
+    const toDataURL = vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue('data:image/png;base64,iVBORw0KGgo=');
+    const onClose = vi.fn();
+    render(<AnswersCardSheet card={{ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '1/2/03' }} onClose={onClose} />);
+    await act(async () => { fireEvent.click(screen.getByText('Share')); });
+    expect(shareImage).toHaveBeenCalledWith('iVBORw0KGgo=');
+    expect(onClose).toHaveBeenCalledTimes(1);
+    shareImage.mockReturnValue(false);
+    await act(async () => { fireEvent.click(screen.getByText('Share')); });
+    expect(window.showToast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Couldn’t share the card.' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    toDataURL.mockRestore();
   });
 });
