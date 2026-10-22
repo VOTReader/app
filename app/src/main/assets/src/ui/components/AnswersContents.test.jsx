@@ -56,6 +56,17 @@ describe('AnswersContents — "On this page" (f10)', () => {
     expect(document.querySelectorAll('.ans-toc-ex').length).toBe(7);
   });
 
+  it('"Show N more" opens the current row only: a new current row starts at three again', () => {
+    const many = rows.map((r) => (r.ex.length > 4 ? r : { ...r, ex: rows[0].ex }));
+    const pane = (cur) => <TocRows rows={many} cur={cur} withEx={true} onSection={() => {}} onExcerpt={() => {}} />;
+    const r = render(pane(0));
+    fireEvent.click(document.querySelector('.ans-toc-more'));
+    expect(document.querySelectorAll('.ans-toc-ex').length).toBe(7);
+    r.rerender(pane(1));
+    expect(document.querySelectorAll('.ans-toc-ex').length).toBe(3);
+    expect(document.querySelector('.ans-toc-more')).toBeTruthy();
+  });
+
   it('a row says where it goes; a tap names the section (the page jumps), Android Back closes the sheet', () => {
     const onSection = vi.fn(); const onClose = vi.fn(); const onExcerpt = vi.fn();
     sheet({ onSection, onClose, onExcerpt });

@@ -39,7 +39,9 @@ export function FoldRow({ on, onChange }) {
  *   onSection: (k: number) => void, onExcerpt: (at: number) => void }} props
  */
 export function TocRows({ rows, cur, withEx, onSection, onExcerpt }) {
-  const [more, setMore] = React.useState(false);
+  // "Show N more" opens the current row's list only: a new current row starts at three again
+  const [moreAt, setMoreAt] = React.useState(-1);
+  const more = moreAt === cur;
   return rows.map((r, k) => {
     const current = k === cur;
     const l2 = r.level === 2 ? ' is-l2' : '';
@@ -61,7 +63,7 @@ export function TocRows({ rows, cur, withEx, onSection, onExcerpt }) {
           </a>
         ))}
         {ex.length > 4 && !more ? (
-          <button type="button" className={'ans-textbtn ans-toc-more' + l2} aria-expanded="false" onClick={() => setMore(true)}>{'Show ' + (ex.length - 3) + ' more'}<Chev dir="down" /></button>
+          <button type="button" className={'ans-textbtn ans-toc-more' + l2} aria-expanded="false" onClick={() => setMoreAt(cur)}>{'Show ' + (ex.length - 3) + ' more'}<Chev dir="down" /></button>
         ) : null}
       </React.Fragment>
     );
