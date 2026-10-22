@@ -1269,6 +1269,10 @@ const ALIGN_MASS = 0.5;
 const ALIGN_CANDIDATES = 300;
 /** How much of the quote (align.js cov) a text holds, slips allowed for, to lead every text holding less (tier B). */
 const ALIGN_HELD = 0.75;
+/** How much of the quote a text holds to be held with no text holding ALIGN_HELD, when it holds it far better than the rest (search() below). */
+const ALIGN_CLEAR = 0.6;
+/** Texts at most holding a clear best alike (a text and its copy) for it to be held so. */
+const CLEAR_COPIES = 2;
 /** Two covs this near, and a small word's share of the quote (search() below), hold the quote alike: the words' order stands. */
 const ALIGN_TIE = 0.02;
 /** Typed words, one of them a content word, that read as a quote when held in a row. */
@@ -1772,9 +1776,9 @@ function typedAlts(/** @type {Array<{term:string, origin:number, literal?:boolea
  * @param {(doc:any) => boolean} named  the query names this text's title so: it keeps its place
  * @param {(id:string, doc:any) => number} near  how nearly a text holds the typed words in a row (0..1)
  * @param {string[]} [typed]  every typed word, the small ones too: a quote's excerpt is cut by them
- * @param {{has: (id:string) => boolean, cov: (id:string) => number}|null} [aligned]  B4's texts holding the quote with
- *   its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an original
- *   holding ALIGN_HELD of the quote as well
+ * @param {{has: (id:string) => boolean, cov: (id:string) => number, bar: number}|null} [aligned]  B4's texts holding the
+ *   quote with its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an
+ *   original holding the quote as well as the held do (bar: ALIGN_HELD, or a clear best's cov)
  * @param {Map<string, string[]>|null} [alts]  each typed word's synonyms, forms and title near-synonyms (typedAlts, encoded)
  */
 function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null, alts = null) {
@@ -1846,9 +1850,13 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
        letter or verse a sentence's key, its shingles, a cite or the model's passage names may hold another of its lines
        (a study's sentence beside the quote, or the verse a study quotes in another translation's words). */
     const holds = aligned && aligned.has(idOf.get(e) || '') ? aligned : null;
+    // ...a study held as a clear best (under ALIGN_HELD) gives way to the verse it quotes, its original, as keep() has it
+    // below: the study prints the verse's reference beside the quote ("John 3:16 For God so loved the world"), and the
+    // reference's numbers typed with the quote held the study clear of the verse (search200 sealed2, hunt rt1-shapes-27)
+    const quotes = holds && holds.bar < ALIGN_HELD && e.doc.kind === 'bible-study';
     const fit = (/** @type {string[]|null} */ f) => {
       if (!f || !holds) return f;
-      const k = f.filter((x) => holds.cov(x) >= ALIGN_HELD);
+      const k = f.filter((x) => holds.cov(x) >= holds.bar || (quotes && D.get(x).kind === 'verse'));
       return k.length ? k : null;
     };
     const keep = (/** @type {string[]|null} */ f) => {
@@ -1934,7 +1942,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
         if (t === undefined || t >= tier || (titled && t < ORIGINAL_TIER['holy-day']) || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
         if (share > 0 && eachWording(docLemmas(fid, f.doc.text), (t) => bestWindow(pq.query, t, pq.span)) >= share - REPRINT_COST && asWell(fid, f.doc, own) &&
-          (!holds || holds.cov(fid) >= ALIGN_HELD) && (!titled || holdsTopic(id, e.doc, fid, f.doc, words))) {
+          (!holds || holds.cov(fid) >= holds.bar) && (!titled || holdsTopic(id, e.doc, fid, f.doc, words))) {
           out.splice(r, 1);
           out.splice(i, 0, f);
           i++;
@@ -1978,7 +1986,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       const vid = idOf.get(v) || '';
       const vNear = near(vid, v.doc);
       if (vNear < oNear) continue;
-      if (holds ? holds.has(vid) && holds.cov(vid) >= Math.max(ALIGN_HELD, oCov) : vNear >= NEAR_PHRASE_MIN && asWell(vid, v.doc, whole)) verses.push(v);
+      if (holds ? holds.has(vid) && holds.cov(vid) >= Math.max(holds.bar, oCov) : vNear >= NEAR_PHRASE_MIN && asWell(vid, v.doc, whole)) verses.push(v);
     }
     for (const v of verses) out.splice(out.indexOf(v), 1);
     out.splice(i, 0, ...verses);
@@ -2984,6 +2992,8 @@ async function search(query, options) {
   const alignHeld = new Map();
   /** @type {((id: string) => number)|null} how much of the quote a text holds (align.js cov), for originalsFirst */
   let alignCovOf = null;
+  /** How much of the quote the texts held hold at least: ALIGN_HELD, or a clear best's (below), for originalsFirst */
+  let alignBar = ALIGN_HELD;
   const AS = ALIGN_ON && !p.phrase && !keyword && typedTokens.length >= ALIGN_MIN && !heldWhole.length ? storeNow() : null;
   if (AS) {
     const n = msIndex.documentCount || 1;
@@ -3075,6 +3085,8 @@ async function search(query, options) {
     let under = 0;
     /** @type {[ArrayLike<any>, number, number]|null} that candidate's tokens and span, for the typed words it holds */
     let underAt = null;
+    /** @type {Array<{id: string, cov: number, first: number, at: [ArrayLike<any>, number, number], added: boolean}>} the candidates under ALIGN_HELD */
+    const below = [];
     /* A TEXT HOLDING MORE OF THE TYPED WORDS IS NO TIE (search200 R4, 2026-10-18). Two covs within `tie` hold the quote
        alike only when neither text holds a typed word the other lacks (align.js alignMet): x over y when x holds every
        content word y holds and more, or the same content words and every small word y holds and more. */
@@ -3154,7 +3166,36 @@ async function search(query, options) {
       }
       // it opens where the first typed words are (clauses typed in the other order: on the first typed)
       if (a.cov >= ALIGN_HELD) alignHeld.set(id, { cov: a.cov, start: a.first, rank: 0, met: alignMet(at[0], at[1], at[2], w, cls) });
-      else if (a.cov > under && !nearAdded.has(id)) { under = a.cov; underAt = at; }
+      else {
+        if (a.cov > under && !nearAdded.has(id)) { under = a.cov; underAt = at; }
+        below.push({ id, cov: a.cov, first: a.first, at, added: nearAdded.has(id) });
+      }
+    }
+    /* A CLEAR BEST UNDER ALIGN_HELD (search200 sealed2, 2026-10-22; the fault hunt's slip C4 (b)). A text holding the
+       quote far better than every other text, short of ALIGN_HELD, got nothing: a study's line remembered with two of
+       its words traded ("offered as a symbol" for "sacrificed as a representation") held 0.748 of it, the next text
+       0.357, and verses holding its common words led (tri m274; the hunt's sli-18 0.66 against 0.49, sli-21 0.72
+       against 0.47). With no text holding ALIGN_HELD, the best holding ALIGN_CLEAR is held, with the texts holding it
+       alike (within a small word: its copy, its pair), when every other text holds it twice that less: a field of
+       texts holding it about as well (the Nehemiah 8:10 shape, fortress verses for "your fortress") holds nothing so,
+       nor does a passage many texts print alike (more than CLEAR_COPIES: "who willingly gave up His life... carried
+       the weight of the world's sin to the cross", in six texts, held 0.697 of "a servant who gives up his life every
+       day carrying his cross", a paraphrase of a Blessed line, and led it on the 500's open t359). The best other text
+       is then the one the held are told from (`under`). */
+    if (!alignHeld.size && below.length) {
+      let top = 0;
+      for (const b of below) if (b.cov > top) top = b.cov;
+      if (top >= ALIGN_CLEAR) {
+        const alike = below.filter((b) => top - b.cov <= tie);
+        let next = null;
+        for (const b of below) if (!b.added && top - b.cov > tie && (!next || b.cov > next.cov)) next = b;
+        if (alike.length <= CLEAR_COPIES && top - (next ? next.cov : 0) > 2 * tie) {
+          for (const b of alike) alignHeld.set(b.id, { cov: b.cov, start: b.first, rank: 0, met: alignMet(b.at[0], b.at[1], b.at[2], w, cls) });
+          alignBar = Math.min(...alike.map((b) => b.cov));
+          under = next ? next.cov : 0;
+          underAt = next ? next.at : null;
+        }
+      }
     }
     const underMet = underAt ? alignMet(underAt[0], underAt[1], underAt[2], w, cls) : null;
     /* Held, and told from the rest: a text holding the quote within a small word of one just under ALIGN_HELD holds it
@@ -3618,7 +3659,7 @@ async function search(query, options) {
   };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
     admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens,
-    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf } : null, typedAlts(units, filtered));
+    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf, bar: alignBar } : null, typedAlts(units, filtered));
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {
