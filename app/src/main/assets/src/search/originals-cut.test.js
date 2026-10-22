@@ -35,6 +35,9 @@ const EARS = ['Blessed are the ears that hear the counsel of the Lord in the eve
 // a letter's sentence, the end of it in another letter, and an Answers topic reprinting it whole
 const CUP = 'For these did not seek out My Salvation which came down in the flesh, they wanted no part with Him who was sent; they refused to accept Me as I truly am.';
 const SWORD = 'A great emptiness with the way ahead unsure, for those who have not known Me, for they have refused to accept Me as I truly am.';
+// a letter's two sentences, the typed words across their end, and an Answers topic holding them in one sentence
+const HARLOT = 'Woe to you, for you have gone after the harlot! She has deceived you with the wine of her cup, and you drank deeply.';
+const CALLED = 'Come out of her, My people, and hear. The harlot has deceived you! Her cup is full of abominations and the wine of her fornication.';
 const GLOBALS = {
   BOOKS: {
     proverbs: { id: 'proverbs', title: 'Proverbs', chapters: [
@@ -46,6 +49,7 @@ const GLOBALS = {
     { id: 'prophet-letter', num: 2, title: 'Gnashing Children', blocks: [para(filler(12) + PROPHET.join(' ') + ' ' + filler(12))] },
     { id: 'ears-letter', num: 38, title: 'Open the Ear', blocks: [para(filler(12) + EARS.join(' ') + ' ' + filler(12))] },
     { id: 'cup-letter', num: 26, title: 'The Cup Is Full', blocks: [para(filler(12) + CUP + ' ' + filler(12))] },
+    { id: 'harlot-letter', num: 70, title: 'Come Out', blocks: [para(filler(12) + HARLOT + ' ' + filler(12))] },
     { id: 'sword-letter', num: 52, title: 'The Sword', blocks: [para(SWORD + ' Refuse Me not, for I truly am He who comes.')] },
     ...[1, 2, 3].map((n) => ({ id: 'accept-letter-' + n, num: 60 + n, title: 'Accept Me ' + n, blocks: [para(filler(3) + 'Come and accept Me as I truly am, beloved. ' + filler(3))] })),
   ],
@@ -61,6 +65,7 @@ const GLOBALS = {
     ] },
   ],
   ANSWERS: [
+    { id: 'calling-out', num: 2, title: 'I Am Calling You Out', paragraphs: [{ text: [filler(30), CALLED, filler(30)].join(' ✦ ') }] },
     { id: 'second-death', num: 1, title: 'Regarding the Second Death', paragraphs: [{ text: [filler(30), 'Behold the end of the wicked. ' + CUP + cite('The Cup Is Full'), filler(30)].join(' ✦ ') }] },
   ],
 };
@@ -92,5 +97,10 @@ describe('the original of a line its reprint cut (sealed2)', () => {
   it('a letter first: the reprint holding its whole sentence comes up second, not a letter holding the sentence\'s end', async () => {
     const top = ids(await E.search('they refused to accept me as i truly am'));
     expect(top.slice(0, 2)).toEqual(['cup-letter', 'second-death']);
+  });
+
+  it('typed words a letter holds only across a sentence\'s end are not its line: the topic holding them in one sentence leads', async () => {
+    const top = ids(await E.search('the harlot has deceived you'));
+    expect(top[0]).toBe('calling-out');
   });
 });

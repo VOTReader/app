@@ -143,6 +143,8 @@ function runWithin(/** @type {string[]} */ toks, /** @type {string[]} */ run, /*
 }
 /** Words a reprint may have cut from its original's line that the original still holds the typed run with (asWell). */
 const RUN_CUT = 2;
+/** A sentence's end, where the words a reprint cut (RUN_CUT) never reach across. */
+const SENTENCE_END = /[.!?]+/;
 /** True when `run` occurs in `toks` as consecutive tokens (an empty run always does). */
 const hasTokenRun = (/** @type {string[]} */ toks, /** @type {string[]} */ run) => tokenRunAt(toks, run) >= 0;
 
@@ -1828,14 +1830,22 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
      with a small word or two cut ("I have written it on tablets of stone", where the letter says "For I have indeed
      written it, even on tablets of stone"): the reader typing the entry's words held its run whole, the letter did not,
      and the entry led its original. An original holding every typed word in order, so, within RUN_CUT words more than
-     were typed, holds it as well. */
+     were typed, holds it as well...
+     ...WITHIN ONE SENTENCE (sealed2 red team, rt3-08). The words a reprint cut sit inside its line: "the harlot has
+     deceived you" was read held by a letter's "the harlot! She has deceived you", two sentences, and the letter led
+     the Answers topic holding the line whole. The words between are counted within a sentence of the original (its
+     KJV wording read whole, as it has no sentence marks). */
   const typedLemmas = typed.map(lemma);
   /** Does text `x` hold the typed words as nearly as a reprint holding `own` of them in a row (near, 0..1)? */
   const asWell = (/** @type {string} */ x, /** @type {any} */ d, /** @type {number} */ own) => {
     if (near(x, d) >= own - 0.1) return true;
     if (!(own >= 1 && typedLemmas.length >= RUN_MIN && !!d && !!d.text)) return false;
-    const t = joinApostropheS(withKjv(msIndex, msIndex._idToShortId.get(x), kjvEncode(d.text))).map(lemma);
-    return tokenRunAt(t, typedLemmas) >= 0 || runWithin(t, typedLemmas, typedLemmas.length + RUN_CUT);
+    const mine = kjvEncode(d.text);
+    const both = withKjv(msIndex, msIndex._idToShortId.get(x), mine);
+    if (tokenRunAt(joinApostropheS(both).map(lemma), typedLemmas) >= 0) return true;
+    const w = typedLemmas.length + RUN_CUT;
+    const within = (/** @type {string[]} */ toks) => runWithin(joinApostropheS(toks).map(lemma), typedLemmas, w);
+    return d.text.split(SENTENCE_END).some((s) => within(kjvEncode(s))) || (both !== mine && within(both.slice(mine.length)));
   };
   for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
     const e = out[i];
