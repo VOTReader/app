@@ -9075,6 +9075,7 @@ u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underl
    (a phone held sideways: the sheet scrolls), so the card the reader shares is always the card they see */
 .ans-card{max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));margin:16px auto 0;border:1px solid var(--border)} /* the rest with .ans-fig img */
 .ans-btn{width:100%;min-height:48px;margin-top:16px;border:1px solid var(--gold-border);border-radius:12px;background:var(--gold-faint)}
+body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over --bg3 read 4.22:1; --gold-bright reads 4.94:1 (AA) */
 .ans-btn:disabled{opacity:.45;cursor:default}
 .ans-sheet-head{position:sticky;top:-8px;z-index:1;padding-bottom:8px;background:var(--bg3);border-bottom:1px solid var(--border)}
 .ans-toc-sec{position:relative;min-height:52px}
