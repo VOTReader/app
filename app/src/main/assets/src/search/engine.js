@@ -1624,18 +1624,27 @@ function citedOriginal(id, text, words) {
    cut from one letter and joined by "...", re-broken and re-capitalized, so no sentence of it is
    the letter's word for word and the matched place alone carries too few of the letter's runs
    (10 open misses: the entry first, its letter below). The whole entry's runs vote once for its
-   letter. */
-/** @type {Map<string, string|null>} entry id -> the letter it condenses */
+   letter.
+   AN ENTRY CUT FROM TWO LETTERS (search200 sealed2, 2026-10-22). Some entries join lines of two letters about evenly
+   (Words To Live By Part Two's "A Prophet": 18 of its runs are a Rebuke letter's, 10 a Little Flock letter's). The
+   letter had to lead the vote by twice the next one's, so that entry had no letter, and it led its original for a
+   line typed whole. A letter giving it CONDENSED_RUNS runs and more than half the leading letter's is one it is cut
+   from (the leader alone when it has twice the next one's, as before), most runs first; the first of them holding
+   the query as well as the entry does (originalsFirst) is its original there. */
+/** Runs an entry shares with a letter for that letter to be one it is cut from. */
+const CONDENSED_RUNS = 3;
+/** @type {Map<string, string[]>} entry id -> the letters it is cut from, most runs first (none: []) */
 const SOURCE_CACHE = new Map();
 function condensedFrom(/** @type {string} */ id, /** @type {string} */ text, /** @type {number} */ tier) {
-  if (SOURCE_CACHE.has(id)) return SOURCE_CACHE.get(id) || null;
+  const known = SOURCE_CACHE.get(id);
+  if (known) return known;
   const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
   /** @type {Map<string, number>} */ const votes = new Map();
   eachShingle(kjvEncode(text), (h) => {
     for (const x of /** @type {Map<number, string[]>} */ (SHINGLES).get(h) || []) if (x !== id && ORIGINAL_TIER[D.get(x).kind] < tier) votes.set(x, (votes.get(x) || 0) + 1);
   });
   const ranked = [...votes].sort((a, b) => b[1] - a[1]);
-  const src = ranked.length && ranked[0][1] >= 3 && (ranked.length < 2 || ranked[0][1] >= 2 * ranked[1][1]) ? ranked[0][0] : null;
+  const src = ranked.filter((r) => r[1] >= CONDENSED_RUNS && 2 * r[1] > ranked[0][1]).map((r) => r[0]);
   SOURCE_CACHE.set(id, src);
   return src;
 }
@@ -1873,14 +1882,16 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
     }
     if (!found && (e.doc.kind === 'wtlb' || e.doc.kind === 'blessed')) {
       const id = idOf.get(e) || '';
-      const src = condensedFrom(id, e.doc.text, tier);
+      const srcs = condensedFrom(id, e.doc.text, tier);
       const pq = passageQuery(words);
-      const share = src ? eachWording(docLemmas(id, e.doc.text), (t) => bestWindow(pq.query, t, pq.span)) : 0;
-      const own = src ? near(id, e.doc) : 0;
+      const share = srcs.length ? eachWording(docLemmas(id, e.doc.text), (t) => bestWindow(pq.query, t, pq.span)) : 0;
+      const own = srcs.length ? near(id, e.doc) : 0;
       // The entry is cut from its letter: whatever of the query it holds, a letter holding as much comes first
       // (sr11, 2026-10-15: a bar of half the query kept "history has an end and christ is coming" on the entry at
       // 0.46 with its letter holding the same 0.46; Corbin, DECISIONS 10-14: the original first, the reprint second).
-      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || asWell(src, D.get(src), own))) found = fit([src]);
+      // Cut from two letters: the first of them holding it so (sealed2).
+      const src = share > 0 ? srcs.find((x) => holdsAsWell(x, pq, share) && (own < NEAR_PHRASE_MIN || asWell(x, D.get(x), own))) : undefined;
+      if (src) found = fit([src]);
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
