@@ -1,7 +1,10 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    WtlbEntryView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
 import { inertAttr } from '../../utils/inert-attr.js';
 import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
 import { splitFormatBInline } from '../../utils/format-b-inline.js';
@@ -13,8 +16,8 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { wtlbHlKey, wtlbHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { answersFiledUnder } from '../../utils/answers-shelves.js';
-import { AnswersContentsLine } from '../components/AnswersContents.jsx';
+import { AnswersTopic, answersHeadCover } from '../components/AnswersTopic.jsx';
+import { AnsIcon, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { answersAnchorPara, answersMetaFor } from '../../utils/answers-sections.js';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
@@ -29,8 +32,33 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, navBack = null, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, navBack = null, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null }) {
+  // An Answers topic (AOGCG f07-f11) draws its own page (AnswersTopic.jsx) from its sidecar, plain
+  // until ANSWERS_META lands: the body waits up to 300 ms for it, then paints plain and is decorated
+  // in place when it arrives.
+  const isAns = volKey === 'answers';
+  const ansMetaAll = useAnswersMeta(isAns);
+  const ansMeta = ansMetaAll ? ansMetaAll[entry.id] || null : null;
+  const [ansWaited, setAnsWaited] = React.useState(false);
+  React.useEffect(() => {
+    setAnsWaited(false);
+    if (!isAns || ansMetaAll) return undefined;
+    const t = setTimeout(() => setAnsWaited(true), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per entry; the sidecar's arrival ends the wait
+  }, [entry.id, isAns]);
+  const ansReady = !isAns || inert || !!ansMetaAll || ansWaited;
+  const ansDecorated = !!ansMetaAll;
+  // the body's keyed paragraphs mount late (and again decorated): the annotation pass re-runs over them
+  React.useEffect(() => {
+    if (!isAns || inert || !ansReady) return;
+    const w = /** @type {any} */ (window);
+    w.__hlDomV = (w.__hlDomV || 0) + 1;
+    window.dispatchEvent(new Event('vot-hl-dom'));
+  }, [isAns, inert, ansReady, ansDecorated, entry.id]);
   const [scriptureRef, setScriptureRef] = React.useState(null);
+  // The site's own translation for the open cite (refMeta, O2): it opens the HCSB there.
+  const [scriptureNote, setScriptureNote] = React.useState(/** @type {any} */ (null));
   // "Go to Scripture" on the inline ref sheet — close the sheet, then route
   // the resolved {type:'bible'} endpoint through navigateToLink (verse flash
   // highlight + "Back to …" pill + Android back via the from-letter stack).
@@ -57,23 +85,38 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   /* search200 UX B10 (1): an entry landed on mid-way names itself in a band pinned under
      the top bar once this hero has scrolled away (MiniTitleBand), in the hero's words. */
   const heroRef = React.useRef(null);
-  const miniTitle = inert ? null : (
+  // (An Answers topic names itself in its running head instead.)
+  const miniTitle = inert || isAns ? null : (
     <MiniTitleBand heroRef={heroRef} pageKey={entry.id} title={entry.title}
-      eyebrow={(volKey === 'answers' ? ['Answers', answersFiledUnder(entry)] : [partLabel, entry.num]).filter((x) => x != null && x !== '').join(' · ')} />
+      eyebrow={[partLabel, entry.num].filter((x) => x != null && x !== '').join(' · ')} />
   );
   const jumpTimerRef = React.useRef(/** @type {any} */ (null));
   React.useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
-  const jumpToPara = React.useCallback((/** @type {number} */ index) => {
-    const el = wtlbMainRef.current && /** @type {HTMLElement|null} */ (wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, index)}"]`));
+  // opts.el: the element to bring up (an Answers heading); opts.pulse false: no glow (a section jump).
+  const jumpToPara = React.useCallback((/** @type {number} */ index, /** @type {{ pulse?: boolean, el?: HTMLElement | null }} */ o = {}) => {
+    let el = o.el || (wtlbMainRef.current && /** @type {HTMLElement|null} */ (wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, index)}"]`)));
     if (!el) return;
-    // past the "Back to" row and the mini title band under it (search200 UX B10)
-    el.style.scrollMarginTop = (stickyCover(el) + 16) + 'px';
-    el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    if (isAns) {
+      // a heading the site made up ("Section One") sits just before the paragraph it heads
+      const prev = /** @type {HTMLElement | null} */ (el.previousElementSibling);
+      if (!o.el && prev && prev.matches('h2.ans-sh:not([data-hl-key])')) el = prev;
+      // under the running head; a long way is instant, so a jump always lands within 600 ms (U4)
+      el.style.scrollMarginTop = (answersHeadCover() + 8) + 'px';
+      const sc = el.closest('.screen-scroll');
+      const far = !!sc && Math.abs(el.getBoundingClientRect().top - sc.getBoundingClientRect().top) > 2 * sc.clientHeight;
+      el.scrollIntoView({ behavior: far ? 'auto' : scrollBehavior(), block: 'start' });
+      if (el.tabIndex === -1) { try { el.focus({ preventScroll: true }); } catch (_e) { /* best-effort */ } }
+      if (o.pulse === false) return;
+    } else {
+      // past the "Back to" row and the mini title band under it (search200 UX B10)
+      el.style.scrollMarginTop = (stickyCover(el) + 16) + 'px';
+      el.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    }
     setLandedPara(index);
     setLandedOff(null);
     clearTimeout(jumpTimerRef.current);
     jumpTimerRef.current = setTimeout(() => setLandedPara(-1), 4000);
-  }, [entry.id]);
+  }, [entry.id, isAns]);
   // v01-03: a landing belongs to its entry. The instance is reused (no key) for the
   // next entry, and the landing effect below returns early for an anchor made for
   // another entry - before anything reset these - so the next entry's paragraph at
@@ -86,15 +129,16 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
   // the topic's own headings until then). The heading comes to the top the way the Contents sheet's
   // jump brings it (jumpToPara: the same one-shot, reader-initiated write). No heading: the top.
   React.useEffect(() => {
-    if (!surpriseAnchor || surpriseAnchor.type !== 'section' || surpriseAnchor.letterId !== entry.id) return;
+    if (!ansReady || !surpriseAnchor || surpriseAnchor.type !== 'section' || surpriseAnchor.letterId !== entry.id) return;
     const at = answersAnchorPara(entry, surpriseAnchor.anchor, answersMetaFor(entry.id));
     if (at < 0) return;
     const timer = setTimeout(() => jumpToPara(at), 150);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id identifies the entry (same contract as the excerpt landing below)
-  }, [surpriseAnchor, entry.id]);
+  }, [surpriseAnchor, entry.id, ansReady]);
   React.useEffect(() => {
-    if (!surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
+    // (an Answers topic's body paints once its sidecar is in, or 300 ms on: land then)
+    if (!ansReady || !surpriseAnchor || surpriseAnchor.type !== 'excerpt') return;
     if (surpriseAnchor.letterId && surpriseAnchor.letterId !== entry.id) return;   // made for another entry: not ours
     // A title named (search200 B5, the S22 look): the landing is the entry's top, where its title is. No
     // paragraph is landed on, pulsed or sought, though the excerpt (the text's first words) would find one.
@@ -121,7 +165,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     const fadeTimer = setTimeout(() => { setLandedPara(-1); setLandedOff(null); }, 4000);
     return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id identifies the entry (same contract as the refAnalysis memo above)
-  }, [surpriseAnchor, entry.id]);
+  }, [surpriseAnchor, entry.id, ansReady]);
   React.useEffect(() => {
     const pending = window.navHandoff.peek('pendingHighlight');
     if (!pending || pending.letterId !== entry.id || !pending.excerpt) return;
@@ -197,8 +241,9 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     active: scriptureRef != null,
   });
 
-  const openSheetForRef = (ref) => {
+  const openSheetForRef = (ref, note = null) => {
     setScriptureRef(ref);
+    setScriptureNote(note);
   };
 
   const handleBubbleClick = (ref, _n) => {
@@ -437,8 +482,39 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     });
   };
 
+  // ONE Back on an Answers topic (U5): the nav ‹ goes where the old "Back to …" pill went (the
+  // letter or list it was opened from, or the results), else to Answers.
+  const ansBack = !isAns ? null
+    : backHint ? { onBack, label: backHint.volumeLabel ? backHint.volumeLabel + ' · ' + backHint.title : backHint.title }
+      : navBack;
+  const srcMeta = { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null };
+  const ansPage = isAns ? (
+    <AnswersTopic
+      entry={entry} entries={answers ? answers.entries : null} meta={ansMeta} metaAll={ansMetaAll}
+      site={typeof ANSWERS_SITE_META !== 'undefined' ? ANSWERS_SITE_META : null}
+      ready={ansReady} inert={inert} ts2={answersLayoutClass(fontScale, false).includes('ans-ts2')} landedPara={landedPara}
+      mainRef={wtlbMainRef} isRead={(answers && answers.isRead) || (() => false)} pathOn={!!(answers && answers.pathOn)}
+      findOn={!!(surpriseAnchor && surpriseAnchor.find && surpriseAnchor.letterId === entry.id)}
+      nav={answers || {}}
+      act={{
+        cite: (ref, note) => openSheetForRef(ref, note),
+        jump: jumpToPara,
+        letter: (target) => { if (onInAppLink) onInAppLink({ ...target, collection: _attrCollectionLabel(target.collection) || target.collection }, srcMeta); },
+        // a source chip opens its letter ON the passage it closes, and flashes it (n5-01)
+        source: (pi) => {
+          const parts = /^~ \[From ["“”](.+?)["“”]\s*~\s*(.+?)\]$/.exec(String((entry.paragraphs[pi] && entry.paragraphs[pi].text) || '').trim());
+          const collection = parts ? _attrCollectionLabel(parts[2]) : null;
+          if (!parts || !collection || !onInAppLink) return;
+          const excerpt = passageTextBefore(entry.paragraphs, pi);
+          onInAppLink(excerpt ? { collection, letterTitle: parts[1], excerpt } : { collection, letterTitle: parts[1] }, srcMeta);
+        },
+      }}
+    />
+  ) : null;
+
   return (
     <ScreenLayout
+      className={isAns ? answersLayoutClass(fontScale, true) : undefined}
       inert={inert}
       restoreScroll={restoreScroll}
       pager={inert ? undefined : pager}
@@ -459,7 +535,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         // index this returns to is Part One / Part Two / The Blessed /
         // Regarding The Holy Days, which partLabel already carries.
         // navBack (search200 UX B1): from a search hit the ‹ returns to the results.
-        onBack: navBack ? navBack.onBack : onHome, backLabel: navBack ? navBack.label : (partLabel || 'Index'),
+        onBack: ansBack ? ansBack.onBack : navBack ? navBack.onBack : onHome,
+        backLabel: ansBack ? ansBack.label : navBack ? navBack.label : (partLabel || 'Index'),
         arrows: {
           onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
           onNext: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),
@@ -472,19 +549,15 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
+      {isAns ? ansPage : <>
       <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
       {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
       <header className="hero" ref={heroRef}>
         <div className="hero-bg vol" />
         <div className="hero-content">
-          {/* An Answers topic's num is only its place on the site's page list;
-              the reader is told where it is filed instead. */}
-          <div className="hero-eyebrow">{volKey === 'answers'
-            ? ['Answers', answersFiledUnder(entry)].filter(Boolean).join(' · ')
-            : <>{partLabel} {" · "} {entry.num}</>}</div>
+          <div className="hero-eyebrow">{partLabel} {" · "} {entry.num}</div>
           <h1 className="hero-title">{entry.title}</h1>
-          {volKey === 'answers' ? <AnswersContentsLine entry={entry} onJump={jumpToPara} /> : null}
           <div className="hero-ornament">
             <div className="hero-ornament-line" />
             <div className="hero-ornament-diamond" />
@@ -544,26 +617,6 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               </div>
             )}
 
-            {/* Answers topics: the site's own Related Topics, then its source.
-                A related topic opens as a tap-through, so Back returns here. */}
-            {entry.related && entry.related.length > 0 && (
-              <div className="related-card">
-                <div className="related-card-title">Related Topics</div>
-                {entry.related.map((r) => (
-                  <a key={r.id} className="related-link" href="#" onClick={(e) => {
-                    e.preventDefault();
-                    if (onInAppLink && r.title) onInAppLink({ collection: 'Answers Only God Can Give', letterTitle: r.title }, { sourceLetterTitle: entry.title, sourceVolumeLabel: partLabel || null });
-                    else onNavigate(r.id);
-                  }}>{r.title}</a>
-                ))}
-              </div>
-            )}
-            {entry.siteUrl && (
-              <div className="wtlb-source-line">
-                <a href={entry.siteUrl} target="_blank" rel="noopener noreferrer">View on answersonlygodcangive.com</a>
-              </div>
-            )}
-
             <div className="ornament-divider">
               <div className="ornament-divider-line" />
               <div className="ornament-divider-symbol">✦</div>
@@ -613,6 +666,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           </div>
         </div>
       </div>
+      </>}
 
       {/* Read-along. Format B timings are stored in the CORPUS offset domain,
           because the rendered one is not stable — it moves with the footnote
@@ -645,6 +699,12 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               ) : (
                 <div className="sc-sheet-verse" style={{ color: 'var(--cream-dim)', fontStyle: 'italic' }}>Verse text not available in app data</div>
               )}
+              {scriptureNote && scriptureNote.version ? (
+                <div className="ans-sc-note">
+                  <p className="ans-note">{'On the site this reference opens the ' + scriptureNote.version + '. Shown here: NKJV.'}</p>
+                  {scriptureNote.siteUrl ? <a className="ans-textbtn" href={scriptureNote.siteUrl} target="_blank" rel="noopener noreferrer">{'Open the ' + scriptureNote.version + ' on Bible Gateway'}<AnsIcon name="ext" /></a> : null}
+                </div>
+              ) : null}
               {typeof GoToRefButton !== 'undefined' && goToScriptureRef && (
                 <GoToRefButton refStr={scriptureRef} onGo={goToScriptureRef} />
               )}

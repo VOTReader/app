@@ -1,102 +1,96 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
-   AnswersContents — an Answers topic's "5 sections · 54 passages" line and
-   its Contents sheet (Cluster D, esbuild bundle-d.js)
+   AnswersContents — an Answers topic's "On this page" (Cluster D, bundle-d)
    ═══════════════════════════════════════════════════════════════════════
-   A topic runs to 54 passages (median 10) and a UX walk (2026-09-25) found a
-   reader could not tell how long one was or jump anywhere in it. Picture
-   first (D:/Swarm/calls/ux-0925/r3-passages.png, take 1): a quiet line under
-   the title says how big the topic is and opens a sheet listing its sections
-   (or, with no named sections, its passages by source letter); a tap jumps
-   there. utils/answers-contents.js reads the paragraphs; the page owns the
-   jump (it knows its own scroller and pulse).
-
-   Short topics (under three passages) get no line: nothing to navigate.
-   The sheet is the app's select-sheet (portal, SheetHandle, focus trap,
-   window.__closeSheet for Android Back), like the landing's commandments.
+   AOGCG final design f10: every site section with its number (from the
+   site's heading levels) and its sub ("7 passages", "1 chart", "See: 2
+   links"); the current one marked "Reading now" with its passages under it.
+   The same rows make the desktop rail (f07/f08 desktop), without the
+   passages. Topics over 8,000 words offer Fold (f10b). The page owns the
+   jump (it knows its scroller, its running head and its pulse), and runs it
+   after the sheet has closed and given focus back without scrolling
+   (use-focus-trap.js preventScroll), so the jump is never undone (U4).
+   Rows come from utils/answers-topic.js answersTocRows.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { answersContents, contentsSummary } from '../../utils/answers-contents.js';
+import { h, Fragment } from '../jsx-h.js';
+import { AnsSheet } from '../sheets/AnswersSheets.jsx';
+import { Chev } from './AnswersParts.jsx';
+import { SEP } from '../../utils/answers-browse.js';
 
-/** Fewer passages than this and a topic reads end to end without help. */
-const CONTENTS_MIN_PASSAGES = 3;
-
-/**
- * @param {{ entry: any, onJump: (index: number) => void }} props
- */
-export function AnswersContentsLine({ entry, onJump }) {
-  const contents = React.useMemo(() => answersContents(entry), [entry]);
-  const [open, setOpen] = React.useState(false);
-  if (contents.passages < CONTENTS_MIN_PASSAGES) return null;
+/** f10b: the Fold switch (the kit toggle), off by default, remembered per topic by the page. */
+export function FoldRow({ on, onChange }) {
   return (
-    <>
-      <button type="button" className="answers-contents-line" onClick={() => setOpen(true)}
-        aria-haspopup="dialog" aria-expanded={open}>
-        {contentsSummary(contents)}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg>
-      </button>
-      {open ? (
-        <AnswersContentsSheet
-          contents={contents}
-          onDismiss={() => setOpen(false)}
-          onJump={(i) => { setOpen(false); onJump(i); }}
-        />
-      ) : null}
-    </>
+    <div className="ans-row is-2">
+      <span className="ans-row-body"><span className="ans-row-title">Fold sections</span><span className="ans-row-sub">Show headings only. Find and search still open them.</span></span>
+      <label className="settings-toggle">
+        <input type="checkbox" role="switch" checked={on} aria-checked={on} aria-label="Fold sections" onChange={(e) => onChange(e.target.checked)} />
+        <span className="settings-toggle-track" /><span className="settings-toggle-thumb" />
+      </label>
+    </div>
   );
 }
 
 /**
- * @param {{ contents: import('../../utils/answers-contents.js').Contents,
- *           onJump: (index: number) => void, onDismiss: () => void }} props
+ * The section rows; the current one carries "Reading now" and (withEx) its passages, three of them
+ * and "Show N more" past four.
+ * @param {{ rows: import('../../utils/answers-topic.js').AnswersTocRow[], cur: number, withEx: boolean,
+ *   onSection: (k: number) => void, onExcerpt: (at: number) => void }} props
  */
-function AnswersContentsSheet({ contents, onJump, onDismiss }) {
+export function TocRows({ rows, cur, withEx, onSection, onExcerpt }) {
+  const [more, setMore] = React.useState(false);
+  return rows.map((r, k) => {
+    const current = k === cur;
+    const l2 = r.level === 2 ? ' is-l2' : '';
+    const ex = current && withEx ? r.ex : [];
+    const shown = ex.length > 4 && !more ? ex.slice(0, 3) : ex;
+    return (
+      <React.Fragment key={r.at + ':' + r.anchor}>
+        <a className={'ans-row ans-toc-sec' + l2 + (current ? ' is-current' : '')} href={'#' + r.anchor} aria-current={current ? 'location' : undefined}
+          onClick={(e) => { e.preventDefault(); onSection(k); }}>
+          <span className="ans-num">{r.num}</span>
+          <span className="ans-row-body">
+            <span className="ans-row-title">{r.title}</span>
+            {r.sub || current ? <span className="ans-row-sub">{r.sub}{current ? <>{r.sub ? SEP : ''}<span className="ans-now">Reading now</span></> : null}</span> : null}
+          </span>
+        </a>
+        {shown.map((x) => (
+          <a key={x.at} className={'ans-row ans-toc-ex' + l2} href="#" aria-label={'“' + x.title + '”, ' + x.collection} onClick={(e) => { e.preventDefault(); onExcerpt(x.at); }}>
+            <span className="ans-row-body"><span className="ans-row-sub">{'“' + x.title + '”'}</span></span>
+          </a>
+        ))}
+        {ex.length > 4 && !more ? (
+          <button type="button" className={'ans-textbtn ans-toc-more' + l2} aria-expanded="false" onClick={() => setMore(true)}>{'Show ' + (ex.length - 3) + ' more'}<Chev dir="down" /></button>
+        ) : null}
+      </React.Fragment>
+    );
+  });
+}
+
+/**
+ * f10: "On this page", opened from the running head or the hero's contents line; it opens scrolled
+ * so the current row shows. Tall at Text Size 2 and up (ts2).
+ * @param {{ title: string, rows: any[], cur: number, meta: string, foldable: boolean, foldOn: boolean, ts2?: boolean,
+ *   onFold: (on: boolean) => void, onSection: (k: number) => void, onExcerpt: (at: number) => void, onClose: () => void }} props
+ */
+export function AnswersContentsSheet({ title, rows, cur, meta, foldable, foldOn, ts2, onFold, onSection, onExcerpt, onClose }) {
+  const ref = React.useRef(/** @type {HTMLHeadingElement | null} */ (null));
   React.useEffect(() => {
-    const prev = window.__closeSheet;
-    window.__closeSheet = onDismiss;
-    return () => { window.__closeSheet = prev || null; };
-  }, [onDismiss]);
-  const trapRef = useFocusTrap(true);
-  const named = contents.sections.filter((s) => s.title);
-  // Named sections: one row each, with the first sources under it. None (or one):
-  // the passages themselves, by source letter.
-  const bySection = named.length > 1;
-  const passages = contents.sections.flatMap((s) => s.passages);
-  return ReactDOM.createPortal(
-    <>
-      <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onDismiss} />
-      <div className="select-sheet answers-contents-sheet" ref={trapRef} role="dialog" aria-modal="true"
-        aria-labelledby="answers-contents-title" onClick={(e) => e.stopPropagation()}>
-        <SheetHandle onClose={onDismiss} />
-        <div className="select-sheet-eyebrow">In this topic</div>
-        <div className="select-sheet-title" id="answers-contents-title">{contentsSummary(contents)}</div>
-        <div className="answers-contents-list">
-          {bySection ? contents.sections.map((s) => (
-            <button key={s.index + ':' + s.title} type="button" className="answers-contents-row" onClick={() => onJump(s.index)}
-              data-autofocus={s === contents.sections[0] ? true : undefined}>
-              <span className="answers-contents-row-title">
-                {s.title || 'Opening passages'}
-                {/* A section of links, videos or a chart holds no passage: it shows no count, since
-                    "0" read as "nothing here" (Corbin, 2026-10-21). The row still jumps to it. */}
-                {s.passages.length ? <span className="answers-contents-count">{s.passages.length}</span> : null}
-              </span>
-              {s.passages.length ? (
-                <span className="answers-contents-row-sub">
-                  {s.passages.slice(0, 3).map((p) => p.title).join(' · ')}{s.passages.length > 3 ? ' …' : ''}
-                </span>
-              ) : null}
-            </button>
-          )) : passages.map((p, i) => (
-            <button key={p.index} type="button" className="answers-contents-row" onClick={() => onJump(p.index)}
-              data-autofocus={i === 0 ? true : undefined}>
-              <span className="answers-contents-row-title">
-                <span className="answers-contents-num">{i + 1}</span>{p.title}
-              </span>
-              {p.collection ? <span className="answers-contents-row-sub">{p.collection}</span> : null}
-            </button>
-          ))}
-        </div>
-      </div>
-    </>,
-    document.body,
+    const sheet = ref.current && ref.current.closest('.ans-sheet');
+    const row = sheet && /** @type {HTMLElement | null} */ (sheet.querySelector('.ans-toc-sec.is-current'));
+    const head = sheet && /** @type {HTMLElement | null} */ (sheet.querySelector('.ans-sheet-head'));
+    // only when the row (and its passages under it) would sit below the sheet's fold
+    if (!sheet || !row) return;
+    const shown = row.offsetTop + row.offsetHeight * 2 <= sheet.scrollTop + sheet.clientHeight;
+    if (!shown) sheet.scrollTop = Math.max(0, row.offsetTop - (head ? head.offsetHeight : 0) - 8);
+  }, [cur]);
+  return (
+    <AnsSheet label="On this page" tall={!!ts2} onClose={onClose} head={<p className="ans-label">On this page</p>}>
+      <h2 className="ans-h2" ref={ref}>{title}</h2>
+      <p className="ans-meta">{meta}</p>
+      {foldable ? <FoldRow on={foldOn} onChange={onFold} /> : null}
+      <TocRows rows={rows} cur={cur} withEx={true} onSection={onSection} onExcerpt={onExcerpt} />
+    </AnsSheet>
   );
 }

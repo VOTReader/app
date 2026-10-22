@@ -1,3 +1,5 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    AnswersMedia — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -9,6 +11,7 @@
    opens outside the app. Nothing is embedded and no thumbnail is fetched.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
 import { answersShortTitle } from '../../utils/answers-shelves.js';
 import {
   SEP, pl, answersMediaIndex, answersMediaPlace, answersMediaTitle, answersMediaLines, answersMediaSub, answersDomain,

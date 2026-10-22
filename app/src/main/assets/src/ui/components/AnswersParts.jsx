@@ -1,3 +1,5 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    AnswersParts — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -9,6 +11,7 @@
    utils/answers-browse.js; nothing here writes copy of its own.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
 import { NBSP, answersLeadSplit } from '../../utils/answers-browse.js';
 import { loadAnswersMeta } from '../../utils/sync-loaders.js';
 
@@ -16,6 +19,7 @@ import { loadAnswersMeta } from '../../utils/sync-loaders.js';
 export const ANS_ICONS = Object.freeze({
   chev: 'M9 5l7 7-7 7',
   down: 'M6 9l6 6 6-6',
+  up: 'M6 15l6-6 6 6',
   left: 'M15 5l-7 7 7 7',
   info: 'M12 3a9 9 0 1 1 0 18 9 9 0 0 1 0-18zM12 11v5M12 8v.01',
   search: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5L20 20',
@@ -28,6 +32,9 @@ export const ANS_ICONS = Object.freeze({
   doc: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 16h5',
   download: 'M12 4v11M8 11l4 4 4-4M5 19h14',
   tick: 'M5 12.5l4.5 4.5L19 7',
+  list: 'M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01',
+  zoom: 'M10.5 4a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13zM15.5 15.5L20 20M8 10.5h5M10.5 8v5',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
 });
 
 /**
@@ -35,16 +42,16 @@ export const ANS_ICONS = Object.freeze({
  * @param {{ name: keyof typeof ANS_ICONS, className?: string, width?: number | string }} props
  */
 export function AnsIcon({ name, className = 'ans-ico', width }) {
-  const sw = className === 'ans-chev' ? '1.6' : className === 'ans-tick' ? '2' : className === 'ans-ext' ? '1.6' : '1.5';
+  const sw = className.startsWith('ans-chev') ? '1.6' : className === 'ans-tick' ? '2' : className === 'ans-ext' ? '1.6' : className ? '1.5' : '1.8';
   return (
-    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={width || sw}
+    <svg className={className || undefined} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={width || sw}
       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={ANS_ICONS[name]} />
     </svg>
   );
 }
 
-/** @param {{ dir?: 'chev' | 'down' | 'left' }} props */
+/** @param {{ dir?: 'chev' | 'down' | 'up' | 'left' }} props */
 export function Chev({ dir = 'chev' }) {
   return <AnsIcon name={dir} className="ans-chev" />;
 }
@@ -101,18 +108,20 @@ export function AnsRow({ title, sub, onClick, href, num, icon, one, label, haspo
  * The sidecars (ANSWERS_META, src/data/answers-meta.js): the words beyond each topic's text that the
  * browse screens count (minutes, media, sections). null until the lazy file lands; the screens
  * draw without them first (subs fill in place, §3 f01 "Loading").
+ * `enabled` false (a reading screen that is not an Answers topic) asks for nothing.
+ * @param {boolean} [enabled]
  * @returns {Record<string, any> | null}
  */
-export function useAnswersMeta() {
+export function useAnswersMeta(enabled = true) {
   const read = () => (typeof window !== 'undefined' && /** @type {any} */ (window).ANSWERS_META) || null;
   const [meta, setMeta] = React.useState(read);
   React.useEffect(() => {
-    if (meta) return undefined;
+    if (meta || !enabled) return undefined;
     let live = true;
     loadAnswersMeta().then(() => { if (live && read()) setMeta(read()); });
     return () => { live = false; };
-  }, [meta]);
-  return meta;
+  }, [meta, enabled]);
+  return enabled ? meta : null;
 }
 
 /* The reading path (f01 #8, U16): the topic finished last, kept on this device only. The landing's

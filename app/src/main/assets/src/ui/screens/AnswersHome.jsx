@@ -1,3 +1,5 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    AnswersHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -24,6 +26,7 @@
    landed, null before: the head, title and ask paint at once.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
 import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle } from '../../utils/answers-shelves.js';
 import { ANSWERS_SIDEBAR, ANSWERS_FD_INDEX_ID, ANSWERS_FD_INDEX_TEXT, ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU, answersSiteOrder } from '../../utils/answers-site.js';
 import {

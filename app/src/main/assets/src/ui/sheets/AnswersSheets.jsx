@@ -1,3 +1,5 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    AnswersSheets — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -17,6 +19,7 @@
    topic opened here comes back to the sheet (U5).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
 import { ANSWERS_QUESTIONS, SEP, NBSP, answersRowSub, answersSizeWords, answersDomain, answersMediaSource } from '../../utils/answers-browse.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark } from '../components/AnswersParts.jsx';
 import { sheetReference } from '../../utils/passage-copy.js';

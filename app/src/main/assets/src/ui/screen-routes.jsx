@@ -1,3 +1,4 @@
+/** @jsx h */
 /* ═══════════════════════════════════════════════════════════════════════
    screen-routes — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -40,6 +41,7 @@
    in the top nav (app.jsx → ReadingChromeProvider dotEnabled). Extracted
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
+import { h } from './jsx-h.js';
 import { AudioPlayer } from '../utils/audio-player.js';
 import { setWifiOnly } from '../utils/download-gate.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
@@ -880,6 +882,24 @@ export function buildScreenRoutes({
     onSearch: goSearch, onHistory: goHistory, onSettings: goSettings,
     theme, onThemeChange: setTheme, onOpenTopic: _openAnswersTopic,
   };
+  // A topic page's hand-offs (AnswersTopic.jsx): its links, eyebrow, foot rows and the Main Page's
+  // "See left column" row. Each goes through the tap-through stack, so Back returns to the topic.
+  const _answersTopicNav = (entries, fromTitle, go) => ({
+    entries, isRead: (id) => isRead('answers', id), pathOn: _answersPathOn,
+    openTopic: (id, anchor) => _openAnswersTopic(id, null, fromTitle, anchor || null),
+    // Next / Previous in the site's order read on, as the arrows do (no new Back step)
+    go: (id) => { setSurpriseAnchor(null); go(id); },
+    openGroup: _openAnswersGroup,
+    openLanding: () => { resetAnswersLanding(); setScreen('answers-home'); },
+    openStudy: (slug, url) => {
+      if (typeof getStudyById === 'function' && getStudyById(slug)) { _startNewTrail(); selectStudy(slug); } else if (url) window.open(url, '_blank', 'noopener');
+    },
+    searchLibrary: (q) => { setSearchQuery(q); goSearch(); },
+    goToRef: (ref) => {
+      const m = /^Exodus 20:(\d+)$/.exec(ref);
+      if (m) navigateToLink({ type: 'bible', bookId: 'exodus', chapter: 20, verse: Number(m[1]) }, { sourceLetterTitle: 'Answers' });
+    },
+  });
 
   return {
     // ── Volume index screens (13) ──
@@ -1743,7 +1763,9 @@ export function buildScreenRoutes({
       const ansRead = colReadNavProps('answers');
       // A topic read to its end is the reading path's new place (the landing's Continue).
       const onMarkRead = (payload) => { ansRead.onMarkRead(payload); if (_answersPathOn) writeAnswersPath(letterId); };
-      return <WtlbEntryView {...sharedViewProps} {...ansRead} onMarkRead={onMarkRead} {...bc} entry={ansEntry} partLabel="Answers" onNavToChapter={_navToChapter} footnotesMode={true} />;
+      // One cite style on a topic: inline (Book X:Y) only, no footnote bubbles (U6).
+      return <WtlbEntryView {...sharedViewProps} {...ansRead} onMarkRead={onMarkRead} {...bc} entry={ansEntry} partLabel="Answers" onNavToChapter={_navToChapter}
+        footnotesMode={false} fontScale={settings.fontScale} answers={_answersTopicNav(ANSWERS, ansEntry.title, ansRead.onNavigate)} />;
     })),
 
     'hm-letter': () => {

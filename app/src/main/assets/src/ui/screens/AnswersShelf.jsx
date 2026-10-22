@@ -1,3 +1,5 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    AnswersShelf — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -14,6 +16,7 @@
    site's chain.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
 import { NBSP, SEP, pl, answersRowSub, answersShelfByKey } from '../../utils/answers-browse.js';
 import { ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU } from '../../utils/answers-site.js';
 import { AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
