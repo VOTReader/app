@@ -176,6 +176,28 @@ describe('AnnotationHint', () => {
     expect(screen.queryByText(HINT_TEXT)).toBeNull();
   });
 
+  /* Recording the flag as it shows re-renders through the flag's subscription; that render must not
+     read the fresh set as "someone dismissed it" (the pill mounted, unmounted, mounted again: the
+     entrance played twice and role=status spoke twice). act() flushes both renders, so only a DOM
+     observer sees the blink. */
+  it('appears once when it records the flag: no unmount and remount on the way in', async () => {
+    setupStores();
+    const { container } = render(<AnnotationHint />);
+    const seen = [];
+    const mo = new MutationObserver((recs) => {
+      for (const r of recs) {
+        for (const n of r.addedNodes) if (n.classList && n.classList.contains('ann-hint-pill')) seen.push('+');
+        for (const n of r.removedNodes) if (n.classList && n.classList.contains('ann-hint-pill')) seen.push('-');
+      }
+    });
+    mo.observe(container, { childList: true, subtree: true });
+    await act(async () => { vi.advanceTimersByTime(2600); });
+    await act(async () => { await Promise.resolve(); vi.advanceTimersByTime(50); });
+    mo.disconnect();
+    expect(seen).toEqual(['+']);
+    expect(window.AnnHintDismissedFlagStore.is()).toBe(true);
+  });
+
   it('never renders when the dismissal flag is already set at boot', () => {
     setupStores({ hintDismissed: true });                    // dismissed last session
     render(<AnnotationHint />);
