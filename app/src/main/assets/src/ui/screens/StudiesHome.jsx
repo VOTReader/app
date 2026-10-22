@@ -5,7 +5,7 @@
    read at call time rather than imported (in lazy bundle-g a bundled copy
    would have shipped twice). */
 
-export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, onSelectStudy, onOpenAnswers, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.2: pre-fire the Matthew Study Bible corpus load. By the time the
   // user picks a study from the list, the 618 KB corpus is already
   // downloading in parallel.
@@ -83,14 +83,18 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
               <button type="button" onClick={onRetry} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
             </div>
           )}
-          <a className="chapter-card-btn study-external-card" href="https://answersonlygodcangive.com/" target="_blank" rel="noopener noreferrer">
-            <span className="chapter-card-num">↗</span>
-            <div className="chapter-card-divider" />
-            <div className="chapter-card-info">
-              <div className="chapter-card-label">External Site</div>
-              <div className="chapter-card-title">AnswersOnlyGodCanGive.com</div>
-            </div>
-          </a>
+          {/* U14 (AOGCG, 2026-10-22): Answers Only God Can Give is in the app, so the row opens it here
+              (answers-home) rather than the website; the landing's About sheet links the site. */}
+          {onOpenAnswers ? (
+            <button type="button" className="chapter-card-btn" onClick={onOpenAnswers}>
+              <span className="chapter-card-num">{list.length + 1}</span>
+              <div className="chapter-card-divider" />
+              <div className="chapter-card-info">
+                <div className="chapter-card-label">Topics & Doctrines</div>
+                <div className="chapter-card-title">Answers Only God Can Give</div>
+              </div>
+            </button>
+          ) : null}
         </div>
       </div>
     </ScreenLayout>
