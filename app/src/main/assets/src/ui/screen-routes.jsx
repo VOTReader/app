@@ -884,7 +884,9 @@ export function buildScreenRoutes({
     theme, onThemeChange: setTheme, onOpenTopic: _openAnswersTopic,
   };
   // A topic page's hand-offs (AnswersTopic.jsx): its links, eyebrow, foot rows and the Main Page's
-  // "See left column" row. Each goes through the tap-through stack, so Back returns to the topic.
+  // "See left column" row. A topic link goes through the tap-through stack, so Back returns to the
+  // topic. A group and the landing are the collection's own screens, with its Back (use-android-back:
+  // a group goes to the landing, the landing Home); a search goes back where it was opened from.
   const _answersTopicNav = (entries, fromTitle, go) => ({
     entries, isRead: (id) => isRead('answers', id), pathOn: _answersPathOn,
     openTopic: (id, anchor) => _openAnswersTopic(id, null, fromTitle, anchor || null),

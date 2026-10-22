@@ -154,7 +154,7 @@ describe('WtlbEntryView — a section anchor lands on the section the link names
     prevEntry: null, nextEntry: null,
   };
   const renderTopic = (anchor) => render(
-    <WtlbEntryView entry={TOPIC} volKey="answers" partLabel="Answers" theme="dark" markAsReadEnabled={false} footnotesMode={true}
+    <WtlbEntryView entry={TOPIC} volKey="answers" partLabel="Answers" theme="dark" markAsReadEnabled={false} footnotesMode={false}
       onNavigate={() => {}} onHome={() => {}} surpriseAnchor={anchor} />,
   );
 
@@ -219,7 +219,7 @@ describe('WtlbEntryView — the body names its marks for the corpus remap (n4-02
       .toEqual(['wtlb:matters-of-the-heart:0', 'wtlb:matters-of-the-heart:1']);
   });
 
-  it('carries them with footnotes on too (the default for WTLB and Answers)', () => {
+  it('carries them with footnotes on too (as the Holy Days route draws its entries)', () => {
     renderEntry({ footnotesMode: true });
     expect(document.querySelector('[data-mark-entry]').getAttribute('data-mark-entry')).toBe('wtlb:matters-of-the-heart:');
   });
