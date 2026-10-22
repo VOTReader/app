@@ -8924,12 +8924,16 @@
 
 /* Hit bands on small targets. r2: the eyebrow (a target of its own) gets 48 (18.2 + 2×15). Cites, note refs and the
    bare glyph sit inside running text and keep 44: a band wider than the line gap would take the long-press meant for
-   the words around them (WCAG 2.5.8's inline exception). The source chip link is 21.75 + 28 = 49.75 already */
-.ans-eyebrow,.ans-src a,.ans-bare,.ans-note-ref,.ans-chip,.ans-alsosee,.ans-reading .wtlb-cite{position:relative}
-.ans-eyebrow::before,.ans-src a::before,.ans-bare::before,.ans-note-ref::before,.ans-reading .wtlb-cite::before{content:"";position:absolute;inset:-14px}
+   the words around them (WCAG 2.5.8's inline exception). The source chip link is 21.75 + 28 = 49.75 already.
+   An inline topic or letter link in the reading text takes the cites' 44 too (acceptance U10: it was 21 tall); a link
+   that IS its row (A12, A18: link rows and a one-name "Also see:") stays static, so its ::before fills the row instead */
+.ans-eyebrow,.ans-src a,.ans-bare,.ans-note-ref,.ans-chip,.ans-alsosee,.ans-reading :is(.wtlb-cite,.letter-link-ref){position:relative}
+.ans-eyebrow::before,.ans-src a::before,.ans-bare::before,.ans-note-ref::before,.ans-reading :is(.wtlb-cite,.letter-link-ref)::before{content:"";position:absolute;inset:-14px}
 .ans-eyebrow::before{inset:-15px} /* r2 */
 .ans-chip::before{content:"";position:absolute;inset:-4px 0}
-.ans-alsosee-a::before{content:"";position:absolute;inset:0}
+/* A cite's or link's own words (span.ans-tb, AnswersTopic.jsx) sit above every band: two bands overlap where links share
+   adjacent lines (an "Also see:" line's names are 24px apart), and the later link's band took the earlier link's middle */
+.ans-tb{position:relative;z-index:1}
 
 /* Page frame and landing header */
 .ans-page{padding:0 24px 48px;color:var(--cream)}
@@ -9171,8 +9175,10 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 /* A12. Link rows (Main Page :2, :78, :80): the paragraph's own link fills the whole row (one tap target)
    and wears the row's look, not the kit's inline-link look (app.css 4193) */
 .ans-reading .ans-linkrow{position:relative}
-.ans-linkrow .letter-link-ref{color:inherit;font-style:inherit;border-bottom:0;padding-bottom:0}
-.ans-linkrow .letter-link-ref::before{content:"";position:absolute;inset:0}
+.ans-linkrow .letter-link-ref{color:inherit;font-style:inherit}
+/* (A18's one-name "Also see:" link too) the row's look, and the row as its target: static, so the ::before fills the row */
+.ans-linkrow .letter-link-ref,.ans-alsosee .ans-alsosee-a{border-bottom:0;padding-bottom:0;position:static;min-width:0}
+.ans-linkrow .letter-link-ref::before,.ans-alsosee .ans-alsosee-a::before{content:"";position:absolute;inset:0}
 
 /* A13. Desktop Contents rail parts (spec f07-desktop): progress track, compact rows, 15px titles.
    One DOM at every width: the rail only shows at 1024 and up. */
@@ -9198,12 +9204,11 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 
 /* A18. Also see: the lead never wraps ("Also / see:"), and the link may shrink below its longest word so a long title
    breaks inside the column; at Text Size 2 and up the link drops under the lead */
-.ans-alsosee .ans-lead{flex:none}
-.ans-alsosee .ans-alsosee-a{min-width:0}
-.ans-alsosee .ans-chev{flex:none}
-.ans-ts2 .ans-reading .ans-alsosee{flex-wrap:wrap}
-/* the row is the target (hairlines and chevron), so the link drops the kit's inline dotted rule (app.css 4193), as A12 does */
-.ans-alsosee .letter-link-ref{border-bottom:0;padding-bottom:0}
+:is(.ans-alsosee,.ans-fd-truth) .ans-lead{flex:none} /* (A23's lead too) */
+/* (the link's min-width:0 is in A12's static rule) */
+/* (.ans-chev is flex:none already; Text Size 2's wrap is in A26) the row is the target (hairlines and chevron), so the
+   one-name link drops the kit's inline dotted rule (app.css 4193), as A12 does; a line of several names (.is-multi) keeps
+   it on each of its links, which are inline links (each its own target, the 44 band above), and draws no chevron */
 
 /* A19. Source chip: two lines share the words, so "7 ›" is never left alone on the second line */
 .ans-src{text-wrap:balance}
@@ -9222,7 +9227,7 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 
 /* A23. False Doctrines "The Truth:" line: the lead never wraps ("The / Truth:") and sits on the title's first line,
    the chevron keeps the right edge, centred; at Text Size 2 and up the title drops under the lead */
-.ans-fd-truth .ans-lead{flex:none}
+/* (its lead's flex:none is in A18, align-items:baseline in the base rule, Text Size 2's wrap in A26) */
 .ans-fd-truth > strong:not(.ans-lead){min-width:0}
 .ans-fd-truth .ans-chev{margin-left:auto;align-self:center}
 
@@ -9325,7 +9330,7 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 /* R12. One ↗ per external link. The Answers ↗ is the 20px SVG (§icons); main's external-link rule (app.css:2965,
    a[target="_blank"]::after " \2197") would add a second, text ↗ beside it once the build gives these anchors
    target="_blank" as the app does for every link that leaves it. It stands down wherever the SVG is drawn */
-a[target="_blank"]:has(>svg.ans-ico,>svg.ans-ext)::after,.ans-linkrow a[target="_blank"]::after{content:none}
+a[target="_blank"]:has(svg.ans-ico,svg.ans-ext)::after,:is(.ans-linkrow,.ans-alsosee) a[target="_blank"]::after{content:none}
 
 /* R13. Running head: a section name too long for the bar ends on a whole word ("… God's Holy Days…"), never mid-word
    ("(comp…"); the topic's short title still drops out first (A22's row-reverse wrap) */

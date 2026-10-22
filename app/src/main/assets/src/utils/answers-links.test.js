@@ -5,7 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
-import { answersUrlKey, answersUrlAnchor, answersIdForUrl, answersLinkForUrl, answersEndpointForUrl, openAnswersLink, ANSWERS_COLLECTION_LABEL } from './answers-links.js';
+import { answersUrlKey, answersUrlAnchor, answersIdForUrl, answersLinkForUrl, answersEndpointForUrl, openAnswersLink, ANSWERS_COLLECTION_LABEL, answersFragmentStart } from './answers-links.js';
 import { ANSWERS_URL_INDEX, ANSWERS_TITLES } from './answers-url-index.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -112,5 +112,20 @@ describe('openAnswersLink', () => {
     const link = { collection: ANSWERS_COLLECTION_LABEL, letterTitle: 'Regarding Pride' };
     await openAnswersLink(link, open);
     expect(open).toHaveBeenCalledWith(link);
+  });
+});
+
+describe('answersFragmentStart — the words a #:~:text= link lands on', () => {
+  it('reads the start of "start,end", decoded, and skips a prefix or suffix part', () => {
+    expect(answersFragmentStart('https://www.thevolumesoftruth.com/Death_and_Deliverance#:~:text=Yet%20understand%20this,says%20The%20Lord.')).toBe('Yet understand this');
+    expect(answersFragmentStart('https://x.com/P#:~:text=Obey%20God!')).toBe('Obey God!');
+    expect(answersFragmentStart('https://x.com/P#:~:text=before-,the%20words,end,-after')).toBe('the words');
+    expect(answersFragmentStart('https://x.com/P#:~:text=well%2Dbeing%20and%20peace')).toBe('well-being and peace');
+  });
+  it('is empty without a fragment, or with one that does not decode', () => {
+    expect(answersFragmentStart('https://www.thevolumesoftruth.com/Death_and_Awakening#Death_and_Awakening')).toBe('');
+    expect(answersFragmentStart('')).toBe('');
+    expect(answersFragmentStart(undefined)).toBe('');
+    expect(answersFragmentStart('https://x.com/P#:~:text=%E0%A4%A')).toBe('');
   });
 });

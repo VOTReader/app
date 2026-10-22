@@ -36,6 +36,7 @@ import {
   answersLinkSub, answersInline, answersParaMeta, answersParaPlan, answersFdLines, answersChars, answersFoldable,
   answersNoteRange, answersNoteLabel,
 } from '../../utils/answers-topic.js';
+import { answersFragmentStart } from '../../utils/answers-links.js';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 
 /** The pictures' own sizes, so a figure holds its place before it decodes. */
@@ -78,7 +79,10 @@ function renderNodes(nodes, pi, kb) {
     if (tag) return h(tag[0], { key, className: tag[1] }, kids);
     if (n.t === 'br') return <br key={key} />;
     if (n.t === 'ext') return <AnsIcon key={key} name="ext" className="ans-ext" />;
-    if (n.t === 'cite') return <a key={key} className="wtlb-cite" href="#" data-ans="cite" data-p={pi} data-n={d.n} data-ref={d.ref}>{kids}</a>;
+    // A cite's and a link's words sit in span.ans-tb, drawn above every target's 14px band (app.css): where two
+    // bands overlap (links on adjacent lines, the names of an "Also see:" line) a tap on a link's own words is
+    // still that link's. The span wraps the words only: the paragraph's text is unchanged (D3).
+    if (n.t === 'cite') return <a key={key} className="wtlb-cite" href="#" data-ans="cite" data-p={pi} data-n={d.n} data-ref={d.ref}><span className="ans-tb">{kids}</span></a>;
     if (n.t === 'sup') return <sup key={key} className="ans-note-ref" role="button" tabIndex={0} data-ans="note" data-p={pi} data-at={d.N.at}>{kids}</sup>;
     const bare = n.t === 'bare';
     const X = (bare ? d.B : d.L) || {};
@@ -87,7 +91,7 @@ function renderNodes(nodes, pi, kb) {
       : { href: '#', 'data-ans': bare ? 'bare' : X.li == null ? 'contents' : 'link', 'data-p': pi, 'data-l': bare ? undefined : X.li, 'data-b': bare ? d.n : undefined };
     // the bare glyph is inline SVG (the CSP blocks data URIs): it adds no text node
     if (bare) return <a key={key} className="ans-bare" aria-label={'Open ' + (X.title || X.query || 'the linked page')} {...go}><AnsIcon name="link" className="" /></a>;
-    return <a key={key} className="letter-link-ref" {...go}>{kids}</a>;
+    return <a key={key} className="letter-link-ref" {...go}><span className="ans-tb">{kids}</span></a>;
   });
 }
 
@@ -188,11 +192,22 @@ const Para = React.memo(/**
       return <p className={'letter-para ans-metarow' + pulse} {...hl}>{S(nodes({}))}</p>;
     case 'alsosee': {
       const r = trimRange(raw, plan.restAt);
+      const lead = <><span className="sr-only">• </span><span className="ans-lead"><em>{plan.lead}</em></span>{r.lead}</>;
+      const real = pm ? pm.links.filter((l) => l.kind !== 'contents') : [];
+      // several names ("A"; "B"; "C"): each its own inline link, as in running text; the line is not one target
+      if (real.length > 1) {
+        return <p className={'letter-para ans-alsosee is-multi' + pulse} {...hl}>{S(<>{lead}<span>{renderNodes(answersInline(raw, pm, { from: r.from, to: r.to }), i, 'a')}</span>{r.tail}</>)}</p>;
+      }
+      // one name: the whole row is its link (an external one opens in the browser, ↗)
+      const L = real[0];
+      const ext = !!(L && L.kind === 'external' && L.url);
+      const go = ext ? { href: L.url, target: '_blank', rel: 'noopener noreferrer' }
+        : L ? { href: '#', 'data-ans': 'link', 'data-p': i, 'data-l': pm.links.indexOf(L) } : { href: '#', 'data-ans': 'alsosee', 'data-p': i };
       return (
         <p className={'letter-para ans-alsosee' + pulse} {...hl}>{S(<>
-          <span className="sr-only">• </span><span className="ans-lead"><em>{plan.lead}</em></span>{r.lead}
-          <a className="letter-link-ref ans-alsosee-a" href="#" data-ans="alsosee" data-p={i}>{renderNodes(answersInline(raw, null, { from: r.from, to: r.to }), i, 'a')}</a>
-          {r.tail}<Chev />
+          {lead}
+          <a className="letter-link-ref ans-alsosee-a" {...go}>{renderNodes(answersInline(raw, null, { from: r.from, to: r.to }), i, 'a')}</a>
+          {r.tail}{ext ? <AnsIcon name="ext" className="ans-ico ans-chev" /> : <Chev />}
         </>)}</p>
       );
     }
@@ -200,10 +215,15 @@ const Para = React.memo(/**
       return (
         <p className={'letter-para ans-fd' + pulse} {...hl}>{S(answersFdLines(raw).map((ln, k) => {
           if (ln.kind === 'truth') {
+            // a line whose link leaves the app (a PDF, the TVOT main page) is a real link to it, ↗
+            const L = pm && pm.links.find((l) => l.at >= ln.from && l.at < ln.to);
+            const ext = !!(L && L.kind === 'external' && L.url);
+            const go = ext ? { href: L.url, target: '_blank', rel: 'noopener noreferrer' } : { href: '#', 'data-ans': 'fdtruth', 'data-p': i, 'data-from': ln.from, 'data-to': ln.to };
             return (
-              <a key={k} className="ans-fd-truth" href="#" data-ans="fdtruth" data-p={i} data-from={ln.from} data-to={ln.to}>
+              <a key={k} className="ans-fd-truth" {...go}>
                 <strong className="ans-lead">{ln.lead}</strong>{' '}
-                <strong>{renderNodes(answersInline(raw, pm, { from: /** @type {number} */ (ln.leadEnd) + 1, to: ln.to - 2, noLinks: true, noBold: true }), i, 't' + k)}</strong><Chev />
+                <strong>{renderNodes(answersInline(raw, pm, { from: /** @type {number} */ (ln.leadEnd) + 1, to: ln.to - 2, noLinks: true, noBold: true }), i, 't' + k)}</strong>
+                {ext ? <AnsIcon name="ext" className="ans-ico ans-chev" /> : <Chev />}
               </a>
             );
           }
@@ -457,11 +477,15 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     if (L.kind === 'topic') {
       const k = L.id === entry.id && L.anchor ? rows.findIndex((r) => r.anchor === L.anchor) : -1;
       if (k >= 0) jumpRow(k); else nav.openTopic(L.id, L.anchor || null);
-    } else if (L.kind === 'letter') act.letter({ collection: L.collection, letterTitle: L.title });
-    else if (L.kind === 'study') nav.openStudy(L.id, L.url);
+    } else if (L.kind === 'letter') {
+      // the site's #:~:text= lands its letter on those words (G11): the letter marks and shows them
+      const excerpt = answersFragmentStart(L.url);
+      act.letter({ collection: L.collection, letterTitle: L.title, ...(excerpt ? { excerpt } : {}) });
+    } else if (L.kind === 'study') nav.openStudy(L.id, L.url);
     else if (L.kind === 'search') nav.searchLibrary(L.query);
     else if (L.kind === 'scripture') act.cite(L.ref, null);
     else if (L.kind === 'contents') nav.openLanding();
+    else if (L.kind === 'external' && L.url) window.open(L.url, '_blank', 'noopener');
   };
   const refNote = (pi, n) => (((meta && meta.refMeta) || {})[String(pi)] || []).find((x) => x.i === n - 1) || null;
 
@@ -480,7 +504,11 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     } else if (kind === 'link') openLink(pm && pm.links[Number(el.getAttribute('data-l'))]);
     else if (kind === 'contents') nav.openLanding();
     else if (kind === 'bare') openLink(pm && pm.bare[Number(el.getAttribute('data-b'))]);
-    else if (kind === 'alsosee') openLink(pm && pm.links.find((l) => l.kind !== 'contents'));
+    else if (kind === 'alsosee') {
+      // the plain render's row (no sidecar yet): it is one link's target only when the line has one
+      const ls = pm ? pm.links.filter((l) => l.kind !== 'contents') : [];
+      if (ls.length === 1) openLink(ls[0]);
+    }
     else if (kind === 'fdtruth') {
       const from = Number(el.getAttribute('data-from')), to = Number(el.getAttribute('data-to'));
       openLink(pm && pm.links.find((l) => l.at >= from && l.at < to));
@@ -606,7 +634,8 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
           {/* Reading-end sentinel: end of body text, before the foot. */}
           <div className="reading-end" />
           {ready && entries ? (
-            <Foot entry={entry} entries={entries} meta={meta} metaAll={metaAll} byId={byId} isRead={isRead} pathOn={pathOn} nav={nav} onShelf={openShelf} tc={tcBody} />
+            <Foot entry={entry} entries={entries} meta={meta} metaAll={metaAll} byId={byId} isRead={isRead} pathOn={pathOn} nav={nav} onShelf={openShelf}
+              onLetter={act.letter} tc={tcBody} />
           ) : null}
           {ready && site ? (
             <p className="ans-credit">
@@ -686,7 +715,7 @@ function KRow({ kicker, title, sub, onClick, prev, href }) {
 
 const RELATED_SHOWN = 6;
 
-function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShelf, tc }) {
+function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShelf, onLetter, tc }) {
   const [all, setAll] = React.useState(false);
   React.useEffect(() => { setAll(false); }, [entry.id]);
   const topicSub = (id) => {
@@ -702,7 +731,11 @@ function Foot({ entry, entries, meta, metaAll, byId, isRead, pathOn, nav, onShel
   const moreRow = (r, key) => {
     const e = r.id ? byId.get(r.id) : null;
     const sub = e ? 'In ' + (r.id === ANSWERS_FD_INDEX_ID ? 'the False Doctrines index' : answersShortTitle(e.title)) : ((r.letter && r.letter.collection) || 'Letter');
-    return <AnsRow key={key} title={r.title} sub={sub} onClick={() => (r.id ? nav.openTopic(r.id, r.anchor || null) : null)} />;
+    const go = () => {
+      if (r.id) nav.openTopic(r.id, r.anchor || null);
+      else if (r.letter) onLetter({ collection: r.letter.collection, letterTitle: r.letter.title });
+    };
+    return <AnsRow key={key} title={r.title} sub={sub} onClick={go} />;
   };
   const parts = [];
   for (const part of answersFootOrder(entry, meta)) {

@@ -49,6 +49,19 @@ function pagePath(u) {
   return path;
 }
 
+/**
+ * The words a URL's #:~:text= fragment starts on, decoded ('' without one): the site's "find in letter".
+ * "start,end" lands on start; a "prefix-," or ",-suffix" part is context around the words, not them.
+ * @param {string} url
+ */
+export function answersFragmentStart(url) {
+  const s = String(url || '');
+  const at = s.indexOf(':~:text=');
+  if (at < 0) return '';
+  const parts = s.slice(at + 8).split('&')[0].split(',').filter((p) => p && !p.endsWith('-') && !p.startsWith('-'));
+  try { return parts.length ? decodeURIComponent(parts[0]).trim() : ''; } catch (_e) { return ''; }
+}
+
 /** The page key a site URL names (its #fragment is not part of it), or null. */
 export function answersUrlKey(url) {
   const u = siteUrl(url);
