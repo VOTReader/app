@@ -1,15 +1,16 @@
-/* useThumbnails — the WEB BOOT QUIET WINDOW.
+/* useThumbnails — the BOOT QUIET WINDOW (web and Android).
    ─────────────────────────────────────────────────────────────────
    Lighthouse mobile (docs/perf/lighthouse-2026-09.md, item 1): the
    capture-after-nav effect fired 350 ms after the first screen, so an
    html2canvas clone render (plus the other-theme render) ran in the middle
    of page load — 4.5 to 8.2 s of main-thread time on the reading pages.
 
-   On the web, non-urgent captures now wait until the page has been up for
-   WEB_BOOT_CAPTURE_FLOOR_MS AND the main thread has gone idle. Urgent
+   Non-urgent captures now wait until the page has been up for
+   BOOT_CAPTURE_FLOOR_MS AND the main thread has gone idle. Urgent
    captures (the Tabs overview opening, goTabs) still run at once, so the
-   cards stay correct. Android is untouched: its captures keep the 350 ms
-   cadence. */
+   cards stay correct. Android too since pf1 (2026-10-22): reopening the APK
+   with a reader tab restored froze 2.2 s + 1.2 s in html2canvas on the S22
+   and held the search index back to 4-9 s. */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
@@ -28,7 +29,7 @@ vi.mock('../utils/platform-bridge.js', () => ({
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import {
   useThumbnails, noteCaptureInteraction,
-  WEB_BOOT_CAPTURE_FLOOR_MS, _resetCaptureBootGateForTests,
+  BOOT_CAPTURE_FLOOR_MS, _resetCaptureBootGateForTests,
 } from './use-thumbnails.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -67,12 +68,12 @@ const hookProps = (over) => ({
 const flush = async () => act(async () => { await Promise.resolve(); });
 const advance = async (ms) => { await act(async () => { vi.advanceTimersByTime(ms); }); await flush(); };
 
-describe('useThumbnails — web boot quiet window', () => {
+describe('useThumbnails — boot quiet window', () => {
   it('web: no capture during page load — the first after-nav capture waits past the floor', async () => {
     renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
     await advance(350);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS - 1000);
+    await advance(BOOT_CAPTURE_FLOOR_MS - 1000);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
     await advance(1000 + 50);                 // floor passed + idle fallback
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
@@ -85,14 +86,14 @@ describe('useThumbnails — web boot quiet window', () => {
     rerender(hookProps({ tabs: [tabA, tabB], activeTabIdx: 1, activeTab: tabB }));
     await advance(350);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS + 50);
+    await advance(BOOT_CAPTURE_FLOOR_MS + 50);
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
     expect(g.idbPut).toHaveBeenCalledWith('key-b', expect.anything());
   });
 
   it('web: after the boot window, navigation captures on the old 350 ms cadence', async () => {
     const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS + 400);
+    await advance(BOOT_CAPTURE_FLOOR_MS + 400);
     await advance(1000);                      // its other-theme render
     takeThemedScreenshot.mockClear();
     rerender(hookProps({ tabs: [tabA, tabB], activeTabIdx: 1, activeTab: tabB }));
@@ -116,7 +117,7 @@ describe('useThumbnails — web boot quiet window', () => {
     const { unmount } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
     await advance(350);
     unmount();
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS * 2);
+    await advance(BOOT_CAPTURE_FLOOR_MS * 2);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
   });
 
@@ -124,15 +125,24 @@ describe('useThumbnails — web boot quiet window', () => {
     const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
     await advance(350);
     rerender(hookProps({ tabsEnabled: false }));
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS * 2);
+    await advance(BOOT_CAPTURE_FLOOR_MS * 2);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
   });
 
-  it('Android: unchanged — the after-nav capture still fires at 350 ms', async () => {
+  it('Android: the same window — no capture during page load, one after the floor', async () => {
     bridge.isAndroid = true;
     renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
     await advance(350);
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();
+    await advance(BOOT_CAPTURE_FLOOR_MS + 50);
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('Android: the overview-open heal still captures during boot', async () => {
+    bridge.isAndroid = true;
+    renderHook((p) => useThumbnails(p), { initialProps: hookProps({ tabsOverviewOpen: true }) });
+    await advance(60);
+    expect(takeThemedScreenshot).toHaveBeenCalledWith('dark', 1440, 90);
   });
 });
 
@@ -144,10 +154,10 @@ describe('useThumbnails — the Scripture Web is never captured', () => {
   it.each([[false], [true]])('Android %s: no capture and no retries on the web, and a later tab still captures', async (android) => {
     bridge.isAndroid = android;
     const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps({ tabs: [webTab], activeTab: webTab }) });
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS * 3);
+    await advance(BOOT_CAPTURE_FLOOR_MS * 3);
     expect(takeThemedScreenshot).not.toHaveBeenCalled();
     rerender(hookProps({ tabs: [webTab, tabB], activeTabIdx: 1, activeTab: tabB }));
-    await advance(WEB_BOOT_CAPTURE_FLOOR_MS * 2);
+    await advance(BOOT_CAPTURE_FLOOR_MS * 2);
     expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
   });
 });

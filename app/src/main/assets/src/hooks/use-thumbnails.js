@@ -31,8 +31,8 @@
                                    stored thumbs would be the wrong aspect)
      - capture-after-nav effect   (fires 350 ms after screen/tab change,
                                    then waits out the calm gate)
-     - the web boot quiet window  (web only: no non-urgent capture until
-                                   WEB_BOOT_CAPTURE_FLOOR_MS after the first
+     - the boot quiet window      (web and Android: no non-urgent capture
+                                   until BOOT_CAPTURE_FLOOR_MS after the first
                                    render AND an idle moment — keeps
                                    html2canvas out of page load)
      - overview-open heal effect  (opening the overview captures the active
@@ -174,7 +174,7 @@ export function captureIsCalm(now) {
   return !down && (now - _lastInteractTs) >= CAPTURE_CALM_MS;
 }
 
-/* ── Web boot quiet window ──────────────────────────────────────────────
+/* ── Boot quiet window ──────────────────────────────────────────────────
    Lighthouse mobile (docs/perf/lighthouse-2026-09.md, item 1): the after-nav
    capture fired 350 ms after the FIRST screen, so the html2canvas load and
    its clone renders (plus the other-theme render) landed in the middle of
@@ -182,14 +182,17 @@ export function captureIsCalm(now) {
    pages, the top bootup-time entry on every page. Nobody sees a card during
    load: the Tabs overview is the only place cards appear, and opening it
    captures URGENTLY (the heal effect below, and goTabs in app.jsx).
-   So on the WEB every non-urgent capture waits until the page has been up
-   for WEB_BOOT_CAPTURE_FLOOR_MS (measured from the hook's first mount, i.e.
+   So every non-urgent capture waits until the page has been up
+   for BOOT_CAPTURE_FLOOR_MS (measured from the hook's first mount, i.e.
    the first render) AND the main thread has an idle moment; navigations in
    that window collapse into ONE capture of whatever tab is active when it
    lifts. The window lifts once per page load and never re-arms.
-   ANDROID is untouched (PlatformBridge.isAndroid): it keeps the 350 ms
-   cadence, and the native PixelCopy Garden path is not involved. */
-export const WEB_BOOT_CAPTURE_FLOOR_MS = 10000;
+   ANDROID too (pf1, 2026-10-22; it was exempt until then): on the S22,
+   reopening the APK with a reader tab restored ran a 2.0-2.3 s and a
+   1.1-1.3 s html2canvas task in every load (about 3.3 s of a CPU profile)
+   and held the search index back to 4-9 s; from Home there was no freeze
+   over 70 ms and the index was ready in 0.65 s. */
+export const BOOT_CAPTURE_FLOOR_MS = 10000;
 const WEB_BOOT_IDLE_TIMEOUT_MS = 5000;
 let _bootFloorAt = /** @type {number | null} */ (null);
 let _bootSettled = false;
@@ -200,7 +203,7 @@ let _bootIdleCancel = /** @type {null | (() => void)} */ (null);
 
 /** Start the floor clock at the first render (first call wins). */
 function noteCaptureBootStart(now) {
-  if (_bootFloorAt == null) _bootFloorAt = now + WEB_BOOT_CAPTURE_FLOOR_MS;
+  if (_bootFloorAt == null) _bootFloorAt = now + BOOT_CAPTURE_FLOOR_MS;
 }
 
 /**
@@ -517,10 +520,10 @@ export function useThumbnails({
     // overview-open heal covers anything still stale.
     if (typeof document !== 'undefined' && document.body
       && document.body.classList.contains('autoscroll-running')) return;
-    // WEB BOOT QUIET WINDOW (see the module header). Non-urgent web captures
-    // wait for it; one pending wait per hook, so boot-time navigations
-    // collapse into one capture. Android keeps its cadence.
-    if (!(opts && opts.urgent) && !PlatformBridge.isAndroid && !_bootSettled) {
+    // BOOT QUIET WINDOW (see the module header). Non-urgent captures wait
+    // for it on both platforms; one pending wait per hook, so boot-time
+    // navigations collapse into one capture.
+    if (!(opts && opts.urgent) && !_bootSettled) {
       if (!bootWaitCancelRef.current) {
         bootWaitCancelRef.current = whenCaptureBootSettled(() => {
           bootWaitCancelRef.current = null;

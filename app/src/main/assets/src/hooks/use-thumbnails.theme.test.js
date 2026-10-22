@@ -43,7 +43,7 @@ const takeThemedScreenshot = /** @type {import('vitest').Mock} */ (PlatformBridg
 
 beforeEach(() => {
   vi.useFakeTimers();
-  // Post-boot cadence: the web boot quiet window has its own test file
+  // Post-boot cadence: the boot quiet window has its own test file
   // (use-thumbnails.boot.test.js).
   _resetCaptureBootGateForTests(true);
   g.idbReadAll = vi.fn(async () => ({}));
