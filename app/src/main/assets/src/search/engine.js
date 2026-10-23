@@ -1103,6 +1103,19 @@ const MEANING_SURE_LEAD = 0.5;
 const MEANING_TIE = 0.012;
 /** Two copies of one passage score alike to the float: a reprint is no next text. */
 const MEANING_SAME = 1e-4;
+/* THE LEAD AGREES WITH THE RARE WORDS (search200 sweep, meaning-fusion, 2026-10-22). The clear first's lead was read
+   from the cosine alone. A typed word few texts say is the strongest sign the words have of the text meant, so the
+   lead reads it too: a first holding a rare typed word leads by MEANING_SURE_HELD; and a first lacking the rare word
+   the words' own first holds does not lead, when the model rates that text within MEANING_AGREE of its first too (the
+   two nearly agree on it, and the rare word tells them apart). "timothy sad because his family rejects the letters": the
+   letter about loved ones rejecting the Word led the model by 0.032 and holds "rejects"; "the letter where the little
+   flock gets disbanded": an Answers topic led the model by 0.043 without "disbanded", which one letter says. */
+/** A typed word at most this many texts say (its forms with it) is rare. */
+const MEANING_RARE_DF = 30;
+/** How far (cosine) the model's first holding a rare typed word must lead the next text it ranks. */
+const MEANING_SURE_HELD = 0.025;
+/** How near (cosine) the model rates the words' first to its own for the two to nearly agree on it. */
+const MEANING_AGREE = 0.06;
 /**
  * @param {Array<{score:number, doc:any, terms?:string[], placeStart?:number, meaningStart?:number}>} out
  * @param {Map<any, string>} idOf
@@ -1110,15 +1123,10 @@ const MEANING_SAME = 1e-4;
  * @param {(doc:any) => boolean} named
  * @param {number} held  the most of the query one passage of the words engine's top holds (bestPassageFirst)
  * @param {(doc:any) => boolean} admit  marks a document the meaning adds shown: false for a text already shown
+ * @param {(id:string) => number} rare  the rare typed words a document holds (a mask; 0 for none)
  */
-function meaningFirst(out, idOf, sem, named, held, admit) {
+function meaningFirst(out, idOf, sem, named, held, admit, rare) {
   const w = MEANING_WEIGHT * Math.max(0, 1 - held);
-  // The model's clear first: far enough ahead of the next text it ranks (its own copies aside).
-  let sure = '';
-  if (w > 0 && sem.length) {
-    const next = sem.find((s) => sem[0].score - s.score > MEANING_SAME);
-    if (!next || sem[0].score - next.score >= MEANING_SURE) sure = sem[0].id;
-  }
   // Its order, with texts it cannot tell apart taken original first.
   const tierOf = (/** @type {string} */ id) => { const f = msIndex.getStoredFields(id); return (f && ORIGINAL_TIER[f.kind]) ?? 5; };
   const order = sem.map((s) => ({ s, t: tierOf(s.id) }));
@@ -1128,6 +1136,18 @@ function meaningFirst(out, idOf, sem, named, held, admit) {
     }
   }
   const semRank = new Map(order.map((o, i) => [o.s.id, i]));
+  // The model's clear first: far enough ahead of the next text it ranks (its own copies aside), the less so holding a
+  // rare typed word, and not when it lacks the rare word of the words' first that the model rates nearly as high.
+  let sure = '';
+  if (w > 0 && sem.length) {
+    const next = sem.find((s) => sem[0].score - s.score > MEANING_SAME);
+    const by = next ? sem[0].score - next.score : Infinity;
+    const mine = rare(sem[0].id);
+    const wordsFirst = out.length ? idOf.get(out[0]) : undefined;
+    const theirs = wordsFirst && wordsFirst !== sem[0].id ? sem.find((s) => s.id === wordsFirst) : undefined;
+    const lacks = !!theirs && sem[0].score - theirs.score <= MEANING_AGREE && (rare(theirs.id) & ~mine) !== 0;
+    if (!lacks && (by >= MEANING_SURE || (mine && by >= MEANING_SURE_HELD))) sure = sem[0].id;
+  }
   const semStart = new Map(sem.map((s) => [s.id, s.start]));
   const top = out.slice(0, MEANING_REACH);
   const rest = out.slice(MEANING_REACH);
@@ -3700,7 +3720,14 @@ async function search(query, options) {
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed({ ...f, id: s.id }); });
     const wordsFirst = out[0];
-    if (sem && sem.length) meaningFirst(out, idOf, sem, namedOr, held, fresh);
+    if (sem && sem.length) {
+      // the rare typed words (MEANING_RARE_DF): a word's forms count with it, its synonyms do not
+      const dfOf = new Map();
+      for (const u of units) if ((u.literal || u.form) && u.origin < 31 && !isStopTerm(u.term)) dfOf.set(u.origin, Math.max(dfOf.get(u.origin) || 0, docFreq(u.term)));
+      let rareMask = 0;
+      for (const u of units) if (u.literal && u.origin < 31 && !isStopTerm(u.term) && dfOf.get(u.origin) <= MEANING_RARE_DF && docFreq(u.term) > 0) rareMask |= 1 << u.origin;
+      meaningFirst(out, idOf, sem, namedOr, held, fresh, (id) => (termMask[id] || 0) & rareMask);
+    }
     /* A QUOTE TYPED NEARLY RIGHT KEEPS ITS PLACE OVER AN UNSURE MEANING (search200 fix1, scope cause 5). Kept to a
        scope that hides the texts holding the typed run whole, the words' best passage held most of the quote
        (ALIGN_HELD) and the meaning still lifted over it a text the model was not sure of, holding fewer of the typed
