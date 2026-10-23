@@ -15,6 +15,7 @@ import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
 import { recordingTranslationFor, textForRecording } from '../../utils/audio-text-edition.js';
 import { BackHintPill } from '../components/BackHintPill.jsx';
+import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
 export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
   const bodyRef = React.useRef(null);
@@ -204,6 +205,15 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           : prevBook ? { kind: 'boundary', eyebrow: 'Previous Book', title: prevBoundaryTitle || `${prevBook.title} ${prevBook.chapters[prevBook.chapters.length - 1].num}` } : null),
   };
 
+  /* U04.7 / U07.3: a chapter landed on mid-way (a shared verse link, a search hit) named nothing once its hero had
+     gone: the top bar shows only icons. It names itself in the band the letters have (MiniTitleBand), pinned under
+     the top bar once the hero has scrolled away, in the hero's own words ("John · Chapter 3" over its title). */
+  const heroRef = React.useRef(null);
+  const heroTitle = showChapterTitle && !titleFocusHidden && displayChapterTitle ? displayChapterTitle : book.subtitle;
+  const miniTitle = inert ? null : (
+    <MiniTitleBand heroRef={heroRef} pageKey={chapterKey} eyebrow={book.title + ' · Chapter ' + chapter.num} title={heroTitle || ''} />
+  );
+
   // An inert clone (a swipe peek) must never claim __onReadingComplete.
   useMarkAsRead(inert ? false : markAsReadEnabled, onMarkRead, readTrackKey);
 
@@ -253,17 +263,21 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <button type="button" className="visit-ed-btn" onClick={readOwnEdition}>Read in {translationLabel(readerTranslation)}</button>
           </div>
         ) : null;
-        if (!backHint) return visitRow ? <div className="back-hint-row visit-ed-solo">{visitRow}</div> : null;
-        return <BackHintPill backHint={backHint} onClick={onTapThroughBack}>{visitRow}</BackHintPill>;
+        // the mini title hangs from the "Back to" band's bottom edge, or from a zero-height anchor when there is none
+        if (!backHint) {
+          if (visitRow) return <div className="back-hint-row visit-ed-solo">{visitRow}{miniTitle}</div>;
+          return miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null;
+        }
+        return <BackHintPill backHint={backHint} onClick={onTapThroughBack}>{visitRow}{miniTitle}</BackHintPill>;
       })()}
       {(() => {
         const titleEffective = showChapterTitle && !titleFocusHidden;
         const canFocusTitle = showChapterTitle && displayChapterTitle;
         const hasCuratedTitle = !!displayChapterTitle;
-        const titleText = titleEffective && hasCuratedTitle ? displayChapterTitle : book.subtitle;
+        const titleText = heroTitle; // the band above says the same
         const titleIsTappable = titleEffective && hasCuratedTitle;
         return (
-          <header className="hero">
+          <header className="hero" ref={heroRef}>
             <div className={`hero-bg${OT_BOOK_IDS.has(book.id) ? " ot" : ""}`} />
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>

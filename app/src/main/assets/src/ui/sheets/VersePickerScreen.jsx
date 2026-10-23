@@ -59,18 +59,20 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     return verses.filter(v => (v.text || '').toLowerCase().includes(filterQ) || String(v.n) === filterQ);
   }, [verses, filterQ]);
   // s29.3: a selection the filter hides is dropped, so the Link button never
-  // links verses the reader can no longer see.
+  // links verses the reader can no longer see. That is any verse of it, not
+  // just its ends: a 3-10 kept while a filter shows 3 and 10 with 4-9 gone
+  // would link six verses off the screen (the seam v079 trims on a new drag).
   React.useEffect(() => {
     if (!selInfo) return;
-    const shown = (n) => shownVerses.some(v => v.n === n);
-    if (!shown(selInfo.verseStart) || !shown(selInfo.verseEnd)) {
+    const shown = new Set(shownVerses.map(v => v.n));
+    if (verses.some(v => v.n >= selInfo.verseStart && v.n <= selInfo.verseEnd && !shown.has(v.n))) {
       setSelInfo(null);
       try {
         const sel = window.getSelection();
         sel && sel.removeAllRanges && sel.removeAllRanges();
       } catch (_e) { /* no selection API */ }
     }
-  }, [shownVerses, selInfo]);
+  }, [verses, shownVerses, selInfo]);
 
   // captureSelectionSync — find the verse element(s) the user selected, build
   // a span descriptor with the actual selected text plus verse-level + char-

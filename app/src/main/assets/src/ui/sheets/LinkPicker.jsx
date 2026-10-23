@@ -87,10 +87,6 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
   // Full-text results: null = idle (no query / too short), 'building' =
   // engine still preparing its index, [] / [...] = resolved rows.
   const [contentHits, setContentHits] = React.useState(/** @type {any} */ (null));
-  // W51: the words (and corpus) the hits above were found for. The text search
-  // is debounced and async, so for a moment after typing the list still holds
-  // the previous query's hits; Enter acts only on hits for the words in the box.
-  const contentHitsForRef = React.useRef(/** @type {string | null} */ (null));
   const inputRef = React.useRef(null);
   const trapRef = useFocusTrap(true);
   // Re-read RecentNavStore every render so newly-added picks float to the top
@@ -185,7 +181,6 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
           rows.push({ item, snippet: eng.snippet(r.doc.text || '', terms, 110) });
           if (rows.length >= 20) break;
         }
-        contentHitsForRef.current = q + '|' + corpusScope;
         setContentHits(rows);
       } catch (_e) {
         if (!cancelled) setContentHits([]); // engine failed — honest empty state
@@ -495,11 +490,14 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
                 placeholder={searchScope === 'text' ? "Search any phrase in the text…" : "Search titles & references…"}
                 value={input}
                 onChange={e => setInput(e.target.value)}
+                enterKeyHint="search"
+                /* A06.7: Enter shows the results and makes no link. It linked the top hit, a link the
+                   reader never saw (the keyboard covered the list, and the text search lags the box):
+                   a link is made by a tap on the row it names. Enter puts the keyboard away. */
                 onKeyDown={e => {
                   if (e.key !== 'Enter') return;
-                  if (searchScope === 'titles' && results.length > 0) createLinkTo(results[0]);
-                  else if (searchScope === 'text' && Array.isArray(contentHits) && contentHits.length > 0
-                    && contentHitsForRef.current === input.trim() + '|' + corpusScope) createLinkTo(contentHits[0].item);
+                  e.preventDefault();
+                  e.currentTarget.blur();
                 }}
               />
             </div>

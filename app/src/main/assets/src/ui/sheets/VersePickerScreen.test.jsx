@@ -385,6 +385,33 @@ describe('VersePickerScreen drag across a filtered seam (sweep v079)', () => {
     expect(target.text).toBe('DOM-ADJACENT SELECTION');
   });
 
+  it('a kept 3-10 selection that a later filter splits (hidden 5-9 between shown ends) is dropped, not linked (s29.3)', () => {
+    vi.useFakeTimers();
+    const { container } = renderFiltered('');
+    const textOf = (n) => /** @type {Element} */ (container.querySelector('[data-verse="' + n + '"] .picker-verse-text'));
+    const startNode = textOf(3).firstChild;
+    const endNode = textOf(10).firstChild;
+    const getSelectionOrig = window.getSelection;
+    window.getSelection = /** @type {any} */ (() => ({
+      isCollapsed: false, rangeCount: 1, removeAllRanges: () => {},
+      getRangeAt: () => ({ startContainer: startNode, startOffset: 2, endContainer: endNode, endOffset: 8, toString: () => 'X' }),
+      toString: () => 'X',
+    }));
+    try {
+      act(() => { document.dispatchEvent(new Event('selectionchange')); });
+      act(() => { vi.advanceTimersByTime(200); });
+    } finally {
+      window.getSelection = getSelectionOrig;
+    }
+    const btn = () => /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+    expect(btn().disabled).toBe(false);
+    // 'lamp' shows 1, 3, 4 and 10: both ends stay in view, 5-9 go
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'lamp' } });
+    expect(btn().disabled).toBe(true);
+    fireEvent.click(btn());
+    expect(window.persistLink).not.toHaveBeenCalled();
+  });
+
   it("with the real word snapper the seam end is the run's last verse whole, as v6's step-back ends", () => {
     vi.useFakeTimers();
     const { container } = renderFiltered('lamp');

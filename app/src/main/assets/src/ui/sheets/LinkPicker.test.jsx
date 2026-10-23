@@ -296,12 +296,11 @@ describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
   });
 });
 
-/* W51: Enter in Full text linked the top hit of the PREVIOUS query: the text
-   search is debounced and async, so for a moment after typing the list (and
-   Enter) still held the old query's hits. Enter now acts only on hits made
-   for the words in the box. */
-describe('LinkPicker Full text: Enter acts on the words in the box (W51)', () => {
-  it('ignores Enter while the hits still belong to the previous query, then links the new top hit', async () => {
+/* W51 / A06.7: Enter in Full text linked the top hit of the PREVIOUS query (the
+   text search is debounced and async). Enter now links nothing at all: it puts
+   the keyboard away so the results show, and a link takes a tap on its row. */
+describe('LinkPicker search: Enter shows the results and makes no link (A06.7)', () => {
+  it('Enter never links, before or after the hits for the words in the box arrive; a tap does', async () => {
     vi.useFakeTimers();
     stubGlobals();
     window.navItemToEndpoint = (item) => ({ type: 'bible', key: 'k', label: item.label, verse: item.verse || null });
@@ -327,7 +326,11 @@ describe('LinkPicker Full text: Enter acts on the words in the box (W51)', () =>
       expect(window.persistLink).not.toHaveBeenCalled();
       await act(async () => { vi.advanceTimersByTime(300); });
       await act(async () => { await Promise.resolve(); });
+      /** @type {HTMLInputElement} */ (box).focus();
       fireEvent.keyDown(box, { key: 'Enter' });
+      expect(window.persistLink).not.toHaveBeenCalled();
+      expect(document.activeElement).not.toBe(box);
+      fireEvent.click(screen.getByText('Matthew 7:14').closest('button'));
       expect(window.persistLink).toHaveBeenCalledTimes(1);
       expect(window.persistLink.mock.calls[0][1].label).toBe('Matthew 7:14');
     } finally {
