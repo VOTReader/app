@@ -124,7 +124,10 @@ const BUDGETS = [
   // by 1,000 B at 387,700 B. All of it is the web's own chrome; nothing new is imported. Re-baselined UP by
   // the bundle-d rule: 387,700 x 1.15 = 445,855 -> the hundred above. (Moving the .sw rules out of the
   // render-blocking sheet is the real saving, and a separate change.)
-  { file: 'app.min.css', measured: 387700, max: 445900 },   // render-blocking <link> in index.html
+  // 2026-10-23, sy4-3 song voting: the vote pair, the first thumbs-down note and the Popular / All-time loved / New
+  // shelves with their See all tabs added ~2.0 KB of real CSS on top of main's 444,387 B, which crossed the old
+  // ceiling. Re-baselined UP by the same rule: 446,374 x 1.15 = 513,330 -> the hundred above.
+  { file: 'app.min.css', measured: 446374, max: 513400 },   // render-blocking <link> in index.html
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
