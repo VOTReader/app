@@ -96,10 +96,10 @@ export function highlightExcerptInDom(mainEl, excerpt) {
   if (stream.length === 0) return [];
 
   // Find anchor by scanning for the longest consecutive prefix match.
-  const findAnchor = (anchorLen) => {
-    if (anchorLen > exTokens.length) anchorLen = exTokens.length;
+  const findAnchor = (from, anchorLen) => {
+    if (from + anchorLen > exTokens.length) anchorLen = exTokens.length - from;
     if (anchorLen < 1) return -1;
-    const need = exTokens.slice(0, anchorLen);
+    const need = exTokens.slice(from, from + anchorLen);
     const first = need[0];
     outer: for (let i = 0; i <= stream.length - need.length; i++) {
       if (stream[i] !== first) continue;
@@ -108,12 +108,21 @@ export function highlightExcerptInDom(mainEl, excerpt) {
     }
     return -1;
   };
-  let anchor = findAnchor(8);
-  if (anchor === -1) anchor = findAnchor(6);
-  if (anchor === -1) anchor = findAnchor(4);
+  // An excerpt can open with words its letter does not have there (an Answers passage's
+  // "Thus says The Lord:" line, the S22 seam walk 10-22 F2): with no anchor at its start,
+  // try up to 8 words in, always keeping 4 to anchor on.
+  const maxSkip = Math.max(0, Math.min(8, exTokens.length - 4));
+  let anchor = -1;
+  let from = 0;
+  for (; from <= maxSkip; from++) {
+    anchor = findAnchor(from, 8);
+    if (anchor === -1) anchor = findAnchor(from, 6);
+    if (anchor === -1) anchor = findAnchor(from, 4);
+    if (anchor !== -1) break;
+  }
   if (anchor === -1) return [];
 
-  let exIdx = 0;
+  let exIdx = from;
   let stIdx = anchor;
   let lastMatchedStreamIdx = anchor;
   const maxDrift = Math.max(8, Math.floor(exTokens.length * 0.25));

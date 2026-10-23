@@ -1958,6 +1958,20 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
     expect(document.querySelector('[role="dialog"]')).toBeNull();
   });
 
+  it('the web\'s door on an Answers topic names a topic, not a letter (seam walk 10-22 F6)', async () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    try {
+      const c = readingContainer('wtlb:there-is-no-other:0', 'For I am a Great King! Says The Lord.');
+      mount();
+      const tb = await raise(c, 0, 22);
+      const web = /** @type {HTMLButtonElement} */ (tb.querySelector('[data-door="web"]'));
+      expect(web.textContent.trim()).toBe('See this topic’s scriptures');
+      act(() => { web.click(); });
+      expect(open).toHaveBeenCalledWith('this-letter');
+    } finally { delete /** @type {any} */ (window).__openScriptureWeb; }
+  });
+
   it('a selection across two passages is cited by the passage it starts in', async () => {
     const w = /** @type {any} */ (window);
     w.ANSWERS = [{ id: 'there-is-no-other', title: 'THERE IS NO OTHER', paragraphs: [

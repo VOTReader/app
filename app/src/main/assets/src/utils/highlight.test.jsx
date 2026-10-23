@@ -118,6 +118,17 @@ describe('highlightExcerptInDom — the anchor, the drift walk and the guards', 
     expect(highlightExcerptInDom(root4, 'Behold I stand here ALWAYS WITHOUT FAIL')).toHaveLength(1);
   });
 
+  it('skips lead-in words the letter does not have there (an Answers passage\'s "Thus says The Lord:")', () => {
+    const root = letter('<p>Come forth, O acolytes of satan, all you wicked vipers who shake your fists!</p>');
+    const hits = highlightExcerptInDom(root, 'Thus says The Lord: Come forth, O acolytes of satan, all you wicked vipers');
+    expect(hits).toHaveLength(1);
+    expect(marked(root)).toContain('Come forth');
+    expect(marked(root)).not.toMatch(/Thus/);
+    // nine lead-in words is past the skip: nothing is marked
+    expect(highlightExcerptInDom(letter('<p>Come forth, O acolytes of satan, all you wicked vipers.</p>'),
+      'one two three four five six seven eight nine Come forth O acolytes of satan')).toEqual([]);
+  });
+
   it('a short excerpt (under 4 tokens) still anchors on what it has', () => {
     const root = letter('<p>Be still and know.</p>');
     expect(highlightExcerptInDom(root, 'Be still')).toHaveLength(1);

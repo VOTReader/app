@@ -77,7 +77,9 @@ function webDoorOf(selInfo) {
     return open(start, { check: true }) ? { start, label: 'Show in Scripture Web' } : null;
   }
   if (/^(letter|wtlb):/.test(key)) {
-    return open('this-letter', { check: true }) ? { start: 'this-letter', label: 'See this letter\u2019s scriptures' } : null;
+    // an Answers topic is a page of the site, not a letter (the S22 seam walk 10-22, F6)
+    const what = answersCardKey(selInfo) ? 'topic' : 'letter';
+    return open('this-letter', { check: true }) ? { start: 'this-letter', label: 'See this ' + what + '\u2019s scriptures' } : null;
   }
   return null;
 }
