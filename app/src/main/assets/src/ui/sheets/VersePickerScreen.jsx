@@ -58,6 +58,19 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     if (!filterQ) return verses;
     return verses.filter(v => (v.text || '').toLowerCase().includes(filterQ) || String(v.n) === filterQ);
   }, [verses, filterQ]);
+  // s29.3: a selection the filter hides is dropped, so the Link button never
+  // links verses the reader can no longer see.
+  React.useEffect(() => {
+    if (!selInfo) return;
+    const shown = (n) => shownVerses.some(v => v.n === n);
+    if (!shown(selInfo.verseStart) || !shown(selInfo.verseEnd)) {
+      setSelInfo(null);
+      try {
+        const sel = window.getSelection();
+        sel && sel.removeAllRanges && sel.removeAllRanges();
+      } catch (_e) { /* no selection API */ }
+    }
+  }, [shownVerses, selInfo]);
 
   // captureSelectionSync — find the verse element(s) the user selected, build
   // a span descriptor with the actual selected text plus verse-level + char-

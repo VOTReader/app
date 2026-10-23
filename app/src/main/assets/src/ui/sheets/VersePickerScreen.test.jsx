@@ -394,3 +394,28 @@ describe('VersePickerScreen drag across a filtered seam (sweep v079)', () => {
     expect(target.key).toBe('bible:genesis:1:3-4:2-20');
   });
 });
+
+/* s29.3: a verse picked, then filtered out of view, was still what the Link
+   button linked. A selection the filter hides is dropped. */
+describe('VersePickerScreen selection hidden by the filter (s29.3)', () => {
+  it('filtering the picked verse out of view clears the selection', () => {
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.click(container.querySelectorAll('.picker-verse-num')[0]);   // verse 1
+    const btn = () => /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+    expect(btn().disabled).toBe(false);
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'without form' } });   // only verse 2 shows
+    expect(btn().disabled).toBe(true);
+    fireEvent.click(btn());
+    expect(window.persistLink).not.toHaveBeenCalled();
+  });
+
+  it('a filter that keeps the picked verse in view keeps the selection', () => {
+    stubGlobals();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.click(container.querySelectorAll('.picker-verse-num')[1]);   // verse 2
+    fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'without form' } });
+    const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
+    expect(btn.disabled).toBe(false);
+  });
+});
