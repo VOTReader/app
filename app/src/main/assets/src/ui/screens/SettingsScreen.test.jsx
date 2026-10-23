@@ -33,6 +33,31 @@ afterEach(() => { cleanup(); teardownSettingsGlobals(); vi.restoreAllMocks(); })
 
 const slider = (label) => document.querySelector(`input[type="range"][aria-label*="${label}"]`);
 
+describe('Mark as Read loads the studies it counts (mw17 A09.3)', () => {
+  it('opening the group loads Matthew and the Bible studies, and the Studies rows fill in when they land', async () => {
+    let landStudies;
+    window.loadBibleStudies = vi.fn(() => new Promise((r) => { landStudies = r; }));
+    window.__loadMatthewCorpus = vi.fn(() => Promise.resolve());
+    const STUDIES = { id: 'studies', label: 'Studies', genres: [{ label: 'Bible Letter Studies', books: [{ id: 'bible-study-purity', label: 'Purity', total: 7 }] }] };
+    window.buildProgressGroups = () => (window.BIBLE_STUDIES ? [STUDIES] : []);
+    try {
+      renderSettings({ markAsRead: true }, {}, { expandGroups: false });
+      fireEvent.click(groupHead('Mark as Read'));
+      expect(window.loadBibleStudies).toHaveBeenCalledTimes(1);
+      expect(window.__loadMatthewCorpus).toHaveBeenCalledTimes(1);
+      const studiesSection = () => [...document.querySelectorAll('.progress-section-toggle')].find((t) => /Studies/.test(t.textContent));
+      expect(studiesSection()).toBeUndefined();
+      window.BIBLE_STUDIES = [{ slug: 'purity' }];
+      await act(async () => { landStudies(); });
+      await waitFor(() => expect(studiesSection().textContent).toMatch(/0\s*\/\s*7/));
+    } finally {
+      delete window.loadBibleStudies;
+      delete window.__loadMatthewCorpus;
+      delete window.BIBLE_STUDIES;
+    }
+  });
+});
+
 describe('settings filter and lazy progress', () => {
   it('finds and expands backup settings, then restores the previous accordion state', () => {
     renderSettings({}, {}, { expandGroups: false });

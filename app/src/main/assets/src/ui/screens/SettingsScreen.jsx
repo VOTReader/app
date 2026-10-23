@@ -578,14 +578,20 @@ const SETTINGS_TOPICS = {
 };
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
-  React.useSyncExternalStore(
+  const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
   );
-  React.useSyncExternalStore(
+  const votVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
   );
+  // The Studies rows count Matthew and the Bible studies (mw17 A09.3).
+  const matthewVer = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
+  );
+  const [studiesTick, setStudiesTick] = React.useState(0);
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
     () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
@@ -613,11 +619,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const progressOpen = groupOpen('progress');
   // Only the progress table needs the corpora. Changing a font or exporting
   // a backup must not parse the whole library as a side effect.
+  // The Studies rows need Matthew and the Bible studies too: without them the
+  // table read Studies 0 / 0 on a first open (mw17 A09.3, as My Progress loads them).
   React.useEffect(() => {
-    if (!progressOpen) return;
-    for (const load of [window.__loadBibleCorpus, window.__loadVotCorpus]) {
+    if (!progressOpen) return undefined;
+    for (const load of [window.__loadBibleCorpus, window.__loadVotCorpus, window.__loadMatthewCorpus]) {
       if (typeof load === 'function') load().catch((e) => console.warn('Progress corpus load failed', e));
     }
+    let alive = true;
+    if (typeof loadBibleStudies === 'function') {
+      Promise.resolve(loadBibleStudies())
+        .then(() => { if (alive) setStudiesTick((t) => t + 1); })
+        .catch((e) => console.warn('Progress studies load failed', e));
+    }
+    return () => { alive = false; };
   }, [progressOpen]);
   // "Show me around" (review-tutorial): when the tour's stop needs a group open
   // (the backup stop rings Export inside Your Data), open it — whether Settings
@@ -918,7 +933,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
      My Progress dashboard). buildProgressGroups() returns [] until the
      BOOKS + VOT corpora are loaded — the subscriptions above re-render
      this screen when they land. */
-  const PROGRESS_GROUPS = buildProgressGroups();
+  // Built when a corpus lands, not on every keystroke in the find box (s23.2). The
+  // corpora themselves are keys too: a screen that loaded one bumps no tick here.
+  const _matthewNow = typeof MATTHEW !== 'undefined' ? MATTHEW : null;
+  const _studiesNow = typeof BIBLE_STUDIES !== 'undefined' ? BIBLE_STUDIES : null;
+  const PROGRESS_GROUPS = React.useMemo(() => buildProgressGroups(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildProgressGroups reads the lazy corpora as globals; these keys say when they changed
+    [bibleVer, votVer, matthewVer, studiesTick, _matthewNow, _studiesNow]);
   const countFor = (bid) => countReadFor(readItems, bid);
   const frontierData = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.get === 'function')
     ? ReadingStatsStore.get()
@@ -926,12 +947,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const frontierKeys = Object.keys((frontierData && frontierData.progress) || {})
     .filter((key) => key.indexOf(`${READ_VERSION_ID}:`) === 0);
   const hasFrontierFor = (bid) => frontierKeys.some((key) => key.indexOf(`${READ_VERSION_ID}:${bid}:`) === 0);
-  const allBooks = PROGRESS_GROUPS.flatMap((g) => g.genres.flatMap((gr) => gr.books));
   // The numerator counts the same books the denominator sums. Answers and Hidden Manna marks
   // (v1:answers:*, v1:hidden-manna:*) have no row here, so counting every readItems key let
   // "All Scriptures" pass the sum of the rows, and even its own total (sweep v075).
-  const totalRead = allBooks.reduce((s, b) => s + countFor(b.id), 0);
-  const totalItems = allBooks.reduce((s, b) => s + b.total, 0);
+  const { totalRead, totalItems } = React.useMemo(() => {
+    const allBooks = PROGRESS_GROUPS.flatMap((g) => g.genres.flatMap((gr) => gr.books));
+    return {
+      totalRead: allBooks.reduce((s, b) => s + countReadFor(readItems, b.id), 0),
+      totalItems: allBooks.reduce((s, b) => s + b.total, 0),
+    };
+  }, [PROGRESS_GROUPS, readItems]);
   // Clear All wipes every read mark, off-table ones too, so it stays live while any exists.
   const hasAnyMark = Object.keys(readItems || {}).length > 0;
   const sectionBooks = (grp) => grp.genres.flatMap((gr) => gr.books);
