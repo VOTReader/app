@@ -238,21 +238,25 @@ export function registerServiceWorker() {
       incoming.addEventListener('statechange', () => {
         if (incoming.state !== 'installed') return;
         if (!touched && Date.now() - bootAt < BOOT_TAKEOVER_MS && quiet()) { incoming.postMessage({ type: 'SKIP_WAITING' }); return; }
-        if (anotherBuildSeen) { takeNeededBuild(); return; }
+        if (anotherBuildSeen) { offerBuild(); return; }   // installed later than the failure: offered, never taken unasked
         console.info('[sw] new build downloaded; it waits for the next open or a return after 10 min away');
       });
     });
 
-    // W27 + up1: something the reader asked for could not be served by this build. Take the new one now when nothing
-    // plays and nothing is held (what they asked for failed to load anyway); else offer it, one tap, once.
+    // W27 + up1: something the reader asked for did not load (another build's code or timings: the worker's 503).
+    // A build already waiting, nothing playing, nothing held: take it now, the load that failed is what the reader is
+    // waiting for. Otherwise offer it, one tap; a build that only finishes installing later is offered too.
     let offered = false;
     const takeNeededBuild = () => {
       const w = reg.waiting;
-      if (!w) return;   // still installing: 'installed' above comes back here
+      if (!w) return;   // still installing: 'installed' above offers it
       if (quiet()) { w.postMessage({ type: 'SKIP_WAITING' }); return; }
-      if (offered) return;
+      offerBuild();
+    };
+    const offerBuild = () => {
+      if (offered || !reg.waiting) return;
       offered = true;
-      showToast({ id: UPDATE_READY_TOAST_ID, className: 'vot-toast', text: UPDATE_READY_TEXT, durationMs: 10000 });
+      showToast({ id: UPDATE_READY_TOAST_ID, className: 'vot-toast', text: UPDATE_READY_TEXT, durationMs: 20000 });
       const el = document.getElementById(UPDATE_READY_TOAST_ID);
       if (!el) return;
       el.classList.add('vot-toast-action');

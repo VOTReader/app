@@ -1380,6 +1380,8 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(res.status).toBe(503);
     expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeFalsy();
     expect(registration.count).toBe(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'the pages are told (up1)').toBe(1);
   });
 
   it('a code file this build lacks: its own bytes from the network are served and kept', async () => {
@@ -1407,6 +1409,8 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(res.status).toBe(503);
     expect(await (await sw.caches.open(CURRENT_CORPUS)).match(TIMINGS)).toBeFalsy();
     expect(registration.count).toBe(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'the pages are told (up1)').toBe(1);
   });
 
   it('online, another build\'s corpus text is served for now, never kept, and marked for search', async () => {
@@ -1418,6 +1422,8 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(await otherCorpusAfter(res, otherBuildBytes(KJV).length)).toEqual([KJV]);
     expect(await (await sw.caches.open(CURRENT_CORPUS)).match(KJV)).toBeFalsy();
     expect(registration.count).toBe(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'text that loaded tells nobody: the reader is reading it (up1 r2)').toBe(0);
   });
 
   it('this build\'s own corpus bytes carry no mark', async () => {

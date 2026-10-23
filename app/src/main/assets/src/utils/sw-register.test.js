@@ -615,6 +615,28 @@ describe('registerServiceWorker — auto-update (no toast)', () => {
       expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
     });
 
+    it('a build that finishes installing AFTER the failure is offered, never taken unasked (up1 r2)', async () => {
+      const incoming = fakeWorker();
+      let regListeners = {};
+      const reg = { waiting: null, installing: incoming, addEventListener: (t, cb) => { regListeners[t] = cb; }, update: () => {} };
+      Object.defineProperty(navigator, 'serviceWorker', { configurable: true, value: {
+        controller: {}, register: () => Promise.resolve(reg),
+        addEventListener: (type, cb) => { if (type === 'message') deliver = cb; },
+      }});
+      registerServiceWorker();
+      await flush();
+      window.dispatchEvent(new Event('pointerdown'));
+      deliver({ data: { type: 'ANOTHER_BUILD' } });   // nothing waiting yet
+      regListeners.updatefound();
+      reg.waiting = incoming;
+      incoming.fireState('installed');
+      expect(incoming.postMessage).not.toHaveBeenCalled();
+      const el = document.getElementById('vot-toast-update-ready');
+      expect(el && el.textContent).toBe('A newer version is ready. Tap to update.');
+      el.click();
+      expect(incoming.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
     it('answers the worker BUSY question with whether it plays or holds', async () => {
       mockWithMessages(null);
       registerServiceWorker();

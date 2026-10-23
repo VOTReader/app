@@ -890,12 +890,13 @@ async function isThisBuilds(response, want) {
   return (await sha256Stripped(await response.clone().arrayBuffer())) === want;
 }
 
-/** The network holds another build: look for it now, not at the page's next check (at most once a minute), and tell
-    the pages (up1): a new build no longer takes over on its own, and this page has just asked for something its
-    build cannot give it, so sw-register takes the new build as soon as nothing plays, or offers it. */
+/** The network holds another build: look for it now, not at the page's next check (at most once a minute). With
+    `failed` (a 503: another build's code or timings, so what the page asked for did not load), also tell the pages
+    (up1): a new build no longer takes over on its own, and sw-register takes or offers it. Another build's TEXT is
+    served (marked) and told nobody: the reader is reading it. @param {boolean} [failed] */
 let _updateAskedAt = 0;
-function askForUpdate() {
-  try {
+function askForUpdate(failed) {
+  if (failed) try {
     Promise.resolve(self.clients.matchAll({ type: 'window' }))
       .then((all) => { for (const c of all || []) { try { c.postMessage({ type: 'ANOTHER_BUILD' }); } catch (_e) { /* gone */ } } })
       .catch(() => {});
@@ -1035,6 +1036,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // What's new (up1): the list the deploy writes beside index.html after the release is built, so no build's
+  // precache or integrity map can name it. Straight to the network, never kept: an old copy would announce an
+  // older release. Offline the page says nothing.
+  if (url.pathname === SW_DIR + 'whats-new.json') return;
+
   // An older build's page asking for a screen bundle this build folded into bundle-d (lz1): reload it onto this build.
   if (url.pathname.startsWith(SW_DIR) && RETIRED_SCREEN_FILE.test(url.pathname.slice(SW_DIR.length))) {
     event.respondWith(retiredScreenResponse(url.pathname));
@@ -1106,7 +1112,7 @@ async function coreFirst(request) {
     const want = key && ASSET_INTEGRITY[key];
     if (want && response.ok && !response.redirected) {
       if (!(await isThisBuilds(response, want))) {
-        askForUpdate();
+        askForUpdate(true);
         return new Response('Another build', { status: 503, statusText: 'Service Unavailable' });
       }
       try { await (await caches.open(CORE_CACHE)).put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
@@ -1280,8 +1286,8 @@ async function corpusFirst(request) {
     if (response.ok && !response.redirected) {
       // W27: another build's bytes are never kept under this build's name (THIS BUILD'S BYTES above).
       if (want && !(await isThisBuilds(response, want))) {
+        if (TIMING_FILE.test(key)) { askForUpdate(true); return new Response('Another build\'s timings', { status: 503, statusText: 'Service Unavailable' }); }
         askForUpdate();
-        if (TIMING_FILE.test(key)) return new Response('Another build\'s timings', { status: 503, statusText: 'Service Unavailable' });
         return otherBuildCopy(response, key);
       }
       const cache = await caches.open(CORPUS_CACHE);
