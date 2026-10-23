@@ -344,6 +344,15 @@ export const WebOfflineAudio = {
   },
   /** The service worker's address for a saved recording, whatever the signal, or null. @param {string} url */
   localFor: (url) => _localFor(url),
+  /**
+   * `src` is `url`'s saved-copy address, saved now or not: a Remove does not change what the element holds, and a
+   * paused element holding the copy must still resume where it was (the refuter of dl-d0 batch A).
+   * @param {string} url @param {string} src @returns {boolean}
+   */
+  isCopyOf(url, src) {
+    const m = _release(url);
+    return !!m && typeof src === 'string' && src.endsWith('/offline-audio/' + m[1] + '/' + m[2]);
+  },
   /** Tests only. */
   _reset() {
     if (_active) _active.ctl.abort();

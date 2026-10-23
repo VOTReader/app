@@ -256,6 +256,21 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.webSameRecording(URL_OF('h'), URL_OF('other'))).toBe(false);
   });
 
+  // Refuter of dl-d0 batch A: online the element now holds the saved copy, so a Remove while paused left it holding a
+  // URL that no longer counted as the same recording, and Play reloaded it from 0:00 instead of where it was paused.
+  it('the saved copy the element holds is still the same recording after it is removed', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('r'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r'))).toBe(true));
+    const local = OfflineAudio.webSrc(URL_OF('r'));
+    expect(local).toBe('https://votreader.github.io/app/offline-audio/audio-v1/r.mp3');
+    OfflineAudio.remove([URL_OF('r')]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r'))).toBe(false));
+    expect(OfflineAudio.webSrc(URL_OF('r'))).toBe(URL_OF('r'));
+    expect(OfflineAudio.webSameRecording(URL_OF('r'), local)).toBe(true);
+    expect(OfflineAudio.webSameRecording(URL_OF('other'), local)).toBe(false);
+  });
+
   it('with no worker controlling the page a saved recording loads the GitHub URL', async () => {
     await ready();
     OfflineAudio.download([{ url: URL_OF('w'), key: 'k', title: 't' }]);

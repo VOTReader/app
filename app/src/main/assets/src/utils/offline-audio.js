@@ -278,7 +278,7 @@ export const OfflineAudio = {
    * the other carries on from where it was (cf1).
    * @param {string} url @param {string} src @returns {boolean}
    */
-  webSameRecording: (url, src) => !_nativeBridge() && !!src && (src === url || src === WebOfflineAudio.localFor(url)),
+  webSameRecording: (url, src) => !_nativeBridge() && !!src && (src === url || WebOfflineAudio.isCopyOf(url, src)),
   refresh,
   /** @param {string} url */
   isSaved: (url) => statusOf(url) === 'saved',
