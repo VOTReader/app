@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   dayNum, dateOf, todayKey, cutPoints, planDays, dayItems, itemsLabel, itemsCount, newRun, runStatus, tickItem,
-  markDay, catchUp, spreadOut, spreadPreview, changePace, pauseRun, resumeRun, monthCells, isReadingDay,
+  markDay, catchUp, spreadOut, spreadPreview, changePace, pauseRun, resumeRun, monthCells, isReadingDay, weeksOnPlan, markOn,
 } from './plan-engine.js';
 import { BIBLE_BOOKS, biblePortion, BIBLE_YEAR_DAYS } from './reading-plans.js';
 
@@ -175,5 +175,32 @@ describe('the calendar', () => {
     expect(st(5)).toBe('today');
     expect(st(6)).toBe('ahead');
     expect(cells[5].day).toBe(3);   // Oct 6 reads day 4 (0-based 3) on the flexible schedule
+  });
+});
+
+describe('weeks on plan (S4)', () => {
+  // 2026-10-04 is a Sunday. Read every day from Sun 10-04 to Sat 10-17 (two whole weeks), then this week so far.
+  const readDays = (run, days) => days.reduce((r, d) => markOn(r, d, at(d)), run);
+  const dates = (a, b) => { const out = []; for (let n = dayNum(a); n <= dayNum(b); n++) out.push(dateOf(n)); return out; };
+
+  it('counts whole weeks with every reading day read, and this week once its days so far are read', () => {
+    let run = bibleYear(at('2026-10-04'));
+    run = readDays(run, dates('2026-10-04', '2026-10-20'));
+    expect(weeksOnPlan(run, at('2026-10-20'))).toBe(3);   // two whole weeks + this week (Sun-Tue) so far
+    expect(weeksOnPlan(run, at('2026-10-21'))).toBe(3);   // Wed not read yet: still on plan, today is open
+  });
+
+  it('a week short ends the count; repairing the missed day by hand puts it back', () => {
+    let run = bibleYear(at('2026-10-04'));
+    run = readDays(run, dates('2026-10-04', '2026-10-10').concat(dates('2026-10-12', '2026-10-17')));   // Sun 10-11 missed
+    expect(weeksOnPlan(run, at('2026-10-17'))).toBe(0);
+    run = markOn(run, '2026-10-11', at('2026-10-18'));
+    expect(weeksOnPlan(run, at('2026-10-18'))).toBe(2);   // both whole weeks again; the new week has nothing read yet
+  });
+
+  it('markOn ticks the next unfinished day with the date given', () => {
+    const run = markOn(bibleYear(at('2026-10-04')), '2026-10-05', at('2026-10-06'));
+    expect(dayItems(run, 0).every((it) => run.ticks[it.k] === '2026-10-05')).toBe(true);
+    expect(runStatus(run, at('2026-10-06')).day).toBe(1);
   });
 });

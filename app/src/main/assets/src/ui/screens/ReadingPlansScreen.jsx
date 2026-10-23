@@ -21,7 +21,7 @@ import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate } from '../../utils/plan-runs-view.js';
 import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
-import { monthCells, dayItems, newRun, dayNum, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
+import { monthCells, dayItems, newRun, dayNum, weeksOnPlan, markOn, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -178,6 +178,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   const [pacing, setPacing] = React.useState(/** @type {string | null} */ (null));
   const [building, setBuilding] = React.useState(/** @type {0 | 1 | 2} */ (0));
   const [monthShift, setMonthShift] = React.useState(0);
+  const [repairing, setRepairing] = React.useState(/** @type {string | null} */ (null));
   const [status, setStatus] = React.useState('');
   const rows = plans.map((r) => runRow(r, now));
   const running = new Set(plans.map((p) => p.plan));
@@ -328,6 +329,14 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                         const ref = dayRef(d);
                         const label = MONTHS[sm] + ' ' + d.date + (d.state === 'none' ? '' : ', ' + d.state);
                         const inner = (<><span className="plans-day-num">{d.date}</span><span className="plans-day-mark" aria-hidden="true" /></>);
+                        const key = sy + '-' + String(sm + 1).padStart(2, '0') + '-' + String(d.date).padStart(2, '0');
+                        if (d.state === 'missed') {
+                          // S4 repair: read that day in print or elsewhere? Mark it read (the plan's next day, dated then).
+                          return (
+                            <button key={d.date} type="button" className="plans-day" data-state="missed" aria-label={label + ': mark it read'}
+                              onClick={() => setRepairing(plan.id + '|' + key)}>{inner}</button>
+                          );
+                        }
                         return ref ? (
                           <button key={d.date} type="button" className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined}
                             aria-label={'Open ' + label} onClick={() => onRead(ref)}>{inner}</button>
@@ -337,6 +346,14 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                       })}
                     </div>
                     <p className="plans-legend"><span className="plans-key" data-state="done" />read <span className="plans-key" data-state="missed" />missed</p>
+                    {repairing && repairing.startsWith(plan.id + '|') ? (
+                      <ConfirmStrip question={'Read on ' + shortDate(repairing.slice(plan.id.length + 1)) + '? Mark it read.'} yesLabel="Mark it read"
+                        onCancel={() => setRepairing(null)}
+                        onConfirm={() => { saveRun(markOn(plan, repairing.slice(plan.id.length + 1), new Date())); setRepairing(null); }} />
+                    ) : null}
+                    {weeksOnPlan(plan, now) > 0 ? (
+                      <p className="plans-weeks">{weeksOnPlan(plan, now) + (weeksOnPlan(plan, now) === 1 ? ' week' : ' weeks') + ' on plan'}</p>
+                    ) : null}
                   </div>
                   {row.behind > 0 && !row.paused ? <Behind plan={plan} row={row} now={now} /> : null}
                   {pacing === plan.id ? <PaceChoices plan={plan} now={now} onDone={() => setPacing(null)} /> : null}

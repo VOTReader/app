@@ -463,6 +463,45 @@ export function markDay(run, d, done, now) {
   return done ? finishIfDone(next, key) : next;
 }
 
+/**
+ * S4, weeks on plan (never a streak alarm): how many weeks in a row, Sunday to Saturday, every reading day had
+ * something of the plan read on it. This week counts once a day of it is read and none before today missed; a week the plan had not
+ * started is not counted, and the first one short ends the count. A missed day repaired by hand (markOn) counts.
+ * @param {PlanRun} run @param {Date} now
+ */
+export function weeksOnPlan(run, now) {
+  const start = dayNum(run.start), today = dayNum(todayKey(now));
+  if (start == null || today == null) return 0;
+  const readOn = new Set(Object.values(run.ticks || {}).filter(Boolean));
+  let sunday = today - weekdayOf(today), weeks = 0;
+  for (; sunday + 6 >= start; sunday -= 7) {
+    let days = 0, ok = true;
+    for (let n = Math.max(sunday, start); n <= Math.min(sunday + 6, today); n++) {
+      if (!isReadingDay(run, n)) continue;
+      if (readOn.has(dateOf(n))) { days++; continue; }
+      if (n === today) continue;   // today not read yet: still open, it neither counts nor ends the week
+      ok = false;
+      break;
+    }
+    if (!ok) break;
+    if (days) weeks++;
+  }
+  return weeks;
+}
+
+/**
+ * S4 repair: the reader read on `dateKey` (in print, elsewhere): the plan's next unfinished day is ticked with that
+ * date, so the plan moves on and that day counts as read.
+ * @param {PlanRun} run @param {string} dateKey @param {Date} now
+ */
+export function markOn(run, dateKey, now) {
+  const st = runStatus(run, now);
+  if (st.finished) return run;
+  const ticks = { ...(run.ticks || {}) };
+  for (const it of dayItems(run, st.day)) if (!(it.k in ticks)) ticks[it.k] = dateKey;
+  return finishIfDone({ ...run, ticks, updated: now.getTime() }, todayKey(now));
+}
+
 /** A run whose every day is read is finished on `dateKey`. */
 function finishIfDone(run, dateKey) {
   if (run.status === 'finished' || run.status === 'stopped') return run;

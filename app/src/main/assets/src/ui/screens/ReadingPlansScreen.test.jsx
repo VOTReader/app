@@ -222,6 +222,18 @@ describe('ReadingPlansScreen', () => {
     expect(screen.queryByRole('region', { name: 'You finished Proverbs in 31 days' })).toBeNull();
   });
 
+  it('a missed day can be marked read, and whole weeks read show as weeks on plan (S4)', () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(1)));
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /: mark it read$/ })); });
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark it read' })); });
+    const run = ReadingPlanStore.active()[0];
+    expect(['genesis:1', 'genesis:2', 'genesis:3'].every((k) => run.ticks[k] === todayKey(daysAgo(1)))).toBe(true);
+    expect(screen.queryByRole('button', { name: /: mark it read$/ })).toBeNull();
+    expect(screen.getByText(/^\d+ weeks? on plan$/)).toBeTruthy();
+  });
+
   it('never scores the reader', () => {
     ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(4)));
     const { container } = render(<ReadingPlansScreen {...base()} />);
