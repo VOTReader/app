@@ -113,6 +113,8 @@ export function rubberBand(dx, width) {
 // commit a tiny drag that should spring back). ~half a frame; a real flick's
 // window is ~30ms (see the scan below), well clear of this.
 const MIN_VELOCITY_DT = 8;
+// A lift this long after the last move means the finger paused: no fling.
+const FLING_STALE_MS = 50;
 
 /**
  * Fling velocity (px/ms) from recent {x,t} samples — the delta over the last
@@ -370,7 +372,7 @@ export function createPagerGesture(io) {
   //   mode 'instant-reset' — no animation at all (force-reset at a new
   //                          touchstart; the caller starts a fresh gesture
   //                          in the same tick)
-  function endGesture(mode, traceMsg) {
+  function endGesture(mode, traceMsg, endTs) {
     if (!s) return;
     const st = s;
     s = null;
@@ -380,7 +382,11 @@ export function createPagerGesture(io) {
     if (mode === 'instant-reset') { resetTrack(); parkAllPeeks(); return; }
     if (mode === 'spring') { beginSettle(false, st.dir, st.width); return; }
     const hasSel = io.hasSelection ? io.hasSelection() : false;
-    const vx = velocityFromSamples(st.samples);
+    let vx = velocityFromSamples(st.samples);
+    // s04.3: a finger that stopped and then lifts is not a fling — zero the
+    // velocity when the lift comes more than FLING_STALE_MS after the last move.
+    const lastT = st.samples.length ? st.samples[st.samples.length - 1].t : 0;
+    if (endTs && lastT && endTs - lastT > FLING_STALE_MS) vx = 0;
     const committed = !hasSel && !!st.desc && isCommit(st.dx, vx, st.width);
     if (committed && st.desc.kind === 'boundary') { instantCommit(st.dir); return; }
     beginSettle(committed, st.dir, st.width);
@@ -467,7 +473,7 @@ export function createPagerGesture(io) {
       // Only OUR finger lifting ends the gesture; a foreign finger's lift is
       // ignored. Calls without an event (tests / unmount) end unconditionally.
       if (e && e.changedTouches && !findTouch(e.changedTouches, s.touchId)) return;
-      endGesture('commit-decide', null);
+      endGesture('commit-decide', null, e && e.timeStamp);
     },
 
     cancel(e) {
