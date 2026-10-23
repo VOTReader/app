@@ -146,6 +146,20 @@ def belts_on_disk(belts_dir):
             yield d
 
 
+def edition_vol_key(ed):
+    """The edition's player volKey ('web-ebible' -> 'bible-web'), read from the registry in audio-track.js."""
+    src = open(os.path.join(ROOT, "app", "src", "main", "assets", "src", "utils", "audio-track.js"), encoding="utf-8").read()
+    m = re.search(r"'" + re.escape(ed) + r"': Object\.freeze\(\{.*?volKey: '([^']+)'", src, re.S)
+    return m.group(1) if m else None
+
+
+def load_partial_map():
+    """bible-audio-manifest.js's BIBLE_SYNC_PARTIAL ("volKey:bookId" -> timed chapters); absent = none partial."""
+    src = open(os.path.join(DATA, "bible-audio-manifest.js"), encoding="utf-8").read()
+    m = re.search(r"^var BIBLE_SYNC_PARTIAL = (\{.*?\});$", src, re.M)
+    return json.loads(m.group(1)) if m else {}
+
+
 def check(ed, a):
     """Validate ONE edition's data file. Returns 0 when it is clean. The extractor's temp folder is removed after
     every run (it was left behind each time; al5)."""
@@ -270,40 +284,51 @@ def _check(ed, a, tmp):
                 pinned.append(f"{tag} ({bab.proven_share(belt):.3f}: {pin})")
             if rebuild(belt, pinned=pin is not None and bab.proven_share(belt) < bab.MIN_PROVEN) != arr:
                 problems.append((tag, "shipped array != rebuilt from belt"))
-    # every gate-clearing current belt must be in the file -- unless its BOOK is
-    # partial (ship() holds a half-aligned book back whole, by the same
-    # partial_books() rule; 2026-09-13, Joshua 10 of 24 at the 07:45 stop): those
-    # belts are expected absent and are printed, never silently skipped. And the
-    # shipped side must hold whole books only: a partial book in the file is the
-    # shipper without the rule.
+    # every gate-clearing current belt must be in the file. A partly aligned book
+    # ships its finished chapters (Corbin 2026-10-23 15:4x; before that a partial
+    # book was held back whole), so no clearing belt is ever expected absent.
     missing = []
-    clearing = {}
     if not structural and not os.path.isdir(belts_dir):
         problems.append((ed, f"no belt folder {belts_dir}"))
     for d in ([] if structural else belts_on_disk(belts_dir)):
         key = (d.get("bookId"), d.get("chapter"))
         entry = idx.get(key)
         if (d.get("settings_hash") == want and entry and d.get("audioSize") == os.path.getsize(entry[0])
-                and bab.clears_gate(ed, d)):
-            clearing.setdefault(key[0], set()).add(key[1])
-    held = {} if structural else bab.partial_books(clearing, idx)
-    for book, chs in clearing.items():
-        for ch in chs:
-            if book not in held and (book, ch) not in shipped:
-                missing.append(f"{book}_{ch:03d}")
+                and bab.clears_gate(ed, d) and key not in shipped):
+            missing.append(f"{key[0]}_{key[1]:03d}")
     for tag in sorted(missing):
         problems.append((tag, "current belt clears the gate but is not in the data file"))
     if pinned:
         print("  shipped BELOW the gate by GATE_PINS (proven rows only, the rest dark): " + "; ".join(sorted(pinned)))
-    if held:
-        print("  held back as partial books (whole book or nothing; their belts are expected absent): "
-              + ", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())))
+    # The library labels a partly timed book "N of M chapters" from the audio
+    # manifest's BIBLE_SYNC_PARTIAL (gen-bible-audio-manifest.mjs). A stale map
+    # labels a book wrong, or not at all, so it must agree with this file: each
+    # entry of this edition lists exactly the shipped chapters, and (full mode,
+    # where the audio index says what is recorded) every partly timed book has one.
+    vol = edition_vol_key(ed)
+    if not vol:
+        problems.append((ed, "no volKey for this edition in audio-track.js: the BIBLE_SYNC_PARTIAL check cannot run"))
+    partial_map = load_partial_map()
+    shipped_by_book = {}
+    for book, ch in shipped:
+        shipped_by_book.setdefault(book, set()).add(ch)
+    mine = {k.split(":", 1)[1]: v for k, v in partial_map.items() if vol and k.startswith(vol + ":")}
+    for book, chs in sorted(mine.items()):
+        if sorted(chs) != sorted(shipped_by_book.get(book, ())):
+            problems.append((book, f"bible-audio-manifest.js BIBLE_SYNC_PARTIAL lists {len(chs)} timed chapter(s), "
+                                   f"the data file ships {len(shipped_by_book.get(book, ()))}: re-run gen-bible-audio-manifest.mjs"))
     if not structural:
-        shipped_by_book = {}
-        for book, ch in shipped:
-            shipped_by_book.setdefault(book, set()).add(ch)
-        for book, (h, w) in sorted(bab.partial_books(shipped_by_book, idx).items()):
-            problems.append((book, f"shipped PARTIAL: {h} of the {w} chapters the audio index knows (whole book or nothing)"))
+        recorded = {}
+        for book, ch in idx:
+            recorded.setdefault(book, set()).add(ch)
+        partial = {b: (len(shipped_by_book.get(b, ())), len(chs)) for b, chs in recorded.items()
+                   if shipped_by_book.get(b, set()) != chs}
+        for book in sorted(set(partial) - set(mine)):
+            problems.append((book, f"partly timed ({partial[book][0]} of {partial[book][1]}) but not in "
+                                   f"bible-audio-manifest.js BIBLE_SYNC_PARTIAL: re-run gen-bible-audio-manifest.mjs"))
+        if partial:
+            print("  partial books (finished chapters ship, labelled N of M): "
+                  + ", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(partial.items())))
 
     mode = "STRUCTURAL (corpus shape only; belts + audio not checked)" if structural else "FULL"
     print(f"{data_path}: {chapters} chapters, {slots} verse slots, {slots - zeros} timed, "

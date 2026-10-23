@@ -355,12 +355,12 @@ def chapters_for(args, idx):
 
 def partial_books(shipped, idx):
     """{book: (have, want)} for every book whose chapter set is not the whole book
-    the audio index knows. A book ships WHOLE OR NOT AT ALL: the 2026-09-13 07:45
-    deadline stopped chunk 2 at Joshua 10 of 24, and a book that ships half-way
-    meets the listener with read-along on ten chapters and silence on fourteen,
-    which reads as a defect, not a partial edition. Shared by ship() (holds the
-    book back and names it) and validate-bible-sync.py (a held-back book's belts
-    are expected absent; a shipped partial book is a problem)."""
+    the audio index knows. A partial book SHIPS ITS FINISHED CHAPTERS (Corbin
+    2026-10-23 15:4x; until then a book shipped whole or not at all, which held
+    Joshua 10 of 24 back on 2026-09-13), and the app labels it "N of M chapters"
+    from gen-bible-audio-manifest.mjs's BIBLE_SYNC_PARTIAL. Shared by ship()
+    (names each partial book on its ship line) and validate-bible-sync.py
+    (checks the manifest's BIBLE_SYNC_PARTIAL against the shipped table)."""
     if idx is None:
         return {}
     want = {}
@@ -454,11 +454,9 @@ def ship(ed, belts_dir, want_settings=None, idx=None, text_of=None):
                 last = v
         table.setdefault(book_id, {})[str(chapter)] = arr
 
-    # Whole book or nothing (see partial_books): a half-aligned book is held back
-    # and NAMED on the ship line, so a short ship is never silent about it.
-    held = partial_books({b: {int(c) for c in chs} for b, chs in table.items()}, idx)
-    for book in held:
-        del table[book]
+    # A half-aligned book ships its finished chapters (see partial_books) and is
+    # NAMED on the ship line, so a short ship is never silent about it.
+    partial = partial_books({b: {int(c) for c in chs} for b, chs in table.items()}, idx)
     for chs in table.values():
         for arr in chs.values():
             verses_timed += sum(1 for v in arr if v)
@@ -492,8 +490,8 @@ def ship(ed, belts_dir, want_settings=None, idx=None, text_of=None):
     print(f"\nship: {kept} chapters ({dropped} below the {MIN_PROVEN:.0%} proven gate; "
           f"not shipped: {stale_settings} other settings, {stale_audio} audio changed since the belt, "
           f"{stale_text} text changed since the belt, "
-          f"{no_audio} no local audio; held back as partial books: "
-          + (", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(held.items())) or "none") + "), "
+          f"{no_audio} no local audio; partial books: "
+          + (", ".join(f"{b} {h} of {w}" for b, (h, w) in sorted(partial.items())) or "none") + "), "
           f"{verses_timed}/{verses_total} verses timed -> {path} ({size // 1024} KB)")
     if pinned:
         print("  shipped BELOW the gate by GATE_PINS (proven rows only, the rest dark): " + "; ".join(pinned))

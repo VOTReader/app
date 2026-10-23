@@ -2,12 +2,15 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   COVERAGE_LISTENING_ONLY, COVERAGE_NONE, COVERAGE_READ_ALONG,
-  bibleEditionCoverage, coverageCopy, studyCoverage, studyCoverageDetail,
+  bibleBookPartial, bibleBookPartialDetail, bibleEditionCoverage, bibleEditionPartialDetail, coverageCopy,
+  studyCoverage, studyCoverageDetail,
 } from './audio-coverage.js';
 
 afterEach(() => {
   delete globalThis.BIBLE_AUDIO_MANIFEST;
   delete globalThis.AUDIO_MANIFEST;
+  delete globalThis.BIBLE_SYNC_PARTIAL;
+  delete globalThis.BIBLE_AUDIO_BOOKS;
 });
 
 describe('bibleEditionCoverage -- an edition is read-along unless it says otherwise', () => {
@@ -31,6 +34,45 @@ describe('bibleEditionCoverage -- an edition is read-along unless it says otherw
   it('matches the volKey whole, not by prefix', () => {
     globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv-extra:genesis': [['g', '']] };
     expect(bibleEditionCoverage('bible-brm-kjv')).toBe(COVERAGE_NONE);
+  });
+});
+
+describe('partly timed Bible books -- labelled N of M chapters (Corbin 2026-10-23)', () => {
+  const joshua = () => {
+    const parts = Array.from({ length: 24 }, (_, i) => ['wop1_joshua_' + (i + 1), '', 'Chapter ' + (i + 1)]);
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-wop-nkjv:joshua': parts, 'bible-wop-nkjv:ruth': parts.slice(0, 4) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['joshua', 'Joshua'], ['ruth', 'Ruth']];
+  };
+
+  it('counts the timed chapters of a partial book against its recorded ones', () => {
+    joshua();
+    globalThis.BIBLE_SYNC_PARTIAL = { 'bible-wop-nkjv:joshua': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
+    expect(bibleBookPartial('bible-wop-nkjv', 'joshua')).toEqual({ timed: 10, total: 24 });
+    expect(bibleBookPartialDetail('bible-wop-nkjv', 'joshua')).toBe('10 of 24 chapters');
+  });
+
+  it('says nothing for a whole book, another edition, or with no map at all', () => {
+    joshua();
+    expect(bibleBookPartialDetail('bible-wop-nkjv', 'ruth')).toBeNull();
+    globalThis.BIBLE_SYNC_PARTIAL = { 'bible-wop-nkjv:joshua': [1, 2] };
+    expect(bibleBookPartialDetail('bible-wop-nkjv', 'ruth')).toBeNull();
+    expect(bibleBookPartialDetail('bible-brm-kjv', 'joshua')).toBeNull();
+  });
+
+  it('names the one partial book on the edition row, and counts several', () => {
+    joshua();
+    globalThis.BIBLE_SYNC_PARTIAL = { 'bible-wop-nkjv:joshua': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] };
+    expect(bibleEditionPartialDetail('bible-wop-nkjv')).toBe('Joshua 10 of 24 chapters');
+    globalThis.BIBLE_SYNC_PARTIAL['bible-wop-nkjv:ruth'] = [1];
+    expect(bibleEditionPartialDetail('bible-wop-nkjv')).toBe('2 books in part');
+    expect(bibleEditionPartialDetail('bible-brm-kjv')).toBeNull();
+  });
+
+  it('a recorded book with no timed chapter is listening only, not read-along on 0', () => {
+    joshua();
+    globalThis.BIBLE_SYNC_PARTIAL = { 'bible-wop-nkjv:joshua': [] };
+    expect(bibleBookPartial('bible-wop-nkjv', 'joshua')).toEqual({ timed: 0, total: 24 });
+    expect(bibleBookPartialDetail('bible-wop-nkjv', 'joshua')).toBeNull();
   });
 });
 

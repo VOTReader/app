@@ -19,6 +19,8 @@ import {
   useOfflineAudio, useOnline,
 } from '../components/OfflineAudioControls.jsx';
 import { RowMenu, openRowMenu } from '../components/RowMenu.jsx';
+import { CoverageBadge } from '../components/CoverageBadge.jsx';
+import { COVERAGE_READ_ALONG, bibleBookPartialDetail } from '../../utils/audio-coverage.js';
 import { queueMenuItems } from '../components/queue-menu.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
@@ -294,6 +296,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 // edition is recorded one chapter at a time — and the row's own
                 // disclosure below already calls them that (B2, 2026-08-10).
                 const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader].filter(Boolean).join(' · ');
+                // A Bible book whose read-along ships before every chapter is aligned says how far it goes (Corbin 10-23).
+                const partly = bible ? bibleBookPartialDetail(volKey, item.id) : null;
                 const remaining = reading ? renditionRemainingLabel(reading.tracks) : '';
                 const voicesOpen = openVoices === item.id;
                 const own = offline ? plays : [];
@@ -338,6 +342,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                         {line || (held && held.state === 'saved') ? (
                           <small>{line}{!unavailable && held && held.state === 'saved' ? <>{line ? ' ' : null}<OnPhoneTick /></> : null}</small>
                         ) : null}
+                        {partly ? <CoverageBadge state={COVERAGE_READ_ALONG} detail={partly} /> : null}
                         {offline ? <OfflineRowStatus tracks={own} name={item.title} quiet /> : null}
                       </div>
                       <div className="audio-library-row-actions">

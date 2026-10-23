@@ -96,7 +96,7 @@ afterEach(() => {
   delete globalThis.AudioPlayer;
   for (const key of ['ScreenLayout', 'LibraryNav', 'COL_BY_KEY', 'colPreface', 'colLetterArr',
     'AUDIO_MANIFEST', 'AUDIO_ALTERNATES', 'AUDIO_SECTIONS', 'BIBLE_AUDIO_BOOKS', 'BIBLE_AUDIO_MANIFEST',
-    'AudioPositionsStore', 'Audio']) delete globalThis[key];
+    'BIBLE_SYNC_PARTIAL', 'AudioPositionsStore', 'Audio']) delete globalThis[key];
   localStorage.removeItem('vot-audio-pos');
 });
 
@@ -281,6 +281,18 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
     installGlobals();
     renderScreen('one');   // Letter C is two PARTS of one recording, not chapters
     expect(screen.getByText('2 parts · Read by Timothy')).toBeTruthy();
+  });
+
+  it('a partly timed book wears Read-along with "N of M chapters"; a whole book wears no badge (Corbin 10-23)', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': perChapter('jonah', 4), 'bible-brm-kjv:ruth': perChapter('ruth', 4) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['ruth', 'Ruth'], ['jonah', 'Jonah']];
+    globalThis.BIBLE_SYNC_PARTIAL = { 'bible-brm-kjv:jonah': [1, 2] };
+    renderScreen('bible-brm-kjv');
+    const rows = [...document.querySelectorAll('.audio-library-row-copy')];
+    expect(rows.map((r) => r.querySelector('strong').textContent)).toEqual(['Ruth', 'Jonah']);
+    expect(rows[0].querySelector('.coverage-badge')).toBeNull();
+    expect(rows[1].querySelector('.coverage-badge').textContent).toBe('Read-along');
+    expect(rows[1].querySelector('.coverage-badge-detail').textContent).toBe('2 of 4 chapters');
   });
 });
 

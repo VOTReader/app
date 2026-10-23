@@ -20,6 +20,7 @@ import { studiesSummary } from './AudioStudiesScreen.jsx';
 import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote, useOnline } from '../components/OfflineAudioControls.jsx';
 import { stripModel } from '../components/DownloadStrip.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
+import { bibleEditionPartialDetail } from '../../utils/audio-coverage.js';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -395,7 +396,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                   <span className="audio-library-shelf-copy">
                     <strong>{edition.label}</strong>
                     <small>{parts.join(' · ')}</small>
-                    <CoverageBadge state={bibleEditionCoverage(edition.volKey)} />
+                    <CoverageBadge state={bibleEditionCoverage(edition.volKey)} detail={bibleEditionPartialDetail(edition.volKey)} />
                   </span>
                   <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                 </button>

@@ -29,7 +29,9 @@ so pinning the length would fail a change that costs the reader nothing. The one
 property that must hold is that no index ever carries another verse's time.
 """
 import argparse
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import re
@@ -99,12 +101,12 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         # borrowing its neighbour's onset.
         self.assertEqual(arr[36], 0, "acts 8:37 is absent from WEB and must stay 0")
 
-    def test_a_half_aligned_book_ships_whole_or_not_at_all(self):
-        # 2026-09-13: the 07:45 deadline stopped chunk 2 at Joshua 10 of 24. A book
-        # that ships half-way meets the reader with read-along on ten chapters and
-        # silence on fourteen, so ship() holds a PARTIAL book back (by the audio
-        # index's chapter list) and names it, while a complete book beside it
-        # ships. Bitten by deleting the partial_books() filter: joshua ships.
+    def test_a_half_aligned_book_ships_its_finished_chapters_and_names_them(self):
+        # Corbin 2026-10-23 15:4x ("yes", DECISIONS (3)): a partly aligned book
+        # ships the chapters that are done, and the app labels it "N of M
+        # chapters" (gen-bible-audio-manifest.mjs BIBLE_SYNC_PARTIAL). Before,
+        # ship() held the whole book back (Joshua 10 of 24, 2026-09-13). The ship
+        # line still NAMES the partial book so a short ship is never silent.
         # The audio index names every chapter's recording; ship() compares each
         # belt's audioSize with the file on disk, so the fixture has real (empty)
         # files and belts stamped audioSize 0.
@@ -117,9 +119,13 @@ class ShipIndexesByVerseNumber(unittest.TestCase):
         belts = [belt("joshua", ch, [1, 2, 3]) for ch in range(1, 11)] +                 [belt("ruth", ch, [1, 2]) for ch in range(1, 5)]
         for d in belts:
             d["audioSize"] = 0
-        table = self._ship(*belts, idx=idx)
-        self.assertNotIn("joshua", table, "10 of 24 Joshua chapters must not ship")
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            table = self._ship(*belts, idx=idx)
+        self.assertEqual(sorted(table.get("joshua", {}), key=int), [str(c) for c in range(1, 11)],
+                         "Joshua's 10 finished chapters ship")
         self.assertEqual(sorted(table.get("ruth", {})), ["1", "2", "3", "4"], "the complete book beside it ships")
+        self.assertIn("partial books: joshua 10 of 24", out.getvalue())
         self.assertEqual(bab.partial_books({"joshua": set(range(1, 11)), "ruth": {1, 2, 3, 4}}, idx),
                          {"joshua": (10, 24)})
 

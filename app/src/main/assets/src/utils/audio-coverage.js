@@ -135,6 +135,53 @@ export function bibleBookCoverage(bookId) {
   return editions.some((e) => e.timed !== false) ? COVERAGE_READ_ALONG : COVERAGE_LISTENING_ONLY;
 }
 
+/**
+ * A partly timed Bible book in one edition: how many of its recorded chapters
+ * carry read-along. A book's read-along ships its finished chapters before the
+ * rest are aligned (Corbin 2026-10-23 15:4x), and BIBLE_SYNC_PARTIAL (bundle-a,
+ * written by gen-bible-audio-manifest.mjs only when some book is partial) lists
+ * the timed chapters of each such book. Null for a whole book.
+ *
+ * @param {string} volKey
+ * @param {string} bookId
+ * @returns {{ timed: number, total: number } | null}
+ */
+export function bibleBookPartial(volKey, bookId) {
+  const partial = manifest('BIBLE_SYNC_PARTIAL');
+  const timed = partial ? partial[volKey + ':' + bookId] : null;
+  if (!Array.isArray(timed)) return null;
+  const rows = manifest('BIBLE_AUDIO_MANIFEST');
+  const parts = rows ? rows[volKey + ':' + bookId] : null;
+  const total = Array.isArray(parts) ? parts.length : 0;
+  return total && timed.length < total ? { timed: timed.length, total } : null;
+}
+
+/** The count a partly timed book wears beside its badge ("10 of 24 chapters");
+ *  null for a whole book, and for one with no timed chapter (nothing to read along with).
+ *  @param {string} volKey  @param {string} bookId  @returns {string | null} */
+export function bibleBookPartialDetail(volKey, bookId) {
+  const p = bibleBookPartial(volKey, bookId);
+  return p && p.timed ? p.timed + ' of ' + p.total + ' chapters' : null;
+}
+
+/** The edition row's note when some of its books are partly timed: the book by
+ *  name when there is one ("Joshua 10 of 24 chapters"), else how many.
+ *  @param {string} volKey  @returns {string | null} */
+export function bibleEditionPartialDetail(volKey) {
+  const partial = manifest('BIBLE_SYNC_PARTIAL');
+  if (!partial) return null;
+  const books = Object.keys(partial)
+    .filter((key) => key.slice(0, key.indexOf(':')) === volKey)
+    .map((key) => key.slice(key.indexOf(':') + 1))
+    .filter((bookId) => bibleBookPartial(volKey, bookId));
+  if (!books.length) return null;
+  if (books.length > 1) return books.length + ' books in part';
+  const g = /** @type {any} */ (globalThis);
+  const row = Array.isArray(g.BIBLE_AUDIO_BOOKS) ? g.BIBLE_AUDIO_BOOKS.find((b) => b && b[0] === books[0]) : null;
+  const p = /** @type {{ timed: number, total: number }} */ (bibleBookPartial(volKey, books[0]));
+  return (row ? row[1] + ' ' : '') + p.timed + ' of ' + p.total + ' chapters';
+}
+
 /** Every chapter id a study holds, in either shape it ships in (a flat
  *  `chapters` list, or `parts` of `chapterIds` with an optional preface). */
 function studyChapterIds(study) {
