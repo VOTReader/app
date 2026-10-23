@@ -180,6 +180,7 @@ function _isBibleBookId(id) {
  *   selectBibleCh: (num: number) => void,
  *   selectScriptureBook: (id: string, clearGenre?: boolean) => void,
  *   goToLastRead: () => void,
+ *   lastReadPlace: () => ({ screen: string, letterId?: string, studyId?: string, studyChapterId?: string, bookId?: string, chapterNum?: number } | null),
  *   searchLanding: string | null,
  *   setSearchLanding: ((v: string | null) => void) | null
  * }}
@@ -398,11 +399,30 @@ export function useReadingPositionNav({
     }
   };
 
+  // Where goToLastRead would go, as a tab-shaped place (utils/tabs.js describeTab
+  // names it), so the top bar's resume button says where it goes (mw17 s15.1).
+  // Null when there is nowhere to go.
+  const lastReadPlace = () => {
+    if (!activeReadKey) return null;
+    if (activeReadKey.startsWith('vol:')) {
+      const col = COL_BY_KEY.get(activeReadKey.slice(4));
+      const lid = lastReadLetterMap[activeReadKey.slice(4)] || null;
+      return lid && col ? { screen: col.letterScreen, letterId: lid } : null;
+    }
+    if (activeReadKey.startsWith('bible-study-')) {
+      const slug = activeReadKey.slice('bible-study-'.length);
+      const chId = lastReadChapters[activeReadKey];
+      return chId ? { screen: 'bible-study-chapter', studyId: slug, studyChapterId: chId } : { screen: 'bible-study-index', studyId: slug };
+    }
+    const ch = lastReadChapters[activeReadKey];
+    return ch ? { screen: activeReadKey === 'matthew' ? 'matthew-ch' : 'bible-ch', bookId: activeReadKey, chapterNum: ch } : null;
+  };
+
   return {
     prophecyCardStatesRef, saveProphecyCardStates,
     setLastReadForVol,
     selectMatthewCh, selectBibleCh, selectScriptureBook,
-    goToLastRead,
+    goToLastRead, lastReadPlace,
     searchLanding, setSearchLanding,
   };
 }

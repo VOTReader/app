@@ -206,7 +206,7 @@ const STOPS = [
     /* Corbin, 2026-09-11: say too that whole features go quiet here — "control many UI
        features (like disabling search, history, other icons, etc)". Search and History are the
        rows' own names; "the icons in the top bar" is the Top-Nav Buttons group's own subtitle. */
-    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar, Auto-Scroll, even Search and History, and which icons sit in the top bar. Turn off what you do not use.',
+    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar (it jumps back to where you stopped), Auto-Scroll, even Search and History, and which icons sit in the top bar. Turn off what you do not use.',
     primary: 'Next',
   },
   /* THE TOUR ENDS ON THE BIBLE (Corbin, 2026-09-12, and the Tour Reviewer's reorder, accepted
