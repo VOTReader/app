@@ -64,6 +64,12 @@ export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack
     if (el) el.focus();
   }, []);
   const go = React.useCallback((/** @type {number} */ at) => { setCi(at); closePicker(); }, [closePicker]);
+  // the picker opens on its first control, the book (ideas audit s24.2); a step while it is open
+  // leaves focus on the step
+  React.useEffect(() => {
+    const el = picking ? document.getElementById('swf-picker-book') : null;
+    if (el) el.focus();
+  }, [picking]);
   return (
     <div className="sw-fallback-list" data-chapter={label}>
       <div className="swf-head">

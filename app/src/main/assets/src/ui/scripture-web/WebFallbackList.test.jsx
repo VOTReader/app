@@ -75,6 +75,7 @@ describe('WebFallbackList jumps to any chapter (n6-06)', () => {
     fireEvent.click(toggle());
     expect(toggle().getAttribute('aria-expanded')).toBe('true');
     expect(screen.getByRole('combobox', { name: 'Book' }).value).toBe('0');
+    expect(document.activeElement, 'it opens on its first control (s24.2)').toBe(screen.getByRole('combobox', { name: 'Book' }));
     fireEvent.click(toggle());
     expect(screen.queryByRole('combobox', { name: 'Book' })).toBeNull();
   });

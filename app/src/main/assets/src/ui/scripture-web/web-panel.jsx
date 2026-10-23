@@ -271,7 +271,7 @@ function VerseBlock({ block, heading = true, onOpen, extra = null }) {
  * the clamp is measured (and again when the panel's width or the Text Size moves it); the length
  * stands in only where nothing is laid out.
  */
-function Quote({ text, children }) {
+function Quote({ text, title, children }) {
   const [open, setOpen] = React.useState(false);
   const ref = React.useRef(/** @type {HTMLParagraphElement | null} */ (null));
   const [cut, setCut] = React.useState(text.length > QUOTE_LONG);
@@ -292,8 +292,10 @@ function Quote({ text, children }) {
       {/* "more" ends the passage's own row of links (w4: on a row of its own it cost a line a quote) */}
       <div className="sw-links">
         {children}
+        {/* each passage's own "more", so a list of them is not "more, more, more" (ideas audit s27.1) */}
         {long ? (
-          <button type="button" className="sw-link sw-link-quiet sw-quote-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button type="button" className="sw-link sw-link-quiet sw-quote-more" aria-expanded={open} onClick={() => setOpen(!open)}
+            aria-label={title ? (open ? 'less of ' : 'more of ') + title : undefined}>
             {open ? 'less' : 'more'}
           </button>
         ) : null}
@@ -333,7 +335,7 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel, onRet
             <li className="sw-cite" key={c.key}>
               <div className="sw-cite-title">{c.title}</div>
               <div className="sw-cite-source">{metaItems(c.collectionName + (showCites(c) ? ' · ' + c.cites : ''))}</div>
-              {c.excerpt ? <Quote text={c.excerpt}>{links}</Quote> : <div className="sw-links">{links}</div>}
+              {c.excerpt ? <Quote text={c.excerpt} title={c.title}>{links}</Quote> : <div className="sw-links">{links}</div>}
             </li>
           );
         })}

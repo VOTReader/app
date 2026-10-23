@@ -201,6 +201,11 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
       expect(panel.querySelectorAll('.sw-quote-more').length, 'cut: more').toBe(quotes.length);
       // the row's quiet link, as "Verses it cites" is (w4 review: an underlined grey third look)
       for (const b of panel.querySelectorAll('.sw-quote-more')) expect(b.className).toMatch(/\bsw-link\b.*\bsw-link-quiet\b/);
+      // each more names its passage, and flips with it (s27.1)
+      const more = panel.querySelector('.sw-quote-more');
+      expect(more.getAttribute('aria-label')).toMatch(/^more of \S/);
+      fireEvent.click(more);
+      expect(more.getAttribute('aria-label')).toMatch(/^less of \S/);
       cleanup();
       dims.scroll = 44;
       ({ panel } = mount({ detail: detail() }));
