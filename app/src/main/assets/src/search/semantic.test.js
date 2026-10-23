@@ -184,6 +184,35 @@ describe('semanticDocs over a pack', () => {
       globalThis.fetch = real;
     }
   });
+  /* search200 bugcheck #10: a file whose download hung (no answer, or an answer whose bytes stopped) held the
+     model at 'loading' for good: the worker's alive beat kept the page waiting and nothing ever failed, so nothing
+     was tried again. A file that makes no progress for the stall time is a failed load. */
+  it('a download that stops making progress is a failed load, before or after its headers', async () => {
+    configureSemantic({ url: (p) => 'https://app.test/' + p });
+    const real = globalThis.fetch;
+    const guard = (/** @type {Promise<any>} */ p) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('hung')), 3000))]);
+    const aborted = (/** @type {any} */ opts) => new Promise((_, no) => {
+      const sig = opts && opts.signal;
+      if (sig) sig.addEventListener('abort', () => no(new Error('aborted')));
+    });
+    try {
+      globalThis.fetch = /** @type {any} */ ((_u, opts) => aborted(opts));
+      await expect(guard(fetchSemanticFile('semantic/model.onnx', 30))).rejects.toThrow('aborted');
+      globalThis.fetch = /** @type {any} */ (async (_u, opts) => ({
+        ok: true, status: 200, redirected: false,
+        body: { getReader: () => { let n = 0; return { read: () => (n++ ? aborted(opts) : Promise.resolve({ done: false, value: new Uint8Array(3) })) }; } },
+      }));
+      await expect(guard(fetchSemanticFile('semantic/model.onnx', 30))).rejects.toThrow('aborted');
+      // bytes that keep coming are a download, however slow in all
+      globalThis.fetch = /** @type {any} */ (async () => ({
+        ok: true, status: 200, redirected: false,
+        body: { getReader: () => { let n = 0; return { read: () => new Promise((ok) => setTimeout(() => ok(n++ < 8 ? { done: false, value: new Uint8Array([n]) } : { done: true }), 50)) }; } },
+      }));
+      expect(new Uint8Array(await guard(fetchSemanticFile('semantic/vocab.txt', 300)))).toEqual(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]));
+    } finally {
+      globalThis.fetch = real;
+    }
+  });
   it('a device that cannot run the model (every file in, no session) is not asked again', async () => {
     vi.useFakeTimers({ toFake: ['Date'] });
     try {

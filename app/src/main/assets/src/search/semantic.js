@@ -37,13 +37,40 @@ const CLS = 101;
 const SEP = 102;
 const UNK = 100;
 const MAX_LEN = 64; // a query is a sentence or two; the model's own limit is 512
+/** A pack file that makes no progress for this long is a failed load (and tried again later). */
+const FILE_STALL_MS = 45000;
 
 /** A file of the pack, fetched. A redirected answer is a captive portal or a proxy, not the file (the worker
  *  never stores one either): a failed load, tried again later, never bytes that make a failure final (W35 refuter r2). */
-export async function fetchSemanticFile(/** @type {string} */ p) {
-  const r = await fetch(io.url(p));
-  if (!r.ok || r.redirected) throw new Error('semantic: ' + p + ' ' + (r.redirected ? 'redirected' : r.status));
-  return r.arrayBuffer();
+export async function fetchSemanticFile(/** @type {string} */ p, stallMs = FILE_STALL_MS) {
+  /* A DOWNLOAD THAT STOPS IS A FAILED LOAD (search200 bugcheck #10). A hung fetch held the model at 'loading' for
+     good: the worker's alive beat kept the page waiting, nothing failed, so nothing was tried again. The fetch is
+     aborted when no answer, or no bytes of it, arrive for `stallMs`; a slow line that keeps sending is a download. */
+  const ac = typeof AbortController === 'function' ? new AbortController() : null;
+  /** @type {any} */ let timer = 0;
+  const arm = () => { if (ac) { clearTimeout(timer); timer = setTimeout(() => ac.abort(), stallMs); } };
+  arm();
+  try {
+    const r = await fetch(io.url(p), ac ? { signal: ac.signal } : undefined);
+    if (!r.ok || r.redirected) throw new Error('semantic: ' + p + ' ' + (r.redirected ? 'redirected' : r.status));
+    if (!ac || !r.body || typeof r.body.getReader !== 'function') return await r.arrayBuffer();
+    const rd = r.body.getReader();
+    /** @type {Uint8Array[]} */ const parts = [];
+    let n = 0;
+    for (;;) {
+      arm();
+      const { done, value } = await rd.read();
+      if (done) break;
+      parts.push(value);
+      n += value.length;
+    }
+    const out = new Uint8Array(n);
+    let at = 0;
+    for (const c of parts) { out.set(c, at); at += c.length; }
+    return out.buffer;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /** @type {{url: (p: string) => string, load: (p: string) => Promise<ArrayBuffer>, importModule: (p: string) => Promise<any>, worker: () => any}} */
