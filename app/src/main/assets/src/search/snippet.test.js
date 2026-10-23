@@ -239,6 +239,22 @@ describe('a placed card: snippetAt and morePlaces(..., shownAt)', () => {
   });
 });
 
+/* search200 audit 26 (A03.6): a place the snippet's box partly shows, holding no word the box does not show
+   already, was offered again under "More places": its leftover hit just past the box, or the whole place on a
+   placed card. The card read "1 + 1 more" where the reader's find bar counts the passage once ("1 of 1"). */
+describe('More places drops a place the box already shows part of, unless it adds a word', () => {
+  it('a leftover hit just past the snippet box is not a place of its own', () => {
+    const t = 'and the word went on. '.repeat(3) + 'the flood came ' + 'x '.repeat(30) + 'a flood again. ' + 'and the word went on. '.repeat(30);
+    expect(findPlaces(t, ['flood'], 120)).toHaveLength(1);
+    expect(morePlaces(t, ['flood'], 120)).toEqual([]);
+  });
+  it('a placed card does not offer a place it partly shows with the same word', () => {
+    const t = 'Preface. ' + 'alpha ' + 'x '.repeat(50) + 'y alpha ' + 'x '.repeat(80);   // the 2nd alpha crosses the box's end
+    expect(findPlaces(t, ['alpha'], 120)).toHaveLength(1);
+    expect(morePlaces(t, ['alpha'], undefined, 9)).toEqual([]);
+  });
+});
+
 describe('bestMatch counts word families, not highlight forms', () => {
   it('a longer matched form is not worth two words: the earliest window of the typed word wins', () => {
     const t = 'the flood rose. ' + 'and the word went on. '.repeat(20) + 'the flooding came, flooded and flooding. ';

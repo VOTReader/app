@@ -582,12 +582,45 @@ export function morePlaces(text, terms, maxLen, shownAt) {
   const best = bestIn(occ, 180);
   const shownFrom = best ? best.start - SHOWN_BEFORE : -1;
   const shownTo = best ? best.start + SHOWN_FROM : -1;
-  const rest = occ.filter((o) => o.idx < shownFrom || o.idx + o.len > shownTo);
+  const shown = (/** @type {{ idx: number, len: number }} */ h) => h.idx >= shownFrom && h.idx + h.len <= shownTo;
+  const rest = occ.filter((o) => !shown(o));
   // the bar is the whole text's best place, the snippet's own included: when only
   // the snippet holds every word, the one-word leftovers are not places
   const most = mostOf(cluster(occ, maxLen, freq));
+  // a leftover of a place the box partly shows is that place again, the passage the
+  // find bar counts once (search200 audit 26): only a place adding a word stays
+  const seen = shownTerms(occ, shown);
+  const repeats = cluster(occ, maxLen, freq).filter((p) => partlyShown(p, shown, seen));
   return keep(cluster(rest, maxLen, freq), freq, most)
+    .filter((p) => !repeats.some((r) => p.hits.every((h) => r.hits.some((x) => x.idx === h.idx))))
     .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
+}
+
+/**
+ * The words (families) of the hits the box shows.
+ * @param {Array<{ idx: number, len: number, term: string }>} occ
+ * @param {(h: { idx: number, len: number }) => boolean} shown
+ * @returns {Record<string, boolean>}
+ */
+function shownTerms(occ, shown) {
+  const seen = Object.create(null);
+  for (const o of occ) if (shown(o)) seen[o.term] = true;
+  return seen;
+}
+
+/**
+ * A place the box shows a hit of whose every word the box shows already: offered
+ * again, it repeats the card's snippet (search200 audit 26). One that adds a word
+ * the box lacks is the words' best place only partly on screen, and stays.
+ * @param {{ hits: Array<{ idx: number, len: number }>, fams: Record<string, boolean> }} p
+ * @param {(h: { idx: number, len: number }) => boolean} shown
+ * @param {Record<string, boolean>} seen
+ * @returns {boolean}
+ */
+function partlyShown(p, shown, seen) {
+  if (!p.hits.some(shown)) return false;
+  for (const f in p.fams) if (!seen[f]) return false;
+  return true;
 }
 
 /**
@@ -595,7 +628,8 @@ export function morePlaces(text, terms, maxLen, shownAt) {
  * worth a tap but one the box already shows whole. The box holds about three
  * lines of the window, centred on its first hit where the window allows; the
  * words' best place is not the card's here, so a place only partly on screen
- * is still offered, never split into leftovers too small to keep.
+ * is still offered when it holds a word the box does not show, never split into
+ * leftovers too small to keep; one adding no word is the snippet again (audit 26).
  * @param {string} text
  * @param {Array<{ idx: number, len: number, term: string, primary: boolean }>} occ
  * @param {Record<string, number>} freq
@@ -609,8 +643,9 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
   const box = SHOWN_BEFORE + SHOWN_FROM;
   const top = first ? Math.max(shownAt, Math.min(first.idx - SHOWN_BEFORE, shownAt + 180 - box)) : -1;
   const shown = (/** @type {{ idx: number, len: number }} */ h) => top >= 0 && h.idx >= top && h.idx + h.len <= top + box;
+  const seen = shownTerms(occ, shown);
   return keep(places, freq, mostOf(places))
-    .filter((p) => !p.hits.every(shown))
+    .filter((p) => !partlyShown(p, shown, seen))
     .map((p) => ({ start: p.start, clip: clipAround(text, p, maxLen) }));
 }
 
