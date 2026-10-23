@@ -16,9 +16,8 @@ import { answersShortTitle } from '../../utils/answers-shelves.js';
 import {
   SEP, pl, answersMediaIndex, answersMediaPlace, answersMediaTitle, answersMediaLines, answersMediaSub, answersDomain,
 } from '../../utils/answers-browse.js';
-import { AnsIcon, Chev, useAnswersMeta, answersLayoutClass } from '../components/AnswersParts.jsx';
+import { AnsIcon, Chev, useAnswersMetaState, answersLayoutClass } from '../components/AnswersParts.jsx';
 import { ChartViewer, AboutSheet } from '../sheets/AnswersSheets.jsx';
-import { loadAnswersMeta } from '../../utils/sync-loaders.js';
 
 /** A sub with soft breaks after its slashes, so a channel's long address wraps at a slash. */
 function slashBreaks(s) {
@@ -50,21 +49,15 @@ function MediaRow({ m, place }) {
  *   onSettings?: any, theme?: any, onThemeChange?: any, onOpenTopic: Function }} props
  */
 export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onOpenTopic }) {
-  const meta = useAnswersMeta();
+  // The list comes from the sidecars: say so while they load, and if they never do (offline, first
+  // visit), with a Try again.
+  const [meta, failed, retry] = useAnswersMetaState();
   const idx = React.useMemo(() => (meta ? answersMediaIndex(entries, meta) : null), [entries, meta]);
   const [chart, setChart] = React.useState(/** @type {any} */ (null));
   const [about, setAbout] = React.useState(false);
   const place = (id) => answersMediaPlace(entries, id, answersShortTitle);
   const closeChart = React.useCallback(() => setChart(null), []);
   const closeAbout = React.useCallback(() => setAbout(false), []);
-  // The list comes from the sidecars: say so while they load, and if they never do (offline, first visit).
-  const [failed, setFailed] = React.useState(false);
-  React.useEffect(() => {
-    if (meta) return undefined;
-    let live = true;
-    loadAnswersMeta().then(() => { if (live && !(/** @type {any} */ (window)).ANSWERS_META) setFailed(true); });
-    return () => { live = false; };
-  }, [meta]);
   const playlists = idx ? idx.lists.filter((m) => m.kind === 'playlist').length : 0;
   const channels = idx ? idx.lists.length - playlists : 0;
   return (
@@ -95,7 +88,12 @@ export function AnswersMedia({ entries, site, fontScale, onBack, onSearch, onHis
             <div className="ans-sechead"><h2 className="ans-h2">Audio &amp; PDF</h2><span className="ans-count">{pl(idx.files.length, 'item')}</span></div>
             {idx.files.map((m, i) => <MediaRow key={'f' + i} m={m} place={place(m.id)} />)}
           </>
-        ) : <p className="ans-meta" role="status">{failed ? 'Couldn’t load the list of charts and videos.' : 'Loading…'}</p>}
+        ) : failed ? (
+          <p className="ans-meta" role="status">
+            {'Couldn’t load the list of charts and videos. '}
+            <button type="button" className="ans-textbtn" onClick={retry}>Try again</button>
+          </p>
+        ) : <p className="ans-meta" role="status">Loading…</p>}
         {site ? (
           <p className="ans-credit">
             {'From ' + answersDomain(site.site)}<br />{'Captured ' + site.capturedAt}<br />

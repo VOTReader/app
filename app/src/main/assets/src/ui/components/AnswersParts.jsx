@@ -121,9 +121,10 @@ export function useAnswersMeta(enabled = true) {
 
 /**
  * The sidecars and whether they failed: a load that leaves no ANSWERS_META (offline, a 404) is
- * tried once more 3 s on (the loader forgets a failed load), then reported failed.
+ * tried once more 3 s on (the loader forgets a failed load), then reported failed; the third item
+ * starts the two tries over (a screen's Try again).
  * @param {boolean} [enabled]
- * @returns {[Record<string, any> | null, boolean]}
+ * @returns {[Record<string, any> | null, boolean, () => void]}
  */
 export function useAnswersMetaState(enabled = true) {
   const read = () => (typeof window !== 'undefined' && /** @type {any} */ (window).ANSWERS_META) || null;
@@ -140,7 +141,8 @@ export function useAnswersMetaState(enabled = true) {
     });
     return () => { live = false; clearTimeout(t); };
   }, [meta, enabled, tries]);
-  return [enabled ? meta : null, enabled && !meta && tries > 1];
+  const retry = React.useCallback(() => setTries(0), []);
+  return [enabled ? meta : null, enabled && !meta && tries > 1, retry];
 }
 
 /**
