@@ -582,9 +582,10 @@ function splitCompound(word) {
  * @param {string} term
  * @param {Object} opts  the unit's exact + prefix options
  * @param {boolean} [keyword]  searchUnit's
+ * @param {(w: string) => boolean} [accept]  only the nearest word it accepts (no split): a word only its forms found
  * @returns {{ res: any[], to: string | null }}
  */
-function searchCorrected(term, opts, keyword) {
+function searchCorrected(term, opts, keyword, accept) {
   const tokens = kjvEncode(term);
   if (tokens.length !== 1) return { res: searchUnit(term, { ...opts, fuzzy: FUZZY }, keyword), to: null };
   const word = tokens[0];
@@ -599,11 +600,11 @@ function searchCorrected(term, opts, keyword) {
       .filter((h) => hasTokenRun(kjvEncode((h.text || '') + ' ' + (h.title || '')), parts));
     return res.length ? { res, to: parts.join(' ') } : null;
   };
-  if (!weakSplit) { const s = split(); if (s) return s; }
+  if (!weakSplit && !accept) { const s = split(); if (s) return s; }
   /* A name the text splits, typed whole AND a letter off: "abednigo" (Abed-Nego) is a split
      plus a slip, beyond either alone (search benchmark, 2026-10-05). Two parts, one of them an
      indexed word and the other one slip from one, both of three letters or more. */
-  if (word.length >= 7) {
+  if (word.length >= 7 && !accept) {
     for (let i = 3; i <= word.length - 3; i++) {
       const a = word.slice(0, i);
       const b = word.slice(i);
@@ -638,7 +639,7 @@ function searchCorrected(term, opts, keyword) {
   let best = null;
   let bestRank = 9;
   for (const w in docs) {
-    if (w === word) continue;
+    if (w === word || (accept && !accept(w))) continue;
     const rank = slipRank(word, w);
     // beyond one slip for a word of seven letters or fewer, unless it is the same word by ear
     if (rank === 4 && budget < 2 && !(word[0] === w[0] && skeleton(word) === skeleton(w))) continue;
@@ -648,7 +649,18 @@ function searchCorrected(term, opts, keyword) {
     }
   }
   if (best) return { res: searchUnit(best, opts, keyword), to: best };
-  return (weakSplit && split()) || { res: [], to: null };
+  return (weakSplit && !accept && split()) || { res: [], to: null };
+}
+
+/** Whether a typed word that only its forms found is `to` misspelt: one word each, `to` no form of the typed word
+    (those were searched already) and of its family (their forms meet). */
+function formMisspelt(/** @type {string[]} */ typed, /** @type {string|null} */ to) {
+  if (!to || typed.length !== 1 || /\s/.test(to) || typed[0] === to) return false;
+  const stop = (/** @type {string} */ w) => !!(searchData().STOP_WORDS_TRIMMED && searchData().STOP_WORDS_TRIMMED.has(w));
+  const mine = wordForms(typed[0], stop);
+  if (mine.indexOf(to) >= 0) return false;
+  const fam = new Set(mine.concat(typed[0]));
+  return wordForms(to, stop).some((f) => fam.has(f));
 }
 
 /** A word's consonants as heard: vowels and h dropped, doubles single ("shepard" and "shepherd": sprd). */
@@ -2760,13 +2772,14 @@ async function searchWords(query, options) {
     }
   };
   const heard = Object.create(null);   // origin -> some unit of that word found something
+  const heardOwn = Object.create(null); // origin -> a unit other than its word forms found something
   const unheard = [];                  // literal units that found nothing as typed
   for (let u = 0; u < units.length; u++) {
     if (spent()) { const r = await pause(); if (r) return r; }
     const unit = units[u];
     let res;
     try { res = searchUnit(unit.term, unitOpts(unit), keyword); } catch { continue; }
-    if (res && res.length) { heard[unit.origin] = true; accumulate(unit, res); continue; }
+    if (res && res.length) { heard[unit.origin] = true; if (!unit.form) heardOwn[unit.origin] = true; accumulate(unit, res); continue; }
     if (unit.literal) unheard.push(unit);
   }
   /* THE TYPO FALLBACK WAITS FOR THE WHOLE FAMILY (2026-09-26). A typed word that
@@ -2780,15 +2793,20 @@ async function searchWords(query, options) {
   const corrections = [];
   // Under a card (a book name, a named passage) the card answers the query: no typo
   // guess ("Beatitudes", the quick pick, showed "Showing results for platitudes").
+  /* ...AND A WORD ONLY ITS FORMS FOUND IS STILL A TYPO WHEN THE TEXT'S OWN SPELLING OF IT IS ONE SLIP AWAY (search200
+     wave 3, U08.6, 2026-10-23). "in the begining god creatd" corrected creatd and kept "begining": stripped of -ing it
+     is begin, which the text holds. Its near spelling "beginning" is of the same family (its forms meet the typed
+     word's) and is no form the engine searched, so the typed word is that word misspelt. "prays" stays as typed: its
+     near spelling, pray, is one of the forms already searched. */
   for (let u = 0; u < (navAlso ? 0 : unheard.length); u++) {
     const unit = unheard[u];
-    if (heard[unit.origin]) continue;
+    if (heardOwn[unit.origin]) continue;
     if (spent()) { const r = await pause(); if (r) return r; }
     if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
-    let fixed;
-    try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword); } catch { continue; }
-    if (!fixed.res.length) continue;
     const typed = kjvEncode(unit.term);
+    let fixed;
+    try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword, heard[unit.origin] ? (w) => formMisspelt(typed, w) : undefined); } catch { continue; }
+    if (!fixed.res.length) continue;
     accumulate(unit, fixed.res);
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
