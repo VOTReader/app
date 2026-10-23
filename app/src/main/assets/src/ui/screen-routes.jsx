@@ -648,14 +648,40 @@ export function buildScreenRoutes({
   // The loader (index.html) sets corpus.error + bumps its version on failure and
   // nulls _promise so re-calling the loader retries cleanly; App subscribes to
   // each corpus version, so this re-evaluates on the bump.
-  const _corpusView = (corpus, loadFn, loadingLabel) => {
+  /**
+   * Every fallback route's view (mw17 s17.2/s17.3): what went wrong, an optional
+   * way on, and the screen's chrome around it. Loading is a polite status, a
+   * failure an alert, so a screen reader hears both. A FALLBACK MUST NOT BE ABLE
+   * TO FAIL: it only runs because something already went wrong, so ScreenLayout
+   * and LibraryNav (bare Cluster-D globals) wrap it only when they are there.
+   * @param {{ say: any, label?: string, onGo?: () => void, nav?: () => any, role?: 'status' | 'alert' }} v
+   * @returns {any} never null
+   */
+  const _fallbackView = ({ say, label, onGo, nav, role }) => {
+    const body = (
+      <div className="sc-sheet-loading route-fallback" role={role}>
+        <div>{say}</div>
+        {label ? <button type="button" className="route-fallback-btn" onClick={onGo}>{label}</button> : null}
+      </div>
+    );
+    let navEl = null;
+    try { navEl = (typeof LibraryNav === 'function' && nav) ? nav() : null; } catch (_e) { navEl = null; }
+    return (typeof ScreenLayout === 'function')
+      ? <ScreenLayout navChildren={navEl}>{body}</ScreenLayout>
+      : body;
+  };
+  /** LibraryNav with a way back to `onBack` (named `backLabel`) and the usual top-bar actions. */
+  const _navTo = (/** @type {() => void} */ onBack, /** @type {string} */ backLabel) => () => LibraryNav({
+    onBack, backLabel,
+    onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
+    theme, onThemeChange: setTheme,
+  });
+  const _corpusView = (corpus, loadFn, loadingLabel, nav = _navTo(goHome, 'Home')) => {
     if (corpus && corpus.error) {
-      return (
-        <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
-          <div>Couldn’t load this section.</div>
-          <button type="button" onClick={() => { if (typeof loadFn === 'function') loadFn(); }} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>Try again</button>
-        </div>
-      );
+      return _fallbackView({
+        say: 'Couldn’t load this section.', label: 'Try again', role: 'alert', nav,
+        onGo: () => { if (typeof loadFn === 'function') loadFn(); },
+      });
     }
     // SHELL-3: this kicks the lazy-corpus load from inside a route's RENDER
     // function (the ROUTES factory produces elements, not a component body, so
@@ -667,7 +693,7 @@ export function buildScreenRoutes({
     // concurrent render can't loop or warn. Both invariants are load-bearing: a
     // future loader that notifies synchronously would turn this into a render loop.
     if (typeof loadFn === 'function') loadFn();
-    return <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>{loadingLabel}</div>;
+    return _fallbackView({ say: loadingLabel, role: 'status', nav });
   };
   /**
    * What a letter/entry route renders when the corpus IS loaded and the active
@@ -700,46 +726,26 @@ export function buildScreenRoutes({
    * @returns {any} never null
    */
   const _deadStudy = (partGone) => {
-    const loading = <div className="sc-sheet-loading" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '60vh' }}>Loading…</div>;
     const failed = studiesError && !studiesLoading;
-    if (!failed && (studiesLoading || typeof BIBLE_STUDIES === 'undefined')) return loading;
+    if (!failed && (studiesLoading || typeof BIBLE_STUDIES === 'undefined')) {
+      return _fallbackView({ say: 'Loading…', role: 'status', nav: _navTo(goStudiesHome, 'Studies') });
+    }
     const say = failed ? 'Couldn’t load studies.' : partGone ? 'This part is no longer available.' : 'This study is no longer available.';
     const label = failed ? 'Try again' : partGone ? 'Back to the study' : 'Back to Studies';
     const go = failed ? retryStudies : partGone ? () => setScreen('bible-study-index') : goStudiesHome;
-    const body = (
-      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
-        <div>{say}</div>
-        <button type="button" onClick={go} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>{label}</button>
-      </div>
-    );
-    const nav = (typeof LibraryNav === 'function') ? LibraryNav({
-      onBack: goStudiesHome, backLabel: 'Studies',
-      onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
-      theme, onThemeChange: setTheme,
-    }) : null;
-    return (typeof ScreenLayout === 'function')
-      ? <ScreenLayout navChildren={nav}>{body}</ScreenLayout>
-      : body;
+    return _fallbackView({ say, label, onGo: go, role: failed ? 'alert' : undefined, nav: _navTo(goStudiesHome, 'Studies') });
   };
 
   const _deadLetter = (volKey) => {
     const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get) ? COL_BY_KEY.get(volKey) : null;
     const idxScreen = (col && col.indexScreen) || 'volumes-home';
-    const body = (
-      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
-        <div>This letter is no longer available.</div>
-        <button type="button" onClick={() => setScreen(idxScreen)} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>Back to the list</button>
-      </div>
-    );
     // Chrome when it is there, body alone when it is not. A FALLBACK MUST NOT
     // BE ABLE TO FAIL: this path only runs because something already went
     // wrong, and throwing a ReferenceError here would replace a blank route
     // with a dead app — strictly worse than the bug it fixes. `ScreenLayout`
     // is a bare Cluster-D global, so its presence is an assumption, not a
-    // guarantee this function can make.
-    return (typeof ScreenLayout === 'function')
-      ? <ScreenLayout navChildren={_idxNav()}>{body}</ScreenLayout>
-      : body;
+    // guarantee this function can make (_fallbackView).
+    return _fallbackView({ say: 'This letter is no longer available.', label: 'Back to the list', onGo: () => setScreen(idxScreen), nav: _idxNav });
   };
 
   /**
@@ -750,21 +756,18 @@ export function buildScreenRoutes({
    * _deadLetter: chrome, what the book holds, and a way into it.
    * @param {any} bk the resolved book
    * @param {number} num the chapter asked for
+   * @param {() => void} [openBook] the way into the book (default: its chapter list)
    * @returns {any} never null
    */
-  const _missingChapter = (bk, num) => {
+  const _missingChapter = (bk, num, openBook) => {
     const count = (bk && bk.chapters && bk.chapters.length) || 0;
     const one = count === 1;
-    const body = (
-      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
-        <div>{bk.title + (one ? ' has one chapter' : ' has ' + count + ' chapters') + (num ? ', so there is no chapter ' + num + '.' : '.')}</div>
-        <button type="button" onClick={() => (one ? selectBibleCh(1) : goBibleIdx())} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>{'Open ' + bk.title}</button>
-      </div>
-    );
-    // A fallback must not be able to fail (see _deadLetter): chrome only when it is there.
-    return (typeof ScreenLayout === 'function')
-      ? <ScreenLayout navChildren={_idxNav()}>{body}</ScreenLayout>
-      : body;
+    // Matthew passes its own way in (s17.1: a stale tab on "Matthew 40" opened blank).
+    const onGo = openBook || (() => (one ? selectBibleCh(1) : goBibleIdx()));
+    return _fallbackView({
+      say: bk.title + (one ? ' has one chapter' : ' has ' + count + ' chapters') + (num ? ', so there is no chapter ' + num + '.' : '.'),
+      label: 'Open ' + bk.title, onGo, nav: _idxNav,
+    });
   };
 
   /**
@@ -778,22 +781,10 @@ export function buildScreenRoutes({
    * like every fallback here, unable to fail.
    * @returns {any} never null
    */
-  const _missingBook = () => {
-    const body = (
-      <div className="sc-sheet-loading" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '60vh', gap: '14px', textAlign: 'center', padding: '0 24px' }}>
-        <div>This book is no longer available.</div>
-        <button type="button" onClick={goScripturesHome} style={{ padding: '8px 20px', borderRadius: '999px', border: '1px solid currentColor', background: 'transparent', color: 'inherit', font: 'inherit', cursor: 'pointer', opacity: 0.85 }}>Back to Scriptures</button>
-      </div>
-    );
-    const nav = (typeof LibraryNav === 'function') ? LibraryNav({
-      onBack: goScripturesHome, backLabel: 'Scriptures',
-      onSettings: goSettings, onHistory: goHistory, onSearch: goSearch,
-      theme, onThemeChange: setTheme,
-    }) : null;
-    return (typeof ScreenLayout === 'function')
-      ? <ScreenLayout navChildren={nav}>{body}</ScreenLayout>
-      : body;
-  };
+  const _missingBook = () => _fallbackView({
+    say: 'This book is no longer available.', label: 'Back to Scriptures', onGo: goScripturesHome,
+    nav: _navTo(goScripturesHome, 'Scriptures'),
+  });
 
   /**
    * @param {any} jsx     the route's element, or falsy when the letter did not resolve
@@ -801,7 +792,7 @@ export function buildScreenRoutes({
    *   on every letter/entry route; index routes have no letter to lose.
    */
   const _wrapVot = (jsx, volKey) => {
-    if (!_votReady) return _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…');
+    if (!_votReady) return _corpusView(window.__votCorpus, window.__loadVotCorpus, 'Loading…', _idxNav);
     // Corpus loaded and nothing to render: a dead letterId, never a blank screen.
     if (!jsx && volKey) return _deadLetter(volKey);
     return jsx;
@@ -1473,7 +1464,7 @@ export function buildScreenRoutes({
     ),
     'matthew-idx': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
-      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
+      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…', _navTo(goStudiesHome, 'Studies'));
       // Wave 0: onBack + backLabel mirror the matthew-idx hardware-back
       // branch in use-android-back.js — fromSearch is consumed FIRST (a
       // book-level search result lands here; P1-13), then fromStudies,
@@ -1563,7 +1554,7 @@ export function buildScreenRoutes({
       );
       // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
-        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…');
+        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…', _navTo(goScripturesHome, 'Scriptures'));
       }
       // The corpus is in and the bookId did not resolve (v109): a way out, not nothing.
       return _missingBook();
@@ -1605,7 +1596,7 @@ export function buildScreenRoutes({
       );
       // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
       if (bookId && typeof window.__bibleCorpus !== 'undefined' && !window.__bibleCorpus.loaded) {
-        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…');
+        return _corpusView(window.__bibleCorpus, window.__loadBibleCorpus, 'Loading Bible…', _navTo(goScripturesHome, 'Scriptures'));
       }
       // The corpus is in and the book resolved, but not this chapter: a way out, not nothing.
       if (book && !chapter) return _missingChapter(book, chapterNum);
@@ -1618,7 +1609,7 @@ export function buildScreenRoutes({
     //    components in src/ui/screens/. ──
     'matthew-ch': () => {
       // Q8.2: MATTHEW lazy-loaded — show loading (or a retry on failure, E1).
-      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…');
+      if (typeof MATTHEW === 'undefined') return _corpusView(window.__matthewCorpus, window.__loadMatthewCorpus, 'Loading Matthew…', _navTo(goStudiesHome, 'Studies'));
       // The Matthew study cards cross-reference VOT letters; resolveVotLetter only
       // resolves once the VOT corpus has loaded and __finishVotInit has rebuilt
       // VOT_LETTER_REGISTRY. On a cold-boot restore STRAIGHT into Matthew, nothing
@@ -1628,6 +1619,8 @@ export function buildScreenRoutes({
       // it never blocks the verses; useLazyBundles re-renders App when the corpus
       // arrives, upgrading the cards to tappable.
       if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+      // A stale tab or deep link past the last chapter (s17.1): chrome and a way into Matthew.
+      if (!chapter) return _missingChapter(MATTHEW, chapterNum, goMatthewIdx);
       return (
         <MatthewChapterView
           chapter={chapter} chapterNum={chapterNum} mode={mode} showStudy={showStudy}

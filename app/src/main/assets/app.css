@@ -2898,6 +2898,9 @@
     .footnote-list-verse .sc-sheet-compound { gap:0.75rem; }
     .footnote-list-verse .sc-sheet-compound-label { font-size:var(--fs-10); }
     .sc-sheet-loading { color:var(--gold-dim); font-size:var(--fs-14); font-style:italic; animation:pulse 1.4s ease infinite; }
+    /* screen-routes _fallbackView (mw17 s17.3): loading, failed loads, stale tabs. */
+    .route-fallback { display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:14px; text-align:center; padding:0 24px; }
+    .route-fallback-btn { padding:8px 20px; border-radius:999px; border:1px solid currentColor; background:transparent; color:inherit; font:inherit; cursor:pointer; opacity:0.85; }
     .scripture-ref-chevron { margin-left:auto; padding-left:0.5rem; color:var(--gold-dim); font-size:var(--fs-16); flex-shrink:0; align-self:center; }
     .scripture-ref-note { cursor:default; }
     @media (hover: hover) { .scripture-ref-note:hover, .scripture-ref-note:focus-visible { background:var(--study-note) !important; border-color:var(--study-border) !important; outline:none; } }

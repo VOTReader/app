@@ -84,3 +84,40 @@ describe('bible-ch: a chapter the book does not have (v07-01)', () => {
     expect(screen.getByText(/Loading Bible/)).toBeTruthy();
   });
 });
+
+describe('matthew-ch: a chapter Matthew does not have (mw17 s17.1)', () => {
+  afterEach(() => { delete globalThis.MATTHEW; });
+  it('a stale tab on "Matthew 40" gets chrome and a way into Matthew, never a blank screen', () => {
+    globalThis.MATTHEW = { id: 'matthew', title: 'Matthew', chapters: Array.from({ length: 28 }, (_, i) => ({ num: i + 1 })) };
+    const goMatthewIdx = vi.fn();
+    const { routes } = makeRoutes({ bookId: 'matthew', book: globalThis.MATTHEW, chapterNum: 40, chapter: undefined, goMatthewIdx });
+    const el = routes['matthew-ch']();
+    expect(el).not.toBeNull();
+    render(el);
+    expect(screen.getByText(/Matthew has 28 chapters, so there is no chapter 40/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /Open Matthew/ }));
+    expect(goMatthewIdx).toHaveBeenCalled();
+  });
+});
+
+describe('corpus loading and error views (mw17 s17.2)', () => {
+  it('loading has chrome and is a polite status; a failed load is an alert with Try again, inside chrome', () => {
+    const nav = vi.fn(() => <span data-testid="nav" />);
+    globalThis.LibraryNav = nav;
+    globalThis.ScreenLayout = ({ children, navChildren }) => <div data-testid="layout">{navChildren}{children}</div>;
+    window.__bibleCorpus = { loaded: false, error: false };
+    window.__loadBibleCorpus = vi.fn();
+    const { routes } = makeRoutes({ bookId: 'john', book: null, chapterNum: 3, chapter: undefined });
+    render(routes['bible-ch']());
+    expect(screen.getByTestId('layout')).toBeTruthy();
+    expect(screen.getByTestId('nav')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toMatch(/Loading Bible/);
+    cleanup();
+    window.__bibleCorpus = { loaded: false, error: true };
+    render(makeRoutes({ bookId: 'john', book: null, chapterNum: 3, chapter: undefined }).routes['bible-ch']());
+    expect(screen.getByTestId('nav')).toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toMatch(/Couldn’t load this section/);
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(window.__loadBibleCorpus).toHaveBeenCalled();
+  });
+});
