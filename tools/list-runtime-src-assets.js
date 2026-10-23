@@ -208,7 +208,7 @@ function main() {
         }
       }
       for (const name of missingSiteRootFiles(resolve(root, site)) || []) {
-        fail(`CORE_ASSETS names '${name}' but it is MISSING from the staged site — the service worker would fail to install on every client.`);
+        fail(`the site's required root files (CORE_ASSETS + build-sha.txt, privacy.html) name '${name}' but it is MISSING from the staged site: a missing CORE_ASSETS file fails the service worker install on every client, a missing build-sha.txt loses the deploy floor.`);
       }
     }
   }
