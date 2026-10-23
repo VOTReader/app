@@ -84,7 +84,7 @@ export function runRow(run, now) {
     again: st.doneToday && prev.length ? itemRef(prev[0].k) : null,
     // Listen: today's portion from the first item not read yet, and no further (C5).
     listen: today.slice(from).map((it) => itemRef(it.k)),
-    items: shown.map((it) => ({ k: it.k, short: itemShort(it), done: it.k in ticks })),
+    items: shown.map((it) => ({ k: it.k, short: itemShort(it), label: itemsLabel([it], bookTitle), done: it.k in ticks })),
     todayTicked: st.todayTicked, todayCount: today.length, minutes: words ? minutesFor(words) : 0,
     itemsDone: st.itemsDone, itemsTotal: st.itemsTotal, projected: st.projected, target: st.target,
     counts: fmt(st.itemsDone) + ' of ' + fmt(st.itemsTotal) + ' ' + unitOf(run), pace,

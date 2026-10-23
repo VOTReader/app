@@ -8,6 +8,7 @@ import { HeroListen } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { PlanRibbon } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
@@ -324,6 +325,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <div className="ornament-divider-symbol">✦</div>
             <div className="ornament-divider-line" />
           </div>
+          <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
           <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
           <div className="bottom-nav">
             {prevCh ? (

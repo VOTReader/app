@@ -15,6 +15,7 @@ import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { PlanRibbon } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
@@ -559,6 +560,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               </div>
             )}
 
+            {!studyMode && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? (
+              <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={letter.id} inert={inert} />
+            ) : null}
             <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
 
             <div className="bottom-nav">

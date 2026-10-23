@@ -321,6 +321,8 @@ export function buildScreenRoutes({
       navigateToLink({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
     }
   };
+  // mw18 S8: the reader's plan line (PlanRibbon) opens a plan's next item the way the Today card's Read does.
+  /** @type {any} */ (window).__votOpenPlanItem = openPlanItem;
   // mw18 C5: Listen plays today's portion only (the refs from its first item not read yet), as one queue that
   // stops when the portion ends: each Bible chapter in the reader's audio edition, each letter in its
   // collection's recording. Items with no recording are passed over; with none, Read opens the first.
