@@ -97,6 +97,10 @@ export const NotebookStore = extendStore(
     rename(id, name) {
       const trimmed = (name || '').trim();
       if (!trimmed) return false;
+      // Judged on what the reader sees (the pending overlay while loading) BEFORE a
+      // deferral, so a queued duplicate is refused here, not dropped later (refuter r1).
+      const seen = (this._load().list || []);
+      if (seen.some(n => n.id !== id && (n.name || '').trim().toLowerCase() === trimmed.toLowerCase())) return false;
       if (this._shouldDefer('rename', id, name)) return true;
       const data = this._load();
       const list = data.list || [];

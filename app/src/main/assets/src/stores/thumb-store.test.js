@@ -353,14 +353,36 @@ describe('ThumbStore — IDB unavailable', () => {
     expect(n).toBe(2);
   });
 
-  it('a blocked open settles null, and a connection that arrives later is closed, not leaked', async () => {
-    const late = { onversionchange: null, close: vi.fn() };
-    let req = /** @type {any} */ (null);
-    const m = await freshModuleWith({
-      open: () => { req = {}; queueMicrotask(() => req.onblocked && req.onblocked()); return req; },
-    });
-    await expect(m.openThumbDB()).resolves.toBeNull();
-    req.onsuccess({ target: { result: late } });   // the blocker closed after all
-    expect(late.close).toHaveBeenCalled();
+  // Refuter r1: a blocker that lets go soon must still get the write through, as before.
+  it('a blocked open still opens when the blocker lets go in time', async () => {
+    vi.useFakeTimers();
+    try {
+      const db = { onversionchange: null, close: vi.fn() };
+      let req = /** @type {any} */ (null);
+      const m = await freshModuleWith({
+        open: () => { req = {}; queueMicrotask(() => req.onblocked && req.onblocked()); return req; },
+      });
+      const p = m.openThumbDB();
+      await vi.advanceTimersByTimeAsync(2000);
+      req.onsuccess({ target: { result: db } });     // the old tab closed
+      await expect(p).resolves.toBe(db);
+      expect(db.close).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a blocker that never lets go settles null after a while, and a connection that comes later is closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const late = { onversionchange: null, close: vi.fn() };
+      let req = /** @type {any} */ (null);
+      const m = await freshModuleWith({
+        open: () => { req = {}; queueMicrotask(() => req.onblocked && req.onblocked()); return req; },
+      });
+      const p = m.openThumbDB();
+      await vi.advanceTimersByTimeAsync(m.THUMB_BLOCKED_GIVE_UP_MS + 10);
+      await expect(p).resolves.toBeNull();
+      req.onsuccess({ target: { result: late } });
+      expect(late.close).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
   });
 });

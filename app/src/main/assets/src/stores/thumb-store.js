@@ -43,6 +43,10 @@ const _queue = writeQueue();
 /** Object-store name inside THUMB_DB. */
 export const THUMB_STORE = 'thumbs';
 
+/** A blocked open (an old connection holding the upgrade) waits this long for the
+ *  blocker to let go, then settles null so queued writes stop waiting (ds5 s12.2). */
+export const THUMB_BLOCKED_GIVE_UP_MS = 10000;
+
 /** Module-private singleton promise; cached so re-opens reuse the same
  *  connection. Dropped on versionchange, and when an open fails or is blocked
  *  (ds5 s12.2), so the next call opens again. */
@@ -62,7 +66,10 @@ export function openThumbDB() {
   let self = null;
   /** ds5 s12.2: a failed or blocked open resolves null and is not kept, so one
    *  transient failure no longer turns thumbnails off until a reload. */
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let giveUp = null;
   const fail = () => {
+    if (giveUp) { clearTimeout(giveUp); giveUp = null; }
     if (settled) return;
     settled = true;
     if (self && _thumbDbPromise === self) _thumbDbPromise = null;
@@ -85,6 +92,7 @@ export function openThumbDB() {
         // upgrade or Clear All's delete in turn.
         if (settled) { try { db.close(); } catch (_e) { /* best-effort close */ } return; }
         settled = true;
+        if (giveUp) { clearTimeout(giveUp); giveUp = null; }
         // storage-backup-4: without this, the connection stays open for the
         // life of the page and indexedDB.deleteDatabase('vot-thumbs')
         // (Settings → Clear All My Data) fires onblocked instead of
@@ -100,8 +108,9 @@ export function openThumbDB() {
       };
       req.onerror = fail;
       // An old connection holding the upgrade fires blocked and may never let go:
-      // without this the promise never settled and every queued write waited on it.
-      req.onblocked = fail;
+      // without a limit the promise never settled and every queued write waited on
+      // it. A blocker that closes in time still lets this open (and its writes) through.
+      req.onblocked = () => { if (!settled && !giveUp) giveUp = setTimeout(fail, THUMB_BLOCKED_GIVE_UP_MS); };
     } catch (_e) { fail(); }
   });
   self = p;
