@@ -1811,7 +1811,8 @@ function drawPills(ctx, g, cam, L, fs, grid, hits, badges) {
     if (!(n > 1)) continue;
     const cx = ((cell.lo + cell.hi + 1) / 2 - cam.x) * cam.ppv + W / 2;
     const wCell = (cell.hi - cell.lo + 1) * cam.ppv;
-    const text = '+' + fmtCount(n);
+    // the count of what meets there, not "n more" (Corbin, 2026-10-23: the "+" goes)
+    const text = fmtCount(n);
     const w = Math.max(h, measure.width(ctx, font, text) + 16 * s);
     if (w > wCell + 2 * s) continue;
     const box = { x0: cx - w / 2, x1: cx + w / 2, y0, y1 };

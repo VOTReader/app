@@ -76,6 +76,16 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 import { createRenderer } from '../scripture-web/web-renderer.js';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { ScriptureWebScreen, _resetWebPlace, _setWebPlace } from './ScriptureWebScreen.jsx';
+
+/** The density, as the Filters sheet's Strength row chooses it (Corbin, 2026-10-23: the Famous /
+ * Essential menu folded into it). @param {string} label  'All' | 'Essential' | '50+ votes' | '100+ votes' */
+function chooseStrength(label) {
+  if (!document.querySelector('.sw-filter-sheet')) fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+  const b = [...document.querySelectorAll('.sw-filter-sheet .sw-seg-btn')].find((x) => x.textContent === label);
+  if (!b) throw new Error('no Strength button ' + label);
+  fireEvent.click(b);
+  return b;
+}
 import { LEG_PPV_CSS } from '../scripture-web/overlay-renderer.js';
 import { modalRegistry } from '../../hooks/use-modal-registry.js';
 import { webFrame } from '../../utils/scripture-web/web-frame.js';
@@ -255,7 +265,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
      Nested here because this block owns the SIZED-CANVAS harness (800x360, the + key, the
      recorded draws). Forty presses reach the 44 px ceiling (1,711x on this frame). */
   describe('the density is the reader\'s choice at every zoom, Famous unless they chose Essential', () => {
-    const shown = () => screen.getByLabelText('Connection density').value;
+    const shown = () => document.querySelector('.sw-root').getAttribute('data-density');
     const pressFrame = async (key) => {
       fireEvent.keyDown(document.querySelector('.sw-root'), { key });
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
@@ -432,7 +442,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('CONTROL: choosing Essential on the pill persists it as the setting (updateSetting webDensity) — green today, stated as such', async () => {
       const updateSetting = vi.fn();
       await mount({ updateSetting });
-      fireEvent.change(screen.getByLabelText('Connection density'), { target: { value: 'essential' } });
+      chooseStrength('Essential');
       expect(updateSetting).toHaveBeenCalledWith('webDensity', 'essential');
       await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
       expect(lastDensity()).toBe('essential');
@@ -981,8 +991,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     it('w4: the density hint does not outlive the switch to My Web', async () => {
       stubMyWeb();
       const { container } = await mount({ settings: seen }, threaded);
-      const select = container.querySelector('.sw-select');
-      fireEvent.change(select, { target: { value: 'essential' } });
+      chooseStrength('Essential');
+      fireEvent.click(screen.getByRole('button', { name: 'Close the filters' }));
       await settle(20);
       expect(container.querySelector('.sw-hint'), 'PRECONDITION: the density switch printed its hint').toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'My Web' }));
@@ -1052,16 +1062,19 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await settle(20);
       expect(lastDraw().camX, 'CONTROL: the web panned').not.toBeCloseTo(before.camX, 3);
 
-      const select = screen.getByLabelText('Connection density');
+      // a control of the Filters sheet (the density's home since 2026-10-23) keeps its own keys
+      fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+      const select = [...container.querySelectorAll('.sw-filter-sheet .sw-seg-btn')].find((x) => x.textContent === 'Essential');
       select.focus();
       before = lastDraw();
       for (const key of ['ArrowRight', 'ArrowLeft', 'ArrowDown', 'ArrowUp', '+', '-', '0']) {
-        expect(fireEvent.keyDown(select, { key }), key + ' on the select is not cancelled').toBe(true);
+        expect(fireEvent.keyDown(select, { key }), key + ' on the sheet\'s control is not cancelled').toBe(true);
         await settle(20);
       }
       expect(lastDraw().camX, 'the web did not pan under the select').toBeCloseTo(before.camX, 6);
       expect(lastDraw().ppv, 'nor zoom').toBeCloseTo(before.ppv, 6);
       expect(lastDraw().camY, 'nor climb').toBe(before.camY);
+      fireEvent.click(screen.getByRole('button', { name: 'Close the filters' }));
 
       fireEvent.click(screen.getByRole('button', { name: 'Nearby' }));
       await settle(20);
@@ -1071,12 +1084,12 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await settle(20);
       expect(lastDraw().camX, 'the web did not pan behind the list').toBeCloseTo(before.camX, 6);
 
-      // Escape is the web's from anywhere: from the row it closes the list, from the select it leaves
+      // Escape is the web's from anywhere: from the row it closes the list, with nothing open it leaves
       fireEvent.keyDown(row, { key: 'Escape' });
       await settle(20);
       expect(container.querySelector('.sw-list')).toBeNull();
       expect(onBack).not.toHaveBeenCalled();
-      fireEvent.keyDown(select, { key: 'Escape' });
+      fireEvent.keyDown(container.querySelector('.sw-legend .sw-chip'), { key: 'Escape' });
       expect(onBack).toHaveBeenCalledTimes(1);
     });
   });

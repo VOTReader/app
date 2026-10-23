@@ -180,11 +180,24 @@ function SegRow({ name, value, options, onChange }) {
 }
 
 /**
+ * The Strength row's value: the votes filter, or the density it stands on. Essential is the
+ * density (Corbin, 2026-10-23: the Famous / Essential menu folds into this row), and 50+ and 100+
+ * stand on it, so their ghosts are the Essential web's.
+ * @param {WebFilters} f @param {string} density
+ */
+export function strengthOf(f, density) {
+  return f.strength !== 'all' ? f.strength : density === 'essential' ? 'essential' : 'all';
+}
+
+/**
  * The Filters sheet: every filter, combined, with the count they leave and Clear all.
  * Escape closes it (use-web-keys.js: it is a layer of the web's).
- * @param {{ web: ReturnType<typeof useWebFilters>, graph: any }} p
+ * @param {{ web: ReturnType<typeof useWebFilters>, graph: any, density: string,
+ *   chooseDensity: (d: any) => void, total: number }} p
+ *   density, chooseDensity: the web's density, which the Strength row sets; total: what the density
+ *   shows with no filter on
  */
-export function FilterSheet({ web, graph }) {
+export function FilterSheet({ web, graph, density, chooseDensity, total }) {
   // the keyboard goes in as it opens and back where it was as it closes (use-focus-trap.js); not
   // modal: the web behind it is the point, showing what the filters leave
   const ref = useFocusTrap(true, { modal: false });
@@ -205,15 +218,22 @@ export function FilterSheet({ web, graph }) {
     <button type="button" className={'sw-btn sw-toggle' + (value ? ' is-on' : '')} aria-pressed={value}
       onClick={() => web.change({ [key]: !value })}>{label}</button>
   );
-  const count = web.on ? web.shown : -1;
+  const count = web.on ? web.shown : total;
+  const strength = strengthOf(f, density);
+  /** @param {string} v */
+  const setStrength = (v) => {
+    chooseDensity(v === 'all' ? 'famous' : 'essential');
+    web.change({ strength: /** @type {any} */ (v === 'all' || v === 'essential' ? 'all' : v) });
+  };
+  const clearAll = () => { web.clear(); if (density !== 'famous') chooseDensity('famous'); };
   return (
     <div className="sw-filter-sheet" ref={ref} role="dialog" aria-modal="false" aria-label="Filters" data-wheel-through="1">
       <div className="sw-filter-head">
         <h2>Filters</h2>
-        <span className="sw-filter-count" aria-live="off">
-          {count >= 0 ? count.toLocaleString() + ' shown' : 'Everything shown'}
+        <span className="sw-filter-count">
+          {count >= 0 ? count.toLocaleString() + ' shown' : ''}
         </span>
-        <button type="button" className="sw-filter-clear" disabled={!web.on} onClick={web.clear}>Clear all</button>
+        <button type="button" className="sw-filter-clear" disabled={!web.on && density === 'famous'} onClick={clearAll}>Clear all</button>
         <button type="button" className="sw-btn sw-btn-icon sw-filter-close" aria-label="Close the filters"
           onClick={() => web.setSheetOpen(false)}>
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
@@ -233,8 +253,8 @@ export function FilterSheet({ web, graph }) {
           options={['all', 'near', 'middle', 'far'].map((k) => [k, k === 'middle' ? 'Middle' : DISTANCE_LABEL[k]])} />
         <SegRow name="Testament" value={f.testament} onChange={(v) => web.change({ testament: /** @type {any} */ (v) })}
           options={['all', 'oo', 'on', 'nn'].map((k) => [k, TESTAMENT_LABEL[k]])} />
-        <SegRow name="Strength" value={f.strength} onChange={(v) => web.change({ strength: /** @type {any} */ (v) })}
-          options={[['all', 'All'], ['strong', '50+ votes'], ['strongest', '100+ votes']]} />
+        <SegRow name="Strength" value={strength} onChange={setStrength}
+          options={[['all', 'All'], ['essential', 'Essential'], ['strong', '50+ votes'], ['strongest', '100+ votes']]} />
         <div className="sw-filter-row">
           <span className="sw-filter-name">Books</span>
           <div className="sw-filter-books">

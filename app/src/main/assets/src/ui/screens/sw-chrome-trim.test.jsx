@@ -134,10 +134,10 @@ describe('the Scripture Web chrome, trimmed', () => {
     delete window.SCRIPTURE_WEB_DATA;
   });
 
-  it('mounts with its topbar, density control and a drawn frame — the precondition every absence below depends on', async () => {
+  it('mounts with its topbar, the Filters entry (where the density lives) and a drawn frame — the precondition every absence below depends on', async () => {
     const { container } = await mount();
     expect(container.querySelector('.sw-topbar')).toBeTruthy();
-    expect(screen.getByLabelText('Connection density')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
     /* The renderer was asked to draw at least once. If this is 0 the canvas
        sizing above has stopped working and the colorMode case is vacuous. */
     expect(DRAWN.length).toBeGreaterThan(0);

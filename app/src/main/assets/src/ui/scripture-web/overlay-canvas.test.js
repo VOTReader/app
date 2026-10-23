@@ -46,6 +46,11 @@ const FRAMES = {
 };
 
 /** A 2D context that records what is drawn; text is `em` (0.5) em a glyph plus the tracking. */
+/* A "+n" pill reads "n" since 2026-10-23 (Corbin: the "+" goes): a pill's count is told from a
+   numeral by its weight, 600 (drawPills), where the numerals carry none. */
+const isPill = (c) => /^\d[\d,]*$/.test(c.t) && /^600 /.test(c.font);
+const isNum = (c) => /^\d+$/.test(c.t) && !/^600 /.test(c.font);
+
 function recorder(canvas = null, em = 0.5) {
   const calls = [];
   const state = { font: '10px serif', letterSpacing: '0px', globalAlpha: 1, fillStyle: '#000', strokeStyle: '#000', lineWidth: 1, textAlign: 'start', textBaseline: 'alphabetic', lineJoin: 'miter' };
@@ -686,9 +691,9 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     for (const zoom of [85, 196, 211]) {
       const { rec, fs } = paint('phone', zoom, ISA53_6, { canvas });
       const s = fs.v.DPR;
-      const pills = rec.texts().filter((c) => /^\+\d/.test(c.t));
+      const pills = rec.texts().filter(isPill);
       expect(pills.length, zoom + 'x: pills').toBeGreaterThan(2);
-      const nums = rec.texts().filter((c) => /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
+      const nums = rec.texts().filter((c) => isNum(c) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
       expect(nums.length, zoom + 'x: numerals').toBeGreaterThan(2);
       const pillFoot = Math.max(...pills.map((c) => c.y)) + 9 * s, numTop = Math.min(...nums.map((c) => textRect(c).y0));
       expect(numTop - pillFoot, zoom + 'x: the pills end above the numerals').toBeGreaterThanOrEqual(0);
@@ -707,7 +712,7 @@ describe('the band under the baseline (w4: r2-01a, r2-06, r3-03)', () => {
     expect(marks.length).toBeGreaterThan(50);
     for (const m of marks) for (const z of zones) expect(meet(m, z), 'a tick, rule or dot under a corner button at ' + Math.round(m.x0 / s)).toBe(false);
     for (const c of rec.texts()) for (const z of zones) expect(meet(textRect(c), z), '"' + c.t + '" under a corner button').toBe(false);
-    const nums = rec.texts().filter((c) => /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
+    const nums = rec.texts().filter((c) => isNum(c) && Math.abs(fontPxOf(c.font) - 20 * s) < 1e-6);
     const right = Math.max(...nums.map((c) => textBox(c).x1));
     expect(right / s, 'a chapter numeral at the right end (the right ' + Math.round((fs.v.W - right) / s) + ' px were empty)').toBeGreaterThan(891 - 90);
   });
@@ -772,7 +777,7 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
     expect(n53.length, 'chapter 53 is numbered').toBe(1);
     expect(fontPxOf(n53[0].font), 'at the spec size').toBe(28);
     expect(n53[0].fill, 'the centre chapter in gold').toBe('rgb(196,164,105)');
-    const others = t.filter((c) => /^\d+$/.test(c.t) && c.t !== '53' && fontPxOf(c.font) === 28);
+    const others = t.filter((c) => isNum(c) && c.t !== '53' && fontPxOf(c.font) === 28);
     expect(others.length, 'other chapters numbered').toBeGreaterThan(2);
     for (const c of others) expect(c.fill, c.t + ' plain').toBe(css('chapterNumeral'));
     expect(t.some((c) => c.t === '‹'), 'the sticky arrow').toBe(true);
@@ -791,7 +796,7 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
       const s = fs.v.DPR;
       const t = rec.texts();
       for (const c of t) expect(fontPxOf(c.font) / s, c.t + ' at ' + zoom + 'x').toBeGreaterThanOrEqual(12 - 1e-9);
-      const vnums = t.filter((c) => c.align === 'center' && /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);
+      const vnums = t.filter((c) => c.align === 'center' && isNum(c) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);
       expect(vnums.length, 'verse numerals at ' + zoom + 'x').toBeGreaterThan(0);
       if (every === 5) for (const c of vnums) expect(Number(c.t) % 5, c.t).toBe(0);
       else expect(vnums.some((c) => Number(c.t) % 5 !== 0)).toBe(true);
@@ -806,7 +811,7 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
       const { canvas } = chromeRoot('phone');
       const { rec, fs } = paint('phone', zoom, ISA53_6, { canvas });
       const s = fs.v.DPR, what = 'phone ' + zoom + 'x (' + (fs.cam.ppv / s).toFixed(2) + ' px a verse)';
-      const vnums = rec.texts().filter((c) => c.align === 'center' && /^\d+$/.test(c.t) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);
+      const vnums = rec.texts().filter((c) => c.align === 'center' && isNum(c) && Math.abs(fontPxOf(c.font) - 12 * s) < 1e-6);
       expect(vnums.length, what + ': verse numerals').toBeGreaterThan(3);
       for (const c of vnums) {
         expect(Number(c.t) % 5, what + ': ' + c.t).toBe(0);
@@ -846,7 +851,7 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
         const f0 = side === 'left' ? 0 : Wc - span, f1 = side === 'left' ? span : Wc;
         let beside = 0;
         calls.forEach((c, k) => {
-          if (c.op !== 'fillText' || !/^\d+$/.test(c.t)) return;
+          if (c.op !== 'fillText' || !isNum(c)) return;
           const b = textBox(c);
           expect(b.x1 <= z0 || b.x0 >= z1, what + ': numeral ' + c.t + ' at ' + Math.round(b.x0) + ' under the solid fade').toBe(true);
           if (b.x1 > f0 && b.x0 < f1) { beside++; expect(k, what + ': numeral ' + c.t + ' drawn before the fade over it').toBeGreaterThan(gi); }
@@ -908,7 +913,7 @@ describe('the deep band (r3-03): chapter numerals, verse ticks and numerals, the
   });
 
   it('the overview hands over to the deep band: no chapter-length bars past it, no numerals before it', () => {
-    const before = paint('pc', 3, ISA53_6).rec.texts().filter((c) => /^\d+$/.test(c.t));
+    const before = paint('pc', 3, ISA53_6).rec.texts().filter((c) => isNum(c));
     expect(before.length, 'no numerals at 3x').toBe(0);
     const after = paint('pc', DEEP_FULL + 0.5, ISA53_6).rec.calls.filter((c) => c.op === 'fillRect' && c.h > 4 && c.w > 1.5);
     expect(after.length, 'no bars at depth').toBe(0);

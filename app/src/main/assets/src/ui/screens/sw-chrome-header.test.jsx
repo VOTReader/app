@@ -109,23 +109,33 @@ describe('the header and the controls (spec 4.1)', () => {
     expect(container.querySelector('.sw-title p').textContent).toMatch(/^\d[\d,]* connections$/);
   });
 
-  it('the density options name each density with its count and one line; closed, it reads the name', async () => {
+  // Corbin, 2026-10-23: the Famous / Essential menu folds into the Filters sheet's Strength row
+  it('the density is the Filters sheet\'s Strength row (All, Essential, 50+, 100+); the menu has none', async () => {
     const { container } = await mount();
-    const select = screen.getByLabelText('Connection density');
-    expect([...select.options].map((o) => o.textContent)).toEqual([
-      'Famous · 0, the full classic chart', 'Essential · 0, the strongest',
-    ]);
-    const face = container.querySelector('.sw-select-face');
-    expect(face && face.textContent).toBe('Famous');
-    expect(face.getAttribute('aria-hidden')).toBe('true');
-    fireEvent.change(select, { target: { value: 'essential' } });
+    expect(screen.queryByLabelText('Connection density'), 'the menu\'s select is gone').toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const row = [...container.querySelectorAll('.sw-filter-row')].find((r) => /Strength/.test(r.textContent));
+    const btns = [...row.querySelectorAll('.sw-seg-btn')];
+    expect(btns.map((b) => b.textContent)).toEqual(['All', 'Essential', '50+ votes', '100+ votes']);
+    expect(btns[0].getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(btns[1]);
     await settle(40);
-    expect(container.querySelector('.sw-select-face').textContent).toBe('Essential');
+    expect(container.querySelector('.sw-root').getAttribute('data-density')).toBe('essential');
+    expect(btns[1].getAttribute('aria-pressed')).toBe('true');
+    // 50+ stands on Essential; All goes back to Famous
+    fireEvent.click(btns[2]);
+    await settle(40);
+    expect(container.querySelector('.sw-root').getAttribute('data-density')).toBe('essential');
+    expect(btns[2].getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(btns[0]);
+    await settle(40);
+    expect(container.querySelector('.sw-root').getAttribute('data-density')).toBe('famous');
   });
 
   it('one live region: a density switch shows its line under the title and is said in .sw-live only', async () => {
     const { container } = await mount();
-    fireEvent.change(screen.getByLabelText('Connection density'), { target: { value: 'essential' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.click([...container.querySelectorAll('.sw-filter-sheet .sw-seg-btn')].find((x) => x.textContent === 'Essential'));
     await settle(40);
     const hint = container.querySelector('.sw-hint');
     expect(hint && hint.textContent).toBe('Essential · 0, the strongest');

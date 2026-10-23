@@ -113,10 +113,10 @@ describe('the load error (item 24)', () => {
     expect(container.querySelector('.sw-guide-btn')).toBeNull();
   });
 
-  it('while the web is woven, the density names no count it does not have yet ("Famous", not "Famous · 0")', async () => {
+  it('while the web is woven there is no density control to name a count it does not have yet', async () => {
     render(<ScriptureWebScreen {...baseProps()} />);
     await act(async () => { await Promise.resolve(); });
-    const select = /** @type {HTMLSelectElement} */ (screen.getByLabelText('Connection density'));
-    expect([...select.options].map((o) => o.textContent)).toEqual(['Famous', 'Essential']);
+    expect(screen.queryByLabelText('Connection density')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Filters' }), 'the Filters entry waits for the web').toBeNull();
   });
 });

@@ -206,6 +206,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (hintTimer.current) clearTimeout(hintTimer.current);
     hintTimer.current = setTimeout(() => setHint(''), 3600);
   }, [setAnnounce]);
+  /** The density, chosen in the Filters sheet's Strength row: kept as the setting, its line said. @param {Density} next */
+  const chooseDensity = React.useCallback((next) => {
+    setDensity(next);
+    if (graph) flashHint(densityLine(next, graphStats(graph, next).shown));
+    if (typeof updateSetting === 'function') updateSetting('webDensity', next);
+  }, [graph, flashHint, updateSetting]);
   const [showUnderlay, setShowUnderlay] = React.useState(true);
 
   // ── everything below here is per-frame state; deliberately NOT React ──
@@ -515,8 +521,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // no-WebGL face.)
 
   const stats = graph ? graphStats(graph, density) : null;
-  const famousCount = graph ? graphStats(graph, 'famous').shown : 0;
-  const essentialCount = graph ? graphStats(graph, 'essential').shown : 0;
 
   return (
     <div className={'sw-root' + (rotated ? ' sw-rotated' : '') + (chromeHidden ? ' sw-chrome-hidden' : '')
@@ -524,7 +528,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       // renderer's classList toggle, so a re-render cannot drop it
       + (layout && layout.narrow ? ' sw-narrow' : '') + (layout && layout.compact ? ' sw-compact' : '')
       + (panelOpen ? ' sw-panel-open' : '') + (collapse ? ' sw-collapse' : '') + (collapse && menuOpen ? ' sw-menu-open' : '') + (stack ? ' sw-stack' : '')}
-      ref={wrapRef} data-panel={panelOpen ? (layout && layout.sheet ? 'sheet' : 'dock') : undefined}
+      ref={wrapRef} data-panel={panelOpen ? (layout && layout.sheet ? 'sheet' : 'dock') : undefined} data-density={density}
       tabIndex={0} onKeyDown={onKeyDown}
       role="application"
       aria-label="The Scripture Web — an interactive map of cross-references"
@@ -583,28 +587,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <button type="button" className={'sw-btn' + (listOpen ? ' is-on' : '')}
           onClick={fromMenu(() => { setListOpen(!listOpen); setChoices(null); })}
           aria-expanded={listOpen} aria-haspopup="dialog">Nearby</button>
-        {mode === 'canonical' ? (
-            <label className="sw-select-wrap">
-              <span className="sw-sr-only">Connection density</span>
-              <select className="sw-select" value={density} aria-label="Connection density"
-                onChange={(e) => {
-                  const next = /** @type {Density} */ (e.target.value);
-                  setDensity(next);
-                  flashHint(densityLine(next, graphStats(graph, next).shown));
-                  if (typeof updateSetting === 'function') updateSetting('webDensity', next);
-                  setMenuOpen(false);
-                }}>
-                {/* each density with its count and one line (Q6); closed, the face reads its name */}
-                {/* the count only once the graph is here: no "Famous · 0" while the web is woven */}
-                <option value="famous">{graph ? densityLine('famous', famousCount) : 'Famous'}</option>
-                <option value="essential">{graph ? densityLine('essential', essentialCount) : 'Essential'}</option>
-              </select>
-              <span className="sw-select-face" aria-hidden="true">
-                {density === 'essential' ? 'Essential' : 'Famous'}
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M6 9l6 6 6-6" /></svg>
-              </span>
-            </label>
-        ) : (
+        {/* the canon's density is the Filters sheet's Strength row (Corbin, 2026-10-23: the Famous /
+            Essential menu folds into it); My Web keeps its notes toggle here */}
+        {mode === 'canonical' ? null : (
           <button type="button" className={'sw-btn sw-toggle' + (showUnderlay ? ' is-on' : '')} aria-pressed={showUnderlay}
             onClick={fromMenu(() => { setShowUnderlay(!showUnderlay); schedule(); })}
             aria-label={'Timothy’s notes · ' + (contextCount > 0 ? contextCount.toLocaleString() : '…') + ' citations'}>
@@ -612,7 +597,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           </button>
         )}
         {/* Reset brings the whole web back: the view, and the filters with it */}
-        <button type="button" className="sw-btn" onClick={fromMenu(() => { resetView(); web.clear(); })} aria-label="Reset the view">Reset</button>
+        <button type="button" className="sw-btn" onClick={fromMenu(() => { resetView(); web.clear(); if (density !== 'famous') chooseDensity('famous'); })} aria-label="Reset the view">Reset</button>
         </div>
         {collapse ? (
           <button type="button" ref={moreBtnRef} className={'sw-btn sw-btn-icon sw-more-btn' + (menuOpen ? ' is-on' : '')}
@@ -665,7 +650,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       ) : null}
       {/* the pill names what is on; with the sheet open the sheet's own count does */}
       {web.canon && graph && !web.sheetOpen ? <FilterPill web={web} /> : null}
-      {web.canon && graph && web.sheetOpen ? <FilterSheet web={web} graph={graph} /> : null}
+      {web.canon && graph && web.sheetOpen ? (
+        <FilterSheet web={web} graph={graph} density={density} chooseDensity={chooseDensity} total={stats ? stats.shown : 0} />
+      ) : null}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
       {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby

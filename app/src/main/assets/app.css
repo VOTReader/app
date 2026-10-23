@@ -8478,29 +8478,13 @@
     .sw-seg-btn:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
     .sw-root.sw-compact .sw-seg-btn { min-height: 34px; font-size: var(--fsc-15); }
     .sw-root.sw-compact .sw-seg-btn::after { top: -6px; bottom: -6px; }
-    /* THE DENSITY (Q6). The closed control reads the density's name and a chevron (the face);
-       the native select lies over it, transparent, so the list it opens names each density
-       with its count and one line ("Famous · 63,418, the full classic chart"), and the keyboard
-       and a screen reader get the real control. */
-    .sw-select-wrap { position: relative; display: inline-flex; align-items: center; }
+    /* THE SELECTS: the Filters sheet's book pickers (web-filters.jsx), the web's own ink; the
+       density's select left the menu for the sheet's Strength row (Corbin, 2026-10-23) */
     .sw-select {
-      position: absolute; z-index: 1; left: 0; top: -2px; width: 100%; height: calc(100% + 4px);
-      margin: 0; padding: 0; opacity: 0; appearance: none; border: 0; border-radius: 6px;
-      background: var(--sw-control-fill); color: var(--sw-text);
+      margin: 0; border-radius: 6px; background: var(--sw-control-fill); color: var(--sw-text);
       font-family: var(--sw-font); font-size: var(--fsc-16); cursor: pointer;
     }
     .sw-select option { background: var(--sw-panel); color: var(--sw-text); }
-    .sw-select-face {
-      display: inline-flex; align-items: center; gap: 8px; box-sizing: border-box;
-      min-height: 40px; padding: 0 10px 0 14px; pointer-events: none;
-      background: var(--sw-control-fill); color: var(--sw-text);
-      border: 1px solid var(--sw-control-border); border-radius: 6px;
-      font-family: var(--sw-font); font-size: var(--fsc-16); line-height: 1;
-    }
-    .sw-select-face svg { flex: none; display: block; color: var(--sw-text-meta); }
-    .sw-select-wrap:hover .sw-select-face { border-color: var(--sw-control-border-hover); }
-    .sw-select:focus-visible + .sw-select-face { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
-    .sw-root.sw-compact .sw-select-face { min-height: 36px; font-size: var(--fsc-15); }
 
     /* The loader and the load error paint on the canvas's black in both themes (Q4); the
        topbar (z 6) stays above the loader, so Back is there while the web is woven (item 24). */
@@ -9198,7 +9182,7 @@
     .sw-filter-seg { flex-wrap: wrap; }
     .sw-filter-toggles, .sw-filter-books { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     .sw-filter-and { color: var(--sw-text-muted); }
-    .sw-filter-book .sw-select { position: static; opacity: 1; appearance: auto; width: auto; height: auto;
+    .sw-filter-book .sw-select {
       min-height: 38px; padding: 0 10px; max-width: 190px;
       background: var(--sw-control-fill); color: var(--sw-text); border: 1px solid var(--sw-control-border); border-radius: 6px;
       font-family: var(--sw-font); font-size: var(--fsc-15); }

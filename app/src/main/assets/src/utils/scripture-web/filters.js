@@ -74,7 +74,7 @@ export function filterLabels(g, f) {
   const book = (/** @type {number} */ b) => (g && g.books && g.books[b] ? g.books[b].title : '');
   if (f.fromBook >= 0 && f.toBook >= 0) out.push({ key: 'book', label: book(f.fromBook) + ' and ' + book(f.toBook) });
   else if (f.fromBook >= 0 || f.toBook >= 0) out.push({ key: 'book', label: book(f.fromBook >= 0 ? f.fromBook : f.toBook) });
-  if (f.strength !== 'all') out.push({ key: 'strength', label: f.strength === 'strong' ? 'Strong links' : 'Strongest links' });
+  if (f.strength !== 'all') out.push({ key: 'strength', label: f.strength === 'strong' ? '50+ votes' : '100+ votes' });
   return out;
 }
 
