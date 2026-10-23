@@ -20,6 +20,7 @@
    React re-renders so the useEffect-only path leaves the refs stale.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { runName } from '../../data/plan-catalog.js';
 import { isMarkKind } from '../../utils/mark-kinds.js';
 import { createPressDrag } from '../../utils/press-drag.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
@@ -36,13 +37,17 @@ function _libDragTrace(msg) {
 }
 
 // The stores behind the Notes, Links, Bookmarks, Journal and Highlights counts.
-const LIBRARY_COUNT_STORES = Object.freeze(['NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore']);
+const LIBRARY_COUNT_STORES = Object.freeze(['NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore']);
 
 export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // The tile counts below read these stores directly; subscribing to each one is
   // what keeps a count live while the Library stays open (a note saved in a
   // sheet, a bookmark removed). Fixed list — stable hook order.
   LIBRARY_COUNT_STORES.forEach(useStoreVersionByName);
+  const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
+  /** @type {any[]} */
+  const runningPlans = planStore && typeof planStore.active === 'function' ? planStore.active() : [];
+  const planCount = runningPlans.length || readingPlanCount || 0;
 
   const noteCount      = NoteStore.count();
   const linkCount      = LinkStore.all().length;
@@ -156,10 +161,11 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
     // rp1: the way in to a reading plan (the Today card on Home shows it once it runs)
     plans: {
       id: 'plans', title: 'Reading plans',
-      count: readingPlanCount ? String(readingPlanCount) : null, unit: readingPlanCount === 1 ? ' plan running' : ' plans running',
+      count: planCount ? String(planCount) : null, unit: planCount === 1 ? ' plan running' : ' plans running',
       empty: 'No plan yet',
-      desc: 'Bible in a Year, the Volumes in order',
-      guide: !readingPlanCount ? 'Read the Bible in a year, or the Volumes in order.' : null,
+      // mw18 C12: the row names the plans running, never ones the reader has not started.
+      desc: runningPlans.length ? runningPlans.map((r) => runName(r, null)).join(', ') : 'The Bible, the letters, short starts',
+      guide: !planCount ? 'Read the Bible in a year, or the Volumes in order.' : null,
       onClick: onOpenPlans,
       icon: (
         <svg viewBox="0 0 24 24">

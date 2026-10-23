@@ -321,24 +321,27 @@ export function buildScreenRoutes({
       navigateToLink({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
     }
   };
-  const listenPlanItem = (next) => {
-    if (!next) return;
-    const col = _planCol(next.bid);
-    let started = false;
-    if (col) {
-      if (AudioPlayer.collectionHasAudio(col.volKey)) {
+  // mw18 C5: Listen plays today's portion only (the refs from its first item not read yet), as one queue that
+  // stops when the portion ends: each Bible chapter in the reader's audio edition, each letter in its
+  // collection's recording. Items with no recording are passed over; with none, Read opens the first.
+  const listenPlanItem = (refs, label) => {
+    const list = (Array.isArray(refs) ? refs : refs ? [refs] : []).filter(Boolean);
+    if (!list.length) return;
+    const items = [];
+    for (const ref of list) {
+      const col = _planCol(ref.bid);
+      if (col) {
         const pref = colPreface(col);
-        const arr = colLetterArr(col);
-        started = AudioPlayer.playCollection({ volKey: col.volKey, items: pref ? [pref, ...arr] : arr, collectionLabel: col.label, startId: next.cid }) !== false;
-      }
-    } else {
-      const audio = bibleAudioFor(next.bid);
-      if (audio) {
-        AudioPlayer.playBibleBook({ volKey: audio.volKey, bookId: next.bid, label: audio.label, chapterNum: next.cid });
-        started = true;
+        const item = [...(pref ? [pref] : []), ...colLetterArr(col)].find((e) => e && e.id === ref.cid);
+        if (item) items.push({ volKey: col.volKey, item, collectionLabel: col.label });
+      } else {
+        const bookId = ref.bid === 'matthew' ? 'matthew-plain' : ref.bid;
+        const audio = bibleAudioFor(bookId);
+        if (audio) items.push({ volKey: audio.volKey, item: { id: bookId }, collectionLabel: audio.label, chapterNum: Number(ref.cid) });
       }
     }
-    if (!started) openPlanItem(next);
+    const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
+    if (!started) openPlanItem(list[0]);
   };
   // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to
@@ -1072,6 +1075,7 @@ export function buildScreenRoutes({
         markAsReadEnabled={settings.markAsRead !== false}
         onPlanRead={openPlanItem}
         onPlanListen={listenPlanItem}
+        onEnableMarkAsRead={() => updateSetting('markAsRead', true)}
         onOpenPlans={goReadingPlans}
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
       />
@@ -1162,6 +1166,7 @@ export function buildScreenRoutes({
         markAsReadEnabled={settings.markAsRead !== false}
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
         onRead={openPlanItem}
+        onListen={listenPlanItem}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

@@ -444,6 +444,42 @@ function _booksAfter(volKey, bookId) {
  *
  * @returns {boolean}
  */
+/**
+ * Play a reading plan's portion for today (mw18 C5): the recordings of the
+ * listed chapters and letters, in order, as ONE queue that ends with the
+ * portion - never on into the rest of the book or collection. A custom queue
+ * with no volKey (_continues refuses it), so it is persisted whole and stops.
+ * A Bible chapter is its edition's chapter part; a letter is all its parts in
+ * the listener's Letter Voice. Items with no recording are passed over.
+ * Returns false (nothing changed) when none of them has one, or offline when
+ * none is on the phone (with the offline toast).
+ *
+ * @param {{ items: Array<{ volKey: string, item: { id?: string, title?: string }, collectionLabel?: string | null, chapterNum?: number | null }>, label?: string | null }} opts
+ * @returns {boolean}
+ */
+export function playPortion(opts) {
+  const o = opts || /** @type {any} */ ({});
+  /** @type {Track[]} */
+  const queue = [];
+  for (const p of Array.isArray(o.items) ? o.items : []) {
+    if (!p || !p.volKey || !p.item) continue;
+    const tracks = playbackTracks(p.volKey, p.item, p.collectionLabel || undefined);
+    const n = Math.floor(Number(p.chapterNum) || 0);
+    if (n >= 1 && tracks.length > 1) { if (n <= tracks.length) queue.push(tracks[n - 1]); }
+    else for (const t of tracks) queue.push(t);
+  }
+  if (!queue.length) return false;
+  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
+  _rememberOutgoingPosition();
+  _setPendingRestore(null);
+  _setSource({ mode: 'custom', volKey: '', label: o.label || null });
+  _state.queue = queue;
+  _state.qi = 0;
+  _countPlay();
+  _startAt(_resumeAt);
+  return true;
+}
+
 function _extendQueue() {
   // A songs queue is refused here like a custom one: songs never continue into
   // letters (README §1.1) — a songs queue ends, or wraps under repeat 'all'.

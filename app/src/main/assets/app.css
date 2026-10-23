@@ -3182,14 +3182,6 @@
     /* rp1: the Plans screen (ReadingPlansScreen.jsx; mockup r2-plans.png) */
     .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:1.25rem 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }   /* 1.25rem top: the personal-study header's one inset */
     .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
-    .plans-offer { display:grid; grid-template-columns:repeat(auto-fit, minmax(11rem, 1fr)); gap:0.75rem; margin:0.5rem 0 1.25rem; }
-    .plans-offer-card { display:flex; flex-direction:column; align-items:center; gap:0.4rem; padding:1rem 0.85rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); text-align:center; }
-    .plans-offer-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
-    .plans-offer-sub { margin:0; color:var(--cream-dim); font-size:var(--fs-14); }
-    .plans-start { width:100%; margin-top:0.4rem; }
-    .plans-pace { display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:center; }
-    .plans-pace button { min-height:44px; padding:0 0.7rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    .plans-pace button.on { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
     .plans-eyebrow { margin:0.5rem 0 0.6rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
     .plans-plan { margin:0 0 0.9rem; padding:0.9rem 1rem 0.6rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
     .plans-plan-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
@@ -3207,6 +3199,46 @@
     .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
     .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
     .plans-stop { display:block; margin:0.35rem 0 0 auto; }
+    /* mw18 landing 1: Home's done state, the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
+    .today-done { display:flex; align-items:center; gap:0.75rem; margin-top:0.35rem; }
+    .today-links, .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }
+    .today-btn:disabled { opacity:0.5; cursor:default; }
+    .plans-plan .today-eyebrow { display:block; margin-bottom:0.25rem; }
+    .plans-done { display:flex; align-items:center; gap:0.65rem; }
+    .plans-actions { margin:0.6rem 0 0.2rem; }
+    .plans-actions .today-btn { flex:1; }
+    .plans-items { display:flex; flex-wrap:wrap; justify-content:center; gap:0.25rem 0.6rem; list-style:none; margin:0.75rem 0 0; padding:0.7rem 0 0; border-top:1px solid var(--gold-border); }
+    .plans-item { display:flex; flex-direction:column; align-items:center; gap:0.2rem; min-width:44px; min-height:44px; padding:0.2rem 0.3rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .plans-item-label { max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .plans-items-count { margin:0.1rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
+    .plans-week { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.2rem; margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); text-align:center; }
+    .plans-week .plans-day { min-height:40px; }
+    .plans-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.75rem; margin-top:0.5rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
+    .plans-counts { color:var(--cream-dim); font-size:var(--fs-14); }
+    .plans-foot .today-link { color:var(--gold); }
+    .plans-details { margin-top:0.25rem; }
+    .plans-legend { margin:0.5rem 0 0; color:var(--cream-muted); font-size:var(--fs-13); text-align:center; }
+    .plans-key { display:inline-block; width:9px; height:9px; margin:0 0.3rem 0 0.6rem; border-radius:50%; vertical-align:middle; box-sizing:border-box; }
+    .plans-key[data-state="done"] { background:var(--gold); opacity:0.8; }
+    .plans-key[data-state="missed"] { border:1.5px solid var(--gold); }
+    .plans-group { margin:0 0 0.9rem; }
+    .plans-group-title { display:flex; align-items:center; gap:0.6rem; margin:0.4rem 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
+    .plans-group-title::after { content:""; flex:1; height:1px; background:var(--gold-border); }
+    .plans-list { list-style:none; margin:0; padding:0; }
+    .plans-list > li + li { border-top:1px solid var(--gold-border); }
+    .plans-row { display:flex; align-items:center; gap:0.85rem; width:100%; min-height:56px; padding:0.5rem 0.2rem; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .plans-row:disabled { cursor:default; }
+    .plans-row-icon { flex:none; color:var(--gold); opacity:0.85; }
+    .plans-row-text { display:flex; flex-direction:column; flex:1; min-width:0; }
+    .plans-row-name { color:var(--cream); font-size:var(--fs-18); }
+    .plans-row-sub { color:var(--cream-dim); font-size:var(--fs-14); }
+    .plans-row:disabled .plans-row-sub { color:var(--gold); font-style:italic; }
+    .plans-row-chev { flex:none; color:var(--gold); }
+    .plans-row:disabled .plans-row-chev { visibility:hidden; }
+    @media (hover:hover) { .plans-row:not(:disabled):hover { background:var(--gold-faint); } .plans-item:hover { color:var(--cream); } }
+    .plans-pick { display:flex; flex-wrap:wrap; gap:0.4rem; padding:0 0 0.7rem 2.6rem; }
+    .plans-chip { min-height:44px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .plans-note:empty { display:none; }
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }

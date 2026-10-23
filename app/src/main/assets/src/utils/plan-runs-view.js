@@ -37,6 +37,23 @@ export function itemRef(k) {
   return { bid: k.slice(0, i), cid: /^\d+$/.test(cid) ? Number(cid) : cid };
 }
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** 'YYYY-MM-DD' as "Oct 21, 2027". @param {string} key */
+export function shortDate(key) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key || '');
+  return m ? MONTHS[Number(m[2]) - 1] + ' ' + Number(m[3]) + ', ' + m[1] : '';
+}
+
+/** One of today's items as its check: a chapter's number, a letter's title. @param {import('../data/plan-engine.js').PlanItem} it */
+const itemShort = (it) => (it.t ? it.t : it.k.slice(it.k.lastIndexOf(':') + 1));
+
+/** What the items are, counted: "chapters", "letters" or "chapters and letters". @param {PlanRun} run */
+function unitOf(run) {
+  let ch = false, le = false;
+  for (const tr of run.tracks) for (const it of tr.items) { if (it.t) le = true; else ch = true; if (ch && le) return 'chapters and letters'; }
+  return le ? 'letters' : 'chapters';
+}
+
 /**
  * A run's row for the Today card and the Plans screen.
  * @param {PlanRun} run @param {Date} now
@@ -48,18 +65,29 @@ export function runRow(run, now) {
   const prev = st.day > 0 ? dayItems(run, st.day - 1) : [];
   const shown = st.doneToday ? prev : today;
   const nextItem = today.find((it) => !(it.k in ticks)) || today[0] || null;
+  const from = nextItem ? today.indexOf(nextItem) : 0;
   const words = itemsWords(today);
+  // C10: counts, never a percentage rounded down; the finish is the honest one (behind moves it).
+  const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
+  const pace = st.finished ? '' : st.behind > 0 ? st.behind + (st.behind === 1 ? ' day' : ' days') + ' behind · new finish ' + shortDate(st.projected)
+    : st.ahead > 0 ? st.ahead + (st.ahead === 1 ? ' day' : ' days') + ' ahead · finish ' + shortDate(st.projected)
+      : 'on pace to finish ' + shortDate(st.projected);
   return {
     id: run.id, plan: run.plan, name: runName(run, null), loading: false,
     label: st.finished ? '' : itemsLabel(shown, bookTitle),
     tomorrow: st.doneToday ? itemsLabel(today, bookTitle) : '',
     done: st.doneToday, day: st.doneToday ? st.day - 1 : st.day, totalDays: st.total,
-    // The old line read floor(percent) (0 % for days); landing 1 shows counts instead (C10).
     percent: st.total ? Math.floor(st.doneDays * 100 / st.total) : 0,
-    behind: st.behind, finished: st.finished, paused: st.paused,
+    behind: st.behind, ahead: st.ahead, finished: st.finished, paused: st.paused,
     next: nextItem ? itemRef(nextItem.k) : null,
+    // Read again: the day just finished, from its start.
+    again: st.doneToday && prev.length ? itemRef(prev[0].k) : null,
+    // Listen: today's portion from the first item not read yet, and no further (C5).
+    listen: today.slice(from).map((it) => itemRef(it.k)),
+    items: shown.map((it) => ({ k: it.k, short: itemShort(it), done: it.k in ticks })),
     todayTicked: st.todayTicked, todayCount: today.length, minutes: words ? minutesFor(words) : 0,
     itemsDone: st.itemsDone, itemsTotal: st.itemsTotal, projected: st.projected, target: st.target,
+    counts: fmt(st.itemsDone) + ' of ' + fmt(st.itemsTotal) + ' ' + unitOf(run), pace,
   };
 }
 

@@ -79,7 +79,8 @@ export function useNow() {
 
 /**
  * @typedef {{ id: string, name: string, loading: boolean, label: string, done: boolean, day: number,
- *   totalDays: number, percent: number, behind: number, finished: boolean, next: any }} TodayRow
+ *   totalDays: number, behind: number, finished: boolean, next: any, again?: any, listen?: any[], tomorrow?: string,
+ *   todayTicked?: number, todayCount?: number, minutes?: number }} TodayRow
  */
 
 /** @param {{ done: boolean }} props */
@@ -92,13 +93,19 @@ function Check({ done }) {
 }
 
 /** @param {TodayRow} r */
-const portionOf = (r) => (r.loading ? 'Loading the Volumes…' : r.finished ? 'Plan complete' : r.label);
+const portionOf = (r) => (r.loading ? 'Loading the Volumes…' : r.finished ? 'Plan complete' : r.done ? 'Done today' : r.label);
+
+/** What Listen plays: today's portion from the first item not read yet (C5); the next item for an older row. @param {TodayRow} r */
+const listenOf = (r) => (Array.isArray(r.listen) && r.listen.length ? r.listen : r.next ? [r.next] : []);
 
 /**
- * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (next: any, planId: string) => void,
- *   onOpenPlans: () => void, markAsReadEnabled?: boolean }} props
+ * mw18 landing 1 (C2, C10, C12): one plan reads "Today · Day 47 of 365", the portion, "Bible in a Year · 2 of 4 ·
+ * about 13 min", Read and Listen; a day read through reads "Done today", tomorrow's portion, Read ahead and Read
+ * again; two plans list each with its day number; "Mark as read is off" is a button that turns it on.
+ * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
+ *   onOpenPlans: () => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void }} props
  */
-export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled }) {
+export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead }) {
   if (!rows || !rows.length) return null;
   const behind = rows.reduce((n, r) => n + (r.behind || 0), 0);
   const foot = (
@@ -107,38 +114,60 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
         <button type="button" className="today-link" onClick={onOpenPlans}>{behind + (behind === 1 ? ' day' : ' days') + ' to catch up'}</button>
       ) : null}
       {markAsReadEnabled === false ? (
-        <p className="today-note">Mark as read is off, so days don’t tick. Turn it on in Settings.</p>
+        <p className="today-note">
+          {'Mark as read is off, so days don’t tick. '}
+          {onEnableMarkAsRead ? <button type="button" className="today-link" onClick={onEnableMarkAsRead}>Turn it on</button> : 'Turn it on in Settings.'}
+        </p>
       ) : null}
     </>
   );
 
   if (rows.length === 1) {
     const r = rows[0];
+    if (!r.loading && r.done && !r.finished) {
+      return (
+        <section className="today-card" aria-label="Today’s reading">
+          <div className="today-head">
+            <span className="today-eyebrow">{'Today · ' + r.name}</span>
+            <button type="button" className="today-plans-link" onClick={onOpenPlans}>Plans</button>
+          </div>
+          <div className="today-done">
+            <Check done />
+            <div className="today-one-text">
+              <h2 className="today-title">Done today</h2>
+              {r.tomorrow ? <span className="today-plan">{'Tomorrow: ' + r.tomorrow}</span> : null}
+            </div>
+          </div>
+          <div className="today-links">
+            {r.next ? <button type="button" className="today-link" onClick={() => onRead(r.next, r.id)}>Read ahead</button> : null}
+            {r.again ? <button type="button" className="today-link" onClick={() => onRead(r.again, r.id)}>Read again</button> : null}
+          </div>
+          {foot}
+        </section>
+      );
+    }
     const ready = !r.loading && !!r.next;
+    const line = [r.name];
+    if (ready && (r.todayCount || 0) > 1) line.push(r.todayTicked + ' of ' + r.todayCount);
+    if (ready && r.minutes) line.push('about ' + r.minutes + ' min');
     return (
       <section className="today-card" aria-label="Today’s reading">
         <div className="today-head">
-          <span className="today-eyebrow">{r.loading ? 'Today' : 'Today · Day ' + (r.day + 1) + ' of ' + r.totalDays}</span>
+          <span className="today-eyebrow">{r.loading || r.finished ? 'Today' : 'Today · Day ' + (r.day + 1) + ' of ' + r.totalDays}</span>
           <button type="button" className="today-plans-link" onClick={onOpenPlans}>Plans</button>
         </div>
         <div className="today-one">
           <div className="today-one-text">
             <h2 className="today-title">{portionOf(r)}</h2>
-            <span className="today-plan">{r.name}</span>
+            <span className="today-plan">{line.join(' · ')}</span>
           </div>
           {ready ? (
             <div className="today-actions">
               <button type="button" className="today-btn" aria-label={'Read ' + r.label} onClick={() => onRead(r.next, r.id)}>Read</button>
-              <button type="button" className="today-btn" aria-label={'Listen to ' + r.label} onClick={() => onListen(r.next, r.id)}>Listen</button>
+              <button type="button" className="today-btn" aria-label={'Listen to ' + r.label} onClick={() => onListen(listenOf(r), r.id)}>Listen</button>
             </div>
           ) : null}
         </div>
-        {!r.loading ? (
-          <div className="today-progress-row">
-            <span className="today-progress" aria-hidden="true"><span style={{ width: Math.max(0, Math.min(100, r.percent)) + '%' }} /></span>
-            <span className="today-percent">{r.percent + ' %'}</span>
-          </div>
-        ) : null}
         {foot}
       </section>
     );
@@ -155,19 +184,19 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
         {rows.map((r) => (
           <li key={r.id} className="today-row">
             <button type="button" className="today-row-btn" disabled={r.loading || !r.next}
-              aria-label={'Read ' + portionOf(r) + ', ' + r.name + (r.done ? ', done' : '')}
+              aria-label={'Read ' + (r.done ? 'ahead' : portionOf(r)) + ', ' + r.name + (r.done ? ', done today' : '')}
               onClick={() => { if (r.next) onRead(r.next, r.id); }}>
               <Check done={r.done} />
               <span className="today-row-text">
-                <span className="today-row-title">{portionOf(r)}</span>
-                <span className="today-plan">{r.name}</span>
+                <span className="today-row-title">{r.done && r.tomorrow ? 'Done · Tomorrow: ' + r.tomorrow : portionOf(r)}</span>
+                <span className="today-plan">{r.loading || r.finished ? r.name : r.name + ' · Day ' + (r.day + 1)}</span>
               </span>
             </button>
           </li>
         ))}
       </ul>
       {first ? (
-        <button type="button" className="today-btn today-btn-wide" onClick={() => onListen(first.next, first.id)}>Listen to today</button>
+        <button type="button" className="today-btn today-btn-wide" onClick={() => onListen(listenOf(first), first.id)}>Listen to today</button>
       ) : null}
       {foot}
     </section>
