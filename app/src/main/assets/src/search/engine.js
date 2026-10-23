@@ -2340,6 +2340,24 @@ const RESTORE_QUIET_MS = 20000;
    build it started read the cache before the delete landed and swapped the same index back in. The next build
    after a rebuild() reads no cache, whichever call starts it (a search waiting on the index can). */
 let coldNext = false;
+
+/* A BUILD THE APP STARTS AT LAUNCH RUNS IN IDLE TIME (search200 wave 3, U10.3). init({ background: true })
+   builds a chunk per idle turn (bounded by IDLE_TURN_MS), so a reader turning pages meanwhile is never behind
+   it. Any other init (the Search screen, a search) takes the build to full speed from its next chunk. */
+const IDLE_TURN_MS = 1000;
+let paceIdle = false;
+/** @type {null | (() => void)} ends the idle turn a background build is waiting on */
+let hurryTurn = null;
+/** The wait between two chunks of a build: the next task, or the next idle turn for a background build. */
+function buildTurn() {
+  if (!paceIdle) return new Promise((r) => setTimeout(r, 0));
+  return new Promise((r) => {
+    let over = false;
+    const end = () => { if (over) return; over = true; hurryTurn = null; r(undefined); };
+    const cancel = onIdle(end, { timeout: IDLE_TURN_MS, fallbackDelay: 16 });
+    hurryTurn = () => { cancel(); end(); };
+  });
+}
 /** The cached index for `sig`, or null when there is none. @returns {Promise<{ms: any, where: string}|null>} */
 async function restoreIndex(/** @type {string} */ sig) {
   const w = searchWorker();
@@ -2397,7 +2415,7 @@ async function build(options) {
   for (let i = 0; i < docs.length; i += CHUNK) {
     ms.addAll(docs.slice(i, i + CHUNK));
     if (options.onProgress) options.onProgress(Math.min(i + CHUNK, docs.length), docs.length);
-    await new Promise((r) => setTimeout(r, 0));
+    await buildTurn();
   }
   if (options.onProgress) options.onProgress(docs.length, docs.length);
   const t2 = now();
@@ -2472,13 +2490,16 @@ function isCurrent(/** @type {{translation?:string}|undefined} */ options) {
 
 /**
  * Build (or rebuild) the index for an edition from every corpus. Concurrent calls
- * for the same data share one build. SearchScreen calls this on mount.
- * @param {{translation?:string, onProgress?:(done:number,total:number)=>void}} [options]
+ * for the same data share one build. SearchScreen calls this on mount; the app calls it at launch
+ * with `background: true` (search/warm-at-launch.js), which builds in idle time until another call asks.
+ * @param {{translation?:string, onProgress?:(done:number,total:number)=>void, background?:boolean}} [options]
  * @returns {Promise<boolean>}
  */
 function init(options) {
   const code = editionOf(options);
   const opts = { ...options, translation: code };
+  // someone is waiting for this index now: a background build goes at full speed from here
+  if (!opts.background && paceIdle) { paceIdle = false; if (hurryTurn) hurryTurn(); }
   loadAlignLexicon(true); // beside the corpora (B7): a text search waits for it, not the build
   loadKjvTwin(true); // the KJV wording too (kjv-twin.js), waited for the same way
   // One build at a time (each swaps in its index): this call is looked at again when it ends.
@@ -2488,9 +2509,10 @@ function init(options) {
     if (building) return init(opts); // another call started one while the corpora loaded
     if (isCurrent(opts)) return true;
     buildingFor = code;
+    paceIdle = !!opts.background;
     building = build({ ...opts, persist: all })
-      .then(() => { building = null; buildingFor = null; startMeaningWhenIdle(); return true; })
-      .catch((e) => { building = null; buildingFor = null; buildError = e; throw e; });
+      .then(() => { building = null; buildingFor = null; paceIdle = false; startMeaningWhenIdle(); return true; })
+      .catch((e) => { building = null; buildingFor = null; paceIdle = false; buildError = e; throw e; });
     return building;
   });
 }

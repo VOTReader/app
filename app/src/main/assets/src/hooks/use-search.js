@@ -192,6 +192,7 @@ import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colP
 import { readingPlaceKey } from '../utils/search-visit.js';
 import { formsToMark } from '../utils/marked-forms.js';
 import { kjvVisitEdition } from '../utils/kjv-visit.js';
+import { warmSearchAtLaunch } from '../search/warm-at-launch.js';
 
 /**
  * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
@@ -235,6 +236,7 @@ function scopeBookTitle(bookId) {
  *   letterId: string | null,
  *   studyId: string | null,
  *   studyChapterId: string | null,
+ *   translation?: string,
  *   setScreen: (v: any) => void,
  *   setBookId: (v: any) => void,
  *   setChapterNum: (v: any) => void,
@@ -284,12 +286,16 @@ export function studyChapterIdByNum(studyId, num) {
 
 export function useSearch({
   tabField,
-  screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+  screen, bookId, chapterNum, letterId, studyId, studyChapterId, translation = 'nkjv',
   setScreen, setBookId, setChapterNum, setLetterId,
   setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise, setGenreId,
   setSearchLanding, setFromWtlb, setFromMatthewCh,
   handleSurprise, goSettings, goHome,
 }) {
+  // U10.3 (search200): the search index is built at launch, in idle time after the first chapter has
+  // the page (search/warm-at-launch.js), not the first time Search opens; for the edition read when it starts.
+  const searchEditionRef = useRefMirror(translation);
+  React.useEffect(() => warmSearchAtLaunch({ engine: () => window.VotSearchMini, translation: () => searchEditionRef.current }), [searchEditionRef]);   // a stable ref: once, on mount
   // ── Search tabFields (per-tab state) ────────────────────────────────────
   const [searchQuery, setSearchQuery] = tabField('searchQuery');
   const [searchOrigin, setSearchOrigin] = tabField('searchOrigin');

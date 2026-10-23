@@ -602,7 +602,7 @@ function App() {
     handleSearchSelect, handleSearchCommand,
   } = useSearch({
     tabField,
-    screen, bookId, chapterNum, letterId, studyId, studyChapterId,
+    screen, bookId, chapterNum, letterId, studyId, studyChapterId, translation: settings.translation, // U10.3: the index built at launch
     setScreen, setBookId, setChapterNum, setLetterId,
     setStudyId, setStudyChapterId, setSurpriseAnchor, setFromSearch, setFromSurprise,
     setGenreId, // Wave 0 (sticky genreId): useSearch clears it on every result dispatch
