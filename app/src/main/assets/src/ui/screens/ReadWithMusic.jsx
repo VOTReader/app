@@ -57,6 +57,15 @@ export function readingLetters() {
     if (Array.isArray(rows) && rows.length && rows.every((r) => Array.isArray(r) && r[1] === 'M')) add(key, 0);
   }
   const reg = g.COL_BY_KEY;
+  // s21.3: a collection CHAIN does not name (a new one, a renamed key) comes after it, in the registry's order;
+  // only one this build does not register is left out (its letters cannot open).
+  const regKeys = reg && typeof reg.keys === 'function' ? Array.from(reg.keys()) : [];
+  const rank = (/** @type {string} */ volKey) => {
+    const c = CHAIN.indexOf(volKey);
+    if (c >= 0) return c;
+    const r = regKeys.indexOf(volKey);
+    return r >= 0 ? CHAIN.length + r : -1;
+  };
   return keys.map((key) => {
     const { volKey, id } = splitKey(key);
     const col = reg && typeof reg.get === 'function' ? reg.get(volKey) : null;
@@ -64,8 +73,8 @@ export function readingLetters() {
     const index = Array.isArray(letters) ? letters.findIndex((l) => l && l.id === id) : -1;
     const letter = index >= 0 ? letters[index] : null;
     return { key, volKey, id, title: (letter && letter.title) || slugTitle(id), colLabel: (col && col.label) || '', index, d: dur[key] };
-  }).filter((r) => CHAIN.indexOf(r.volKey) >= 0).sort((a, b) => {
-    const ca = CHAIN.indexOf(a.volKey), cb = CHAIN.indexOf(b.volKey);
+  }).filter((r) => rank(r.volKey) >= 0).sort((a, b) => {
+    const ca = rank(a.volKey), cb = rank(b.volKey);
     return ca !== cb ? ca - cb : a.index - b.index;
   });
 }
