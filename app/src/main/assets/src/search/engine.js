@@ -2471,7 +2471,8 @@ function shownEdition(/** @type {string} */ code) {
   // translations.js's own rule (it is not a bundle-d global): the text in memory, and a sparse overlay's base too
   const w = /** @type {any} */ (globalThis);
   if (!w['BIBLE_' + code.toUpperCase()]) return 'nkjv';
-  const opts = w.TRANSLATION_OPTIONS;
+  // index.html's registry is a top-level const, a global binding and no property of globalThis: read it by its name
+  const opts = typeof TRANSLATION_OPTIONS !== 'undefined' ? TRANSLATION_OPTIONS : w.TRANSLATION_OPTIONS;
   const opt = Array.isArray(opts) ? opts.find((/** @type {any} */ o) => o && o.id === code) : null;
   const base = opt && opt.base;
   return !base || base === 'nkjv' || w['BIBLE_' + String(base).toUpperCase()] ? code : 'nkjv';
