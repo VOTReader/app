@@ -1,6 +1,6 @@
 {
  "pass": 480,
- "strict": 370,
+ "strict": 369,
  "top5": 492,
  "found": 499,
  "style": {
@@ -25,5 +25,5 @@
   "words": 78
  },
  "fresh": 94,
- "unsealed": 10
+ "unsealed": 11
 }
