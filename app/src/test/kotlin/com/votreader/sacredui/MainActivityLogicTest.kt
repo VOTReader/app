@@ -313,4 +313,18 @@ class MainActivityLogicTest {
         assertEquals(1200, g.destWidth)
         assertEquals((1080 * 1200f / 2400).toInt(), g.destHeight)
     }
+
+    // ── webCacheStamp / shouldClearWebCache (ds5 s42.3) ──────────────
+    // Every cold start cleared the whole WebView cache, so every launch re-read the bundled JS and
+    // CSS. The clear exists for one case: the first launch after an install, when the old cached
+    // modules would be served. Daily builds can keep their versionCode, so the stamp carries the
+    // install time too.
+    @Test
+    fun `clears on the first launch and after any install, not on an ordinary cold start`() {
+        val stamp = MainActivityLogic.webCacheStamp(412, 1_760_000_000_000L)
+        assertTrue(MainActivityLogic.shouldClearWebCache(null, stamp))
+        assertFalse(MainActivityLogic.shouldClearWebCache(stamp, stamp))
+        assertTrue(MainActivityLogic.shouldClearWebCache(stamp, MainActivityLogic.webCacheStamp(412, 1_760_000_500_000L)))
+        assertTrue(MainActivityLogic.shouldClearWebCache(stamp, MainActivityLogic.webCacheStamp(413, 1_760_000_000_000L)))
+    }
 }

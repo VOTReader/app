@@ -43,6 +43,7 @@ import androidx.annotation.VisibleForTesting
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.core.content.pm.PackageInfoCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.net.toUri
@@ -396,6 +397,10 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // sub-second on real devices) while still bounding a wedged-renderer hang.
         private const val SPLASH_HATCH_MS = 5_000L
 
+        // ds5 s42.3: where the last-cleared install stamp lives (see clearWebCacheAfterInstall).
+        private const val WEB_CACHE_PREFS = "web_cache"
+        private const val WEB_CACHE_STAMP = "stamp"
+
         // #1: onPageFinished fallback for the splash release — long enough that the
         // deterministic onAppReady() handshake (a few hundred ms after paint) wins
         // on a healthy boot, short enough that a page which loads but never signals
@@ -666,7 +671,9 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // loads the freshly-bundled JS. This clears the file/resource
             // cache ONLY — localStorage / DOM storage (where all journal,
             // notes, bookmarks, links data live) is untouched.
-            webView.clearCache(true)
+            // ds5 s42.3: only on the first launch after an install or update
+            // (the stamp changed); every other cold start keeps the cache.
+            clearWebCacheAfterInstall()
             // n6-15: launched by a shared passage link, the page boots with its key (openSharedPassage reads ?p=).
             // Only a fresh launch carries one: a restore, or a relaunch from Recents, must not replay the link.
             val launchedFromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
@@ -1525,6 +1532,21 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // backgrounded app's mic hears silence, which was saved at full length (sweep W14). onStop, not onPause: a
         // split-screen app or a permission dialog keeps the activity visible, and the memo goes on.
         appInterface.pauseRecordingForBackground()
+    }
+
+    private fun clearWebCacheAfterInstall() {
+        val stamp = try {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            MainActivityLogic.webCacheStamp(PackageInfoCompat.getLongVersionCode(info), info.lastUpdateTime)
+        } catch (e: Exception) {
+            Timber.w(e, "package info unavailable; clearing the WebView cache")
+            null
+        }
+        val prefs = getSharedPreferences(WEB_CACHE_PREFS, MODE_PRIVATE)
+        if (stamp == null || MainActivityLogic.shouldClearWebCache(prefs.getString(WEB_CACHE_STAMP, null), stamp)) {
+            webView.clearCache(true)
+            if (stamp != null) prefs.edit().putString(WEB_CACHE_STAMP, stamp).apply()
+        }
     }
 
     /**

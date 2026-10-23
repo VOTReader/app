@@ -291,6 +291,39 @@ class AppInterfaceTest {
     }
 
     @Test
+    fun `a session started over another app's call never sets or restores the mode`() {
+        // ds5 s41.4: started while another app's call held MODE_IN_COMMUNICATION, the start kept the
+        // stale previousAudioMode (NORMAL), and the end then forced the device-global mode to NORMAL
+        // under that call. The mode was never ours to change: leave it alone at both ends.
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_IN_COMMUNICATION)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        every { vm.audioFocusRequest } returns null
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        app.endAudioSession()
+
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
+        verify(exactly = 0) { am.mode = any() }
+    }
+
+    @Test
+    fun `a second start in our own session keeps the mode it found first`() {
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        every { vm.audioFocusRequest } returns null
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        app.startAudioSession()
+        app.endAudioSession()
+
+        assertEquals(AudioManager.MODE_NORMAL, mode())
+    }
+
+    @Test
     fun `teardown blocks stale native starts until replacement renderer is ready`() {
         var starts = 0
         val vm = mockk<MainViewModel>(relaxed = true)
@@ -711,11 +744,14 @@ class AppInterfaceTest {
 
         app.startAudioSession()
 
-        // N2: a second start (mode already COMMUNICATION) must NOT overwrite
+        // N2: a start that finds COMMUNICATION must NOT overwrite
         // previousAudioMode — otherwise endAudioSession would restore TO
-        // communication mode and strand the device. The mode is still applied.
+        // communication mode and strand the device. ds5 s41.4: outside our own
+        // session that mode is another app's call, so it is not set either; the
+        // double start within one session is `a second start in our own session
+        // keeps the mode it found first`.
         verify(exactly = 0) { vm.previousAudioMode = any() }
-        verify { am.mode = AudioManager.MODE_IN_COMMUNICATION }
+        verify(exactly = 0) { am.mode = any() }
     }
 
     @Test

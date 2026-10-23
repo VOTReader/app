@@ -530,6 +530,10 @@ class AudioKeepAliveService : Service() {
                     // Cleared BEFORE the call: stopService may throw, and the
                     // intent to stop is already settled by then.
                     startPending = false
+                    // ds5 s41.2: the stop settles the foreground now. Left true until onDestroy, a start in
+                    // that window (a quick letter switch) hit the early return above and the service then
+                    // went down under playing audio.
+                    foreground = false
                     context.stopService(intent)
                 }
                 return true
