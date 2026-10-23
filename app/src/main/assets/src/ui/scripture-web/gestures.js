@@ -56,6 +56,8 @@ export function slopFor(pointerType) {
 /** A second tap is a double only this soon after the first, and this close to it, CSS px: two
  * quick taps on two different lines are two choices, not a zoom. */
 export const DOUBLE_TAP_MS = 300;
+/** How long a still press is held before it is a long press (handlers().hold), ms. */
+export const LONG_PRESS_MS = 500;
 export const DOUBLE_TAP_PX = 24;
 /** One wheel line in CSS px (deltaMode 1, Firefox's mouse wheel); a page is the view's height.
  * A single event zooms by at most this much pixel delta, so a page-mode notch is not a leap. */
@@ -81,7 +83,7 @@ const FLING_TAU_MS = 325;
  *   camFor?: (yDevice:number) => {x:number, y?:number, ppv:number, total:number},
  *   live?: () => void,
  *   view: () => {W:number, H:number, DPR:number},
- *   handlers: () => {hover:Function, tap:Function, doubleTap:Function, leave?:Function, snapshot?:() => (() => void)},
+ *   handlers: () => {hover:Function, tap:Function, doubleTap:Function, leave?:Function, snapshot?:() => (() => void), hold?:(x: number, y: number) => boolean},
  *   schedule: () => void,
  *   maxZoom: (cam?:object) => number,
  *   clampCamera: (cam:object, width:number, maxZoom:number, yf?:object) => void,
@@ -195,6 +197,18 @@ export function attachWebGestures(el, deps) {
     drag = { id: e.pointerId, x: pt.x, y: pt.y, camx: dc.x, camy: dc.y || 0, cam: dc,
              lift: liftAt(pt.x, pt.y), slop: slopFor(e.pointerType), samples: [] };
     sample(drag, pt);
+    // a press held still is a long press: the handler says whether it took it (a book name's
+    // filter); taken, the press is no tap and its lift does nothing
+    clearHold();
+    const held = drag;
+    if (!held.lift && !gliding) {
+      holdTimer = setTimeout(() => {
+        holdTimer = 0;
+        if (drag !== held || moved || pinch) return;
+        const h = handlers();
+        if (h && typeof h.hold === 'function' && h.hold(pt.x, pt.y)) { held.taken = true; moved = true; lastTap = null; }
+      }, LONG_PRESS_MS);
+    }
   };
   // W52: a pointer that went down on the chrome (or anywhere this code did
   // not register it) is the chrome's for its whole life: its move must not
@@ -204,6 +218,8 @@ export function attachWebGestures(el, deps) {
   // hovered (a reach for Reset lit the threads under the button and put a
   // chip beside it), as it does when it leaves the web.
   const leave = () => { const h = handlers(); if (h && typeof h.leave === 'function') h.leave(); };
+  let holdTimer = 0;
+  const clearHold = () => { if (holdTimer) { clearTimeout(holdTimer); holdTimer = 0; } };
   const move = (e) => {
     if (!pointers.has(e.pointerId)) {
       if (drag || pinch || e.pointerType !== 'mouse') return;
@@ -255,6 +271,8 @@ export function attachWebGestures(el, deps) {
     // between the rails is likewise a gesture and not a tap.
     // Inside the slop it is still a tap and the camera holds (slopFor, above).
     if (!moved && Math.hypot(pt.x - drag.x, pt.y - drag.y) <= drag.slop) return;
+    if (drag.taken) return;   // a long press that was taken: the finger lifting off it pans nothing
+    clearHold();
     moved = true;
     sample(drag, pt);
     c.x = drag.camx - (pt.x - drag.x) * dpr() / c.ppv;
@@ -287,11 +305,15 @@ export function attachWebGestures(el, deps) {
   const up = (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
+    clearHold();
     if (pinch) { if (pinch.ids.includes(e.pointerId)) pinchFingerGone(); return; }
     if (!drag || drag.id !== e.pointerId) return;
     if (drag.lift) {
       // a tap on the track jumps there; never a web tap, never a double-tap zoom
       if (!moved) { drag.lift(loc(e).y); schedule(); }
+      lastTap = null;
+    } else if (drag.taken) {
+      // the long press took it: no tap, no fling
       lastTap = null;
     } else if (!moved && caught) {
       // the press only stopped the glide
@@ -321,6 +343,7 @@ export function attachWebGestures(el, deps) {
   const cancel = (e) => {
     if (!pointers.has(e.pointerId)) return;
     pointers.delete(e.pointerId);
+    clearHold();
     if (pinch) { if (pinch.ids.includes(e.pointerId)) pinchFingerGone(); return; }
     if (drag && drag.id === e.pointerId) drag = null;
   };
@@ -364,8 +387,20 @@ export function attachWebGestures(el, deps) {
   el.addEventListener('wheel', wheel, { passive: false });
   const out = (e) => { if (e.pointerType === 'mouse') leave(); };
   el.addEventListener('pointerleave', out);
+  // a right click is a mouse's long press; the browser's menu stays where the handler took nothing
+  // (and the phone's own long-press menu, which arrives as a contextmenu, is taken the same way)
+  const menu = (e) => {
+    if (isChromeTarget(e.target)) return;
+    const h = handlers();
+    if (holdTimer || (drag && drag.taken)) { e.preventDefault(); return; }
+    const pt = loc(e);
+    if (h && typeof h.hold === 'function' && h.hold(pt.x, pt.y)) e.preventDefault();
+  };
+  el.addEventListener('contextmenu', menu);
   return () => {
     endFling();
+    clearHold();
+    el.removeEventListener('contextmenu', menu);
     el.removeEventListener('pointerdown', down);
     el.removeEventListener('pointermove', move);
     el.removeEventListener('pointerup', up);

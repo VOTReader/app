@@ -10,7 +10,7 @@
  * older jsdom would have needed.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { attachWebGestures, SW_CHROME_SELECTOR, isChromeTarget } from './gestures.js';
+import { attachWebGestures, SW_CHROME_SELECTOR, isChromeTarget, LONG_PRESS_MS } from './gestures.js';
 import { createCamera, clampCamera, zoomAbout, xToVerse } from '../../utils/scripture-web/geometry.js';
 
 /** `.sw-root` containing one of every chrome surface the selector lists. */
@@ -619,3 +619,68 @@ describe('fling inertia (A4)', () => {
     expect(handlers.tap, 'the press after it is a tap').toHaveBeenCalledTimes(1);
   });
 });
+
+/* The deep dive's book filter (2026-10-23): a press held still on a book name filters to it. The
+   handler says whether it took the press; taken, the lift is no tap and the finger pans nothing. */
+describe('a long press is handlers().hold, and a taken one is no tap', () => {
+  it('held still past LONG_PRESS_MS: hold is asked at the press; taken, the lift does not tap', () => {
+    vi.useFakeTimers();
+    try {
+      const { root } = makeDom();
+      root.setPointerCapture = vi.fn();
+      const hold = vi.fn(() => true);
+      const { cam, handlers } = attach(root, { handlers: () => handlersWith(hold) });
+      const x0 = cam.x;
+      root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 500 }));
+      vi.advanceTimersByTime(LONG_PRESS_MS + 10);
+      expect(hold).toHaveBeenCalledWith(300, 500);
+      root.dispatchEvent(pointerEvent('pointermove', { clientX: 200, clientY: 500 }));
+      root.dispatchEvent(pointerEvent('pointerup', { clientX: 200, clientY: 500 }));
+      expect(TAPS.tap).not.toHaveBeenCalled();
+      expect(cam.x, 'the finger lifting off a taken press pans nothing').toBe(x0);
+      expect(handlers.tap).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('not taken (no book name there), the lift still taps; a press that moves or lifts early asks nothing', () => {
+    vi.useFakeTimers();
+    try {
+      const { root } = makeDom();
+      root.setPointerCapture = vi.fn();
+      const hold = vi.fn(() => false);
+      attach(root, { handlers: () => handlersWith(hold) });
+      root.dispatchEvent(pointerEvent('pointerdown', { clientX: 300, clientY: 500 }));
+      vi.advanceTimersByTime(LONG_PRESS_MS + 10);
+      root.dispatchEvent(pointerEvent('pointerup', { clientX: 300, clientY: 500 }));
+      expect(hold).toHaveBeenCalledTimes(1);
+      expect(TAPS.tap).toHaveBeenCalledTimes(1);
+      root.dispatchEvent(pointerEvent('pointerdown', { clientX: 700, clientY: 500 }));
+      vi.advanceTimersByTime(100);
+      root.dispatchEvent(pointerEvent('pointerup', { clientX: 700, clientY: 500 }));
+      vi.advanceTimersByTime(LONG_PRESS_MS);
+      root.dispatchEvent(pointerEvent('pointerdown', { clientX: 500, clientY: 500 }));
+      root.dispatchEvent(pointerEvent('pointermove', { clientX: 400, clientY: 500 }));
+      vi.advanceTimersByTime(LONG_PRESS_MS + 10);
+      root.dispatchEvent(pointerEvent('pointerup', { clientX: 400, clientY: 500 }));
+      expect(hold, 'an early lift and a drag ask nothing').toHaveBeenCalledTimes(1);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a right click asks hold, and keeps the browser menu only where hold took nothing', () => {
+    const { root } = makeDom();
+    let took = true;
+    const hold = () => took;
+    attach(root, { handlers: () => handlersWith(hold) });
+    const menu = () => { const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 300, clientY: 500 }); root.dispatchEvent(e); return e.defaultPrevented; };
+    expect(menu()).toBe(true);
+    took = false;
+    expect(menu()).toBe(false);
+  });
+});
+
+let TAPS = { tap: vi.fn(), doubleTap: vi.fn(), hover: vi.fn(), hold: vi.fn() };
+/** The handlers with this hold, one object a test (handlers() is asked on every event). */
+function handlersWith(hold) {
+  if (TAPS.hold !== hold) TAPS = { tap: vi.fn(), doubleTap: vi.fn(), hover: vi.fn(), hold };
+  return TAPS;
+}

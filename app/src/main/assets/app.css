@@ -9202,13 +9202,23 @@
       min-height: 38px; padding: 0 10px; max-width: 190px;
       background: var(--sw-control-fill); color: var(--sw-text); border: 1px solid var(--sw-control-border); border-radius: 6px;
       font-family: var(--sw-font); font-size: var(--fsc-15); }
-    .sw-root.sw-compact .sw-filter-sheet { bottom: calc(6px + var(--sw-safe-bottom)); max-height: calc(100% - 64px); }
-    .sw-root.sw-compact .sw-filter-head { padding: 4px 6px 4px 14px; }
-    .sw-root.sw-compact .sw-filter-body { padding: 2px 14px 8px; }
-    .sw-root.sw-compact .sw-filter-row { padding: 4px 0; }
-    .sw-root.sw-compact .sw-filter-name { flex-basis: 78px; font-size: var(--fsc-13); }
+    /* a phone's sheet stands at the right, the height of the frame, so the web the filters leave is
+       there beside it (the S22 look, 2026-10-22: a sheet over the foot hid nearly all of it); each
+       row's name over its choices, the body scrolling */
+    .sw-root.sw-compact .sw-filter-sheet {
+      left: auto; right: calc(8px + var(--sw-safe-right)); transform: none;
+      top: calc(8px + var(--sw-safe-top)); bottom: calc(8px + var(--sw-safe-bottom)); max-height: none;
+      width: min(400px, 46%);
+    }
+    .sw-root.sw-compact .sw-filter-head { padding: 4px 6px 4px 14px; gap: 10px; }
+    .sw-root.sw-compact .sw-filter-head h2 { font-size: var(--fsc-16); }
+    .sw-root.sw-compact .sw-filter-count { font-size: var(--fsc-13); }
+    .sw-root.sw-compact .sw-filter-body { padding: 2px 14px 10px; }
+    .sw-root.sw-compact .sw-filter-row { flex-direction: column; align-items: flex-start; gap: 4px; padding: 5px 0; }
+    .sw-root.sw-compact .sw-filter-name { flex-basis: auto; font-size: var(--fsc-13); }
     .sw-root.sw-compact .sw-filter-seg .sw-seg-btn { min-height: 32px; padding: 0 10px; font-size: var(--fsc-14); }
-    .sw-root.sw-compact .sw-filter-book .sw-select { min-height: 32px; font-size: var(--fsc-14); }
+    .sw-root.sw-compact .sw-filter-book .sw-select { min-height: 32px; font-size: var(--fsc-14); max-width: 150px; }
+    .sw-root.sw-compact .sw-filter-toggles .sw-btn { min-height: 32px; font-size: var(--fsc-14); padding: 0 10px; }
     /* The canvas carried a CC-BY credit line of its own until 2026-09-11; it printed over the
        book labels in landscape. Since Q5 it is the legend's tail (.sw-legend .sw-credit). */
     .sw-live {

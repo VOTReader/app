@@ -22,6 +22,22 @@ import { bucketDrawCount } from '../../utils/scripture-web/decode.js';
 /** @typedef {import('../../utils/scripture-web/filters.js').WebFilters} WebFilters */
 
 /**
+ * A stored set of filters, kept only when every field is one the sheet can set (a saved spot from
+ * an older build, or a hand-edited one, opens with none rather than a broken filter).
+ * @param {any} f @returns {WebFilters | null}
+ */
+export function validFilters(f) {
+  if (!f || typeof f !== 'object') return null;
+  const one = (v, list) => list.indexOf(v) >= 0;
+  const book = (v) => Number.isInteger(v) && v >= -1 && v < 66;
+  if (!one(f.distance, ['all', 'near', 'middle', 'far']) || !one(f.testament, ['all', 'oo', 'on', 'nn'])
+    || !one(f.strength, ['all', 'strong', 'strongest']) || typeof f.cited !== 'boolean'
+    || typeof f.prophecy !== 'boolean' || !book(f.fromBook) || !book(f.toBook)) return null;
+  return { distance: f.distance, cited: f.cited, prophecy: f.prophecy, testament: f.testament,
+    fromBook: f.fromBook, toBook: f.toBook, strength: f.strength };
+}
+
+/**
  * How many lines a set of masks leaves lit at a density: the kept threads it draws, or with the
  * prophecy filter on the kept prophecy pairs, each drawn once.
  * @param {any} g @param {import('../../utils/scripture-web/filters.js').FilterMasks} masks
@@ -44,10 +60,11 @@ export function keptShown(g, masks, f, density) {
 /**
  * The filters' state, their masks in force on the graph and the count they leave.
  * @param {{ graph: any, mode: string, density: import('../../utils/scripture-web/decode.js').Density,
- *   schedule: () => void, setAnnounce: (text: string) => void }} p
+ *   schedule: () => void, setAnnounce: (text: string) => void, initial?: any }} p
+ *   initial: the filters to open with (a resume point's or the saved spot's), checked field by field
  */
-export function useWebFilters({ graph, mode, density, schedule, setAnnounce }) {
-  const [filters, setFilters] = React.useState(/** @type {WebFilters} */ (NO_FILTERS));
+export function useWebFilters({ graph, mode, density, schedule, setAnnounce, initial }) {
+  const [filters, setFilters] = React.useState(() => /** @type {WebFilters} */ (validFilters(initial) || NO_FILTERS));
   const [sheetOpen, setSheetOpen] = React.useState(false);
   const canon = mode !== 'personal';
   const masks = React.useMemo(() => (graph ? filterMasks(graph, filters, prophecySet(graph)) : null), [graph, filters]);
@@ -76,11 +93,15 @@ export function useWebFilters({ graph, mode, density, schedule, setAnnounce }) {
   const change = React.useCallback((part) => setFilters((f) => ({ ...f, ...part })), []);
   const clear = React.useCallback(() => setFilters(NO_FILTERS), []);
   /** One tap on a legend chip: on, or off when it is already the one on. @param {'near'|'far'|'cited'|'prophecy'} kind */
+  /** A long press on a book name: the web keeps that book's threads, or lets it go when it is
+   * already the one book kept. @param {number} book */
+  const holdBook = React.useCallback((book) => setFilters((f) => (
+    f.fromBook === book && f.toBook < 0 ? { ...f, fromBook: -1 } : { ...f, fromBook: book, toBook: -1 })), []);
   const toggle = React.useCallback((kind) => setFilters((f) => (
     kind === 'cited' || kind === 'prophecy' ? { ...f, [kind]: !f[kind] }
       : { ...f, distance: f.distance === kind ? 'all' : kind })), []);
 
-  return { filters, on, labels, shown, change, clear, toggle, sheetOpen, setSheetOpen, canon };
+  return { filters, on, labels, shown, change, clear, toggle, holdBook, sheetOpen, setSheetOpen, canon };
 }
 
 /**

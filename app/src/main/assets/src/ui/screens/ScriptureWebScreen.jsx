@@ -92,9 +92,34 @@ const CHROME_HIDDEN_KEY = 'vot-sw-chrome-hidden';
    one-shot: the next mount takes it, the way WebFallbackList keeps its chapter. */
 let resumeWeb = null;
 /** Tests only: forget the resume point between cases. */
-export function _resetWebPlace() { resumeWeb = null; }
+export function _resetWebPlace() {
+  resumeWeb = null;
+  try { localStorage.removeItem('vot-sw-spot'); } catch (_e) { /* no storage */ }
+}
 /** Tests only: stand a resume point, as leaving for the reader does. @param {any} place */
 export function _setWebPlace(place) { resumeWeb = place; }
+/* THE SAVED SPOT (2026-10-23, the deep dive's third add): where the reader left the canon (its
+   camera) and the filters on, kept on this device for the next visit, so the web opens where they
+   were rather than at the whole canon. localStorage, this device's alone (never in a backup, never
+   counted); a door in (start) and a resume point win over it; Reset is the way to the whole web. */
+const SPOT_KEY = 'vot-sw-spot';
+/** The saved spot as a resume point, or null. @param {number} total  the canon's verse count */
+export function readSavedSpot(total) {
+  try {
+    const s = JSON.parse(localStorage.getItem(SPOT_KEY) || 'null');
+    if (!s || !s.cam || !(s.cam.ppv > 0) || !Number.isFinite(s.cam.x)) return null;
+    if (total && s.cam.total !== total) return null;
+    return { mode: 'canonical', cam: { x: s.cam.x, ppv: s.cam.ppv, y: s.cam.y > 0 ? s.cam.y : 0, total: s.cam.total },
+      focus: {}, detail: null, filters: s.filters || null };
+  } catch (_e) { return null; }
+}
+/** Keep the canon's camera and filters for the next visit. @param {any} cam @param {any} filters */
+export function saveSpot(cam, filters) {
+  if (!cam || !(cam.ppv > 0)) return;
+  try {
+    localStorage.setItem(SPOT_KEY, JSON.stringify({ cam: { x: cam.x, ppv: cam.ppv, y: cam.y > 0 ? cam.y : 0, total: cam.total }, filters }));
+  } catch (_e) { /* private mode: nothing kept, the web opens whole */ }
+}
 function readChromeHidden() {
   try { return sessionStorage.getItem(CHROME_HIDDEN_KEY) === '1'; } catch (_e) { return false; }
 }
@@ -121,7 +146,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // start fresh on the canon, and the resume point is spent either way. Seeding the mode from it
   // opened My Web from a verse's "Show in Scripture Web" (w4 interaction hunt).
   const resumeRef = React.useRef(/** @type {any} */ (undefined));
-  if (resumeRef.current === undefined) { resumeRef.current = start ? null : resumeWeb; resumeWeb = null; }
+  if (resumeRef.current === undefined) { resumeRef.current = start ? null : (resumeWeb || readSavedSpot(0)); resumeWeb = null; }
   const glRef = React.useRef(null);
   const uiRef = React.useRef(null);
   const wrapRef = React.useRef(null);
@@ -282,6 +307,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // chip, the chooser, Nearby and the open card; the tap test and the handlers the
   // gestures call; the cards' close, Follow, a row's Follow and the zoom row; the
   // panel API (openPanel, closePanel, panel) and the lit set (lightThreads)
+  // the filters (web-filters.jsx): the legend's chips, the sheet, the pill and a book name's long
+  // press, the canon's only; they open with the resume point's or the saved spot's
+  const web = useWebFilters({ graph, mode, density, schedule, setAnnounce,
+    initial: resumeRef.current && resumeRef.current.filters });
   const {
     tip, choices, choiceChapter, choiceCut, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, followRow, zoomTo,
@@ -289,8 +318,19 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
     personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink, settledAt,
-    insetFor, slackFor,
+    insetFor, slackFor, holdBook: web.holdBook,
   });
+
+  // the saved spot: the canon's camera and filters as the reader leaves (the screen goes, or the app
+  // is put away, which on a phone may be the last the page hears)
+  const spotRef = React.useRef(/** @type {any} */ (null));
+  spotRef.current = web.filters;
+  React.useEffect(() => {
+    const keep = () => { if (modeRef.current !== 'personal' && graph && camRef.current) saveSpot(camRef.current, spotRef.current); };
+    const hidden = () => { if (document.visibilityState === 'hidden') keep(); };
+    document.addEventListener('visibilitychange', hidden);
+    return () => { document.removeEventListener('visibilitychange', hidden); keep(); };
+  }, [graph, camRef, modeRef]);
 
   // the docked panel is open while anything is: the inset's one writer (CONTRACTS.md section 5)
   // records what it covers and the controls right-align to its edge; under 1000 px of canvas
@@ -426,8 +466,6 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setMode(next);
   }, [closeCards, journey, cancelFly, camRef, modeRef, viewRef, zoomCapFor, schedule]);
 
-  // the filters (web-filters.jsx): the legend's chips, the sheet and the pill, the canon's only
-  const web = useWebFilters({ graph, mode, density, schedule, setAnnounce });
   const { setSheetOpen } = web;
   const closeFilters = React.useCallback(() => setSheetOpen(false), [setSheetOpen]);
 
@@ -448,9 +486,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // and the hook snapshots the current screen as the return target — so a
     // jump from here comes back HERE.
     const cam = camRef.current;
-    resumeWeb = cam ? { mode: modeRef.current, cam: Object.assign({}, cam), focus: Object.assign({}, focusRef.current), detail } : null;
+    resumeWeb = cam ? { mode: modeRef.current, cam: Object.assign({}, cam), focus: Object.assign({}, focusRef.current), detail,
+      filters: web.filters } : null;
     navigateToLink(endpoint, { sourceLetterTitle: 'The Scripture Web' });
-  }, [navigateToLink, camRef, focusRef, modeRef, detail]);
+  }, [navigateToLink, camRef, focusRef, modeRef, detail, web.filters]);
 
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) return loadErrorPanel(loadError, retryLoad, onBack, !!(layout && layout.compact));
@@ -624,7 +663,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           Back to {returnTo.label}
         </button>
       ) : null}
-      {web.canon && graph ? <FilterPill web={web} /> : null}
+      {/* the pill names what is on; with the sheet open the sheet's own count does */}
+      {web.canon && graph && !web.sheetOpen ? <FilterPill web={web} /> : null}
       {web.canon && graph && web.sheetOpen ? <FilterSheet web={web} graph={graph} /> : null}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}

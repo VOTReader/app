@@ -185,7 +185,7 @@ export function isTie(d0, d1, dpr) {
  *   double-tap's zoom keeps
  */
 export function useWebSelection({
-  graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
+  graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor, holdBook,
   personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink = null,
   settledAt, insetFor, slackFor,
 }) {
@@ -763,7 +763,18 @@ export function useWebSelection({
     const had = focusRef.current.hover !== -1 || focusRef.current.hoverProphecy !== -1 || !!focusRef.current.hoverUnderlay;
     if (dropHover() || had) schedule();
   }, [focusRef, dropHover, schedule]);
-  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, leave, snapshot }; }, [hover, tap, doubleTap, leave, snapshot]);
+  /** A long press (gestures.js): on a drawn book name it filters the web to that book (holdBook,
+   * web-filters.jsx). Returns whether it took the press. */
+  const holdRef = React.useRef(holdBook);
+  holdRef.current = holdBook;
+  const hold = React.useCallback((cx, cy) => {
+    if (mode === 'personal' || typeof holdRef.current !== 'function') return false;
+    const hit = hitOverlay(overlayFrameRef ? overlayFrameRef.current : null, cx, cy);
+    if (!hit || hit.kind !== 'book' || !(hit.book >= 0)) return false;
+    holdRef.current(hit.book);
+    return true;
+  }, [mode, overlayFrameRef]);
+  React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, leave, snapshot, hold }; }, [hover, tap, doubleTap, leave, snapshot, hold]);
 
   // Timothy's notes turned off: a card or a chooser on one of their threads closes, and a hover on
   // one lets go, as the thread is no longer drawn (w4: the card and the focus stayed on a hidden

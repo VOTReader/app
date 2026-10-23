@@ -604,12 +604,19 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(now.camX).toBeCloseTo(before.camX, 6);
       expect(now.focusArc).toBe(0);
       expect(back.container.querySelector('.sw-sheet'), 'the card is back up').toBeTruthy();
-      // one-shot: a later visit opens at fit as before
+      // one-shot: a later visit opens at the saved spot (2026-10-23), the place without the card
       back.unmount();
+      DRAWN.length = 0;
+      const later = await mount({}, threaded);
+      expect(zoomText(), 'the saved spot keeps the zoom').not.toBe('Overview');
+      expect(DRAWN[DRAWN.length - 1].focusArc).toBe(-1);
+      expect(later.container.querySelector('.sw-sheet')).toBeNull();
+      // with no spot kept the web opens at fit as before
+      later.unmount();
+      _resetWebPlace();
       DRAWN.length = 0;
       await mount({}, threaded);
       expect(zoomText()).toBe('Overview');
-      expect(DRAWN[DRAWN.length - 1].focusArc).toBe(-1);
     });
 
     /* sw1 (audit-web 10-05): under the baseline each chapter's bar is as TALL as the chapter is long, and was
