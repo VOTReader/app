@@ -327,7 +327,8 @@ if (process.argv.includes('--release')) {
     }
     // The reverse leg: an asset on the release that the manifest never emits is
     // an orphan (dead weight, or a recording that lost its mapping). Reported,
-    // not failed: deleting one is the owner's call, not this checker's.
+    // not failed: some orphans may be recordings kept on purpose, so this checker
+    // only names them.
     const orphans = [...sizes.keys()].filter((n) => !emitted.has(n.replace(/\.mp3$/, ''))).sort();
     const orphanMb = orphans.reduce((n, o) => n + sizes.get(o), 0) / 1e6;
     console.log(`[audio-manifest] release ${TAG}: ${orphans.length} asset(s) the manifest never emits (${orphanMb.toFixed(1)} MB)` +

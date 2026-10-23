@@ -192,7 +192,7 @@ def _retired_main():
         keys = keys[:limit]
     print(f"letters: {len(keys)} (manifest {len(tracks)}, fragments {len(frag_all)})")
 
-    # Volume-by-volume order (owner directive: QA checkpoint per volume) +
+    # Volume-by-volume order (a QA checkpoint per volume) +
     # MERGE with any already-shipped sync data so sequential nights accumulate.
     VOL_ORDER = {v: i for i, v in enumerate(
         ["one", "two", "three", "four", "five", "six", "seven",

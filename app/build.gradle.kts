@@ -69,7 +69,7 @@ android {
             .getOrElse("1.0")
     }
 
-    // ln5 (Play, Corbin 2026-10-05 01:5x "just get it there", do not publish): the Play UPLOAD key.
+    // ln5 (Play; Timothy gave permission 10-05, Play is parked until Corbin raises it): the Play UPLOAD key.
     // Play App Signing holds the real app-signing key, so a lost upload key is reset in the Play
     // Console, not fatal. The keystore lives outside git (D:/VOTReader-keys, a copy in OneDrive
     // Backups); its password is never in a file Gradle reads - tools/play-bundle.ps1 decrypts it from

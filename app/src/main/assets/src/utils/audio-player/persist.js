@@ -258,10 +258,11 @@ function _savedCustomQueue(queue) {
   return _customSaved.saved;
 }
 
-/** How many ids an explicit songs list may persist. Longer lists persist the
- *  window FROM the playing song forward — the forward-only horizon every other
- *  rebuild keeps — so the snapshot stays small whatever the list. */
-const SONG_IDS_PERSIST = 50;
+/** How many ids an explicit songs list may persist: the same 1000 playSongs
+ *  takes (songs.js SONG_IDS_MAX), so a restart keeps the whole queue. Longer
+ *  lists persist the window FROM the playing song forward — the forward-only
+ *  horizon every other rebuild keeps. */
+const SONG_IDS_PERSIST = 1000;
 
 /**
  * The songs half of a snapshot: the compact descriptor, never the queue. An

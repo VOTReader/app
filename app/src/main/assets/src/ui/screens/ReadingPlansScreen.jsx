@@ -164,7 +164,7 @@ function useHold(onHold) {
 
 /**
  * mw18 S6: the recordings of the plan's next 7 days, saved to the phone, each chapter or letter its own recording
- * (DECISIONS 09-22: save per recording, never a whole edition). Only where downloads work (the Android app, or a
+ * (save per recording). Only where downloads work (the Android app, or a
  * browser that keeps recordings); the same confirm as a collection's Download all (count, size, free space).
  * @param {{ plan: any, from: number, tracksOf: (refs: any[]) => any[] }} props
  */

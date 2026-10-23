@@ -56,9 +56,9 @@ import { playSongs } from './songs.js';
 export function playBibleBook(opts) {
   const o = opts || /** @type {any} */ ({});
   const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
-  // Queue scope is THE BOOK (owner directive 2026-08-10): a chapter tap
-  // queues that book's remaining chapters, never the rest of the Bible up
-  // front. Since w-audio-continue (2026-09-11) the queue EXTENDS into the next
+  // Queue scope is THE BOOK (Corbin 2026-08-09 23:14: "playing one bible chapter
+  // should not queue the entire bible, only the book"): a chapter tap queues
+  // that book's remaining chapters, never the rest of the Bible up front. Since w-audio-continue (2026-09-11) the queue EXTENDS into the next
   // book of the same edition as the last chapter ends (_extendQueue, _booksAfter)
   // — the horizon is a book at a time, the walk is the whole edition.
   const items = books.filter((b) => b[0] === o.bookId).map((b) => ({ id: b[0], title: b[1] }));

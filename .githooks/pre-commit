@@ -180,7 +180,7 @@ fi
 # its S22 frame-time measurement (2026-09-24: a one-sentence guide edit, with
 # the phone off adb). It only hashes source, so ask it here, at the commit.
 # A STALE measurement only WARNS - in CI too - because the fix needs the phone
-# and the S22 must never block (Corbin, 2026-09-24): the check prints the
+# and the S22 must never block (Corbin, 2026-09-22: "don't let that be a blocker"): the check prints the
 # warning itself and exits 0. A scene over budget or a missing measurement
 # still fails, here as in CI.
 s22_changed=$(echo "$staged" | grep -E '^(app/src/main/assets/src/(utils|ui)/scripture-web/[^/]+\.(js|jsx)|app/src/main/assets/src/ui/screens/ScriptureWebScreen\.jsx|tools/perf/s22-frame-time\.json)$' | grep -vE '\.test\.(js|jsx)$' || true)

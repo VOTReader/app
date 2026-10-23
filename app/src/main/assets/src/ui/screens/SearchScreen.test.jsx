@@ -285,7 +285,7 @@ describe('SearchScreen (W0 micro-gaps)', () => {
   });
 
   /* v07-12: the empty state promised study notes and footnotes, which the
-     index never holds (index-builder.js NOT emitted, an owner directive). */
+     index never holds (index-builder.js NOT emitted, an agent design choice). */
   it('(v07-12) the empty state names only what search searches', () => {
     const { container } = render(<SearchScreen {...baseProps()} />);
     const hero = container.querySelector('.srch-empty-hero');

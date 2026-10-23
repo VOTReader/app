@@ -236,11 +236,11 @@ describe('the boot snapshot of a songs queue', () => {
     expect(AudioPlayer.removeUpcoming(3)).toBe(true);
     AudioPlayer.toggle();
     const raw = localStorage.getItem('vot-audio-pos');
-    expect(raw.length).toBeLessThan(2048);
+    expect(raw.length).toBeLessThan(32768);         // ids only: ~14 KB for 899 songs
     const snap = JSON.parse(raw);
     expect(snap.mode).toBe('songs');
     expect(snap.customQueue).toBeUndefined();
-    expect(snap.ids).toHaveLength(50);              // the window from the playing song forward
+    expect(snap.ids).toHaveLength(899);             // the whole queue from the playing song forward (cap 1000)
     expect(snap.ids[0]).toBe(AudioPlayer.getState().queue[0].key.slice(5));
   });
 

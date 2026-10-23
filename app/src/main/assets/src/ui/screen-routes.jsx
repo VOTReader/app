@@ -1114,8 +1114,8 @@ export function buildScreenRoutes({
           // Wave 0 (sticky genreId): entering content from History is a
           // non-genre entry — clear genreId so a later index-level Back
           // can't misroute into a genre visited in an earlier session leg.
-          // `silent: true` — History is the ONE link surface the owner wants
-          // pill-less (you already know where you came from). The back-stack
+          // `silent: true` — History is the ONE pill-less link surface (agent
+          // design: you already know where you came from). The back-stack
           // entry is still pushed, so Back from the destination returns to
           // History; only the visible pill is suppressed.
           if (entry.type === 'study-chapter') {

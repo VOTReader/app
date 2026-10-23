@@ -230,7 +230,7 @@ void main(){
   // chosen thread and the chosen range's threads, keeps its full ink.
   float dim = mix(1., ${glslFloat(TAP_CONTEXT)}, uTapFade*(1. - lit));
 
-  // colour is distance, the one law (Corbin, 2026-09-10: genre and testament retired)
+  // colour is distance, the one law (agent design 2026-09-10, genre and testament retired; Corbin took sweb's picks 10-22)
   // (the chosen, hovered and lit lines take the ink table's gold in the top pass)
   vec3 col = distanceRamp(tSpan);
 

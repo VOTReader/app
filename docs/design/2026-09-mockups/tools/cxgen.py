@@ -10,7 +10,7 @@ after, appends a line to usage.log, and refuses to start past the thresholds.
 import json, os, subprocess, sys, time, select, shutil, glob
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# Hub rule (Corbin, 09-25): Luna only, one or two Codex runs at a time. No Sol, no Astra.
+# Default model for these mockup runs; any Codex model may be used (Corbin lifted Luna-only 10-05).
 MODEL = 'gpt-6-luna'
 
 def limits():
