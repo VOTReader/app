@@ -48,7 +48,27 @@ export function prophecyCardKeysOf(letter) {
   return keys;
 }
 
-export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
+/**
+ * U01.1: the letter's own "done" control at its end. Only the pace tracker credited a letter, so a reader who
+ * finished it saw 93% and "Nothing read yet"; a tap marks it read (the route's manual markRead), Undo takes it back.
+ * @param {{ read: boolean, onMark: () => void, onUndo?: () => void }} props
+ */
+function MarkReadRow({ read, onMark, onUndo }) {
+  return (
+    <div className="mark-read-row">
+      {read ? (
+        <>
+          <span className="mark-read-done"><span aria-hidden="true">✓ </span>Read</span>
+          {onUndo ? <button type="button" className="mark-read-undo" onClick={onUndo} aria-label="Undo: mark as not read">Undo</button> : null}
+        </>
+      ) : (
+        <button type="button" className="mark-read-btn" onClick={onMark}>Mark as read</button>
+      )}
+    </div>
+  );
+}
+
+export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, onUnmark, isRead, markAsReadEnabled, volumeLabel, studyMode, onLetterClick, onInAppLink, onNavigateToLink, backHint, onBack, navBack = null, prophecyCardStatesRef, saveProphecyCardStates, onLinkOpen: _onLinkOpen, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, resolvePeek = null }) {
   const wrappedInAppLink = onInAppLink ? (link) => onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel }) : null;
   const [sheetFn, setSheetFn] = React.useState(null);
   const [surpriseBlockKey, setSurpriseBlockKey] = React.useState(null); // hl-key of the landing block while it flashes; ReadAlongHighlight's seekTo
@@ -560,51 +580,12 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               </div>
             )}
 
+            {!studyMode && !inert && markAsReadEnabled && onMarkRead && isRead ? (
+              <MarkReadRow read={isRead(letter.id)} onMark={() => onMarkRead()} onUndo={onUnmark} />
+            ) : null}
             {!studyMode && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? (
               <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={letter.id} inert={inert} />
             ) : null}
-            <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
-
-            <div className="bottom-nav">
-              {letter.prevLetter ? (
-                <button className="bottom-nav-card" onClick={() => onNavigate(letter.prevLetter.id)}>
-                  <div className="bottom-nav-label">‹ Previous Letter</div>
-                  <div className="bottom-nav-title">{letter.prevLetter.title}</div>
-                </button>
-              ) : prevBoundary ? (
-                <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                  <div className="bottom-nav-label">{prevBoundary.short ? `‹ Previous · ${prevBoundary.short}` : "‹ Previous Book"}</div>
-                  <div className="bottom-nav-title">{prevBoundary.title}</div>
-                </button>
-              ) : (
-                <div className="bottom-nav-card placeholder">
-                  <div className="bottom-nav-label">‹ Previous Letter</div>
-                  <div className="bottom-nav-title">—</div>
-                </div>
-              )}
-
-              {letter.nextLetter ? (
-                <button className="bottom-nav-card next" onClick={() => onNavigate(letter.nextLetter.id)}>
-                  <div className="bottom-nav-label">Next Letter ›</div>
-                  <div className="bottom-nav-title">{letter.nextLetter.title}</div>
-                </button>
-              ) : nextBoundary ? (
-                <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                  <div className="bottom-nav-label">{nextBoundary.short ? `Next · ${nextBoundary.short} ›` : "Next Book ›"}</div>
-                  <div className="bottom-nav-title">{nextBoundary.title}</div>
-                </button>
-              ) : letter.nextLetterExternal ? (
-                <a className="bottom-nav-card next" href={letter.nextLetterExternal.url} target="_blank" rel="noopener noreferrer">
-                  <div className="bottom-nav-label">Next Letter ›</div>
-                  <div className="bottom-nav-title">{letter.nextLetterExternal.title}</div>
-                </a>
-              ) : (
-                <div className="bottom-nav-card next placeholder">
-                  <div className="bottom-nav-label">Next Letter ›</div>
-                  <div className="bottom-nav-title">—</div>
-                </div>
-              )}
-            </div>
 
             <div className="related-section">
               {letter.addendum && (
@@ -700,6 +681,50 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               </div>
               )}
             </div>
+
+            {/* U01.3: the letter ends on Next letter. Related, songs, audio and videos sit above it, and the install
+                offer is one line under it. */}
+            <div className="bottom-nav">
+              {letter.prevLetter ? (
+                <button className="bottom-nav-card" onClick={() => onNavigate(letter.prevLetter.id)}>
+                  <div className="bottom-nav-label">‹ Previous Letter</div>
+                  <div className="bottom-nav-title">{letter.prevLetter.title}</div>
+                </button>
+              ) : prevBoundary ? (
+                <button className="bottom-nav-card" onClick={onPrevBoundary}>
+                  <div className="bottom-nav-label">{prevBoundary.short ? `‹ Previous · ${prevBoundary.short}` : "‹ Previous Book"}</div>
+                  <div className="bottom-nav-title">{prevBoundary.title}</div>
+                </button>
+              ) : (
+                <div className="bottom-nav-card placeholder">
+                  <div className="bottom-nav-label">‹ Previous Letter</div>
+                  <div className="bottom-nav-title">—</div>
+                </div>
+              )}
+
+              {letter.nextLetter ? (
+                <button className="bottom-nav-card next" onClick={() => onNavigate(letter.nextLetter.id)}>
+                  <div className="bottom-nav-label">Next Letter ›</div>
+                  <div className="bottom-nav-title">{letter.nextLetter.title}</div>
+                </button>
+              ) : nextBoundary ? (
+                <button className="bottom-nav-card next" onClick={onNextBoundary}>
+                  <div className="bottom-nav-label">{nextBoundary.short ? `Next · ${nextBoundary.short} ›` : "Next Book ›"}</div>
+                  <div className="bottom-nav-title">{nextBoundary.title}</div>
+                </button>
+              ) : letter.nextLetterExternal ? (
+                <a className="bottom-nav-card next" href={letter.nextLetterExternal.url} target="_blank" rel="noopener noreferrer">
+                  <div className="bottom-nav-label">Next Letter ›</div>
+                  <div className="bottom-nav-title">{letter.nextLetterExternal.title}</div>
+                </a>
+              ) : (
+                <div className="bottom-nav-card next placeholder">
+                  <div className="bottom-nav-label">Next Letter ›</div>
+                  <div className="bottom-nav-title">—</div>
+                </div>
+              )}
+            </div>
+            <InstallCard unitKey={'letter:' + volKey + ':' + letter.id} inert={inert} />
           </div>
         </div>
       </div>

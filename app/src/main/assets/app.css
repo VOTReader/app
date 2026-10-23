@@ -9678,29 +9678,22 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */
 .install-card-sentinel { height: 1px; }
 .install-card {
-  position: relative; box-sizing: border-box; width: calc(100% - 2rem); max-width: 30rem; margin: 0.5rem auto 1.75rem;
-  padding: 1.5rem 1.25rem 1rem; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg2);
-  color: var(--cream); text-align: center; font-family: var(--font-body);
+  /* One line under Next (U01.3/U06.5): icon, the offer, Install or Show me how, Not now. Wraps, never clips. */
+  box-sizing: border-box; width: calc(100% - 2rem); max-width: 34rem; margin: 0.25rem auto 1.5rem; padding: 0.4rem 0;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.25rem 0.75rem;
+  border-top: 1px solid var(--gold-border); color: var(--cream-dim); font-family: var(--font-body); text-align: center;
 }
-.install-card-close {
-  position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
-  background: none; border: 0; color: var(--gold); cursor: pointer;
+.install-card-icon { width: 28px; height: 28px; border-radius: 7px; flex: none; }
+.install-card-title { font-size: var(--fs-16); line-height: 1.35; color: var(--cream-dim); }
+.install-card-actions { display: inline-flex; flex-wrap: wrap; gap: 0 0.5rem; }
+.install-card-primary, .install-card-later {
+  min-height: 44px; padding: 0 0.5rem; background: none; border: 0; cursor: pointer;
+  font-family: var(--font-body); font-size: var(--fs-16); color: var(--gold); text-decoration: underline; text-underline-offset: 3px;
 }
-.install-card-close svg { width: 20px; height: 20px; }
-.install-card-icon { display: block; width: 64px; height: 64px; margin: 0 auto 0.75rem; border-radius: 16px; }
-.install-card-title { margin: 0 0 0.5rem; font-family: var(--font-body); font-size: var(--fs-24); font-weight: 600; line-height: 1.2; color: var(--cream); }
-.install-card-body { margin: 0 auto 1.1rem; max-width: 24rem; font-size: var(--fs-18); line-height: 1.45; color: var(--cream-dim); }
-.install-card-primary, .install-card-later, .install-steps-done {
+.install-card-later { color: var(--cream-muted); }
+.install-steps-done {
   display: block; width: 100%; min-height: 48px; padding: 0 16px; border-radius: 10px; cursor: pointer;
   font-family: var(--font-cinzel); font-size: var(--fs-14); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-}
-.install-card-primary { background: var(--gold); color: #000; border: 1px solid var(--gold); }
-body.light .install-card-primary { color: #fff; }
-.install-card-later { margin-top: 0.6rem; background: transparent; color: var(--cream); border: 1px solid var(--gold-border);
-  font-family: var(--font-body); font-size: var(--fs-18); font-weight: 400; letter-spacing: 0; text-transform: none; }
-.install-card-never {
-  display: block; margin: 0.35rem auto 0; min-height: 44px; padding: 0 12px; background: none; border: 0; cursor: pointer;
-  font-family: var(--font-body); font-size: min(var(--fs-16), 18px); color: var(--gold); text-decoration: underline;
 }
 .install-card button:focus-visible, .install-steps button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
@@ -9725,6 +9718,12 @@ body.light .install-step-num { color: #fff; }
 .install-step-note { margin-top: 0.25rem; font-size: var(--fs-15); line-height: 1.35; color: var(--cream-dim); }
 .install-step-pic { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--gold-border); }
 .install-steps-done { margin-top: 0.9rem; background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+
+/* U01.1: "Mark as read" at a letter's end, "✓ Read · Undo" once it is. Quiet: a link, not a card. */
+.mark-read-row { display: flex; align-items: center; justify-content: center; gap: 0 1rem; margin: 0.25rem auto 0.75rem; font-family: var(--font-body); font-size: var(--fs-16); }
+.mark-read-btn, .mark-read-undo { min-height: 44px; padding: 0 0.5rem; background: none; border: 0; cursor: pointer; font: inherit; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+.mark-read-undo { color: var(--cream-muted); }
+.mark-read-done { color: var(--gold); }
 
 /* Wave 3 large text (J-w3g1.1): rules for text sizes of 1.8 and up, keyed on the root class use-settings sets. */
 .vot-large-text .pill-left { display: none; }   /* RC.8: "RESUME · 1 MIN LE" was cut at both screen edges at 300% */

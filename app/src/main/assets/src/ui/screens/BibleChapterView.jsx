@@ -326,7 +326,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <div className="ornament-divider-line" />
           </div>
           <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
-          <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
           <div className="bottom-nav">
             {prevCh ? (
               <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
@@ -362,6 +361,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               </div>
             )}
           </div>
+          {/* U01.3: the install offer is one line under Previous/Next, so the chapter ends on Next. */}
+          <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
         </div>
       </div>
       {/* Read-along, on the same !inert contract as LetterView: the swipe peek
