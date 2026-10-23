@@ -121,7 +121,7 @@ export function _clearStallWatchdog() {
 function _setStatus(next) {
   if (_state.status === next) return;
   _state.status = next;
-  if (next === 'playing') { _clearStallWatchdog(); _songSkips = 0; }
+  if (next === 'playing') { _clearStallWatchdog(); _songSkips = 0; _state.failed = null; }
   // Keep-alive tracks the listening SESSION, not the play state (media-card
   // rework 2026-08-09): 'paused' keeps the anchor so the system media card
   // survives a pause with its Play button LIVE — resuming from the card needs
@@ -369,6 +369,7 @@ function _onError() {
     _state.duration = back.duration;
     _errorTime = back.time;
     _lastTick = Math.floor(back.time);
+    _state.failed = 'signal';
     _setStatus('paused');
     _mediaSession(back.queue[back.qi]);
     _persist();
@@ -377,11 +378,12 @@ function _onError() {
   }
   // Keep queue + qi + position: toggle() retries from here.
   _errorTime = _state.time;
+  // A downloaded recording failing offline is a load failure, not a missing connection; a streamed one that died at
+  // the network with the phone online is a dead zone (U04.2's line). The bar says the same (player brief 3g).
+  _state.failed = _unreachable(failed) ? 'offline' : lostSignal ? 'signal' : 'load';
   _setStatus('paused');
   _persist();
-  // A downloaded recording failing offline is a load failure, not a missing connection; a streamed one that died at
-  // the network with the phone online is a dead zone (U04.2's line).
-  _toast(_unreachable(failed) ? OFFLINE_MSG : lostSignal ? NO_SIGNAL_MSG : LOAD_FAIL_MSG);
+  _toast(_state.failed === 'offline' ? OFFLINE_MSG : _state.failed === 'signal' ? NO_SIGNAL_MSG : LOAD_FAIL_MSG);
 }
 
 /**
@@ -406,6 +408,7 @@ export function _start(placeOf) {
   _nativePlaced = -1;
   _clearOfflineSkip();
   _resetSectionFollow();   // a new file: no letter under its clock yet, nothing heard
+  _state.failed = null;    // the bar's failure line belongs to the start that failed
   const track = _state.queue[_state.qi];
   if (!track) { late.stop(); return; }
   // A repeated passage belongs to the play that set it: any new start ends it, except the first start of a
@@ -446,6 +449,7 @@ export function _start(placeOf) {
       _state.time = 0;
       _state.duration = 0;
       _errorTime = 0;
+      _state.failed = 'offline';
       // Paused BEFORE the element lets go, so its 'pause' finds nothing live to file.
       _setStatus('paused');
       // A manual Next or Prev lands here with the element still playing the recording being LEFT: it would play on

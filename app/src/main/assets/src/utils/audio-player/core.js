@@ -63,7 +63,7 @@ export function _setNative(v) { _native = v; }
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null };
+export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null, failed: null };
 /** The READING speed — the listener's chosen rate for letters and chapters.
  *  `_state.rate` is the EFFECTIVE rate of what is playing, which is 1 for a
  *  song: the reader's 1.5× must not warp music (W3-05), and it must come back

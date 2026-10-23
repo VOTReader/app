@@ -41,11 +41,13 @@ import { _clearLoop, _clearLoopTimer, LOOP_SLACK_S } from './loop.js';
 import { _clearMediaSession, _setAudioActive, _syncMediaSessionPosition, _syncNative } from './media-session.js';
 import { _holdsOtherForm, _offlineRefuses, _srcFor, _unreachable } from './offline.js';
 import {
+  _applyUndoSnapshot,
   _clearPersist,
   _persist,
   _rememberCurrentPosition,
   _rememberOutgoingPosition,
   _setLastPersistSec,
+  _undoSnapshot,
 } from './persist.js';
 import { _stopWarming } from './prefetch.js';
 import { _rebuildInFlight, _rebuildRestored, _rebuildRestoredQueue, _toggleRebuildStart } from './restore.js';
@@ -386,6 +388,7 @@ export function stop() {
   _state.time = 0;
   _state.duration = 0;
   _state.status = 'idle';
+  _state.failed = null;
   _setLastTick(-1);
   _setErrorTime(0);
   _setPrewarmKey(null);
@@ -393,6 +396,35 @@ export function stop() {
   _clearMediaSession();
   if (wasActive) _setAudioActive(false);
   _notify();
+}
+
+/**
+ * The bar's Close (player brief 3a: "Stopped · Undo"): stop, and hand back what Undo needs to bring the session
+ * back. The record is the one a reload restores from, so Undo restores it the same way.
+ *
+ * @returns {{ snap: any, playing: boolean } | null} null when nothing was playing
+ */
+export function stopWithUndo() {
+  if (_state.status === 'idle') return null;
+  const snap = _undoSnapshot();
+  const playing = _state.status === 'playing' || _state.status === 'loading';
+  stop();
+  return snap ? { snap, playing } : null;
+}
+
+/**
+ * Undo a Close: the session comes back at its place, paused with nothing loaded (as after a reload), and plays
+ * again when it was playing. Once anything else has started, the Undo is spent.
+ *
+ * @param {{ snap: any, playing: boolean } | null} token what stopWithUndo returned
+ * @returns {boolean} whether the session came back
+ */
+export function undoStop(token) {
+  if (!token || _state.status !== 'idle') return false;
+  if (!_applyUndoSnapshot(token.snap)) return false;
+  _persist();
+  if (token.playing) toggle();
+  return true;
 }
 
 /**

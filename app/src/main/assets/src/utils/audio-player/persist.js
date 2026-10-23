@@ -340,6 +340,21 @@ export async function _adoptDurableSnapshot() {
 }
 
 /**
+ * The record a reload would restore the live session from, for Close's Undo (player brief 3a): the same record, so
+ * every queue kind (custom edits, songs, a plan portion) comes back as a reload would bring it.
+ * @returns {any} null when there is nothing to bring back
+ */
+export function _undoSnapshot() {
+  try { const s = _snapshot(); return s && s !== 'clear' ? s : null; } catch (_e) { return null; }
+}
+
+/**
+ * Put an _undoSnapshot record back on the bar, paused at its place, the way a reload does.
+ * @param {any} rec @returns {boolean} whether the record was usable
+ */
+export function _applyUndoSnapshot(rec) { return _applySnapshot(rec); }
+
+/**
  * Boot-time restore: show the bar paused at the saved position. Pure display
  * state — one placeholder queue entry from the snapshot; the real queue is
  * rebuilt by _rebuildRestoredQueue() on the first transport tap.

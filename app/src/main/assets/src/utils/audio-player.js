@@ -47,7 +47,7 @@
      songs         songs queues, shuffle, repeat, version switch
      queue         the play* entry points, the site order, queue edits
      restore       rebuild a restored bar, resume across the update reload and a close
-     transport     toggle, next/prev, playAt, seek, skip, speed, stop, pauseIfPlaying
+     transport     toggle, next/prev, playAt, seek, skip, speed, stop, stopWithUndo/undoStop, pauseIfPlaying
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
@@ -97,7 +97,9 @@ import {
   setPlaybackRate,
   skip,
   stop,
+  stopWithUndo,
   toggle,
+  undoStop,
 } from './audio-player/transport.js';
 
 /**
@@ -136,6 +138,8 @@ import {
  *   at its end; reset to 'off' by any queue that is not songs, so a letter never loops
  * @property {{ id: number, url: string, start: number, end: number, times: number, pass: number, label: string, waits: boolean } | null} loop
  *   - REPEAT THIS PASSAGE (setLoop): the span of the playing recording heard `times` times; null when none
+ * @property {'load'|'offline'|'signal'|null} failed - why the last start failed to play (the bar's failure line,
+ *   player brief 3g); null from the next start, the first 'playing' or a stop
  */
 
 export { AUDIO_TOAST_ID, trackUrl } from './audio-player/core.js';
@@ -234,6 +238,8 @@ export const AudioPlayer = {
   clearUpcoming,
   switchVoiceInPlace,
   stop,
+  stopWithUndo,
+  undoStop,
   pauseIfPlaying,
   syncKeepAlive,
 };
