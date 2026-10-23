@@ -48,12 +48,14 @@ function TextSizeSliderRow({ value, onChange }) {
           aria-valuetext={pct === 100 ? 'Standard' : pct + ' percent'}
         />
         <span className="txtsize-value">{pct}%</span>
-        <button
-          type="button"
-          className="txtsize-reset"
-          disabled={pct === 100}
-          onClick={() => onChange("1")}
-        >Reset</button>
+        {/* A09.11: shown only away from 100% (a disabled ghost at 30% read as broken), and named for what it does. */}
+        {pct !== 100 && (
+          <button
+            type="button"
+            className="txtsize-reset txtsize-reset-full"
+            onClick={() => onChange("1")}
+          >Reset to 100%</button>
+        )}
       </div>
       <div className="txtsize-preview">
         “Your word is a lamp to my feet and a light to my path.”

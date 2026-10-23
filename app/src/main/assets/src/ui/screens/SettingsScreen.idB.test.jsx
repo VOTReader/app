@@ -76,3 +76,16 @@ describe('Help keeps the promise of its summary (A09.10)', () => {
     expect(onAbout).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('Text Size reset (A01.8 / A09.11)', () => {
+  it('is gone at 100%, and away from it says "Reset to 100%" and resets', () => {
+    renderSettings({ fontScale: '1' });
+    expect(row('Text Size').querySelector('.txtsize-reset')).toBeNull();
+    cleanup();
+    const onSetting = vi.fn();
+    renderSettings({ fontScale: '1.5' }, { onSetting });
+    const reset = within(row('Text Size')).getByRole('button', { name: 'Reset to 100%' });
+    fireEvent.click(reset);
+    expect(onSetting).toHaveBeenCalledWith('fontScale', '1');
+  });
+});

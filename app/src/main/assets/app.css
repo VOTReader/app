@@ -2307,6 +2307,7 @@
            same size as a short one (the old .hero-title-long shrink is gone).
            Fluid ends are tokens; the vw term between them is the point. */
         font-size: clamp(var(--fs-30), 5vw, var(--fs-36));
+        font-size: min(clamp(var(--fs-30), 5vw, var(--fs-36)), 9vw);   /* U05.4: Text Size never pushes a title past the screen */
         color: var(--cream); line-height: 1.2; margin-bottom: 1.6rem;
         overflow-wrap: break-word; word-wrap: break-word;
         hyphens: auto;
@@ -3332,13 +3333,13 @@
     .home-screen-app { justify-content:flex-start; padding-top:1.6rem; }
     .home-screen-app .home-sub { margin-bottom:2rem; }
     .home-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold); opacity:0.8; margin-bottom:0.75rem; text-align:center; }
-    .home-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-30); color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
+    .home-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-30); font-size:min(var(--fs-30), 9vw); color:var(--cream); text-align:center; margin-bottom:0.4rem; line-height:1.2; }
     .home-sub { font-size:var(--fs-16); color:var(--cream-muted); text-align:center; font-style:italic; margin-bottom:2rem; }
     .home-ornament { display:flex; align-items:center; gap:0.75rem; margin-bottom:2.5rem; width:100%; max-width:25rem; }
     /* ── Volumes landing: fill screen, no scroll ── */
     .volumes-landing { padding:1.2rem min(1.2rem, 5.4vw) 0.8rem; justify-content:flex-start; }
     .volumes-landing .home-eyebrow { margin-bottom:0.3rem; }
-    .volumes-landing .home-title { font-size:var(--fs-24); margin-bottom:0.15rem; }
+    .volumes-landing .home-title { font-size:var(--fs-24); font-size:min(var(--fs-24), 9vw); margin-bottom:0.15rem; }
     .volumes-landing .home-sub { margin-bottom:0.6rem; font-size:var(--fs-15); }
     .volumes-landing .home-ornament { margin-bottom:0.8rem; }
     .volumes-landing .genre-columns { gap:0.5rem; }
@@ -3354,7 +3355,7 @@
     .home-eyebrow-pick { display:block; margin-left:auto; margin-right:auto; background:none; border:0; padding:0.25rem 0.5rem; min-height:44px; cursor:pointer; font:inherit; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; color:var(--gold); border-radius:6px; }
     .home-eyebrow-pick:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .home-eyebrow-chev { margin-left:0.4em; font-size:0.85em; opacity:0.75; }
-    .scriptures-landing .home-title { font-size:var(--fs-24); margin-bottom:0.2rem; }
+    .scriptures-landing .home-title { font-size:var(--fs-24); font-size:min(var(--fs-24), 9vw); margin-bottom:0.2rem; }
     .scriptures-landing .home-ornament { margin-bottom:1.2rem; }
     .scriptures-landing .genre-columns { max-width:33.75rem; gap:0.65rem; }
     .scriptures-landing .genre-tile { padding:0.85rem 0.95rem; }
@@ -3386,6 +3387,7 @@
       font-family: 'Cinzel Decorative', 'Cinzel', serif;
       font-weight: 400;
       font-size: var(--fs-24);
+      font-size: min(var(--fs-24), 9vw);   /* U05.4: at 300% the brand title ran to four lines */
       color: var(--gold);
       text-align: center;
       letter-spacing: 0.06em;
@@ -3400,6 +3402,7 @@
       font-style: italic;
       font-weight: 500;
       font-size: var(--fs-24);
+      font-size: min(var(--fs-24), 9vw);
       color: var(--gold-bright);
       text-align: center;
       line-height: 1;
@@ -3417,6 +3420,7 @@
       font-weight: 500;
       font-style: italic;
       font-size: var(--fs-18);
+      font-size: min(var(--fs-18), 7vw);
       color: var(--cream);
       text-align: center;
       letter-spacing: 0.035em;
@@ -4236,6 +4240,9 @@
     .settings-clear-btn { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.15em; text-transform:uppercase; color:var(--cream-muted); background:transparent; border:1px solid var(--gold-border); border-radius:4px; padding:0.4rem 0.75rem; cursor:pointer; transition:all var(--transition); max-width:100%; }
     @media (hover: hover) { .settings-clear-btn:hover { color:var(--gold); border-color:var(--gold-dim); } }
     .settings-clear-btn:disabled { opacity:0.3; cursor:default; pointer-events:none; }
+    [data-settings-group="data"] .settings-clear-btn { min-height:44px; font-size:var(--fs-12); letter-spacing:0.1em; padding:0.45rem 0.85rem; border-color:var(--gold-dim); color:var(--cream); }
+    [data-settings-group="data"] .settings-row-head .settings-clear-btn { margin-left:auto; }
+    [data-settings-group="data"] .settings-clear-btn.danger { border-color:var(--danger); color:var(--danger); font-size:var(--fs-12); }
     .settings-clear-btn.warning { color:var(--settings-warning); border-color:var(--settings-warning); font-size:var(--fs-10); }
     @media (hover: hover) { .settings-clear-btn.warning:hover { background:rgba(209,143,46,0.1); } }
     /* W67: was --settings-danger #c0392b, 3.9:1 dark / 4.4:1 light for 10 px text; --danger is AA in both themes. */
@@ -8184,7 +8191,7 @@
     @media (max-width: 500px) { .mode-btn { font-size: var(--fsc-10); padding: 8px 12px; } }
 
     /* ── Text Size slider row (Settings) ── */
-    .txtsize-controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+    .txtsize-controls { display: flex; align-items: center; gap: 12px; margin-top: 10px; padding: 0 0.95rem; }   /* A01.8: the row inset */
     .txtsize-slider { flex: 1; accent-color: var(--gold); min-height: 28px; cursor: pointer; }
     .txtsize-value {
       font-family: 'Cinzel', serif; font-size: var(--fsc-11); letter-spacing: 0.08em;
@@ -8199,8 +8206,23 @@
     }
     .txtsize-reset:disabled { opacity: 0.3; cursor: default; }
     .txtsize-reset:active:not(:disabled) { background: var(--gold-faint); color: var(--gold); }
+    /* A09.11: Text Size's reset shows only away from 100%, at full contrast, and says what it does. */
+    .txtsize-reset.txtsize-reset-full { color: var(--gold); border-color: var(--gold-dim); min-height: 44px; }
+    /* Settings at large text (Text Size 1.8 and up, the root class vot-large-text; U05.3): px gutters, no group icon,
+       the value buttons take the full row and wrap, so nothing is cut at the card edge at 300%. */
+    .vot-large-text .settings-screen { padding-left: 12px; padding-right: 12px; }
+    .vot-large-text .settings-group-icon { display: none; }
+    .vot-large-text .settings-group-head .settings-section-label { overflow-wrap: anywhere; }
+    .vot-large-text .settings-row-head { padding-left: 12px; padding-right: 12px; }
+    .vot-large-text .settings-select-trigger { max-width: 100%; flex: 1 1 100%; justify-content: space-between; text-align: left; }
+    .vot-large-text .settings-select-trigger .settings-row-value { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; overflow: visible; }
+    .vot-large-text .txtsize-controls { flex-wrap: wrap; padding: 0 12px; }
+    .vot-large-text .txtsize-controls .txtsize-slider { flex: 1 1 100%; }
+    .vot-large-text .txtsize-preview { margin-left: 12px; margin-right: 12px; }
+    .vot-large-text :is(.settings-row-desc, .settings-data-value) { padding-left: 12px; padding-right: 12px; }
+    .vot-large-text .settings-help-body { padding: 12px; }
     .txtsize-preview {
-      margin-top: 10px; padding: 10px 12px;
+      margin: 10px 0.95rem 0; padding: 10px 12px;
       border: 1px solid var(--gold-border); border-radius: 8px;
       background: var(--bg3);
       font-size: var(--fs-16); line-height: 1.6; color: var(--cream);
