@@ -8,6 +8,8 @@ import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
 import { tickItem, todayKey } from '../../data/plan-engine.js';
+import { usePlanReminders, takePlanOpen } from '../../utils/plan-runs-view.js';
+import { _resetForTests } from '../../utils/plan-reminder.js';
 
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(12); return d; };
 
@@ -258,5 +260,105 @@ describe('ReadingPlansScreen', () => {
     ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(4)));
     const { container } = render(<ReadingPlansScreen {...base()} />);
     expect(container.textContent).not.toMatch(/streak/i);
+  });
+});
+
+/* rp-s1: the page's side of the daily Android reminder (utils/plan-reminder.js; the native half is PlanReminder.kt). */
+function fakeBridge({ allowed = true, quiet = [] } = {}) {
+  const b = {
+    sent: [], opened: '',
+    planReminderSet: vi.fn((json) => { b.sent.push(JSON.parse(json)); return JSON.stringify({ ok: true, allowed, next: 1, quiet }); }),
+    planReminderStatus: vi.fn(() => JSON.stringify({ ok: true, allowed, next: 1, quiet })),
+    planReminderAsk: vi.fn(() => { if (typeof window.__votNotificationsResult === 'function') window.__votNotificationsResult(allowed); }),
+    planReminderSettings: vi.fn(),
+    planReminderOpened: vi.fn(() => { const o = b.opened; b.opened = ''; return o; }),
+  };
+  return b;
+}
+
+describe('the daily reminder (rp-s1)', () => {
+  afterEach(() => { delete window.AndroidBridge; _resetForTests(); });
+
+  it('on the web nothing offers a reminder', () => {
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
+    expect(screen.queryByText(/A reminder each day/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    expect(screen.queryByRole('button', { name: 'Remind me each day' })).toBeNull();
+  });
+
+  it('a plan just started offers one; yes keeps 07:30 on the run and asks the phone once', () => {
+    const b = fakeBridge();
+    window.AndroidBridge = b;
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
+    expect(screen.getByText('A reminder each day at 7:30 AM?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Yes, remind me' }));
+    expect(runs()[0].remind).toBe('07:30');
+    expect(b.planReminderAsk).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/A reminder each day/)).toBeNull();
+  });
+
+  it('no thanks leaves it off; the details turn it on, change its time and turn it off', () => {
+    window.AndroidBridge = fakeBridge();
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
+    fireEvent.click(screen.getByRole('button', { name: 'No thanks' }));
+    expect(runs()[0].remind).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remind me each day' }));
+    expect(runs()[0].remind).toBe('07:30');
+    fireEvent.change(screen.getByLabelText('Reminder each day at'), { target: { value: '21:15' } });
+    expect(runs()[0].remind).toBe('21:15');
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+    expect('remind' in runs()[0]).toBe(false);
+  });
+
+  it('notifications refused: the details say so and open the phone’s settings', () => {
+    const b = fakeBridge({ allowed: false });
+    window.AndroidBridge = b;
+    ReadingPlanStore.put({ ...startCatalogPlan('bible-year', null, new Date()), remind: '07:30' });
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    expect(screen.getByText(/Notifications are off for this app/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
+    expect(b.planReminderSettings).toHaveBeenCalled();
+  });
+
+  it('a quiet plan asks once whether to keep its reminder; Turn it off drops it', () => {
+    const run = { ...startCatalogPlan('bible-year', null, daysAgo(10)), remind: '07:30' };
+    window.AndroidBridge = fakeBridge({ quiet: [run.id] });
+    ReadingPlanStore.put(run);
+    const first = render(<ReadingPlansScreen {...base()} />);
+    expect(screen.getByText('Keep the daily reminder for Bible in a Year?')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Turn it off' }));
+    expect('remind' in runs()[0]).toBe(false);
+    first.unmount();
+    ReadingPlanStore.put({ ...runs()[0], remind: '07:30', updated: run.updated });
+    render(<ReadingPlansScreen {...base()} />);
+    expect(screen.queryByText(/Keep the daily reminder/)).toBeNull();     // asked once for this quiet stretch
+  });
+
+  it('the app hands the native side the running plans on each change, and a tapped reminder opens its plan', async () => {
+    const b = fakeBridge();
+    b.opened = 'none-yet';
+    window.AndroidBridge = b;
+    const run = { ...startCatalogPlan('bible-year', null, new Date()), remind: '06:45' };
+    const openPlans = vi.fn();
+    function App() { usePlanReminders(openPlans); return null; }
+    const cold = render(<App />);
+    expect(openPlans).toHaveBeenCalledTimes(1);                               // the tap that cold-started the app
+    expect(takePlanOpen()).toBe('none-yet');
+    cold.unmount();
+    render(<><App /><ReadingPlansScreen {...base()} /></>);
+    act(() => { ReadingPlanStore.put(run); });
+    expect(b.sent.at(-1).plans.map((p) => [p.id, p.time, p.name])).toEqual([[run.id, '06:45', 'Bible in a Year']]);
+    act(() => { ReadingPlanStore.put({ ...run, status: 'stopped', updated: Date.now() }); });
+    expect(b.sent.at(-1).plans).toEqual([]);                                   // a stopped plan drops its reminder
+    act(() => { ReadingPlanStore.put({ ...run, updated: Date.now() }); });
+    expect(screen.queryByRole('button', { name: 'Stop Bible in a Year' })).toBeNull();
+    act(() => { window.__votPlanReminderOpen(run.id); });                     // a later tap while the page runs
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Stop Bible in a Year' })).toBeTruthy());
+    expect(openPlans).toHaveBeenCalledTimes(2);
   });
 });

@@ -3207,6 +3207,12 @@
     .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
     .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
     .plans-detail-links { display:flex; flex-wrap:wrap; justify-content:center; gap:0 1.25rem; margin-top:0.6rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
+    /* rp-s1: the daily reminder's offer, its quiet ask, and its time in the details */
+    .plans-remind-ask { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-remind { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 1rem; margin-top:0.6rem; padding-top:0.5rem; border-top:1px solid var(--gold-border); }
+    .plans-remind-time { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem 0.6rem; color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-remind-time input { min-height:44px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:var(--cream); font:inherit; }
+    .plans-remind .plans-note { flex-basis:100%; margin:0; }
     /* mw18 C3/C4/C6: behind, its two ways back, a new pace, marking a day (mockup r1-behind.png) */
     .plans-behind { margin-top:0.8rem; padding-top:0.7rem; border-top:1px solid var(--gold-border); }
     .plans-behind-title { margin:0; color:var(--cream); font-size:var(--fs-20); font-weight:400; }

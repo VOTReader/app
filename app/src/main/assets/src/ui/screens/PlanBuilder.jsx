@@ -47,10 +47,10 @@ function Stepper({ label, value, min, step, unit, onChange }) {
 }
 
 /**
- * @param {{ step: 1 | 2, onStep: (s: 0 | 1 | 2) => void, lettersReady: boolean }} props
- *   step 0 closes the builder (back on the Plans screen)
+ * @param {{ step: 1 | 2, onStep: (s: 0 | 1 | 2) => void, lettersReady: boolean, onStarted?: (run: any) => void }} props
+ *   step 0 closes the builder (back on the Plans screen); onStarted hears the run it began
  */
-export function PlanBuilder({ step, onStep, lettersReady }) {
+export function PlanBuilder({ step, onStep, lettersReady, onStarted }) {
   const [tab, setTab] = React.useState(/** @type {'bible' | 'letters'} */ ('bible'));
   const [picks, setPicks] = React.useState(/** @type {Pick[]} */ ([]));
   const [open, setOpen] = React.useState(/** @type {string | null} */ (null));
@@ -121,7 +121,9 @@ export function PlanBuilder({ step, onStep, lettersReady }) {
 
   const start = () => {
     if (!preview) return;
-    saveRun(newRun(spec, new Date()));
+    const run = newRun(spec, new Date());
+    saveRun(run);
+    if (onStarted) onStarted(run);
     onStep(0);
   };
 

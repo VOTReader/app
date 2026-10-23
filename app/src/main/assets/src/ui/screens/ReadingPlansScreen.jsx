@@ -19,13 +19,18 @@
 
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
-import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate } from '../../utils/plan-runs-view.js';
+import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate, takePlanOpen, onPlanOpenAsk } from '../../utils/plan-runs-view.js';
+import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, lastActive, isReminderTime } from '../../utils/plan-reminder.js';
 import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
 import { monthCells, dayItems, newRun, dayNum, weeksOnPlan, markOn, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const GROUPS = [['bible', 'The Bible'], ['letters', 'The Letters'], ['starter', 'Short starts']];
+const QUIET_ASKED = 'vot-plan-quiet-asked';
+const REMIND_AT = '07:30';
+/** '07:30' as '7:30 AM' (the phone's own clock style is not known to the page). @param {string} t */
+const clockTime = (t) => { const [h, m] = t.split(':').map(Number); return (h % 12 || 12) + ':' + String(m).padStart(2, '0') + (h < 12 ? ' AM' : ' PM'); };
 
 /** @param {{ done: boolean }} props */
 function Check({ done }) {
@@ -174,7 +179,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   const seq = useVolumesSeq(true);
   const now = useNow();
   const [stopping, setStopping] = React.useState(/** @type {string | null} */ (null));
-  const [open, setOpen] = React.useState(/** @type {string | null} */ (null));
+  const [open, setOpen] = React.useState(/** @type {() => string | null} */ (takePlanOpen));
   const [picking, setPicking] = React.useState(false);
   const [pacing, setPacing] = React.useState(/** @type {string | null} */ (null));
   const [building, setBuilding] = React.useState(/** @type {0 | 1 | 2} */ (0));
@@ -187,7 +192,45 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   /** @param {string} id @param {any} [opt] */
   const start = (id, opt) => {
     const r = startCatalogPlan(id, letterSource(), new Date(), opt);
-    if (r) { saveRun(r); setStatus(''); setPicking(false); } else setStatus('Loading the Volumes… try again in a moment.');
+    if (r) { saveRun(r); setStatus(''); setPicking(false); if (remindable) setOffer(r.id); } else setStatus('Loading the Volumes… try again in a moment.');
+  };
+  // rp-s1: a tapped reminder opens its plan's details, also while this screen shows.
+  React.useEffect(() => onPlanOpenAsk((id) => { takePlanOpen(); setOpen(id); setMonthShift(0); }), []);
+  // rp-s1: the daily reminder (the Android app only), offered once as a plan starts; its time is kept per plan in the
+  // details. A plan untouched for 7 days goes quiet, and the screen asks once whether to keep its reminder.
+  const remindable = reminderSupported();
+  const [offer, setOffer] = React.useState(/** @type {string | null} */ (null));
+  const [notify, setNotify] = React.useState(() => reminderStatus());
+  React.useEffect(() => {
+    if (!remindable) return undefined;
+    // Back from the phone's settings: whether notifications are allowed may have changed.
+    const back = () => { if (document.visibilityState === 'visible') setNotify(reminderStatus()); };
+    document.addEventListener('visibilitychange', back);
+    return () => document.removeEventListener('visibilitychange', back);
+  }, [remindable]);
+  /** Turn the reminder on (the phone asks for notifications the first time). @param {any} plan @param {string} time */
+  const remindAt = (plan, time) => {
+    saveRun({ ...plan, remind: time, updated: Date.now() });
+    setOffer(null);
+    askForReminders(() => setNotify(reminderStatus()));
+  };
+  /** @param {any} plan */
+  const remindOff = (plan) => { const { remind: _off, ...rest } = plan; saveRun({ ...rest, updated: Date.now() }); };
+  const [quietAsked, setQuietAsked] = React.useState(() => {
+    try { const v = JSON.parse(localStorage.getItem(QUIET_ASKED) || '[]'); return Array.isArray(v) ? v : []; } catch (_e) { return []; }
+  });
+  /** One ask per quiet stretch: the plan and the day it was last touched. @param {any} plan */
+  const quietMark = (plan) => plan.id + '@' + lastActive(plan);
+  /** @param {any} plan */
+  const isQuiet = (plan) => !!(remindable && plan.remind && notify && notify.quiet.includes(plan.id) && !quietAsked.includes(quietMark(plan)));
+  /** @param {any} plan @param {boolean} keep */
+  const answerQuiet = (plan, keep) => {
+    const next = [...quietAsked, quietMark(plan)].slice(-20);
+    setQuietAsked(next);
+    try { localStorage.setItem(QUIET_ASKED, JSON.stringify(next)); } catch (_e) { /* asked again next time */ }
+    setNotify((n) => (n ? { ...n, quiet: n.quiet.filter((x) => x !== plan.id) } : n));
+    // Keeping it is a saved change, which wakes the reminder; no drops it.
+    if (keep) saveRun({ ...plan, updated: Date.now() }); else remindOff(plan);
   };
   const src = lettersIn ? letterSource() : null;
   // S5: a reflection note for the day, kept in the Journal and opened again from the day (run.notes[day] = its id).
@@ -232,7 +275,8 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
     return (
       <ScreenLayout navChildren={LibraryNav({ onBack: () => setBuilding(building === 2 ? 1 : 0), backLabel: 'Reading plans', showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}>
         <div className="plans-screen">
-          <PlanBuilder step={building} onStep={setBuilding} lettersReady={lettersIn} />
+          <PlanBuilder step={building} onStep={setBuilding} lettersReady={lettersIn}
+            onStarted={(r) => { if (remindable) setOffer(r.id); }} />
         </div>
       </ScreenLayout>
     );
@@ -337,6 +381,23 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                   <button type="button" className="today-link" aria-expanded={details} onClick={() => setOpen(plan.id)}>Catch up</button>
                 </div>
               ) : null}
+              {offer === plan.id && !plan.remind ? (
+                <div className="plans-remind-ask" role="group" aria-label="Daily reminder">
+                  <span>{'A reminder each day at ' + clockTime(REMIND_AT) + '?'}</span>
+                  <div className="plans-links">
+                    <button type="button" className="today-link" onClick={() => remindAt(plan, REMIND_AT)}>Yes, remind me</button>
+                    <button type="button" className="today-link" onClick={() => setOffer(null)}>No thanks</button>
+                  </div>
+                </div>
+              ) : isQuiet(plan) ? (
+                <div className="plans-remind-ask" role="group" aria-label="Daily reminder">
+                  <span>{'Keep the daily reminder for ' + row.name + '?'}</span>
+                  <div className="plans-links">
+                    <button type="button" className="today-link" onClick={() => answerQuiet(plan, true)}>Keep it</button>
+                    <button type="button" className="today-link" onClick={() => answerQuiet(plan, false)}>Turn it off</button>
+                  </div>
+                </div>
+              ) : null}
               <div className="plans-foot">
                 <span className="plans-counts">{row.counts + (row.behind > 0 || !row.pace ? '' : ' · ' + row.pace)}</span>
                 <button type="button" className="today-link" aria-expanded={details} onClick={() => { setOpen(details ? null : plan.id); setMonthShift(0); }}>Plan details</button>
@@ -384,6 +445,28 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                   </div>
                   {row.behind > 0 && !row.paused ? <Behind plan={plan} row={row} now={now} /> : null}
                   {pacing === plan.id ? <PaceChoices plan={plan} now={now} onDone={() => setPacing(null)} /> : null}
+                  {remindable && !row.finished ? (
+                    <div className="plans-remind">
+                      {plan.remind ? (
+                        <>
+                          <label className="plans-remind-time">
+                            <span>Reminder each day at</span>
+                            <input type="time" value={plan.remind}
+                              onChange={(e) => { if (isReminderTime(e.target.value)) saveRun({ ...plan, remind: e.target.value, updated: Date.now() }); }} />
+                          </label>
+                          <button type="button" className="today-link" onClick={() => remindOff(plan)}>Turn off</button>
+                        </>
+                      ) : (
+                        <button type="button" className="today-link" onClick={() => remindAt(plan, REMIND_AT)}>Remind me each day</button>
+                      )}
+                      {plan.remind && notify && !notify.allowed ? (
+                        <p className="plans-note">
+                          {'Notifications are off for this app, so the reminder can’t show. '}
+                          <button type="button" className="today-link" onClick={() => openReminderSettings()}>Open settings</button>
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {stopping === plan.id ? (
                     <ConfirmStrip question={'Stop ' + row.name + '? Your reading stays marked.'} yesLabel="Yes, stop"
                       onCancel={() => setStopping(null)}
