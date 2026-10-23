@@ -403,7 +403,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // on (a pick, Escape, the clear button) and open again once it changes. A flag
   // reset on every query change reopened them on the pick itself, which changes
   // the query (search audit 2026-09-27).
-  const [dismissedFor, setDismissedFor] = React.useState(/** @type {string|null} */ (null));
+  /* A search Back resumes opens with them closed (search200 bugcheck #1): the list it was read from is the answer,
+     and the closed-for query did not survive the remount, so they opened over it. */
+  const [dismissedFor, setDismissedFor] = React.useState(/** @type {string|null} */ (resumed ? query : null));
   // The option the arrow keys are on (search200 B3), -1 for none: the box keeps the focus, and names it.
   const [activeSug, setActiveSug] = React.useState(-1);
   React.useEffect(() => {

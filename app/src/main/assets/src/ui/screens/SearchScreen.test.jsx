@@ -1931,6 +1931,24 @@ describe('SearchScreen (search200 UX, track B)', () => {
     act(() => { tapOn(); });
     expect(onSelect).toHaveBeenCalledWith(expect.objectContaining({ doc: expect.objectContaining({ title: 'v7-0' }) }), ['mourn'], 'those who mourn', ['those', 'who']);
   });
+  /* search200 bugcheck #1: Back from a result reopened the search's suggestions over its list (the closed-for
+     query did not survive the remount, and the box's focus on mount opened them too). A resumed search opens with
+     them closed; a changed query opens them as before. */
+  it('bugcheck #1: Back to a search keeps its suggestions closed until the query changes', async () => {
+    psalmSuggest();
+    searchReturns({ results: letters('v1', 3) });
+    const r = await typeIn(baseProps(), 'psa');
+    r.unmount();
+    const back = render(<SearchScreen {...baseProps()} query="psa" />);
+    await commit();
+    expect(listOpen(), 'closed on the resumed search').toBe(false);
+    act(() => { box().focus(); });
+    expect(listOpen(), 'the box focused on the resumed search').toBe(false);
+    back.rerender(<SearchScreen {...baseProps()} query="psal" />);
+    await commit();
+    expect(listOpen(), 'open again once the query changes').toBe(true);
+  });
+
 });
 
 describe('SearchScreen (search200 UX, track D)', () => {
