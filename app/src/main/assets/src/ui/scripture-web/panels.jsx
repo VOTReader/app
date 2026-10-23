@@ -87,8 +87,9 @@ export function TipChip({ info, viewport, inset }) {
  * focus in on open, Tab kept inside, focus handed back to where the reader
  * was (the ? button) on close. Escape and Back close it through
  * closeTopOverlay, the same as the docked panel. */
-/** "How to read this web": four short lines, five with the go-to, each pointing at something the
- * screen has (digest items 22, 23). The "+" button, the ruler on the left and the bar that
+/** "How to read this web": seven short lines, eight with the go-to, each pointing at something the
+ * screen has (digest items 22, 23; the count numbers, the bold names, the zoom to the words, Filters,
+ * the held name and My Web added 2026-10-23, ideas audit A10.1). The "+" button, the ruler on the left and the bar that
  * jumped are gone, so the card no longer names them; the legend says what the colours are, and the
  * first line what an arch's height is (C22, w3 review).
  * The footer carries the OpenBible.info credit (Q5). `canSearch`: the go-to's button is there.
@@ -123,11 +124,14 @@ export function HowToReadGuide({ onClose, canSearch, credit, mode, home }) {
           </ul>
         ) : (
           <ul className="sw-guide-body">
-            <li><strong>Pinch</strong> or scroll to zoom. The farther apart two verses, the taller their arch: drag down to look higher.</li>
+            <li><strong>Pinch</strong> or scroll to zoom, all the way down to each verse&rsquo;s words.</li>
+            <li>The farther apart two verses, the taller their arch: drag down to look higher.</li>
             <li>Tap a thread to read both ends. Its votes are readers&rsquo; votes for how strong the link is.</li>
-            <li>A gold tick under the baseline marks a verse the Volumes cite.</li>
+            <li>A number where threads meet counts them; tap it to fan them out.</li>
+            <li>Bold names are the major books; a gold tick under the baseline marks a verse the Volumes cite.</li>
+            <li><strong>Filters</strong> narrows the web; hold a book&rsquo;s name to keep only its threads.</li>
             {canSearch ? <li><strong>Go to</strong> (the magnifier at the top, or /) jumps to a book, chapter or verse.</li> : null}
-            <li><strong>Reset</strong> brings the whole web back.</li>
+            <li><strong>Reset</strong> brings the whole web back; <strong>My Web</strong>, in More, draws your own links.</li>
           </ul>
         )}
         <p className="sw-guide-foot">{credit || WEB_CREDIT}</p>

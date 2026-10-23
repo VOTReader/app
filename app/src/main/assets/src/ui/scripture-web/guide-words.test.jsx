@@ -33,17 +33,17 @@ const lines = (card) => [...card.querySelectorAll('li')].map((li) => li.textCont
 
 afterEach(cleanup);
 
-describe('How to read this web: four or five short lines about controls that exist', () => {
+describe('How to read this web: seven or eight short lines about controls that exist', () => {
   /* w4 quality hunt: the line called the control "Search", which everywhere else is Go to (its
      aria-label, its tooltip "Go to ( / )", the dialog, the key help). This test pinned the word
      "search"; its intent, the go-to's line comes only with the go-to, now pins the control's name. */
-  it('four lines without the go-to, five with it; the Go to line comes only with the go-to, by its own name', () => {
+  it('seven lines without the go-to, eight with it; the Go to line comes only with the go-to, by its own name', () => {
     const without = lines(guide());
-    expect(without).toHaveLength(4);
+    expect(without).toHaveLength(7);
     expect(without.join(' ')).not.toMatch(/go to|search/i);
     cleanup();
     const withSearch = lines(guide({ canSearch: true }));
-    expect(withSearch).toHaveLength(5);
+    expect(withSearch).toHaveLength(8);
     expect(withSearch.filter((s) => /\bGo to\b/.test(s) && /book, chapter or verse/.test(s))).toHaveLength(1);
     expect(withSearch.join(' ')).not.toMatch(/search/i);
   });
@@ -61,6 +61,18 @@ describe('How to read this web: four or five short lines about controls that exi
     expect(text).toMatch(/tap a thread/i);
     expect(text).toMatch(/gold ticks?\b[^.]*\bVolumes\b/i);
     expect(text).toMatch(/\bReset\b/);
+  });
+
+  // ideas audit A10.1 (2026-10-23): the card left out what the numbers count, the bold names, the
+  // zoom down to the words, Filters, the held name and where My Web is
+  it('says what a count number is, what bold names mark, that zoom reaches the words, Filters, a held name, My Web in More', () => {
+    const text = lines(guide()).join(' ');
+    expect(text).toMatch(/number where threads meet counts them/);
+    expect(text).toMatch(/Bold names are the major books/);
+    expect(text).toMatch(/zoom, all the way down to each verse’s words/);
+    expect(text).toMatch(/Filters narrows the web/);
+    expect(text).toMatch(/hold a book’s name to keep only its threads/);
+    expect(text).toMatch(/My Web, in More, draws your own links/);
   });
 
   it("says what an arch's height means, once: the farther apart its verses, the taller (C22, w3 review)", () => {
@@ -139,7 +151,7 @@ describe('the guide reads in browse mode (w4 quality hunt)', () => {
     const doc = card.querySelector('[role="document"]');
     expect(doc).not.toBeNull();
     expect(doc.querySelector('.sw-guide-title')).not.toBeNull();
-    expect(doc.querySelectorAll('li').length).toBe(5);
+    expect(doc.querySelectorAll('li').length).toBe(8);
     expect(doc.querySelector('.sw-guide-foot').textContent).toBe(WEB_CREDIT);
     expect(doc.contains(card.querySelector('.sw-guide-close'))).toBe(false);
   });
