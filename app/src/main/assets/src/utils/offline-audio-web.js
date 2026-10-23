@@ -41,6 +41,8 @@ const RELEASE = /^https:\/\/github\.com\/VOTReader\/votreader-assets\/releases\/
 /** Size lookups in flight at once (a Bible book asks for up to 150). */
 const SIZE_LOOKUPS = 4;
 const PROGRESS_MS = 250;
+/** What is saved, kept beside the cache and read synchronously at boot (section 7 item 18). Not in backups. */
+const INDEX_KEY = 'vot.offlineAudioIndex';
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
 
@@ -54,6 +56,8 @@ let _active = null;
 let _unhookGate = null;
 let _free = -1;
 let _loaded = false;
+/** The index has been read into _items (the cache may not have been yet). */
+let _seeded = false;
 /** @type {Promise<void> | null} */
 let _loading = null;
 let _persistAsked = false;
@@ -116,6 +120,31 @@ async function _estimate() {
 /** @param {string | null} v */
 const _dec = (v) => { try { return v ? decodeURIComponent(v) : ''; } catch (_e) { return ''; } };
 
+/** Write what is saved to the index (after every change, and once the cache has been read). */
+function _writeIndex() {
+  try { localStorage.setItem(INDEX_KEY, JSON.stringify([..._items.values()])); } catch (_e) { /* storage off or full */ }
+}
+
+/**
+ * What the index says is saved, synchronously: reading the cache takes a moment at a cold start (one match per
+ * recording), and until it had, nothing looked saved and a saved row's Play offline said it needed a connection
+ * (downloads brief 2026-10-23, section 7 item 18). The cache stays the truth: _load replaces this with what it holds.
+ */
+function _seed() {
+  if (_seeded || _loaded) return;
+  _seeded = true;
+  try {
+    const raw = localStorage.getItem(INDEX_KEY);
+    const list = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(list)) return;
+    for (const it of list) {
+      if (it && typeof it.url === 'string' && _release(it.url) && !_items.has(it.url)) {
+        _items.set(it.url, { url: it.url, key: String(it.key || ''), title: String(it.title || ''), bytes: Number(it.bytes) || 0, savedAt: Number(it.savedAt) || 0 });
+      }
+    }
+  } catch (_e) { /* no index, or a broken one: the cache read fills in */ }
+}
+
 /** Read what the cache holds (once), then tell the page its state is ready. */
 function _load() {
   if (_loading) return _loading;
@@ -124,12 +153,16 @@ function _load() {
       const cache = await caches.open(OFFLINE_AUDIO_CACHE);
       /** @type {Map<string, SavedItem>} */
       const items = new Map();
-      for (const req of await cache.keys()) {
-        const res = await cache.match(req);
+      // All at once, and the storage estimate beside them: one after another this was a moment per recording.
+      const [entries] = await Promise.all([
+        cache.keys().then((reqs) => Promise.all(reqs.map((req) => cache.match(req).then((res) => /** @type {[string, Response | undefined]} */ ([req.url, res]))))),
+        _estimate(),
+      ]);
+      for (const [url, res] of entries) {
         if (!res) continue;
         const h = res.headers;
-        items.set(req.url, {
-          url: req.url,
+        items.set(url, {
+          url,
           key: _dec(h.get('X-Vot-Key')),
           title: _dec(h.get('X-Vot-Title')),
           bytes: Number(h.get('X-Vot-Bytes')) || 0,
@@ -137,8 +170,8 @@ function _load() {
         });
       }
       _items = items;
-      await _estimate();
-    } catch (_e) { /* no cache here (a private window): nothing is saved */ }
+      _writeIndex();
+    } catch (_e) { /* no cache here (a private window): nothing is saved */ _items = new Map(); }
     _loaded = true;
     // 'checked', not 'done': the mirror re-reads either way, but a 'done' with nothing downloading told a screen
     // reader "Download finished" at every boot whose first screen had a download control.
@@ -234,6 +267,7 @@ async function _next() {
     if (ctl.signal.aborted) throw new Error('cancelled');
     if (job.bytes !== total) { reason = 'short'; throw new Error('short'); }
     _items.set(it.url, { url: it.url, key: it.key, title: it.title, bytes: total, savedAt });
+    _writeIndex();
     await _estimate();
     _active = null;
     _emit({ type: 'done', url: it.url });
@@ -257,9 +291,13 @@ async function _next() {
 /** The phone app's bridge, as a browser keeps it. */
 export const WebOfflineAudio = {
   supported,
-  /** @returns {string | null} the whole state as JSON, null until the cache has been read */
+  /** @returns {string | null} the whole state as JSON (from the index until the cache has been read), null with neither */
   offlineAudioState() {
-    if (!_loaded) { _load(); return null; }
+    if (!_loaded) {
+      _seed();
+      _load();
+      if (!_items.size) return null;
+    }
     return JSON.stringify(_state());
   },
   /** @param {string} json [{ url, key, title }] */
@@ -290,6 +328,7 @@ export const WebOfflineAudio = {
     const gone = urls.includes('*') ? [..._items.keys()] : urls.filter((u) => _items.has(u));
     if (!gone.length) return;
     for (const u of gone) _items.delete(u);
+    _writeIndex();
     (async () => {
       try {
         const cache = await caches.open(OFFLINE_AUDIO_CACHE);
@@ -358,10 +397,10 @@ export const WebOfflineAudio = {
     if (_active) _active.ctl.abort();
     if (_unhookGate) _unhookGate();
     _unhookGate = null;
-    _items = new Map(); _queue = []; _active = null; _free = -1; _loaded = false; _loading = null; _persistAsked = false; _persisted = null;
+    _items = new Map(); _queue = []; _active = null; _free = -1; _loaded = false; _seeded = false; _loading = null; _persistAsked = false; _persisted = null;
   },
 };
 
 // Read what is saved as the app starts: the player's offline check is synchronous, and a cold start with no signal
 // must already know a saved recording on the first tap.
-if (supported()) _load();
+if (supported()) { _seed(); _load(); }

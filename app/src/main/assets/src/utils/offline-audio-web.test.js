@@ -46,6 +46,7 @@ beforeEach(() => {
   define(globalThis, 'fetch', fetchMock);
   define(navigator, 'serviceWorker', { controller: { scriptURL: SW_URL } });
   define(navigator, 'storage', { estimate: async () => ({ quota: 1e9, usage: 1e6 }), persist: vi.fn(async () => true) });
+  try { localStorage.clear(); } catch (_e) { /* no storage */ }
   WebOfflineAudio._reset();
   OfflineAudio._reset();
 });
@@ -127,9 +128,46 @@ describe('offline-audio-web (cf1)', () => {
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
     WebOfflineAudio._reset();
     OfflineAudio._reset();
-    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);          // not read yet
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
     expect(OfflineAudio.items()[0]).toEqual(expect.objectContaining({ key: 'two:b', title: 'Título “quoted”', bytes: 5000 }));
+  });
+
+  // Downloads brief 2026-10-23 section 7 item 18: the cache was read one entry at a time at a cold start, so for a
+  // moment nothing looked saved (Play on a saved row offline said "needs a connection").
+  it('what was saved looks saved at the first look after a reload, before the cache is read', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('b'), key: 'two:b', title: 'B' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true);
+    expect(WebOfflineAudio.srcFor(URL_OF('b'))).toBe('https://votreader.github.io/app/offline-audio/audio-v1/b.mp3');
+    expect(OfflineAudio.items()[0]).toEqual(expect.objectContaining({ key: 'two:b', title: 'B', bytes: 5000 }));
+  });
+
+  it('a recording the browser cleared from the cache stops looking saved once the cache is read', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('b'), key: 'two:b', title: 'B' }, { url: URL_OF('c'), key: 'two:c', title: 'C' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('c'))).toBe(true));
+    await (await caches.open(OFFLINE_AUDIO_CACHE)).delete(URL_OF('b'));   // evicted under storage pressure
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true);              // the index still says so for a moment
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false));
+    expect(OfflineAudio.isSaved(URL_OF('c'))).toBe(true);
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);             // and the index learned it
+  });
+
+  it('a removed recording does not look saved after a reload', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('b'), key: 'two:b', title: 'B' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
+    OfflineAudio.remove([URL_OF('b')]);
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);
   });
 
   it('a cut-off download is failed and nothing half-saved stays', async () => {

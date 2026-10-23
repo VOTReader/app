@@ -8,7 +8,7 @@ import { answersEndpointForUrl, answersLinkForUrl, openAnswersLink } from '../..
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { blockReadText } from '../../utils/segment-dom-text.js';
-import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
+import { LetterListenRow, LetterSongsCard, LetterAudioLinks } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '../../utils/landing-mark.js';
 import { FindInUnit } from '../components/FindInUnit.jsx';
@@ -645,17 +645,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               {/* Songs of the Letters (L4): in-app songs sit above the external ↗ Audio / Video links. */}
               {!studyMode ? <LetterSongsCard volKey={volKey} letterId={letter.id} letterTitle={letter.title} showSongs={showSongs} /> : null}
 
-              {(letter.audioUrl || letter.soundcloudUrl) && (
-                <div className="related-card">
-                  <div className="related-card-title">Audio</div>
-                  {letter.audioUrl && (
-                    <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer">♪ Audio Recording</a>
-                  )}
-                  {letter.soundcloudUrl && (
-                    <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer">♪ Listen on SoundCloud</a>
-                  )}
-                </div>
-              )}
+              <LetterAudioLinks letter={letter} />
 
               {/* C2-C [C5]: the presence guard its four siblings above all
                   have. Without it this card rendered on EVERY letter — the
