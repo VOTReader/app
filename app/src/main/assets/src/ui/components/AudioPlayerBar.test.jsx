@@ -15,6 +15,7 @@
    because the bar subscribes through useSyncExternalStore. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 
@@ -113,6 +114,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   AudioPlayer.stop();
+  _resetToasts();   // a Close's Undo toast lives in document.body, outside cleanup's reach (shuffle seed 20261023)
   modalRegistry._reset();
   const arbiter = globalThis.__votAudioArbiter;
   if (typeof arbiter === 'function') document.removeEventListener('play', arbiter, true);

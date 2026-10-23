@@ -7,6 +7,7 @@
    phone's free space. "On this phone" lists every download with its size and a Remove, and Remove all asks first.
    Only in the Android app: on the web the store is unavailable and none of this renders. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
 import { OfflineRowStatus, OfflineCollectionAction, formatBytes, useOfflineState } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
@@ -53,6 +54,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  _resetToasts();   // a Remove's Undo toast lives in document.body, outside cleanup's reach (shuffle seed 20261023)
   setOnline(true);
   for (const k of ['OfflineAudio', 'ScreenLayout', 'LibraryNav', 'AudioPlayer']) delete globalThis[k];
 });
