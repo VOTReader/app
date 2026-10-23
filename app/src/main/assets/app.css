@@ -4584,6 +4584,8 @@
     .srch-clear-btn:active { color:var(--gold); }
 
     .srch-section-label { padding:0.45rem 1rem 0.2rem; font-family:'Cinzel',serif; font-size:var(--fs-12); font-weight:inherit; letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+    .srch-section-head { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; }
+    .srch-clear-all { flex:0 0 auto; background:none; border:none; min-height:44px; min-width:44px; padding:0 1rem; font-family:var(--font-body); font-size:var(--fs-14); color:var(--gold-bright); cursor:pointer; }
     /* Book order's two lists on a passage search (sr13): the loose matches start under a rule, as Best Matches ends on one */
     .srch-loose-label, .srch-loose-more { border-top:2px solid var(--gold-border); margin-top:0.3rem; }
     .nav-search-btn { background:none; border:none; cursor:pointer; color:var(--gold); padding:0.5rem; display:flex; align-items:center; justify-content:center; border-radius:var(--radius); transition:color 0.2s; min-width:44px; min-height:44px; flex-shrink:0; }

@@ -1070,6 +1070,29 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(screen.getByText('mercy')).toBeTruthy();
   });
 
+  /* search200 audit 143: a Clear all beside the Recent label, asked once (ConfirmStrip), wired to the store's
+     clearRecentSearches; the per-chip remove was the only way to empty the list. */
+  it('143: Clear all empties the recent searches after one confirm', () => {
+    /** @type {any} */ (window).getRecentSearches = () => ['mercy', 'grace'];
+    const clear = vi.fn(() => []);
+    /** @type {any} */ (window).clearRecentSearches = clear;
+    try {
+      render(<SearchScreen {...baseProps()} settings={{ historyEnabled: true }} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Clear all recent searches' }));
+      expect(screen.getByText('Clear all recent searches?')).toBeTruthy();
+      expect(clear).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByText('Cancel'));
+      expect(screen.getByText('mercy')).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'Clear all recent searches' }));
+      fireEvent.click(screen.getByText('Yes, clear'));
+      expect(clear).toHaveBeenCalledTimes(1);
+      expect(screen.queryByText('mercy')).toBeNull();
+      expect(screen.queryByText('Recent')).toBeNull();
+    } finally {
+      delete /** @type {any} */ (window).clearRecentSearches;
+    }
+  });
+
   /* Recent searches dropped any query without two ASCII letters (sweep low, REPORT.md:647): a Greek or
      Hebrew word, typed and committed, was never kept. Letters and digits of any script count. */
   it('a committed query in another script is kept as a recent search', () => {
@@ -1668,6 +1691,9 @@ describe('SearchScreen (search200 UX, track B)', () => {
 
   it('B3: Enter closes the suggestions, keeps the search and lets the keyboard go; its key says "search"', async () => {
     psalmSuggest();
+    // A search that found something is kept (one that found nothing is not, audit 143).
+    /** @type {any} */ (window).VotSearchMini.search = () => Promise.resolve({
+      parsed: { kind: 'text' }, parsedTerms: ['psa'], results: [{ doc: { id: 'a', g: 'x', title: 'A', text: 'psa' }, score: 1 }] });
     const addRecentSearch = vi.fn(() => []);
     /** @type {any} */ (window).addRecentSearch = addRecentSearch;
     try {
@@ -1681,6 +1707,27 @@ describe('SearchScreen (search200 UX, track B)', () => {
       expect(addRecentSearch).toHaveBeenCalledWith('psa');
       act(() => { box().focus(); });
       expect(listOpen(), 'still closed for the query Enter closed it on').toBe(false);
+    } finally {
+      delete /** @type {any} */ (window).addRecentSearch;
+    }
+  });
+
+  /* search200 audit 143: a search that found nothing (no result, no reference card, no topic) is not kept as a
+     recent search: the chip only led back to "No results". */
+  it('143: a committed query that found nothing is not kept in Recent; one that found something is', async () => {
+    const add = vi.fn(() => []);
+    /** @type {any} */ (window).addRecentSearch = add;
+    try {
+      await typeIn({ ...baseProps(), settings: { historyEnabled: true } }, 'zzyzxqw');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(add, 'a dead query is not kept').not.toHaveBeenCalled();
+      cleanup();
+      /** @type {any} */ (window).VotSearchMini.search = () => Promise.resolve({
+        parsed: { kind: 'text' }, parsedTerms: ['mercy'],
+        results: [{ doc: { id: 'a', g: 'x', title: 'A', text: 'mercy' }, score: 1 }] });
+      await typeIn({ ...baseProps(), settings: { historyEnabled: true } }, 'mercy');
+      fireEvent.keyDown(box(), { key: 'Enter' });
+      expect(add).toHaveBeenCalledWith('mercy');
     } finally {
       delete /** @type {any} */ (window).addRecentSearch;
     }

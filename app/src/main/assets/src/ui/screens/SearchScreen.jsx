@@ -118,6 +118,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // W0 (micro-gap b): the recent-search query whose per-chip ✕ was tapped;
   // non-null swaps the chips row for a ConfirmStrip ("remove" vocabulary).
   const [confirmRecent, setConfirmRecent] = React.useState(null);
+  // search200 audit 143: true while "Clear all recent searches?" asks (the same ConfirmStrip swap).
+  const [confirmClearAll, setConfirmClearAll] = React.useState(false);
   const debounceRef = React.useRef(null);
 
   // Build the index on mount, for the reader's edition. The engine loads every
@@ -646,10 +648,13 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // Record a query as "recent" only on an explicit commit (Enter or tapping a
   // result) — never per keystroke. Needs >=2 letters or digits (any script: a Greek or Hebrew word
   // counted none under [a-z0-9] and was never kept, sweep low) + history enabled.
+  // A search done for this very text that found nothing (no result, no reference card, no topic) is not kept: its
+  // chip only led back to "No results" (search200 audit 143). One still running is kept, as before.
   const recordSearch = () => {
     if (settings.historyEnabled === false) return;
     const q = (query || '').trim();
     if (q.replace(/[^\p{L}\p{N}]/gu, '').length < 2) return;
+    if (isDone && answered === qTrim && !state.error && state.results.length === 0 && directEntries.length === 0 && !topic) return;
     if (typeof window.addRecentSearch === 'function') setRecents(window.addRecentSearch(q));
   };
 
@@ -693,8 +698,24 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     <>
       {settings.historyEnabled !== false && recents.length > 0 && (
         <>
-          <h2 className="srch-section-label">Recent</h2>
-          {confirmRecent != null ? (
+          <div className="srch-section-head">
+            <h2 className="srch-section-label">Recent</h2>
+            {confirmRecent == null && !confirmClearAll ? (
+              <button type="button" className="srch-clear-all" aria-label="Clear all recent searches"
+                onClick={() => setConfirmClearAll(true)}>Clear all</button>
+            ) : null}
+          </div>
+          {confirmClearAll ? (
+            <ConfirmStrip
+              question="Clear all recent searches?"
+              yesLabel="Yes, clear"
+              onCancel={() => setConfirmClearAll(false)}
+              onConfirm={() => {
+                if (typeof window.clearRecentSearches === 'function') setRecents(window.clearRecentSearches() || []);
+                setConfirmClearAll(false);
+              }}
+            />
+          ) : confirmRecent != null ? (
             /* W0 (micro-gap b): per-recent removal. Follows the
                ConfirmStrip convention — per-instance useId registration
                (back dismisses the confirm, not the screen), "remove"
