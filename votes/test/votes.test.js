@@ -46,7 +46,7 @@ describe('song votes (sync sy4)', () => {
   it('a like counts, and a clear takes it back', async () => {
     expect((await like('install-aaaaaaaaaaaa')).status).toBe(204);
     expect(await tallies()).toEqual({ [SONG]: [1, 1] });
-    await vote({ install: 'install-aaaaaaaaaaaa', song: SONG, v: 0, at: NOW + 1000 });
+    await vote({ install: 'install-aaaaaaaaaaaa', song: SONG, v: 0, at: NOW + 1000 }, '1.2.3.4', NOW + 1000);
     expect(await tallies()).toEqual({});
   });
 
@@ -81,10 +81,16 @@ describe('song votes (sync sy4)', () => {
 
   it('refuses a malformed vote and never accepts a thumbs-down', async () => {
     for (const bad of [{ install: 'x', song: SONG, v: 1, at: NOW }, { install: 'install-aaaaaaaaaaaa', song: 'nope', v: 1, at: NOW },
-      { install: 'install-aaaaaaaaaaaa', song: SONG, v: -1, at: NOW }, { install: 'install-aaaaaaaaaaaa', song: SONG, v: 1, at: NOW + 3600e3 }]) {
+      { install: 'install-aaaaaaaaaaaa', song: SONG, v: -1, at: NOW }]) {
       expect((await vote(bad)).status).toBe(400);
     }
     expect(await tallies()).toEqual({});
+  });
+
+  it('a phone whose clock runs fast still counts, at the server time', async () => {
+    expect((await like('install-aaaaaaaaaaaa', NOW + 3600e3)).status).toBe(204);
+    expect(await tallies()).toEqual({ [SONG]: [1, 1] });
+    expect(env.DB.raw.prepare('SELECT at FROM votes').get().at).toBe(NOW);
   });
 
   it('rate-limits one address', async () => {

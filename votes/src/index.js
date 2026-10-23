@@ -63,11 +63,14 @@ export async function handle(req, env, now = Date.now()) {
 
   let b;
   try { b = await req.json(); } catch { return new Response(null, { status: 400, headers: headers(req) }); }
-  const at = Number(b && b.at);
+  let at = Number(b && b.at);
   if (!b || !INSTALL.test(b.install) || !SONG.test(b.song) || (b.v !== 1 && b.v !== 0)
-      || !Number.isFinite(at) || at > now + 5 * 60 * 1000 || at < now - 90 * 24 * 3600 * 1000) {
+      || !Number.isFinite(at) || at < now - 90 * 24 * 3600 * 1000) {
     return new Response(null, { status: 400, headers: headers(req) });
   }
+  // a phone whose clock runs ahead still counts: its vote takes the server's time (the outbox sends only each
+  // song's latest state, so this cannot reorder one install's votes)
+  if (at > now) at = now;
   const iph = await hash(env.SALT, req.headers.get('CF-Connecting-IP') || '');
   const hour = Math.floor(now / 3600e3);
   const used = await env.DB.prepare(
