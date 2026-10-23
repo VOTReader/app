@@ -1949,6 +1949,35 @@ describe('SearchScreen (search200 UX, track B)', () => {
     expect(listOpen(), 'open again once the query changes').toBe(true);
   });
 
+  /* search200 bugcheck #2: a bare verse reference ("john 3:16") made a card saying only "John 3:16 / Open
+     chapter": the verse itself was nowhere on the screen. The card quotes the verse, in the reader's edition. */
+  it('bugcheck #2: a verse reference card quotes the verse in the reader\'s edition', async () => {
+    /** @type {any} */ (globalThis).SrchCard = ({ entry, isDirect }) => (isDirect ? <div className="stub-direct">{entry.__label + ' | ' + entry.__sub}</div> : null);
+    /** @type {any} */ (globalThis).resolveVerseText = (/** @type {any} */ x) => (x.bookId === 'john' && x.chapter === 3
+      ? ({ 16: 'For God so loved the world', 17: 'For God did not send His Son', 18: 'He who believes' })[x.verse] || '' : '');
+    /** @type {any} */ (globalThis).translateVerse = (/** @type {string} */ b, /** @type {number} */ c, /** @type {any} */ v, /** @type {string} */ t) => (t === 'kjv' ? 'KJV ' + v.text : v.text);
+    const direct = () => [...document.querySelectorAll('.stub-direct')].map((d) => d.textContent);
+    try {
+      searchReturns({ parsed: { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 16 } });
+      let r = await typeIn(baseProps(), 'john 3:16');
+      expect(direct()).toEqual(['John 3:16 | For God so loved the world']);
+      r.unmount();
+      r = await typeIn({ ...baseProps(), settings: { translation: 'kjv' } }, 'jn 3:16');
+      expect(direct(), 'the reader\'s edition').toEqual(['John 3:16 | KJV For God so loved the world']);
+      r.unmount();
+      searchReturns({ parsed: { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 16, verseEnd: 18 } });
+      r = await typeIn(baseProps(), 'john 3:16-18');
+      expect(direct(), 'a range quotes its first verses').toEqual(['John 3:16-18 | For God so loved the world For God did not send His Son He who believes']);
+      r.unmount();
+      searchReturns({ parsed: { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3 } });
+      await typeIn(baseProps(), 'john 3');
+      expect(direct(), 'a chapter is still a chapter').toEqual(['John 3 | Open chapter']);
+    } finally {
+      delete /** @type {any} */ (globalThis).resolveVerseText;
+      delete /** @type {any} */ (globalThis).translateVerse;
+    }
+  });
+
 });
 
 describe('SearchScreen (search200 UX, track D)', () => {

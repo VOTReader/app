@@ -6,6 +6,26 @@ import { kjvEncode } from '../../search/tokenize.js';
 import { applyCorrections } from '../../search/query-parse.js';
 import { foldReprints } from '../components/srch-reprints.js';
 import { cardPassage } from '../components/SrchCard.jsx';
+import { verseText } from '../../utils/scripture-web/panel-model.js';
+
+/** A verse reference card quotes at most this many verses of its range. */
+const REF_QUOTE_VERSES = 3;
+/**
+ * The words a Bible reference card quotes (search200 bugcheck #2): the verse, or a range's first verses, in the
+ * reader's edition; '' for a chapter, a range across chapters, or a Bible not yet loaded.
+ * @param {any} p  a ref-bible parse
+ * @param {string} translation
+ */
+function refQuote(p, translation) {
+  if (!p || p.kind !== 'ref-bible' || !p.verseStart || p.chapterEnd) return '';
+  const last = Math.min(p.verseEnd || p.verseStart, p.verseStart + REF_QUOTE_VERSES - 1);
+  const said = [];
+  for (let v = p.verseStart; v <= last; v++) {
+    const t = verseText({ bookId: p.bookId, chapter: p.chapter, verse: v }, translation);
+    if (t) said.push(t);
+  }
+  return said.join(' ') + (said.length && (p.verseEnd || p.verseStart) > last ? ' …' : '');
+}
 
 /**
  * SRCH4: build the snippet-highlight term list. SrchSnippet only marks the terms
@@ -691,7 +711,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       const lbl = p.bookTitle + ' ' + (p.chapterEnd && p.verseStart
         ? p.chapter + ':' + p.verseStart + '-' + p.chapterEnd + (p.verseEnd ? ':' + p.verseEnd : '')
         : p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : ''));
-      out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter', ref: p });
+      const quote = refQuote(p, settings.translation || 'nkjv');
+      out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: quote || (p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter'), ref: p });
     } else if (p.kind === 'ref-letter') {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
       for (const c of lr.cards) out.push({ __direct: true, __corpus: curCorpus, ...c });
@@ -700,7 +721,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     }
     return out;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- buildInfo.ready: the collections' letters load with the index, and the cards read them off window.
-  }, [navParsed, settings.searchCorpus, buildInfo.ready]);
+  }, [navParsed, settings.searchCorpus, settings.translation, buildInfo.ready]);
 
   // A letter reference to a letter that is not there says so, instead of a card that does nothing.
   const letterRefMissing = React.useMemo(() => {
