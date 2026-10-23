@@ -2523,6 +2523,8 @@ async function searchWords(query, options) {
   await ensureReady(options);
   await warmOriginals();
   await alignLexiconReady();
+  // a search the screen moved past while it waited to start stops here, not at its first page turn (search200 bugcheck #11)
+  if (options.signal && options.signal.aborted) return { parsed, results: [], aborted: true };
   // rebuild() dropped the index while this search waited (sweep 2026-10-14 v061): it waits for the new one
   if (!msIndex) return searchWords(query, options);
   /* A REFERENCE TYPED WITH WORDS (search200 fix1, ref-edge.js): "john 3 16 for god so loved the world" is the

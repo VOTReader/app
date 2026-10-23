@@ -60,6 +60,16 @@ describe('VotSearchMini engine', () => {
     expect(VotSearchMini.getStats().docCount).toBe(5); // 3 verses + 1 verse + 1 letter
   });
 
+  /* search200 bugcheck #11: a search the screen had moved past was checked only at the ranking's page turns,
+     never right after the waits at its start (the index, the originals, the lexicon): it ranked for nobody. */
+  it('a search aborted while it waited to start stops there, with nothing ranked', async () => {
+    const ac = new AbortController();
+    ac.abort();
+    const r = await VotSearchMini.search('shepherd', { signal: ac.signal });
+    expect(r.aborted).toBe(true);
+    expect(r.results).toEqual([]);
+  });
+
   /* One total budget let the Bible's verses crowd the letters out of the All
      corpus ("lord": 125 of 890 volume hits kept). perVolume caps each
      collection on its own, and the result says which ones it cut. */
