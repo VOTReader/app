@@ -157,6 +157,15 @@ describe('a named passage inside a longer query', () => {
     expect(await card('harbor vigil the gulls rested upon the long stone wall')).toMatchObject({ kind: 'named-passage', chapter: 3, text: 'harbor vigil the gulls rested upon the long stone wall' });
   });
 
+  /* search200 audit n218: spans holding more words than the longest name are skipped unfolded; a name inside a long
+     query, little words round it and inside it, is found as before */
+  it('a name inside a long query is read as before; spans longer than any name are not tried', async () => {
+    expect(await card('harbor vigil the keeper of the harbor sang over the gray water')).toMatchObject({ kind: 'named-passage', bookId: 'john', chapter: 3, verseStart: 1, verseEnd: 3 });
+    expect(await card('the harbor vigil the keeper of the harbor sang over the gray water john 3')).toMatchObject({ kind: 'ref-bible', chapter: 3 });
+    expect((await card('the keeper of the harbor sang over the gray water and the gulls rested upon the long stone wall in the harbor vigil')).kind).toBe('text');
+    expect((await card('the harbor vigil and the gulls rested upon the long stone wall and the keeper of the harbor sang over the gray water')).kind).toBe('text');
+  });
+
   it('a parallel telling of it, named by its book', async () => {
     expect(await card('walking on water in john')).toMatchObject({ kind: 'named-passage', bookId: 'john', chapter: 6, verseStart: 16, verseEnd: 21 });
   });

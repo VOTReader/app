@@ -274,11 +274,22 @@ function passagesByKey(list) {
   let byKey = PASSAGES_BY_KEY.get(list);
   if (!byKey) {
     byKey = new Map();
-    for (const np of list) for (const k of np.keys || []) { const pk = passageKey(k); if (pk && !byKey.has(pk)) byKey.set(pk, np); }
+    let most = 0;
+    for (const np of list) for (const k of np.keys || []) {
+      const pk = passageKey(k);
+      if (pk && !byKey.has(pk)) byKey.set(pk, np);
+      if (pk) most = Math.max(most, pk.split(' ').length);
+    }
     PASSAGES_BY_KEY.set(list, byKey);
+    KEY_WORDS_MOST.set(byKey, most);
   }
   return byKey;
 }
+/* A SPAN LONGER THAN ANY NAME IS NOT TRIED (search200 audit n218, s08.5). passageInside tried every span of a long
+   query, each one folded through passageKey: ~1.4 ms on a desktop for a 42-word quote. A span holding more of the
+   words passageKey keeps than the longest name has cannot be a name, so it is skipped before it is folded. */
+/** @type {WeakMap<Map<string, any>, number>} the most words a name of the list has, in passageKey's shape */
+const KEY_WORDS_MOST = new WeakMap();
 /** The passage and its parallel tellings. @param {any} np @returns {any[]} */
 function tellingsOf(np) {
   const keys = new Set((np.keys || []).map(passageKey));
@@ -317,10 +328,14 @@ function passageInside(query, opts, facts) {
   /** @type {{w: string, i: number}[]} each word and the typed token it is in */ const words = [];
   raw.forEach((t, i) => { for (const w of t.toLowerCase().replace(/['‘’]/g, '').split(/[^a-z0-9]+/)) if (w) words.push({ w, i }); });
   if (words.length < 2) return null;
+  const most = KEY_WORDS_MOST.get(byKey) || 0;
+  /** @type {number[]} kept[i]: how many of the first i words passageKey keeps */ const kept = [0];
+  for (const x of words) kept.push(kept[kept.length - 1] + (passageKey(x.w) ? 1 : 0));
   /** @type {{a: number, b: number, np: any}|null} */ let best = null;
   for (let a = 0; a < words.length; a++) {
     for (let b = words.length; b > a && (!best || b - a > best.b - best.a); b--) {
       if (b - a === words.length) continue;   // the whole query: parseReference's own reading
+      if (kept[b] - kept[a] > most) continue;   // more words than any name has
       const np = byKey.get(passageKey(words.slice(a, b).map((x) => x.w).join(' ')));
       if (np) best = { a, b, np };
     }
