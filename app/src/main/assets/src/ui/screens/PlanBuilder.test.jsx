@@ -1,0 +1,95 @@
+// @ts-nocheck - ScreenLayout / LibraryNav are free globals, as the other personal-study screens
+/* PlanBuilder (mw18): build your own plan from the Plans screen: pick any mix of Bible and letters, set the goal,
+   see each day's chapters, letters, words and minutes, start it. Corbin 2026-10-22: a mix shares each day side by
+   side by default, one after the other as the option. */
+import 'fake-indexeddb/auto';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, cleanup, fireEvent, screen, within, act } from '@testing-library/react';
+import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
+import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
+import { dayItems } from '../../data/plan-engine.js';
+
+const COL = { volKey: 'seven', readKey: 'volume-seven', label: 'Volume Seven', letterScreen: 'seven-letter' };
+const LETTERS = Array.from({ length: 4 }, (_, i) => ({ id: 'seven-' + (i + 1), title: 'Letter ' + (i + 1), paragraphs: [{ text: 'word '.repeat(600) }] }));
+
+beforeEach(() => {
+  globalThis.ScreenLayout = ({ children, navChildren }) => <main>{navChildren}{children}</main>;
+  globalThis.LibraryNav = ({ onBack, backLabel }) => <button type="button" onClick={onBack}>{'Back to ' + backLabel}</button>;
+  globalThis.ConfirmStrip = () => null;
+  globalThis.READING_CHAIN = ['seven'];
+  globalThis.COL_BY_KEY = new Map([['seven', COL]]);
+  globalThis.colLetterArr = () => LETTERS;
+  globalThis.colPreface = () => null;
+  localStorage.clear();
+  ReadingPlanStore._resetForTests({ forceLoaded: true });
+  globalThis.ReadingPlanStore = ReadingPlanStore;
+});
+afterEach(() => {
+  cleanup();
+  for (const k of ['ReadingPlanStore', 'READING_CHAIN', 'COL_BY_KEY', 'colLetterArr', 'colPreface']) delete globalThis[k];
+});
+
+const base = () => ({ readingPlans: [], isRead: () => false, markAsReadEnabled: true, onPlansMoved: vi.fn(), onRead: vi.fn(), onBack: vi.fn() });
+const open = () => { render(<ReadingPlansScreen {...base()} />); fireEvent.click(screen.getByRole('button', { name: /Build your own plan/ })); };
+
+describe('PlanBuilder', () => {
+  it('picks a few chapters, sets chapters a day, shows each day, and starts the plan', () => {
+    open();
+    expect(screen.getByRole('heading', { name: 'What do you want to read?' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Next' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Pick chapters of Genesis' }));
+    for (const c of [1, 2, 3, 4]) fireEvent.click(screen.getByRole('button', { name: 'Genesis ' + c }));
+    expect(screen.getByRole('checkbox', { name: /^Genesis/ }).getAttribute('aria-checked')).toBe('mixed');
+    expect(within(screen.getByRole('list', { name: 'Your picks' })).getByText('Genesis 1-4')).toBeTruthy();
+    expect(screen.getByText(/^4 chapters · about [\d,]+ words$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByRole('heading', { name: 'How do you want to read it?' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: /chapter or letter a day/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'More: chapters or letters a day' }));
+    const each = screen.getByRole('region', { name: 'Each day' });
+    expect(within(each).getByText('2 chapters')).toBeTruthy();
+    expect(within(each).getByText(/^Finishes .* · 2 reading days$/)).toBeTruthy();
+    act(() => { fireEvent.click(within(each).getByRole('button', { name: 'Start plan' })); });
+    const [run] = ReadingPlanStore.active();
+    expect(run.plan).toBe('custom');
+    expect(run.name).toBe('Genesis 1-4');
+    expect(dayItems(run, 0).map((it) => it.k)).toEqual(['genesis:1', 'genesis:2']);
+    expect(screen.getByRole('region', { name: 'Genesis 1-4' })).toBeTruthy();   // back on Plans, following it
+  });
+
+  it('mixes Bible and letters side by side by default, one after the other on request; Back steps back', () => {
+    open();
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Ruth/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'The Letters' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Volume Seven/ }));
+    expect(screen.getByText(/^4 chapters \+ 4 letters · about [\d,]+ words$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    const share = screen.getByRole('radiogroup', { name: 'Bible and letters on the same day?' });
+    expect(within(share).getByRole('radio', { name: /Side by side/ }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: /^In \d+ days/ }));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Number of days' }), { target: { value: '4' } });
+    expect(within(screen.getByRole('region', { name: 'Each day' })).getByText('1 chapter + 1 letter')).toBeTruthy();
+    fireEvent.click(within(share).getByRole('radio', { name: /One after the other/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Plan name' }), { target: { value: 'Ruth, then Seven' } });
+    // Back goes to step 1 with the picks kept, and forward again
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Reading plans' }));
+    expect(screen.getByRole('list', { name: 'Your picks' }).textContent).toMatch(/Ruth.*Volume Seven/);
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start plan' })); });
+    const [run] = ReadingPlanStore.active();
+    expect(run.name).toBe('Ruth, then Seven');
+    expect(run.share).toBe('serial');
+    expect(dayItems(run, 0).every((it) => !it.t)).toBe(true);
+    expect(dayItems(run, 3).every((it) => it.t)).toBe(true);
+  });
+
+  it('a whole testament is one tap, and taps again to clear', () => {
+    open();
+    const nt = screen.getByRole('checkbox', { name: /^New Testament/ });
+    fireEvent.click(nt);
+    expect(nt.getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByText(/^260 chapters · about [\d,]+ words$/)).toBeTruthy();
+    fireEvent.click(nt);
+    expect(screen.getByText('Nothing picked yet')).toBeTruthy();
+  });
+});

@@ -18,6 +18,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
+import { PlanBuilder } from './PlanBuilder.jsx';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate } from '../../utils/plan-runs-view.js';
 import { startCatalogPlan, planDef, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
 import { monthCells, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
@@ -175,6 +176,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   const [open, setOpen] = React.useState(/** @type {string | null} */ (null));
   const [picking, setPicking] = React.useState(false);
   const [pacing, setPacing] = React.useState(/** @type {string | null} */ (null));
+  const [building, setBuilding] = React.useState(/** @type {0 | 1 | 2} */ (0));
   const [status, setStatus] = React.useState('');
   const rows = plans.map((r) => runRow(r, now));
   const running = new Set(plans.map((p) => p.plan));
@@ -186,6 +188,16 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   };
   const src = lettersIn ? letterSource() : null;
   const collections = src ? LETTER_CHAIN.map((k) => src.colByKey.get(k)).filter(Boolean) : [];
+
+  if (building) {
+    return (
+      <ScreenLayout navChildren={LibraryNav({ onBack: () => setBuilding(building === 2 ? 1 : 0), backLabel: 'Reading plans', showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}>
+        <div className="plans-screen">
+          <PlanBuilder step={building} onStep={setBuilding} lettersReady={lettersIn} />
+        </div>
+      </ScreenLayout>
+    );
+  }
 
   return (
     <ScreenLayout navChildren={LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}>
@@ -349,6 +361,14 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
             </ul>
           </section>
         ))}
+        <button type="button" className="plans-row plans-build-row" onClick={() => setBuilding(1)}>
+          <svg className="plans-row-icon" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.3" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v8M8 12h8" /></svg>
+          <span className="plans-row-text">
+            <span className="plans-row-name">Build your own plan</span>
+            <span className="plans-row-sub">Pick any books and letters</span>
+          </span>
+          <svg className="plans-row-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
         <p className="plans-note">A day ticks when you read it through or listen to the end.</p>
         <p className="plans-note" role="status">{status}</p>
       </div>

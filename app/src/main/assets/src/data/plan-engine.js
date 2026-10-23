@@ -346,7 +346,7 @@ export function newRun(spec, now) {
   const startN = /** @type {number} */ (dayNum(startKey));
   let tracks = spec.tracks.filter((t) => t && Array.isArray(t.items) && t.items.length);
   if (spec.share === 'serial' && tracks.length > 1) {
-    tracks = [{ kind: 'mixed', by: 'words', items: tracks.flatMap((t) => t.items) }];
+    tracks = [{ kind: 'mixed', by: tracks.every((t) => t.by === 'count') ? 'count' : 'words', items: tracks.flatMap((t) => t.items) }];
   }
   const run = /** @type {PlanRun} */ ({
     id: spec.id || ('p_' + now.getTime().toString(36) + '_' + Math.random().toString(36).slice(2, 6)),

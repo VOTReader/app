@@ -3260,6 +3260,51 @@
     .plans-pick { display:flex; flex-wrap:wrap; gap:0.4rem; padding:0 0 0.7rem 2.6rem; }
     .plans-chip { min-height:44px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
     .plans-note:empty { display:none; }
+    /* mw18: Build your own plan (PlanBuilder.jsx; mockups r1-build-pick.png, r1-build-goal.png) */
+    .plans-build-row { margin-top:0.2rem; border-top:1px solid var(--gold-border); }
+    .plans-build .study-head .today-eyebrow { display:block; margin-bottom:0.3rem; }
+    .build-tabs { display:grid; grid-template-columns:1fr 1fr; margin:0.4rem 0 0.75rem; border:1px solid var(--gold-border); border-radius:8px; overflow:hidden; }
+    .build-tabs button { min-height:44px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
+    .build-tabs button[aria-selected="true"] { color:var(--gold); background:var(--gold-faint); box-shadow:inset 0 0 0 1px var(--gold); }
+    .build-list, .build-letters, .build-chips { list-style:none; margin:0; padding:0; }
+    .build-list > li + li { border-top:1px solid var(--gold-border); }
+    .build-row-wrap { display:flex; align-items:center; }
+    .build-row, .build-radio { display:flex; align-items:center; gap:0.8rem; width:100%; min-height:52px; padding:0.4rem 0.2rem; border:0; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); text-align:left; cursor:pointer; }
+    .build-row-text { display:flex; flex-direction:column; min-width:0; }
+    .build-row-name { color:var(--cream); }
+    .build-row-sub { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
+    .build-box { border-radius:5px; }
+    .build-box[data-done="some"] { background:linear-gradient(var(--gold), var(--gold)) center / 10px 2px no-repeat; }
+    .build-expand { flex:none; width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); cursor:pointer; }
+    .build-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(44px, 1fr)); gap:0.3rem; padding:0 0 0.7rem; }
+    .build-grid button { min-height:44px; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-15); cursor:pointer; }
+    .build-grid button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
+    .build-letters { padding:0 0 0.5rem 1.6rem; }
+    .build-letter { min-height:44px; font-size:var(--fs-15); }
+    .build-bar { position:sticky; bottom:0; z-index:2; margin:0.75rem -1rem 0; padding:0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--gold-border); background:var(--bg2); }
+    .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; }
+    .build-chip { display:inline-flex; align-items:center; gap:0.15rem; padding-left:0.7rem; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-size:var(--fs-14); }
+    .build-chip button { min-width:36px; min-height:36px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+    .build-bar-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+    .build-summary { color:var(--cream); font-size:var(--fs-15); }
+    .build-card { margin:0 0 0.75rem; padding:0.7rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
+    .build-card-title { margin:0 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
+    .build-goal { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.5rem; }
+    .build-goal .build-radio { width:auto; flex:1 1 12rem; }
+    .build-stepper { display:inline-flex; align-items:center; border:1px solid var(--gold-border); border-radius:8px; }
+    .build-stepper button { width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-20); cursor:pointer; }
+    .build-stepper button:disabled { opacity:0.4; cursor:default; }
+    .build-stepper-value { min-width:4.5rem; text-align:center; color:var(--cream); }
+    .build-input { min-height:44px; padding:0 0.6rem; border:1px solid var(--gold-border); border-radius:8px; background:var(--bg); color:var(--cream); font:inherit; font-size:var(--fs-16); color-scheme:dark; }
+    body.light .build-input { color-scheme:light; }
+    .build-goal input[type="number"] { width:6.5rem; }
+    .build-name { width:100%; box-sizing:border-box; }
+    .build-days { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; padding-top:0.3rem; }
+    .build-days button { min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .build-days button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); }
+    .build-each-main { margin:0.2rem 0 0.1rem; color:var(--gold); font-size:var(--fs-20); }
+    .build-each p { margin:0.1rem 0; }
+    .build-each .today-btn-wide { margin-top:0.8rem; }
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }
