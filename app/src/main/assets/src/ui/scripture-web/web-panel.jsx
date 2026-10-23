@@ -41,7 +41,7 @@
 import { ConnectionRow } from './connection-row.jsx';
 import {
   connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, openInReaderLabel,
-  verseEndpoint, verseTextFor, WHOLE_WEB, exitsWords,
+  verseEndpoint, verseTextFor, WHOLE_WEB, exitsWords, endsOf,
 } from '../../utils/scripture-web/describe.js';
 import {
   GROUP_ROWS, verseText, shortRef, connectionModel, verseModel, rangeModel, letterRows, zoomChapterOf, chapterName,
@@ -571,15 +571,24 @@ export function WebPanel(props) {
     );
   } else if (mode === 'chooser') {
     const rows = strongestFirst(choices || []);
+    // a thread's far end in its own words, so close threads tell apart by more than a reference
+    // (ideas audit A10.6): the end away from the tapped chapter, else the later one
+    const quoteOf = (/** @type {any} */ c) => {
+      if (c.kind !== 'arc') return '';
+      const near = (/** @type {number} */ v) => choiceChapter >= 0 && g.chapterOfVerse[v] === choiceChapter;
+      const end = near(c.from) && !near(c.to) ? c.b : near(c.to) && !near(c.from) ? c.a : endsOf(c)[1];
+      const text = verseText(end, translation);
+      return text ? end.label + ' ' + text : '';
+    };
     const arcs = rows.filter((r) => r.kind === 'arc').map((r) => r.index);
     body = (
       <React.Fragment>
         <PanelHead over="Connections here"
           title={choiceCut ? 'The ' + rows.length + ' nearest threads' : plural(rows.length, 'thread', 'threads') + ' close together'}
-          meta="Choose the one you meant. Strongest first." />
+          meta="Choose the one you meant. Strongest first, by readers’ votes." />
         <ul className="sw-rows sw-choice-list">
           {rows.map((c) => (
-            <ConnectionRow key={c.kind + c.index} title={connectionTitle(c)} text={connectionMeta(c)} mainClass="sw-choice-row"
+            <ConnectionRow key={c.kind + c.index} title={connectionTitle(c)} text={connectionMeta(c)} quote={quoteOf(c)} mainClass="sw-choice-row"
               onMain={() => onChoose(c)}
               onLight={c.kind === 'arc' ? (on) => light(on ? [c.index] : null) : undefined} />
           ))}

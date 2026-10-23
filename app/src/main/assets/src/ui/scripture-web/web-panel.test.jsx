@@ -545,6 +545,22 @@ describe('the chooser at overview', () => {
     expect(byText(/^Zoom to Isaiah 7$/)).toHaveLength(1);
   });
 
+  // ideas audit A10.6: close threads tell apart by their far end's words, not a reference alone
+  it('each row quotes its far end: the end away from the tapped chapter, else the later end', () => {
+    const ids = [ARC, ...pm.threadsFrom(g, ISA_7_14, ISA_7_14, 'famous').ids.slice(0, 4)];
+    const choices = ids.map(arcOf);
+    const quotes = (p) => [...p.querySelectorAll('.sw-choice-row .sw-row-quote')].map((q) => q.textContent);
+    const isaiah7 = g.chapterOfVerse[ISA_7_14];
+    const tapped = mount({ choices, choiceChapter: isaiah7 });
+    expect(quotes(tapped.panel)).toHaveLength(5);
+    for (const q of quotes(tapped.panel)) expect(q, 'the end away from Isaiah 7').not.toMatch(/^Isaiah 7:/);
+    for (const q of quotes(tapped.panel)) expect(q).toMatch(/^\S.* TEXT \S+ \d+:\d+$/);
+    cleanup();
+    const untapped = mount({ choices });
+    const later = strongestFirst(choices).map((c) => (c.from <= c.to ? c.b : c.a).label);
+    expect(quotes(untapped.panel).map((q) => q.split(' TEXT ')[0])).toEqual(later);
+  });
+
   it('"Zoom to" names the chapter the reader tapped when the tap is known (w3 review)', () => {
     const ids = [ARC, ...pm.threadsFrom(g, ISA_7_14, ISA_7_14, 'famous').ids.slice(0, 4)];
     const { byText, props } = mount({ choices: ids.map(arcOf), choiceChapter: g.chapterOfVerse[JOHN_3_16] });
@@ -561,7 +577,7 @@ describe('the chooser at overview', () => {
     const { panel } = mount({ choices: ids.map(arcOf), choiceCut: true });
     expect(panel.querySelectorAll('.sw-choice-row')).toHaveLength(8);
     expect(panel.querySelector('.sw-panel-title').textContent).toBe('The 8 nearest threads');
-    expect(panel.querySelector('.sw-panel-meta').textContent).toBe('Choose the one you meant. Strongest first.');
+    expect(panel.querySelector('.sw-panel-meta').textContent).toBe('Choose the one you meant. Strongest first, by readers’ votes.');
   });
 
   it('lights nothing on My Web (the reader\'s own links have no lit set)', () => {

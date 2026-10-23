@@ -4,7 +4,8 @@
    ═══════════════════════════════════════════════════════════════════════
 
    A connection row: a reference, a tag (its votes, its tier, where it
-   starts), a one-line preview of the verse text, and the row's actions on
+   starts), a one-line preview of the verse text (or a meta line, then the
+   verse as `quote`: the chooser's rows), and the row's actions on
    the right ([Open] the verse in the reader, [Follow] the thread there).
    The docked panel (web-panel.jsx) and the no-WebGL list
    (WebFallbackList.jsx) both draw it (digest B1: "reuse the WFL card so the
@@ -20,14 +21,14 @@
 
 /**
  * @param {{
- *   title: string, tag?: string, text?: string, skin?: 'panel' | 'fallback',
+ *   title: string, tag?: string, text?: string, quote?: string, skin?: 'panel' | 'fallback',
  *   onMain?: () => void, mainLabel?: string,
  *   onOpen?: () => void, openLabel?: string,
  *   onFollow?: () => void, followLabel?: string,
  *   onLight?: (on: boolean) => void, active?: boolean, mainClass?: string,
  * }} props
  */
-export function ConnectionRow({ title, tag, text, skin = 'panel', onMain, mainLabel, onOpen, openLabel,
+export function ConnectionRow({ title, tag, text, quote, skin = 'panel', onMain, mainLabel, onOpen, openLabel,
   onFollow, followLabel, onLight, active, mainClass }) {
   const fallback = skin === 'fallback';
   // a named row keeps its verse: the name replaces the button's words, so the preview is its
@@ -52,6 +53,7 @@ export function ConnectionRow({ title, tag, text, skin = 'panel', onMain, mainLa
           {tag ? <span className={c.tag}>{tag}</span> : null}
         </span>
         {text != null ? <span className={c.text} id={described}>{text}</span> : null}
+        {quote ? <span className={c.text + ' sw-row-quote'}>{quote}</span> : null}
       </button>
       {(onOpen || onFollow) && (
         <span className="sw-row-actions">
