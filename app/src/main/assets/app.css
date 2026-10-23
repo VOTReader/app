@@ -608,9 +608,11 @@
       body:has(.mode-toggle-wrap) { --dock-context: 72px; }  /* the 59px Study Notes card + 8 + air */
       body:has(.jrn-fab) { --dock-context: 72px; }
       /* cz5 (Corbin 02:59: "Media player should be auto hidden when viewing ... the garden images"): a full-screen
-         image view hides the mini player and the whole dock; playback goes on, and they come back on leaving. */
-      body:has(.garden-fullscreen) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
-      body:has(.garden-fullscreen) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
+         image view hides the mini player and the whole dock; playback goes on, and they come back on leaving.
+         The Scripture Web too (Corbin 2026-10-22 23:4x: "media player should not be present on certain screen like
+         scripture web"), and its load-error panel, the screen's root when WebGL fails. */
+      body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
+      body:has(.garden-fullscreen, .sw-root, .sw-fallback) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
       body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
