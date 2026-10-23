@@ -39,6 +39,7 @@ import {
   verseToX, xToVerse, arcShape, arcHeightAt, arcAnchored, footX, fitPPV, maxCamY, ALTITUDE_MARKS, spanAtHeight, spanT,
 } from '../../utils/scripture-web/geometry.js';
 import { refOfVerse, labelFeed, eachLabelThread } from '../../utils/scripture-web/pick.js';
+import { filterSerial } from '../../utils/scripture-web/filters.js';
 import { fansOf, bucketDrawCount } from '../../utils/scripture-web/decode.js';
 import { distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabelsRanked } from '../../utils/scripture-web/rail-labels.js';
@@ -2110,7 +2111,7 @@ function drawChips(ctx, g, cam, L, fs, grid, m, labelled, quiet) {
   // the same camera and layout as last frame keep last frame's keepers: the memory the pass
   // would read is last frame's placement, which was chosen from them, so none of it is lost
   const key = [cam.x, cam.ppv, camY, fs.density, W, Wc, gutter, every, view.base, view.squash, inset,
-    centre ? centre.x0 : -1, centre ? centre.x1 : -1].join('|');
+    centre ? centre.x0 : -1, centre ? centre.x1 : -1, filterSerial(g)].join('|');
   if (!m.chipCache || m.chipCache.key !== key) {
     m.chipCache = {
       key,
@@ -2160,7 +2161,7 @@ function drawChips(ctx, g, cam, L, fs, grid, m, labelled, quiet) {
 /** The leg labels' feed (labelFeed with the fly-overs), kept while the camera and the frame stand still. */
 function legFeed(g, cam, L, fs, m) {
   const view = fs.view;
-  const key = [cam.x, cam.ppv, L.camY, fs.density, L.W, view.base, view.squash, L.inset].join('|');
+  const key = [cam.x, cam.ppv, L.camY, fs.density, L.W, view.base, view.squash, L.inset, filterSerial(g)].join('|');
   if (!m.feedCache || m.feedCache.key !== key) {
     m.feedCache = {
       key,

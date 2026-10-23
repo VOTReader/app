@@ -17,6 +17,7 @@ import {
   spanInkGLSL, STROKE_FIT_CSS,
 } from '../../utils/scripture-web/geometry.js';
 import { frameSetAt, drawOrder } from '../../utils/scripture-web/frame-set.js';
+import { setFilterMasks } from '../../utils/scripture-web/filters.js';
 import {
   FLYOVER_LEG_WIDTH, TAP_CONTEXT, CENTRE_BRIGHT, CENTRE_WIDTH, rgba01, inkWidth,
   NEAR_GLOW_CSS, NEAR_GLOW_COMPACT_CSS, NEAR_GLOW_ALPHA, NEAR_GLOW_COMPACT_ALPHA,
@@ -913,9 +914,28 @@ describe('E1-E3: the visible set, the gesture backing, and a frame that sends on
     }
   });
 
+  it('filters: the keep mask goes up once when the masks change, the ghost reads it, a clear stops reading it', () => {
+    const g = threeArcs();
+    const { calls, r } = build(g);
+    frameOf(r, calls, view({}));
+    const masks = { threads: new Uint8Array([1, 0, 1]), pairs: new Uint8Array(0), kept: 2, keptPairs: 0, serial: 9 };
+    setFilterMasks(g, masks);
+    const on = frameOf(r, calls, view({}));
+    const ups = on.calls.filter((c) => c[0] === 'texSubImage2D');
+    expect(ups).toHaveLength(1);
+    expect(Array.from(ups[0][1][8].slice(0, 3))).toEqual([1, 0, 1]);
+    expect(on.u(on.main, 'uFiltered')[0]).toEqual([1]);
+    expect(frameOf(r, calls, view({})).calls.filter((c) => c[0] === 'texSubImage2D')).toEqual([]);
+    setFilterMasks(g, null);
+    const off = frameOf(r, calls, view({}));
+    expect(off.u(off.main, 'uFiltered')[0]).toEqual([0]);
+    expect(off.calls.filter((c) => c[0] === 'texSubImage2D')).toEqual([]);
+  });
+
   it('E3: an unchanged frame sends no uniform but each run\'s segment count, and uploads nothing; the threads go up once, at creation', () => {
     const { calls, r } = build();
-    expect(calls.filter((c) => c[0] === 'texImage2D').length).toBe(2);
+    // the threads, their votes and the filters' keep mask (filled only when a filter is on)
+    expect(calls.filter((c) => c[0] === 'texImage2D').length).toBe(3);
     const first = frameOf(r, calls, view({}));
     expect(first.calls.filter((c) => c[0] === 'bufferSubData').length).toBe(1);
     const again = frameOf(r, calls, view({}));

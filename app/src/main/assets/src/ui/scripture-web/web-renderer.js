@@ -60,6 +60,7 @@ import {
 import { topSet, topDraws, isCompact, frameSetAt, TOP_ORDER } from '../../utils/scripture-web/frame-set.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { fansOf } from '../../utils/scripture-web/decode.js';
+import { FILTER_GHOST, filterMasksOf } from '../../utils/scripture-web/filters.js';
 
 /** Density steps, in the order the control cycles them. */
 export const DENSITY_STEPS = ['essential', 'famous'];
@@ -97,6 +98,8 @@ precision highp float;
 precision highp int;
 uniform highp sampler2D uArcs;   // per thread: (from, to, fanA, fanB), ARC_TEX_W texels a row
 uniform highp sampler2D uVotes;  // per thread: its votes
+uniform highp sampler2D uKeep;   // per thread: 1 kept by the filters, 0 a ghost (filters.js)
+uniform float uFiltered;         // 1 while a filter is on (uKeep is read), 0 otherwise
 uniform vec2  uRes;          // the frame, full-resolution device px (the backing may be smaller: uPx)
 uniform float uCamXHi, uCamXLo;  // the camera's x, split: hi = floor(x), lo = x - hi (float32 at the ceiling)
 uniform float uPPV, uBase, uSquash;
@@ -129,6 +132,7 @@ void main(){
   ivec2 at = ivec2(i & 1023, i >> 10);
   vec4 arc = texelFetch(uArcs, at, 0);
   float aVotes = texelFetch(uVotes, at, 0).r;
+  float aKeep = uFiltered > .5 ? texelFetch(uKeep, at, 0).r : 1.;
   float a = arc.x, b = arc.y, aFanA = arc.z, aFanB = arc.w;
   // each foot stands in its verse's own cell, in the order of its far end
   // (geometry.footX; the picker computes the same). The camera's x comes
@@ -233,7 +237,8 @@ void main(){
   float aOut = min(uAlpha*aStrength*spanGain(shortness), 1.)*dim*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
   // past full ink the centre's boost lifts the colour instead, clamped
   col = min(col*max(aOut, 1.), vec3(1.));
-  vCol = vec4(col, min(aOut, 1.));
+  // a thread the filters leave out is a ghost of its ink (filters.js FILTER_GHOST)
+  vCol = vec4(col, min(aOut, 1.)*mix(${glslFloat(FILTER_GHOST)}, 1., aKeep));
   vEdge = side;
   vHalfW = halfW;
   vInk = vec2(glowHalf, uGlow.y);
@@ -495,7 +500,7 @@ export function createRenderer(canvas, graph, opts = {}) {
   }
   gl.useProgram(program);
 
-  const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
+  const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uKeep', 'uFiltered', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
     'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uAlpha', 'uTotal',
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uCentre', 'uCentreT', 'uGlow']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
@@ -530,9 +535,16 @@ export function createRenderer(canvas, graph, opts = {}) {
   };
   const arcTex = texture(0, gl.RGBA32F, gl.RGBA, arcData);
   const voteTex = texture(1, gl.R32F, gl.RED, voteData);
+  // the filters' keep mask (filters.js), the same shape, filled when the masks in force change
+  const keepData = new Float32Array(ARC_TEX_W * rows);
+  const keepTex = texture(2, gl.R32F, gl.RED, keepData);
+  /** @type {object | null} */
+  let keepHeld = null;
   gl.activeTexture(gl.TEXTURE0);
   U.i1('uArcs', 0);
   U.i1('uVotes', 1);
+  U.i1('uKeep', 2);
+  U.f1('uFiltered', 0);
 
   // The id stream: the frame's visible set in rank order (frame-set.js),
   // uploaded only when the set changes (a new camera), into one buffer as
@@ -788,6 +800,19 @@ export function createRenderer(canvas, graph, opts = {}) {
       U.f1('uAlpha', v.alpha);
       U.f1('uTotal', graph.total);
       U.f1('uVoteMix', v.voteMix || 0);
+      // the filters in force: the mask is uploaded only when it changes
+      const masks = filterMasksOf(graph);
+      if (masks !== keepHeld) {
+        keepHeld = masks;
+        if (masks) {
+          for (let i = 0; i < count; i++) keepData[i] = masks.threads[i];
+          gl.activeTexture(gl.TEXTURE2);
+          gl.bindTexture(gl.TEXTURE_2D, keepTex);
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, ARC_TEX_W, rows, gl.RED, gl.FLOAT, keepData);
+          gl.activeTexture(gl.TEXTURE0);
+        }
+      }
+      U.f1('uFiltered', masks ? 1 : 0);
       // the near glow's reach in device px and its alpha share: the phone's (a compact frame) is
       // shorter and lighter (sw-ink NEAR_GLOW_COMPACT_CSS / NEAR_GLOW_COMPACT_ALPHA), the same at every zoom
       const compactFrame = isCompact(v.height / dpr);
@@ -839,6 +864,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       for (const a of topAttribs) gl.deleteBuffer(a.buf);
       gl.deleteTexture(arcTex);
       gl.deleteTexture(voteTex);
+      gl.deleteTexture(keepTex);
       gl.deleteVertexArray(vao);
       gl.deleteVertexArray(topVao);
       gl.deleteProgram(program);

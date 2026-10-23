@@ -29,6 +29,7 @@ import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import { createCamera, clampCamera, fitPPV, ribbonStyle } from '../../utils/scripture-web/geometry.js';
 import { footBundles } from '../../utils/scripture-web/pick.js';
 import { frameSet } from '../../utils/scripture-web/frame-set.js';
+import { filterMasksOf } from '../../utils/scripture-web/filters.js';
 import { maxZoomOf, centreOf, centreRange, tapFadeStep, TAP_FADE_MS } from '../../utils/scripture-web/web-frame.js';
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { readChromeTokens } from '../../utils/scripture-web/palette.js';
@@ -60,11 +61,12 @@ export function walkOn() {
  * less than 2 %; overlay-renderer.js draws them.
  */
 function bundlesFor(cache, g, cam, view, v, density) {
-  const moved = cache.W !== v.W || cache.density !== density
+  const masks = filterMasksOf(g);
+  const moved = cache.W !== v.W || cache.density !== density || cache.masks !== masks
     || Math.abs(cam.ppv - cache.ppv) > cache.ppv * 0.02
     || Math.abs(cam.x - cache.x) * cam.ppv > v.W * 0.02;
   if (moved) {
-    cache.W = v.W; cache.density = density; cache.ppv = cam.ppv; cache.x = cam.x;
+    cache.W = v.W; cache.density = density; cache.masks = masks; cache.ppv = cam.ppv; cache.x = cam.x;
     cache.cells = footBundles(g, cam, view, v.DPR);
   }
   return cache;

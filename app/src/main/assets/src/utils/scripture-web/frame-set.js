@@ -78,6 +78,7 @@
    arc stands on that arc's fans; any other pair stands mid-cell (fan 0),
    and the picker reads the same table (prophecySet). */
 
+import { filterMasksOf } from './filters.js';
 import { fansOf, bucketDrawCount } from './decode.js';
 import {
   arcFrameTau, frameSegments, frameHeights, topSegmentsFor, CLIP_MARGIN, FLYOVER_MARGIN, TOP_SEGMENT_MIN,
@@ -168,10 +169,12 @@ export function prophecySet(g) {
 /**
  * @typedef {{ kind: string, first: number, count: number }} TopRange
  * @typedef {{ key: string, count: number, from: Uint16Array, to: Uint16Array,
- *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[], pairs: ProphecySet, litKey: string,
+ *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[], pairs: ProphecySet,
+ *   masks: ({ threads: Uint8Array, pairs: Uint8Array } | null), litKey: string,
  *   hoverArc: number, hoverProphecy: number, focusArc: number, focusProphecy: number,
  *   range: ReadonlyArray<number> }} TopSet
- *   pairs: the prophecySet it was built over (one per graph);
+ *   pairs: the prophecySet it was built over (one per graph); masks: the filters it was built
+ *   under (filters.filterMasksOf, null for none);
  *   litKey .. focusProphecy: the ask it was built for, as topSetKey reads it (-1 for none);
  *   range: the chosen range as the shader reads it, [lo, hi], or [1, 0] for none
  */
@@ -224,8 +227,10 @@ export function topSet(g, v, prev) {
   const ps = prophecySet(g);
   const range = spanOf(v.focusRange);
   const ranged = range[0] <= range[1];
+  // the filters in force (filters.js): a ghosted pair or lit arc is not drawn here
+  const masks = filterMasksOf(g);
   // the same ask, field by field: a frame that changes nothing builds no key (E3)
-  if (prev && prev.pairs === ps && prev.litKey === (v.litKey || '')
+  if (prev && prev.pairs === ps && prev.masks === masks && prev.litKey === (v.litKey || '')
     && prev.hoverArc === askOf(v.hoverArc) && prev.focusArc === askOf(v.focusArc)
     && prev.focusProphecy === askOf(v.focusProphecy) && prev.hoverProphecy === askOf(v.hoverProphecy)
     && prev.range[0] === range[0] && prev.range[1] === range[1]) return prev;
@@ -233,7 +238,9 @@ export function topSet(g, v, prev) {
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
   const arcs = { lit: /** @type {number[]} */ ([]), hover: /** @type {number[]} */ ([]), chosen: /** @type {number[]} */ ([]) };
-  if (v.lit) for (let k = 0; k < v.lit.length; k++) if (isArc(v.lit[k])) arcs.lit.push(v.lit[k]);
+  if (v.lit) {
+    for (let k = 0; k < v.lit.length; k++) if (isArc(v.lit[k]) && (!masks || masks.threads[v.lit[k]])) arcs.lit.push(v.lit[k]);
+  }
   if (isArc(v.hoverArc) && v.hoverArc !== v.focusArc) arcs.hover.push(/** @type {number} */ (v.hoverArc));
   if (isArc(v.focusArc)) arcs.chosen.push(/** @type {number} */ (v.focusArc));
   const isPair = (k) => k != null && k >= 0 && k < ps.count && Number.isInteger(k);
@@ -249,7 +256,12 @@ export function topSet(g, v, prev) {
     const a = ps.from[k], b = ps.to[k];
     return (a >= range[0] && a <= range[1]) || (b >= range[0] && b <= range[1]);
   };
-  const total = ps.unique + arcs.lit.length + arcs.hover.length + arcs.chosen.length
+  let pairsKept = ps.unique;
+  if (masks) {
+    pairsKept = 0;
+    for (let k = 0; k < ps.count; k++) if (ps.twin[k] === k && masks.pairs[k]) pairsKept++;
+  }
+  const total = pairsKept + arcs.lit.length + arcs.hover.length + arcs.chosen.length
     + (hoverPair >= 0 ? 1 : 0) + (chosenPair >= 0 ? 1 : 0);
   const from = new Uint16Array(total), to = new Uint16Array(total);
   const fanA = new Float32Array(total), fanB = new Float32Array(total);
@@ -272,14 +284,14 @@ export function topSet(g, v, prev) {
   };
   for (const kind of TOP_ORDER) {
     const first = at;
-    if (kind === 'prophecy' && ps.unique === ps.count && !ranged) {
+    if (kind === 'prophecy' && ps.unique === ps.count && !ranged && !masks) {
       from.set(ps.from, at); to.set(ps.to, at); fanA.set(ps.fanA, at); fanB.set(ps.fanB, at);
       at += ps.count;
     } else if (kind === 'prophecy' || kind === 'prophecyInRange') {
       // a pair given twice is drawn once: twice, its line would carry double ink
       const kept = kind === 'prophecyInRange';
       for (let k = 0; k < ps.count; k++) {
-        if (ps.twin[k] === k && keeps(k) === kept) putPair(k);
+        if (ps.twin[k] === k && keeps(k) === kept && (!masks || masks.pairs[k])) putPair(k);
       }
     } else {
       for (const i of arcs[kind]) putArc(i);
@@ -289,7 +301,7 @@ export function topSet(g, v, prev) {
     ranges.push({ kind, first, count: at - first });
   }
   return {
-    key, count: total, from, to, fanA, fanB, ranges, pairs: ps, litKey: v.litKey || '',
+    key, count: total, from, to, fanA, fanB, ranges, pairs: ps, masks, litKey: v.litKey || '',
     hoverArc: askOf(v.hoverArc), hoverProphecy: askOf(v.hoverProphecy),
     focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
     range,

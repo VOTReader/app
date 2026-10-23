@@ -67,6 +67,7 @@ import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { TipChip, HowToReadGuide, EmptyWebNotice, loadErrorPanel, legendFor } from '../scripture-web/panels.jsx';
+import { useWebFilters, legendChips, FilterPill, FilterSheet } from '../scripture-web/web-filters.jsx';
 import { startChapter, webChapter } from '../../utils/scripture-web/chapter-connections.js';
 import { graphStats, densityLine, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
@@ -414,9 +415,15 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setMode(next);
   }, [closeCards, journey, cancelFly, camRef, modeRef, viewRef, zoomCapFor, schedule]);
 
+  // the filters (web-filters.jsx): the legend's chips, the sheet and the pill, the canon's only
+  const web = useWebFilters({ graph, mode, density, schedule, setAnnounce });
+  const { setSheetOpen } = web;
+  const closeFilters = React.useCallback(() => setSheetOpen(false), [setSheetOpen]);
+
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset
   const { onKeyDown } = useWebKeys({
+    filtersOpen: web.canon && web.sheetOpen, closeFilters,
     graph, guideOpen: guideShown, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
     resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor,
@@ -495,7 +502,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                something the reader had not asked about (Corbin, 2026-09-11:
                "just keep x connections"); the density hint that flashes on a
                switch is where the two densities are explained. */
-            : (stats && <p>{stats.shown.toLocaleString()} connections</p>)}
+            : (stats && <p>{web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections'}</p>)}
           {/* the density's line after a switch: seen here, said by .sw-live (one live region) */}
           {hint ? <div className="sw-hint" aria-hidden="true">{hint}</div> : null}
         </div>
@@ -552,7 +559,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             Timothy&rsquo;s notes · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
           </button>
         )}
-        <button type="button" className="sw-btn" onClick={fromMenu(resetView)} aria-label="Reset the view">Reset</button>
+        {/* Reset brings the whole web back: the view, and the filters with it */}
+        <button type="button" className="sw-btn" onClick={fromMenu(() => { resetView(); web.clear(); })} aria-label="Reset the view">Reset</button>
         </div>
         {collapse ? (
           <button type="button" ref={moreBtnRef} className={'sw-btn sw-btn-icon sw-more-btn' + (menuOpen ? ' is-on' : '')}
@@ -595,6 +603,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} mode={mode}
         home={() => wrapRef.current} />}
       {goTo.box}
+      {web.canon && graph ? <FilterPill web={web} /> : null}
+      {web.canon && graph && web.sheetOpen ? <FilterSheet web={web} graph={graph} /> : null}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
       {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby
@@ -610,7 +620,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       ) : null}
 
       {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden; its glyphs are */}
-      <div className="sw-legend"><div className="sw-legend-line">{legendFor(mode, graph && graph.attribution)}</div></div>
+      <div className="sw-legend"><div className="sw-legend-line">{legendFor(mode, graph && graph.attribution, web.canon && graph ? legendChips({ web }) : null)}</div></div>
       {mode === 'personal' && railZoom.top ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
           data-wheel-through="1" onClick={() => resetRail('top')}>Reset Volumes</button>

@@ -31,6 +31,7 @@
 
 import { spanT } from './geometry.js';
 import { refOfVerse } from './pick.js';
+import { filterMasksOf } from './filters.js';
 
 /**
  * What a run of verses holds, in words: "Isaiah 50-57", "Isaiah 53:1-12", "Malachi 3 - Matthew 2"
@@ -72,7 +73,7 @@ export const EXIT_SECTIONS = Object.freeze([
  * @typedef {{ lo: number, hi: number }} ExitCell  a verse range, inclusive (a "+n" pill's cell)
  */
 
-/** @type {WeakMap<object, { serial: number, Wc: number, cell: string, out: ExitCensus }>} */
+/** @type {WeakMap<object, { serial: number, Wc: number, cell: string, masks: object | null, out: ExitCensus }>} */
 const CENSUS = new WeakMap();
 
 /**
@@ -104,7 +105,8 @@ const bookOfVerse = (g, v) => g.chapters[g.chapterOfVerse[v]][0];
 export function exitCensus(g, set, Wc, cell = null) {
   const ck = cell ? cell.lo + '-' + cell.hi : '';
   const memo = CENSUS.get(set);
-  if (memo && memo.serial === set.serial && memo.Wc === Wc && memo.cell === ck) return memo.out;
+  const masks = filterMasksOf(g);
+  if (memo && memo.serial === set.serial && memo.Wc === Wc && memo.cell === ck && memo.masks === masks) return memo.out;
   const nb = g.books.length;
   const left = { count: new Int32Array(nb), t: new Float64Array(nb) };
   const right = { count: new Int32Array(nb), t: new Float64Array(nb) };
@@ -113,6 +115,7 @@ export function exitCensus(g, set, Wc, cell = null) {
   let legs = 0;
   for (let k = 0; k < set.count; k++) {
     const i = list[k];
+    if (masks && !masks.threads[i]) continue;   // a ghost leaves for nowhere (filters.js)
     const r = rankOf[i];
     const x0 = (fx0[r] - camX) * ppv + half, x1 = (fx1[r] - camX) * ppv + half;
     const on0 = x0 >= 0 && x0 <= Wc, on1 = x1 >= 0 && x1 <= Wc;
@@ -130,7 +133,7 @@ export function exitCensus(g, set, Wc, cell = null) {
   const { lo, hi } = total > 0 ? areaOf(g, set, Wc) : { lo: 0, hi: 0 };
   const mid = Math.max(0, Math.min(total - 1, Math.floor((Wc / 2 - half) / ppv + camX)));
   const out = { legs, left, right, home: total > 0 ? bookOfVerse(g, mid) : -1, lo, hi };
-  CENSUS.set(set, { serial: set.serial, Wc, cell: ck, out });
+  CENSUS.set(set, { serial: set.serial, Wc, cell: ck, masks, out });
   return out;
 }
 
@@ -145,9 +148,11 @@ export function exitCensus(g, set, Wc, cell = null) {
 export function exitIds(g, set, Wc, side, bookLo, bookHi, cell = null) {
   const { fx0, fx1, rankOf } = set.order;
   const half = set.width / 2, camX = set.camX, ppv = set.ppv, list = set.list;
+  const masks = filterMasksOf(g);
   const out = [];
   for (let k = 0; k < set.count; k++) {
     const i = list[k];
+    if (masks && !masks.threads[i]) continue;
     const r = rankOf[i];
     const x0 = (fx0[r] - camX) * ppv + half, x1 = (fx1[r] - camX) * ppv + half;
     const on0 = x0 >= 0 && x0 <= Wc, on1 = x1 >= 0 && x1 <= Wc;
