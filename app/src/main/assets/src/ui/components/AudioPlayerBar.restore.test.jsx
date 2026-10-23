@@ -66,10 +66,7 @@ async function boot() {
   ({ AudioPlayerBar } = await import('./AudioPlayerBar.jsx'));
 }
 
-const position = () => {
-  const node = document.querySelector('.audio-bar-pos');
-  return node ? node.textContent : null;
-};
+const line2 = () => document.querySelector('.audio-bar-line2').textContent;
 
 beforeEach(() => {
   FakeAudio.last = null;
@@ -94,31 +91,28 @@ afterEach(() => {
 });
 
 describe('AudioPlayerBar — a boot-restored bar is not a queue of one (sweep v021)', () => {
-  it('offers Next and calls prev Previous track, and claims no "1 of 1"', async () => {
+  it('reads Resume at its place, and claims no "1 of 1" (brief 3g)', async () => {
     await boot();
     render(<AudioPlayerBar />);
     expect(AudioPlayer.getState().restoring).toBe(true);
     expect(AudioPlayer.getState().queue).toHaveLength(1);    // the placeholder
-
-    expect(screen.getByRole('button', { name: 'Next track' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Previous track' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
     // The real queue's length is unknown until the rebuild, so the bar names no place in it.
-    expect(position()).toBe(null);
+    expect(line2()).toBe('Resume · 2:03');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
   });
 
-  it('Next rebuilds the real queue and moves on to the recording after the saved one', async () => {
+  it('Play rebuilds the real queue at the saved recording, and the bar counts its place in it', async () => {
     await boot();
     render(<AudioPlayerBar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Play' }));
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
     const st = AudioPlayer.getState();
     expect(st.restoring).toBe(false);
     expect(st.queue).toHaveLength(4);
-    expect(st.qi).toBe(3);
-    expect(FakeAudio.last.src).toBe(URL_OF('idC'));
-    expect(document.querySelector('.audio-bar-title').textContent).toBe('The Seventh Day');
-    expect(position()).toBe('· 3 of 3');   // counted in recordings: Letter A's two parts are one
+    expect(st.qi).toBe(2);
+    expect(FakeAudio.last.src).toBe(URL_OF('idA2'));
+    expect(document.querySelector('.audio-bar-title').textContent).toBe('The Wide Path · Part 2');
+    expect(line2()).toBe('Volume One · 2 of 3');   // counted in recordings: Letter A's two parts are one
   });
 });
