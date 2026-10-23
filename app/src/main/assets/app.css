@@ -3213,6 +3213,8 @@
     .plans-items-count { margin:0.1rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
     .plans-week { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.2rem; margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); text-align:center; }
     .plans-week .plans-day { min-height:40px; }
+    .plans-day[data-read="1"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
+    .plans-week .plans-day[data-state="ahead"] .plans-day-mark { border:1px solid var(--gold-border); border-radius:50%; box-sizing:border-box; }
     .plans-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.75rem; margin-top:0.5rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
     .plans-counts { color:var(--cream-dim); font-size:var(--fs-14); }
     .plans-foot .today-link { color:var(--gold); }

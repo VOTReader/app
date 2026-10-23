@@ -147,7 +147,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
               )}
               <div className="plans-week" role="group" aria-label="This week">
                 {week.map((d, i) => (
-                  <span key={i} className="plans-day" data-state={dayState(d.state)}
+                  <span key={i} className="plans-day" data-state={dayState(d.state)} data-read={d.read || (d.state === 'today' && row.done) ? '1' : undefined}
                     aria-label={WEEKDAYS[i] + ' ' + d.date + (d.state === 'none' ? '' : ', ' + (d.state === 'today' ? (row.done || d.read ? 'today, read' : 'today') : d.state))}>
                     <span className="plans-weekday" aria-hidden="true">{WEEKDAYS[i]}</span>
                     <span className="plans-day-mark" aria-hidden="true" />
@@ -172,7 +172,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                       {WEEKDAYS.map((w, i) => <span key={'w' + i} className="plans-weekday" aria-hidden="true">{w}</span>)}
                       {Array.from({ length: lead }, (_, i) => <span key={'b' + i} className="plans-day-blank" />)}
                       {days.map((d) => (
-                        <span key={d.date} className="plans-day" data-state={dayState(d.state)}
+                        <span key={d.date} className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined}
                           aria-label={d.date + (d.state === 'none' ? '' : ', ' + d.state)}>
                           <span className="plans-day-num">{d.date}</span>
                           <span className="plans-day-mark" aria-hidden="true" />
