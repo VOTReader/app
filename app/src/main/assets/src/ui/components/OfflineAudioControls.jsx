@@ -15,6 +15,22 @@
    _entry-d.js). Where no store exists, nothing here renders.
    ═══════════════════════════════════════════════════════════════════════ */
 
+const _noSubscribe = () => () => {};
+const _noShape = () => '';
+
+/**
+ * One of these recordings is the one playing (or starting): offline it plays on from what it buffered (RC.5).
+ * @param {string[]} urls @returns {boolean}
+ */
+function usePlayingOneOf(urls) {
+  const has = typeof AudioPlayer !== 'undefined' && typeof AudioPlayer.getShape === 'function';
+  React.useSyncExternalStore(has ? AudioPlayer.subscribe : _noSubscribe, has ? AudioPlayer.getShape : _noShape);
+  if (!has) return false;
+  const s = AudioPlayer.getState();
+  const cur = s && Array.isArray(s.queue) ? s.queue[s.qi] : null;
+  return !!cur && urls.includes(cur.url) && (s.status === 'playing' || s.status === 'loading');
+}
+
 /** The phone keeps this much free beyond a download (OfflineAudioStore's SPACE_MARGIN). */
 const SPACE_MARGIN = 200 * 1024 * 1024;
 
@@ -217,13 +233,15 @@ export function OfflineRowStatus({ tracks, name }) {
   const u = off && urls.length ? unitState(off, urls) : null;
   const shown = !u ? '' : u.status === 'saved' ? 'saved' : !online && u.status !== 'downloading' ? 'offline' : u.status;
   const focus = useKeepFocus(shown);
+  const playing = usePlayingOneOf(urls);
   if (!off || !u) return null;
   const download = () => off.download(list.map((t) => _item(t, name)));
   if (shown === 'saved') {
     return <p className="offline-row is-saved" {...focus}><CheckIcon /><span>On this phone{u.bytes ? ' · ' + formatBytes(u.bytes) : ''}</span></p>;
   }
   if (shown === 'offline') {
-    return <p className="offline-row is-offline" {...focus}><NoSignalIcon /><span>Needs a connection</span></p>;
+    // The one playing goes on from what it buffered (RC.5): it did say it needed a connection while it played.
+    return <p className="offline-row is-offline" {...focus}><NoSignalIcon /><span>{playing ? 'Playing from the buffer' : 'Needs a connection'}</span></p>;
   }
   if (u.status === 'downloading') {
     return (

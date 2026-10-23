@@ -614,6 +614,11 @@
          pauses it (useNoAudioHere), so the bar is back on leaving paused at the same spot, one tap from resuming. */
       body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
       body:has(.garden-fullscreen, .sw-root, .sw-fallback) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
+      /* The keyboard is up (use-keyboard-inset.js marks html.kb-up): the mini player steps aside and gives its lane
+         back, so nothing being typed sits under it; the notification, lock screen and headset still control the
+         audio (player brief 2026-10-22, 3a, approved 10-23). */
+      html.kb-up .audio-bar { display: none; }
+      html.kb-up body { --dock-player: 0px; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
       body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
@@ -4972,7 +4977,7 @@
     }
     .ann-chip-confirm-btn {
       background: none; border: 1px solid transparent;
-      padding: 6px 10px; border-radius: 6px;
+      padding: 6px 10px; border-radius: 6px; min-height: 44px; min-width: 44px;
       font-family: 'Cinzel', serif; font-size: var(--fs-10);
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -9154,7 +9159,7 @@
         font-family: var(--font-body); font-size: min(var(--fs-16), 18px); text-decoration: underline;
       }
       .tour-wait {
-        position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 322; text-align: center;
+        position: fixed; left: 12px; right: 12px; bottom: var(--dock-message, 16px); z-index: 322; text-align: center;
         font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-muted);
         background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 16px; padding: 12px;
       }

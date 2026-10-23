@@ -77,6 +77,45 @@ describe('useKeyboardInset', () => {
     expect(kh()).toBe('0px');
   });
 
+  it('marks the root kb-up while the keyboard is up, even fully panned, and clears it when it closes', () => {
+    const vv = mockVV(800);
+    renderHook(() => useKeyboardInset());
+    const up = () => document.documentElement.classList.contains('kb-up');
+    expect(up()).toBe(false);
+    vv.height = 355; vv.offsetTop = 500; vv._fire('scroll');   // open, and panned past: the height reads 0
+    expect(kh()).toBe('0px');
+    expect(up(), 'the raw diff says the keyboard is open').toBe(true);
+    vv.height = 800; vv.offsetTop = 0; vv._fire('resize');
+    expect(up()).toBe(false);
+  });
+
+  it('a pinch-zoom shrinks the visual viewport too, and is not a keyboard', () => {
+    const vv = mockVV(800);
+    renderHook(() => useKeyboardInset());
+    vv.height = 400; vv.scale = 2; vv._fire('resize');
+    expect(document.documentElement.classList.contains('kb-up')).toBe(false);
+  });
+
+  it("the APK's keyboard arrives as --inset-bottom, not a smaller viewport: that marks it too", async () => {
+    mockVV(800);
+    const { unmount } = renderHook(() => useKeyboardInset());
+    const root = document.documentElement;
+    root.style.setProperty('--inset-bottom', '24.00px');          // the gesture bar alone
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.classList.contains('kb-up')).toBe(false);
+    root.style.setProperty('--inset-bottom', '312.00px');         // the keyboard joins it
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.classList.contains('kb-up')).toBe(true);
+    root.style.setProperty('--inset-bottom', '24.00px');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(root.classList.contains('kb-up')).toBe(false);
+    root.style.setProperty('--inset-bottom', '312.00px');
+    await new Promise((r) => setTimeout(r, 0));
+    unmount();
+    expect(root.classList.contains('kb-up'), 'unmount takes the mark away').toBe(false);
+    root.style.removeProperty('--inset-bottom');
+  });
+
   it('removes listeners and resets the var on unmount', () => {
     const vv = mockVV(500); // diff 300
     const { unmount } = renderHook(() => useKeyboardInset());

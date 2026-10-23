@@ -27,6 +27,18 @@ const RECENT_OPEN_KEY = 'vot-audio-recent-open';
 const RECENT_PREVIEW = 8;
 
 /**
+ * The offline line counts what is on the phone (RC.2, UX re-check 2026-10-22): "Recordings on this phone still
+ * play" over a phone with none on it promised what it could not keep.
+ * @param {any} off the offline store, or null where recordings cannot be kept
+ * @returns {string}
+ */
+function offlineShelfLine(off) {
+  const n = off && typeof off.items === 'function' ? off.items().length : 0;
+  if (!n) return 'You’re offline. No recordings are saved on this phone yet.';
+  return 'You’re offline. ' + (n === 1 ? '1 recording on this phone still plays.' : n + ' recordings on this phone still play.');
+}
+
+/**
  * The now-playing card's scrubber and clock: the one part of the screen that moves every second, so the one part
  * that re-renders with it (s18.3). The ONE scrubber (AUDIO-MANAGER.md rule 6); the decorative progressbar it
  * replaced could be read but never moved.
@@ -196,7 +208,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
           <h1>Listening Library</h1>
           <p className="audio-library-intro">A quiet place for the recordings you return to, the ones you just heard, and every source waiting to be explored.</p>
         </header>
-        <OfflineNote text="You’re offline. Recordings on this phone still play." />
+        <OfflineNote text={offlineShelfLine(offline)} />
 
         {current ? (
           <section className={'audio-library-now' + (active ? ' is-active' : '')} aria-labelledby="audio-library-now-title">

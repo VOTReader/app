@@ -156,6 +156,17 @@ describe('a recording row: what the phone holds, and the next step', () => {
     expect(queryByRole('button')).toBeNull();
   });
 
+  it('offline, the row of the recording playing says it plays from the buffer, not that it needs a connection (RC.5)', () => {
+    fakeStore();
+    setOnline(false);
+    globalThis.AudioPlayer = { ...globalThis.AudioPlayer, getShape: () => 'x', getState: () => ({ status: 'playing', queue: [T('a')], qi: 0 }) };
+    const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    expect(container.textContent).toMatch(/Playing from the buffer/);
+    expect(container.textContent).not.toMatch(/Needs a connection/);
+    const other = render(<OfflineRowStatus tracks={[T('b')]} name="Letter b" />);
+    expect(other.container.textContent).toMatch(/Needs a connection/);
+  });
+
   it('follows the store live (a download finishing turns the row)', () => {
     const s = fakeStore();
     s.st.status.set(U('a'), 'queued');
