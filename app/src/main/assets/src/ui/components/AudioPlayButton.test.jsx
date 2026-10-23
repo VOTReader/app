@@ -87,6 +87,14 @@ describe('HeroListen: says what the audio is doing (U04.5, U10.2)', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it('the minutes ride their own span, so large text can drop them and keep Resume whole (RC.8)', () => {
+    setPlayerState({ queue: [JONAH_2], qi: 0, status: 'paused', time: 60, duration: 240 });
+    render(<HeroListen onClick={vi.fn()} canPlay={() => true} resume={() => null} here={() => true} />);
+    const pill = screen.getByRole('button', { name: 'Resume · 3 min left' });
+    expect(pill.querySelector('.pill-left').textContent).toBe(' · 3 min left');
+    expect(pill.textContent).toBe('Resume · 3 min left');
+  });
+
   it('offline, its chapter playing can still be paused', () => {
     setPlayerState({ queue: [JONAH_2], qi: 0, status: 'playing', time: 40, duration: 240 });
     render(<HeroListen onClick={() => {}} canPlay={() => false} here={() => true} />);

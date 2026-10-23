@@ -148,11 +148,22 @@ function scrollToPendingMark(sk, placeRef, missRef, loaded) {
     if (!waiting || loaded) {
       try { el.scrollIntoView({ block: 'center' }); } catch (_e) { /* scrollIntoView unsupported */ }
     }
+    if (window.navHandoff.peek('pendingScrollFlash') === sk) { window.navHandoff.clear('pendingScrollFlash'); flashBlock(el); }
     endScrollWait(sk, missRef);
   } else if (!waiting) {
     if (miss) miss.stop();
     missRef.current = { key: sk, place: here, stop: watchReaderScroll(sk, missRef) };
   }
+}
+
+/** The pulse a shared passage gets on arrival (U07.6): the letters' tap-through highlight, one 8.4 s cycle. */
+const FLASH_MS = 8400;
+/** @param {Element} el */
+function flashBlock(el) {
+  try {
+    el.classList.add('letter-highlight', 'shared-flash');
+    setTimeout(() => { el.classList.remove('letter-highlight', 'shared-flash'); }, FLASH_MS);
+  } catch (_e) { /* the jump itself already happened */ }
 }
 
 /**

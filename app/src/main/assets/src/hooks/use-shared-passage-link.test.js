@@ -75,6 +75,21 @@ describe('openSharedPassage', () => {
     expect(nav.mock.calls[0][0]).toMatchObject({ type: 'letter', letterId: 'the-wide-path', screen: 'vot-one-letter', key: 'letter:the-wide-path:3' });
   });
 
+  it('asks for one flash on a shared letter passage, never on a verse (it flashes by its anchor) (U07.6)', async () => {
+    const slots = new Map();
+    const navHandoff = { set: (k, v) => slots.set(k, v) };
+    /** @type {any} */ (globalThis).findEntryContext = (id) => (id === 'the-wide-path'
+      ? { kind: 'letter', screen: 'vot-one-letter', collection: 'one', title: 'The Wide Path' } : null);
+    openSharedPassage(fakeWin('?p=letter%3Athe-wide-path%3A3', { __loadVotCorpus: () => Promise.resolve(), navHandoff }).win, vi.fn());
+    await flush();
+    expect(slots.get('pendingScrollFlash')).toBe('letter:the-wide-path:3');
+    slots.clear();
+    /** @type {any} */ (globalThis).BOOKS = JOHN;
+    openSharedPassage(fakeWin('?p=bible%3Ajohn%3A3%3A16', { __loadBibleCorpus: () => Promise.resolve(), navHandoff }).win, vi.fn());
+    await flush();
+    expect(slots.has('pendingScrollFlash')).toBe(false);
+  });
+
   /* n6-01: a Bible or Letter Study chapter reads as LetterView, so it shares as
      letter:<chapterId>:<n>. findEntryContext knows study chapters only once the
      studies are loaded, which a fresh recipient's boot never did: the link

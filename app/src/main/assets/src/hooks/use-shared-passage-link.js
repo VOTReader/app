@@ -91,6 +91,9 @@ function openKey(win, key, navigateToLink, final) {
     }
     if (final && _parkedSharedKey === key) _parkedSharedKey = null; // W41: settled, by a mount nothing replaces
     if (!ok) { say('That shared passage could not be found.', 4000); return; }
+    // U07.6: mark the passage a friend sent. A Bible verse flashes by its verse anchor; any other passage asks the
+    // scroll that finds its block to flash it once (use-dom-annotation-sync).
+    if (ep && ep.type !== 'bible' && win.navHandoff) win.navHandoff.set('pendingScrollFlash', ep.key || key);
     navigateToLink(ep, { sourceLetterTitle: 'Shared passage', silent: true });
   };
   const load = kind === 'bible' ? win.__loadBibleCorpus

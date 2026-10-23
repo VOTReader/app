@@ -5993,7 +5993,9 @@
     }
     .note-sheet-menu-btn {
       background: none; border: none;
-      width: 32px; height: 32px;
+      /* 44 px to the finger (wave 3 re-check A06.2: the last 32 px control on the sheet); the negative margin keeps
+         the header row's height and the glyph where it sat. */
+      width: 44px; height: 44px; margin: -6px;
       display: flex; align-items: center; justify-content: center;
       color: var(--cream-muted); cursor: pointer;
       border-radius: 6px;
@@ -9723,3 +9725,6 @@ body.light .install-step-num { color: #fff; }
 .install-step-note { margin-top: 0.25rem; font-size: var(--fs-15); line-height: 1.35; color: var(--cream-dim); }
 .install-step-pic { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--gold-border); }
 .install-steps-done { margin-top: 0.9rem; background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+
+/* Wave 3 large text (J-w3g1.1): rules for text sizes of 1.8 and up, keyed on the root class use-settings sets. */
+.vot-large-text .pill-left { display: none; }   /* RC.8: "RESUME · 1 MIN LE" was cut at both screen edges at 300% */

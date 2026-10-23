@@ -183,6 +183,12 @@ describe('useSettings — SEC-3 font-scale clamp (hostile .votbak values)', () =
     mount({ savedSettings: { fontScale: 'Infinity' } });
     expect(scaleVar()).toBe('1');
   });
+
+  it.each([['1.7', false], ['1.8', true], ['3', true], ['9', true], ['abc', false]])(
+    'fontScale %j sets the large-text root class: %j (J-w3g1.1)', (input, on) => {
+      mount({ savedSettings: { fontScale: input } });
+      expect(document.documentElement.classList.contains('vot-large-text')).toBe(on);
+    });
 });
 
 describe('useSettings — reading-font routing', () => {

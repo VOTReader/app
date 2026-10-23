@@ -81,6 +81,9 @@ const DEFAULT_FLIPS = Object.freeze([
   Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
 ]);
 
+/** The text scale from which the app lays out for large text (the root class vot-large-text). */
+export const LARGE_TEXT_SCALE = 1.8;
+
 /**
  * What a saved profile still owes from the rounds it has not been through: `{ key: newDefault }`
  * for every key still at its OLD default that the reader never set, plus the stamp. Pure, so the
@@ -299,6 +302,9 @@ export function useSettings({ savedSettings, theme }) {
     const _fs = parseFloat(String(settings.fontScale));
     const _fsSafe = Number.isFinite(_fs) ? Math.min(3, Math.max(0.8, _fs)) : 1;
     document.documentElement.style.setProperty("--font-scale", String(_fsSafe));
+    // Wave 3 (J-w3g1.1): one root class for the large sizes (1.8 and up), where gutters, letter-spacing and long
+    // one-line labels stop fitting a phone; app.css keys its large-text rules on it.
+    document.documentElement.classList.toggle("vot-large-text", _fsSafe >= LARGE_TEXT_SCALE);
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on

@@ -168,6 +168,23 @@ export function AppShellOverlays({
 
       {gardenWarningOpen && (() => {
         const selectedTier = getGardenTier(settings.gardenTier);
+        // U09.6: offline, the Wi-Fi and size gate led on to "Failed to load". Before the first visit nothing of the
+        // Garden is on the phone, so say that it needs a connection, and offer only Go Back.
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          return (
+            <div className="garden-warning-overlay" onClick={() => setGardenWarningOpen(false)}>
+              <div className="garden-warning-modal" ref={gardenTrapRef} role="dialog" aria-modal="true" aria-labelledby="garden-warning-title" onClick={(e) => e.stopPropagation()}>
+                <div className="garden-warning-title" id="garden-warning-title">No connection</div>
+                <div className="garden-warning-body">
+                  The pictures of <em>A Return to The Garden</em> come from the internet, and stay on your phone once you have seen them. Connect, then open it again.
+                </div>
+                <div className="garden-warning-actions">
+                  <button className="garden-warning-btn garden-warning-btn-cancel" onClick={() => setGardenWarningOpen(false)}>Go Back</button>
+                </div>
+              </div>
+            </div>
+          );
+        }
         return (
           <div className="garden-warning-overlay" onClick={() => setGardenWarningOpen(false)}>
             <div className="garden-warning-modal" ref={gardenTrapRef} role="dialog" aria-modal="true" aria-labelledby="garden-warning-title" onClick={(e) => e.stopPropagation()}>
