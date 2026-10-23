@@ -8,7 +8,9 @@ import { CachedStore } from './cached-store.js';
 import { IDBAdapter } from './idb-adapter.js';
 import { DiagnosticLog } from '../utils/diagnostic-log.js';
 
-const modules = /** @type {Record<string, Record<string, any>>} */ (/** @type {any} */ (import.meta).glob(['./*.js', '!./*.test.js'], { eager: true }));
+// vite replaces import.meta.glob by its literal name, so no cast around it
+// @ts-ignore - ImportMeta has no glob in this tsconfig
+/** @type {Record<string, Record<string, any>>} */ const modules = import.meta.glob(['./*.js', '!./*.test.js'], { eager: true });
 
 describe('every IDB-backed store is in STORE_NAMES (ds5 s10.3)', () => {
   const stores = [];

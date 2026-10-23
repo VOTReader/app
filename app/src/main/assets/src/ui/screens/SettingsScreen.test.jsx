@@ -737,12 +737,13 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
 
   it('reports a failed personal-data deletion as failure and does not reload', async () => {
     // A failed delete (onerror). A blocked one is still running, not failed (sweep v033:
-    // backup-flow.test.js).
+    // backup-flow.test.js). The library's own delete: when only the media's fails, the
+    // library is already gone and the page reloads with its writers frozen (ds5 s33.1).
     const toastSpy = vi.fn();
     const deleteSpy = vi.spyOn(indexedDB, 'deleteDatabase').mockImplementation((name) => {
       const req = {};
       queueMicrotask(() => {
-        if (name === 'vot-journal-media') req.onerror && req.onerror();
+        if (name === 'votreader') req.onerror && req.onerror();
         else req.onsuccess && req.onsuccess();
       });
       return req;
@@ -763,7 +764,7 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       });
       expect(localStorage.getItem('vot-clear-probe')).toBe('keep-until-critical-deletes-finish');
       expect(window.location.reload).not.toHaveBeenCalled();
-      expect(deleteSpy).toHaveBeenCalledWith('vot-journal-media');
+      expect(deleteSpy).toHaveBeenCalledWith('votreader');
     } finally {
       localStorage.removeItem('vot-clear-probe');
     }
