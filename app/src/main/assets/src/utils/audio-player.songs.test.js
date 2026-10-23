@@ -605,7 +605,7 @@ describe('songs kept on this phone (K1)', () => {
       expect(document.getElementById('vot-toast-song-offline').textContent).toContain('This song isn’t on this phone.');
       // A reading offline keeps its own notice.
       AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
-      expect(document.getElementById('vot-toast-audio').textContent).toBe('Playing audio requires an internet connection.');
+      expect(document.getElementById('vot-toast-audio').textContent).toBe('Not on this phone. Connect to listen.');
     } finally { delete window.__openSongs; }
   });
 

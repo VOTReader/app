@@ -21,7 +21,8 @@ import {
 /** Shared DOM id so every audio message replaces the previous one. */
 export const AUDIO_TOAST_ID = 'vot-toast-audio';
 
-export const OFFLINE_MSG = 'Playing audio requires an internet connection.';
+/** Offline, and nothing asked for is on the phone: says what to do (downloads brief 2026-10-23, section 7 item 4). */
+export const OFFLINE_MSG = 'Not on this phone. Connect to listen.';
 export const LOAD_FAIL_MSG = 'Couldn’t load this track.';
 /** A streamed recording that died at the network (MediaError 2) with the phone still online: a dead zone (U04.2). */
 export const NO_SIGNAL_MSG = 'No signal. This recording isn’t on your phone.';

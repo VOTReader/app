@@ -1922,7 +1922,7 @@ describe('audio-player — offline', () => {
     expect(AudioPlayer.getState().queue).toHaveLength(0);
     const toast = document.getElementById(AUDIO_TOAST_ID);
     expect(toast).toBeTruthy();
-    expect(toast.textContent).toBe('Playing audio requires an internet connection.');
+    expect(toast.textContent).toBe('Not on this phone. Connect to listen.');
     expect(toast.getAttribute('aria-live'), 'a notice, not an interruption (s31.6)').toBe('polite');
     expect(toast.classList.contains('vot-toast')).toBe(true);
   });
@@ -1988,7 +1988,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     const s = AudioPlayer.getState();
     expect(s.status).toBe('paused');
     expect(s.queue[s.qi].url).toBe(URL_OF('idA2'));
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
     // Back online, Play loads the recording the bar names (not the one that ended).
     setOnline(true);
     AudioPlayer.toggle();
@@ -2141,7 +2141,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     AudioPlayer.stop();
     AudioPlayer.playTrack({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA1') });
     expect(AudioPlayer.getState().status).toBe('idle');
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
   });
 
   // SHOULD 5: a letter the listener CHOSE is refused when it is not on the phone, even if a later one is.
@@ -2154,7 +2154,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
       setOnline(false);
       AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
       expect(AudioPlayer.getState().status).toBe('idle');
-      expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+      expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
       AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
       expect(AudioPlayer.getState().status).toBe('idle');
       // Play all (no chosen start) still plays what is on the phone.
@@ -2171,7 +2171,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     expect(AudioPlayer.getState().status).toBe('idle');
     expect(AudioPlayer.getState().queue).toHaveLength(0);
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
   });
 });
 
@@ -2199,7 +2199,7 @@ describe('audio-player — load errors', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     setOnline(false);
     el().dispatchEvent(new Event('error'));
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
   });
 
   it('stop() teardown does not fire a spurious failure toast', () => {
