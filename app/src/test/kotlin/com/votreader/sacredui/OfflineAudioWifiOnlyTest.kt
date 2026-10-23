@@ -20,8 +20,8 @@ import kotlin.test.assertTrue
 
 /**
  * Download only on Wi-Fi (ra6, Corbin 2026-10-14, brief design-10): with the switch on and the network metered, a
- * download waits in the queue and lands once the network is unmetered; one on its way stops, keeps no bytes, and
- * starts again from the top on Wi-Fi; a cancel ends the wait. Off (the default) nothing changes. A real worker thread:
+ * download waits in the queue and lands once the network is unmetered; one on its way stops, keeps its bytes (dl-d2),
+ * and goes on on Wi-Fi; a cancel ends the wait. Off (the default) nothing changes. A real worker thread:
  * the wait is the worker's.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -89,7 +89,7 @@ class OfflineAudioWifiOnlyTest {
     }
 
     @Test
-    fun `one on its way stops when the network turns metered, keeps no bytes, and starts again from the top on Wi-Fi`() {
+    fun `one on its way stops when the network turns metered, keeps its bytes, and on Wi-Fi goes on from them`() {
         unmetered.set(true)
         val s = store(opener = {
             val n = opens.incrementAndGet()
@@ -108,7 +108,7 @@ class OfflineAudioWifiOnlyTest {
         s.enqueue(listOf(item()))
         waitFor("the stop") { JSONObject(s.stateJson()).getBoolean("waiting") }
         assertFalse(s.isSaved(url1))
-        assertEquals(emptyList(), leftovers(), "no partial bytes kept")
+        assertEquals(listOf("one-christmas-B.mp3.part".let { "audio-v1__$it" }), leftovers(), "its bytes kept for a resume (dl-d2)")
         val st = JSONObject(s.stateJson())
         assertEquals(url1, st.getJSONArray("queued").getString(0), "back in the queue")
         assertTrue(st.isNull("active"))
@@ -116,7 +116,7 @@ class OfflineAudioWifiOnlyTest {
         unmetered.set(true)
         s.gateChanged()
         waitFor("the second try") { s.isSaved(url1) }
-        assertEquals(2, opens.get(), "started again from the top")
+        assertEquals(1, opens.get(), "every byte was on disk when it stopped: it lands without asking the server again")
         assertEquals(body.size.toLong(), s.fileFor(url1)!!.length())
     }
 

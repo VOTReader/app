@@ -1550,6 +1550,12 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        // dl-d2: a download queue saved from an earlier run goes on under its job, which Android lets the app
+        // schedule only now, while it is visible.
+        try {
+            val store = OfflineAudioStore.shared(this)
+            if (store.busy()) DownloadJob.schedule(this, store)
+        } catch (e: Exception) { Timber.w(e, "downloads: resume check") }
     }
 
     override fun onPause() {

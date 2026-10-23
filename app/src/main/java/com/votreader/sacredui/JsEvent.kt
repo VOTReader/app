@@ -63,8 +63,8 @@ sealed class JsEvent(val fn: String) {
     // toggle()/next()/prev()/seek().
     data object MediaCommand : JsEvent("__votMediaCommand")
     // A downloaded-recordings event from OfflineAudioStore (listening item 8):
-    // one JSON string, {type: queued|progress|done|failed|cancelled|removed,
-    // url?, urls?, all?, bytes?, total?, reason?}. utils/offline-audio.js
+    // one JSON string, {type: queued|progress|done|failed|cancelled|removed|
+    // checked|sizes|waiting, url?, urls?, all?, bytes?, total?, reason?}. utils/offline-audio.js
     // installs the receiver and mirrors the store.
     data object OfflineAudio : JsEvent("__votOfflineAudio")
     // The native player's events (m3): one JSON string, {type: state|tick|transition|error, url, pos, dur, rate,

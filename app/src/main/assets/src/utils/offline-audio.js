@@ -72,6 +72,17 @@ let _news = { seq: 0, text: '' };
 function _say(text) { _news = { seq: _news.seq + 1, text }; }
 /** The most urls one size call carries (OfflineAudioStore.MAX_SIZE_BATCH). */
 const SIZE_BATCH = 400;
+/**
+ * The most urls one save, remove or cancel call carries (dl-d2): an older phone app took 400 and dropped the rest
+ * silently, while the rows said every one was queued (a whole edition is 1,189).
+ */
+const SAVE_BATCH = 400;
+/** dl-d2: the native queue's own words (BRIDGE.md): paused, why it waits, what is left, the batch's counts. */
+let _paused = false;
+/** @type {string | null} paused | wifi | offline | space | retrying */
+let _reason = null;
+let _left = { count: 0, bytes: 0, unknown: 0 };
+let _batch = { done: 0, total: 0, failed: 0 };
 let _loaded = false;
 
 /** @returns {any} the phone app's bridge, or null */
@@ -144,6 +155,12 @@ function refresh() {
   _queued = new Set((Array.isArray(s.queued) ? s.queued : []).filter((u) => typeof u === 'string'));
   const a = s.active;
   _active = a && typeof a.url === 'string' ? { url: a.url, bytes: Number(a.bytes) || 0, total: Number(a.total) || -1 } : null;
+  _paused = s.paused === true;
+  _reason = typeof s.reason === 'string' ? s.reason : null;
+  const l = s.left && typeof s.left === 'object' ? s.left : {};
+  _left = { count: Number(l.count) || 0, bytes: Number(l.bytes) || 0, unknown: Number(l.unknown) || 0 };
+  const bt = s.batch && typeof s.batch === 'object' ? s.batch : {};
+  _batch = { done: Number(bt.done) || 0, total: Number(bt.total) || 0, failed: Number(bt.failed) || 0 };
   for (const url of _saved.keys()) _failed.delete(url);
   _notify();
 }
@@ -159,6 +176,10 @@ function _onEvent(json) {
   const url = typeof e.url === 'string' ? e.url : null;
   switch (e.type) {
     case 'checked':   // the listings of what is on the phone were read again: items now say which are stale (n2-01)
+      refresh();
+      return;
+    case 'waiting':   // dl-d2: the head of the queue holds (space, retrying, offline); the state says why
+      if (e.reason === 'space' && _reason !== 'space') _say('Not enough room on this phone. Downloads wait until there is.');
       refresh();
       return;
     case 'done':
@@ -267,7 +288,34 @@ function _flushSizes() {
 function _send(urls, method) {
   const b = _bridge();
   if (!b || typeof b[method] !== 'function') return false;
-  try { b[method](JSON.stringify(urls)); return true; } catch (_e) { return false; }
+  // ['*'] (everything) goes as it is; a list goes SAVE_BATCH at a time.
+  for (let i = 0; i < urls.length; i += SAVE_BATCH) {
+    try { b[method](JSON.stringify(urls.slice(i, i + SAVE_BATCH))); } catch (_e) { return false; }
+  }
+  return true;
+}
+
+/**
+ * Hand `items` to the store SAVE_BATCH at a time. @returns {number} how many were handed over before a call threw
+ * @param {any} b @param {any[]} items
+ */
+function _save(b, items) {
+  let sent = 0;
+  for (let i = 0; i < items.length; i += SAVE_BATCH) {
+    const chunk = items.slice(i, i + SAVE_BATCH);
+    try { b.offlineAudioSave(JSON.stringify(chunk)); } catch (_e) { break; }
+    sent += chunk.length;
+  }
+  return sent;
+}
+
+/** A no-argument store call (pause, resume); the state is read again after it. @param {string} method */
+function _call(method) {
+  const b = _bridge();
+  if (!b || typeof b[method] !== 'function') return false;
+  try { b[method](); } catch (_e) { return false; }
+  refresh();
+  return true;
 }
 
 export const OfflineAudio = {
@@ -355,19 +403,27 @@ export const OfflineAudio = {
   /** @returns {boolean} downloads wait for Wi-Fi now (Download only on Wi-Fi is on and the phone is on mobile data) */
   waiting: () => { if (!_loaded) refresh(); return _waiting; },
   /**
-   * Download each of `list` to the phone (queued one at a time, natively or in the web store).
-   * @param {Array<{ url: string, key: string, title: string }>} list
+   * Download each of `list` to the phone (queued one at a time, natively or in the web store). `bytes`, when known
+   * (the manifest's size), lets the phone total the queue before a byte arrives.
+   * @param {Array<{ url: string, key: string, title: string, bytes?: number }>} list
    * @returns {boolean} false where downloads are not possible
    */
   download(list) {
     if (!_loaded) refresh();
     const b = _bridge();
     const items = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && !_saved.has(t.url))
-      .map((t) => ({ url: t.url, key: String(t.key || ''), title: String(t.title || '') }));
+      .map((t) => {
+        /** @type {{ url: string, key: string, title: string, bytes?: number }} */
+        const it = { url: t.url, key: String(t.key || ''), title: String(t.title || '') };
+        if (typeof t.bytes === 'number' && t.bytes > 0) it.bytes = t.bytes;
+        return it;
+      });
     if (!b || typeof b.offlineAudioSave !== 'function') return false;
     if (!items.length) return true;
-    try { b.offlineAudioSave(JSON.stringify(items)); } catch (_e) { return false; }
-    for (const t of items) { _queued.add(t.url); _failed.delete(t.url); _asked.set(t.url, t); }
+    const sent = _save(b, items);
+    if (!sent) return false;
+    if (sent < items.length) items.length = sent;
+    for (const t of items) { _queued.add(t.url); _failed.delete(t.url); _asked.set(t.url, { url: t.url, key: t.key, title: t.title }); }
     _warmTimings(items);
     _notify();
     return true;
@@ -405,8 +461,7 @@ export const OfflineAudio = {
     const items = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && _saved.has(t.url))
       .map((t) => ({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), update: true }));
     if (!b || typeof b.offlineAudioSave !== 'function' || !items.length) return false;
-    try { b.offlineAudioSave(JSON.stringify(items)); } catch (_e) { return false; }
-    return true;
+    return _save(b, items) > 0;
   },
   /** An update of a recording on the phone is on its way. @param {string} url */
   isUpdating: (url) => _saved.has(url) && (_queued.has(url) || !!(_active && _active.url === url)),
@@ -426,6 +481,28 @@ export const OfflineAudio = {
     const busy = [..._queued].concat(_active ? [_active.url] : []).filter((u) => !isSongUrl(u));
     if (busy.length) _send(busy, 'offlineAudioCancel');
   },
+  /** @returns {boolean} the phone's downloads are paused (Pause all; it holds across a restart) */
+  paused: () => { if (!_loaded) refresh(); return _paused; },
+  /** @returns {string | null} why the queue is not moving: paused | wifi | offline | space | retrying; null when it is */
+  reason: () => { if (!_loaded) refresh(); return _reason; },
+  /** @returns {{ count: number, bytes: number, unknown: number }} recordings still to download, their known bytes, how many have no size yet */
+  left: () => { if (!_loaded) refresh(); return _left; },
+  /** @returns {{ done: number, total: number, failed: number }} this batch (since the queue was last empty): "3 of 31" */
+  batch: () => { if (!_loaded) refresh(); return _batch; },
+  /**
+   * The recordings on their way in order, the one downloading first ("Waiting · 2nd in line"); songs being kept left
+   * out. key and title are what this session asked them as, '' for ones queued before a restart.
+   * @returns {Array<{ url: string, key: string, title: string }>}
+   */
+  queue: () => {
+    if (!_loaded) refresh();
+    const urls = (_active ? [_active.url] : []).concat([..._queued].filter((u) => !_active || u !== _active.url));
+    return urls.filter((u) => !isSongUrl(u)).map((u) => _asked.get(u) || { url: u, key: '', title: '' });
+  },
+  /** Pause all downloads (the one on its way keeps its bytes). @returns {boolean} false where the store cannot */
+  pause: () => _call('offlineAudioPause'),
+  /** Resume all downloads, from their bytes. @returns {boolean} false where the store cannot */
+  resume: () => _call('offlineAudioResume'),
   /** Tests only: forget everything and re-install the receiver. */
   _reset() {
     _listeners.clear();
@@ -434,6 +511,7 @@ export const OfflineAudio = {
     if (_sizeRetryTimer) clearTimeout(_sizeRetryTimer);
     _sizeRetryTimer = null; _sizeRetry = 0; _news = { seq: 0, text: '' };
     _active = null; _totalBytes = 0; _freeBytes = -1; _evictable = false; _waiting = false; _loaded = false; _version = 0;
+    _paused = false; _reason = null; _left = { count: 0, bytes: 0, unknown: 0 }; _batch = { done: 0, total: 0, failed: 0 };
     _install();
   },
 };

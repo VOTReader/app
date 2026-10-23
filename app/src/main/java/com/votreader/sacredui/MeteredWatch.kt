@@ -22,17 +22,27 @@ class MeteredWatch(context: Context) {
     /** The default network is unmetered now. */
     fun unmetered(): Boolean = free
 
+    @Volatile
+    private var up: Boolean = try { cm?.activeNetwork != null } catch (e: Exception) { true }
+
+    /** The phone has a default network now (dl-d2: a download that failed without one waits for it, no retry spent). */
+    fun online(): Boolean = up
+
     /** Follow the default network; [onChange] runs (on a ConnectivityManager thread) each time the answer flips. */
     fun start(onChange: () -> Unit) {
         val m = cm ?: return
         try {
             m.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                    set(unmeteredBy(caps), onChange)
+                    val wasUp = up
+                    up = true
+                    set(unmeteredBy(caps), onChange, wasUp != up)
                 }
 
                 override fun onLost(network: Network) {
-                    set(false, onChange)
+                    val wasUp = up
+                    up = false
+                    set(false, onChange, wasUp != up)
                 }
             })
         } catch (e: Exception) {
@@ -41,8 +51,8 @@ class MeteredWatch(context: Context) {
         }
     }
 
-    private fun set(now: Boolean, onChange: () -> Unit) {
-        if (now == free) return
+    private fun set(now: Boolean, onChange: () -> Unit, moved: Boolean = false) {
+        if (now == free && !moved) return
         free = now
         try { onChange() } catch (e: Exception) { Timber.w(e, "metered watch: a listener threw") }
     }

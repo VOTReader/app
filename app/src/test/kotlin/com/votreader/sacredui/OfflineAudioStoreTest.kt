@@ -149,13 +149,21 @@ class OfflineAudioStoreTest {
     }
 
     @Test
-    fun `no room on the phone refuses the download before a byte is written`() {
-        val s = store(free = 50L shl 20)   // 50 MB free: under the recording + the 200 MB margin
-        s.enqueue(listOf(item(url1)))
-        assertFalse(s.isSaved(url1))
-        val last = events.last()
-        assertEquals("failed", last.getString("type"))
-        assertEquals("space", last.getString("reason"))
+    fun `no room on the phone waits for room before a byte is written`() {
+        // dl-d2: no longer a failure (Corbin's downloads picks: "pause when full"); the head of the queue waits.
+        val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+        try {
+            val seen = java.util.Collections.synchronizedList(ArrayList<JSONObject>())
+            val s = OfflineAudioStore(tmp.root, opener = { opened() }, executor = worker, freeBytes = { 50L shl 20 }, emit = { seen += JSONObject(it) })
+            s.enqueue(listOf(item(url1)))
+            val until = System.currentTimeMillis() + 5_000
+            while (seen.none { it.getString("type") == "waiting" } && System.currentTimeMillis() < until) Thread.sleep(20)
+            assertEquals("space", seen.first { it.getString("type") == "waiting" }.getString("reason"))
+            assertFalse(s.isSaved(url1))
+            assertTrue(File(tmp.root, "offline-audio").listFiles { f -> f.name.endsWith(".part") }.isNullOrEmpty())
+            assertFalse(seen.any { it.getString("type") == "failed" })
+            s.cancel(listOf(url1))   // the wait ends on a cancel
+        } finally { worker.shutdownNow() }
     }
 
     @Test

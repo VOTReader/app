@@ -48,6 +48,9 @@
     <!-- RECEIVE_BOOT_COMPLETED - a "normal" (non-runtime) permission. rp-s1: an alarm does not survive a reboot, so
          PlanReminderReceiver sets the reading-plan reminder's alarm again after one. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- RUN_USER_INITIATED_JOBS - a "normal" (non-runtime) permission. dl-d2: downloads run as a user-initiated data
+         transfer job (Android 14+, DownloadJob.kt) so they keep going with the app closed. -->
+    <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- usesCleartextTraffic="false" is DOCUMENTATION, not new hardening: with
@@ -165,6 +168,16 @@
                 <action android:name="android.intent.action.TIMEZONE_CHANGED" />
             </intent-filter>
         </receiver>
+
+        <!-- dl-d2: the downloads' user-initiated data transfer job and its notification's Pause (DownloadJob.kt).
+             Only the system binds the job (BIND_JOB_SERVICE); the receiver is reached by its explicit PendingIntent. -->
+        <service
+            android:name=".DownloadJobService"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <receiver
+            android:name=".DownloadActionReceiver"
+            android:exported="false" />
 
     </application>
 

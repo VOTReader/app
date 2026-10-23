@@ -739,7 +739,7 @@ class AppInterface(
     @JavascriptInterface
     fun offlineAudioState(): String = try { host.offlineAudio?.stateJson() ?: "" } catch (e: Exception) { "" }
 
-    /** Download each of `[{url, key, title}]`. */
+    /** Download each of `[{url, key, title, update?, bytes?}]` (at most 2000 a call; the page sends 400). */
     @JavascriptInterface
     fun offlineAudioSave(json: String?) { host.offlineAudio?.enqueueJson(json) }
 
@@ -762,6 +762,14 @@ class AppInterface(
     /** Settings > Download only on Wi-Fi (ra6): on, downloads wait while the network is metered. */
     @JavascriptInterface
     fun offlineAudioWifiOnly(on: Boolean) { host.offlineAudio?.setWifiOnly(on) }
+
+    /** Pause all downloads (dl-d2): the one on its way keeps its bytes; the queue holds, across a restart too. */
+    @JavascriptInterface
+    fun offlineAudioPause() { host.offlineAudio?.pause() }
+
+    /** Resume all downloads (dl-d2): they go on from their bytes. */
+    @JavascriptInterface
+    fun offlineAudioResume() { host.offlineAudio?.resume() }
 
     // ─── The native player (m3) ─────────────────────────────────────────
     // utils/native-audio.js, the page's stand-in <audio>, drives ExoPlayer through these. Binder thread: the port

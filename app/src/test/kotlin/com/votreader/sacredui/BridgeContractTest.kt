@@ -149,6 +149,9 @@ class BridgeContractTest {
         "offlineAudioSizes" to 1,
         "offlineAudioCheck" to 0,
         "offlineAudioWifiOnly" to 1,
+        // dl-d2: Pause all / Resume all (the saved queue).
+        "offlineAudioPause" to 0,
+        "offlineAudioResume" to 0,
         // m3, the native player: called DIRECTLY (guarded window.AndroidBridge)
         // by src/utils/native-audio.js, the page's stand-in <audio>; no
         // platform-bridge mirror. JSON in; audioJournal answers JSON.
