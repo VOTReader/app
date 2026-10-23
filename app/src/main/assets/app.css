@@ -1383,9 +1383,14 @@
       .now-playing .np-close svg { width: 26px; height: 26px; }
       .np-kicker {
         min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px 6px; text-align: center;
-        color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.2em; line-height: 1.5; text-transform: uppercase;
+        min-width: 0; white-space: nowrap;
+        color: var(--gold); font-family: var(--font-cinzel); font-size: clamp(11px, var(--fs-12), 14px); letter-spacing: 0.12em; line-height: 1.5; text-transform: uppercase;
         touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
       }
+      /* One line at 360 px and 200 % text (S22 wrapped "LETTER 1 OF / 29"): the collection shrinks to an ellipsis, the count never does. */
+      .np-kicker-from { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+      .np-kicker-dot { flex-shrink: 0; white-space: pre; }
+      .np-kicker-at { flex-shrink: 0; }
       .np-head .row-menu-btn { width: 48px; height: 48px; justify-self: end; }
       .np-body {
         flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column;

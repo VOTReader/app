@@ -268,6 +268,9 @@ describe('AudioManagerSheet — the head: kicker, byline, ⋯', () => {
     openSheet();
     expect(screen.getByRole('heading', { name: 'A Word of Warning' })).toBeTruthy();
     expect(kicker()).toBe('Volume One · Letter 1 of 4');
+    // The collection is the part that gives way on a narrow screen; the count is its own unshrinking span.
+    expect(document.querySelector('.np-kicker-from').textContent).toBe('Volume One');
+    expect(document.querySelector('.np-kicker-at').textContent).toBe('Letter 1 of 4');
     expect(byline()).toBe('Read by Benjamin');
 
     fireEvent.click(nextTrack());

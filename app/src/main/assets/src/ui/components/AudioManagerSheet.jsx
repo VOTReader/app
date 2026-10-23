@@ -326,9 +326,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const heading = liveTitle || current.title;
   // Counted in recordings, as the bar and the collection screens count them (queuePlace).
   const counted = queuePlace(queue, state.qi);
-  const kicker = songId
-    ? (current.sub || 'Songs of the Letters')
-    : [current.sub, restoring || single || counted.of < 2 ? null : placeNoun(current) + ' ' + counted.at + ' of ' + counted.of].filter(Boolean).join(' · ') || 'The Volumes of Truth';
+  const kickerAt = songId || restoring || single || counted.of < 2 ? '' : placeNoun(current) + ' ' + counted.at + ' of ' + counted.of;
+  const kickerFrom = songId ? (current.sub || 'Songs of the Letters') : (current.sub || (kickerAt ? '' : 'The Volumes of Truth'));
   // Suppressed when it would only echo the title: a per-chapter Bible track is titled "Genesis 2" and labelled
   // "Chapter 2" (2026-08-10). The label itself is untouched; see displayPartLabel.
   const part = liveTitle ? current.title : displayPartLabel(current.title, current.partLabel);
@@ -399,7 +398,12 @@ export function AudioManagerSheet({ open, state, onClose }) {
         <header className="np-head">
           <button type="button" className="sheet-handle-back np-close" onClick={onClose} aria-label="Close player"><DownIcon /></button>
           {/* The head is the drag zone (the kicker's words are not a control): a drag down closes the screen. */}
-          <div className="np-kicker" {...grab} onClick={undefined}>{kicker}</div>
+          {/* One line at any text size: the collection gives way (ellipsis) before the count does. */}
+          <div className="np-kicker" {...grab} onClick={undefined}>
+            {kickerFrom ? <span className="np-kicker-from">{kickerFrom}</span> : null}
+            {kickerFrom && kickerAt ? <span className="np-kicker-dot" aria-hidden="true">{' · '}</span> : null}
+            {kickerAt ? <span className="np-kicker-at">{kickerAt}</span> : null}
+          </div>
           <RowMenu label={'More for ' + (heading || 'this recording')} items={menu} />
         </header>
 
