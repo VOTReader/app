@@ -269,6 +269,18 @@ describe('the outbox', () => {
     expect(pendingSongVotes()).toEqual([]);
   });
 
+  it('in the APK a vote native refuses (not a vote) is dropped; a bridge that throws keeps it for later', async () => {
+    window.AndroidBridge = { queueSongVote: () => false };
+    await loadSongVotes();
+    setSongVote(A, 1, Date.now());
+    await flushSongVotes();
+    expect(pendingSongVotes()).toEqual([]);
+    window.AndroidBridge = { queueSongVote: () => { throw new Error('gone'); } };
+    setSongVote(B, 1, Date.now());
+    await flushSongVotes();
+    expect(pendingSongVotes()).toEqual([expect.objectContaining({ song: B })]);
+  });
+
   it('resends what a closed app left in the outbox on the next launch', async () => {
     const at = Date.now();
     idb.data.set(SONG_VOTE_KEYS.outbox, { [B]: { install: 'storedrandomid_0000', song: B, v: 1, at } });

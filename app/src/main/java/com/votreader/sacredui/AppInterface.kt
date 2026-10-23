@@ -717,6 +717,18 @@ class AppInterface(
     @JavascriptInterface
     fun planReminderOpened(): String = PlanReminder.takeOpened(host.activityContext.applicationContext)
 
+    // ─── Song votes (sy4-3, Corbin 2026-10-22) ─────────────────────────
+    // utils/song-votes.js hands each like or its clearing here; SongVotes keeps it and a network-constrained job
+    // sends it with the app closed. A thumbs-down never reaches here. False = not a vote (the page drops it).
+    @JavascriptInterface
+    fun queueSongVote(json: String?): Boolean =
+        try { SongVotes.queue(host.activityContext.applicationContext, json) } catch (e: Exception) { false }
+
+    /** The per-install id song votes carry: ANDROID_ID, salted and hashed (a reinstall keeps it); "" for none. */
+    @JavascriptInterface
+    fun songVoteInstallId(): String =
+        try { SongVotes.installId(host.activityContext.applicationContext) } catch (e: Exception) { "" }
+
     // ─── Downloaded recordings (listening item 8) ───────────────────────
     // JSON in, JSON out. The page's JSON is untrusted; OfflineAudioStore parses it
     // (a bad shape is a quiet no-op). Runs on the binder thread: the store is

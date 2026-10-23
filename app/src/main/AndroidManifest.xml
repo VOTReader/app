@@ -145,6 +145,13 @@
             </intent-filter>
         </service>
 
+        <!-- sy4-3: song votes send with the app closed (SongVotes.kt): a persisted JobScheduler job with a network
+             constraint; only the system may bind it. -->
+        <service
+            android:name=".SongVoteJob"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <!-- rp-s1: the daily reading-plan reminder (PlanReminder.kt). The alarm's PendingIntent names this receiver
              explicitly; the system's own broadcasts (reboot, update, clock and time-zone changes, after which the
              alarm is set again) reach an unexported receiver too. -->

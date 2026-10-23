@@ -129,6 +129,9 @@ class BridgeContractTest {
         "planReminderAsk" to 0,
         "planReminderSettings" to 0,
         "planReminderOpened" to 0,
+        // sy4-3 song votes: called directly (guarded) by utils/song-votes.js, no platform-bridge mirror.
+        "queueSongVote" to 1,
+        "songVoteInstallId" to 0,
         // sh1: the phone's share sheet. Mirrored by platform-bridge.js androidImpl
         // (utils/copy-share.js calls PlatformBridge.shareText before navigator.share).
         "shareText" to 1,

@@ -350,9 +350,8 @@ export function flushSongVotes() {
       let kept = false;
       for (const body of list) {
         if (bridge) {
-          let ok = false;
-          try { ok = bridge.queueSongVote(JSON.stringify(body)) !== false; } catch (_e) { ok = false; }
-          if (!ok) { kept = true; break; }
+          // Native keeps it and sends it (true); false = not a vote it will ever send (drop); a throw = try later.
+          try { bridge.queueSongVote(JSON.stringify(body)); } catch (_e) { kept = true; break; }
           _settleSent(body);
           continue;
         }
