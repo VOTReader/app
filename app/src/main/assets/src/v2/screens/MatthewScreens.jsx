@@ -200,7 +200,7 @@ function Verse({ ch, v, echo, onEcho }) {
   return (
     <>
       <span className="v" id={'v-' + v.n} data-read-seg={'v' + v.n} data-hl-key={key}>
-        <span className="vn">{v.n}</span>
+        <span className="vn">{v.n}</span>{' '}
         <span className="vt" data-hl-key={key} data-hl-dom="true">{v.text}</span>
         {echo.map((ref) => (
           <React.Fragment key={ref}>

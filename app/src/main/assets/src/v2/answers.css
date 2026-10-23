@@ -290,7 +290,7 @@ a[target="_blank"]:has(svg.ans-ico,svg.ans-ext)::after,:is(.ans-linkrow,.ans-als
 .sheet-handle-back { grid-column:1; justify-self:start; width:44px; height:44px; margin-left:-8px; padding:0; background:none; border:none; cursor:pointer; color:var(--gold-dim); font-size:var(--fsc-30); line-height:1; font-family:var(--font); display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; transition:color 0.15s ease; }
 .sheet-handle-back:active { color:var(--gold-bright); }
 @media (hover:hover) { .sheet-handle-back:hover { color:var(--gold-bright); } }
-.sheet-handle-grab { grid-column:2; width:132px; height:44px; padding:0; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
+.sheet-handle-grab { touch-action: none; grid-column:2; width:132px; height:44px; padding:0; background:none; border:none; cursor:pointer; display:flex; align-items:center; justify-content:center; -webkit-tap-highlight-color:transparent; }
 .sheet-handle-bar { width:44px; height:4px; background:var(--gold-border); border-radius:2px; transition:background 0.15s ease; }
 .sheet-handle-grab:active .sheet-handle-bar { background:var(--gold); }
 @media (hover:hover) { .sheet-handle-grab:hover .sheet-handle-bar { background:var(--gold); } }

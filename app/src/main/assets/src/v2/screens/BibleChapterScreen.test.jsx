@@ -80,8 +80,31 @@ describe('5c-search-match', () => {
       <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{ translation: 'kjv' }} replace={() => {}} onReady={onReady} />,
     );
     expect(container.querySelector('.eyebrow').textContent).toBe('The Scriptures of Truth · KJV');
-    expect(container.querySelector('#v-1').textContent).toBe('1KJV There was a man of the Pharisees named Nicodemus.');
+    expect(container.querySelector('#v-1').textContent).toBe('1 KJV There was a man of the Pharisees named Nicodemus.');
     expect(onReady).toHaveBeenCalled();
+  });
+
+  it('the number ends its word, and the chapter names the edition whose words show (rs1: copy tags it)', async () => {
+    g.BOOKS = { john: JOHN };
+    let loaded = false;
+    let land = () => {};
+    g.translateVerse = (book, ch, verse, tr) => (loaded ? tr.toUpperCase() + ' ' : '') + verse.text;
+    g.translationLabel = (tr) => tr.toUpperCase();
+    g.loadTranslation = () => new Promise((r) => { land = () => { loaded = true; r(undefined); }; });
+    try {
+      const { container } = render(
+        <BibleChapterScreen route={{ place: 'bible-chapter', book: 'john', chapter: 3 }} facts={{ translation: 'kjv' }} replace={() => {}} onReady={() => {}} />,
+      );
+      // "1 There": a long-press on the first word takes the word, not "1There"
+      expect(container.querySelector('#v-1 .vn').nextSibling?.textContent).toBe(' ');
+      // the KJV is still on its way: the words on the page are the NKJV's, and so is the tag
+      expect(container.querySelector('.body.bible').getAttribute('data-translation')).toBe('nkjv');
+      await act(async () => { land(); });
+      expect(container.querySelector('.body.bible').getAttribute('data-translation')).toBe('kjv');
+      expect(container.querySelector('#v-1').textContent).toBe('1 KJV There was a man of the Pharisees named Nicodemus.');
+    } finally {
+      delete g.loadTranslation;
+    }
   });
 });
 
@@ -273,7 +296,7 @@ describe("main's Bible chrome settings (Settings > Reading, v2-gaps 14; design d
     expect(container.querySelector('.reader-head .lede').textContent).toBe('Nicodemus and the New Birth · YahuShua Is Lord');
     // a section the restored chrome has no heading for keeps its own
     expect(texts(container, '.bible .sec-h')).toEqual(['Nicodemus and the New Birth', 'YahuShua HaMashiach Is Lord']);
-    expect(container.querySelector('#v-16').textContent).toBe('16For God so loved the world.');
+    expect(container.querySelector('#v-16').textContent).toBe('16 For God so loved the world.');
     unmount();
     const off = open({ restoredNames: false });
     expect(off.container.querySelector('.reader-head .lede').textContent).toBe("Nicodemus and the New Birth · John the Baptist's Final Witness");

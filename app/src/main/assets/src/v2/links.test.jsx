@@ -318,6 +318,13 @@ describe('the picker (4d-4f; main\'s LinkPicker and its words pickers)', () => {
     sel.removeAllRanges();
     sel.addRange(r);
     expect(selectionPick(box, 'verses', sel)).toEqual({ v1: 15, v2: 16, start: 3, end: 7, text: 'longer do I call you.16You di' });
+    // an end on the next verse's number is that verse's edge (rs1): the pick is verse 15's words, no "16"
+    const rn = document.createRange();
+    rn.setStart(box.querySelector('[data-verse="15"] .vw').firstChild, 3);
+    rn.setEnd(box.querySelector('[data-verse="16"] .vn').firstChild, 2);
+    sel.removeAllRanges();
+    sel.addRange(rn);
+    expect(selectionPick(box, 'verses', sel)).toEqual({ v1: 15, v2: 15, start: 3, end: 23, text: 'longer do I call you.' });
     const page = document.createElement('div');
     page.innerHTML = '<p data-hl-key="letter:run:0">Timothy, write as I speak. For the time</p>';
     document.body.appendChild(page);

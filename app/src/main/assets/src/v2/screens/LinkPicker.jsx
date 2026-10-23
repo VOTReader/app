@@ -156,8 +156,14 @@ export function selectionPick(root, kind, sel = typeof window.getSelection === '
     const a = el(range.startContainer);
     const b = el(range.endContainer);
     const p1 = a && a.closest('[data-verse]');
-    const p2 = b && b.closest('[data-verse]');
+    let p2 = b && b.closest('[data-verse]');
     if (!p1 || !p2 || !root.contains(p1) || !root.contains(p2)) return null;
+    // an end on a later verse's number is that verse's edge (rs1, main's reading-range): the pick ends with the verse before
+    const edge = p2 !== p1 && !!(b && b.closest('.vn'));
+    if (edge) {
+      const all = Array.from(root.querySelectorAll('[data-verse]'));
+      p2 = all[all.indexOf(p2) - 1] || p2;
+    }
     const w1 = p1.querySelector('.vw');
     const w2 = p2.querySelector('.vw');
     if (!w1 || !w2) return null;
@@ -166,7 +172,8 @@ export function selectionPick(root, kind, sel = typeof window.getSelection === '
     const inWords1 = w1.contains(range.startContainer);
     const start = snapWords(t1, inWords1 ? offsetIn(w1, range.startContainer, range.startOffset) : 0, t1.length).start;
     const end = snapWords(t2, 0, w2.contains(range.endContainer) ? offsetIn(w2, range.endContainer, range.endOffset) : t2.length).end;
-    const text = String(sel).replace(/^\s*\d+\s*/, '').trim();
+    const said = String(sel).replace(/^\s*\d+\s*/, '').trim();
+    const text = edge ? said.replace(/\s*\d+$/, '') : said;
     if (!text) return null;
     return { v1: Number(p1.getAttribute('data-verse')), v2: Number(p2.getAttribute('data-verse')), start, end, text };
   }

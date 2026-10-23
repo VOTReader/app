@@ -71,6 +71,9 @@ function useTranslation(tr) {
     label: typeof g.translationLabel === 'function' ? g.translationLabel(tr || 'nkjv') : String(tr || 'nkjv').toUpperCase(),
     /** a Spanish edition's verses say so once its words are on the page (main's translationLang; English until then) */
     lang: tick > 0 ? (translationOptions().find((o) => o.id === tr) || {}).lang : undefined,
+    /** the edition whose words are on the page (NKJV until another has loaded), which a copied reference names (rs1;
+        main's passage-copy reads it off the page) */
+    shown: tr && tr !== 'nkjv' && tick === 0 ? 'nkjv' : (tr || 'nkjv'),
     /** changes whenever the words on the page do */
     words: (tr || 'nkjv') + ':' + tick,
   };
@@ -174,7 +177,8 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
     return (
       <React.Fragment key={v.n}>
         <span className={'v' + (hit ? ' hit-v' : '')} id={'v-' + v.n} lang={tr.lang} data-read-seg={'v' + v.n} data-hl-key={hlKey}>
-          <span className="vn">{v.n}</span>
+          {/* the space ends the number's word (rs1): "16For" was one word to a long-press */}
+          <span className="vn">{v.n}</span>{' '}
           <VerseWords key={tr.words + (hit ? '|' + termsKey : '')} hlKey={hlKey} text={tr.text(book, ch, v)} terms={vt} matchRef={hit ? matchRef : null} />
         </span>{' '}
       </React.Fragment>
@@ -183,7 +187,7 @@ export function BibleChapterScreen({ route, facts, gate = null, replace, onReady
   return (
     <>
       {head}
-      <div className={'body g bible' + (POETIC_BOOKS.has(book.id) ? ' poetry' : '')} ref={bodyRef}>
+      <div className={'body g bible' + (POETIC_BOOKS.has(book.id) ? ' poetry' : '')} ref={bodyRef} data-translation={tr.shown}>
         {on('showSectionHeadings') ? ch.sections.map((sec, si) => {
           const heading = (rch && rch.sections && rch.sections[si] && rch.sections[si].heading) || sec.heading;
           return (

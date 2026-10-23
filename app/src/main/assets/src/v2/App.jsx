@@ -22,6 +22,8 @@ import { applyLook, savedLook, saveLook, gateLook, sizeWord } from './look.js';
 import { applyReadingFont, DEFAULT_FONT } from './reading-font.js';
 import { useReadingRecord } from './reading-record.js';
 import { useReadingBars, READING_PLACES } from './reading-bars.js';
+import { startSelectionDrag } from '../ui/sheets/selection-drag.js';
+import { V2_DRAG_LAYOUT } from './selection-layout.js';
 import './screens/index.js';
 
 const g = /** @type {any} */ (globalThis);
@@ -186,6 +188,9 @@ export function V2App({ gateId = readGateId() }) {
   // the reading font (reading-font.js): main's chosen one, else the kit's EB Garamond; a gate boot shows its picture's
   const font = (facts && facts.readingFont) || DEFAULT_FONT;
   React.useLayoutEffect(() => { applyReadingFont(font); }, [font]);
+  // rs1 (main's SelectionToolbar starts the same guard): a selection end dragged to an edge scrolls the page gently and
+  // stays in it, never taking the mini player, the bars or the whole page; a gate boot draws, so it has none
+  React.useEffect(() => (gate ? undefined : startSelectionDrag({ layout: V2_DRAG_LAYOUT })), [gate]);
   // main's Keep the screen on (Settings > Reading; main's use-settings effect): the app holds the screen awake while open
   React.useEffect(() => {
     const pb = gate ? null : g.PlatformBridge;

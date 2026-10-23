@@ -154,3 +154,16 @@ html, body { background: var(--bg); height: 100%; overflow: hidden; overscroll-b
 .v2 .lkend { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: var(--r); background: var(--input); border: 1px solid var(--line); }
 .v2 .lkend .je { display: block; font-size: var(--fs-xs); letter-spacing: var(--track-caps); text-transform: uppercase; color: var(--tgold); }
 .v2 .lkend .t { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; font-size: var(--fs-s); color: var(--t1); margin-top: 4px; line-height: 1.25; }
+
+/* rs1 (selection-drag.js, started in App with selection-layout.js): while a selection end is dragged, the chrome takes
+   no touches, so the browser puts the end on the words under the finger, even under the mini player (over it, it took
+   the page's last text in document order: the rest of the page and the player at once); only the scroller takes the
+   end, and the chapter's end marker and next card never do. The space after a verse's number ends its word
+   ("16For" was one word to a long-press) and stands in for the number's margin; a poetry line starts with it, so it
+   collapses there. */
+body.sel-dragging .v2 .tb, body.sel-dragging .v2 .mini, body.sel-dragging .v2 .tabbar, body.sel-dragging .v2 .rail,
+body.sel-dragging .v2 .asp, body.sel-dragging .v2 .fnd, body.sel-dragging .v2 .toast-wrap { pointer-events: none; }
+body.sel-dragging { -webkit-user-select: none; user-select: none; }
+body.sel-dragging .v2 [data-scroller] { -webkit-user-select: text; user-select: text; }
+.v2 .reading-end, .v2 .nextcard { -webkit-user-select: none; user-select: none; }
+.v2 .v > .vn { margin-right: 0; }

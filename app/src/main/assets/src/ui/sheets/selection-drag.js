@@ -80,6 +80,18 @@ const OFF_PAGE = '[inert], .pager-peek';
 /** Words inside the column that are not reading text: a press there is no place for an end. */
 const NOT_TEXT = 'button, input, textarea, [contenteditable]:not([contenteditable="false"]), .mini-title, .back-hint-row, .bottom-nav, .sel-toolbar';
 
+/** The page's pieces the guard reads: the reading column, the bottom dock, the bands pinned at the column's top, the
+    swipe previews and the words that are no reading text. Main's by default; v2 starts the guard with its own (rs1).
+    @typedef {{ column: string, dock: string, bands: string, offPage: string, notText: string }} DragLayout */
+/** @type {DragLayout} */
+export const MAIN_LAYOUT = {
+  column: '.screen-scroll',
+  dock: '.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap',
+  bands: '.back-hint-row, .mini-title.shown',
+  offPage: OFF_PAGE,
+  notText: NOT_TEXT,
+};
+
 /**
  * How fast (px/s, + down, - up) the column scrolls for an end at `y`, or 0
  * outside the bands. The speed climbs from SPEED_MIN at the band's inner edge,
@@ -100,10 +112,10 @@ export function edgeScrollSpeed({ y, top, bottom, band = DRAG_BAND, min = SPEED_
 
 /** The top edge of the bottom dock: the highest visible floating bottom control (the mini player and its pull
     tab, the auto-scroll and find pills, the Study Notes toggle), or the viewport's bottom when none shows.
-    @param {Document} [doc] @param {number} [vh] @returns {number} */
-export function dockTop(doc = document, vh = window.innerHeight) {
+    @param {Document} [doc] @param {number} [vh] @param {DragLayout} [layout] @returns {number} */
+export function dockTop(doc = document, vh = window.innerHeight, layout = MAIN_LAYOUT) {
   let top = vh;
-  for (const el of doc.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap')) {
+  for (const el of doc.querySelectorAll(layout.dock)) {
     const r = el.getBoundingClientRect();
     if (r.width && r.height && r.top < top && getComputedStyle(el).display !== 'none') top = r.top;
   }
@@ -112,25 +124,25 @@ export function dockTop(doc = document, vh = window.innerHeight) {
 
 /** Where the reading text shows in `col`: under the bands pinned at its top (the "Back to" row, the page's
     mini title once shown) and above the bottom dock.
-    @param {Element} col @returns {{ top: number, bottom: number, left: number, right: number }} */
-export function readingEdges(col) {
+    @param {Element} col @param {DragLayout} [layout] @returns {{ top: number, bottom: number, left: number, right: number }} */
+export function readingEdges(col, layout = MAIN_LAYOUT) {
   const box = col.getBoundingClientRect();
   let top = box.top;
-  for (const el of col.querySelectorAll('.back-hint-row, .mini-title.shown')) {
+  for (const el of col.querySelectorAll(layout.bands)) {
     const r = el.getBoundingClientRect();
     if (r.height && r.bottom > top && r.top < box.top + 200) top = r.bottom;
   }
   const doc = col.ownerDocument || document;
   const vh = (doc.defaultView || window).innerHeight;
-  return { top, bottom: Math.min(box.bottom, dockTop(doc, vh)), left: box.left, right: box.right };
+  return { top, bottom: Math.min(box.bottom, dockTop(doc, vh, layout)), left: box.left, right: box.right };
 }
 
 /** The live reading column a node is in (a .screen-scroll that is no swipe preview), or null.
-    @param {Node | null} node @returns {Element | null} */
-export function liveColumnOf(node) {
+    @param {Node | null} node @param {DragLayout} [layout] @returns {Element | null} */
+export function liveColumnOf(node, layout = MAIN_LAYOUT) {
   const el = node && (node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement);
-  const col = el ? el.closest('.screen-scroll') : null;
-  return col && !col.closest(OFF_PAGE) ? col : null;
+  const col = el ? el.closest(layout.column) : null;
+  return col && !col.closest(layout.offPage) ? col : null;
 }
 
 /** Is a selection end being dragged now? The selection toolbar raises at the lift, not in the middle of a drag.
@@ -157,10 +169,10 @@ function caretAt(doc, x, y) {
 }
 
 /** Is a caret on words of the column (not its chrome, nor a decoration a selection cannot take: the ✦ ornament)?
-    @param {{ node: Node }} c @param {Element} col */
-function onColumnText(c, col) {
+    @param {{ node: Node }} c @param {Element} col @param {DragLayout} layout */
+function onColumnText(c, col, layout) {
   const el = c.node.nodeType === 1 ? /** @type {Element} */ (c.node) : c.node.parentElement;
-  if (!el || !col.contains(el) || c.node.nodeType !== 3 || el.closest(NOT_TEXT)) return false;
+  if (!el || !col.contains(el) || c.node.nodeType !== 3 || el.closest(layout.notText)) return false;
   const cs = /** @type {any} */ (getComputedStyle(el));
   return (cs.userSelect || cs.webkitUserSelect) !== 'none';
 }
@@ -188,7 +200,7 @@ function lineHeightOf(col) {
 
 /**
  * Start the selection drag guard on `doc`. Returns stop().
- * @param {{ doc?: Document, now?: () => number, frame?: (cb: FrameRequestCallback) => number, cancelFrame?: (id: number) => void }} [deps]
+ * @param {{ doc?: Document, now?: () => number, frame?: (cb: FrameRequestCallback) => number, cancelFrame?: (id: number) => void, layout?: DragLayout }} [deps]
  * @returns {() => void}
  */
 export function startSelectionDrag(deps = {}) {
@@ -197,6 +209,7 @@ export function startSelectionDrag(deps = {}) {
   const now = deps.now || (() => performance.now());
   const frame = deps.frame || ((cb) => win.requestAnimationFrame(cb));
   const cancelFrame = deps.cancelFrame || ((id) => win.cancelAnimationFrame(id));
+  const layout = deps.layout || MAIN_LAYOUT;
 
   /** The selection as last seen. */
   let last = { anchorNode: /** @type {Node | null} */ (null), anchorOffset: 0, focusNode: /** @type {Node | null} */ (null), focusOffset: 0, collapsed: true };
@@ -248,14 +261,14 @@ export function startSelectionDrag(deps = {}) {
   /** The caret on the column's text at the line of `y` (kept inside the text that shows), or the nearest line
       toward the middle that has text, up to `reach` lines; `x` is kept inside the column. Null when none has. */
   const caretNear = (/** @type {Element} */ c, /** @type {number} */ y, /** @type {number} */ x, reach = 6) => {
-    const e = readingEdges(c);
+    const e = readingEdges(c, layout);
     const lh = lineHeightOf(c);
     const cx = Math.min(Math.max(x, e.left + 24), e.right - 24);
     const cy = Math.min(Math.max(y, e.top + lh / 2), e.bottom - lh / 2);
     const inward = cy > (e.top + e.bottom) / 2 ? -1 : 1;
     for (let i = 0; i < reach; i++) {
       const hit = caretAt(doc, cx, cy + inward * lh * i);
-      if (hit && onColumnText(hit, c)) return hit;
+      if (hit && onColumnText(hit, c, layout)) return hit;
     }
     return null;
   };
@@ -266,9 +279,9 @@ export function startSelectionDrag(deps = {}) {
   const pinEnd = () => {
     const sel = win.getSelection();
     if (!col || !sel || sel.isCollapsed || !sel.focusNode || !last.anchorNode) return;
-    const e = readingEdges(col);
+    const e = readingEdges(col, layout);
     const box = caretBox(doc, sel.focusNode, sel.focusOffset);
-    const inCol = col.contains(sel.focusNode) && !(sel.focusNode.parentElement && sel.focusNode.parentElement.closest(OFF_PAGE));
+    const inCol = col.contains(sel.focusNode) && !(sel.focusNode.parentElement && sel.focusNode.parentElement.closest(layout.offPage));
     let y = null, reach = 6;
     if (!inCol || !box) y = finger.y;
     else if (box.y > e.bottom) y = e.bottom;
@@ -287,7 +300,7 @@ export function startSelectionDrag(deps = {}) {
     const sel = win.getSelection();
     if (!col || !sel || sel.isCollapsed || !sel.rangeCount) { endDrag(); return; }
     if (!mouseDown && !lost && now() - finger.at > SCROLL_LEASE_MS) { stopScroll(); return; }
-    const e = readingEdges(col);
+    const e = readingEdges(col, layout);
     const v = edgeScrollSpeed({ y: finger.y, top: e.top, bottom: e.bottom });
     if (!v) { stopScroll(); return; }
     const dt = lastT ? Math.min(0.05, (t - lastT) / 1000) : 1 / 60;
@@ -321,9 +334,9 @@ export function startSelectionDrag(deps = {}) {
     // reader who scrolled away from a selection must not have it brought back to the screen.
     const endMoved = sel.focusNode !== prev.focusNode || sel.focusOffset !== prev.focusOffset;
     if (!endMoved && !mouseDown) return;
-    const c = liveColumnOf(sel.anchorNode);
+    const c = liveColumnOf(sel.anchorNode, layout);
     const anchorEl = sel.anchorNode.nodeType === 1 ? /** @type {Element} */ (sel.anchorNode) : sel.anchorNode.parentElement;
-    if (!c || !anchorEl || anchorEl.closest(NOT_TEXT)) { if (dragging && !mouseDown) endDrag(); return; }
+    if (!c || !anchorEl || anchorEl.closest(layout.notText)) { if (dragging && !mouseDown) endDrag(); return; }
     if (now() - keyAt < 500) return;
     // A drag moves one end of a selection already there while the other stays put. Dragging the START handle turns
     // the selection round: its old end becomes the anchor (S22, 2026-10-22). The long-press that made the selection
@@ -338,10 +351,10 @@ export function startSelectionDrag(deps = {}) {
     if (Math.abs(c.scrollTop - knownTop) > c.clientHeight * 0.6) c.scrollTop = knownTop;
     knownTop = c.scrollTop;
     scrolled = 0;
-    const e = readingEdges(c);
+    const e = readingEdges(c, layout);
     const lh = lineHeightOf(c);
     const box = caretBox(doc, sel.focusNode, sel.focusOffset);
-    const inCol = c.contains(sel.focusNode) && !(sel.focusNode.parentElement && sel.focusNode.parentElement.closest(OFF_PAGE));
+    const inCol = c.contains(sel.focusNode) && !(sel.focusNode.parentElement && sel.focusNode.parentElement.closest(layout.offPage));
     const vh = win.innerHeight;
     // A finger is on the screen, so an end the browser put far past the reading text's edges (more than a few
     // lines under the top bar, or off the bottom of the screen) was put there by its document-order fallback.
@@ -389,7 +402,7 @@ export function startSelectionDrag(deps = {}) {
   const onPointerMove = (/** @type {PointerEvent} */ e) => {
     if (!mouseDown || !col) return;
     finger = { x: e.clientX, y: e.clientY, at: now() };
-    const ed = readingEdges(col);
+    const ed = readingEdges(col, layout);
     if (edgeScrollSpeed({ y: finger.y, top: ed.top, bottom: ed.bottom })) { if (!raf) raf = frame(tick); }
     else stopScroll();
   };
@@ -405,7 +418,7 @@ export function startSelectionDrag(deps = {}) {
     pointer = e.pointerType || 'mouse';
     if (dragging) endDrag();          // a new touch: no lift was heard, and the drag is over
     if (pointer === 'mouse' && e.button === 0) {
-      const c = liveColumnOf(/** @type {Node} */ (e.target));
+      const c = liveColumnOf(/** @type {Node} */ (e.target), layout);
       // A press on the column's own box (its scrollbar, the padding under the text) moves the column, not a
       // selection: onScroll would undo every step of a dragged thumb.
       mouseDown = !!c && e.target !== c;
