@@ -249,6 +249,40 @@ export function expandContractions(q) {
   return s.replace(PRONOUN_TYPED_BARE, (m) => PRONOUN_BARE[m.toLowerCase()]);
 }
 
+const VERSE_WINDOW = 3;
+/** TWO WORDS OF ONE STORY (search200 sweep, meaning-fusion). A keyword search of two or more words that no one text
+   holds all of often names a person and a thing of their story ("<name> tree"): the story tells the name in one verse
+   and the thing in the next, and a text whose title says the common word outranked every verse of it. When no text
+   holds every typed word, a verse counts as held the typed words its chapter's verses within VERSE_WINDOW of it hold.
+ * @param {string[]} ids
+ * @param {Record<string, any>} lookup
+ * @param {Record<string, number>} mask  the typed words each text holds (termMask)
+ * @param {number} wanted  the typed words that count (requiredMask)
+ * @param {Record<string, number>} score
+ */
+function storyWindow(ids, lookup, mask, wanted, score) {
+  /** @type {Map<string, Array<[number, string]>>} */
+  const chapters = new Map();
+  for (const id of ids) {
+    const d = lookup[id];
+    if (!d || d.kind !== 'verse') continue;
+    const k = d.corpus + '|' + d.bookId + '|' + d.chapterNum;
+    let list = chapters.get(k);
+    if (!list) chapters.set(k, (list = []));
+    list.push([d.verseNum, id]);
+  }
+  for (const list of chapters.values()) {
+    if (list.length < 2) continue;
+    for (const [v, id] of list) {
+      const own = (mask[id] || 0) & wanted;
+      let near = own;
+      for (const [u, other] of list) if (other !== id && Math.abs(u - v) <= VERSE_WINDOW) near |= (mask[other] || 0) & wanted;
+      const a = popcount(own), b = popcount(near);
+      if (b > a) score[id] *= coverageMultiplier(b) / coverageMultiplier(Math.max(1, a));
+    }
+  }
+}
+
 /**
  * One unit's BM25 search, the body and the title scored apart and summed per text:
  * BM25 as published (BM25_PARAMS), or with MiniSearch's floor for a keyword search
@@ -2799,12 +2833,15 @@ async function search(query, options) {
     if (kb) scoreMap[rankedIds[i]] *= kb;
   }
   // Coverage multiplier (distinct original terms matched); an Answers topic's, within one excerpt.
+  let mostHeld = 0;
   for (let i = 0; i < rankedIds.length; i++) {
     if (spent()) { const r = await pause(); if (r) return r; }
     const id = rankedIds[i];
     const cc = answersHits[id] ? excerptCover(id, docLookup[id].text || '', answersHits[id]) : popcount(termMask[id] || 0);
+    if (cc > mostHeld) mostHeld = cc;
     if (cc > 1) scoreMap[rankedIds[i]] *= coverageMultiplier(cc);
   }
+  if (keyword && required > 1 && mostHeld < required) storyWindow(rankedIds, docLookup, termMask, requiredMask, scoreMap);
   /* THE PHRASE RANKING, graded (search audit 2026-09-27). A text holding the typed
      words together outranks one that scatters them: the exact run of every typed word
      x PHRASE_BOOST as before; a run one word off (a word swapped, dropped or added)
