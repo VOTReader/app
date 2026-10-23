@@ -8791,7 +8791,7 @@
         font-family: var(--font-body);
         /* Never taller than the screen: at a large text size the card is the only way out
            (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
-        max-height: calc(100vh - 24px); overflow-y: auto;
+        max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto;
       }
       /* As tall as its words and no taller (journey F1.1, 2026-09-12). The 33vh cap of 2026-09-05
          ("never more than a third of the screen": at Text Size 1.8 the strip was 350 px of 800)
@@ -8806,7 +8806,7 @@
       /* On a short screen (landscape, the player open) it scrolls inside itself rather than climb onto the nav.
          While it shows, toasts drop in under the nav (first run on Home is where the root-exit toast shows):
          the 80px it leaves free there is that lane (a two-line toast is 68px). */
-      .tour-prompt { max-height: calc(100vh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); }
+      .tour-prompt { max-height: calc(100vh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); max-height: calc(100dvh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); }
       body.tour-prompt-open { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
       /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
          later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
@@ -9093,10 +9093,10 @@ u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underl
 
 /* Sheets */
 .select-sheet.ans-sheet{padding:8px 24px calc(var(--inset-bottom,0px) + 28px);text-align:left}
-.ans-sheet.is-tall{height:calc(100vh - var(--dock-under-nav));max-height:none}
+.ans-sheet.is-tall{height:calc(100vh - var(--dock-under-nav));height:calc(100dvh - var(--dock-under-nav));max-height:none}
 /* O6 Share as a card: the 4:5 preview as large as leaves the theme control and Share in view; never under 220 wide
    (a phone held sideways: the sheet scrolls), so the card the reader shares is always the card they see */
-.ans-card{max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));margin:16px auto 0;border:1px solid var(--border)} /* the rest with .ans-fig img */
+.ans-card{max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));max-width:max(220px,calc((100dvh - var(--dock-under-nav) - 310px)*.8));margin:16px auto 0;border:1px solid var(--border)} /* the rest with .ans-fig img */
 .ans-btn{width:100%;min-height:48px;margin-top:16px;border:1px solid var(--gold-border);border-radius:12px;background:var(--gold-faint)}
 body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over --bg3 read 4.22:1; --gold-bright reads 4.94:1 (AA) */
 .ans-btn:disabled{opacity:.45;cursor:default}
@@ -9144,7 +9144,7 @@ body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over -
 @media (min-width:1024px){
   .screen-layout.ans-wide{--col-max:1120px}
   .ans-landing{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:64px;padding:16px 48px 48px}
-  .ans-rail{display:block;position:sticky;top:24px;align-self:start;max-height:calc(100vh - var(--dock-under-nav) - 48px);overflow:auto} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
+  .ans-rail{display:block;position:sticky;top:24px;align-self:start;max-height:calc(100vh - var(--dock-under-nav) - 48px);max-height:calc(100dvh - var(--dock-under-nav) - 48px);overflow:auto} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
   /* the rail and gap stop at their Text Size 1 sizes (17rem and 3rem of the 18px root): in rem they grew with Text Size and
      took the column (1.6: 490px rail; 3: 918px, a 0px column). From Text Size 2 the page is one column, as on a phone:
      the rail's titles no longer fit it, and the hero's Contents line opens the Contents sheet */

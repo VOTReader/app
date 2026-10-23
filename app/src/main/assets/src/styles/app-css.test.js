@@ -936,3 +936,24 @@ describe('app.css — the document is never taller than the visible viewport', (
     }
   });
 });
+
+/* s00.3: in a mobile browser 100vh is the viewport with the URL bar hidden, so
+   a box sized by it runs under the bar while the bar shows: the tour card's
+   Skip/Next and the Answers sheet's buttons went out of reach. Each sizes by
+   100dvh, after its 100vh fallback line. */
+describe('app.css — tour and Answers boxes are sized by the visible viewport (s00.3)', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((m) => /\.(tour-card|tour-prompt|ans-sheet\.is-tall|ans-card|ans-rail)\b/.test(m[1]) && /100vh/.test(m[2]));
+  it('found the boxes', () => { expect(blocks.length).toBeGreaterThanOrEqual(5); });
+  it('every 100vh line has a 100dvh line for the same property after it', () => {
+    for (const [, sel, body] of blocks) {
+      const decls = [...body.matchAll(/(?<![\w-])([a-z-]+)\s*:\s*([^;]+)/g)].map((m) => [m[1], m[2].trim()]);
+      decls.forEach(([prop, val], i) => {
+        if (!/100vh/.test(val)) return;
+        const later = decls.slice(i + 1).find(([p, v]) => p === prop && v === val.replace(/100vh/g, '100dvh'));
+        expect(later, sel.trim() + ' { ' + prop + ' } has no 100dvh line after its 100vh fallback').toBeTruthy();
+      });
+    }
+  });
+});
