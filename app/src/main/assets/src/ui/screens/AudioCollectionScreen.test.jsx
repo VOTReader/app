@@ -1,7 +1,9 @@
 // @ts-nocheck -- drives the REAL AudioPlayer against fixture manifests, so the
 // forward-only queue and the reader choice are proven as behavior, not wiring.
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { _resetToasts } from '../../utils/toast.js';
+import * as ReactDOM from 'react-dom';
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { AudioCollectionScreen } from './AudioCollectionScreen.jsx';
@@ -325,26 +327,76 @@ describe('a recordings screen in the phone app: downloads', () => {
     return s;
   }
   function setOnline(v) { Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => v }); }
-  afterEach(() => { delete globalThis.OfflineAudio; setOnline(true); AudioPlayer.setPreferredReader('auto'); });
+  beforeEach(() => { globalThis.ReactDOM = ReactDOM; });
+  afterEach(() => { _resetToasts(); delete globalThis.ReactDOM; delete globalThis.OfflineAudio; setOnline(true); AudioPlayer.setPreferredReader('auto'); });
 
-  it('every recording row says what the phone holds, and Download all sits beside Play all', () => {
+  /* D4 (picture 14): a row's Download moved into its ... menu; the line under it speaks only while a download is on
+     its way or failed, and Download all sits beside Play all. */
+  it('every recording row has a ... menu whose Download saves the reading its own Play plays', () => {
     const store = fakeStore();
+    store.sizeOf = () => 5e6;
     AudioPlayer.setPreferredReader('V');
     renderScreen('one');
     const rows = [...document.querySelectorAll('.audio-collection-item')];
     expect(rows).toHaveLength(2);
-    for (const row of rows) expect(row.querySelector('.offline-row').textContent).toMatch(/^Download/);
+    for (const row of rows) expect(row.querySelector('.offline-row')).toBeNull();
     expect(screen.getByRole('button', { name: /download all/i })).toBeTruthy();
-    // A row downloads the reading its own Play plays: letter C in the chosen reader V, both parts.
-    fireEvent.click(rows[1].querySelector('.offline-row-download'));
+    fireEvent.click(screen.getByRole('button', { name: 'More for Letter C' }));
+    const menu = screen.getByRole('menu', { name: 'More for Letter C' });
+    expect([...menu.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Download · 10 MB', 'Open the letter']);
+    // Letter C in the chosen reader V, both parts.
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Download · 10 MB' }));
     expect(store.download.mock.calls[0][0].map((t) => t.url)).toEqual([URL_OF('idC1v'), URL_OF('idC2v')]);
+    expect(screen.queryByRole('menu')).toBeNull();
   });
 
-  it('a Bible edition offers a book at a time, never the whole edition', () => {
+  it('a long-press on a row opens its menu, and Choose more… opens the Downloads tree at the collection', () => {
+    fakeStore();
+    window.__openDownloads = vi.fn();
+    try {
+      renderScreen('one');
+      const row = document.querySelectorAll('.audio-collection-item')[0];
+      // The phone's long-press is a contextmenu: the row's menu opens instead of the browser's (fireEvent: false = prevented).
+      expect(fireEvent.contextMenu(row.querySelector('.audio-library-row-copy strong'))).toBe(false);
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Choose more…' }));
+      expect(window.__openDownloads).toHaveBeenCalledWith({ tab: 'choose', focus: 'one' }, 'Volume One');
+    } finally { delete window.__openDownloads; }
+  });
+
+  it('a row on the phone ends its line with a tick, its menu removes it with an Undo, and the header counts it', () => {
+    vi.useFakeTimers();
+    try {
+      const store = fakeStore();
+      const saved = new Set([URL_OF('idA')]);
+      store.isSaved = (u) => saved.has(u);
+      store.statusOf = (u) => (saved.has(u) ? 'saved' : 'none');
+      store.sizeOf = () => 3e6;
+      renderScreen('one');
+      const rows = [...document.querySelectorAll('.audio-collection-item')];
+      expect(rows[0].querySelector('small .offline-tick').getAttribute('aria-label')).toBe('On this phone');
+      expect(rows[1].querySelector('.offline-tick')).toBeNull();
+      expect(document.querySelector('.offline-mark').textContent).toBe('1 of 2 on this phone');
+      expect(screen.getByRole('button', { name: /^Download the other 1 · 6 MB$/ })).toBeTruthy();
+      fireEvent.click(screen.getByRole('button', { name: 'More for Letter A' }));
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Remove · 3 MB' }));
+      // It reads as gone at once; the file goes when the Undo toast does.
+      expect(document.getElementById('vot-toast-offline-removed').textContent).toBe('Removed Letter A · 3 MBUndo');
+      expect(rows[0].querySelector('.offline-tick')).toBeNull();
+      expect(document.querySelector('.offline-mark')).toBeNull();
+      expect(store.remove).not.toHaveBeenCalled();
+      act(() => { vi.advanceTimersByTime(5100); });
+      expect(store.remove).toHaveBeenCalledWith([URL_OF('idA')]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a Bible edition offers a book at a time from its rows, never the whole edition', () => {
     fakeStore();
     renderScreen('bible-brm-kjv');
-    expect(document.querySelectorAll('.audio-collection-item .offline-row').length).toBe(2);
+    expect(document.querySelectorAll('.audio-collection-item .row-menu-btn').length).toBe(2);
     expect(screen.queryByRole('button', { name: /download all/i })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'More for Genesis' }));
+    expect(screen.getByRole('menuitem', { name: /^Download/ })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Open the book' })).toBeTruthy();
   });
 
   // Downloads brief 3a, picture 14: "Choose…" beside Play all opens the Downloads tree at this collection or edition.
@@ -445,6 +497,11 @@ describe('a recordings screen in the phone app: downloads', () => {
     renderScreen('one');
     const rows = [...document.querySelectorAll('.audio-collection-item')];
     expect(rows.every((r) => r.classList.contains('is-unavailable'))).toBe(true);
-    expect(rows[0].querySelector('.offline-row').textContent).toMatch(/Needs a connection/);
+    expect(rows[0].querySelector('small').textContent).toBe('Not on this phone');
+    // Picture 17: the screen says it is showing what is on the phone, and a row's menu queues it for the signal.
+    expect(screen.getByRole('status').textContent).toBe('You’re offline. Showing what’s on this phone.');
+    fireEvent.click(screen.getByRole('button', { name: 'More for Letter A' }));
+    expect(screen.getByRole('menuitem', { name: 'Download when online' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download when online' })).toBeTruthy();
   });
 });

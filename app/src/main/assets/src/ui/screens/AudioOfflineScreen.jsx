@@ -12,15 +12,12 @@
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13), lazy bundle-h before. OfflineAudio and AudioPlayer
    live in bundle-d too and are read as free globals at call time - one store, one player (see _entry-d.js). */
 
-import { useOfflineAudio, formatBytes } from '../components/OfflineAudioControls.jsx';
+import { useOfflineAudio, formatBytes, isLeaving, removeWithUndo, REMOVED_TOAST_ID } from '../components/OfflineAudioControls.jsx';
 import { DownloadChooser, Sheet, TrashIcon } from '../components/DownloadChooser.jsx';
 import { DownloadStrip } from '../components/DownloadStrip.jsx';
 import { countOf } from '../../utils/download-tree.js';
-import { hideToast, showToast } from '../../utils/toast.js';
 
-export const REMOVED_TOAST_ID = 'vot-toast-offline-removed';
-/** How long a single Remove can be taken back (brief section 7 item 14). */
-const REMOVE_UNDO_MS = 5000;
+export { REMOVED_TOAST_ID };
 /** Rows a group shows before "Show all 30" (picture 11). */
 const ROWS_SHOWN = 3;
 
@@ -224,10 +221,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   const [sort, setSort] = React.useState(/** @type {'order' | 'size'} */ ('order'));
   const [open, setOpen] = React.useState(() => /** @type {Set<string> | null} */ (null));
   const [showAll, setShowAll] = React.useState(() => new Set());
-  // A single Remove waits out its Undo (brief section 7 item 14): the row steps aside at once and the file goes when
-  // the toast does, so Undo keeps the very file rather than downloading it again.
-  const [leaving, setLeaving] = React.useState(() => new Set());
-  const items = off ? off.items().filter((it) => !leaving.has(it.url)) : [];
+  // A single Remove waits out its Undo (removeWithUndo, brief section 7 item 14): the row steps aside at once.
+  const items = off ? off.items().filter((it) => !isLeaving(it.url)) : [];
   const sections = shelfSections(items);
   const pending = off && typeof off.pending === 'function' ? off.pending() : { busy: 0, failed: [] };
   const total = off ? off.totalBytes() : 0;
@@ -240,26 +235,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   React.useEffect(() => { if (off && typeof off.checkForUpdates === 'function') off.checkForUpdates(); }, [off]);
   const stale = items.filter((it) => it.stale);
   const removeRow = (/** @type {ShelfRow} */ row, /** @type {string} */ label) => {
-    if (!off) return;
-    let undone = false;
-    const urls = row.items.map((it) => it.url);
-    setLeaving((prev) => { const next = new Set(prev); for (const u of urls) next.add(u); return next; });
-    const back = () => setLeaving((prev) => { const next = new Set(prev); for (const u of urls) next.delete(u); return next; });
-    // Toasts share one spot; this one carries an action, so the others step aside.
-    document.querySelectorAll('.vot-toast.show').forEach((el) => { if (el.id && el.id !== REMOVED_TOAST_ID) hideToast(el.id); });
-    showToast({
-      id: REMOVED_TOAST_ID, className: 'vot-toast vot-toast-undo', durationMs: REMOVE_UNDO_MS,
-      text: 'Removed ' + label + (row.bytes ? ' · ' + formatBytes(row.bytes) : ''),
-      onHide: () => { if (!undone) off.remove(urls); back(); },
-    });
-    const el = document.getElementById(REMOVED_TOAST_ID);
-    if (!el) return;
-    const undo = document.createElement('button');
-    undo.type = 'button';
-    undo.className = 'vot-undo-btn';
-    undo.textContent = 'Undo';
-    undo.addEventListener('click', () => { undone = true; hideToast(REMOVED_TOAST_ID); }, { once: true });
-    el.appendChild(undo);
+    if (off) removeWithUndo(off, row.items.map((it) => it.url), 'Removed ' + label + (row.bytes ? ' · ' + formatBytes(row.bytes) : ''));
   };
   const play = (/** @type {ShelfItem} */ it) => {
     if (typeof AudioPlayer !== 'undefined' && typeof AudioPlayer.playTrack === 'function') {

@@ -9,7 +9,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
-import { OfflineRowStatus, OfflineCollectionAction, formatBytes, useOfflineState } from './OfflineAudioControls.jsx';
+import {
+  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, downloadWhenOnline, formatBytes, offlineMenuItems, useOfflineState,
+} from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
 const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
@@ -320,9 +322,10 @@ describe('Download all, beside Play all', () => {
     s.st.sizes.set(U('b'), 60_000_000); s.st.sizes.set(U('b2'), 40_000_000); s.st.sizes.set(U('c'), 110_000_000);
     s.st.free = 1_480_000_000;
     const { getByRole, container } = render(<OfflineCollectionAction units={units} label="Volume One" />);
-    // One of three already on the phone: it says so, and offers the rest (brief section 7 item 8).
+    // One of three already on the phone: it says so, and offers the other two with their size (brief section 7 item 8,
+    // pictures 10 and 14).
     expect(container.textContent).toMatch(/1 of 3 on this phone/);
-    fireEvent.click(getByRole('button', { name: /download the rest/i }));
+    fireEvent.click(getByRole('button', { name: 'Download the other 2 · 210 MB' }));
     expect(container.textContent).toMatch(/Download Volume One\?/);
     // Counted in recordings as the rows count them: b in two parts is one (item 12).
     expect(container.textContent).toMatch(/2 recordings · 210 MB/);
@@ -360,6 +363,85 @@ describe('Download all, beside Play all', () => {
     fakeStore({ available: false });
     const web = render(<OfflineCollectionAction units={units} label="Volume One" />);
     expect(web.container.textContent).toBe('');
+  });
+});
+
+/* D4 (downloads brief 3h, 3j; pictures 10, 14, 17): the ring + count under a collection's title, a row's ... menu, and
+   "Download when online". */
+describe('on-phone marks, the row menu and Download when online (D4)', () => {
+  const units = [[T('a')], [T('b'), T('b2')], [T('c')]];
+  afterEach(() => { delete globalThis.NetStatus; });
+
+  it('the collection mark counts rows as the rows count them, and says nothing while none is on the phone', () => {
+    const s = fakeStore();
+    const view = render(<OfflineCollectionMark units={units} />);
+    expect(view.container.textContent).toBe('');
+    save(s, 'a', 1e6); save(s, 'b', 1e6);   // b2 not yet: letter b is not on the phone
+    act(() => s.bump());
+    expect(view.container.textContent).toBe('1 of 3 on this phone');
+    save(s, 'b2', 1e6); save(s, 'c', 1e6);
+    act(() => s.bump());
+    expect(view.container.textContent).toBe('All 3 on this phone');
+    expect(view.container.querySelector('.offline-mark.is-all .offline-ring-tick')).toBeTruthy();
+  });
+
+  it('a row menu offers Download with its size, Download the rest for a part-saved book, Remove once saved, Cancel while on its way', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 11e6); s.st.sizes.set(U('b'), 4e6); s.st.sizes.set(U('b2'), 6e6);
+    const texts = (tracks, online = true) => offlineMenuItems({ off: s, online, tracks, name: 'X' }).map((i) => i.text);
+    expect(texts([T('a')])).toEqual(['Download · 11 MB']);
+    expect(texts([T('a')], false)).toEqual(['Download when online']);
+    save(s, 'b', 4e6);
+    expect(texts([T('b'), T('b2')])).toEqual(['Download the rest · 6 MB', 'Remove · 4 MB']);
+    s.st.status.set(U('a'), 'downloading');
+    expect(texts([T('a')])).toEqual(['Cancel download']);
+    s.st.status.delete(U('a'));
+    s.st.free = 150e6;   // under 11 MB + the 200 MB the phone keeps free
+    const [item] = offlineMenuItems({ off: s, online: true, tracks: [T('a')], name: 'X' });
+    expect(item.text).toBe('Not enough room · 11 MB');
+    expect(item.disabled).toBe(true);
+  });
+
+  it('with no signal, a store that cannot wait holds the download and sends it the moment the signal returns', () => {
+    const s = fakeStore();
+    let offline = true;
+    const subs = new Set();
+    globalThis.NetStatus = { isOffline: () => offline, subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); }, getVersion: () => 0 };
+    const row = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" quiet />);
+    expect(row.container.textContent).toBe('');
+    act(() => downloadWhenOnline(s, [{ url: U('a'), key: 'one:a', title: 'Letter a' }]));
+    expect(s.download).not.toHaveBeenCalled();
+    // Held, it reads as waiting, not as nothing.
+    expect(row.container.textContent).toMatch(/Waiting/);
+    offline = false;
+    act(() => { for (const cb of [...subs]) cb(); });
+    expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'Letter a' }]);
+    expect(row.container.textContent).toBe('');
+    act(() => { for (const cb of [...subs]) cb(); });
+    expect(s.download).toHaveBeenCalledTimes(1);
+  });
+
+  it('a store that waits for a signal itself (dl-d2: it has reason()) takes the download at once, and online it always does', () => {
+    const s = fakeStore();
+    globalThis.NetStatus = { isOffline: () => true, subscribe: () => () => {}, getVersion: () => 0 };
+    s.reason = () => 'offline';
+    downloadWhenOnline(s, [{ url: U('a'), key: '', title: 'a' }]);
+    expect(s.download).toHaveBeenCalledTimes(1);
+    delete s.reason;
+    globalThis.NetStatus.isOffline = () => false;
+    downloadWhenOnline(s, [{ url: U('b'), key: '', title: 'b' }]);
+    expect(s.download).toHaveBeenCalledTimes(2);
+  });
+
+  it('Download all offline reads Download when online and still asks first', () => {
+    const s = fakeStore();
+    setOnline(false);
+    s.st.sizes.set(U('a'), 1e6); s.st.sizes.set(U('b'), 1e6); s.st.sizes.set(U('b2'), 1e6); s.st.sizes.set(U('c'), 1e6);
+    const { getByRole, container } = render(<OfflineCollectionAction units={units} label="Volume One" note={false} />);
+    fireEvent.click(getByRole('button', { name: 'Download when online' }));
+    expect(container.textContent).toMatch(/Download Volume One\?/);
+    fireEvent.click(getByRole('button', { name: /download 4 MB/i }));
+    expect(s.download.mock.calls[0][0]).toHaveLength(4);
   });
 });
 

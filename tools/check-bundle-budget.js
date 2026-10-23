@@ -107,7 +107,11 @@ const BUDGETS = [
   // (src/ui/jsx-inject.js) instead of "React.createElement": 1,678,740 -> 1,599,529 (-79,211 B), no
   // behaviour change (smoke:ci PASS). The ceiling is not loosened and not lowered: the Answers stages spend
   // part of the room, and what is left stays unclaimed.
-  { file: 'bundle-d.js', measured: 1460091, max: 1679200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
+  // 2026-10-23, downloads D1-D4a (readalong): the Downloads screen (Choose tree, footer, sheets, On this phone, the
+  // progress strip), the baked-lengths reader and the row ... menu, plus the Answers stages since 10-22: 1,599,529 ->
+  // 1,680,140, all of it feature code (no new import from node_modules in these landings).
+  // Re-baselined UP by the same rule: 1,680,140 x 1.15 = 1,932,161 -> the hundred above.
+  { file: 'bundle-d.js', measured: 1680140, max: 1932200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
   { file: 'bundle-w.js', measured: 7967, max: 9200 },

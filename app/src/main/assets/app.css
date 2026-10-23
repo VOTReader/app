@@ -1602,6 +1602,22 @@
       .audio-library-secondary-action:disabled { opacity:.5; cursor:default; }
       .audio-library-secondary-action .offline-icon { width:16px; height:16px; }
       .offline-collection-note { margin:0; font-size:var(--fs-12); color:var(--cream-dim); }
+      /* D4 (downloads brief 3h, pictures 14, 17): the on-phone tick that ends a row's line, the ring + count under a
+         collection's title, and the row's ⋯ menu (RowMenu.jsx; the dropdown itself is .more-menu). */
+      .offline-ring { width:1.15em; height:1.15em; flex:none; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+      .offline-ring-track { stroke:var(--gold-border); }
+      .offline-mark.is-all .offline-ring-track, .offline-tick .offline-ring-track { stroke:var(--gold); }
+      .offline-ring-arc, .offline-ring-tick { stroke:var(--gold); }
+      .offline-tick { display:inline-flex; vertical-align:-.2em; color:var(--gold); }
+      .offline-mark { position:relative; z-index:1; display:flex; align-items:center; gap:.55rem; margin:.45rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); line-height:1.35; }
+      .offline-mark .offline-ring { width:1.5em; height:1.5em; }
+      .row-menu-btn { display:inline-flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; padding:0; border:0; border-radius:var(--radius); background:none; color:var(--gold); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+      .row-menu-btn svg { width:22px; height:22px; }
+      .row-menu-btn.open, .row-menu-btn:active { background:var(--gold-faint); }
+      .row-menu-btn:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
+      .row-menu .more-menu-item:disabled { color:var(--cream-dim); cursor:default; background:none; }
+      .row-menu .more-menu-item:disabled svg { color:var(--cream-dim); }
+      .audio-collection-item.is-unavailable .row-menu-btn { opacity:1; }
       .offline-confirm { flex-basis:100%; margin:.4rem 0 0; padding:.8rem .9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
       .offline-confirm-title { margin:0 0 .3rem; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-14); }
       .offline-confirm-line { margin:.1rem 0; color:var(--cream-dim); font-size:var(--fs-12); }

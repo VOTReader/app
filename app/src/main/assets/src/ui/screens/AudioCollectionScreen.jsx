@@ -14,7 +14,11 @@
    reading, the row discloses the voices and each one starts the same queue
    on that rendition.
 */
-import { OfflineRowStatus, OfflineCollectionAction, useOfflineAudio, useOnline } from '../components/OfflineAudioControls.jsx';
+import {
+  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, OfflineNote, OnPhoneTick, offlineMenuItems, rowOnPhone,
+  useOfflineAudio, useOnline,
+} from '../components/OfflineAudioControls.jsx';
+import { RowMenu, openRowMenu } from '../components/RowMenu.jsx';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -200,10 +204,13 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   return (
     <ScreenLayout navChildren={nav}>
       <div className="audio-library-screen">
+        {offline ? <OfflineNote text={'You’re offline. Showing what’s on this phone.'} /> : null}
         <header className="audio-library-hero">
           <div className="audio-library-eyebrow">Listening Library</div>
           <h1>{label}</h1>
           <p className="audio-library-intro">{countLine}</p>
+          {/* "12 of 30 on this phone" (pictures 10, 14, 17). A Bible edition's books say it on their own rows. */}
+          {offline && !bible && playable.length ? <OfflineCollectionMark units={playable.map(ownTracks)} /> : null}
           {textOnly.length ? (
             <p className="audio-collection-text-only">
               {textOnly.length > 3 ? textOnly.length + ' ' + itemNoun(col, textOnly.length) + ' are text only' : (
@@ -228,7 +235,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
               </button>
               {/* A collection at once; a Bible edition a book at a time from its rows until the Downloads picker (downloads
                   brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
-              {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
+              {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} note={false} /> : null}
               {/* The Downloads tree opened at this collection or edition (downloads brief 3a, picture 14). */}
               {offline && !study && typeof window.__openDownloads === 'function' ? (
                 <button type="button" className="audio-collection-choose" onClick={() => window.__openDownloads({ tab: 'choose', focus: volKey }, label)}>Choose…</button>
@@ -296,8 +303,21 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 // Listening Library instead of only from the reader.
                 const chapters = bible && parts > 1 ? primary.tracks : null;
                 const chaptersOpen = !!chapters && openChapters === item.id;
+                // Picture 14: the row's line ends with a tick once it is on the phone; a book part on it says how much.
+                const held = offline ? rowOnPhone(offline, own) : null;
+                const heldLine = held && held.state === 'part' ? held.saved + ' of ' + held.count + ' on this phone' : '';
+                const line = unavailable ? 'Not on this phone' : [meta, heldLine].filter(Boolean).join(' · ');
+                const opensText = canOpenText && hasTextDestination({ key });
+                const openText = () => onOpenText(current && current.key === key ? current : { key });
+                const menu = offline ? [
+                  ...offlineMenuItems({ off: offline, online, tracks: own, name: item.title || label }),
+                  ...(!study && typeof window.__openDownloads === 'function'
+                    ? [{ id: 'choose', text: 'Choose more…', icon: 'choose', onSelect: () => window.__openDownloads({ tab: 'choose', focus: volKey }, label) }] : []),
+                  ...(opensText ? [{ id: 'open', text: 'Open the ' + (bible ? 'book' : itemNoun(col, 1)), icon: 'open', onSelect: openText }] : []),
+                ] : [];
                 return (
-                  <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '') + (unavailable ? ' is-unavailable' : '')}>
+                  <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '') + (unavailable ? ' is-unavailable' : '')}
+                    onContextMenu={menu.length ? openRowMenu : undefined}>
                     <div className="audio-library-row">
                       <button
                         type="button"
@@ -310,8 +330,10 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                       </button>
                       <div className="audio-library-row-copy">
                         <strong>{!bible && item.num ? <span className="audio-collection-num">{item.num}</span> : null}{item.title}</strong>
-                        {meta ? <small>{meta}</small> : null}
-                        {offline ? <OfflineRowStatus tracks={own} name={item.title} /> : null}
+                        {line || (held && held.state === 'saved') ? (
+                          <small>{line}{!unavailable && held && held.state === 'saved' ? <>{line ? ' ' : null}<OnPhoneTick /></> : null}</small>
+                        ) : null}
+                        {offline ? <OfflineRowStatus tracks={own} name={item.title} quiet /> : null}
                       </div>
                       <div className="audio-library-row-actions">
                         {remaining ? <span className="audio-library-remaining">{remaining}</span> : null}
@@ -339,13 +361,14 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                             <span>{chapters.length} chapters</span><ChevronIcon />
                           </button>
                         ) : null}
-                        {canOpenText && hasTextDestination({ key }) ? (
+                        {opensText ? (
                           // The reading under the clock when the player is inside THIS row: the
                           // playing track carries the chapter ("Chapter N") and the part the opener
                           // lands on. A bare key opened Nehemiah 1 under a Nehemiah 10 recording —
                           // nothing lit, taps seeked nothing (myweb's walk, 2026-09-22).
-                          <button type="button" className="audio-library-icon-button" onClick={() => onOpenText(current && current.key === key ? current : { key })} aria-label={'Open text for ' + (item.title || 'this recording')} title="Open text"><TextIcon /></button>
+                          <button type="button" className="audio-library-icon-button" onClick={openText} aria-label={'Open text for ' + (item.title || 'this recording')} title="Open text"><TextIcon /></button>
                         ) : null}
+                        {menu.length ? <RowMenu label={'More for ' + (item.title || 'this recording')} items={menu} /> : null}
                       </div>
                     </div>
                     {voicesOpen ? (
