@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
 import {
-  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, DownloadWhenOnline, HeroDownload, downloadWhenOnline, formatBytes, offlineMenuItems, useOfflineState,
+  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, DownloadWhenOnline, HeroDownload, TrackOnPhone, downloadWhenOnline, formatBytes, offlineMenuItems, useOfflineState,
 } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
@@ -481,6 +481,17 @@ describe('beside the Listen pill (D4b)', () => {
     s.st.status.set(U('a'), 'queued');
     act(() => s.bump());
     expect(view.container.querySelector('.hero-dl-held').textContent).toBe('It will download when you’re back online.');
+  });
+});
+
+describe('history and Up next rows (D4c)', () => {
+  it('a row on the phone ends its line with the tick; one that is not, and the web, add nothing', () => {
+    const s = fakeStore();
+    save(s, 'a', 1e6);
+    expect(render(<TrackOnPhone url={U('a')} />).container.querySelector('.offline-tick')).toBeTruthy();
+    expect(render(<TrackOnPhone url={U('b')} />).container.textContent).toBe('');
+    fakeStore({ available: false });
+    expect(render(<TrackOnPhone url={U('a')} />).container.textContent).toBe('');
   });
 });
 

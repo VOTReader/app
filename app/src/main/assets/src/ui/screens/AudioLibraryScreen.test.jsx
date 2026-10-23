@@ -259,7 +259,7 @@ describe('AudioLibraryScreen -- the offline line counts what is on the phone (RC
   const offlineWith = (n) => {
     setOnline(false);
     globalThis.OfflineAudio = {
-      available: () => true, subscribe: () => () => {}, getVersion: () => 0, news: () => null,
+      available: () => true, subscribe: () => () => {}, getVersion: () => 0, news: () => null, statusOf: () => 'none',
       items: () => Array.from({ length: n }, (_, i) => ({ url: 'https://example.test/' + i + '.mp3', bytes: 1, savedAt: i })),
       pending: () => ({ busy: 0 }), totalBytes: () => n,
     };

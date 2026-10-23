@@ -649,6 +649,36 @@ export function queuePlace(queue, qi) {
   return { at, of };
 }
 
+/**
+ * queuePlace counted over what can play with no signal (downloads brief 3j, picture 17: "1 of 3 · Skipped 27 not on
+ * this phone"): units grouped as queuePlace groups them (a letter's parts once, a Bible chapter each), `onPhone(unit)`
+ * says whether the player would play one (it passes over the rest). `at` is 0 while the current unit is not one of them.
+ * @param {Array<{ key?: string, partLabel?: string | null }>} queue
+ * @param {number} qi
+ * @param {(unit: any[]) => boolean} onPhone
+ * @returns {{ at: number, of: number, skipped: number }}
+ */
+export function queuePlaceOnPhone(queue, qi, onPhone) {
+  /** @type {any[][]} */
+  const units = [];
+  let cur = -1;
+  for (let i = 0; i < queue.length; i++) {
+    const t = queue[i];
+    const before = i > 0 ? queue[i - 1] : null;
+    const chapter = !!(t && typeof t.partLabel === 'string' && /^Chapter \d+$/.test(t.partLabel.trim()));
+    if (!t || !t.key || chapter || !before || before.key !== t.key) units.push([]);
+    units[units.length - 1].push(t);
+    if (i === qi) cur = units.length - 1;
+  }
+  let of = 0;
+  let at = 0;
+  let skipped = 0;
+  units.forEach((u, i) => {
+    if (onPhone(u)) { of++; if (i === cur) at = of; } else skipped++;
+  });
+  return { at, of, skipped };
+}
+
 /* ── durable-resume policy ────────────────────────────────────────────────
    Shared here rather than owned by the player, because the Listening Library
    surfaces have to describe the SAME judgment the player acts on: a row that

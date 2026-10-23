@@ -23,16 +23,30 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
+import { displayPartLabel, queuePlace, queuePlaceOnPhone, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
 import { hideToast, showToast } from '../../utils/toast.js';
 import { SongCover, NextIcon } from './SongParts.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
+import { OfflineAudio } from '../../utils/offline-audio.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { useStillLoading } from './AudioPlayButton.jsx';
 import { formatClock as fmt } from './AudioSeekSlider.jsx';
+
+/**
+ * Offline, the player plays a unit of the queue when some reading of it is on the phone (playableNow, the rule its
+ * offline skip and _downloadedReading follow); a unit with no key plays when its own file is.
+ * @param {any[]} unit @returns {boolean}
+ */
+function unitOnPhone(unit) {
+  const t = unit[0];
+  const key = t && typeof t.key === 'string' ? t.key : '';
+  const cut = key.indexOf(':');
+  if (cut < 1) return unit.every((x) => OfflineAudio.isSaved(x.url));
+  return AudioPlayer.playableNow(key.slice(0, cut), key.slice(cut + 1), AudioPlayer.bibleChapterOfTrack(t) || undefined);
+}
 
 export const STOPPED_TOAST_ID = 'vot-toast-audio-stopped';
 /** How long Close's "Stopped · Undo" stays up (brief 3a). */
@@ -213,11 +227,17 @@ export function AudioPlayerBar() {
   // Place in the QUEUE, not in the book: "3 of 30". Derived, never stored — and
   // silent at 1 of 1, which is noise, not news, and while restoring, when the
   // queue's length is not known yet.
-  const counted = queuePlace(queue, st.qi);
+  // With no signal the player passes over what is not on the phone (downloads brief 3j, picture 17): the place counts
+  // what it will play, and line 2 says how many it skips.
+  const onPhone = !online && !restoring && !single && !songIdOfKey(track.key) ? queuePlaceOnPhone(queue, st.qi, unitOnPhone) : null;
+  const counted = onPhone && onPhone.skipped && onPhone.at ? onPhone : queuePlace(queue, st.qi);
   const place = single || restoring || counted.of < 2 ? null : counted.at + ' of ' + counted.of;
-  // Why the last start failed (brief 3g), while the bar sits paused on it.
+  const skippedLine = onPhone && onPhone.skipped && onPhone.at ? 'Skipped ' + onPhone.skipped + ' not on this phone' : null;
+  // Why the last start failed (brief 3g), while the bar sits paused on it. Offline (player brief 3g): nothing ahead of
+  // it is on the phone either, or it was the last one.
   const failed = st.status === 'paused' ? st.failed : null;
-  const failLine = failed === 'offline' ? 'No connection' : failed === 'signal' ? 'No signal. Your place is kept.' : failed ? 'Couldn’t load' : null;
+  const failLine = failed === 'offline' ? (st.qi < queue.length - 1 ? 'Nothing ahead is on this phone' : 'Not on this phone')
+    : failed === 'signal' ? 'No signal. Your place is kept.' : failed ? 'Couldn’t load' : null;
   const left = dur && !starting ? timeLeft(st.time, dur) : null;
   // Sleep and speed chips (brief 3a: a small moon "15m" when sleep is set, "1.5×" when speed isn't 1×).
   const sleepSec = st.sleepEndsAt ? AudioPlayer.getSleepRemainingSeconds() : 0;
@@ -258,7 +278,7 @@ export function AudioPlayerBar() {
   } else {
     // With a sleep or speed chip beside it, line 2 keeps the source and its place and gives up the time left
     // (picture 02, "Sleep and speed set"): the full player has the clock.
-    line2 = [track.sub, place, sleepChip || speedChip ? null : left].filter(Boolean).join(' · ');
+    line2 = [track.sub, place, skippedLine || (sleepChip || speedChip ? null : left)].filter(Boolean).join(' · ');
   }
 
   const segs = line2.split(' · ');

@@ -20,6 +20,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import * as ReactDOM from 'react-dom';
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { NetStatus } from '../../utils/net-status.js';
+import { OfflineAudio } from '../../utils/offline-audio.js';
 import { AudioPlayerBar } from './AudioPlayerBar.jsx';
 
 /** Mimics the bits of HTMLAudioElement the player touches (see audio-player.test.js). */
@@ -125,6 +127,23 @@ afterEach(() => {
   delete globalThis.ReactDOM;
   delete globalThis.Audio;
   localStorage.removeItem('vot-audio-pos');
+});
+
+/* D4c (downloads brief 3j, picture 17; player brief 3g): with no signal the player passes over what is not on the
+   phone; the bar counts what it will play and says how many it skips, and when nothing ahead is there it says so. */
+describe('AudioPlayerBar — offline, what is on the phone', () => {
+  afterEach(() => { NetStatus._reset(); vi.restoreAllMocks(); });
+
+  it('line 2 reads "1 of 2 · Skipped 1 not on this phone"', () => {
+    vi.spyOn(OfflineAudio, 'isSaved').mockImplementation((u) => /idPreface|idC/.test(u));
+    render(<AudioPlayerBar />);
+    playWholeCollection();
+    emit('playing');
+    clockAt(5, 240);
+    expect(line2()).toMatch(/1 of 3/);
+    act(() => { NetStatus.reportFailure(); });
+    expect(line2()).toBe('Volume One · 1 of 2 · Skipped 1 not on this phone');
+  });
 });
 
 describe('AudioPlayerBar — visibility + the reading-surface body class', () => {

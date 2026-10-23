@@ -43,6 +43,12 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Listening Library', on
   const off = useOfflineAudio();
   /** Recordings of this collection on the phone (counted by letter, as the rows are). @param {string} volKey */
   const onPhone = (volKey) => (off ? new Set(off.items().filter((it) => it.key.startsWith(volKey + ':')).map((it) => it.key)).size : 0);
+  /** Its recordings, counted as its screen counts them (the preface and each letter once), or 0 when unknown. @param {any} col */
+  const recorded = (col) => {
+    if (typeof colLetterArr !== 'function' || typeof AudioPlayer.hasAudio !== 'function') return 0;
+    const pre = typeof colPreface === 'function' ? colPreface(col) : null;
+    return [pre, ...(colLetterArr(col) || [])].filter((it) => it && it.id && AudioPlayer.hasAudio(col.volKey, it.id)).length;
+  };
 
   // Warm the lazy VOT corpus so the availability sub-lines can answer.
   React.useEffect(() => {
@@ -77,14 +83,18 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Listening Library', on
               const available = votReady && AudioPlayer.collectionHasAudio(collection.volKey);
               // With no signal only what is on the phone plays (RC.3; downloads brief section 7 item 16): the row says
               // how much of this collection that is, not "Recordings available" over rows that need a connection.
-              const here = !online && available ? onPhone(collection.volKey) : 0;
+              // Online too, a collection with some of it on the phone says so (downloads brief 3h, picture 14's mark).
+              const here = available ? onPhone(collection.volKey) : 0;
+              const total = here ? recorded(collection) : 0;
+              const held = !here ? '' : total && here >= total ? 'All ' + total + ' on this phone' : here + (total ? ' of ' + total : '') + ' on this phone';
               return (
                 <button key={collection.volKey} type="button" className="audio-library-shelf-row" onClick={() => onOpenCollection(collection.volKey)}>
                   <span className="audio-library-shelf-mark" aria-hidden="true">{available ? '♪' : '○'}</span>
                   <span className="audio-library-shelf-copy">
                     <strong>{collection.label}</strong>
-                    <small>{!votReady ? 'Loading recordings…' : !available ? 'No recordings yet' : online ? 'Recordings available'
-                      : here ? here + ' on this phone · the rest need a connection' : 'Needs a connection'}</small>
+                    <small>{!votReady ? 'Loading recordings…' : !available ? 'No recordings yet'
+                      : online ? held || 'Recordings available'
+                        : here ? held + (total && here >= total ? '' : ' · the rest need a connection') : 'Needs a connection'}</small>
                   </span>
                   <span className="audio-library-shelf-tail"><ArrowIcon /></span>
                 </button>

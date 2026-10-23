@@ -715,3 +715,14 @@ export function NotOnPhone({ tracks, name, line = 'You’re offline. This isn’
     </>
   );
 }
+
+/**
+ * The tick after a history or Up next row's line when its recording is on the phone (downloads brief 3h). Nothing
+ * where downloads are not possible here.
+ * @param {{ url?: string }} props
+ */
+export function TrackOnPhone({ url }) {
+  const off = useOfflineAudio();
+  if (!off || typeof url !== 'string' || _leaving.has(url) || off.statusOf(url) !== 'saved') return null;
+  return <>{' '}<OnPhoneTick /></>;
+}

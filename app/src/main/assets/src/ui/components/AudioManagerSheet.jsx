@@ -16,6 +16,7 @@ import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.js
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { hasTextDestination } from './AudioShelf.jsx';
+import { TrackOnPhone } from './OfflineAudioControls.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** @returns {any | null} */
@@ -558,7 +559,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
                       <span className="audio-manager-queue-number">{index + 1}</span>
                       <span>
                         <strong>{trackLabel(track.title)}</strong>
-                        <small>{['Playing now', track.partLabel].filter(Boolean).join(' · ')}</small>
+                        <small>{['Playing now', track.partLabel].filter(Boolean).join(' · ')}<TrackOnPhone url={track.url} /></small>
                       </span>
                     </div>
                   ) : (
@@ -571,7 +572,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
                       <span className="audio-manager-queue-number">{index + 1}</span>
                       <span>
                         <strong>{trackLabel(track.title)}</strong>
-                        <small>{[track.partLabel, track.sub].filter(Boolean).join(' · ')}</small>
+                        <small>{[track.partLabel, track.sub].filter(Boolean).join(' · ')}<TrackOnPhone url={track.url} /></small>
                       </span>
                     </button>
                   )}

@@ -30,6 +30,7 @@ import {
   bibleAudioEdition,
   displayPartLabel,
   queuePlace,
+  queuePlaceOnPhone,
   isVotAudioUrl,
   normalizeAudioTrack,
   resolveBibleAudio,
@@ -253,6 +254,26 @@ describe('audio-track — queuePlace counts recordings, not tracks (player brief
 
   it('the same letter again after another counts again', () => {
     expect(queuePlace([L('a'), L('b'), L('a')], 2)).toEqual({ at: 3, of: 3 });
+  });
+});
+
+/* D4c (downloads brief 3j, picture 17): offline the bar counts what the player will play, and what it passes over. */
+describe('audio-track — queuePlaceOnPhone', () => {
+  const L = (id, part) => ({ key: 'vol1:' + id, partLabel: part || null });
+  const CH = (book, n) => ({ key: 'bible-brm-kjv:' + book, partLabel: 'Chapter ' + n });
+  const saved = (ids) => (unit) => ids.includes(unit[0].key.split(':')[1] + (unit[0].partLabel || ''));
+
+  it('counts recordings on the phone (a letter in parts once) and the ones it skips', () => {
+    const q = [L('preface'), L('a', 'Part 1'), L('a', 'Part 2'), L('b'), L('c')];
+    expect(queuePlaceOnPhone(q, 0, saved(['preface', 'c']))).toEqual({ at: 1, of: 2, skipped: 2 });
+    expect(queuePlaceOnPhone(q, 4, saved(['preface', 'c']))).toEqual({ at: 2, of: 2, skipped: 2 });
+    // The current one not on the phone: no place among them.
+    expect(queuePlaceOnPhone(q, 3, saved(['preface', 'c'])).at).toBe(0);
+  });
+
+  it("a book's chapters count one by one", () => {
+    const q = [CH('ruth', 1), CH('ruth', 2), CH('ruth', 3)];
+    expect(queuePlaceOnPhone(q, 2, (u) => u[0].partLabel !== 'Chapter 2')).toEqual({ at: 2, of: 2, skipped: 1 });
   });
 });
 

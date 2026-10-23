@@ -97,6 +97,28 @@ describe('AudioVolumesScreen', () => {
     }
   });
 
+  // D4c (downloads brief 3h): online, a collection part on the phone says how much; all of it, All N.
+  it('online, a collection with downloads says "2 of 3 on this phone", and All 3 once every recording is there', () => {
+    globalThis.colLetterArr = () => [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+    player.hasAudio = () => true;
+    globalThis.OfflineAudio = {
+      subscribe: () => () => {}, getVersion: () => 0, available: () => true,
+      items: () => [{ url: 'u1', key: 'one:a', title: 'A', bytes: 1 }, { url: 'u3', key: 'one:b', title: 'B', bytes: 1 }],
+    };
+    try {
+      renderScreen();
+      expect(screen.getByRole('button', { name: /Volume One/ }).textContent).toContain('2 of 3 on this phone');
+      cleanup();
+      globalThis.OfflineAudio.items = () => ['a', 'b', 'c'].map((id) => ({ url: 'u' + id, key: 'one:' + id, title: id, bytes: 1 }));
+      renderScreen();
+      expect(screen.getByRole('button', { name: /Volume One/ }).textContent).toContain('All 3 on this phone');
+    } finally {
+      delete globalThis.OfflineAudio;
+      delete globalThis.colLetterArr;
+      delete player.hasAudio;
+    }
+  });
+
   it('hands the volKey to the coordinator wiring', () => {
     const onOpenCollection = vi.fn();
     renderScreen({ onOpenCollection });

@@ -16,6 +16,7 @@ import { AUDIO_RESUME_END_FRACTION, isSongKey, songIdOfKey } from '../../utils/a
 import { songById } from '../../utils/song-catalog.js';
 import { formatClock } from './AudioSeekSlider.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
+import { TrackOnPhone } from './OfflineAudioControls.jsx';
 
 /** AudioLibraryStore lives in bundle-b; resolved at call time, never imported. */
 export function audioLibraryStore() { return /** @type {any} */ (globalThis).AudioLibraryStore || null; }
@@ -230,7 +231,7 @@ export function AudioShelfRow({ track, source, onOpenTrack, onRemove }) {
       </button>
       <div className="audio-library-row-copy">
         <strong>{trackName(track)}</strong>
-        <small>{trackMeta(track)}</small>
+        <small>{trackMeta(track)}<TrackOnPhone url={track.url} /></small>
       </div>
       <div className="audio-library-row-actions">
         {remaining
