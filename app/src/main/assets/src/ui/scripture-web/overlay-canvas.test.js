@@ -1484,6 +1484,25 @@ describe('the verse zoom: one verse fills the frame, every link its own labelled
     expect(drawn).toContain('loved');
     expect(rec.texts().map((c) => c.t).join(' '), 'no text source, no words').not.toContain('loved');
   });
+
+  // s25.6: the plates' layouts were keyed on the text's length, so another translation's verse of
+  // the same length drew the first one's lines
+  it('a verse of the same length in other words draws its own words', () => {
+    const one = 'For God so loved the world that He gave His only begotten Son';
+    const two = one.replace('loved', 'cared');
+    const paintWith = (words) => {
+      const fs = frameAt('pc', deep('pc'), JOHN3_16 + 0.5);
+      fs.textOf = (v) => (v === JOHN3_16 ? words : '');
+      const r = recorder(); r.ctx.translate = () => {}; r.ctx.rotate = () => {}; r.ctx.clip = () => {};
+      paintCanonOverlay(r.ctx, fs);
+      return r.texts().map((c) => c.t).join(' ');
+    };
+    expect(two.length).toBe(one.length);
+    expect(paintWith(one)).toContain('loved');
+    const drawn = paintWith(two);
+    expect(drawn).toContain('cared');
+    expect(drawn).not.toContain('loved');
+  });
 });
 
 /* w5 minor (s08 phone): the count in a phone's one-row header sat where the top scrim had fallen to

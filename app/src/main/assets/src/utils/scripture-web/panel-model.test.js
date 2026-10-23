@@ -90,6 +90,15 @@ describe('the words (digest item 22)', () => {
     expect(ds.summaryOf(info)).toMatch(/a prophecy fulfilled\.$/);
   });
 
+  // s37.3: a bundle over a run of chapters was named with an en dash ("Genesis 1 – 3")
+  it('a bundle over a run of chapters is named with an ASCII hyphen, across a book end too', () => {
+    const cellOf = (c0, c1) => ({ lo: g.chapters[c0][2], hi: g.chapters[c1][2] + g.chapters[c1][3] - 1, chapterLo: c0, chapterHi: c1 });
+    const label = (cell) => ds.describeFound({ kind: 'bundle', cell }, { g, density: 'famous' }).label;
+    expect(label(cellOf(0, 2))).toBe('Genesis 1-3');
+    expect(label(cellOf(49, 50))).toBe('Genesis 50-Exodus 1');
+    expect(label(cellOf(0, 0))).toBe('Genesis 1');
+  });
+
   it('a letter opens as its own mode: its title, its collection, the verses it cites', () => {
     const info = ds.describeFound({ kind: 'letter', letterKey: 'two/the-lord-comes-nigh' }, { g, density: 'famous' });
     expect(info.kind).toBe('letter');

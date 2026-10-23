@@ -1472,7 +1472,9 @@ function drawPlates(ctx, g, cam, L, fs, grid) {
     const head = isHold && !compact ? String(r.bookTitle).toUpperCase() + ' ' + r.chapter : '';
     const prefix = isHold && compact ? spaced(r.abbr) + ' ' + r.chapter + ':' + r.verse : num;
     const width = c.x1 - c.x0 - 2 * pad;
-    const key = [c.v, Math.round(width), Math.round(bottom - top), compact ? 1 : 0, head ? 1 : 0, prefix, body.length].join('|');
+    // keyed on the words themselves (s25.6: on their length, a translation whose verse ran to the
+    // same length drew the other's lines)
+    const key = [c.v, Math.round(width), Math.round(bottom - top), compact ? 1 : 0, head ? 1 : 0, prefix, body].join('|');
     let lay = layouts.get(key);
     if (!lay) {
       const words = body ? body.split(' ') : [];
