@@ -881,7 +881,8 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
 
   /* Find in the unit (2026-09-26): the landing names what to find, the words
      the result card marked (the query's own, then the engine's matched forms),
-     and the query as typed, for the host's pill. */
+     and the query as typed, for the host's pill; and the words typed apart (`typed`), so the pill
+     counts the places of what search matched for them apart (search200 ideas D). */
   it('the landing carries what to find: the card\u2019s marked words and the query as typed', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect(
@@ -890,7 +891,7 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       'Still Voice',
     ); });
     expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({
-      find: { terms: ['still', 'voice', 'spoke'], label: 'Still Voice' },
+      find: { terms: ['still', 'voice', 'spoke'], label: 'Still Voice', typed: ['still', 'voice'] },
     }));
   });
 
@@ -901,7 +902,7 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'vengeance', text }, terms: ['flooding'], placeStart: text.indexOf('flood of') },
       ['flood'],
     ); });
-    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ find: { terms: ['flood', 'flooding'], label: 'flood' } }));
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(expect.objectContaining({ find: { terms: ['flood', 'flooding'], label: 'flood', typed: ['flood'] } }));
   });
 
   /* Track D (D6): the pill marked "whom" and "whoever" in a letter opened from a lone "who" (find6-before.log
@@ -913,12 +914,12 @@ describe('useSearch — handleSearchSelect lands letter-shaped hits on the passa
       { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'who-is-first', text: 'Who is he whom the Lord chose? Whoever will, let him come.' }, terms: ['who', 'whom', 'whoever'] },
       ['who'], 'who', ['who'],
     ); });
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['who'], label: 'who' } }));
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['who'], label: 'who', typed: ['who'] } }));
     act(() => { result.current.handleSearchSelect(
       { doc: { kind: 'letter', volumeId: 'vot-two', letterId: 'one-body', text: 'Christ who strengthens me, in whom is all strengthening.' }, terms: ['who', 'whom', 'strengthening'] },
       ['christ', 'strengthens'], 'christ who strengthens me', ['who', 'me'],
     ); });
-    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['christ', 'strengthens', 'who', 'strengthening'], label: 'christ who strengthens me' } }));
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith(expect.objectContaining({ find: { terms: ['christ', 'strengthens', 'who', 'strengthening'], label: 'christ who strengthens me', typed: ['christ', 'strengthens'] } }));
   });
 
   it('no match (a title hit, no terms) clears the anchor so a stale verse anchor cannot leak in', () => {

@@ -3188,11 +3188,14 @@
        that cite the verse for the landing's 4 s, between the find wash and the current place. */
     ::highlight(vot-landing) { background-color: rgba(214,179,95,0.34); }
     body.light ::highlight(vot-landing) { background-color: rgba(122,92,16,0.26); }
+    body.light ::highlight(vot-find-related) { text-decoration-color: #705c26; }
     /* Find in the unit (FindInUnit): every place the searched words appear, and,
        stronger and underlined, the place being looked at. Gold like the result
        cards' marks, never a highlighter colour a reader's own marks could wear. */
     ::highlight(vot-find) { background-color: rgba(200,164,86,0.24); }
     ::highlight(vot-find-current) { background-color: rgba(214,179,95,0.52); text-decoration: underline; text-decoration-color: #d6b35f; text-decoration-thickness: 2px; text-underline-offset: 0.2em; }
+    /* search200 ideas D: what search matched for a typed word, no wash, a dotted underline (= --gold-dim, literal as above) */
+    ::highlight(vot-find-related) { text-decoration: underline dotted; text-decoration-color: #c29f57; text-decoration-thickness: 1.5px; text-underline-offset: 0.18em; }
     .wtlb-footnote-list { margin-top:3.5rem; padding-top:2.5rem; }
     .wtlb-footnote-list .footnote-list-item { margin-bottom:1rem; padding:0.7rem 0.9rem; }
     .wtlb-footnote-list .footnote-list-header { margin-bottom:1.5rem; font-size:var(--fs-11); text-align:center; }
@@ -8012,6 +8015,8 @@
       font-family: var(--font-body); font-size: var(--fsc-15); color: var(--cream-dim); white-space: nowrap;
       padding: 0 12px; border-right: 1px solid var(--gold-border);
     }
+    /* search200 ideas D: "· 4 related", the places holding only what search matched for a typed word */
+    .find-pill-related { color: var(--cream-muted); }
     .find-pill-btn {
       width: 44px; height: 44px; flex-shrink: 0; padding: 0;
       display: flex; align-items: center; justify-content: center;

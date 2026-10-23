@@ -20,7 +20,10 @@
 
    HOW IT MARKS. The CSS Custom Highlight API, like ReadAlongHighlight: Ranges
    over the text nodes, registered as ::highlight(vot-find) (every place) and
-   ::highlight(vot-find-current) (the place being looked at). No DOM mutation,
+   ::highlight(vot-find-current) (the place being looked at), and what search
+   matched for a typed word (a form, a synonym, one of His names) apart, as
+   ::highlight(vot-find-related): a place holding only those is counted apart,
+   "1 of 2 · 4 related" (search200 ideas D, splitPlaces). No DOM mutation,
    so annotations, selection and the read detector are untouched. A browser
    without the API (iOS before 17.2) still gets the pill and the stepping,
    unmarked. A DOM change under the body (the annotation paint, a re-render)
@@ -44,6 +47,8 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 const HL_ALL = 'vot-find';
 const HL_CURRENT = 'vot-find-current';
+/** What search matched for a typed word (a form, a synonym, one of His names): a dotted underline, no wash (search200 ideas D). */
+const HL_REL = 'vot-find-related';
 /** Text in these is not the unit's words: footnote numbers, controls, icons. */
 const SKIP = '.fn-ref, sup, button, svg, [aria-hidden="true"], script, style';
 const PLACE_LEN = 120;
@@ -203,23 +208,52 @@ function unmark() {
   if (!canMark()) return;
   /** @type {any} */ (CSS).highlights.delete(HL_ALL);
   /** @type {any} */ (CSS).highlights.delete(HL_CURRENT);
+  /** @type {any} */ (CSS).highlights.delete(HL_REL);
 }
 
 /**
- * @param {Array<{ ranges: Range[] }>} places
+ * @param {Array<{ ranges: Range[], rel: Range[], near?: boolean }>} places  the places the pill steps through
  * @param {number} cur
+ * @param {Range[]} [related]  the related words of the places it does not step through
  */
-function mark(places, cur) {
+function mark(places, cur, related = []) {
   if (!canMark()) return;
   const H = /** @type {any} */ (window).Highlight;
   const rest = [];
-  for (let i = 0; i < places.length; i++) if (i !== cur) rest.push(...places[i].ranges);
+  const rel = related.slice();
+  for (let i = 0; i < places.length; i++) {
+    // a related place stepped to (no place holds a word typed) is marked as the current one, else as related
+    if (i !== cur) (places[i].near ? rel : rest).push(...places[i].ranges);
+    rel.push(...places[i].rel);
+  }
   const all = new H(...rest);
   all.priority = 1;
   const now = new H(...(places[cur] ? places[cur].ranges : []));
   now.priority = 2;
+  const near = new H(...rel);
+  near.priority = 1;
   /** @type {any} */ (CSS).highlights.set(HL_ALL, all);
   /** @type {any} */ (CSS).highlights.set(HL_CURRENT, now);
+  /** @type {any} */ (CSS).highlights.set(HL_REL, near);
+}
+
+/**
+ * EXACT PLACES AND RELATED ONES (search200 ideas D, 2026-10-22). The places holding a word the reader typed
+ * are the places the pill counts and steps through; a place holding only what search matched for one (a word
+ * form, a synonym, one of His names: a hit's `rel`) is counted apart and marked apart. With no place of a
+ * typed word, the related places are the ones it steps through. Pure.
+ * @template {{ ranges: Range[], rel: Range[] }} P
+ * @param {P[]} places  every place, in text order
+ * @returns {{ steps: Array<P & { near?: boolean }>, aside: Range[], related: number, relOnly: boolean }}
+ */
+export function splitPlaces(places) {
+  const exact = places.filter((p) => p.ranges.length);
+  const near = places.filter((p) => !p.ranges.length);
+  if (!exact.length) return { steps: near.map((p) => ({ ...p, ranges: p.rel, rel: [], near: true })), aside: [], related: 0, relOnly: near.length > 0 };
+  /** @type {Range[]} */
+  const aside = [];
+  for (const p of near) aside.push(...p.rel);
+  return { steps: exact, aside, related: near.length, relOnly: false };
 }
 
 /** Where a range is on screen; its text's element where a Range cannot say. */
@@ -273,8 +307,11 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
   const [closed, setClosed] = React.useState(false);
   const [count, setCount] = React.useState(0);
   const [cur, setCur] = React.useState(0);
-  /** @type {{ current: Array<{ start: number, span: number, ranges: Range[] }> }} */
+  const [related, setRelated] = React.useState({ n: 0, only: false });
+  /** @type {{ current: Array<{ start: number, span: number, ranges: Range[], rel: Range[], near?: boolean }> }} */
   const placesRef = React.useRef([]);
+  /** @type {{ current: Range[] }} the related words of the places the pill does not step through */
+  const asideRef = React.useRef([]);
   const curRef = React.useRef(0);
   const active = !!find && !closed;
 
@@ -289,23 +326,29 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     let first = true;
     const build = () => {
       const { flat, segs } = readUnitText(root, keyPrefix);
-      /** @type {Array<{ start: number, span: number, ranges: Range[] }>} */
-      const places = [];
-      for (const p of sm.findPlaces(flat, find.terms, PLACE_LEN)) {
-        const ranges = [];
+      /** @type {Array<{ start: number, span: number, ranges: Range[], rel: Range[] }>} */
+      const found = [];
+      // `typed`: the words the reader typed, so a hit says whether it is one of them (findPlaces' `rel`)
+      for (const p of sm.findPlaces(flat, find.terms, PLACE_LEN, Array.isArray(find.typed) ? find.typed : undefined)) {
+        /** @type {Range[]} */ const ranges = [];
+        /** @type {Range[]} */ const rel = [];
         for (const h of p.hits) {
           const r = rangeFor(segs, h.idx, wordEnd(flat, h.idx + h.len));
-          if (r) ranges.push(r);
+          if (r) (h.rel ? rel : ranges).push(r);
         }
-        if (ranges.length) places.push({ start: p.start, span: p.span, ranges });
+        if (ranges.length || rel.length) found.push({ start: p.start, span: p.span, ranges, rel });
       }
+      const split = splitPlaces(found);
+      const places = split.steps;
       placesRef.current = places;
+      asideRef.current = split.aside;
+      setRelated((o) => (o.n === split.related && o.only === split.relOnly ? o : { n: split.related, only: split.relOnly }));
       // A landing at the unit's top (a title named, search200 B5) is on no place: none is current until a step.
       if (first) { first = false; curRef.current = anchor.top ? -1 : placeAt(places, locate(flat, anchor.text)); }
       else if (curRef.current >= places.length) curRef.current = Math.max(0, places.length - 1);
       setCount(places.length);
       setCur(curRef.current);
-      mark(places, curRef.current);
+      mark(places, curRef.current, asideRef.current);
     };
     build();
 
@@ -362,17 +405,20 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     const from = curRef.current < 0 ? (delta > 0 ? -1 : 0) : curRef.current;
     curRef.current = (from + delta + places.length) % places.length;
     setCur(curRef.current);
-    mark(places, curRef.current);
+    mark(places, curRef.current, asideRef.current);
     reveal(mainRef.current, places[curRef.current]);
   };
 
   if (!active || !count || typeof document === 'undefined' || !document.body) return null;
   // At the top (no place current) the pill counts the places: "0 of 3" read as none found (search200 UX B6).
-  const counted = cur < 0 ? count + (count === 1 ? ' place' : ' places') : (cur + 1) + ' of ' + count;
+  // The related places come after ("1 of 2 · 4 related"), or are the count when no place holds a word typed.
+  const counted = related.only ? (cur < 0 ? count + ' related' : (cur + 1) + ' of ' + count + ' related')
+    : cur < 0 ? count + (count === 1 ? ' place' : ' places') : (cur + 1) + ' of ' + count;
+  const aside = !related.only && related.n ? ' · ' + related.n + ' related' : '';
   return ReactDOM.createPortal(
     <div className="find-pill" role="toolbar" aria-label={'Search words in this ' + noun}>
       <span className="find-pill-word">{find.label || find.terms[0]}</span>
-      <span className="find-pill-count" role="status" aria-live="polite">{counted}</span>
+      <span className="find-pill-count" role="status" aria-live="polite">{counted}{aside ? <span className="find-pill-related">{aside}</span> : null}</span>
       <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2 && cur >= 0} onClick={() => go(-1)}>‹</button>
       <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2 && cur >= 0} onClick={() => go(1)}>›</button>
       <button type="button" className="find-pill-btn find-pill-close" aria-label="Close" onClick={() => setClosed(true)}>×</button>

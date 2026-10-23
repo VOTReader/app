@@ -432,7 +432,8 @@ export function useSearch({
     const own = Array.isArray(terms) ? terms : [];
     const hit = (entry && Array.isArray(entry.terms)) ? entry.terms.filter((t) => own.indexOf(t) < 0) : [];
     const marked = own.concat(formsToMark(hit, own, Array.isArray(stopTyped) ? stopTyped : []));
-    const find = marked.length ? { terms: marked, label: String(query || '').trim() || marked[0] } : null;
+    // `typed`: the words the reader typed (and their synonyms), so the pill tells them from the rest (search200 ideas D)
+    const find = marked.length ? { terms: marked, label: String(query || '').trim() || marked[0], typed: own } : null;
     // A tapped PLACE (SrchCard's "more places" list) names where in the text it
     // starts, a word start: the landing reads the same 48 chars matchExcerpt cuts.
     // A landing at the text's very start is the engine saying a TITLE was named
