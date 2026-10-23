@@ -24,7 +24,7 @@ timings addressed to the old text. A cache key must cover every INPUT.
 SHIP GATE (owner policy, same as the letters): a chapter whose CONFIRMED+PROBED
 share is below MIN_PROVEN ships nothing at all rather than a doubtful timeline.
 Verses the belt could not prove carry an onset spread across the gap by
-_alignlib._interpolate_runs and DO ship (owner directive 2026-08-26 — a clause
+_alignlib._interpolate_runs and DO ship (agent design, 2026-08-26 — a clause
 that does not paint reads as the feature being broken). UNSPOKEN verses never
 ship: those words are provably absent from the recording.
 
@@ -142,6 +142,14 @@ def clears_gate(ed, d):
     return proven_share(d) >= MIN_PROVEN or gate_pin(ed, d) is not None
 
 
+def _unnumbered(folder):
+    """A Drive folder name without its leading list number ("18. TSOT New Testament" ->
+    "TSOT New Testament"). The number is Drive's sort order, not identity: Tim renamed the
+    folder to "TSOT New Testament - Matthew (read by ...)" in 2026-10 and a plain prefix
+    match indexed 0 chapters. audio-renditions-lib.mjs reads it as optional the same way."""
+    return re.sub(r"^\d+\. ", "", folder)
+
+
 def drive_index(cfg, listing_path=LISTING, archive_root=ARCHIVE):
     """(book, chapter) -> (local mp3 path, driveId) for a driveFolder edition (tsot-matthew).
     Ids come from the Drive listing -- the SAME rows gen-bible-audio-manifest.mjs ships, so a
@@ -156,9 +164,10 @@ def drive_index(cfg, listing_path=LISTING, archive_root=ARCHIVE):
     pat = re.compile(r"Chapter-(\d{3})\.mp3$", re.I)
     with open(listing_path, encoding="utf-8") as f:
         listing = json.load(f)
+    folder = _unnumbered(cfg["driveFolder"])
     idx, missing = {}, []
     for row in listing:
-        if not row["path"].startswith(cfg["driveFolder"]):
+        if not _unnumbered(row["path"]).startswith(folder):
             continue
         base = row["path"].split("/")[-1]
         m = pat.search(base)
@@ -168,7 +177,9 @@ def drive_index(cfg, listing_path=LISTING, archive_root=ARCHIVE):
         if (book, ch) in idx:
             raise RuntimeError(f"{cfg['driveFolder']}: two files claim {book} chapter {ch}")
         cached = os.path.join(BASE, "_align-work", "audio", row["id"] + ".mp3")
-        local = [cached] if os.path.exists(cached) else glob.glob(os.path.join(archive_root, glob.escape(cfg["driveFolder"]) + "*", base))
+        local = [cached] if os.path.exists(cached) else sorted(
+            glob.glob(os.path.join(archive_root, glob.escape(folder) + "*", base))
+            + glob.glob(os.path.join(archive_root, "[0-9]*. " + glob.escape(folder) + "*", base)))
         if not local:
             missing.append(f"{book} {ch} ({base}, id {row['id']})")
             continue

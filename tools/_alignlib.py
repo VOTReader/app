@@ -1008,8 +1008,8 @@ def _interpolate_runs(rows, end_t=None, weights=None):
     SAME timestamp — and since the app takes the last row with t <= now, k-1 of
     them were unreachable and the wash still skipped the whole passage. Spreading
     the run proportionally by spoken length is what actually makes an unproven
-    clause paint (owner directive 2026-08-26: no part of a letter should fail to
-    highlight).
+    clause paint (agent design, serving Corbin's 2026-08-26 ask that the
+    highlight follow what is playing: no part of a letter should fail to highlight).
 
     Weighted by token count, because a nine-word clause takes about three times
     as long to speak as a three-word one and an even split would drift audibly
