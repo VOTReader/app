@@ -1,8 +1,8 @@
 {
- "pass": 1236,
- "strict": 1154,
- "top5": 1304,
- "found": 1394,
+ "pass": 1256,
+ "strict": 1172,
+ "top5": 1326,
+ "found": 1414,
  "family": {
   "parallel": 64,
   "paraphrase": 67,
@@ -26,6 +26,7 @@
   "sw-short": 33,
   "titles": 66,
   "topical": 33,
+  "w3-rt": 20,
   "wording": 73
  }
 }
