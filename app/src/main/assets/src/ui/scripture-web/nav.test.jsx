@@ -340,3 +340,37 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     expect(get().journey.stack).toEqual([]);
   });
 });
+
+/* Corbin, 2026-10-22: "tapping a line then having it fully zoom all the way out sucks, takes me away
+   from the verse I was zoomed into. Would be ok if I had a button that only showed in that moment
+   that allowed me to return to my zoomed in vision." */
+describe('the way back: a choice that zooms far out keeps the camera it left', () => {
+  it('a wide thread chosen at the verse zoom offers the way back, and taking it lands where the reader was', async () => {
+    const { get } = mount();
+    expect(get().sel.returnTo).toBeNull();
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    const r = get().sel.returnTo;
+    expect(r).toMatchObject({ x: 15551, ppv: 8, y: 0 });
+    expect(r.label).toMatch(/^Genesis 1:\d+$/);
+    expect(get().cam.camRef.current.ppv, 'PRECONDITION: the frame zoomed out').toBeLessThan(8 / 1.5);
+    // a second choice keeps the first way back: the verse the reader was zoomed into
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    expect(get().sel.returnTo).toBe(r);
+    await act(async () => { get().sel.returnBack(); });
+    expect(get().sel.returnTo).toBeNull();
+    expect(get().cam.camRef.current.x).toBeCloseTo(15551, 3);
+    expect(get().cam.camRef.current.ppv).toBeCloseTo(8, 6);
+  });
+
+  it('a short thread that keeps the zoom offers nothing; taking the camera drops the offer', () => {
+    const { get } = mount();
+    get().cam.camRef.current = { x: 250, ppv: 8, total: TOTAL, y: 0 };
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 1 }); });
+    expect(get().sel.returnTo).toBeNull();
+    get().cam.camRef.current = { x: 15551, ppv: 8, total: TOTAL, y: 0 };
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    expect(get().sel.returnTo).not.toBeNull();
+    act(() => { get().sel.dropReturn(); });
+    expect(get().sel.returnTo).toBeNull();
+  });
+});

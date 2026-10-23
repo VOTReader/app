@@ -49,13 +49,15 @@ const TEXT_FIELD = { INPUT: 1, TEXTAREA: 1, SELECT: 1 };
  *   box Escape closes first and whose open, selectCentre and step the keys call;
  *   slackFor (optional, use-web-camera.js): the camera clamp's room for the docked
  *   panel, device px, so the keys stop where flyTo and the gestures do
- *   filtersOpen, closeFilters: the Filters sheet (web-filters.jsx), the layer under the go-to
+ *   filtersOpen, closeFilters: the Filters sheet (web-filters.jsx), the layer under the go-to;
+ *   returnShown, returnBack: the way back to the verse a choice zoomed out of (use-web-selection.js)
  * @returns {{ onKeyDown: (e: any) => void }}
  */
 export function useWebKeys({
   graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
   camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
   resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor, filtersOpen, closeFilters,
+  returnShown, returnBack,
 }) {
   const goToOpen = !!(goTo && goTo.isOpen);
   /** Close whatever is on top of the web, one layer a call: the guide, then
@@ -67,15 +69,17 @@ export function useWebKeys({
     if (goToOpen) { goTo.close(); return true; }
     // the Filters sheet (web-filters.jsx), over the web and its panel
     if (filtersOpen) { closeFilters(); return true; }
+    // the way back to the verse a choice zoomed out of (use-web-selection.js): Back takes it
+    if (returnShown) { returnBack(); return true; }
     if (guideOpen) { closeGuide(); return true; }
     if (emptyShown) { dismissEmpty(); return true; }
     if (listOpen || choices || detail || tip) { closeCards(); return true; }
     return false;
-  }, [goToOpen, goTo, filtersOpen, closeFilters, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
+  }, [goToOpen, goTo, filtersOpen, closeFilters, returnShown, returnBack, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
   // Android Back and the app's Escape dispatcher close the top overlay first
   // instead of leaving the web (the hover chip alone is not worth a Back).
   useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
-    active: !!(goToOpen || filtersOpen || guideOpen || emptyShown || listOpen || choices || detail) });
+    active: !!(goToOpen || filtersOpen || returnShown || guideOpen || emptyShown || listOpen || choices || detail) });
 
   // / and Ctrl+K: the go-to, from anywhere on the screen but a text field. The capture phase puts
   // it ahead of the app's document listener, which reads defaultPrevented and leaves / alone.

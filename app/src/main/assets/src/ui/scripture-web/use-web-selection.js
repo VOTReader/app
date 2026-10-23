@@ -33,10 +33,10 @@
 
 import { zoomAbout, fitPPV, verseToX } from '../../utils/scripture-web/geometry.js';
 import {
-  pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching,
+  pickThreads, pickChapter, pickVerse, chapterRange, nearbyChapter, nearbyThreads, arcsTouching, refOfVerse,
 } from '../../utils/scripture-web/pick.js';
 import {
-  connectionFrame, chapterFrame, frameHolds, chapterAtX, chooserChapter, FEET_BAND,
+  connectionFrame, chapterFrame, frameHolds, landingOf, chapterAtX, chooserChapter, FEET_BAND,
 } from '../../utils/scripture-web/panel-model.js';
 import { maxZoomOf, flightCapOf } from '../../utils/scripture-web/web-frame.js';
 import { focusState, withLit } from '../../utils/scripture-web/focus-state.js';
@@ -46,6 +46,9 @@ import {
 import { pickPersonalLinks, pickUnderlayLinks, nearestLinks, nearestUnderlay } from './rail-renderer.js';
 import { hitOverlay, fanAt } from './overlay-renderer.js';
 import { routeOverlayHit } from './goto.jsx';
+
+/** How far a choice's frame must zoom out (the zoom it leaves over the landing's) to offer the way back. */
+export const RETURN_ZOOM_OUT = 1.5;
 
 /**
  * What the panel is asked to show (CONTRACTS.md section 6). `arc` is an OpenBible arc id unless
@@ -420,13 +423,40 @@ export function useWebSelection({
    * under the panel or in the area's outer tenth (bringIn). My Web's cards stay where the reader
    * put them.
    */
+  /* THE WAY BACK (Corbin, 2026-10-22: "tapping a line then having it fully zoom all the way out
+     sucks, takes me away from the verse I was zoomed into. Would be ok if I had a button that only
+     showed in that moment that allowed me to return to my zoomed in vision"). A choice whose frame
+     zooms out past RETURN_ZOOM_OUT keeps the camera it left, and the screen shows "Back to <verse>"
+     until the reader takes the camera (a gesture or a key: dropReturn) or goes back (returnBack;
+     Escape and Android Back too). A later choice keeps the first way back: it is the verse the
+     reader was zoomed into. */
+  const [returnTo, setReturnTo] = React.useState(/** @type {null | { x: number, ppv: number, y: number, label: string }} */ (null));
+  const returnRef = React.useRef(returnTo);
+  returnRef.current = returnTo;
+  const dropReturn = React.useCallback(() => { if (returnRef.current) setReturnTo(null); }, []);
+  const returnBack = React.useCallback(() => {
+    const r = returnRef.current, cam = camRef.current, v = viewRef.current;
+    setReturnTo(null);
+    if (!r || !cam || !v || !v.W || typeof flyTo !== 'function') return;
+    flyTo({ x: r.x, zoom: r.ppv / fitPPV(cam, v.W), y: r.y }, { insetRight: 0, insetBottom: 0, ms: FRAME_MS });
+  }, [camRef, viewRef, flyTo]);
+
   const frameFound = React.useCallback((found) => {
     const cam = camRef.current, v = viewRef.current;
     if (!found || !cam || !v || !v.W || typeof flyTo !== 'function') return;
     if (found.kind === 'arc') {
       const { right, opts } = coverNow();
       const frame = connectionFrame(found.from, found.to);
-      if (frameHolds(cam, v.W, right, frame, found.from, found.to, flightCapOf(graph, v, cam))) { flyTo(frame, opts); return; }
+      const cap = flightCapOf(graph, v, cam);
+      if (frameHolds(cam, v.W, right, frame, found.from, found.to, cap)) {
+        if (!returnRef.current && graph && landingOf(cam, v.W, right, frame, cap).ppv < cam.ppv / RETURN_ZOOM_OUT) {
+          // the verse the reader was looking at: the near foot, the one Follow does not go to
+          const near = found.far === 'from' ? found.to : found.from;
+          setReturnTo({ x: cam.x, ppv: cam.ppv, y: cam.y > 0 ? cam.y : 0, label: refOfVerse(graph, near).label });
+        }
+        flyTo(frame, opts);
+        return;
+      }
       bringIn((found.far === 'to' ? found.from : found.to) + 0.5);
       return;
     }
@@ -817,7 +847,7 @@ export function useWebSelection({
 
   return {
     tip, choices, choiceChapter, choiceCut, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
-    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread,
+    handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, returnTo, returnBack, dropReturn,
     followRow, zoomTo, describe,
     panel, openPanel, closePanel: closeCards, lightThreads, journey,
   };

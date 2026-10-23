@@ -8673,6 +8673,14 @@
     .sw-root.sw-compact .sw-filter-pill { top: calc(var(--sw-chrome-top, 10px) + 64px); font-size: var(--fsc-13); }
     .sw-root.sw-compact .sw-filter-pill button { min-height: 32px; }
     .sw-root.sw-chrome-hidden .sw-filter-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+    /* THE WAY BACK (use-web-selection.js returnTo): under the title, where the eye goes after the
+       zoom out, until the reader takes the camera; at the top with the controls hidden */
+    .sw-return-pill {
+      position: absolute; z-index: 5; left: 24px; top: calc(var(--sw-chrome-top, 10px) + 76px);
+      gap: 6px; padding: 0 16px 0 10px; border-radius: 22px; border-color: var(--sw-active-border); color: var(--sw-gold);
+    }
+    .sw-root.sw-compact .sw-return-pill { left: 16px; top: calc(var(--sw-chrome-top, 10px) + 64px); }
+    .sw-root.sw-chrome-hidden .sw-return-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
     /* a docked panel takes the right: the pill centres on the web left of it */
     .sw-root.sw-panel-open[data-panel="dock"] .sw-filter-pill {
       left: calc((100% - var(--sw-panel-w, 42%)) / 2); max-width: calc(100% - var(--sw-panel-w, 42%) - 32px);
