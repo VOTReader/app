@@ -126,22 +126,29 @@ export function AnnotationHint() {
     BookmarkStore.count() > 0;
 
   const visible = !(hasAnyData || dismissed || !delayDone || yielding);
-  // U10.7: the tip goes by itself, after about 20 s up or two screens of the reader's scrolling (it stayed over the
-  // text through the letter's end). It fades, then leaves; the durable flag was already set when it showed.
+  // U10.7: the tip goes by itself, after about 20 s up, two screens of the reader's scrolling, or the reader reaching
+  // the page's end (it stayed over the text through the letter's end). It fades, then leaves; the durable flag was
+  // already set when it showed. Each page's position is taken as the tip shows: a browser coalesces scroll events, so
+  // a first event can come a whole screen down, and a short letter has less than two screens to scroll.
   const [fading, setFading] = React.useState(false);
   React.useEffect(() => {
     if (!visible) return undefined;
     let moved = 0;
     /** @type {WeakMap<EventTarget, number>} */
     const last = new WeakMap();
+    document.querySelectorAll('.screen-scroll').forEach((el) => last.set(el, el.scrollTop));
+    last.set(document, window.scrollY || 0);
     const onScroll = (/** @type {Event} */ e) => {
       const t = /** @type {any} */ (e.target);
-      const top = t && typeof t.scrollTop === 'number' ? t.scrollTop : (typeof window !== 'undefined' ? window.scrollY : 0);
-      const key = t || window;
+      const el = t && typeof t.scrollTop === 'number' ? t : null;
+      const top = el ? el.scrollTop : (window.scrollY || 0);
+      const key = t || document;
       const was = last.get(key);
       last.set(key, top);
-      if (was != null) moved += Math.abs(top - was);
-      if (moved > 2 * (window.innerHeight || 800)) setFading(true);
+      if (was == null || top === was) return;
+      moved += Math.abs(top - was);
+      const atEnd = !!el && el.scrollHeight > el.clientHeight && top + el.clientHeight >= el.scrollHeight - 2;
+      if (atEnd || moved > 2 * (window.innerHeight || 800)) setFading(true);
     };
     const timer = setTimeout(() => setFading(true), HINT_FADE_AFTER_MS);
     document.addEventListener('scroll', onScroll, { capture: true, passive: true });

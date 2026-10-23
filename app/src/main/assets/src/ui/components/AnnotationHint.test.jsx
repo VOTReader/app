@@ -398,6 +398,37 @@ describe('AnnotationHint goes by itself', () => {
     page.remove();
   });
 
+  // Seen in Chrome (mw19): its scroll events come coalesced, so the first one already lands far down the page;
+  // the page's own position as the tip shows is the start, not that first event.
+  it('counts the first scroll from where the page stood as the tip showed', () => {
+    setupStores();
+    const page = document.createElement('div');
+    page.className = 'screen-scroll';
+    document.body.appendChild(page);
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    act(() => { page.scrollTop = window.innerHeight * 2.5; page.dispatchEvent(new Event('scroll')); });
+    expect(document.querySelector('.ann-hint-pill.is-fading')).toBeTruthy();
+    page.remove();
+  });
+
+  it('fades when the reader reaches the end of a short page', () => {
+    setupStores();
+    const page = document.createElement('div');
+    page.className = 'screen-scroll';
+    Object.defineProperty(page, 'clientHeight', { value: 900 });
+    Object.defineProperty(page, 'scrollHeight', { value: 1500 });
+    document.body.appendChild(page);
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    const scrollTo = (y) => { page.scrollTop = y; page.dispatchEvent(new Event('scroll')); };
+    act(() => { scrollTo(300); });
+    expect(document.querySelector('.ann-hint-pill.is-fading'), 'part way down: still up').toBeNull();
+    act(() => { scrollTo(600); });
+    expect(document.querySelector('.ann-hint-pill.is-fading'), 'at the end: it goes').toBeTruthy();
+    page.remove();
+  });
+
   it('says Got it, a word, not a bare ×', () => {
     setupStores();
     render(<AnnotationHint />);
