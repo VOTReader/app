@@ -265,12 +265,33 @@ describe('PlatformBridge — Web impl (placeholders)', () => {
   // Category 1 — genuine no-ops do not warn
   /** @type {Array<[string, any[]]>} */
   const noopCases = [
-    ['setLightStatusBar', [true]],
     ['startAudioSession', []],
     ['endAudioSession', []],
   ];
   it.each(noopCases)('genuine no-op %s does not warn', (name, args) => {
     bridge[name](...args);
+    expect(warnSpy).not.toHaveBeenCalled();
+  });
+
+  // pwa-bars: an installed PWA paints the phone's status + gesture bars from meta theme-color, so it follows the
+  // theme: the bar black on dark, the light theme's own background on light (never the old gold).
+  it('setLightStatusBar keeps meta theme-color in step with the theme', () => {
+    const meta = document.createElement('meta');
+    meta.name = 'theme-color';
+    meta.content = '#b8860b';
+    document.head.appendChild(meta);
+    try {
+      bridge.setLightStatusBar(true);
+      expect(meta.content).toBe('#f7f2e8');
+      bridge.setLightStatusBar(false);
+      expect(meta.content).toBe('#000000');
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      meta.remove();
+    }
+  });
+  it('setLightStatusBar with no meta theme-color is a quiet no-op', () => {
+    expect(() => bridge.setLightStatusBar(true)).not.toThrow();
     expect(warnSpy).not.toHaveBeenCalled();
   });
 

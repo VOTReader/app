@@ -1205,7 +1205,12 @@ function webNativeRecordCancel() {
 /** @type {PlatformBridgeShape} */
 const webImpl = {
   // Category 1 — genuine no-ops on web
-  setLightStatusBar: () => {},   // CSS body.light handles the theme
+  // pwa-bars: CSS body.light paints the page; an installed PWA paints the phone's status + gesture bars from
+  // meta theme-color, so keep it in step (the bar black on dark, the light theme's --bg on light).
+  setLightStatusBar: (light) => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', light ? '#f7f2e8' : '#000000');
+  },
   onAppReady: () => {},          // #1: web has no native splash to release
   startAudioSession: () => {},   // Browser handles audio session natively
   endAudioSession: () => {},

@@ -7,7 +7,7 @@
   "id": "./",
   "display": "standalone",
   "background_color": "#000000",
-  "theme_color": "#b8860b",
+  "theme_color": "#000000",
   "categories": ["books", "education"],
   "icons": [
     {
