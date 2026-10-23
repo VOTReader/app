@@ -69,6 +69,14 @@ describe('NoteSheet empty-note action', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true');
   });
 
+  it('the colour dot is drawn inside a button a finger can hit (#10)', () => {
+    setupStores({ body: 'Saved note' });
+    render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    const btn = screen.getByRole('button', { name: 'Change note color' });
+    expect(btn.className).toBe('note-sheet-color-hit');
+    expect(btn.querySelector('.note-sheet-color-dot').getAttribute('data-color')).toBe('yellow');
+  });
+
   it('read mode on an EMPTY note renders the "Add note text" button', () => {
     setupStores({ body: '' });
     render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);

@@ -5836,7 +5836,15 @@
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 12px;
     }
+    /* #10: the dot is 18 px; the button around it is the 44 px a finger needs, laid out as the dot. */
+    .note-sheet-color-hit {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; margin: -13px; padding: 0;
+      background: none; border: none; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
     .note-sheet-color-dot {
+      display: block;
       width: 18px; height: 18px; border-radius: 50%;
       border: 1.5px solid rgba(255,255,255,0.15);
       flex-shrink: 0; padding: 0;
@@ -5921,7 +5929,7 @@
        arrives with unsaved note text (honest-Save, 2026-07-12). */
     .note-sheet-discard-confirm { margin-top: 12px; width: 100%; }
     .note-sheet-save {
-      flex: 1;
+      flex: 1; min-height: 44px;
       padding: 11px; border-radius: 8px; cursor: pointer;
       font-family: 'Cinzel', serif; font-size: var(--fs-11);
       letter-spacing: 0.16em; text-transform: uppercase;
@@ -5939,7 +5947,7 @@
     }
     .note-sheet-save.disabled:active, .note-sheet-save:disabled:active { background: transparent; }
     .note-sheet-secondary {
-      flex: 1;
+      flex: 1; min-height: 44px;
       padding: 11px; border-radius: 8px; cursor: pointer;
       font-family: 'Cinzel', serif; font-size: var(--fs-11);
       letter-spacing: 0.16em; text-transform: uppercase;
@@ -7063,6 +7071,15 @@
       stroke-width: 1.6;
     }
     .inline-bookmark-icon-multi { color: var(--gold); }
+    /* #10 (idea sweep 2026-10-22): the note, link and bookmark markers are 14-16 px glyphs, hard to hit on a
+       phone. An invisible box the size of the line around each takes a tap near it; it stops short of the lines
+       above and below, whose words keep their own taps (tap-to-seek, a long-press to select). The glyph stays on
+       top, so of two markers side by side each keeps its own. */
+    .hl-note-icon, .inline-link-icon, .inline-bookmark-icon { position: relative; }
+    .hl-note-icon::before, .inline-link-icon::before, .inline-bookmark-icon::before {
+      content: ''; position: absolute; inset: -8px -10px;
+    }
+    .hl-note-icon svg, .inline-link-icon svg, .inline-bookmark-icon svg { position: relative; z-index: 1; }
     /* Bookmark create sheet — pre-commit form, reuses link-picker overlay
        chrome (navpick-sheet) for consistency with the new-link flow. */
     .bkm-create-sheet { min-height: auto; }
@@ -7267,7 +7284,7 @@
     }
     .bkm-row-more {
       background: none; border: none; cursor: pointer;
-      color: var(--cream-muted); padding: 2px;
+      color: var(--cream-muted); padding: 14px; margin: -12px;   /* 44 px to hit, laid out as 20 (#10) */
       -webkit-tap-highlight-color: transparent;
       transition: color 0.12s;
     }
@@ -7386,6 +7403,7 @@
       display: flex; align-items: center; justify-content: center;
       line-height: 1;
       box-shadow: 0 0 0 1.5px var(--bg);
+      z-index: 2;   /* above the glyph (#10) */
     }
     body.light .hl-note-icon-badge::after { box-shadow: 0 0 0 1.5px var(--bg3); }
 
