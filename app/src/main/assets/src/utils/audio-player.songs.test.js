@@ -560,6 +560,31 @@ describe('songs kept on this phone (K1)', () => {
     expect(AudioPlayer.getState().status).toBe('loading');
   });
 
+  // n366 (RC.1 on the wrap): Repeat all's wrap from the last song skipped the offline refusal, so offline with no
+  // kept song the wrap paused on queue[0] and the song playing from its buffer stopped.
+  it('offline, Repeat all with nothing kept refuses the wrap: the last song plays on', async () => {
+    await keptOnWeb([]);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    AudioPlayer.next();
+    AudioPlayer.setRepeat('all');
+    el().dispatchEvent(new Event('playing'));
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(AudioPlayer.getState().status).toBe('playing');
+    expect(el().src).toBe(SONG_URL(1, 'aaaaaaaaaaa2'));
+  });
+
+  it('offline, Repeat all wraps onto a kept song at the top', async () => {
+    await keptOnWeb(['aaaaaaaaaaa1']);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    AudioPlayer.next();
+    AudioPlayer.setRepeat('all');
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().qi).toBe(0);
+  });
+
   it('offline with nothing kept, a songs queue is refused with the offline notice', async () => {
     await keptOnWeb([]);
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });

@@ -138,7 +138,10 @@ export function next(atSeam) {
   // playing from its buffer and parked a 0:00 bar over Home. With nothing ahead on the phone it is refused before
   // qi moves, and the one playing plays on; with something ahead on it, _start passes over the rest to reach it.
   // A seam has nothing left to keep: it moves on and pauses on what cannot load, with the offline notice (item 8).
-  if (atSeam !== true && _state.qi + 1 < _state.queue.length && _offlineRefuses(_state.queue.slice(_state.qi + 1))) {
+  // Repeat all's wrap is a step too (n366): what lies ahead is the rest, then the top round to the one playing.
+  const ahead = _state.qi + 1 < _state.queue.length ? _state.queue.slice(_state.qi + 1)
+    : _repeatMode() === 'all' ? _state.queue.slice(0, _state.qi + 1) : [];
+  if (atSeam !== true && ahead.length && _offlineRefuses(ahead)) {
     _toast(NEXT_OFFLINE_MSG);
     return;
   }

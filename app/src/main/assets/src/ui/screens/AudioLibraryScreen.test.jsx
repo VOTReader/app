@@ -22,7 +22,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
 
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { AudioLibraryScreen } from './AudioLibraryScreen.jsx';
+import { AudioLibraryScreen, lengthText } from './AudioLibraryScreen.jsx';
 import * as Shelf from '../components/AudioShelf.jsx';
 import * as AudioTrack from '../../utils/audio-track.js';
 import * as AudioCoverage from '../../utils/audio-coverage.js';
@@ -251,6 +251,40 @@ describe('AudioLibraryScreen -- the hub', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove The Narrow Path from recently played' }));
     expect(globalThis.AudioLibraryStore.removeRecent).toHaveBeenCalledWith(recentTrack.url);
     expect(globalThis.AudioLibraryStore.clearRecent).not.toHaveBeenCalled();
+  });
+});
+
+// s18.8 (n101): Clear history emptied the list at one tap; now a 5 s Undo puts it back.
+describe('AudioLibraryScreen -- Clear history has an Undo', () => {
+  it('Clear history offers Undo, and Undo restores the cleared rows', () => {
+    installGlobals();
+    const gone = [recentTrack];
+    globalThis.AudioLibraryStore.clearRecent = vi.fn(() => gone);
+    globalThis.AudioLibraryStore.restoreRecent = vi.fn();
+    renderScreen();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear history' }));
+    const toast = document.getElementById('vot-toast-history-cleared');
+    expect(toast.textContent).toBe('History clearedUndo');
+    fireEvent.click(toast.querySelector('.vot-undo-btn'));
+    expect(globalThis.AudioLibraryStore.restoreRecent).toHaveBeenCalledWith(gone);
+  });
+});
+
+// RC.7 (n372): the length under the scrubber is never 'Streaming'.
+describe('AudioLibraryScreen -- the now-playing length', () => {
+  const setOnline = (v) => Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => v });
+  afterEach(() => { delete globalThis.AUDIO_LENGTHS; setOnline(true); });
+  const URL = 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/idL.mp3';
+  it('uses the loaded length, then the baked one, then says why offline', () => {
+    expect(lengthText({ duration: 125, queue: [], qi: 0 })).toBe('2:05');
+    globalThis.AUDIO_LENGTHS = { idL: [1e6, 61] };
+    expect(lengthText({ duration: 0, queue: [{ url: URL }], qi: 0 })).toBe('1:01');
+    delete globalThis.AUDIO_LENGTHS;
+    globalThis.AUDIO_LENGTHS = {};
+    setOnline(false);
+    expect(lengthText({ duration: 0, queue: [{ url: URL }], qi: 0 })).toBe('Needs a connection');
+    setOnline(true);
+    expect(lengthText({ duration: 0, queue: [{ url: URL }], qi: 0 })).not.toBe('Streaming');
   });
 });
 

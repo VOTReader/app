@@ -192,6 +192,24 @@ describe('AudioCollectionScreen -- a VOT collection', () => {
   });
 });
 
+// U04.1 (n300, n313): lengths baked into the build show on each row and beside the hero's count.
+describe('AudioCollectionScreen -- recording lengths', () => {
+  afterEach(() => { delete globalThis.AUDIO_LENGTHS; });
+  it('each row carries its reading\'s length, and the hero the whole collection\'s', () => {
+    globalThis.AUDIO_LENGTHS = { idA: [1e6, 141], idC1: [1e6, 1800], idC2: [1e6, 1860] };
+    renderScreen('one');
+    const rows = [...document.querySelectorAll('.audio-collection-item')];
+    expect(rows[0].querySelector('small').textContent).toContain('2:21');
+    expect(rows[1].querySelector('small').textContent).toContain('61:00');
+    expect(screen.getByText('2 of 3 letters have recordings · 1 h 3 min')).toBeTruthy();
+  });
+  it('no length is guessed while one is unknown', () => {
+    globalThis.AUDIO_LENGTHS = { idA: [1e6, 141] };
+    renderScreen('one');
+    expect(screen.getByText('2 of 3 letters have recordings')).toBeTruthy();
+  });
+});
+
 describe('AudioCollectionScreen -- a Bible edition', () => {
   const OT = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-brm-v1/' + id + '.mp3';
   /** A per-chapter book, which is what every shipped edition actually is. */
@@ -470,6 +488,37 @@ describe('a recordings screen in the phone app: downloads', () => {
         onHistory={() => {}} onSettings={() => {}} theme="dark" onThemeChange={() => {}} />
     );
     expect(screen.getByRole('button', { name: /^Play the 2 on this phone$/ })).toBeTruthy();
+  });
+
+  // RC.3 + RC.4 (n368, n369): offline with none of it on the phone, the hero says so and the gold button leads to saving.
+  it('with no signal and nothing on the phone, the hero says 0 of N and the button opens the Downloads tree', () => {
+    fakeStore();
+    setOnline(false);
+    window.__openDownloads = vi.fn();
+    try {
+      renderScreen('one');
+      expect(screen.getByText('On this phone: 0 of 2 · needs a connection')).toBeTruthy();
+      expect(screen.queryByText(/have recordings/)).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Choose…' })).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Save recordings to play offline' }));
+      expect(window.__openDownloads).toHaveBeenCalledWith({ tab: 'choose', focus: 'one' }, 'Volume One');
+    } finally { delete window.__openDownloads; }
+  });
+
+  // RC.5 (n370): the row playing from its buffer says so, not 'Not on this phone'.
+  it('with no signal, the row that is playing says Playing from the buffer', () => {
+    fakeStore();
+    const view = renderScreen('one');
+    fireEvent.click(screen.getByRole('button', { name: 'Play Letter A' }));
+    setOnline(false);
+    window.dispatchEvent(new Event('offline'));
+    view.rerender(
+      <AudioCollectionScreen volKey="one" onBack={() => {}} onOpenText={() => {}} onSearch={() => {}}
+        onHistory={() => {}} onSettings={() => {}} theme="dark" onThemeChange={() => {}} />
+    );
+    const rows = [...document.querySelectorAll('.audio-collection-item')];
+    expect(rows[0].querySelector('small').textContent).toBe('Playing from the buffer');
+    expect(rows[1].querySelector('small').textContent).toBe('Not on this phone');
   });
 
   it('with no signal and nothing on the phone, and with a signal, it stays Play all', () => {

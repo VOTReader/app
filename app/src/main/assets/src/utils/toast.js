@@ -174,6 +174,31 @@ export function hideToast(id) {
 }
 
 /**
+ * A toast whose one button puts things back ("Stopped · Undo", "History cleared · Undo"). Toasts share one spot, and
+ * this one carries an action, so any other toast up steps aside. The text goes in as text; the button is built.
+ * @param {string} id @param {string} text @param {() => void} onUndo
+ * @param {{ label?: string, durationMs?: number }} [opts]
+ * @returns {void}
+ */
+export function showUndoToast(id, text, onUndo, opts) {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.vot-toast.show').forEach((el) => { if (el.id && el.id !== id) hideToast(el.id); });
+  showToast({ id, className: 'vot-toast vot-toast-undo', durationMs: (opts && opts.durationMs) || 5000, text });
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.querySelectorAll('.vot-undo-btn').forEach((b) => b.remove());   // a second action inside the window re-uses the toast
+  const undo = document.createElement('button');
+  undo.type = 'button';
+  undo.className = 'vot-undo-btn';
+  undo.textContent = (opts && opts.label) || 'Undo';
+  undo.addEventListener('click', () => {
+    onUndo();
+    hideToast(id);
+  }, { once: true });
+  el.appendChild(undo);
+}
+
+/**
  * TEST-ONLY. Tear down every tracked toast DOM element + clear every
  * pending auto-hide timer. Used by vitest beforeEach for isolation.
  *

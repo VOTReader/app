@@ -25,7 +25,7 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { displayPartLabel, queuePlace, queuePlaceOnPhone, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
-import { hideToast, showToast } from '../../utils/toast.js';
+import { showUndoToast } from '../../utils/toast.js';
 import { SongCover, NextIcon } from './SongParts.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
@@ -79,21 +79,7 @@ export const SKIPPED_TOAST_ID = 'vot-toast-audio-skipped';
  * @param {string} id @param {string} text @param {string} label @param {() => void} onUndo
  */
 function undoToast(id, text, label, onUndo) {
-  if (typeof document === 'undefined') return;
-  document.querySelectorAll('.vot-toast.show').forEach((el) => { if (el.id && el.id !== id) hideToast(el.id); });
-  showToast({ id, className: 'vot-toast vot-toast-undo', durationMs: UNDO_MS, text });
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.querySelectorAll('.vot-undo-btn').forEach((b) => b.remove());   // a second skip inside 5 s re-uses the toast
-  const undo = document.createElement('button');
-  undo.type = 'button';
-  undo.className = 'vot-undo-btn';
-  undo.textContent = label;
-  undo.addEventListener('click', () => {
-    onUndo();
-    hideToast(id);
-  }, { once: true });
-  el.appendChild(undo);
+  showUndoToast(id, text, onUndo, { label, durationMs: UNDO_MS });
 }
 
 /**

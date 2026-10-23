@@ -9,6 +9,9 @@
 */
 
 import { useOfflineAudio, useOnline } from '../components/OfflineAudioControls.jsx';
+import { queueTime } from '../components/PlayerSheets.jsx';
+import { lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
+import { itemNoun, tracksSeconds } from './AudioCollectionScreen.jsx';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -51,9 +54,25 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Listening Library', on
   };
 
   // Warm the lazy VOT corpus so the availability sub-lines can answer.
+  /** U04.1: "30 letters · 6 h 10 min" from the baked lengths, '' until they are known. @param {any} col */
+  const sizeLine = (col) => {
+    if (typeof colLetterArr !== 'function' || typeof AudioPlayer.renditionsFor !== 'function') return '';
+    const pre = typeof colPreface === 'function' ? colPreface(col) : null;
+    const items = [pre, ...(colLetterArr(col) || [])].filter((it) => it && it.id && AudioPlayer.hasAudio(col.volKey, it.id));
+    let total = 0;
+    for (const it of items) {
+      const s = tracksSeconds((AudioPlayer.renditionsFor(col.volKey, it, col.label)[0] || { tracks: [] }).tracks);
+      if (!s) return '';
+      total += s;
+    }
+    return items.length && total ? items.length + ' ' + itemNoun(col, items.length) + ' · ' + queueTime(total) : '';
+  };
+
   React.useEffect(() => {
     if (typeof window.__loadVotCorpus === 'function') void window.__loadVotCorpus();
+    void lengthsReady();
   }, []);
+  React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
   React.useSyncExternalStore(
     React.useCallback((callback) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(callback) : () => {}, []),
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
@@ -93,7 +112,7 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Listening Library', on
                   <span className="audio-library-shelf-copy">
                     <strong>{collection.label}</strong>
                     <small>{!votReady ? 'Loading recordings…' : !available ? 'No recordings yet'
-                      : online ? held || 'Recordings available'
+                      : online ? held || sizeLine(collection) || 'Recordings available'
                         : here ? held + (total && here >= total ? '' : ' · the rest need a connection') : 'Needs a connection'}</small>
                   </span>
                   <span className="audio-library-shelf-tail"><ArrowIcon /></span>

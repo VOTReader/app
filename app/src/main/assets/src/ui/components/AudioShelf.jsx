@@ -81,9 +81,23 @@ export function renditionRemainingLabel(tracks) {
 /** @param {any} track @returns {string} */
 export function trackName(track) { return (track && track.title) || 'Untitled recording'; }
 
-/** @param {any} track @returns {string} */
+/**
+ * A Bible chapter's title from the book's chrome ("The Fall"), or ''. U04.6.
+ * @param {any} track @returns {string}
+ */
+export function chapterTitleOf(track) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  const m = track && typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
+  if (!m || key.lastIndexOf('bible-', 0) !== 0) return '';
+  const books = /** @type {any} */ (globalThis).BOOKS;
+  const book = books ? books[key.slice(key.indexOf(':') + 1)] : null;
+  const ch = book && Array.isArray(book.chapters) ? book.chapters.find((/** @type {any} */ c) => c && c.num === Number(m[1])) : null;
+  return ch && typeof ch.title === 'string' ? ch.title : '';
+}
+
+/** "KJV · BRM · Chapter 3 · The Fall" (U04.6: a chapter carries its title in audio lists too). @param {any} track @returns {string} */
 export function trackMeta(track) {
-  return [track && track.sub, track && track.partLabel].filter(Boolean).join(' · ') || 'The Volumes of Truth';
+  return [track && track.sub, track && track.partLabel, chapterTitleOf(track)].filter(Boolean).join(' · ') || 'The Volumes of Truth';
 }
 
 /** @param {any} track @returns {string} */

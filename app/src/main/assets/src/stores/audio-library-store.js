@@ -428,12 +428,29 @@ export const AudioLibraryStore = extendStore(
       return true;
     },
 
-    /** @returns {void} */
+    /** Empty the recent shelf. @returns {RecentAudioTrack[]} the rows it held, for an Undo (restoreRecent). */
     clearRecent() {
-      if (this._shouldDefer('clearRecent')) return;
+      if (this._shouldDefer('clearRecent')) return [];
       const data = _writeableData(this);
-      if (!data.recent.length) return;
+      if (!data.recent.length) return [];
+      const gone = data.recent;
       data.recent = [];
+      this._cache = data;
+      this._save();
+      this._bump();
+      return gone;
+    },
+
+    /**
+     * Undo a Clear history (s18.8): put the cleared rows back beside anything played since, newest first, deduped.
+     * @param {unknown} rows what clearRecent returned
+     * @returns {void}
+     */
+    restoreRecent(rows) {
+      if (!Array.isArray(rows) || !rows.length) return;
+      if (this._shouldDefer('restoreRecent', rows)) return;
+      const data = _writeableData(this);
+      data.recent = /** @type {RecentAudioTrack[]} */ (_sortedUniqueTracks(data.recent.concat(rows), 'playedAt', MAX_RECENT_AUDIO_TRACKS));
       this._cache = data;
       this._save();
       this._bump();

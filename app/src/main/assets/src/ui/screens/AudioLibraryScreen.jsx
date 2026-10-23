@@ -20,6 +20,8 @@ import { studiesSummary } from './AudioStudiesScreen.jsx';
 import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote, useOnline } from '../components/OfflineAudioControls.jsx';
 import { stripModel } from '../components/DownloadStrip.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
+import { showUndoToast } from '../../utils/toast.js';
+import { secondsOf } from '../../utils/audio-lengths.js';
 import { bibleEditionPartialDetail } from '../../utils/audio-coverage.js';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
@@ -42,6 +44,19 @@ function offlineShelfLine(off) {
 }
 
 /**
+ * The length under the scrubber (RC.7): the recording's own once it loads, the build's baked length before that,
+ * and offline with neither, why. Never 'Streaming', which is not a length.
+ * @param {any} state @returns {string}
+ */
+export function lengthText(state) {
+  if (state.duration) return clock(state.duration);
+  const track = Array.isArray(state.queue) ? state.queue[state.qi] : null;
+  const baked = track ? secondsOf(track.url) : null;
+  if (baked) return clock(baked);
+  return typeof navigator !== 'undefined' && navigator.onLine === false ? 'Needs a connection' : '–:––';
+}
+
+/**
  * The now-playing card's scrubber and clock: the one part of the screen that moves every second, so the one part
  * that re-renders with it (s18.3). The ONE scrubber (AUDIO-MANAGER.md rule 6); the decorative progressbar it
  * replaced could be read but never moved.
@@ -52,9 +67,18 @@ function NowProgress() {
   return (
     <div className="audio-library-progress-wrap">
       <AudioSeekSlider className="audio-library-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
-      <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{state.duration ? clock(state.duration) : 'Streaming'}</span></div>
+      <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{lengthText(state)}</span></div>
     </div>
   );
+}
+
+/** Clear history, with a 5 s Undo (s18.8: it emptied the list at one tap with no way back). @param {any} library */
+function clearHistory(library) {
+  if (!library) return;
+  const gone = library.clearRecent();
+  if (Array.isArray(gone) && gone.length && typeof library.restoreRecent === 'function') {
+    showUndoToast('vot-toast-history-cleared', 'History cleared', () => library.restoreRecent(gone));
+  }
 }
 
 /** @param {number} value @returns {string} */
@@ -279,7 +303,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
             <div><span>Pick up again</span><h2 id="audio-library-recent">Recently played</h2><p>{recent.length ? 'Your latest starts, newest first.' : 'Your listening trail will appear here.'}</p></div>
             <div className="audio-library-section-tail">
               <strong aria-label={recent.length + ' recent recordings'}>{recent.length}</strong>
-              {recent.length ? <button type="button" className="audio-library-clear" onClick={() => library && library.clearRecent()}>Clear history</button> : null}
+              {recent.length ? <button type="button" className="audio-library-clear" onClick={() => clearHistory(library)}>Clear history</button> : null}
               <button
                 type="button"
                 className={'audio-library-disclosure' + (recentOpen ? ' is-open' : '')}

@@ -25,7 +25,9 @@ import { AudioSpeedControl, AudioSpeedReadout } from './AudioSpeedControl.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { TrackOnPhone } from './OfflineAudioControls.jsx';
-import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
+import { PlayIcon, PauseIcon, chapterTitleOf } from './AudioShelf.jsx';
+
+export { chapterTitleOf };
 import { formatClock } from './AudioSeekSlider.jsx';
 import { NextIcon } from './SongParts.jsx';
 
@@ -235,20 +237,6 @@ export function queueTime(seconds) {
   if (m < 60) return m + ' min';
   const h = Math.floor(m / 60);
   return h + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '');
-}
-
-/**
- * A Bible chapter's title from the book's chrome ("The Fall"), or ''. U04.6.
- * @param {any} track @returns {string}
- */
-export function chapterTitleOf(track) {
-  const key = track && typeof track.key === 'string' ? track.key : '';
-  const m = track && typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
-  if (!m || key.lastIndexOf('bible-', 0) !== 0) return '';
-  const books = /** @type {any} */ (globalThis).BOOKS;
-  const book = books ? books[key.slice(key.indexOf(':') + 1)] : null;
-  const ch = book && Array.isArray(book.chapters) ? book.chapters.find((/** @type {any} */ c) => c && c.num === Number(m[1])) : null;
-  return ch && typeof ch.title === 'string' ? ch.title : '';
 }
 
 /**

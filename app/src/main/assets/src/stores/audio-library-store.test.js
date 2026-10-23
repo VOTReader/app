@@ -136,6 +136,19 @@ describe('AudioLibraryStore — normalized metadata', () => {
     expect(AudioLibraryStore.saved()).toHaveLength(1);
     expect(AudioLibraryStore.getPlaybackRate()).toBe(1.25);
   });
+
+  // s18.8: Clear history gets an Undo, which puts the rows back beside anything played since.
+  it('clearRecent hands back what it cleared, and restoreRecent puts it back', () => {
+    AudioLibraryStore.recordPlayed(track(1));
+    AudioLibraryStore.recordPlayed(track(2));
+    const gone = AudioLibraryStore.clearRecent();
+    expect(gone).toHaveLength(2);
+    AudioLibraryStore.recordPlayed(track(3));
+    AudioLibraryStore.restoreRecent(gone);
+    expect(AudioLibraryStore.recent().map((t) => t.url)).toEqual([track(3).url, track(2).url, track(1).url]);
+    expect(AudioLibraryStore.clearRecent()).toHaveLength(3);
+    expect(AudioLibraryStore.clearRecent()).toEqual([]);
+  });
 });
 
 describe('normalizeAudioLibrary — import boundary', () => {

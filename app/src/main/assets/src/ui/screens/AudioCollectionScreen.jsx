@@ -22,6 +22,10 @@ import { RowMenu, openRowMenu } from '../components/RowMenu.jsx';
 import { CoverageBadge } from '../components/CoverageBadge.jsx';
 import { COVERAGE_READ_ALONG, bibleBookPartialDetail } from '../../utils/audio-coverage.js';
 import { queueMenuItems } from '../components/queue-menu.js';
+import { chapterTitleOf } from '../components/AudioShelf.jsx';
+import { formatClock } from '../components/AudioSeekSlider.jsx';
+import { queueTime } from '../components/PlayerSheets.jsx';
+import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -86,6 +90,14 @@ export function itemNoun(col, count) {
   return count === 1 ? (entry ? 'entry' : 'letter') : (entry ? 'entries' : 'letters');
 }
 
+/** A reading's whole length from the lengths baked into the build (U04.1), or 0 while any part is unknown.
+ *  @param {any[]} tracks @returns {number} */
+export function tracksSeconds(tracks) {
+  let total = 0;
+  for (const t of tracks || []) { const s = secondsOf(t && t.url); if (!(s > 0)) return 0; total += s; }
+  return total;
+}
+
 /** The hero's count line, from the list the Read tile counts (colLetterArr): letters counted as letters and the
  *  preface named on its own. It said 'All 30 letters have recordings' for Volume One, whose Read tile says
  *  '29 Letters' - the preface counted as a letter (zones L4, 2026-10-05; VolumesHome.parity.test.jsx). */
@@ -112,6 +124,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   // Not the 1 Hz clock: nothing here draws it (s18.3).
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   useAudioPositions();
+  // Recording lengths (U04.1) ride a lazy file: paint again when it lands.
+  React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
+  React.useEffect(() => { void lengthsReady(); }, []);
 
   const bible = isBibleVol(volKey);
   // A study's recordings are 'study:<chapterId>' to the player, whatever study
@@ -197,6 +212,19 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
     ? playable.filter((item) => { const own = ownTracks(item); return own.length > 0 && own.every((t) => offline.isSaved(t.url)); }).length
     : 0;
   const playAllLabel = onPhone === 1 ? 'Play the one on this phone' : onPhone > 1 ? 'Play the ' + onPhone + ' on this phone' : 'Play all';
+  // RC.3: offline with none of it on the phone, the hero says that rather than 'All 29 letters have recordings'
+  // over rows that each say 'Not on this phone'. RC.4: and the gold button leads to saving them, not to a toast.
+  const noneHere = !online && !bible && playable.length > 0
+    && !(offline && playable.some((item) => ownTracks(item).some((t) => offline.isSaved(t.url))));
+  const saveFirst = noneHere && !!offline && typeof window.__openDownloads === 'function';
+  const openChoose = () => window.__openDownloads({ tab: 'choose', focus: volKey }, label);
+  // U04.1: the whole collection's length beside its count, once every reading's length is known.
+  let totalSec = 0;
+  if (online && !bible) {
+    for (const item of playable) { const s = tracksSeconds(ownTracks(item)); if (!s) { totalSec = 0; break; } totalSec += s; }
+  }
+  const heroLine = noneHere ? 'On this phone: 0 of ' + playable.length + ' · needs a connection'
+    : countLine + (totalSec > 0 ? ' · ' + queueTime(totalSec) : '');
 
   const playFrom = (item) => {
     if (current && current.key === srcKey + ':' + item.id) { AudioPlayer.toggle(); return; }
@@ -211,7 +239,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
         <header className="audio-library-hero">
           <div className="audio-library-eyebrow">Listening Library</div>
           <h1>{label}</h1>
-          <p className="audio-library-intro">{countLine}</p>
+          <p className="audio-library-intro">{heroLine}</p>
           {/* "12 of 30 on this phone" (pictures 10, 14, 17). A Bible edition's books say it on their own rows. */}
           {offline && !bible && playable.length ? <OfflineCollectionMark units={playable.map(ownTracks)} /> : null}
           {textOnly.length ? (
@@ -233,15 +261,21 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
           ) : null}
           {playable.length ? (
             <div className="audio-library-hero-actions">
-              <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
-                <PlayIcon /><span>{playAllLabel}</span>
-              </button>
+              {saveFirst ? (
+                <button type="button" className="audio-library-primary-action" onClick={openChoose}>
+                  <span>Save recordings to play offline</span>
+                </button>
+              ) : (
+                <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
+                  <PlayIcon /><span>{playAllLabel}</span>
+                </button>
+              )}
               {/* A collection at once; a Bible edition a book at a time from its rows until the Downloads picker (downloads
                   brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
               {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} note={false} /> : null}
               {/* The Downloads tree opened at this collection or edition (downloads brief 3a, picture 14). */}
-              {offline && typeof window.__openDownloads === 'function' ? (
-                <button type="button" className="audio-collection-choose" onClick={() => window.__openDownloads({ tab: 'choose', focus: volKey }, label)}>Choose…</button>
+              {offline && !saveFirst && typeof window.__openDownloads === 'function' ? (
+                <button type="button" className="audio-collection-choose" onClick={openChoose}>Choose…</button>
               ) : null}
             </div>
           ) : null}
@@ -295,7 +329,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 // A Bible book's "parts" ARE its chapters — every shipped
                 // edition is recorded one chapter at a time — and the row's own
                 // disclosure below already calls them that (B2, 2026-08-10).
-                const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader].filter(Boolean).join(' · ');
+                // U04.1: the reading's length from the build's baked lengths, so it shows offline too.
+                const secs = reading ? tracksSeconds(reading.tracks) : 0;
+                const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader, secs ? formatClock(secs) : null].filter(Boolean).join(' · ');
                 // A Bible book whose read-along ships before every chapter is aligned says how far it goes (Corbin 10-23).
                 const partly = bible ? bibleBookPartialDetail(volKey, item.id) : null;
                 const remaining = reading ? renditionRemainingLabel(reading.tracks) : '';
@@ -311,7 +347,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 // Picture 14: the row's line ends with a tick once it is on the phone; a book part on it says how much.
                 const held = offline ? rowOnPhone(offline, own) : null;
                 const heldLine = held && held.state === 'part' ? held.saved + ' of ' + held.count + ' on this phone' : '';
-                const line = unavailable ? 'Not on this phone' : [meta, heldLine].filter(Boolean).join(' · ');
+                // RC.5: the one playing from its buffer says so, not 'Not on this phone'.
+                const line = unavailable ? (rowPlaying ? 'Playing from the buffer' : 'Not on this phone') : [meta, heldLine].filter(Boolean).join(' · ');
                 const opensText = canOpenText && hasTextDestination({ key });
                 const openText = () => onOpenText(current && current.key === key ? current : { key });
                 // Play next / Add to queue (player brief 3c): every row that plays, downloads or not.
@@ -417,7 +454,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                               >
                                 <PlayIcon />
                               </button>
-                              <span>{track.partLabel || ('Chapter ' + chapterNum)}</span>
+                              <span>{[track.partLabel || ('Chapter ' + chapterNum), chapterTitleOf(track), secondsOf(track.url) ? formatClock(secondsOf(track.url)) : ''].filter(Boolean).join(' · ')}</span>
                             </div>
                           );
                         })}
