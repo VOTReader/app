@@ -123,7 +123,7 @@ describe('ReadingPlansScreen', () => {
   it('Find a plan lists every catalog plan in its group, one tap to start; a running one says Following (Corbin: B)', () => {
     render(<ReadingPlansScreen {...base()} />);
     for (const [g, names] of [['The Bible', ['Bible in a Year', 'New Testament', 'Psalms', 'Proverbs in 31 days', 'The Gospels']],
-      ['The Letters', ['The Seven Volumes', 'Letters in a Year', 'Every letter, in order', 'One collection']],
+      ['The Letters', ['The Seven Volumes', 'Letters in a Year', 'Every letter, in order', 'Letters by date', 'One collection']],
       ['Short starts', ['The Blessed', 'Timothy', 'Holy Days', 'Matthew Study Bible']]]) {
       const group = screen.getByRole('region', { name: g });
       for (const n of names) expect(within(group).getByText(n)).toBeTruthy();

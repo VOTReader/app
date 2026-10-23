@@ -79,6 +79,43 @@ const SEVEN = ['one', 'two', 'three', 'four', 'five', 'six', 'seven'];
 /** The Volumes in site order (data/scripture-resolution.js READING_CHAIN). */
 export const LETTER_CHAIN = ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'rebuke', 'wtlb1', 'wtlb2', 'blessed', 'flock', 'timothy', 'holydays'];
 
+/** A letter's date ("3/28/07") as a sortable number (20070328), or null when it has none. @param {any} e */
+function letterDate(e) {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/.exec(String((e && e.date) || '').trim());
+  if (!m) return null;
+  const y = m[3].length === 4 ? Number(m[3]) : 2000 + Number(m[3]);
+  return y * 10000 + Number(m[1]) * 100 + Number(m[2]);
+}
+
+/**
+ * S3: every letter in the order it was given, by its date: Volume Seven falls inside the Volume Four and Five years,
+ * the Flock and Timothy interleave. A preface goes just before its collection's first letter; the undated (Words
+ * To Live By, The Blessed) come at the end, in site order.
+ * @param {LetterSource | null} src @returns {PlanItem[]}
+ */
+export function chronoItems(src) {
+  if (!src || !src.colByKey) return [];
+  const rows = [];
+  LETTER_CHAIN.forEach((volKey, c) => {
+    const col = src.colByKey.get(volKey);
+    const items = collectionItems(volKey, src);
+    if (!col || !items.length) return;
+    const pref = src.preface(col);
+    const letters = src.letters(col) || [];
+    const byId = new Map(letters.filter((e) => e && e.id).map((e) => [String(e.id), e]));
+    const dates = letters.map(letterDate).filter((d) => d != null);
+    const first = dates.length ? Math.min(...dates) : null;
+    items.forEach((it, i) => {
+      const id = it.k.slice(it.k.indexOf(':') + 1);
+      const isPref = !!pref && String(pref.id) === id;
+      const d = isPref ? first : letterDate(byId.get(id));
+      rows.push({ it, d: d == null ? Infinity : d, pre: isPref ? 0 : 1, c, i });
+    });
+  });
+  rows.sort((a, b) => a.d - b.d || a.pre - b.pre || a.c - b.c || a.i - b.i);
+  return rows.map((r) => r.it);
+}
+
 /** @param {string[]} keys @param {LetterSource | null} src @returns {PlanTrack} */
 const lettersTrack = (keys, src) => ({ kind: 'letters', by: 'words', items: keys.flatMap((k) => collectionItems(k, src)) });
 /** @param {PlanItem[]} items @returns {PlanTrack} */
@@ -109,6 +146,8 @@ export const PLAN_CATALOG = [
     tracks: (src) => [lettersTrack(LETTER_CHAIN, src)], pace: { mode: 'days', n: 365 } },
   { id: 'volumes', group: 'letters', name: 'Every letter, in order', sub: 'All 14 collections · about 5 min a day', letters: true,
     tracks: (src) => [lettersTrack(LETTER_CHAIN, src)], pace: { mode: 'minutes', n: 5 } },
+  { id: 'letters-chrono', group: 'letters', name: 'Letters by date', sub: 'Every letter in the order it was given · about 5 min a day', letters: true,
+    tracks: (src) => [{ kind: 'letters', by: 'words', items: chronoItems(src) }], pace: { mode: 'minutes', n: 5 } },
   { id: 'collection', group: 'letters', name: 'One collection', sub: 'Any collection, at your pace', letters: true,
     tracks: (src, opt) => [lettersTrack([String(opt && opt.volKey || 'one')], src)], pace: { mode: 'minutes', n: 5 } },
   { id: 'blessed', group: 'starter', name: 'The Blessed', sub: '8 days', letters: true,
