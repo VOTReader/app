@@ -149,9 +149,9 @@ describe('useTranslationLoader — an edition that never arrived (mw16 O1)', () 
     resolveLoad(); await flush();
     expect(g().loadTranslation).toHaveBeenCalledTimes(1);
     onLine.mockReturnValue(true);
-    g().BIBLE_RVR = {};
     act(() => { window.dispatchEvent(new Event('online')); });
     expect(g().loadTranslation).toHaveBeenCalledTimes(2);
+    g().BIBLE_RVR = {};                                           // this time the script lands
     resolveLoad(); await flush();
     expect(tick).toHaveBeenCalledTimes(2);
     expect(g().hideToast).toHaveBeenCalledWith('vot-toast-translation-missing');
@@ -164,6 +164,15 @@ describe('useTranslationLoader — an edition that never arrived (mw16 O1)', () 
     renderHook(() => useTranslationLoader('rvr', vi.fn()));
     resolveLoad(); await flush();
     expect(g().showToast).not.toHaveBeenCalled();
+  });
+
+  it('the connection returning while the first load is still failing is not missed (refuter)', async () => {
+    renderHook(() => useTranslationLoader('rvr', vi.fn()));
+    onLine.mockReturnValue(true);
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(g().loadTranslation).toHaveBeenCalledTimes(1);        // still in flight: no second load yet
+    resolveLoad(); await flush();
+    expect(g().loadTranslation).toHaveBeenCalledTimes(2);        // the failed load tries again at once
   });
 
   it('switching away before the connection returns stops listening', async () => {

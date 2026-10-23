@@ -1021,6 +1021,34 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
       expect(await cache.match(thumb(HID))).toBeFalsy();
     });
 
+    it('a catalog that lands during a run is warmed after it (refuter)', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const NEW = 'eeeeeeeeeee5';
+        let body = catalogBody;
+        const calls = [];
+        const sw = bootSW({ fetchImpl: async (r) => {
+          const url = typeof r === 'string' ? r : r.url;
+          calls.push(url);
+          if (url !== CAT) return { ok: true, redirected: false, body: url };
+          const b = body;
+          return { ok: true, redirected: false, clone: () => ({ json: async () => b }) };
+        } });
+        const waited = [];
+        const ask = async () => { let p; sw.handlers.fetch({ request: getReq(CAT), respondWith: (x) => { p = x; }, waitUntil: (w) => { waited.push(w); } }); await p; };
+        await ask();
+        await vi.advanceTimersByTimeAsync(5000);
+        body = { songs: [...catalogBody.songs, { id: NEW }] };
+        await ask();                                    // lands inside the first run's pause
+        await vi.advanceTimersByTimeAsync(40000);
+        for (let n = -1; n !== waited.length;) { n = waited.length; await Promise.all(waited); }
+        expect(calls).toContain(thumb(NEW));
+        expect(calls.filter((u) => u === thumb(A))).toHaveLength(1);   // the second run skips what the first kept
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('a 404 cover is skipped, and a network failure stops the run', async () => {
       const calls = [];
       const cache = await run(async (r) => {

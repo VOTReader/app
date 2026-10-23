@@ -1173,14 +1173,26 @@ async function networkFirstCatalog(event) {
    bucket in the background: a pause first so a launch's own requests go
    ahead, a few at a time, only the ones the bucket lacks (covers are named by
    song id and never change), and it stops at the first network failure. One
-   run at a time; an interrupted run continues after the next catalog. */
+   run at a time: a catalog that lands during a run is warmed right after it
+   (the newest one only); an interrupted run continues after the next catalog. */
 const SONG_THUMB_WARM_DELAY_MS = 15000;
 const SONG_THUMB_WARM_AT_ONCE = 3;
-const SONG_THUMB_ID = /^[0-9a-f]{12}$/;
+const SONG_THUMB_ID = /^[0-9a-f]{12}$/;   // audio-track.js SONG_ID: the page builds no cover URL for any other id
 let songThumbWarm = null;
+let songThumbWarmNext = null;
 
 function warmSongThumbs(catalogResponse) {
-  if (!songThumbWarm) songThumbWarm = runSongThumbWarm(catalogResponse).catch(() => {}).finally(() => { songThumbWarm = null; });
+  if (songThumbWarm) { songThumbWarmNext = catalogResponse; return songThumbWarm; }
+  songThumbWarm = (async () => {
+    let next = catalogResponse;
+    while (next) {
+      const run = next;
+      next = null;
+      songThumbWarmNext = null;
+      try { await runSongThumbWarm(run); } catch (_e) { /* best effort: the next catalog tries again */ }
+      next = songThumbWarmNext;
+    }
+  })().finally(() => { songThumbWarm = null; });
   return songThumbWarm;
 }
 

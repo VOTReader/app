@@ -85,23 +85,30 @@ export function useTranslationLoader(translation, setTranslationTick) {
        WEB's label. Swept against WEB, the late ASV frees itself instead; only
        the live load re-renders. */
     let live = true;
-    let retry = null;
-    const load = () => loadTranslation(code).then(() => {
-      releaseTranslationsExcept(selectedRef.current);
-      if (!live) return;
-      setTranslationTick((v) => v + 1);
-      if (!translationMissing(code)) { hideMissingNotice(); return; }
-      /* mw16 (seam walk O1): an edition picked offline before it was ever downloaded failed to
-         load and the Bible silently showed NKJV under the reader's choice. Say so plainly, and
-         load it the moment the connection is back. */
-      showMissingNotice(code);
-      if (!retry && typeof window !== 'undefined') {
-        retry = () => { window.removeEventListener('online', retry); retry = null; if (live) load(); };
-        window.addEventListener('online', retry);
-      }
-    });
+    let loading = false;
+    let failed = false;
+    /* mw16 (seam walk O1): an edition picked offline before it was ever downloaded failed to
+       load and the Bible silently showed NKJV under the reader's choice. Say so plainly, and
+       load it the moment the connection is back. The listener is up from the start, so a
+       connection that returns while the first load is still failing is not missed. */
+    const onOnline = () => { if (!live) return; if (loading) failed = true; else if (translationMissing(code)) load(); };
+    const stopListening = () => { if (typeof window !== 'undefined') window.removeEventListener('online', onOnline); };
+    const load = () => {
+      loading = true;
+      failed = false;
+      return loadTranslation(code).then(() => {
+        loading = false;
+        releaseTranslationsExcept(selectedRef.current);
+        if (!live) return;
+        setTranslationTick((v) => v + 1);
+        if (!translationMissing(code)) { hideMissingNotice(); stopListening(); return; }
+        if (failed) { load(); return; }       // the connection came back mid-load: try once more now
+        showMissingNotice(code);
+      });
+    };
+    if (typeof window !== 'undefined') window.addEventListener('online', onOnline);
     load();
-    return () => { live = false; if (retry) window.removeEventListener('online', retry); };
+    return () => { live = false; stopListening(); };
   // The setter is in the deps for exhaustive-deps' sake; App()'s is a useState setter, so
   // it never changes and the effect runs on the translation alone, as it did inline.
   }, [translation, setTranslationTick]);
