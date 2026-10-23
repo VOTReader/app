@@ -2388,7 +2388,7 @@ async function build(options) {
   // arrived while the cache was read is in both or in neither.
   const t0 = now();
   const builtSig = dataSignature(code);
-  const docs = buildDocs({ translation: code });
+  const docs = buildDocs({ translation: shownEdition(code) });
   const t1 = now();
   const ms = new MiniSearch(buildMiniSearchOptions());
   // 500 at a time: a chunk of 2,000 held the main thread for about a second on a
@@ -2440,6 +2440,23 @@ function loadCorpora(/** @type {string} */ code) {
     loads.push(call(w.loadTranslation, [code]).then((ok) => ok && !!w['BIBLE_' + code.toUpperCase()]));
   }
   return Promise.all(loads).then((oks) => oks.every(Boolean));
+}
+
+/* THE EDITION THE READER CAN SHOW (search200 wave 3, RC.6, 2026-10-23). The Bible shows an edition only while its
+   text is in memory (translations.js isTranslationLoaded), else NKJV. Offline, WEB picked and not on the phone, the
+   index was built "for WEB": NKJV words badged WEB, and a sparse overlay without its own text read its base's words,
+   which the reader never shows. The docs are built from the edition shown; the signature still names the one picked
+   with its text absent, so the index is built again the moment that text is in memory. */
+/** @returns {string} */
+function shownEdition(/** @type {string} */ code) {
+  if (code === 'nkjv') return code;
+  // translations.js's own rule (it is not a bundle-d global): the text in memory, and a sparse overlay's base too
+  const w = /** @type {any} */ (globalThis);
+  if (!w['BIBLE_' + code.toUpperCase()]) return 'nkjv';
+  const opts = w.TRANSLATION_OPTIONS;
+  const opt = Array.isArray(opts) ? opts.find((/** @type {any} */ o) => o && o.id === code) : null;
+  const base = opt && opt.base;
+  return !base || base === 'nkjv' || w['BIBLE_' + String(base).toUpperCase()] ? code : 'nkjv';
 }
 
 /** The edition a call means: the one it names, else the one built or being built, else NKJV. */
