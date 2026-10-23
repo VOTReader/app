@@ -15,7 +15,7 @@ import { formatBytes, DownloadIcon, SPACE_MARGIN } from './OfflineAudioControls.
 import { SheetHandle } from './SheetHandle.jsx';
 import { networkType } from '../../utils/download-gate.js';
 import {
-  buildTvot, buildBible, checkState, toggleNode, selectRange, initialWanted, planOf, roomShort, groupPicked,
+  buildTvot, buildBible, buildStudies, checkState, toggleNode, selectRange, initialWanted, planOf, roomShort, groupPicked,
   countOf, formatLength, unitOnPhone, unitHeld,
 } from '../../utils/download-tree.js';
 
@@ -415,13 +415,26 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
     id, edition: e, tree: buildBible({ edition: e, books: typeof BIBLE_AUDIO_BOOKS !== 'undefined' ? BIBLE_AUDIO_BOOKS : [], player: AudioPlayer }),
   // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus: the Bible manifest is read from globals too
   })).filter((b) => b.tree.units.length), [editions, corpus]);
-  const allUnits = React.useMemo(() => [...tvot.units, ...bibles.flatMap((b) => b.tree.units)], [tvot, bibles]);
+  // The studies registry is its own lazy file: asked for here, the branch fills in when it lands.
+  const [studiesIn, setStudiesIn] = React.useState(0);
+  React.useEffect(() => {
+    let live = true;
+    const load = /** @type {any} */ (window).loadBibleStudies;
+    if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesIn((n) => n + 1); }, () => {});
+    return () => { live = false; };
+  }, []);
+  const studies = React.useMemo(() => buildStudies({
+    studies: typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [], player: AudioPlayer,
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- studiesIn, corpus: the registry and manifest are read from globals
+  }), [studiesIn, corpus]);
+  const allUnits = React.useMemo(() => [...tvot.units, ...bibles.flatMap((b) => b.tree.units), ...studies.units], [tvot, bibles, studies]);
   // The leaves the confirm sheet groups by: collections and books. A book names its edition when more than one is offered.
   const groups = React.useMemo(() => [
     ...tvot.children || [],
     ...bibles.flatMap((b) => (b.tree.children || []).flatMap((tm) => (tm.children || []).map((book) => (
       bibles.length > 1 ? { ...book, suffix: b.edition.short || '' } : book)))),
-  ], [tvot, bibles]);
+    ...studies.children || [],
+  ], [tvot, bibles, studies]);
 
   // The ticks: what is held now, with the listener's changes over it (so a download finishing keeps its tick, and an
   // edit the phone has caught up with changes nothing).
@@ -441,7 +454,8 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
       s.add(focus);
       const b = bibles.find((x) => x.edition.volKey === focus);
       if (b) s.delete('tvot');
-      else if (focus) s.delete('bible');
+      else if (focus.lastIndexOf('study:', 0) === 0) { s.add('studies'); s.delete('tvot'); s.delete('bible'); }
+      else s.delete('bible');
     }
     return s;
   });
@@ -488,6 +502,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
   const shownBible = bibles.find((b) => b.id === editionId) || bibles[0] || null;
   const tvotHere = statsOf(off, tvot.units).here;
   const bibleHere = bibles.reduce((n, b) => n + statsOf(off, b.tree.units).here, 0);
+  const studiesHere = statsOf(off, studies.units).here;
   const readerNames = /** @type {any} */ (globalThis).AUDIO_READERS;
   const readers = readerNames ? Object.entries(readerNames) : [];
   const held = heldForWifi();
@@ -560,6 +575,21 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
                 </GroupRow>
               ))}
             </GroupRow>
+          ))}
+        </GroupRow>
+      ) : null}
+
+      {studies.units.length ? (
+        <GroupRow node={studies} noun="recording" wanted={wanted} off={off} level={0}
+          open={open.has('studies')} onOpen={() => flip('studies')} onBox={() => setWanted(toggleNode(studies, wanted))}
+          sub={((studies.children || []).length === 1 ? '1 study' : (studies.children || []).length + ' studies') + (studiesHere ? ' · ' + studiesHere + ' on this phone' : '')}>
+          {(studies.children || []).map((st) => (
+            <div key={st.id} data-node={st.id}>
+              <GroupRow node={st} noun="recording" wanted={wanted} off={off} level={1}
+                open={open.has(st.id)} onOpen={() => flip(st.id)} onBox={() => setWanted(toggleNode(st, wanted))}>
+                {st.units.map((u) => <UnitRow key={u.id} unit={u} wanted={wanted} off={off} onBox={() => setWanted(toggleNode({ units: [u] }, wanted))} />)}
+              </GroupRow>
+            </div>
           ))}
         </GroupRow>
       ) : null}

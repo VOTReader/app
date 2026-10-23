@@ -129,6 +129,19 @@ describe('Choose: ticks and the footer', () => {
   });
 });
 
+describe('Choose: Studies (brief 3b)', () => {
+  afterEach(() => { delete globalThis.BIBLE_STUDIES; });
+
+  it('a Studies branch lists each study with its recorded chapters, and Choose… on a study opens it', () => {
+    globalThis.BIBLE_STUDIES = [{ id: 'lamb', title: 'The Lamb', chapters: [{ id: 'supper', title: 'The Supper' }, { id: 'thorns', title: 'Thorns' }] }];
+    globalThis.AudioPlayer = { playbackTracks: (volKey, item) => (volKey === 'study' ? [{ url: U('study-' + item.id), key: 'study:' + item.id }] : tracksOf(volKey, item)), renditionsFor: () => [] };
+    const { container } = render(<DownloadChooser off={off} bibleAudio="kjv" focus="study:lamb" />);
+    expect(container.textContent).toMatch(/Studies1 study/);
+    fireEvent.click(box(container, /^The Supper/));
+    expect(footer(container).textContent).toMatch(/Add 1/);
+  });
+});
+
 describe('Choose: rows on their way', () => {
   it('a letter on its way says Waiting, or its percent once bytes arrive, and stays ticked', () => {
     off.st.status.set(U('xmas-1'), 'downloading');

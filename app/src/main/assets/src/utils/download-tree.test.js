@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  buildTvot, buildBible, checkState, toggleNode, selectRange, initialWanted, planOf, roomShort, groupPicked,
+  buildTvot, buildBible, buildStudies, checkState, toggleNode, selectRange, initialWanted, planOf, roomShort, groupPicked,
   chapterRuns, countOf, formatLength,
 } from './download-tree.js';
 
@@ -62,6 +62,22 @@ describe('download-tree: the tree', () => {
     expect(ruth.units.map((u) => u.chapter)).toEqual([1, 2, 3, 4]);
     expect(ruth.noun).toBe('chapter');
     expect(bible.units).toHaveLength(5);
+  });
+});
+
+describe('download-tree: Studies (brief 3b)', () => {
+  it('each study with a recording, its recorded chapters as units; a study with none is left out', () => {
+    const studyPlayer = { playbackTracks: (/** @type {string} */ volKey, /** @type {any} */ ch) => (volKey === 'study' && ch.id !== 'quiet' ? [t('study/' + ch.id + '.mp3')] : []) };
+    const tree = buildStudies({
+      studies: [
+        { id: 'lamb', title: 'The Lamb', chapters: [{ id: 'supper', title: 'The Supper' }, { id: 'quiet', title: 'Text only' }, { id: 'thorns', title: 'Thorns' }] },
+        { id: 'empty', title: 'Empty', chapters: [{ id: 'quiet', title: 'Text only' }] },
+      ],
+      player: studyPlayer,
+    });
+    expect(tree.children.map((c) => [c.id, c.title])).toEqual([['study:lamb', 'The Lamb']]);
+    expect(tree.units.map((u) => u.id)).toEqual(['study:supper', 'study:thorns']);
+    expect(tree.units[0].name).toBe('The Supper');
   });
 });
 

@@ -237,7 +237,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                   brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
               {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} note={false} /> : null}
               {/* The Downloads tree opened at this collection or edition (downloads brief 3a, picture 14). */}
-              {offline && !study && typeof window.__openDownloads === 'function' ? (
+              {offline && typeof window.__openDownloads === 'function' ? (
                 <button type="button" className="audio-collection-choose" onClick={() => window.__openDownloads({ tab: 'choose', focus: volKey }, label)}>Choose…</button>
               ) : null}
             </div>
@@ -311,7 +311,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const openText = () => onOpenText(current && current.key === key ? current : { key });
                 const menu = offline ? [
                   ...offlineMenuItems({ off: offline, online, tracks: own, name: item.title || label }),
-                  ...(!study && typeof window.__openDownloads === 'function'
+                  ...(typeof window.__openDownloads === 'function'
                     ? [{ id: 'choose', text: 'Choose more…', icon: 'choose', onSelect: () => window.__openDownloads({ tab: 'choose', focus: volKey }, label) }] : []),
                   ...(opensText ? [{ id: 'open', text: 'Open the ' + (bible ? 'book' : itemNoun(col, 1)), icon: 'open', onSelect: openText }] : []),
                 ] : [];

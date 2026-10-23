@@ -62,6 +62,31 @@ export function buildTvot({ collections, itemsOf, player, voice = '' }) {
 }
 
 /**
+ * The Studies branch (brief 3b): each Bible/Letter Study with a recording, its recorded chapters in order. The player
+ * knows a study's chapters as volKey 'study' ("study:<chapterId>"); a study's node id is its Listening Library volKey
+ * ('study:<studyId>'), so "Choose…" on a study opens the tree at it.
+ * @param {{ studies: any[], player: any }} o
+ * @returns {TreeNode}
+ */
+export function buildStudies({ studies, player }) {
+  /** @type {TreeNode[]} */
+  const children = [];
+  for (const st of studies || []) {
+    if (!st || !st.id || !Array.isArray(st.chapters)) continue;
+    const title = st.title || '';
+    /** @type {Unit[]} */
+    const units = [];
+    for (const ch of st.chapters) {
+      if (!ch || !ch.id) continue;
+      const tracks = /** @type {Track[]} */ (player.playbackTracks('study', ch, title) || []).filter((t) => t && typeof t.url === 'string');
+      if (tracks.length) units.push({ id: 'study:' + ch.id, title: ch.title || '', name: ch.title || title, tracks });
+    }
+    if (units.length) children.push({ id: 'study:' + st.id, volKey: 'study:' + st.id, title, noun: 'recording', units });
+  }
+  return { id: 'studies', title: 'Studies', noun: 'recording', children, units: _unitsUnder(children) };
+}
+
+/**
  * One Bible edition's branch: Old Testament / New Testament › books › chapters.
  * @param {{ edition: { volKey: string, label?: string, short?: string }, books: Array<[string, string]>, player: any }} o
  * @returns {TreeNode}
