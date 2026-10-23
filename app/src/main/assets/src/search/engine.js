@@ -34,7 +34,7 @@ import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './s
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
 import { edgeReading, readReference, restWords } from './ref-edge.js';
-import { scopeWord } from './scope-word.js';
+import { scopeWord, collectionNamed } from './scope-word.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
@@ -4084,6 +4084,8 @@ const nameWords = (t) => String(t || '').toLowerCase().replace(/['‘’]/g, '')
  */
 async function search(query, options) {
   const plain = await searchWords(query, options);
+  const front = frontPageFirst(query, options, plain);
+  if (front) return front;
   const o = options || {};
   const lead = plain.results && plain.results[0];
   if (!lead || o.scope || plain.aborted || plain.unquoted || (plain.corrections && plain.corrections.length) || !plain.parsed || plain.parsed.kind !== 'text') return plain;
@@ -4117,6 +4119,35 @@ async function search(query, options) {
   const lifted = new Set(lift.map((e) => docKey(e.doc)));
   const results = lift.concat(plain.results.filter((e) => !lifted.has(docKey(e.doc)))).slice(0, Math.max(plain.results.length, lift.length));
   return { ...plain, results };
+}
+
+/* A COLLECTION'S NAME TYPED ALONE OPENS IT (search200 wave 3, U02.5, 2026-10-23). "letters from timothy" led with a
+   Bible study and Answers topics saying "letters", "from" and "Timothy" often, the collection's own first page nowhere
+   near the top. A collection's full name typed alone (scope-word.js collectionNamed) puts its front page first: the
+   text titled with the name (Answers Only God Can Give's main page), else its preface, else its first letter. A search
+   kept to a scope, or to a corpus the collection is not in, is left alone. */
+/** @returns {ReturnType<typeof searchWords>|null} */
+function frontPageFirst(/** @type {string} */ query, /** @type {any} */ options, /** @type {any} */ plain) {
+  const o = options || {};
+  if (o.scope || !msIndex || plain.aborted || !plain.parsed || plain.parsed.kind !== 'text' || !Array.isArray(plain.results)) return null;
+  const named = collectionNamed(query);
+  if (!named) return null;
+  const vol = named.volumes[0];
+  const corpus = o.corpus && o.corpus !== 'all' ? o.corpus : null;
+  /** @type {any} */ let best = null;
+  let rank = 0;
+  for (const f of msIndex._storedFields.values()) {
+    if (!f || f.kind === 'verse' || f.volumeId !== vol || (corpus && f.corpus !== corpus)) continue;
+    const r = nameWords(f.title) === named.name ? 3 : / · Preface$/.test(f.ref || '') ? 2 : 1;
+    const num = (/** @type {any} */ d) => d.letterNum || Infinity;
+    if (!best || r > rank || (r === rank && r === 1 && num(f) < num(best))) { best = f; rank = r; }
+  }
+  if (!best) return null;
+  const same = (/** @type {any} */ d) => d.kind === best.kind && d.volumeId === best.volumeId && d.letterId === best.letterId && (d.studyChapterId || '') === (best.studyChapterId || '');
+  const at = plain.results.findIndex((/** @type {any} */ e) => same(e.doc));
+  if (at === 0) return plain;
+  const entry = at > 0 ? plain.results[at] : { score: plain.results.length ? plain.results[0].score : 0, doc: reshapeDoc(best), terms: [] };
+  return { ...plain, results: [entry, ...plain.results.filter((/** @type {any} */ e) => !same(e.doc))] };
 }
 
 /** Whether the index holds a word (search200 ideas G: "Try fewer words" keeps the words some text holds). */

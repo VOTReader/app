@@ -66,6 +66,21 @@ function bookNames() {
 }
 
 /**
+ * A collection's full name typed alone ("the" before it allowed): its volume ids and the name's words; null when the
+ * query is anything else (search200 wave 3, U02.5: the engine opens the collection's front page first).
+ * @param {string} query
+ * @returns {{ volumes: string[], name: string }|null}
+ */
+export function collectionNamed(query) {
+  if (/["“”+]|(?:^|\s)-\S/.test(String(query || ''))) return null;
+  const words = String(query || '').trim().split(/\s+/).map(wordOf).filter(Boolean);
+  if (words[0] === 'the' && words.length > 1) words.shift();
+  const w = words.join(' ');
+  for (const c of COLLECTIONS) if (c.w.join(' ') === w) return { volumes: c.ids, name: w };
+  return null;
+}
+
+/**
  * A book's name or a collection's full name at the query's start or end, beside other words; null when none.
  * `rest` is the query's other words as typed (the joining small words off), `book` the book id or `volumes` the
  * collection's volume ids, `name` the name's words, `wordish` a book named by an English word.
