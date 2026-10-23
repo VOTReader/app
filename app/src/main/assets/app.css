@@ -9727,3 +9727,17 @@ body.light .install-step-num { color: #fff; }
 
 /* Wave 3 large text (J-w3g1.1): rules for text sizes of 1.8 and up, keyed on the root class use-settings sets. */
 .vot-large-text .pill-left { display: none; }   /* RC.8: "RESUME · 1 MIN LE" was cut at both screen edges at 300% */
+/* U05.5: the verse number sits inline before its words; its 1.8rem gutter (86 px at 300%) left 8 to 10 letters a line. */
+.vot-large-text .verses-block .verse { padding-left: 0; }
+.vot-large-text .verses-block .verse .verse-num { position: static; margin-right: 0.35em; vertical-align: 0.15em; }
+/* U05.1: a footnote is one column, its number inline: the number's column squeezed the card to a word a line
+   ("OPE N IN APP", "Graf ted"). */
+.vot-large-text .footnote-list-item { display: block; padding: 6px 8px; }
+.vot-large-text .footnote-list-item > .footnote-list-num { display: inline; margin-right: 0.35em; }
+.vot-large-text .footnote-list-link-btn.fn-list-rich { margin-top: 0.3rem; }
+/* J-w3g1.1: spaced capitals (Cinzel eyebrows, headers) spread a fifth of an em per letter, which at 300% pushed
+   short labels onto three lines. In the reading area every letter gap is held to 1 px at large sizes. */
+.vot-large-text .screen-scroll * { letter-spacing: min(0.04em, 1px) !important; }
+/* J-w3g1.1: card padding in rem tripled with the text (a 48 px inset each side at 300%); held to phone px. */
+.vot-large-text :is(.bottom-nav-card, .related-card) { padding: 12px 14px; }
+.vot-large-text .bottom-nav { gap: 10px; }
