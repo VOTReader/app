@@ -134,7 +134,19 @@ while read -r local_ref local_sha remote_ref remote_sha; do
           echo "[pre-push] FATAL: neither ./gradlew nor gradle on PATH; cannot run the Kotlin tests (git push --no-verify skips them; CI runs them)."
           exit 1
         fi
-        heavy_run gradle "$GRADLE_CMD" :app:testDebugUnitTest :app:jacocoTestCoverageVerification
+        # 'Cannot access ...: it is internal' from compileDebugKotlin is the shared Kotlin daemon still holding another
+        # worktree's classes after a rebase there, not this push: one retry with the compiler in Gradle's own process
+        # (docs, 2026-10-23).
+        glog=$(mktemp); grc_f=$(mktemp)
+        { heavy_run gradle "$GRADLE_CMD" :app:testDebugUnitTest :app:jacocoTestCoverageVerification; echo $? > "$grc_f"; } 2>&1 | tee "$glog"
+        grc=$(cat "$grc_f")
+        if [ "$grc" != 0 ] && grep -q "it is internal" "$glog"; then
+          echo "[pre-push] Kotlin 'it is internal' error: a stale shared Kotlin daemon - retrying once with the compiler in-process..."
+          heavy_run gradle env 'ORG_GRADLE_PROJECT_kotlin.compiler.execution.strategy=in-process' "$GRADLE_CMD" :app:testDebugUnitTest :app:jacocoTestCoverageVerification
+          grc=$?
+        fi
+        rm -f "$glog" "$grc_f"
+        [ "$grc" = 0 ]
         ;;
     esac
     rc=$?
