@@ -576,3 +576,53 @@ describe('screen-routes — link-outs never overwrite the captured navOrigin (na
     expect(routes['notes-index']().props.navOrigin).toBe(READING_ORIGIN);
   });
 });
+
+describe('screen-routes — a letter opened from a list drops an old search\'s find (search200 U08.2)', () => {
+  /* A search landing leaves its anchor (find: terms, label) on the tab. A letter opened
+     later from Highlights, History or another list is not a search hit, but the anchor
+     still named that letter, so FindInUnit raised the old pill ("1 of 1") and hit marks.
+     Every list open now clears the anchor before it navigates; an endpoint that carries
+     its own landing (a verse, an Answers section) still sets it after. */
+  const ENDPOINT = { screen: 'vot-letter', letterId: 'the-narrow-way' };
+  /** the anchor was cleared, and before the navigation */
+  const clearedFirst = (/** @type {any} */ props) => {
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.navigateToLink).toHaveBeenCalled();
+    expect(props.setSurpriseAnchor.mock.invocationCallOrder[0])
+      .toBeLessThan(props.navigateToLink.mock.invocationCallOrder[0]);
+  };
+
+  for (const entry of [
+    { type: 'letter', letterId: 'wide-path', volumeScreen: 'vot-one-index' },
+    { type: 'study-chapter', studyId: 's1', studyChapterId: 'c1' },
+    { type: 'chapter', bookId: 'john', chapterNum: 3 },
+  ]) {
+    it(`History ${entry.type} row`, () => {
+      const { routes, props } = makeRoutes();
+      routes.history().props.onSelect(entry);
+      clearedFirst(props);
+    });
+  }
+
+  for (const [screenName, propName] of [
+    ['highlights-index', 'onNavigateToSource'],
+    ['notes-index', 'onNavigateToSource'],
+    ['links-index', 'onNavigateToSource'],
+    ['links-index', 'onNavigateToTarget'],
+    ['bookmarks-index', 'onNavigateToSource'],
+    ['journal-viewer', 'onNavigateToLink'],
+    ['scripture-web', 'navigateToLink'],
+  ]) {
+    it(`${screenName} ${propName}`, () => {
+      const { routes, props } = makeRoutes();
+      routes[screenName]().props[propName](ENDPOINT);
+      clearedFirst(props);
+    });
+  }
+
+  it('a missing endpoint changes nothing', () => {
+    const { routes, props } = makeRoutes();
+    routes['highlights-index']().props.onNavigateToSource(null);
+    expect(props.setSurpriseAnchor).not.toHaveBeenCalled();
+  });
+});

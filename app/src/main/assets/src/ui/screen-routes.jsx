@@ -310,6 +310,12 @@ export function buildScreenRoutes({
   // Bible bookId, or a collection's readKey). Read opens it the way a History
   // row does; Listen plays from it (a Bible chapter on through its book, a
   // letter on through its collection) and opens it when there is no recording.
+  // U08.2 (search200): a search landing leaves its anchor (find: terms, label) on the
+  // tab, and navigateToLink's letter branch keeps the anchor an endpoint does not name.
+  // A letter opened from a list (History, Highlights, Notes, Today...) is not a search
+  // hit, so the old find pill and hit marks came back on it. List opens clear the
+  // anchor first; an endpoint that carries a landing (a verse, a section) sets its own.
+  const _listOpen = (endpoint, meta) => { setSurpriseAnchor(null); navigateToLink(endpoint, meta); };
   const _planCol = (bid) => COLLECTIONS.find((c) => c.readKey === bid) || null;
   const openPlanItem = (next) => {
     if (!next) return;
@@ -317,10 +323,10 @@ export function buildScreenRoutes({
     setGenreId(null);
     if (col) {
       setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, next.cid));
-      navigateToLink({ screen: col.letterScreen, letterId: next.cid }, { sourceLetterTitle: 'Today', silent: true });
+      _listOpen({ screen: col.letterScreen, letterId: next.cid }, { sourceLetterTitle: 'Today', silent: true });
     } else {
       setActiveReadKey(next.bid, () => setLastReadChapters((prev) => ({ ...prev, [next.bid]: next.cid })));
-      navigateToLink({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
+      _listOpen({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
     }
   };
   // mw18 S8: the reader's plan line (PlanRibbon) opens a plan's next item the way the Today card's Read does.
@@ -830,7 +836,7 @@ export function buildScreenRoutes({
     const hc = col;
     setGenreId(null);
     setActiveReadKey('vol:' + hc.volKey, () => setLastReadForVol(hc.volKey, entry.letterId));
-    navigateToLink({ screen: hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History', silent: true });
+    _listOpen({ screen: hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History', silent: true });
   };
 
   /**
@@ -1139,13 +1145,13 @@ export function buildScreenRoutes({
             const slug = (study && study.slug) || entry.studySlug || entry.studyId;
             setGenreId(null);
             setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: entry.studyChapterId })));
-            navigateToLink({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
+            _listOpen({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
           } else if (entry.type === 'letter') {
             _openHistoryLetter(entry);
           } else {
             setGenreId(null);
             setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-            navigateToLink({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History', silent: true });
+            _listOpen({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History', silent: true });
           }
         }}
         onSearch={goSearch}
@@ -1225,7 +1231,7 @@ export function buildScreenRoutes({
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
           }
         }}
         onSearch={goSearch}
@@ -1264,7 +1270,7 @@ export function buildScreenRoutes({
         tapThroughBack={tapThroughBack}
         onNavigateToLink={(endpoint, meta) => {
           if (endpoint) {
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Journal' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'My Journal' });
           }
         }}
         onOpenJournalEntry={(eid) => goJournalViewer(eid)}
@@ -1308,7 +1314,7 @@ export function buildScreenRoutes({
         onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Notes' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'My Notes' });
           }
         }}
         onSearch={goSearch}
@@ -1324,12 +1330,12 @@ export function buildScreenRoutes({
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'My Links' });
           }
         }}
         onNavigateToTarget={(endpoint, meta) => {
           if (endpoint) {
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Links' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'My Links' });
           }
         }}
         onSearch={goSearch}
@@ -1345,7 +1351,7 @@ export function buildScreenRoutes({
         onHome={goHome}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'My Bookmarks' });
           }
         }}
         onSearch={goSearch}
@@ -1869,7 +1875,7 @@ export function buildScreenRoutes({
         <ScriptureWebScreen
           navigateToLink={(endpoint, meta) => {
             if (!endpoint) return;
-            navigateToLink(endpoint, meta || { sourceLetterTitle: 'The Scripture Web' });
+            _listOpen(endpoint, meta || { sourceLetterTitle: 'The Scripture Web' });
           }}
           onBack={() => navOrigin ? goNavOrigin() : setScreen('library')}
           settings={settings}
