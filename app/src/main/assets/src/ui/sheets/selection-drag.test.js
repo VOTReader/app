@@ -614,6 +614,17 @@ describe('a mouse and the keyboard', () => {
     expect(dragging()).toBe(false);
   });
 
+  it('a press on the column itself (its scrollbar) is no drag: the thumb dragged scrolls the column', () => {
+    col.scrollTop = 1000;
+    const e = new PointerEvent('pointerdown', { bubbles: true, cancelable: true, button: 0, clientX: WIDTH - 3, clientY: 300, pointerType: 'mouse' });
+    if (e.pointerType !== 'mouse') Object.defineProperty(e, 'pointerType', { value: 'mouse' });
+    col.dispatchEvent(e);
+    expect(dragging()).toBe(false);
+    col.scrollTop = 1400;                // the thumb dragged down
+    col.dispatchEvent(new Event('scroll'));
+    expect(col.scrollTop).toBe(1400);
+  });
+
   it('Shift+arrow moves of the end are the reader\'s own and untouched', () => {
     longPress(10);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', shiftKey: true }));

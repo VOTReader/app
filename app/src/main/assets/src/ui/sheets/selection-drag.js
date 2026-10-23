@@ -406,8 +406,10 @@ export function startSelectionDrag(deps = {}) {
     if (dragging) endDrag();          // a new touch: no lift was heard, and the drag is over
     if (pointer === 'mouse' && e.button === 0) {
       const c = liveColumnOf(/** @type {Node} */ (e.target));
-      mouseDown = !!c;
-      if (c) { col = c; knownTop = c.scrollTop; finger = { x: e.clientX, y: e.clientY, at: now() }; setDragging(true); }
+      // A press on the column's own box (its scrollbar, the padding under the text) moves the column, not a
+      // selection: onScroll would undo every step of a dragged thumb.
+      mouseDown = !!c && e.target !== c;
+      if (c && mouseDown) { col = c; knownTop = c.scrollTop; finger = { x: e.clientX, y: e.clientY, at: now() }; setDragging(true); }
     }
   };
   const onPointerUp = () => {
