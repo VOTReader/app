@@ -339,7 +339,8 @@ val coveredClasses = listOf(
     "com/votreader/sacredui/MainActivityLogic*.class",
     "com/votreader/sacredui/AppInterface*.class",
     "com/votreader/sacredui/GardenImageCache*.class",
-    "com/votreader/sacredui/NativeAudioLogic*.class"
+    "com/votreader/sacredui/NativeAudioLogic*.class",
+    "com/votreader/sacredui/PlanReminderLogic*.class"
 )
 
 // Helper that returns the class tree filtered to the covered set.
@@ -432,6 +433,7 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         classFloor("AppInterface", "0.52")        // measured  58.2% (135/232)
         classFloor("GardenImageCache", "0.48")    // measured  54.4% (74/136)
         classFloor("NativeAudioLogic", "0.95")    // m3, new: plain JVM, NativeAudioLogicTest
+        classFloor("PlanReminderLogic", "0.95")   // rp-s1, new: plain JVM, PlanReminderLogicTest
     }
 }
 
