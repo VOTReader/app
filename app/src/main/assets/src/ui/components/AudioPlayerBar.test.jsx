@@ -504,3 +504,77 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     expect(screen.getByRole('button', { name: /Open listening controls\.$/ }).getAttribute('aria-expanded')).toBe('false');
   });
 });
+
+/* pl-l2b (brief 3a, call 11): the bar's swipes, each with a button that does the same: left / right skip with a 5 s
+   "Back to …" Undo, down stops with Close's Undo, up opens the player. A swipe's click is never a tap. */
+describe('AudioPlayerBar — swipes', () => {
+  const swipe = (dx, dy) => {
+    const b = bar();
+    fireEvent.pointerDown(b, { clientX: 200, clientY: 40, pointerId: 1 });
+    fireEvent.pointerMove(b, { clientX: 200 + dx / 2, clientY: 40 + dy / 2, pointerId: 1 });
+    fireEvent.pointerMove(b, { clientX: 200 + dx, clientY: 40 + dy, pointerId: 1 });
+    fireEvent.pointerUp(b, { clientX: 200 + dx, clientY: 40 + dy, pointerId: 1 });
+  };
+  const summary = () => screen.getByRole('button', { name: /Open listening controls\.$/ });
+  const skipped = () => document.getElementById('vot-toast-audio-skipped');
+
+  it('swipe left plays the next one, and Back to … returns to the one it left at its place', async () => {
+    render(<AudioPlayerBar />);
+    playWholeCollection();
+    emit('playing');
+    clockAt(42, 300);
+    swipe(-120, 4);
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(title()).toBe('The Wide Path · Part 1');
+    expect(skipped().textContent).toBe('SkippedBack to A Word of Warning\u00a00:42');
+    await act(async () => {
+      fireEvent.click(skipped().querySelector('.vot-undo-btn'));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(title()).toBe('A Word of Warning');
+    expect(skipped().classList.contains('show')).toBe(false);
+  });
+
+  it('swipe right goes back one; a short drag does nothing', () => {
+    render(<AudioPlayerBar />);
+    playWholeCollection();
+    drive(() => AudioPlayer.next());
+    swipe(16, 0);                                   // past a tap's slop, short of a flick
+    expect(AudioPlayer.getState().qi).toBe(1);
+    swipe(120, 0);
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(skipped().textContent).toBe('Went backBack to The Wide Path\u00a00:00');
+  });
+
+  it('swipe left on the last one does nothing: the session never ends by a swipe', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    swipe(-120, 0);
+    expect(AudioPlayer.getState().status).not.toBe('idle');
+    expect(bar()).toBeTruthy();
+    expect(skipped()).toBeNull();
+  });
+
+  it('swipe down stops with Close’s Undo; swipe up opens the player', () => {
+    render(<AudioPlayerBar />);
+    playWholeCollection();
+    swipe(0, -90);
+    expect(summary().getAttribute('aria-expanded')).toBe('true');
+    cleanup();
+    render(<AudioPlayerBar />);
+    swipe(0, 90);
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(document.getElementById('vot-toast-audio-stopped').textContent).toBe('StoppedUndo');
+  });
+
+  it('the click a swipe ends with is not a tap; the next tap opens the player', () => {
+    render(<AudioPlayerBar />);
+    playWholeCollection();
+    swipe(-120, 0);
+    fireEvent.click(summary());
+    expect(summary().getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(summary());
+    expect(summary().getAttribute('aria-expanded')).toBe('true');
+  });
+});

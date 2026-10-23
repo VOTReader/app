@@ -67,21 +67,79 @@ export function useNoAudioHere() {
  */
 function closeWithUndo() {
   const token = AudioPlayer.stopWithUndo();
-  if (!token || typeof document === 'undefined') return;
-  document.querySelectorAll('.vot-toast.show').forEach((el) => { if (el.id && el.id !== STOPPED_TOAST_ID) hideToast(el.id); });
-  showToast({ id: STOPPED_TOAST_ID, className: 'vot-toast vot-toast-undo', durationMs: UNDO_MS, text: 'Stopped' });
-  const el = document.getElementById(STOPPED_TOAST_ID);
+  if (!token) return;
+  undoToast(STOPPED_TOAST_ID, 'Stopped', 'Undo', () => AudioPlayer.undoStop(token));
+}
+
+export const SKIPPED_TOAST_ID = 'vot-toast-audio-skipped';
+
+/**
+ * A 5 s toast whose one button puts things back. Toasts share one spot, and this one carries an action, so any
+ * other toast up steps aside.
+ * @param {string} id @param {string} text @param {string} label @param {() => void} onUndo
+ */
+function undoToast(id, text, label, onUndo) {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.vot-toast.show').forEach((el) => { if (el.id && el.id !== id) hideToast(el.id); });
+  showToast({ id, className: 'vot-toast vot-toast-undo', durationMs: UNDO_MS, text });
+  const el = document.getElementById(id);
   if (!el) return;
+  el.querySelectorAll('.vot-undo-btn').forEach((b) => b.remove());   // a second skip inside 5 s re-uses the toast
   const undo = document.createElement('button');
   undo.type = 'button';
   undo.className = 'vot-undo-btn';
-  undo.textContent = 'Undo';
+  undo.textContent = label;
   undo.addEventListener('click', () => {
-    AudioPlayer.undoStop(token);
-    hideToast(STOPPED_TOAST_ID);
+    onUndo();
+    hideToast(id);
   }, { once: true });
   el.appendChild(undo);
 }
+
+/**
+ * The bar's swipe left / right (brief 3a): the next or previous item, as the full player's buttons do, with a 5 s
+ * "Back to Christmas 3:25" that returns to the item and the place it left. Nothing after the last item: the swipe
+ * does nothing rather than end the session (Close is the way to end it, and has its own Undo).
+ * @param {1 | -1} dir @returns {boolean} whether it moved
+ */
+export function skipWithUndo(dir) {
+  const st = AudioPlayer.getState();
+  const queue = st.queue || [];
+  const from = queue[st.qi];
+  if (!from || st.restoring || st.status === 'idle') return false;
+  const qi = st.qi;
+  const at = Math.max(0, Number(st.time) || 0);
+  if (dir > 0 && qi + 1 >= queue.length && !(songIdOfKey(from.key) && st.repeat === 'all')) return false;
+  if (dir < 0 && qi === 0 && at < 1) return false;
+  if (dir > 0) AudioPlayer.next(); else AudioPlayer.prev();
+  const now = AudioPlayer.getState();
+  const moved = now.qi !== qi || (now.queue || [])[qi] !== from;
+  // Refused (offline, nothing on the phone that way): the player said why, and nothing moved.
+  if (now.status === 'idle' || (dir > 0 && !moved)) return false;
+  const name = (from.title || 'the last one');
+  undoToast(SKIPPED_TOAST_ID, moved ? (dir > 0 ? 'Skipped' : 'Went back') : 'Started over', 'Back to ' + name + '\u00a0' + fmt(at), () => {
+    const s = AudioPlayer.getState();
+    const q = s.queue || [];
+    const i = q[qi] === from ? qi : q.findIndex((t) => t && t.url === from.url && t.key === from.key);
+    if (i < 0) return;
+    if (i === s.qi) AudioPlayer.seek(at);
+    else AudioPlayer.playAt(i, at > 0 ? at : undefined);
+  });
+  return true;
+}
+
+/** A light tick under the finger as a swipe lands: the phone's own haptic on the APK, a 10 ms buzz on the web. */
+function tick() {
+  try {
+    if (typeof PlatformBridge !== 'undefined' && PlatformBridge.isAndroid) PlatformBridge.haptic(0);
+    else if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(10);
+  } catch (_e) { /* no haptics here */ }
+}
+
+/** Past this a touch is a swipe, not a tap; past SWIPE_PX (or a quick flick past FLICK_PX) the swipe acts. */
+const SLOP_PX = 10;
+const SWIPE_PX = 64;
+const FLICK_PX = 24;
 
 /** "12 min left", or "0:42 left" under a minute. */
 function timeLeft(time, dur) {
@@ -148,6 +206,61 @@ export function AudioPlayerBar() {
   const open = st.status !== 'idle';
   const [managerOpen, setManagerOpen] = React.useState(false);
   const barRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  // Swipes on the bar (brief 3a), each with a button that does the same: left / right = Next / Previous (the full
+  // player's), down = Close, up = open the player (the bar's tap). A swipe's own click never counts as a tap.
+  const drag = React.useRef(/** @type {{ id: number, x: number, y: number, t: number, axis: string | null } | null} */ (null));
+  const swiped = React.useRef(false);
+  const settle = () => {
+    const el = barRef.current;
+    if (!el) return;
+    el.classList.remove('is-dragging');
+    el.style.transform = '';
+    el.style.opacity = '';
+  };
+  const onPointerDown = (/** @type {any} */ e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), axis: null };
+    swiped.current = false;
+  };
+  const onPointerMove = (/** @type {any} */ e) => {
+    const d = drag.current;
+    const el = barRef.current;
+    if (!d || d.id !== e.pointerId || !el) return;
+    const dx = e.clientX - d.x;
+    const dy = e.clientY - d.y;
+    if (!d.axis) {
+      if (Math.abs(dx) < SLOP_PX && Math.abs(dy) < SLOP_PX) return;
+      d.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      try { el.setPointerCapture(e.pointerId); } catch (_e) { /* a synthetic pointer has nothing to capture */ }
+      el.classList.add('is-dragging');
+    }
+    if (d.axis === 'x') el.style.transform = 'translateX(' + Math.round(dx * 0.6) + 'px)';
+    else {
+      el.style.transform = 'translateY(' + Math.round(dy > 0 ? dy : dy * 0.25) + 'px)';
+      el.style.opacity = dy > 0 ? String(Math.max(0.4, 1 - dy / 200)) : '';
+    }
+  };
+  const onPointerUp = (/** @type {any} */ e) => {
+    const d = drag.current;
+    if (!d || d.id !== e.pointerId) return;
+    drag.current = null;
+    settle();
+    if (!d.axis) return;
+    swiped.current = true;
+    const dist = d.axis === 'x' ? e.clientX - d.x : e.clientY - d.y;
+    const far = Math.abs(dist) >= SWIPE_PX || (Math.abs(dist) >= FLICK_PX && Math.abs(dist) / Math.max(1, Date.now() - d.t) > 0.5);
+    if (!far) return;
+    if (d.axis === 'x') { if (skipWithUndo(dist < 0 ? 1 : -1)) tick(); }
+    else if (dist > 0) closeWithUndo();
+    else setManagerOpen(true);
+  };
+  const onPointerCancel = () => { drag.current = null; settle(); };
+  const onClickCapture = (/** @type {any} */ e) => {
+    if (!swiped.current) return;
+    swiped.current = false;
+    e.stopPropagation();
+    e.preventDefault();
+  };
 
   // The one side effect this component owns. Kept above the early return so
   // the hook order is stable, and it removes the class on unmount as well as
@@ -313,7 +426,17 @@ export function AudioPlayerBar() {
 
   return (
     <>
-    <div ref={barRef} className={'audio-bar' + (songId ? ' is-song' : '')} role="region" aria-label="Audio player">
+    <div
+      ref={barRef}
+      className={'audio-bar' + (songId ? ' is-song' : '')}
+      role="region"
+      aria-label="Audio player"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerCancel}
+      onClickCapture={onClickCapture}
+    >
       <span className="audio-bar-line" aria-hidden="true"><span style={{ width: pct + '%' }} /></span>
       <button
         type="button"

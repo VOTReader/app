@@ -1243,7 +1243,10 @@
         border: 1px solid var(--gold-border); border-bottom: 0;
         border-radius: 14px 14px 0 0;
         box-shadow: 0 -6px 22px rgba(0,0,0,0.45);
+        /* Swipes (brief 3a): the bar is the gesture's, so the page underneath never pans from it. */
+        touch-action: none; transition: transform 0.18s ease, opacity 0.18s ease;
       }
+      .audio-bar.is-dragging { transition: none; }
       body.light .audio-bar { box-shadow: 0 -6px 22px rgba(0,0,0,0.18); }
       /* The top edge is the progress (brief 3a: no seek on the bar; seeking lives in the controls it opens). */
       .audio-bar-line { position: absolute; top: 0; left: 14px; right: 14px; height: 3px; overflow: hidden; border-radius: 0 0 2px 2px; background: var(--gold-border); pointer-events: none; }
