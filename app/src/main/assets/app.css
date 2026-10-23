@@ -2692,7 +2692,7 @@
     }
     .sheet-handle-back:active { color:var(--gold-bright); }
     @media (hover:hover) { .sheet-handle-back:hover { color:var(--gold-bright); } }
-    .sheet-handle-grab {
+    .sheet-handle-grab { touch-action: none; /* U06.8: the pill takes the drag, the page does not scroll */
       grid-column:2; width:132px; height:44px; padding:0;
       background:none; border:none; cursor:pointer;
       display:flex; align-items:center; justify-content:center;
