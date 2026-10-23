@@ -3871,17 +3871,38 @@ async function searchWords(query, options) {
      restored text under The Volumes and the plain chapter under Scriptures, so "judge not" showed
      Matthew 7:1 twice, one under the other. Across both collections a verse shows once, as whichever
      of the two the query found first; a search kept to one collection still finds its own. */
+  /* ...AS THE SCRIPTURE'S, WHEN BOTH WERE FOUND (search200 wave 3, U03.9, 2026-10-23). Kept as whichever came first,
+     Matthew's five "bride" verses showed as the Study Bible's under everything and as the Scripture's under its own
+     tab: the Scriptures group said 24 verses there, 29 here. A verse both readings found shows as the Scripture's,
+     where the first of them stood, when it holds as many of the typed words; one only the study's restored text
+     found (its names) stays the study's. */
   if (!corpusFilter) {
+    /** The plain verse the dedup (dedupKey) left out for its study twin worded alike, as an entry; null if none. @param {any} e */
+    const plainTwin = (e) => {
+      const id = verseIds().get('matthew:' + e.doc.chapterNum + ':' + e.doc.verseNum);
+      const f = id && (docLookup[id] || msIndex.getStoredFields(id));
+      if (!f || f.bookId !== 'matthew-plain' || f.text !== e.doc.text || !inScope({ ...f, id }) || capped[f.volumeId || 'bible']) return null;
+      const twin = { score: scoreMap[id] ?? e.score, doc: reshapeDoc({ ...f, id }), terms: e.terms || [] };
+      idOf.set(twin, id);
+      return twin;
+    };
+    const plainOf = new Map();
+    for (const e of out) if (e.doc.kind === 'verse' && e.doc.bookId === 'matthew-plain') plainOf.set(e.doc.chapterNum + ':' + e.doc.verseNum, e);
     const seenVerse = new Set();
     let w = 0;
     for (let r = 0; r < out.length; r++) {
-      const d = out[r].doc;
+      let e = out[r];
+      const d = e.doc;
       if (d.kind === 'verse' && (d.bookId === 'matthew' || d.bookId === 'matthew-plain')) {
         const k = d.chapterNum + ':' + d.verseNum;
         if (seenVerse.has(k)) continue;
         seenVerse.add(k);
+        if (d.bookId === 'matthew') {
+          const plain = plainOf.get(k) || plainTwin(e);
+          if (plain && (plain.doc.text === d.text || (e.terms || []).every((/** @type {string} */ t) => (plain.terms || []).includes(t)))) e = plain;
+        }
       }
-      out[w++] = out[r];
+      out[w++] = e;
     }
     out.length = w;
   }
