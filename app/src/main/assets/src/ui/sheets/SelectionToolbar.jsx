@@ -792,6 +792,19 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       return false;
     };
 
+    // A06.3: a tap routed on its lift (below) has opened a sheet or a chip under the finger, and the browser's click
+    // for that same tap comes 5-20 ms later (S22 trace): on the backdrop of the sheet it had just opened, which closed
+    // it, so a note marker never showed its note on a phone. That click is spent: it reaches nothing.
+    let spentClick = /** @type {{ at: number, x: number, y: number } | null} */ (null);
+    const onSpentClick = (/** @type {MouseEvent} */ e) => {
+      const s = spentClick;
+      spentClick = null;
+      if (!s || performance.now() - s.at > 700) return;
+      if (Math.abs((e.clientX || 0) - s.x) > 24 || Math.abs((e.clientY || 0) - s.y) > 24) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    };
+
     // Pointer/touch lifecycle: track drag state and commit on release
     let pointerDownTime = 0;
     const onPointerDown = (e) => {
@@ -816,7 +829,10 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // are scrolls or long-presses; both should be ignored here. Also skip
       // if ScreenLayout already flagged this lift as a scroll.
       const isBriefTap = (performance.now() - pointerDownTime) < 300;
-      if (isCollapsed && isBriefTap && !window.__scrollLiftPending && tapTarget && routeAnnotationTap(tapTarget, pos.x, pos.y)) return;
+      if (isCollapsed && isBriefTap && !window.__scrollLiftPending && tapTarget && routeAnnotationTap(tapTarget, pos.x, pos.y)) {
+        spentClick = { at: performance.now(), x: pos.x, y: pos.y };
+        return;
+      }
       if (stillTimer) clearTimeout(stillTimer);
       stillTimer = setTimeout(() => showWhenStill(STILL_WAITS), 150);
     };
@@ -902,6 +918,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     document.addEventListener('pointerup', onPointerUp);
     document.addEventListener('touchend', onPointerUp);
     document.addEventListener('click', onClick);
+    window.addEventListener('click', onSpentClick, true);   // first of all: before any sheet's own listener
     document.addEventListener('contextmenu', onContextMenu);
     document.addEventListener('copy', onCopy);
     document.addEventListener('scroll', onAnyScroll, { capture: true, passive: true });
@@ -912,6 +929,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('pointerup', onPointerUp);
       document.removeEventListener('touchend', onPointerUp);
       document.removeEventListener('click', onClick);
+      window.removeEventListener('click', onSpentClick, true);
       document.removeEventListener('contextmenu', onContextMenu);
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('scroll', onAnyScroll, true);
