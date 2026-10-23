@@ -284,7 +284,7 @@ describe('AnnotationHint — yields to the tour and the audio bar (journey F2.1)
     const stop = TS.TOUR_STEPS.find((s) => s.id === 'highlight');
     expect(said.length, 'the pill says something').toBeGreaterThan(20);
     expect(stop.text.startsWith(said), `the pill's words "${said}" must open the highlight stop's text`).toBe(true);
-    expect(said).toContain('Highlight, or Note');
+    expect(said).toContain('Note, Link, Copy or Share');
   });
 
   /* THE ONE THING THE CASE ABOVE CANNOT SEE: a pill holding an IDENTICAL copy of the words passes it
@@ -299,7 +299,7 @@ describe('AnnotationHint — yields to the tour and the audio bar (journey F2.1)
     expect(raw, 'CONTROL: the header comment quotes the old copy').toMatch(/highlight, note, or bookmark/);
     expect(code, 'CONTROL: the stripper removed it').not.toMatch(/highlight, note, or bookmark/);
     expect(code, 'CONTROL: the stripped text is still the program').toMatch(/highlightWords\(\)/);
-    expect(code).not.toMatch(/Hold your finger|A small bar appears|Highlight, or Note/);
+    expect(code).not.toMatch(/Hold your finger|A bar appears|tap a colour|Note, Link, Copy/);
   });
 });
 

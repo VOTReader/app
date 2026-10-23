@@ -23,7 +23,7 @@
    letters the voice … and then dismiss it once again so they can listen to the
    text as it reads"). The tour ENDS on the Bible: the Bible stop presses
    Listen, the player stop opens the player from the bar and rings the voice
-   row (`afterTarget`), the back-to-words stop closes it with ‹, and the closing
+   row (`afterTarget`), the back-to-words stop closes it with ⌄, and the closing
    card sits over John 3 with the verses still lighting up — Done keeps the
    reading running, Skip stops it. Those three carry `listening: true`: the
    tour's playback is up there by construction (`enter: 'ensureListening'`
@@ -90,15 +90,17 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
     opens with these words and the first-run hint pill (AnnotationHint, bundle d) says exactly
     them, read through TourController.highlightWords() the way the stop count travels — so the
     pill can never drift from the stop it echoes, as its own copy did ("highlight, note, or
-    bookmark" against "Highlight, or Note"). */
-export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A small bar appears: Highlight, or Note.';
+    bookmark" against "Highlight, or Note"). The second sentence names what the bar really holds
+    (SelectionToolbar: the colours, then Note, Link, Copy, Share; n88, A06.8): it said "Highlight, or
+    Note", and the bar has no Highlight button. */
+export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A bar appears: tap a colour to highlight it, or choose Note, Link, Copy or Share.';
 
-/** The listening sheet's ‹ button, as the two cards that point at it name it. */
+/** The full player's ⌄ button, as the card that points at it names it (sheets close with ×; ‹ is only Back). */
 const CLOSE_GLYPH = '⌄';
 
 /* THE COUNT IS WRITTEN ONCE (2026-09-10). A stop's `number` is its position in this array and
    its eyebrow's "N of M" is built from that; the word every sentence uses to count the stops
-   ("seven stops, about two minutes" on the welcome card, the Home strip and the Settings Help
+   ("thirteen stops, about three minutes" on the welcome card, the tour strip and the Settings Help
    note) is TOUR_STOPS_WORD below, and the minutes beside it are TOUR_MINUTES_WORD — typed here
    and nowhere else (the Home strip and the Help note read both through TourController). Until
    tonight all four were typed by hand, and the Home strip still said "six" after the highlight
@@ -216,7 +218,8 @@ const STOPS = [
     /* Corbin, 2026-09-11: say too that whole features go quiet here — "control many UI
        features (like disabling search, history, other icons, etc)". Search and History are the
        rows' own names; "the icons in the top bar" is the Top-Nav Buttons group's own subtitle. */
-    text: 'Most of what you have seen can be switched on or off here in Settings: the Surprise Me button on Home, the Reading Position Marker in the top bar (it jumps back to where you stopped), Auto-Scroll, even Search and History, and which icons sit in the top bar. Turn off what you do not use.',
+    /* n119 (A08.9): two short sentences, not one of fifty words; the names are the rows' own. */
+    text: 'Most of what you have seen can be switched on or off here in Settings: Surprise Me, the Reading Position Marker, Auto-Scroll, Search, History and the icons in the top bar. Turn off what you do not use.',
     primary: 'Next',
   },
   /* THE TOUR ENDS ON THE BIBLE (Corbin, 2026-09-12, and the Tour Reviewer's reorder, accepted
@@ -253,9 +256,9 @@ const STOPS = [
   },
   /* BACK TO THE WORDS. The player's ⌄ (a real 48 px button, class sheet-handle-back) is the ring; the press
      closes the player and the reading is the brightest thing on the screen again. `doneIf`: no
-     sheet on the page — the reader closed it by ‹, by the backdrop or by Back, or Back arrived
+     sheet on the page — the reader closed it by ⌄, by the backdrop or by Back, or Back arrived
      here from the closing card — is the press done. Nothing here the reader can try inside the
-     tour and fail: the dim panes leave only ‹ open. */
+     tour and fail: the dim panes leave only ⌄ open. */
   {
     id: 'back-to-words', screen: 'bible-ch', enter: 'ensureListening', listening: true,
     target: { selector: '.audio-manager-sheet .sheet-handle-back' }, act: 'press',
@@ -276,17 +279,18 @@ const STOPS = [
     title: "That's the tour",
     // Highlighting used to be taught here, in passing. It has its own stop now, so teaching it
     // again on the way out would repeat it at the one moment nothing can be shown.
-    text: 'You can see this tour again from Settings › Help. The reading goes on. Enjoy your reading.',
+    // n120 (A08.11): Done keeps John 3 playing, so the card says so and where to pause it.
+    text: 'John 3 keeps playing; pause it from the bar at the bottom. You can see this tour again from Settings › Help. Enjoy your reading.',
     primary: 'Done',
   },
 ];
 
-// The numbered stops: everything after the welcome card, the closing card included ("7 of 7").
+// The numbered stops: everything after the welcome card, the closing card included (its eyebrow reads "N of N").
 const NUMBERED = STOPS.length - 1;
 const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen'];
-/** The stop count as the word the sentences use ("eleven stops, about three minutes"). */
+/** The stop count as the word the sentences use ("thirteen stops, about three minutes"; n284). */
 export const TOUR_STOPS_WORD = WORDS[NUMBERED] || String(NUMBERED);
-/** The minutes the same sentences promise; honest for eleven quick stops (the Orchestrator, 2026-09-13). */
+/** The minutes the same sentences promise (the Orchestrator, 2026-09-13, for eleven stops; still honest at thirteen quick ones). */
 export const TOUR_MINUTES_WORD = 'three';
 
 /** @type {ReadonlyArray<TourStep>} */

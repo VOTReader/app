@@ -58,7 +58,10 @@ describe('tour-steps — shape', () => {
     expect(typeof mod.HIGHLIGHT_GESTURE_WORDS, 'tour-steps.js must export HIGHLIGHT_GESTURE_WORDS').toBe('string');
     const stop = TOUR_STEPS.find((s) => s.id === 'highlight');
     expect(stop.text.startsWith(mod.HIGHLIGHT_GESTURE_WORDS)).toBe(true);
-    expect(mod.HIGHLIGHT_GESTURE_WORDS).toContain('Highlight, or Note');
+    // n88 (A06.8): the bar has no "Highlight" button; the words name what it holds.
+    expect(mod.HIGHLIGHT_GESTURE_WORDS).not.toContain('Highlight, or Note');
+    expect(mod.HIGHLIGHT_GESTURE_WORDS).toContain('tap a colour to highlight');
+    for (const name of ['Note', 'Link', 'Copy', 'Share']) expect(mod.HIGHLIGHT_GESTURE_WORDS, name).toContain(name);
   });
 
   it('publishes the stop count as a word, and the welcome card counts with it', () => {
@@ -111,7 +114,8 @@ describe('tour-steps — shape', () => {
      appears under their own finger. TOUR_WORDS is the trailer's vocabulary; these join it. */
   it("names the bar's own two words, in the copy and in TOUR_WORDS", () => {
     const hl = TOUR_STEPS.find((s) => s.id === 'highlight');
-    expect(hl.text).toContain('Highlight');
+    // The bar's colours highlight (its Highlight button is an icon); Note is a labelled button (n88).
+    expect(hl.text).toMatch(/highlight/i);
     expect(hl.text).toContain('Note');
     expect(TOUR_WORDS).toContain('Highlight');
     expect(TOUR_WORDS).toContain('Note');
@@ -181,6 +185,12 @@ describe('tour-steps — shape', () => {
     expect(st.text).toMatch(/icons/i);
     expect(bannedWord(st.text)).toBeNull();
     expect(st.text.split(/\s+/).length).toBeLessThan(60);
+  });
+
+  it('the settings stop is two short sentences (n119, A08.9)', () => {
+    const st = TOUR_STEPS.find((s) => s.id === 'settings');
+    expect(st.text.split(/(?<=\.)\s+/).length).toBe(2);
+    expect(st.text.split(/\s+/).length).toBeLessThan(40);
   });
 
   /* The closing card used to carry highlighting as a parting sentence. Now that it is a stop of
@@ -330,7 +340,8 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
     expect(d.listening).toBe(true);
     expect(d.target).toBeNull();
     expect(d.act).toBeNull();
-    expect(d.text).toBe('You can see this tour again from Settings › Help. The reading goes on. Enjoy your reading.');
+    // n120 (A08.11): Done keeps the audio playing, and the card says so.
+    expect(d.text).toBe('John 3 keeps playing; pause it from the bar at the bottom. You can see this tour again from Settings › Help. Enjoy your reading.');
     expect(d.primary).toBe('Done');
   });
 

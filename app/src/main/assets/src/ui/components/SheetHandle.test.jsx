@@ -53,3 +53,23 @@ describe('SheetHandle grab pill', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
+
+/* n132 (A01.10, A07.5): one close glyph. A sheet's close draws ×, never ‹, so ‹ means only Back in the app;
+   a sheet that brings its own glyph (the Answers sheets) still draws that. */
+describe('SheetHandle close button', () => {
+  it('draws an × by default, not the Back chevron, and is still named Close', () => {
+    const { container } = render(<SheetHandle onClose={() => {}} />);
+    const btn = container.querySelector('.sheet-handle-back');
+    expect(btn.getAttribute('aria-label')).toBe('Close');
+    expect(btn.textContent).not.toContain('‹');
+    const path = btn.querySelector('svg path');
+    expect(path && path.getAttribute('d')).toBe('M6 6l12 12M18 6L6 18');
+    expect(btn.querySelector('svg').getAttribute('aria-hidden')).toBe('true');
+  });
+
+  it('a glyph passed in still wins', () => {
+    const { container } = render(<SheetHandle onClose={() => {}} glyph={<i className="mine" />} />);
+    expect(container.querySelector('.sheet-handle-back .mine')).not.toBeNull();
+    expect(container.querySelector('.sheet-handle-back svg')).toBeNull();
+  });
+});

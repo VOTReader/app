@@ -1017,7 +1017,7 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
     expect(card.classList.contains('docked')).toBe(true);
     expect(parseFloat(card.style.bottom)).toBe(12 + 80);
     expect(document.querySelector('.tour-ring')).toBeNull();
-    expect(screen.getByText(/The reading goes on/)).toBeTruthy();
+    expect(screen.getByText(/John 3 keeps playing/)).toBeTruthy();
     const d = [...document.querySelectorAll('.tour-dim')].map((x) => ({ top: parseFloat(/** @type {HTMLElement} */ (x).style.top), height: parseFloat(/** @type {HTMLElement} */ (x).style.height), width: parseFloat(/** @type {HTMLElement} */ (x).style.width) }));
     expect(d.length).toBe(4);
     expect(d[0]).toEqual({ top: 0, height: 56, width: window.innerWidth });

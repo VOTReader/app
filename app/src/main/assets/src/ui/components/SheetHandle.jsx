@@ -5,10 +5,12 @@
    cosmetic handle divs (fn-sheet-handle / select-sheet-handle /
    link-action-handle) that were duplicated across 9 sheets — an owner
    report: an older reader tapped the pill bar expecting it to close the
-   sheet and nothing happened. Both the pill bar and the ‹ chevron at the
+   sheet and nothing happened. Both the pill bar and the close button at the
    sheet's upper-left are real 44px buttons that close the sheet; the
-   chevron is the visible fallback for readers who don't know the
-   pull-handle idiom. */
+   close button is the visible fallback for readers who don't know the
+   pull-handle idiom. It draws × (n132, A01.10/A07.5): it drew ‹, the
+   app's Back, so one glyph meant two things; now ‹ means only Back, ×
+   closes a sheet and ⌄ puts the full player away. */
 
 /** U06.8: a downward drag this far closes the sheet, or a quicker flick (px per ms) of any length past a few px. */
 export const DRAG_CLOSE_PX = 64;
@@ -53,19 +55,28 @@ export function useDragToClose(onClose, sheetOf) {
   return { onPointerDown, onPointerMove, onPointerUp: end, onPointerCancel: end, onClick };
 }
 
-/* `glyph` (the Answers sheets, AOGCG 2026-10-22): what the close button draws in place of the ‹,
-   their 20px × icon. The button, its name and its place are the same for every sheet. */
+/** The default close glyph: the same 24-unit × path the Answers sheets draw (AnswersParts ANS_ICONS.close). */
+function CloseX() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+/* `glyph` (the Answers sheets, AOGCG 2026-10-22): what the close button draws in place of the
+   default ×, their own 20px × icon. The button, its name and its place are the same for every sheet. */
 /** @param {{ onClose: () => void, glyph?: any }} props */
 export function SheetHandle({ onClose, glyph }) {
   const grab = useDragToClose(onClose);
   return (
     <div className="sheet-handle-row">
       <button type="button" className="sheet-handle-back" onClick={onClose} aria-label="Close">
-        {glyph || '‹'}
+        {glyph || <CloseX />}
       </button>
       {/* The pill bar is a redundant touch affordance for sighted users —
           aria-hidden + tabIndex -1 keep it out of the accessibility tree so
-          the ‹ chevron is the ONE screen-reader/keyboard Close stop (two
+          the × button is the ONE screen-reader/keyboard Close stop (two
           adjacent identical "Close" announcements otherwise). */}
       <button type="button" className="sheet-handle-grab" {...grab} aria-hidden="true" tabIndex={-1}>
         <span className="sheet-handle-bar" />
