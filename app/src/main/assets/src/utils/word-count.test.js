@@ -116,3 +116,14 @@ describe('readingMinutes', () => {
     expect(readingMinutes(920, 0)).toBe(4);  // bad pace falls back to 230
   });
 });
+
+// ds5 s40.4 (idea sweep 2026-10-22): prophecy groups were left out only because they carried no
+// text field; the exclusion is now a rule, so one that gains text still counts 0.
+describe('countItemWords — prophecy groups are excluded by rule (ds5 s40.4)', () => {
+  it('counts a prophecy-group block as 0 even when it carries text, segments or lines', () => {
+    expect(countItemWords({ blocks: [
+      { type: 'p', text: 'one two three' },
+      { type: 'prophecy-group', text: 'four five', segments: [{ text: 'six seven' }], lines: [[{ text: 'eight' }]] },
+    ] })).toBe(3);
+  });
+});

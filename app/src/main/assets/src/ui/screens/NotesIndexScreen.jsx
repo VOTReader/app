@@ -291,8 +291,9 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                       <button className="nb-drilled-action" onClick={() => { setRenameTaken(''); setRenaming(false); }} title="Cancel rename">Cancel</button>
                     </>
                   : <>
-                      {drilledNotes.length > 0 && (
-                        <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotes)} title="Share notebook as text">Share</button>
+                      {/* ds5 s21.1: Share sends what the reader sees, a search's matches included. */}
+                      {drilledNotesShown.length > 0 && (
+                        <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotesShown)} title="Share notebook as text">Share</button>
                       )}
                       {drilledNb && <>
                         <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
@@ -447,7 +448,8 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
               <div className="notes-index-controls">
                 <button
                   className="notes-index-sort-btn"
-                  onClick={() => exportNotes('My Notes', allNotesSorted)}
+                  onClick={() => exportNotes('My Notes', allNotesShown)}
+                  disabled={allNotesShown.length === 0}
                   title="Share all notes as text"
                 >Share as Text</button>
                 <button

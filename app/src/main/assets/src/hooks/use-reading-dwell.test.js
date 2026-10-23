@@ -153,3 +153,31 @@ describe('useReadingDwell — a mid-session dwell change reaches the resume path
     expect(recordReadingDay).toHaveBeenCalledTimes(1);
   });
 });
+
+/* ds5 s04.2 (idea sweep 2026-10-22): every setActiveReadKey reset the dwell, and the Bible arm
+   passes the same book for each chapter, so two 15 s chapters of one book recorded no day. */
+describe('useReadingDwell — the same place keeps its time (ds5 s04.2)', () => {
+  it('chapter to chapter in one book carries the time read toward the day', () => {
+    const recordReadingDay = vi.fn();
+    window.ReadingStreakStore = { recordReadingDay };
+    const { result } = mount();                                   // dwellMs 1000
+    act(() => { result.current.setActiveReadKey('john'); });
+    act(() => { vi.advanceTimersByTime(600); });
+    act(() => { result.current.setActiveReadKey('john'); });     // next chapter, same book
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(recordReadingDay).toHaveBeenCalledTimes(1);
+  });
+
+  it('a different place still starts over', () => {
+    const recordReadingDay = vi.fn();
+    window.ReadingStreakStore = { recordReadingDay };
+    const { result } = mount();
+    act(() => { result.current.setActiveReadKey('john'); });
+    act(() => { vi.advanceTimersByTime(600); });
+    act(() => { result.current.setActiveReadKey('mark'); });
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(recordReadingDay).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(500); });
+    expect(recordReadingDay).toHaveBeenCalledTimes(1);
+  });
+});

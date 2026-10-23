@@ -141,7 +141,10 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   };
 
   const setActiveReadKey = (key, commitFn) => {
-    cancelDwell();
+    // ds5 s04.2: the same key again (the Bible arm passes the book for every chapter) keeps the
+    // time already read; only a new place, or null, starts the dwell over.
+    if (key && key === dwellKeyRef.current) pauseDwell();
+    else cancelDwell();
     if (!key) return; // null = cancel only — never clears a committed position
     // POSITION IS IMMEDIATE (2026-07-19): the resume cursor tracks wherever
     // the user actually IS the moment they land there. Gating it behind a
