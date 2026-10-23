@@ -257,6 +257,23 @@ describe('LinkStore — query + mutation API', () => {
       .toEqual(['ancestor', 'descend', 'exact', 'tgtside']);
   });
 
+  it('getTouching (mw17 s29.4): a verse finds its whole-verse, partial-verse and covering-range links, not its chapter or neighbours', () => {
+    localStorage.setItem('vot-links', JSON.stringify([
+      mk('exact', 'bible:john:3:16', 'letter:a:0'),
+      mk('partial', 'letter:b:0', 'bible:john:3:16:12-40'),   // the verse picker's partial target
+      mk('range', 'bible:john:3:15-17', 'letter:c:0'),        // a span covering 16
+      mk('rangepart', 'bible:john:3:16-18:0-9', 'letter:d:0'),
+      mk('chapter', 'bible:john:3', 'letter:e:0'),            // chapter-level: not a verse's link
+      mk('other', 'bible:john:3:161', 'letter:f:0'),
+      mk('before', 'bible:john:3:10-15', 'letter:g:0'),
+    ]));
+    expect(LinkStore.getTouching('bible:john:3:16').map(l => l.id).sort())
+      .toEqual(['exact', 'partial', 'range', 'rangepart']);
+    expect(LinkStore.getTouching('bible:john:3:17').map(l => l.id).sort()).toEqual(['range', 'rangepart']);
+    // a block key keeps the prefix scan the inline icons use
+    expect(LinkStore.getTouching('letter:b:0').map(l => l.id)).toEqual(['partial']);
+  });
+
   it('getForKeyPrefix skips a record missing an endpoint key (internal guard)', () => {
     localStorage.setItem('vot-links', JSON.stringify([mk('good', 'bible:genesis:1:1', 'letter:a:0')]));
     LinkStore.all();  // load (clean record)

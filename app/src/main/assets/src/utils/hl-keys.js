@@ -106,3 +106,25 @@ export const HOLY_DAYS_LETTER_IDS = new Set([
 export function entryHlBase(type, entryId) {
   return (type === 'holy-days' && HOLY_DAYS_LETTER_IDS.has(entryId) ? 'letter:' : 'wtlb:') + entryId;
 }
+
+/** A verse key's chapter part and verse number ("bible:john:3:16" -> ["bible:john:3", 16]); null for any other key. @param {string} key */
+export function verseKeyParts(key) {
+  const m = /^((?:bible|study):[^:]+:\d+|study:[^:]+):(\d+)$/.exec(String(key || ''));
+  return m ? /** @type {[string, number]} */ ([m[1], Number(m[2])]) : null;
+}
+
+/**
+ * Whether an endpoint key belongs to a verse: the verse itself, part of it
+ * ("...:16:12-40") or a span covering it ("...:15-17", "...:15-17:0-9").
+ * Shared by LinkStore.getTouching and LinkCard's which-side test (mw17 s29.4).
+ * @param {string} key  an endpoint key
+ * @param {string} hlKey  the verse ("bible:john:3:16")
+ */
+export function keyTouchesVerse(key, hlKey) {
+  if (typeof key !== 'string') return false;
+  if (key === hlKey || key.startsWith(hlKey + ':')) return true;
+  const vp = verseKeyParts(hlKey);
+  if (!vp || !key.startsWith(vp[0] + ':')) return false;
+  const m = /^(\d+)-(\d+)(?::|$)/.exec(key.slice(vp[0].length + 1));
+  return !!m && Number(m[1]) <= vp[1] && vp[1] <= Number(m[2]);
+}

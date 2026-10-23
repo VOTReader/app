@@ -13,9 +13,10 @@ export function LinkSidebar({ hlKey, onClose, onNavigate }) {
   // Letter/WTLB/Blessed/Holy-Days blocks anchor links by block-index, but
   // excerpts append ":start-end" to the stored endpoint key. Use prefix
   // matching for those scopes so the sidebar finds excerpt-scoped links from
-  // the bare block hlKey. Bible verses stay exact-match (verse N is N).
+  // the bare block hlKey. A verse lists what its icon counts (mw17 s29.4): the
+  // whole verse, a part of it ("...:16:12-40") and a span covering it.
   const isBlockScope = hlKey && (hlKey.startsWith('letter:') || hlKey.startsWith('wtlb:') || hlKey.startsWith('blessed:') || hlKey.startsWith('holy-days:'));
-  const links = isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey);
+  const links = hlKey ? (isBlockScope ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getTouching(hlKey)) : [];
   React.useEffect(() => {
     if (!hlKey) return;
     const prev = window.__closeSheet;

@@ -3,12 +3,13 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { relativeDate } from '../../utils/dates.js';
+import { keyTouchesVerse } from '../../utils/hl-keys.js';
 
 export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const [expanded, setExpanded] = React.useState(false);
   // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).
   const [confirmRemove, setConfirmRemove] = React.useState(false);
-  const matchesSide = (k) => isBlockScope ? (k === hlKey || k.startsWith(hlKey + ':')) : k === hlKey;
+  const matchesSide = (k) => isBlockScope ? (k === hlKey || k.startsWith(hlKey + ':')) : keyTouchesVerse(k, hlKey);
   // Determine which side is "us" (this container) and which is "other" (the linked passage).
   // source = where the user originated the link; target = the destination they picked.
   const isSource = matchesSide(lnk.source.key);

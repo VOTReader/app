@@ -29,8 +29,8 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { mergeArrayStore } from './store-merge.js';
-import { HOLY_DAYS_LETTER_IDS } from '../utils/hl-keys.js';
-import { recordsAlongKey } from './key-prefix-index.js';
+import { HOLY_DAYS_LETTER_IDS, verseKeyParts, keyTouchesVerse } from '../utils/hl-keys.js';
+import { recordsAlongKey, recordsAtOrBelow } from './key-prefix-index.js';
 
 /**
  * A link endpoint (either source or target). The `key` is the hlKey
@@ -190,6 +190,22 @@ export const LinkStore = extendStore(
      */
     getForKeyPrefix(prefix) {
       return recordsAlongKey(this, _linkKeys, prefix);
+    },
+
+    /**
+     * The links a verse or block's icon and Links sidebar show (mw17 s29.4).
+     * A Bible or study verse key ("bible:john:3:16") takes the whole verse,
+     * a partial verse the verse picker stored ("...:16:12-40") and a span
+     * covering it ("...:15-17", "...:16-18:0-9"); a chapter-level key is not
+     * the verse's. Any other key (a letter block) keeps getForKeyPrefix.
+     * @param {string} hlKey
+     * @returns {Link[]}
+     */
+    getTouching(hlKey) {
+      if (!verseKeyParts(hlKey)) return this.getForKeyPrefix(hlKey);
+      const parent = hlKey.slice(0, hlKey.lastIndexOf(':'));
+      return recordsAtOrBelow(this, _linkKeys, parent).filter((lnk) =>
+        keyTouchesVerse(lnk.source.key, hlKey) || keyTouchesVerse(lnk.target.key, hlKey));
     },
 
     /**

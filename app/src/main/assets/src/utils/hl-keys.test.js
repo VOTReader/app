@@ -49,3 +49,19 @@ describe('entryHlBase', () => {
     expect(entryHlBase('blessed', 'unleavened')).toBe('wtlb:unleavened');
   });
 });
+
+describe('keyTouchesVerse (mw17 s29.4)', () => {
+  it('the verse, part of it, and a span covering it; never a neighbour, the chapter or another chapter', async () => {
+    const { keyTouchesVerse } = await import('./hl-keys.js');
+    const v = 'bible:john:3:16';
+    expect(keyTouchesVerse('bible:john:3:16', v)).toBe(true);
+    expect(keyTouchesVerse('bible:john:3:16:12-40', v)).toBe(true);
+    expect(keyTouchesVerse('bible:john:3:14-16', v)).toBe(true);
+    expect(keyTouchesVerse('bible:john:3:16-18:0-9', v)).toBe(true);
+    expect(keyTouchesVerse('bible:john:3:17-18', v)).toBe(false);
+    expect(keyTouchesVerse('bible:john:3:161', v)).toBe(false);
+    expect(keyTouchesVerse('bible:john:3', v)).toBe(false);
+    expect(keyTouchesVerse('bible:john:4:16', v)).toBe(false);
+    expect(keyTouchesVerse('study:matthew-5:3-5', 'study:matthew-5:4')).toBe(true);
+  });
+});
