@@ -1073,6 +1073,7 @@ export function buildScreenRoutes({
         onPlanRead={openPlanItem}
         onPlanListen={listenPlanItem}
         onOpenPlans={goReadingPlans}
+        onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
       />
     ),
     'about': () => (
@@ -1138,7 +1139,7 @@ export function buildScreenRoutes({
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
           onOpenPlans={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
-          readingPlanCount={Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0}
+          readingPlanCount={(typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore ? ReadingPlanStore.active().length : 0) || (Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0)}
           onOpenScriptureWeb={() => {
             setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null });
             setScreen('scripture-web');
@@ -1159,7 +1160,7 @@ export function buildScreenRoutes({
         readingPlans={settings.readingPlans}
         isRead={isRead}
         markAsReadEnabled={settings.markAsRead !== false}
-        onChangePlans={(plans) => updateSetting('readingPlans', plans)}
+        onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
         onRead={openPlanItem}
         onSearch={goSearch}
         onHistory={goHistory}

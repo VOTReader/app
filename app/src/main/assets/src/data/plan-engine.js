@@ -34,7 +34,7 @@ export const WORDS_PER_MIN = 200;
  * @typedef {{ id: string, plan: string, name?: string, created?: number, updated?: number, start: string,
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
- *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string }} PlanRun
+ *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string }} PlanRun
  */
 
 // ── dates ────────────────────────────────────────────────────────────────

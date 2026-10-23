@@ -14,8 +14,8 @@
    read yet; what they open is the caller's (screen-routes).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { readingPlansOf, todayRows } from '../../utils/reading-plan-view.js';
 import { volumeSequence } from '../../data/reading-plans.js';
+import { usePlanRuns, runRow } from '../../utils/plan-runs-view.js';
 
 /** The Volumes in site order from the loaded corpus; [] until it is in. */
 function volumesNow() {
@@ -25,18 +25,18 @@ function volumesNow() {
 }
 
 /**
- * Today's rows for the plans in settings. A Volumes plan loads the Volumes
- * (and re-reads them when they land); the date is read again whenever the app
- * comes back to the front, so the card turns over at midnight.
- * @param {any} readingPlans  settings.readingPlans
+ * Today's rows for the plans being followed (ReadingPlanStore, mw18). rp1's
+ * settings.readingPlans are moved into the store on the way (usePlanRuns), and
+ * `onLegacyMoved` clears them from settings; the date is read again whenever the
+ * app comes back to the front, so the card turns over at midnight.
+ * @param {any} readingPlans  settings.readingPlans (rp1, moved in once)
  * @param {(bid: string, cid: any) => boolean} isRead
+ * @param {(left: any[]) => void} [onLegacyMoved]
  */
-export function useTodayRows(readingPlans, isRead) {
-  const plans = readingPlansOf({ readingPlans });
-  const seq = useVolumesSeq(plans.some((p) => p.id === 'volumes'));
+export function useTodayRows(readingPlans, isRead, onLegacyMoved) {
+  const runs = usePlanRuns({ legacy: readingPlans, isRead, onLegacyMoved });
   const now = useNow();
-  if (!plans.length || typeof isRead !== 'function') return [];
-  return todayRows(plans, now, isRead, seq);
+  return runs.map((r) => runRow(r, now));
 }
 
 /**

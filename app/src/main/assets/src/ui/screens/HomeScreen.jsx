@@ -43,9 +43,9 @@ function useSongCatalogCount() {
   }, [cat]);
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans, onPlansMoved }) {
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
-  const todayRows = useTodayRows(readingPlans, isRead);
+  const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
   useSongCatalogCount();
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)

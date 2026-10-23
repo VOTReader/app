@@ -11,7 +11,7 @@
    Every plan here is the plan engine (plan-engine.js) with a preset choice
    of items; the custom builder makes the same specs from the reader's picks.
    Items are frozen when a run starts: Bible words come from the generated
-   bible-chapter-words.js (no corpus needed), letters from the loaded Volumes.
+   plan-bible-words.js (no corpus needed), letters from the loaded Volumes.
 
    Pure: the Volumes arrive through `src` (the loaded corpus), never globals.
    ═══════════════════════════════════════════════════════════════════════ */
