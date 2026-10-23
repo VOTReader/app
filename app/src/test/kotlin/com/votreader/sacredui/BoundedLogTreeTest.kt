@@ -178,6 +178,9 @@ class BoundedLogTreeTest {
         )
         assertEquals("open [path] failed", BoundedLogTree.sanitize("open /storage/emulated/0/My Notes/my prayer list.txt failed"))
         assertEquals("Pick from [path] failed", BoundedLogTree.sanitize("Pick from /storage/emulated/0/Download failed"))
+        // Refuter r3: a spaced name with no extension, up to Java's ": " after the path.
+        assertEquals("[path]: open failed: ENOENT", BoundedLogTree.sanitize("/storage/emulated/0/Private Notes/my prayer: open failed: ENOENT"))
+        assertEquals("[path]: Permission denied", BoundedLogTree.sanitize("/storage/emulated/0/Private Notes: Permission denied"))
     }
 
     @Test
