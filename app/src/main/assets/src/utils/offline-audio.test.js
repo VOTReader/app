@@ -277,3 +277,38 @@ describe('offline-audio — in the phone app', () => {
     expect(() => OfflineAudio.refresh()).not.toThrow();
   });
 });
+
+/* Downloads brief 2026-10-23, 3d: sizes are baked (tools/gen-audio-lengths.py -> AUDIO_LENGTHS, a lazy file), so a
+   whole set's total is known at once and the phone is asked only for what the build did not see. */
+describe('offline-audio — baked sizes', () => {
+  afterEach(() => { delete /** @type {any} */ (globalThis).AUDIO_LENGTHS; delete /** @type {any} */ (globalThis).__makeLazyLoader; });
+
+  it('a baked size answers at once and is never asked of the phone', async () => {
+    const b = fakeBridge();
+    /** @type {any} */ (globalThis).AUDIO_LENGTHS = { 'one-christmas-B': [18_000_000, 600] };
+    expect(OfflineAudio.sizeOf(U1)).toBe(18_000_000);
+    OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toEqual([U2]);
+  });
+
+  it('a size asked before the table lands waits for it, then asks only what it lacks', async () => {
+    const b = fakeBridge();
+    let land = () => {};
+    const corpus = { loaded: false, error: false, subscribe: () => () => {}, getVersion: () => 0 };
+    /** @type {any} */ (globalThis).__makeLazyLoader = vi.fn(() => ({
+      corpus,
+      load: () => new Promise((res) => { land = () => { /** @type {any} */ (globalThis).AUDIO_LENGTHS = { 'one-christmas-B': [18_000_000, 600] }; corpus.loaded = true; res(undefined); }; }),
+    }));
+    const heard = vi.fn();
+    OfflineAudio.subscribe(heard);
+    OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
+    expect(b.offlineAudioSizes).not.toHaveBeenCalled();
+    land();
+    await vi.waitFor(() => expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toEqual([U2]);
+    expect(OfflineAudio.sizeOf(U1)).toBe(18_000_000);
+    expect(heard).toHaveBeenCalled();                    // the screens repaint with the totals
+  });
+});

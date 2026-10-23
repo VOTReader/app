@@ -189,6 +189,28 @@ export function unitState(off, urls) {
   };
 }
 
+/**
+ * Where a set of recordings stands on the phone, counted one way for every badge, the picker and the player's
+ * offline ticks (downloads brief 2026-10-23, 3h: player L4 paints with this, it does not count on its own):
+ * unitState over the set plus its baked seconds (AUDIO_LENGTHS through the AudioLengths global; null while any
+ * recording of the set has none). `target` is URLs or tracks. Null where downloads are not possible here.
+ * @param {Array<string | { url?: string }>} target
+ */
+export function useOfflineState(target) {
+  const off = useOfflineAudio();
+  const lengths = typeof AudioLengths !== 'undefined' ? AudioLengths : null;
+  React.useSyncExternalStore(lengths ? lengths.lengthsStore.subscribe : _noSub, lengths ? lengths.lengthsStore.getVersion : _zero);
+  if (!off) return null;
+  const urls = (Array.isArray(target) ? target : []).map((t) => (typeof t === 'string' ? t : t && t.url)).filter((u) => typeof u === 'string');
+  let seconds = 0;
+  let timed = urls.length > 0;
+  for (const u of urls) {
+    const sec = lengths ? lengths.secondsOf(u) : null;
+    if (sec == null) timed = false; else seconds += sec;
+  }
+  return { ...unitState(off, urls), seconds: timed ? seconds : null };
+}
+
 /** Download only on Wi-Fi (ra6): queued on mobile data, a download waits for Wi-Fi. */
 const WAITING_WORDS = 'Waiting for Wi-Fi';
 

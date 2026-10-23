@@ -8,7 +8,7 @@
    Only in the Android app: on the web the store is unavailable and none of this renders. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
-import { OfflineRowStatus, OfflineCollectionAction, formatBytes } from './OfflineAudioControls.jsx';
+import { OfflineRowStatus, OfflineCollectionAction, formatBytes, useOfflineState } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
 const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
@@ -473,5 +473,34 @@ describe('On this phone (the shelf)', () => {
     fakeStore();
     const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(container.textContent).toMatch(/Nothing is on this phone yet/);
+  });
+});
+
+/* Downloads brief 2026-10-23, 3h: one hook counts for every badge, the picker and the player's offline ticks (L4). */
+describe('useOfflineState', () => {
+  afterEach(() => { delete globalThis.AudioLengths; });
+  function Probe({ target }) {
+    const st = useOfflineState(target);
+    return <output>{JSON.stringify(st)}</output>;
+  }
+  const read = (c) => JSON.parse(c.querySelector('output').textContent);
+
+  it('counts what is on the phone, the bytes and the baked seconds of a set', () => {
+    const s = fakeStore();
+    save(s, 'a', 100);
+    s.st.sizes.set(U('b'), 300);
+    globalThis.AudioLengths = { secondsOf: (u) => ({ [U('a')]: 60, [U('b')]: 90 })[u] ?? null, lengthsStore: { subscribe: () => () => {}, getVersion: () => 0 } };
+    const { container } = render(<Probe target={[U('a'), { url: U('b') }]} />);
+    expect(read(container)).toEqual(expect.objectContaining({ status: 'none', saved: 1, count: 2, bytes: 400, remaining: 300, seconds: 150 }));
+  });
+
+  it('seconds are null while any recording of the set has none; null where downloads are not possible', () => {
+    const s = fakeStore();
+    globalThis.AudioLengths = { secondsOf: (u) => (u === U('a') ? 60 : null), lengthsStore: { subscribe: () => () => {}, getVersion: () => 0 } };
+    const { container, rerender } = render(<Probe target={[U('a'), U('b')]} />);
+    expect(read(container).seconds).toBeNull();
+    s.available = () => false;
+    rerender(<Probe target={[U('a')]} />);
+    expect(read(container)).toBeNull();
   });
 });

@@ -27,6 +27,7 @@
 import { isSongUrl, resolveBibleAudio } from './audio-track.js';
 import { WebOfflineAudio } from './offline-audio-web.js';
 import { loadAudioSync, loadBibleSync, loadAudioSyncSections } from './sync-loaders.js';
+import { bytesOf, lengthsReady, lengthsSettled } from './audio-lengths.js';
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale: boolean }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
@@ -299,13 +300,14 @@ export const OfflineAudio = {
   /** @param {string} url @returns {string | null} network | space | short | size | disk */
   failureOf: (url) => _failed.get(url) || null,
   /**
-   * Bytes of `url`: a download's own size, else one looked up (requestSizes), else null.
+   * Bytes of `url`: a download's own size, else one looked up (requestSizes), else the build's (AUDIO_LENGTHS,
+   * downloads brief 3d), else null.
    * @param {string} url @returns {number | null}
    */
   sizeOf: (url) => {
     const saved = _saved.get(url);
     if (saved && saved.bytes > 0) return saved.bytes;
-    return _sizes.get(url) || null;
+    return _sizes.get(url) || bytesOf(url) || null;
   },
   /**
    * Ask the phone for the sizes of `urls` not yet known (answered by a 'sizes' event).
@@ -314,7 +316,13 @@ export const OfflineAudio = {
   requestSizes(urls) {
     const b = _bridge();
     if (!b || typeof b.offlineAudioSizes !== 'function') return;
-    const want = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === 'string' && !_saved.has(u) && !_sizes.has(u) && !_sizesAsked.has(u));
+    // The build's sizes first (a lazy file): asked before it lands, this waits for it, repaints the screens with what
+    // it knows, and asks the phone only for what the build did not see (a recording uploaded after it).
+    if (!lengthsSettled()) {
+      lengthsReady().then(() => { _notify(); OfflineAudio.requestSizes(urls); });
+      return;
+    }
+    const want = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === 'string' && !_saved.has(u) && !_sizes.has(u) && !_sizesAsked.has(u) && !bytesOf(u));
     if (!want.length) return;
     for (const u of want) { _sizesAsked.add(u); _sizesToSend.add(u); }
     if (_sizesFlushQueued) return;

@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 621 distinct identifiers.
+// Total: 623 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -18,6 +18,7 @@ declare const ANSWERS_META: any;
 declare const ANSWERS_SITE_META: any;
 declare const ARROW_LAYOUT_OPTIONS: any;
 declare const AUDIO_ALTERNATES: any;
+declare const AUDIO_LENGTHS: any;
 declare const AUDIO_MANIFEST: any;
 declare const AUDIO_SECTIONS: any;
 declare const AUDIO_SYNC: any;
@@ -34,6 +35,7 @@ declare const AppShellOverlays: any;
 declare const AppShellSheets: any;
 declare const ArrowIcon: any;
 declare const AudioCollectionScreen: any;
+declare const AudioLengths: any;
 declare const AudioLibraryScreen: any;
 declare const AudioLibraryStore: any;
 declare const AudioManagerSheet: any;

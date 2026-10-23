@@ -92,6 +92,8 @@ import { AudioPlayer, trackUrl as audioTrackUrl } from '../utils/audio-player.js
 // Downloads to the phone (listening item 8): ONE store, here beside the player that consults it offline; the
 // Listening Library's rows and "On this phone" read it as the OfflineAudio global.
 import { OfflineAudio } from '../utils/offline-audio.js';
+// Bytes and seconds of every recording (downloads brief 3d): the lazy screens read the AudioLengths global.
+import { AudioLengths } from '../utils/audio-lengths.js';
 // Songs of the Letters (2026-09-24): ONE catalog store, here beside the player that queues from it; the lazy Songs
 // screens read it as the SongCatalog global, never by import (a second bundled copy would be a second catalog).
 import { SongCatalog } from '../utils/song-catalog.js';
@@ -334,7 +336,7 @@ Object.assign(window, {
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
-  AudioPlayer, audioTrackUrl, OfflineAudio, SongCatalog,
+  AudioPlayer, audioTrackUrl, OfflineAudio, AudioLengths, SongCatalog,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,
