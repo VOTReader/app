@@ -3029,6 +3029,22 @@
       pointer-events: none;
     }
     .back-hint-row .back-hint-pill { pointer-events: auto; }
+    /* A verse found in its KJV wording, opened in the KJV for this visit (BibleChapterView, search200 idea A,
+       PICKS.md A): one row under the pill, in the band, so the band's hairline is the one line below it and none
+       sits between. The note on the left, the way back on the right; at a large Text Size it wraps to two lines. */
+    .back-hint-row:has(> .visit-ed-row) { flex-wrap: wrap; padding-bottom: 0; }
+    .visit-ed-row {
+      flex: 0 0 100%; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      column-gap: 12px; min-height: 44px; margin-top: 0.35rem;
+    }
+    .visit-ed-solo { padding-top: 0; }
+    .visit-ed-note { flex: 1 1 auto; min-width: 0; font-family: var(--font-body); font-style: italic; font-size: var(--fs-14); color: var(--cream-muted); }
+    .visit-ed-btn {
+      flex: 0 0 auto; margin-left: auto; min-height: 44px; padding: 0 0 0 8px; pointer-events: auto;
+      background: none; border: none; cursor: pointer;
+      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em; text-transform: uppercase; color: var(--gold);
+    }
+    @media (hover: hover) { .visit-ed-btn:hover { color: var(--gold-bright); } }
     /* ── The mini title band (search200 UX B10 item 1, mockup
        ux/mockups/1-sticky-title/PICK.png) ── a landing mid-letter named no
        letter: the hero sat above, out of sight. Once it has scrolled up under

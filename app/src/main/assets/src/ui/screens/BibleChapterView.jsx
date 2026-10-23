@@ -23,19 +23,31 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   // (utils/audio-text-edition.js). The snapshot is a string, so the clock's
   // ticks do not re-render the chapter; only a change of recording does.
   const recording = React.useSyncExternalStore(AudioPlayer.subscribe, () => recordingTranslationFor(AudioPlayer, book.id));
-  const translation = textForRecording(readerTranslation, recording);
-  const matchingRecording = translation !== (readerTranslation || 'nkjv');
+  const recordingEdition = textForRecording(readerTranslation, recording);
+  const matchingRecording = recordingEdition !== (readerTranslation || 'nkjv');
+  /* THE KJV FOR THIS VISIT (search200 idea A, 2026-10-22, PICKS.md A). A verse its KJV wording found opens in the
+     KJV (the search anchor's `edition`) under one row beneath "‹ Back to results": "Shown in KJV, as you searched"
+     and "Read in <the reader's edition>". The visit is this chapter, this time: the row's button, another chapter or
+     the next landing read the reader's own again, and the saved edition is never touched. A loaded recording wins
+     (the words follow the voice), and a swipe peek never takes it. */
+  const chapterKey = book.id + ':' + chapter.num;
+  const chapterKeyRef = React.useRef(chapterKey);
+  chapterKeyRef.current = chapterKey;
+  const [visit, setVisit] = React.useState(/** @type {{ key: string, ed: string, verse: number } | null} */ (null));
+  const visitEdition = !inert && !matchingRecording && visit && visit.key === chapterKey && visit.ed !== (readerTranslation || 'nkjv') ? visit.ed : null;
+  const translation = visitEdition || recordingEdition;
+  const altShown = translation !== (readerTranslation || 'nkjv');
   // An alt edition is a lazy script; translateVerse answers NKJV until it lands,
   // so its arrival is a render input here (App's own tick follows only Settings).
   const [textTick, setTextTick] = React.useState(0);
   React.useEffect(() => {
-    if (!matchingRecording) return undefined;
+    if (!altShown) return undefined;
     let live = true;
     // W25: held while shown, or a translation switch's sweep frees it under the page.
     const letGo = holdTranslation(translation);
     loadTranslation(translation).then(() => { if (live) setTextTick((v) => v + 1); });
     return () => { live = false; letGo(); };
-  }, [translation, matchingRecording]);
+  }, [translation, altShown]);
   // W25: name the recording's edition only once its text is on the page; a
   // download in flight (or one that failed) still reads NKJV.
   const recordingTextShown = matchingRecording && isTranslationLoaded(translation);
@@ -56,6 +68,25 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         : 'Back to the ' + translationLabel(shownTranslation) + ' text.',
     });
   }, [recordingTextShown, inert, translation, shownTranslation]);
+  // ...and the visit's, the same way (idea A)
+  const visitShown = !!visitEdition && isTranslationLoaded(visitEdition);
+  /** Where the landed verse stood when the reader asked for their own edition: it stays there (idea A). */
+  const keepRef = React.useRef(/** @type {{ n: number, top: number } | null} */ (null));
+  const readOwnEdition = () => {
+    const el = visit && bodyRef.current ? /** @type {HTMLElement | null} */ (bodyRef.current.querySelector('#v-' + visit.verse)) : null;
+    keepRef.current = el && visit ? { n: visit.verse, top: el.getBoundingClientRect().top } : null;
+    setVisit(null);
+  };
+  React.useLayoutEffect(() => {
+    const keep = keepRef.current;
+    keepRef.current = null;
+    const el = keep && bodyRef.current ? /** @type {HTMLElement | null} */ (bodyRef.current.querySelector('#v-' + keep.n)) : null;
+    const sc = el && el.closest('.screen-scroll');
+    if (!keep || !el || !sc) return;
+    const drift = el.getBoundingClientRect().top - keep.top;
+    // the reader's own tap, one instant write (the class of the landing's scroll): the verse holds its place
+    if (Math.abs(drift) >= 1 && typeof sc.scrollTo === 'function') sc.scrollTo({ top: Math.max(0, sc.scrollTop + drift), behavior: /** @type {ScrollBehavior} */ ('instant') });
+  }, [translation]);
   /* "Book · Chapter N" is what the narrator announces before verse 1: the
      read-along's lead-in sits there (ReadAlongHighlight, 2026-09-22). */
   // The verse-number key builder read-along paints through. useCallback is NOT
@@ -86,6 +117,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
     if (!surpriseAnchor || surpriseAnchor.type !== "verse") return;
     const vs = surpriseAnchor.verses;
     setHighlightedVerses(vs);
+    // idea A: the edition the search found the verse in, for this visit of this chapter
+    setVisit(surpriseAnchor.edition ? { key: chapterKeyRef.current, ed: surpriseAnchor.edition, verse: vs[0] } : null);
     const timer = setTimeout(() => {
       const el = document.getElementById(`v-${vs[0]}`);
       if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
@@ -99,7 +132,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   }, [surpriseAnchor]);
   // v01-02: a landing belongs to the chapter it landed in, even on a way of moving
   // that leaves the anchor set.
-  React.useEffect(() => () => setHighlightedVerses([]), [book.id, chapter.num]);
+  React.useEffect(() => () => { setHighlightedVerses([]); setVisit(null); }, [book.id, chapter.num]);
   const prevCh = book.chapters.find((c) => c.num === chapter.num - 1);
   const nextCh = book.chapters.find((c) => c.num === chapter.num + 1);
   const goPrevCh = () => prevCh ? onNavigate(prevCh.num) : onPrevBook && onPrevBook();
@@ -202,7 +235,17 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         onSettings, onHistory, onSearch, theme, onThemeChange,
       })}
     >
-      <BackHintPill backHint={backHint} onClick={onTapThroughBack} />
+      {(() => {
+        // idea A's row hangs in the "Back to" band, under the pill: the band's own hairline is the one below it
+        const visitRow = visitShown ? (
+          <div className="visit-ed-row">
+            <span className="visit-ed-note">Shown in {translationLabel(visitEdition)}, as you searched</span>
+            <button type="button" className="visit-ed-btn" onClick={readOwnEdition}>Read in {translationLabel(readerTranslation)}</button>
+          </div>
+        ) : null;
+        if (!backHint) return visitRow ? <div className="back-hint-row visit-ed-solo">{visitRow}</div> : null;
+        return <BackHintPill backHint={backHint} onClick={onTapThroughBack}>{visitRow}</BackHintPill>;
+      })()}
       {(() => {
         const titleEffective = showChapterTitle && !titleFocusHidden;
         const canFocusTitle = showChapterTitle && displayChapterTitle;

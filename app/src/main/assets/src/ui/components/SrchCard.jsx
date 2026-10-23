@@ -2,7 +2,8 @@
    SrchCard — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { translationLabel } from '../../data/translations.js';
+import { translationLabel, translateVerse, loadTranslation, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
+import { kjvVisitEdition } from '../../utils/kjv-visit.js';
 import { recall, remember, docKey } from './srch-memory.js';
 import { formsToMark } from '../../utils/marked-forms.js';
 import { snippetText, markSpans } from './SrchSnippet.jsx';
@@ -87,12 +88,36 @@ export function cardPassage(entry, terms, stopTyped) {
   return snippetText(sm, body, cardTerms(entry, terms, stopTyped), titled ? undefined : cardPlaceStart(entry, doc), 180) || '';
 }
 
+/**
+ * A verse its KJV wording found (the engine's kjvWording, search200 idea A) quotes the KJV words it matched: the
+ * edition is fetched and held while the card shows (data/translations.js), and the card reads its own words until
+ * the text is in memory. Null for any other card.
+ * @param {any} entry
+ * @returns {{ edition: string, text: string } | null}
+ */
+function useKjvWording(entry) {
+  const doc = entry && entry.doc;
+  const edition = doc && doc.kind === 'verse' && entry.kjvWording && doc.bookId !== 'matthew' ? kjvVisitEdition(doc.translation) : null;
+  const [, setTick] = React.useState(0);
+  React.useEffect(() => {
+    if (!edition) return undefined;
+    let live = true;
+    const letGo = holdTranslation(edition);
+    if (!isTranslationLoaded(edition)) loadTranslation(edition).then(() => { if (live) setTick((t) => t + 1); });
+    return () => { live = false; letGo(); };
+  }, [edition]);
+  if (!edition || !isTranslationLoaded(edition)) return null;
+  const text = translateVerse(doc.bookId, doc.chapterNum, { n: doc.verseNum, text: doc.text }, edition);
+  return text && text !== doc.text ? { edition, text } : null;
+}
+
 /* `also`: the reprints Best Matches folded under this card (search200 UX B10 2), offered in an
    "Also in N places" row after the snippet, each its own tap. `why`: one quiet line under the
    snippet saying how a card that holds no typed word matched ("by meaning", search200 ideas E/G). */
 export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined, why = '' }) {
   const doc = (!isDirect && entry && entry.doc) || null;
   const hlTerms = cardTerms(entry, terms, stopTyped);
+  const kjv = useKjvWording(doc ? entry : null);
   // Every OTHER place this unit says the words (Brianna, 2026-09-26): a letter's
   // snippet shows one passage, and the passage she was looking for sat three
   // hits further down the same letter with nothing to say it was there.
@@ -138,7 +163,9 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   }
   const meta = SRCH_KIND_LABEL[doc.kind] || { label: doc.kind, cls: '' };
   const { named, headline, locLine } = cardHeads(doc);
-  const { titled, body } = cardBody(doc);
+  const own = cardBody(doc);
+  const titled = own.titled;
+  const body = kjv ? kjv.text : own.body;
   // A title marks the typed words it holds (search200 B6): a letter found by its title, whose
   // body never says them, showed no mark anywhere. A reference ("Psalms 23:1") is a place, unmarked.
   const smHead = /** @type {any} */ (window).VotSearchMini;
@@ -153,7 +180,8 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
             TRANSLATION_OPTIONS registry ('NKJV-R') — the same label the rest
             of the app shows. Never render the raw id uppercased ('RNKJV');
             translationLabel falls back to the NKJV default for unknown ids. */}
-        {doc.translation && doc.translation !== 'nkjv' && <span className="srch-card-badge">{translationLabel(doc.translation)}</span>}
+        {kjv ? <span className="srch-card-badge">{translationLabel(kjv.edition)}</span>
+          : doc.translation && doc.translation !== 'nkjv' && <span className="srch-card-badge">{translationLabel(doc.translation)}</span>}
         {doc.heading && doc.kind === 'verse' && <span className="srch-card-badge badge-heading">{doc.heading.length > 28 ? doc.heading.slice(0, 28) + '…' : doc.heading}</span>}
       </div>
       {locLine && <div className="srch-card-loc">{locLine}</div>}

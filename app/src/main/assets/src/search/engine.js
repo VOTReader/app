@@ -3961,6 +3961,15 @@ async function searchWords(query, options) {
     }
   }
 
+  /* A VERSE ITS KJV WORDING FOUND SAYS SO (search200 idea A, 2026-10-22): its card shows the KJV words it matched,
+     and the reader opens it in the KJV for the visit. Only where that wording stood for it (ownShare: it scored better
+     than the verse's own), never on a text that is not a verse. Ranking reads nothing of it. */
+  if (readInKjv) {
+    for (const e of out) {
+      if (e.doc.kind === 'verse' && /** @type {string} */ (idOf.get(e)) in ownShare) /** @type {any} */ (e).kjvWording = true;
+    }
+  }
+
   /* A QUOTED PHRASE NOTHING HOLDS IS SEARCHED AS ITS WORDS (search audit 2026-09-27).
      A quote remembered one word off ("the earth shall grow old like a garment", where
      the letter says "will") showed "No results" with the letter a word away; the

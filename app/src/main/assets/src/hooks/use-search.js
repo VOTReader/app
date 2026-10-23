@@ -191,6 +191,7 @@ import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_INDEX_SC, COL_BY_LETTER_SC, COL_BY_SEARCH_ID, colLetterArr, colPreface } from '../data/scripture-resolution.js';
 import { readingPlaceKey } from '../utils/search-visit.js';
 import { formsToMark } from '../utils/marked-forms.js';
+import { kjvVisitEdition } from '../utils/kjv-visit.js';
 
 /**
  * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
@@ -544,7 +545,10 @@ export function useSearch({
       setBookId(doc.bookId);
       setChapterNum(doc.chapterNum);
       if (doc.verseNum) {
-        setSurpriseAnchor({ type: 'verse', verses: [doc.verseNum] });
+        // `edition` (search200 idea A): a verse its KJV wording found opens in the KJV for this visit (BibleChapterView);
+        // the Matthew Study Bible reads one edition.
+        const edition = entry.kjvWording && doc.bookId !== 'matthew' ? kjvVisitEdition(doc.translation) : null;
+        setSurpriseAnchor(edition ? { type: 'verse', verses: [doc.verseNum], edition } : { type: 'verse', verses: [doc.verseNum] });
       } else {
         setSurpriseAnchor(null);
       }

@@ -589,6 +589,20 @@ describe('useSearch — handleSearchSelect (Orama doc results)', () => {
     expect(props.setScreen).toHaveBeenCalledWith('bible-ch');
   });
 
+  /* search200 idea A (2026-10-22): a verse its KJV wording found (the engine's kjvWording) opens in the KJV for the
+     visit: the anchor names the edition. Not for a KJV reader, and not in the Matthew Study Bible (one edition). */
+  it('a verse its KJV wording found opens in the KJV: the anchor names the edition', () => {
+    const { result, props } = setup();
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'exodus', chapterNum: 20, verseNum: 13, translation: 'nkjv' }, kjvWording: true }); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'verse', verses: [13], edition: 'kjv' });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'exodus', chapterNum: 20, verseNum: 13, translation: 'kjv' }, kjvWording: true }); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'verse', verses: [13] });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'matthew', chapterNum: 5, verseNum: 3 }, kjvWording: true }); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'verse', verses: [3] });
+    act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'exodus', chapterNum: 20, verseNum: 13 } }); });
+    expect(props.setSurpriseAnchor).toHaveBeenLastCalledWith({ type: 'verse', verses: [13] });
+  });
+
   it('routes matthew verse doc to matthew-ch (study mode)', () => {
     const { result, props } = setup();
     act(() => { result.current.handleSearchSelect({ doc: { kind: 'verse', bookId: 'matthew', chapterNum: 5, verseNum: 1 } }); });

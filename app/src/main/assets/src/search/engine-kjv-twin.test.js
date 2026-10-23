@@ -139,6 +139,22 @@ describe('every verse in its KJV wording too, in the engine', () => {
     expect(E.getState().kjv).toBe('failed');
   });
 
+  /* search200 idea A (2026-10-22): a verse its KJV wording found says so on its result (kjvWording), so its card
+     shows the KJV words it matched and the reader opens that verse in the KJV for the visit. Only when that wording
+     stood for it: a verse its own edition found as well, or better, is no KJV find. */
+  it('a verse its KJV wording found carries kjvWording; one its own wording found does not', async () => {
+    const of = (/** @type {any} */ r, /** @type {string} */ ref) => r.results.find((/** @type {any} */ x) => x.doc.ref === ref);
+    const q = 'the candle of the sentinel burneth upon the rampart';
+    expect(of(await E.search(q), 'Proverbs 2:1') || {}).not.toHaveProperty('kjvWording');
+    E.setKjvTwin(TWIN);
+    expect(of(await E.search(q), 'Proverbs 2:1').kjvWording).toBe(true);
+    expect(of(await E.search('dayspring'), 'Proverbs 2:2').kjvWording).toBe(true);
+    // its own edition's score stands (the KJV verse is longer): no KJV find
+    expect(of(await E.search('steward door'), 'Proverbs 2:3')).not.toHaveProperty('kjvWording');
+    // never on a text that is not a verse
+    for (const x of (await E.search(q)).results) if (x.doc.kind !== 'verse') expect(x).not.toHaveProperty('kjvWording');
+  });
+
   it('the app names a file: read beside the index, and the verse leads once it is in', async () => {
     const fetch = vi.fn(async () => ({ ok: true, redirected: false, status: 200, json: async () => encodeKjvTwin({ proverbs: { 1: FILL.map((text, i) => ({ n: i + 1, text })), 2: KJV.map((text, i) => ({ n: i + 1, text })) } }, 'fixture') }));
     vi.stubGlobal('fetch', fetch);
