@@ -363,78 +363,114 @@ describe('Download all, beside Play all', () => {
   });
 });
 
-describe('On this phone (the shelf)', () => {
-  it('lists every download with its size, plays one, removes one, and asks before removing all', () => {
+describe('On this phone (the shelf, pictures 11-13)', () => {
+  beforeEach(() => { globalThis.COLLECTIONS = [{ volKey: 'one', label: 'Volume One' }, { volKey: 'two', label: 'Volume Two' }]; });
+  afterEach(() => { delete globalThis.COLLECTIONS; delete globalThis.BIBLE_AUDIO_EDITIONS; delete globalThis.BIBLE_AUDIO_BOOKS; });
+
+  it('groups downloads like the tree, plays one, and asks before removing all', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
     save(s, 'b', 12_000_000, 'Matthew 1');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(container.querySelector('h1').textContent).toBe('Downloads');
     expect(getByRole('tab', { name: 'On this phone' }).getAttribute('aria-selected')).toBe('true');
-    expect(container.textContent).toMatch(/2 recordings · 30 MB/);
-    const rows = container.querySelectorAll('.audio-offline-item');
-    expect([...rows].map((r) => r.querySelector('strong').textContent)).toEqual(['Matthew 1', 'I Am The Passover']);
+    expect(container.querySelector('.dl-storage-line').textContent).toBe('Recordings 30 MB · 5 GB free on this phone');
+    expect(container.querySelector('.dl-shelf-kicker').textContent).toBe('The Volumes of Truth');
+    const head = container.querySelector('.dl-shelf-head');
+    expect(head.textContent).toMatch(/Volume One2 recordings · 30 MB/);
+    expect([...container.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['I Am The Passover', 'Matthew 1']);
     fireEvent.click(getByRole('button', { name: /^play i am the passover/i }));
     expect(globalThis.AudioPlayer.playTrack).toHaveBeenCalledWith(expect.objectContaining({ url: U('a'), key: 'one:a', title: 'I Am The Passover' }));
-    fireEvent.click(getByRole('button', { name: /^remove all/i }));
+    fireEvent.click(getByRole('button', { name: 'Remove all downloads' }));
     expect(s.removeAll).not.toHaveBeenCalled();
-    expect(container.textContent).toMatch(/Remove all 2 recordings \(30 MB\) from this phone\?/);
-    fireEvent.click(getByRole('button', { name: /^yes, remove all/i }));
+    const sheet = getByRole('dialog');
+    expect(sheet.textContent).toMatch(/Remove all downloads from this phone\?/);
+    expect(sheet.textContent).toMatch(/2 recordings · 30 MB\. You can download them again any time\./);
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Remove' }));
     expect(s.removeAll).toHaveBeenCalledTimes(1);
   });
 
   // Downloads brief section 7 item 14: a single Remove had no Undo. The row steps aside at once; the file goes when the
   // toast does, so Undo keeps the very file.
-  it('a single Remove can be taken back for 5 s, and the file goes only when that time is up', () => {
+  it('a single × can be taken back for 5 s, and the file goes only when that time is up', () => {
     vi.useFakeTimers();
     try {
       const s = fakeStore();
       save(s, 'a', 18_000_000, 'I Am The Passover');
       save(s, 'b', 12_000_000, 'Matthew 1');
-      const { container, getAllByRole, queryAllByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-      fireEvent.click(getAllByRole('button', { name: /^remove matthew 1/i })[0]);
+      const { container, getByRole, queryAllByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      fireEvent.click(getByRole('button', { name: /^remove matthew 1 from this phone/i }));
       expect(queryAllByRole('button', { name: /^remove matthew 1/i })).toHaveLength(0);
       const toast = document.getElementById('vot-toast-offline-removed');
-      expect(toast.textContent).toBe('Removed “Matthew 1”Undo');
+      expect(toast.textContent).toBe('Removed Matthew 1 · 12 MBUndo');
       expect(s.remove).not.toHaveBeenCalled();
       act(() => { toast.querySelector('.vot-undo-btn').click(); });
       expect(s.remove).not.toHaveBeenCalled();
-      expect(container.querySelectorAll('.audio-offline-item')).toHaveLength(2);
-      fireEvent.click(getAllByRole('button', { name: /^remove matthew 1/i })[0]);
+      expect(container.querySelectorAll('.dl-shelf-row')).toHaveLength(2);
+      fireEvent.click(getByRole('button', { name: /^remove matthew 1 from this phone/i }));
       act(() => { vi.advanceTimersByTime(5100); });
       expect(s.remove).toHaveBeenCalledWith([U('b')]);
     } finally { vi.useRealTimers(); }
   });
 
-  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own Remove is the whole job.
+  it('a letter in parts is one row, and its × takes every part', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fakeStore();
+      s.st.saved.set(U('x1'), { url: U('x1'), key: 'one:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 1 });
+      s.st.saved.set(U('x2'), { url: U('x2'), key: 'one:x', title: 'Christmas · Part 2', bytes: 6e6, savedAt: 2 });
+      const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      expect([...container.querySelectorAll('.dl-shelf-row')].map((r) => r.textContent)).toEqual(['Christmas11 MB']);
+      fireEvent.click(getByRole('button', { name: /^remove christmas from this phone/i }));
+      act(() => { vi.advanceTimersByTime(5100); });
+      expect(s.remove).toHaveBeenCalledWith([U('x1'), U('x2')]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own × is the whole job.
   it('a shelf of one offers no Remove all', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
     const { container, queryByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.querySelectorAll('.audio-offline-item')).toHaveLength(1);
+    expect(container.querySelectorAll('.dl-shelf-row')).toHaveLength(1);
     expect(getByRole('button', { name: /^remove i am the passover/i })).toBeTruthy();
-    expect(queryByRole('button', { name: /^remove all/i })).toBeNull();
+    expect(queryByRole('button', { name: 'Remove all downloads' })).toBeNull();
   });
 
-  it('groups a Bible book by edition, chapters in their order, and removes the book after asking (n2-04)', () => {
+  it('a Bible book sits under its edition, chapters in order, and its ⋯ removes it after asking (n2-04, picture 12)', () => {
     const s = fakeStore();
     globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
+    globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis']];
     const ch = (n, at) => s.st.saved.set(U('gen' + n), { url: U('gen' + n), key: 'bible-brm-kjv:genesis', title: 'Genesis · Chapter ' + n, bytes: 1_000_000, savedAt: at });
     ch(10, 1); ch(2, 3); ch(1, 2);
-    save(s, 'a', 18_000_000, 'I Am The Passover');   // added last: its group comes first
+    save(s, 'a', 18_000_000, 'I Am The Passover');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    const groups = container.querySelectorAll('.audio-offline-item');
-    expect(groups).toHaveLength(2);
-    const book = groups[1];
-    expect(book.querySelector('.audio-offline-group-head strong').textContent).toBe('Genesis · KJV · BRM');
-    expect(book.textContent).toMatch(/3 recordings · 3 MB/);
-    const rows = [...book.querySelectorAll('.audio-library-row:not(.audio-offline-group-head) strong')].map((x) => x.textContent);
-    expect(rows).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
-    fireEvent.click(getByRole('button', { name: /^remove genesis · kjv · brm, 3 recordings/i }));
+    expect([...container.querySelectorAll('.dl-shelf-kicker')].map((k) => k.textContent)).toEqual(['The Volumes of Truth', 'The Bible · KJV · BRM']);
+    fireEvent.click(getByRole('button', { name: /^Genesis3 chapters · 3 MB/ }));
+    const book = container.querySelectorAll('.dl-shelf-branch')[1];
+    expect([...book.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
+    fireEvent.click(getByRole('button', { name: 'More for Genesis' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Remove · 3 MB' }));
     expect(s.remove).not.toHaveBeenCalled();
-    fireEvent.click(getByRole('button', { name: /^yes, remove$/i }));
+    const sheet = getByRole('dialog');
+    expect(sheet.textContent).toMatch(/Remove Genesis from this phone\?/);
+    expect(sheet.textContent).toMatch(/3 chapters · 3 MB/);
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Remove' }));
     expect(s.remove).toHaveBeenCalledWith([U('gen1'), U('gen2'), U('gen10')]);
-    delete globalThis.BIBLE_AUDIO_EDITIONS;
+  });
+
+  it('sorts by size, and a group\'s Choose more opens the tree', () => {
+    const s = fakeStore();
+    s.st.saved.set(U('t'), { url: U('t'), key: 'two:t', title: 'Big one', bytes: 90e6, savedAt: 1 });
+    save(s, 'a', 18_000_000, 'Small one');
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const heads = () => [...container.querySelectorAll('.dl-shelf-head strong')].map((x) => x.textContent);
+    expect(heads()).toEqual(['Volume One', 'Volume Two']);
+    fireEvent.change(container.querySelector('.dl-sort select'), { target: { value: 'size' } });
+    expect(heads()).toEqual(['Volume Two', 'Volume One']);
+    fireEvent.click(getByRole('button', { name: 'More for Volume Two' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Choose more…' }));
+    expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('groupShelf keeps a download with no key on its own, and a letter\'s parts together', () => {

@@ -70,7 +70,6 @@
     "bibleEditionCoverage": "read as a free global by AudioLibraryScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
     "renditionRemainingLabel": "read as a free global by AudioCollectionScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
     "trackSearchText": "read as a free global by AudioSavedScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
-    "PlayIcon": "read as a free global by AudioOfflineScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
     "SongKeep": "read as a free global by AudioSongsScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
     "songLetterOf": "read as a free global by AudioSongsScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
     "playerIsActive": "read as a free global by AudioSongsScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",

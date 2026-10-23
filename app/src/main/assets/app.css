@@ -1705,6 +1705,39 @@
       .dl-sheet-summary { margin:.8rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
       .dl-sheet-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
       .dl-sheet-actions > button { flex:1 1 9em; min-height:48px; font-family:inherit; font-size:var(--fs-16); }
+      /* On this phone (pictures 11-13): the storage bar, sections like the tree, a × per recording, ⋯ per group. */
+      .dl-storage { margin:.9rem 0 .2rem; }
+      .dl-storage-bar { display:flex; height:14px; border-radius:7px; background:var(--gold-faint); border:1px solid var(--gold-border); overflow:hidden; }
+      .dl-storage-rec { background:var(--gold); }
+      .dl-storage-songs { background:var(--gold-dim); border-left:2px solid var(--bg); }
+      .dl-storage-line { margin:.45rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-sort { display:flex; justify-content:flex-end; margin:.2rem 0 0; }
+      .dl-sort select { min-height:44px; max-width:100%; padding:.2rem .4rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); text-align:right; }
+      .dl-sort select option { background:var(--bg); color:var(--cream); }
+      .dl-shelf-section { margin:.6rem 0 0; }
+      .dl-shelf-kicker { margin:.8rem 0 .1rem; color:var(--gold); font-family:'Cinzel',serif; font-weight:400; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
+      .dl-shelf-branch { border-bottom:1px solid var(--gold-border); }
+      .dl-shelf-head { display:flex; align-items:flex-start; gap:.5rem; }
+      .dl-shelf-mark { flex:0 0 auto; width:26px; height:26px; margin-top:.85rem; fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-icon-btn { flex:0 0 48px; width:48px; height:48px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; color:var(--gold); cursor:pointer; }
+      .dl-shelf-head .dl-icon-btn { margin-top:.4rem; }
+      .dl-icon-btn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+      .dl-icon-btn svg circle { fill:currentColor; stroke:none; }
+      .dl-icon-btn:focus-visible, .dl-shelf-play:focus-visible, .dl-remove-all:focus-visible, .dl-menu-item:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .dl-shelf-rows { padding:0 0 .4rem calc(26px + .5rem); }
+      .dl-shelf-row { display:flex; align-items:center; gap:.4rem; min-height:52px; border-top:1px solid var(--gold-faint); }
+      .dl-shelf-play { flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.1rem .8rem; padding:.5rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .dl-shelf-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
+      .dl-shelf-size { flex:0 0 auto; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-shelf-more { margin:.1rem 0 .3rem; }
+      .dl-remove-all { display:block; min-height:48px; margin:1.2rem auto .4rem; padding:.3rem 1rem; border:0; background:none; color:var(--dl-brick); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+      .dl-remove-line { display:flex; align-items:flex-start; gap:.6rem; text-align:left; color:var(--cream-dim); }
+      .dl-remove-line .offline-icon { flex:0 0 auto; width:24px; height:24px; color:var(--dl-brick); }
+      .dl-sheet-actions .dl-remove-go { background:var(--dl-brick); border-color:var(--dl-brick); color:#17130a; }
+      body.light .dl-sheet-actions .dl-remove-go { color:#fff; }
+      .dl-menu { display:flex; flex-direction:column; margin:.6rem 0 0; }
+      .dl-menu-item { min-height:52px; padding:.4rem .2rem; border:0; border-bottom:1px solid var(--gold-border); background:none; color:var(--cream); font:inherit; font-size:var(--fs-18); text-align:left; cursor:pointer; }
+      .dl-menu-item.is-remove { color:var(--dl-brick); border-bottom:0; }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }

@@ -249,15 +249,15 @@ function ChapterGrid({ book, wanted, setWanted, off }) {
   );
 }
 
-function TrashIcon() {
+export function TrashIcon() {
   return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14" /><path d="M9 7V5h6v2" /><path d="M7 7l1 12h8l1-12" /><path d="M10.5 10.5v5.5" /><path d="M13.5 10.5v5.5" /></svg>;
 }
 
 /**
- * A bottom sheet in the app's select-sheet grammar.
+ * A bottom sheet in the app's select-sheet grammar (both Downloads tabs).
  * @param {{ id: string, title: string, onClose: () => void, children: any }} props
  */
-function Sheet({ id, title, onClose, children }) {
+export function Sheet({ id, title, onClose, children }) {
   useModalRegistry({ id, dismiss: onClose, active: true });
   const trapRef = useFocusTrap(true);
   return (
