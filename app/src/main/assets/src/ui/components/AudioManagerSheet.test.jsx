@@ -1107,26 +1107,76 @@ describe('AudioManagerSheet — the queue window follows playback', () => {
   }
   beforeEach(() => { globalThis.AUDIO_MANIFEST = BIG_MANIFEST; });
 
-  it('re-centres on the new recording when the queue advances under an open desk', () => {
+  /* jsdom lays nothing out, so the follow rule's boxes are stated: the desk shows y 100-800, the playing row sits
+     below it at 1200, and Play/Pause is wherever the reader has scrolled it. */
+  const layDesk = ({ transportTop }) => vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function () {
+    const box = (top, height) => ({ top, bottom: top + height, height, left: 0, right: 360, width: 360, x: 0, y: top, toJSON() {} });
+    if (this.classList.contains('audio-manager-sheet')) return box(100, 700);
+    if (this.classList.contains('audio-manager-transport')) return box(transportTop, 60);
+    if (this.matches('.audio-manager-queue li.is-current')) return box(1200, 54);
+    return box(0, 0);
+  });
+  const currentTitle = () => document.querySelector('.audio-manager-queue li.is-current .audio-manager-queue-main strong').textContent;
+
+  it('follows the new recording when the queue advances under a desk scrolled down to the queue', () => {
     const scrollIntoView = vi.fn();
     Element.prototype.scrollIntoView = scrollIntoView;
+    const rects = layDesk({ transportTop: -300 });   // the reader scrolled to the queue: Play/Pause is above the fold
     try {
       drive(() => AudioPlayer.playCollection({ volKey: 'big', items: BIG_ITEMS, collectionLabel: 'Big' }));
       drive(() => AudioPlayer.playAt(100));
       openSheet();
-      expect(scrollIntoView).not.toHaveBeenCalled();     // the open itself scrolls nothing (2026-09-13)
+      expect(sheetEl().scrollTop).toBe(0);     // the open itself scrolls nothing (2026-09-13)
 
       // An auto-advance with the desk OPEN: the window and the centring both
       // have to follow, or the playing chapter drifts out of view entirely.
       emit('ended');
       expect(AudioPlayer.getState().qi).toBe(101);
-      expect(scrollIntoView).toHaveBeenCalledTimes(1);
-      expect(scrollIntoView.mock.calls[0][0]).toEqual({ block: 'center' });
-      expect(scrollIntoView.mock.instances[0]).toBe(document.querySelector('.audio-manager-queue li.is-current'));
-      expect(document.querySelector('.audio-manager-queue li.is-current .audio-manager-queue-main strong').textContent)
-        .toBe('Track 102');
+      expect(currentTitle()).toBe('Track 102');
+      // Centred by moving the desk alone (the row's middle 1227 onto the desk's 450): scrollIntoView would also
+      // scroll every scroller behind the desk.
+      expect(sheetEl().scrollTop).toBe(777);
+      expect(scrollIntoView).not.toHaveBeenCalled();
     } finally {
+      rects.mockRestore();
       delete Element.prototype.scrollIntoView;
+    }
+  });
+
+  /* U04.3 (UX sweep 2026-10-22): Next in the desk centred the new row, which scrolled the title and Play/Pause off
+     the screen under the finger that had just pressed Next. */
+  it('keeps the desk still on a Next from its own transport: the title and Play/Pause stay on screen (U04.3)', () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const rects = layDesk({ transportTop: 420 });   // Play/Pause on screen
+    try {
+      drive(() => AudioPlayer.playCollection({ volKey: 'big', items: BIG_ITEMS, collectionLabel: 'Big' }));
+      drive(() => AudioPlayer.playAt(100));
+      openSheet();
+      fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+      expect(AudioPlayer.getState().qi).toBe(101);
+      expect(currentTitle()).toBe('Track 102');
+      fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
+      expect(AudioPlayer.getState().qi).toBe(100);
+      expect(sheetEl().scrollTop).toBe(0);
+      expect(scrollIntoView).not.toHaveBeenCalled();
+    } finally {
+      rects.mockRestore();
+      delete Element.prototype.scrollIntoView;
+    }
+  });
+
+  it('keeps the desk still when the advance happens with Play/Pause on screen', () => {
+    const rects = layDesk({ transportTop: 420 });
+    try {
+      drive(() => AudioPlayer.playCollection({ volKey: 'big', items: BIG_ITEMS, collectionLabel: 'Big' }));
+      drive(() => AudioPlayer.playAt(100));
+      openSheet();
+      emit('ended');
+      expect(AudioPlayer.getState().qi).toBe(101);
+      expect(sheetEl().scrollTop).toBe(0);
+    } finally {
+      rects.mockRestore();
     }
   });
 
