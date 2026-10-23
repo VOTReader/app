@@ -30,6 +30,7 @@ for (const f of fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) f
 
 const D = await buildDocs('nkjv');
 const ALL = D.map((d) => norm(d.text + ' ' + (d.title || ''))).join('\u0001');
+// eslint-disable-next-line no-control-regex -- \u0001 is the document separator
 const vocab = new Set(ALL.split(/[\s\u0001]+/));
 const unitsOf = (phrase) => { const n = norm(phrase); const out = new Set(); let p = ALL.indexOf(n); while (p >= 0 && out.size < 50) { out.add(ALL.lastIndexOf('\u0001', p)); p = ALL.indexOf(n, p + 1); } return out; };
 const toks = (s) => norm(s).trim().split(' ').filter(Boolean);

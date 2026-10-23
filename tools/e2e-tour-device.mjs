@@ -11,7 +11,7 @@
  *
  * usage: node tools/e2e-tour-device.mjs --out <dir> [--scale 1.8] [--serial emulator-5554] [--grant-notifications]
  */
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -60,7 +60,7 @@ async function connect() {
   let pid = '';
   try { pid = sh('pidof', PKG); } catch (_e) { /* no process */ }
   if (!pid) throw new Error('app not running');
-  try { adb('forward', '--remove', `tcp:${PORT}`); } catch (_e) {}
+  try { adb('forward', '--remove', `tcp:${PORT}`); } catch (_e) { /* no forward to remove */ }
   adb('forward', `tcp:${PORT}`, `localabstract:webview_devtools_remote_${pid}`);
   for (let i = 0; i < 60; i++) {
     try {
@@ -72,7 +72,7 @@ async function connect() {
         const page = new Page(ws); page._url = t.url;
         return { browser: { disconnect: () => ws.close() }, page };
       }
-    } catch (_e) {}
+    } catch (_e) { /* devtools not up yet: retry */ }
     await sleep(500);
   }
   throw new Error('no app page');
@@ -259,7 +259,6 @@ async function setScale() {
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
 
   const expected = ['welcome', 'letters', 'listen', 'highlight', 'bible', 'journal', 'backup', 'done'];
-  let lastTitle = null;
   for (let i = 0; i < expected.length; i++) {
     const id = expected[i];
     // Settle: the title has changed AND the ring/card rects read the same twice 500 ms apart.
@@ -272,7 +271,6 @@ async function setScale() {
       if (f.active && f.step === id && sig === prev && (f.ring || i === 0 || i === expected.length - 1)) break;
       prev = sig;
     }
-    lastTitle = f.title;
     if (!f.active) { fail(`${id}: no card`); break; }
     say(`  stop ${i} ${id}: "${(f.title || '').trim()}" · primary ${f.primary} · ring ${f.ring ? Math.round(f.ring.w) + 'x' + Math.round(f.ring.h) : 'none'} · card ${Math.round(f.card.w)}x${Math.round(f.card.h)} @y${Math.round(f.card.y)}`);
     if (f.player) say(`  note ${id}: mini player is up`);
@@ -392,7 +390,7 @@ async function setScale() {
 
   say(failed ? `device-tour FAIL (${failed})` : 'device-tour PASS');
   writeFileSync(join(OUT, `${tag}-log.txt`), log.join('\n') + '\n');
-  try { adb('forward', '--remove', `tcp:${PORT}`); } catch (_e) {}
+  try { adb('forward', '--remove', `tcp:${PORT}`); } catch (_e) { /* already gone */ }
   browser.disconnect();
   process.exit(failed ? 1 : 0);
 })().catch((e) => { say('ERROR ' + (e && e.stack || e)); writeFileSync(join(OUT, 'error-log.txt'), log.join('\n') + '\n'); process.exit(2); });

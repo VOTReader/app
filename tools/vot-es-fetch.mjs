@@ -52,7 +52,7 @@ async function scrape(page, url) {
       document.body;
 
     const paragraphs = [...article.querySelectorAll('p, h1, h2, h3, blockquote, li')]
-      .map((n) => n.innerText.replace(/ /g, ' ').trim())
+      .map((n) => n.innerText.replace(/\u00a0/g, ' ').trim())
       .filter(Boolean);
 
     const title =

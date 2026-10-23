@@ -274,7 +274,7 @@ describe('the detector isolates its storage instead of deleting it', () => {
       /waitForScreen\(\s*'([^']*)'\s*,\s*HAS_TEXT\s*,\s*'((?:[^'\\]|\\.)*)'\s*\)|clickText\(\s*\/((?:[^/\\\n]|\\.)+)\/\s*\)/g,
     )) {
       if (m[3] === undefined) {
-        // eslint-disable-next-line no-new-func -- the text is read from our own
+        // new Function: the text is read from our own
         // source file, and evaluating it as a JS string literal is the only way
         // to reproduce what the running harness builds its RegExp from.
         pending = { label: m[1], wait: new RegExp(new Function(`return '${m[2]}';`)()).source };

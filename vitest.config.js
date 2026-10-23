@@ -1,16 +1,14 @@
 /* Vitest config (Q5.1).
    ─────────────────────
-   Test runner for the typed Q4 surfaces (hooks + stores + utils).
-   Q5.1 is infrastructure-only: config + setup + ONE trivial useRefMirror
-   test that proves the harness works. Real test coverage starts in Q5.2+
-   (_validateTabState first per the pinned priority).
+   Test runner for the app's JS (hooks, stores, utils, UI) and tools/.
 
    - environment: jsdom (window, localStorage, document available)
    - setupFiles: vitest.setup.js (React-as-global + window.__* stubs)
    - include: any *.test.js / *.test.jsx alongside source files
 
-   Coverage gate is NOT set yet — Q5.2 (first real test) locks the
-   initial value per the regression-gate principle. See PLAN.txt. */
+   Coverage gates are set: aggregate floors plus per-file floors for the hot
+   files, in coverage.thresholds below. `npm run test:coverage` (the
+   pre-commit hook) enforces them; ratchet up, never down. */
 
 import { defineConfig, configDefaults } from 'vitest/config';
 import { readFileSync } from 'node:fs';

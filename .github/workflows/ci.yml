@@ -109,7 +109,7 @@ jobs:
       - name: Lint (0 errors + 0 warnings hard gate)
         # `npm run lint` chains `npm run lint:globals` (regenerates the
         # auto-globals list + the parallel TS ambient .d.ts) and
-        # `eslint app/src/main/assets/src`. ESLint exits nonzero on ANY
+        # `eslint app/src/main/assets/src app/src/main/assets/service-worker.js tools`. ESLint exits nonzero on ANY
         # error, and --max-warnings 0 means any new warning fails CI.
         # This is the permanent steady state after Q3.3e closed all 59
         # exhaustive-deps warnings (every remaining exception is a

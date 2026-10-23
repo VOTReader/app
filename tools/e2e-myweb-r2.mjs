@@ -416,7 +416,7 @@ async function armC(page, tag, fname, c, r0, f) {
     note(`${tag} C ${which} rail, ${NOTCHES} notches at ${label}: largest per-notch endpoint displacement ${maxDisp.toFixed(1)} CSS px (notch ${at}); drawn at every notch: ${nulls === 0 ? 'yes' : 'NO (' + nulls + ' null)'}; flattest on-screen run ${(flattest * 100).toFixed(1)} % of the width (notch ${flatAt}, gate <= ${(FLAT_SHARE * 100).toFixed(1)} %); class changes ${classChanges} (information: ${[...new Set(rows.map((x) => x.cls))].join(' / ')}); endpoints notch 0 -> ${NOTCHES}: bottom x ${rows[0].ax} -> ${prev.ax}, top x ${rows[0].bx} -> ${prev.bx}; cameras now Bible ${(p.b / rows[0].r.cam.ppv * f.dpr).toFixed(1)}x Volumes ${(p.v / rows[0].r.camV.ppv * f.dpr).toFixed(1)}x`);
     if (nulls) fails.push(`${tag} C ${which}: the thread vanished at ${nulls} notches`);
     if (flattest > FLAT_SHARE) fails.push(`${tag} C ${which}: at notch ${flatAt} an on-screen run of the thread flatter than ${FLAT_DEG.leg} deg (${FLAT_DEG.fly} for a fly-over) spans ${(flattest * 100).toFixed(1)} % of the width: the smear`);
-    if (OUT) writeFileSync(resolve(OUT, `${fname}-C-${which}.json`), JSON.stringify(rows.map(({ r, ...rest }) => rest), null, 1));
+    if (OUT) writeFileSync(resolve(OUT, `${fname}-C-${which}.json`), JSON.stringify(rows.map(({ r: _r, ...rest }) => rest), null, 1));
     return maxDisp;
   };
   await strip('top', volumeOf(found.meta));

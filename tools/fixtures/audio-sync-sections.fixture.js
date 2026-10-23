@@ -11,6 +11,7 @@
        runs to the end of the file; the middle letter's first row is the sentinel.
    Not shipped, not loaded by the app; tools/check-audio-sync.js accepts it via
    AUDIO_SYNC_SECTIONS_FILE (test_batch_align_sections.py). */
+// eslint-disable-next-line no-unused-vars -- a classic-script global, read by tools/check-audio-sync.js
 var AUDIO_SYNC_SECTIONS = {
 "1U0xmOIDAo6Q99aZMeKh-3CYVDninq62g":{
 "wtlb1:introduction":[[4.2, 0, -1, -1, 0], [5.31, 0, 30, 50, 0], [6.97, 0, 58, 91, 0], [12.66, 0, 99, 131, 0]],

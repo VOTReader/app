@@ -32,6 +32,7 @@
  *
  * Wired into `npm run build` (build:csp, BEFORE build:sw so the SW content
  * hash covers the final CSP) and the pre-commit hook (auto-restages index.html).
+ * Tests: tools/integrity-gates.test.js
  */
 
 import { readFileSync, writeFileSync } from 'fs';
@@ -40,70 +41,79 @@ import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const htmlPath = resolve(root, 'app/src/main/assets/index.html');
-const check = process.argv.includes('--check');
+const HTML_PATH = resolve(root, 'app/src/main/assets/index.html');
 
-const html = readFileSync(htmlPath, 'utf-8');
+// Returns the exit code (0 ok or rewritten, 1 stale under --check or unreadable);
+// tools/integrity-gates.test.js runs it in-process on a fixture.
+export function main(argv = process.argv.slice(2), { htmlPath = HTML_PATH, log = console.log, error = console.error } = {}) {
+  const check = argv.includes('--check');
 
-// Strip HTML comments BEFORE extracting scripts. The browser hashes only real
-// <script> ELEMENTS — never the literal text "<script>" that appears in a
-// <!-- comment --> (e.g. the CSP rationale above the meta tag mentions the
-// "inline <script>" blocks). Without this strip, the regex would match the
-// comment's <script> token and fold prose into a bogus hash. Stripping comments
-// is both correct (matches the browser) and robust to any future comment text.
-const scannable = html.replace(/<!--[\s\S]*?-->/g, '');
+  const html = readFileSync(htmlPath, 'utf-8');
 
-// Every INLINE <script> (no `src=` attribute). No real inline block contains the
-// literal `</script>` (verified), so the non-greedy match is unambiguous.
-const scriptRx = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
-const hashes = [];
-const seen = new Set();
-let m;
-while ((m = scriptRx.exec(scannable)) !== null) {
-  const content = m[1].replace(/\r/g, ''); // CR-strip → match the HTML parser
-  const digest = createHash('sha256').update(content, 'utf8').digest('base64');
-  const token = `'sha256-${digest}'`;
-  if (!seen.has(token)) { seen.add(token); hashes.push(token); }
-}
+  // Strip HTML comments BEFORE extracting scripts. The browser hashes only real
+  // <script> ELEMENTS — never the literal text "<script>" that appears in a
+  // <!-- comment --> (e.g. the CSP rationale above the meta tag mentions the
+  // "inline <script>" blocks). Without this strip, the regex would match the
+  // comment's <script> token and fold prose into a bogus hash. Stripping comments
+  // is both correct (matches the browser) and robust to any future comment text.
+  const scannable = html.replace(/<!--[\s\S]*?-->/g, '');
 
-if (hashes.length === 0) {
-  console.error('[csp-hashes] found no inline <script> blocks in index.html — aborting');
-  process.exit(1);
-}
-
-// Rebuild the directive: 'self' + the inline-script hashes. No 'unsafe-inline'
-// (the whole point) and no blob: (export uses a blob <a download> HREF, never a
-// blob script; verified no new Worker(blob)/blob <script>, FlexSearch not in
-// worker mode).
-// The one external script: Cloudflare Web Analytics' beacon (cfa1, Corbin 2026-09-26 21:3x), loaded by src, so
-// no hash; its host is named here so every re-hash keeps it.
-const SCRIPT_HOSTS = ['https://static.cloudflareinsights.com'];
-// 'wasm-unsafe-eval' lets WebAssembly compile, nothing else (JS eval stays blocked): the on-device
-// meaning search runs its model on onnxruntime-web's wasm (src/search/semantic.js, Corbin 2026-10-05 21:0x).
-const nextDirective = `script-src 'self' 'wasm-unsafe-eval' ${SCRIPT_HOSTS.join(' ')} ${hashes.join(' ')};`;
-
-// Scope the rewrite to INSIDE the CSP `content="..."` attribute so the word
-// "script-src" in the explanatory <!-- comment --> above the meta tag is never
-// touched (it has no `;`, so a document-wide regex would eat prose).
-const cspRx = /(<meta http-equiv="Content-Security-Policy" content=")([\s\S]*?)(")/;
-const cspM = html.match(cspRx);
-if (!cspM || !/script-src [^;]*;/.test(cspM[2])) {
-  console.error('[csp-hashes] could not find the script-src directive inside the CSP meta tag');
-  process.exit(1);
-}
-const next = html.replace(cspRx, (_full, open, body, close) =>
-  open + body.replace(/script-src [^;]*;/, nextDirective) + close);
-
-if (check) {
-  if (next !== html) {
-    console.error('[csp-hashes] CSP script-src is STALE — an inline <script> changed without a re-hash.');
-    console.error('  Run `npm run build` (or `node tools/sync-csp-hashes.js`) and re-stage index.html.');
-    process.exit(1);
+  // Every INLINE <script> (no `src=` attribute). No real inline block contains the
+  // literal `</script>` (verified), so the non-greedy match is unambiguous.
+  const scriptRx = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+  const hashes = [];
+  const seen = new Set();
+  let m;
+  while ((m = scriptRx.exec(scannable)) !== null) {
+    const content = m[1].replace(/\r/g, ''); // CR-strip → match the HTML parser
+    const digest = createHash('sha256').update(content, 'utf8').digest('base64');
+    const token = `'sha256-${digest}'`;
+    if (!seen.has(token)) { seen.add(token); hashes.push(token); }
   }
-  console.log(`[csp-hashes] CSP script-src matches ${hashes.length} inline-script hashes — OK.`);
-} else if (next === html) {
-  console.log(`[csp-hashes] CSP script-src already current (${hashes.length} hashes) — no change.`);
-} else {
-  writeFileSync(htmlPath, next);
-  console.log(`[csp-hashes] CSP script-src -> ${hashes.length} sha256 hashes (dropped 'unsafe-inline' + blob:).`);
+
+  if (hashes.length === 0) {
+    error('[csp-hashes] found no inline <script> blocks in index.html — aborting');
+    return 1;
+  }
+
+  // Rebuild the directive: 'self' + the inline-script hashes. No 'unsafe-inline'
+  // (the whole point) and no blob: (export uses a blob <a download> HREF, never a
+  // blob script; verified no new Worker(blob)/blob <script>, FlexSearch not in
+  // worker mode).
+  // The one external script: Cloudflare Web Analytics' beacon (cfa1, Corbin 2026-09-26 21:3x), loaded by src, so
+  // no hash; its host is named here so every re-hash keeps it.
+  const SCRIPT_HOSTS = ['https://static.cloudflareinsights.com'];
+  // 'wasm-unsafe-eval' lets WebAssembly compile, nothing else (JS eval stays blocked): the on-device
+  // meaning search runs its model on onnxruntime-web's wasm (src/search/semantic.js, Corbin 2026-10-05 21:0x).
+  const nextDirective = `script-src 'self' 'wasm-unsafe-eval' ${SCRIPT_HOSTS.join(' ')} ${hashes.join(' ')};`;
+
+  // Scope the rewrite to INSIDE the CSP `content="..."` attribute so the word
+  // "script-src" in the explanatory <!-- comment --> above the meta tag is never
+  // touched (it has no `;`, so a document-wide regex would eat prose).
+  const cspRx = /(<meta http-equiv="Content-Security-Policy" content=")([\s\S]*?)(")/;
+  const cspM = html.match(cspRx);
+  if (!cspM || !/script-src [^;]*;/.test(cspM[2])) {
+    error('[csp-hashes] could not find the script-src directive inside the CSP meta tag');
+    return 1;
+  }
+  const next = html.replace(cspRx, (_full, open, body, close) =>
+    open + body.replace(/script-src [^;]*;/, nextDirective) + close);
+
+  if (check) {
+    if (next !== html) {
+      error('[csp-hashes] CSP script-src is STALE — an inline <script> changed without a re-hash.');
+      error('  Run `npm run build` (or `node tools/sync-csp-hashes.js`) and re-stage index.html.');
+      return 1;
+    }
+    log(`[csp-hashes] CSP script-src matches ${hashes.length} inline-script hashes — OK.`);
+  } else if (next === html) {
+    log(`[csp-hashes] CSP script-src already current (${hashes.length} hashes) — no change.`);
+  } else {
+    writeFileSync(htmlPath, next);
+    log(`[csp-hashes] CSP script-src -> ${hashes.length} sha256 hashes (dropped 'unsafe-inline' + blob:).`);
+  }
+  return 0;
 }
+
+const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(fileURLToPath(import.meta.url));
+if (isMain) process.exitCode = main();

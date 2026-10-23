@@ -171,25 +171,10 @@ A_VOT = [
     # runtime-assets and apk-assets gates now derive it from the loader module.
 ]
 
-# Cluster B — stores + components + hooks + journal subsystem + scripture-resolution
-# (NOW BUNDLED VIA ESBUILD as of G.2.2).
-# This list is kept empty; the source files use ES `export` syntax now.
-# See package.json `build:b` for the esbuild invocation.
-B = []  # intentionally empty; esbuild owns bundle-b.js
-
-# Cluster C — renderer (NOW BUNDLED VIA ESBUILD as of G.2.1).
-# This list is kept for reference; tools/build.py no longer emits bundle-c.js.
-# See tools/build-esbuild.sh (or package.json `build:c`) for the esbuild
-# invocation. The classic-script concat is dead for this cluster — the
-# source files use ES `export` syntax now.
-C = []  # intentionally empty; esbuild owns bundle-c.js
-
-# Cluster D — screens + sheets + components + utils + late stores
-# (NOW BUNDLED VIA ESBUILD as of G.2.3).
-# This list is kept empty; the source files use ES `export` syntax now.
-# See package.json `build:d` for the esbuild invocation (entry point:
-# src/ui/_entry-d.js).
-D = []  # intentionally empty; esbuild owns bundle-d.js
+# Clusters B, C and D (stores/components/hooks/journal, the renderer, and
+# screens/sheets) are bundled by esbuild since G.2.1-G.2.3: their sources use ES
+# `export` syntax, so this script emits no bundle-b/c/d.js. See package.json
+# `build:b` / `build:c` / `build:d` (D's entry point is src/ui/_entry-d.js).
 
 
 def _minify_content(content, label):

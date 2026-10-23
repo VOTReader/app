@@ -21,7 +21,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
-import { createContext, runInNewContext } from 'vm';
+import { runInNewContext } from 'vm';
 import { resolve, basename } from 'path';
 import { fileURLToPath } from 'url';
 import { parseRefRange, splitIntoVerses } from '../app/src/main/assets/src/utils/scripture-parse.js';

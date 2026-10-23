@@ -406,7 +406,7 @@ try {
   // target into view, which would undo the scroll the walk is about to assert. ──
   // The player's element is a detached new Audio(); everything is read through the
   // app's own window.AudioPlayer (getState / getPreciseTime / seek), never the DOM.
-  let track0 = null, t0 = null;
+  let t0 = null;
   if (withAudio) {
     const pill = await page.$('.hero-play-pill');
     if (!pill) fail('precondition: no Listen pill on the letter');
@@ -417,7 +417,7 @@ try {
       note('after seek: ' + JSON.stringify(await page.evaluate(() => { const s = window.AudioPlayer.getState(); return { status: s.status, time: s.time, duration: s.duration, precise: window.AudioPlayer.getPreciseTime() }; })));
       await page.waitForFunction((t) => window.AudioPlayer.getPreciseTime() > t + 1, { timeout: 15000 }, RESUME_AT);
       const st = await page.evaluate(() => { const s = window.AudioPlayer.getState(); const tr = s.queue[s.qi] || {}; return { key: tr.key, title: tr.title, status: s.status, t: window.AudioPlayer.getPreciseTime() }; });
-      track0 = st.key; t0 = st.t;
+      t0 = st.t;
       note(`before: ${st.status} ${JSON.stringify(st.title)} (key ${st.key}) at ${t0.toFixed(1)} s`);
     }
   }
@@ -694,7 +694,7 @@ try {
         const s = JSON.parse(localStorage.getItem('vot-audio-pos') || 'null');
         return !!s && window.AudioPlayer.getPreciseTime() - Number(s.time) >= 2.5;
       }, { timeout: 15000 }).then(() => true, () => false);
-      const D0 = await page2.evaluate(() => { const P = window.AudioPlayer; const s = P.getState(); const tr = s.queue[s.qi] || {}; let snap = null; try { snap = Number(JSON.parse(localStorage.getItem('vot-audio-pos')).time); } catch (e) { snap = null; } return { key: tr.key || null, t: P.getPreciseTime(), snap }; });
+      const D0 = await page2.evaluate(() => { const P = window.AudioPlayer; const s = P.getState(); const tr = s.queue[s.qi] || {}; let snap = null; try { snap = Number(JSON.parse(localStorage.getItem('vot-audio-pos')).time); } catch (_e) { snap = null; } return { key: tr.key || null, t: P.getPreciseTime(), snap }; });
       note(`D before: playing key ${D0.key} at ${D0.t.toFixed(3)} s; the localStorage snapshot holds ${D0.snap} s`);
       if (!stale) fail('D precondition: the snapshot never read >= 2.5 s stale within 15 s — the cadence changed, or the clock is not advancing');
       const killedAt = Date.now();

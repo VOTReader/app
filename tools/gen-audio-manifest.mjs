@@ -34,7 +34,7 @@ import { fileURLToPath } from 'url';
 // tests, so the manifest and the gate that checks it cannot drift apart.
 import {
   READER_RANK, composeAlternates, countByReader, dedupeByAudioHash, formatReaderCounts,
-  readerFromFilename, isLetterAudio, NON_LETTER_ROOT,
+  readerFromFilename, NON_LETTER_ROOT,
   STUDY_ROOT, studyChapterFor,
 } from './audio-renditions-lib.mjs';
 
@@ -459,7 +459,7 @@ for (const [key, e] of acc) {
       .map(([n, t]) => ({ ...t, label: `Section ${n}` }));
   } else if (e.parts.size > 0) {
     list = [...e.parts.entries()].sort((a, b) => a[0] - b[0])
-      .map(([n, t], i, arr) => ({ ...t, label: arr.length > 1 ? `Part ${i + 1}` : null }));
+      .map(([, t], i, arr) => ({ ...t, label: arr.length > 1 ? `Part ${i + 1}` : null }));
   }
   for (const a of e.addenda) list.push({ ...a, label: 'Addendum' });
   if (list.length === 0) continue;

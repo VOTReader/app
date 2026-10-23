@@ -89,6 +89,9 @@ function mount() {
 
 beforeEach(() => {
   _origGetSelection = window.getSelection;
+  // Fake timers for every test: the component's debounces and settle waits run on the
+  // test's clock, so a wait costs nothing and never races a loaded machine (ideas L5.5).
+  vi.useFakeTimers();
   // Globals SelectionToolbar reads as free variables (provided by the bundle
   // IIFE in production; stubbed here). StorageHealth / findEntryContext /
   // _bookmarkSourceLabel / bkmId are typeof-guarded in the component, so
@@ -113,6 +116,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   window.getSelection = _origGetSelection;
   document.body.innerHTML = '';
   delete /** @type {any} */ (globalThis).HL_COLORS;
@@ -134,7 +138,7 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250)); // past the 150ms computeAndShow
+      await vi.advanceTimersByTimeAsync(250); // past the 150ms computeAndShow
     });
     const tb = document.querySelector('.sel-toolbar');
     expect(tb).not.toBeNull();
@@ -150,7 +154,7 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 5, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     expect(document.querySelector('.sel-toolbar')).toBeNull();
   });
@@ -162,7 +166,7 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     const squiggleBtn = document.querySelector('.sel-style-btn-squiggle');
     expect(squiggleBtn).not.toBeNull();
@@ -191,7 +195,7 @@ describe('SelectionToolbar — zero-width annotation guard (annotation-selection
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     // The trimmed selection text is the em dash itself (non-empty), so
     // computeAndShow raises the toolbar same as any other selection.
@@ -221,21 +225,21 @@ describe('SelectionToolbar — zero-width annotation guard (annotation-selection
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     const yellowBtn = document.querySelector('.sel-color-btn[data-color="yellow"]');
     act(() => { fire(yellowBtn, 'click'); });
     expect(/** @type {any} */ (globalThis).AnnotationStore.add).not.toHaveBeenCalled();
 
     // 2. Past the 300 ms reset the bail schedules.
-    await act(async () => { await new Promise((r) => setTimeout(r, 350)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
 
     // 3. A normal word selection must still be able to raise the toolbar.
     stubSelection(rangeOver(c, 11, 14)); // "and"
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     expect(document.querySelector('.sel-color-btn[data-color="yellow"]')).not.toBeNull();
   });
@@ -257,7 +261,7 @@ describe('SelectionToolbar — footnote markers excluded from stored text (annot
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r2) => setTimeout(r2, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     const yellowBtn = document.querySelector('.sel-color-btn[data-color="yellow"]');
     expect(yellowBtn).not.toBeNull();
@@ -720,7 +724,7 @@ describe('SelectionToolbar — ANN2 remove-confirm discloses note deletion', () 
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     const clearBtn = document.querySelector('.sel-color-clear');
     expect(clearBtn).not.toBeNull();
@@ -758,7 +762,7 @@ describe('SelectionToolbar — P1-11a accessible names', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     const tb = document.querySelector('.sel-toolbar');
     expect(tb).not.toBeNull();
@@ -897,7 +901,7 @@ describe('SelectionToolbar — Copy / Share outcomes are reported (A15)', () => 
     act(() => { fire(btn, 'click'); });
   }
   async function settle() {
-    await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
   }
   function recovery() { return document.querySelector('[role="dialog"].copy-fallback, [role="alertdialog"].copy-fallback'); }
   function toastText() { const t = document.querySelector('.vot-toast.show'); return t ? t.textContent : ''; }
@@ -1122,7 +1126,7 @@ describe('SelectionToolbar — Copy keeps a poetry selection\'s line breaks (cg1
       const shareBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
         .find((s) => s.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
-      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
       expect(sent.length).toBe(1);
       expect(sent[0].text.startsWith('18 If anyone adds to these words,\nI will add to them the punishments')).toBe(true);
     } finally {
@@ -1145,7 +1149,7 @@ describe('SelectionToolbar — Listen from here', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
   }
@@ -1207,7 +1211,7 @@ describe('SelectionToolbar — Repeat', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
   }
@@ -1346,7 +1350,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
       const shareBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
         .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
-      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
       expect(sent[0].text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
@@ -1371,7 +1375,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
       const shareBtn = /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')]
         .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
-      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
       expect(sent[0].text.startsWith('Take your every thought captive\n\nThat you may be set apart')).toBe(true);
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
@@ -1407,7 +1411,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
         + 'https://www.thevolumesoftruth.com/The_Wide_Path']);
       raise();
       press('Share');
-      await act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+      await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
       expect(sent[0].text).toBe('"' + words + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
     } finally {
       delete g.findEntryContext;
@@ -1447,7 +1451,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
     // Ctrl+A: no pointer, so the toolbar rises from the settled selectionchange.
     await act(async () => {
       document.dispatchEvent(new Event('selectionchange'));
-      await new Promise((r) => setTimeout(r, 400));
+      await vi.advanceTimersByTimeAsync(400);
     });
     const yellow = /** @type {any} */ (document.querySelector('.sel-color-btn[data-color="yellow"]'));
     act(() => { fire(yellow, 'click'); });
@@ -1593,7 +1597,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     else delete /** @type {any} */ (navigator).share;
     delete g.findEntryContext; delete g._bookTitle; delete g.StateStore;
   });
-  const settle = () => act(async () => { for (let i = 0; i < 5; i++) await new Promise((res) => setTimeout(res, 0)); });
+  const settle = () => act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
   const shareBtn = () => /** @type {any} */ ([...document.querySelectorAll('.sel-action-btn span')].find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
   const choice = (/** @type {string} */ label) => /** @type {any} */ ([...document.querySelectorAll('.sel-link-choice button')].find((b) => (b.getAttribute('aria-label') || b.textContent) === label));
   function raise(/** @type {string} */ key, /** @type {string} */ words) {
@@ -1605,7 +1609,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
   }
   const hold = async () => {
     act(() => { fire(shareBtn(), 'pointerdown', { button: 0 }); });
-    await act(async () => { await new Promise((res) => setTimeout(res, 500)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
   };
 
   it('a tap shares with the app link; a hold offers both, and the click that ends the hold shares nothing', async () => {
@@ -1718,7 +1722,7 @@ describe('SelectionToolbar — the Scripture Web door', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
   }
@@ -1809,7 +1813,7 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
     act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
     await act(async () => {
       fire(c, 'pointerup', { clientX: 80, clientY: 5 });
-      await new Promise((r) => setTimeout(r, 250));
+      await vi.advanceTimersByTimeAsync(250);
     });
     return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
   }
@@ -1861,7 +1865,7 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
     r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
     stubSelection(r);
     act(() => { fire(ps[0], 'pointerdown', { clientX: 5, clientY: 5 }); });
-    await act(async () => { fire(ps[2], 'pointerup', { clientX: 80, clientY: 5 }); await new Promise((res) => setTimeout(res, 250)); });
+    await act(async () => { fire(ps[2], 'pointerup', { clientX: 80, clientY: 5 }); await vi.advanceTimersByTimeAsync(250); });
     act(() => { /** @type {HTMLElement} */ (door(/** @type {HTMLElement} */ (document.querySelector('.sel-toolbar')))).click(); });
     const label = document.querySelector('[role="dialog"][aria-label="Share as a card"] canvas').getAttribute('aria-label');
     expect(label.startsWith('I am a Great King!')).toBe(true);

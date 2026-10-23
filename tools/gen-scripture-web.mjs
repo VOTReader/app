@@ -348,7 +348,7 @@ if (MEASURE) {
   size('E2 grouped by letter + anchors (shipped)', votCites);
   const withText = votCites.map((row) => ({ ...row, s: row.s.map((site) => [...site, excerptOf(row, site)]) }));
   size('E3 E2 + embedded excerpt text', withText);
-  size('E2 without titles (t, st)', votCites.map(({ t, st, ...row }) => row));
+  size('E2 without titles (t, st)', votCites.map(({ t: _t, st: _st, ...row }) => row));
   size('E1 + titles', flat.map((e) => ({ ...e, title: describe('', e).title })));
   console.log('  study links:');
   size(`prophecy + votLinks as objects (${prophecy.length} + ${votLinks.length})`, { prophecy, votLinks });

@@ -2,7 +2,8 @@
 // ESLint config — flat config (ESLint 9.x)
 // ═══════════════════════════════════════════════════════════════════════
 // Scope: every .js and .jsx under app/src/main/assets/src (every source
-// module; count them with ls/wc, a number here drifts). Out of scope: dist (built output), .min.js (vendor),
+// module; count them with ls/wc, a number here drifts), plus
+// service-worker.js and tools/ (base rules only). Out of scope: dist (built output), .min.js (vendor),
 // src/data (auto-generated corpus data, would be pure noise).
 //
 // NB: line comments throughout this header — block /* */ comments break
@@ -152,6 +153,39 @@ export default [
       'react-hooks/unsupported-syntax': 'off',
       'react-hooks/config': 'off',
       'react-hooks/gating': 'off',
+    },
+  },
+
+  // The service worker: a classic script in the worker scope, outside the
+  // bundles, so it gets the worker globals and the base rules only.
+  {
+    files: ['app/src/main/assets/service-worker.js'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: 'script',
+      globals: { ...globals.serviceworker },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      'no-empty': 'warn',
+    },
+  },
+
+  // tools/: Node scripts and their tests. The e2e and smoke drivers pass
+  // callbacks to page.evaluate(), which run in the page, so the browser
+  // globals and the app's own bare names are in scope there too.
+  {
+    files: ['tools/**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser, ...projectGlobals },
+    },
+    rules: {
+      ...js.configs.recommended.rules,
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }],
+      'no-empty': 'warn',
     },
   },
 ];

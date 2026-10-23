@@ -145,6 +145,7 @@ function restoreVerse(text, ref, tr) {
     });
   }
   // unmask
+  // eslint-disable-next-line no-control-regex -- \x00 brackets the masked spans
   text = text.replace(/\x00(\d+)\x00/g, (_, i) => masked[+i]);
   return text;
 }

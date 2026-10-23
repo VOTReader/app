@@ -27,6 +27,9 @@ const rect = (x, y, w, h) => () => /** @type {any} */ ({ x, y, width: w, height:
 
 beforeEach(() => {
   localStorage.clear();
+  // Fake timers for every test: the component's debounces and settle waits run on the
+  // test's clock, so a wait costs nothing and never races a loaded machine (ideas L5.5).
+  vi.useFakeTimers();
   TourDoneFlagStore._resetForTests({ forceLoaded: true });
   TourController._resetForTests();
   /** @type {any} */ (globalThis).TourController = TourController;
@@ -130,7 +133,7 @@ describe('TourOverlay — ring and target', () => {
     startAt('listen');
     render(<TourOverlay waitMs={0} />);
     expect(document.querySelector('.tour-ring')).toBeNull();
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
     expect(screen.getByText(/could not find/i)).toBeTruthy();
   });
 
@@ -138,7 +141,7 @@ describe('TourOverlay — ring and target', () => {
   it('with the hint up, Next goes on to the next stop, with no after-words over nothing', async () => {
     startAt('listen');
     render(<TourOverlay waitMs={0} />);
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
     expect(screen.getByText(/could not find/i)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /^Next/ }));
     expect(TourController.getState().step.id).toBe('highlight');
@@ -151,14 +154,14 @@ describe('TourOverlay — ring and target', () => {
   it('a target that arrives after the hint: the ring appears and the hint goes', async () => {
     startAt('listen');
     render(<TourOverlay waitMs={0} />);
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
     expect(screen.getByText(/could not find/i)).toBeTruthy();
     const pill = document.createElement('button');
     pill.className = 'hero-play-pill';
     pill.textContent = 'Listen';
     pill.getBoundingClientRect = rect(133, 271, 94, 25);
     document.body.appendChild(pill);
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
     expect(document.querySelector('.tour-ring'), 'the late target is ringed').toBeTruthy();
     expect(screen.queryByText(/could not find/i), 'and the card stops saying it is missing').toBeNull();
   });
@@ -228,7 +231,7 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     tile.scrollIntoView = scrolls;
     startAt('letters');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    await act(async () => { await new Promise((r) => setTimeout(r, 500)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(500); });
     expect(scrolls.mock.calls.some((c) => c[0] && c[0].block === 'start')).toBe(true);
   });
 
@@ -244,10 +247,10 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
     pill.scrollIntoView = () => { y = 300; };                          // the overlay's scroll lands it on screen
     startAt('listen');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    await act(async () => { await new Promise((r) => setTimeout(r, 120)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(120); });
     expect(y).toBe(300);
     y = vh() + 120;                                                    // scroll memory: scrollTop = 0, second writer wins
-    await act(async () => { await new Promise((r) => setTimeout(r, 900)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(900); });
     expect(y).toBe(300);                                               // the overlay put it back
     const ring = /** @type {HTMLElement} */ (document.querySelector('.tour-ring'));
     expect(parseFloat(ring.style.top) + parseFloat(ring.style.height)).toBeLessThanOrEqual(vh());
@@ -512,7 +515,7 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     const pill = letterScreen(vh() - 80);
     startAt('listen');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(40); });
     const scroller = /** @type {HTMLElement} */ (document.querySelector('.screen-scroll'));
     const cardTop = vh() - (12 + 80) - 220;
     expect(scroller.style.scrollPaddingBottom).toBe((vh() - cardTop) + 'px');
@@ -526,7 +529,7 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     const pill = letterScreen(vh() - 80);
     startAt('listen');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(40); });
     expect(parseFloat(/** @type {HTMLElement} */ (document.querySelector('.tour-card')).style.bottom)).toBe(92);
     fireEvent.click(pill);
     document.querySelector('.audio-bar').remove();                      // the tour stopped the playback
@@ -542,7 +545,7 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
       await act(async () => { TourController.next(); });                 // → the next stop, on the same DOM
       expect(TourController.getState().step.id).toBe(id);
     }
-    await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(40); });
     expect(parseFloat(/** @type {HTMLElement} */ (document.querySelector('.tour-card')).style.bottom)).toBe(12);
   });
 
@@ -694,7 +697,7 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     expect(TourController.getState().step.id).toBe('highlight');
     await act(async () => {
       document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="sel-toolbar">Highlight</div>');
-      await new Promise((r) => setTimeout(r, 60));
+      await vi.advanceTimersByTimeAsync(60);
     });
     expect(TourController.getState().pressed).toBe(true);
     expect(on.classList.contains('hl-mark')).toBe(false);
@@ -774,18 +777,18 @@ describe('TourOverlay — the demonstration leaves by every door', () => {
     document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="sel-toolbar">Highlight</div>');
     startAt('highlight');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
-    await act(async () => { await new Promise((r) => setTimeout(r, 80)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
     expect(TourController.getState().step.id).toBe('highlight');
     expect(TourController.getState().pressed).toBe(false);
     expect(screen.getByText(/Try it now/i)).toBeTruthy();
     // And it still answers the real gesture: the bar goes down, then comes back up.
     await act(async () => {
       document.querySelector('.sel-toolbar').remove();
-      await new Promise((r) => setTimeout(r, 60));
+      await vi.advanceTimersByTimeAsync(60);
     });
     await act(async () => {
       document.querySelector('#app').insertAdjacentHTML('beforeend', '<div class="sel-toolbar">Highlight</div>');
-      await new Promise((r) => setTimeout(r, 60));
+      await vi.advanceTimersByTimeAsync(60);
     });
     expect(TourController.getState().pressed).toBe(true);
   });
@@ -829,7 +832,7 @@ describe('TourOverlay — the player stops ring the bar, then the voice row; the
   };
   const ringBox = () => { const r = /** @type {HTMLElement|null} */ (document.querySelector('.tour-ring')); return r ? { top: parseFloat(r.style.top), left: parseFloat(r.style.left), height: parseFloat(r.style.height) } : null; };
   const described = () => [...document.querySelectorAll('[aria-describedby="tour-desc"]')].map((e) => e.className);
-  const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 60)); });
+  const settle = () => act(async () => { await vi.advanceTimersByTimeAsync(60); });
   beforeEach(() => { /** @type {any} */ (globalThis).AudioPlayer = { stop: vi.fn(), syncKeepAlive: vi.fn(), getState: () => ({ status: 'playing', queue: [{ key: 'bible-brm-kjv:john' }], qi: 0 }) }; });
 
   it('the player stop: docked above the bar, the bar\'s button ringed and described, four dims', async () => {
@@ -1065,7 +1068,7 @@ describe('TourOverlay — a docked stop brings a target out from under its own c
     const card = stubCard();
     expect(card.classList.contains('docked')).toBe(true);
     // Past RESCROLL_EVERY_MS (300): the first tick's scroll is unconditional, a re-scroll is not.
-    await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
     // 'start', not 'center': centring in a viewport whose bottom the card owns can put the target
     // straight back underneath it. The first tick always scrolls (block null → 'center'), so this
     // asks whether a LATER tick, once the card has been measured, asked for 'start'.
@@ -1080,7 +1083,7 @@ describe('TourOverlay — a docked stop brings a target out from under its own c
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     stubCard();
     // Past RESCROLL_EVERY_MS (300): the first tick's scroll is unconditional, a re-scroll is not.
-    await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
     expect(calls).not.toContain('start');
   });
 });
@@ -1144,7 +1147,7 @@ describe('TourOverlay — the highlight stop obeys the dock floor too', () => {
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     const card = /** @type {HTMLElement} */ (document.querySelector('.tour-card'));
     card.getBoundingClientRect = rect(12, Math.round(vh() * 0.62), 336, Math.round(vh() * 0.38));
-    await act(async () => { await new Promise((r) => setTimeout(r, 600)); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(600); });
     expect(calls).toContain('start');
   });
 });

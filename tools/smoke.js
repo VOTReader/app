@@ -897,7 +897,7 @@
     var realErr = console.error;
     console.error = function () {
       try { errs.push([].slice.call(arguments).map(String).join(' ').slice(0, 200)); }
-      catch (e) {}
+      catch (_e) { /* logging must never throw */ }
       return realErr.apply(console, arguments);
     };
 

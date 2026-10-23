@@ -267,10 +267,8 @@ for (const c of cands) {
 // What the 500 and its fresh set already ask for (make-fresh.mjs's `taken`, by class): their rare 4-grams, their verses,
 // their whole-unit targets (titles, the letter about...) and the blocks of their block targets.
 const oldUsed = new Set(); const oldVerse = new Set(); const oldUnits = new Set(); const oldBlocks = new Set(); const oldSent = new Set();
-let oldN = 0;
 for (const f of ['targets.json', 'fresh-targets.json']) {
   for (const t of JSON.parse(fs.readFileSync(path.join(BENCH, f), 'utf8')).targets) {
-    oldN++;
     if (t.level === 'unit') { oldUnits.add(t.uk); continue; }
     for (const s of [t.sentence, t.kjv].filter(Boolean)) { for (const h of rare4(s)) oldUsed.add(h); oldSent.add(norm(s)); }
     if (t.level === 'verse') oldVerse.add(twinOf(t.uk));
@@ -344,7 +342,7 @@ const headings = [];
       const t = b.text.trim();
       if (i > 0 && bl[i - 1].text.trim() !== '✦') return;
       if (!t || t === '✦' || t.length > 120 || wc(t) < 2 || wc(t) > 16 || CITE_LINE.test(t) || notProse(t)) return;
-      if (/^["“'‘•(\[]/.test(t) || /[:;,]$/.test(t) || /^(the blessed:|words to live by|volume|see\b)/i.test(t)) return;
+      if (/^["“'‘•([]/.test(t) || /[:;,]$/.test(t) || /^(the blessed:|words to live by|volume|see\b)/i.test(t)) return;
       const nx = bl[i + 1];
       if (!nx || nx.text.trim() === '✦' || CITE_LINE.test(nx.text.trim())) return;
       all.push({ uk: k, blockIdx: b.idx, at: i, text: t });
