@@ -130,6 +130,7 @@ function withBlockIds(blocks) {
  *   linkIds: string[],
  *   highlights: number,
  *   underlines: number,
+ *   squiggles: number,
  *   notes: number,
  *   bookmarks: number,
  *   links: number
@@ -301,6 +302,7 @@ export var JournalStore = extendStore(
       };
       /** @type {Record<string, 1>} */ var hlG = {};
       /** @type {Record<string, 1>} */ var ulG = {};
+      /** @type {Record<string, 1>} */ var sqG = {};
       /** @type {Record<string, 1>} */ var noteG = {};
       /** @type {Record<string, 1>} */ var noteShown = {};
       /** @type {Array<{ groupId: string, keys: string[] }>} */ var noteTrims = [];
@@ -318,6 +320,8 @@ export var JournalStore = extendStore(
               // a legacy note segment: a whole-entry scan purges its group; one block's only its segments
               if (a.kind === 'note') { if (blockKey === null) noteG[gid] = 1; else noteShown[gid] = 1; }
               else if (a.kind === 'underline') ulG[gid] = 1;
+              // ds5 s35.1: a squiggle is its own mark kind (mark-kinds.js), not a highlight
+              else if (a.kind === 'squiggle') sqG[gid] = 1;
               else hlG[gid] = 1;
             });
           });
@@ -359,7 +363,7 @@ export var JournalStore = extendStore(
       return {
         annKeys: annKeys, noteGroupIds: Object.keys(noteG), noteTrims: noteTrims,
         bookmarkIds: bkmIds, linkIds: linkIds,
-        highlights: Object.keys(hlG).length, underlines: Object.keys(ulG).length,
+        highlights: Object.keys(hlG).length, underlines: Object.keys(ulG).length, squiggles: Object.keys(sqG).length,
         // a note that spans other blocks survives the block's delete: not counted (refuter F3)
         notes: Object.keys(Object.assign({}, noteG, noteShown)).length,
         bookmarks: bkmIds.length, links: linkIds.length
@@ -464,14 +468,14 @@ export var JournalStore = extendStore(
      * one block's (the editor's block-delete confirm, n4-06).
      * @param {string} id
      * @param {string} [blockId]
-     * @returns {{ highlights: number, underlines: number, notes: number, bookmarks: number, links: number, total: number }}
+     * @returns {{ highlights: number, underlines: number, squiggles: number, notes: number, bookmarks: number, links: number, total: number }}
      */
     associatedDataCounts(id, blockId) {
       var s = this._scanAssociated(id, blockId);
       return {
-        highlights: s.highlights, underlines: s.underlines, notes: s.notes,
+        highlights: s.highlights, underlines: s.underlines, squiggles: s.squiggles, notes: s.notes,
         bookmarks: s.bookmarks, links: s.links,
-        total: s.highlights + s.underlines + s.notes + s.bookmarks + s.links
+        total: s.highlights + s.underlines + s.squiggles + s.notes + s.bookmarks + s.links
       };
     },
 
@@ -488,7 +492,7 @@ export var JournalStore = extendStore(
       /** @type {string[]} */
       var parts = [];
       function p(/** @type {number} */ n, /** @type {string} */ s) { if (n > 0) parts.push(n + ' ' + s + (n === 1 ? '' : 's')); }
-      p(c.highlights, 'highlight'); p(c.underlines, 'underline'); p(c.notes, 'note');
+      p(c.highlights, 'highlight'); p(c.underlines, 'underline'); p(c.squiggles, 'squiggle'); p(c.notes, 'note');
       p(c.bookmarks, 'bookmark'); p(c.links, 'link');
       var last = parts.pop();
       return parts.length ? parts.join(', ') + ' and ' + last : (last || null);

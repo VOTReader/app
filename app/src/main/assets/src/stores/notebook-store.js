@@ -88,17 +88,23 @@ export const NotebookStore = extendStore(
 
     /**
      * Rename a notebook in place. No-op when name is blank or id is unknown.
+     * ds5 s11.3: refuses (false) a name another notebook already has,
+     * case-insensitively, the duplicate add() was written to prevent.
      * @param {string} id
      * @param {string | null | undefined} name
-     * @returns {void}
+     * @returns {boolean} false when nothing was renamed
      */
     rename(id, name) {
       const trimmed = (name || '').trim();
-      if (!trimmed) return;
-      if (this._shouldDefer('rename', id, name)) return;
+      if (!trimmed) return false;
+      if (this._shouldDefer('rename', id, name)) return true;
       const data = this._load();
-      const nb = (data.list || []).find(n => n.id === id);
-      if (nb) { nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump(); }
+      const list = data.list || [];
+      const nb = list.find(n => n.id === id);
+      if (!nb) return false;
+      if (list.some(n => n.id !== id && (n.name || '').trim().toLowerCase() === trimmed.toLowerCase())) return false;
+      nb.name = trimmed; nb.updated = Date.now(); this._save(); this._bump();
+      return true;
     },
 
     /**

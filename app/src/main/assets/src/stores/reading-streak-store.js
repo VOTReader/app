@@ -28,7 +28,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
-import { _jrnDateStr, _jrnDaysBetween } from './journal-stats-store.js';
+import { _jrnDateStr, _jrnDaysBetween, _count } from './journal-stats-store.js';
 
 /**
  * On-disk shape.
@@ -120,10 +120,10 @@ export var ReadingStreakStore = extendStore(
       if (this._shouldDefer('replaceAll', data)) return;
       var d = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
       this._cache = /** @type {any} */ ({
-        currentStreak: d.currentStreak || 0,
-        longestStreak: d.longestStreak || 0,
+        currentStreak: _count(d.currentStreak),
+        longestStreak: _count(d.longestStreak),
         lastReadDate: d.lastReadDate || null,
-        totalDays: d.totalDays || 0
+        totalDays: _count(d.totalDays)
       });
       this._save();
       this._bump();

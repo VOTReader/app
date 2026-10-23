@@ -6446,6 +6446,7 @@
       outline: none;
     }
     body.light .nb-drilled-rename { background: var(--bg); color: var(--input-text); }
+    .nb-drilled-rename-note { margin: 0.35rem 0 0; font-family: var(--font-body); font-size: var(--fs-14); color: var(--danger); }
 
     .notes-index-search {
       width: 100%; padding: 11px 16px;

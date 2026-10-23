@@ -68,6 +68,22 @@ export function _jrnDaysBetween(d1, d2) {
   return Math.round((b.getTime() - a.getTime()) / 86400000);
 }
 
+/**
+ * v062: a lifetime total or one day's word count as the finite, non-negative
+ * number the writers keep. A backup's numbers arrived unchecked, so a string
+ * total ("100") made the next completion's `total + words` concatenate into
+ * "100300", which My Progress then showed and saved. A numeric string keeps
+ * its value; anything else (junk, negative, NaN, Infinity) counts as 0.
+ * ds5 s11.2: the journal and reading-streak restores use it too; a string
+ * streak made the next entry's `total + 1` concatenate the same way.
+ * @param {any} x
+ * @returns {number}
+ */
+export function _count(x) {
+  var n = (typeof x === 'number' || typeof x === 'string') ? Number(x) : NaN;
+  return isFinite(n) && n > 0 ? n : 0;
+}
+
 export var JournalStatsStore = extendStore(
   CachedStore('vot-journal-stats', /** @type {JournalStatsData} */ ({
     totalEntries: 0,
@@ -166,9 +182,9 @@ export var JournalStatsStore = extendStore(
       if (this._shouldDefer('replaceAll', data)) return;
       var d = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
       this._cache = /** @type {any} */ ({
-        totalEntries: d.totalEntries || 0,
-        currentStreak: d.currentStreak || 0,
-        longestStreak: d.longestStreak || 0,
+        totalEntries: _count(d.totalEntries),
+        currentStreak: _count(d.currentStreak),
+        longestStreak: _count(d.longestStreak),
         lastEntryDate: d.lastEntryDate || null,
         milestonesUnlocked: Array.isArray(d.milestonesUnlocked) ? d.milestonesUnlocked : []
       });

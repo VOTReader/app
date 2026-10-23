@@ -241,3 +241,17 @@ describe('AnnotationStore useSyncExternalStore (Q7.2 pattern)', () => {
     }
   });
 });
+
+describe('AnnotationStore — replaceAll drops malformed segments (ds5 s09.2)', () => {
+  it('a null or shapeless segment in a backup is dropped, so removeGroup still works for that key', () => {
+    AnnotationStore.replaceAll(/** @type {any} */ ({
+      'b-1-1': [null, { id: 'a1', groupId: 'g1', color: 'yellow' }, 'junk', { groupId: 'g2' }],
+      'b-1-2': 'not-an-array',
+      'b-1-3': [null],
+    }));
+    expect(AnnotationStore.get('b-1-1')).toEqual([{ id: 'a1', groupId: 'g1', color: 'yellow' }, { groupId: 'g2' }]);
+    expect(Object.keys(AnnotationStore._load())).toEqual(['b-1-1']);
+    expect(() => AnnotationStore.removeGroup('g1')).not.toThrow();
+    expect(AnnotationStore.get('b-1-1')).toEqual([{ groupId: 'g2' }]);
+  });
+});

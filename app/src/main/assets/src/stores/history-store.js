@@ -97,12 +97,16 @@ export const HistoryStore = extendStore(
      * 2000. Caller is responsible for the historyEnabled gate (the
      * hook does this so the gate isn't tied to the store API).
      * @param {HistoryEntry} entry
+     * @param {number} [at] the visit's time; the hook leaves it out (ds5 s10.5:
+     *   a visit deferred while the store loads is replayed with the time it
+     *   was made, not the time hydration landed, which can be a later day)
      * @returns {void}
      */
-    add(entry) {
+    add(entry, at) {
       if (!entry) return;
-      if (this._shouldDefer('add', entry)) return;
-      const stamped = { ...entry, key: _historyKey(entry), ts: Date.now() };
+      const ts = (typeof at === 'number' && isFinite(at)) ? at : Date.now();
+      if (this._shouldDefer('add', entry, ts)) return;
+      const stamped = { ...entry, key: _historyKey(entry), ts: ts };
       this._cache = [stamped, ...this._load()].slice(0, 2000);
       this._save();
       this._bump();

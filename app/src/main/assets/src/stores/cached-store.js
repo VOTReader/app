@@ -113,6 +113,9 @@ export function setRemoteWriteFence(on) {
    check: they are REFUSED (WriteFenced), never resolved unwritten like behind Clear All's door. */
 if (typeof IDBAdapter.setHoldCheck === 'function') IDBAdapter.setHoldCheck(function () { return _remoteFence; });
 
+/** @type {Record<string, boolean>} store names already warned about (ds5 s10.3) */
+const _unlistedWarned = {};
+
 /** This page's fence onto the adapter's door; once neither fence holds, every save they skipped runs now. */
 function _applyFences() {
   if (typeof IDBAdapter.setWriteFence === 'function') IDBAdapter.setWriteFence(_writeFenceAtAdapter);
@@ -322,6 +325,13 @@ export function CachedStore(storageKey, defaultVal, opts) {
   opts = opts || {};
   const useIdb = opts.idb === true;
   const idbStoreName = opts.storeName || storageKey;
+  // ds5 s10.3: a name missing from STORE_NAMES has no object store, so the
+  // store degrades at the timeout and queues every write for the session.
+  // Say so once (store-names-parity.test.js holds every real store to the list).
+  if (useIdb && Array.isArray(IDBAdapter.STORE_NAMES) && IDBAdapter.STORE_NAMES.indexOf(idbStoreName) < 0 && !_unlistedWarned[idbStoreName]) {
+    _unlistedWarned[idbStoreName] = true;
+    try { if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('store', idbStoreName + ' is not in IDBAdapter.STORE_NAMES: it cannot load or save'); } catch (_e) { /* logging must never break a store */ }
+  }
   const lsShim = opts.lsShim || null;
   const hydrationTimeoutMs = (opts.hydrationTimeoutMs != null) ? opts.hydrationTimeoutMs : 3000;
   /**

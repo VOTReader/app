@@ -73,6 +73,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const [newNbName, setNewNbName] = React.useState('');
   const [renaming, setRenaming] = React.useState(false);
   const [renameValue, setRenameValue] = React.useState('');
+  const [renameTaken, setRenameTaken] = React.useState('');
   // [11] notebook color-tag swatch row (drilled header's Color action).
   const [colorPicking, setColorPicking] = React.useState(false);
   const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(false);
@@ -165,13 +166,17 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const startRename = () => {
     if (!drilledNb) return;
     setRenameValue(drilledNb.name);
+    setRenameTaken('');
     setRenaming(true);
   };
   const commitRename = () => {
     const trimmed = renameValue.trim();
-    if (trimmed && drilledNb) {
-      NotebookStore.rename(drilledNb.id, trimmed);
+    // ds5 s11.3: a name another notebook has is refused; keep the field open.
+    if (trimmed && drilledNb && NotebookStore.rename(drilledNb.id, trimmed) === false) {
+      setRenameTaken(trimmed);
+      return;
     }
+    setRenameTaken('');
     setRenaming(false);
   };
   const deleteCurrent = () => {
@@ -261,7 +266,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   ? <input
                       className="nb-drilled-rename"
                       autoFocus type="text" value={renameValue}
-                      onChange={e => setRenameValue(e.target.value)}
+                      onChange={e => { setRenameValue(e.target.value); setRenameTaken(''); }}
                       // No onBlur commit — explicit Save/Cancel buttons own the
                       // commit so tapping a button doesn't race the blur handler
                       // (Android has no Escape key; blur-commit was non-obvious).
@@ -274,13 +279,16 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                     </>
                 }
               </div>
+              {renaming && renameTaken && (
+                <p className="nb-drilled-rename-note" role="alert">Another notebook is already called {renameTaken}.</p>
+              )}
               {/* Rename mode: explicit Save / Cancel. Otherwise (user notebooks
                   only, not Uncategorized): Rename / Delete. */}
               <div className="nb-drilled-actions">
                 {renaming
                   ? <>
                       <button className="nb-drilled-action" onClick={commitRename} title="Save name">Save</button>
-                      <button className="nb-drilled-action" onClick={() => setRenaming(false)} title="Cancel rename">Cancel</button>
+                      <button className="nb-drilled-action" onClick={() => { setRenameTaken(''); setRenaming(false); }} title="Cancel rename">Cancel</button>
                     </>
                   : <>
                       {drilledNotes.length > 0 && (

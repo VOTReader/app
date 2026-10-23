@@ -449,3 +449,18 @@ describe('JournalStatsStore — replaceAll (import path)', () => {
     expect(after.milestonesUnlocked).toEqual([]);
   });
 });
+
+describe('JournalStatsStore — imported counts are numbers (ds5 s11.2)', () => {
+  it('a backup with string counts keeps their values, and the next entry adds instead of concatenating', () => {
+    const today = _jrnDateStr(_tsRelative(0));
+    JournalStatsStore.replaceAll(/** @type {any} */ ({
+      totalEntries: '41', currentStreak: '3', longestStreak: 'junk', lastEntryDate: today,
+    }));
+    const s = JournalStatsStore.get();
+    expect(s.totalEntries).toBe(41);
+    expect(s.currentStreak).toBe(3);
+    expect(s.longestStreak).toBe(0);
+    JournalStatsStore.recordNewEntry(_tsRelative(0));
+    expect(JournalStatsStore.get().totalEntries).toBe(42);
+  });
+});

@@ -738,3 +738,13 @@ describe('JournalStore - one block\'s purge never reaches another block (n4-06 r
     expect(AnnotationStore.get(k1)).toEqual([]);
   });
 });
+
+describe('JournalStore - a squiggle is counted as a squiggle (ds5 s35.1)', () => {
+  it('a squiggle-only entry is not described as a highlight', () => {
+    const j = JournalStore.add({ title: 'S', blocks: [{ id: 'b_s', type: 'p', text: 'wavy' }] });
+    AnnotationStore.add('journal:' + j.id + ':b_s', { id: 'q1', groupId: 'gq', start: 0, end: 4, kind: 'squiggle', color: 'yellow' });
+    const c = JournalStore.associatedDataCounts(j.id);
+    expect(c).toMatchObject({ highlights: 0, squiggles: 1, total: 1 });
+    expect(JournalStore.associatedDataSummary(j.id)).toBe('1 squiggle');
+  });
+});

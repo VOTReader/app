@@ -278,3 +278,18 @@ describe('NotebookStore — [11] setColor()', () => {
     expect(NotebookStore.getVersion()).toBe(v0);
   });
 });
+
+describe('NotebookStore — rename() keeps names unique (ds5 s11.3)', () => {
+  it('refuses a name another notebook already has, in any case, and reports it', () => {
+    NotebookStore.add('Devotional');
+    const nb = /** @type {any} */ (NotebookStore.add('Study'));
+    expect(NotebookStore.rename(nb.id, '  devotional ')).toBe(false);
+    expect(/** @type {any} */ (NotebookStore.get(nb.id)).name).toBe('Study');
+  });
+
+  it('still lets a notebook change the case of its own name', () => {
+    const nb = /** @type {any} */ (NotebookStore.add('study'));
+    expect(NotebookStore.rename(nb.id, 'Study')).toBe(true);
+    expect(/** @type {any} */ (NotebookStore.get(nb.id)).name).toBe('Study');
+  });
+});
