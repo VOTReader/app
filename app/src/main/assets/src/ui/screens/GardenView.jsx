@@ -2,6 +2,8 @@
    GardenView — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useNoAudioHere } from '../components/AudioPlayerBar.jsx';
+
 export const GARDEN_PRELOAD_AHEAD = 5; // default; the EFFECTIVE per-tier value is gardenTierLimits(tier).ahead (PERF-2)
 export const GARDEN_CRAWL_DELAY = 500;
 const MAX_ZOOM = 5;
@@ -21,6 +23,8 @@ export function gardenSwipeDir(dx, dy) {
 }
 
 export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeChange: _onThemeChange, tier }) {
+  // No audio in the Garden (Corbin 2026-10-22 23:5x): entering pauses the player where it is.
+  useNoAudioHere();
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState(false);
   // UX: retry counter, suffixed onto the <img> key so a retry REMOUNTS the

@@ -31,6 +31,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
 });
 
 import { ScriptureWebScreen } from './ScriptureWebScreen.jsx';
+import { AudioPlayer } from '../../utils/audio-player.js';
 import { _resetFallbackPlace } from '../scripture-web/WebFallbackList.jsx';
 
 const realGetContext = HTMLCanvasElement.prototype.getContext;
@@ -141,5 +142,20 @@ describe('Scripture Web without WebGL2: the web read as a list (A7)', () => {
       await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
     }
     expect(container.querySelector('.sw-fallback-list'), 'Scripture without WebGL2 is the list again').toBeTruthy();
+  });
+});
+
+/* Corbin 2026-10-22 23:5x: "Audio should not play in those two screens" (the Garden and the Scripture Web). Entering
+   the web pauses the player where it is, drawn or read as this list; the bar hides over it (app.css cz5). */
+describe('ScriptureWebScreen — no audio here', () => {
+  it('entering the web pauses the player once', async () => {
+    const pause = vi.spyOn(AudioPlayer, 'pauseIfPlaying').mockImplementation(() => {});
+    try {
+      const view = await mountWithoutWebGL();
+      expect(pause).toHaveBeenCalledTimes(1);
+      view.unmount();
+    } finally {
+      pause.mockRestore();
+    }
   });
 });

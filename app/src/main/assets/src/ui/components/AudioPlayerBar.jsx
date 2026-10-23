@@ -25,6 +25,15 @@ import { AudioManagerSheet } from './AudioManagerSheet.jsx';
 import { useStillLoading } from './AudioPlayButton.jsx';
 import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
 
+/**
+ * A screen where audio does not play (Corbin 2026-10-22 23:5x: "Audio should not play in those two screens", the
+ * Garden and the Scripture Web): entering it pauses the player where it is. The bar hides over it (app.css cz5) and
+ * is back on leaving, paused at the same spot, one tap from resuming; nothing resumes by itself.
+ */
+export function useNoAudioHere() {
+  React.useEffect(() => { AudioPlayer.pauseIfPlaying(); }, []);
+}
+
 export function AudioPlayerBar() {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   // The song skin says "Not on this phone" the moment the signal goes (and stops when it returns): the player only

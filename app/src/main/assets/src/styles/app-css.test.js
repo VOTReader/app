@@ -860,7 +860,7 @@ describe('bottom dock stack (cz1)', () => {
   });
   /* Corbin 2026-10-22 23:4x: "media player should not be present on certain screen like scripture web". The web is
      a full-screen view like the Garden: the same rule hides the bar over it (and over its load-error panel, the
-     screen's root when WebGL fails); playback and the lock-screen controls go on. */
+     screen's root when WebGL fails). Entering either also pauses the audio (useNoAudioHere, 23:5x). */
   it('the Scripture Web hides the player and the whole dock, as the Garden does', () => {
     const rule = bare.match(/body:has\(([^)]*)\) :is\(\.audio-bar, \.ascroll-pill, \.find-pill, \.mode-toggle-wrap\)\s*\{\s*display:\s*none/);
     expect(rule && rule[1].split(',').map((s) => s.trim())).toEqual(['.garden-fullscreen', '.sw-root', '.sw-fallback']);

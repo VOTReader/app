@@ -3056,6 +3056,26 @@ describe('audio-player — durable resume (position survives restart)', () => {
       expect(el().src).toBe(URL_OF('idA2'));
       expect(st.status).toBe('loading');
     });
+
+    /* Corbin 2026-10-22 23:5x: audio does not play on the Garden or the Scripture Web; entering one calls
+       pauseIfPlaying. A Play still waiting for its corpus has no element to pause: it must not start later. */
+    it('pauseIfPlaying during that wait takes the start back too', async () => {
+      delete globalThis.AUDIO_MANIFEST;
+      let land = () => {};
+      globalThis.__loadVotCorpus = () => new Promise((res) => { land = () => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }; });
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      AudioPlayer.toggle();                            // Play: the rebuild waits for the corpus
+      expect(AudioPlayer.getState().status).toBe('loading');
+      AudioPlayer.pauseIfPlaying();
+      expect(AudioPlayer.getState().status).toBe('paused');
+      land();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(FakeAudio.last).toBe(null);               // nothing started
+      const st = AudioPlayer.getState();
+      expect(st.status).toBe('paused');
+      expect(st.time).toBe(123);                       // paused at the same spot, one tap from resuming
+    });
   });
 
   it('restores a v2 custom queue without needing the lazy corpus', async () => {

@@ -72,6 +72,7 @@ import { startChapter, webChapter } from '../../utils/scripture-web/chapter-conn
 import { graphStats, densityLine, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
+import { useNoAudioHere } from '../components/AudioPlayerBar.jsx';
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
    frame live in utils/scripture-web/web-frame.js, pure and tested; the
@@ -113,6 +114,8 @@ function readChromeHidden() {
  *   over the resume point. The go-to (goto.jsx) takes it; the stub ignores it.
  */
 export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting, start }) {
+  // No audio on the Scripture Web (Corbin 2026-10-22 23:5x): entering pauses the player where it is.
+  useNoAudioHere();
   // Taken once per mount (a ref survives StrictMode's second render; the module slot does not).
   // A start wins over it (a door in from the reader): the mode, the camera and the open card all
   // start fresh on the canon, and the resume point is spent either way. Seeding the mode from it

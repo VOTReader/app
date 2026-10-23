@@ -375,6 +375,9 @@ export function stop() {
  * @returns {void}
  */
 export function pauseIfPlaying() {
+  // A restored bar's Play still waiting for its corpus (the bar says Loading, s32.1) has no element to pause: take
+  // the start back, or it would begin once the corpus lands (a screen with no audio, Corbin 2026-10-22 23:5x).
+  if (_rebuildInFlight() && _state.status === 'loading') { _toggleRebuildStart(); return; }
   if ((_state.status === 'playing' || _state.status === 'loading') && _el) {
     _el.pause();
     _markPaused();
