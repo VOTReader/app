@@ -64,4 +64,22 @@ describe('DownloadStrip', () => {
     const { container } = render(<DownloadStrip off={store({ pending: () => ({ busy: 4, failed: [] }) })} />);
     expect(container.textContent).toMatch(/No connection · 4 leftStarts again when you’re online/);
   });
+
+  // Picture 09, last state: a browser runs nothing once the page is shut, so a queue found at open waits for a yes.
+  it('stopped when the app closed (web): the line, what is left, and one Resume', () => {
+    const off = store({ paused: () => true, reason: () => 'closed', left: () => ({ count: 27, bytes: 191e6 }), batch: () => ({ done: 3, total: 30, failed: 0 }), pause: vi.fn(), resume: vi.fn() });
+    const { container, getByRole, queryByRole } = render(<DownloadStrip off={off} />);
+    expect(container.querySelector('.dl-strip-line1').textContent).toBe('Downloads stopped when VOTReader closed.');
+    expect(container.querySelector('.dl-strip-line2').textContent).toBe('27 recordings left · 191 MB');
+    expect(queryByRole('button', { name: 'Pause all' })).toBeNull();
+    expect(queryByRole('button', { name: 'Cancel' })).toBeNull();
+    fireEvent.click(getByRole('button', { name: 'Resume' }));
+    expect(off.resume).toHaveBeenCalledTimes(1);
+  });
+
+  it('paused with nothing left in line says nothing', () => {
+    const off = store({ paused: () => true, reason: () => null, left: () => ({ count: 0, bytes: 0 }), batch: () => ({ done: 0, total: 0, failed: 0 }), pause: vi.fn(), resume: vi.fn() });
+    const { container } = render(<DownloadStrip off={off} />);
+    expect(container.textContent).toBe('');
+  });
 });

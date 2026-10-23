@@ -31,6 +31,14 @@
    Download only on Wi-Fi (ra6, download-gate.js): on mobile data the queue
    waits, and one on its way stops, goes back to the head of the queue and
    starts again from the top once the phone is on Wi-Fi.
+
+   The queue (dl-d2's contract, D:/Swarm/lanes/datasafe/out/dl-d2/BRIDGE.md, as a browser keeps it): Pause all /
+   Resume all (the one on its way starts again from the top: Cache Storage keeps no part of a file); no signal, no
+   room or a failed fetch make the head WAIT (offline until a signal, space until a Remove or 30 s, retrying at 5, 20
+   and 60 s) before a network failure is final. The queue is saved beside the index (QUEUE_KEY): a browser runs
+   nothing with the page closed, so a queue found at the next open waits as 'closed' ("Downloads stopped when
+   VOTReader closed · Resume", downloads brief 3f) until Resume or a new download. A screen wake lock is held while
+   a download runs with the page in view.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { downloadsWait, onGateChange } from './download-gate.js';
@@ -43,15 +51,40 @@ const SIZE_LOOKUPS = 4;
 const PROGRESS_MS = 250;
 /** What is saved, kept beside the cache and read synchronously at boot (section 7 item 18). Not in backups. */
 const INDEX_KEY = 'vot.offlineAudioIndex';
+/** The queue, paused and the batch's counts, so a reload or a closed tab finds them again (brief section 7 item 11). */
+const QUEUE_KEY = 'vot.offlineAudioQueue';
+/** Waits before a failed fetch is tried again (the phone app's RETRY_DELAYS); then it is a failure. */
+const RETRY_MS = [5000, 20000, 60000];
+const SPACE_RECHECK_MS = 30000;
+const OFFLINE_RECHECK_MS = 30000;
+let _timing = { retry: RETRY_MS, space: SPACE_RECHECK_MS, offline: OFFLINE_RECHECK_MS };
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
+/** @typedef {{ url: string, key: string, title: string, bytes: number, tries?: number }} QueueItem bytes 0 = not known */
 
 /** @type {Map<string, SavedItem>} */
 let _items = new Map();
-/** @type {Array<{ url: string, key: string, title: string }>} */
+/** @type {QueueItem[]} */
 let _queue = [];
-/** @type {{ url: string, bytes: number, total: number, ctl: AbortController, held: boolean } | null} */
+/** held: stopped for mobile data or Pause, so it goes back to the head of the queue. @type {{ it: QueueItem, url: string, bytes: number, total: number, ctl: AbortController, held: boolean } | null} */
 let _active = null;
+let _paused = false;
+/** Paused because the queue was found at open (the page closed with it), not by Pause all. */
+let _closed = false;
+/** Why the head of the queue waits: offline | space | retrying, or null. @type {string | null} */
+let _hold = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _holdTimer = null;
+/** @type {(() => void) | null} */
+let _onlineHook = null;
+/** Recordings asked since the queue was last empty: "Downloading 3 of 31" = done + 1 of total. */
+let _batch = { done: 0, total: 0, failed: 0 };
+/** @type {any} the screen wake lock while a download runs in view */
+let _lock = null;
+let _lockAsking = false;
+let _visHooked = false;
+/** Bumped by a reload (tests' _reset): a job of the page before it changes nothing. */
+let _gen = 0;
 /** @type {(() => void) | null} */
 let _unhookGate = null;
 let _free = -1;
@@ -172,6 +205,7 @@ function _load() {
       _items = items;
       _writeIndex();
     } catch (_e) { /* no cache here (a private window): nothing is saved */ _items = new Map(); }
+    _restoreQueue();
     _loaded = true;
     // 'checked', not 'done': the mirror re-reads either way, but a 'done' with nothing downloading told a screen
     // reader "Download finished" at every boot whose first screen had a download control.
@@ -192,7 +226,128 @@ function _state() {
     active: _active ? { url: _active.url, bytes: _active.bytes, total: _active.total } : null,
     // Download only on Wi-Fi: what is queued waits for it (the rows say so).
     waiting: !!_queue.length && downloadsWait(),
+    paused: _paused,
+    reason: _reasonNow(),
+    left: _left(),
+    batch: { ..._batch },
+    // Web only: what each one on its way was asked as, so the In line rows have titles after a reload.
+    queue: (_active ? [_active.it] : []).concat(_queue).map((t) => ({ url: t.url, key: t.key, title: t.title })),
   };
+}
+
+/** Why the queue is not moving (paused, closed, wifi, offline, space, retrying), or null when it is, or is empty. */
+function _reasonNow() {
+  if (!_queue.length && !_active) return null;
+  if (_paused) return _closed ? 'closed' : 'paused';
+  if (downloadsWait()) return 'wifi';
+  return _hold;
+}
+
+/** What is still to download: how many, their known bytes, how many have no size. */
+function _left() {
+  let bytes = 0;
+  let unknown = 0;
+  const a = _active;
+  if (a) {
+    if (a.total > 0) bytes += Math.max(0, a.total - a.bytes);
+    else if (a.it.bytes > 0) bytes += a.it.bytes;
+    else unknown++;
+  }
+  for (const t of _queue) { if (t.bytes > 0) bytes += t.bytes; else unknown++; }
+  return { count: _queue.length + (a ? 1 : 0), bytes, unknown };
+}
+
+/** Save the queue (the one on its way first), paused and the batch; nothing when there is nothing to come back to. */
+function _persistQueue() {
+  try {
+    const q = (_active ? [_active.it] : []).concat(_queue);
+    if (!q.length) { localStorage.removeItem(QUEUE_KEY); return; }
+    localStorage.setItem(QUEUE_KEY, JSON.stringify({
+      items: q.map((t) => ({ url: t.url, key: t.key, title: t.title, bytes: t.bytes })),
+      paused: _paused && !_closed,
+      batch: _batch,
+    }));
+  } catch (_e) { /* storage off or full: the queue lives as long as the page */ }
+}
+
+/**
+ * The queue a closed page left: what is not saved yet goes back in line, waiting as 'closed' (or 'paused', when Pause
+ * all held it), so nothing starts using data before the listener says so. Once, with the cache read.
+ */
+function _restoreQueue() {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(QUEUE_KEY) || 'null'); } catch (_e) { saved = null; }
+  if (!saved || !Array.isArray(saved.items)) return;
+  const have = new Set(_queue.map((t) => t.url));
+  /** @type {QueueItem[]} */
+  const back = [];
+  for (const t of saved.items) {
+    if (!t || typeof t.url !== 'string' || !relayUrl(t.url) || _items.has(t.url) || have.has(t.url)) continue;
+    have.add(t.url);
+    back.push({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0 });
+  }
+  if (!back.length) { _persistQueue(); return; }
+  _queue = back.concat(_queue);
+  _paused = true;
+  _closed = saved.paused !== true;
+  const b = saved.batch && typeof saved.batch === 'object' ? saved.batch : {};
+  const done = Math.max(0, Number(b.done) || 0);
+  const failed = Math.max(0, Number(b.failed) || 0);
+  _batch = { done, failed, total: Math.max(Number(b.total) || 0, done + failed + back.length) };
+  _hookGate();
+}
+
+/** The head waits for `reason` (offline, space, retrying) until `ms` pass, a signal comes back or something frees it. */
+function _holdFor(/** @type {string} */ reason, /** @type {number} */ ms, /** @type {string} */ url) {
+  _hold = reason;
+  if (_holdTimer) clearTimeout(_holdTimer);
+  _holdTimer = setTimeout(_releaseHold, ms);
+  if (reason === 'offline' && !_onlineHook && typeof window !== 'undefined') {
+    _onlineHook = _releaseHold;
+    window.addEventListener('online', _onlineHook);
+  }
+  _emit({ type: 'waiting', url, reason });
+}
+
+/** Whatever the head waited for, it tries again now. */
+function _releaseHold() {
+  if (_holdTimer) clearTimeout(_holdTimer);
+  _holdTimer = null;
+  if (_onlineHook && typeof window !== 'undefined') window.removeEventListener('online', _onlineHook);
+  _onlineHook = null;
+  if (!_hold) return;
+  _hold = null;
+  _next();
+}
+
+/** The queue emptied by a cancel (or Remove all): nothing waits, and the next download starts unpaused. */
+function _settleEmpty() {
+  _paused = false; _closed = false;
+  _hold = null;
+  if (_holdTimer) clearTimeout(_holdTimer);
+  _holdTimer = null;
+}
+
+/** No signal, as far as the browser knows (a failed fetch with onLine true is a retry, not a wait). */
+const _offlineNow = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
+/** Keep the screen on while a download runs in view (brief 3f); let it go when none does. */
+function _wakeCheck() {
+  const wl = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator).wakeLock : null;
+  const want = !!_active && typeof document !== 'undefined' && document.visibilityState === 'visible';
+  if (want && !_lock && !_lockAsking && wl && typeof wl.request === 'function') {
+    _lockAsking = true;
+    Promise.resolve().then(() => wl.request('screen')).then((/** @type {any} */ l) => {
+      _lockAsking = false;
+      if (!_active) { l.release().catch(() => {}); return; }
+      _lock = l;
+      l.addEventListener('release', () => { if (_lock === l) _lock = null; });
+    }, () => { _lockAsking = false; /* refused (battery saver, no permission): downloads go on regardless */ });
+  } else if (!want && _lock) {
+    const l = _lock;
+    _lock = null;
+    l.release().catch(() => {});
+  }
 }
 
 /** @param {string} json @returns {any[]} */
@@ -213,21 +368,35 @@ function _onGate() {
 
 function _hookGate() {
   if (!_unhookGate) _unhookGate = onGateChange(_onGate);
+  // The wake lock goes when the page is hidden; back in view with a download running, ask again.
+  if (!_visHooked && typeof document !== 'undefined') { _visHooked = true; document.addEventListener('visibilitychange', _wakeCheck); }
 }
 
 async function _next() {
   if (_active || !_queue.length) return;
+  // Paused (Pause all, or found at open): the queue holds where it is; Resume goes on.
+  if (_paused) { _emit({ type: 'checked' }); return; }
   // Download only on Wi-Fi: on mobile data the queue waits (the rows re-read, and say so); _onGate starts it on Wi-Fi.
   if (downloadsWait()) { _emit({ type: 'checked' }); return; }
-  const it = /** @type {{ url: string, key: string, title: string }} */ (_queue.shift());
+  if (_hold) return;
+  // No signal: wait for one (the 'online' event, or a look every 30 s); that spends no retry.
+  if (_offlineNow()) { _holdFor('offline', _timing.offline, _queue[0].url); return; }
+  const it = /** @type {QueueItem} */ (_queue.shift());
   const ctl = new AbortController();
-  const job = { url: it.url, bytes: 0, total: -1, ctl, held: false };
+  const job = { it, url: it.url, bytes: 0, total: -1, ctl, held: false };
+  const gen = _gen;
   _active = job;
+  _wakeCheck();
   _emit({ type: 'progress', url: it.url, bytes: 0, total: -1 });
   let reason = 'network';
   let stored = false;
   try {
     if (_items.has(it.url)) throw new Error('already saved');
+    // Its size known (the page's baked bytes): no room is known before a byte is fetched.
+    if (it.bytes > 0) {
+      await _estimate();
+      if (_free >= 0 && it.bytes > _free) { reason = 'space'; throw new Error('no room'); }
+    }
     if (!_persistAsked) {
       _persistAsked = true;
       // The answer was ignored, so downloads the browser may clear carried no word of it (brief section 7 item 3).
@@ -235,13 +404,19 @@ async function _next() {
     }
     const from = relayUrl(it.url);
     if (!from) throw new Error('not a release recording');
+    // Paused, cancelled or reloaded while it looked for room: it never fetches.
+    if (ctl.signal.aborted || gen !== _gen) throw new Error('stopped');
     const res = await fetch(from, { signal: ctl.signal, credentials: 'omit' });
     if (res.status !== 200 || !res.body) throw new Error('relay ' + res.status);
     const total = Number(res.headers.get('Content-Length')) || 0;
     if (!(total > 0)) { reason = 'size'; throw new Error('no size'); }
     job.total = total;
     await _estimate();
-    if (_free >= 0 && total > _free) { reason = 'space'; throw new Error('no room'); }
+    if (_free >= 0 && total > _free) {
+      reason = 'space';
+      try { res.body.cancel(); } catch (_e) { /* already closed */ }
+      throw new Error('no room');
+    }
     let last = 0;
     const count = new TransformStream({
       transform(chunk, out) {
@@ -266,26 +441,41 @@ async function _next() {
     // Cancelled (or swept by Remove all) while its last bytes were being stored: it does not stay (sweep W63).
     if (ctl.signal.aborted) throw new Error('cancelled');
     if (job.bytes !== total) { reason = 'short'; throw new Error('short'); }
+    if (gen !== _gen) return;
     _items.set(it.url, { url: it.url, key: it.key, title: it.title, bytes: total, savedAt });
     _writeIndex();
     await _estimate();
     _active = null;
+    _batch.done++;
+    _persistQueue();
     _emit({ type: 'done', url: it.url });
   } catch (e) {
+    if (gen !== _gen) return;
     _active = null;
     // A cut-off copy never stays behind to play half a letter. (A put that failed stored nothing: a copy saved
     // before it is untouched.)
     if (stored) { try { await (await caches.open(OFFLINE_AUDIO_CACHE)).delete(it.url); } catch (_e) { /* gone already */ } }
-    if (_items.has(it.url)) _emit({ type: 'done', url: it.url });
-    // Stopped for mobile data: back at the head of the queue, from the top (its bytes are gone), waiting for Wi-Fi.
-    else if (job.held) { _queue.unshift(it); _emit({ type: 'checked' }); }
-    else if (ctl.signal.aborted) _emit({ type: 'cancelled', url: it.url });
-    else {
-      if (e && /** @type {any} */ (e).name === 'QuotaExceededError') reason = 'space';
+    if (e && /** @type {any} */ (e).name === 'QuotaExceededError') reason = 'space';
+    if (_items.has(it.url)) { _batch.done++; _persistQueue(); _emit({ type: 'done', url: it.url }); }
+    // Stopped for mobile data or Pause all: back at the head of the queue, from the top (its bytes are gone).
+    else if (job.held) { _queue.unshift(it); _persistQueue(); _emit({ type: 'checked' }); }
+    else if (ctl.signal.aborted) { _persistQueue(); _emit({ type: 'cancelled', url: it.url }); }
+    // No room is a wait, never a failure (brief 3i): a Remove or a look every 30 s tries again.
+    else if (reason === 'space') { _queue.unshift(it); _holdFor('space', _timing.space, it.url); }
+    else if (reason === 'network' && _offlineNow()) { _queue.unshift(it); _holdFor('offline', _timing.offline, it.url); }
+    else if (reason === 'network' && (it.tries || 0) < _timing.retry.length) {
+      const wait = _timing.retry[it.tries || 0];
+      it.tries = (it.tries || 0) + 1;
+      _queue.unshift(it);
+      _holdFor('retrying', wait, it.url);
+    } else {
+      _batch.failed++;
+      _persistQueue();
       _emit({ type: 'failed', url: it.url, reason });
     }
   }
   _next();
+  _wakeCheck();
 }
 
 /** The phone app's bridge, as a browser keeps it. */
@@ -300,24 +490,51 @@ export const WebOfflineAudio = {
     }
     return JSON.stringify(_state());
   },
-  /** @param {string} json [{ url, key, title }] */
+  /** @param {string} json [{ url, key, title, bytes? }] */
   offlineAudioSave(json) {
     // Before the cache has been read nothing looks saved: a save then would fetch again what is already kept.
     if (!_loaded) { _load().then(() => WebOfflineAudio.offlineAudioSave(json)); return; }
     _hookGate();
     const busy = new Set(_queue.map((t) => t.url).concat(_active ? [_active.url] : []));
+    // A new batch once the queue has been empty (the phone app's count).
+    if (!busy.size) _batch = { done: 0, total: 0, failed: 0 };
     /** @type {string[]} */
     const queued = [];
     for (const t of _list(json)) {
       if (!t || typeof t.url !== 'string' || _items.has(t.url) || busy.has(t.url)) continue;
       if (!relayUrl(t.url)) { _emit({ type: 'failed', url: t.url, reason: 'network' }); continue; }
-      _queue.push({ url: t.url, key: String(t.key || ''), title: String(t.title || '') });
+      _queue.push({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0 });
       busy.add(t.url);
       queued.push(t.url);
     }
+    if (!queued.length) return;
+    _batch.total += queued.length;
+    // Asking for more is a yes to what stopped when the page closed; a Pause all the listener chose holds.
+    if (_closed) { _closed = false; _paused = false; }
+    _persistQueue();
     // One event for the batch, as the phone app sends it (n2-03).
-    if (queued.length) _emit({ type: 'queued', urls: queued });
+    _emit({ type: 'queued', urls: queued });
     _next();
+  },
+  /** Pause all: the one on its way stops and goes back to the head of the queue. Holds across a reload. */
+  offlineAudioPause() {
+    if (_paused && !_closed) return;
+    _paused = true;
+    _closed = false;
+    if (_active && !_active.held) { _active.held = true; _active.ctl.abort(); }
+    _persistQueue();
+    _emit({ type: 'checked' });
+  },
+  /** Resume all (and the queue found at open): it goes on from the head. */
+  offlineAudioResume() {
+    if (!_paused) return;
+    _paused = false;
+    _closed = false;
+    _persistQueue();
+    _hookGate();
+    if (_hold) _releaseHold();
+    else _next();
+    _emit({ type: 'checked' });
   },
   /** @param {string} json urls, or ['*'] for every one */
   offlineAudioRemove(json) {
@@ -336,6 +553,8 @@ export const WebOfflineAudio = {
       } catch (_e) { /* the next load reads what is really there */ }
       await _estimate();
       _emit({ type: 'removed', url: gone.length === 1 ? gone[0] : null });
+      // Room was made: a queue waiting for space tries again now.
+      if (_hold === 'space') _releaseHold();
     })();
   },
   /** @param {string} json urls, or ['*'] for every one */
@@ -344,9 +563,14 @@ export const WebOfflineAudio = {
     const all = urls.includes('*');
     const dropped = _queue.filter((t) => all || urls.includes(t.url));
     _queue = _queue.filter((t) => !dropped.includes(t));
+    let off = dropped.length;
     for (const t of dropped) _emit({ type: 'cancelled', url: t.url });
     // A cancel outranks a stop for mobile data that has not landed yet: it is cancelled, not queued again.
-    if (_active && (all || urls.includes(_active.url))) { _active.held = false; _active.ctl.abort(); }
+    if (_active && (all || urls.includes(_active.url))) { _active.held = false; _active.ctl.abort(); off++; }
+    // Cancelled ones leave the batch's count ("3 of 31" never waits on them).
+    if (off) _batch.total = Math.max(0, _batch.total - off);
+    if (!_queue.length && (!_active || _active.ctl.signal.aborted)) _settleEmpty();
+    _persistQueue();
   },
   /** @param {string} json urls whose sizes the page wants (answered by one 'sizes' event) */
   offlineAudioSizes(json) {
@@ -392,11 +616,20 @@ export const WebOfflineAudio = {
     const m = _release(url);
     return !!m && typeof src === 'string' && src.endsWith('/offline-audio/' + m[1] + '/' + m[2]);
   },
-  /** Tests only. */
+  /** Tests only: the waits, shortened. @param {{ retry?: number[], space?: number, offline?: number }} t */
+  _setTiming(t) { _timing = { ..._timing, ...t }; },
+  /** Tests only (a reload: what localStorage and the cache hold stays). */
   _reset() {
     if (_active) _active.ctl.abort();
     if (_unhookGate) _unhookGate();
     _unhookGate = null;
+    if (_holdTimer) clearTimeout(_holdTimer);
+    if (_onlineHook && typeof window !== 'undefined') window.removeEventListener('online', _onlineHook);
+    if (_visHooked && typeof document !== 'undefined') document.removeEventListener('visibilitychange', _wakeCheck);
+    _holdTimer = null; _onlineHook = null; _hold = null; _visHooked = false; _lock = null; _lockAsking = false;
+    _gen++;
+    _paused = false; _closed = false; _batch = { done: 0, total: 0, failed: 0 };
+    _timing = { retry: RETRY_MS, space: SPACE_RECHECK_MS, offline: OFFLINE_RECHECK_MS };
     _items = new Map(); _queue = []; _active = null; _free = -1; _loaded = false; _seeded = false; _loading = null; _persistAsked = false; _persisted = null;
   },
 };

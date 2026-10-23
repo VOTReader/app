@@ -162,6 +162,12 @@ function refresh() {
   const bt = s.batch && typeof s.batch === 'object' ? s.batch : {};
   _batch = { done: Number(bt.done) || 0, total: Number(bt.total) || 0, failed: Number(bt.failed) || 0 };
   for (const url of _saved.keys()) _failed.delete(url);
+  // The web store names what each one on its way was asked as (the native state does not): titles after a reload.
+  if (Array.isArray(s.queue)) {
+    for (const q of s.queue) {
+      if (q && typeof q.url === 'string' && !_asked.has(q.url)) _asked.set(q.url, { url: q.url, key: String(q.key || ''), title: String(q.title || '') });
+    }
+  }
   _notify();
 }
 
@@ -233,7 +239,17 @@ function _onEvent(json) {
     default:
       return;
   }
+  // The queue's own words (left, batch, reason) change with these too; progress is too frequent to re-read for.
+  if (e.type !== 'progress' && e.type !== 'sizes') _refreshSoon();
   _notify();
+}
+
+let _refreshQueued = false;
+/** One re-read for a burst of events (a cancel of a whole edition sends one per recording). */
+function _refreshSoon() {
+  if (_refreshQueued) return;
+  _refreshQueued = true;
+  queueMicrotask(() => { _refreshQueued = false; refresh(); });
 }
 
 function _install() {
@@ -415,7 +431,9 @@ export const OfflineAudio = {
       .map((t) => {
         /** @type {{ url: string, key: string, title: string, bytes?: number }} */
         const it = { url: t.url, key: String(t.key || ''), title: String(t.title || '') };
-        if (typeof t.bytes === 'number' && t.bytes > 0) it.bytes = t.bytes;
+        // The build's size when the caller gave none (brief section 7 item 17): the phone totals the queue with no lookups.
+        const bytes = typeof t.bytes === 'number' && t.bytes > 0 ? t.bytes : bytesOf(t.url);
+        if (bytes && bytes > 0) it.bytes = bytes;
         return it;
       });
     if (!b || typeof b.offlineAudioSave !== 'function') return false;

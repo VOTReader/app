@@ -626,18 +626,34 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(s.update).toHaveBeenCalledWith([expect.objectContaining({ url: U('a') })]);
   });
 
-  it('shows what is on its way and what did not download, with Cancel all and Retry all (n2-05)', () => {
+  it('shows what is on its way and what did not download, with Cancel all and Retry (n2-05; picture 08)', () => {
     const s = fakeStore();
     s.cancelAll = vi.fn();
     const failed = [{ url: U('c'), key: 'one:c', title: 'Letter c' }];
     s.pending = () => ({ busy: 12, failed });
+    s.failureOf = () => 'network';
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(container.textContent).toMatch(/Downloading · 12 recordings to go/);
-    expect(container.textContent).toMatch(/Did not download · 1 recording/);
+    expect(container.textContent).toMatch(/Letter cServer didn’t answer/);
     fireEvent.click(getByRole('button', { name: /^cancel all/i }));
     expect(s.cancelAll).toHaveBeenCalledTimes(1);
-    fireEvent.click(getByRole('button', { name: /^retry all/i }));
+    fireEvent.click(getByRole('button', { name: 'Retry Letter c' }));
     expect(s.download).toHaveBeenCalledWith(failed);
+  });
+
+  it('In line (picture 08): the one downloading with its bytes, then each waiting with its place', () => {
+    const s = fakeStore();
+    const q = [{ url: U('h'), key: 'one:h', title: 'Honor God' }, { url: U('x'), key: 'one:x', title: 'Christmas' }, { url: U('d'), key: 'one:d', title: '' }];
+    s.queue = () => q;
+    s.pending = () => ({ busy: 3, failed: [] });
+    s.statusOf = (u) => (u === U('h') ? 'downloading' : 'queued');
+    s.progressOf = (u) => (u === U('h') ? { bytes: 4_100_000, total: 7_000_000 } : null);
+    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const rows = [...container.querySelectorAll('.dl-queue-row')].map((r) => r.textContent);
+    expect(rows[0]).toBe('Honor God4.1 of 7 MB');
+    expect(rows[1]).toBe('ChristmasWaiting · 1st in line');
+    expect(rows[2]).toMatch(/Waiting · 2nd in line$/);
+    expect(container.querySelector('.dl-queue-count').textContent).toBe('3');
   });
 
   it('nothing on the phone opens Choose; the empty shelf says how to fill it', () => {

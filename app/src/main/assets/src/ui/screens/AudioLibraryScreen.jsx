@@ -17,7 +17,8 @@
    shelf, one copy of each table. */
 
 import { studiesSummary } from './AudioStudiesScreen.jsx';
-import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote } from '../components/OfflineAudioControls.jsx';
+import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote, useOnline } from '../components/OfflineAudioControls.jsx';
+import { stripModel } from '../components/DownloadStrip.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
@@ -179,6 +180,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
   const downloads = offline ? offline.items() : [];
   // Recordings on their way: the row shows (and says so) while a Download all runs, not only once one landed (n2-05).
   const busy = offline && typeof offline.pending === 'function' ? offline.pending().busy : 0;
+  // The row says what the Downloads strip says (picture 02): 'Downloading 3 of 30 · 191 MB left', 'Paused · 3 of 30'.
+  const online = useOnline();
+  const queueLine = offline ? stripModel(offline, online) : null;
   const isPlaying = state.status === 'playing';
   const isLoading = state.status === 'loading';
   const active = isPlaying || isLoading;
@@ -315,8 +319,10 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                 <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
                 <span className="audio-library-shelf-copy">
                   <strong>Downloads</strong>
-                  <small>{busy
-                    ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
+                  <small>{queueLine
+                    ? (queueLine.reason === 'closed' ? 'Stopped when VOTReader closed · ' + queueLine.count + ' left' : queueLine.line1)
+                      + (queueLine.reason == null && queueLine.leftBytes ? ' · ' + queueLine.leftBytes + ' left' : '')
+                    : busy ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
                     : !downloads.length ? 'Download for offline listening'
                     : downloads.length + ' on this phone · ' + formatBytes(offline.totalBytes())}</small>
                 </span>

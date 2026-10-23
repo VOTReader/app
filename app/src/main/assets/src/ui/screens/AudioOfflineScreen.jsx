@@ -15,6 +15,7 @@
 import { useOfflineAudio, formatBytes, isLeaving, removeWithUndo, REMOVED_TOAST_ID } from '../components/OfflineAudioControls.jsx';
 import { DownloadChooser, Sheet, TrashIcon } from '../components/DownloadChooser.jsx';
 import { DownloadStrip } from '../components/DownloadStrip.jsx';
+import { DownloadQueue } from '../components/DownloadQueue.jsx';
 import { countOf } from '../../utils/download-tree.js';
 
 export { REMOVED_TOAST_ID };
@@ -224,7 +225,6 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   // A single Remove waits out its Undo (removeWithUndo, brief section 7 item 14): the row steps aside at once.
   const items = off ? off.items().filter((it) => !isLeaving(it.url)) : [];
   const sections = shelfSections(items);
-  const pending = off && typeof off.pending === 'function' ? off.pending() : { busy: 0, failed: [] };
   const total = off ? off.totalBytes() : 0;
   const songs = off && typeof off.songItems === 'function' ? off.songItems().reduce((n, it) => n + (it.bytes || 0), 0) : 0;
   const free = off ? off.freeBytes() : -1;
@@ -290,6 +290,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
           {/* Pinned under the tabs (README: the strip). */}
           {off ? <DownloadStrip off={off} /> : null}
+          {/* In line (picture 08): the one downloading, each waiting with its place, each that did not download with Retry. */}
+          {off ? <DownloadQueue off={off} /> : null}
           {items.length || songs ? (
             <div className="dl-storage">
               {barTotal > 0 ? (
@@ -314,16 +316,6 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
                 <span>{'Updates available · ' + many(stale.length)}</span>
                 <button type="button" className="offline-row-link" onClick={() => off.update(stale)}>Update all</button>
               </p>
-            </div>
-          ) : null}
-          {pending.failed.length ? (
-            <div className="offline-collection offline-shelf-status">
-              {pending.failed.length ? (
-                <p className="offline-collection is-failed">
-                  <span>{'Did not download · ' + many(pending.failed.length)}</span>
-                  <button type="button" className="offline-row-link" onClick={() => off.download(pending.failed)}>Retry all</button>
-                </p>
-              ) : null}
             </div>
           ) : null}
 

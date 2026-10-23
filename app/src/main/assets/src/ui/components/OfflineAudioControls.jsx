@@ -315,7 +315,7 @@ export function DownloadIcon() {
 function CheckIcon() {
   return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>;
 }
-function AlertIcon() {
+export function AlertIcon() {
   return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5v.01" /></svg>;
 }
 function NoSignalIcon() {
@@ -499,7 +499,7 @@ export function OfflineCollectionAction({ units, label, action = 'Download all',
 }
 
 /** A thin ring with a gold arc for the share on the phone; a tick in it once all of it is. @param {{ share: number }} props */
-function OnPhoneRing({ share }) {
+export function OnPhoneRing({ share }) {
   const all = share >= 1;
   const c = 2 * Math.PI * 9;
   return (
@@ -611,7 +611,7 @@ export function CloudOffIcon() {
 }
 
 /** "4 of 10 MB": the unit said once when both halves share it. @param {number} done @param {number} total */
-function _ofBytes(done, total) {
+export function ofBytes(done, total) {
   const a = formatBytes(done) || '0 MB';
   const b = formatBytes(total);
   const unit = / (MB|GB)$/.exec(b);
@@ -648,7 +648,7 @@ export function HeroDownload({ tracks, name }) {
       else { const p = off.progressOf(x); if (p) done += p.bytes; }
     }
     const cap = !u.started ? (waitsForWifi(off, urls) ? WAITING_WORDS : !online ? 'Waiting for a connection' : 'Waiting')
-      : u.bytes ? _ofBytes(done, u.bytes) : u.percent + '%';
+      : u.bytes ? ofBytes(done, u.bytes) : u.percent + '%';
     return (
       <button type="button" className="hero-dl is-busy" {...focus} onClick={() => _cancel(off, urls)} aria-label={'Cancel the download of ' + name + '. ' + cap}>
         <svg className="hero-dl-ring" viewBox="0 0 24 24" aria-hidden="true">
