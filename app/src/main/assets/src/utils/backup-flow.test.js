@@ -783,7 +783,11 @@ describe('sweep v034: the safety copies go only once the library has', () => {
   it('media that will not delete keeps the copies too; the library went, so DataSafety stays marked', async () => {
     deletes((name) => (name === 'vot-journal-media' ? 'onerror' : 'onsuccess'));
     await createBackupFlow(ctx).clearAllPersonalData();
-    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(lastToast()).toBe('Clear did not finish. Reloading… then please try again.');
+    // ds5 s33.1: the library database is gone, so the writers stay frozen until the reload:
+    // lifting the fence let the next save recreate a partial 'votreader' from memory.
+    expect(globalThis.setStoreWriteFence).not.toHaveBeenCalledWith(false);
+    expect(ctx.reloadPendingRef.current).toBe(true);
     expect(ds.clearSnapshots).not.toHaveBeenCalled();
     expect(ds.clearWeeklyCopies).not.toHaveBeenCalled();
     expect(ds.abortClear).not.toHaveBeenCalled();
@@ -840,7 +844,7 @@ describe('W8: the other open tabs hear about Clear All and Import', () => {
       return req;
     });
     await createBackupFlow(ctx).clearAllPersonalData();
-    expect(lastToast()).toBe('Clear did not finish. Please try again.');
+    expect(lastToast()).toBe('Clear did not finish. Reloading… then please try again.');
     expect(said).toEqual(['changing', 'changed']);
   });
 

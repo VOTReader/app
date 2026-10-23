@@ -2,7 +2,7 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { settingsGlance } from '../../utils/settings-glance.js';
+import { settingsGlance, daysAgo } from '../../utils/settings-glance.js';
 import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell } from '../../utils/download-gate.js';
@@ -507,22 +507,23 @@ function AllProgressClearRow({ totalRead, totalItems, hasMarks, hasPartial, onCl
   );
 }
 
-/** "today", "yesterday", or "N days ago" for a past time. @param {number} at */
-function _daysAgo(at) {
-  const day = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-  const n = Math.round((day(Date.now()) - day(at)) / 86400000);
-  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
-}
+const _daysAgo = (/** @type {number} */ at) => daysAgo(at);
 
 /** datasafe 10-05: when this device last finished an export (backup-flow.js LAST_EXPORT_KEY). */
-function _lastBackupText() {
+function _lastBackupAt() {
   let at = 0;
   try { at = Number(localStorage.getItem('vot-last-export')) || 0; } catch (_e) { /* no storage */ }
+  return at;
+}
+function _lastBackupText() {
+  const at = _lastBackupAt();
   return at ? 'Exported ' + _daysAgo(at) : 'Not exported from this device yet';
 }
 
-/** @param {{ where: string | null, count: number, newestAt: number }} st */
+/** @param {{ where: string | null, count: number, newestAt: number, tooBig?: number }} st */
 function _snapshotText(st) {
+  // ds5 s34.1: past the cap no copy is taken; say so where the copies are described.
+  if (st.tooBig) return 'Paused: your library is too big for an automatic copy (' + Math.round(st.tooBig / 1048576) + ' MB). Export a backup to keep a copy.';
   if (!st.count) return 'The first is taken shortly after the app opens';
   const where = st.where === 'phone' ? 'kept on this phone' : 'kept in this browser (cleared with its site data)';
   return 'Newest ' + _daysAgo(st.newestAt) + ' · ' + st.count + ' ' + where;
@@ -645,7 +646,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // of the deployed service-worker.js that installs nothing.
   const [buildInfo, setBuildInfo] = React.useState({ state: 'loading', running: null, server: null });
   // datasafe 10-05: the automatic snapshots' line in Your Data (DataSafety lives in bundle-b).
-  const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number } | null} */ (null));
+  const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number, tooBig?: number } | null} */ (null));
   // dl-weekly: the weekly copy in Downloads (phone app, Android 10+).
   const [weekly, setWeekly] = React.useState(/** @type {{ supported: boolean, on: boolean, count: number, newestAt: number } | null} */ (null));
   React.useEffect(() => {
@@ -958,6 +959,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const glance = settingsGlance({
     settings, theme, textPercent: textScalePercent, fontLabel: selectedFontLabel,
     readerLabel, gardenLabel: gardenTier ? gardenTier.label + ' images' : null,
+    lastBackupAt: _lastBackupAt(),
   });
 
   return (

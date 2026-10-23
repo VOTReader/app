@@ -103,7 +103,7 @@ export function _validateTabState(s) {
 import { answersRetiredPlace } from '../utils/answers-retired.js';
 import { StateStore } from '../stores/state-store.js';
 import { mergeStateStore } from '../stores/store-merge.js';
-import { takeResumeRecord, stateStoreUnloaded } from './use-persisted-state.js';
+import { takeResumeRecord, stateStoreUnloaded, markSavedStateRead } from './use-persisted-state.js';
 
 /**
  * Read + validate vot-state exactly once on mount. Source-of-truth
@@ -140,6 +140,7 @@ import { takeResumeRecord, stateStoreUnloaded } from './use-persisted-state.js';
  */
 export function useSavedState() {
   return React.useMemo(() => {
+    markSavedStateRead(false);
     try {
       // The leave record, when this boot is the far side of a reload; the
       // store otherwise. Read-and-clear is one call.
@@ -203,6 +204,11 @@ export function useSavedState() {
       _validateTabState(s);
       if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
       return s;
-    } catch (_e) { return {}; }
+    } catch (_e) {
+      // ds5 s04.1: {} here is NOT an empty store; usePersistedState holds every
+      // write of this mount so the defaults never land over the stored record.
+      markSavedStateRead(true);
+      return {};
+    }
   }, []);
 }

@@ -95,6 +95,15 @@ export const PROGRESS_RESET_KEY = 'vot-health-progress';
 export const MIN_SCORE = 5;
 /** Never snapshot a manifest bigger than this (SnapshotStore refuses 24 MB). */
 const MAX_SNAPSHOT_BYTES = 16 * 1024 * 1024;
+/** The cap in force (a test lowers it). */
+let _maxSnapshotBytes = MAX_SNAPSHOT_BYTES;
+/** ds5 s34.1: the size of the last snapshot refused for the cap, 0 when none was: Your Data shows it. */
+let _tooBigBytes = 0;
+/** A snapshot past the cap: logged once a session, kept for status(). @param {number} n */
+function _tooBig(n) {
+  if (!_tooBigBytes) DiagnosticLog.warn('data-health', 'library too big for an automatic snapshot: ' + n + ' chars (cap ' + _maxSnapshotBytes + '); none saved');
+  _tooBigBytes = n;
+}
 /** Stores never snapshotted: song bytes (gigabytes; they come back from the song sites). */
 const SKIP_STORES = new Set(['offline-songs']);
 /** localStorage {name, at} of the last auto-restore: once an hour per snapshot (5). In LS_SKIP_LIST. */
@@ -242,14 +251,26 @@ function _openNote() {
     (lost ? ', dataLoss ' + info.dataLoss + (info.dataLossMessage ? ' (' + info.dataLossMessage + ')' : '') : '');
 }
 
-/** May this boot restore `name` on its own? Once an hour per snapshot (5). @param {string} name @param {number} ms */
+/** May this boot restore `name` on its own? Once an hour per snapshot (5). Taken before the
+ *  restore (its reload must find the hour spent); ds5 s34.2: a restore that then did not run
+ *  hands it back (_refundAutoRestore), so a busy lock or another tab does not cost the hour.
+ *  @param {string} name @param {number} ms @returns {{ prev: string | null } | null} */
 function _mayAutoRestore(name, ms) {
   try {
-    const last = JSON.parse(localStorage.getItem(AUTO_RESTORE_KEY) || 'null');
-    if (last && last.name === name && ms - (+last.at || 0) < AUTO_RESTORE_WINDOW_MS) return false;
+    const prev = localStorage.getItem(AUTO_RESTORE_KEY);
+    const last = JSON.parse(prev || 'null');
+    if (last && last.name === name && ms - (+last.at || 0) < AUTO_RESTORE_WINDOW_MS) return null;
     localStorage.setItem(AUTO_RESTORE_KEY, JSON.stringify({ name, at: ms }));
-    return true;
-  } catch (_e) { return false; }                 // no storage, no guard: never restore on our own
+    return { prev };
+  } catch (_e) { return null; }                  // no storage, no guard: never restore on our own
+}
+
+/** @param {{ prev: string | null }} token */
+function _refundAutoRestore(token) {
+  try {
+    if (token.prev == null) localStorage.removeItem(AUTO_RESTORE_KEY);
+    else localStorage.setItem(AUTO_RESTORE_KEY, token.prev);
+  } catch (_e) { /* no storage */ }
 }
 
 /** The toast after a restore's reload: which copy came back. Shown once. */
@@ -272,7 +293,7 @@ function _showRestoredNote() {
  * The boot-time pass: check health, then take today's snapshot. Quiet on every
  * failure. Resolves to what it did, for tests and the diagnostic log.
  * @param {{ now?: () => number, sink?: any, force?: boolean, weeklyBridge?: any, reload?: () => void }} [opts] force: snapshot now, no comparison (acceptCurrent); weeklyBridge: a stand-in for AndroidBridge (tests); reload: the auto-restore's reload (tests)
- * @returns {Promise<'no-sink' | 'not-loaded' | 'damaged' | 'restored' | 'snapshotted' | 'fresh' | 'empty' | 'failed'>}
+ * @returns {Promise<'no-sink' | 'not-loaded' | 'damaged' | 'restored' | 'snapshotted' | 'fresh' | 'empty' | 'too-big' | 'failed'>}
  */
 export async function run(opts) {
   const now = (opts && opts.now) || Date.now;
@@ -313,8 +334,10 @@ export async function run(opts) {
         DiagnosticLog.warn('data-health', 'library looks smaller than snapshot ' + newest.name + ': ' + JSON.stringify(then) + ' -> ' + JSON.stringify(summary) + _openNote());
         StorageHealth.setDataMissing({ name: newest.name, at: newest.at || snapshotTime(newest.name), then, now: summary });
         // (5) Nothing at all left: the database was thrown away. Put it back now.
-        if (isWiped(summary) && _mayAutoRestore(newest.name, now())) {
+        const token = isWiped(summary) ? _mayAutoRestore(newest.name, now()) : null;
+        if (token) {
           if (await restoreMissing({ sink, reload: opts && opts.reload, auto: true })) return 'restored';
+          _refundAutoRestore(token);
         }
         return 'damaged';
       }
@@ -338,7 +361,12 @@ export async function run(opts) {
       return 'empty';
     }
     const json = snapshotJson(stores, summary, now());
-    if (json.length > MAX_SNAPSHOT_BYTES) return 'failed';
+    if (json.length > _maxSnapshotBytes) {
+      // ds5 s34.1: said, and the leave checks stay armed: a loss this session is still caught.
+      _tooBig(json.length);
+      if (!_cleared) _arm(sink, summary, '');
+      return 'too-big';
+    }
     if (_cleared) return 'empty';                 // Clear All ran while this pass read
     const saved = await sink.save(json);
     // The weekly copy rides the same healthy pass: never from a library that looked
@@ -485,7 +513,7 @@ async function _saveLatest(opts) {
     const storesJson = JSON.stringify(stores);
     if (storesJson === _lastStoresJson) return 'unchanged';
     const json = snapshotJson(stores, summary, now());
-    if (json.length > MAX_SNAPSHOT_BYTES) return 'failed';
+    if (json.length > _maxSnapshotBytes) { _tooBig(json.length); return 'failed'; }
     if (_cleared || isStoreWriteFenced()) return 'off';
     if (!(await sink.save(json))) return 'failed';
     _lastStoresJson = storesJson;
@@ -498,7 +526,10 @@ async function _saveLatest(opts) {
 }
 
 /** TEST-ONLY: forget this page's state (a new boot). */
-export function _resetForTests() {
+/** @param {{ maxSnapshotBytes?: number }} [opts] */
+export function _resetForTests(opts) {
+  _maxSnapshotBytes = (opts && opts.maxSnapshotBytes) || MAX_SNAPSHOT_BYTES;
+  _tooBigBytes = 0;
   if (_disarm) _disarm();
   _disarm = null;
   _healthy = false;
@@ -685,11 +716,19 @@ function _syncShim(name, value) {
 export async function restoreMissing(opts) {
   const sink = (opts && opts.sink) || snapshotSink();
   const missing = StorageHealth.getReport().dataMissing;
-  if (!sink || !missing || storesNotLoaded().length) return false;
+  // ds5 s16.1: the banner's tap is answered on every path that does nothing (the boot's own stays quiet).
+  /** @param {string} text */
+  const said = (text) => {
+    if (opts && opts.auto) return false;
+    try { showToast({ id: 'vot-toast-restore', className: 'vot-toast', text, durationMs: 6000 }); } catch (_e) { /* no document */ }
+    return false;
+  };
+  if (!missing) return false;
+  if (!sink || storesNotLoaded().length) return said('Restore could not run yet. Your library is unchanged; try again in a moment.');
   // W8: another tab changed the library under this one: this tab's writes would not land.
-  if (heldByOtherTab()) return false;
+  if (heldByOtherTab()) return said('Your library was changed in another tab. Reload this tab, then try Restore again.');
   const snap = _parse(await sink.read(missing.name));
-  if (!snap) return false;
+  if (!snap) return said('The saved copy could not be read. Your library is unchanged.');
   // W8 refuter round 2: an Import or Clear All in another tab holds the backup Web Lock while it
   // writes the library; a Restore holds it too, so two tabs never write the library at once (a
   // Restore's merge read the library before the import and would land over it). Another backup
@@ -760,13 +799,13 @@ async function _restoreLocked(sink, missing, snap, opts) {
 /**
  * Your Data's "Automatic snapshots" line: where they live, how many, the newest's time.
  * @param {{ sink?: any }} [opts]
- * @returns {Promise<{ where: 'phone' | 'browser' | null, count: number, newestAt: number }>}
+ * @returns {Promise<{ where: 'phone' | 'browser' | null, count: number, newestAt: number, tooBig: number }>}  tooBig: the size of a snapshot refused for the cap this session (ds5 s34.1), else 0
  */
 export async function status(opts) {
   const sink = (opts && opts.sink) || snapshotSink();
-  if (!sink) return { where: null, count: 0, newestAt: 0 };
+  if (!sink) return { where: null, count: 0, newestAt: 0, tooBig: _tooBigBytes };
   const list = await sink.list();
-  return { where: sink.kind === 'android' ? 'phone' : 'browser', count: list.length, newestAt: list.length ? (list[0].at || snapshotTime(list[0].name)) : 0 };
+  return { where: sink.kind === 'android' ? 'phone' : 'browser', count: list.length, newestAt: list.length ? (list[0].at || snapshotTime(list[0].name)) : 0, tooBig: _tooBigBytes };
 }
 
 /**
