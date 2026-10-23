@@ -77,7 +77,7 @@ describe('TourOverlay — dialog', () => {
     startAt('listen');
     const r = render(<TourOverlay />);
     expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy();
-    expect(screen.getByText(/2 of 12/)).toBeTruthy();
+    expect(screen.getByText(/2 of 13/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /previous stop/i }));
     expect(TourController.getState().step.id).toBe('letters');
     r.unmount();
@@ -530,15 +530,15 @@ describe('TourOverlay — Listen stops dock at the bottom and open the reading c
     expect(parseFloat(/** @type {HTMLElement} */ (document.querySelector('.tour-card')).style.bottom)).toBe(92);
     fireEvent.click(pill);
     document.querySelector('.audio-bar').remove();                      // the tour stopped the playback
-    /* The next DOCKED stop is now seven on: the highlight stop and, since the Bible moved to the end
-       (2026-09-13), the five ring stops after it (songs joined 2026-09-25) sit between them, each placed beside its ring like
+    /* The next DOCKED stop is now eight on: the highlight stop and, since the Bible moved to the end
+       (2026-09-13), the six ring stops after it (songs joined 2026-09-25, plans 2026-10-23) sit between them, each placed beside its ring like
        any other (none of those rings is in this fixture, so each is simply walked). It is walked
        through rather than skipped to: the bar being gone has to survive the stops in between, which
        is the whole of what this case is about. This fixture's paragraph carries no .letter-para, so
        the demonstration finds nothing to paint and this case stays about the card's geometry. */
     await act(async () => { TourController.next(); });                   // → highlight
     await act(async () => { TourController.next(); });                   // shows the demonstration, stays
-    for (const id of ['scripture-web', 'songs', 'journal', 'backup', 'settings', 'bible']) {
+    for (const id of ['scripture-web', 'songs', 'journal', 'plans', 'backup', 'settings', 'bible']) {
       await act(async () => { TourController.next(); });                 // → the next stop, on the same DOM
       expect(TourController.getState().step.id).toBe(id);
     }
@@ -711,7 +711,7 @@ describe('TourOverlay — the highlight stop paints a demonstration and never sa
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
     fireEvent.click(screen.getByText('Next'));            // paint
     fireEvent.click(screen.getByText('Next'));            // on to the Bible stop
-    for (let i = 0; i < 12 && TourController.getState().active; i++) TourController.targetPressed();
+    for (let i = 0; i < 13 && TourController.getState().active; i++) TourController.targetPressed();
     expect(TourController.getState().active).toBe(false);
     expect(annCount()).toBe(before);
     expect(document.querySelectorAll('.tour-hl-demo').length).toBe(0);

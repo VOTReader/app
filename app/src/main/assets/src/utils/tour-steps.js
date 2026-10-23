@@ -184,6 +184,16 @@ const STOPS = [
     text: 'Your Journal is in the Library. Tap New Entry to write one. It saves by itself as you write.',
     primary: 'Next',
   },
+  /* READING PLANS GET A STOP (mw18 C8, the hub 2026-10-23): after the Journal, the other Library stop, so the tour
+     goes there with one navigation. Rings the first plan in Find a plan (always listed; one tap starts it). */
+  {
+    id: 'plans', screen: 'reading-plans', enter: 'goReadingPlans',
+    target: { selector: '.plans-group .plans-row' }, act: null,
+    label: 'Reading plans',
+    title: 'Read a little each day',
+    text: 'Reading plans are in the Library. Pick one, or build your own from any books and letters. Each day\'s reading then waits for you on Home.',
+    primary: 'Next',
+  },
   {
     id: 'backup', screen: 'settings', enter: 'openSettingsData', settingsGroup: 'data',
     target: { selector: '[data-settings-group="data"] button', text: 'Export' }, act: null,
@@ -273,7 +283,7 @@ const STOPS = [
 
 // The numbered stops: everything after the welcome card, the closing card included ("7 of 7").
 const NUMBERED = STOPS.length - 1;
-const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+const WORDS = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen'];
 /** The stop count as the word the sentences use ("eleven stops, about three minutes"). */
 export const TOUR_STOPS_WORD = WORDS[NUMBERED] || String(NUMBERED);
 /** The minutes the same sentences promise; honest for eleven quick stops (the Orchestrator, 2026-09-13). */

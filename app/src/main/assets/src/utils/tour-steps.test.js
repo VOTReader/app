@@ -19,31 +19,31 @@ import { TOUR_STEPS, TOUR_STOPS_WORD, stepCount, nextIndex, prevIndex, findTarge
 afterEach(() => { document.body.innerHTML = ''; });
 
 describe('tour-steps — shape', () => {
-  it('is a welcome card plus twelve numbered stops', () => {
-    expect(stepCount()).toBe(13);
+  it('is a welcome card plus thirteen numbered stops', () => {
+    expect(stepCount()).toBe(14);
     expect(TOUR_STEPS[0].id).toBe('welcome');
     expect(TOUR_STEPS[0].number).toBe(0);
-    expect(TOUR_STEPS.slice(1).map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
-    expect(TOUR_STEPS[12].id).toBe('done');
+    expect(TOUR_STEPS.slice(1).map((s) => s.number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+    expect(TOUR_STEPS[13].id).toBe('done');
   });
 
   it('every teaching stop points at a real control and knows how to get there', () => {
-    for (const s of TOUR_STEPS.slice(1, 12)) {
+    for (const s of TOUR_STEPS.slice(1, 13)) {
       expect(s.target && s.target.selector, s.id).toBeTruthy();
       expect(s.screen, s.id).toBeTruthy();
       expect(typeof s.enter, s.id).toBe('string');
     }
-    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'scripture-web', 'songs', 'journal', 'backup', 'settings', 'bible', 'player', 'back-to-words', 'done']);
+    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'scripture-web', 'songs', 'journal', 'plans', 'backup', 'settings', 'bible', 'player', 'back-to-words', 'done']);
   });
 
   /* THE NUMBER IS WRITTEN TWICE — once as `number`, once inside the eyebrow's words — and
      nothing but this case makes the two agree. Adding a stop moved every eyebrow after it,
      and an eyebrow reading "3 of 6" on the fourth of eight stops is the kind of wrong that
      no other assertion here can see. Derived from the array, never hand-listed. */
-  it('every eyebrow counts itself out of twelve, and the welcome card says how many are coming', () => {
+  it('every eyebrow counts itself out of thirteen, and the welcome card says how many are coming', () => {
     const teaching = TOUR_STEPS.slice(1);
     for (const s of teaching) expect(s.eyebrow, s.id).toContain(`${s.number} of ${teaching.length}`);
-    expect(TOUR_STEPS[0].text).toContain('twelve stops');
+    expect(TOUR_STEPS[0].text).toContain('thirteen stops');
   });
 
   /* THE COUNT IS WRITTEN ONCE (2026-09-10). Four sentences counted the stops by hand — every
@@ -62,7 +62,7 @@ describe('tour-steps — shape', () => {
   });
 
   it('publishes the stop count as a word, and the welcome card counts with it', () => {
-    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+    const words = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen'];
     expect(TOUR_STOPS_WORD).toBe(words[TOUR_STEPS.length - 1]);
     expect(TOUR_STEPS[0].text).toContain(`${TOUR_STOPS_WORD} stops, about ${mod.TOUR_MINUTES_WORD} minutes`);
   });
@@ -198,8 +198,8 @@ describe('tour-steps — shape', () => {
 describe('tour-steps — bounds', () => {
   it('nextIndex stops at the last stop, prevIndex at the first', () => {
     expect(nextIndex(0)).toBe(1);
-    expect(nextIndex(12)).toBe(12);
-    expect(nextIndex(11)).toBe(12);
+    expect(nextIndex(13)).toBe(13);
+    expect(nextIndex(12)).toBe(13);
     expect(prevIndex(0)).toBe(0);
     expect(prevIndex(3)).toBe(2);
   });
@@ -256,7 +256,7 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
   const idx = (id) => TOUR_STEPS.indexOf(at(id));
 
   it('the order: … settings › bible › player › back-to-words › done, the Bible stop entered from Settings', () => {
-    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'scripture-web', 'songs', 'journal', 'backup', 'settings', 'bible', 'player', 'back-to-words', 'done']);
+    expect(TOUR_STEPS.map((s) => s.id)).toEqual(['welcome', 'letters', 'listen', 'highlight', 'scripture-web', 'songs', 'journal', 'plans', 'backup', 'settings', 'bible', 'player', 'back-to-words', 'done']);
     expect(idx('bible')).toBe(idx('settings') + 1);
     expect(at('bible').enter).toBe('openBible');
     expect(at('bible').text).toContain('I opened John 3 for you');
@@ -341,9 +341,9 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
   });
 
   it('the count and the minutes are published once and read into the welcome card', () => {
-    expect(TOUR_STOPS_WORD).toBe('twelve');
+    expect(TOUR_STOPS_WORD).toBe('thirteen');
     expect(mod.TOUR_MINUTES_WORD).toBe('three');
-    expect(TOUR_STEPS[0].text).toContain('twelve stops, about three minutes');
+    expect(TOUR_STEPS[0].text).toContain('thirteen stops, about three minutes');
   });
 });
 

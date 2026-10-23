@@ -449,7 +449,7 @@ function App() {
     setFromStudies, setFromMatthewCh, setJournalEntryId, setGardenPage,
   });
   // "Show me around" (review-tutorial): the tour's five navigation verbs, kept current every render.
-  useTour({ goHome, goJournalHub, goSettings, setScreen, setLetterId, setBookId, setChapterNum });
+  useTour({ goHome, goJournalHub, goReadingPlans, goSettings, setScreen, setLetterId, setBookId, setChapterNum });
   // The reading pane moves with the audio at each unit boundary (w-audio-continue; live-pane rule in the hook), carrying the tap-through back entry along (retargetTop, sweep v041).
   useAudioFollow({ enabled: settings.audioTurnPage !== false, screen, letterId, bookId, chapterNum, studyId, studyChapterId, setLetterId, setBookId, setChapterNum, setScreen, setStudyId, setStudyChapterId, retargetTop });
 
