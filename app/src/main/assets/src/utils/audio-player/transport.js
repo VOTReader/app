@@ -129,8 +129,8 @@ export function next() {
   // The end of the queue is the end of the ORDER, not merely of a unit: the site order was
   // already appended when this unit's last track STARTED (_start → _extendQueue, so the boundary
   // track is warmed during this one), and nothing between that start and this end can turn a
-  // refused extension into a granted one — a queue edit switches the source to 'custom', which
-  // _extendQueue refuses. So a queue that still ends here has nowhere to go: stop().
+  // refused extension into a granted one — a queue edit that leaves the playing track last extends
+  // at once (s31.1), and Clear upcoming ends the run. So a queue that still ends here has nowhere to go: stop().
   // (A second _extendQueue() call lived here until 2026-09-12; verifier-2 measured that nothing
   // exercised it and its comment's reason was false.)
   // …unless a songs queue repeats: 'all' wraps to its top instead of ending.

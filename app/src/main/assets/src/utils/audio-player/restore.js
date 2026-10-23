@@ -211,6 +211,13 @@ async function _rebuild() {
           if (!_bibleManifest() && typeof g.__loadBibleCorpus === 'function') await g.__loadBibleCorpus();
         } else if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
       } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
+    } else if (r.volKey) {
+      // s31.1: an edited run goes on into the next unit of the site order, which needs the corpus by the time its
+      // last track starts. Its own queue does not, so the load is asked for here and not waited on.
+      const load = _isBibleVol(r.volKey) ? (_bibleManifest() ? null : g.__loadBibleCorpus) : (_manifest() ? null : g.__loadVotCorpus);
+      if (typeof load === 'function') {
+        try { void Promise.resolve(load()).catch(() => {}); } catch (_e) { /* no corpus: the run ends where it is */ }
+      }
     }
   } finally {
     _waiting = false;

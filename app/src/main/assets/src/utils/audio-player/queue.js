@@ -373,7 +373,7 @@ export function playTrack(track) {
  * @returns {void}
  */
 function _crossInto(track) {
-  if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return;
+  if (!_continues()) return;
   const volKey = _volKeyOf(track.key);
   const back = _source.fromSection;
   if (!volKey) {
@@ -447,11 +447,12 @@ function _booksAfter(volKey, bookId) {
 function _extendQueue() {
   // A songs queue is refused here like a custom one: songs never continue into
   // letters (README §1.1) — a songs queue ends, or wraps under repeat 'all'.
-  if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return false;
+  if (!_continues()) return false;
   const last = _state.queue[_state.queue.length - 1];
   // A section run's tracks carry key null (one file, many letters); the run
   // belongs to its collection, so the site order continues from THAT (2026-09-20).
-  const volKey = _source.mode === 'section' ? (_source.volKey || '') : (last ? _volKeyOf(last.key) : '');
+  // An edited run's tracks may carry null keys the same way: its descriptor names the collection (s31.1).
+  const volKey = _source.mode === 'section' ? (_source.volKey || '') : ((last ? _volKeyOf(last.key) : '') || _source.volKey || '');
   if (!volKey) return false;
   const units = _isBibleVol(volKey)
     ? _booksAfter(volKey, /** @type {string} */ (last.key).slice(volKey.length + 1))
@@ -470,8 +471,15 @@ function _extendQueue() {
   return false;
 }
 
-/** @param {Track[]} queue */
-function _commitQueueEdit(queue) {
+/** Does this run go on into the next unit of the site order when it is spent? A collection or section run does,
+ *  and so does a run the listener edited out of one (s31.1): a custom source that still names its collection.
+ *  @returns {boolean} */
+function _continues() {
+  return !!_source && (_source.mode === 'collection' || _source.mode === 'section' || (_source.mode === 'custom' && !!_source.volKey));
+}
+
+/** @param {Track[]} queue @param {boolean} [ends] the listener cleared what was next: the run ends after this track */
+function _commitQueueEdit(queue, ends = false) {
   _state.queue = queue;
   const current = queue[_state.qi];
   // An edited SONGS queue stays a songs descriptor — its explicit ids, in the
@@ -480,7 +488,12 @@ function _commitQueueEdit(queue) {
   if (_source && _source.mode === 'songs' && queue.every(_isSong)) {
     _setSource({ ..._source, ids: queue.map((t) => songIdOfKey(t.key)), filter: null, startKey: null });
   } else {
-    _setSource({ mode: 'custom', volKey: '', label: current ? current.sub : null });
+    // The edited queue persists as it is (custom), and still names the collection it came out of, so the site order
+    // goes on after it (s31.1): taking one letter out of the run is not asking for the run to end. Clear upcoming is.
+    const volKey = !ends && _continues() ? _source.volKey || '' : '';
+    _setSource({ mode: 'custom', volKey, label: current ? current.sub : null });
+    // The order joins a run when its last track STARTS; an edit that leaves the playing track last is that moment.
+    if (volKey && _state.qi + 1 >= queue.length) _extendQueue();
   }
   // A queue edit is the one queue-SHAPE change with no track start behind it,
   // so the host media card's skip handlers have to be re-decided here.
@@ -531,7 +544,7 @@ export function moveUpcoming(from, to) {
 /** @returns {boolean} */
 export function clearUpcoming() {
   if (_pendingRestore || _state.qi + 1 >= _state.queue.length) return false;
-  _commitQueueEdit(_state.queue.slice(0, _state.qi + 1));
+  _commitQueueEdit(_state.queue.slice(0, _state.qi + 1), true);
   return true;
 }
 

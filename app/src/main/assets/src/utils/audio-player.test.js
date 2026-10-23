@@ -3075,6 +3075,30 @@ describe('audio-player — durable resume (position survives restart)', () => {
     expect(el().src).toBe(URL_OF('idC'));
   });
 
+  it('an edited run restores at once and asks for the corpus its site order needs, without waiting for it (s31.1)', async () => {
+    const first = { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', readerCode: 'B', partLabel: null, url: URL_OF('idPreface') };
+    const second = { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', readerCode: 'T', partLabel: null, url: URL_OF('idC') };
+    delete globalThis.AUDIO_MANIFEST;                // a cold boot: the letters' corpus is not in memory
+    const loadCorpus = vi.fn(() => new Promise(() => {}));
+    globalThis.__loadVotCorpus = loadCorpus;
+    try {
+      localStorage.setItem('vot-audio-pos', JSON.stringify({
+        v: 2, mode: 'custom', volKey: 'vol1', label: 'Volume One', qi: 1, key: second.key, time: 31,
+        track: second, customQueue: [first, second],
+      }));
+      await load();
+      AudioPlayer.toggle();
+      expect(el().src).toBe(URL_OF('idC'));          // the queue never waited for the corpus
+      expect(loadCorpus).toHaveBeenCalledTimes(1);
+      const st = AudioPlayer.getState();
+      expect(st.queue.map((track) => track.url)).toEqual([URL_OF('idPreface'), URL_OF('idC')]);
+      expect(st.sourceMode).toBe('custom');
+    } finally {
+      delete globalThis.__loadVotCorpus;
+      globalThis.AUDIO_MANIFEST = MANIFEST;
+    }
+  });
+
   it('a startId queue persists its horizon and rebuilds forward-only after a reboot', async () => {
     globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1', label: 'Volume One' }]]);
     globalThis.colPreface = () => ITEMS[0];
