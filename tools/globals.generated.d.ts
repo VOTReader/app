@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 624 distinct identifiers.
+// Total: 629 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -289,6 +289,8 @@ declare const SongKeepAction: any;
 declare const SongKeepCard: any;
 declare const SongListRow: any;
 declare const SongPlayButton: any;
+declare const SongVoteAsk: any;
+declare const SongVotePair: any;
 declare const SongVotes: any;
 declare const SrchCard: any;
 declare const SrchGroup: any;
@@ -312,6 +314,8 @@ declare const TabsNavBtn: any;
 declare const TabsOverview: any;
 declare const TextIcon: any;
 declare const ThemeBtn: any;
+declare const ThumbDownIcon: any;
+declare const ThumbUpIcon: any;
 declare const TourController: any;
 declare const TourDoneFlagStore: any;
 declare const TourOverlay: any;
@@ -580,6 +584,7 @@ declare const translationName: any;
 declare const useAudioPositions: any;
 declare const useSongKeep: any;
 declare const useSongLyrics: any;
+declare const useSongVote: any;
 declare const useSongsOnline: any;
 declare const useStorageHealth: any;
 declare const v3AndroidImportEntries: any;

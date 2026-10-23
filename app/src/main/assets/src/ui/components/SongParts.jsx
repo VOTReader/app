@@ -20,6 +20,7 @@ import { SheetHandle } from './SheetHandle.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { NetStatus, isNetworkError } from '../../utils/net-status.js';
 import { KeepIcon, useSongsOnline } from './SongKeepParts.jsx';
+import { SongVotePair } from './SongVoteParts.jsx';
 
 /**
  * A length in seconds as the pictures print it: 4:12 (1:02:05 past an hour).
@@ -160,25 +161,27 @@ export function SongListRow({ song, title, line = '', versions = 0, onVersions, 
   React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
   const kept = !!(song && song.id) && SongKeep.isKept(song.id);
   const off = !useSongsOnline() && !kept && !current;
+  // sy4-3: the length ends the meta line (pictures song-voting 05, player 15), so the vote pair has room at the right.
+  const meta = line && len ? line + ' · ' + len : line || len;
   return (
     <div className={'songs-row song-tap-row' + (current ? ' is-current' : '') + (off ? ' is-unavailable' : '')}>
       <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} disabled={off} />
       <SongCover song={song} />
       <span className="songs-row-copy">
         <strong>{title}</strong>
-        {line || kept || (versions > 1 && onVersions) ? (
+        {meta || kept || (versions > 1 && onVersions) ? (
           <span className="songs-row-line">
             {kept ? <span className="songs-row-kept" title="On this phone"><KeepIcon /><span className="sr-only">On this phone</span></span> : null}
-            {line ? <small>{line}</small> : null}
+            {meta ? <small>{meta}</small> : null}
             {versions > 1 && onVersions ? (
               <button type="button" className="songs-row-versions" onClick={(event) => { event.stopPropagation(); onVersions(); }} aria-label={'All ' + versions + ' versions of ' + title}>
-                {(line ? '· ' : '') + versions + ' versions'} <span aria-hidden="true">›</span>
+                {(meta ? '· ' : '') + versions + ' versions'} <span aria-hidden="true">›</span>
               </button>
             ) : null}
           </span>
         ) : null}
       </span>
-      {len ? <span className="songs-row-len">{len}</span> : null}
+      {song && song.id ? <SongVotePair song={song} title={title} /> : null}
       {children}
       <SongPlayButton playing={playing} label={title} onClick={onPlay} disabled={off} />
     </div>

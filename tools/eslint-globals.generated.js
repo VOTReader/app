@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 624 distinct identifiers.
+// Total: 629 distinct identifiers.
 
 export const projectGlobals = {
   ALL_WEEK: "readonly",
@@ -286,6 +286,8 @@ export const projectGlobals = {
   SongKeepCard: "readonly",
   SongListRow: "readonly",
   SongPlayButton: "readonly",
+  SongVoteAsk: "readonly",
+  SongVotePair: "readonly",
   SongVotes: "readonly",
   SrchCard: "readonly",
   SrchGroup: "readonly",
@@ -309,6 +311,8 @@ export const projectGlobals = {
   TabsOverview: "readonly",
   TextIcon: "readonly",
   ThemeBtn: "readonly",
+  ThumbDownIcon: "readonly",
+  ThumbUpIcon: "readonly",
   TourController: "readonly",
   TourDoneFlagStore: "readonly",
   TourOverlay: "readonly",
@@ -613,6 +617,7 @@ export const projectGlobals = {
   useSheetOrchestration: "readonly",
   useSongKeep: "readonly",
   useSongLyrics: "readonly",
+  useSongVote: "readonly",
   useSongsOnline: "readonly",
   useStorageHealth: "readonly",
   useStorageInfo: "readonly",

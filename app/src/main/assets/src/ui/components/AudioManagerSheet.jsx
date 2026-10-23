@@ -10,6 +10,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
 import { SongDeskHead, SongVersionsCard, SongTransport, SongLyricsCard } from './SongDeskParts.jsx';
+import { SongVoteAsk } from './SongVoteParts.jsx';
 import { AudioSpeedControl } from './AudioSpeedControl.jsx';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
@@ -396,6 +397,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
         </div>
         </>)}
         {song ? <SongVersionsCard song={song} state={state} /> : null}
+        {song ? <SongVoteAsk song={song} title={current.title} /> : null}
 
         {/* Voice sits right under the track identity (owner directive
             2026-08-10): what you're hearing and the switch for it are one

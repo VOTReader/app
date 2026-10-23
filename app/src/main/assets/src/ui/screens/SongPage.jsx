@@ -15,6 +15,7 @@
 */
 
 import { useOnline } from '../components/OfflineAudioControls.jsx';
+import { SongVotePair, SongVoteAsk } from '../components/SongVoteParts.jsx';
 
 /** Version rows before "Show all N versions". */
 const VERSIONS_SHOWN = 4;
@@ -115,6 +116,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
         </button>
       </div>
       {/* K1 (picture r2-more-screens, third panel): the whole family, sized from the catalog. */}
+      {versions.length === 1 ? <SongVoteAsk song={lead} title={fam.t} /> : null}
       <SongKeepCard ids={versions.map((v) => v.id)} noteKey={'keep-fam-' + fam.id} versions={versions.length} title={fam.t} />
 
       {versions.length > 1 ? (
@@ -131,6 +133,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
                     <span className="song-version-label">{s.v || 'Version'}</span>
                     <span className="songs-row-len">{songClock(s.d)}</span>
                   </button>
+                  <SongVotePair song={s} title={fam.t + ', ' + (s.v || 'version')} />
                   <SongPlayButton playing={now && active} label={fam.t + ', ' + (s.v || 'version')} onClick={() => play(s)} disabled={off} />
                 </div>
               );
