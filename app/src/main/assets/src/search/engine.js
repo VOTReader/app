@@ -87,6 +87,18 @@ const DESCRIBED = /^\s*(?:the\s+|a\s+)?(?:letter|passage|part|entry|verse|sectio
    led a text where the Lord speaks and tithing is named in passing (the sealed2 red team, rt3-30..33). A speaking word
    and "about" (of, on, concerning, regarding), up to three words in, tell a subject: the query is searched as typed. */
 const SUBJECT_TOLD = /^(?:\S+\s+){0,3}?(?:speaks?|spoke|speaking|talks?|talked|talking|teach(?:es)?|taught|writes?|wrote|tells?|told|explains?|explained|warns?|warned|discuss(?:es)?|discussed)\s+(?:about|of|on|concerning|regarding)\s+\S/i;
+/* A QUESTION OR A DESCRIPTION IS NO QUOTE (search200 sweep). originalsFirst gives a reprint's place (an Answers topic,
+   a Words To Live By entry) to its original, which serves a reader remembering a line. A reader's question ("what
+   happens if we ...", "why does god ...": a wh-word and an auxiliary, or an auxiliary first, in a reader's voice) or a
+   description ("the short one about ...") typed no line: the words the two texts share are the subject's (James 4:14
+   took Regarding Forgiveness's #1 on "happen"; sw-questions-09), or the reprint is the one asked for (the short WTLB
+   entry, not its letter; sw-gist-27). Such a query keeps the order the words and the meaning gave, unless the reprint
+   holds the typed words as a quote. Any question opening was too broad (par-15, par-35, t239, t282 lost). */
+const ASKED_OPEN = /^\s*(?:(?:whats|hows|whys|whos)\s+\S|(?:what|how|why|who|whom|whose|when|where|which)\s+(?:\S+\s+)?(?:is|isnt|are|arent|was|were|do|does|doesnt|did|didnt|dont|can|cant|could|should|shouldnt|would|will|wont|shall|may|must|am|happens?|happened|to)\s+\S|(?:is|isnt|are|arent|was|were|do|does|doesnt|did|didnt|dont|can|cant|could|should|shouldnt|would|will|wont|shall|may|must|am)\s+\S)/i;
+const READER_VOICE = /\b(?:i|im|ive|id|we|us|our|ourselves|god|gods|lord|lords|jesus|christ)\b/i;
+const DESCRIBED_ONE = /^\s*(?:the|that|this)\s+(?:\S+\s+){0,2}?one\s+(?:about|where|with|that|which|saying|says|on|when|of)\s+\S/i;
+/** A reader's question or a "the … one about …" description (no quote typed; see the block above). */
+const askedNotQuoted = (/** @type {string} */ q) => (ASKED_OPEN.test(q) && READER_VOICE.test(q.replace(/['’]/g, ''))) || DESCRIBED_ONE.test(q);
 /** A query with its describing opening left off (DESCRIBED), unless what follows tells a subject (SUBJECT_TOLD). */
 const undescribed = (/** @type {string} */ q) => {
   const rest = q.replace(DESCRIBED, '');
@@ -1890,8 +1902,10 @@ function typedAlts(/** @type {Array<{term:string, origin:number, literal?:boolea
  *   quote with its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an
  *   original holding the quote as well as the held do (bar: ALIGN_HELD, or a clear best's cov)
  * @param {Map<string, string[]>|null} [alts]  each typed word's synonyms, forms and title near-synonyms (typedAlts, encoded)
+ * @param {boolean} [asked]  the query is a reader's question or a description (askedNotQuoted): a reprint not holding
+ *   the typed words as a quote keeps its place
  */
-function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null, alts = null) {
+function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null, alts = null, asked = false) {
   if (!terms.length) return;
   let O;
   try { O = originals(); } catch { return; }
@@ -1968,6 +1982,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
        letter or verse a sentence's key, its shingles, a cite or the model's passage names may hold another of its lines
        (a study's sentence beside the quote, or the verse a study quotes in another translation's words). */
     const holds = aligned && aligned.has(idOf.get(e) || '') ? aligned : null;
+    if (asked && !holds && whole < NEAR_PHRASE_MIN) continue;   // a question or a description is no quote (above)
     // ...a study held as a clear best (under ALIGN_HELD) gives way to the verse it quotes, its original, as keep() has it
     // below: the study prints the verse's reference beside the quote ("John 3:16 For God so loved the world"), and the
     // reference's numbers typed with the quote held the study clear of the verse (search200 sealed2, hunt rt1-shapes-27)
@@ -3820,7 +3835,7 @@ async function search(query, options) {
   };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
     admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens,
-    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf, bar: alignBar } : null, typedAlts(units, filtered));
+    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf, bar: alignBar } : null, typedAlts(units, filtered), askedNotQuoted(typedQ));
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {
