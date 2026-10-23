@@ -32,6 +32,8 @@
    reuseEndpoint), so journal card/excerpt modes get them for free.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { navItemPreview } from '../../utils/nav-index.js';
+
 /**
  * The three corpus scopes, in SearchScreen's order + vocabulary
  * (.srch-corpus-row). `id` is the engine's own `corpus` option value, so the
@@ -61,7 +63,7 @@ function readerTranslation() {
  * @param {any} item @returns {string}
  */
 function verseWords(item) {
-  if (!item || !item.verse || typeof navItemPreview !== 'function') return '';
+  if (!item || !item.verse) return '';
   let t = '';
   try { t = String(navItemPreview(item) || '').replace(/\s+/g, ' ').trim(); } catch (_e) { return ''; }
   if (t.length <= 70) return t;

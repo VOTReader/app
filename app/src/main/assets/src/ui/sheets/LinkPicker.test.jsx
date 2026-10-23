@@ -503,7 +503,7 @@ describe('LinkPicker verse rows show the verse', () => {
       { item: { kind: 'bible-chapter', bookId: 'john', chapter: 3, verse: 29, label: 'John 3:29', category: 'New Testament' } },
       { item: { kind: 'bible-chapter', bookId: 'john', chapter: 4, label: 'John 4', category: 'New Testament' } },
     ];
-    window.navItemPreview = (it) => (it.verse === 29 ? long : 'heading');
+    /** @type {any} */ (globalThis)._allBooks = () => ({ john: { chapters: [{ num: 3, sections: [{ verses: [{ n: 29, text: long }] }] }] } });
     try {
       render(<LinkPicker {...baseProps} />);
       fireEvent.change(document.querySelector('input'), { target: { value: 'john 3' } });
@@ -515,6 +515,6 @@ describe('LinkPicker verse rows show the verse', () => {
       expect(words.length).toBeLessThanOrEqual(71);
       const c = rows.find((r) => r.textContent.includes('John 4'));
       expect(c.querySelector('.navpick-row-cat').textContent).toBe('New Testament');
-    } finally { delete window.navItemPreview; }
+    } finally { delete /** @type {any} */ (globalThis)._allBooks; }
   });
 });
