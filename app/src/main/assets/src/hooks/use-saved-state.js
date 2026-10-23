@@ -90,7 +90,11 @@ export function _validateTabState(s) {
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-index$/.test(s.screen)) s.screen = "volumes-home";
   if ((s.screen === "matthew-idx" || s.screen === "bible-idx") && !s.bookId) s.screen = "home";
   if (s.screen === "search") s.screen = "home";
-  if (s.screen === "scripture-genre" && !s.genreId) s.screen = "scriptures-home";
+  // s21.2: a genre that no longer exists (renamed, retired) reopens on the
+  // Scriptures too. SCRIPTURE_GENRES may not exist yet at boot: only a genre
+  // list that is present can reject an id.
+  if (s.screen === "scripture-genre" && (!s.genreId || (typeof SCRIPTURE_GENRES !== 'undefined' && SCRIPTURE_GENRES
+    && ![...(SCRIPTURE_GENRES.ot || []), ...(SCRIPTURE_GENRES.nt || [])].some((g) => g && g.id === s.genreId)))) s.screen = "scriptures-home";
   if (s.screen === "bible-study-chapter" && (!s.studyId || !s.studyChapterId)) s.screen = "studies-home";
   if (s.screen === "bible-study-index" && !s.studyId) s.screen = "studies-home";
   // Journal screens reopen on the hub after a reload: the tab keeps its

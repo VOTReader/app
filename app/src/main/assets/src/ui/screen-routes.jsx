@@ -1318,7 +1318,14 @@ export function buildScreenRoutes({
         onTranslation={(/** @type {string} */ v) => updateSetting('translation', v)}
       />
     ),
-    'scripture-genre': () => genreId && (
+    'scripture-genre': () => (!genreId || (typeof SCRIPTURE_GENRES !== 'undefined' && SCRIPTURE_GENRES
+      && ![...(SCRIPTURE_GENRES.ot || []), ...(SCRIPTURE_GENRES.nt || [])].some((g) => g && g.id === genreId)))
+      // s21.2: a stale genreId said nothing at all (a blank screen); now it says so and goes back.
+      ? _fallbackView({
+        say: 'This group of books is no longer available.', label: 'Back to Scriptures', onGo: goScripturesHome,
+        nav: _navTo(goScripturesHome, 'Scriptures'),
+      })
+      : (
       <ScriptureGenre
         genreId={genreId}
         onSelect={(/** @type {[id: string, clearGenre?: boolean]} */ ...a) => { _startNewTrail(); handleScriptureSelect(...a); }}
