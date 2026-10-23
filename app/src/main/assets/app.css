@@ -4229,6 +4229,11 @@
     /* search200 B2: no results offers a tip, then the Recent and Quick picks rows under it. */
     .search-no-results.has-picks { padding-bottom:1rem; }
     .srch-no-results-tip { display:block; margin-top:0.75rem; font-size:var(--fs-14); line-height:1.5; }
+    /* search200 ideas G (mockups/G-empty-state): "Try fewer words: seven trumpets · Search all" under the no-results
+       line, then the texts nearest by meaning under a hairline, before the picks. */
+    .srch-fewer { display:block; margin-top:0.75rem; }
+    .srch-nearest { border-top:1px solid var(--gold-border); }
+    .srch-nearest-label { padding:0.9rem 1rem 0.2rem; color:var(--gold); }
     .search-highlight { background:rgba(200,164,86,0.25); color:var(--cream); border-radius:2px; }
     body.light .search-highlight { background:rgba(122,92,16,0.2); }
 
@@ -4331,6 +4336,9 @@
     .srch-card-badge.badge-letter { color:var(--gold-bright); }
     .srch-card-badge.badge-heading { color:var(--gold-dim); font-style:italic; }
     .srch-card-snippet { font-family:var(--font-body); font-size:var(--fs-15); line-height:1.5; color:var(--cream-muted); }
+    /* How a card that holds no typed word matched (search200 ideas E/G): a quiet grey line, never gold. */
+    .srch-card-why { margin-top:6px; font-family:var(--font-body); font-size:var(--fs-13); font-style:italic; line-height:1.3; color:#9a9387; }
+    body.light .srch-card-why { color:#6b5e4a; }
     /* The topic card a question gets (search200 ideas F, mockups/F-topic-card): one outlined unit on the page
        ground over Best Matches, its texts parted by faint hairlines (the pick's solid gold was too bright). */
     .srch-topic { margin:12px 16px; padding:16px; border:1px solid var(--gold-border); border-radius:12px; background:var(--bg); }

@@ -88,8 +88,9 @@ export function cardPassage(entry, terms, stopTyped) {
 }
 
 /* `also`: the reprints Best Matches folded under this card (search200 UX B10 2), offered in an
-   "Also in N places" row after the snippet, each its own tap. */
-export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined }) {
+   "Also in N places" row after the snippet, each its own tap. `why`: one quiet line under the
+   snippet saying how a card that holds no typed word matched ("by meaning", search200 ideas E/G). */
+export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined, why = '' }) {
   const doc = (!isDirect && entry && entry.doc) || null;
   const hlTerms = cardTerms(entry, terms, stopTyped);
   // Every OTHER place this unit says the words (Brianna, 2026-09-26): a letter's
@@ -161,6 +162,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
       <div className="srch-card-snippet">
         <SrchSnippet text={body || ''} terms={hlTerms} typed={terms} start={titled ? undefined : placeStart} />
       </div>
+      {why ? <div className="srch-card-why">{why}</div> : null}
     </button>
   );
   const reprints = (also || []).filter((r) => r && r.doc);

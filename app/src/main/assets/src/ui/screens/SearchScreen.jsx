@@ -9,6 +9,7 @@ import { cardPassage } from '../components/SrchCard.jsx';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { pickTopic, topicTexts } from '../components/srch-topic.js';
 import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
+import { fewerWords, nearestShown, NEAREST_SHOWN } from '../components/srch-empty.js';
 
 /** A verse reference card quotes at most this many verses of its range. */
 const REF_QUOTE_VERSES = 3;
@@ -968,6 +969,40 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
      the list answers; text still waiting for its search is "Searching…", said once. */
   const answered = typeof state.q === 'string' ? state.q : qTrim;
   const pending = isDone && answered !== qTrim && qTrim.replace(/[^\p{L}\p{N}]/gu, '').length >= 2;
+
+  /* A SEARCH THAT FOUND NOTHING OFFERS A WAY ON (search200 ideas G, mockups/G-empty-state). Under "No results for …":
+     "Try fewer words: <the query's content words some text holds>" when that finds something under the same tab and
+     scope, and the texts nearest by meaning (engine.js nearest) above the model's floor (srch-empty.js), each tagged
+     "by meaning". Both are asked for once per search that found nothing (`emptyFor`, the list's memo); the nearest
+     wait for the model when it is still loading. */
+  const emptyFor = isDone && !pending && !state.error && state.parsed && state.parsed.kind === 'text' && state.results.length === 0 &&
+    directEntries.length === 0 && !didYouMean && !letterRefMissing && !state.stopWordsOnly && !(searchScope && conflict) ? (state.memo || '') : '';
+  const [emptyHelp, setEmptyHelp] = React.useState(/** @type {{ for: string, fewer: string, nearest: any[] }} */ ({ for: '', fewer: '', nearest: [] }));
+  React.useEffect(() => {
+    if (!emptyFor) return undefined;
+    const E = pickEngine();
+    if (!E) return undefined;
+    let stale = false;
+    const q = answered;
+    setEmptyHelp({ for: emptyFor, fewer: '', nearest: [] });
+    const put = (/** @type {{ fewer?: string, nearest?: any[] }} */ part) => { if (!stale) setEmptyHelp((h) => (h.for === emptyFor ? { ...h, ...part } : h)); };
+    const stop = markStopWords(/** @type {any} */ (window).VotSearchData);
+    const fewer = fewerWords(q, (w) => isStopTerm(w, stop), typeof E.knows === 'function' ? E.knows : null);
+    if (fewer) {
+      E.search(fewer, {
+        translation, useStopWords: settings.searchUseStopWords !== false, synonyms: settings.searchSynonyms !== false,
+        scope: searchScope || null, corpus, limit: 1, perVolume: 1,
+      }).then((r) => { if (r && r.results && r.results.length) put({ fewer }); }).catch(() => {});
+    }
+    if (typeof E.nearest === 'function') {
+      const ready = typeof E.whenMeaningReady === 'function' ? E.whenMeaningReady() : Promise.resolve(true);
+      ready.then((ok) => (ok && !stale ? E.nearest(q, { corpus, scope: searchScope || null, limit: NEAREST_SHOWN * 2 }) : []))
+        .then((n) => put({ nearest: nearestShown(n) })).catch(() => {});
+    }
+    return () => { stale = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- emptyFor is the search (its memo holds the query, tab, scope and settings); what else it reads is that search's.
+  }, [emptyFor]);
+  const help = emptyFor && emptyHelp.for === emptyFor ? emptyHelp : null;
   let liveText = '';
   if (qTrim && !/[\p{L}\p{N}]/u.test(qTrim)) liveText = 'Type a word, a title or a reference to search.';
   else if (qTrim && buildInfo.ready && (state.phase === 'searching' || pending)) liveText = 'Searching…';
@@ -985,6 +1020,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       else if (state.stopWordsOnly) said.push('“' + answered + '” is in nearly every verse and letter. Add another word to search.');
       else if (searchScope && conflict) said.push(scopeLabel + ' is in ' + conflict.home + ', and the ' + conflict.tab + ' tab is on.');
       else said.push('No results for “' + answered + '”' + scopeIn + '.');
+      if (help && help.fewer) said.push('Try fewer words: ' + help.fewer + '.');
+      if (help && help.nearest.length) said.push(help.nearest.length + (help.nearest.length === 1 ? ' text' : ' texts') + ' nearest by meaning.');
     }
     liveText = said.join(' ');
   }
@@ -1280,6 +1317,17 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                   {' · '}
                   <button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button>
                 </>
+              ) : help && help.fewer ? (
+                <>
+                  No results for “{answered}”{scopeIn}.
+                  {/* The fewer words and the way out of the tab or scope, as one line of links (G's pick). */}
+                  <span className="srch-fewer">
+                    Try fewer words:{' '}
+                    <button type="button" className="srch-more-link" onClick={() => onQueryChange(help.fewer)}>{help.fewer}</button>
+                    {searchScope ? <>{' · '}<button type="button" className="srch-more-link" onClick={searchEverywhere}>Search everywhere</button></> :
+                      tabName ? <>{' · '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
+                  </span>
+                </>
               ) : (
                 <>
                   No results for “{answered}”{scopeIn}.
@@ -1287,10 +1335,18 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                     tabName ? <>{' '}<button type="button" className="srch-more-link" onClick={searchAll}>Search all</button></> : null}
                 </>
               )}
-              {state.stopWordsOnly || (searchScope && conflict) ? null : (
+              {state.stopWordsOnly || (searchScope && conflict) || (help && help.fewer) ? null : (
                 <span className="srch-no-results-tip">Check the spelling, try fewer words, or type a reference such as John 3:16.</span>
               )}
             </div>
+            {help && help.nearest.length ? (
+              <div className="srch-nearest">
+                <h2 className="srch-section-label srch-nearest-label">Nearest by meaning</h2>
+                {help.nearest.map((e, i) => (
+                  <SrchCard key={'near' + i} entry={e} terms={[]} onSelect={handleSelect} memo={listMemo} where="near" why="by meaning" />
+                ))}
+              </div>
+            ) : null}
             {state.stopWordsOnly ? null : pickRows}
           </>
         )}

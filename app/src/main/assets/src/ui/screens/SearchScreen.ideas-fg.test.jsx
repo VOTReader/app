@@ -1,9 +1,11 @@
-/* search200 ideas F on the screen: the topic card a question gets (mockups/F-topic-card). The engine is a stand-in; the pick and the floors are real. */
+/* search200 ideas F and G on the screen: the topic card a question gets (mockups/F-topic-card), and what a search
+   that found nothing offers (mockups/G-empty-state). The engine is a stand-in; the pick and the floors are real. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { SearchScreen } from './SearchScreen.jsx';
 import { TOPIC_MEANING_FLOOR } from '../components/srch-topic.js';
+import { NEAREST_MEANING_FLOOR } from '../components/srch-empty.js';
 import { srchSortCanonical, SRCH_CANONICAL_BOOK_INDEX } from '../../utils/search.js';
 
 const noop = () => {};
@@ -132,5 +134,53 @@ describe('F: the topic card a question gets', () => {
     expect(document.querySelector('.srch-topic')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Book order' }));
     expect(document.querySelector('.srch-topic')).toBeNull();
+  });
+});
+
+describe('G: what a search that found nothing offers', () => {
+  it('lists the nearest texts by meaning above the floor, each tagged "by meaning", before the picks', async () => {
+    const near = [
+      { score: 0, meaning: NEAREST_MEANING_FLOOR + 0.05, doc: { kind: 'verse', ref: 'Genesis 1:11', text: 'Let the earth bring forth grass' }, terms: [] },
+      { score: 0, meaning: NEAREST_MEANING_FLOOR - 0.01, doc: { kind: 'verse', ref: 'Job 8:11', text: 'Can the papyrus grow up without a marsh?' }, terms: [] },
+    ];
+    const nearest = vi.fn(() => Promise.resolve(near));
+    Object.assign(/** @type {any} */ (window).VotSearchMini, { nearest, knows: () => false, whenMeaningReady: () => Promise.resolve(true) });
+    await typeAndWait({ ...baseProps(), settings: { searchCorpus: 'scriptures' } }, 'photosynthesis');
+    expect(nearest).toHaveBeenCalledWith('photosynthesis', expect.objectContaining({ corpus: 'scriptures' }));
+    expect(document.querySelector('.srch-nearest-label').textContent).toBe('Nearest by meaning');
+    expect([...document.querySelectorAll('.srch-nearest .stub-card')].map((c) => c.textContent)).toEqual(['Genesis 1:11 [by meaning]']);
+    // no fewer words to offer: today's line and tip stand
+    const none = document.querySelector('.search-no-results');
+    expect(none.textContent).toContain('No results for “photosynthesis” in the Scriptures.');
+    expect(none.textContent).toContain('Check the spelling');
+    expect(document.querySelector('.srch-fewer')).toBeNull();
+  });
+
+  it('offers the query trimmed to the words some text holds, when that finds something, with "Search all"', async () => {
+    const search = vi.fn((/** @type {string} */ q) => Promise.resolve(q === 'seven trumpets'
+      ? { parsed: { kind: 'text' }, parsedTerms: ['seven', 'trumpets'], results: [{ score: 1, doc: verseDoc }] }
+      : { parsed: { kind: 'text' }, parsedTerms: [], results: [] }));
+    Object.assign(/** @type {any} */ (window).VotSearchMini, { search, nearest: () => Promise.resolve([]), knows: (/** @type {string} */ w) => w !== 'photosynthesis' });
+    const onQueryChange = vi.fn();
+    const onSettingsChange = vi.fn();
+    await typeAndWait({ ...baseProps(), onQueryChange, onSettingsChange, settings: { searchCorpus: 'scriptures' } }, '"seven trumpets" +photosynthesis');
+    const line = document.querySelector('.srch-fewer');
+    expect(line && line.textContent).toBe('Try fewer words: seven trumpets · Search all');
+    expect(document.querySelector('.srch-no-results-tip'), 'the old tip goes when the link shows').toBeNull();
+    expect(search).toHaveBeenCalledWith('seven trumpets', expect.objectContaining({ corpus: 'scriptures' }));
+    fireEvent.click(screen.getByRole('button', { name: 'seven trumpets' }));
+    expect(onQueryChange).toHaveBeenCalledWith('seven trumpets');
+    fireEvent.click(screen.getByRole('button', { name: 'Search all' }));
+    expect(onSettingsChange).toHaveBeenCalledWith('searchCorpus', 'all');
+    expect(document.querySelector('.srch-nearest'), 'nothing near enough: no list').toBeNull();
+  });
+
+  it('offers no fewer words that would find nothing either', async () => {
+    const search = vi.fn(() => Promise.resolve({ parsed: { kind: 'text' }, parsedTerms: [], results: [] }));
+    Object.assign(/** @type {any} */ (window).VotSearchMini, { search, nearest: () => Promise.resolve([]), knows: (/** @type {string} */ w) => w !== 'photosynthesis' });
+    await typeAndWait(baseProps(), '"seven trumpets" +photosynthesis');
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(document.querySelector('.srch-fewer')).toBeNull();
+    expect(document.querySelector('.srch-no-results-tip')).toBeTruthy();
   });
 });
