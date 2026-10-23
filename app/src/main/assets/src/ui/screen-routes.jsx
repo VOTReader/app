@@ -49,6 +49,7 @@ import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
+import { openDownloadsAt } from './screens/AudioOfflineScreen.jsx';
 import { AnswersShelf } from './screens/AnswersShelf.jsx';
 import { AnswersMedia } from './screens/AnswersMedia.jsx';
 import { AnswersSaved } from './screens/AnswersSaved.jsx';
@@ -609,6 +610,13 @@ export function buildScreenRoutes({
   // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
   // Already on the Songs screen (the desk's "Song page ›" over a song list), the frames go on top of its stack, so
   // Back returns to the list. From anywhere else Back returns to that page, the root pill naming it (W-03).
+  // Downloads (downloads brief D3b): a collection or edition header's "Choose…" opens the tree there, Settings'
+  // Downloads & storage opens On this phone; Back returns to the page it came from, the pill naming it.
+  window.__openDownloads = (at, label) => {
+    openDownloadsAt(at);
+    setNavOrigin({ screen, letterId, label: label || '', returnOrigin: navOrigin || null });
+    setScreen('audio-library-offline');
+  };
   window.__openSongs = (frames, label) => {
     if (screen === SONGS_SCREEN) {
       // W2-03: the page already on top is not stacked again (its copy made the first Back go nowhere).
@@ -1424,7 +1432,7 @@ export function buildScreenRoutes({
     'audio-library-offline': () => (
       <AudioOfflineScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel={(navOrigin && navOrigin.label) || 'Listening Library'}
         bibleAudio={settings.bibleAudio}
         onSearch={goSearch}
         onHistory={goHistory}

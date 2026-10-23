@@ -1738,6 +1738,14 @@
       .dl-menu { display:flex; flex-direction:column; margin:.6rem 0 0; }
       .dl-menu-item { min-height:52px; padding:.4rem .2rem; border:0; border-bottom:1px solid var(--gold-border); background:none; color:var(--cream); font:inherit; font-size:var(--fs-18); text-align:left; cursor:pointer; }
       .dl-menu-item.is-remove { color:var(--dl-brick); border-bottom:0; }
+      .audio-library-hero-actions .audio-collection-choose, .audio-collection-choose { min-height:44px; padding:.3rem .2rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .audio-collection-choose:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .settings-downloads-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.3rem .6rem; width:100%; min-height:56px; padding:.3rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .settings-downloads-row .settings-row-label { grid-column:1; }
+      .settings-downloads-row .settings-select-chev { grid-column:2; grid-row:1 / span 3; color:var(--gold); }
+      .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
+      .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
+      .settings-downloads-row .settings-row-value { grid-column:1; }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }

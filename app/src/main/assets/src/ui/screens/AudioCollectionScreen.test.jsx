@@ -347,11 +347,27 @@ describe('a recordings screen in the phone app: downloads', () => {
     expect(screen.queryByRole('button', { name: /download all/i })).toBeNull();
   });
 
+  // Downloads brief 3a, picture 14: "Choose…" beside Play all opens the Downloads tree at this collection or edition.
+  it('Choose… opens the Downloads tree at this collection, and at a Bible edition too', () => {
+    fakeStore();
+    window.__openDownloads = vi.fn();
+    try {
+      renderScreen('one');
+      fireEvent.click(screen.getByRole('button', { name: 'Choose…' }));
+      expect(window.__openDownloads).toHaveBeenCalledWith({ tab: 'choose', focus: 'one' }, expect.any(String));
+      cleanup();
+      renderScreen('bible-brm-kjv');
+      fireEvent.click(screen.getByRole('button', { name: 'Choose…' }));
+      expect(window.__openDownloads).toHaveBeenLastCalledWith({ tab: 'choose', focus: 'bible-brm-kjv' }, expect.any(String));
+    } finally { delete window.__openDownloads; }
+  });
+
   it('on the web none of it renders', () => {
     fakeStore({ available: false });
     renderScreen('one');
     expect(document.querySelector('.offline-row')).toBeNull();
     expect(screen.queryByRole('button', { name: /download all/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Choose…' })).toBeNull();
     // The compilations stay the plain chips they were.
     expect(document.querySelector('.audio-collection-compilation')).toBeNull();
     expect(screen.getByRole('button', { name: /Part 2 · 3/ })).toBeTruthy();

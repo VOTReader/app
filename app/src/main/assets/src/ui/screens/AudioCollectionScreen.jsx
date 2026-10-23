@@ -229,6 +229,10 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
               {/* A collection at once; a Bible edition a book at a time from its rows until the Downloads picker (downloads
                   brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
               {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
+              {/* The Downloads tree opened at this collection or edition (downloads brief 3a, picture 14). */}
+              {offline && !study && typeof window.__openDownloads === 'function' ? (
+                <button type="button" className="audio-collection-choose" onClick={() => window.__openDownloads({ tab: 'choose', focus: volKey }, label)}>Choose…</button>
+              ) : null}
             </div>
           ) : null}
         </header>
