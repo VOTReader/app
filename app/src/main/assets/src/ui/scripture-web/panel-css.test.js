@@ -122,6 +122,7 @@ describe('the panel\'s ink: app.css --sw-* tokens are sw-ink.js TABLE rows', () 
       if (t === '--sw-panel-w' || t === '--sw-sheet-h') continue; // measured, written by use-panel-layout.js
       if (t === '--sw-ts') continue; // not a colour: the panel's Text Size multiplier (w4, 'panel density' below)
       if (t === '--sw-scrolled') continue; // not a colour: how far the band has come in, written by web-panel.jsx
+      if (t === '--sw-chrome-top' || t === '--sw-topbar-floor') continue; // not colours: the header's floor, which the go-to's edge chips keep under over a sheet
       if (/^--sw-safe-(top|right|bottom|left)$/.test(t)) continue; // not a colour: the glass's insets by the frame's edges (sw-rotated-insets.test.js)
       expect(Object.keys(ROWS).concat('--sw-font'), t).toContain(t);
     }
