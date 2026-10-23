@@ -1066,6 +1066,7 @@ export function buildScreenRoutes({
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onOpenSongs={() => _openSongs([{ k: 'hub' }], { screen: 'home' })}
         onNotes={goNotesIndex}
+        onHighlights={goHighlightsIndex}
         onBookmarks={goBookmarksIndex}
         onScriptureWeb={() => {
           // Same entry as the Library's: capture Home as the origin so back returns here.
@@ -1277,7 +1278,8 @@ export function buildScreenRoutes({
       <JournalEditorScreen
         onSettings={goSettings}
         entryId={journalEntryId}
-        onBack={() => goJournalViewer(journalEntryId)}
+        // U03.6: an entry just made with New entry goes Back to the Journal list (its read-only view was a second Back away).
+        onBack={() => { if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId); }}
         onHome={goHome}
         onSearch={goSearch}
         onHistory={goHistory}

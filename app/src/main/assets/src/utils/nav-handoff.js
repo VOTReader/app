@@ -47,6 +47,9 @@
         writer: screen-routes window.__openScriptureWeb (a door from the reader)
         reader: screen-routes' scripture-web route (peek on render: the screen's start prop)
         cleared by: screen-routes, on every build while another screen is up
+     journalNewEntry    string (the entry's id) | null
+        writer: use-journal-mutations (New entry, U03.6)
+        reader: screen-routes' journal-editor route (take on Back: the list it was made from, not its read-only view)
 
    (Removed in D2: `pendingLinkExcerpt` — it was write-only dead code, set by
    use-navigate-to-link with no reader anywhere.)

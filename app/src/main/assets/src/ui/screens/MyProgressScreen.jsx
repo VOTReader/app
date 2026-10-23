@@ -285,7 +285,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const summary = (() => {
     const bits = [];
     if (totalRead > 0) bits.push(plural(totalRead, 'chapter or letter read', 'chapters and letters read'));
-    if (readStreak >= 2) bits.push(_articleFor(readStreak) + ' ' + readStreak + '-day reading streak');
+    // A 1-day streak is said only when nothing else is (U01.2): "Nothing read yet" above "Reading streak 1 day"
+    // contradicted itself for a reader whose day counted but who finished nothing yet.
+    if (readStreak >= 2 || (readStreak === 1 && totalRead === 0)) bits.push(_articleFor(readStreak) + ' ' + readStreak + '-day reading streak');
     if (journalCount > 0) bits.push(plural(journalCount, 'journal entry', 'journal entries'));
     if (bits.length === 0) return 'Nothing read yet. The chapters and letters you read are counted here.';
     const s = bits.length === 1 ? bits[0] : bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1];

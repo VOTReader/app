@@ -46,7 +46,7 @@ function useSongCatalogCount() {
 /** localStorage: the reader said "Not now" to Today's reading-plan offer (C8). */
 const PLAN_OFFER_KEY = 'vot-plans-offer-hidden';
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
   // mw18 C8: with no plan running (and the plans store loaded, so a plan never flashes the offer at boot),
@@ -343,6 +343,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           </button>}
           {historyEnabled !== false && <button type="button" onClick={onHistory}>Recent reading</button>}
           {onNotes && <button type="button" onClick={onNotes}>Notes</button>}
+          {/* U08.1: Highlights were four taps from a letter; now one from Home. */}
+          {onHighlights && <button type="button" onClick={onHighlights}>Highlights</button>}
           {onBookmarks && <button type="button" onClick={onBookmarks}>Bookmarks</button>}
           {/* Back on the landing page (Corbin, 2026-09-11: "like it was before, as
               seen in the trailer") — the button b3e3625a removed on 2026-09-05

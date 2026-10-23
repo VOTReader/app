@@ -407,3 +407,16 @@ describe('the Home reorder hint', () => {
     expect(set.mock.calls[0][0].slice(0, 2)).toEqual(['scriptures', 'volumes']);
   });
 });
+
+/* U08.1: Highlights were four taps from a letter (Library, Personal Study, Highlights); Home's row holds them now. */
+describe('Home shortcut to Highlights', () => {
+  it('sits after Notes and opens the Highlights list', () => {
+    setupGlobals();
+    const onHighlights = vi.fn();
+    renderHome({ onNotes: () => {}, onHighlights, onBookmarks: () => {} });
+    const buttons = [...document.querySelectorAll('.home-shortcuts button')];
+    expect(buttons.map((x) => x.textContent.trim())).toEqual(['Search library', 'Recent reading', 'Notes', 'Highlights', 'Bookmarks']);
+    buttons[3].click();
+    expect(onHighlights).toHaveBeenCalledTimes(1);
+  });
+});

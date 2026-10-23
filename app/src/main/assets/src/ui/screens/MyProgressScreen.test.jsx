@@ -151,6 +151,12 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
     expect(fact(container, 'Reading streak')).toBe('1 day');
   });
 
+  it('a day that counted with nothing finished says the 1-day streak, never "Nothing read yet" (U01.2)', () => {
+    setupGlobals({ readStreak: 1 });
+    const { container } = renderScreen();
+    expect(summaryOf(container)).toBe('A 1-day reading streak.');
+  });
+
   it('draws no gold-outlined stat boxes any more', () => {
     setupGlobals({ stats: { words: 100, wpm: 214 } });
     const { container } = renderScreen();
