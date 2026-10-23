@@ -30,6 +30,8 @@ afterEach(() => {
 });
 
 const base = () => ({ readingPlans: [], isRead: () => false, markAsReadEnabled: true, onPlansMoved: vi.fn(), onRead: vi.fn(), onBack: vi.fn() });
+/** The picks bar's status line, the word count in its own span (hidden at large text). */
+const summary = () => document.querySelector('.build-summary').textContent;
 const open = () => { render(<ReadingPlansScreen {...base()} />); fireEvent.click(screen.getByRole('button', { name: /Build your own plan/ })); };
 
 describe('PlanBuilder', () => {
@@ -41,7 +43,7 @@ describe('PlanBuilder', () => {
     for (const c of [1, 2, 3, 4]) fireEvent.click(screen.getByRole('button', { name: 'Genesis ' + c }));
     expect(screen.getByRole('checkbox', { name: /^Genesis/ }).getAttribute('aria-checked')).toBe('mixed');
     expect(within(screen.getByRole('list', { name: 'Your picks' })).getByText('Genesis 1-4')).toBeTruthy();
-    expect(screen.getByText(/^4 chapters · about [\d,]+ words$/)).toBeTruthy();
+    expect(summary()).toMatch(/^4 chapters · about [\d,]+ words$/);
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     expect(screen.getByRole('heading', { name: 'How do you want to read it?' })).toBeTruthy();
     fireEvent.click(screen.getByRole('radio', { name: /chapter or letter a day/ }));
@@ -62,7 +64,7 @@ describe('PlanBuilder', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /^Ruth/ }));
     fireEvent.click(screen.getByRole('tab', { name: 'The Letters' }));
     fireEvent.click(screen.getByRole('checkbox', { name: /^Volume Seven/ }));
-    expect(screen.getByText(/^4 chapters \+ 4 letters · about [\d,]+ words$/)).toBeTruthy();
+    expect(summary()).toMatch(/^4 chapters \+ 4 letters · about [\d,]+ words$/);
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
     const share = screen.getByRole('radiogroup', { name: 'Bible and letters on the same day?' });
     expect(within(share).getByRole('radio', { name: /Side by side/ }).getAttribute('aria-checked')).toBe('true');
@@ -88,8 +90,23 @@ describe('PlanBuilder', () => {
     const nt = screen.getByRole('checkbox', { name: /^New Testament/ });
     fireEvent.click(nt);
     expect(nt.getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByText(/^260 chapters · about [\d,]+ words$/)).toBeTruthy();
+    expect(summary()).toMatch(/^260 chapters · about [\d,]+ words$/);
     fireEvent.click(nt);
+    expect(screen.getByText('Nothing picked yet')).toBeTruthy();
+  });
+
+  it('the whole Bible is one chip in the picks bar, and its × clears it (mw-pb1)', () => {
+    open();
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Old Testament/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^New Testament/ }));
+    const bar = screen.getByRole('list', { name: 'Your picks' });
+    expect(within(bar).getAllByRole('listitem').map((li) => li.textContent)).toEqual(['Whole Bible · 66 books · 1,189 ch×']);
+    expect(screen.getByRole('checkbox', { name: /^Whole Bible/ }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Genesis/ }));   // one book out: back to the books, still one row per pick
+    expect(within(bar).getAllByRole('listitem').map((li) => li.firstChild.textContent))
+      .toEqual(['Exodus to Malachi · 38 books · 879 ch', 'New Testament · 27 books · 260 ch']);
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Genesis/ }));
+    fireEvent.click(within(screen.getByRole('list', { name: 'Your picks' })).getByRole('button', { name: 'Remove Whole Bible' }));
     expect(screen.getByText('Nothing picked yet')).toBeTruthy();
   });
 });

@@ -77,9 +77,55 @@ export function pickName(p, src) {
   return label + ': ' + p.ids.length + (p.ids.length === 1 ? ' letter' : ' letters');
 }
 
-/** A name for the plan from its picks: "Genesis and Volume Seven", "Genesis, John and more". @param {Pick[]} picks @param {LetterSource | null} src */
+/** A pick's key: one per book, one per collection. @param {Pick} p */
+export const pickKey = (p) => (p.t === 'b' ? 'b:' + p.bid : 'l:' + p.volKey);
+
+/**
+ * The picks as the picks bar shows them (mw-pb1, Corbin hit 66 book chips filling the screen): the whole Bible or a
+ * testament picked whole is one chip, "Whole Bible · 66 books · 1,189 ch", where its first book was picked; every
+ * three or more whole books picked in a row in Bible order are one chip, "Exodus to Malachi · 38 books · 879 ch";
+ * every other pick is its own chip. `keys` are the picks a chip's × removes.
+ * @param {Pick[]} picks @param {LetterSource | null} src @returns {{ key: string, name: string, label: string, keys: string[] }[]}
+ */
+export function pickChips(picks, src) {
+  const whole = new Set(picks.filter((p) => p.t === 'b' && (!p.ch || p.ch.length >= chapterCount(p.bid))).map((p) => /** @type {any} */ (p).bid));
+  /** @type {Map<string, typeof BIBLE_GROUPS[number]>} */
+  const groupOf = new Map();
+  for (const g of BIBLE_GROUPS) {
+    if (g.books.every((b) => whole.has(b)) && !g.books.some((b) => groupOf.has(b))) for (const b of g.books) groupOf.set(b, g);
+  }
+  const label = (/** @type {string} */ name, /** @type {string[]} */ books) =>
+    name + ' · ' + books.length + ' books · ' + books.reduce((n, b) => n + chapterCount(b), 0).toLocaleString('en-US') + ' ch';
+  /** A whole book outside the groups, or null. @param {Pick | undefined} p */
+  const loose = (p) => (p && p.t === 'b' && whole.has(p.bid) && !groupOf.has(p.bid) ? p.bid : null);
+  const chips = [];
+  const shown = new Set();
+  for (let i = 0; i < picks.length; i++) {
+    const p = picks[i];
+    const g = p.t === 'b' ? groupOf.get(p.bid) : undefined;
+    if (g) {
+      if (!shown.has(g.id)) chips.push({ key: 'g:' + g.id, name: g.name, label: label(g.name, g.books), keys: g.books.map((b) => 'b:' + b) });
+      shown.add(g.id);
+      continue;
+    }
+    // three or more whole books picked one after another in Bible order are one chip: "Exodus to Malachi"
+    const run = [];
+    for (let b = loose(p); b && (!run.length || BOOK_INDEX.get(b) === BOOK_INDEX.get(run[run.length - 1]) + 1); b = loose(picks[i + run.length])) run.push(b);
+    if (run.length >= 3) {
+      const name = bookTitle(run[0]) + ' to ' + bookTitle(run[run.length - 1]);
+      chips.push({ key: 'r:' + run[0], name, label: label(name, run), keys: run.map((b) => 'b:' + b) });
+      i += run.length - 1;
+      continue;
+    }
+    const name = pickName(p, src);
+    chips.push({ key: pickKey(p), name, label: name, keys: [pickKey(p)] });
+  }
+  return chips;
+}
+
+/** A name for the plan from its picks: "Genesis and Volume Seven", "Genesis, John and more", "Whole Bible". @param {Pick[]} picks @param {LetterSource | null} src */
 export function defaultName(picks, src) {
-  const names = picks.map((p) => pickName(p, src));
+  const names = pickChips(picks, src).map((c) => c.name);
   if (!names.length) return 'My reading plan';
   if (names.length === 1) return names[0];
   if (names.length === 2) return names[0] + ' and ' + names[1];

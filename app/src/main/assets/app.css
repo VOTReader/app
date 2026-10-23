@@ -3286,11 +3286,16 @@
     .build-letters { padding:0 0 0.5rem 1.6rem; }
     .build-letter { min-height:44px; font-size:var(--fs-15); }
     .build-bar { position:sticky; bottom:0; z-index:2; margin:0.75rem -1rem 0; padding:0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--gold-border); background:var(--bg2); }
-    .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; }
-    .build-chip { display:inline-flex; align-items:center; gap:0.15rem; padding-left:0.7rem; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-size:var(--fs-14); }
+    /* mw-pb1: the bar never outgrows the screen - the picks scroll inside it (about two rows of chips, less at large text) */
+    .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; max-height:min(5.6rem, 22vh); overflow-y:auto; overscroll-behavior:contain; }
+    .build-chip { display:inline-flex; align-items:center; gap:0.15rem; max-width:100%; padding-left:0.7rem; overflow-wrap:anywhere; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-size:var(--fs-14); }
     .build-chip button { min-width:36px; min-height:36px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-18); cursor:pointer; }
-    .build-bar-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+    .build-bar-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 0.75rem; }
+    .build-bar-row .today-btn { margin-left:auto; max-width:100%; }
     .build-summary { color:var(--cream); font-size:var(--fs-15); }
+    /* mw-pb1: at large text the bar keeps to about half the screen - fewer chip rows show, the word count goes (Next keeps it) */
+    .vot-large-text .build-chips { max-height:15vh; }
+    .vot-large-text .build-summary-words { display:none; }
     .build-card { margin:0 0 0.75rem; padding:0.7rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
     .build-card-title { margin:0 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
     .build-goal { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.5rem; }

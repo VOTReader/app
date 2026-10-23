@@ -16,7 +16,7 @@
 
 import { useModalRegistry } from '../../hooks/use-modal-registry.js';
 import { BIBLE_BOOKS } from '../../data/reading-plans.js';
-import { BIBLE_GROUPS, chapterCount, pickName, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
+import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
 import { LETTER_CHAIN } from '../../data/plan-catalog.js';
 import { newRun, todayKey } from '../../data/plan-engine.js';
 import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
@@ -75,7 +75,7 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted }) {
   const mixed = picks.some((p) => p.t === 'b') && picks.some((p) => p.t === 'l');
 
   // ── picks ────────────────────────────────────────────────────────────
-  const keyOf = (/** @type {Pick} */ p) => (p.t === 'b' ? 'b:' + p.bid : 'l:' + p.volKey);
+  const keyOf = pickKey;
   const find = (/** @type {string} */ key) => picks.find((p) => keyOf(p) === key) || null;
   /** Replace, add (at the end) or remove (null) the pick under `key`, keeping the order picked. @param {string} key @param {Pick | null} next */
   const put = (key, next) => setPicks((cur) => {
@@ -229,16 +229,16 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted }) {
         <div className="build-bar">
           {picks.length ? (
             <ul className="build-chips" aria-label="Your picks">
-              {picks.map((p) => (
-                <li key={keyOf(p)} className="build-chip">
-                  <span>{pickName(p, src)}</span>
-                  <button type="button" aria-label={'Remove ' + pickName(p, src)} onClick={() => put(keyOf(p), null)}>×</button>
+              {pickChips(picks, src).map((c) => (
+                <li key={c.key} className="build-chip">
+                  <span>{c.label}</span>
+                  <button type="button" aria-label={'Remove ' + c.name} onClick={() => setPicks((cur) => cur.filter((p) => !c.keys.includes(keyOf(p))))}>×</button>
                 </li>
               ))}
             </ul>
           ) : null}
           <div className="build-bar-row">
-            <span className="build-summary" role="status">{preview ? preview.picked : 'Nothing picked yet'}</span>
+            <span className="build-summary" role="status">{preview ? preview.picked.split(' · ')[0] : 'Nothing picked yet'}{preview ? <span className="build-summary-words">{' · ' + preview.picked.split(' · ')[1]}</span> : null}</span>
             <button type="button" className="today-btn" disabled={!preview} onClick={() => onStep(2)}>Next</button>
           </div>
         </div>
