@@ -5,8 +5,8 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { shareText } from '../../utils/copy-share.js';
-import { withPassageLink } from '../../utils/passage-link.js';
-import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
+import { passageLinkFor } from '../../utils/passage-link.js';
+import { passageLabel, translationTag } from '../../utils/passage-copy.js';
 import { relativeDate } from '../../utils/dates.js';
 
 /**
@@ -158,8 +158,15 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // n6-08: the passage travels with its reference and a link, as the
     // selection Share's does (A8); the link names the passage, never the
     // note, and the reader's own journal sends the words alone.
+    // U07.2: the passage goes in quotes with its reference (Copy's: "John 3:16 (NKJV)") and the reader's words as
+    // "My note:", so the note can't read as part of the verse.
     const key = segs[0] && segs[0].key;
-    const text = withPassageLink(anchor + (note.body ? '\n\n' + note.body : ''), key, key ? _bookmarkSourceLabel(key) : null);
+    const lastKey = segs.length > 1 ? segs[segs.length - 1].key : null;
+    const link = key ? passageLinkFor(key) : null;
+    const text = link
+      ? '\u201C' + anchor + '\u201D \u2014 ' + passageLabel(key, lastKey) + translationTag(key)
+        + (note.body ? '\n\nMy note: ' + note.body : '') + '\n\n' + link
+      : anchor + (note.body ? '\n\n' + note.body : '');
     setMenuOpen(false);
     shareText(text).then((outcome) => {
       if (typeof showToast !== 'function') return;

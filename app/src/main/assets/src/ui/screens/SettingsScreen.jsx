@@ -1428,7 +1428,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Copy & Share"
               title="Share Includes"
               label="Share Includes"
-              desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy always adds the website link."
+              desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy adds the website link wherever the passage has a page there."
               value={settings.shareLink === 'site' ? 'site' : 'app'}
               options={SHARE_LINK_OPTIONS}
               onChange={(v) => onSetting("shareLink", v)}

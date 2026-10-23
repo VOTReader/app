@@ -493,3 +493,28 @@ describe('LinkPicker search warm-up', () => {
     }
   });
 });
+
+/* U03.2 (UX wave 3): a reference row read "John 3:29 · New Testament", no verse words to tell it was the verse meant. */
+describe('LinkPicker verse rows show the verse', () => {
+  it('a row naming a verse shows its words, clipped; a chapter row keeps its category', () => {
+    stubGlobals();
+    const long = 'He who has the bride is the bridegroom; but the friend of the bridegroom, who stands and hears him, rejoices greatly';
+    window.searchNavIndex = () => [
+      { item: { kind: 'bible-chapter', bookId: 'john', chapter: 3, verse: 29, label: 'John 3:29', category: 'New Testament' } },
+      { item: { kind: 'bible-chapter', bookId: 'john', chapter: 4, label: 'John 4', category: 'New Testament' } },
+    ];
+    window.navItemPreview = (it) => (it.verse === 29 ? long : 'heading');
+    try {
+      render(<LinkPicker {...baseProps} />);
+      fireEvent.change(document.querySelector('input'), { target: { value: 'john 3' } });
+      const rows = [...document.querySelectorAll('.navpick-row')];
+      const v = rows.find((r) => r.textContent.includes('John 3:29'));
+      const words = v.querySelector('.navpick-row-snippet').textContent;
+      expect(words.startsWith('He who has the bride')).toBe(true);
+      expect(words.endsWith('…')).toBe(true);
+      expect(words.length).toBeLessThanOrEqual(71);
+      const c = rows.find((r) => r.textContent.includes('John 4'));
+      expect(c.querySelector('.navpick-row-cat').textContent).toBe('New Testament');
+    } finally { delete window.navItemPreview; }
+  });
+});
