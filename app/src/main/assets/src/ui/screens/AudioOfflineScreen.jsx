@@ -14,6 +14,7 @@
 
 import { useOfflineAudio, formatBytes } from '../components/OfflineAudioControls.jsx';
 import { DownloadChooser, Sheet, TrashIcon } from '../components/DownloadChooser.jsx';
+import { DownloadStrip } from '../components/DownloadStrip.jsx';
 import { countOf } from '../../utils/download-tree.js';
 import { hideToast, showToast } from '../../utils/toast.js';
 
@@ -287,6 +288,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
           {head}
           {tabs}
           <div role="tabpanel" id="dl-tabpanel" aria-labelledby="dl-tab-choose">
+            <DownloadStrip off={off} onMakeRoom={() => setTab('phone')} />
             <DownloadChooser key={focus || ''} off={off} bibleAudio={bibleAudio} focus={focus} />
           </div>
         </div>
@@ -310,6 +312,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
         {head}
         {off ? tabs : null}
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
+          {/* Pinned under the tabs (README: the strip). */}
+          {off ? <DownloadStrip off={off} /> : null}
           {items.length || songs ? (
             <div className="dl-storage">
               {barTotal > 0 ? (
@@ -336,14 +340,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
               </p>
             </div>
           ) : null}
-          {pending.busy || pending.failed.length ? (
+          {pending.failed.length ? (
             <div className="offline-collection offline-shelf-status">
-              {pending.busy ? (
-                <p className="offline-collection is-busy">
-                  <span>{'Downloading · ' + many(pending.busy) + ' to go'}</span>
-                  <button type="button" className="offline-row-link" onClick={() => off.cancelAll()}>Cancel all</button>
-                </p>
-              ) : null}
               {pending.failed.length ? (
                 <p className="offline-collection is-failed">
                   <span>{'Did not download · ' + many(pending.failed.length)}</span>

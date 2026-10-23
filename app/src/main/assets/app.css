@@ -1738,6 +1738,15 @@
       .dl-menu { display:flex; flex-direction:column; margin:.6rem 0 0; }
       .dl-menu-item { min-height:52px; padding:.4rem .2rem; border:0; border-bottom:1px solid var(--gold-border); background:none; color:var(--cream); font:inherit; font-size:var(--fs-18); text-align:left; cursor:pointer; }
       .dl-menu-item.is-remove { color:var(--dl-brick); border-bottom:0; }
+      /* The progress strip (pictures 08-09): line 1 the state, line 2 bytes or the reason, a 3 px line, gold text buttons. */
+      .dl-strip { position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:.3rem 1rem; margin:.8rem 0 .4rem; padding:.75rem .9rem 1rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--dl-surface); }
+      .dl-strip-text { flex:1 1 12em; min-width:0; }
+      .dl-strip-line1 { margin:0; color:var(--cream); font-size:var(--fs-16); line-height:1.35; }
+      .dl-strip-line2 { margin:.15rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-strip-actions { display:flex; flex-wrap:wrap; gap:0 1rem; }
+      .dl-strip-bar { position:absolute; left:.9rem; right:.9rem; bottom:.45rem; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
+      .dl-strip-bar > span { display:block; height:100%; background:var(--gold); transition:width .3s ease; }
+      .dl-strip.is-paused .dl-strip-bar > span { background:var(--gold-dim); }
       .audio-library-hero-actions .audio-collection-choose, .audio-collection-choose { min-height:44px; padding:.3rem .2rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
       .audio-collection-choose:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
       .settings-downloads-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.3rem .6rem; width:100%; min-height:56px; padding:.3rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }

@@ -177,7 +177,15 @@ function UnitRow({ unit, wanted, off, onBox }) {
   const removing = !on && unitHeld(off, unit);
   const s = statsOf(off, [unit]);
   const parts = unit.tracks.length > 1 ? unit.tracks.length + ' parts' : '';
-  const meta = [parts, formatLength(s.seconds), s.bytes ? formatBytes(s.bytes) : ''].filter(Boolean).join(' · ');
+  // On its way (picture 08's row states): the bytes it has, or Waiting - never "Downloading 0%".
+  let moving = '';
+  for (const t of unit.tracks) {
+    const st = off.statusOf(t.url);
+    const p = st === 'downloading' && typeof off.progressOf === 'function' ? off.progressOf(t.url) : null;
+    if (p && p.total > 0) { moving = 'Downloading ' + Math.floor((p.bytes / p.total) * 100) + '%'; break; }
+    if (st === 'downloading' || st === 'queued') moving = moving || 'Waiting';
+  }
+  const meta = [parts, moving, formatLength(s.seconds), s.bytes ? formatBytes(s.bytes) : ''].filter(Boolean).join(' · ');
   return (
     <div className="dl-row dl-unit">
       <Box state={on ? 'all' : 'none'} removing={removing} label={unit.title} onClick={onBox} />

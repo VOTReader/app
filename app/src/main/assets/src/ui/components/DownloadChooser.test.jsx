@@ -129,6 +129,21 @@ describe('Choose: ticks and the footer', () => {
   });
 });
 
+describe('Choose: rows on their way', () => {
+  it('a letter on its way says Waiting, or its percent once bytes arrive, and stays ticked', () => {
+    off.st.status.set(U('xmas-1'), 'downloading');
+    off.st.status.set(U('xmas-2'), 'queued');
+    off.st.status.set(U('v1-warning'), 'queued');
+    off.progressOf = (u) => (u === U('xmas-1') ? { bytes: 2.5e6, total: 5e6 } : null);
+    const { container } = render(<DownloadChooser off={off} />);
+    fireEvent.click(within(container).getByRole('button', { name: /^Volume One/ }));
+    const metas = [...container.querySelectorAll('.dl-unit-meta')].map((m) => m.textContent);
+    expect(metas).toEqual(['Waiting · 3 MB', '2 parts · Downloading 50% · 11 MB']);
+    expect(box(container, 'Volume One').getAttribute('aria-checked')).toBe('true');
+    expect(footer(container).textContent).toMatch(/Tick what you want on this phone/);
+  });
+});
+
 describe('Choose: the Bible', () => {
   it('a range in the chapter grid ticks its run; the sheet names it by chapters', () => {
     off.st.saved.set(U('ruth-4'), {});
