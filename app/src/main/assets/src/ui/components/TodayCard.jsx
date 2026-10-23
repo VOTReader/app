@@ -103,10 +103,31 @@ const listenOf = (r) => (Array.isArray(r.listen) && r.listen.length ? r.listen :
  * about 13 min", Read and Listen; a day read through reads "Done today", tomorrow's portion, Read ahead and Read
  * again; two plans list each with its day number; "Mark as read is off" is a button that turns it on.
  * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
- *   onOpenPlans: () => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void }} props
+ *   onOpenPlans: () => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
+ *   offerStart?: boolean, onHideOffer?: () => void }} props
  */
-export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead }) {
-  if (!rows || !rows.length) return null;
+export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead, offerStart, onHideOffer }) {
+  if (!rows || !rows.length) {
+    // C8: the way in when no plan runs (r2-home-states "No plan").
+    if (!offerStart) return null;
+    return (
+      <section className="today-card" aria-label="Reading plans">
+        <div className="today-head">
+          <span className="today-eyebrow">Today</span>
+          {onHideOffer ? <button type="button" className="today-plans-link" onClick={onHideOffer}>Not now</button> : null}
+        </div>
+        <div className="today-one">
+          <div className="today-one-text">
+            <h2 className="today-title">Start a reading plan</h2>
+            <span className="today-plan">A few minutes a day, at your own pace</span>
+          </div>
+          <div className="today-actions">
+            <button type="button" className="today-btn" onClick={onOpenPlans}>Browse plans</button>
+          </div>
+        </div>
+      </section>
+    );
+  }
   const behind = rows.reduce((n, r) => n + (r.behind || 0), 0);
   const foot = (
     <>

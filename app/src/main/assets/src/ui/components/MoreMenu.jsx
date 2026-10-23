@@ -54,6 +54,7 @@ import { translationName } from '../../data/translations.js';
  * @property {(t: string) => void} onThemeChange
  * @property {() => void} onSettings
  * @property {() => void} onHistory
+ * @property {(() => void) | null} [onPlans]  mw18 C8: Reading plans, beside History
  * @property {string} fontScale         settings.fontScale ("1" = 100 %)
  * @property {(v: string) => void} onFontScale
  * @property {boolean} [translationHere] a Bible chapter: the menu offers the translation picker
@@ -255,6 +256,14 @@ export function MoreMenuBtn() {
                 <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-5.01" />
               </svg>
               <span>History</span>
+            </button>
+          ) : null}
+          {ctx.onPlans ? (
+            <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onPlans)}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
+              </svg>
+              <span>Reading plans</span>
             </button>
           ) : null}
           {canPickTranslation ? (

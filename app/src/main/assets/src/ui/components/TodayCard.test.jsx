@@ -76,6 +76,17 @@ describe('TodayCard', () => {
     expect(on).toHaveBeenCalled();
   });
 
+  it('with no plan, offers one when asked to: Browse plans, and Not now hides it (C8)', () => {
+    const onOpenPlans = vi.fn(), onHideOffer = vi.fn();
+    render(<TodayCard rows={[]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={onOpenPlans} offerStart onHideOffer={onHideOffer} />);
+    expect(screen.getByRole('heading', { name: 'Start a reading plan' })).toBeTruthy();
+    expect(screen.getByText('A few minutes a day, at your own pace')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Browse plans' }));
+    expect(onOpenPlans).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    expect(onHideOffer).toHaveBeenCalled();
+  });
+
   it('a Volumes plan waiting for the letters to load says so', () => {
     render(<TodayCard rows={[row({ id: 'volumes', name: 'The Volumes in Order', loading: true, label: '', next: null })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
     expect(screen.getByText('Loading the Volumes…')).toBeTruthy();

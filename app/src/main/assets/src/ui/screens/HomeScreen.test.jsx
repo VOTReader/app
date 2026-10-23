@@ -106,7 +106,13 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     cleanup();
     ReadingPlanStore.replaceAll([]);
     const bare = renderHome({ readingPlans: [], isRead: () => false });
+    // mw18 C8: with no plan, Today offers one; Not now hides it on this device, and it stays hidden
+    expect(bare.container.querySelector('.today-card').textContent).toContain('Start a reading plan');
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(bare.container.querySelector('.today-card')).toBeNull();
+    cleanup();
+    expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.today-card')).toBeNull();
+    localStorage.removeItem('vot-plans-offer-hidden');
     delete window.ReadingPlanStore;
   });
 

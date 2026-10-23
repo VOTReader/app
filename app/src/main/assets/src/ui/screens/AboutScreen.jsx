@@ -105,6 +105,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                   <p>Highlight, underline, bookmark, and note — anywhere.</p>
                   <p>A private journal with photos, voice memos, and a full feature suite — kept on your device.</p>
                   <p>Full-text search across the entire library.</p>
+                  <p>Reading plans: the Bible in a year, the letters, or any mix you build, a few minutes a day at your own pace.</p>
                   {/* B1 (2026-08-10): this line claimed "nothing is downloaded
                       except the Garden images", which stopped being true the
                       day audio shipped — every Listen streams an MP3. The

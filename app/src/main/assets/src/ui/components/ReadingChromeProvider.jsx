@@ -50,6 +50,7 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = nul
     onThemeChange: n.onThemeChange || (() => {}),
     onSettings: n.onSettings || (() => {}),
     onHistory: n.onHistory || (() => {}),
+    onPlans: n.onPlans || null,
     fontScale: String(s.fontScale || '1'),
     onFontScale: (v) => { if (updateSetting) updateSetting('fontScale', v); },
     // A Bible chapter's menu also switches the translation (mw17 A02.1).

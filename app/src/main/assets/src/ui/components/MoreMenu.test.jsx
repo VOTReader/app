@@ -62,6 +62,13 @@ describe('MoreMenuBtn — the compact bar', () => {
     expect(document.activeElement, 'focus lands on the first item').toBe(item('History'));
   });
 
+  it('offers Reading plans when the app wires it (mw18 C8), and opens them', () => {
+    const { value, open, item } = setup({ onPlans: vi.fn() });
+    open();
+    act(() => { fireEvent.click(item('Reading plans')); });
+    expect(value.onPlans).toHaveBeenCalled();
+  });
+
   it('leaves out History when History itself is off', () => {
     const { open, item } = setup({ historyEnabled: false });
     open();
