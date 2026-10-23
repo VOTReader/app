@@ -17,7 +17,7 @@ import { resolve, dirname } from 'node:path';
 // @ts-ignore -- no node types in this tsconfig
 import { fileURLToPath } from 'node:url';
 import {
-  expandSnippetTerms, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder, correctedQuery, letterRefCards,
+  expandSnippetTerms, relatedWordsFor, relatedWordsFound, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder, correctedQuery, letterRefCards,
 } from './SearchScreen.jsx';
 import {
   srchSortCanonical as realSrchSortCanonical,
@@ -28,6 +28,21 @@ const MAP = {
   shepherd: ['shepherd', 'pastor'],
   pastor: ['shepherd', 'pastor'],
 };
+
+describe('relatedWordsFor / relatedWordsFound (search200 audit 145)', () => {
+  it("names each typed word's group, typed words out, none for a phrase or with synonyms off", () => {
+    expect(relatedWordsFor({ kind: 'text' }, ['shepherd'], MAP, true)).toEqual(['pastor']);
+    expect(relatedWordsFor({ kind: 'text' }, ['shepherd', 'pastor'], MAP, true)).toEqual([]);
+    expect(relatedWordsFor({ kind: 'text', phrase: 'good shepherd' }, ['shepherd'], MAP, true)).toEqual([]);
+    expect(relatedWordsFor({ kind: 'text' }, ['shepherd'], MAP, false)).toEqual([]);
+  });
+  it("a result's own matched terms count; a word no result holds is left out", () => {
+    const withTerms = [{ doc: { text: 'nothing here' }, terms: ['pastor'] }];
+    expect(relatedWordsFound(['pastor', 'herdsman'], withTerms)).toEqual(['pastor']);
+    expect(relatedWordsFound(['pastor'], [{ doc: { text: 'the pastors came' } }]), 'whole words only').toEqual([]);
+    expect(relatedWordsFound(['pastor'], [{ doc: { text: 'a Pastor, faithful' } }])).toEqual(['pastor']);
+  });
+});
 
 describe('expandSnippetTerms (SRCH4)', () => {
   it('returns [] for a non-text parsed result (command / null)', () => {
@@ -1713,6 +1728,31 @@ describe('SearchScreen (search200 UX, track B)', () => {
     } finally {
       delete /** @type {any} */ (window).addRecentSearch;
     }
+  });
+
+  /* search200 audit 145: synonym search was on by default and said nothing: the reader saw "trust" marked under
+     "faith" with no word why. A line under the count names the related words the results hold, with Turn off. */
+  it('145: says which related words are matching, with a Turn off; off, the line goes', async () => {
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: { faith: ['trust', 'belief', 'believe', 'credence'] } };
+    const hit = (/** @type {string} */ t, /** @type {number} */ i) => ({ score: 10 - i, doc: { kind: 'letter', g: 'v1', title: 'L' + i, text: t } });
+    searchReturns({ parsed: { kind: 'text' }, parsedTerms: ['faith'],
+      results: [hit('keep the faith', 0), hit('put your trust in Me', 1), hit('their belief failed', 2), hit('they believe not', 3)] });
+    const changed = [];
+    const props = { ...baseProps(), onSettingsChange: (/** @type {string} */ k, /** @type {any} */ v) => changed.push([k, v]) };
+    const r = await typeIn(props, 'faith');
+    const line = () => document.querySelector('.srch-syn-line');
+    expect(line(), 'the line is there').toBeTruthy();
+    expect(line().textContent, 'a word no result holds is not named').toBe('Also matching: trust, belief, believe · Turn off');
+    fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
+    expect(changed).toEqual([['searchSynonyms', false]]);
+    r.rerender(<SearchScreen {...props} query="faith" settings={{ searchSynonyms: false }} />);
+    await commit();
+    expect(line() && line().textContent, 'off, it says so once, with the way back').toBe('Related words are off · Turn on');
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on' }));
+    expect(changed[1]).toEqual(['searchSynonyms', true]);
+    cleanup();
+    await typeIn({ ...props, settings: { searchSynonyms: false } }, 'faith');
+    expect(line(), 'off from Settings: no line at all').toBeNull();
   });
 
   /* search200 audit 143: a search that found nothing (no result, no reference card, no topic) is not kept as a

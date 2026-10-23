@@ -14,6 +14,51 @@ import {
 
 export { expandSnippetTerms, typedStopWords, scopeConflict, letterRefCards, searchMemo, matchCountLabel, groupInSiteOrder, correctedQuery };
 
+/**
+ * The related words a search looked for besides the typed ones (search200 audit 145): each typed word's SYNONYM_MAP
+ * group, as the engine expands it (synonyms.js expandQueryTerms), in that order, the typed words left out. None for a
+ * phrase (the engine never expands one) or with synonyms off. Pure.
+ * @param {{kind?:string, phrase?:string}|null} parsed
+ * @param {string[]} parsedTerms
+ * @param {Record<string,string[]>|null|undefined} synMap
+ * @param {boolean} synonymsOn
+ * @returns {string[]}
+ */
+export function relatedWordsFor(parsed, parsedTerms, synMap, synonymsOn) {
+  if (!synonymsOn || !synMap || !parsed || parsed.kind !== 'text' || parsed.phrase) return [];
+  const typed = new Set((parsedTerms || []).map((t) => String(t).toLowerCase()));
+  const out = [];
+  for (const t of typed) {
+    const grp = synMap[t];
+    if (!Array.isArray(grp)) continue;
+    for (const g of grp) { const w = String(g).toLowerCase(); if (!typed.has(w) && !out.includes(w)) out.push(w); }
+  }
+  return out;
+}
+
+/* Of the related words, the ones some result holds (a word the search looked for and found nowhere is not
+   "matching"). A result's own matched terms (the engine's `terms`) say it at no cost; a result that carries none
+   (one found by meaning) is read, whole-word and case-blind, the first RELATED_SCAN of them only. Pure. */
+const RELATED_SCAN = 30;
+/** @param {string[]} words @param {any[]} results @returns {string[]} */
+export function relatedWordsFound(words, results) {
+  if (!words.length || !results.length) return [];
+  const found = new Set();
+  const bare = [];
+  for (const e of results) {
+    if (!e || !e.doc) continue;
+    if (Array.isArray(e.terms) && e.terms.length) { for (const t of e.terms) found.add(String(t).toLowerCase()); } else if (bare.length < RELATED_SCAN) bare.push(e.doc);
+  }
+  const left = new Map(words.filter((w) => !found.has(w)).map((w) => [w, new RegExp('(^|[^\\p{L}\\p{N}])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}])', 'iu')]));
+  for (const d of bare) {
+    if (!left.size) break;
+    const text = (d.title || '') + '\n' + (d.text || '');
+    for (const [w, re] of left) if (re.test(text)) { found.add(w); left.delete(w); }
+  }
+  return words.filter((w) => found.has(w));
+}
+
+
 // MiniSearch is THE engine (the owner A/B'd it against the retired FlexSearch
 // Classic and kept it — typo tolerance, BM25 ranking, recent searches, warm IDB
 // cache). It ships in bundle-d alongside this screen, so it's always loaded by
@@ -289,6 +334,10 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
       );
       // `stopTyped`: the small words typed, whose engine forms ("whom" for "who") a card leaves unmarked.
       const stopTyped = typedStopWords(r.textQuery || r.parsed, r.parsedTerms || [], stop);
+      // The related words the search looked for (search200 audit 145), for the line under the count.
+      const related = relatedWordsFor(r.textQuery || r.parsed, r.parsedTerms || [],
+        /** @type {any} */ (window).VotSearchData && /** @type {any} */ (window).VotSearchData.SYNONYM_MAP,
+        settings.searchSynonyms !== false);
       /* `memo`: the search this list came from (search200 B2). The groups are keyed by it, not by the live memo,
          which a tab or scope change moves at once: keyed live, the groups remounted over the OLD list (long, so
          closed), and the new list, a lone group, arrived under the same key and stayed closed over a blank screen.
@@ -302,7 +351,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         try { const p = E.parse(q, { corpus: 'all' }); if (p && REF_CARD_KINDS.indexOf(p.kind) >= 0) refParsed = p; } catch { /* words, then */ }
       }
       // `q`: the text this list answers (search200 B9 review); the box can be ahead of it, a key typed since.
-      const done = { phase: 'done', memo, q, parsed: r.parsed, refParsed, results: r.results || [], terms, stopTyped, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
+      const done = { phase: 'done', memo, q, parsed: r.parsed, refParsed, results: r.results || [], terms, stopTyped, related, error: r.error ? String(r.error) : null, total: (r.results || []).length, capped: r.capped || [], truncated: !!r.truncated, corrections: r.corrections || [], stopWordsOnly: !!r.stopWordsOnly, unquoted: r.unquoted || null, meaningLater: !!r.meaningLater };
       if (!r.error) lastSearch = { memo, allWordsFor, state: done };
       setState(done);
       if (r.meaningLater) rankWithMeaning();
@@ -615,6 +664,12 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const texts = withOwnPassage(found, pick.entry, found.length < 2 ? cardPassage(pick.entry, state.terms, state.stopTyped) : '');
     return { entry: pick.entry, texts };
   }, [engineNav, state.results, state.q, state.terms, state.stopTyped]);
+
+  /* SAY WHEN SYNONYMS ARE MATCHING (search200 audit 145, mockups/audit-ui/synonyms-line.png A). Synonym search is on by
+     default and said nothing: "trust" came marked under "faith" with no word why. A grey line under the count names
+     the related words the results hold, with Turn off; turned off here, it says so for this query, with Turn on. */
+  const relatedShown = React.useMemo(() => relatedWordsFound(state.related || [], state.results), [state.related, state.results]);
+  const [synOffFor, setSynOffFor] = React.useState('');
 
   // The switch matters when some group has two or more results to order, or when
   // there is a Best Matches row for Book order to set aside.
@@ -1093,6 +1148,18 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
                 {sectionsListed ? <>{" across "}<strong>{grouped.length} {grouped.length === 1 ? "section" : "sections"}</strong></> : null}
               </>
             )}
+            {settings.searchSynonyms !== false && relatedShown.length > 0 ? (
+              <div className="srch-syn-line">
+                {'Also matching: ' + (relatedShown.length > 5 ? relatedShown.slice(0, 5).join(', ') + ' and ' + (relatedShown.length - 5) + ' more' : relatedShown.join(', '))}
+                {' · '}
+                <button type="button" className="srch-more-link" onClick={() => { setSynOffFor(qTrim); onSettingsChange('searchSynonyms', false); }}>Turn off</button>
+              </div>
+            ) : settings.searchSynonyms === false && synOffFor !== '' && synOffFor === qTrim ? (
+              <div className="srch-syn-line">
+                {'Related words are off · '}
+                <button type="button" className="srch-more-link" onClick={() => { setSynOffFor(''); onSettingsChange('searchSynonyms', true); }}>Turn on</button>
+              </div>
+            ) : null}
           </div>
         )}
 

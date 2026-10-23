@@ -4466,6 +4466,9 @@
     .srch-songs-row:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
     .srch-results-summary { padding:0.55rem 1rem; font-family:var(--font-body); font-size:var(--fs-12); color:var(--gold); background:var(--bg2); border-bottom:1px solid var(--gold-border); font-style:italic; }
     .srch-results-summary strong { color:var(--gold-bright); font-weight:600; font-style:normal; }
+    /* The Turn off / Turn on link is a 44px target (the line's negative margins keep the summary's height close). */
+    .srch-syn-line { margin:-0.35rem 0 -0.55rem; font-style:normal; color:var(--cream-muted); }
+    .srch-syn-line .srch-more-link { display:inline-flex; align-items:center; min-height:44px; min-width:44px; padding:0 0.25rem; margin:0 -0.25rem; vertical-align:middle; }
     .srch-groups { display:block; }
     .srch-group { border-bottom:1px solid var(--gold-border); }
     /* the heading round a group's header button (search200 B9) takes nothing of its own but its

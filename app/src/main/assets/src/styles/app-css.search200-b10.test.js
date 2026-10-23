@@ -284,3 +284,13 @@ describe('B10 item 6 — group headers pin under the search bar while their own 
     expect(decls('.search-screen')['padding-bottom']).toBe('var(--dock-sys)');
   });
 });
+
+/* search200 audit 145: the "Also matching" line's Turn off is a 44px target. */
+describe('the related-words line (search200 audit 145)', () => {
+  it('its link is at least 44px tall and wide', () => {
+    const r = RULES.find((x) => x.selectors.includes('.srch-syn-line .srch-more-link') && !x.at);
+    expect(r, 'the rule').toBeTruthy();
+    expect(r.body).toMatch(/min-height:\s*44px/);
+    expect(r.body).toMatch(/min-width:\s*44px/);
+  });
+});
