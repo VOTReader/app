@@ -10104,3 +10104,9 @@ body.light .install-step-num { color: #fff; }
 /* J-w3g1.1: card padding in rem tripled with the text (a 48 px inset each side at 300%); held to phone px. */
 .vot-large-text :is(.bottom-nav-card, .related-card) { padding: 12px 14px; }
 .vot-large-text .bottom-nav { gap: 10px; }
+/* search200 wave 3: at 300% on a 320 px phone the search box's rem padding (36 px a side), its row gap and the
+   ✕'s 60 px glyph left about three letters of the query in view. Held to phone px, and the box's own words to 36 px
+   ("fear not" fits whole); the ✕ stays a 44 px target. */
+.vot-large-text .srch-input-row { gap: 4px; }
+.vot-large-text .search-input { padding-left: 10px; padding-right: 10px; font-size: min(var(--fs-16), 36px); }
+.vot-large-text .srch-clear-btn { min-width: 44px; font-size: min(var(--fs-20), 28px); }
