@@ -462,7 +462,7 @@ function App() {
      prevent back-induced navigations from re-pushing entries. */
   useHistorySync({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-    genreId, gardenPage,
+    genreId, gardenPage, journalEntryId,
   });
 
   /* useBibleStudies() call → moved UP to right after useReadingDwell

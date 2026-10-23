@@ -210,11 +210,12 @@ export function _resetHistoryEntries() {
  *   studyChapterId: any,
  *   genreId: any,
  *   gardenPage: any,
+ *   journalEntryId?: any,
  * }} navKey
  * @returns {void}
  */
 export function useHistorySync({
-  screen, bookId, chapterNum, letterId, studyId, studyChapterId, genreId, gardenPage,
+  screen, bookId, chapterNum, letterId, studyId, studyChapterId, genreId, gardenPage, journalEntryId = null,
 }) {
   // Track the last-serialized nav-key. Compare-and-skip on equality so
   // React StrictMode's setup-cleanup-setup-on-mount cycle doesn't
@@ -229,7 +230,9 @@ export function useHistorySync({
     if (PlatformBridge.isAndroid) return;
     if (typeof history === 'undefined' || typeof history.pushState !== 'function') return;
 
-    const key = `${screen}|${bookId}|${chapterNum}|${letterId}|${studyId}|${studyChapterId}|${genreId}|${gardenPage}`;
+    // journalEntryId (mw17 s03.1): an entry-to-entry link keeps the screen at journal-viewer,
+    // so without it entry A to B pushed nothing and web Back ran out of entries early.
+    const key = `${screen}|${bookId}|${chapterNum}|${letterId}|${studyId}|${studyChapterId}|${genreId}|${gardenPage}|${journalEntryId}`;
 
     if (lastKeyRef.current === null) {
       // Initial mount. Don't push — the bootstrap state is already the
@@ -277,5 +280,5 @@ export function useHistorySync({
     // the app continues to work, just without browser-back support
     // (handleAndroidBack still routes via the in-app back affordances).
     pushHistoryEntry();
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, genreId, gardenPage]);
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, genreId, gardenPage, journalEntryId]);
 }
