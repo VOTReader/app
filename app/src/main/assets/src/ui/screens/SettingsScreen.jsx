@@ -604,9 +604,12 @@ function _snapshotText(st) {
   return 'Newest ' + _daysAgo(st.newestAt) + ' · ' + st.count + ' ' + where;
 }
 
-/** dl-weekly: the weekly copy in Downloads. @param {{ on: boolean, count: number, newestAt: number }} w */
+/** dl-weekly: the weekly copy in Downloads. @param {{ on: boolean, count: number, newestAt: number, failure?: any }} w */
 function _weeklyText(w) {
   if (!w.on) return 'Off';
+  // id-datasafe 159: a copy that failed says so, and when the next try is.
+  if (w.failure && w.failure.reason === 'too-big') return 'Paused: your library is too big for this copy. Export keeps all of it';
+  if (w.failure) return 'The last copy could not be saved (' + _daysAgo(w.failure.at) + '). The app tries again a day later';
   if (!w.count) return 'Once a week to Downloads/VOTReader (the last 4 kept)';
   return 'Newest ' + _daysAgo(w.newestAt) + ' · in Downloads/VOTReader, the last 4 kept';
 }

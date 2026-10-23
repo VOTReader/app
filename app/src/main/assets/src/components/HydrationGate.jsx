@@ -49,6 +49,7 @@ import { DiagnosticLog } from '../utils/diagnostic-log.js';
 import { showToast } from '../utils/toast.js';
 import { DataSafety } from '../utils/data-safety.js';
 import { watchOtherTabs } from '../utils/other-tabs.js';
+import { remountHolds } from '../utils/update-hold.js';
 
 const { useState, useEffect } = React;
 
@@ -180,6 +181,9 @@ export function HydrationGate({ children }) {
         // has focus the remount waits (a draft held in component state would go with it).
         // No overall cap (refuter b34-r2): a cap would drop a draft the reader is still typing.
         if (_readerIsTyping()) { timer = setTimeout(fire, TYPING_RECHECK_MS); return; }
+        // id-datasafe 80: nor while a note is in edit, a take is recording or the journal editor
+        // is open, typing or not (a reader who pauses over a thought keeps the draft).
+        if (remountHolds().length) { timer = setTimeout(fire, TYPING_RECHECK_MS); return; }
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
         loadedCount = 0;
         _appReplacementPending = waiting.length > 0;

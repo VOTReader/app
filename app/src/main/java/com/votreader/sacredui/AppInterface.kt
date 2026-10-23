@@ -308,11 +308,28 @@ class AppInterface(
         vm.audioFocusRequest = null
         if (!audioSessionLive) return
         audioSessionLive = false
+        // id-datasafe 84 (s41.4): a call that began mid-memo owns the mode now. A phone call moves it
+        // off the MODE_IN_COMMUNICATION we set (ringtone, in call); a VoIP call keeps that mode but
+        // plays as voice communication. Either way writing our saved mode back would cut into it.
+        if (am.mode != AudioManager.MODE_IN_COMMUNICATION || otherAppInVoiceCall(am)) {
+            Timber.i("endAudioSession: a call holds the audio mode (%d); left alone", am.mode)
+            return
+        }
         try {
             am.mode = vm.previousAudioMode
         } catch (e: Exception) {
             Timber.w(e, "endAudioSession restoreMode failed")
         }
+    }
+
+    /** True while some app plays voice-communication audio: our memos play as media, so it is a call. */
+    private fun otherAppInVoiceCall(am: AudioManager): Boolean = try {
+        am.activePlaybackConfigurations.orEmpty().any {
+            it.audioAttributes?.usage == AudioAttributes.USAGE_VOICE_COMMUNICATION
+        }
+    } catch (e: Exception) {
+        Timber.w(e, "activePlaybackConfigurations failed")
+        false
     }
 
     // ─── Native voice recording (Android-reliable path) ──────────────

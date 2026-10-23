@@ -7,7 +7,9 @@ import { holdUpdateReload } from '../utils/update-hold.js';
 /**
  * @param {boolean} active - true while a reload would lose what is on screen
  * @param {string} reason - 'note', 'recording', ...
+ * @param {{ remountOnly?: boolean }} [opts] - remountOnly: hold only the late-load remount
  */
-export function useUpdateHold(active, reason) {
-  React.useEffect(() => (active ? holdUpdateReload(reason) : undefined), [active, reason]);
+export function useUpdateHold(active, reason, opts) {
+  const remountOnly = !!(opts && opts.remountOnly);
+  React.useEffect(() => (active ? holdUpdateReload(reason, { remountOnly }) : undefined), [active, reason, remountOnly]);
 }

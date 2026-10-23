@@ -148,6 +148,7 @@ export var JournalStatsStore = extendStore(
       if (delta >= 2 && data.currentStreak > 0) {
         data.currentStreak = 0;
         this._save();
+        this._bump();   // id-datasafe 39: My Progress reads the streak in render; tell it
       }
       return data;
     },

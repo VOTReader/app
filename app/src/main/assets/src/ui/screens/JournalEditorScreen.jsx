@@ -78,13 +78,15 @@ function _writeJournalDraft(eid, title, blocks, mood) {
  *  r2). A write that started meanwhile (the next entry's save, the fence coming down and
  *  re-saving) writes the whole store, these words included: wait for that one instead
  *  (refuter r3: giving up there left confirmed drafts behind for good). */
+function _journalStoreSettled() {
+  var store = /** @type {any} */ (JournalStore);
+  return !(typeof store.isReady === 'function' && !store.isReady())
+    && !(typeof isStoreWriteFenced === 'function' && isStoreWriteFenced());
+}
 function _markJournalDraftDurableWhenSaved(eid, n) {
   var store = /** @type {any} */ (JournalStore);
   if (!eid || typeof store.whenSaved !== 'function') return;
-  var settled = function() {
-    return !(typeof store.isReady === 'function' && !store.isReady())
-      && !(typeof isStoreWriteFenced === 'function' && isStoreWriteFenced());
-  };
+  var settled = _journalStoreSettled;
   if (!settled()) return;
   if (n == null) { var cur = _readJournalDrafts()[eid]; if (!cur || !cur.n) return; n = cur.n; }
   var wait = function() {
@@ -165,6 +167,11 @@ export function JournalEditorScreen(props) {
 
   var entryId = props.entryId;
   var onBack = props.onBack;
+
+  // id-datasafe 80: a store that loads late must not remount the app under an open entry
+  // (its unmount flush would write into a store that has not loaded). Not the update
+  // reload: the editor saves as it goes, and the reload's restore brings it back.
+  useUpdateHold(true, 'journal', { remountOnly: true });
 
   // JRNL-1: on open, recover a background-draft whose edits never reached IDB. Restore
   // ONLY when the draft is for THIS entry, is at least as recent as the last durable save
@@ -485,6 +492,9 @@ export function JournalEditorScreen(props) {
     var seq = ++saveSeqRef.current;
     if (typeof JournalStore === 'undefined' || typeof JournalStore.whenSaved !== 'function') { setSavedLabel('Saved'); return; }
     function ask() {
+      // id-datasafe 76: before the store has loaded, or while its writes are fenced, a save is
+      // only queued and whenSaved answers for an older write: keep 'Saving…' until it settles.
+      if (!_journalStoreSettled()) { setSavedLabel('Saving…'); awaitSettled(); return; }
       var write = JournalStore._lastWrite;
       JournalStore.whenSaved().then(function(ok) {
         if (!mountedRef.current || seq !== saveSeqRef.current) return;
@@ -497,6 +507,12 @@ export function JournalEditorScreen(props) {
       setTimeout(function() {
         if (!mountedRef.current || seq !== saveSeqRef.current) return;
         if (JournalStore._lastWrite !== failed) ask(); else awaitRetry(failed, n + 1);
+      }, SAVED_RETRY_LOOK_MS);
+    }
+    function awaitSettled() {
+      setTimeout(function() {
+        if (!mountedRef.current || seq !== saveSeqRef.current) return;
+        if (_journalStoreSettled()) ask(); else awaitSettled();
       }, SAVED_RETRY_LOOK_MS);
     }
     ask();

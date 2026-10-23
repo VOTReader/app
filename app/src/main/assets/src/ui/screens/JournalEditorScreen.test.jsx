@@ -804,6 +804,35 @@ describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.
     } finally { vi.useRealTimers(); }
   });
 
+  // id-datasafe 76: before the store loads (or while writes are fenced) a save is only queued,
+  // and whenSaved answers true for an older write: the chip must keep 'Saving…' until it settles.
+  it("keeps 'Saving…' while the store has not loaded or is fenced, then says 'Saved'", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const ready = JournalStore.isReady;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      JournalStore.whenSaved = () => Promise.resolve(true);
+      JournalStore.isReady = () => false;
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+      await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saving…');
+      await act(async () => { vi.advanceTimersByTime(5000); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saving…');
+      JournalStore.isReady = ready;
+      globalThis.isStoreWriteFenced = () => true;
+      await act(async () => { vi.advanceTimersByTime(2100); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saving…');
+      delete globalThis.isStoreWriteFenced;
+      await act(async () => { vi.advanceTimersByTime(2100); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saved');
+    } finally {
+      JournalStore.isReady = ready;
+      delete globalThis.isStoreWriteFenced;
+      vi.useRealTimers();
+    }
+  });
+
   it("keeps 'Saving…' while the write is still in flight", async () => {
     const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);

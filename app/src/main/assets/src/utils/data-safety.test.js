@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { CachedStore, _resetStoreRegistry, setStoreWriteFence } from '../stores/cached-store.js';
 import { StorageHealth } from './storage-health.js';
-import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, WEEKLY_OFF_KEY, weeklyCopyJson } from './data-safety.js';
+import { DataSafety, summarize, score, looksDamaged, mergeForRestore, HEALTH_SKIP_KEY, SKIP_CLEAR_ALL, PROGRESS_RESET_KEY, WEEKLY_OFF_KEY, WEEKLY_FAIL_KEY, WEEKLY_MAX_BYTES, weeklyCopy, weeklyCopyJson } from './data-safety.js';
 import { validateImportEnvelope } from './import-validators.js';
 import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
@@ -239,6 +239,18 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(sink.files.size).toBe(1);
   });
 
+  // id-datasafe 4: a tap before the stores load hid the banner and snapshotted nothing.
+  it('Keep as is before every store has loaded keeps the finding and saves nothing', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    const finding = { name: 'x', at: 0, then: {}, now: {} };
+    StorageHealth.setDataMissing(finding);
+    stores[0]._resetForTests();                   // pending
+    expect(await DataSafety.acceptCurrent({ sink })).toBe('not-loaded');
+    expect(StorageHealth.getReport().dataMissing).toEqual(finding);
+    expect(sink.files.size).toBe(0);
+  });
+
   it('a restore whose write fails lifts the fence, changes nothing and keeps the finding', async () => {
     await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
     const sink = memorySink();
@@ -428,6 +440,35 @@ describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
     for (let day = 0; day < 15; day++) await runOn(day, sink, bridge);
     expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(3);          // days 0, 7, 14
     expect(DataSafety.weeklyStatus({ bridge })).toMatchObject({ supported: true, on: true, count: 3 });
+  });
+
+  // id-datasafe 159: a failed copy was silent and retried on every pass.
+  it('a failed copy is remembered with its reason, waits a day, and clears once one is written', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    const bridge = fakeBridge();
+    const save = bridge.weeklyCopySave.getMockImplementation();
+    bridge.weeklyCopySave.mockImplementation(() => false);
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    await runOn(0, sink, bridge);
+    expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(1);
+    expect(DataSafety.weeklyStatus({ bridge }).failure).toMatchObject({ reason: 'failed' });
+    await runOn(0.5, sink, bridge);                                    // the same day: no retry
+    expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(1);
+    bridge.weeklyCopySave.mockImplementation(save);
+    await runOn(1.1, sink, bridge);
+    expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(2);
+    expect(DataSafety.weeklyStatus({ bridge }).failure).toBeNull();
+    expect(localStorage.getItem(WEEKLY_FAIL_KEY)).toBeNull();
+  });
+
+  it('a copy past the Downloads cap is not sent, and says it is too big', async () => {
+    const big = 'x'.repeat(WEEKLY_MAX_BYTES + 1);
+    const bridge = fakeBridge();
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(await weeklyCopy({ now: () => Date.now(), stores: { 'vot-notes': big }, bridge })).toBe('failed');
+    expect(bridge.weeklyCopySave).not.toHaveBeenCalled();
+    expect(DataSafety.weeklyStatus({ bridge }).failure).toMatchObject({ reason: 'too-big' });
   });
 
   it('is never written from a library that looks damaged or empty', async () => {

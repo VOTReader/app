@@ -329,6 +329,52 @@ class AppInterfaceTest {
     }
 
     @Test
+    fun `a phone call that began mid-memo keeps its mode when the memo ends`() {
+        // id-datasafe 84: our session set MODE_IN_COMMUNICATION; a call moved it to MODE_IN_CALL.
+        // The end used to write NORMAL back over the call (Android 8 to 10 share one mode).
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        every { vm.audioFocusRequest } returns null
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        app.startAudioSession()
+        mode.value = AudioManager.MODE_IN_CALL
+        app.endAudioSession()
+
+        assertEquals(AudioManager.MODE_IN_CALL, mode())
+    }
+
+    @Test
+    fun `a VoIP call that began mid-memo keeps its mode when the memo ends`() {
+        // id-datasafe 84: a VoIP call holds MODE_IN_COMMUNICATION, the mode we set, and plays as
+        // voice communication; our own memos play as media.
+        val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
+        val call = mockk<android.media.AudioPlaybackConfiguration>()
+        val attrs = mockk<android.media.AudioAttributes>()
+        every { attrs.usage } returns android.media.AudioAttributes.USAGE_VOICE_COMMUNICATION
+        every { call.audioAttributes } returns attrs
+        val host = FakeBridgeHost().apply { audioSystemService = am }
+        val vm = vmWithStoredPreviousMode()
+        every { vm.audioFocusRequest } returns null
+        val (app, _, _) = newSubject(host = host, vm = vm)
+
+        every { am.activePlaybackConfigurations } returns emptyList()
+        app.startAudioSession()
+        every { am.activePlaybackConfigurations } returns listOf(call)
+        app.endAudioSession()
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
+
+        // The call ends (its app puts NORMAL back); with no call on, the end restores the mode.
+        mode.value = AudioManager.MODE_NORMAL
+        every { am.activePlaybackConfigurations } returns emptyList()
+        app.startAudioSession()
+        assertEquals(AudioManager.MODE_IN_COMMUNICATION, mode())
+        app.endAudioSession()
+        assertEquals(AudioManager.MODE_NORMAL, mode())
+    }
+
+    @Test
     fun `a second start in our own session keeps the mode it found first`() {
         val (am, mode) = audioManagerWithMode(AudioManager.MODE_NORMAL)
         val host = FakeBridgeHost().apply { audioSystemService = am }

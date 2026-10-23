@@ -1,6 +1,6 @@
 /* update-hold (ds2): the app-update reload waits while a note, a voice memo or a backup is open. */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { holdUpdateReload, updateHolds, whenUpdateUnheld, _resetForTests } from './update-hold.js';
+import { holdUpdateReload, updateHolds, remountHolds, whenUpdateUnheld, _resetForTests } from './update-hold.js';
 
 beforeEach(() => _resetForTests());
 
@@ -22,6 +22,24 @@ describe('the update hold', () => {
     expect(updateHolds()).toEqual([]);
     releaseMemo();
     expect(fn).toHaveBeenCalledTimes(2);              // a waiter runs once
+  });
+
+  // id-datasafe 80: the journal editor holds the late-load remount, never the update reload.
+  it('a remountOnly hold stops the remount but not the reload', () => {
+    const fn = vi.fn();
+    const releaseJournal = holdUpdateReload('journal', { remountOnly: true });
+    expect(updateHolds()).toEqual([]);
+    expect(remountHolds()).toEqual(['journal']);
+    whenUpdateUnheld(fn);
+    expect(fn).toHaveBeenCalledTimes(1);              // the reload is not held by it
+    const releaseNote = holdUpdateReload('note');
+    expect(remountHolds()).toEqual(['journal', 'note']);
+    whenUpdateUnheld(fn);
+    releaseJournal();
+    expect(fn).toHaveBeenCalledTimes(1);              // the note still holds the reload
+    releaseNote();
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(remountHolds()).toEqual([]);
   });
 
   it('a waiter that throws does not stop the next', () => {

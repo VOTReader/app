@@ -77,6 +77,23 @@ describe('JournalStatsStore — date helpers', () => {
   });
 });
 
+// id-datasafe 39: a streak broken past midnight stayed on My Progress (no _bump after _save).
+describe('JournalStatsStore — recomputeFromLoad tells its readers', () => {
+  it('a streak it breaks notifies subscribers; one it keeps does not', () => {
+    JournalStatsStore.recordNewEntry(_tsRelative(-1));
+    let calls = 0;
+    const unsub = JournalStatsStore.subscribe(() => { calls += 1; });
+    JournalStatsStore.recomputeFromLoad();             // yesterday: still alive
+    expect(calls).toBe(0);
+    const data = JournalStatsStore.get();
+    data.lastEntryDate = _jrnDateStr(_tsRelative(-3));
+    JournalStatsStore.recomputeFromLoad();
+    expect(JournalStatsStore.get().currentStreak).toBe(0);
+    expect(calls).toBeGreaterThan(0);
+    unsub();
+  });
+});
+
 describe('JournalStatsStore — recordNewEntry (streak math)', () => {
   // ── Module-level recomputeFromLoad subscriber caveat ──
   // journal-stats-store.js registers a module-level subscriber that

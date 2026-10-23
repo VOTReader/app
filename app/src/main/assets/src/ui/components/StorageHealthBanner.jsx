@@ -136,7 +136,10 @@ export function StorageHealthBanner({ onNavigateSettings }) {
           { label: 'Keep as is', onClick: () => {
             if (typeof DataSafety === 'undefined') return;
             const failed = () => _say('Kept as is, but a fresh copy could not be saved just now. It will be tried again.');
-            _attempt(() => DataSafety.acceptCurrent()).then((r) => { if (r === 'failed') failed(); }, failed);
+            _attempt(() => DataSafety.acceptCurrent()).then((r) => {
+              if (r === 'failed') failed();
+              else if (r === 'not-loaded') _say('Your library is still loading. Tap Keep as is again in a moment.');
+            }, failed);
           } },
         ],
       };

@@ -1568,6 +1568,22 @@ describe('Your Data: the last backup and the automatic snapshots (datasafe 10-05
     await waitFor(() => expect([...document.querySelectorAll('button')].some((b) => b.textContent === 'Turn on')).toBe(true));
   });
 
+  // id-datasafe 159: a failed weekly copy said nothing.
+  it('says when the weekly copy could not be saved, and why', async () => {
+    let failure = { at: Date.now(), reason: 'failed' };
+    /** @type {any} */ (globalThis).DataSafety = {
+      status: async () => ({ where: 'phone', count: 1, newestAt: Date.now() }),
+      weeklyStatus: () => ({ supported: true, on: true, count: 2, newestAt: Date.now() - 8 * 86400000, failure }),
+      setWeeklyOn: vi.fn(),
+    };
+    const { unmount } = renderSettings();
+    await waitFor(() => expect(document.body.textContent).toContain('The last copy could not be saved (today). The app tries again a day later'));
+    unmount();
+    failure = { at: Date.now(), reason: 'too-big' };
+    renderSettings();
+    await waitFor(() => expect(document.body.textContent).toContain('Paused: your library is too big for this copy'));
+  });
+
   it('shows no weekly line where it cannot be kept (the web app, Android 9)', async () => {
     /** @type {any} */ (globalThis).DataSafety = {
       status: async () => ({ where: 'browser', count: 1, newestAt: Date.now() }),

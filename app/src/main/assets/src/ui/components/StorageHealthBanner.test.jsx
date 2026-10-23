@@ -437,6 +437,17 @@ describe('StorageHealthBanner — data-missing (automatic snapshot)', () => {
     delete /** @type {any} */ (globalThis).DataSafety;
   });
 
+  it('a Keep as is before the library has loaded says so', async () => {
+    /** @type {any} */ (globalThis).DataSafety = { restoreMissing: vi.fn(), acceptCurrent: vi.fn(() => Promise.resolve('not-loaded')) };
+    const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, dataMissing: finding });
+    const keep = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Keep as is');
+    /** @type {HTMLElement} */ (keep).click();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(document.getElementById('vot-toast-restore').textContent).toMatch(/still loading/i);
+    expect(container.querySelector('.sh-banner')).not.toBeNull();
+    delete /** @type {any} */ (globalThis).DataSafety;
+  });
+
   it('can be dismissed for the session', () => {
     StorageHealth.dismissScenario('data-missing');
     const { container } = renderBanner({ tier: StorageHealth.TIER.HEALTHY, dataMissing: finding });

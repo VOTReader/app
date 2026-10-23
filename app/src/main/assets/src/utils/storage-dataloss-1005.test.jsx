@@ -18,6 +18,7 @@ import { usePersistedState, RESUME_STATE_KEY } from '../hooks/use-persisted-stat
 import { useSavedState } from '../hooks/use-saved-state.js';
 import { HydrationGate, REMOUNT_COALESCE_MS, TYPING_RECHECK_MS, TYPING_IDLE_MS } from '../components/HydrationGate.jsx';
 import { DiagnosticLog, PERSIST_KEY } from './diagnostic-log.js';
+import { holdUpdateReload, _resetForTests as _resetUpdateHolds } from './update-hold.js';
 
 const marks = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => ['bible:john:' + (i + 1), 1]));
 
@@ -270,6 +271,41 @@ describe('HydrationGate remounts App when a late store loads', () => {
     }
     expect(mounts).toBe(1);
     getByTestId('draft').blur();
+    await settle(TYPING_RECHECK_MS + 10);
+    expect(mounts).toBe(2);
+  });
+
+  // id-datasafe 80: a reader who pauses over 30 s in an open note or entry lost the draft.
+  it('waits while a note or entry is open, typing or not, and remounts once it closes', async () => {
+    const realGet = IDBAdapter.get.bind(IDBAdapter);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    vi.spyOn(IDBAdapter, 'get').mockImplementation((store, key) => (store === 'vot-test-late4' ? gate.then(() => ['real']) : realGet(store, key)));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    _resetUpdateHolds();
+    const late = CachedStore('vot-test-late4', [], { idb: true });
+    late._backgroundRetryDelays = [];
+    let mounts = 0;
+    function Child() {
+      React.useEffect(() => { mounts += 1; }, []);
+      return <textarea data-testid="draft" />;
+    }
+    const { getByTestId } = render(<HydrationGate><Child /></HydrationGate>);
+    await settle(3000);
+    await settle(10);
+    expect(mounts).toBe(1);
+    const releaseEntry = holdUpdateReload('journal', { remountOnly: true });
+    getByTestId('draft').focus();
+    fireEvent.input(getByTestId('draft'), { target: { value: 'a thought' } });
+    release();
+    await settle(10);
+    await settle(REMOUNT_COALESCE_MS + 10);
+    await settle(TYPING_IDLE_MS + 5000);         // paused over a thought: the typing hold is gone
+    expect(mounts).toBe(1);
+    getByTestId('draft').blur();
+    await settle(TYPING_RECHECK_MS * 3);
+    expect(mounts).toBe(1);                      // the entry is still open
+    releaseEntry();
     await settle(TYPING_RECHECK_MS + 10);
     expect(mounts).toBe(2);
   });

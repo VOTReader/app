@@ -545,10 +545,13 @@ export function _resetForTests(opts) {
 
 /**
  * The banner's "Keep as is": the smaller library is the reader's own doing.
- * Clears the finding and takes today's snapshot from it at once.
+ * Clears the finding and takes today's snapshot from it at once. Before every store has
+ * loaded it does neither and answers 'not-loaded' (id-datasafe 4: the tap hid the banner and
+ * snapshotted nothing), so the banner stays up for another tap.
  * @param {{ sink?: any }} [opts]
  */
 export async function acceptCurrent(opts) {
+  if (storesNotLoaded().length) return 'not-loaded';
   StorageHealth.setDataMissing(null);
   DiagnosticLog.warn('data-health', 'reader kept the smaller library');
   return run({ sink: opts && opts.sink, force: true });
@@ -844,6 +847,12 @@ export async function clearSnapshots() {
 // can turn it off in Your Data.
 
 export const WEEKLY_OFF_KEY = 'vot-weekly-copy-off';
+/** id-datasafe 159: the last failed weekly copy, `{ at, reason: 'too-big' | 'failed' }`; gone once one is written. */
+export const WEEKLY_FAIL_KEY = 'vot-weekly-copy-fail';
+/** DownloadsCopy.kt MAX_BYTES: a copy past it is refused there. */
+export const WEEKLY_MAX_BYTES = 24 * 1024 * 1024;
+/** After a failed copy, the next try waits this long (it retried on every pass, silently). */
+export const WEEKLY_RETRY_MS = 86400000;
 /** A copy is due 6.5 days after the last, so a daily pass at a slightly earlier hour keeps the week. */
 const WEEKLY_DUE_MS = 6.5 * 86400000;
 
@@ -864,15 +873,29 @@ export function setWeeklyOn(on) {
   try { if (on) localStorage.removeItem(WEEKLY_OFF_KEY); else localStorage.setItem(WEEKLY_OFF_KEY, '1'); } catch (_e) { /* no storage */ }
 }
 
-/** `{ supported, on, count, newestAt }`; supported is false off the phone app and before Android 10. @param {{ bridge?: any }} [opts] */
+/** @returns {{ at: number, reason: string } | null} */
+function _weeklyFailure() {
+  try {
+    const f = JSON.parse(localStorage.getItem(WEEKLY_FAIL_KEY) || 'null');
+    return f && typeof f.at === 'number' ? { at: f.at, reason: f.reason === 'too-big' ? 'too-big' : 'failed' } : null;
+  } catch (_e) { return null; }
+}
+
+/** @param {{ at: number, reason: string } | null} f */
+function _setWeeklyFailure(f) {
+  try { if (f) localStorage.setItem(WEEKLY_FAIL_KEY, JSON.stringify(f)); else localStorage.removeItem(WEEKLY_FAIL_KEY); } catch (_e) { /* no storage */ }
+}
+
+/** `{ supported, on, count, newestAt, failure }`; supported is false off the phone app and before Android 10.
+ *  failure: the last try that wrote nothing (`{ at, reason }`), or null. @param {{ bridge?: any }} [opts] */
 export function weeklyStatus(opts) {
-  const none = { supported: false, on: false, count: 0, newestAt: 0 };
+  const none = { supported: false, on: false, count: 0, newestAt: 0, failure: null };
   const b = weeklyBridge(opts && opts.bridge);
   if (!b) return none;
   try {
     const st = JSON.parse(String(b.weeklyCopyStatus() || '{}'));
     if (!st || !st.supported) return none;
-    return { supported: true, on: weeklyOn(), count: +st.count || 0, newestAt: +st.newestAt || 0 };
+    return { supported: true, on: weeklyOn(), count: +st.count || 0, newestAt: +st.newestAt || 0, failure: _weeklyFailure() };
   } catch (_e) { return none; }
 }
 
@@ -896,6 +919,7 @@ export function weeklyCopyJson(stores, nowMs) {
  */
 export function clearWeeklyCopies(opts) {
   _cleared = true;
+  _setWeeklyFailure(null);
   const b = weeklyBridge(opts && opts.bridge);
   if (!b || typeof b.weeklyCopyClear !== 'function') return true;
   try { if (b.weeklyCopyClear()) return true; } catch (_e) { /* logged below */ }
@@ -914,9 +938,18 @@ export async function weeklyCopy(p) {
   if (!b || !st.supported) return 'unsupported';
   const t = p.now();
   if (st.newestAt && t - st.newestAt < WEEKLY_DUE_MS) return 'recent';
+  const failed = st.failure;
+  if (failed && t >= failed.at && t - failed.at < WEEKLY_RETRY_MS) return 'recent';
+  const json = weeklyCopyJson(p.stores, t);
+  if (new TextEncoder().encode(json).length > WEEKLY_MAX_BYTES) {
+    _setWeeklyFailure({ at: t, reason: 'too-big' });
+    DiagnosticLog.warn('data-health', 'weekly copy skipped: ' + json.length + ' chars is over the Downloads cap');
+    return 'failed';
+  }
   try {
-    if (b.weeklyCopySave(weeklyCopyJson(p.stores, t))) return 'written';
-  } catch (_e) { /* quiet */ }
+    if (b.weeklyCopySave(json)) { _setWeeklyFailure(null); return 'written'; }
+  } catch (_e) { /* logged below */ }
+  _setWeeklyFailure({ at: t, reason: 'failed' });
   DiagnosticLog.warn('data-health', 'weekly copy to Downloads failed');
   return 'failed';
 }
