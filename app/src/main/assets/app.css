@@ -4236,6 +4236,9 @@
     .srch-nearest-label { padding:0.9rem 1rem 0.2rem; color:var(--gold); }
     .search-highlight { background:rgba(200,164,86,0.25); color:var(--cream); border-radius:2px; }
     body.light .search-highlight { background:rgba(122,92,16,0.2); }
+    /* search200 ideas D: what search matched FOR a typed word (a word form, a synonym, one of His names) has
+       no wash, only a dotted underline in --gold-dim, so the words typed stand out and the rest read as related. */
+    .search-related { background:none; color:inherit; text-decoration:underline dotted var(--gold-dim); text-decoration-thickness:1.5px; text-underline-offset:0.18em; text-decoration-skip-ink:none; }
 
     /* Corpus segmented toggle */
     /* The All / Scriptures / Volumes row wraps at a large text size instead of pushing the third

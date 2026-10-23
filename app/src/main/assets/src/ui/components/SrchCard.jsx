@@ -5,7 +5,7 @@
 import { translationLabel } from '../../data/translations.js';
 import { recall, remember, docKey } from './srch-memory.js';
 import { formsToMark } from '../../utils/marked-forms.js';
-import { snippetText } from './SrchSnippet.jsx';
+import { snippetText, markSpans } from './SrchSnippet.jsx';
 
 /* What one unit of a kind is called in "3 more places in this letter": the kinds
    whose one doc is a whole letter, entry, topic or study chapter, so its text can
@@ -147,9 +147,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   const card = (
     <button className="srch-card" onClick={() => onSelect(entry)}>
       <div className="srch-card-top">
-        <span className="srch-card-ref">{headSpans ? headSpans.map((/** @type {{text:string, hit:boolean}} */ s, /** @type {number} */ i) =>
-          s.hit ? <mark key={i} className="search-highlight">{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>
-        ) : headline}</span>
+        <span className="srch-card-ref">{headSpans ? markSpans(headSpans) : headline}</span>
         <span className={"srch-card-badge " + (meta.cls || '')}>{meta.label}</span>
         {/* W0: resolve the engine's raw translation id ('rnkjv') through the
             TRANSLATION_OPTIONS registry ('NKJV-R') — the same label the rest
@@ -211,11 +209,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
           {places.map((p) => (
             <li key={p.start}>
               <button type="button" className="srch-place" onClick={() => onSelect({ ...entry, placeStart: p.start })}>
-                <span className="srch-place-text">
-                  {sm.highlightSpans(p.clip, hlTerms || [], terms).map((s, i) =>
-                    s.hit ? <mark key={i} className="search-highlight">{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>
-                  )}
-                </span>
+                <span className="srch-place-text">{markSpans(sm.highlightSpans(p.clip, hlTerms || [], terms))}</span>
                 <span className="srch-place-go" aria-hidden="true">›</span>
               </button>
             </li>

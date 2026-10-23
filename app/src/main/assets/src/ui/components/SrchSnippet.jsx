@@ -35,6 +35,22 @@ export function snippetText(sm, text, terms, start, maxLen) {
     sm.snippet(text.slice(start), terms || [], maxLen);
 }
 
+/**
+ * A text's highlight spans as marks (search200 ideas D): the words typed get the full mark, what search
+ * matched for them (a word form, a synonym, one of His names: the span's `rel`) a dotted underline and no
+ * wash (app.css .search-related). The snippet, a card's title and its "more places" list all mark this way.
+ * @param {Array<{text:string, hit:boolean, rel?:boolean}>} spans
+ */
+export function markSpans(spans) {
+  return spans.map((s, i) =>
+    s.hit ? (
+      <mark key={i} className={s.rel ? 'search-related' : 'search-highlight'}>{s.text}</mark>
+    ) : (
+      <React.Fragment key={i}>{s.text}</React.Fragment>
+    )
+  );
+}
+
 /** `start` (a placed hit's placeStart): the snippet opens there, where the tap lands (sweep W33).
  *  `typed`: the words the reader typed, apart from the engine's forms in `terms` (search200 B7). */
 export function SrchSnippet({ text, terms, maxLen = 180, start = undefined, typed = undefined }) {
@@ -80,15 +96,7 @@ export function SrchSnippet({ text, terms, maxLen = 180, start = undefined, type
   const spans = window.VotSearchMini.highlightSpans(snippet, terms || [], typed);
   return (
     <div ref={ref} className="srch-snippet-scroll">
-      <div className="srch-snippet-lines">
-        {spans.map((s, i) =>
-          s.hit ? (
-            <mark key={i} className="search-highlight">{s.text}</mark>
-          ) : (
-            <React.Fragment key={i}>{s.text}</React.Fragment>
-          )
-        )}
-      </div>
+      <div className="srch-snippet-lines">{markSpans(spans)}</div>
     </div>
   );
 }

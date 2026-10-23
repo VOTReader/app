@@ -9,6 +9,7 @@
 import { expandArchaicTerms, ARCHAIC_NORMALIZE } from './tokenize.js';
 import { wordForms } from './word-forms.js';
 import { searchData } from './search-data.js';
+import { damerau } from './ref-parser.js';
 
 /* A short word (two letters or fewer) or a stop word matches only itself, as the
    engine now searches it (search audit 2026-09-27): "ye" marked "Yet", "me" marked
@@ -619,27 +620,67 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
  * text the reading screen renders. Same places as a result card lists, by the
  * marks' rule (search200 UX D6): a word of the fuller stop list counts only as
  * itself, so a typed "who" no longer marks and counts "whom" and "whoever".
+ * With the words the reader typed (`typed`, search200 ideas D), a hit that is not one of them, a word
+ * form, a synonym or one of His names search matched for one, says so (`rel`): the find bar marks it
+ * apart and counts its places apart.
  * @param {string} text
  * @param {string[]} terms
  * @param {number} [maxLen=120]
- * @returns {Array<{ start: number, span: number, hits: Array<{ idx: number, len: number }> }>}
+ * @param {string[]} [typed]
+ * @returns {Array<{ start: number, span: number, hits: Array<{ idx: number, len: number, rel?: boolean }> }>}
  */
-export function findPlaces(text, terms, maxLen) {
+export function findPlaces(text, terms, maxLen, typed) {
   maxLen = maxLen || 120;
   // every hit: find in page steps through them all, where a snippet stops at 400 a term (search200 bugcheck #6)
   const occ = occurrences(text, terms, true, Infinity);
   if (!occ.length) return [];
   const freq = familyCounts(occ);
   const places = cluster(occ, maxLen, freq);
-  return keep(places, freq, mostOf(places)).map((p) => ({ start: p.start, span: p.span, hits: p.hits }));
+  const exact = typed && typed.length ? exactOf(typedOwn(typed)) : null;
+  return keep(places, freq, mostOf(places)).map((p) => ({
+    start: p.start,
+    span: p.span,
+    hits: exact ? p.hits.map((h) => (exact(text.slice(h.idx, h.idx + h.len)) ? h : { ...h, rel: true })) : p.hits,
+  }));
+}
+
+/** Lowercase, apostrophes out, spaces as one: a hit and a typed word read alike ("Tz’va’ot", tzvaot). @param {string} s */
+function bare(s) {
+  return String(s || '').toLowerCase().replace(/['’‘ʼ]/g, '').replace(/\s+/g, ' ').trim();
 }
 
 /**
- * Split text into {text, hit} spans for rendering — hit spans get <mark>.
+ * EXACT OR RELATED (search200 ideas D, 2026-10-22). A hit is the typed word itself when it is a word the
+ * reader typed or a longer word one starts ("loves" for love: the engine's own prefix reach), its archaic
+ * twin ("thou" for you), or the word a typed slip meant ("Israel" for a typed "isreal": one slip off a
+ * typed word of five letters or more, and no form of it). What search matched for a typed word besides (a
+ * word form, "weeping" for wept; a synonym, "pastor" for shepherd; one of His names, "YahuShua" for Jesus)
+ * is related.
+ * @param {Set<string>} own  the words the reader typed (typedOwn)
+ * @returns {(hit: string) => boolean}
+ */
+function exactOf(own) {
+  const words = [...own].map(bare).filter(Boolean);
+  const norm = (/** @type {string} */ w) => ARCHAIC_NORMALIZE[w] || w;
+  const twins = new Set(words.map(norm));
+  const slipped = (/** @type {string} */ b, /** @type {string} */ w) => w.length >= SLIP_MIN && /^[a-z]+$/.test(w)
+    && damerau(b, w, 1) <= 1 && wordForms(w).indexOf(b) < 0;
+  return (hit) => {
+    const b = bare(hit);
+    return words.some((w) => b.startsWith(w)) || twins.has(norm(b)) || words.some((w) => slipped(b, w));
+  };
+}
+/** The shortest typed word whose one-slip neighbour reads as the word meant (exactOf). */
+const SLIP_MIN = 5;
+
+/**
+ * Split text into {text, hit} spans for rendering — hit spans get <mark>. A hit that is not a
+ * word the reader typed (exactOf: a form, a synonym, one of His names) carries `rel` (search200
+ * ideas D): the card marks it lighter, and it never joins an exact hit into one run.
  * @param {string} text
  * @param {string[]} terms
  * @param {string[]} [typed]  the words the reader typed, when `terms` adds the engine's forms
- * @returns {Array<{text:string, hit:boolean}>}
+ * @returns {Array<{text:string, hit:boolean, rel?:boolean}>}
  */
 export function highlightSpans(text, terms, typed) {
   if (!text) return [{ text: '', hit: false }];
@@ -678,7 +719,8 @@ export function highlightSpans(text, terms, typed) {
     const f = fams.get(t);
     return f ? f.fam : t;
   };
-  /** @type {Array<{text:string, hit:boolean}>} */
+  const exact = exactOf(own);
+  /** @type {Array<{text:string, hit:boolean, rel?:boolean}>} */
   const out = [];
   let last = 0;
   let lastTok = '';
@@ -687,10 +729,17 @@ export function highlightSpans(text, terms, typed) {
     const gap = text.slice(last, m.index);
     const prev = out[out.length - 1];
     const tok = tokOf(m[0]);
-    if (prev && prev.hit && joinsRun(gap, tok !== lastTok)) prev.text += gap + m[0];
-    else {
+    // a small word is neither (the engine's "who" beside a typed "mourn"): it joins either kind, and a run
+    // of small words takes the kind of the word that joins it
+    const glue = !hasRealWord(m[0]);
+    const rel = !glue && !exact(m[0]);
+    const prevGlue = !!prev && prev.hit && !hasRealWord(prev.text);
+    if (prev && prev.hit && (glue || prevGlue || !!prev.rel === rel) && joinsRun(gap, tok !== lastTok)) {
+      prev.text += gap + m[0];
+      if (prevGlue && !glue) { if (rel) prev.rel = true; else delete prev.rel; }
+    } else {
       if (gap) out.push({ text: gap, hit: false });
-      out.push({ text: m[0], hit: true });
+      out.push(rel ? { text: m[0], hit: true, rel: true } : { text: m[0], hit: true });
     }
     lastTok = tok;
     last = m.index + m[0].length;
@@ -733,12 +782,12 @@ function hasRealWord(t) {
   return String(t).split(/[^\p{L}\p{N}'’]+/u).some((w) => !!w && !isGlue(w));
 }
 /**
- * @param {Array<{text:string, hit:boolean}>} spans
+ * @param {Array<{text:string, hit:boolean, rel?:boolean}>} spans
  * @param {string[]} typed
  */
 function besideTyped(spans, typed) {
   if (!typed.some(hasRealWord)) return spans;
-  /** @type {Array<{text:string, hit:boolean}>} */
+  /** @type {Array<{text:string, hit:boolean, rel?:boolean}>} */
   const out = [];
   for (const s of spans) {
     if (s.hit && hasRealWord(s.text)) { out.push(s); continue; }
