@@ -170,6 +170,10 @@ let _lastWriteFailToastAt = 0;
 const WRITE_FAIL_TOAST_COOLDOWN_MS = 8000;
 /** Stable DOM id for the write-failure toast (so repeats coalesce). */
 const WRITE_FAIL_TOAST_ID = 'vot-toast-writefail';
+/* Names the place the reader can act on, by the labels Settings really shows (A08.6 / s40.1: it said
+   "Settings → Storage", a section that never existed). ui/screens/SettingsScreen.toast-path.test.jsx pins each step
+   of the path to the rendered Settings screen. */
+export const WRITE_FAIL_TOAST_TEXT = "Couldn't save your last change — device storage may be full. Free up some space, or back up from Settings → Your Data → Export.";
 /** @type {Set<string>} */
 let _sessionDismissals = new Set();
 /** @type {ReturnType<typeof setInterval> | null} */
@@ -600,7 +604,7 @@ function _notifyWriteFailureToast() {
   showToast({
     id: WRITE_FAIL_TOAST_ID,
     className: 'vot-toast',
-    text: "Couldn't save your last change — device storage may be full. Open Settings → Storage, or export a backup.",
+    text: WRITE_FAIL_TOAST_TEXT,
     durationMs: 6000,
     ariaLive: 'assertive',
   });

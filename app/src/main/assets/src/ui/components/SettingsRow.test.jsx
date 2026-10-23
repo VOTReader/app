@@ -89,3 +89,18 @@ describe('SettingsRow — P1-9 named switch (TalkBack)', () => {
     expect(/** @type {HTMLInputElement} */ (input).checked).toBe(true);
   });
 });
+
+// s15.9: a shown description is tied to the ⓘ that opened it and describes the switch; hidden, nothing points at it.
+describe('SettingsRow — description links', () => {
+  it('links the description to the info button and the switch only while it is shown', () => {
+    render(<SettingsRow label="Tabs" desc="Run many places at once." checked={false} onToggle={() => {}} />);
+    const sw = screen.getByRole('switch', { name: 'Tabs' });
+    const info = screen.getByLabelText('Show description for Tabs');
+    expect(info.hasAttribute('aria-controls')).toBe(false);
+    expect(sw.hasAttribute('aria-describedby')).toBe(false);
+    fireEvent.click(info);
+    const id = sw.getAttribute('aria-describedby');
+    expect(document.getElementById(id).textContent).toBe('Run many places at once.');
+    expect(screen.getByLabelText('Hide description for Tabs').getAttribute('aria-controls')).toBe(id);
+  });
+});

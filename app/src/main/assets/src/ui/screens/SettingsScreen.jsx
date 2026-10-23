@@ -135,6 +135,7 @@ function AutoScrollSpeedRow({ value, onChange }) {
           value={v}
           onChange={(e) => onChange(String(clampLpm(e.target.value)))}
           aria-label="Auto-scroll speed in lines per minute"
+          aria-valuetext={v + (v === 1 ? ' line' : ' lines') + ' per minute'}
         />
         <span className="txtsize-value">{v}/min</span>
         <button
@@ -219,6 +220,7 @@ function SettingsGroupIcon({ sectionId }) {
     topnav: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M7 9h3M14 9h3M7 14h3M14 14h3" /></>,
     features: <><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4M8.5 11h5M11 8.5v5" /></>,
     garden: <><path d="M4 19c3.8-5.4 7-8.1 10.2-8.1 2.1 0 3.9 1 5.8 3.1" /><path d="M5 17.5C4.3 12 6.9 7.7 12.5 5c.6 3.2-.3 5.7-2.7 7.5" /><path d="M4 20h16" /></>,
+    share: <><circle cx="17" cy="6.2" r="2.3" /><circle cx="7" cy="12" r="2.3" /><circle cx="17" cy="17.8" r="2.3" /><path d="m9 10.8 6-3.4M9 13.2l6 3.4" /></>,
     data: <><path d="M5 5.5h14v13H5z" /><path d="M8 9h8M8 12h8M8 15h5" /></>,
     progress: <><circle cx="12" cy="12" r="8.5" /><path d="m8 12 2.6 2.7L16.5 9" /></>,
     help: <><circle cx="12" cy="12" r="8.5" /><path d="M9.4 9.6a2.6 2.6 0 1 1 3.8 2.3c-.8.4-1.2 1-1.2 1.9" /><path d="M12 17h.01" /></>,
@@ -236,7 +238,7 @@ function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hid
   if (hidden) return null;
   return (
     <section className={'settings-section' + (open ? ' open' : '')} data-settings-group={sectionId}>
-      <button type="button" className="settings-group-head" aria-expanded={open} aria-controls={'settings-group-' + sectionId} onClick={onToggle}>
+      <button type="button" className="settings-group-head" aria-expanded={open} aria-controls={open ? 'settings-group-' + sectionId : undefined} onClick={onToggle}>
         <SettingsGroupIcon sectionId={sectionId} />
         <span className="settings-group-titles">
           <span className="settings-section-label">{label}</span>
@@ -542,6 +544,14 @@ function AllProgressClearRow({ totalRead, totalItems, hasMarks, hasPartial, onCl
 
 const _daysAgo = (/** @type {number} */ at) => daysAgo(at);
 
+/** The live streak dwell in words ("20 seconds", "1 minute"), from settings.dwellMs (A09.12). @param {unknown} ms */
+function _dwellWords(ms) {
+  const n = Number(ms);
+  const secs = Math.round((Number.isFinite(n) && n > 0 ? n : 20000) / 1000);
+  if (secs === 60) return '1 minute';
+  return secs + (secs === 1 ? ' second' : ' seconds');
+}
+
 /** datasafe 10-05: when this device last finished an export (backup-flow.js LAST_EXPORT_KEY). */
 function _lastBackupAt() {
   let at = 0;
@@ -609,8 +619,11 @@ const SETTINGS_TOPICS = {
   // group without one crashed the screen (2026-09-04, the Help group meeting this table).
   help: 'help tour show me around guide about welcome',
 };
+// A typed word matches the start of a topic word (s23.3): a raw substring test let "a" light every group.
+/** @type {Record<string, string[]>} */
+const SETTINGS_TOPIC_WORDS = Object.fromEntries(Object.entries(SETTINGS_TOPICS).map(([id, t]) => [id, t.split(' ')]));
 
-export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
+export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null }) {
   const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
@@ -639,7 +652,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const [closedMatches, setClosedMatches] = React.useState(() => new Set());
   const queryWords = settingsQuery.toLowerCase().trim().split(/[\s-]+/).filter(Boolean);
   const searching = queryWords.length > 0;
-  const matchesGroup = (id) => queryWords.every((word) => SETTINGS_TOPICS[id].includes(word));
+  const matchesGroup = (id) => queryWords.every((word) => SETTINGS_TOPIC_WORDS[id].some((w) => w.startsWith(word)));
   const groupOpen = (id) => searching ? matchesGroup(id) && !closedMatches.has(id) : openGroups.has(id);
   const toggleGroup = (id) => (searching ? setClosedMatches : setOpenGroups)((prev) => {
     const next = new Set(prev);
@@ -1040,7 +1053,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
         <div className="settings-find">
           <label htmlFor="settings-find-input">Find settings</label>
           <div className="settings-find-controls">
-            <input ref={settingsFindRef} id="settings-find-input" type="search" placeholder="Try font, audio, or backup" value={settingsQuery} onChange={(e) => changeSettingsQuery(e.target.value)} />
+            <input ref={settingsFindRef} id="settings-find-input" type="search" placeholder="Find a setting" value={settingsQuery} onChange={(e) => changeSettingsQuery(e.target.value)} />
             {settingsQuery && <button type="button" onClick={() => { changeSettingsQuery(''); settingsFindRef.current?.focus(); }}>Clear filter</button>}
           </div>
           {searching && <p role="status">{matchingCount ? matchingCount + (matchingCount === 1 ? ' matching group' : ' matching groups') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
@@ -1163,7 +1176,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Reading"
               title="Reading Streak Dwell Time"
               label="Reading Streak Dwell Time"
-              desc="How long you must stay reading before the day counts toward the reading streak on My Progress. The reading dot is not affected — it always follows where you are."
+              desc={'A day counts toward your reading streak on My Progress after ' + _dwellWords(settings.dwellMs) + ' reading one chapter or letter. The reading position marker is not affected: it always follows where you are.'}
               value={settings.dwellMs || "20000"}
               options={[
                 { id: "3000",  label: "3 seconds",  desc: "Counts almost immediately" },
@@ -1271,7 +1284,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Listening"
               title="Letter Voice"
               label="Letter Voice"
-              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader plays every letter THEY have recorded in their voice, including the letters that play next, and letters they haven't keep the primary one. You can always switch voice for the recording that is playing from the listening desk."
+              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader plays every letter that reader has recorded in their voice, including the letters that play next. Letters they have not recorded play the primary reading. You can always switch voice for the recording that is playing from the listening desk."
               value={settings.letterReader || "auto"}
               options={[
                 { id: "auto", label: "Automatic", desc: "Each recording's primary reading" },
@@ -1759,11 +1772,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
 
         {/* review-tutorial: the tour is re-openable from here, whatever the Home strip decided. */}
         <SettingsGroup label="Help" sub={glance.help} {...groupProps('help')}>
-          <div className="settings-card">
+          <div className="settings-card settings-help-body">
             <button type="button" className="settings-help-btn" onClick={() => { if (typeof TourController !== 'undefined') TourController.start('settings'); }}>Show me around</button>
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no
                 controller on the page the note states no number rather than a stale one. */}
             <p className="settings-help-note">A short tour of the app: {_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes'}. It points at the real buttons; you can leave at any time.</p>
+            {/* A09.10: the group's summary promises About; this is it (the same screen Home's ⓘ opens). */}
+            {typeof onAbout === 'function' ? (
+              <button type="button" className="settings-help-about" onClick={onAbout}>
+                <span>About VOTReader</span>
+                <span className="settings-select-chev" aria-hidden="true">{"›"}</span>
+              </button>
+            ) : null}
           </div>
         </SettingsGroup>
         </div>

@@ -2295,7 +2295,7 @@
       /* Bible chapter: the text follows the recording's translation while it
          plays (BibleChapterView); one calm line says so. */
       .hero-audio-text {
-        font-family: 'EB Garamond', serif; font-style: italic;
+        font-family: var(--font-body); font-style: italic;   /* s00.7: the Reading Font, like the text it describes */
         font-size: var(--fs-14); color: var(--cream-muted);
         opacity: 0.9; margin: -0.45rem 0 0.7rem;
       }
@@ -4045,6 +4045,14 @@
     .about-page-dot { width:7px; height:7px; border-radius:50%; background:var(--gold-border); transition:background 0.18s ease; }
     .about-page-dot.active { background:var(--gold); }
     .about-features p strong { color:var(--cream); font-style:normal; }
+    /* Credits & privacy, folded under one line on About page one (A08.6). */
+    .about-credits { margin:1.2rem 0 0; }
+    .about-credits > summary { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; min-height:44px; display:flex; align-items:center; justify-content:center; gap:0.4rem; list-style:none; }
+    .about-credits > summary::-webkit-details-marker { display:none; }
+    .about-credits > summary::after { content:'A'; font-family:var(--font-body); font-size:var(--fs-16); transition:transform 0.18s ease; }
+    .about-credits[open] > summary::after { transform:rotate(90deg); }
+    .about-credits > .about-body { margin-top:0.6rem; }
+    .about-credits .about-credit { font-size:var(--fs-14); }
     .about-features p { margin-bottom:0.8rem; }
     /* Phone-width tightening: at 360×800 the page-2 card pushed "Begin
        Reading" below the fold. Slimmer paddings/margins keep the whole
@@ -9534,6 +9542,13 @@
       }
       body.light .settings-help-btn { color: #fff; }
       .settings-help-note { font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted); margin: 8px 0 0; line-height: 1.4; }
+      /* A08.4: the Help body sits on the same 0.95rem inset as every settings row. */
+      .settings-help-body { padding: 0.95rem; }
+      .settings-help-about {
+        display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; width: 100%; min-height: 44px;
+        margin: 12px 0 0; padding: 0.35rem 0.75rem; border: 1px solid var(--gold-border); border-radius: 10px;
+        background: var(--gold-faint); color: var(--cream); font-family: var(--font-body); font-size: var(--fs-15); cursor: pointer; text-align: left;
+      }
 
 /* ── ANSWERS ONLY GOD CAN GIVE (AnswersHome.jsx, AnswersShelf.jsx, AnswersMedia.jsx, AnswersSheets.jsx, AnswersTopic.jsx,
    AnswersContents.jsx) · final design 2026-10-19, round 2 2026-10-20 ──

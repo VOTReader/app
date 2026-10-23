@@ -74,8 +74,53 @@ describe('SelectField options state', () => {
     const { container } = render(<SelectField eyebrow="Test" title="Choose a value" label="Row" desc={null} value="a" options={OPTIONS} onChange={() => {}} />);
     fireEvent.click(/** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger')));
     const opts = [...document.querySelectorAll('.select-sheet-option')];
-    expect(opts.map((b) => b.getAttribute('aria-pressed'))).toEqual(OPTIONS.map((o) => String(o.id === 'a')));
+    // s15.4: one choice of several is a radio group, not a row of toggle buttons.
+    expect(document.querySelector('.select-sheet-options').getAttribute('role')).toBe('radiogroup');
+    expect(opts.map((b) => b.getAttribute('role'))).toEqual(OPTIONS.map(() => 'radio'));
+    expect(opts.map((b) => b.getAttribute('aria-checked'))).toEqual(OPTIONS.map((o) => String(o.id === 'a')));
+    expect(opts.some((b) => b.hasAttribute('aria-pressed'))).toBe(false);
     expect(opts.every((b) => b.getAttribute('type') === 'button')).toBe(true);
     expect(document.querySelector('.select-sheet-option-check').getAttribute('aria-hidden')).toBe('true');
+  });
+});
+
+describe('SelectField radio group keys and links (s15.4, s15.9)', () => {
+  it('names the group by the sheet title, and arrows move focus between the options', () => {
+    const { container } = render(<SelectField eyebrow="Test" title="Choose a value" label="Row" desc={null} value="a" options={OPTIONS} onChange={() => {}} />);
+    fireEvent.click(/** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger')));
+    expect(screen.getByRole('radiogroup', { name: 'Choose a value' })).toBeTruthy();
+    const [alpha, beta] = screen.getAllByRole('radio');
+    alpha.focus();
+    fireEvent.keyDown(alpha, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(beta);
+    fireEvent.keyDown(beta, { key: 'ArrowDown' });
+    expect(document.activeElement).toBe(alpha);
+    fireEvent.keyDown(alpha, { key: 'End' });
+    expect(document.activeElement).toBe(beta);
+  });
+
+  it('the trigger controls the sheet only while it is open, and a shown description describes it', () => {
+    const { container } = render(<SelectField eyebrow="Test" title="Choose" label="Row" desc="what it does" value="a" options={OPTIONS} onChange={() => {}} />);
+    const trigger = /** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger'));
+    expect(trigger.hasAttribute('aria-controls')).toBe(false);
+    expect(trigger.hasAttribute('aria-describedby')).toBe(false);
+    const info = screen.getByLabelText('Show description for Row');
+    expect(info.hasAttribute('aria-controls')).toBe(false);
+    fireEvent.click(info);
+    const descId = trigger.getAttribute('aria-describedby');
+    expect(document.getElementById(descId).textContent).toBe('what it does');
+    expect(screen.getByLabelText('Hide description for Row').getAttribute('aria-controls')).toBe(descId);
+    fireEvent.click(trigger);
+    expect(document.getElementById(trigger.getAttribute('aria-controls'))).toBeTruthy();
+  });
+
+  it('valueLabel replaces only the value on the closed row, never the option in the sheet', () => {
+    const { container } = render(<SelectField eyebrow="Test" title="Choose" label="Row" desc={null} value="a" valueLabel="Alpha · later" options={OPTIONS} onChange={() => {}} />);
+    const trigger = /** @type {HTMLElement} */ (container.querySelector('.settings-select-trigger'));
+    expect(trigger.textContent).toContain('Alpha · later');
+    expect(trigger.getAttribute('aria-label')).toBe('Row: Alpha · later');
+    fireEvent.click(trigger);
+    expect(screen.getAllByRole('radio')[0].textContent).toContain('Alpha');
+    expect(screen.getAllByRole('radio')[0].textContent).not.toContain('later');
   });
 });

@@ -92,6 +92,30 @@ describe('AboutScreen — page 2 describes the app that actually shipped', () =>
   it('names the Listening Library among what the library holds', () => {
     expect(page2()).toMatch(/Listening Library/);
   });
+
+  // A08.6 / s40.1: no build words, no marketing, and the offline line says what needs a connection.
+  it('speaks plainly: no corpus, release files or feature suite; reading works offline', () => {
+    const text = page2();
+    expect(text).not.toMatch(/corpus|release files|feature suite/i);
+    expect(text).toMatch(/Reading works offline/);
+  });
+});
+
+describe('AboutScreen — page one (A08.6 / U02.3)', () => {
+  it('gives the backup path Settings really has', () => {
+    setupGlobals();
+    const { container } = renderAbout();
+    expect(container.querySelector('.about-body').textContent).toContain('Settings → Your Data → Export');
+  });
+
+  it('folds the credits and privacy policy under one line, still on page one', () => {
+    setupGlobals();
+    const { container } = renderAbout();
+    const fold = container.querySelector('details.about-credits');
+    expect(fold.querySelector('summary').textContent).toBe('Credits & privacy');
+    expect(fold.querySelectorAll('.about-credit').length).toBe(3);
+    expect(container.querySelector('.about-body').querySelector('.about-credit')).toBeNull();
+  });
 });
 
 describe('AboutScreen — the Songs of the Letters credit (L8)', () => {

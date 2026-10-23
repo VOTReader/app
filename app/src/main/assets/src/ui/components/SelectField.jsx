@@ -8,12 +8,15 @@
      renders each font's NAME in that font via its preview family);
    - meta: small right-aligned status text ("Built in" / "~77 KB" / …).
    `valueStyle` does the same for the closed row's current-value span. */
-export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null }) {
+export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null, valueLabel = null }) {
   const [open, setOpen] = React.useState(false);
   const [showDesc, setShowDesc] = React.useState(false);
   const fieldId = React.useId();
   const sheetId = `select-sheet-${fieldId}`;
+  const descId = `select-desc-${fieldId}`;
   const selected = options.find((o) => o.id === value) || options[0];
+  // valueLabel: the closed row may say more than the option's own label (U09.2: "WEB · NKJV until it downloads").
+  const shown = valueLabel || selected.label;
 
   return (
     <div className="settings-row">
@@ -25,16 +28,18 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
             className="settings-info-btn"
             aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
             aria-expanded={showDesc}
+            aria-controls={showDesc ? descId : undefined}
             onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
           >i</button>
         )}
         <span className="settings-row-grow" />
-        <button type="button" className="settings-select-trigger" aria-label={label + ': ' + selected.label} aria-haspopup="dialog" aria-expanded={open} aria-controls={sheetId} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
-          <span className="settings-row-value" style={valueStyle}>{selected.label}</span>
+        <button type="button" className="settings-select-trigger" aria-label={label + ': ' + shown} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? sheetId : undefined}
+          aria-describedby={showDesc && desc ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+          <span className="settings-row-value" style={valueStyle}>{shown}</span>
           <span className="settings-select-chev">{"›"}</span>
         </button>
       </div>
-      {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
+      {showDesc && desc && <div className="settings-row-desc" id={descId}>{desc}</div>}
       <SelectSheet id={sheetId} open={open} onClose={() => setOpen(false)} eyebrow={eyebrow} title={title || label}
         value={value} options={options} onChange={onChange} />
     </div>
@@ -63,6 +68,20 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
   }, [open, onClose]);
 
   if (!open) return null;
+  // s15.4: one radio group. Arrows, Home and End move between the options; Enter or Space picks, as the click always
+  // has. Every option stays in the Tab order: a roving tabindex would let Tab leave the sheet, since the focus trap
+  // counts a tabindex=-1 button among its stops.
+  /** @param {any} e */
+  const moveFocus = (e) => {
+    const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[/** @type {'ArrowDown'} */ (e.key)];
+    if (!step && e.key !== 'Home' && e.key !== 'End') return;
+    const radios = Array.from(/** @type {HTMLElement} */ (e.currentTarget).querySelectorAll('[role="radio"]'));
+    if (!radios.length) return;
+    const at = radios.indexOf(/** @type {any} */ (document.activeElement));
+    const to = e.key === 'Home' ? 0 : e.key === 'End' ? radios.length - 1 : (Math.max(0, at) + step + radios.length) % radios.length;
+    e.preventDefault();
+    /** @type {HTMLElement} */ (radios[to]).focus();
+  };
   const sheet = (
     <>
       <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onClose} />
@@ -75,7 +94,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
           <div className="select-sheet-ornament-diamond">{"✦"}</div>
           <div className="select-sheet-ornament-line r" />
         </div>
-        <div className="select-sheet-options">
+        <div className="select-sheet-options" role="radiogroup" aria-labelledby={titleId} onKeyDown={moveFocus}>
           {options.map((opt) => {
             const isSelected = opt.id === value;
             return (
@@ -83,7 +102,8 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
                 key={opt.id}
                 type="button"
                 className={`select-sheet-option${isSelected ? " selected" : ""}`}
-                aria-pressed={isSelected}
+                role="radio"
+                aria-checked={isSelected}
                 onClick={() => { onChange(opt.id); onClose(); }}
               >
                 <div className="select-sheet-option-main">

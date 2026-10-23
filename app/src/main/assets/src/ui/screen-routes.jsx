@@ -1055,6 +1055,7 @@ export function buildScreenRoutes({
         onClearHistory={clearHistory}
         historyCount={readHistory.length}
         theme={theme} onThemeChange={setTheme}
+        onAbout={goAbout}
       />
     ),
     'search': () => (

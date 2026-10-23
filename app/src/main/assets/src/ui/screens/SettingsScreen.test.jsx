@@ -1287,8 +1287,10 @@ describe('settings folio summary', () => {
   it('links each accordion header to its mounted body', () => {
     renderSettings({}, {}, { expandGroups: false });
     const appearance = groupHead('Appearance');
-    expect(appearance.getAttribute('aria-controls')).toBe('settings-group-appearance');
+    // s23.4: closed, the body is not mounted, so the header points at nothing.
+    expect(appearance.hasAttribute('aria-controls')).toBe(false);
     fireEvent.click(appearance);
+    expect(appearance.getAttribute('aria-controls')).toBe('settings-group-appearance');
     expect(document.getElementById('settings-group-appearance')).toBeTruthy();
   });
 });

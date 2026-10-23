@@ -132,3 +132,16 @@ describe('ErrorBoundary — ERR3-ACK onCatch callback', () => {
     expect(getByText('Something went wrong')).toBeTruthy();
   });
 });
+
+// s01.2: the root panel drew fixed dark-theme golds with no background, barely readable on parchment.
+describe('ErrorBoundary — the crash panel follows the theme', () => {
+  it('colours come from the theme tokens and the panel paints its own background', () => {
+    const { container } = render(<ErrorBoundary><Boom /></ErrorBoundary>);
+    const panel = /** @type {HTMLElement} */ (container.querySelector('.vot-crash-panel'));
+    const style = panel.getAttribute('style') || '';
+    expect(style).toMatch(/color:\s*var\(--gold/);
+    expect(style).toMatch(/background:\s*var\(--bg/);
+    const btn = /** @type {HTMLElement} */ (panel.querySelector('button'));
+    expect(btn.getAttribute('style') || '').toMatch(/var\(--gold/);
+  });
+});

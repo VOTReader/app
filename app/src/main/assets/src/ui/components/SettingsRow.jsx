@@ -6,6 +6,9 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
   // Compact layout (Settings Option B): label + toggle on a single line; the
   // (often long) description is hidden behind the ⓘ button and revealed on tap.
   const [showDesc, setShowDesc] = React.useState(false);
+  // s15.9: the description, while shown, is linked to the ⓘ that opened it and describes the switch.
+  const descId = `settings-desc-${React.useId()}`;
+  const descShown = !!(showDesc && desc);
   return (
     <div className={`settings-row${disabled ? " settings-row-disabled" : ""}`}>
       <div className="settings-row-head">
@@ -16,6 +19,7 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
             className="settings-info-btn"
             aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
             aria-expanded={showDesc}
+            aria-controls={descShown ? descId : undefined}
             onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
           >i</button>
         )}
@@ -35,6 +39,7 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
             checked={checked}
             aria-checked={!!checked}
             aria-label={label}
+            aria-describedby={descShown ? descId : undefined}
             disabled={!!disabled}
             onChange={disabled ? undefined : onToggle}
           />
@@ -42,7 +47,7 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
           <div className="settings-toggle-thumb" />
         </label>
       </div>
-      {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
+      {descShown && <div className="settings-row-desc" id={descId}>{desc}</div>}
       {disabled && disabledReason && (
         <div className="settings-row-disabled-hint">{disabledReason}</div>
       )}

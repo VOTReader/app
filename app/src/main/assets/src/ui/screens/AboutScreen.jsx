@@ -62,12 +62,18 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                 <div className="about-body">
                   <p>The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
                   <p>This reader was made by a disciple for personal study; it is not the canonical source.</p>
-                  <p>Your notes, journal, and highlights stay on this device — use Settings → Export to back them up.</p>
+                  <p>Your notes, journal, and highlights stay on this device — use Settings → Your Data → Export to back them up.</p>
                   <p>
                     For the canonical text, audio, video, and PDFs, visit{" "}
                     <a href="https://www.thevolumesoftruth.com" target="_blank" rel="noopener noreferrer"><em>thevolumesoftruth.com</em></a>
                     .
                   </p>
+                </div>
+                {/* Credits and the privacy policy fold under one line (A08.6 / U02.3): page one is what the reader
+                    needs first; the credits stay on this page, one tap away, and stay in the DOM for the tests. */}
+                <details className="about-credits">
+                  <summary>Credits &amp; privacy</summary>
+                  <div className="about-body">
                   {/* CC-BY obligation for the Scripture Web's cross-reference
                       dataset. The web carries it too since Q5 (w3, 2026-10-18): the
                       legend's tail, the panel's footer and the guide's footer, never
@@ -90,20 +96,21 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                     <a href="https://votreader.github.io/app/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a>
                     : no accounts, and nothing you write leaves this device.
                   </p>
-                </div>
+                  </div>
+                </details>
               </>
             ) : (
               <>
                 <h1 className="about-heading">What You Can Do</h1>
                 <div className="about-body about-features">
                   <p className="about-subhead">The Library</p>
-                  <p>The complete Volumes of Truth corpus.</p>
+                  <p>Every volume and letter of The Volumes of Truth.</p>
                   <p>The entire Bible in eleven translations, including two custom Restored Name editions and the Spanish Reina-Valera 1960.</p>
                   <p>Every PDF, Bible study, and letter study.</p>
                   <p>A Listening Library — the Letters and the Bible, read aloud.</p>
                   <p className="about-subhead">Your Tools</p>
                   <p>Highlight, underline, bookmark, and note — anywhere.</p>
-                  <p>A private journal with photos, voice memos, and a full feature suite — kept on your device.</p>
+                  <p>A private journal with photos and voice memos, kept on your device.</p>
                   <p>Full-text search across the entire library.</p>
                   <p>Reading plans: the Bible in a year, the letters, or any mix you build, a few minutes a day at your own pace.</p>
                   {/* B1 (2026-08-10): this line claimed "nothing is downloaded
@@ -112,7 +119,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                       privacy promise it was really making (nothing of YOURS
                       leaves) is unchanged and stays; the download claim is now
                       the truth. */}
-                  <p>Fully offline to read. Tapping Listen streams that recording (download a recording and it plays with no connection), and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files. Your notes, highlights and journal never leave this device.</p>
+                  <p>Reading works offline. Listen streams each recording and the <em>Return to the Garden</em> images load as you view them, so both need a connection unless saved: download a recording and it plays with no connection. Your notes, highlights and journal never leave this device.</p>
                 </div>
               </>
             )}

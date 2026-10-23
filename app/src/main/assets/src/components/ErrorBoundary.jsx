@@ -89,10 +89,12 @@ export class ErrorBoundary extends React.Component {
     // explicit null is honored.
     if (this.props.fallback !== undefined) return this.props.fallback;
     var looping = this.state.crashCount >= 2;
+    // s01.2: theme tokens (each with the old dark colour as its fallback, for a crash before app.css applies),
+    // so the panel reads in the light theme too; it was gold-on-parchment there.
     return (
-      <div style={{ padding: "2rem", textAlign: "center", color: "#e0c97f", fontFamily: "Georgia, serif" }}>
+      <div className="vot-crash-panel" style={{ padding: "2rem", textAlign: "center", color: "var(--gold, #e0c97f)", background: "var(--bg, #0b0a08)", fontFamily: "Georgia, serif" }}>
         <h2 style={{ marginBottom: "1rem" }}>Something went wrong</h2>
-        <p style={{ color: "#b0a080", fontSize: "var(--fs-14)", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" }}>
+        <p style={{ color: "var(--cream-muted, #b0a080)", fontSize: "var(--fs-14)", maxWidth: "400px", margin: "0 auto 1.5rem", wordBreak: "break-word" }}>
           {/* Wave-0: was String(this.state.error) — raw stack text facing the
               user. The technical detail is already in DiagnosticLog
               (componentDidCatch); the panel speaks human. */}
@@ -101,21 +103,21 @@ export class ErrorBoundary extends React.Component {
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "center", flexWrap: "wrap" }}>
           <button
             onClick={() => location.reload()}
-            style={{ padding: "0.6rem 1.6rem", background: "transparent", border: "1px solid #e0c97f", color: "#e0c97f", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit" }}
+            style={{ padding: "0.6rem 1.6rem", background: "transparent", border: "1px solid var(--gold, #e0c97f)", color: "var(--gold, #e0c97f)", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit" }}
           >
             Reload App
           </button>
           {looping && (
             <button
               onClick={() => { try { sessionStorage.setItem(CRASH_RECOVER_KEY, '1'); } catch (_e) { /* non-fatal */ } location.reload(); }}
-              style={{ padding: "0.6rem 1.6rem", background: "#e0c97f", border: "1px solid #e0c97f", color: "#1a1408", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit", fontWeight: "bold" }}
+              style={{ padding: "0.6rem 1.6rem", background: "var(--gold, #e0c97f)", border: "1px solid var(--gold, #e0c97f)", color: "var(--bg, #1a1408)", borderRadius: "4px", cursor: "pointer", fontFamily: "inherit", fontWeight: "bold" }}
             >
               Reset to Home
             </button>
           )}
         </div>
         {looping && (
-          <p style={{ color: "#8a7a55", fontSize: "var(--fs-12)", maxWidth: "360px", margin: "1rem auto 0" }}>
+          <p style={{ color: "var(--cream-muted, #8a7a55)", fontSize: "var(--fs-12)", maxWidth: "360px", margin: "1rem auto 0" }}>
             This screen keeps failing. Use Reset to Home to return to the home screen — your saved notes and data are not affected.
           </p>
         )}
