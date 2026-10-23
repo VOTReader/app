@@ -457,15 +457,96 @@ describe('registerServiceWorker — auto-update (no toast)', () => {
     expect(waiting.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
   });
 
-  it('posts SKIP_WAITING when a new worker reaches installed via updatefound', async () => {
+  it('a new build that finishes installing while the reader is here WAITS: no SKIP_WAITING, so no reload mid-session (up1)', async () => {
     const incoming = fakeWorker();
     const reg = mockSW({ installing: incoming });
     registerServiceWorker();
     await flush();
-    expect(incoming.postMessage).not.toHaveBeenCalled(); // not yet — still installing
     reg._fire('updatefound');
     incoming.fireState('installed');
-    expect(incoming.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    expect(incoming.postMessage).not.toHaveBeenCalled();
+  });
+
+  describe('the waiting build takes over after 10+ minutes away (up1, Corbin 10-23)', () => {
+    let now = 0;
+    const setVisibility = (v) => {
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: v });
+      Object.defineProperty(document, 'hidden', { configurable: true, value: v === 'hidden' });
+      document.dispatchEvent(new Event('visibilitychange'));
+    };
+    beforeEach(() => {
+      now = 1_000_000;
+      vi.spyOn(Date, 'now').mockImplementation(() => now);
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] });
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+      delete (/** @type {any} */ (document)).visibilityState;
+      delete (/** @type {any} */ (document)).hidden;
+      try { navigator.mediaSession.playbackState = 'none'; } catch (_e) { /* jsdom without mediaSession */ }
+    });
+    async function waitingBuild() {
+      const incoming = fakeWorker();
+      const reg = mockSW({ installing: incoming });
+      registerServiceWorker();
+      await flush();
+      reg._fire('updatefound');
+      incoming.fireState('installed');
+      reg.waiting = incoming;
+      return incoming;
+    }
+
+    it('back after 10 minutes in the background: SKIP_WAITING on return', async () => {
+      const w = await waitingBuild();
+      setVisibility('hidden');
+      now += 10 * 60 * 1000;
+      setVisibility('visible');
+      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
+    it('back after 9 minutes: nothing, the reader is mid-session', async () => {
+      const w = await waitingBuild();
+      setVisibility('hidden');
+      now += 9 * 60 * 1000;
+      setVisibility('visible');
+      expect(w.postMessage).not.toHaveBeenCalled();
+    });
+
+    it('still away when 10 minutes pass: it takes over in the background, unseen', async () => {
+      const w = await waitingBuild();
+      setVisibility('hidden');
+      now += 10 * 60 * 1000;
+      vi.advanceTimersByTime(10 * 60 * 1000);
+      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
+    it('never while a recording plays, screen off or on', async () => {
+      const ms = /** @type {any} */ (navigator).mediaSession;
+      if (!ms) Object.defineProperty(navigator, 'mediaSession', { configurable: true, value: { playbackState: 'none' } });
+      const w = await waitingBuild();
+      navigator.mediaSession.playbackState = 'playing';
+      setVisibility('hidden');
+      now += 30 * 60 * 1000;
+      vi.advanceTimersByTime(30 * 60 * 1000);
+      setVisibility('visible');
+      expect(w.postMessage).not.toHaveBeenCalled();
+      // Paused, then away again: now it may.
+      navigator.mediaSession.playbackState = 'paused';
+      setVisibility('hidden');
+      now += 11 * 60 * 1000;
+      setVisibility('visible');
+      expect(w.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+    });
+
+    it('never while a note, voice memo or backup holds it', async () => {
+      const w = await waitingBuild();
+      const release = holdUpdateReload('note');
+      setVisibility('hidden');
+      now += 15 * 60 * 1000;
+      setVisibility('visible');
+      expect(w.postMessage).not.toHaveBeenCalled();
+      release();
+    });
   });
 
   it('does not post SKIP_WAITING when there is no waiting worker', async () => {

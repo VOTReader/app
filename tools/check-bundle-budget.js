@@ -55,7 +55,11 @@ const BUDGETS = [
   // wiped database, idb-adapter's dataLoss record) added 6,333 B of real code,
   // nothing pulled in. Re-baselined UP by the same rule: 310,748 x 1.15 =
   // 357,360.2 -> the hundred above.
-  { file: 'bundle-b.js', measured: 310748, max: 357400 },   // stores/hooks/journal machinery/bridge
+  // 2026-10-23, up1: main had grown to ~356.9 KB by ordinary work since 10-11 (12 days of lane landings); the
+  // update wait (sw-register: take over only at open or after 10+ min away, never while playing) added ~1 KB of
+  // real code, nothing pulled in, and tipped it 481 B over. Re-baselined UP by the same rule: 357,881 x 1.15 =
+  // 411,563.2 -> the hundred above.
+  { file: 'bundle-b.js', measured: 357881, max: 411600 },   // stores/hooks/journal machinery/bridge
   // 2026-10-23, pl-l0 batch C (RC.13): one box per highlight and the note icon kept with its word, on both
   // paint paths (React verses + the letters' DOM pass), added 1,865 B of real code; the delete-confirm
   // helper it shares (mark-overlap.js uncoveredLine) is tree-shaken out. Re-baselined UP by the same

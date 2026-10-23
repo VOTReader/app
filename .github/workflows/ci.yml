@@ -560,6 +560,12 @@ jobs:
         # runner first (branch run 36123741219) after its first try went red (08298894).
         run: npm run e2e:restore-fresh
 
+      - name: End-to-end a new build waits for the reader (up1)
+        # tools/e2e-update-waits.mjs (up1, 2026-10-23; Corbin: "VOTReader has been flashing 'VOTReader was just
+        # updated' at me all day long"): the real service worker, a new build published mid-session. It must WAIT
+        # while the page is in use and while a recording plays, and take over after 10+ min away (~30 s).
+        run: npm run e2e:update-waits
+
       - name: End-to-end search quality
         # tools/e2e-search.mjs (search audit 2026-09-27): the queries readers type,
         # run against the corpus that ships, with the index built as the search

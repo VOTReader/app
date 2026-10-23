@@ -14,9 +14,12 @@
  *     only read here; no deploy ever deletes it.
  *
  * Update lifecycle (fully automatic):
- *   New SW calls self.skipWaiting() on install → takes over immediately.
- *   'controllerchange' fires in sw-register.js → page reloads onto the
- *   new build, at a moment the user can't see it (boot window or backgrounded).
+ *   A new SW installs and WAITS (up1, Corbin 2026-10-23: no update mid-session).
+ *   It takes over when the browser closes the app's last page, or when a page
+ *   asks with SKIP_WAITING (sw-register.js: at app open, or on a return after
+ *   10+ min away, never while a recording plays), and only if no OTHER window
+ *   of the app is on screen. 'controllerchange' then fires in sw-register.js
+ *   and the page reloads onto the new build.
  *
  * STALE-CACHE RESILIENCE — two layers, because a fresh cache KEY does not prove
  * fresh BYTES:
@@ -555,9 +558,8 @@ async function addVerified(cache, url, expected) {
 }
 
 self.addEventListener('install', (event) => {
-  // Take over immediately — don't wait for the old SW's tabs to close.
-  // controllerchange fires in sw-register.js, which reloads the page.
-  self.skipWaiting();
+  // No skipWaiting here (up1, 2026-10-23): the new build waits until the page asks at a quiet moment (the
+  // SKIP_WAITING message below) or the app's last page closes. Taking over at once reloaded readers mid-session.
   event.waitUntil((async () => {
     try {
       await installCore();
@@ -915,13 +917,23 @@ async function otherBuildCopy(response, key) {
   return new Response(out, { status: response.status, statusText: response.statusText, headers });
 }
 
-// ── Message: page-triggered activation (belt-and-suspenders) ────
-// Install already calls skipWaiting(); this path exists for a SW left
-// WAITING by an older page (installed before skipWaiting-on-install) —
-// sw-register.js posts SKIP_WAITING at registration to unstick it.
+// ── Message: page-triggered activation (up1) ────
+// The one way a waiting build takes over while the app is open: sw-register.js
+// asks at app open or after 10+ min away. Refused while ANOTHER window of the app
+// is on screen: the takeover reloads every page it claims, and that reader is
+// mid-session. (An older page asks with no source; the same rule applies.)
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+    const asker = event.source && event.source.id;
+    const work = (async () => {
+      let others = [];
+      try {
+        const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        others = all.filter((c) => c && c.id !== asker && c.visibilityState === 'visible');
+      } catch (_e) { /* cannot tell: take over, as the page asked */ }
+      if (!others.length) await self.skipWaiting();
+    })();
+    if (typeof event.waitUntil === 'function') event.waitUntil(work);
   }
   // GET_VERSION — let the PAGE ask which build is actually serving it.
   //
