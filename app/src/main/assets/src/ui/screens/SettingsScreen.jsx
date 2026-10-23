@@ -6,6 +6,7 @@ import { settingsGlance, daysAgo } from '../../utils/settings-glance.js';
 import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell } from '../../utils/download-gate.js';
+import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -1471,6 +1472,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             </DataInfoRow>
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />
+            {/* U09.5: the web's offline library, standing (the APK carries every book in itself). */}
+            {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
+              ? <DataInfoRow label="Offline library" value={<OfflineLibraryStatus />} /> : null}
             <DataInfoRow label="Your data" value={userDataDisplayText} />
             {dataSamples.length > 0 && (
               <DataInfoRow label="Growth" value={<StorageTrendValue samples={dataSamples} />} />

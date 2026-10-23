@@ -2,7 +2,7 @@
    offline library, and that Retry / dismiss drive the store. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act, fireEvent } from '@testing-library/react';
-import { OfflineLibraryBanner } from './OfflineLibraryBanner.jsx';
+import { OfflineLibraryBanner, OfflineLibraryStatus, offlineLibraryWords } from './OfflineLibraryBanner.jsx';
 import { OfflineLibrary } from '../../utils/offline-library.js';
 
 function fakeWorker(answers) {
@@ -111,5 +111,25 @@ describe('OfflineLibraryBanner (B5)', () => {
     } finally {
       HTMLElement.prototype.getBoundingClientRect = rect;
     }
+  });
+});
+
+/* U09.5 (UX wave 3): Settings > Your Data says, standing, whether the offline library is ready. */
+describe('OfflineLibraryStatus (the Settings line)', () => {
+  it('words for every phase', () => {
+    expect(offlineLibraryWords('complete', 0)).toBe('Ready. Every book opens without a connection.');
+    expect(offlineLibraryWords('incomplete', 3)).toBe('Not ready. 3 files are missing.');
+    expect(offlineLibraryWords('dismissed', 1)).toBe('Not ready. 1 file is missing.');
+    expect(offlineLibraryWords('retrying', 2)).toBe('Downloading 2 missing files…');
+    expect(offlineLibraryWords('unknown', 0)).toBe('Not ready yet.');
+  });
+
+  it('says what the worker found, and offers Retry while files are missing', async () => {
+    const { container } = render(<OfflineLibraryStatus />);
+    expect(container.textContent).toBe('Not ready yet.');
+    await act(async () => { await OfflineLibrary.check(() => fakeWorker({ CHECK_OFFLINE: status(['a.js', 'b.js']) })); });
+    await settle();
+    expect(container.textContent).toBe('Not ready. 2 files are missing. Retry');
+    expect(container.querySelector('button').textContent).toBe('Retry');
   });
 });
