@@ -2370,23 +2370,22 @@
       }
       /* ── First-run annotation tip (AnnotationHint) ── */
       .ann-hint-pill {
-        position: fixed; left: 50%; transform: translateX(-50%);
+        /* U05.6 (UX wave 3): a full-width strip along the bottom, not a centred pill (at 300% the pill was a 646 px
+           column with its close half off-screen). */
+        position: fixed; left: 0; right: 0;
         /* Message lane, above the context row (cz1: the Study Notes toggle sat on its ✕). */
         bottom: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context));
         z-index: 190; /* under the mode-toggle pill (200) + sheets */
         display: flex; align-items: center; gap: 10px;
-        /* width:max-content defeats the left:50% shrink-to-fit trap (a
-           transform-centered fixed box otherwise sizes against the half
-           viewport and wraps needlessly narrow). */
-        width: max-content;
-        max-width: min(320px, calc(100vw - 5.5rem));
-        padding: 10px 6px 10px 14px;
+        justify-content: center;
+        padding: 6px 6px 6px 14px;
         /* No backdrop-filter (2026-07-28): floats over scrolling text; the
            96%-opaque bg needs no blur. */
         background: var(--bg3);  /* cz7: opaque */
-        border: 1px solid var(--gold-border); border-radius: 14px;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+        border-top: 1px solid var(--gold-border);
+        box-shadow: 0 -4px 18px rgba(0,0,0,0.4);
         animation: annHintIn 0.5s ease;
+        transition: opacity 0.6s ease;
         /* Wave-0 (P1-1): the pill teaches the long-press gesture yet sat
            ON TOP of the reading text — a long-press landing under the pill
            selected the pill's own label and raised the native Copy menu,
@@ -2400,7 +2399,8 @@
         -webkit-user-select: none;
       }
       body.light .ann-hint-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-      @keyframes annHintIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+      @keyframes annHintIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      .ann-hint-pill.is-fading { opacity: 0; }   /* U10.7: it goes by itself */
       /* ux3 (A15 critique, 2026-09-22): while this tip pill is up, a toast sits ABOVE it instead of on its words
          ("Copied" covered "Long-press any text..."). The pill starts at the
          same base offset and is up to three lines tall on a 320 px phone;
@@ -2419,8 +2419,8 @@
            events here so the ✕ still dismisses (P1-1). */
         pointer-events: auto;
         background: none; border: none; cursor: pointer;
-        color: var(--gold-dim); font-size: var(--fs-18); line-height: 1;
-        padding: 10px 12px; flex-shrink: 0;
+        color: var(--gold); font-family: var(--font-body); font-size: var(--fs-16); line-height: 1;
+        min-height: 44px; padding: 0 12px; flex-shrink: 0; text-decoration: underline; text-underline-offset: 3px;
         -webkit-tap-highlight-color: transparent;
       }
       .ann-hint-close:active { color: var(--gold); }
