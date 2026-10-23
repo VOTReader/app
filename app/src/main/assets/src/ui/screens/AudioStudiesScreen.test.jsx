@@ -90,7 +90,7 @@ describe('the Listening Library hub: one doorway for the studies', () => {
   });
 });
 
-describe('the Listening Library hub: On this phone (item 8)', () => {
+describe('the Listening Library hub: Downloads (item 8; downloads brief D3, picture 01)', () => {
   const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
   function fakeStore(items, available = true) {
     globalThis.OfflineAudio = {
@@ -105,8 +105,8 @@ describe('the Listening Library hub: On this phone (item 8)', () => {
     fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 18_000_000, savedAt: 1 }, { url: U('b'), key: 'one:b', title: 'B', bytes: 12_000_000, savedAt: 2 }]);
     const onOpenOffline = vi.fn();
     hub(onOpenOffline);
-    const row = screen.getByText('On this phone').closest('button');
-    expect(row.textContent).toContain('2 recordings · 30 MB');
+    const row = screen.getByText('Downloads').closest('button');
+    expect(row.textContent).toContain('2 on this phone · 30 MB');
     fireEvent.click(row);
     expect(onOpenOffline).toHaveBeenCalledTimes(1);
   });
@@ -115,12 +115,12 @@ describe('the Listening Library hub: On this phone (item 8)', () => {
   it('shows before the first download, saying what it is for, and is absent on the web', () => {
     fakeStore([]);
     hub(noop);
-    expect(screen.getByText('On this phone')).toBeTruthy();
-    expect(screen.getByText('Download recordings to play them with no signal')).toBeTruthy();
+    expect(screen.getByText('Downloads')).toBeTruthy();
+    expect(screen.getByText('Download for offline listening')).toBeTruthy();
     cleanup();
     fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 1, savedAt: 1 }], false);
     hub(noop);
-    expect(screen.queryByText('On this phone')).toBeNull();
+    expect(screen.queryByText('Downloads')).toBeNull();
   });
 });
 

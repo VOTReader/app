@@ -1,5 +1,6 @@
 /*
-   AudioOfflineScreen -- "On this phone": every recording downloaded to the phone (listening item 8).
+   AudioOfflineScreen -- the Downloads screen (downloads brief 2026-10-23, D3): two tabs, Choose (the tree, the
+   DownloadChooser) and On this phone (below; listening item 8).
 
    Built to Codex's mockup round 1, option 1 (lanes/readalong/out/mockups/offline/r1-1.png): each download with its
    size, a tap on it plays it (with no signal too), a Remove per row, and Remove all, which asks first. The Listening
@@ -10,6 +11,7 @@
    live in bundle-d too and are read as free globals at call time - one store, one player (see _entry-d.js). */
 
 import { useOfflineAudio, formatBytes } from '../components/OfflineAudioControls.jsx';
+import { DownloadChooser } from '../components/DownloadChooser.jsx';
 import { hideToast, showToast } from '../../utils/toast.js';
 
 export const REMOVED_TOAST_ID = 'vot-toast-offline-removed';
@@ -69,10 +71,16 @@ export function groupShelf(items) {
   return groups.sort((a, b) => b.savedAt - a.savedAt);
 }
 
+/** Where the next opening of the screen lands: a header's "Choose…" opens the tree at its collection (D3b). */
+let _openAt = /** @type {null | { tab: 'choose' | 'phone', focus?: string | null }} */ (null);
+/** @param {{ tab: 'choose' | 'phone', focus?: string | null }} at */
+export function openDownloadsAt(at) { _openAt = at; }
+
 /**
  * @param {{
  *   onBack: () => void,
  *   backLabel?: string,
+ *   bibleAudio?: string,
  *   onSearch?: () => void,
  *   onHistory?: () => void,
  *   onSettings?: () => void,
@@ -80,8 +88,15 @@ export function groupShelf(items) {
  *   onThemeChange?: (theme: any) => void,
  * }} props
  */
-export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bibleAudio, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const off = useOfflineAudio();
+  // Nothing on the phone or on its way opens Choose; else what is there (an entry point may say which: openDownloadsAt).
+  const [at] = React.useState(() => { const a = _openAt; _openAt = null; return a; });
+  const [tab, setTab] = React.useState(() => {
+    if (at) return at.tab;
+    const p = off && typeof off.pending === 'function' ? off.pending() : { busy: 0, failed: [] };
+    return off && (off.items().length || p.busy || p.failed.length) ? 'phone' : 'choose';
+  });
   const [askingAll, setAskingAll] = React.useState(false);
   const [askingGroup, setAskingGroup] = React.useState(/** @type {string | null} */ (null));
   // A single Remove waits out its Undo (brief section 7 item 14): the row steps aside at once and the file goes when
@@ -124,12 +139,41 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
       AudioPlayer.playTrack({ key: it.key, title: it.title, url: it.url, sub: null, readerCode: '', partLabel: null });
     }
   };
+  const tabs = (
+    <div className="dl-tabs" role="tablist" aria-label="Downloads">
+      {/** @type {Array<['choose' | 'phone', string]>} */ ([['choose', 'Choose'], ['phone', 'On this phone']]).map(([id, name]) => (
+        <button key={id} type="button" role="tab" id={'dl-tab-' + id} aria-selected={tab === id} aria-controls="dl-tabpanel"
+          className={'dl-tab' + (tab === id ? ' is-on' : '')} onClick={() => setTab(id)}>{name}</button>
+      ))}
+    </div>
+  );
+  const nav = LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange });
+  if (tab === 'choose' && off) {
+    return (
+      <ScreenLayout navChildren={nav}>
+        <div className="audio-library-screen dl-screen">
+          <header className="audio-library-hero dl-hero">
+            <div className="audio-library-eyebrow">Listening Library</div>
+            <h1>Downloads</h1>
+          </header>
+          {tabs}
+          <div role="tabpanel" id="dl-tabpanel" aria-labelledby="dl-tab-choose">
+            <DownloadChooser off={off} bibleAudio={bibleAudio} focus={at ? at.focus : null} />
+          </div>
+        </div>
+      </ScreenLayout>
+    );
+  }
   return (
-    <ScreenLayout navChildren={LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}>
-      <div className="audio-library-screen">
-        <header className="audio-library-hero">
+    <ScreenLayout navChildren={nav}>
+      <div className="audio-library-screen dl-screen">
+        <header className="audio-library-hero dl-hero">
           <div className="audio-library-eyebrow">Listening Library</div>
-          <h1>On this phone</h1>
+          <h1>Downloads</h1>
+        </header>
+        {off ? tabs : null}
+        <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
+        <header className="dl-phone-head">
           <p className="audio-library-intro">
             {items.length ? count + ' · ' + formatBytes(total) + '. They play with no signal.' : 'Recordings you download play with no signal.'}
           </p>
@@ -219,7 +263,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
               ))}
             </div>
           ) : (
-            <div className="audio-library-empty">Nothing is on this phone yet. In the Listening Library, open a volume or a Bible edition and tap Download on a recording, a book or the whole collection; it then plays with no signal.</div>
+            <div className="audio-library-empty">Nothing is on this phone yet. In Choose, tick what you want and tap Download; it then plays with no signal.</div>
           )}
           {/* With one recording its own Remove is the whole job (Codex critique of the built screens, 2026-09-24). */}
           {items.length > 1 ? (
@@ -237,6 +281,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
             )
           ) : null}
         </section>
+        </div>
       </div>
     </ScreenLayout>
   );

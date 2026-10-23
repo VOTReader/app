@@ -1420,11 +1420,12 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    // Downloads to the phone (listening item 8): the hub's "On this phone" row.
+    // Downloads (listening item 8; downloads brief D3): the Library's Downloads card.
     'audio-library-offline': () => (
       <AudioOfflineScreen
         onBack={goNavOrigin}
         backLabel="Listening Library"
+        bibleAudio={settings.bibleAudio}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

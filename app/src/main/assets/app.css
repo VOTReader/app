@@ -1615,6 +1615,96 @@
       .offline-confirm-go:disabled { opacity:.45; cursor:default; }
       .audio-offline-remove { min-height:36px; padding:.2rem .7rem; border:1px solid var(--gold-border); border-radius:7px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.035em; cursor:pointer; }
       .audio-offline-remove-all { margin-top:1rem; }
+      /* The Downloads screen (downloads brief 2026-10-23, D3; pictures 03-07 in D:/Swarm/calls/downloads-mockups/): tabs,
+         the Choose tree with tri-state boxes and a chapter grid, its sticky footer and the Apply / mobile-data sheets.
+         Brick = marked for removal (README #C4664A). */
+      .dl-screen, .dl-sheet { --dl-brick:#c4664a; --dl-surface:#14120e; }
+      body.light .dl-screen, body.light .dl-sheet { --dl-brick:#9b3a2a; --dl-surface:#ece5d4; }
+      .dl-hero { padding-bottom:.4rem; }
+      .dl-tabs { display:flex; gap:1.6rem; margin:0 0 .4rem; border-bottom:1px solid var(--gold-border); }
+      .dl-tab { min-height:48px; padding:.4rem .1rem; border:0; border-bottom:3px solid transparent; margin-bottom:-1px; background:none; color:var(--cream-dim); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+      .dl-tab.is-on { color:var(--cream); border-bottom-color:var(--gold); }
+      .dl-phone-head { margin:.3rem 0 .6rem; }
+      .dl-choose { padding-bottom:.5rem; }
+      .dl-loading, .dl-held { margin:.8rem 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-held { color:var(--gold); font-style:normal; }
+      .dl-group { border-bottom:1px solid var(--gold-border); }
+      .dl-children > .dl-group:last-child, .dl-children > div:last-child > .dl-group { border-bottom:0; }
+      .dl-level-1 .dl-children, .dl-level-2 .dl-children { padding-left:.9rem; }
+      .dl-level-0 > .dl-children { border-top:1px solid var(--gold-border); }
+      .dl-row { display:flex; align-items:flex-start; gap:.35rem; min-height:56px; }
+      .dl-row-main { flex:1 1 auto; min-width:0; display:flex; align-items:flex-start; gap:.5rem; padding:.7rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .dl-row-copy { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
+      .dl-row-copy strong { color:var(--cream); font-weight:400; font-size:var(--fs-18); line-height:1.25; overflow-wrap:anywhere; }
+      .dl-level-0 > .dl-row .dl-row-copy strong { font-size:var(--fs-20); }
+      .dl-row-copy small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); line-height:1.4; }
+      .dl-chevron { flex:0 0 auto; width:26px; height:26px; margin-top:.15rem; fill:none; stroke:var(--gold); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s ease; }
+      .dl-chevron.is-open { transform:rotate(180deg); }
+      .dl-box { flex:0 0 48px; width:48px; height:48px; margin-top:.25rem; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; cursor:pointer; }
+      .dl-box-mark { width:calc(12px + .625rem); height:calc(12px + .625rem); border:1.6px solid var(--gold-dim); border-radius:5px; display:inline-flex; align-items:center; justify-content:center; }
+      .dl-box-mark svg { width:80%; height:80%; fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-box.is-all .dl-box-mark { background:var(--gold); border-color:var(--gold); }
+      .dl-box.is-all svg { stroke:#17130a; }
+      body.light .dl-box.is-all svg { stroke:var(--bg); }
+      .dl-box.is-some .dl-box-mark { border-color:var(--gold); }
+      .dl-box.is-some svg { stroke:var(--gold); }
+      .dl-box.is-remove .dl-box-mark { border-color:var(--dl-brick); }
+      .dl-box:focus-visible .dl-box-mark, .dl-chip:focus-visible, .dl-tab:focus-visible, .dl-row-main:focus-visible, .dl-link:focus-visible, .dl-footer-go:focus-visible, .dl-range:focus-visible, .dl-edition:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .dl-mark { display:inline-flex; align-items:center; gap:.4rem; margin-top:.15rem; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-mark svg { flex:0 0 auto; width:20px; height:20px; fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; }
+      .dl-mark.is-some .dl-mark-ring { stroke:var(--gold-border); }
+      .dl-mark.is-some .dl-mark-arc { stroke:var(--gold); stroke-width:2.2; }
+      .dl-remove-note { color:var(--dl-brick); font-size:var(--fs-14); }
+      .dl-unit { min-height:52px; border-top:1px solid var(--gold-faint); }
+      .dl-unit .dl-row-main { align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.2rem .8rem; padding:.55rem 0; }
+      .dl-unit-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
+      .dl-unit-meta { flex:0 0 auto; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-show-all { margin:.2rem 0 .5rem calc(48px + .35rem); }
+      .dl-tools { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem 1rem; padding:0 0 .8rem calc(48px + .35rem); }
+      .dl-link { min-height:44px; padding:.3rem 0; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; text-align:left; }
+      .dl-voice { flex:0 1 auto; min-width:0; max-width:100%; }
+      .dl-voice select { min-height:44px; width:100%; max-width:100%; text-overflow:ellipsis; padding:.3rem 2rem .3rem .8rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); }
+      .dl-voice select option { background:var(--bg); color:var(--cream); }
+      .dl-editions { display:flex; flex-wrap:wrap; gap:.5rem; padding:0 0 .5rem calc(48px + .35rem); }
+      .dl-edition { min-height:44px; padding:.3rem .9rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .dl-edition.is-on { background:var(--gold); color:#17130a; }
+      body.light .dl-edition.is-on { color:var(--bg); }
+      .dl-chapters { padding:0 0 1rem; }
+      .dl-chapters-head { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; margin:0 0 .6rem; }
+      .dl-chapters-hint { flex:1 1 8em; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-range { min-height:40px; padding:.2rem 1rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .dl-range.is-on { background:var(--gold); color:#17130a; }
+      body.light .dl-range.is-on { color:var(--bg); }
+      .dl-chip-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(max(44px, 2.6em), 1fr)); gap:.45rem; }
+      .dl-chip { position:relative; min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+      /* hub 03:14: on the phone = a tick on a quiet fill; picked to add = the strong gold. */
+      .dl-chip.is-kept { background:var(--gold-faint); border-color:var(--gold-dim); }
+      .dl-chip.is-add { background:var(--gold); border-color:var(--gold); color:#17130a; }
+      body.light .dl-chip.is-add { color:var(--bg); }
+      .dl-chip.is-remove { border-color:var(--dl-brick); color:var(--dl-brick); text-decoration:line-through; }
+      .dl-chip.is-from { box-shadow:0 0 0 2px var(--gold-bright); }
+      .dl-chip-tick { position:absolute; top:2px; right:2px; width:12px; height:12px; fill:none; stroke:var(--gold); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-footer { position:sticky; bottom:calc(var(--dock-player) + var(--dock-sys)); z-index:3; display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1rem; margin:1rem -1rem 0; padding:.8rem 1rem; border-top:1px solid var(--gold-border); background:var(--dl-surface); }
+      .dl-footer-text { flex:1 1 12em; min-width:0; }
+      .dl-footer-text p { margin:0; color:var(--cream); font-size:var(--fs-16); line-height:1.35; }
+      .dl-footer-text .dl-footer-sub { margin-top:.15rem; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-footer-warn { color:var(--dl-brick); }
+      .dl-footer-go { flex:0 0 auto; min-height:48px; max-width:100%; padding:.4rem 1.2rem; border:1px solid var(--gold); border-radius:8px; background:var(--gold); color:#17130a; font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      body.light .dl-footer-go { color:var(--bg); }
+      .dl-footer-go:disabled { background:transparent; border-color:var(--gold-dim); color:var(--cream-dim); cursor:default; }
+      .dl-sheet .dl-sheet-title { text-align:left; }
+      .dl-sheet-body { max-height:50vh; overflow-y:auto; margin:.6rem 0 0; }
+      .dl-sheet-kicker { margin:.9rem 0 .2rem; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
+      .dl-sheet-kicker.is-remove { color:var(--dl-brick); }
+      .dl-sheet-row { display:flex; align-items:flex-start; gap:.8rem; padding:.6rem 0; border-bottom:1px solid var(--gold-border); color:var(--gold); }
+      .dl-sheet-row.is-remove { color:var(--dl-brick); }
+      .dl-sheet-row .offline-icon { flex:0 0 auto; width:24px; height:24px; margin-top:.15rem; }
+      .dl-sheet-row span { display:flex; flex-direction:column; min-width:0; }
+      .dl-sheet-row strong { color:var(--cream); font-weight:400; font-size:var(--fs-18); overflow-wrap:anywhere; }
+      .dl-sheet-row small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-sheet-summary { margin:.8rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
+      .dl-sheet-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
+      .dl-sheet-actions > button { flex:1 1 9em; min-height:48px; font-family:inherit; font-size:var(--fs-16); }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }

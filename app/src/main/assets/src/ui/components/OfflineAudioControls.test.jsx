@@ -369,7 +369,8 @@ describe('On this phone (the shelf)', () => {
     save(s, 'a', 18_000_000, 'I Am The Passover');
     save(s, 'b', 12_000_000, 'Matthew 1');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.querySelector('h1').textContent).toBe('On this phone');
+    expect(container.querySelector('h1').textContent).toBe('Downloads');
+    expect(getByRole('tab', { name: 'On this phone' }).getAttribute('aria-selected')).toBe('true');
     expect(container.textContent).toMatch(/2 recordings · 30 MB/);
     const rows = container.querySelectorAll('.audio-offline-item');
     expect([...rows].map((r) => r.querySelector('strong').textContent)).toEqual(['Matthew 1', 'I Am The Passover']);
@@ -471,10 +472,12 @@ describe('On this phone (the shelf)', () => {
     expect(s.download).toHaveBeenCalledWith(failed);
   });
 
-  it('an empty shelf says how to fill it', () => {
+  it('nothing on the phone opens Choose; the empty shelf says how to fill it', () => {
     fakeStore();
-    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.textContent).toMatch(/Nothing is on this phone yet/);
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(getByRole('tab', { name: 'On this phone' }));
+    expect(container.textContent).toMatch(/Nothing is on this phone yet\. In Choose, tick what you want/);
   });
 });
 

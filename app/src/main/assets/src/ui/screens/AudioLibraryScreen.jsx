@@ -269,29 +269,6 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
           </div>
         </section>
 
-        {/* Downloads to the phone (item 8), wherever this app keeps them: shown before the first one too, so the
-            place is known before it is needed (downloads brief 2026-10-23, section 7 item 15). */}
-        {offline ? (
-          <section className="audio-library-section audio-library-offline-row" aria-label="On this phone">
-            <div className="audio-library-shelf">
-              <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
-                <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
-                <span className="audio-library-shelf-copy">
-                  <strong>On this phone</strong>
-                  <small>{busy
-                    ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
-                    : !downloads.length ? 'Download recordings to play them with no signal'
-                    : (downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes()) + ' · plays with no signal'}</small>
-                </span>
-                <span className="audio-library-shelf-tail">
-                  <b>{downloads.length}</b>
-                  <ArrowIcon />
-                </span>
-              </button>
-            </div>
-          </section>
-        ) : null}
-
         <section className="audio-library-section" aria-labelledby="audio-library-recent">
           <div className="audio-library-section-head">
             <div><span>Pick up again</span><h2 id="audio-library-recent">Recently played</h2><p>{recent.length ? 'Your latest starts, newest first.' : 'Your listening trail will appear here.'}</p></div>
@@ -327,6 +304,30 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
             ) : null}
           </div>
         </section>
+
+        {/* Downloads (item 8; downloads brief D3, picture 01): under Recently played, above Browse, wherever this app
+            keeps recordings; shown before the first one too, so the place is known before it is needed (section 7
+            item 15). */}
+        {offline ? (
+          <section className="audio-library-section audio-library-offline-row" aria-label="Downloads">
+            <div className="audio-library-shelf">
+              <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
+                <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
+                <span className="audio-library-shelf-copy">
+                  <strong>Downloads</strong>
+                  <small>{busy
+                    ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
+                    : !downloads.length ? 'Download for offline listening'
+                    : downloads.length + ' on this phone · ' + formatBytes(offline.totalBytes())}</small>
+                </span>
+                <span className="audio-library-shelf-tail">
+                  <b>{downloads.length}</b>
+                  <ArrowIcon />
+                </span>
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="audio-library-section audio-library-browse" aria-labelledby="audio-library-browse">
           <div className="audio-library-section-head"><div><span>Explore the source</span><h2 id="audio-library-browse">Browse the recordings</h2><p>Open a source to hear it letter by letter, or book by book.</p></div></div>

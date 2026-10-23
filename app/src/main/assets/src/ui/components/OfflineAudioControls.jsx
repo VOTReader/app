@@ -32,7 +32,7 @@ function usePlayingOneOf(urls) {
 }
 
 /** The phone keeps this much free beyond a download (OfflineAudioStore's SPACE_MARGIN). */
-const SPACE_MARGIN = 200 * 1024 * 1024;
+export const SPACE_MARGIN = 200 * 1024 * 1024;
 
 /** @returns {any} the bundle-d store, or null on a host without it */
 function _store() {
