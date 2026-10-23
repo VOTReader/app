@@ -339,6 +339,23 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     expect(get().cam.camRef.current.x).toBe(15551.5);
     expect(get().journey.stack).toEqual([]);
   });
+
+  it('a Back whose fly is cut short gives the crumb back; one the trail moved on from does not', async () => {
+    let land = null;
+    const flyTo = vi.fn(() => new Promise((r) => { land = r; }));
+    const { result } = renderHook(() => useJourney({ flyTo }));
+    act(() => { result.current.push({ verse: 300, label: 'b' }, { verse: 5, label: 'home' }); });
+    act(() => { result.current.push({ verse: 900, label: 'c' }); });
+    act(() => { result.current.back(); });
+    expect(verses(result.current.stack)).toEqual([5, 300]);
+    await act(async () => { land(false); await Promise.resolve(); await Promise.resolve(); });
+    expect(verses(result.current.stack), 'a finger took the camera: Back still goes to 300').toEqual([5, 300, 900]);
+    act(() => { result.current.back(); });
+    const first = land;
+    act(() => { result.current.back(); });
+    await act(async () => { first(false); await Promise.resolve(); await Promise.resolve(); });
+    expect(result.current.stack, 'a second Back went on: the first fly gives nothing back').toEqual([]);
+  });
 });
 
 /* Corbin, 2026-10-22: "tapping a line then having it fully zoom all the way out sucks, takes me away

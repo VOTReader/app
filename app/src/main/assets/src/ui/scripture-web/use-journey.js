@@ -122,6 +122,10 @@ export function useJourney(deps) {
     const to = rest[rest.length - 1];
     // home to where the trail set out: nothing further back, so the trail is done
     set(rest.length > 1 ? rest : []);
+    const left = stackRef.current;
+    // a fly cut short (a finger took the camera) did not get there: the crumb comes back, so Back
+    // still goes where it said (s26.5); unless the trail moved on since (another Back, a Follow)
+    const missed = () => { if (stackRef.current === left) set(s); };
     const fly = flyRef.current;
     const arrive = () => {
       const p = panelRef.current;
@@ -133,7 +137,7 @@ export function useJourney(deps) {
     if (typeof fly === 'function') {
       // a crumb is a verse; the camera centres its middle, where a foot stands (v + 0.5), as Follow does
       const target = to.span ? { x0: to.span[0], x1: to.span[1] } : { x: to.verse + 0.5 };
-      Promise.resolve(fly(target)).then((ok) => { if (ok) arrive(); }, () => {});
+      Promise.resolve(fly(target)).then((ok) => { if (ok) arrive(); else missed(); }, missed);
     } else arrive();
     return to;
   }, [set]);
