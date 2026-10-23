@@ -273,20 +273,23 @@ export function useWebSelection({
    * The elevator's lift (landing 14): for a pointer going down on the track
    * (device-px box in elevatorRef, kept by drawElevator), the function of a
    * CSS y that sets the camera's height - the track's top is the tallest
-   * apex, its foot the baseline. Null off the track, so the web pans.
+   * apex, its foot the baseline. Null off the track, so the web pans. A finger finds it 44 px in
+   * (lift.reach); in the reach past the drawn strip a pill or a chip there wins.
    */
   const liftAt = React.useCallback((cx, cy) => {
     const lift = elevatorRef.current, v = viewRef.current;
     if (!lift || !v.W) return null;
     const px = cx * v.DPR, py = cy * v.DPR;
-    if (px < lift.x0 || px > lift.x1 || py < lift.y0 || py > lift.y1) return null;
+    const x0 = lift.reach != null ? Math.min(lift.reach, lift.x0) : lift.x0;
+    if (px < x0 || px > lift.x1 || py < lift.y0 || py > lift.y1) return null;
+    if (px < lift.x0 && hitOverlay(overlayFrameRef ? overlayFrameRef.current : null, cx, cy)) return null;
     return (yCss) => {
       const cam = camRef.current;
       if (!cam) return;
       const f = lift.y1 > lift.y0 ? (lift.y1 - yCss * v.DPR) / (lift.y1 - lift.y0) : 0;
       cam.y = Math.max(0, Math.min(1, f)) * lift.maxY;
     };
-  }, [camRef, viewRef, elevatorRef]);
+  }, [camRef, viewRef, elevatorRef, overlayFrameRef]);
 
   // Verse and chapter candidates carry no distance: they only ever come alone.
   const hitCandidatesAt = React.useCallback(/** @returns {Array<{ kind: string, distance?: number } & Record<string, any>>} */ (cx, cy) => {

@@ -59,7 +59,7 @@ function mount({ withCamera = true, mode = 'canonical', personal = null, rails =
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: cam.flyTo, journey, schedule, setAnnounce,
       insetFor,
     });
-    return { cam, sel, journey, overlayFrameRef };
+    return { cam, sel, journey, overlayFrameRef, elevatorRef };
   }, { initialProps: { showUnderlay: underlay } });
   const { cam } = hook.result.current;
   cam.viewRef.current = { W: 800, H: 360, DPR: 1 };
@@ -1008,5 +1008,21 @@ describe('the go-to (CONTRACTS.md sections 8 and 9)', () => {
     expect(() => { first.open('John 3:16'); first.close(); }).not.toThrow();
     rerender();
     expect(result.current).toBe(first);
+  });
+});
+
+/* ideas audit s25.1: the elevator's strip is 24 px to see, 44 px for a finger; in the reach past
+   the drawn strip a pill or a chip there wins, so the wider target steals no tap. */
+describe('the elevator is a 44 px target that yields to a pill in its reach', () => {
+  it('finds the track 44 px in, and lets a pill there have its tap', () => {
+    const { get } = mount();
+    const { sel, elevatorRef, overlayFrameRef } = get();
+    elevatorRef.current = { x0: 776, x1: 800, y0: 20, y1: 300, maxY: 500, at: 0, reach: 756 };
+    expect(typeof sel.liftAt(790, 150), 'on the drawn strip').toBe('function');
+    expect(typeof sel.liftAt(760, 150), 'in the reach').toBe('function');
+    expect(sel.liftAt(740, 150), 'past the reach: the web pans').toBeNull();
+    overlayFrameRef.current = { v: { DPR: 1 }, hits: [{ x0: 740, x1: 770, y0: 140, y1: 160, hit: { kind: 'pill', ids: [], label: '3' } }] };
+    expect(sel.liftAt(760, 150), 'a pill in the reach wins').toBeNull();
+    expect(typeof sel.liftAt(790, 150), 'the drawn strip is still the track').toBe('function');
   });
 });

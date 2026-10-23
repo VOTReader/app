@@ -633,7 +633,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         aria-label={chromeHidden ? 'Show controls' : 'Hide controls'}
         title={chromeHidden ? undefined : 'Hide controls'} onClick={toggleChrome}>
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
-          <path d={chromeHidden ? 'M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5' : 'M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5'} />
+          {/* an eye: shut to hide the controls, open to bring them back (the fullscreen brackets
+              read as fullscreen; ideas audit A10.8) */}
+          <path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z" />
+          <circle cx="12" cy="12" r="2.75" />
+          {chromeHidden ? null : <path d="M4 4l16 16" />}
         </svg>
         <span className="sw-hide-label">{chromeHidden ? 'Show controls' : 'Hide controls'}</span>
       </button>

@@ -184,7 +184,7 @@ export function AppShellOverlays({
                 </div>
               </>) : (<>
               <div className="garden-warning-body">
-                <em>A Return to The Garden</em> contains <strong>209 high-resolution photographs</strong> totaling approximately <strong>{selectedTier.size}</strong> at the selected quality. Pages stream from the internet as you read and are cached on your device.
+                <em>A Return to The Garden</em> contains <strong>209 high-resolution photographs</strong> totaling <strong>{selectedTier.size}</strong> at the selected quality. Pages stream from the internet as you read and are cached on your device.
                 <br /><br />For the best experience, connect to <strong>Wi-Fi</strong> before proceeding. Mobile data charges may apply otherwise.
                 <br /><br />Please also ensure your device has sufficient <strong>free storage</strong> available to cache the full collection.
               </div>

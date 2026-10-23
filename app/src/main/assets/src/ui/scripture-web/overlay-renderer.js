@@ -2316,17 +2316,20 @@ function drawAltitude(ctx, g, cam, view, v, chrome, out) {
   return shown;
 }
 
-/** The elevator's tap zone, CSS px in from the right edge. */
+/** The elevator's own strip, CSS px in from the right edge: the names keep clear of it. */
 const ELEVATOR_ZONE_CSS = 24;
+/** How far in a finger finds it: a 44 px target (ideas audit s25.1). The strip past the drawn one
+ * yields to a pill or a chip there (use-web-selection.js liftAt). */
+const ELEVATOR_REACH_CSS = 44;
 
 /**
  * The elevator (landing 9): a thin track down the right edge from the top
  * chrome to the baseline, its thumb at camY / maxCamY - the top is the
  * tallest apex, the bottom the baseline. Drawn only on the canon web once
  * there is a sky to climb (maxCamY > 0: past the overview). Returns the
- * track's tap box (the right ELEVATOR_ZONE_CSS px), the height its top
- * stands for and the thumb's fraction, or null; the tap callback reads it.
- * @returns {{x0:number, x1:number, y0:number, y1:number, maxY:number, at:number}|null}
+ * track's box (the right ELEVATOR_ZONE_CSS px; `reach`, the x a finger finds it from), the height
+ * its top stands for and the thumb's fraction, or null; the tap callback reads it.
+ * @returns {{x0:number, x1:number, y0:number, y1:number, maxY:number, at:number, reach:number}|null}
  */
 function drawElevator(ctx, cam, view, v, chrome, yf) {
   if (!yf) return null;
@@ -2337,7 +2340,7 @@ function drawElevator(ctx, cam, view, v, chrome, yf) {
   if (!(y1 > y0)) return null;
   const camY = cam.y > 0 ? cam.y : 0;
   const at = Math.min(1, camY / maxY);
-  const box = { x0: W - ELEVATOR_ZONE_CSS * DPR, x1: W, y0, y1, maxY, at };
+  const box = { x0: W - ELEVATOR_ZONE_CSS * DPR, x1: W, y0, y1, maxY, at, reach: W - ELEVATOR_REACH_CSS * DPR };
   if (view.reserved) view.reserved.push({ x0: box.x0, x1: box.x1, y0, y1 });
   if (!ctx) return box;
   const x = W - 10 * DPR;
