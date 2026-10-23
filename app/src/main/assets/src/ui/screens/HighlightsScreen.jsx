@@ -6,7 +6,7 @@
    Study bundle-g until lz1) and reads normalizeExcerptDisplay from the window slots
    bundle-d fills — one copy of each law, and no second module state.
    mark-kinds.js is the exception: pure, stateless, a few lines (v05-04). */
-import { isMarkKind } from '../../utils/mark-kinds.js';
+import { isCountedMark } from '../../utils/mark-kinds.js';
 
 /* Self-contained CSS injection (segregated from the main stylesheet,
    same pattern as journal-styles.js). All classes prefixed `hlx-`. */
@@ -107,9 +107,8 @@ export function _collectMarks() {
     var arr = data[hlKey] || [];
     for (var i = 0; i < arr.length; i++) {
       var a = arr[i];
-      if (!isMarkKind(a.kind)) continue;
       // A note made with "No color (icon only)" marks no text: it is a note (Notes lists it), not a mark (A06.4).
-      if (a.color === 'blank') continue;
+      if (!isCountedMark(a)) continue;
       var gid = a.groupId || a.id;
       var g = groups[gid];
       if (!g) {

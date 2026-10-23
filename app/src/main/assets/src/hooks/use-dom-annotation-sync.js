@@ -69,6 +69,7 @@ import { BookmarkStore } from '../stores/bookmark-store.js';
 import { LinkStore } from '../stores/link-store.js';
 import { NoteStore } from '../stores/note-store.js';
 import { NotebookStore } from '../stores/notebook-store.js';
+import { useStoreVersion, useStoreVersionByName } from './use-store-version.js';
 
 /** @typedef {{ key: string, place: string, stop: () => void }} ScrollWait */
 
@@ -182,30 +183,16 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
   // store's _bump() (fired by its own mutation methods) changes its version,
   // re-renders App, and re-runs the apply pass below — the W7.3 replacement
   // for the old hlTick/__bumpHlTick cache-bust. The typeof guards keep the
-  // hook safe if a store global isn't defined yet (cold boot / test isolation).
-  const annV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),
-    () => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.getVersion() : 0
-  );
-  const noteV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof NoteStore !== 'undefined') ? NoteStore.subscribe(cb) : () => {}, []),
-    () => (typeof NoteStore !== 'undefined') ? NoteStore.getVersion() : 0
-  );
-  const linkV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof LinkStore !== 'undefined') ? LinkStore.subscribe(cb) : () => {}, []),
-    () => (typeof LinkStore !== 'undefined') ? LinkStore.getVersion() : 0
-  );
-  const bkmV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.subscribe(cb) : () => {}, []),
-    () => (typeof BookmarkStore !== 'undefined') ? BookmarkStore.getVersion() : 0
-  );
+  // hook safe if a store global isn't defined yet (cold boot / test isolation);
+  // useStoreVersion keeps that: an absent store is inert at version 0.
+  const annV = useStoreVersion(AnnotationStore);
+  const noteV = useStoreVersion(NoteStore);
+  const linkV = useStoreVersion(LinkStore);
+  const bkmV = useStoreVersion(BookmarkStore);
   // [11b] notebook COLOR tags tint inline note icons, so a color change (or
   // notebook delete) must repaint the icon pass — same contract as the four
   // stores above.
-  const nbV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof NotebookStore !== 'undefined') ? NotebookStore.subscribe(cb) : () => {}, []),
-    () => (typeof NotebookStore !== 'undefined') ? NotebookStore.getVersion() : 0
-  );
+  const nbV = useStoreVersion(NotebookStore);
 
   // Lazy-corpus readiness (bundle-a-bible / matthew / vot). A reading screen
   // renders a "Loading…" placeholder — NOT its [data-hl-key] verse DOM — until
@@ -221,24 +208,12 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
   // a fast device — but a slow device loses that race; this fixes it at the
   // root. (The pendingScrollHlKey scroll in the same effect benefits too: a
   // Library/link jump now scrolls to its mark once the corpus DOM exists.)
-  const bibleCorpusV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
-  );
-  const matthewCorpusV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
-  );
-  const votCorpusV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
-  );
+  const bibleCorpusV = useStoreVersionByName('__bibleCorpus');
+  const matthewCorpusV = useStoreVersionByName('__matthewCorpus');
+  const votCorpusV = useStoreVersionByName('__votCorpus');
   // Answers is its own lazy file (sync-loaders.js): a topic opened cold by a
   // link mounted after the first pass and its marks stayed unpainted (n4-02).
-  const answersCorpusV = React.useSyncExternalStore(
-    React.useCallback((cb) => (typeof window.__answersCorpus !== 'undefined') ? window.__answersCorpus.subscribe(cb) : () => {}, []),
-    () => (typeof window.__answersCorpus !== 'undefined') ? window.__answersCorpus.getVersion() : 0
-  );
+  const answersCorpusV = useStoreVersionByName('__answersCorpus');
 
   // A reading view whose keyed paragraphs mount after the screen did, or are replaced, says so
   // (window.__hlDomV + a 'vot-hl-dom' event): an Answers topic paints its body once its sidecar is

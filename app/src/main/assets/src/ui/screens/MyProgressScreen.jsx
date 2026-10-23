@@ -24,7 +24,7 @@
    the streaks and counts here are plain progress and stay.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { isMarkKind } from '../../utils/mark-kinds.js';
+import { countMarks } from '../../utils/mark-kinds.js';
 import { usePlanRuns, runRow, shortDate } from '../../utils/plan-runs-view.js';
 import { runName } from '../../data/plan-catalog.js';
 import { dayNum } from '../../data/plan-engine.js';
@@ -210,11 +210,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
      word. The source titles also come from the journal and the lazy corpora, hence those keys. */
   const annAgg = React.useMemo(() => {
     const annData = (typeof AnnotationStore !== 'undefined') ? (AnnotationStore.all() || {}) : {};
-    const seen = {};
-    Object.keys(annData).forEach((k) => (annData[k] || []).forEach((a) => {
-      if (isMarkKind(a.kind)) seen[a.groupId || a.id] = 1;
-    }));
-    return { markCount: Object.keys(seen).length, topSources: mostAnnotatedSources(annData, 5) };
+    return { markCount: countMarks(annData), topSources: mostAnnotatedSources(annData, 5) };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store versions: all() is the live object
   }, [annVer, jrnVer, groupShape]);
   const markCount = annAgg.markCount;

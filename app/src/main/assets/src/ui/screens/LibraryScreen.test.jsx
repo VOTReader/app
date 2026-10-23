@@ -259,6 +259,15 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(detail()).toMatch(/^1 /);
   });
 
+  it('a blank-colour note is not counted as a highlight (n363)', () => {
+    setupGlobals({ AnnotationStore: fakeStore({ all: () => ({
+      'v1:john:3': [{ id: 'b1', kind: 'highlight', color: 'blank' }, { id: 'a1', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
+      'v1:john:4': [{ id: 'a2', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
+    }) }) });
+    renderLibrary();
+    expect(tileEl('Highlights & Underlines').querySelector('.library-tile-detail').textContent).toMatch(/^1 /);
+  });
+
   it('adopts a restored custom tile order after asynchronous hydration', () => {
     let version = 0;
     let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress'];

@@ -21,7 +21,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runName } from '../../data/plan-catalog.js';
-import { isMarkKind } from '../../utils/mark-kinds.js';
+import { countMarks } from '../../utils/mark-kinds.js';
 import { createPressDrag } from '../../utils/press-drag.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
@@ -43,7 +43,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   // The tile counts below read these stores directly; subscribing to each one is
   // what keeps a count live while the Library stays open (a note saved in a
   // sheet, a bookmark removed). Fixed list — stable hook order.
-  LIBRARY_COUNT_STORES.forEach(useStoreVersionByName);
+  const storeVersions = LIBRARY_COUNT_STORES.map(useStoreVersionByName);
+  const annVer = storeVersions[LIBRARY_COUNT_STORES.indexOf('AnnotationStore')];
   const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
   /** @type {any[]} */
   const runningPlans = planStore && typeof planStore.active === 'function' ? planStore.active() : [];
@@ -53,15 +54,12 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   const linkCount      = LinkStore.all().length;
   const bookmarkCount  = (typeof BookmarkStore  !== 'undefined') ? BookmarkStore.count()  : 0;
   const journalCount   = (typeof JournalStore   !== 'undefined') ? JournalStore.count()   : 0;
-  const highlightCount = (() => {
-    if (typeof AnnotationStore === 'undefined') return 0;
-    const data = AnnotationStore.all() || {};
-    const seen = {};
-    Object.keys(data).forEach(k => (data[k] || []).forEach(a => {
-      if (isMarkKind(a.kind)) seen[a.groupId || a.id] = 1;
-    }));
-    return Object.keys(seen).length;
-  })();
+  // The mark walk runs once per AnnotationStore version, not on every render.
+  const highlightCount = React.useMemo(
+    () => (typeof AnnotationStore === 'undefined' ? 0 : countMarks(AnnotationStore.all())),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: all() is the live object
+    [annVer],
+  );
 
   // ── Tile metadata (static) ──────────────────────────────────────────
   // Defined inline so the SVG JSX resolves in component scope.
