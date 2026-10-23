@@ -26,6 +26,8 @@
                          translateVerse() starts returning the loaded text.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { hideToast, showToast } from '../utils/toast.js';
+
 export const TRANSLATION_MISSING_TOAST_ID = 'vot-toast-translation-missing';
 
 /** True when the edition's text never arrived (its bible-<code>.js global is absent). @param {string} code */
