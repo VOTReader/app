@@ -739,6 +739,37 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* search200 audit 146 (s22.1): every keystroke reset Book order, so refining "faith" to "faith works" dropped the
+     reader back to Relevance mid-word. The order holds while the query is refined and resets once the box is cleared. */
+  it('Book order holds while the query is refined, and resets when the box is cleared', async () => {
+    vi.useFakeTimers();
+    /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g;
+    /** @type {any} */ (globalThis).SRCH_GROUP_META = realGroupMeta();
+    /** @type {any} */ (globalThis).SrchGroup = ({ gkey, items }) => <div className="stub-group" data-key={gkey}>{items.map((e) => e.doc.ref).join(',')}</div>;
+    /** @type {any} */ (globalThis).SrchCard = ({ entry }) => <div className="stub-card">{entry.doc.ref}</div>;
+    const V = (bookId, c) => ({ score: 1, doc: { kind: 'verse', g: 'bible', bookId, chapterNum: c, verseNum: 1, ref: bookId + ' ' + c, text: 't' } });
+    const results = [V('john', 3), V('genesis', 1), V('romans', 5)];
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: null, results, parsedTerms: [] }));
+    const props = baseProps();
+    const { rerender } = render(<SearchScreen {...props} />);
+    const runQuery = async (q) => {
+      rerender(<SearchScreen {...props} query={q} />);
+      act(() => { vi.advanceTimersByTime(200); });
+      await act(async () => { await Promise.resolve(); });
+    };
+    const sw = (name) => [...document.querySelectorAll('.srch-sort-btn')].find((b) => b.textContent === name);
+    await runQuery('faith');
+    fireEvent.click(sw('Book order'));
+    expect(sw('Book order').getAttribute('aria-pressed')).toBe('true');
+    await runQuery('faith w');
+    await runQuery('faith works');
+    expect(sw('Book order').getAttribute('aria-pressed'), 'refining keeps the order').toBe('true');
+    await runQuery('');
+    await runQuery('grace');
+    expect(sw('Relevance').getAttribute('aria-pressed'), 'a cleared box starts over').toBe('true');
+    vi.useRealTimers();
+  });
+
   it('a corrected typo is said out loud, and the corrected query is one tap into the box', async () => {
     vi.useFakeTimers();
     const onQueryChange = vi.fn();

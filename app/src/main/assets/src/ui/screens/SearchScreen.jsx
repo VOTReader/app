@@ -401,7 +401,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
   // [8] Book order — a client-side view over the fetched set (the corpus
   // pills above narrow what is SEARCHED; this re-orders what is RENDERED —
-  // instant, no re-query). Resets on a new query. The result-filter chips
+  // instant, no re-query). Resets when the box is cleared. The result-filter chips
   // that sat beside it (All / Scriptures / Volumes / WTLB / Studies) were the
   // corpus row said twice on one screen, and the one place the app wrote
   // "WTLB"; deleted 2026-09-13 (catalogue SR1 + SR2).
@@ -410,7 +410,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // changed nothing a reader could see (Corbin 2026-10-14, sr12). Book order now
   // drops Best Matches (relevance's row) and opens every collection in reading order.
   const [sortMode, setSortMode] = React.useState('relevance'); // 'relevance' | 'canonical'
-  React.useEffect(() => { setSortMode('relevance'); }, [query]);
+  // The order holds while the query is refined (search200 audit 146: each key typed dropped Book order back to
+  // Relevance mid-word) and starts over once the box is cleared.
+  React.useEffect(() => { if (!(query || '').trim()) setSortMode('relevance'); }, [query]);
   const bookOrder = sortMode === 'canonical';
   // Canonical book positions: the CONSTANT map (utils/search.js) — never
   // the lazy corpus, which usually isn't loaded on this screen (the first
