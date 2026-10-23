@@ -19,6 +19,14 @@ class CrashRecordTest {
     }
 
     @Test
+    fun `a crash on a file in a folder with a space keeps none of its path`() {
+        val e = java.io.FileNotFoundException("/storage/emulated/0/Private Notes/prayer.txt: open failed: ENOENT")
+        val json = CrashRecord.entryJson(1L, e)
+        assertTrue("FileNotFoundException: [path]: open failed" in json, json)
+        assertFalse("Notes" in json || "prayer" in json, json)
+    }
+
+    @Test
     fun `merge joins entry arrays and skips empty or broken ones`() {
         assertEquals("[]", CrashRecord.merge("[]", "", "[]"))
         assertEquals("[{\"a\":1},{\"b\":2}]", CrashRecord.merge("[{\"a\":1}]", "[]", "not json", "[{\"b\":2}]"))
