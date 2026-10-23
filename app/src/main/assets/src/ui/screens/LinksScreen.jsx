@@ -352,7 +352,12 @@ export function LinksScreen(props) {
     var load = typeof w.loadBibleStudies === 'function' ? w.loadBibleStudies : null;
     if (!load) return undefined;
     var live = true;
-    Promise.resolve(load()).then(function() { if (live) setStudiesTick(function(n) { return n + 1; }); });
+    // s21.5: a failed load (offline, a bad fetch) leaves the links as
+    // "unknown, assume OK" instead of an unhandled rejection.
+    var loading;
+    try { loading = Promise.resolve(load()); } catch (err) { loading = Promise.reject(err); }
+    loading.then(function() { if (live) setStudiesTick(function(n) { return n + 1; }); })
+      .catch(function() { /* studies unavailable: nothing is called broken */ });
     return function() { live = false; };
   }, [needsStudies, setStudiesTick]);
 
