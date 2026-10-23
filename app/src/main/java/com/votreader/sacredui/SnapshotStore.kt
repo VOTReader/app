@@ -64,6 +64,7 @@ class SnapshotStore(private val dir: File, private val cloud: File = File(dir.pa
         if (json.isNullOrBlank()) return false
         val bytes = json.toByteArray(Charsets.UTF_8)
         if (bytes.size > MAX_BYTES) return false
+        if (!cloudChecked) { cloudChecked = true; cloudTakeBack() }
         return try {
             if (!dir.isDirectory && !dir.mkdirs()) return false
             var name = "snap-" + stampFormat().format(Date(nowMs)) + ".json"
@@ -136,15 +137,18 @@ class SnapshotStore(private val dir: File, private val cloud: File = File(dir.pa
             val newest = snapshots().firstOrNull { whole(it) == true } ?: return
             if (!File(cloud, newest.name).isFile) {
                 if (!cloud.isDirectory && !cloud.mkdirs()) return
-                if (!place(newest, cloud)) return
+                if (!place(newest, cloud, via = dir)) return
             }
             for (f in cloud.listFiles() ?: emptyArray()) if (f.name != newest.name) f.delete()
         } catch (e: Exception) { Timber.w(e, "cloud snapshot copy failed") }
     }
 
-    /** Copy [src] into [to] under its own name: bytes forced to the disk first, then renamed (W9). */
-    private fun place(src: File, to: File): Boolean {
-        val tmp = File(to, src.name + ".tmp")
+    /**
+     * Copy [src] into [to] under its own name: bytes forced to the disk first, then renamed (W9). The
+     * part-written file sits in [via], so one a dead process leaves is never in the cloud backup.
+     */
+    private fun place(src: File, to: File, via: File = to): Boolean {
+        val tmp = File(via, src.name + ".tmp")
         FileOutputStream(tmp).use { out -> src.inputStream().use { it.copyTo(out) }; out.flush(); sync(out) }
         if (tmp.renameTo(File(to, src.name))) return true
         tmp.delete()

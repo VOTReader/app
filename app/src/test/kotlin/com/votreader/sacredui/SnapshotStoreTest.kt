@@ -216,6 +216,22 @@ class SnapshotStoreTest {
         assertEquals(listOf("snap-20261002-120000.json"), SnapshotStore(File(dir, "snapshots")).let { it.listJson(); cloud() })
     }
 
+    @Test fun `a save before any listing on a restored phone keeps the restored snapshot`() {
+        File(dir, "snapshot-cloud").mkdirs()
+        File(dir, "snapshot-cloud/snap-20261001-120000.json").writeText(j("c"))
+        assertTrue(store.save(j("n"), at(2026, 10, 2)))
+        assertEquals(listOf("snap-20261002-120000.json", "snap-20261001-120000.json"), names())
+        assertEquals(listOf("snap-20261002-120000.json"), cloud())
+    }
+
+    @Test fun `an older cloud copy beside the phone's own snapshots joins them and the copy moves to the newest`() {
+        assertTrue(store.save(j("1"), at(2026, 10, 5)))
+        File(dir, "snapshot-cloud/snap-20261001-120000.json").writeText(j("old"))
+        val fresh = SnapshotStore(File(dir, "snapshots"))
+        assertEquals(2, JSONArray(fresh.listJson()).length())   // harmless: prune keeps it by its own day
+        assertEquals(listOf("snap-20261005-120000.json"), cloud())
+    }
+
     @Test fun `clear removes the cloud copy too`() {
         assertTrue(store.save(j("1"), at(2026, 10, 1)))
         assertTrue(store.clear())
