@@ -59,6 +59,12 @@ let _asked = new Map();
 /** @type {Set<string>} */
 let _sizesToSend = new Set();
 let _sizesFlushQueued = false;
+/** Lookups that came back unanswered are asked again on their own, at these delays (brief section 7 item 9: the
+ *  Download all total hid until the screen was opened again). */
+const SIZE_RETRY_MS = [8000, 30000, 90000];
+let _sizeRetry = 0;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _sizeRetryTimer = null;
 /** What a screen reader hears next (n2-06): a batch started, the queue finished, a download failed. Not per percent. */
 let _news = { seq: 0, text: '' };
 /** @param {string} text */
@@ -195,6 +201,11 @@ function _onEvent(json) {
       // what this answer was for (it names them), not what another call still has on its way (n2-02).
       const asked = Array.isArray(e.asked) ? e.asked : [..._sizesAsked];
       for (const u of asked) if (typeof u === 'string' && !_sizes.has(u)) _sizesAsked.delete(u);
+      const missed = asked.filter((u) => typeof u === 'string' && !_sizes.has(u) && !_saved.has(u));
+      if (!missed.length) _sizeRetry = 0;
+      else if (_sizeRetry < SIZE_RETRY_MS.length && !_sizeRetryTimer) {
+        _sizeRetryTimer = setTimeout(() => { _sizeRetryTimer = null; OfflineAudio.requestSizes(missed); }, SIZE_RETRY_MS[_sizeRetry++]);
+      }
       break;
     }
     default:
@@ -411,7 +422,9 @@ export const OfflineAudio = {
   _reset() {
     _listeners.clear();
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
-    _sizesToSend = new Set(); _sizesFlushQueued = false; _news = { seq: 0, text: '' };
+    _sizesToSend = new Set(); _sizesFlushQueued = false;
+    if (_sizeRetryTimer) clearTimeout(_sizeRetryTimer);
+    _sizeRetryTimer = null; _sizeRetry = 0; _news = { seq: 0, text: '' };
     _active = null; _totalBytes = 0; _freeBytes = -1; _evictable = false; _waiting = false; _loaded = false; _version = 0;
     _install();
   },

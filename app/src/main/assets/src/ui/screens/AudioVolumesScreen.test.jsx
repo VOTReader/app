@@ -76,6 +76,27 @@ describe('AudioVolumesScreen', () => {
     expect(screen.getByLabelText('2 collections').textContent).toBe('2');
   });
 
+  // Downloads brief section 7 item 16 (RC.3): with no signal it said "Recordings available" over rows that need one.
+  it('with no signal says how much of each collection is on the phone, not "Recordings available"', () => {
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    globalThis.OfflineAudio = {
+      subscribe: () => () => {}, getVersion: () => 0, available: () => true,
+      items: () => [{ url: 'u1', key: 'one:a', title: 'A', bytes: 1 }, { url: 'u2', key: 'one:a', title: 'A 2', bytes: 1 }, { url: 'u3', key: 'one:b', title: 'B', bytes: 1 }],
+    };
+    try {
+      renderScreen();
+      expect(screen.getByRole('button', { name: /Volume One/ }).textContent).toContain('2 on this phone · the rest need a connection');
+      expect(screen.getByRole('button', { name: /Volume Two/ }).textContent).toContain('No recordings yet');
+      cleanup();
+      globalThis.OfflineAudio.items = () => [];
+      renderScreen();
+      expect(screen.getByRole('button', { name: /Volume One/ }).textContent).toContain('Needs a connection');
+    } finally {
+      delete globalThis.OfflineAudio;
+      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
+    }
+  });
+
   it('hands the volKey to the coordinator wiring', () => {
     const onOpenCollection = vi.fn();
     renderScreen({ onOpenCollection });

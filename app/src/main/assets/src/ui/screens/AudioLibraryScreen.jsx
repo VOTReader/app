@@ -269,8 +269,9 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
           </div>
         </section>
 
-        {/* Downloads to the phone (item 8): shown once something is on it; Android only. */}
-        {offline && (downloads.length || busy) ? (
+        {/* Downloads to the phone (item 8), wherever this app keeps them: shown before the first one too, so the
+            place is known before it is needed (downloads brief 2026-10-23, section 7 item 15). */}
+        {offline ? (
           <section className="audio-library-section audio-library-offline-row" aria-label="On this phone">
             <div className="audio-library-shelf">
               <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
@@ -279,6 +280,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                   <strong>On this phone</strong>
                   <small>{busy
                     ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
+                    : !downloads.length ? 'Download recordings to play them with no signal'
                     : (downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes()) + ' · plays with no signal'}</small>
                 </span>
                 <span className="audio-library-shelf-tail">

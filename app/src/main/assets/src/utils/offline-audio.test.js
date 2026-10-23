@@ -163,6 +163,25 @@ describe('offline-audio — in the phone app', () => {
     expect(JSON.parse(b.offlineAudioSizes.mock.calls[1][0])).toEqual([U2]);
   });
 
+  // Downloads brief section 7 item 9: a failed lookup hid the Download all total until the screen was opened again.
+  it('a size that went unanswered is asked again on its own, a few times, while the screen stays open', async () => {
+    vi.useFakeTimers();
+    try {
+      const b = fakeBridge();
+      OfflineAudio.requestSizes([U1, U2]);
+      await Promise.resolve();
+      send({ type: 'sizes', sizes: { [U1]: 5 }, asked: [U1, U2] });
+      expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(b.offlineAudioSizes).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(b.offlineAudioSizes.mock.calls[1][0])).toEqual([U2]);
+      send({ type: 'sizes', sizes: { [U2]: 7 }, asked: [U2] });
+      expect(OfflineAudio.sizeOf(U2)).toBe(7);
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(b.offlineAudioSizes).toHaveBeenCalledTimes(2);   // answered: no more asks
+    } finally { vi.useRealTimers(); }
+  });
+
   it('every row of a screen asking in one turn is one call to the phone (n2-02)', async () => {
     const b = fakeBridge();
     const url = (i) => U1.replace('.mp3', '-' + i + '.mp3');

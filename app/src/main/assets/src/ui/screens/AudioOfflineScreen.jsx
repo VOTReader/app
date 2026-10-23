@@ -10,6 +10,11 @@
    live in bundle-d too and are read as free globals at call time - one store, one player (see _entry-d.js). */
 
 import { useOfflineAudio, formatBytes } from '../components/OfflineAudioControls.jsx';
+import { hideToast, showToast } from '../../utils/toast.js';
+
+export const REMOVED_TOAST_ID = 'vot-toast-offline-removed';
+/** How long a single Remove can be taken back (brief section 7 item 14). */
+const REMOVE_UNDO_MS = 5000;
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale?: boolean }} ShelfItem */
 /** @typedef {{ id: string, lead: string, title: string, items: ShelfItem[], bytes: number, savedAt: number }} ShelfGroup */
@@ -79,7 +84,10 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
   const off = useOfflineAudio();
   const [askingAll, setAskingAll] = React.useState(false);
   const [askingGroup, setAskingGroup] = React.useState(/** @type {string | null} */ (null));
-  const items = off ? off.items() : [];
+  // A single Remove waits out its Undo (brief section 7 item 14): the row steps aside at once and the file goes when
+  // the toast does, so Undo keeps the very file rather than downloading it again.
+  const [leaving, setLeaving] = React.useState(() => new Set());
+  const items = off ? off.items().filter((it) => !leaving.has(it.url)) : [];
   // By recording, the one last added to first: the one just downloaded is the one looked for.
   const groups = groupShelf(items);
   const pending = off && typeof off.pending === 'function' ? off.pending() : { busy: 0, failed: [] };
@@ -90,6 +98,27 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
   // new bytes, so the old file would drift.
   React.useEffect(() => { if (off && typeof off.checkForUpdates === 'function') off.checkForUpdates(); }, [off]);
   const stale = items.filter((it) => it.stale);
+  const removeOne = (/** @type {any} */ it) => {
+    if (!off) return;
+    let undone = false;
+    setLeaving((prev) => new Set(prev).add(it.url));
+    const back = () => setLeaving((prev) => { const next = new Set(prev); next.delete(it.url); return next; });
+    // Toasts share one spot; this one carries an action, so the others step aside.
+    document.querySelectorAll('.vot-toast.show').forEach((el) => { if (el.id && el.id !== REMOVED_TOAST_ID) hideToast(el.id); });
+    showToast({
+      id: REMOVED_TOAST_ID, className: 'vot-toast vot-toast-undo', durationMs: REMOVE_UNDO_MS,
+      text: 'Removed “' + it.title + '”',
+      onHide: () => { if (!undone) off.remove([it.url]); back(); },
+    });
+    const el = document.getElementById(REMOVED_TOAST_ID);
+    if (!el) return;
+    const undo = document.createElement('button');
+    undo.type = 'button';
+    undo.className = 'vot-undo-btn';
+    undo.textContent = 'Undo';
+    undo.addEventListener('click', () => { undone = true; hideToast(REMOVED_TOAST_ID); }, { once: true });
+    el.appendChild(undo);
+  };
   const play = (/** @type {any} */ it) => {
     if (typeof AudioPlayer !== 'undefined' && typeof AudioPlayer.playTrack === 'function') {
       AudioPlayer.playTrack({ key: it.key, title: it.title, url: it.url, sub: null, readerCode: '', partLabel: null });
@@ -182,7 +211,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
                         {it.stale && !(off.isUpdating && off.isUpdating(it.url)) ? (
                           <button type="button" className="audio-offline-remove" onClick={() => off.update([it])} aria-label={'Update ' + it.title + ' on this phone'}>Update</button>
                         ) : null}
-                        <button type="button" className="audio-offline-remove" onClick={() => off.remove([it.url])} aria-label={'Remove ' + it.title + ' from this phone'}>Remove</button>
+                        <button type="button" className="audio-offline-remove" onClick={() => removeOne(it)} aria-label={'Remove ' + it.title + ' from this phone'}>Remove</button>
                       </div>
                     </div>
                   ))}
@@ -190,7 +219,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
               ))}
             </div>
           ) : (
-            <div className="audio-library-empty">Nothing is on this phone yet. Download a recording from its row in a collection, or a whole collection at once, and it plays with no signal.</div>
+            <div className="audio-library-empty">Nothing is on this phone yet. In the Listening Library, open a volume or a Bible edition and tap Download on a recording, a book or the whole collection; it then plays with no signal.</div>
           )}
           {/* With one recording its own Remove is the whole job (Codex critique of the built screens, 2026-09-24). */}
           {items.length > 1 ? (

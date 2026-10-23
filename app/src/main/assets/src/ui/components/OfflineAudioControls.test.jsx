@@ -318,14 +318,25 @@ describe('Download all, beside Play all', () => {
     s.st.sizes.set(U('b'), 60_000_000); s.st.sizes.set(U('b2'), 40_000_000); s.st.sizes.set(U('c'), 110_000_000);
     s.st.free = 1_480_000_000;
     const { getByRole, container } = render(<OfflineCollectionAction units={units} label="Volume One" />);
-    fireEvent.click(getByRole('button', { name: /download all/i }));
+    // One of three already on the phone: it says so, and offers the rest (brief section 7 item 8).
+    expect(container.textContent).toMatch(/1 of 3 on this phone/);
+    fireEvent.click(getByRole('button', { name: /download the rest/i }));
     expect(container.textContent).toMatch(/Download Volume One\?/);
-    expect(container.textContent).toMatch(/3 recordings · 210 MB/);
+    // Counted in recordings as the rows count them: b in two parts is one (item 12).
+    expect(container.textContent).toMatch(/2 recordings · 210 MB/);
     expect(container.textContent).toMatch(/Free space on this phone: 1.5 GB/);
     // Downloads run while the app is open (SHOULD 9 of the refutation: no background service yet).
     expect(container.textContent).toMatch(/Keep VOTReader open until it finishes/);
     fireEvent.click(getByRole('button', { name: /download 210 MB/i }));
     expect(s.download.mock.calls[0][0].map((t) => t.url)).toEqual([U('b'), U('b2'), U('c')]);
+  });
+
+  it('a size not known yet leaves the total open ("at least"), not hidden (brief section 7 item 9)', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 10_000_000); s.st.sizes.set(U('b'), 60_000_000);   // b2 and c not answered yet
+    const { getByRole, container } = render(<OfflineCollectionAction units={units} label="Volume One" />);
+    fireEvent.click(getByRole('button', { name: /download all/i }));
+    expect(container.textContent).toMatch(/3 recordings · at least 70 MB/);
   });
 
   it('refuses a download the phone has no room for', () => {
@@ -355,13 +366,11 @@ describe('On this phone (the shelf)', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
     save(s, 'b', 12_000_000, 'Matthew 1');
-    const { container, getAllByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(container.querySelector('h1').textContent).toBe('On this phone');
     expect(container.textContent).toMatch(/2 recordings · 30 MB/);
     const rows = container.querySelectorAll('.audio-offline-item');
     expect([...rows].map((r) => r.querySelector('strong').textContent)).toEqual(['Matthew 1', 'I Am The Passover']);
-    fireEvent.click(getAllByRole('button', { name: /^remove matthew 1/i })[0]);
-    expect(s.remove).toHaveBeenCalledWith([U('b')]);
     fireEvent.click(getByRole('button', { name: /^play i am the passover/i }));
     expect(globalThis.AudioPlayer.playTrack).toHaveBeenCalledWith(expect.objectContaining({ url: U('a'), key: 'one:a', title: 'I Am The Passover' }));
     fireEvent.click(getByRole('button', { name: /^remove all/i }));
@@ -369,6 +378,29 @@ describe('On this phone (the shelf)', () => {
     expect(container.textContent).toMatch(/Remove all 2 recordings \(30 MB\) from this phone\?/);
     fireEvent.click(getByRole('button', { name: /^yes, remove all/i }));
     expect(s.removeAll).toHaveBeenCalledTimes(1);
+  });
+
+  // Downloads brief section 7 item 14: a single Remove had no Undo. The row steps aside at once; the file goes when the
+  // toast does, so Undo keeps the very file.
+  it('a single Remove can be taken back for 5 s, and the file goes only when that time is up', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fakeStore();
+      save(s, 'a', 18_000_000, 'I Am The Passover');
+      save(s, 'b', 12_000_000, 'Matthew 1');
+      const { container, getAllByRole, queryAllByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      fireEvent.click(getAllByRole('button', { name: /^remove matthew 1/i })[0]);
+      expect(queryAllByRole('button', { name: /^remove matthew 1/i })).toHaveLength(0);
+      const toast = document.getElementById('vot-toast-offline-removed');
+      expect(toast.textContent).toBe('Removed “Matthew 1”Undo');
+      expect(s.remove).not.toHaveBeenCalled();
+      act(() => { toast.querySelector('.vot-undo-btn').click(); });
+      expect(s.remove).not.toHaveBeenCalled();
+      expect(container.querySelectorAll('.audio-offline-item')).toHaveLength(2);
+      fireEvent.click(getAllByRole('button', { name: /^remove matthew 1/i })[0]);
+      act(() => { vi.advanceTimersByTime(5100); });
+      expect(s.remove).toHaveBeenCalledWith([U('b')]);
+    } finally { vi.useRealTimers(); }
   });
 
   // Codex critique of the built screens (2026-09-24, 5): with one recording, its own Remove is the whole job.

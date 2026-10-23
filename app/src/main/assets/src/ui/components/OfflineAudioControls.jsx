@@ -226,17 +226,22 @@ const ROW_ASK_BYTES = 50e6;
 
 /**
  * "Download <label>?" with the count, the size and the phone's free space; Download is off when it would not fit.
- * @param {{ off: any, label: string, todo: any[], onCancel: () => void, onGo: () => void }} props
+ * @param {{ off: any, label: string, todo: any[], count?: number, onCancel: () => void, onGo: () => void }} props
+ *   count = recordings as the listener counts them (a letter in two parts is one); the parts when absent
  */
-function DownloadConfirm({ off, label, todo, onCancel, onGo }) {
+function DownloadConfirm({ off, label, todo, count, onCancel, onGo }) {
   const need = todo.reduce((n, t) => (n === null || !off.sizeOf(t.url) ? null : n + off.sizeOf(t.url)), /** @type {number | null} */ (0));
   const free = off.freeBytes();
   const noRoom = need !== null && free > 0 && need + SPACE_MARGIN > free;
-  const recordings = todo.length === 1 ? '1 recording' : todo.length + ' recordings';
+  const n = count == null ? todo.length : count;
+  const recordings = n === 1 ? '1 recording' : n + ' recordings';
+  // A size still on its way (asked again on its own, item 9) leaves the total open, not hidden: "at least".
+  const known = todo.reduce((sum, t) => sum + (off.sizeOf(t.url) || 0), 0);
+  const size = need ? formatBytes(need) : known ? 'at least ' + formatBytes(known) : '';
   return (
     <div className="offline-confirm" role="group" aria-label={'Download ' + label}>
       <p className="offline-confirm-title">{'Download ' + label + '?'}</p>
-      <p className="offline-confirm-line">{recordings + (need ? ' · ' + formatBytes(need) : '')}</p>
+      <p className="offline-confirm-line">{recordings + (size ? ' · ' + size : '')}</p>
       {free > 0 ? <p className="offline-confirm-line">{'Free space on this phone: ' + formatBytes(free)}</p> : null}
       {noRoom ? <p className="offline-confirm-warn">Not enough room: free some space on the phone first.</p> : null}
       {/* Downloads run while the app is open: no background service yet (the refutation of 2026-09-24, SHOULD 9). */}
@@ -337,10 +342,15 @@ export function OfflineCollectionAction({ units, label, action = 'Download all',
   if (u.status === 'saved') {
     return <p className="offline-collection is-saved" {...focus}><CheckIcon /><span>{savedText}</span></p>;
   }
+  // Counted in recordings as the rows count them, not in files: Christmas in two parts is one (brief section 7
+  // item 12, "30 recordings" beside "1 of 31").
+  const rows = (Array.isArray(units) ? units : []).map((r) => (Array.isArray(r) ? r.filter((t) => t && typeof t.url === 'string') : [])).filter((r) => r.length);
+  const rowsSaved = rows.filter((r) => r.every((t) => off.statusOf(t.url) === 'saved')).length;
+  const onPhone = rowsSaved + ' of ' + rows.length + ' on this phone';
   if (u.status === 'downloading') {
     return (
       <p className="offline-collection is-busy" {...focus}>
-        <DownloadIcon /><span>{(waitsForWifi(off, urls) ? WAITING_WORDS : 'Downloading') + ' · ' + u.saved + ' of ' + u.count + ' on this phone'}</span>
+        <DownloadIcon /><span>{(waitsForWifi(off, urls) ? WAITING_WORDS : 'Downloading') + ' · ' + onPhone}</span>
         <button type="button" className="offline-row-link" onClick={() => off.cancel(urls)}>Cancel</button>
       </p>
     );
@@ -350,11 +360,13 @@ export function OfflineCollectionAction({ units, label, action = 'Download all',
     <div className="offline-collection" {...focus}>
       <button type="button" className="audio-library-secondary-action" disabled={!online}
         onClick={() => { off.refresh(); setAsking(true); }} aria-expanded={asking}>
-        <DownloadIcon /><span>{action}</span>
+        <DownloadIcon /><span>{rowsSaved ? 'Download the rest' : action}</span>
       </button>
+      {/* After a Cancel (or a Remove) the part already on the phone stays said (brief section 7 item 8). */}
+      {rowsSaved ? <p className="offline-collection-note">{onPhone}</p> : null}
       {!online ? <p className="offline-collection-note">Needs a connection</p> : null}
       {asking && online ? (
-        <DownloadConfirm off={off} label={label} todo={todo} onCancel={() => setAsking(false)}
+        <DownloadConfirm off={off} label={label} todo={todo} count={rows.length - rowsSaved} onCancel={() => setAsking(false)}
           onGo={() => { off.download(todo.map((t) => _item(t, t.title))); setAsking(false); }} />
       ) : null}
     </div>

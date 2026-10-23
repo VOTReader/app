@@ -111,10 +111,12 @@ describe('the Listening Library hub: On this phone (item 8)', () => {
     expect(onOpenOffline).toHaveBeenCalledTimes(1);
   });
 
-  it('is absent with nothing downloaded, and on the web', () => {
+  // Downloads brief section 7 item 15: it was hidden until the first download, so nobody found where they go.
+  it('shows before the first download, saying what it is for, and is absent on the web', () => {
     fakeStore([]);
     hub(noop);
-    expect(screen.queryByText('On this phone')).toBeNull();
+    expect(screen.getByText('On this phone')).toBeTruthy();
+    expect(screen.getByText('Download recordings to play them with no signal')).toBeTruthy();
     cleanup();
     fakeStore([{ url: U('a'), key: 'one:a', title: 'A', bytes: 1, savedAt: 1 }], false);
     hub(noop);
