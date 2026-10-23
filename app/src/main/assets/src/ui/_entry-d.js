@@ -97,6 +97,8 @@ import { AudioLengths } from '../utils/audio-lengths.js';
 // Songs of the Letters (2026-09-24): ONE catalog store, here beside the player that queues from it; the lazy Songs
 // screens read it as the SongCatalog global, never by import (a second bundled copy would be a second catalog).
 import { SongCatalog } from '../utils/song-catalog.js';
+// Song votes (sy4-3, Corbin 2026-10-22): ONE store of this device's 👍/👎, the outbox and the tallies; lazy screens read SongVotes.
+import { SongVotes } from '../utils/song-votes.js';
 // The shared song pieces (cover, round play, clock, icons, the choice sheet): the bar and the desk draw a song with them,
 // and the lazy Songs screens read them as globals. The route helpers keep the Songs stack in the tab's audioColKey.
 import {
@@ -336,7 +338,7 @@ Object.assign(window, {
   writeContainer, readContainer, isContainerMagic,
   runV3AndroidExport, classifyV3ImportBegin, v3AndroidImportEntries,
   summarizeBackupManifest, formatVerifyReport,
-  AudioPlayer, audioTrackUrl, OfflineAudio, AudioLengths, SongCatalog,
+  AudioPlayer, audioTrackUrl, OfflineAudio, AudioLengths, SongCatalog, SongVotes,
   songClock, songCountLabel, currentSongId, playerIsActive, songLetterOf, familyIsPlaying, songFamilyTitle,
   SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,

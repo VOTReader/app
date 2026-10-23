@@ -1008,6 +1008,101 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// ── Song votes: Background Sync drains the outbox (sy4-3) ───────
+// Corbin 2026-10-22: a 👍 made with no signal sends when the link is back, even
+// with the app closed. The page keeps the outbox in IDB ('votreader' / meta /
+// 'song-votes-outbox', utils/song-votes.js) and registers the 'song-votes' sync
+// tag when a send fails; the browser fires it once online. Only 👍 or its
+// clearing is ever in it (👎 never leaves the device). The Worker is idempotent
+// per (install, song, at): a vote the page also sent is harmless. The database
+// is opened at its current version only: a worker must never create or
+// upgrade the app's database (an upgrade here is aborted).
+const SONG_VOTE_URL = 'https://votes.votreader.workers.dev/v1/vote';
+const SONG_VOTE_OUTBOX = 'song-votes-outbox';
+const SONG_VOTE_MAX_AGE_MS = 89 * 24 * 3600 * 1000;
+
+function openAppDb() {
+  return new Promise((resolve) => {
+    let req;
+    try { req = indexedDB.open('votreader'); } catch (_e) { resolve(null); return; }
+    req.onupgradeneeded = () => { try { req.transaction.abort(); } catch (_e) { /* the open fails below */ } };
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('meta')) { db.close(); resolve(null); return; }
+      resolve(db);
+    };
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+}
+
+function metaOp(db, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('meta', mode);
+    let out;
+    fn(tx.objectStore('meta'), (v) => { out = v; });
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function postSongVote(body) {
+  if (!body || Date.now() - Number(body.at) > SONG_VOTE_MAX_AGE_MS) return 'drop';
+  try {
+    const res = await fetch(SONG_VOTE_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      credentials: 'omit', cache: 'no-store',
+    });
+    if (res.status >= 200 && res.status < 300) return 'sent';
+    return res.status === 400 ? 'drop' : 'keep';
+  } catch (_e) {
+    return 'keep';
+  }
+}
+
+async function drainSongVotes() {
+  const db = await openAppDb();
+  if (!db) return;
+  try {
+    const outbox = await metaOp(db, 'readonly', (store, done) => {
+      const r = store.get(SONG_VOTE_OUTBOX);
+      r.onsuccess = () => done(r.result);
+    });
+    if (!outbox || typeof outbox !== 'object') return;
+    const list = Object.values(outbox).filter((b) => b && typeof b.song === 'string').sort((a, b) => a.at - b.at);
+    const settled = [];
+    let kept = false;
+    for (const body of list) {
+      const r = await postSongVote(body);
+      if (r === 'keep') { kept = true; break; }
+      settled.push(body);
+    }
+    if (settled.length) {
+      // Remove what was sent, unless a newer vote for the song took its place meanwhile.
+      await metaOp(db, 'readwrite', (store) => {
+        const r = store.get(SONG_VOTE_OUTBOX);
+        r.onsuccess = () => {
+          const cur = r.result && typeof r.result === 'object' ? r.result : {};
+          for (const b of settled) {
+            const c = cur[b.song];
+            if (c && c.at === b.at && c.v === b.v) delete cur[b.song];
+          }
+          store.put(cur, SONG_VOTE_OUTBOX);
+        };
+      });
+    }
+    // A rejection asks the browser to fire the sync again later (its own backoff).
+    if (kept) throw new Error('song votes wait for the network');
+  } finally {
+    db.close();
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'song-votes') event.waitUntil(drainSongVotes());
+});
+
 // ── Fetch: cache-first for core, cache-on-use for corpus ────────
 
 self.addEventListener('fetch', (event) => {
@@ -1059,6 +1154,11 @@ self.addEventListener('fetch', (event) => {
   if (/^\/songs-\d+\//.test(url.pathname)) return;
   if (url.pathname === '/songs/catalog.json') {
     event.respondWith(networkFirstCatalog(event));
+    return;
+  }
+  // sy4-3: the song tallies beside it, network-first the same way (no cover warm-up: no song list in it).
+  if (url.pathname === '/songs/votes.json') {
+    event.respondWith(networkFirstCatalog(event, false));
     return;
   }
   if (url.pathname.startsWith('/songs/thumbs/') || url.pathname.startsWith('/songs/lyrics/')) {
@@ -1189,13 +1289,13 @@ function markedCopy(cached) {
   }
 }
 
-async function networkFirstCatalog(event) {
+async function networkFirstCatalog(event, warm = true) {
   const request = event.request;
   const cache = await caches.open(SONGS_CACHE);
   const network = fetch(request).then(async (response) => {
     if (response && response.ok && !response.redirected) {
       try { await cache.put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
-      if (typeof event.waitUntil === 'function') event.waitUntil(warmSongThumbs(response.clone()));
+      if (warm && typeof event.waitUntil === 'function') event.waitUntil(warmSongThumbs(response.clone()));
     }
     return response;
   }).catch(() => null);
