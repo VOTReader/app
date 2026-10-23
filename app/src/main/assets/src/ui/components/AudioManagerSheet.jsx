@@ -7,7 +7,7 @@
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, songIdOfKey } from '../../utils/audio-track.js';
+import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
 import { SongDeskHead, SongVersionsCard, SongTransport, SongLyricsCard } from './SongDeskParts.jsx';
 import { AudioSpeedControl } from './AudioSpeedControl.jsx';
@@ -101,7 +101,10 @@ function chapterOfTrack(track) {
  * middle of a sentence they never heard.
  *
  * @param {any} current - the playing track
- * @returns {{ kind: 'reader'|'edition', activeLabel: string, chips: Array<{ id: string, label: string, active: boolean, select: () => void }> } | null}
+ * select() rebuilds the queue from the corpus (a plain queue rebuilds to itself); swap() makes the switch in place
+ * on a queue the listener made, keeping its shape, and says false when it cannot.
+ *
+ * @returns {{ kind: 'reader'|'edition', activeLabel: string, chips: Array<{ id: string, label: string, active: boolean, select: () => void, swap: () => boolean }> } | null}
  */
 function voiceChoices(current) {
   const split = splitTrackKey(current);
@@ -130,6 +133,12 @@ function voiceChoices(current) {
           // chapter tapped in the reader would snap back to the old edition.
           const setting = typeof window !== 'undefined' ? /** @type {any} */ (window).__setBibleAudioEdition : null;
           if (typeof setting === 'function') setting(id);
+        },
+        swap: () => {
+          if (!AudioPlayer.switchVoiceInPlace({ volKey: edition.volKey, label: edition.label })) return false;
+          const setting = typeof window !== 'undefined' ? /** @type {any} */ (window).__setBibleAudioEdition : null;
+          if (typeof setting === 'function') setting(id);
+          return true;
         },
       })),
     };
@@ -161,6 +170,7 @@ function voiceChoices(current) {
           collectionLabel: current.sub, reader: rendition.reader, noResume: true,
         });
       },
+      swap: () => AudioPlayer.switchVoiceInPlace({ volKey: split.volKey, reader: rendition.reader }),
     })),
   };
 }
@@ -292,6 +302,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const live = AudioPlayer.liveLetter();
   const liveTitle = live && live.title ? live.title : null;
   const heading = liveTitle || current.title;
+  // Counted in recordings, as the bar and the collection screens count them (queuePlace).
+  const counted = queuePlace(queue, state.qi);
   const headLine = [
     current.sub,
     // Suppressed when it would only echo the <h2> directly above it — a
@@ -299,13 +311,13 @@ export function AudioManagerSheet({ open, state, onClose }) {
     // (2026-08-10). The label itself is untouched; see displayPartLabel.
     liveTitle ? current.title : displayPartLabel(current.title, current.partLabel),
     reader,
-    restoring || single ? null : (state.qi + 1) + ' of ' + queue.length,
+    restoring || single || counted.of < 2 ? null : counted.at + ' of ' + counted.of,
   ].filter(Boolean).join(' · ') || 'The Volumes of Truth';
-  // A voice switch REBUILDS the queue from the corpus, so anything the
-  // listener made by hand is lost — a queue they reordered or pruned (source
-  // mode 'custom'), or a lone saved recording that is about to become a whole
-  // collection. Plain, unedited queues rebuild to themselves and switch
-  // immediately; only these two ask first (owner directive 2026-08-10).
+  // A queue the listener made (source mode 'custom': reordered, pruned, a lone
+  // saved recording, a plan's portion) switches voice IN PLACE and keeps its
+  // shape (switchVoiceInPlace; player brief 2026-10-22, section 7). Only when
+  // that cannot be done does the rebuild, which would drop it, ask first
+  // (owner directive 2026-08-10). Plain queues rebuild to themselves.
   const needsVoiceConfirm = state.sourceMode === 'custom';
   // A pending choice that has since become the voice playing (the queue moved
   // under the open confirm) has nothing left to confirm.
@@ -413,7 +425,8 @@ export function AudioManagerSheet({ open, state, onClose }) {
                     // letter (sweep v003: Part 2 at minute 2 went back to Part 1,
                     // 0:00), and on an edited queue it would ask to drop the edits.
                     if (chip.active) return;
-                    if (needsVoiceConfirm) setPendingVoice(chip.id); else chip.select();
+                    if (!needsVoiceConfirm) chip.select();
+                    else if (!chip.swap()) setPendingVoice(chip.id);
                   }}
                 >{chip.label}</button>
               ))}
@@ -429,7 +442,9 @@ export function AudioManagerSheet({ open, state, onClose }) {
                 onConfirm={() => { setPendingVoice(''); pendingChip.select(); }}
               />
             ) : (
-              <p className="audio-manager-voice-note">Switches this {voices.kind === 'edition' ? 'chapter' : 'recording'} — starts it again, and the queue follows.</p>
+              <p className="audio-manager-voice-note">{voices.kind === 'edition'
+                ? 'Starts this chapter again in the edition you pick; the chapters after it follow.'
+                : 'Starts this recording again in the voice you pick; the rest of the queue stays as it is.'}</p>
             )}
           </div>
         ) : null}
@@ -496,7 +511,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
 
         <div className="audio-manager-queue">
           <div className="audio-manager-section-head">
-            <div><span>Queue</span><strong>{restoring ? 'Resuming…' : single ? '1 recording' : (state.qi + 1) + ' of ' + queue.length}</strong></div>
+            <div><span>Queue</span><strong>{restoring ? 'Resuming…' : single || counted.of < 2 ? '1 recording' : counted.at + ' of ' + counted.of}</strong></div>
             {upcoming > 0 ? <button type="button" onClick={() => AudioPlayer.clearUpcoming()}>Clear upcoming</button> : null}
           </div>
           {/* Created empty and kept mounted: a live region that appears WITH

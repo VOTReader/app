@@ -12,6 +12,7 @@ const { player } = vi.hoisted(() => {
   const player = {
     subscribe: () => () => {},
     getVersion: () => 0,
+    getShape: () => '0|',
     getState: () => ({ status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1 }),
     collectionHasAudio: vi.fn(() => true),
     hasAudio: vi.fn((volKey, id) => !!(globalThis.AUDIO_MANIFEST && globalThis.AUDIO_MANIFEST[volKey + ':' + id])),

@@ -26,6 +26,22 @@ const RECENT_OPEN_KEY = 'vot-audio-recent-open';
  *  that Browse stays reachable without a long scroll. */
 const RECENT_PREVIEW = 8;
 
+/**
+ * The now-playing card's scrubber and clock: the one part of the screen that moves every second, so the one part
+ * that re-renders with it (s18.3). The ONE scrubber (AUDIO-MANAGER.md rule 6); the decorative progressbar it
+ * replaced could be read but never moved.
+ */
+function NowProgress() {
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  const state = AudioPlayer.getState();
+  return (
+    <div className="audio-library-progress-wrap">
+      <AudioSeekSlider className="audio-library-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
+      <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{state.duration ? clock(state.duration) : 'Streaming'}</span></div>
+    </div>
+  );
+}
+
 /** @param {number} value @returns {string} */
 function clock(value) {
   const seconds = Math.max(0, Math.floor(Number(value) || 0));
@@ -96,7 +112,8 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Not the 1 Hz clock: only the now-playing card's scrubber draws it, and it subscribes on its own (s18.3).
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   useAudioPositions();
 
   // The VOT registry and manifest are lazy. Warming them here lets the browse
@@ -207,12 +224,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
               <button type="button" className={'audio-library-icon-button audio-library-save-button' + (currentSaved ? ' is-saved' : '')} onClick={() => library && library.toggleSaved(current)} aria-label={currentSaved ? 'Remove current recording from saved recordings' : 'Save current recording'} aria-pressed={currentSaved} title={currentSaved ? 'Remove from saved recordings' : 'Save recording'}><StarIcon filled={currentSaved} /></button>
               {hasTextDestination(current) ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(current)} aria-label="Open current recording text" title="Open text"><TextIcon /></button> : null}
             </div>
-            <div className="audio-library-progress-wrap">
-              {/* The ONE scrubber (AUDIO-MANAGER.md rule 6). The decorative
-                  progressbar this replaces could be read but never moved. */}
-              <AudioSeekSlider className="audio-library-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
-              <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{state.duration ? clock(state.duration) : 'Streaming'}</span></div>
-            </div>
+            <NowProgress />
           </section>
         ) : (
           <section className="audio-library-now audio-library-empty-now" aria-labelledby="audio-library-empty-title">

@@ -102,7 +102,8 @@ export function recordingsLine(col, items, playable, preface) {
  * }} props
  */
 export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening Library', onOpenText, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Not the 1 Hz clock: nothing here draws it (s18.3).
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   useAudioPositions();
 
   const bible = isBibleVol(volKey);

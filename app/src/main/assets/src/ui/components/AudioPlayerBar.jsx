@@ -15,7 +15,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { displayPartLabel, songIdOfKey } from '../../utils/audio-track.js';
+import { displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
 import { SongCover, NextIcon } from './SongParts.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
@@ -112,7 +112,15 @@ export function AudioPlayerBar() {
   // Place in the QUEUE, not in the book: "3 of 12" beside the source line.
   // Derived, never stored — and silent at 1 of 1, which is noise, not news, and
   // while restoring, when the queue's length is not known yet.
-  const place = single || restoring ? null : '· ' + (st.qi + 1) + ' of ' + queue.length;
+  const counted = queuePlace(queue, st.qi);
+  const place = single || restoring || counted.of < 2 ? null : '· ' + counted.at + ' of ' + counted.of;
+  // s13.1 (idea sweep 2026-10-22): the summary says what is playing, as the bar shows it, then what it opens;
+  // it was "Open listening controls" alone.
+  const summaryLabel = (st.status === 'playing' ? 'Now playing ' : st.status === 'loading' ? 'Loading ' : 'Paused on ') + [
+    (liveTitle || track.title || 'this recording') + (!liveTitle && part ? ', ' + part : ''),
+    track.sub,
+    !starting && dur ? fmt(st.time) + ' of ' + fmt(dur) : null,
+  ].filter(Boolean).join(', ') + '. Open listening controls.';
 
   // Songs of the Letters (L3, picture final-08): the SAME bar, 70 px, pull-tab kept, in its song skin — cover,
   // title, version, a filled play/pause, next and close; progress is a 3 px line along the top edge (seeking
@@ -199,7 +207,7 @@ export function AudioPlayerBar() {
           type="button"
           className="audio-bar-summary"
           onClick={() => setManagerOpen(true)}
-          aria-label="Open listening controls"
+          aria-label={summaryLabel}
           aria-expanded={managerOpen}
         >
           <span className="audio-bar-summary-text">

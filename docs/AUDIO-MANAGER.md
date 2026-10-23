@@ -91,9 +91,16 @@ that engine rather than creating independent `<audio>` elements or queues.
 - Open the source text for saved/recent letter recordings when the corpus key
   still resolves.
 
-Audio remains streaming-only. There is no local download manager, arbitrary
-remote URL loader, or second media player. One refinement rides the HTTP
-cache: when the current track is fully buffered on a healthy connection, the
+Audio streams by default, and a listener can keep recordings on the phone
+(listening item 8, `utils/offline-audio.js`): the Android app saves them in
+its own OfflineAudioStore and answers the `<audio>` element's requests from
+disk; the PWA saves them through the relay Worker into Cache Storage and the
+service worker plays them back (`offline-audio-web.js`). Songs are kept the
+same way through `utils/song-keep.js` (the `offline-songs` IDB store on the
+web). A saved recording plays, seeks and reads along with no signal, and the
+player's offline gate refuses only what is not on the phone. There is no
+arbitrary remote URL loader and no second media player. One refinement rides
+the HTTP cache: when the current track is fully buffered on a healthy connection, the
 player quietly warms the next two queued tracks through a detached,
 never-playing element (`_maybePrefetchNext` in `audio-player/prefetch.js`), so track
 boundaries start near-instantly. Save-Data or 2g-class connections disable

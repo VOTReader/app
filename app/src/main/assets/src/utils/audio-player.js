@@ -63,7 +63,7 @@ import {
   sectionTracks,
   setPreferredReader,
 } from './audio-player/catalog.js';
-import { _g, getState, getVersion, subscribe } from './audio-player/core.js';
+import { _g, getShapeVersion, getState, getVersion, subscribe } from './audio-player/core.js';
 import { playableNow } from './audio-player/offline.js';
 import { getPreciseTime, prewarm } from './audio-player/engine.js';
 import { canLoop, clearLoop, isNative, setLoop } from './audio-player/loop.js';
@@ -81,6 +81,7 @@ import {
   playSection,
   playTrack,
   removeUpcoming,
+  switchVoiceInPlace,
 } from './audio-player/queue.js';
 import { _flushOnHide, _onBeforeUpdateReload, _resumeAfterUpdate } from './audio-player/restore.js';
 import { liveLetter, sectionLetterKeyAt, sectionOpeningKey } from './audio-player/sections.js';
@@ -165,10 +166,22 @@ if (typeof window !== 'undefined') {
 _resumeAfterUpdate();
 _adoptDurableSnapshot();
 
+/**
+ * The player as a screen that draws no clock sees it (s18.3, idea sweep 2026-10-22): the useSyncExternalStore
+ * snapshot that moves on every change but the 1 Hz clock tick, and when a compilation's letter under the clock
+ * changes. Five Listening screens re-rendered whole every second on getVersion.
+ * @returns {string}
+ */
+function getShape() {
+  const live = liveLetter();
+  return getShapeVersion() + '|' + (live ? live.key : '');
+}
+
 /** The singleton audio player store. */
 export const AudioPlayer = {
   subscribe,
   getVersion,
+  getShape,
   getState,
   getPreciseTime,
   hasAudio,
@@ -217,6 +230,7 @@ export const AudioPlayer = {
   removeUpcoming,
   moveUpcoming,
   clearUpcoming,
+  switchVoiceInPlace,
   stop,
   pauseIfPlaying,
   syncKeepAlive,

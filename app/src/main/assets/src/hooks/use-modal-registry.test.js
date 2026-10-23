@@ -40,6 +40,18 @@ describe('modalRegistry imperative API — basic ops', () => {
     expect(modalRegistry.openIds()).toEqual([]);
   });
 
+  it('subscribe hears each register and each unregister that removed one, until it unsubscribes', () => {
+    let calls = 0;
+    const off = modalRegistry.subscribe(() => { calls++; });
+    modalRegistry.register({ id: 'a', dismiss: () => {} });
+    modalRegistry.unregister('a');
+    modalRegistry.unregister('a');          // nothing removed: no call
+    expect(calls).toBe(2);
+    off();
+    modalRegistry.register({ id: 'b', dismiss: () => {} });
+    expect(calls).toBe(2);
+  });
+
   it('unregister is idempotent for unknown ids', () => {
     expect(() => modalRegistry.unregister('never-registered')).not.toThrow();
     expect(modalRegistry.isAnyOpen()).toBe(false);

@@ -222,9 +222,7 @@ function _snapshot() {
   const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
     ? _pendingRestore.queue
     : _state.queue;
-  const customQueue = src.mode === 'custom'
-    ? queueForCustomSource.map(normalizeAudioTrack).filter(Boolean)
-    : undefined;
+  const customQueue = src.mode === 'custom' ? _savedCustomQueue(queueForCustomSource) : undefined;
   const songs = src.mode === 'songs' ? _songsSnapshotFields(src, savedTrack, qi) : null;
   return {
     v: 2,
@@ -238,6 +236,7 @@ function _snapshot() {
     startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
     startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
     startReader: src.startReader || undefined,
+    portion: src.portion ? true : undefined,
     filter: songs ? songs.filter : undefined,
     one: songs && songs.one ? true : undefined,
     seed: songs && songs.seed ? songs.seed : undefined,
@@ -248,6 +247,15 @@ function _snapshot() {
     repeat: songs && _state.repeat !== 'off' ? _state.repeat : undefined,
     at: Date.now(),   // which copy is newer, when the two channels disagree at boot
   };
+}
+
+/* A custom queue's saved form, made once per queue (player brief 2026-10-22, section 7): every write re-copied
+   every track of it. A queue edit replaces the array (queue.js slices, then commits), so its identity is the key. */
+let _customSaved = /** @type {{ queue: Track[] | null, saved: any[] }} */ ({ queue: null, saved: [] });
+/** @param {Track[]} queue @returns {any[]} */
+function _savedCustomQueue(queue) {
+  if (_customSaved.queue !== queue) _customSaved = { queue, saved: queue.map(normalizeAudioTrack).filter(Boolean) };
+  return _customSaved.saved;
 }
 
 /** How many ids an explicit songs list may persist. Longer lists persist the
@@ -383,6 +391,7 @@ function _applySnapshot(s) {
       // null keeps the two readings from being confused later.
       startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
+      portion: mode === 'custom' && s.portion === true,
       filter: mode === 'songs' && !songIds ? normalizeSongFilter(s.filter) : null,
       one: mode === 'songs' && !songIds && s.one === true,
       seed: mode === 'songs' ? (Number(s.seed) >>> 0) : 0,

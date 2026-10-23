@@ -328,15 +328,21 @@ describe('AudioPlayerBar — transport', () => {
     expect(screen.getByRole('button', { name: 'Previous track' })).toBeTruthy();
   });
 
-  it('reads out the position within the QUEUE, and stays quiet for a lone recording', () => {
+  it('reads out the position within the QUEUE in recordings, and stays quiet for a lone recording', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
     expect(position()).toBe(null);              // "1 of 1" is noise, not information
 
-    playWholeCollection();
-    expect(position()).toBe('· 1 of 4');
+    playWholeCollection();                      // the preface, Letter A in two parts, Letter C: three recordings
+    expect(position()).toBe('· 1 of 3');
     fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
-    expect(position()).toBe('· 2 of 4');
+    expect(position()).toBe('· 2 of 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+    expect(position(), "Letter A's second part is still the second recording (31 vs 30, player brief s7)").toBe('· 2 of 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+    expect(position()).toBe('· 3 of 3');
+    fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
     // …counted within the queue, beside the source line, never inside it.
     expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume One · Read by Benjamin');
   });
@@ -499,17 +505,32 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     const { container } = render(<AudioPlayerBar />);
     playSingleLetter();
 
-    const summary = screen.getByRole('button', { name: 'Open listening controls' });
+    const summary = screen.getByRole('button', { name: /Open listening controls\.$/ });
     expect(summary.getAttribute('aria-expanded')).toBe('false');
     expect(document.querySelector('.audio-manager-sheet')).toBeNull();
 
     fireEvent.click(summary);
-    expect(screen.getByRole('button', { name: 'Open listening controls' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: /Open listening controls\.$/ }).getAttribute('aria-expanded')).toBe('true');
     const sheet = screen.getByRole('dialog');
     expect(sheet.classList.contains('audio-manager-sheet')).toBe(true);
     expect(document.body.contains(sheet)).toBe(true);
     expect(container.querySelector('.audio-manager-sheet')).toBeNull();   // portal, not a child of the bar
     expect(screen.getByRole('heading', { name: 'The Seventh Day' })).toBeTruthy();
+  });
+
+  it('the summary names what is playing, where, and how far, then what it opens (s13.1)', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    const label = () => document.querySelector('.audio-bar-summary').getAttribute('aria-label');
+    expect(label()).toBe('Loading The Seventh Day, Volume One. Open listening controls.');
+    act(() => {
+      el().duration = 240; el().dispatchEvent(new Event('durationchange'));
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 65; el().dispatchEvent(new Event('timeupdate'));
+    });
+    expect(label()).toBe('Now playing The Seventh Day, Volume One, 1:05 of 4:00. Open listening controls.');
+    act(() => { el().dispatchEvent(new Event('pause')); });
+    expect(label()).toBe('Paused on The Seventh Day, Volume One, 1:05 of 4:00. Open listening controls.');
   });
 
   it('opens from the redundant pull tab, which stays out of the accessibility tree', () => {
@@ -527,7 +548,7 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
   it('closes the desk with the queue it controls when playback stops', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
-    fireEvent.click(screen.getByRole('button', { name: 'Open listening controls' }));
+    fireEvent.click(screen.getByRole('button', { name: /Open listening controls\.$/ }));
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(modalRegistry.openIds()).toContain('audio-manager-sheet');
 
@@ -538,6 +559,6 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     // …and it does not come back on its own with the next recording.
     playSingleLetter();
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Open listening controls' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: /Open listening controls\.$/ }).getAttribute('aria-expanded')).toBe('false');
   });
 });

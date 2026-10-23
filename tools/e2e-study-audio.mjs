@@ -183,7 +183,7 @@ try {
 
   // ── 3. away, then the desk's "Open the text" — back on the chapter, still playing ──
   await goHome();
-  await click('Open listening controls', { settle: 800 });
+  await click('Open listening controls', { settle: 800, contains: true });
   const opener = (await controls()).find((c) => c.startsWith('Open the text of'));
   note(`3: desk opener ${JSON.stringify(opener || null)}`);
   if (!opener) fail('3: the desk has no "Open the text of …" control for the study recording (hasTextDestination)');

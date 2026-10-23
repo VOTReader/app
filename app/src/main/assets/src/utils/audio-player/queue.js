@@ -39,7 +39,7 @@ import { _countPlay } from './credit.js';
 import { _seekOnMetadata, _start, _startAt } from './engine.js';
 import { _syncMediaSessionActions } from './media-session.js';
 import { _offlineNotice, _offlineRefuses } from './offline.js';
-import { _persist, _rememberOutgoingPosition, _resumeAt } from './persist.js';
+import { _persist, _rememberOutgoingPosition, _resumeAt, _setLastPersistSec } from './persist.js';
 import { playSongs } from './songs.js';
 
 /** @typedef {import('../audio-player.js').Track} Track */
@@ -497,7 +497,7 @@ export function playPortion(opts) {
   if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
   _rememberOutgoingPosition();
   _setPendingRestore(null);
-  _setSource({ mode: 'custom', volKey: '', label: o.label || null });
+  _setSource({ mode: 'custom', volKey: '', label: o.label || null, portion: true });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
@@ -609,6 +609,67 @@ export function clearUpcoming() {
   return true;
 }
 
+/**
+ * The desk's voice or edition switch on a queue the listener made (edited, or a plan's portion): the playing item
+ * goes to the chosen recordings IN PLACE and starts again, and the rest of the queue stays as the listener made it.
+ * A letter swaps its own parts for the chosen reader's; a Bible edition swaps this chapter and every chapter of the
+ * old edition after it, each to the same chapter. The desk used to rebuild the queue from the corpus, which dropped
+ * the edits and turned a plan's portion into a whole book (player brief 2026-10-22, section 7).
+ *
+ * @param {{ volKey: string, reader?: string | null, label?: string | null }} opts a Bible switch names the edition's
+ *   volKey and label; a letter switch names its own volKey and the reader
+ * @returns {boolean} false when nothing could be switched in place (the caller rebuilds instead)
+ */
+export function switchVoiceInPlace(opts) {
+  const o = opts || /** @type {any} */ ({});
+  const q = _state.queue;
+  const cur = q[_state.qi];
+  if (_pendingRestore || !cur || !o.volKey) return false;
+  const oldVol = _volKeyOf(cur.key);
+  if (!oldVol) return false;   // a section run's track names no item
+  const itemId = cur.key.slice(oldVol.length + 1);
+  let queue;
+  let qi = _state.qi;
+  if (_chapterOfTrack(cur) > 0) {
+    if (!_isBibleVol(o.volKey)) return false;
+    const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
+    /** @type {Map<string, Track[]>} */
+    const byBook = new Map();
+    const chapterIn = (/** @type {Track} */ t) => {
+      const id = t.key.slice(oldVol.length + 1);
+      if (!byBook.has(id)) {
+        const book = books.find((b) => b[0] === id);
+        byBook.set(id, _tracksFor(o.volKey, { id, title: book ? book[1] : '' }, o.label || null));
+      }
+      const n = _chapterOfTrack(t);
+      return /** @type {Track[]} */ (byBook.get(id)).find((x) => _chapterOfTrack(x) === n) || null;
+    };
+    const first = chapterIn(cur);
+    if (!first) return false;
+    queue = q.map((t, i) => (i > _state.qi && _volKeyOf(t.key) === oldVol && _chapterOfTrack(t) > 0 ? chapterIn(t) || t : t));
+    queue[_state.qi] = first;
+  } else {
+    const item = { id: itemId, title: cur.title };
+    const chosen = o.reader ? _renditionByReader(o.volKey, item, cur.sub, o.reader) : null;
+    const run = chosen ? chosen.tracks : _tracksFor(o.volKey, item, cur.sub);
+    if (!run.length) return false;
+    let a = _state.qi;
+    while (a > 0 && q[a - 1].key === cur.key) a--;
+    let b = _state.qi;
+    while (b + 1 < q.length && q[b + 1].key === cur.key) b++;
+    queue = q.slice(0, a).concat(run, q.slice(b + 1));
+    qi = a;
+  }
+  if (_offlineRefuses([queue[qi]])) { _offlineNotice(queue[qi]); return true; }
+  _rememberOutgoingPosition();   // R8: the clock belongs to the recording leaving
+  if (_source && oldVol !== o.volKey && _source.volKey === oldVol) _setSource({ ..._source, volKey: o.volKey });
+  _state.qi = qi;
+  _commitQueueEdit(queue);
+  _start();
+  _setLastPersistSec(-1);
+  _persist();
+  return true;
+}
 
 // This module's verbs that the modules below it call (core.js `late`).
 Object.assign(late, { _crossInto, _extendQueue });

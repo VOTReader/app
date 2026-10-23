@@ -13,10 +13,12 @@ import {
   NEXT_OFFLINE_MSG,
   _notify,
   _pendingRestore,
+  PORTION_DONE_MSG,
   PREV_OFFLINE_MSG,
   _setPendingRestore,
   _setReadingRate,
   _setSource,
+  _source,
   _state,
   _toast,
 } from './core.js';
@@ -148,7 +150,16 @@ export function next(atSeam) {
   // exercised it and its comment's reason was false.)
   // …unless a songs queue repeats: 'all' wraps to its top instead of ending.
   if (_state.qi + 1 >= _state.queue.length) {
-    if (_repeatMode() !== 'all') { stop(); return; }
+    if (_repeatMode() !== 'all') {
+      // The end says so (player brief 2026-10-22, section 7: the bar just vanished): a plan's portion in its own
+      // words, anything else by the collection the bar named. The new bar's Finished state replaces this (L4).
+      const last = _state.queue[_state.qi];
+      const named = (last && last.sub) || (_source && _source.label) || '';
+      const done = _source && _source.portion ? PORTION_DONE_MSG : 'Finished' + (named ? ' · ' + named : '') + '.';
+      stop();
+      _toast(done);
+      return;
+    }
     _state.qi = 0;
   } else {
     _state.qi++;

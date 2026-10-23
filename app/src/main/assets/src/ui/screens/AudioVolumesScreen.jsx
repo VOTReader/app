@@ -35,7 +35,8 @@ function votAudioReady() {
  * }} props
  */
 export function AudioVolumesScreen({ onBack, backLabel = 'Listening Library', onOpenCollection, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Not the 1 Hz clock: nothing here draws it (s18.3).
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
 
   // Warm the lazy VOT corpus so the availability sub-lines can answer.
   React.useEffect(() => {

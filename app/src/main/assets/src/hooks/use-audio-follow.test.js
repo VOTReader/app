@@ -135,6 +135,53 @@ describe('the follower moves the live pane with the audio — and nothing else',
     expect(m2.setScreen, 'the desk is the player\'s own UI').toHaveBeenCalledWith('vot-two-letter');
   });
 
+  it('a follow a sheet held catches up the moment the sheet closes, once, with no history push (s02.2)', () => {
+    const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
+    const m = mount(player, { screen: 'vot-one-letter', letterId: 'last', bookId: null, chapterNum: null });
+    modalRegistry.register({ id: 'note-sheet', dismiss: () => {} });
+    act(() => player.advance());
+    expect(m.setScreen).not.toHaveBeenCalled();
+    act(() => modalRegistry.unregister('note-sheet'));
+    expect(m.setLetterId).toHaveBeenCalledWith('first');
+    expect(m.setScreen).toHaveBeenCalledWith('vot-two-letter');
+    expect(suppressNextHistoryPush).toHaveBeenCalledTimes(1);
+    // the hold is spent: another sheet opening and closing moves nothing
+    act(() => { modalRegistry.register({ id: 'x-sheet', dismiss: () => {} }); modalRegistry.unregister('x-sheet'); });
+    expect(m.setScreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('under one sheet the audio walks two readings: closing it opens the one playing now; two sheets wait for both', () => {
+    const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two'), LETTER('two', 'second', 'Volume Two')]);
+    const m = mount(player, { screen: 'vot-one-letter', letterId: 'last', bookId: null, chapterNum: null });
+    modalRegistry.register({ id: 'note-sheet', dismiss: () => {} });
+    modalRegistry.register({ id: 'scripture-sheet', dismiss: () => {} });
+    act(() => { player.advance(); player.advance(); });
+    act(() => modalRegistry.unregister('scripture-sheet'));
+    expect(m.setScreen, 'the note sheet still holds it').not.toHaveBeenCalled();
+    act(() => modalRegistry.unregister('note-sheet'));
+    expect(m.setLetterId).toHaveBeenCalledTimes(1);
+    expect(m.setLetterId).toHaveBeenCalledWith('second');
+  });
+
+  it('a reader who went elsewhere while the sheet was open is not moved when it closes; nor when the audio came back', () => {
+    const player = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
+    const m = mount(player, { screen: 'vot-one-letter', letterId: 'last', bookId: null, chapterNum: null });
+    modalRegistry.register({ id: 'note-sheet', dismiss: () => {} });
+    act(() => player.advance());
+    m.hook.rerender({ enabled: true, screen: 'home', letterId: null, bookId: null, chapterNum: null, ...m });
+    act(() => modalRegistry.unregister('note-sheet'));
+    expect(m.setScreen).not.toHaveBeenCalled();
+
+    const p2 = fakePlayer([LETTER('one', 'last', 'Volume One'), LETTER('two', 'first', 'Volume Two')]);
+    const m2 = mount(p2, { screen: 'vot-one-letter', letterId: 'last', bookId: null, chapterNum: null });
+    modalRegistry.register({ id: 'note-sheet', dismiss: () => {} });
+    act(() => p2.advance());
+    act(() => { p2.getState().qi = -1; p2.advance(); });   // back to the page's own letter (a Previous)
+    act(() => modalRegistry.unregister('note-sheet'));
+    expect(m2.setScreen).not.toHaveBeenCalled();
+    expect(suppressNextHistoryPush).not.toHaveBeenCalled();
+  });
+
   it('a part boundary inside one letter is not a unit boundary: nothing moves', () => {
     const a1 = { ...LETTER('one', 'long', 'Volume One'), partLabel: 'Part 1' };
     const a2 = { ...LETTER('one', 'long', 'Volume One'), partLabel: 'Part 2', url: a1.url.replace('.mp3', '-2.mp3') };

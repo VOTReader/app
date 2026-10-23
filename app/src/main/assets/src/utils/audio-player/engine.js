@@ -9,18 +9,17 @@ import { NativeAudio, nativeAudioAvailable } from '../native-audio.js';
 import { isVotAudioUrl, normalizeAudioRate } from '../audio-track.js';
 import { NetStatus } from '../net-status.js';
 import { OfflineAudio } from '../offline-audio.js';
-import { _locateTrack } from './catalog.js';
+import { _locateTrack, playbackTracks } from './catalog.js';
 import {
-  _assetUrlFor,
   _el,
   _isSong,
   late,
   _library,
   LOAD_FAIL_MSG,
-  _mapFor,
   _native,
   NO_SIGNAL_MSG,
   _notify,
+  _notifyTick,
   _offline,
   OFFLINE_MSG,
   _pendingRestore,
@@ -221,7 +220,7 @@ function _ensureEl() {
     if (sec !== _lastTick) {
       _lastTick = sec;
       _syncMediaSessionPosition();
-      _notify();
+      _notifyTick();
       // Durable resume: snapshot every ~5s of playback (and on the pause
       // below, and on pagehide / hidden — _flushOnHide). Cheap — ~300 bytes
       // to localStorage.
@@ -591,15 +590,15 @@ export function prewarm(volKey, letterId) {
   if (_offline()) return;
   const connection = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator).connection : null;
   if (connection && connection.saveData) return;
-  const m = _mapFor(volKey);
-  const parts = m && m[volKey + ':' + letterId];
-  if (!parts || !parts.length) return;
+  // The recording Listen will start: the listener's chosen reader where they read this letter, else the primary
+  // (playbackTracks, as playLetter queues it). The warm fetched the primary alone (player brief 2026-10-22, section 7).
+  const first = playbackTracks(volKey, { id: letterId }, null)[0];
+  const url = first ? _srcFor(first) : '';
+  if (!url) return;
   const key = volKey + ':' + letterId;
-  if (_prewarmKey === key) return;
+  if (_prewarmKey === key && _el && _el.src === url) return;
   const el = _ensureEl();
   el.preload = 'metadata';
-  const url = _assetUrlFor(volKey, parts[0][0]);
-  if (!url) return;
   el.src = url;
   _prewarmKey = key;
   // Native (m3): the src above only notes the url; binding the player's service is the warm-up there (n1-05).

@@ -7,6 +7,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
   const player = {
     subscribe: () => () => {},
     getVersion: () => 0,
+    getShape: () => '0|',
     getState: () => playerState,
     toggle: vi.fn(),
     playTrack: vi.fn(),

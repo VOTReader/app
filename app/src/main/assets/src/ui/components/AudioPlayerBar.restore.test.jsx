@@ -119,6 +119,6 @@ describe('AudioPlayerBar — a boot-restored bar is not a queue of one (sweep v0
     expect(st.qi).toBe(3);
     expect(FakeAudio.last.src).toBe(URL_OF('idC'));
     expect(document.querySelector('.audio-bar-title').textContent).toBe('The Seventh Day');
-    expect(position()).toBe('· 4 of 4');
+    expect(position()).toBe('· 3 of 3');   // counted in recordings: Letter A's two parts are one
   });
 });
