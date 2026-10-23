@@ -20,8 +20,8 @@
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate } from '../../utils/plan-runs-view.js';
-import { startCatalogPlan, planDef, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
-import { monthCells, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
+import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
+import { monthCells, dayItems, newRun, dayNum, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -177,6 +177,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   const [picking, setPicking] = React.useState(false);
   const [pacing, setPacing] = React.useState(/** @type {string | null} */ (null));
   const [building, setBuilding] = React.useState(/** @type {0 | 1 | 2} */ (0));
+  const [monthShift, setMonthShift] = React.useState(0);
   const [status, setStatus] = React.useState('');
   const rows = plans.map((r) => runRow(r, now));
   const running = new Set(plans.map((p) => p.plan));
@@ -187,6 +188,21 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
     if (r) { saveRun(r); setStatus(''); setPicking(false); } else setStatus('Loading the Volumes… try again in a moment.');
   };
   const src = lettersIn ? letterSource() : null;
+  // C11: finished plans, newest first; one finished in the last three days is celebrated, quietly.
+  const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
+  /** @type {any[]} */
+  const finished = (planStore && typeof planStore.all === 'function' ? planStore.all() : [])
+    .filter((/** @type {any} */ r) => r.status === 'finished' && r.finished)
+    .sort((/** @type {any} */ a, /** @type {any} */ b) => (a.finished < b.finished ? 1 : a.finished > b.finished ? -1 : 0));
+  const todayN = /** @type {number} */ (dayNum(todayKey(now)));
+  const recent = finished.find((r) => todayN - /** @type {number} */ (dayNum(r.finished)) <= 3 && !running.has(r.plan)) || null;
+  /** "Started Oct 14 · finished Oct 22 · 9 days" @param {any} r */
+  const finishedLine = (r) => {
+    const n = /** @type {number} */ (dayNum(r.finished)) - /** @type {number} */ (dayNum(r.start)) + 1;
+    return 'Started ' + shortDate(r.start) + ' · finished ' + shortDate(r.finished) + ' · ' + n + (n === 1 ? ' day' : ' days');
+  };
+  /** Run it again: the same items, pace, days and name, from today; the finished run stays in the list. @param {any} r */
+  const runAgain = (r) => saveRun(newRun({ plan: r.plan, name: r.name, tracks: r.tracks, share: r.share, pace: r.pace, weekdays: r.weekdays }, new Date()));
   const collections = src ? LETTER_CHAIN.map((k) => src.colByKey.get(k)).filter(Boolean) : [];
 
   if (building) {
@@ -212,7 +228,18 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
           if (!row) return null;
           const week = weekCells(plan, now);
           const details = open === plan.id;
-          const days = details ? monthCells(plan, now.getFullYear(), now.getMonth(), now) : [];
+          const shownMonth = new Date(now.getFullYear(), now.getMonth() + (details ? monthShift : 0), 1, 12);
+          const sy = shownMonth.getFullYear(), sm = shownMonth.getMonth();
+          const days = details ? monthCells(plan, sy, sm, now) : [];
+          /** C9: what a calendar day opens: today's next, a planned day's first item, or what was read that day. @param {any} d */
+          const dayRef = (d) => {
+            if (d.state === 'today') return row.next;
+            if (d.day != null) { const it = dayItems(plan, d.day)[0]; return it ? itemRef(it.k) : null; }
+            if (!d.read) return null;
+            const key = sy + '-' + String(sm + 1).padStart(2, '0') + '-' + String(d.date).padStart(2, '0');
+            const k = Object.keys(plan.ticks || {}).find((x) => plan.ticks[x] === key);
+            return k ? itemRef(k) : null;
+          };
           const lead = days.length ? days[0].weekday : 0;
           // C4: reading in print or elsewhere: the day's items ticked today (a hold on the chapters does the same).
           const markToday = () => saveRun(markDay(plan, row.day, true, new Date()));
@@ -284,22 +311,30 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
               ) : null}
               <div className="plans-foot">
                 <span className="plans-counts">{row.counts + (row.behind > 0 || !row.pace ? '' : ' · ' + row.pace)}</span>
-                <button type="button" className="today-link" aria-expanded={details} onClick={() => setOpen(details ? null : plan.id)}>Plan details</button>
+                <button type="button" className="today-link" aria-expanded={details} onClick={() => { setOpen(details ? null : plan.id); setMonthShift(0); }}>Plan details</button>
               </div>
               {details ? (
                 <div className="plans-details">
-                  <div className="plans-month" role="group" aria-label={MONTHS[now.getMonth()]}>
-                    <div className="plans-month-name">{MONTHS[now.getMonth()]}</div>
+                  <div className="plans-month" role="group" aria-label={MONTHS[sm] + (sy !== now.getFullYear() ? ' ' + sy : '')}>
+                    <div className="plans-month-head">
+                      <button type="button" className="plans-month-step" aria-label="Previous month" onClick={() => setMonthShift(monthShift - 1)}>‹</button>
+                      <div className="plans-month-name">{MONTHS[sm] + (sy !== now.getFullYear() ? ' ' + sy : '')}</div>
+                      <button type="button" className="plans-month-step" aria-label="Next month" onClick={() => setMonthShift(monthShift + 1)}>›</button>
+                    </div>
                     <div className="plans-grid">
                       {WEEKDAYS.map((w, i) => <span key={'w' + i} className="plans-weekday" aria-hidden="true">{w}</span>)}
                       {Array.from({ length: lead }, (_, i) => <span key={'b' + i} className="plans-day-blank" />)}
-                      {days.map((d) => (
-                        <span key={d.date} className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined}
-                          aria-label={d.date + (d.state === 'none' ? '' : ', ' + d.state)}>
-                          <span className="plans-day-num">{d.date}</span>
-                          <span className="plans-day-mark" aria-hidden="true" />
-                        </span>
-                      ))}
+                      {days.map((d) => {
+                        const ref = dayRef(d);
+                        const label = MONTHS[sm] + ' ' + d.date + (d.state === 'none' ? '' : ', ' + d.state);
+                        const inner = (<><span className="plans-day-num">{d.date}</span><span className="plans-day-mark" aria-hidden="true" /></>);
+                        return ref ? (
+                          <button key={d.date} type="button" className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined}
+                            aria-label={'Open ' + label} onClick={() => onRead(ref)}>{inner}</button>
+                        ) : (
+                          <span key={d.date} className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined} aria-label={label}>{inner}</span>
+                        );
+                      })}
                     </div>
                     <p className="plans-legend"><span className="plans-key" data-state="done" />read <span className="plans-key" data-state="missed" />missed</p>
                   </div>
@@ -328,6 +363,33 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
             </section>
           );
         })}
+
+        {finished.length ? (
+          <>
+            {recent ? (
+              <section className="plans-plan plans-complete" aria-label={'You finished ' + runName(recent, null)}>
+                <span className="plans-complete-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 12.5l4.2 4.2L19 7" /></svg></span>
+                <h3 className="plans-complete-title">You finished<span>{runName(recent, null)}</span></h3>
+                <p className="plans-plan-sub">{finishedLine(recent)}</p>
+                <div className="today-actions plans-actions">
+                  <button type="button" className="today-btn" onClick={() => runAgain(recent)}>Run it again</button>
+                </div>
+              </section>
+            ) : null}
+            <h2 className="plans-eyebrow">Finished plans</h2>
+            <ul className="plans-list plans-finished">
+              {finished.map((r) => (
+                <li key={r.id} className="plans-finished-row">
+                  <span className="plans-row-text">
+                    <span className="plans-row-name">{runName(r, null)}</span>
+                    <span className="plans-row-sub">{finishedLine(r)}</span>
+                  </span>
+                  <button type="button" className="today-link" aria-label={'Run ' + runName(r, null) + ' again'} onClick={() => runAgain(r)}>Run it again</button>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
 
         <h2 className="plans-eyebrow">Find a plan</h2>
         {GROUPS.map(([g, title]) => (

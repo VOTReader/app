@@ -3306,6 +3306,19 @@
     .build-each-main { margin:0.2rem 0 0.1rem; color:var(--gold); font-size:var(--fs-20); }
     .build-each p { margin:0.1rem 0; }
     .build-each .today-btn-wide { margin-top:0.8rem; }
+    /* mw18 C9/C11: the month pages and its days open their reading; finished plans (mockup r1-complete.png) */
+    .plans-month-head { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.4rem; }
+    .plans-month-head .plans-month-name { margin:0; min-width:9rem; }
+    .plans-month-step { width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-24); line-height:1; cursor:pointer; }
+    button.plans-day { width:100%; margin:0; background:transparent; color:inherit; font:inherit; font-size:var(--fs-15); cursor:pointer; }
+    @media (hover:hover) { button.plans-day:hover { border-color:var(--gold-border); } }
+    .plans-complete { text-align:center; }
+    .plans-complete-check { display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; margin:0.2rem 0 0.4rem; border:1.5px solid var(--gold); border-radius:50%; color:var(--gold); }
+    .plans-complete-title { margin:0; color:var(--cream); font-size:var(--fs-24); font-weight:400; }
+    .plans-complete-title span { display:block; color:var(--gold); }
+    .plans-complete .plans-actions { justify-content:center; }
+    .plans-finished { margin-bottom:1rem; }
+    .plans-finished-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; min-height:56px; padding:0.35rem 0.2rem; }
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }

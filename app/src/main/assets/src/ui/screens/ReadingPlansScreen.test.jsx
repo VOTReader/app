@@ -189,6 +189,39 @@ describe('ReadingPlansScreen', () => {
     } finally { vi.useRealTimers(); }
   });
 
+  it('the month pages back and forth, and a planned day opens its reading (C9)', () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    const p = base();
+    render(<ReadingPlansScreen {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+    const month = screen.getByRole('group', { name: new RegExp('^' + MONTHS[next.getMonth()]) });
+    // The first of next month is a planned day: it opens that day's first chapter.
+    fireEvent.click(within(month).getByRole('button', { name: new RegExp('^Open ' + MONTHS[next.getMonth()] + ' 1, ahead') }));
+    const [call] = p.onRead.mock.calls;
+    expect(call[0].bid).toBe('genesis');
+    expect(call[0].cid).toBeGreaterThan(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+    expect(screen.getByRole('group', { name: MONTHS[now.getMonth()] })).toBeTruthy();
+  });
+
+  it('a finished plan is celebrated quietly, listed with its dates, and can run again (C11)', () => {
+    let run = startCatalogPlan('proverbs', null, daysAgo(2));
+    run = { ...run, status: 'finished', finished: todayKey(new Date()) };
+    ReadingPlanStore.put(run);
+    render(<ReadingPlansScreen {...base()} />);
+    const done = screen.getByRole('region', { name: 'You finished Proverbs in 31 days' });
+    expect(within(done).getByText(/^Started .* · finished .* · 3 days$/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Run Proverbs in 31 days again' })).toBeTruthy();
+    act(() => { fireEvent.click(within(done).getByRole('button', { name: 'Run it again' })); });
+    expect(ReadingPlanStore.active().map((r) => r.plan)).toEqual(['proverbs']);
+    expect(ReadingPlanStore.all().filter((r) => r.status === 'finished').length).toBe(1);
+    expect(screen.queryByRole('region', { name: 'You finished Proverbs in 31 days' })).toBeNull();
+  });
+
   it('never scores the reader', () => {
     ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(4)));
     const { container } = render(<ReadingPlansScreen {...base()} />);
