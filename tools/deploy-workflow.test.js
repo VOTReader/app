@@ -57,11 +57,17 @@ function permissionsOf(jobText) {
 }
 
 describe('deploy-web.yml - the deploy waits for green CI (v12-01)', () => {
-  it('starts on a completed CI run on main, not on the push', () => {
+  it('publishes at the two release windows, not on each CI run or push (up1, DECISIONS 10-23)', () => {
     const on = topBlock('on');
-    expect(on).toMatch(/\n {2}workflow_run:\n {4}workflows: \[CI\]\n {4}types: \[completed\]\n {4}branches: \[main\]/);
+    expect(on).toMatch(/\n {2}schedule:\n(?: {4}- cron: '[^']+'[^\n]*\n){4}/);
+    expect(on, 'a completed CI run published every green commit: dozens of updates a day on screen').not.toMatch(/\n {2}workflow_run:/);
     expect(on, 'a push trigger would publish beside CI again, before it is green').not.toMatch(/\n {2}push:/);
-    expect(on, 'the manual override stays').toMatch(/\n {2}workflow_dispatch:/);
+    expect(on, 'ship now stays, for a live break').toMatch(/\n {2}workflow_dispatch:/);
+    const gate = code(jobs().gate || '');
+    expect(gate).toContain('run: node tools/release-window.mjs');
+    expect(gate, 'the window gate reads the run\'s own cron line').toContain('SCHEDULE: ${{ github.event.schedule }}');
+    expect(gate, 'the picker runs only in a window').toMatch(/- name: Pick the newest commit on main whose CI is green\n\s+if: steps\.window\.outputs\.due == 'true'\n/);
+    expect(gate, 'the window gate comes from main too').toMatch(/sparse-checkout: \|\n\s+tools\/deploy-target\.mjs\n\s+tools\/release-window\.mjs\n/);
   });
 
   it('publishes the newest green commit on main, picked by tools/deploy-target.mjs (ci10)', () => {
