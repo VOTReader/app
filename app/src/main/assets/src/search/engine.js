@@ -3552,6 +3552,22 @@ async function search(query, options) {
     const reordered = (/** @type {any} */ h) => !!typedSorted && h.kind !== 'heading' && sortedWords(titleWords(h.title || '')) === typedSorted;
     const whole = admitted.some((h) => h.level >= TITLE_LEVEL_LEAD || reordered(h));
     admittedWhole = whole;
+    /* A COLLECTION'S NAME TYPED BESIDE A TITLE NAMES THE COLLECTION (main CI, 2026-10-22). "regarding israel answers
+       only god can give" is the topic "Regarding Israel" typed whole with its collection's name. The collection's own
+       front page is titled with that name and opens on it, so it held five of the seven typed words in a row: B4 read
+       it as the quote remembered with its slips, kept it as a quote found, and the meaning, sure of the front page, put
+       it over the title the reader named (tri n121, after a re-embed). Typed beside a title in it, the collection's
+       words name the collection only: a text B4 held that holds the title's own typed words (the collection's taken
+       off) nowhere together holds the typed words only by that name, and holds no quote. */
+    if (whole && admitted.some((h) => h.hinted && (h.level >= TITLE_LEVEL_LEAD || reordered(h)))) {
+      const own = joinApostropheS(kjvEncode(typedTitle.join(' ')));
+      for (const e of own.length ? out : []) {
+        if (!alignedSo(e) || has(e)) continue;
+        if (typedHeld(joinApostropheS(kjvEncode(e.doc.text || '')), own, own.length + 2) >= own.length) continue;
+        keptDocs.delete(e.doc);
+        alignHeld.delete(/** @type {string} */ (idOf.get(e)));
+      }
+    }
     /** A text holding the typed words in a row, in its own words (a title holding them is the admission's call). */
     const holdsTyped = (/** @type {any} */ e) => {
       const id = idOf.get(e);

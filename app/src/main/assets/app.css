@@ -8472,6 +8472,18 @@
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-hide-all { bottom: calc(var(--sw-sheet-h, 60%) + 8px); }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-guide-btn { bottom: calc(var(--sw-sheet-h, 60%) + 60px); }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-controls { bottom: calc(var(--sw-sheet-h, 60%) + 10px); }
+    /* the go-to's edge chips over a sheet ride above the bottom row (the ? at 60 px + 44, the
+       controls at 10 px + 58), never on it. A compact sheet leaves the canvas about 176 px
+       (520x440): the ? goes beside hide-all as it does with no sheet, and the chips drop to
+       40 px, so they fit between the header and that row (Corbin's screenshot, 2026-10-22). */
+    .sw-root.sw-panel-open[data-panel="sheet"] .sw-goto-edge {
+      top: min(max(23%, calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 8px)), calc(100% - var(--sw-sheet-h, 60%) - 112px - 44px));
+    }
+    .sw-root.sw-compact.sw-panel-open[data-panel="sheet"] .sw-guide-btn { right: 68px; bottom: calc(var(--sw-sheet-h, 60%) + 8px); }
+    .sw-root.sw-compact.sw-panel-open[data-panel="sheet"] .sw-goto-edge {
+      top: min(max(23%, calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 8px)), calc(100% - var(--sw-sheet-h, 60%) - 68px - 40px));
+      min-height: 40px;
+    }
 
     /* THE COLLAPSE (spec section 3): under 1000 px of canvas area the controls fold to the go-to
        and a "more" button; the same buttons drop down from it. .sw-menu is a real box (not
