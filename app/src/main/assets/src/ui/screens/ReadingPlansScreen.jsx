@@ -188,7 +188,7 @@ function WeekAudio({ plan, from, tracksOf }) {
   return (
     <div className="plans-audio">
       <OfflineCollectionAction units={tracks.map((t) => [t])} label={(end - from === 1 ? 'the last day' : 'the next ' + (end - from) + ' days') + ' of your plan'}
-        action={'Save this week’s audio'} savedText={'This week’s audio is on this phone'} />
+        action={'Download this week’s audio'} savedText={'This week’s audio is on this phone'} />
     </div>
   );
 }

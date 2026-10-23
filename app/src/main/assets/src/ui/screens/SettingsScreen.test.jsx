@@ -370,13 +370,12 @@ describe('Listening group', () => {
     } finally { delete window.AndroidBridge; }
   });
 
-  it('Download only on Wi-Fi: a browser that cannot tell Wi-Fi from mobile data says so; none where nothing downloads', () => {
+  // Downloads brief section 7 item 10: where the browser cannot tell Wi-Fi from mobile data the switch did nothing.
+  it('Download only on Wi-Fi: not offered where Wi-Fi cannot be told from mobile data, nor where nothing downloads', () => {
     window.AndroidBridge = { offlineAudioState: () => '{}' };   // a store, but no way to tell (as a desktop browser)
     try {
       renderSettings({ downloadWifiOnly: true });
-      expect(within(row('Download only on Wi-Fi')).getByRole('switch').getAttribute('aria-checked')).toBe('true');
-      fireEvent.click(within(row('Download only on Wi-Fi')).getByRole('button', { name: /show description/i }));
-      expect(row('Download only on Wi-Fi').textContent).toContain('This browser cannot tell Wi-Fi from mobile data');
+      expect(groupRowLabels('Listening')).not.toContain('Download only on Wi-Fi');
     } finally { delete window.AndroidBridge; }
     cleanup();
     renderSettings();

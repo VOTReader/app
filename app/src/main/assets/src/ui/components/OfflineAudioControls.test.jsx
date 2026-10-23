@@ -7,7 +7,7 @@
    phone's free space. "On this phone" lists every download with its size and a Remove, and Remove all asks first.
    Only in the Android app: on the web the store is unavailable and none of this renders. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
 import { OfflineRowStatus, OfflineCollectionAction, formatBytes } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
@@ -171,9 +171,53 @@ describe('a recording row: what the phone holds, and the next step', () => {
     const s = fakeStore();
     s.st.status.set(U('a'), 'queued');
     const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/Downloading/);
+    // Queued behind another: Waiting, with no empty bar (brief section 7 item 7: it read "Downloading 0%").
+    expect(container.textContent).toMatch(/^Waiting/);
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+    act(() => { s.st.status.set(U('a'), 'downloading'); s.st.progress.set(U('a'), { bytes: 0, total: -1 }); s.bump(); });
+    expect(container.textContent).toMatch(/Downloading 0%/);
+    expect(container.querySelector('[role="progressbar"]')).not.toBeNull();
     act(() => { save(s, 'a', 5_000_000); s.bump(); });
     expect(container.textContent).toMatch(/On this phone · 5 MB/);
+  });
+});
+
+// Downloads brief section 7 item 6: a whole Bible book started on one tap, with no size or room check (Genesis, 206 MB).
+describe('a book row asks before it downloads', () => {
+  const BOOK = ['g1', 'g2', 'g3', 'g4', 'g5'];
+  it('a book asks with its count, size and the free space; Cancel downloads nothing, Download downloads it', () => {
+    const s = fakeStore();
+    for (const id of BOOK) s.st.sizes.set(U(id), 40e6);
+    const { getByRole, container } = render(<OfflineRowStatus tracks={BOOK.map((id) => T(id))} name="Genesis" />);
+    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
+    expect(s.download).not.toHaveBeenCalled();
+    const ask = getByRole('group', { name: 'Download Genesis' });
+    expect(ask.textContent).toContain('5 recordings · 200 MB');
+    expect(ask.textContent).toContain('Free space on this phone: 5 GB');
+    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(container.querySelector('.offline-confirm')).toBeNull();
+    expect(s.download).not.toHaveBeenCalled();
+    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
+    fireEvent.click(getByRole('button', { name: 'Download 200 MB' }));
+    expect(s.download).toHaveBeenCalledWith(BOOK.map((id) => expect.objectContaining({ url: U(id) })));
+  });
+
+  it('with no room it says so and will not start', () => {
+    const s = fakeStore();
+    s.st.free = 100e6;
+    for (const id of BOOK) s.st.sizes.set(U(id), 40e6);
+    const { getByRole } = render(<OfflineRowStatus tracks={BOOK.map((id) => T(id))} name="Genesis" />);
+    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
+    expect(getByRole('group', { name: 'Download Genesis' }).textContent).toContain('Not enough room');
+    expect(getByRole('button', { name: 'Download 200 MB' }).disabled).toBe(true);
+  });
+
+  it('a letter in two parts still downloads on one tap', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('p1'), 9e6); s.st.sizes.set(U('p2'), 9e6);
+    const { getByRole } = render(<OfflineRowStatus tracks={[T('p1'), T('p2')]} name="Christmas" />);
+    fireEvent.click(getByRole('button', { name: /download christmas to this phone/i }));
+    expect(s.download).toHaveBeenCalledTimes(1);
   });
 });
 

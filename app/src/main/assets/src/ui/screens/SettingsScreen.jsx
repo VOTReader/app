@@ -1281,12 +1281,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             <SongsKeptRow />
             {/* Download only on Wi-Fi (ra6, Corbin 2026-10-14, brief design-10): off by default; on, recordings and
                 kept songs wait while the phone is on mobile data (utils/download-gate.js). Only where this app keeps
-                downloads; a browser that cannot tell Wi-Fi from mobile data says so rather than promise it. */}
-            {OfflineAudio.available() && (
+                downloads, and only where it can tell Wi-Fi from mobile data: elsewhere the switch did nothing (downloads
+                brief 2026-10-23, section 7 item 10), so it is not offered. */}
+            {OfflineAudio.available() && canTell() && (
               <SettingsRow
                 label="Download only on Wi-Fi"
-                desc={'Downloads wait until you are on Wi-Fi, so they never use mobile data. One already on its way stops and starts again on Wi-Fi.'
-                  + (canTell() ? '' : ' This browser cannot tell Wi-Fi from mobile data, so here downloads always go ahead.')}
+                desc="Downloads wait until you are on Wi-Fi, so they never use mobile data. One already on its way stops and starts again on Wi-Fi."
                 checked={settings.downloadWifiOnly === true}
                 onToggle={() => onToggle("downloadWifiOnly")}
               />

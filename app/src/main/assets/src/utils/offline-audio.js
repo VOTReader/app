@@ -38,6 +38,8 @@ let _version = 0;
 let _saved = new Map();
 let _totalBytes = 0;
 let _freeBytes = -1;
+/** The browser said it may clear downloads under storage pressure (web only; native files are the app's own). */
+let _evictable = false;
 /** Download only on Wi-Fi (ra6): what is queued waits for Wi-Fi now (the store's state says so). */
 let _waiting = false;
 /** @type {Set<string>} */
@@ -130,6 +132,7 @@ function refresh() {
   }
   _totalBytes = Number(s.totalBytes) || 0;
   _freeBytes = typeof s.freeBytes === 'number' ? s.freeBytes : -1;
+  _evictable = s.persisted === false;
   _waiting = s.waiting === true;
   _queued = new Set((Array.isArray(s.queued) ? s.queued : []).filter((u) => typeof u === 'string'));
   const a = s.active;
@@ -328,6 +331,8 @@ export const OfflineAudio = {
     return Math.max(0, _totalBytes - songs);
   },
   freeBytes: () => { if (!_loaded) refresh(); return _freeBytes; },
+  /** @returns {boolean} this browser may clear the downloads when space runs low (it refused persistent storage) */
+  evictable: () => { if (!_loaded) refresh(); return _evictable; },
   /** @returns {boolean} downloads wait for Wi-Fi now (Download only on Wi-Fi is on and the phone is on mobile data) */
   waiting: () => { if (!_loaded) refresh(); return _waiting; },
   /**
@@ -407,7 +412,7 @@ export const OfflineAudio = {
     _listeners.clear();
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
     _sizesToSend = new Set(); _sizesFlushQueued = false; _news = { seq: 0, text: '' };
-    _active = null; _totalBytes = 0; _freeBytes = -1; _waiting = false; _loaded = false; _version = 0;
+    _active = null; _totalBytes = 0; _freeBytes = -1; _evictable = false; _waiting = false; _loaded = false; _version = 0;
     _install();
   },
 };

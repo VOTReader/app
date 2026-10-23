@@ -104,6 +104,10 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', on
           <p className="audio-library-intro">
             {items.length ? count + ' · ' + formatBytes(total) + '. They play with no signal.' : 'Recordings you download play with no signal.'}
           </p>
+          {/* The browser refused persistent storage (brief section 7 item 3): say plainly what that can mean. */}
+          {items.length && off.evictable && off.evictable() ? (
+            <p className="audio-library-intro audio-offline-evictable">This browser may clear downloads when the phone runs low on space. Adding VOTReader to the Home Screen helps keep them.</p>
+          ) : null}
         </header>
 
         {stale.length > 1 ? (

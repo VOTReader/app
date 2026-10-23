@@ -3,8 +3,9 @@
    offline-audio-web — recordings saved for offline in a browser (cf1)
    ═══════════════════════════════════════════════════════════════════════
    Corbin 2026-09-26 21:1x: the PWA and an iPhone on its Home Screen save a
-   letter, study or Bible book for offline, the same per-recording and
-   per-collection rule as the phone app (no whole-edition button).
+   letter, study or Bible book for offline, as the phone app does (a whole
+   edition and all of TVOT too, Corbin 2026-10-23; the picker that offers
+   them is the downloads brief's D3).
 
    GitHub's release downloads answer without CORS, so the page cannot keep
    their bytes itself. A save goes through the relay Worker
@@ -56,6 +57,8 @@ let _loaded = false;
 /** @type {Promise<void> | null} */
 let _loading = null;
 let _persistAsked = false;
+/** Storage the browser keeps (true), may clear under pressure (false), or not known yet (null). */
+let _persisted = /** @type {boolean | null} */ (null);
 
 /** @param {string} url @returns {RegExpExecArray | null} */
 const _release = (url) => (typeof url === 'string' ? RELEASE.exec(url) : null);
@@ -105,6 +108,9 @@ async function _estimate() {
     const est = await navigator.storage.estimate();
     if (est && typeof est.quota === 'number' && typeof est.usage === 'number') _free = Math.max(0, est.quota - est.usage);
   } catch (_e) { _free = -1; }
+  // Whether this browser has promised to keep the downloads (persisted() asks nothing of the listener; the first
+  // download asks with persist()). False: it may clear them when space runs low, and the Downloads screen says so.
+  try { if (navigator.storage.persisted) _persisted = (await navigator.storage.persisted()) === true; } catch (_e) { /* unknown */ }
 }
 
 /** @param {string | null} v */
@@ -148,6 +154,7 @@ function _state() {
     items: [..._items.values()],
     totalBytes: total,
     freeBytes: _free,
+    persisted: _persisted,
     queued: _queue.map((t) => t.url),
     active: _active ? { url: _active.url, bytes: _active.bytes, total: _active.total } : null,
     // Download only on Wi-Fi: what is queued waits for it (the rows say so).
@@ -190,7 +197,8 @@ async function _next() {
     if (_items.has(it.url)) throw new Error('already saved');
     if (!_persistAsked) {
       _persistAsked = true;
-      try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch (_e) { /* best effort */ }
+      // The answer was ignored, so downloads the browser may clear carried no word of it (brief section 7 item 3).
+      try { if (navigator.storage && navigator.storage.persist) _persisted = (await navigator.storage.persist()) === true; } catch (_e) { /* best effort */ }
     }
     const from = relayUrl(it.url);
     if (!from) throw new Error('not a release recording');
@@ -324,17 +332,15 @@ export const WebOfflineAudio = {
     })();
   },
   /**
-   * Where the player loads a recording: with no signal, its saved copy (served by the service worker) when this
-   * browser keeps it and a worker controls the page; else its own URL (streamed from GitHub, as always).
-   * `held`, the src the element holds now (unfailed): the saved copy it already plays keeps playing when the
-   * signal comes back, rather than reloading from GitHub.
-   * @param {string} url @param {string} [held] @returns {string}
+   * Where the player loads a recording: its saved copy (served by the service worker, byte ranges included) whenever
+   * this browser keeps it and a worker controls the page, signal or none; else its own URL (streamed from GitHub).
+   * Saved first (downloads brief 2026-10-23, section 7 item 2): it was used only when navigator.onLine said false,
+   * so on a weak signal a saved recording streamed, failed and said "No signal" with the file on the phone.
+   * @param {string} url @param {string} [_held] the src the element holds now (kept for the player's call)
+   * @returns {string}
    */
-  srcFor(url, held) {
-    const local = _localFor(url);
-    if (local && held === local) return local;
-    if (!local || typeof navigator === 'undefined' || navigator.onLine !== false) return url;
-    return local;
+  srcFor(url, _held) {
+    return _localFor(url) || url;
   },
   /** The service worker's address for a saved recording, whatever the signal, or null. @param {string} url */
   localFor: (url) => _localFor(url),
@@ -343,7 +349,7 @@ export const WebOfflineAudio = {
     if (_active) _active.ctl.abort();
     if (_unhookGate) _unhookGate();
     _unhookGate = null;
-    _items = new Map(); _queue = []; _active = null; _free = -1; _loaded = false; _loading = null; _persistAsked = false;
+    _items = new Map(); _queue = []; _active = null; _free = -1; _loaded = false; _loading = null; _persistAsked = false; _persisted = null;
   },
 };
 

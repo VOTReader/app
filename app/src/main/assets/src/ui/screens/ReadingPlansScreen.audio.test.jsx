@@ -50,12 +50,12 @@ afterEach(() => { cleanup(); delete globalThis.ReadingPlanStore; delete globalTh
 const base = (o) => ({ readingPlans: [], isRead: () => false, onPlansMoved: vi.fn(), onRead: vi.fn(), onBack: vi.fn(), ...o });
 const planTracks = vi.fn((refs) => refs.map((r) => ({ url: U(r.bid + '-' + r.cid), key: r.bid + ':' + r.cid, title: r.bid + ' ' + r.cid })));
 
-describe('Save this week’s audio (S6)', () => {
+describe('Download this week’s audio (S6; one verb, Download, brief section 7 item 13)', () => {
   it('is not offered where downloads do not work', () => {
     ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
     render(<ReadingPlansScreen {...base({ planTracks })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    expect(screen.queryByRole('button', { name: /Save this week/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /(Save|Download) this week/ })).toBeNull();
   });
 
   it('asks first, then saves the next 7 days, one recording per chapter', () => {
@@ -64,7 +64,7 @@ describe('Save this week’s audio (S6)', () => {
     ReadingPlanStore.put(run);
     render(<ReadingPlansScreen {...base({ planTracks })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Save this week’s audio' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Download this week’s audio' }));
     const week = [0, 1, 2, 3, 4, 5, 6].flatMap((d) => dayItems(run, d));
     expect(screen.getByText('Download the next 7 days of your plan?')).toBeTruthy();
     expect(screen.getByText(week.length + ' recordings · ' + week.length + ' MB')).toBeTruthy();

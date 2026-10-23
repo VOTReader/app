@@ -226,7 +226,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
               <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
                 <PlayIcon /><span>{playAllLabel}</span>
               </button>
-              {/* A collection at once; a Bible edition only a book at a time (its rows), never the whole edition. */}
+              {/* A collection at once; a Bible edition a book at a time from its rows until the Downloads picker (downloads
+                  brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
               {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
             </div>
           ) : null}
