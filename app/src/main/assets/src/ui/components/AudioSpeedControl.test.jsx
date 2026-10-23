@@ -4,17 +4,17 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { AudioSpeedControl } from './AudioSpeedControl.jsx';
+import { AudioSpeedReadout } from './AudioSpeedControl.jsx';
 
 afterEach(() => { cleanup(); });
 
-describe('AudioSpeedControl — W42: Escape in the typed-speed field', () => {
+describe('AudioSpeedReadout — W42: Escape in the typed-speed field', () => {
   it('cancels the typing and goes no further than the field', () => {
     let reached = 0;
     const onDoc = () => { reached++; };
     document.addEventListener('keydown', onDoc);
     try {
-      render(<AudioSpeedControl rate={1} />);
+      render(<AudioSpeedReadout rate={1} />);
       fireEvent.click(screen.getByRole('button', { name: 'Speed, tap to type a value' }));
       const field = screen.getByLabelText('Playback speed', { selector: 'input[type="number"], input:not([type="range"])' });
       fireEvent.keyDown(field, { key: 'Escape' });

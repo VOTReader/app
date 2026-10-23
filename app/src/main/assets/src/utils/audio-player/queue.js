@@ -519,6 +519,8 @@ function _extendQueue() {
   // A songs queue is refused here like a custom one: songs never continue into
   // letters (README §1.1) — a songs queue ends, or wraps under repeat 'all'.
   if (!_continues()) return false;
+  // Sleep at the end of the queue: the run ends where Up next ends (sleep.js clearSleepTimer joins it up again).
+  if (_state.sleepAtQueueEnd) return false;
   const last = _state.queue[_state.queue.length - 1];
   // A section run's tracks carry key null (one file, many letters); the run
   // belongs to its collection, so the site order continues from THAT (2026-09-20).

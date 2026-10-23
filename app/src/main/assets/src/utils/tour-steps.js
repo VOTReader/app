@@ -94,7 +94,7 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
 export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A small bar appears: Highlight, or Note.';
 
 /** The listening sheet's ‹ button, as the two cards that point at it name it. */
-const CLOSE_GLYPH = '‹';
+const CLOSE_GLYPH = '⌄';
 
 /* THE COUNT IS WRITTEN ONCE (2026-09-10). A stop's `number` is its position in this array and
    its eyebrow's "N of M" is built from that; the word every sentence uses to count the stops
@@ -233,9 +233,9 @@ const STOPS = [
     primary: 'Next',
   },
   /* THE PLAYER (Corbin, 2026-09-12). The bar's own "Open listening controls" button is the
-     ring; the press opens the listening sheet, and the ring moves to the voice row at its top —
-     the three Bible editions here, a letter's readers on a letter — or, on a recording with one
-     voice, to the transport (first on-screen match of the comma selector). `doneIf`: the sheet
+     ring; the press opens the full player (pl-l2), and the ring moves to its Voice chip — the
+     Bible editions here, a letter's readers on a letter — or, on a recording with one voice, to
+     the transport (first on-screen match of the comma selector). `doneIf`: the sheet
      already open (the reader tapped the bar, or Back from the next stop) is the press done. */
   {
     id: 'player', screen: 'bible-ch', enter: 'ensureListening', listening: true,
@@ -248,11 +248,11 @@ const STOPS = [
     tip: 'Tap it now, or press Next and I will open it for you.',
     // Five lines of a docked card on a phone: 162 characters (tour-steps.test.js, measured 2026-09-13).
     // Leads with the teaching (the Tour Reviewer's D6): where a card is cut, the cut line must not be this one.
-    after: 'Tap another edition under Listening now: the chapter starts again in that voice, and the rest follow. Pause, skip or slow the reading here. Press Next when ready.',
+    after: 'Tap the edition under the title to hear another: the chapter starts again in that voice, and the rest follow. Pause, skip or slow it here. Press Next when ready.',
     primary: 'Next',
   },
-  /* BACK TO THE WORDS. The sheet's ‹ (a real 44 px button, SheetHandle) is the ring; the press
-     closes the sheet and the reading is the brightest thing on the screen again. `doneIf`: no
+  /* BACK TO THE WORDS. The player's ⌄ (a real 48 px button, class sheet-handle-back) is the ring; the press
+     closes the player and the reading is the brightest thing on the screen again. `doneIf`: no
      sheet on the page — the reader closed it by ‹, by the backdrop or by Back, or Back arrived
      here from the closing card — is the press done. Nothing here the reader can try inside the
      tour and fail: the dim panes leave only ‹ open. */

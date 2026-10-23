@@ -132,6 +132,27 @@ export function liveLetter() {
 }
 
 /**
+ * The letters of the compilation playing, each where it starts on the file's clock: the full player's scrubber
+ * ticks and its "Entry 12 of 25 in this recording" (brief 3b, picture 07). Null for a keyed recording or until the
+ * section table lands; a title is null until the registry lands.
+ * @returns {{ key: string, start: number, title: string | null }[] | null}
+ */
+export function sectionMarks() {
+  const track = _state.queue[_state.qi];
+  if (!track || track.key != null) return null;
+  const table = _sectionTableFor(track);
+  if (!table) return null;
+  /** @type {{ key: string, start: number, title: string | null }[]} */
+  const marks = [];
+  for (const k of Object.keys(table)) {
+    const rows = table[k];
+    if (!Array.isArray(rows) || !rows.length || !Array.isArray(rows[0])) continue;
+    marks.push({ key: k, start: Number(rows[0][0]) || 0, title: _letterTitleOf(k) });
+  }
+  return marks.length ? marks : null;
+}
+
+/**
  * A letter's span on the file clock: its first row to the next letter's first
  * row, or to the end of the file for the last one. 0 when unknown.
  * @param {any} track @param {string} key @returns {number}

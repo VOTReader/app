@@ -2,20 +2,19 @@
    AudioSpeedControl — playback speed in 1 % steps (Cluster D, bundle-d)
    ═══════════════════════════════════════════════════════════════════════
    Corbin 2026-09-21: "Audio player speed should be variable ... shouldn't be
-   fixed at quarter speed jumps, should be by 1% increments." One tool on the
-   listening desk, four ways in, ONE way out (AudioPlayer.setPlaybackRate,
-   which retimes the element and persists to AudioLibraryStore.rate):
+   fixed at quarter speed jumps, should be by 1% increments." The full player's
+   Speed sheet (pl-l2, picture 11) is ONE control with three ways in and ONE way
+   out (AudioPlayer.setPlaybackRate, which retimes the element and persists to
+   AudioLibraryStore.rate):
 
-     readout  "1.37×"  a button; tap = a number box (Enter/blur commit, Esc cancel)
-     −  /  +           1 % per press; held past 400 ms it repeats 12×/s
-     slider            native <input type="range" min=50 max=300 step=1>: the
-                       slider role, arrows = 1 %, Home/End, valuetext, and 250
-                       steps on a 300 px track = 1 px per step, snap-free by
-                       construction. Shift+arrow = 5 % is the one keydown we add.
-     chips             the AUDIO_PLAYBACK_RATES presets, kept as shortcuts
+     AudioSpeedReadout  "1.37×" in the sheet's head; a button: tap = a number box
+                        (Enter/blur commit, Esc cancel)
+     chips              the AUDIO_PLAYBACK_RATES presets, one radio group
+     −  /  +            1 % per press; held past 400 ms it repeats 12×/s
 
-   The slider works in integer PERCENT so the browser never rounds a float
-   step; the rate is percent / 100, and normalizeAudioRate clamps the domain.
+   The desk's slider went with the desk (brief 3b: three ways to set one thing
+   was the problem, picture 06 of the 10-22 look); the 1 % stepper keeps
+   Corbin's fine control, and a typed value reaches any speed in one go.
    Hold-repeat: pointerdown fires the first step and arms the timers; the
    button's click is honoured ONLY for keyboard activation (event.detail 0),
    otherwise a mouse press would step twice (pointerdown + click).
@@ -33,12 +32,56 @@ const PCT_MAX = Math.round(AUDIO_RATE_MAX * 100);
 const applyPct = (pct) => AudioPlayer.setPlaybackRate(Math.min(PCT_MAX, Math.max(PCT_MIN, pct)) / 100);
 
 /**
+ * The rate in the Speed sheet's head; tap it to type one.
+ * @param {{ rate: number }} props  the player's current rate (state.rate)
+ */
+export function AudioSpeedReadout({ rate }) {
+  /** Text in the number box while it is open; null = showing the readout. */
+  const [typed, setTyped] = React.useState(/** @type {string | null} */ (null));
+  // The number box opens EMPTY with the current rate as placeholder: Chrome
+  // refuses selection APIs on type=number, so a pre-filled "1.5" made a typed
+  // "3.5" read "1.535" (headless look, 2026-09-21). Empty = cancel.
+  const commitTyped = () => {
+    const n = Number(typed);
+    if (typed !== '' && Number.isFinite(n) && n > 0) applyPct(Math.round(n * 100));
+    setTyped(null);
+  };
+  return (
+    <strong className="audio-speed-readout">
+      {typed == null ? (
+        <button type="button" aria-label="Speed, tap to type a value" onClick={() => setTyped('')}>
+          {formatAudioRate(rate)}
+        </button>
+      ) : (
+        <input
+          type="number"
+          inputMode="decimal"
+          aria-label="Playback speed"
+          min={AUDIO_RATE_MIN}
+          max={AUDIO_RATE_MAX}
+          step={0.01}
+          value={typed}
+          placeholder={String(Math.round(rate * 100) / 100)}
+          autoFocus
+          onChange={(event) => setTyped(event.target.value)}
+          onBlur={commitTyped}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') { event.preventDefault(); commitTyped(); }
+            // W42: Escape cancels the typing only, never also closes the sheet around it.
+            else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setTyped(null); }
+          }}
+        />
+      )}
+    </strong>
+  );
+}
+
+/**
+ * The presets and the 1 % stepper.
  * @param {{ rate: number }} props  the player's current rate (state.rate)
  */
 export function AudioSpeedControl({ rate }) {
   const pct = Math.round(rate * 100);
-  /** Text in the number box while it is open; null = showing the readout. */
-  const [typed, setTyped] = React.useState(/** @type {string | null} */ (null));
   const hold = React.useRef(/** @type {{ t: any, i: any } | null} */ (null));
 
   const stopHold = () => {
@@ -60,15 +103,6 @@ export function AudioSpeedControl({ rate }) {
     hold.current = h;
   };
 
-  // The number box opens EMPTY with the current rate as placeholder: Chrome
-  // refuses selection APIs on type=number, so a pre-filled "1.5" made a typed
-  // "3.5" read "1.535" (headless look, 2026-09-21). Empty = cancel.
-  const commitTyped = () => {
-    const n = Number(typed);
-    if (typed !== '' && Number.isFinite(n) && n > 0) applyPct(Math.round(n * 100));
-    setTyped(null);
-  };
-
   /** @param {number} dir */
   const stepButton = (dir) => (
     <button
@@ -85,61 +119,8 @@ export function AudioSpeedControl({ rate }) {
   );
 
   return (
-    <div className="audio-manager-tool audio-speed">
-      <div className="audio-manager-tool-head">
-        <span>Speed</span>
-        <strong className="audio-speed-readout">
-          {typed == null ? (
-            <button type="button" aria-label="Speed, tap to type a value" onClick={() => setTyped('')}>
-              {formatAudioRate(rate)}
-            </button>
-          ) : (
-            <input
-              type="number"
-              inputMode="decimal"
-              aria-label="Playback speed"
-              min={AUDIO_RATE_MIN}
-              max={AUDIO_RATE_MAX}
-              step={0.01}
-              value={typed}
-              placeholder={String(Math.round(rate * 100) / 100)}
-              autoFocus
-              onChange={(event) => setTyped(event.target.value)}
-              onBlur={commitTyped}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') { event.preventDefault(); commitTyped(); }
-                // W42: Escape cancels the typing only, never also closes the desk around it.
-                else if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setTyped(null); }
-              }}
-            />
-          )}
-        </strong>
-      </div>
-      <div className="audio-speed-row">
-        {stepButton(-1)}
-        <input
-          type="range"
-          className="audio-manager-seek audio-speed-slider"
-          aria-label="Playback speed"
-          min={PCT_MIN}
-          max={PCT_MAX}
-          step={1}
-          value={pct}
-          aria-valuetext={formatAudioRate(rate)}
-          style={/** @type {any} */ ({ '--seek-pct': (((pct - PCT_MIN) / (PCT_MAX - PCT_MIN)) * 100).toFixed(2) + '%' })}
-          onChange={(event) => applyPct(Number(event.target.value))}
-          onKeyDown={(event) => {
-            if (!event.shiftKey) return;
-            const dir = (event.key === 'ArrowUp' || event.key === 'ArrowRight') ? 1
-              : (event.key === 'ArrowDown' || event.key === 'ArrowLeft') ? -1 : 0;
-            if (!dir) return;
-            event.preventDefault();
-            applyPct(pct + dir * 5);
-          }}
-        />
-        {stepButton(1)}
-      </div>
-      <div className="audio-manager-segment" role="radiogroup" aria-label="Playback speed presets">
+    <div className="audio-speed">
+      <div className="np-chips audio-speed-presets" role="radiogroup" aria-label="Playback speed presets">
         {AUDIO_PLAYBACK_RATES.map((preset) => {
           const on = Math.abs(rate - preset) < 0.005;
           return (
@@ -153,6 +134,11 @@ export function AudioSpeedControl({ rate }) {
             >{formatAudioRate(preset)}</button>
           );
         })}
+      </div>
+      <div className="audio-speed-row">
+        {stepButton(-1)}
+        <span className="audio-speed-fine">Fine-tune by {'1\u00a0%'}</span>
+        {stepButton(1)}
       </div>
     </div>
   );

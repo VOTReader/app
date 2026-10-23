@@ -175,47 +175,47 @@ describe('the mini-player song skin (final-08, player brief picture 03)', () => 
   it('the bar and desk buttons take the reading serif, and the journal button lifts over the bar (W3-07, W3-01)', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const css = readFileSync(resolve(here, '../../../app.css'), 'utf-8');
-    expect(css).toContain(':where(.audio-bar, .audio-manager-sheet) button { font-family: inherit; }');
+    expect(css).toContain(':where(.audio-bar, .audio-manager-sheet, .np-sheet) button { font-family: inherit; }');
     const journal = readFileSync(resolve(here, '../../styles/journal-styles.js'), 'utf-8');
     // cz1: the FAB rides the bottom dock, whose player row is the bar plus its pull tab while one is open.
     expect(journal).toContain('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px));');
   });
 });
 
-describe('the listening desk in song mode (final-04)', () => {
+describe('the full player in song mode (pictures 08-09, pl-l2)', () => {
   const openDesk = () => {
     render(<AudioPlayerBar />);
     fireEvent.click(document.querySelector('.audio-bar-summary'));
     return screen.getByRole('dialog');
   };
+  /** The Lyrics view takes the cover's place (picture 09). */
+  const openLyrics = (desk) => { fireEvent.click(within(desk).getByRole('button', { name: 'Lyrics' })); return desk; };
 
-  it('heads with the cover, the version and Open the letter; no speed card', () => {
+  it('heads with the cover, the version chip and From the letter; no Speed', () => {
     playFamilyA();
     const desk = openDesk();
-    expect(desk.querySelector('.song-desk-cover img')).not.toBeNull();
+    expect(desk.querySelector('.np-cover img')).not.toBeNull();
     expect(within(desk).getByRole('heading', { level: 2 }).textContent).toBe('Come, Love Awaits You');
-    fireEvent.click(within(desk).getByRole('button', { name: /Open the letter — Come, Love Awaits You/ }));
+    expect(within(desk).getByRole('button', { name: /^Version: / }).textContent).toMatch(/1 of 2/);
+    fireEvent.click(within(desk).getByRole('button', { name: /From the letter — Come, Love Awaits You/ }));
     expect(window.__openAudioText).toHaveBeenCalledTimes(1);
-    expect(Array.from(document.querySelectorAll('.audio-manager-tool-head span')).map((n) => n.textContent)).not.toContain('Speed');
+    expect(screen.queryByRole('button', { name: /^Speed/ })).toBeNull();
   });
 
-  it('(W-02) the title and Song page open the song page, and the desk closes; the song plays on', () => {
+  it('(W-02) the ⋯ menu opens the song page, and the player closes; the song plays on', () => {
     window.__openSongs = vi.fn();
     try {
       playFamilyA();
-      let desk = openDesk();
-      fireEvent.click(within(desk).getByRole('button', { name: /^Song page/ }));
+      const desk = openDesk();
+      fireEvent.click(within(desk).getByRole('button', { name: /^More for Come, Love Awaits You/ }));
+      fireEvent.click(screen.getByRole('menuitem', { name: /Song page/ }));
       expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'song', v: 'fam-a' }], '');
       expect(screen.queryByRole('dialog')).toBeNull();
-      cleanup();
-      desk = openDesk();
-      fireEvent.click(within(desk).getByRole('button', { name: /Come, Love Awaits You — open its song page/ }));
-      expect(window.__openSongs).toHaveBeenCalledTimes(2);
       expect(AudioPlayer.getState().status).not.toBe('idle');
     } finally { delete window.__openSongs; }
   });
 
-  it('(K3) a single-version song reaches its Keep from the desk: Keep · size, then On this phone · Remove', async () => {
+  it('(K3) a single-version song reaches its Keep from the player: Keep · size, then On this phone, Remove in the menu', async () => {
     const { SongKeep } = await import('../../utils/song-keep.js');
     const map = new Map();
     globalThis.OfflineSongsStore = {
@@ -237,8 +237,9 @@ describe('the listening desk in song mode (final-04)', () => {
       await act(async () => { await SongKeep.ready(); });
       cleanup();
       const desk2 = openDesk();
-      expect(desk2.querySelector('.song-desk-keep').textContent).toContain('On this phone');
-      await act(async () => { fireEvent.click(within(desk2).getByRole('button', { name: 'Remove Lead Me To That Place from this phone' })); });
+      expect(within(desk2).getByRole('button', { name: 'Lead Me To That Place is on this phone' }).textContent).toContain('On this phone');
+      fireEvent.click(within(desk2).getByRole('button', { name: /^More for Lead Me To That Place/ }));
+      await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Remove from this phone/ })); });
       expect(map.has('bbbbbbbbbbb1')).toBe(false);
     } finally { keepSpy.mockRestore(); delete globalThis.OfflineSongsStore; SongKeep._reset(); }
   });
@@ -268,19 +269,19 @@ describe('the listening desk in song mode (final-04)', () => {
     playFamilyA();
     at(40);
     const desk = openDesk();
-    expect(within(desk).getByText('Switches to another version of this song, from the start.')).toBeTruthy();
-    fireEvent.click(within(desk).getByRole('radio', { name: 'Pop' }));
+    fireEvent.click(within(desk).getByRole('button', { name: /^Version: / }));
+    fireEvent.click(screen.getByRole('button', { name: /^Pop/ }));
     const st = AudioPlayer.getState();
     expect(st.queue[st.qi].key).toBe('song:aaaaaaaaaaa2');
     expect(el().currentTime).toBe(0);
   });
 
-  it('the transport is labelled Shuffle · Previous · Pause · Next · Repeat, and repeat cycles off → all → one', () => {
+  it('the transport is Shuffle · Previous · Pause · Next · Repeat, and repeat cycles off → all → one', () => {
     playFamilyA();
     emit('playing');
     const desk = openDesk();
-    const words = Array.from(desk.querySelectorAll('.song-desk-word')).map((n) => n.textContent);
-    expect(words).toEqual(['Shuffle', 'Previous', 'Pause', 'Next', 'Repeat']);
+    const names = Array.from(desk.querySelectorAll('.np-transport button')).map((n) => n.getAttribute('aria-label'));
+    expect(names).toEqual(['Shuffle', 'Previous song', 'Pause', 'Next song', 'Repeat: off']);
     fireEvent.click(within(desk).getByRole('button', { name: 'Repeat: off' }));
     expect(AudioPlayer.getState().repeat).toBe('all');
     fireEvent.click(within(desk).getByRole('button', { name: 'Repeat: the queue' }));
@@ -291,7 +292,7 @@ describe('the listening desk in song mode (final-04)', () => {
 
   it('synced lyrics wash the line being sung; Follow along can be turned off', async () => {
     playFamilyA();
-    const desk = openDesk();
+    const desk = openLyrics(openDesk());
     expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
     at(11);
     expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('Come, love awaits you');
@@ -314,7 +315,7 @@ describe('the listening desk in song mode (final-04)', () => {
     try {
       playFamilyA();
       emit('playing');
-      const desk = openDesk();
+      const desk = openLyrics(openDesk());
       expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
       // CI's order (flaked 10-15, run 38702531793): a frame lands before the page's clock moves, so the card
       // already holds a frame reading (-1 at 0 s) and keeps it until its next frame reads the new time.
@@ -342,7 +343,7 @@ describe('the listening desk in song mode (final-04)', () => {
     try {
       playFamilyA();
       emit('playing');
-      const desk = openDesk();
+      const desk = openLyrics(openDesk());
       expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
       at(20);
       el().readyState = 4;
@@ -360,7 +361,7 @@ describe('the listening desk in song mode (final-04)', () => {
 
   it('a song whose lyrics are not synced never paints a line', async () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-a' }, startId: 'aaaaaaaaaaa2' }); });
-    const desk = openDesk();
+    const desk = openLyrics(openDesk());
     expect(await within(desk).findByText('Plain words one')).toBeTruthy();
     at(11);
     expect(desk.querySelector('.song-lyrics-line.is-now')).toBeNull();
@@ -369,13 +370,13 @@ describe('the listening desk in song mode (final-04)', () => {
 
   it('no lyrics hides the card; an instrumental says Instrumental', () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
-    let desk = openDesk();
+    let desk = openLyrics(openDesk());
     expect(desk.querySelector('.song-lyrics-card')).toBeNull();
     cleanup();
     AudioPlayer.stop();
     adoptSongCatalog(catalog({ bbbbbbbbbbb1: { dl: 'instrumental' } }));
     act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
-    desk = openDesk();
+    desk = openLyrics(openDesk());
     expect(desk.querySelector('.song-lyrics-card').textContent).toContain('Instrumental');
   });
 });
@@ -405,7 +406,7 @@ describe('lyricLineAt', () => {
 
 /* The verbatim gate (Corbin 2026-09-25): the desk never says a song's words are the letter's unless it sings them.
    Golden: "Born Again" (Rock, hmarie777) sings wholly new lyrics. */
-describe('the listening desk: the verbatim gate', () => {
+describe('the full player: the verbatim gate', () => {
   beforeEach(() => {
     LYRICS['620080f78d26'] = { v: 1, id: '620080f78d26', synced: false, lines: [{ t: 'New words of the song', s: 1, e: 4 }] };
     LYRICS['179aabfb6748'] = { v: 1, id: '179aabfb6748', synced: false, lines: [{ t: 'Come, love awaits you', s: 1, e: 4 }] };
@@ -424,18 +425,20 @@ describe('the listening desk: the verbatim gate', () => {
     fireEvent.click(document.querySelector('.audio-bar-summary'));
     return screen.getByRole('dialog');
   };
+  const openLyrics = (desk) => { fireEvent.click(within(desk).getByRole('button', { name: 'Lyrics' })); return desk; };
 
   it('(golden) "Born Again": Inspired by the letter (still opens it), lyrics transcribed from the song, no claim', async () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'born-again' } }); });
-    const desk = openDesk();
+    const desk = openLyrics(openDesk());
     expect(await within(desk).findByText('New words of the song')).toBeTruthy();
+    fireEvent.click(within(desk).getByRole('button', { name: 'Hide lyrics' }));
     fireEvent.click(within(desk).getByRole('button', { name: /^Inspired by the letter — Born Again/ }));
     expect(window.__openAudioText).toHaveBeenCalledTimes(1);
   });
 
   it('(golden) "Born Again": the lyrics footer names the song, not the letter', async () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'born-again' } }); });
-    const desk = openDesk();
+    const desk = openLyrics(openDesk());
     expect(await within(desk).findByText('New words of the song')).toBeTruthy();
     expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Lyrics transcribed from the song');
     expect(desk.textContent).not.toMatch(/Words from the letter|From the letter/i);
@@ -443,9 +446,10 @@ describe('the listening desk: the verbatim gate', () => {
 
   it('a verbatim song keeps Open the letter and Words from the letter', async () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'come-love-awaits-you' } }); });
-    const desk = openDesk();
+    const desk = openLyrics(openDesk());
     expect(await within(desk).findByText('Come, love awaits you')).toBeTruthy();
-    expect(within(desk).getByRole('button', { name: /^Open the letter — Come, Love Awaits You/ })).toBeTruthy();
     expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
+    fireEvent.click(within(desk).getByRole('button', { name: 'Hide lyrics' }));
+    expect(within(desk).getByRole('button', { name: /^From the letter — Come, Love Awaits You/ })).toBeTruthy();
   });
 });

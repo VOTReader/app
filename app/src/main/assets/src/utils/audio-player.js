@@ -85,8 +85,8 @@ import {
   switchVoiceInPlace,
 } from './audio-player/queue.js';
 import { _flushOnHide, _onBeforeUpdateReload, _resumeAfterUpdate } from './audio-player/restore.js';
-import { liveLetter, sectionLetterKeyAt, sectionOpeningKey } from './audio-player/sections.js';
-import { clearSleepTimer, getSleepRemainingSeconds, setSleepAtTrackEnd, setSleepTimer } from './audio-player/sleep.js';
+import { liveLetter, sectionLetterKeyAt, sectionMarks, sectionOpeningKey } from './audio-player/sections.js';
+import { clearSleepTimer, getSleepRemainingSeconds, setSleepAtQueueEnd, setSleepAtTrackEnd, setSleepTimer } from './audio-player/sleep.js';
 import { playSongs, setRepeat, setShuffle, switchSongVersion } from './audio-player/songs.js';
 import {
   next,
@@ -129,6 +129,7 @@ import {
  * @property {number} sleepEndsAt - epoch ms, 0 when no sleep timer is armed
  * @property {number} sleepMinutes - the countdown preset that was armed, 0 when none
  * @property {boolean} sleepAtTrackEnd - stop when the CURRENT recording ends
+ * @property {boolean} sleepAtQueueEnd - stop when the last recording in the queue ends; the run does not extend
  * @property {boolean} restoring - the bar is a boot placeholder; the real queue
  *   has not been rebuilt yet, so its SHAPE is unknown (see _pendingRestore)
  * @property {'letter'|'collection'|'section'|'custom'|'songs'|''} sourceMode - how this
@@ -221,6 +222,7 @@ export const AudioPlayer = {
   sectionLetterKeyAt,
   sectionOpeningKey,
   liveLetter,
+  sectionMarks,
   playTrack,
   toggle,
   next,
@@ -231,6 +233,7 @@ export const AudioPlayer = {
   getSleepRemainingSeconds,
   setSleepTimer,
   setSleepAtTrackEnd,
+  setSleepAtQueueEnd,
   clearSleepTimer,
   playAt,
   removeUpcoming,

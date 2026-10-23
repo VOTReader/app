@@ -64,7 +64,7 @@ export function _setNative(v) { _native = v; }
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null, failed: null };
+export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, sleepAtQueueEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null, failed: null };
 /** The READING speed — the listener's chosen rate for letters and chapters.
  *  `_state.rate` is the EFFECTIVE rate of what is playing, which is 1 for a
  *  song: the reader's 1.5× must not warp music (W3-05), and it must come back
@@ -134,6 +134,21 @@ export function _offline() {
  *  the screen reader was saying, over the audio the listener had started. @param {string} text */
 export function _toast(text) {
   showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast', text, ariaLive: 'polite' });
+}
+
+/** A notice with one action on the player's toast spot ("Sleep timer ended · Keep listening +15 min", brief 3b):
+ *  the button is the toast's own, replaced with its words by the next notice (showToast writes textContent).
+ *  @param {string} text @param {string} label @param {() => void} act */
+export function _toastAction(text, label, act) {
+  showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast vot-toast-action', text, ariaLive: 'polite', durationMs: 8000 });
+  const el = typeof document !== 'undefined' ? document.getElementById(AUDIO_TOAST_ID) : null;
+  if (!el) return;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'vot-escape-btn';
+  btn.textContent = label;
+  btn.addEventListener('click', () => { el.classList.remove('show'); act(); }, { once: true });
+  el.appendChild(btn);
 }
 
 /** Keep native's next recording in step with the queue and its modes (cheap: one short JSON compare). */

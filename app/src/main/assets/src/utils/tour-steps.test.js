@@ -283,10 +283,9 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
     expect(p.tip).toBe('Tap it now, or press Next and I will open it for you.');
     // Leads with the teaching (the Tour Reviewer's D6, 2026-09-13): where a card is cut, the cut line
     // was Corbin's sentence — "Pause, skip or slow the reading here. Under" and nothing more at 1.8.
-    expect(p.after).toBe('Tap another edition under Listening now: the chapter starts again in that voice, and the rest follow. Pause, skip or slow the reading here. Press Next when ready.');
-    // The sheet's own kicker, so the reader finds the row under the words the card used.
-    expect(p.after).toContain('Listening now');
-    expect(TOUR_WORDS).toContain('Listening now');
+    expect(p.after).toBe('Tap the edition under the title to hear another: the chapter starts again in that voice, and the rest follow. Pause, skip or slow it here. Press Next when ready.');
+    // The full player (pl-l2) has no kicker to name: the card points at the chip by its place, under the title.
+    expect(p.after).toContain('under the title');
   });
 
   it('the back-to-words stop: the sheet\'s ‹, pressed; no sheet on the page counts as pressed; nothing ringed after', () => {
@@ -317,7 +316,7 @@ describe('tour-steps — the player stops, and the tour ends over the Bible', ()
   it('the back-to-words stop\'s words, verbatim — nothing the reader can try inside the tour and fail', () => {
     const b = at('back-to-words');
     expect(b.title).toBe('Close the player, keep listening');
-    expect(b.text).toBe('Tap ‹ at the top of the player to put it away. The reading goes on.');
+    expect(b.text).toBe('Tap ⌄ at the top of the player to put it away. The reading goes on.');
     expect(b.tip).toBe('Tap it now, or press Next and I will do it for you.');
     expect(b.after).toBe('You are back with the words, and they keep lighting up as they are read. A letter\'s reader is changed the same way. Press Next when you are ready.');
     expect(b.text).not.toContain('anywhere above it');     // the dim panes cover that region during the stop

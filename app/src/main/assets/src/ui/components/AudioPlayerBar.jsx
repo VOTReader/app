@@ -241,7 +241,7 @@ export function AudioPlayerBar() {
   const left = dur && !starting ? timeLeft(st.time, dur) : null;
   // Sleep and speed chips (brief 3a: a small moon "15m" when sleep is set, "1.5×" when speed isn't 1×).
   const sleepSec = st.sleepEndsAt ? AudioPlayer.getSleepRemainingSeconds() : 0;
-  const sleepChip = st.sleepAtTrackEnd ? 'End' : sleepSec > 0 ? Math.max(1, Math.ceil(sleepSec / 60)) + 'm' : null;
+  const sleepChip = st.sleepAtTrackEnd || st.sleepAtQueueEnd ? 'End' : sleepSec > 0 ? Math.max(1, Math.ceil(sleepSec / 60)) + 'm' : null;
   const speedChip = st.rate && st.rate !== 1 ? rateLabel(st.rate) : null;
 
   const songId = songIdOfKey(track.key);

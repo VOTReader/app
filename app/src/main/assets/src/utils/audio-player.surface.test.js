@@ -11,9 +11,9 @@ const METHODS = [
   'readerLabel', 'renditionsFor', 'setPreferredReader', 'playbackTracks', 'playableNow', 'listenResume', 'listenHere',
   'playLetter', 'playCollection', 'playSection', 'playBibleBook', 'playPortion', 'portionTracks', 'playSongs',
   'setShuffle', 'switchSongVersion', 'setRepeat', 'setLoop', 'clearLoop', 'canLoop', 'isNative',
-  'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter',
+  'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter', 'sectionMarks',
   'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'setPlaybackRate',
-  'getSleepRemainingSeconds', 'setSleepTimer', 'setSleepAtTrackEnd', 'clearSleepTimer',
+  'getSleepRemainingSeconds', 'setSleepTimer', 'setSleepAtTrackEnd', 'setSleepAtQueueEnd', 'clearSleepTimer',
   'playAt', 'removeUpcoming', 'moveUpcoming', 'clearUpcoming', 'switchVoiceInPlace', 'stop', 'stopWithUndo', 'undoStop', 'pauseIfPlaying', 'syncKeepAlive',
 ];
 
@@ -36,7 +36,7 @@ describe('audio-player public surface', () => {
     const { AudioPlayer } = await import('./audio-player.js');
     const s = AudioPlayer.getState();
     expect(Object.keys(s).sort()).toEqual(['duration', 'failed', 'loop', 'qi', 'queue', 'rate', 'repeat', 'restoring', 'shuffle',
-      'sleepAtTrackEnd', 'sleepEndsAt', 'sleepMinutes', 'sourceMode', 'status', 'time']);
+      'sleepAtQueueEnd', 'sleepAtTrackEnd', 'sleepEndsAt', 'sleepMinutes', 'sourceMode', 'status', 'time']);
     expect(s.status).toBe('idle');
     expect(AudioPlayer.getState()).toBe(s);   // the live object, never a copy
   });

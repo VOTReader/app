@@ -62,7 +62,7 @@ import {
 import { _maybePrefetchNext } from './prefetch.js';
 import { _seamStop, _seamTick } from './seam.js';
 import { _followSectionLetter, _resetSectionFollow, _setSecLastT } from './sections.js';
-import { _sleepAtTrackEndFire, _sleepTimerFire, _syncSleepVolume } from './sleep.js';
+import { _sleepAtTrackEndFire, _sleepTimerFire, _sleepsAtThisEnd, _syncSleepVolume } from './sleep.js';
 
 /* ── module state (singleton) ─────────────────────────────────────────── */
 
@@ -256,7 +256,7 @@ function _ensureEl() {
       // The sleep mode a clock cannot express, checked BEFORE the advance:
       // "stop when this recording ends" has no computable moment (playback
       // rate and buffering both move it), so the END EVENT is the trigger.
-      if (_state.sleepAtTrackEnd) _sleepAtTrackEndFire();
+      if (_sleepsAtThisEnd()) _sleepAtTrackEndFire();
       else if (late._repeatMode() === 'one') late._replayCurrent();
       else late.next(true);
     } finally { _setFinishedUrl(null); }
@@ -279,7 +279,7 @@ function _ensureEl() {
  * @returns {{ url: string, title: string, artist: string, album: string, art: string, kind: string, rate: number }[]}
  */
 function _nativeUpcoming() {
-  if (_state.sleepAtTrackEnd || _pendingRestore || _state.loop) return [];
+  if (_sleepsAtThisEnd() || _pendingRestore || _state.loop) return [];
   const cur = _state.queue[_state.qi];
   if (!cur) return [];
   let t = null;

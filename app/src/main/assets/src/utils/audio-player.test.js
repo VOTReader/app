@@ -1161,7 +1161,9 @@ describe('audio-player — sleep at end of track', () => {
     expect(AudioPlayer.getState().queue).toHaveLength(4);   // pause, never stop
     expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
     expect(el().paused).toBe(true);
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Sleep timer ended. Playback paused.');
+    // The words, then the one action every sleep end offers (pl-l2): 'Keep listening +15 min'.
+    expect(document.getElementById(AUDIO_TOAST_ID).firstChild.textContent).toBe('Sleep timer ended. Playback paused.');
+    expect(document.querySelector('#' + AUDIO_TOAST_ID + ' button').textContent).toBe('Keep listening +15 min');
 
     // One-shot: the next boundary advances normally.
     AudioPlayer.toggle();

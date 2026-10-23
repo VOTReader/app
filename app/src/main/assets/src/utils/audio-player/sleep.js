@@ -7,7 +7,7 @@ import {
   late,
   _notify,
   _state,
-  _toast,
+  _toastAction,
 } from './core.js';
 
 /** Sleep timer — intentionally session-only: a closed app must never wake just to pause audio. */
@@ -17,10 +17,14 @@ let _sleepTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
  *  @returns {void} */
 export function _clearSleepTimer(notify = true) {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
-  if (_state.sleepEndsAt || _state.sleepAtTrackEnd) {
+  const heldRun = _state.sleepAtQueueEnd;
+  if (_state.sleepEndsAt || _state.sleepAtTrackEnd || _state.sleepAtQueueEnd) {
     _state.sleepEndsAt = 0;
     _state.sleepMinutes = 0;
     _state.sleepAtTrackEnd = false;
+    _state.sleepAtQueueEnd = false;
+    // "End of the queue" held the run back from the site order; let go on its last recording, it joins it again.
+    if (heldRun && _state.qi + 1 >= _state.queue.length) late._extendQueue();
     if (notify) _notify();
   }
   _syncSleepVolume();   // a fade in progress ends with the timer: full voice again
@@ -48,7 +52,7 @@ function _sleepFadeVolume() {
   let left = Infinity;
   if (_state.sleepEndsAt) {
     left = (_state.sleepEndsAt - Date.now()) / 1000;
-  } else if (_state.sleepAtTrackEnd) {
+  } else if (_sleepsAtThisEnd()) {
     const d = Number(_state.duration) || 0;
     if (d > 0) left = Math.max(0, d - (Number(_state.time) || 0)) / (Number(_state.rate) || 1);
   }
@@ -76,12 +80,26 @@ export function _syncSleepVolume() {
  */
 export function _sleepAtTrackEndFire() {
   _state.sleepAtTrackEnd = false;
+  _state.sleepAtQueueEnd = false;
   const wasLive = _state.status === 'playing' || _state.status === 'loading';
   if (wasLive && _el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
   late._markPaused();
   _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
   if (!wasLive) _notify();
-  if (wasLive) _toast('Sleep timer ended. Playback paused.');
+  if (wasLive) _sleepEndedToast();
+}
+
+/** Every sleep end says so, with one tap to play on for another quarter hour (brief 3b, pl-l2). */
+function _sleepEndedToast() {
+  _toastAction('Sleep timer ended. Playback paused.', 'Keep listening +15 min', () => {
+    late.toggle();
+    setSleepTimer(15);
+  });
+}
+
+/** Is the playing recording the last the armed "End of the queue" lets play? @returns {boolean} */
+export function _sleepsAtThisEnd() {
+  return _state.sleepAtTrackEnd || (_state.sleepAtQueueEnd && _state.qi + 1 >= _state.queue.length);
 }
 
 /**
@@ -117,7 +135,7 @@ export function _sleepTimerFire() {
   late._markPaused();
   _syncSleepVolume();   // paused at the bottom of the fade; the next Play is at full voice
   if (!wasLive) _notify();
-  if (wasLive) _toast('Sleep timer ended. Playback paused.');
+  if (wasLive) _sleepEndedToast();
 }
 
 export function setSleepTimer(minutes) {
@@ -125,6 +143,7 @@ export function setSleepTimer(minutes) {
   if (_state.status === 'idle' || !_state.queue.length) return false;
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
   _state.sleepAtTrackEnd = false;   // one sleep arming at a time
+  _state.sleepAtQueueEnd = false;
   _state.sleepEndsAt = Date.now() + mins * 60000;
   // The PRESET, kept beside the deadline: the desk shows which chip is armed,
   // and the remaining seconds cannot answer that (a 30-minute timer with 15
@@ -151,6 +170,26 @@ export function setSleepAtTrackEnd() {
   _state.sleepEndsAt = 0;
   _state.sleepMinutes = 0;
   _state.sleepAtTrackEnd = true;
+  _state.sleepAtQueueEnd = false;
+  _syncSleepVolume();
+  _notify();
+  return true;
+}
+
+/**
+ * The sleep sheet's "End of the queue" (brief 3b): play out what is in Up next, then pause. While it is armed the
+ * run does not go on into the site order (queue.js _extendQueue asks), so the end of the queue is the end of what
+ * the listener can see. Session-only, like the other modes.
+ *
+ * @returns {boolean}
+ */
+export function setSleepAtQueueEnd() {
+  if (_state.status === 'idle' || !_state.queue.length) return false;
+  if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  _state.sleepEndsAt = 0;
+  _state.sleepMinutes = 0;
+  _state.sleepAtTrackEnd = false;
+  _state.sleepAtQueueEnd = true;
   _syncSleepVolume();
   _notify();
   return true;

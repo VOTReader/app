@@ -1,54 +1,46 @@
 /*
-   AudioManagerSheet — the expanded surface for the one AudioPlayer singleton.
+   AudioManagerSheet — the full Now Playing screen (player brief 3b, pl-l2;
+   pictures 05-09 in D:/Swarm/calls/player-mockups/). It replaced the desk
+   sheet: the bar's tap opens it full screen (a right-side panel on a wide
+   window), ⌄ or a drag down on its head closes it.
+
+     head        ⌄ · "VOLUME ONE · LETTER 3 OF 30" · ⋯ (Save, Open the reading)
+     body        a reading: the title in the reading serif, "Read by …" and the
+                 Voice chip, "Open the reading ›"; a WTLB compilation names the
+                 letter under the clock and "Entry 12 of 25 in this recording".
+                 A song: its cover (or its lyrics), the version chip, the letter
+                 it comes from, "Do you like this song?"
+     dock        pinned to the thumb zone, never scrolled away (fixes 27a, U04.3):
+                 the scrubber (a compilation's letters as ticks), the transport
+                 (reading: prev · −15 · play · +15 · next; song: shuffle · prev ·
+                 play · next · repeat) and the bottom row (Speed · Sleep · Up next
+                 · Read along; a song: Lyrics · Sleep · Up next · On this phone),
+                 each of which opens a small sheet (PlayerSheets.jsx).
 
    This is deliberately a controller, never a second player: all transport,
    queue edits, persistence, Media Session integration, and audio arbitration
-   remain in utils/audio-player.js. The sheet only renders that public state.
+   remain in utils/audio-player.js. The screen only renders that public state.
 */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
-import { songById } from '../../utils/song-catalog.js';
-import { SongDeskHead, SongVersionsCard, SongTransport, SongLyricsCard } from './SongDeskParts.jsx';
+import { songById, familyById, versionsOf, isVerbatimSong } from '../../utils/song-catalog.js';
+import { SongCover, ChoiceSheet, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, songClock, songLetterOf } from './SongParts.jsx';
+import { SongLyricsCard } from './SongDeskParts.jsx';
 import { SongVoteAsk } from './SongVoteParts.jsx';
-import { AudioSpeedControl } from './AudioSpeedControl.jsx';
+import { useSongKeep, useSongsOnline } from './SongKeepParts.jsx';
+import { formatSongBytes } from '../../utils/song-keep.js';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
-import { ConfirmStrip } from './ConfirmStrip.jsx';
-import { SheetHandle } from './SheetHandle.jsx';
-import { hasTextDestination } from './AudioShelf.jsx';
-import { TrackOnPhone } from './OfflineAudioControls.jsx';
+import { useDragToClose } from './SheetHandle.jsx';
+import { hasTextDestination, PlayIcon, PauseIcon } from './AudioShelf.jsx';
+import { RowMenu } from './RowMenu.jsx';
+import { SpeedSheet, SleepSheet, VoiceSheet, UpNextSheet } from './PlayerSheets.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** @returns {any | null} */
 function libraryStore() {
   return /** @type {any} */ (globalThis).AudioLibraryStore || null;
 }
-
-/** @param {string | null | undefined} value @returns {string} */
-function trackLabel(value) { return value || 'Untitled recording'; }
-
-/** @param {number} seconds @returns {string} */
-function sleepLabel(seconds) {
-  if (!seconds) return 'Off';
-  const minutes = Math.ceil(seconds / 60);
-  return minutes + ' min left';
-}
-
-/* ── the queue as a picker (owner directive 2026-08-09) ───────────────────
-   The list used to start at qi + 1, so the recording playing and everything
-   already heard were simply absent — a played chapter could not be picked
-   again without rebuilding the queue. It now renders the WHOLE queue.
-
-   Which makes length the new problem: a whole Bible edition queues 1,189
-   chapters, and 1,189 rows of DOM is a real cost for a sheet that opens on a
-   phone. The answer is deliberately dumb — a WINDOW around the current row
-   plus two "show more" expanders. No virtualization, no scroll math, nothing
-   to go wrong when the queue is edited underneath it. */
-
-/** Above this many rows the window applies; below it the queue renders whole. */
-const QUEUE_WINDOW_MIN = 80;
-/** Rows either side of the current one, and the step each expander adds. */
-const QUEUE_PAGE = 40;
 
 /**
  * Split a track key ("volKey:letterId") into its two halves, or null when the
@@ -178,429 +170,357 @@ function voiceChoices(current) {
   };
 }
 
+/* ── icons (the pictures' line set) ─────────────────────────────────────── */
+const ICON = { viewBox: '0 0 24 24', 'aria-hidden': true, fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: /** @type {'round'} */ ('round'), strokeLinejoin: /** @type {'round'} */ ('round') };
+function DownIcon() { return <svg {...ICON} strokeWidth={2}><path d="M5 9l7 7 7-7" /></svg>; }
+function PrevItemIcon() { return <svg {...ICON}><path d="M17 5L9 12l8 7z" /><path d="M6.5 5v14" /></svg>; }
+function NextItemIcon() { return <svg {...ICON}><path d="M7 5l8 7-8 7z" /><path d="M17.5 5v14" /></svg>; }
+/** A curved arrow round "15": back (dir -1) or forward (dir 1). @param {{ dir: number }} props */
+function SkipIcon({ dir }) {
+  return (
+    <svg {...ICON} strokeWidth={1.6}>
+      {dir < 0
+        ? <><path d="M9 4.5L6 7.5l3 3" /><path d="M6.5 7.5H13a6.5 6.5 0 1 1-6.4 7.6" /></>
+        : <><path d="M15 4.5l3 3-3 3" /><path d="M17.5 7.5H11a6.5 6.5 0 1 0 6.4 7.6" /></>}
+      <text x="12" y="17.4" textAnchor="middle" fontSize="7.6" fontWeight="600" fill="currentColor" stroke="none" fontFamily="inherit">15</text>
+    </svg>
+  );
+}
+function MoonIcon() { return <svg {...ICON}><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" /></svg>; }
+function ListIcon() { return <svg {...ICON}><path d="M5 7h14M5 12h14M5 17h9" /></svg>; }
+function BookIcon() { return <svg {...ICON} strokeWidth={1.5}><path d="M12 6.5C9.8 5 7 4.6 3.5 5v13c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5c-3.5-.4-6.3 0-8.5 1.5z" /><path d="M12 6.5v13" /></svg>; }
+function QuoteIcon() { return <svg {...ICON} fill="currentColor" stroke="none"><path d="M10 7c-2.8.6-4.6 2.8-4.6 5.9V17H10v-4.6H7.7c.1-1.6 1-2.7 2.6-3.1zm8 0c-2.8.6-4.6 2.8-4.6 5.9V17H18v-4.6h-2.3c.1-1.6 1-2.7 2.6-3.1z" /></svg>; }
+function KeepIcon() { return <svg {...ICON}><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 19.5h14" /></svg>; }
+function KeptIcon() { return <svg {...ICON}><circle cx="12" cy="12" r="8.5" /><path d="M8.2 12.3l2.6 2.6 5-5.2" /></svg>; }
+
+/**
+ * What the kicker counts this recording as: "Letter 3 of 30", "Chapter 3 of 50", "Recording 2 of 6".
+ * @param {any} track @returns {string}
+ */
+function placeNoun(track) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  if (!key) return 'Recording';
+  if (key.lastIndexOf('bible-', 0) === 0 || key.lastIndexOf('study:', 0) === 0) return 'Chapter';
+  return 'Letter';
+}
+
+/** What "End of this …" in the sleep sheet ends. @param {any} track @param {boolean} isSong @returns {string} */
+function sleepNoun(track, isSong) {
+  if (isSong) return 'song';
+  const noun = placeNoun(track);
+  return noun === 'Recording' ? 'recording' : noun.toLowerCase();
+}
+
+/**
+ * The bottom row's one button: an icon (or the speed) in a box, its word under it.
+ * @param {{ label: string, word: string, onClick: () => void, children: any, badge?: number, on?: boolean, disabled?: boolean, haspopup?: boolean, className?: string }} props
+ */
+function Tool({ label, word, onClick, children, badge = 0, on = false, disabled = false, haspopup = true, className = '' }) {
+  return (
+    <button
+      type="button"
+      className={'np-tool' + (on ? ' is-on' : '') + (className ? ' ' + className : '')}
+      aria-label={label}
+      aria-haspopup={haspopup ? 'dialog' : undefined}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="np-tool-box">
+        {children}
+        {badge > 0 ? <span className="np-tool-badge" aria-hidden="true">{badge > 99 ? '99+' : badge}</span> : null}
+      </span>
+      <span className="np-tool-word" aria-hidden="true">{word}</span>
+    </button>
+  );
+}
+
+/**
+ * The scrubber with elapsed and remaining time; a compilation's letters are ticks along it.
+ * @param {{ state: any, marks: Array<{ key: string, start: number, title: string | null }> | null }} props
+ */
+function Scrubber({ state, marks }) {
+  const duration = Math.max(0, Number(state.duration) || 0);
+  const time = Math.max(0, Number(state.time) || 0);
+  // The clock stays hidden until the length is known (brief 3g): no "0:00 / 0:00" while it loads.
+  const known = duration > 0;
+  return (
+    <div className="np-scrub audio-manager-progress">
+      {known && marks && marks.length > 1 ? (
+        <div className="np-ticks" aria-hidden="true">
+          {marks.map((m) => <span key={m.key} style={{ left: Math.min(100, (m.start / duration) * 100).toFixed(2) + '%' }} />)}
+        </div>
+      ) : null}
+      <AudioSeekSlider className="audio-manager-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
+      <div className="audio-manager-time np-times">
+        <span>{known ? formatTime(time) : ''}</span>
+        <span>{known ? '−' + formatTime(Math.max(0, duration - time)) : ''}</span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * @param {{ open: boolean, state: import('../../utils/audio-player.js').AudioPlayerState, onClose: () => void }} props
  */
 export function AudioManagerSheet({ open, state, onClose }) {
-  // A sheet that will render nothing (no current track) must not claim the
-  // modal registry or the close-sheet bridge — an invisible topmost modal
-  // would swallow Escape/back. Hooks stay unconditional; only `active` and
-  // the bridge effect gate on actually having something to show.
+  // A screen that will render nothing (no current track) must not claim the modal registry or the close-sheet
+  // bridge: an invisible topmost modal would swallow Escape/back. Hooks stay unconditional; only `active` and the
+  // bridge effect gate on actually having something to show.
   const hasCurrent = !!(Array.isArray(state.queue) && state.queue[state.qi]);
   const renders = open && hasCurrent;
   const trapRef = useFocusTrap(renders);
   useModalRegistry({ id: 'audio-manager-sheet', dismiss: onClose, active: renders });
+  /** Which small sheet is up over the player, if any. */
+  const [sheet, setSheet] = React.useState(/** @type {''|'speed'|'sleep'|'voice'|'upnext'|'versions'} */ (''));
+  /** A song's Lyrics view in place of its cover. */
+  const [lyrics, setLyrics] = React.useState(false);
+  React.useEffect(() => { if (!open) { setSheet(''); setLyrics(false); } }, [open]);
+  const closeSheet = React.useCallback(() => setSheet(''), []);
 
-  // AudioLibraryStore belongs to bundle-b. Resolve it at render time instead
-  // of importing that bundle's source here, which would duplicate its singleton
-  // when esbuild builds bundle-d.
+  // AudioLibraryStore belongs to bundle-b. Resolve it at render time instead of importing that bundle's source here,
+  // which would duplicate its singleton when esbuild builds bundle-d.
   const library = libraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
+  const keep = useSongKeep();
+  const online = useSongsOnline();
 
+  // The close bridge is the player's while no sheet of its own is up (a sheet holds it then, and hands it back).
   React.useEffect(() => {
-    if (!renders || typeof window === 'undefined') return undefined;
+    if (!renders || sheet || typeof window === 'undefined') return undefined;
     const previous = window.__closeSheet;
     window.__closeSheet = onClose;
     return () => { window.__closeSheet = previous || null; };
-  }, [renders, onClose]);
+  }, [renders, sheet, onClose]);
 
-  // While paused, no playback tick re-renders the sheet — an armed sleep
-  // timer would show a frozen countdown. One coarse tick keeps it honest.
-  const [, forceSleepTick] = React.useReducer((n) => n + 1, 0);
-  const sleepArmed = open && !!state.sleepEndsAt;
-  React.useEffect(() => {
-    if (!sleepArmed) return undefined;
-    const timer = setInterval(forceSleepTick, 1000);
-    return () => clearInterval(timer);
-  }, [sleepArmed]);
-
-  // Expander pages, in both directions. Reset every time the desk opens: the
-  // window follows the CURRENT recording, and a page count kept from the last
-  // visit would put the reader somewhere they didn't ask to be.
-  const [earlierPages, setEarlierPages] = React.useState(0);
-  const [laterPages, setLaterPages] = React.useState(0);
-  // What an expander did, announced politely. The region is rendered EMPTY and
-  // always present, so the first fill is what a screen reader speaks — a live
-  // region created together with its content announces nothing.
-  const [queueNote, setQueueNote] = React.useState('');
-  // A voice chip waiting on its confirm, by chip id (see needsVoiceConfirm).
-  const [pendingVoice, setPendingVoice] = React.useState('');
-  React.useEffect(() => {
-    setEarlierPages(0); setLaterPages(0); setQueueNote(''); setPendingVoice('');
-  }, [open]);
-
-  const currentRowRef = React.useRef(/** @type {any} */ (null));
-  /* The queue row is centred when the TRACK CHANGES while the desk is open — never on the open
-     itself. Centring it on every open put a phone's sheet at scrollTop 352 with the voice row at
-     y −103 (the Tour Reviewer, 360x800 at Text Size 1, 2026-09-13): the reader opened the desk and
-     the first thing to see was the queue, the picker gone above. The sheet now opens at its top,
-     the voice row in view. And only a reader who has scrolled down to the queue is followed
-     (U04.3, UX sweep 2026-10-22): with Play/Pause on screen the desk stays still, because centring
-     the row there scrolled the title and transport away under the finger that had just pressed Next. */
-  const prevQiRef = React.useRef(/** @type {number|null} */ (null));
-  React.useEffect(() => {
-    if (!renders) { prevQiRef.current = null; return undefined; }
-    const prevQi = prevQiRef.current;
-    prevQiRef.current = state.qi;
-    if (prevQi === null || prevQi === state.qi) return undefined;
-    const node = currentRowRef.current;
-    const sheet = node && typeof node.closest === 'function' ? node.closest('.audio-manager-sheet') : null;
-    if (!sheet || typeof sheet.getBoundingClientRect !== 'function') return undefined;
-    const box = sheet.getBoundingClientRect();
-    // Nothing laid out (jsdom, or a desk not yet painted): nothing to follow.
-    if (!(box.height > 0)) return undefined;
-    const transport = sheet.querySelector('.audio-manager-transport');
-    if (transport) {
-      const t = transport.getBoundingClientRect();
-      const mid = (t.top + t.bottom) / 2;
-      if (mid > box.top && mid < box.bottom) return undefined;
-    }
-    const row = node.getBoundingClientRect();
-    // Already on screen: a short queue must not scroll the desk past its own
-    // transport just to reveal a row that was visible all along.
-    if (row.top >= box.top && row.bottom <= box.bottom) return undefined;
-    // Centred by moving the desk alone: scrollIntoView also scrolls every scroller behind it.
-    sheet.scrollTop += (row.top + row.bottom) / 2 - (box.top + box.bottom) / 2;
-    return undefined;
-    // `state.qi` (2026-08-10): the desk left open through an auto-advance kept
-    // the OLD row centred while the playing one drifted off — on a 1,189-row
-    // Bible queue, out of the window entirely. The visibility test above is
-    // what keeps this from yanking a short queue on every boundary.
-  }, [renders, state.qi]);
+  // The whole screen follows a drag down on its head, and closes past the line (U06.8).
+  const grab = useDragToClose(onClose, (target) => /** @type {HTMLElement | null} */ (target.closest('.audio-manager-sheet')));
 
   if (!open || typeof document === 'undefined') return null;
-
   const queue = Array.isArray(state.queue) ? state.queue : [];
   const current = queue[state.qi] || null;
   if (!current) return null;
 
-  const duration = Math.max(0, Math.floor(state.duration || 0));
   const playing = state.status === 'playing';
   const loading = state.status === 'loading';
   const active = playing || loading;
   const reader = AudioPlayer.readerLabel(current.readerCode);
   const saved = !!(library && typeof library.isSaved === 'function' && library.isSaved(current));
-  const sleepSeconds = AudioPlayer.getSleepRemainingSeconds();
-  const sleepAtEnd = !!state.sleepAtTrackEnd;
-  const upcoming = queue.length - (state.qi + 1);
-  // Songs of the Letters (L3 + L5): the desk's song mode — cover head, Versions card, labelled
-  // transport, lyrics; no speed card. The sleep timer and the queue stay as they are.
+  const upcoming = Math.max(0, queue.length - (state.qi + 1));
   const songId = songIdOfKey(current.key);
   const song = songId ? songById(songId) : null;
   const voices = songId ? null : voiceChoices(current);
-  // A boot-restored bar is ONE placeholder track standing in for a queue whose
-  // shape nobody knows yet — the real one is rebuilt on the first transport
-  // tap. Describing it as a lone recording ("Restart", "1 recording", "1 of 1")
-  // was a confident lie about a 1,189-chapter edition; the desk stays neutral
-  // until the rebuild answers (2026-08-10).
+  // A boot-restored bar is ONE placeholder track standing in for a queue whose shape nobody knows yet: the real one
+  // is rebuilt on the first transport tap. The screen stays neutral until the rebuild answers (2026-08-10).
   const restoring = !!state.restoring;
-  // Mirrors the bar: a queue of one turns prev into a Restart rather than a
-  // dead control, and the place-in-queue readout stays silent at 1 of 1.
+  // A queue of one turns prev into a Restart rather than a dead control.
   const single = !restoring && queue.length < 2;
-  // A WTLB compilation: the letter under the clock is the heading and the
-  // section label joins the line under it (2026-09-22, as the bar does).
+  // A WTLB compilation: the letter under the clock is the title, its place among the file's letters under it.
   const live = AudioPlayer.liveLetter();
   const liveTitle = live && live.title ? live.title : null;
+  const marks = songId ? null : AudioPlayer.sectionMarks();
+  const entry = live && marks ? marks.findIndex((m) => m.key === live.key) : -1;
   const heading = liveTitle || current.title;
   // Counted in recordings, as the bar and the collection screens count them (queuePlace).
   const counted = queuePlace(queue, state.qi);
-  const headLine = [
-    current.sub,
-    // Suppressed when it would only echo the <h2> directly above it — a
-    // per-chapter Bible track is titled "Genesis 2" and labelled "Chapter 2"
-    // (2026-08-10). The label itself is untouched; see displayPartLabel.
-    liveTitle ? current.title : displayPartLabel(current.title, current.partLabel),
-    reader,
-    restoring || single || counted.of < 2 ? null : counted.at + ' of ' + counted.of,
-  ].filter(Boolean).join(' · ') || 'The Volumes of Truth';
-  // A queue the listener made (source mode 'custom': reordered, pruned, a lone
-  // saved recording, a plan's portion) switches voice IN PLACE and keeps its
-  // shape (switchVoiceInPlace; player brief 2026-10-22, section 7). Only when
-  // that cannot be done does the rebuild, which would drop it, ask first
-  // (owner directive 2026-08-10). Plain queues rebuild to themselves.
+  const kicker = songId
+    ? (current.sub || 'Songs of the Letters')
+    : [current.sub, restoring || single || counted.of < 2 ? null : placeNoun(current) + ' ' + counted.at + ' of ' + counted.of].filter(Boolean).join(' · ') || 'The Volumes of Truth';
+  // Suppressed when it would only echo the title: a per-chapter Bible track is titled "Genesis 2" and labelled
+  // "Chapter 2" (2026-08-10). The label itself is untouched; see displayPartLabel.
+  const part = liveTitle ? current.title : displayPartLabel(current.title, current.partLabel);
+  const byline = [
+    entry >= 0 && marks ? 'Entry ' + (entry + 1) + ' of ' + marks.length + ' in this recording' : null,
+    part,
+    reader || null,   // readerLabel says it whole: 'Read by Benjamin', 'Text-to-speech'
+  ].filter(Boolean).join(' · ');
+  const canRead = hasTextDestination(current) && typeof window !== 'undefined' && typeof window.__openAudioText === 'function';
+  const openReading = () => { window.__openAudioText(current); onClose(); };
+  // A queue the listener made (source mode 'custom': reordered, pruned, a lone saved recording, a plan's portion)
+  // switches voice IN PLACE and keeps its shape (switchVoiceInPlace); only when that cannot be done does the rebuild,
+  // which would drop it, ask first (owner directive 2026-08-10). Plain queues rebuild to themselves.
   const needsVoiceConfirm = state.sourceMode === 'custom';
-  // A pending choice that has since become the voice playing (the queue moved
-  // under the open confirm) has nothing left to confirm.
-  const pendingChip = needsVoiceConfirm && voices
-    ? voices.chips.find((chip) => chip.id === pendingVoice && !chip.active) || null
-    : null;
+  const sleepOn = !!(state.sleepEndsAt || state.sleepAtTrackEnd || state.sleepAtQueueEnd);
+  const sleepLeft = AudioPlayer.getSleepRemainingSeconds();
+  const sleepWord = state.sleepAtTrackEnd ? 'End of ' + sleepNoun(current, !!songId) : state.sleepAtQueueEnd ? 'End of queue'
+    : sleepLeft > 0 ? Math.max(1, Math.ceil(sleepLeft / 60)) + ' min' : 'Sleep';
 
-  // The window. Only a genuinely long queue is paged; everything else renders
-  // whole, so the common case has no expanders and nothing to discover.
-  const windowed = queue.length > QUEUE_WINDOW_MIN;
-  const from = windowed ? Math.max(0, state.qi - QUEUE_PAGE - earlierPages * QUEUE_PAGE) : 0;
-  const to = windowed ? Math.min(queue.length, state.qi + 1 + QUEUE_PAGE + laterPages * QUEUE_PAGE) : queue.length;
-  const rows = queue.slice(from, to);
+  // A song's versions and its keep.
+  const fam = song ? familyById(song.f) : null;
+  const versions = fam ? versionsOf(fam) : [];
+  const versionAt = song ? versions.findIndex((v) => v.id === song.id) : -1;
+  const versionWord = song && song.v ? String(song.v).split(' · ')[0] : 'Version';
+  const letter = song ? songLetterOf(song) : null;
+  // The verbatim gate (Corbin 2026-09-25): an interpretation keeps the way to its letter but never says it is the
+  // letter's words.
+  const fromWords = isVerbatimSong(song) ? 'From the letter' : 'Inspired by the letter';
+  const songName = current.title || 'this song';
+  const keepOk = !!songId && keep.availability() === 'ok';
+  const keepState = keepOk ? keep.progressOf([songId]) : null;
+  const kept = !!(keepState && keepState.total > 0 && keepState.kept === keepState.total);
+  const keeping = !!(keepState && keepState.busy);
+  const canPage = !!(song && song.f) && typeof window !== 'undefined' && typeof window.__openSongs === 'function';
+
+  const menu = [
+    { id: 'save', text: saved ? 'Saved · Remove' : 'Save', icon: 'save', onSelect: () => { toggleSavedRecording(library, current); } },
+  ];
+  if (canRead) menu.push({ id: 'read', text: songId ? (letter ? fromWords.replace('From', 'Open') : 'Open the reading') : 'Open the reading', icon: 'open', onSelect: openReading });
+  if (kept) menu.push({ id: 'unkeep', text: 'Remove from this phone', icon: 'remove', onSelect: () => { void keep.remove([songId]); } });
+  if (canPage) menu.push({ id: 'page', text: 'Song page', icon: 'open', onSelect: () => { window.__openSongs([{ k: 'song', v: song.f }], ''); onClose(); } });
+
+  const play = (
+    <button
+      type="button"
+      className={'audio-manager-play np-play' + (loading ? ' is-loading' : '')}
+      onClick={() => AudioPlayer.toggle()}
+      aria-label={active ? 'Pause' : 'Play'}
+      aria-busy={loading}
+    >
+      {active ? <PauseIcon /> : <PlayIcon />}
+    </button>
+  );
+  const repeat = state.repeat || 'off';
+  const nextRepeat = repeat === 'off' ? 'all' : repeat === 'all' ? 'one' : 'off';
 
   return ReactDOM.createPortal(
     <>
-      <div className="audio-manager-backdrop" aria-hidden="true" onClick={onClose} />
+      <div className="audio-manager-backdrop np-backdrop" aria-hidden="true" onClick={onClose} />
       <section
-        className="audio-manager-sheet"
+        className={'audio-manager-sheet now-playing' + (songId ? ' is-song' : '')}
         ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="audio-manager-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <SheetHandle onClose={onClose} />
-        {songId ? (
-          <SongDeskHead
-            current={current} song={song} saved={saved} onClose={onClose}
-            onToggleSave={() => { toggleSavedRecording(library, current); }}
-          />
-        ) : (<>
-        <div className="audio-manager-kicker">Listening now</div>
-        <div className="audio-manager-head">
-          {/* Owner request 2026-08-09: tapping the letter/chapter title jumps
-              to its TEXT in the reader — pure navigation through the
-              __openAudioText bridge (screen-routes), so playback is never
-              interrupted or restarted. Tracks with no destination (range
-              compilations, Hidden Manna) keep the plain, untappable copy. */}
-          {hasTextDestination(current) && typeof window !== 'undefined' && typeof window.__openAudioText === 'function' ? (
-            <button
-              type="button"
-              className="audio-manager-track-copy audio-manager-jump"
-              aria-label={'Open the reading — ' + trackLabel(heading) + '; playback continues'}
-              title="Open the reading"
-              onClick={() => { window.__openAudioText(current); onClose(); }}
-            >
-              {/* '›' — the same go-to cue the home cards carry; marks the
-                  title as the tap that opens the text. */}
-              {/* Spans, not h2/p: a button holds phrasing content only (sweep 2026-10-13); the CSS draws them alike. */}
-              <span className="audio-manager-title" id="audio-manager-title">{trackLabel(heading)} <span className="audio-manager-jump-chevron" aria-hidden="true">›</span></span>
-              <span className="audio-manager-headline">{headLine}</span>
-              {/* The words, drawn (2026-09-12): the Settings row sends a reader here
-                  by name, and a phone shows neither the tooltip nor the aria-label. */}
-              <span className="audio-manager-jump-cue">Open the reading</span>
-            </button>
-          ) : (
-          <div className="audio-manager-track-copy">
-            <h2 className="audio-manager-title" id="audio-manager-title">{trackLabel(heading)}</h2>
-            <p className="audio-manager-headline">{headLine}</p>
-          </div>
-          )}
-          <button
-            type="button"
-            className={'audio-manager-save' + (saved ? ' is-saved' : '')}
-            aria-pressed={saved}
-            aria-label={saved ? 'Remove from saved recordings' : 'Save recording'}
-            onClick={() => { toggleSavedRecording(library, current); }}
-          >
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 3.7l2.55 5.17 5.71.83-4.13 4.03.98 5.69L12 16.74l-5.11 2.68.98-5.69-4.13-4.03 5.71-.83L12 3.7z" />
-            </svg>
-            <span>{saved ? 'Saved' : 'Save'}</span>
-          </button>
-        </div>
-        </>)}
-        {song ? <SongVersionsCard song={song} state={state} /> : null}
-        {song ? <SongVoteAsk song={song} title={current.title} /> : null}
+        <header className="np-head">
+          <button type="button" className="sheet-handle-back np-close" onClick={onClose} aria-label="Close player"><DownIcon /></button>
+          {/* The head is the drag zone (the kicker's words are not a control): a drag down closes the screen. */}
+          <div className="np-kicker" {...grab} onClick={undefined}>{kicker}</div>
+          <RowMenu label={'More for ' + (heading || 'this recording')} items={menu} />
+        </header>
 
-        {/* Voice sits right under the track identity (owner directive
-            2026-08-10): what you're hearing and the switch for it are one
-            glance apart. Absent entirely when this recording has only one
-            voice — a chip row of one is furniture. Switching restarts THIS
-            chapter/recording in the chosen voice and the rest of the queue
-            follows (the rebuilt queue IS that voice's). */}
-        {voices ? (
-          <div className="audio-manager-tool audio-manager-voice audio-manager-voice-top">
-            <div className="audio-manager-tool-head">
-              <span>{voices.kind === 'edition' ? 'Audio Bible' : 'Voice'}</span>
-              <strong>{voices.activeLabel}</strong>
+        <div className="np-body">
+          {songId ? (
+            <>
+              {lyrics ? (
+                <div className="np-lyrics-head">
+                  <SongCover song={song || { id: songId }} className="np-cover-small" />
+                  <div>
+                    <h2 className="np-title np-title-song" id="audio-manager-title">{current.title || 'Untitled song'}</h2>
+                    {versionAt >= 0 ? <p className="np-byline">{versionWord}</p> : null}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <SongCover song={song || { id: songId }} large className="np-cover" />
+                  <h2 className="np-title np-title-song" id="audio-manager-title">{current.title || 'Untitled song'}</h2>
+                  {versions.length > 1 && versionAt >= 0 ? (
+                    <button type="button" className="np-chip np-version" aria-haspopup="dialog" onClick={() => setSheet('versions')}
+                      aria-label={'Version: ' + (song.v || versionWord) + ', ' + (versionAt + 1) + ' of ' + versions.length + '. Choose another'}>
+                      {versionWord} · {versionAt + 1} of {versions.length} <span aria-hidden="true">›</span>
+                    </button>
+                  ) : current.partLabel ? <p className="np-byline">{current.partLabel}</p> : null}
+                  {letter && canRead ? (
+                    <button type="button" className="np-from" onClick={openReading} aria-label={fromWords + ' — ' + (letter.title || '') + '; the song keeps playing'}>
+                      {fromWords} <em>{letter.title}</em> <span aria-hidden="true">›</span>
+                    </button>
+                  ) : null}
+                </>
+              )}
+              {lyrics ? <SongLyricsCard song={song} time={state.time} /> : null}
+              {song ? <SongVoteAsk song={song} title={current.title} /> : null}
+            </>
+          ) : (
+            <>
+              <h2 className="np-title" id="audio-manager-title">{heading || 'Untitled recording'}</h2>
+              <div className="np-byrow">
+                {byline ? <p className="np-byline">{byline}</p> : null}
+                {voices ? (
+                  <button type="button" className="np-chip np-voice audio-manager-voice-top" aria-haspopup="dialog" onClick={() => setSheet('voice')}
+                    aria-label={(voices.kind === 'edition' ? 'Edition: ' : 'Voice: ') + voices.activeLabel + '. Choose another'}>
+                    {voices.kind === 'edition' ? voices.activeLabel : 'Voice'} <span aria-hidden="true">▾</span>
+                  </button>
+                ) : null}
+              </div>
+              {canRead ? (
+                <button type="button" className="np-live audio-manager-jump" onClick={openReading}
+                  aria-label={'Open the reading — ' + (heading || 'this recording') + '; playback continues'}>
+                  <span className="np-live-cue audio-manager-jump-cue">Open the reading <span aria-hidden="true">›</span></span>
+                </button>
+              ) : null}
+              {state.failed ? (
+                <p className="np-status" role="status">
+                  {state.failed === 'load' ? 'Couldn’t load this recording.' : 'This recording isn’t on this phone.'}
+                  {' '}<button type="button" className="np-sheet-link" onClick={() => AudioPlayer.toggle()}>Retry</button>
+                </p>
+              ) : null}
+            </>
+          )}
+        </div>
+
+        <div className="np-dock">
+          <Scrubber state={state} marks={marks} />
+          {songId ? (
+            <div className="audio-manager-transport np-transport is-song" aria-label="Playback controls">
+              <button type="button" className={'np-flat' + (state.shuffle ? ' is-on' : '')} aria-pressed={!!state.shuffle} aria-label="Shuffle" onClick={() => AudioPlayer.setShuffle(!state.shuffle)}><ShuffleIcon /></button>
+              <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} aria-label="Previous song"><PrevIcon /></button>
+              {play}
+              <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={!restoring && upcoming < 1 && repeat !== 'all'} aria-label="Next song"><NextIcon /></button>
+              <button type="button" className={'np-flat' + (repeat !== 'off' ? ' is-on' : '')} aria-pressed={repeat !== 'off'}
+                aria-label={repeat === 'one' ? 'Repeat: this song' : repeat === 'all' ? 'Repeat: the queue' : 'Repeat: off'}
+                onClick={() => AudioPlayer.setRepeat(nextRepeat)}><RepeatIcon one={repeat === 'one'} /></button>
             </div>
-            {/* Voice and Speed are the same KIND of control — pick exactly one
-                of a closed set — so they carry the same semantics (2026-08-10):
-                radiogroup/radio/aria-checked, not a row of toggle buttons. */}
-            <div className="audio-manager-segment" role="radiogroup" aria-label={voices.kind === 'edition' ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
-              {voices.chips.map((chip) => (
-                <button
-                  key={chip.id}
-                  type="button"
-                  role="radio"
-                  className={chip.active ? 'is-active' : ''}
-                  aria-checked={chip.active}
-                  onClick={() => {
-                    // The checked chip is the voice already playing: a tap on it
-                    // switches nothing. select() is a REBUILD from the top of the
-                    // letter (sweep v003: Part 2 at minute 2 went back to Part 1,
-                    // 0:00), and on an edited queue it would ask to drop the edits.
-                    if (chip.active) return;
-                    if (!needsVoiceConfirm) chip.select();
-                    else if (!chip.swap()) setPendingVoice(chip.id);
-                  }}
-                >{chip.label}</button>
-              ))}
+          ) : (
+            <div className="audio-manager-transport np-transport" aria-label="Playback controls">
+              <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart' : 'Previous track'}><PrevItemIcon /></button>
+              <button type="button" className="audio-manager-round np-skip" onClick={() => AudioPlayer.skip(-15)} aria-label="Back 15 seconds"><SkipIcon dir={-1} /></button>
+              {play}
+              <button type="button" className="audio-manager-round np-skip" onClick={() => AudioPlayer.skip(15)} aria-label="Forward 15 seconds"><SkipIcon dir={1} /></button>
+              {/* Live while restoring: the placeholder's length says nothing about the queue the tap rebuilds (sweep v021). */}
+              <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={!restoring && upcoming < 1} aria-label="Next track"><NextItemIcon /></button>
             </div>
-            {pendingChip ? (
-              <ConfirmStrip
-                className="audio-manager-voice-confirm"
-                question={single
-                  ? 'Switching voice rebuilds this into a full queue. Continue?'
-                  : 'Switching voice rebuilds this queue and drops your changes to it. Continue?'}
-                yesLabel="Yes, switch"
-                onCancel={() => setPendingVoice('')}
-                onConfirm={() => { setPendingVoice(''); pendingChip.select(); }}
-              />
+          )}
+          <div className="np-tools">
+            {songId ? (
+              <Tool label={lyrics ? 'Hide lyrics' : 'Lyrics'} word="Lyrics" on={lyrics} haspopup={false} onClick={() => setLyrics(!lyrics)}><QuoteIcon /></Tool>
             ) : (
-              <p className="audio-manager-voice-note">{voices.kind === 'edition'
-                ? 'Starts this chapter again in the edition you pick; the chapters after it follow.'
-                : 'Starts this recording again in the voice you pick; the rest of the queue stays as it is.'}</p>
+              <Tool label={'Speed, ' + String(Math.round(state.rate * 100) / 100) + '×'} word="Speed" on={Math.abs(state.rate - 1) > 0.005} onClick={() => setSheet('speed')}>
+                <span className="np-tool-rate">{(Math.round(state.rate * 100) / 100).toFixed(Math.round(state.rate * 100) % 10 ? 2 : 1)}×</span>
+              </Tool>
+            )}
+            <Tool label={sleepOn ? 'Sleep timer: ' + sleepWord : 'Sleep timer'} word={sleepWord} on={sleepOn} onClick={() => setSheet('sleep')}><MoonIcon /></Tool>
+            <Tool label={'Up next' + (upcoming ? ', ' + upcoming + ' left' : '')} word="Up next" badge={restoring ? 0 : upcoming} onClick={() => setSheet('upnext')}><ListIcon /></Tool>
+            {songId ? (
+              keepOk ? (
+                <Tool
+                  label={kept ? songName + ' is on this phone' : keeping ? 'Keeping ' + songName + ' on this phone'
+                    : online ? 'Keep ' + songName + ' on this phone' + (keepState && keepState.needBytes ? ' · ' + formatSongBytes(keepState.needBytes) : '')
+                      : 'Keeping needs a connection · ' + songName}
+                  word={kept ? 'On this phone' : keeping ? 'Keeping…' : 'Keep on phone'}
+                  on={kept} haspopup={false} disabled={!kept && !keeping && !online}
+                  onClick={() => { if (kept || keeping) return; void keep.keep([songId], 'keep-desk-' + songId); }}
+                >{kept ? <KeptIcon /> : <KeepIcon />}</Tool>
+              ) : null
+            ) : (
+              <Tool label="Read along" word="Read along" haspopup={false} disabled={!canRead} onClick={openReading}><BookIcon /></Tool>
             )}
           </div>
+        </div>
+
+        {sheet === 'speed' ? <SpeedSheet rate={state.rate} onClose={closeSheet} /> : null}
+        {sheet === 'sleep' ? <SleepSheet state={state} noun={sleepNoun(current, !!songId)} onClose={closeSheet} /> : null}
+        {sheet === 'voice' && voices ? <VoiceSheet voices={voices} title={heading || ''} needsConfirm={needsVoiceConfirm} single={single} onClose={closeSheet} /> : null}
+        {sheet === 'upnext' ? <UpNextSheet state={state} onClose={closeSheet} /> : null}
+        {sheet === 'versions' && fam ? (
+          <ChoiceSheet
+            eyebrow={fam.t} title="Versions" value={song.id}
+            options={versions.map((s) => ({ id: s.id, label: s.v || 'Version', meta: songClock(s.d) }))}
+            onChange={(id) => { if (id !== song.id) AudioPlayer.switchSongVersion(id); }} onClose={closeSheet}
+          />
         ) : null}
-
-        <div className="audio-manager-progress">
-          <AudioSeekSlider className="audio-manager-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
-          <div className="audio-manager-time"><span>{formatTime(state.time)}</span><span>{duration ? formatTime(duration) : '—'}</span></div>
-        </div>
-
-        {songId ? <SongTransport state={state} /> : (
-        <div className="audio-manager-transport" aria-label="Playback controls">
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(-15)} aria-label="Back 15 seconds">−15</button>
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart' : 'Previous track'}>
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /><path d="M19 5v14" /></svg>
-          </button>
-          <button
-            type="button"
-            className={'audio-manager-play' + (loading ? ' is-loading' : '')}
-            onClick={() => AudioPlayer.toggle()}
-            aria-label={active ? 'Pause' : 'Play'}
-            aria-busy={loading}
-          >
-            {active ? <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M6.5 4h4v16h-4zM13.5 4h4v16h-4z" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 4v16l13-8z" /></svg>}
-          </button>
-          {/* Live while restoring: the placeholder's length says nothing about the queue the tap rebuilds (sweep v021). */}
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={!restoring && state.qi + 1 >= queue.length} aria-label="Next track">
-            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /><path d="M5 5v14" /></svg>
-          </button>
-          <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.skip(15)} aria-label="Forward 15 seconds">+15</button>
-        </div>
-        )}
-        {songId ? <SongLyricsCard song={song} time={state.time} /> : null}
-
-        <div className="audio-manager-tools">
-          {songId ? null : <AudioSpeedControl rate={state.rate} />}
-          <div className="audio-manager-tool">
-            <div className="audio-manager-tool-head"><span>Sleep timer</span><strong>{sleepAtEnd ? 'Ends after this track' : sleepLabel(sleepSeconds)}</strong></div>
-            <div className="audio-manager-segment" role="group" aria-label="Sleep timer">
-              {/* Which preset is ARMED cannot be read off the remaining
-                  seconds — a 30-minute timer with 15 left is not the 15m chip —
-                  so the player keeps the preset beside the deadline and the
-                  armed chip shows it, the way "End of track" always has. */}
-              {[15, 30, 60].map((minutes) => (
-                <button
-                  key={minutes}
-                  type="button"
-                  className={state.sleepMinutes === minutes ? 'is-active' : ''}
-                  aria-pressed={state.sleepMinutes === minutes}
-                  onClick={() => AudioPlayer.setSleepTimer(minutes)}
-                >{minutes}m</button>
-              ))}
-              {/* The one sleep mode a countdown can't express — it holds no
-                  deadline, so the player reads it off the 'ended' event. */}
-              <button
-                type="button"
-                className={sleepAtEnd ? 'is-active' : ''}
-                aria-pressed={sleepAtEnd}
-                onClick={() => AudioPlayer.setSleepAtTrackEnd()}
-              >End of track</button>
-              <button type="button" disabled={!sleepSeconds && !sleepAtEnd} onClick={() => AudioPlayer.clearSleepTimer()}>Clear</button>
-            </div>
-          </div>
-        </div>
-
-        <div className="audio-manager-queue">
-          <div className="audio-manager-section-head">
-            <div><span>Queue</span><strong>{restoring ? 'Resuming…' : single || counted.of < 2 ? '1 recording' : counted.at + ' of ' + counted.of}</strong></div>
-            {upcoming > 0 ? <button type="button" onClick={() => AudioPlayer.clearUpcoming()}>Clear upcoming</button> : null}
-          </div>
-          {/* Created empty and kept mounted: a live region that appears WITH
-              its text announces nothing, so the expanders below fill this one
-              instead. Tapping "Show 40 earlier" is otherwise silent to a
-              screen reader — 40 rows arrive above the focus with no word said. */}
-          <p className="sr-only" aria-live="polite">{queueNote}</p>
-          {from > 0 ? (
-            <button
-              type="button"
-              className="audio-manager-queue-page"
-              onClick={() => {
-                setEarlierPages((n) => n + 1);
-                setQueueNote('Showing ' + (to - Math.max(0, from - QUEUE_PAGE)) + ' of ' + queue.length + ' recordings.');
-              }}
-            >
-              {'Show ' + Math.min(QUEUE_PAGE, from) + ' earlier'}
-            </button>
-          ) : null}
-          <ol>
-            {rows.map((track, offset) => {
-              const index = from + offset;
-              const played = index < state.qi;
-              const isCurrent = index === state.qi;
-              const canMoveUp = index > state.qi + 1;
-              const canMoveDown = index < queue.length - 1;
-              return (
-                <li
-                  key={track.url + ':' + index}
-                  className={played ? 'is-played' : isCurrent ? 'is-current' : ''}
-                  aria-current={isCurrent ? 'true' : undefined}
-                  ref={isCurrent ? currentRowRef : null}
-                >
-                  {isCurrent ? (
-                    /* The playing row is a marker, not a control: the desk's
-                       own transport already owns play/pause, and a second
-                       button for the same thing invites a mis-tap that would
-                       restart the recording. It is also what the queue editor
-                       may never touch (removeUpcoming's protection). */
-                    <div className="audio-manager-queue-main is-current">
-                      <span className="audio-manager-queue-number">{index + 1}</span>
-                      <span>
-                        <strong>{trackLabel(track.title)}</strong>
-                        <small>{['Playing now', track.partLabel].filter(Boolean).join(' · ')}<TrackOnPhone url={track.url} /></small>
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      className="audio-manager-queue-main"
-                      onClick={() => AudioPlayer.playAt(index)}
-                      aria-label={(played ? 'Play again: ' : 'Play now: ') + trackLabel(track.title)}
-                    >
-                      <span className="audio-manager-queue-number">{index + 1}</span>
-                      <span>
-                        <strong>{trackLabel(track.title)}</strong>
-                        <small>{[track.partLabel, track.sub].filter(Boolean).join(' · ')}<TrackOnPhone url={track.url} /></small>
-                      </span>
-                    </button>
-                  )}
-                  {played || isCurrent ? null : (
-                    <div className="audio-manager-queue-actions">
-                      <button type="button" disabled={!canMoveUp} onClick={() => AudioPlayer.moveUpcoming(index, index - 1)} aria-label={'Move ' + trackLabel(track.title) + ' earlier'}>↑</button>
-                      <button type="button" disabled={!canMoveDown} onClick={() => AudioPlayer.moveUpcoming(index, index + 1)} aria-label={'Move ' + trackLabel(track.title) + ' later'}>↓</button>
-                      <button type="button" onClick={() => AudioPlayer.removeUpcoming(index)} aria-label={'Remove ' + trackLabel(track.title) + ' from queue'}>×</button>
-                    </div>
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-          {to < queue.length ? (
-            <button
-              type="button"
-              className="audio-manager-queue-page"
-              onClick={() => {
-                setLaterPages((n) => n + 1);
-                setQueueNote('Showing ' + (Math.min(queue.length, to + QUEUE_PAGE) - from) + ' of ' + queue.length + ' recordings.');
-              }}
-            >
-              {'Show ' + Math.min(QUEUE_PAGE, queue.length - to) + ' later'}
-            </button>
-          ) : null}
-          {upcoming > 0 ? null : <p className="audio-manager-empty">Play a collection to line up more recordings. Your current recording will resume where you leave it.</p>}
-        </div>
       </section>
     </>,
     document.body

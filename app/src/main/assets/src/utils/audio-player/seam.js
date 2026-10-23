@@ -73,6 +73,7 @@ export function _seamTick(el) {
   }
   // Nothing to bridge into: a sleep that ends with this recording, or a repeated passage (it goes round, ra2).
   if (_state.status !== 'playing' || _state.sleepAtTrackEnd || _state.loop) return;
+  if (_state.sleepAtQueueEnd && _state.qi + 1 >= _state.queue.length) return;
   if (_left(el) > LEAD_SEC || !_wanted()) return;
   if (!_keeper) {
     const url = _silenceUrl();

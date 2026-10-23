@@ -1344,39 +1344,8 @@
         box-shadow: 0 2px 9px rgba(0, 0, 0, 0.42);
       }
       body.light .audio-seek-bubble { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.14); }
-      /* The bar's and the desk's buttons speak in the reading serif (W3-07: a button does not inherit its font, so
-         the bar's title fell back to a sans). :where() keeps this at zero specificity, under every class that names
-         its own family (the Cinzel labels). */
-      :where(.audio-bar, .audio-manager-sheet) button { font-family: inherit; }
-      /* ── SONGS OF THE LETTERS: the listening desk in song mode (L3 + L5, picture final-04). A 72 px cover head with
-         "Open the letter ›", the Versions card in the Voice card's grammar, a transport with words under the icons,
-         and the lyrics card whose current line takes the read-along wash (--reading-wash, the ::highlight colour). ── */
-      .song-desk-head { display: grid; grid-template-columns: 72px minmax(0, 1fr) auto; align-items: start; gap: 14px; margin: 2px 0 14px; }
-      .song-desk-cover { width: 72px; height: 72px; border-radius: 8px; }
-      .song-desk-cover .song-cover-note { font-size: var(--fs-30); }
-      .song-desk-kicker { margin: 0 0 2px; }
-      .song-desk-copy { min-width: 0; }
-      .song-desk-copy h2 { margin: 0; color: var(--cream); font-size: var(--fs-20); font-weight: 500; line-height: 1.2; }
-      .song-desk-version { margin: 2px 0 0; color: var(--cream-dim); font-size: var(--fs-15); }
-      .song-desk-letter { min-height: 44px; margin: 0; padding: 0; border: 0; background: none; color: var(--gold); font-size: var(--fs-16); text-align: left; cursor: pointer; }
-      .song-desk-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      /* W-02: the title opens the song page; "Open the letter ›" and "Song page ›" sit side by side. */
-      .song-desk-title { display: inline; margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: var(--gold-border); text-underline-offset: .18em; }
-      .song-desk-title:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      .song-desk-links { display: flex; flex-wrap: wrap; column-gap: 1.1rem; }
-      /* The Versions chips as pictured (final-04; Opus check of U2): pills, the playing version FILLED gold. */
-      .song-desk-versions .audio-manager-segment button { border-radius: 999px; padding-left: 14px; padding-right: 14px; color: var(--cream); font-size: var(--fs-14); }
-      .song-desk-versions .audio-manager-segment button.is-active { border-color: var(--gold); background: var(--gold); color: var(--bg); }
-      .song-desk-transport { align-items: flex-start; }
-      .song-desk-tool { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 56px; padding: 0; border: 0; background: none; color: var(--gold); cursor: pointer; }
-      .song-desk-tool:disabled { opacity: 0.4; cursor: default; }
-      .song-desk-tool svg { width: 22px; height: 22px; }
-      .song-desk-tool.is-on .audio-manager-round { border-color: var(--gold); background: var(--gold-faint); }
-      .song-desk-main .audio-manager-play { border-color: var(--gold); background: var(--gold); color: var(--bg); }
-      .song-desk-main.is-loading .audio-manager-play { opacity: 0.7; }
-      .song-desk-word { color: var(--cream-dim); font-size: var(--fs-13); line-height: 1.2; }
-      .song-desk-tool.is-on .song-desk-word { color: var(--gold); }
-      .song-desk-tool:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 8px; }
+      /* ── SONGS OF THE LETTERS: a song's lyrics card in the full player (picture 09), whose current line takes the
+         read-along wash (--reading-wash, the ::highlight colour). ── */
       .song-lyrics-card { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--gold-border); border-radius: 10px; background: var(--bg3); }
       .song-lyrics-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; }
       .song-lyrics-head > span { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-13); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
@@ -1389,174 +1358,215 @@
       .song-lyrics-note { margin: 6px 0 0; color: var(--cream-dim); font-style: italic; }
       .song-lyrics-foot { margin: 8px 0 0; color: var(--cream-dim); font-size: var(--fs-13); font-style: italic; }
 
-      /* Listening desk — expanded controls for the SAME AudioPlayer singleton.
-         It uses the app's established sheet geometry, but its calm, ledger-like
-         sections distinguish playback management from a generic settings panel.
-         This sheet is intentionally above the mini-player (z 150) and below
-         only app-wide emergency surfaces/toasts. */
+      /* ── NOW PLAYING (player brief 3b, pl-l2; pictures 05-09). The full player replaced the desk sheet: full screen
+         on a phone, a right-side panel on a wide window. Head, a body that scrolls if it must, and the dock pinned to
+         the thumb zone (scrubber, transport, bottom row), so the transport stays above the fold at 220 % (27a, U04.3).
+         Above the mini-player (z 150), below select sheets (250) and menus (400). ── */
       .audio-manager-backdrop {
         position: fixed; inset: 0; z-index: 200; background: rgba(8, 8, 7, 0.72);
         animation: audio-manager-fade 0.16s ease-out;
       }
-      .audio-manager-sheet {
-        position: fixed; z-index: 201; left: 50%; bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px));
-        width: min(720px, 100%); max-height: calc(88vh - var(--inset-top, 0px));
-        transform: translateX(-50%); overflow-y: auto; overscroll-behavior: contain;
-        padding: 0.8rem min(1.35rem, 24px) calc(1.25rem + max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)));
-        background: var(--bg3); border: 1px solid var(--gold-border); border-bottom: 0;
-        border-radius: 16px 16px 0 0; box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.4);
-        scrollbar-width: thin; scrollbar-color: var(--gold-border) transparent;
-        animation: audio-manager-rise 0.2s cubic-bezier(0.22, 0.8, 0.28, 1);
+      .audio-manager-sheet.now-playing {
+        position: fixed; z-index: 201; inset: 0; display: flex; flex-direction: column; overflow: hidden;
+        padding: calc(max(env(safe-area-inset-top, 0px), var(--inset-top, 0px)) + 4px) 16px calc(12px + var(--dock-sys));
+        background: var(--bg); color: var(--cream);
+        animation: np-rise 0.22s cubic-bezier(0.22, 0.8, 0.28, 1);
       }
-      .audio-manager-sheet::-webkit-scrollbar { width: 4px; }
-      .audio-manager-sheet::-webkit-scrollbar-thumb { background: var(--gold-border); border-radius: 4px; }
       @keyframes audio-manager-fade { from { opacity: 0; } to { opacity: 1; } }
-      @keyframes audio-manager-rise { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-      .audio-manager-sheet .sheet-handle-row { margin-bottom: 0.2rem; }
-      .audio-manager-kicker {
-        margin: 0 0 0.28rem; font-family: 'Cinzel', serif; font-size: var(--fs-10);
-        letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold-dim);
+      @keyframes np-rise { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+      /* The bar's and the player's buttons speak in the reading serif (W3-07: a button does not inherit its font, so
+         the bar's title fell back to a sans). :where() keeps this at zero specificity, under every class that names
+         its own family (the Cinzel labels). */
+      :where(.audio-bar, .audio-manager-sheet, .np-sheet) button { font-family: inherit; }
+      .np-head { flex: 0 0 auto; display: grid; grid-template-columns: 48px minmax(0, 1fr) 48px; align-items: center; min-height: 56px; }
+      .now-playing .np-close { width: 48px; height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: none; color: var(--gold); cursor: pointer; }
+      .now-playing .np-close svg { width: 26px; height: 26px; }
+      .np-kicker {
+        min-height: 48px; display: flex; align-items: center; justify-content: center; padding: 4px 6px; text-align: center;
+        color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.2em; line-height: 1.5; text-transform: uppercase;
+        touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab;
       }
-      .audio-manager-head { display: flex; align-items: flex-start; gap: 0.85rem; padding-bottom: 1rem; border-bottom: 1px solid var(--gold-border); }
-      .audio-manager-track-copy { flex: 1; min-width: 0; }
-      .audio-manager-track-copy .audio-manager-title { display: block; margin: 0; color: var(--cream); font-family: 'Cinzel', serif; font-size: var(--fs-18); font-weight: 500; line-height: 1.3; }
-      .audio-manager-track-copy .audio-manager-headline { display: block; margin: 0.3rem 0 0; color: var(--cream-dim); font-size: var(--fs-12); font-style: italic; line-height: 1.45; }
-      /* Desk-title jump (2026-08-09): the title is a BUTTON that opens the
-         playing letter/chapter's text without touching playback. Reset the
-         button chrome so the copy renders exactly like the plain variant;
-         the '›' chevron is the same go-to cue the home cards carry. */
-      .audio-manager-jump { background: none; border: 0; padding: 0; margin: 0; display: block; width: 100%; text-align: left; font: inherit; color: inherit; cursor: pointer; border-radius: 6px; }
-      .audio-manager-jump:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-      .audio-manager-jump-chevron { color: var(--gold-dim); font-family: inherit; }
-      .audio-manager-jump-cue { display: block; margin-top: 0.4rem; color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.04em; }
-      @media (hover: hover) { .audio-manager-jump:hover .audio-manager-title { color: var(--gold); } .audio-manager-jump:hover .audio-manager-jump-chevron, .audio-manager-jump:hover .audio-manager-jump-cue { color: var(--gold); } }
-      .audio-manager-save {
-        flex: 0 0 auto; min-width: 58px; min-height: 44px; padding: 0.3rem 0.55rem;
-        display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.05rem;
-        background: transparent; border: 1px solid var(--gold-border); border-radius: 7px; color: var(--gold-dim);
-        cursor: pointer; font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.04em;
+      .np-head .row-menu-btn { width: 48px; height: 48px; justify-self: end; }
+      .np-body {
+        flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column;
+        align-items: center; gap: 14px; padding: 8px 4px 16px; text-align: center;
       }
-      .audio-manager-save svg { width: 19px; height: 19px; }
-      .audio-manager-save.is-saved { color: var(--gold); background: var(--gold-faint); border-color: var(--gold); }
-      @media (hover: hover) { .audio-manager-save:hover { color: var(--gold); border-color: var(--gold); } }
-      .audio-manager-save:focus-visible, .audio-manager-transport button:focus-visible, .audio-manager-segment button:focus-visible,
-      .audio-manager-queue button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      .audio-manager-progress { padding: 1.05rem 0 0.8rem; }
-      /* Named, not `.audio-manager-progress input`: the desk's scrubber is the
-         shared AudioSeekSlider now, so the hook is its class rather than its
-         position in the DOM. Same --seek-pct fill as the bar's. */
+      .np-body > * { flex-shrink: 0; }   /* a 44 px min-height must not let a wrapped line be squeezed under the next */
+      .np-body > :first-child { margin-top: auto; }
+      .np-body > :last-child { margin-bottom: auto; }
+      .np-title { margin: 0; max-width: 100%; color: var(--cream); font-family: var(--font-body); font-size: var(--fs-36); font-weight: 500; line-height: 1.12; overflow-wrap: anywhere; }
+      .np-title-song { font-size: var(--fs-30); }
+      .np-byrow { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 14px; }
+      .np-byline { margin: 0; color: var(--cream-dim); font-family: var(--font-body); font-size: var(--fs-18); font-style: italic; line-height: 1.35; }
+      .np-chip {
+        min-height: 44px; display: inline-flex; align-items: center; gap: 0.4em; padding: 0 16px; border: 1px solid var(--gold); border-radius: 999px;
+        background: transparent; color: var(--cream); font-family: var(--font-body); font-size: var(--fs-16); cursor: pointer;
+      }
+      .np-chip span { color: var(--gold); font-size: 0.8em; }
+      .np-live {
+        width: 100%; max-width: 560px; min-height: 52px; margin: 4px 0 0; padding: 12px 16px; display: block; text-align: left;
+        border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); color: inherit; cursor: pointer;
+      }
+      .np-live-cue.audio-manager-jump-cue { margin: 0; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-18); letter-spacing: 0; }
+      .np-status { margin: 0; color: var(--cream-dim); font-size: var(--fs-15); }
+      .now-playing .np-cover { --np-cover: min(68vw, clamp(96px, calc(100dvh - 30rem), 280px)); width: var(--np-cover); height: var(--np-cover); border-radius: 12px; }
+      .now-playing .np-cover .song-cover-note { font-size: var(--fs-48); }
+      .np-version { font-size: var(--fs-15); }
+      .np-from { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--cream-dim); font-family: var(--font-body); font-size: var(--fs-16); font-style: italic; cursor: pointer; }
+      .np-from em { color: var(--cream); }
+      .np-from span { color: var(--gold); font-style: normal; }
+      .np-lyrics-head { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; }
+      .now-playing .np-cover-small { width: 72px; height: 72px; flex: 0 0 72px; border-radius: 8px; }
+      .np-lyrics-head .np-title { font-size: var(--fs-24); }
+      .np-body .song-lyrics-card { width: 100%; max-width: 560px; margin: 0; text-align: left; }
+      .np-body .song-lyrics-lines { max-height: none; }
+
+      .np-dock { flex: 0 0 auto; width: 100%; max-width: 620px; margin: 0 auto; }
+      .audio-manager-progress { position: relative; padding: 14px 0 6px; }
+      .np-ticks { position: absolute; left: 0; right: 0; top: 50%; height: 12px; margin-top: -16px; pointer-events: none; }
+      .np-ticks span { position: absolute; top: 0; width: 1px; height: 12px; background: var(--gold-dim); opacity: 0.75; }
+      /* Named, not `.audio-manager-progress input`: the scrubber is the shared AudioSeekSlider, so the hook is its
+         class. Same --seek-pct fill as the bar's. A 48 px hit box in a thin footprint. */
       .audio-manager-seek {
         -webkit-appearance: none; appearance: none; width: 100%; height: 48px; margin: -15px 0; padding: 0;
-        background: transparent; cursor: pointer;   /* a 48 px hit box in the old 18 px footprint: the margins sit in .audio-manager-progress's padding (L3) */
+        background: transparent; cursor: pointer;
       }
       .audio-manager-seek:disabled { opacity: 0.45; cursor: default; }
       .audio-manager-seek::-webkit-slider-runnable-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%)); }
-      .audio-manager-seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; margin-top: -6px; border: 0; border-radius: 50%; background: var(--gold); }
+      .audio-manager-seek::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -7px; border: 0; border-radius: 50%; background: var(--gold); }
       .audio-manager-seek::-moz-range-track { height: 4px; border-radius: 4px; background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%)); }
-      .audio-manager-seek::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--gold); }
-      .audio-manager-time { display: flex; justify-content: space-between; margin-top: 0.25rem; color: var(--cream-dim); font-size: var(--fs-11); font-variant-numeric: tabular-nums; }
-      .audio-manager-transport { display: flex; align-items: center; justify-content: center; gap: clamp(0.45rem, 2.2vw, 1.25rem); padding-bottom: 1.1rem; }
+      .audio-manager-seek::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 50%; background: var(--gold); }
+      .audio-manager-time { display: flex; justify-content: space-between; min-height: 1.4em; margin-top: 0.25rem; color: var(--cream-dim); font-size: var(--fs-15); font-variant-numeric: tabular-nums; }
+      .audio-manager-transport { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 10px 0 14px; }
       .audio-manager-round, .audio-manager-play {
-        flex: 0 0 auto; width: 44px; height: 44px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+        flex: 0 0 auto; width: 56px; height: 56px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
         border: 1px solid var(--gold-border); border-radius: 50%; background: transparent; color: var(--gold); cursor: pointer;
-        font-family: 'Cinzel', serif; font-size: var(--fs-11); font-variant-numeric: tabular-nums;
+        font-family: var(--font-cinzel); font-size: var(--fs-14); font-variant-numeric: tabular-nums;
       }
-      .audio-manager-round svg { width: 21px; height: 21px; }
-      .audio-manager-play { width: 58px; height: 58px; background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
-      .audio-manager-play svg { width: 27px; height: 27px; }
+      .audio-manager-round svg { width: 26px; height: 26px; }
+      .np-transport .np-skip svg { width: 34px; height: 34px; }
+      .audio-manager-play { width: 76px; height: 76px; border-color: var(--gold); background: var(--gold); color: var(--bg); }
+      .audio-manager-play svg { width: 32px; height: 32px; }
       .audio-manager-play.is-loading { animation: audio-bar-pulse 1.1s ease-in-out infinite; }
-      .audio-manager-transport button:disabled, .audio-manager-segment button:disabled, .audio-manager-queue button:disabled { opacity: 0.38; cursor: default; }
-      @media (hover: hover) { .audio-manager-round:hover { border-color: var(--gold); background: var(--gold-faint); } .audio-manager-play:hover { background: rgba(200,164,86,0.18); } }
-      /* Two tools side by side only where a 44px chip row still fits inside one
-         (6 speed presets = 6×44 + 5 gaps ≈ 287px of content). auto-fit collapses
-         to a single column below that on its own, which is why the 480px block
-         no longer needs to restate it — and why 360px never overflows. */
-      .audio-manager-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0.65rem; padding: 0.85rem 0; border-top: 1px solid var(--gold-border); }
-      .audio-manager-tool { min-width: 0; padding: 0.65rem; background: rgba(200, 164, 86, 0.035); border: 1px solid rgba(200, 164, 86, 0.16); border-radius: 8px; }
-      .audio-manager-tool-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.5rem; color: var(--cream-dim); font-size: var(--fs-11); }
-      .audio-manager-tool-head strong { color: var(--gold); font-family: 'Cinzel', serif; font-size: var(--fs-11); font-weight: 500; white-space: nowrap; }
-      .audio-manager-segment { display: flex; flex-wrap: wrap; gap: 0.28rem; }
-      /* Speed tool (AudioSpeedControl): −/+ are the transport's 44px rounds, the
-         slider is the desk's seek slider by class (same --seek-pct fill), the
-         readout is a button that swaps for a number box on tap. */
-      .audio-speed-row { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.5rem; }
-      .audio-speed-row .audio-speed-slider { flex: 1 1 auto; min-width: 0; }
-      .audio-speed-step { width: 40px; height: 40px; font-size: var(--fs-14); }
+      .np-flat { width: 48px; height: 48px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 50%; background: none; color: var(--cream-dim); cursor: pointer; }
+      .np-flat svg { width: 26px; height: 26px; }
+      .np-flat.is-on { color: var(--gold); background: var(--gold-faint); }
+      .audio-manager-transport button:disabled { opacity: 0.38; cursor: default; }
+      @media (hover: hover) { .audio-manager-round:not(:disabled):hover { border-color: var(--gold); background: var(--gold-faint); } }
+      .np-tools { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+      .np-tool { min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0; border: 0; background: none; color: var(--gold); cursor: pointer; }
+      .np-tool:disabled { opacity: 0.4; cursor: default; }
+      .np-tool-box { position: relative; width: 100%; max-width: 72px; height: 48px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--gold-border); border-radius: 8px; }
+      .np-tool-box svg { width: 24px; height: 24px; }
+      .np-tool.is-on .np-tool-box { border-color: var(--gold); background: var(--gold-faint); }
+      .np-tool-rate { color: var(--cream); font-family: var(--font-body); font-size: clamp(14px, var(--fs-16), 22px); font-variant-numeric: tabular-nums; }
+      .np-tool-badge {
+        position: absolute; top: -9px; right: -9px; min-width: 22px; height: 22px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 11px; background: var(--gold); color: var(--bg); font-size: var(--fs-12); font-weight: 600; font-variant-numeric: tabular-nums;
+      }
+      .np-tool-word { max-width: 100%; color: var(--cream-dim); font-family: var(--font-body); font-size: var(--fs-15); line-height: 1.2; overflow-wrap: anywhere; }
+      .np-tool.is-on .np-tool-word { color: var(--gold); }
+      .np-close:focus-visible, .np-chip:focus-visible, .np-live:focus-visible, .np-from:focus-visible, .np-flat:focus-visible, .np-tool:focus-visible,
+      .audio-manager-transport button:focus-visible, .np-sheet button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      /* A wide window: a right-side panel over the page (inferred, brief 3b). */
+      @media (min-width: 900px) {
+        .audio-manager-sheet.now-playing { left: auto; width: 440px; border-left: 1px solid var(--gold-border); box-shadow: -18px 0 42px rgba(0, 0, 0, 0.4); }
+      }
+      /* Large text (200 %+): the body gives way first; the dock never scrolls (picture 06). */
+      @media (max-height: 760px) { .np-title { font-size: var(--fs-30); } .audio-manager-play { width: 68px; height: 68px; } }
+
+      /* ── The player's small sheets (PlayerSheets.jsx, pictures 10-13): the select-sheet grammar over the player. ── */
+      .np-sheet-backdrop { position: fixed; inset: 0; z-index: 260; background: rgba(0, 0, 0, 0.62); animation: audio-manager-fade 0.16s ease-out; }
+      .np-sheet {
+        position: fixed; z-index: 261; left: 50%; bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); transform: translateX(-50%);
+        width: min(620px, 100%); max-height: calc(88vh - var(--inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
+        padding: 0.6rem 16px calc(16px + var(--dock-sys)); background: var(--bg3); color: var(--cream);
+        border: 1px solid var(--gold-border); border-bottom: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.45);
+        animation: np-sheet-rise 0.2s cubic-bezier(0.22, 0.8, 0.28, 1);
+      }
+      @keyframes np-sheet-rise { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
+      .np-sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 2px 0 14px; }
+      .np-sheet-titles { min-width: 0; }
+      .np-sheet-title { margin: 0; color: var(--cream); font-family: var(--font-body); font-size: var(--fs-30); font-weight: 500; line-height: 1.15; }
+      .np-sheet-sub { margin: 2px 0 0; color: var(--cream-dim); font-size: var(--fs-16); }
+      .np-sheet-status { color: var(--gold); font-size: var(--fs-16); font-variant-numeric: tabular-nums; text-align: right; }
+      .np-sheet-note { margin: 14px 0; color: var(--cream-dim); font-size: var(--fs-15); font-style: italic; line-height: 1.45; text-align: center; }
+      .np-sheet-done, .np-sheet-go {
+        width: 100%; min-height: 52px; border: 1px solid var(--gold); border-radius: 12px; background: transparent; color: var(--gold);
+        font-family: var(--font-body); font-size: var(--fs-18); cursor: pointer;
+      }
+      .np-sheet-go { border-radius: 999px; background: var(--gold); color: var(--bg); }
+      .np-sheet-link { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-16); cursor: pointer; }
+      .np-chips, .np-grid { display: grid; gap: 8px; }
+      .np-chips { grid-template-columns: repeat(auto-fit, minmax(max(64px, 4.4em), 1fr)); }
+      .np-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+      .np-chips button, .np-grid button {
+        min-height: 52px; padding: 6px 8px; border: 1px solid var(--gold-border); border-radius: 10px; background: transparent;
+        color: var(--cream); font-family: var(--font-body); font-size: var(--fs-16); line-height: 1.2; cursor: pointer;
+      }
+      .np-chips button.is-active, .np-grid button.is-active { border-color: var(--gold); background: var(--gold); color: var(--bg); }
+      /* Speed: the readout in the head, the 1 % stepper under the presets. */
+      .np-speed-sheet .audio-speed-readout { color: var(--gold); font-family: var(--font-body); font-size: var(--fs-30); font-weight: 500; }
       .audio-speed-readout button, .audio-speed-readout input {
-        margin: 0; padding: 0.1rem 0.35rem; border: 1px solid transparent; border-radius: 4px; background: transparent;
-        color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; min-height: 28px;
+        margin: 0; padding: 0.1rem 0.35rem; border: 1px solid transparent; border-radius: 6px; background: transparent;
+        color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; min-height: 44px;
       }
       .audio-speed-readout button { border-bottom: 1px dotted var(--gold-border); }
-      .audio-speed-readout button:focus-visible, .audio-speed-readout input:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      .audio-speed-readout input { width: 4.5em; border-color: var(--gold-border); cursor: text; -moz-appearance: textfield; }
+      .audio-speed-readout input { width: 4.2em; border-color: var(--gold-border); cursor: text; -moz-appearance: textfield; }
       .audio-speed-readout input::-webkit-outer-spin-button, .audio-speed-readout input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-      /* 44px both dimensions — these speed/sleep chips were the last sub-44px
-         touch targets in the listening UI (32×38). The row wraps rather than
-         overflowing, and the grid above stacks before it has to. */
-      .audio-manager-segment button {
-        min-height: 44px; min-width: 44px; padding: 0.15rem 0.4rem; border: 1px solid var(--gold-border); border-radius: 5px;
-        background: transparent; color: var(--cream-muted); cursor: pointer; font-family: var(--font-body); font-size: var(--fs-11);
+      .audio-speed-row { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 16px; }
+      .audio-speed-fine { color: var(--cream-dim); font-size: var(--fs-16); }
+      .audio-speed-step { border-color: var(--gold); font-size: var(--fs-24); }
+      .audio-speed-step:disabled { opacity: 0.38; cursor: default; }
+      .np-custom { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
+      .np-custom-value { min-width: 4.5em; color: var(--cream); font-size: var(--fs-20); text-align: center; font-variant-numeric: tabular-nums; }
+      .np-custom-go { min-height: 48px; padding: 0 20px; border: 1px solid var(--gold); border-radius: 999px; background: var(--gold); color: var(--bg); font-size: var(--fs-16); cursor: pointer; }
+      .np-custom .audio-manager-round:disabled { opacity: 0.38; }
+      /* Voice: radio rows. */
+      .np-radios { display: flex; flex-direction: column; gap: 10px; }
+      .np-radio {
+        min-height: 64px; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--gold-border); border-radius: 12px;
+        background: transparent; color: var(--cream); text-align: left; cursor: pointer;
       }
-      .audio-manager-segment button.is-active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold-bright); }
-      @media (hover: hover) { .audio-manager-segment button:not(:disabled):hover { border-color: var(--gold); color: var(--gold); } }
-      .audio-manager-queue { padding-top: 0.75rem; border-top: 1px solid var(--gold-border); }
-      .audio-manager-section-head { display: flex; align-items: center; justify-content: space-between; gap: 0.65rem; padding: 0 0.1rem 0.45rem; }
-      .audio-manager-section-head div { display: flex; flex-direction: column; gap: 0.08rem; min-width: 0; }
-      .audio-manager-section-head span { color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.18em; text-transform: uppercase; }
-      .audio-manager-section-head strong { color: var(--cream-muted); font-size: var(--fs-11); font-weight: 400; }
-      .audio-manager-section-head > button { min-height: 44px; min-width: 44px; padding: 0.2rem 0.55rem; border: 0; border-radius: 5px; background: transparent; color: var(--gold-dim); cursor: pointer; font-size: var(--fs-11); }
-      @media (hover: hover) { .audio-manager-section-head > button:hover { background: var(--gold-faint); color: var(--gold); } }
+      .np-radio.is-active { border-color: var(--gold); }
+      .np-radio-dot { flex: 0 0 24px; width: 24px; height: 24px; border: 2px solid var(--cream-dim); border-radius: 50%; }
+      .np-radio.is-active .np-radio-dot { border-color: var(--gold); background: radial-gradient(circle, var(--gold) 0 45%, transparent 50%); }
+      .np-radio-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .np-radio-copy strong { font-family: var(--font-body); font-size: var(--fs-18); font-weight: 500; }
+      .np-radio-copy small { color: var(--cream-dim); font-size: var(--fs-15); }
+      /* The standard ConfirmStrip, wrapped for the sheet: it supplies its own surface here. */
+      .audio-manager-voice-confirm { margin: 0.6rem 0; padding: 0.35rem 0.15rem 0; min-width: 0; flex-wrap: wrap; border-top: 1px solid var(--gold-border); }
+      .audio-manager-voice-confirm .ann-chip-confirm-q { font-size: var(--fs-14); }
+      .audio-manager-voice-confirm .ann-chip-confirm-btn { min-height: 44px; }
+      /* Up next (picture 10). */
+      .np-upnext-now { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--gold-faint); }
+      .np-upnext-now-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .np-upnext-now-copy strong { color: var(--cream); font-family: var(--font-body); font-size: var(--fs-18); font-weight: 500; overflow-wrap: anywhere; }
+      .np-upnext-now-copy small { color: var(--cream-dim); font-size: var(--fs-14); }
+      .np-upnext-now .audio-manager-round { width: 48px; height: 48px; }
+      .np-upnext-play { border-color: var(--gold); }
+      .np-upnext-earlier { width: 100%; min-height: 48px; margin: 10px 0 2px; padding: 0 12px; text-align: left; border: 1px solid var(--gold-border); border-radius: 10px; background: transparent; color: var(--cream-dim); font-size: var(--fs-16); cursor: pointer; }
       .audio-manager-queue ol { margin: 0; padding: 0; list-style: none; }
       .audio-manager-queue li { display: flex; align-items: stretch; min-width: 0; border-top: 1px solid rgba(200, 164, 86, 0.13); }
-      .audio-manager-queue-main { flex: 1; min-width: 0; min-height: 54px; padding: 0.45rem 0.25rem; display: flex; align-items: center; gap: 0.6rem; border: 0; background: transparent; color: var(--cream); cursor: pointer; text-align: left; }
-      .audio-manager-queue-number { width: 1.25rem; flex: 0 0 1.25rem; color: var(--gold-dim); font-family: 'Cinzel', serif; font-size: var(--fs-11); text-align: center; }
+      .audio-manager-queue-main { flex: 1; min-width: 0; min-height: 56px; padding: 0.45rem 0.25rem; display: flex; align-items: center; gap: 0.6rem; border: 0; background: transparent; color: var(--cream); cursor: pointer; text-align: left; }
+      .audio-manager-queue-number { width: 1.6rem; flex: 0 0 1.6rem; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); text-align: center; }
       .audio-manager-queue-main > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 0.12rem; }
-      .audio-manager-queue-main strong { overflow: hidden; color: var(--cream); font-size: var(--fs-13); font-weight: 400; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-      .audio-manager-queue-main small { overflow: hidden; color: var(--cream-dim); font-size: var(--fs-11); font-style: italic; text-overflow: ellipsis; white-space: nowrap; }
+      .audio-manager-queue-main strong { color: var(--cream); font-family: var(--font-body); font-size: var(--fs-16); font-weight: 400; line-height: 1.25; overflow-wrap: anywhere; }
+      .audio-manager-queue-main small { color: var(--cream-dim); font-size: var(--fs-13); line-height: 1.3; }
       @media (hover: hover) { .audio-manager-queue-main:hover strong { color: var(--gold-bright); } }
-      /* The queue is the WHOLE queue now (2026-08-09), which makes it the
-         chapter picker for a per-chapter Bible edition. Three row states:
-         played (dimmed but tappable — a chapter can be re-heard), current
-         (marked, and the one row with no edit controls), upcoming (unchanged). */
       .audio-manager-queue li.is-played .audio-manager-queue-main strong { color: var(--cream-muted); }
       .audio-manager-queue li.is-played .audio-manager-queue-number { opacity: 0.62; }
-      .audio-manager-queue li.is-current { background: var(--gold-faint); border-left: 2px solid var(--gold); }
-      .audio-manager-queue-main.is-current { cursor: default; }
-      .audio-manager-queue-main.is-current strong { color: var(--gold-bright); }
-      .audio-manager-queue-main.is-current .audio-manager-queue-number { color: var(--gold); }
-      /* Paging, not virtualization: a whole Bible edition is 1,189 rows, so the
-         desk renders a window around the current one and offers these. */
       .audio-manager-queue-page {
-        width: 100%; min-height: 44px; margin: 0; padding: 0.35rem; border: 1px dashed var(--gold-border); border-radius: 6px;
-        background: transparent; color: var(--gold-dim); cursor: pointer; font-family: var(--font-body); font-size: var(--fs-11);
+        width: 100%; min-height: 44px; margin: 6px 0; padding: 0.35rem; border: 1px dashed var(--gold-border); border-radius: 8px;
+        background: transparent; color: var(--gold-dim); cursor: pointer; font-family: var(--font-body); font-size: var(--fs-14);
       }
-      @media (hover: hover) { .audio-manager-queue-page:hover { border-color: var(--gold); color: var(--gold); } }
-      .audio-manager-queue-page:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      .audio-manager-voice-note { margin: 0.45rem 0 0; color: var(--cream-dim); font-size: var(--fs-10); font-style: italic; line-height: 1.4; }
-      /* The standard ConfirmStrip, wrapped for the desk: it normally sits
-         inside an annotation chip that supplies the surface, and here it has to
-         supply its own. Its two buttons keep the desk's 44px contract. */
-      .audio-manager-voice-confirm {
-        margin: 0.45rem 0 0; padding: 0.35rem 0.15rem 0; min-width: 0; flex-wrap: wrap;
-        border-top: 1px solid var(--gold-border);
-      }
-      .audio-manager-voice-confirm .ann-chip-confirm-q { font-size: var(--fs-11); }
-      .audio-manager-voice-confirm .ann-chip-confirm-btn { min-height: 44px; }
-      /* The relocated top-of-desk voice picker (owner 2026-08-10): a bordered
-         band under the track identity so "what am I hearing" and its switch
-         read as one unit, before the transport. */
-      .audio-manager-voice-top { margin: 0.35rem 0 0.75rem; padding: 0.55rem 0.65rem 0.6rem; border: 1px solid var(--gold-border); border-radius: 10px; background: var(--gold-faint); }
       .audio-manager-queue-actions { display: flex; align-items: center; }
-      .audio-manager-queue-actions button { width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--gold-dim); cursor: pointer; font-family: 'Cinzel', serif; font-size: var(--fs-16); }
+      .audio-manager-queue-actions button { width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--gold-dim); cursor: pointer; font-size: var(--fs-16); }
+      .audio-manager-queue-actions button:disabled { opacity: 0.38; cursor: default; }
       @media (hover: hover) { .audio-manager-queue-actions button:not(:disabled):hover { background: var(--gold-faint); color: var(--gold); } }
-      .audio-manager-empty { margin: 0; padding: 0.7rem 0.15rem 0.25rem; color: var(--cream-dim); font-size: var(--fs-12); font-style: italic; line-height: 1.5; }
-      @media (max-width: 480px) {
-        .audio-manager-sheet { max-height: calc(92vh - var(--inset-top, 0px)); padding-left: 1rem; padding-right: 1rem; }
-        .audio-manager-transport { gap: 0.42rem; }
-        .audio-manager-queue-actions button { width: 44px; min-width: 44px; }
-      }
+      .audio-manager-empty { margin: 0; padding: 0.7rem 0.15rem 0.25rem; color: var(--cream-dim); font-size: var(--fs-14); font-style: italic; line-height: 1.5; }
       @media (prefers-reduced-motion: reduce) {
-        .audio-manager-backdrop, .audio-manager-sheet, .audio-manager-play.is-loading { animation: none; }
+        .audio-manager-backdrop, .audio-manager-sheet, .audio-manager-play.is-loading, .np-sheet, .np-sheet-backdrop { animation: none; }
       }
 
       /* ── LISTENING LIBRARY — one calm, tactile shelf language shared by the
@@ -2109,11 +2119,6 @@
       .song-keep-quiet:disabled { opacity: .5; cursor: default; text-decoration: none; }
       .song-keep-quiet:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       .song-keep-kept-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0 .6rem; }
-      .song-desk-keep { display: flex; align-items: center; flex-wrap: wrap; gap: 0 .6rem; margin-top: -.3rem; }
-      .song-desk-keep-state, .song-desk-keep-go { display: inline-flex; align-items: center; gap: .35rem; color: var(--cream-dim); font-size: var(--fs-15); }
-      .song-desk-keep-go { color: var(--gold); }
-      .song-desk-keep .song-keep-svg { width: 17px; height: 17px; color: var(--gold); }
-      .song-desk-keep .song-keep-note { flex-basis: 100%; }
       .letter-songs-card .song-keep-action { margin-top: .5rem; }
       .song-keep-cancel:focus-visible, .song-keep-remove:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Letters read with music (L7, picture final-06): READINGS in outlined cards, a READ-ALONG pill and the round play. */

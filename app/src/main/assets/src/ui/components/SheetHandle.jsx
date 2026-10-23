@@ -17,14 +17,18 @@ export const FLING_PX_PER_MS = 0.5;
 /**
  * U06.8 (UX wave 3): the pill ignored a drag. Dragged down it carries the sheet with the finger; let go far enough
  * down, or flicked, the sheet closes; otherwise it settles back. A tap still closes it, as before.
+ * The full player (pl-l2) drags its whole screen by its header: `sheetOf` names what moves (default: the sheet two
+ * levels above the handle).
  * @param {() => void} onClose
+ * @param {(target: HTMLElement) => HTMLElement | null} [sheetOf]
  */
-function useDragToClose(onClose) {
+export function useDragToClose(onClose, sheetOf) {
   const drag = React.useRef(/** @type {{ y: number, t: number, dy: number, sheet: HTMLElement | null, id: number } | null} */ (null));
   const moved = React.useRef(false);
   const onPointerDown = (/** @type {any} */ e) => {
     const row = e.currentTarget.parentElement;
-    drag.current = { y: e.clientY, t: performance.now(), dy: 0, sheet: row ? row.parentElement : null, id: e.pointerId };
+    const sheet = sheetOf ? sheetOf(e.currentTarget) : row ? row.parentElement : null;
+    drag.current = { y: e.clientY, t: performance.now(), dy: 0, sheet, id: e.pointerId };
     moved.current = false;
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_e) { /* a synthetic pointer */ }
   };

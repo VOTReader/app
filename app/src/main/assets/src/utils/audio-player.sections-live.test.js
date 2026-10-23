@@ -94,6 +94,23 @@ afterEach(() => {
   localStorage.removeItem('vot-audio-pos');
 });
 
+describe('sectionMarks(): the letters on a compilation clock (the full player ticks, pl-l2)', () => {
+  it('lists each letter with its start and title, in file order', () => {
+    startPart1();
+    expect(AudioPlayer.sectionMarks()).toEqual([
+      { key: 'wtlb1:introduction', start: 4.2, title: 'Introduction' },
+      { key: 'wtlb1:come-love-awaits-you', start: 61.0, title: 'Come, Love Awaits You' },
+      { key: 'wtlb1:crowning-glory', start: 118.5, title: 'Crowning Glory' },
+    ]);
+  });
+
+  it('is null for a keyed recording', () => {
+    globalThis.AUDIO_MANIFEST = { 'one:a': [['idA', 'B']] };
+    AudioPlayer.playLetter({ volKey: 'one', letter: { id: 'a', title: 'A' }, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.sectionMarks()).toBe(null);
+  });
+});
+
 describe('liveLetter(): the letter a compilation is reading', () => {
   it('names the letter under the clock, and nothing during the file intro', () => {
     startPart1();
