@@ -60,15 +60,30 @@ on:
   #
   # Until 10-23 this ran on every completed CI run on main (workflow_run, 2026-09-24 v12-01);
   # that is what put a new build on readers' screens dozens of times a day.
+  #
+  # up2 (2026-10-23): GitHub dropped the 06:00 run (top-of-the-hour crons are the first it
+  # sheds). Each window hour now has two runs off the hour, and the gate publishes once per
+  # window: a run after the site already published since the window began skips. The
+  # other offset's hour catches up a window that passed with nothing published, and so
+  # does a dispatch with catchup=true (the PC's catch-up row, D:/Swarm/tools/release-catchup.py).
   schedule:
-    - cron: '0 12 * * *'   # 06:00 MDT
-    - cron: '0 13 * * *'   # 06:00 MST
-    - cron: '0 3 * * *'    # 21:00 MDT (the next UTC day)
-    - cron: '0 4 * * *'    # 21:00 MST (the next UTC day)
+    - cron: '7 12 * * *'    # 06:07 MDT (07:07 MST: catch-up hour after nothing published)
+    - cron: '37 12 * * *'   # 06:37 MDT
+    - cron: '7 13 * * *'    # 06:07 MST (07:07 MDT: catch-up)
+    - cron: '37 13 * * *'   # 06:37 MST
+    - cron: '7 3 * * *'     # 21:07 MDT (the next UTC day)
+    - cron: '37 3 * * *'    # 21:37 MDT
+    - cron: '7 4 * * *'     # 21:07 MST (22:07 MDT: catch-up)
+    - cron: '37 4 * * *'    # 21:37 MST
   # SHIP NOW, and the manual override: deploy HEAD of main now, between windows, for a live
   # break (a crash, data loss, the app won't open; the hub fires it), even though CI is red (a
   # flaky e2e, say). The build job re-proves the publish gates itself on this path.
   workflow_dispatch:
+    inputs:
+      catchup:
+        description: 'Catch up a missed release window: the newest green commit (not HEAD), only if nothing published since the window began'
+        type: boolean
+        default: false
 
 # Least privilege, split by job (2026-09-24, improvement sweep v10-01). The deploy
 # job used to run `npm ci`, lint, typecheck, vitest and the build - every
@@ -99,6 +114,7 @@ jobs:
     permissions:
       contents: read
       actions: read
+      deployments: read   # up2: when the site last published (the window is done once it has)
     outputs:
       publish: ${{ steps.target.outputs.publish }}
       sha: ${{ steps.target.outputs.sha }}
@@ -112,11 +128,30 @@ jobs:
             tools/release-window.mjs
           sparse-checkout-cone-mode: false
           persist-credentials: false
-      - name: Is this a release window? (06:00 / 21:00 Denver; a dispatch always is)
+      - name: When did the site last publish? (the newest successful github-pages deployment)
+        id: last
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        # Empty when the lookup fails: a window-hour run then publishes anyway, a catch-up run does not.
+        run: |
+          at=""
+          for id in $(gh api "repos/$REPO/deployments?environment=github-pages&per_page=10" --jq '.[].id' 2>/dev/null); do
+            state=$(gh api "repos/$REPO/deployments/$id/statuses?per_page=1" --jq '.[0].state' 2>/dev/null || true)
+            if [ "$state" = "success" ]; then
+              at=$(gh api "repos/$REPO/deployments/$id" --jq '.created_at' 2>/dev/null || true)
+              break
+            fi
+          done
+          echo "last publish: ${at:-unknown}"
+          echo "at=$at" >> "$GITHUB_OUTPUT"
+      - name: Is this a release window? (06:00 / 21:00 Denver, once each; a dispatch always is)
         id: window
         env:
           EVENT_NAME: ${{ github.event_name }}
           SCHEDULE: ${{ github.event.schedule }}
+          LAST_PUBLISH_AT: ${{ steps.last.outputs.at }}
+          CATCHUP: ${{ github.event_name == 'workflow_dispatch' && inputs.catchup && 'true' || 'false' }}
         run: node tools/release-window.mjs
       - name: Pick the newest commit on main whose CI is green
         if: steps.window.outputs.due == 'true'
@@ -131,7 +166,8 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           LIVE_SHA_URL: https://votreader.github.io/app/build-sha.txt
-          DISPATCH_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || '' }}
+          # A catch-up dispatch picks like a window (the newest green commit), not the tip.
+          DISPATCH_SHA: ${{ github.event_name == 'workflow_dispatch' && !inputs.catchup && github.sha || '' }}
         run: node tools/deploy-target.mjs
 
   build:
