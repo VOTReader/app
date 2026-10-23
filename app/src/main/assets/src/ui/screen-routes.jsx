@@ -1324,6 +1324,7 @@ export function buildScreenRoutes({
         layout={settings.scriptureLayout}
         onCycleLayout={(nextId) => updateSetting('scriptureLayout', nextId)}
         translation={settings.translation}
+        onTranslation={(/** @type {string} */ v) => updateSetting('translation', v)}
       />
     ),
     'scripture-genre': () => genreId && (

@@ -3036,6 +3036,10 @@
     /* ── Scriptures landing: fill screen, no scroll ── */
     .scriptures-landing { padding:1.2rem 1.3rem 0.8rem; justify-content:flex-start; }
     .scriptures-landing .home-eyebrow { margin-bottom:0.4rem; }
+    /* mw17 A02.1: the eyebrow opens the translation picker; it keeps the eyebrow's look. */
+    .home-eyebrow-pick { display:block; margin-left:auto; margin-right:auto; background:none; border:0; padding:0.25rem 0.5rem; min-height:44px; cursor:pointer; font:inherit; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; color:var(--gold); border-radius:6px; }
+    .home-eyebrow-pick:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+    .home-eyebrow-chev { margin-left:0.4em; font-size:0.85em; opacity:0.75; }
     .scriptures-landing .home-title { font-size:var(--fs-24); margin-bottom:0.2rem; }
     .scriptures-landing .home-ornament { margin-bottom:1.2rem; }
     .scriptures-landing .genre-columns { max-width:33.75rem; gap:0.65rem; }

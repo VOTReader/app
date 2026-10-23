@@ -52,6 +52,10 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, upda
     onHistory: n.onHistory || (() => {}),
     fontScale: String(s.fontScale || '1'),
     onFontScale: (v) => { if (updateSetting) updateSetting('fontScale', v); },
+    // A Bible chapter's menu also switches the translation (mw17 A02.1).
+    translationHere: screen === 'bible-ch',
+    translation: String(s.translation || 'nkjv'),
+    onTranslation: (v) => { if (updateSetting) updateSetting('translation', v); },
   };
 
   return (

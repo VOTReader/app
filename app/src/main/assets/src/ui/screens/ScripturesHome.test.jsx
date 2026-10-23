@@ -17,6 +17,7 @@
 
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { ScripturesHome } from './ScripturesHome.jsx';
 
 const GENRES = {
@@ -177,5 +178,33 @@ describe('ScripturesHome layout cycle button', () => {
     const { container } = renderAt('genre');
     expect(btn(container)).toBeNull();
     expect(container.querySelector('.genre-columns')).not.toBeNull();
+  });
+});
+
+describe('ScripturesHome — the translation eyebrow (mw17 A02.1)', () => {
+  const OPTS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version — the default' }, { id: 'rvr', label: 'Reina-Valera 1960', desc: 'Reina-Valera 1960 — Spanish' }];
+  beforeEach(() => {
+    window.TRANSLATION_OPTIONS = OPTS;
+    window.ReactDOM = ReactDOM;
+  });
+  afterEach(() => { delete window.TRANSLATION_OPTIONS; });
+
+  it('is a button that opens the Settings picker and switches the translation', () => {
+    const onTranslation = vi.fn();
+    const { getByRole } = renderAt('genre', { onTranslation });
+    const btn = getByRole('button', { name: /Bible translation: .*Change/ });
+    act(() => { fireEvent.click(btn); });
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog && dialog.textContent).toMatch(/Bible Translation/);
+    const rvr = [...dialog.querySelectorAll('button')].find((b) => /Reina-Valera/.test(b.textContent));
+    act(() => { fireEvent.click(rvr); });
+    expect(onTranslation).toHaveBeenCalledWith('rvr');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('stays plain text without a writer', () => {
+    const { container } = renderAt('genre');
+    expect(container.querySelector('div.home-eyebrow')).not.toBeNull();
+    expect(container.querySelector('button.home-eyebrow')).toBeNull();
   });
 });

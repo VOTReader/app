@@ -43,6 +43,8 @@
 import { pageSiteLink } from '../../utils/passage-copy.js';
 import { copyText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
+import { SelectSheet } from './SelectField.jsx';
+import { translationName } from '../../data/translations.js';
 
 /**
  * @typedef {Object} NavMenuValue
@@ -54,6 +56,9 @@ import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
  * @property {() => void} onHistory
  * @property {string} fontScale         settings.fontScale ("1" = 100 %)
  * @property {(v: string) => void} onFontScale
+ * @property {boolean} [translationHere] a Bible chapter: the menu offers the translation picker
+ * @property {string} [translation]      settings.translation
+ * @property {(v: string) => void} [onTranslation]
  */
 
 /** The ⋯ menu's actions and state (a NavMenuValue, or null outside the provider). */
@@ -97,6 +102,8 @@ export function MoreMenuBtn() {
   // The page on screen's website link, read as the menu opens (cp2).
   const [page, setPage] = React.useState(/** @type {{link:string,reference:string}|null} */ (null));
   const [fallback, setFallback] = React.useState(/** @type {string|null} */ (null));
+  const [pickOpen, setPickOpen] = React.useState(false);
+  const closePick = React.useCallback(() => setPickOpen(false), []);
   const btnRef = React.useRef(/** @type {HTMLButtonElement|null} */ (null));
   const menuRef = React.useRef(/** @type {HTMLDivElement|null} */ (null));
 
@@ -200,6 +207,9 @@ export function MoreMenuBtn() {
   const pct = Math.round(parseFloat(String(ctx.fontScale || '1')) * 100) || 100;
   const atMin = pct <= MENU_SCALE_MIN * 100, atMax = pct >= MENU_SCALE_MAX * 100;
   const theme = ctx.theme === 'light' ? 'light' : 'dark';
+  // A Bible chapter's translation, picked from here as from Settings > Reading (mw17 A02.1).
+  const canPickTranslation = !!ctx.translationHere && typeof ctx.onTranslation === 'function'
+    && typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) && TRANSLATION_OPTIONS.length > 1;
 
   return (
     <>
@@ -247,6 +257,17 @@ export function MoreMenuBtn() {
               <span>History</span>
             </button>
           ) : null}
+          {canPickTranslation ? (
+            <button type="button" role="menuitem" className="more-menu-item" aria-haspopup="dialog" onClick={go(() => setPickOpen(true))}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+              </svg>
+              <span className="more-menu-item-text">
+                <span>Bible translation</span>
+                <span className="more-menu-item-sub">{translationName(ctx.translation)}</span>
+              </span>
+            </button>
+          ) : null}
           <div className="more-menu-row" role="group" aria-label="Theme">
             <span className="more-menu-row-label">Theme</span>
             <span className="more-menu-seg">
@@ -280,6 +301,10 @@ export function MoreMenuBtn() {
         <span className="more-menu-live sr-only" aria-live="polite">{'Text size ' + (pct === 100 ? 'Standard' : pct + '%')}</span>
         </>,
         document.body,
+      ) : null}
+      {canPickTranslation ? (
+        <SelectSheet open={pickOpen} onClose={closePick} portal eyebrow="Reading" title="Bible Translation"
+          value={ctx.translation || 'nkjv'} options={TRANSLATION_OPTIONS} onChange={/** @type {(v: string) => void} */ (ctx.onTranslation)} />
       ) : null}
       {fallback ? (
         <CopyFallbackSheet

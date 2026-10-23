@@ -3,8 +3,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { translationName } from '../../data/translations.js';
+import { SelectSheet } from '../components/SelectField.jsx';
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation }) {
+export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation, onTranslation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the
   // full ~7 MB download wait. The subscription re-renders this component
@@ -89,10 +90,30 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
     </div>
   ) : null;
 
+  const [pickOpen, setPickOpen] = React.useState(false);
+  const closePick = React.useCallback(() => setPickOpen(false), []);
+  const canPick = typeof onTranslation === 'function'
+    && typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) && TRANSLATION_OPTIONS.length > 1;
+
   const hero = (
     <>
       {cycleBtn}
-      <div className="home-eyebrow">{translationName(translation)}</div>
+      {/* The eyebrow names the translation and, given onTranslation, opens the
+          same picker as Settings > Reading (mw17 A02.1: switching used to mean
+          knowing that path). */}
+      {canPick ? (
+        <button type="button" className="home-eyebrow home-eyebrow-pick" aria-haspopup="dialog" aria-expanded={pickOpen}
+          aria-label={'Bible translation: ' + translationName(translation) + '. Change'}
+          onClick={() => setPickOpen(true)}>
+          {translationName(translation)}<span className="home-eyebrow-chev" aria-hidden="true">{"▾"}</span>
+        </button>
+      ) : (
+        <div className="home-eyebrow">{translationName(translation)}</div>
+      )}
+      {canPick ? (
+        <SelectSheet open={pickOpen} onClose={closePick} portal eyebrow="Reading" title="Bible Translation"
+          value={translation || 'nkjv'} options={TRANSLATION_OPTIONS} onChange={onTranslation} />
+      ) : null}
       <h1 className="home-title">The Scriptures of Truth</h1>
       <div className="home-ornament">
         <div className="home-ornament-line" />
