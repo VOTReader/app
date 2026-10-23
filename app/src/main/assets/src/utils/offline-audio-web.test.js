@@ -385,6 +385,28 @@ describe('offline-audio-web: Download only on Wi-Fi (ra6)', () => {
     expect(OfflineAudio.waiting()).toBe(false);
   });
 
+  it('dl-d5: an automatic download never starts on mobile data; the listener’s own go past it; Wi-Fi starts it', async () => {
+    await ready();   // the switch off (the default): only the automatic one waits
+    OfflineAudio.download([{ url: URL_OF('a1'), key: 'k', title: 'auto', wifi: true }, { url: URL_OF('o1'), key: 'k', title: 'own' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('o1'))).toBe(true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(OfflineAudio.statusOf(URL_OF('a1'))).toBe('queued');
+    expect(gets().map((c) => c[0])).toEqual([RELAY + 'audio-v1/o1.mp3']);
+    expect(OfflineAudio.reason()).toBe('wifi');
+    expect(JSON.parse(localStorage.getItem('vot.offlineAudioQueue')).items[0].wifi).toBe(true);   // kept across a close
+    conn.move('wifi');
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('a1'))).toBe(true));
+  });
+
+  it('dl-d5: the listener’s own Download of one waiting for Wi-Fi starts it on mobile data', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('a2'), key: 'k', title: 'auto', wifi: true }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(gets()).toHaveLength(0);
+    OfflineAudio.download([{ url: URL_OF('a2'), key: 'k', title: 'auto' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('a2'))).toBe(true));
+  });
+
   it('off (the default), mobile data downloads as before', async () => {
     await ready();
     OfflineAudio.download([{ url: URL_OF('m2'), key: 'k', title: 't' }]);
@@ -502,6 +524,22 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r3'))).toBe(true));
     expect(OfflineAudio.reason()).toBe(null);
     expect(localStorage.getItem('vot.offlineAudioQueue')).toBe(null);
+  });
+
+  it('dl-d5: an automatic download is not the listener asking: a closed queue stays closed', async () => {
+    await ready();
+    hangNext();
+    OfflineAudio.download(three());
+    await vi.waitFor(() => expect(gets()).toHaveLength(1));
+    WebOfflineAudio._reset();   // the page closes
+    OfflineAudio._reset();
+    fetchMock.mockClear();
+    await ready();
+    await vi.waitFor(() => expect(OfflineAudio.reason()).toBe('closed'));
+    OfflineAudio.download([{ url: URL_OF('auto'), key: 'k', title: 'auto', wifi: true }]);
+    await new Promise((r) => setTimeout(r, 20));
+    expect(OfflineAudio.reason()).toBe('closed');
+    expect(gets()).toHaveLength(0);
   });
 
   it('a queue paused by Pause all is still paused, not closed, after a reload', async () => {

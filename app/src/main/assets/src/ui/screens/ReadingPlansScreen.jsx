@@ -20,6 +20,7 @@
 import { useVolumesSeq, useNow, PlanListen } from '../components/TodayCard.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
 import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineAudioControls.jsx';
+import { canTell } from '../../utils/download-gate.js';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate, takePlanOpen, onPlanOpenAsk } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, lastActive, isReminderTime } from '../../utils/plan-reminder.js';
 import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
@@ -187,6 +188,13 @@ function WeekAudio({ plan, from, tracksOf }) {
   if (!off || !tracks.length) return null;
   return (
     <div className="plans-audio">
+      {canTell() && plan.status === 'running' ? (
+        <label className="plans-by plans-audio-auto">
+          <input type="checkbox" checked={plan.autoAudio !== false}
+            onChange={() => saveRun({ ...plan, autoAudio: plan.autoAudio === false, updated: Date.now() })} />
+          <span>Keep the next 7 days on this phone (on Wi-Fi)</span>
+        </label>
+      ) : null}
       <OfflineCollectionAction units={tracks.map((t) => [t])} label={(end - from === 1 ? 'the last day' : 'the next ' + (end - from) + ' days') + ' of your plan'}
         action={'Download this week’s audio'} savedText={'This week’s audio is on this phone'} />
     </div>

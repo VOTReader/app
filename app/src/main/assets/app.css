@@ -3524,6 +3524,10 @@
     .plans-by input[type="date"] { min-height:40px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--cream); font:inherit; color-scheme:dark; }
     body.light .plans-by input[type="date"] { color-scheme:light; }
     .plans-by input[type="checkbox"] { width:20px; height:20px; accent-color:var(--gold); }
+    /* dl-d5: the plan week's switch keeps its words beside the box at any text size. */
+    .plans-audio-auto { flex-wrap:nowrap; margin-bottom:0.5rem; }
+    .plans-audio-auto input[type="checkbox"] { flex:none; }
+    .plans-audio-auto span { flex:1 1 auto; min-width:0; }
     .plans-hold { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .plans-mark { display:block; margin:0 auto; font-size:var(--fs-13); }
     /* mw18 landing 1: Home's done state, the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */

@@ -143,4 +143,66 @@ class OfflineAudioWifiOnlyTest {
         waitFor("the download") { s.isSaved(url1) }
         assertFalse(JSONObject(s.stateJson()).getBoolean("waiting"))
     }
+
+    @Test
+    fun `the page can ask whether the network is unmetered now, whatever the switch (dl-d5)`() {
+        val s = store()
+        assertEquals(false, s.unmeteredNow())
+        unmetered.set(true)
+        assertEquals(true, s.unmeteredNow())
+        val broken = OfflineAudioStore(tmp.root, executor = worker, unmetered = { throw IllegalStateException("no service") })
+        assertEquals(false, broken.unmeteredNow(), "a network that cannot be read counts as metered")
+    }
+
+    private val url2 = "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/one-christmas-C.mp3"
+    private val url3 = "https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/one-easter-B.mp3"
+    private fun recording(executor: java.util.concurrent.ExecutorService = worker) =
+        OfflineAudioStore(tmp.root, opener = { opens.incrementAndGet(); OfflineAudioStore.Opened(ByteArrayInputStream(body), body.size.toLong()) },
+            executor = executor, freeBytes = { 10L shl 30 }, emit = { synchronized(events) { events += JSONObject(it) } },
+            unmetered = { unmetered.get() })
+
+    @Test
+    fun `an automatic download never starts on mobile data, the listener's own go past it, Wi-Fi starts it (dl-d5)`() {
+        val s = recording()   // Download only on Wi-Fi off, the default: only the automatic one waits
+        s.enqueue(listOf(OfflineAudioStore.Item(url1, "a", "auto", wifi = true), OfflineAudioStore.Item(url2, "b", "own")))
+        waitFor("the listener's own") { s.isSaved(url2) }
+        Thread.sleep(200)
+        assertFalse(s.isSaved(url1), "nothing automatic over mobile data")
+        assertEquals(1, opens.get())
+        assertEquals("wifi", JSONObject(s.stateJson()).optString("reason"), "the rows say Waiting for Wi-Fi")
+        // One the listener asks for while it waits goes first too.
+        s.enqueue(listOf(OfflineAudioStore.Item(url3, "c", "own later")))
+        waitFor("the later one") { s.isSaved(url3) }
+        assertFalse(s.isSaved(url1))
+        unmetered.set(true)
+        s.gateChanged()
+        waitFor("the automatic one on Wi-Fi") { s.isSaved(url1) }
+    }
+
+    @Test
+    fun `the listener's own Download of one waiting for Wi-Fi starts it on mobile data (dl-d5)`() {
+        val s = recording()
+        s.enqueue(listOf(OfflineAudioStore.Item(url1, "a", "auto", wifi = true)))
+        Thread.sleep(200)
+        assertEquals(0, opens.get())
+        s.enqueue(listOf(OfflineAudioStore.Item(url1, "a", "auto")))
+        waitFor("the download") { s.isSaved(url1) }
+    }
+
+    @Test
+    fun `an automatic download still waits for Wi-Fi after a restart (dl-d5)`() {
+        val gone = Executors.newSingleThreadExecutor()
+        val first = recording(gone)
+        first.enqueue(listOf(OfflineAudioStore.Item(url1, "a", "auto", wifi = true)))
+        Thread.sleep(100)
+        val queue = JSONObject(File(tmp.root, "offline-audio/queue.json").readText())
+        assertTrue(queue.getJSONArray("items").getJSONObject(0).getBoolean("wifi"))
+        gone.shutdownNow()   // the app is killed; it opens again on mobile data
+        val again = recording()
+        Thread.sleep(300)
+        assertFalse(again.isSaved(url1))
+        unmetered.set(true)
+        again.gateChanged()
+        waitFor("the download on Wi-Fi") { again.isSaved(url1) }
+    }
 }

@@ -234,6 +234,8 @@ export function useSettings({ savedSettings, theme }) {
       showLetterSongs: true,
       // Download only on Wi-Fi (ra6): off by default, stated for toggleSetting as above.
       downloadWifiOnly: false,
+      // Keep the next 3 ready (dl-d5, call 5A): off by default.
+      keepNextReady: false,
       ...savedS,
       ...migrated // migration wins over stale saved values
     };

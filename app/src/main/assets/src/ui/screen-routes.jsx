@@ -44,6 +44,7 @@
 import { h } from './jsx-h.js';
 import { AudioPlayer } from '../utils/audio-player.js';
 import { setWifiOnly } from '../utils/download-gate.js';
+import { setAutoDownloads } from '../utils/auto-download.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
@@ -359,6 +360,8 @@ export function buildScreenRoutes({
   AudioPlayer.setPreferredReader(settings.letterReader);
   // Download only on Wi-Fi (ra6): pushed the same way, to the download stores and the phone app's.
   setWifiOnly(settings.downloadWifiOnly === true);
+  // dl-d5: each running plan's next 7 days, and (opt-in) the next 3 after the one playing, download on Wi-Fi.
+  setAutoDownloads(planTracks, settings.keepNextReady === true);
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,

@@ -88,7 +88,9 @@ class OfflineAudioStore(
      * [bytes]: its size as the page knows it (the manifest's baked bytes), -1 unknown; for the queue's totals only,
      * the server's declared length is what a download is checked against.
      */
-    data class Item(val url: String, val key: String, val title: String, val update: Boolean = false, val bytes: Long = -1L)
+    /** [wifi]: an automatic download (dl-d5: plan week, the next 3), which starts only on an unmetered network. */
+    data class Item(val url: String, val key: String, val title: String, val update: Boolean = false, val bytes: Long = -1L,
+        val wifi: Boolean = false)
 
     /**
      * An open download: the body, its declared length (-1 unknown) and how to release the connection. A Range
@@ -324,7 +326,8 @@ class OfflineAudioStore(
             val o = arr.optJSONObject(i) ?: continue
             val url = o.optString("url")
             val bytes = o.optLong("bytes", -1L).takeIf { it in 1L..MAX_BYTES } ?: -1L
-            if (url.isNotEmpty()) items += Item(url, o.optString("key"), o.optString("title"), o.optBoolean("update", false), bytes)
+            if (url.isNotEmpty()) items += Item(url, o.optString("key"), o.optString("title"), o.optBoolean("update", false), bytes,
+                o.optBoolean("wifi", false))
         }
         if (items.isNotEmpty()) enqueue(items)
     }
@@ -375,6 +378,9 @@ class OfflineAudioStore(
         wake()
         send(JSONObject().put("type", "checked").toString())
     }
+
+    /** The network is unmetered now (Wi-Fi): the page queues its automatic downloads only then (dl-d5). */
+    fun unmeteredNow(): Boolean = runCatching { unmetered() }.getOrDefault(false)
 
     /** Downloads wait now: the switch is on and the network is metered. */
     fun waiting(): Boolean = wifiOnly && !runCatching { unmetered() }.getOrDefault(false)
@@ -456,6 +462,32 @@ class OfflineAudioStore(
         }
     }
 
+    /** [url] is an automatic download and the network is metered: it may not start now (dl-d5). */
+    private fun heldForWifi(url: String): Boolean =
+        synchronized(lock) { queued.contains(url) && pending[url]?.wifi == true } && !unmeteredNow()
+
+    /**
+     * An automatic download on a metered network (dl-d5): it steps aside for the listener's own (to the back of the
+     * queue, taken up again after them), or, with none to let by, waits for Wi-Fi as 'wifi'. True when it stepped
+     * aside: this run of it ends and the queue's later one picks it up. With the app closed this is the only check,
+     * so mobile data never starts one. A pause meanwhile goes back to the gate's wait.
+     */
+    private fun deferredForWifi(item: Item, name: String): WifiHold {
+        while (heldForWifi(item.url)) {
+            if (paused) return WifiHold.PAUSED
+            val other = synchronized(lock) { queued.any { it != item.url && pending[it]?.wifi != true } }
+            if (other) {
+                synchronized(lock) { if (queued.remove(item.url)) queued.add(item.url) }
+                executor.execute { download(item, name) }
+                return WifiHold.STEPPED_ASIDE
+            }
+            holdFor(item.url, "wifi", GATE_RECHECK_MS)
+        }
+        return WifiHold.GO
+    }
+
+    private enum class WifiHold { GO, STEPPED_ASIDE, PAUSED }
+
     /**
      * Hold [url] at the head of the queue for up to [ms] with [why] (space, retrying, offline): one 'waiting' event,
      * and the wait ends early on a cancel, a pause, a removal (room made) or a change of the network.
@@ -490,15 +522,21 @@ class OfflineAudioStore(
         val fresh = ArrayList<Pair<Item, String>>()
         synchronized(lock) {
             if (pending.isEmpty()) { batchTotal = 0; batchDone = 0; batchFailed = 0 }
+            var lifted = false
             for (item in items) {
                 val name = fileNameFor(item.url) ?: continue
+                // The listener's own Download of one queued automatically: it no longer waits for Wi-Fi (dl-d5).
+                val had = pending[item.url]
+                if (had != null && had.wifi && !item.wifi) { pending[item.url] = had.copy(wifi = false); lifted = true }
                 if ((entries.containsKey(item.url) && !item.update) || pending.containsKey(item.url)) continue
                 queued.add(item.url)
                 pending[item.url] = item
                 fresh += item to name
             }
-            if (fresh.isNotEmpty()) { batchTotal += fresh.size; persistQueue() }
+            if (fresh.isNotEmpty() || lifted) { batchTotal += fresh.size; persistQueue() }
         }
+        // A download waiting for Wi-Fi looks again: it steps aside for one of the listener's own (dl-d5).
+        wake()
         if (fresh.isEmpty()) return
         busyNow()
         // One event for the batch, before any worker starts on it: a Download all of 150 re-drew the screen 150 times
@@ -658,6 +696,11 @@ class OfflineAudioStore(
         while (true) {
             // Paused, or Download only on Wi-Fi on a metered network: wait (still queued) at the head of the queue.
             awaitGate(item.url)
+            when (deferredForWifi(item, name)) {
+                WifiHold.STEPPED_ASIDE -> return
+                WifiHold.PAUSED -> continue
+                WifiHold.GO -> Unit
+            }
             when (attempt(item, name)) {
                 Outcome.Finished -> return
                 Outcome.Held -> continue
@@ -960,7 +1003,7 @@ class OfflineAudioStore(
                 val url = o.optString("url")
                 if (fileNameFor(url) == null) continue
                 items += Item(url, o.optString("key").take(MAX_TEXT), o.optString("title").take(MAX_TEXT), o.optBoolean("update", false),
-                    o.optLong("bytes", -1L).takeIf { it in 1L..MAX_BYTES } ?: -1L)
+                    o.optLong("bytes", -1L).takeIf { it in 1L..MAX_BYTES } ?: -1L, o.optBoolean("wifi", false))
             }
         }
         val r = readJsonFile(resumeFile)?.let { o ->
@@ -1006,6 +1049,7 @@ class OfflineAudioStore(
             val o = JSONObject().put("url", item.url).put("key", item.key).put("title", item.title)
             if (item.update) o.put("update", true)
             if (item.bytes > 0L) o.put("bytes", item.bytes)
+            if (item.wifi) o.put("wifi", true)
             items.put(o)
         }
         val json = JSONObject().put("v", 1).put("paused", paused).put("items", items)

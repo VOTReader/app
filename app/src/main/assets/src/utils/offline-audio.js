@@ -130,6 +130,13 @@ function _notify() {
   }
 }
 
+/** Urls cancelled through this store this visit, until takeCancels() (dl-d5). */
+const _cancels = new Set();
+/** @param {unknown} urls */
+function _noteCancels(urls) {
+  if (Array.isArray(urls)) for (const u of urls) if (typeof u === 'string' && u !== '*' && _cancels.size < 2000) _cancels.add(u);
+}
+
 /** Re-read the whole native state. */
 function refresh() {
   const b = _bridge();
@@ -421,7 +428,7 @@ export const OfflineAudio = {
   /**
    * Download each of `list` to the phone (queued one at a time, natively or in the web store). `bytes`, when known
    * (the manifest's size), lets the phone total the queue before a byte arrives.
-   * @param {Array<{ url: string, key: string, title: string, bytes?: number }>} list
+   * @param {Array<{ url: string, key: string, title: string, bytes?: number, wifi?: boolean }>} list
    * @returns {boolean} false where downloads are not possible
    */
   download(list) {
@@ -429,11 +436,13 @@ export const OfflineAudio = {
     const b = _bridge();
     const items = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && !_saved.has(t.url))
       .map((t) => {
-        /** @type {{ url: string, key: string, title: string, bytes?: number }} */
+        /** @type {{ url: string, key: string, title: string, bytes?: number, wifi?: boolean }} */
         const it = { url: t.url, key: String(t.key || ''), title: String(t.title || '') };
         // The build's size when the caller gave none (brief section 7 item 17): the phone totals the queue with no lookups.
         const bytes = typeof t.bytes === 'number' && t.bytes > 0 ? t.bytes : bytesOf(t.url);
         if (bytes && bytes > 0) it.bytes = bytes;
+        // dl-d5: an automatic download, which the phone app starts only on Wi-Fi (with the app closed too).
+        if (t.wifi === true) it.wifi = true;
         return it;
       });
     if (!b || typeof b.offlineAudioSave !== 'function') return false;
@@ -492,13 +501,20 @@ export const OfflineAudio = {
     if (urls.length) _send(urls, 'offlineAudioRemove');
   },
   /** @param {string[]} urls */
-  cancel: (urls) => { _send(urls, 'offlineAudioCancel'); },
+  cancel: (urls) => { _noteCancels(urls); _send(urls, 'offlineAudioCancel'); },
   /** Stop every recording on its way (songs being kept go on). */
   cancelAll: () => {
-    if (!_holdsSongs()) { _send(['*'], 'offlineAudioCancel'); return; }
     const busy = [..._queued].concat(_active ? [_active.url] : []).filter((u) => !isSongUrl(u));
+    _noteCancels(busy);
+    if (!_holdsSongs()) { _send(['*'], 'offlineAudioCancel'); return; }
     if (busy.length) _send(busy, 'offlineAudioCancel');
   },
+  /**
+   * The urls cancelled through this store since the last ask, and forget them (dl-d5: auto-download keeps away from
+   * what the listener cancelled; a failure or the app closing is not a cancel).
+   * @returns {string[]}
+   */
+  takeCancels: () => { const out = [..._cancels]; _cancels.clear(); return out; },
   /** @returns {boolean} the phone's downloads are paused (Pause all; it holds across a restart) */
   paused: () => { if (!_loaded) refresh(); return _paused; },
   /** @returns {string | null} why the queue is not moving: paused | wifi | offline | space | retrying; null when it is */
@@ -523,6 +539,7 @@ export const OfflineAudio = {
   resume: () => _call('offlineAudioResume'),
   /** Tests only: forget everything and re-install the receiver. */
   _reset() {
+    _cancels.clear();
     _listeners.clear();
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
     _sizesToSend = new Set(); _sizesFlushQueued = false;

@@ -763,6 +763,10 @@ class AppInterface(
     @JavascriptInterface
     fun offlineAudioWifiOnly(on: Boolean) { host.offlineAudio?.setWifiOnly(on) }
 
+    /** The network is unmetered now (dl-d5): the page's automatic downloads (plan week, the next 3) start only then. */
+    @JavascriptInterface
+    fun offlineAudioUnmetered(): Boolean = host.offlineAudio?.unmeteredNow() ?: false
+
     /** Pause all downloads (dl-d2): the one on its way keeps its bytes; the queue holds, across a restart too. */
     @JavascriptInterface
     fun offlineAudioPause() { host.offlineAudio?.pause() }

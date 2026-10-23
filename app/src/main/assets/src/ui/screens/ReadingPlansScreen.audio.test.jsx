@@ -84,3 +84,31 @@ describe('Download this week’s audio (S6; one verb, Download, brief section 7 
     expect(screen.getByText('This week’s audio is on this phone')).toBeTruthy();
   });
 });
+
+describe('Keep the next 7 days on this phone (dl-d5, call 5A: on by default)', () => {
+  afterEach(() => { delete window.AndroidBridge; });
+
+  it('a running plan shows the switch on; turning it off is kept on the plan', () => {
+    fakeStore();
+    window.AndroidBridge = { offlineAudioWifiOnly: () => {} };   // the phone app: it can tell Wi-Fi from mobile data
+    const run = startCatalogPlan('bible-year', null, new Date());
+    ReadingPlanStore.put(run);
+    render(<ReadingPlansScreen {...base({ planTracks })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    const sw = screen.getByRole('checkbox', { name: 'Keep the next 7 days on this phone (on Wi-Fi)' });
+    expect(sw.checked).toBe(true);
+    fireEvent.click(sw);
+    expect(ReadingPlanStore.get(run.id).autoAudio).toBe(false);
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Keep the next 7 days on this phone (on Wi-Fi)' }));
+    expect(ReadingPlanStore.get(run.id).autoAudio).toBe(true);
+    expect(screen.getByRole('button', { name: 'Download this week’s audio' })).toBeTruthy();   // the manual button stays
+  });
+
+  it('is not shown where the app cannot tell Wi-Fi from mobile data', () => {
+    fakeStore();
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    render(<ReadingPlansScreen {...base({ planTracks })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    expect(screen.queryByRole('checkbox', { name: /Keep the next 7 days/ })).toBeNull();
+  });
+});

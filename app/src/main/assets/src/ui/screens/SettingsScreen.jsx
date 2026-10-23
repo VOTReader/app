@@ -1326,6 +1326,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 onToggle={() => onToggle("downloadWifiOnly")}
               />
             )}
+            {OfflineAudio.available() && canTell() && (
+              <SettingsRow
+                label="Keep the next 3 ready"
+                desc="On Wi-Fi, the 3 recordings after the one playing download by themselves, so they play with no signal. Nothing is removed."
+                checked={settings.keepNextReady === true}
+                onToggle={() => onToggle("keepNextReady")}
+              />
+            )}
             <SettingsRow
               label="Turn the Page with the Audio"
               desc="The reading moves with the audio. Off keeps the audio going; use Open the reading on the player."

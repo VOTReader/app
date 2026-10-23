@@ -363,12 +363,30 @@ describe('Listening group', () => {
       renderSettings({}, { onToggle });
       const labels = groupRowLabels('Listening');
       expect(labels).toContain('Download only on Wi-Fi');
-      expect(labels.indexOf('Download only on Wi-Fi')).toBe(labels.indexOf('Turn the Page with the Audio') - 1);
+      expect(labels.indexOf('Download only on Wi-Fi')).toBe(labels.indexOf('Turn the Page with the Audio') - 2);   // dl-d5's row between
       const sw = within(row('Download only on Wi-Fi')).getByRole('switch');
       expect(sw.getAttribute('aria-checked')).toBe('false');
       fireEvent.click(sw);
       expect(onToggle).toHaveBeenCalledWith('downloadWifiOnly');
     } finally { delete window.AndroidBridge; }
+  });
+
+  // dl-d5 (call 5A): Keep the next 3 ready, under Download only on Wi-Fi, off by default; hidden where Wi-Fi can't be told.
+  it('Keep the next 3 ready sits under Download only on Wi-Fi, off by default, and toggles its own key', () => {
+    window.AndroidBridge = { offlineAudioState: () => '{}', offlineAudioWifiOnly: vi.fn() };
+    const onToggle = vi.fn();
+    try {
+      renderSettings({}, { onToggle });
+      const labels = groupRowLabels('Listening');
+      expect(labels.indexOf('Keep the next 3 ready')).toBe(labels.indexOf('Download only on Wi-Fi') + 1);
+      const sw = within(row('Keep the next 3 ready')).getByRole('switch');
+      expect(sw.getAttribute('aria-checked')).toBe('false');
+      fireEvent.click(sw);
+      expect(onToggle).toHaveBeenCalledWith('keepNextReady');
+    } finally { delete window.AndroidBridge; }
+    cleanup();
+    renderSettings();
+    expect(groupRowLabels('Listening')).not.toContain('Keep the next 3 ready');
   });
 
   // Downloads brief section 7 item 10: where the browser cannot tell Wi-Fi from mobile data the switch did nothing.

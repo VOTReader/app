@@ -41,7 +41,7 @@
    a download runs with the page in view.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { downloadsWait, onGateChange } from './download-gate.js';
+import { downloadsWait, networkType, onGateChange } from './download-gate.js';
 
 export const RELAY = 'https://audio.votreader.workers.dev/';
 export const OFFLINE_AUDIO_CACHE = 'vot-offline-audio-v1';
@@ -60,7 +60,8 @@ const OFFLINE_RECHECK_MS = 30000;
 let _timing = { retry: RETRY_MS, space: SPACE_RECHECK_MS, offline: OFFLINE_RECHECK_MS };
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number }} SavedItem */
-/** @typedef {{ url: string, key: string, title: string, bytes: number, tries?: number }} QueueItem bytes 0 = not known */
+/** @typedef {{ url: string, key: string, title: string, bytes: number, tries?: number, wifi?: boolean }} QueueItem bytes 0 = not known;
+ *  wifi: an automatic download (dl-d5), started only on Wi-Fi */
 
 /** @type {Map<string, SavedItem>} */
 let _items = new Map();
@@ -240,6 +241,8 @@ function _reasonNow() {
   if (!_queue.length && !_active) return null;
   if (_paused) return _closed ? 'closed' : 'paused';
   if (downloadsWait()) return 'wifi';
+  // dl-d5: nothing on its way and only automatic downloads left, on mobile data.
+  if (!_active && _queue.every((t) => t.wifi) && !_unmetered()) return 'wifi';
   return _hold;
 }
 
@@ -263,7 +266,7 @@ function _persistQueue() {
     const q = (_active ? [_active.it] : []).concat(_queue);
     if (!q.length) { localStorage.removeItem(QUEUE_KEY); return; }
     localStorage.setItem(QUEUE_KEY, JSON.stringify({
-      items: q.map((t) => ({ url: t.url, key: t.key, title: t.title, bytes: t.bytes })),
+      items: q.map((t) => ({ url: t.url, key: t.key, title: t.title, bytes: t.bytes, ...(t.wifi ? { wifi: true } : {}) })),
       paused: _paused && !_closed,
       batch: _batch,
     }));
@@ -284,7 +287,8 @@ function _restoreQueue() {
   for (const t of saved.items) {
     if (!t || typeof t.url !== 'string' || !relayUrl(t.url) || _items.has(t.url) || have.has(t.url)) continue;
     have.add(t.url);
-    back.push({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0 });
+    back.push({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0,
+      ...(t.wifi === true ? { wifi: true } : {}) });
   }
   if (!back.length) { _persistQueue(); return; }
   _queue = back.concat(_queue);
@@ -330,6 +334,8 @@ function _settleEmpty() {
 
 /** No signal, as far as the browser knows (a failed fetch with onLine true is a retry, not a wait). */
 const _offlineNow = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+/** dl-d5: the browser says Wi-Fi (or a wire); one that cannot tell is not. */
+const _unmetered = () => { const t = networkType(); return t === 'wifi' || t === 'ethernet'; };
 
 /** Keep the screen on while a download runs in view (brief 3f); let it go when none does. */
 function _wakeCheck() {
@@ -379,9 +385,13 @@ async function _next() {
   // Download only on Wi-Fi: on mobile data the queue waits (the rows re-read, and say so); _onGate starts it on Wi-Fi.
   if (downloadsWait()) { _emit({ type: 'checked' }); return; }
   if (_hold) return;
+  // dl-d5: an automatic download starts only on Wi-Fi; on mobile data the listener's own go first, and the rest wait
+  // (a connection change runs _onGate, which comes back here).
+  const at = _queue.findIndex((t) => !t.wifi || _unmetered());
+  if (at < 0) { _emit({ type: 'checked' }); return; }
   // No signal: wait for one (the 'online' event, or a look every 30 s); that spends no retry.
-  if (_offlineNow()) { _holdFor('offline', _timing.offline, _queue[0].url); return; }
-  const it = /** @type {QueueItem} */ (_queue.shift());
+  if (_offlineNow()) { _holdFor('offline', _timing.offline, _queue[at].url); return; }
+  const it = /** @type {QueueItem} */ (_queue.splice(at, 1)[0]);
   const ctl = new AbortController();
   const job = { it, url: it.url, bytes: 0, total: -1, ctl, held: false };
   const gen = _gen;
@@ -500,17 +510,26 @@ export const WebOfflineAudio = {
     if (!busy.size) _batch = { done: 0, total: 0, failed: 0 };
     /** @type {string[]} */
     const queued = [];
+    let own = false;
     for (const t of _list(json)) {
+      if (t && typeof t.url === 'string' && t.wifi !== true) {
+        own = true;
+        // The listener's own Download of one queued automatically: it no longer waits for Wi-Fi (dl-d5).
+        const had = _queue.find((q) => q.url === t.url && q.wifi);
+        if (had) { delete had.wifi; _persistQueue(); _next(); }
+      }
       if (!t || typeof t.url !== 'string' || _items.has(t.url) || busy.has(t.url)) continue;
       if (!relayUrl(t.url)) { _emit({ type: 'failed', url: t.url, reason: 'network' }); continue; }
-      _queue.push({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0 });
+      _queue.push({ url: t.url, key: String(t.key || ''), title: String(t.title || ''), bytes: Number(t.bytes) > 0 ? Number(t.bytes) : 0,
+        ...(t.wifi === true ? { wifi: true } : {}) });
       busy.add(t.url);
       queued.push(t.url);
     }
     if (!queued.length) return;
     _batch.total += queued.length;
-    // Asking for more is a yes to what stopped when the page closed; a Pause all the listener chose holds.
-    if (_closed) { _closed = false; _paused = false; }
+    // Asking for more is a yes to what stopped when the page closed; a Pause all the listener chose holds. An
+    // automatic download (dl-d5) is not the listener asking.
+    if (_closed && own) { _closed = false; _paused = false; }
     _persistQueue();
     // One event for the batch, as the phone app sends it (n2-03).
     _emit({ type: 'queued', urls: queued });
