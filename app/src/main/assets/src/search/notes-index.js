@@ -44,20 +44,31 @@ export function buildNoteDocs() {
 
   // ─── Bible books (matthew-plain registered among them): headings and chapter summaries, Scriptures ───
   const books = typeof BOOKS !== 'undefined' ? BOOKS : null;
+  // The Restored Names wording a reader with that setting on sees instead (BibleChapterView getSectionHeading):
+  // indexed beside the standard one, in `title`, so "yahuwah is my shepherd" finds Psalm 23's heading too.
+  const restored = typeof BOOKS_RESTORED !== 'undefined' ? BOOKS_RESTORED : null;
+  /** @param {string} own @param {any} alt */
+  const alsoAs = (own, alt) => (alt && typeof alt === 'string' && alt !== own ? alt : '');
   if (books) {
     for (const id of Object.keys(books)) {
       const book = books[id];
       if (!book || !Array.isArray(book.chapters)) continue;
       const name = book.title || id;
+      const rBook = restored && restored[book.id || id];
       for (const ch of book.chapters) {
         if (!ch) continue;
+        const rCh = rBook && Array.isArray(rBook.chapters) ? rBook.chapters.find((/** @type {any} */ c) => c && c.num === ch.num) : null;
         const where = { corpus: 'scriptures', bookId: book.id || id, chapterNum: ch.num, volumeId: 'bible' };
-        for (const sec of ch.sections || []) {
+        const secs = ch.sections || [];
+        for (let si = 0; si < secs.length; si++) {
+          const sec = secs[si];
           const first = sec && Array.isArray(sec.verses) && sec.verses[0];
           if (!sec || !sec.heading || !first) continue;
-          docs.push(base({ ...where, kind: 'heading', verseNum: first.n, heading: sec.heading, text: sec.heading, ref: name + ' ' + ch.num + ':' + first.n }));
+          const rSec = rCh && rCh.sections && rCh.sections[si];
+          docs.push(base({ ...where, kind: 'heading', verseNum: first.n, heading: sec.heading, text: sec.heading,
+            title: alsoAs(sec.heading, rSec && rSec.heading), ref: name + ' ' + ch.num + ':' + first.n }));
         }
-        if (ch.title) docs.push(base({ ...where, kind: 'chapter-title', verseNum: 0, text: ch.title, ref: name + ' ' + ch.num }));
+        if (ch.title) docs.push(base({ ...where, kind: 'chapter-title', verseNum: 0, text: ch.title, title: alsoAs(ch.title, rCh && rCh.title), ref: name + ' ' + ch.num }));
       }
     }
   }
@@ -136,7 +147,7 @@ function searcherOver(ms, docs) {
       const keep = (d) => (!corpus || d.corpus === corpus) &&
         (!scope || !scope.bookId || d.bookId === scope.bookId) && (!scope || !scope.volumeId || d.volumeId === scope.volumeId);
       const run = (/** @type {boolean} */ fuzzy) => ms.search(words.join(' '), {
-        combineWith: 'AND', prefix: prefixOf, fuzzy: fuzzy ? fuzzyOf : false, boost: { text: 1 },
+        combineWith: 'AND', prefix: prefixOf, fuzzy: fuzzy ? fuzzyOf : false, boost: { text: 1, title: 1 },
         filter: (/** @type {any} */ r) => keep(byId.get(r.id)),
       });
       let hits = run(false);

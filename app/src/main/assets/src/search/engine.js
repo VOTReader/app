@@ -4224,7 +4224,7 @@ async function nearest(query, options) {
    (notes-index.js), so search() and its ranking are untouched; the screen lists them as one group after the collections.
    Built on the first call from the corpora the main index loaded (ensureReady), again only when a corpus object is
    replaced (another load), never cached. */
-/** @type {{ books: any, plain: any, mt: any, searcher: Promise<Awaited<ReturnType<typeof notesSearcherAsync>>>, size: number, buildMs: number } | null} */
+/** @type {{ books: any, plain: any, mt: any, restored: any, searcher: Promise<Awaited<ReturnType<typeof notesSearcherAsync>>>, size: number, buildMs: number } | null} */
 let NOTES = null;
 /**
  * The study notes, chapter summaries and headings holding the typed words, best first, kept to the corpus and scope.
@@ -4239,10 +4239,11 @@ async function searchNotes(query, options) {
   const books = typeof BOOKS !== 'undefined' ? BOOKS : null;
   const mt = typeof MATTHEW !== 'undefined' ? MATTHEW : null;
   const plain = books ? books['matthew-plain'] : null;
-  if (!NOTES || NOTES.books !== books || NOTES.plain !== plain || NOTES.mt !== mt) {
+  const restored = typeof BOOKS_RESTORED !== 'undefined' ? BOOKS_RESTORED : null;
+  if (!NOTES || NOTES.books !== books || NOTES.plain !== plain || NOTES.mt !== mt || NOTES.restored !== restored) {
     const t0 = now();
     const docs = buildNoteDocs();
-    const built = { books, plain, mt, size: docs.length, buildMs: -1, searcher: notesSearcherAsync(docs) };
+    const built = { books, plain, mt, restored, size: docs.length, buildMs: -1, searcher: notesSearcherAsync(docs) };
     built.searcher.then(() => { built.buildMs = Math.round(now() - t0); }, () => { if (NOTES === built) NOTES = null; });
     NOTES = built;
   }

@@ -27,6 +27,10 @@ const GLOBALS = {
       chapters: [{ num: 5, title: 'The Sermon on the Mount', sections: [{ heading: 'The Beatitudes', verses: [{ n: 3, text: 'Blessed are the poor in spirit.' }] }] }],
     },
   },
+  // the Restored Names wording (books-restored.js), what a reader with that setting on sees
+  BOOKS_RESTORED: {
+    genesis: { chapters: [{ num: 1, title: 'The Creation Week of Elohim · Mankind in God’s Image', sections: [{ heading: 'The Creation Week of Elohim' }, { heading: 'Mankind in God’s Image' }] }] },
+  },
   MATTHEW: {
     chapters: [{
       num: 5, title: 'The Sermon on the Mount', verses: [{ n: 3, text: 'Blessed are the poor in spirit.' }],
@@ -74,6 +78,12 @@ describe('buildNoteDocs (study notes, chapter summaries, headings)', () => {
     expect(n[1].heading).toBe('The Blessed');
   });
 
+  it('carries a heading’s Restored Names wording, when it differs, to be found by', () => {
+    const h = docs.filter((d) => d.kind === 'heading' && d.bookId === 'genesis');
+    expect(h.map((d) => d.title)).toEqual(['The Creation Week of Elohim', '']);
+    expect(h[0].heading).toBe('The Creation Week');
+  });
+
   it('leaves footnote refs out', () => {
     expect(docs.some((d) => /Isaiah 57|tabernacle/.test(d.text + ' ' + d.heading))).toBe(false);
     expect(new Set(docs.map((d) => d.kind))).toEqual(new Set(['heading', 'chapter-title', 'study-note']));
@@ -109,6 +119,10 @@ describe('notesSearcher', () => {
   it('a chapter summary gives way to a heading of the same chapter that matched too', () => {
     expect(kinds(S.search('creation'))).toEqual(['heading:genesis:1']);
     expect(kinds(S.search('garden'))).toEqual(['chapter-title:genesis:2']);
+  });
+
+  it('finds a heading by its Restored Names wording', () => {
+    expect(kinds(S.search('elohim'))).toEqual(['heading:genesis:1']);
   });
 
   it('finds a study note by its words', () => {
