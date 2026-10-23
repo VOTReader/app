@@ -222,6 +222,16 @@ describe('a new build waits for a quiet moment (up1, Corbin 2026-10-23)', () => 
     expect(sw.skipped.count).toBe(0);
   });
 
+  it('a hidden window that says it is busy (playing, or a note open) refuses it; one that is not, does not', async () => {
+    const busyWin = (busy) => ({ id: 'other', type: 'window', visibilityState: 'hidden', postMessage: (_m, ports) => ports[0].postMessage({ busy }) });
+    const a = bootSW({ windows: [win('me', 'visible'), busyWin(true)] });
+    await ask(a, 'me');
+    expect(a.skipped.count).toBe(0);
+    const b = bootSW({ windows: [win('me', 'visible'), busyWin(false)] });
+    await ask(b, 'me');
+    expect(b.skipped.count).toBe(1);
+  });
+
   it('an ask with no source (an older page) is still honoured when nothing else is on screen', async () => {
     const sw = bootSW({ windows: [win('a', 'hidden')] });
     let work = Promise.resolve();

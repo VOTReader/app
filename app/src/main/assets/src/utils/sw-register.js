@@ -45,6 +45,12 @@ import { registeredStores } from '../stores/cached-store.js';
 /** Away this long (the app in the background), and a waiting build may take over (up1). */
 export const AWAY_TAKEOVER_MS = 10 * 60 * 1000;
 
+/** A build that finishes installing this soon after the app opens, before the reader has touched anything, takes over
+ *  at once (up1): the reload lands on a page nobody has started using. */
+export const BOOT_TAKEOVER_MS = 15 * 1000;
+export const UPDATE_READY_TOAST_ID = 'vot-toast-update-ready';
+export const UPDATE_READY_TEXT = 'A newer version is ready. Tap to update.';
+
 /** Whether something is playing: the player's media session (set for the native and the web player), or any media element. */
 function listening() {
   try {
@@ -92,6 +98,13 @@ export function registerServiceWorker() {
   // uncontrolled while a worker is already active (activeAtLoad), so the first
   // claim it sees is the next build's, and that one reloads like any other.
   const controllerAtRegistration = navigator.serviceWorker.controller;
+  // up1: the boot window. Any touch, key or wheel ends it: from then on a new build waits.
+  const bootAt = Date.now();
+  let touched = false;
+  if (typeof window !== 'undefined') {
+    const mark = () => { touched = true; };
+    for (const t of ['pointerdown', 'keydown', 'wheel', 'touchstart']) window.addEventListener(t, mark, { capture: true, passive: true, once: true });
+  }
   let controllerNow = controllerAtRegistration;
   /** @type {ServiceWorker | null} */ let activeAtLoad = null;
 
@@ -175,8 +188,19 @@ export function registerServiceWorker() {
   // the page at all — the s12 lesson again ("new work committed, nothing
   // changing on screen"). Record it AND show a toast naming the asset, since
   // the SW console is unreachable on a phone.
+  // up1: the worker asks every other window before a takeover (it reloads them all): busy = playing or holding.
+  // ANOTHER_BUILD: this page asked for something its build cannot give it (W27: another build's code or timings
+  // on the network); the waiting build is what it needs (onAnotherBuild, set once the registration is known).
+  /** @type {() => void} */ let onAnotherBuild = () => { anotherBuildSeen = true; };
+  let anotherBuildSeen = false;
   navigator.serviceWorker.addEventListener('message', (event) => {
     const d = event && event.data;
+    if (d && d.type === 'BUSY') {
+      const port = event.ports && event.ports[0];
+      if (port) { try { port.postMessage({ busy: listening() || updateHolds().length > 0 }); } catch (_e) { /* the worker gave up */ } }
+      return;
+    }
+    if (d && d.type === 'ANOTHER_BUILD') { onAnotherBuild(); return; }
     if (d && d.type === 'PRECACHE_INCOMPLETE') {
       DiagnosticLog.warn('sw', 'corpus precache incomplete at install: '
         + d.count + ' file(s) not cached: ' + (Array.isArray(d.urls) ? d.urls.join(', ') : ''));
@@ -205,14 +229,41 @@ export function registerServiceWorker() {
     if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
 
     // A build that finishes installing while the reader is here waits (up1): no reload mid-session. It takes over
-    // when the reader comes back after AWAY_TAKEOVER_MS away, or at the next open.
+    // when the reader comes back after AWAY_TAKEOVER_MS away, or at the next open; or now, if the app opened moments
+    // ago and nothing has been touched (BOOT_TAKEOVER_MS), or this page's build already failed the reader (below).
+    const quiet = () => !listening() && !updateHolds().length;
     reg.addEventListener('updatefound', () => {
       const incoming = reg.installing;
       if (!incoming) return;
       incoming.addEventListener('statechange', () => {
-        if (incoming.state === 'installed') console.info('[sw] new build downloaded; it waits for the next open or a return after 10 min away');
+        if (incoming.state !== 'installed') return;
+        if (!touched && Date.now() - bootAt < BOOT_TAKEOVER_MS && quiet()) { incoming.postMessage({ type: 'SKIP_WAITING' }); return; }
+        if (anotherBuildSeen) { takeNeededBuild(); return; }
+        console.info('[sw] new build downloaded; it waits for the next open or a return after 10 min away');
       });
     });
+
+    // W27 + up1: something the reader asked for could not be served by this build. Take the new one now when nothing
+    // plays and nothing is held (what they asked for failed to load anyway); else offer it, one tap, once.
+    let offered = false;
+    const takeNeededBuild = () => {
+      const w = reg.waiting;
+      if (!w) return;   // still installing: 'installed' above comes back here
+      if (quiet()) { w.postMessage({ type: 'SKIP_WAITING' }); return; }
+      if (offered) return;
+      offered = true;
+      showToast({ id: UPDATE_READY_TOAST_ID, className: 'vot-toast', text: UPDATE_READY_TEXT, durationMs: 10000 });
+      const el = document.getElementById(UPDATE_READY_TOAST_ID);
+      if (!el) return;
+      el.classList.add('vot-toast-action');
+      el.setAttribute('role', 'button');
+      el.setAttribute('tabindex', '0');
+      const go = () => { const ww = reg.waiting; if (ww) ww.postMessage({ type: 'SKIP_WAITING' }); };
+      el.addEventListener('click', go, { once: true });
+      el.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } }, { once: true });
+    };
+    onAnotherBuild = () => { anotherBuildSeen = true; takeNeededBuild(); };
+    if (anotherBuildSeen) takeNeededBuild();
 
     /** @type {number | null} */ let hiddenAt = null;
     /** @type {ReturnType<typeof setTimeout> | null} */ let awayTimer = null;

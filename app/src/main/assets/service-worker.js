@@ -890,9 +890,16 @@ async function isThisBuilds(response, want) {
   return (await sha256Stripped(await response.clone().arrayBuffer())) === want;
 }
 
-/** The network holds another build: look for it now, not at the page's next check. At most once a minute. */
+/** The network holds another build: look for it now, not at the page's next check (at most once a minute), and tell
+    the pages (up1): a new build no longer takes over on its own, and this page has just asked for something its
+    build cannot give it, so sw-register takes the new build as soon as nothing plays, or offers it. */
 let _updateAskedAt = 0;
 function askForUpdate() {
+  try {
+    Promise.resolve(self.clients.matchAll({ type: 'window' }))
+      .then((all) => { for (const c of all || []) { try { c.postMessage({ type: 'ANOTHER_BUILD' }); } catch (_e) { /* gone */ } } })
+      .catch(() => {});
+  } catch (_e) { /* no clients API */ }
   const reg = self.registration;
   if (!reg || typeof reg.update !== 'function' || Date.now() - _updateAskedAt < 60 * 1000) return;
   _updateAskedAt = Date.now();
@@ -919,19 +926,38 @@ async function otherBuildCopy(response, key) {
 
 // ── Message: page-triggered activation (up1) ────
 // The one way a waiting build takes over while the app is open: sw-register.js
-// asks at app open or after 10+ min away. Refused while ANOTHER window of the app
-// is on screen: the takeover reloads every page it claims, and that reader is
-// mid-session. (An older page asks with no source; the same rule applies.)
+// asks at app open, after 10+ min away, or when its build could not serve what the
+// reader asked for. The takeover reloads EVERY page it claims, so it is refused
+// while another window of the app is on screen, or busy out of sight: playing a
+// recording, or holding a note, memo or backup (each page answers BUSY; one that
+// does not answer within BUSY_WAIT_MS, an older build's, counts as not busy).
+const BUSY_WAIT_MS = 1500;
+/** Whether a hidden window says it is busy. @param {any} client */
+function askBusy(client) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (/** @type {boolean} */ v) => { if (!done) { done = true; resolve(v); } };
+    try {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = (e) => finish(!!(e && e.data && e.data.busy));
+      client.postMessage({ type: 'BUSY' }, [ch.port2]);
+    } catch (_e) { finish(false); return; }
+    setTimeout(() => finish(false), BUSY_WAIT_MS);
+  });
+}
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     const asker = event.source && event.source.id;
     const work = (async () => {
-      let others = [];
+      /** @type {any[]} */ let others = [];
       try {
         const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        others = all.filter((c) => c && c.id !== asker && c.visibilityState === 'visible');
+        others = all.filter((c) => c && c.id !== asker);
       } catch (_e) { /* cannot tell: take over, as the page asked */ }
-      if (!others.length) await self.skipWaiting();
+      if (others.some((c) => c.visibilityState === 'visible')) return;
+      const busy = await Promise.all(others.map(askBusy));
+      if (busy.some(Boolean)) return;
+      await self.skipWaiting();
     })();
     if (typeof event.waitUntil === 'function') event.waitUntil(work);
   }

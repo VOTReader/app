@@ -9,8 +9,8 @@
  * CACHE_VERSION; the assets and their integrity map as committed, so the install verifies) and asks the
  * registration to update. Three arms on one page:
  *
- *   1  HERE. The new worker installs and WAITS; 15 s later the same document is still up (a marker set on window
- *      survives) and the old worker still controls it.
+ *   1  HERE. The reader has touched the page; the new worker installs and WAITS; 15 s later the same document is
+ *      still up (a marker set on window survives) and the old worker still controls it.
  *   2  AWAY WHILE LISTENING. The page goes hidden, the clock moves 11 minutes, the page comes back, with the media
  *      session reading 'playing': still no reload.
  *   3  AWAY, NOTHING PLAYING. The same, paused: the page asks the waiting worker to take over, it does, and the page
@@ -98,7 +98,8 @@ try {
   note(`controlled by ${v0}`);
 
   // ── 1 HERE ──
-  await page.evaluate(() => { /** @type {any} */ (window).__e2eMark = 'same document'; });
+  // The reader has started (a touch ends the boot window, in which a new build may still take over at once).
+  await page.evaluate(() => { /** @type {any} */ (window).__e2eMark = 'same document'; window.dispatchEvent(new Event('pointerdown')); });
   swBump = 'up1' + Date.now().toString(36);
   let navigated = false;
   page.on('framenavigated', (f) => { if (f === page.mainFrame()) navigated = true; });
