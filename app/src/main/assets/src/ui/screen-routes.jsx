@@ -1,3 +1,4 @@
+/** @jsx h */
 /* ═══════════════════════════════════════════════════════════════════════
    screen-routes — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
@@ -40,14 +41,20 @@
    in the top nav (app.jsx → ReadingChromeProvider dotEnabled). Extracted
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
+import { h } from './jsx-h.js';
 import { AudioPlayer } from '../utils/audio-player.js';
 import { setWifiOnly } from '../utils/download-gate.js';
 import { bibleAudioEdition, bibleAudioOffered, resolveBibleAudio } from '../utils/audio-track.js';
 import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
-import { AnswersHome, AnswersSubject, AnswersAZ } from './screens/AnswersHome.jsx';
-import { answersSubjectById } from '../utils/answers-shelves.js';
+import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
+import { AnswersShelf } from './screens/AnswersShelf.jsx';
+import { AnswersMedia } from './screens/AnswersMedia.jsx';
+import { AnswersSaved } from './screens/AnswersSaved.jsx';
+import { readAnswersPath, writeAnswersPath } from './components/AnswersParts.jsx';
+import { ANSWERS_SUBJECT_GROUP, isAnswersGroupKey } from '../utils/answers-retired.js';
+import { answersSectionAnchor } from '../utils/answers-sections.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
@@ -815,15 +822,53 @@ export function buildScreenRoutes({
   // resolves them (__finishVotInit) only knows letters whose corpus has landed.
   const _answersCorpus = typeof window.__answersCorpus !== 'undefined' ? window.__answersCorpus : null;
   const _answersReady = !!(_answersCorpus && _answersCorpus.loaded) && typeof ANSWERS !== 'undefined';
+  // The browse screens get the whole ANSWERS array, the Main Page (appended
+  // last, c72) included: they list it first, as the site's sidebar does, and
+  // the site's order (answers-site.js) starts from it.
   const _wrapAnswers = (render) => {
     if (!_answersReady) return _corpusView(_answersCorpus, window.__loadAnswersCorpus, 'Loading…');
     return _kickVot(render(ANSWERS));
   };
-  // Open a topic from the Answers landing / a subject / A–Z / a commandment.
+  const _answersSite = () => (typeof ANSWERS_SITE_META !== 'undefined' ? ANSWERS_SITE_META : null);
+  // Ticks, "N read" and Continue (Settings › Reading › Answers Reading Path; on unless turned off).
+  const _answersPathOn = settings.answersReadingPath !== false;
+  const _answersBrowseProps = () => ({
+    isRead: (id) => isRead('answers', id), pathOn: _answersPathOn, fontScale: settings.fontScale,
+  });
+  // A shelf: '1'..'12' a numbered group, 'other' Other Topics (it rides letterId).
+  const _openAnswersGroup = (key) => { setLetterId(key); setScreen('answers-group'); };
+  const _answersShelf = (entries, key) => (isAnswersGroupKey(key)
+    ? <AnswersShelf {..._answersNavProps} {..._answersBrowseProps()} entries={entries} groupKey={String(key)} onBack={() => setScreen('answers-home')} />
+    : _answersLanding(entries));
+  // The landing paints its head and ask at once; the lists fill in when the corpus lands.
+  const _answersLanding = (entries) => (
+    <AnswersHome
+      {..._answersNavProps}
+      {..._answersBrowseProps()}
+      entries={entries}
+      site={entries ? _answersSite() : null}
+      pathLast={_answersPathOn ? readAnswersPath() : null}
+      onBack={goHome}
+      onOpenGroup={_openAnswersGroup}
+      onOpenMedia={() => setScreen('answers-media')}
+      onOpenSaved={() => setScreen('answers-saved')}
+      onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
+      onOpenLetter={(target) => openInAppLetter(target, { sourceLetterTitle: 'Answers', sourceVolumeLabel: null })}
+      onGoToRef={(ref) => {
+        const m = /^Exodus 20:(\d+)$/.exec(ref);
+        if (m) navigateToLink({ type: 'bible', bookId: 'exodus', chapter: 20, verse: Number(m[1]) }, { sourceLetterTitle: 'Answers' });
+      }}
+    />
+  );
+  // Open a topic from the Answers landing / a shelf / A–Z / a sheet / a search hit.
   // It goes through the tap-through stack, so the topic shows "‹ Back to …"
-  // and Back returns to the exact list (a subject's id rides letterId). A
-  // search hit carries the paragraph it matched, and the topic lands on it.
-  const _openAnswersTopic = (id, anchorText, fromTitle) => {
+  // and Back returns to the exact list (a shelf's key rides letterId). A
+  // search hit carries the paragraph it matched, and the topic lands on it;
+  // a link naming a section (a site #fragment, `section`) lands on that
+  // section instead (answers-sections.js, aogcg 1b).
+  // find (U8): a passage search hit also presets find-in-topic to its query (FindInUnit's pill).
+  // para (Saved answers, O5): the paragraph itself, so a mark on words a topic repeats lands on its own copy.
+  const _openAnswersTopic = (id, anchorText, fromTitle, section, find, para) => {
     pushFromLetter({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: null, sourceChapterNum: null, sourceStudyId: null, sourceStudyChapterId: null,
@@ -831,7 +876,8 @@ export function buildScreenRoutes({
       destSnapshot: { screen: 'answers-entry', bookId: null, chapterNum: null, letterId: id, studyId: null, studyChapterId: null },
     });
     window.navHandoff.clear('pendingHighlight');
-    setSurpriseAnchor(anchorText ? { type: 'excerpt', text: anchorText, letterId: id } : null);
+    setSurpriseAnchor(section ? answersSectionAnchor(id, section)
+      : anchorText ? { type: 'excerpt', text: anchorText, letterId: id, ...(find ? { find } : {}), ...(Number.isInteger(para) ? { para } : {}) } : null);
     setLetterId(id);
     setActiveReadKey('vol:answers', () => setLastReadForVol('answers', id));
     setScreen('answers-entry');
@@ -840,6 +886,26 @@ export function buildScreenRoutes({
     onSearch: goSearch, onHistory: goHistory, onSettings: goSettings,
     theme, onThemeChange: setTheme, onOpenTopic: _openAnswersTopic,
   };
+  // A topic page's hand-offs (AnswersTopic.jsx): its links, eyebrow, foot rows and the Main Page's
+  // "See left column" row. A topic link goes through the tap-through stack, so Back returns to the
+  // topic. A group and the landing are the collection's own screens, with its Back (use-android-back:
+  // a group goes to the landing, the landing Home); a search goes back where it was opened from.
+  const _answersTopicNav = (entries, fromTitle, go) => ({
+    entries, isRead: (id) => isRead('answers', id), pathOn: _answersPathOn,
+    openTopic: (id, anchor) => _openAnswersTopic(id, null, fromTitle, anchor || null),
+    // Next / Previous in the site's order read on, as the arrows do (no new Back step)
+    go: (id) => { setSurpriseAnchor(null); go(id); },
+    openGroup: _openAnswersGroup,
+    openLanding: () => { resetAnswersLanding(); setScreen('answers-home'); },
+    openStudy: (slug, url) => {
+      if (typeof getStudyById === 'function' && getStudyById(slug)) { _startNewTrail(); selectStudy(slug); } else if (url) window.open(url, '_blank', 'noopener');
+    },
+    searchLibrary: (q) => { setSearchQuery(q); goSearch(); },
+    goToRef: (ref) => {
+      const m = /^Exodus 20:(\d+)$/.exec(ref);
+      if (m) navigateToLink({ type: 'bible', bookId: 'exodus', chapter: 20, verse: Number(m[1]) }, { sourceLetterTitle: 'Answers' });
+    },
+  });
 
   return {
     // ── Volume index screens (13) ──
@@ -1456,6 +1522,7 @@ export function buildScreenRoutes({
             selectStudy(slug);
           }
         }}
+        onOpenAnswers={() => { _startNewTrail(); resetAnswersLanding(); setScreen('answers-home'); }}
         onBack={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1671,26 +1738,27 @@ export function buildScreenRoutes({
     },
 
     // ── Answers Only God Can Give ──
-    'answers-home': () => _wrapAnswers((entries) => (
-      <AnswersHome
-        {..._answersNavProps}
-        entries={entries}
-        onBack={goHome}
-        onOpenSubject={(subjectId) => { setLetterId(subjectId); setScreen('answers-subject'); }}
-        onOpenAZ={() => setScreen('answers-az')}
-        onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
-        onGoToRef={(ref) => {
-          const m = /^Exodus 20:(\d+)$/.exec(ref);
-          if (m) navigateToLink({ type: 'bible', bookId: 'exodus', chapter: 20, verse: Number(m[1]) }, { sourceLetterTitle: 'Answers' });
-        }}
-      />
+    // The landing does not wait for the corpus (f01d): its head and ask paint at once.
+    'answers-home': () => {
+      if (_answersCorpus && _answersCorpus.error) return _corpusView(_answersCorpus, window.__loadAnswersCorpus, 'Loading…');
+      if (!_answersReady) {
+        if (typeof window.__loadAnswersCorpus === 'function') window.__loadAnswersCorpus();   // idempotent, async-notify (see _corpusView)
+        return _answersLanding(null);
+      }
+      return _kickVot(_answersLanding(ANSWERS));
+    },
+    'answers-group': () => _wrapAnswers((entries) => _answersShelf(entries, letterId)),
+    'answers-media': () => _wrapAnswers((entries) => (
+      <AnswersMedia {..._answersNavProps} entries={entries} site={_answersSite()} fontScale={settings.fontScale} onBack={() => setScreen('answers-home')} />
     )),
-    'answers-subject': () => _wrapAnswers((entries) => (answersSubjectById(letterId)
-      ? <AnswersSubject {..._answersNavProps} entries={entries} subjectId={letterId} onBack={() => setScreen('answers-home')} />
-      : <AnswersHome {..._answersNavProps} entries={entries} onBack={goHome} onOpenSubject={(subjectId) => { setLetterId(subjectId); setScreen('answers-subject'); }} onOpenAZ={() => setScreen('answers-az')} />)),
-    'answers-az': () => _wrapAnswers((entries) => (
-      <AnswersAZ {..._answersNavProps} entries={entries} onBack={() => setScreen('answers-home')} />
+    // O5: the reader's highlights and notes in Answers, by topic in the site's order.
+    'answers-saved': () => _wrapAnswers((entries) => (
+      <AnswersSaved {..._answersNavProps} entries={entries} fontScale={settings.fontScale} onBack={() => setScreen('answers-home')} />
     )),
+    // Retired by the AOGCG redesign (answers-retired.js): a place saved on the nine subjects or the
+    // old A–Z screen opens where its topics live now (use-saved-state rewrites the record itself).
+    'answers-subject': () => _wrapAnswers((entries) => _answersShelf(entries, /** @type {Record<string, string>} */ (ANSWERS_SUBJECT_GROUP)[String(letterId || '')])),
+    'answers-az': () => _wrapAnswers((entries) => _answersLanding(entries)),
     'answers-entry': () => (_kickVot(null), _wrapAnswers(() => {
       // A topic also waits for the letters: its attributions open them (the
       // registry that resolves a tap knows only letters that have landed), and
@@ -1702,7 +1770,12 @@ export function buildScreenRoutes({
       const ansEntry = actL('answers');
       if (!ansEntry) return _deadLetter('answers');   // navigation-tabs-4
       const bc = boundaryConfig('answers', ansEntry);
-      return <WtlbEntryView {...sharedViewProps} {...colReadNavProps('answers')} {...bc} entry={ansEntry} partLabel="Answers" onNavToChapter={_navToChapter} footnotesMode={true} />;
+      const ansRead = colReadNavProps('answers');
+      // A topic read to its end is the reading path's new place (the landing's Continue).
+      const onMarkRead = (payload) => { ansRead.onMarkRead(payload); if (_answersPathOn) writeAnswersPath(letterId); };
+      // One cite style on a topic: inline (Book X:Y) only, no footnote bubbles (U6).
+      return <WtlbEntryView {...sharedViewProps} {...ansRead} onMarkRead={onMarkRead} {...bc} entry={ansEntry} partLabel="Answers" onNavToChapter={_navToChapter}
+        footnotesMode={false} fontScale={settings.fontScale} answers={_answersTopicNav(ANSWERS, ansEntry.title, ansRead.onNavigate)} />;
     })),
 
     'hm-letter': () => {

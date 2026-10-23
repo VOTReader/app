@@ -1094,7 +1094,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
               ) : (
                 <>
                   <h2>Search everything</h2>
-                  <p>Verses, letters, Words To Live By and Bible studies — across all 66 books and every Volume.</p>
+                  <p>Verses, letters, Words To Live By, Answers and Bible studies — across all 66 books and every Volume.</p>
                 </>
               )}
               <p className="srch-hint">Try a reference (John 3:16), a phrase, or “exact words” in quotes.</p>

@@ -211,6 +211,18 @@ describe('meaning first', () => {
     expect(r.placeStart).toBe(STARTS.peace);
   });
 
+  /* ...BY A SMALLER LEAD (search200 sealed2, 2026-10-22). A paraphrase of a parable's line ("wild animals were taking the
+     man's sheep and killing their young") opened where its common words crowd ("sheep, sheep of every kind and many young
+     lambs"): the model's passage holding the line led that one by 0.069, under LAND_MARGIN's 0.1 (the panel's unsealed
+     f047). It leads by 0.06 now. */
+  it('a text the words found opens on the passage the model prefers by a lead of 0.07', async () => {
+    // cosines: peace 1/sqrt(1.81) = 0.743, gate 0.9/sqrt(1.81) = 0.669
+    said.near = { peace: 1, gate: 0.9 };
+    const r = await first('everyone come here so weary souls find rest after long labor');
+    expect(r.doc.letterId).toBe('rest');
+    expect(r.placeStart).toBe(STARTS.peace);
+  });
+
   it('a quote typed nearly word for word stays the words’ find', async () => {
     said.near = 'silver';
     const r = await first('remember now your creator in the days of your youth');

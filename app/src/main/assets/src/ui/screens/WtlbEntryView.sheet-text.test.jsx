@@ -63,6 +63,8 @@ afterEach(() => {
   GLOBALS.forEach((k) => { delete globalThis[k]; });
 });
 
+// A Format B entry (WTLB Part Two). Answers topics draw their own page (AnswersTopic.jsx, inline cites only),
+// and the sheet these tests read is the same one every Format B entry opens.
 const ENTRY = {
   id: 'what-is-love', title: 'What Is Love?', num: 3,
   paragraphs: [{ align: 'justify', text: 'He gave His only Son {{ref:John 3:16}} for the world.' }],
@@ -72,8 +74,8 @@ const ENTRY = {
 const view = (footnotesMode) => (
   <WtlbEntryView
     entry={ENTRY}
-    volKey="answers"
-    partLabel="Answers"
+    volKey="wtlb2"
+    partLabel="Part Two"
     theme="dark"
     markAsReadEnabled={false}
     footnotesMode={footnotesMode}

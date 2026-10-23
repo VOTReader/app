@@ -78,16 +78,17 @@ describe('on the real corpus', () => {
   const src = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data', 'answers.js'), 'utf8');
   const ctx = {};
   runInNewContext(src, ctx);
-  it('counts every source line of every topic exactly once (1,636 in all)', () => {
-    let total = 0;
+  it('counts every source line of every entry exactly once (1,636 in the topics + 12 on the Main Page)', () => {
+    let total = 0, main = 0;
     for (const e of ctx.ANSWERS) {
       const c = answersContents(e);
       const lines = e.paragraphs.filter((p) => /^~ \[From /.test(p.text)).length;
       expect(c.passages, e.id).toBe(lines);
       expect(c.sections.flatMap((s) => s.passages).length, e.id).toBe(lines);
-      total += c.passages;
+      if (e.id === 'answers-main-page') main += c.passages; else total += c.passages;
     }
     expect(total).toBe(1636);
+    expect(main).toBe(12);
   });
   it('every passage starts at a real paragraph, in order, and names its source', () => {
     for (const e of ctx.ANSWERS) {

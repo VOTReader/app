@@ -80,12 +80,9 @@ describe('WtlbEntryView — the sticky mini title (B10 item 1)', () => {
     expect(band().classList.contains('shown')).toBe(true);
   });
 
-  it('an Answers topic says Answers and where it is filed, as its hero does', () => {
+  it('an Answers topic draws no band: its running head names the page and its section (AOGCG f08)', () => {
     renderEntry({ volKey: 'answers', partLabel: 'Answers' }, { ...ENTRY, id: 'regarding-obedience', title: 'Regarding Obedience', group: 'Commandment 1' });
-    const eyebrow = band().querySelector('.mini-title-eyebrow').textContent;
-    const words = (t) => t.replace(/\s+/g, ' ').trim(); // the hero keeps its dot with no-break spaces
-    expect(eyebrow).toBe(words(document.querySelector('.hero-eyebrow').textContent));
-    expect(eyebrow.startsWith('Answers \xB7 ')).toBe(true);
+    expect(band()).toBeNull();
   });
 
   it('hangs under the "Back to" row when there is one; an inert peek draws none', () => {

@@ -511,7 +511,7 @@ describe('useAndroidBack — Answers Only God Can Give', () => {
     expect(props.goVolumesHome).not.toHaveBeenCalled();
   });
 
-  it.each(['answers-subject', 'answers-az'])('%s steps back to the landing', (screen) => {
+  it.each(['answers-group', 'answers-media', 'answers-saved', 'answers-subject', 'answers-az'])('%s steps back to the landing', (screen) => {
     const props = baseProps({ screen });
     renderHook(() => useAndroidBack(props));
     expect(window.handleAndroidBack()).toBe('true');
@@ -522,12 +522,12 @@ describe('useAndroidBack — Answers Only God Can Give', () => {
     /** @type {any} */ (globalThis).LETTER_SCREEN_SET = new Set(['answers-entry']);
     const props = baseProps({
       screen: 'answers-entry',
-      fromLetterRef: { current: [{ sourceScreen: 'answers-subject', sourceLetterId: 'the-end-of-this-age' }] },
+      fromLetterRef: { current: [{ sourceScreen: 'answers-group', sourceLetterId: '10' }] },
     });
     renderHook(() => useAndroidBack(props));
     expect(window.handleAndroidBack()).toBe('true');
-    expect(props.setLetterId).toHaveBeenCalledWith('the-end-of-this-age');
-    expect(props.setScreen).toHaveBeenCalledWith('answers-subject');
+    expect(props.setLetterId).toHaveBeenCalledWith('10');
+    expect(props.setScreen).toHaveBeenCalledWith('answers-group');
   });
 });
 

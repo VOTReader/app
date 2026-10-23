@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest';
 import {
   READER_RANK, renditionFor, slotCount, completenessNote,
   composeAlternates, dedupeByAudioHash, countByReader, formatReaderCounts,
-  studyChapterFor,
+  studyChapterFor, isLetterAudio,
 } from './audio-renditions-lib.mjs';
 
 /** The rules as they stood before 2026-09-04 — kept ONLY to prove the change. */
@@ -341,5 +341,28 @@ describe('studyChapterFor — a study recording, or nothing', () => {
     // One file in 5,151 is ".MP3" (TSOT_Matthew-Chapter-001.MP3). A
     // case-sensitive test drops exactly one chapter and reads like an archive gap.
     expect(studyChapterFor(S + 'Purity Part Two_Avoiding Sin_2.1-2.4.MP3', CHAPTERS)).toBe('purity-ch2');
+  });
+});
+
+/* 2026-10-22 (align al8): Tim renumbered the Drive folders ("17. Bible-Letter Studies" became
+   "18. Bible-Letter Studies", "18. TSOT New Testament" became "TSOT New Testament - Matthew (read by
+   "Bejamin")", Benjamin's letters took 17). A rule pinned to the number dropped all six Purity chapters
+   from the next manifest. The folder's NAME is the rule; its number is Tim's ordering. */
+describe('folder rules survive a renumbered Drive', () => {
+  const CH = [{ id: 'purity-ch1', title: 'Purity Part One: Purity is Important to God' }];
+  const NAME = 'Purity Part One_Purity is Important to God_1.1-1.4 (read by text-to-speech).mp3';
+
+  it('finds the studies under any folder number, or none', () => {
+    for (const root of ['17. Bible-Letter Studies/', '18. Bible-Letter Studies/', 'Bible-Letter Studies/']) {
+      expect(studyChapterFor(root + NAME, CH)).toBe('purity-ch1');
+    }
+    expect(studyChapterFor('17. Audio Letters - Read by Benjamin/' + NAME, CH)).toBeNull();
+  });
+
+  it('keeps the studies and the TSOT Bible chapters out of the letters', () => {
+    expect(isLetterAudio('18. Bible-Letter Studies/' + NAME)).toBe(false);
+    expect(isLetterAudio('TSOT New Testament - Matthew (read by "Bejamin")/Matthew 1.mp3')).toBe(false);
+    expect(isLetterAudio('18. TSOT New Testament/Matthew 1.mp3')).toBe(false);
+    expect(isLetterAudio('17. Audio Letters - Read by Benjamin/V1.018_The Signs (read by Benjamin).mp3')).toBe(true);
   });
 });

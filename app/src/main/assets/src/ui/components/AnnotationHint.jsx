@@ -99,11 +99,17 @@ export function AnnotationHint() {
   // (SelectionToolbar, when its bar comes up), so the pill goes for good
   // once the gesture is learned, even with no mark saved yet.
   const _flagSubs = !!(_flag && typeof _flag.subscribe === 'function' && typeof _flag.getVersion === 'function');
-  React.useSyncExternalStore(
+  const flagVer = React.useSyncExternalStore(
     React.useCallback((cb) => (_flagSubs ? _flag.subscribe(cb) : () => {}), [_flag, _flagSubs]),
     () => (_flagSubs ? _flag.getVersion() : 0)
   );
-  const dismissed = dismissedHere || !!(_flag && _flag.is());
+  // U15 (AOGCG, 2026-10-22): at most once per install. The pill records the same durable flag the
+  // moment it shows (the effect below), keeps showing on THIS screen, and never pitches again; a
+  // later set by someone else (the ✕ elsewhere, hint1's long-press) still sends it away at once.
+  // A ref, not state: _flag.set() re-renders through the subscription above before a setState would
+  // land, and that render must already know the set was this pill's own (else it blinks out and back).
+  const shownAt = React.useRef(/** @type {number | null} */ (null));
+  const dismissed = dismissedHere || (shownAt.current == null ? !!(_flag && _flag.is()) : flagVer > shownAt.current);
   React.useEffect(() => {
     const t = setTimeout(() => setDelayDone(true), 2500);
     return () => clearTimeout(t);
@@ -115,7 +121,16 @@ export function AnnotationHint() {
     NoteStore.count() > 0 ||
     BookmarkStore.count() > 0;
 
-  if (hasAnyData || dismissed || !delayDone || yielding) return null;
+  const visible = !(hasAnyData || dismissed || !delayDone || yielding);
+  React.useEffect(() => {
+    if (!visible || shownAt.current != null) return;
+    if (!_flag) { window.__annHintDismissed = true; shownAt.current = 0; return; }
+    shownAt.current = Infinity;                       // showing: holds through the set's own notify
+    _flag.set();
+    shownAt.current = _flagSubs ? _flag.getVersion() : 0;
+  }, [visible, _flag, _flagSubs]);
+
+  if (!visible) return null;
 
   return (
     <div className="ann-hint-pill" role="status">

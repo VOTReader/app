@@ -561,7 +561,7 @@ const SHARE_LINK_OPTIONS = [
 
 const SETTINGS_TOPICS = {
   appearance: 'appearance theme light dark text size font typeface',
-  reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
+  reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
   listening: 'listening bible letter audio voice speed rate read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
   topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
@@ -1089,6 +1089,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               desc="Shows where you left off reading, in the top bar; tap it to go back. It moves to each chapter or letter you open. One opened from a search is just a look until you read it: scroll it yourself, or stay on it 8 seconds."
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
+            />
+            {/* AOGCG (2026-10-22): the reading path on the Answers landing, its ticks, "N read" counts and
+                Continue row; off hides them all and keeps what is stored (U16). */}
+            <SettingsRow
+              label="Answers Reading Path"
+              desc="Ticks and Continue on the Answers screen. Kept only on this device."
+              checked={settings.answersReadingPath !== false}
+              onToggle={() => onToggle("answersReadingPath")}
             />
             <SelectField
               eyebrow="Reading"

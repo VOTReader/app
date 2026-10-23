@@ -189,14 +189,14 @@ describe('Format B entries render their references the way their route does', ()
     { text: '**Blessed** are those {{ref:Matthew 5:8}}' },
   ] };
 
-  it('WTLB and The Blessed: "(Ref)" cites, emphasis stripped, soft breaks as seams', () => {
+  it('WTLB, The Blessed and Answers: "(Ref)" cites, emphasis stripped, soft breaks as seams', () => {
     const blocks = excerptBlocks(entry, false);
     expect(piecesDomText(blocks[0].pieces)).toBe('For it is written:Man shall not live by bread alone (Matthew 4:4) says The Lord.');
     expect(blocks[0].readText).toBe('For it is written:  Man shall not live by bread alone (Matthew 4:4) says The Lord.');
     blocks.forEach((b, i) => expect(piecesDomText(b.pieces)).toBe(formatBDomText(entry.paragraphs[i].text, { footnotesMode: false })));
   });
 
-  it('Holy Days and Answers: footnote numbers, a trailing reference still a cite', () => {
+  it('Holy Days: footnote numbers, a trailing reference still a cite', () => {
     const blocks = excerptBlocks(entry, true);
     const scan = formatBRefScan(entry.paragraphs, true);
     expect(piecesDomText(blocks[0].pieces)).toBe('For it is written:Man shall not live by bread alone 1 says The Lord.');
@@ -207,7 +207,8 @@ describe('Format B entries render their references the way their route does', ()
 
   it('knows which routes render footnote numbers', () => {
     expect(formatBFootnotesMode('holydays')).toBe(true);
-    expect(formatBFootnotesMode('answers')).toBe(true);
+    // an Answers topic draws every cite inline (AOGCG U6: screen-routes passes footnotesMode={false})
+    expect(formatBFootnotesMode('answers')).toBe(false);
     expect(formatBFootnotesMode('wtlb1')).toBe(false);
     expect(formatBFootnotesMode('blessed')).toBe(false);
     expect(formatBFootnotesMode(null)).toBe(false);

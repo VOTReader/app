@@ -720,10 +720,11 @@ describe('app.css — the selection toolbar is opaque in both themes', () => {
    the A–Z jump letters (36.8 x 44 px) and ExpandableVerse's "Read more" (98 x 12 px), which sits in
    a footnote card whose own tap scrolls away to the bubble. */
 describe('app.css — the Answers A–Z letters and the footnote "Read more" are full-finger targets', () => {
-  it('each A–Z jump letter is at least 44 x 44 px', () => {
-    const block = ruleBlock(CSS, '.answers-az-jump button {');
-    expect(block).toMatch(/min-width:\s*max\(44px,/);
-    expect(block).toMatch(/min-height:\s*44px/);
+  // The AOGCG redesign (2026-10-20): the letters live in the sticky strip (.ans-az-key) at the kit's 48 x 48.
+  it('each A–Z jump letter is at least 48 x 48 px', () => {
+    const block = ruleBlock(CSS, '.ans-az-key{');
+    expect(block).toMatch(/min-width:\s*max\(48px,/);
+    expect(block).toMatch(/(^|;)height:\s*48px/);
   });
 
   it('"Read more" keeps its 12 px label and gains a 44 px-tall halo (12 + 16 + 16)', () => {
@@ -755,6 +756,8 @@ describe('app.css — the compact top bar and its ⋯ menu', () => {
   });
   it('the ⋯ button and every menu row are at least 44 px', () => {
     expect(ruleBlock(CSS, '.nav-more-btn {')).toMatch(/min-width:\s*44px;[^}]*min-height:\s*44px/);
+    // pinned with the other bar icons: a rem padding grew the bar with Text Size, under the fixed --dock-nav-bottom
+    expect(bare).toMatch(/\.nav-theme-btn, \.nav-search-btn, \.nav-more-btn \{\s*padding:\s*8px;\s*\}/);
     expect(ruleBlock(CSS, '.more-menu-item {')).toMatch(/min-height:\s*48px/);
     expect(ruleBlock(CSS, '.more-menu-row {')).toMatch(/min-height:\s*52px/);
     // 48 x 48 since L3 (zones, 2026-10-05; tools/e2e-phone-fit.mjs T1): A−/A+ measured 46 x 40.
@@ -770,7 +773,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
     '.audio-library-section-head span', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
     '.prg-section-head h2', '.prg-days-head', '.footnote-list-header', '.related-card-title', '.settings-section-label',
-    '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.answers-hit-eyebrow',
+    '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
     '.section-heading', '.compact-list-header',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-tab', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
@@ -796,6 +799,14 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
       const ls = /letter-spacing:\s*([\d.]+)em/.exec(b);
       if (ls) expect(Number(ls[1])).toBeLessThanOrEqual(0.18);
     }
+  });
+  // Below 334 px, 3.6vw alone fell under the 12 px floor for spaced capitals (the Browse review, 10-22).
+  // The floor is the FIXED 12 px (--fsc-12): --fs-12 follows Text Size, so at Text Size 3 it made every
+  // label 36 px (the Topic stage's f07-ts3 capture; the design caps it at 3.6vw, 12.96 px at 360).
+  it('the Answers label (Cinzel, .14em) never drops under 12 px nor grows with Text Size: clamp(--fsc-12, 3.6vw, --fs-13)', () => {
+    const block = ruleBlock(CSS, '.ans-label{');
+    expect(block).toMatch(/font-size:\s*clamp\(var\(--fsc-12\),\s*3\.6vw,\s*var\(--fs-13\)\)/);
+    expect(block).toMatch(/letter-spacing:\s*\.14em/);
   });
   it('the letter hero eyebrow never drops under 12 px on a phone', () => {
     expect(ruleBlock(CSS, '.hero-eyebrow {')).toMatch(/font-size:\s*clamp\(var\(--fs-12\),/);

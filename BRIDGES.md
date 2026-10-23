@@ -146,6 +146,14 @@ setup effect.
 - **Cleanup:** `delete window.__bumpHlTick`
 - **Consumers:** `ui/components/ChapterBookmarkBtn.jsx:46` (force re-render after bookmark add/delete)
 
+### `__hlDomV`
+- **Setter:** `src/ui/screens/WtlbEntryView.jsx` — an Answers topic, when its body's keyed paragraphs
+  mount (the sidecar landed, or 300 ms passed) and again when they are replaced decorated; it bumps the
+  counter, then dispatches a `vot-hl-dom` event on window.
+- **Cleanup:** none (a monotonic counter)
+- **Consumers:** `src/hooks/use-dom-annotation-sync.js` (useSyncExternalStore on the event; the counter
+  joins the pass's load signals, so the reader's marks are painted on the new paragraphs)
+
 ### `__activeNoteGroup`
 - **Setter:** `index.html:1190` — written continuously, mirrors `noteSheetTarget.groupId`
 - **Cleanup:** none (always reflects current state — nulled when no sheet open)

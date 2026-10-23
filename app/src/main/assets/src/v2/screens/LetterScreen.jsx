@@ -22,6 +22,7 @@ import { collectionHead } from '../collection-facts.js';
 import { firstSaveWaits, useSafariNotice } from '../safari-gate.js';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { definePlace } from '../places.js';
+import { AnswersTopicBody } from './AnswersScreens.jsx';
 import { LayerToast } from '../Sheet.jsx';
 import { MarkSheet } from './MarkSheet.jsx';
 import {
@@ -266,12 +267,18 @@ const SectionIntro = React.memo(/** @param {{ blocks: any[], study?: boolean }} 
  *   gate?: import('../gate.js').GateState | null, desktop?: boolean, waitDoubleTap?: boolean,
  *   onNote?: (target: Record<string, any>) => void, facts?: import('../settings-facts.js').SettingsFacts,
  *   onGo?: (route: any) => void, landAt?: { excerpt?: string, match?: string[], label?: string } | null, doc?: PageDoc | null,
- *   onFind?: (start: { q: string, terms: string[], near: Element | null, nearOff: number }) => void }} props
- *   onFind opens the shell's Find strip on this page (a search landing's words)
+ *   onFind?: (start: { q: string, terms: string[], near: Element | null, nearOff: number }) => void,
+ *   ans?: { route: any, go: (...routes: any[]) => void, replace: (route: any) => void, openTab: (id: string, extra?: any) => void } | null }} props
+ *   onFind opens the shell's Find strip on this page (a search landing's words); ans, the place's routes, which an
+ *   Answers topic's page hands its links and foot to (mw14)
  */
 export function LetterScreen({ collection, n = 0, preface = false, onReady, onOpenLetter, gate = null, desktop = false,
-  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null, doc = null, onFind }) {
+  waitDoubleTap = false, onNote, facts = {}, onGo, landAt = null, doc = null, onFind, ans = null }) {
   const col = doc ? null : collectionOf(collection);
+  // an Answers topic draws main's page (AnswersTopic, mw14) when bundle-d is here and the place hands its routes on
+  const topic = !!(ans && col && col.volKey === 'answers' && typeof g.AnswersTopic === 'function');
+  const [drawn, setDrawn] = React.useState(false);
+  const onDrawn = React.useCallback(() => setDrawn(true), []);
   const { letters, failed, retry } = useLettersLoad(col);
   const letter = doc ? doc.letter : letters ? (preface ? prefaceOf(col) : letterAt(letters, n)) : null;
   const bodyRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
@@ -309,7 +316,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
   // field filled"). The first time only, so Back keeps the reader's place and a closed strip stays closed. A page drawn
   // without the shell's Find marks those words in their block instead, that place a third of the way down.
   React.useEffect(() => {
-    if (!letter || !landAt) return undefined;
+    if (!letter || !landAt || (topic && !drawn)) return undefined;
     const match = [].concat(landAt.match || []).filter(Boolean);
     const { index, off } = landingOf(letter, landAt.excerpt, match);
     if (index < 0 && !(onFind && match.length)) return undefined;
@@ -337,7 +344,7 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     // another hit in the same letter marks its own words, not these too
     return () => { live = false; unmarkWords(marked); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- onFind is the shell's open, read when the hit lands
-  }, [letter, landAt]);
+  }, [letter, landAt, drawn]);
 
   // The gate's open sheet, from the page alone: 4b paragraph 1 tapped, gold ringed (8d: the same paragraph under Safari's
   // notice; 4d-4f the link picker over it); 1e a reference's sheet; 1g a footnote's.
@@ -575,36 +582,46 @@ export function LetterScreen({ collection, n = 0, preface = false, onReady, onOp
     : next ? { k: 'Next · ' + unit + ' ' + nextN, t: next.title, open: () => onOpenLetter && onOpenLetter(nextN) } : null;
   return (
     <>
-      <div className={'page-head g reader-head' + (fb ? ' fb-head' : '')} ref={headRef} onClick={onHeadClick} onKeyDown={onBodyKey}>
-        {doc ? <span className="overline eyebrow wrap">{doc.eyebrow}</span>
-          : <span className="overline eyebrow">{fb ? entryEyebrow(col, n) : col.label + ' · ' + (preface ? 'Preface' : 'Letter ' + n)}</span>}
-        <h1 className={(doc && doc.titleCls) || titleClass(letter.title)}>{letter.title}</h1>
-        {!(doc && doc.recorded === false) && (
-          <ListenPill gate={gate} collection={collection} n={n} volKey={volKey} letter={letter} collectionLabel={label}
-            onToast={setToast} />
-        )}
-        {meta.length > 0 && <div className="meta">{meta.map((m, i) => <React.Fragment key={i}>{i > 0 && <br />}{m}</React.Fragment>)}</div>}
-        {/* the question put to The Lord that the letter answers */}
-        {filled(letter.preamble) && <p className="preamble">{lineOf(letter.preamble)}</p>}
-      </div>
-      <div className="hair" />
-      <div className={'body g first' + (fb ? ' fb' : '') + (doc && doc.study ? ' study' : '') + (sheet ? ' marked' : '')}
-        ref={bodyRef} onClick={onBodyClick} onKeyDown={onBodyKey}>
-        {intro.length > 0 && <SectionIntro blocks={intro} study={!!(doc && doc.study)} />}
-        {doc && doc.body ? doc.body : <LetterBody letter={letter} scan={scan} />}
-        {/* the end of the text (main's sentinel): auto-scroll comes to rest here, before the footnotes */}
-        <span className="reading-end" aria-hidden="true" />
-        <FootnoteList items={items} letter={letter} onGo={live ? goToRef : () => {}} onRead={live ? readLink : () => {}} />
-        {/* Also read, Related topics, Bible study, Songs from this letter, Audio, Videos (dz23 1k/1l); a study chapter's
-            without songs (main's studyMode) */}
-        {(!doc || doc.foot) && <LetterFoot letter={letter} volKey={volKey} gate={gate} onGo={onGo} songs={!doc} />}
-        {card && (
-          <button type="button" className="nextcard" onClick={card.open}>
-            <span className="tx"><span className="k">{card.k}</span><span className="t">{card.t}</span></span>
-            <span className="chev"><Icon name="chev" /></span>
-          </button>
-        )}
-      </div>
+      {topic ? (
+        <div className={'body g first fb ans-body' + (sheet ? ' marked' : '')} ref={bodyRef} onClick={onBodyClick} onKeyDown={onBodyKey}>
+          {/* main's topic page: its hero, Contents, reading, Also see and foot (AnswersScreens.jsx) */}
+          <AnswersTopicBody letter={letter} bodyRef={bodyRef} route={ans.route} gate={gate} go={ans.go} replace={ans.replace}
+            openTab={ans.openTab} onRef={(ref) => setRefOpen({ kind: 'ref', ref })} onDrawn={onDrawn} />
+        </div>
+      ) : (
+        <>
+          <div className={'page-head g reader-head' + (fb ? ' fb-head' : '')} ref={headRef} onClick={onHeadClick} onKeyDown={onBodyKey}>
+            {doc ? <span className="overline eyebrow wrap">{doc.eyebrow}</span>
+              : <span className="overline eyebrow">{fb ? entryEyebrow(col, n) : col.label + ' · ' + (preface ? 'Preface' : 'Letter ' + n)}</span>}
+            <h1 className={(doc && doc.titleCls) || titleClass(letter.title)}>{letter.title}</h1>
+            {!(doc && doc.recorded === false) && (
+              <ListenPill gate={gate} collection={collection} n={n} volKey={volKey} letter={letter} collectionLabel={label}
+                onToast={setToast} />
+            )}
+            {meta.length > 0 && <div className="meta">{meta.map((m, i) => <React.Fragment key={i}>{i > 0 && <br />}{m}</React.Fragment>)}</div>}
+            {/* the question put to The Lord that the letter answers */}
+            {filled(letter.preamble) && <p className="preamble">{lineOf(letter.preamble)}</p>}
+          </div>
+          <div className="hair" />
+          <div className={'body g first' + (fb ? ' fb' : '') + (doc && doc.study ? ' study' : '') + (sheet ? ' marked' : '')}
+            ref={bodyRef} onClick={onBodyClick} onKeyDown={onBodyKey}>
+            {intro.length > 0 && <SectionIntro blocks={intro} study={!!(doc && doc.study)} />}
+            {doc && doc.body ? doc.body : <LetterBody letter={letter} scan={scan} />}
+            {/* the end of the text (main's sentinel): auto-scroll comes to rest here, before the footnotes */}
+            <span className="reading-end" aria-hidden="true" />
+            <FootnoteList items={items} letter={letter} onGo={live ? goToRef : () => {}} onRead={live ? readLink : () => {}} />
+            {/* Also read, Related topics, Bible study, Songs from this letter, Audio, Videos (dz23 1k/1l); a study chapter's
+                without songs (main's studyMode) */}
+            {(!doc || doc.foot) && <LetterFoot letter={letter} volKey={volKey} gate={gate} onGo={onGo} songs={!doc} />}
+            {card && (
+              <button type="button" className="nextcard" onClick={card.open}>
+                <span className="tx"><span className="k">{card.k}</span><span className="t">{card.t}</span></span>
+                <span className="chev"><Icon name="chev" /></span>
+              </button>
+            )}
+          </div>
+        </>
+      )}
       {/* the sentence being read, lit (readalong rv1 1b): main's read-along over the body's [data-hl-key] blocks */}
       <LetterReadAlong gate={gate} collection={collection} n={n} volKey={volKey} letterId={letter.id} bodyRef={bodyRef}
         on={facts.readAlong !== false} follow={facts.readAlongFollow !== false} onListen={listenHere(live, { volKey, label }, letter, setToast)}
@@ -765,14 +782,14 @@ function findNoun(r) {
 }
 
 /** The letter place: the next-letter card replaces this letter, so Back still names the collection. @param {import('../places.js').PlaceProps} props */
-function LetterPlace({ route, replace, go, onReady, gate, desktop, facts, open }) {
+function LetterPlace({ route, replace, go, onReady, gate, desktop, facts, open, openTab }) {
   const openLetter = (n) => replace({ place: 'letter', collection: route.collection, n });
   const openNote = (target) => go({ place: 'note', ...target });
   return <LetterScreen key={route.collection + '/' + (route.preface ? 'P' : route.n)} collection={route.collection} n={route.n}
     preface={!!route.preface} onReady={onReady} onOpenLetter={openLetter} gate={gate} desktop={desktop}
     waitDoubleTap={!desktop && !(facts && facts.doubleTapFullscreen === false)} onNote={openNote} facts={facts || {}} onGo={go}
     landAt={route.excerpt || (route.match && route.match.length) ? route : null}
-    onFind={open && !gate ? (start) => open('find', start) : undefined} />;
+    onFind={open && !gate ? (start) => open('find', start) : undefined} ans={{ route, go, replace, openTab }} />;
 }
 
 definePlace('letter', {

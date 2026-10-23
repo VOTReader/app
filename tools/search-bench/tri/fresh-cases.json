@@ -1,7 +1,7 @@
 {
  "made": "2026-10-18T19:45:08.595Z",
  "by": "freeze-tri.mjs (search200)",
- "targetsHash": "b7cc67dfc81d4e12",
+ "targetsHash": "7d257873fc0da970",
  "counts": {
   "fresh/exact/easy": 10,
   "fresh/exact/medium": 10,
@@ -815,24 +815,6 @@
    "from": "their reed to splinter beneath them, and they too shall be pierced!"
   },
   {
-   "id": "m274",
-   "style": "misremembered",
-   "tier": "medium",
-   "form": "two-three-slips",
-   "group": "studies",
-   "col": "bible-studies",
-   "collection": "Bible / Letter Studies",
-   "level": "sentence",
-   "uk": "bible-studies/grace-and-the-law-ch6",
-   "unit": "grace-and-the-law-ch6",
-   "title": "Grace AND The Law (Bible/Letter Study) — VERSES OFTEN STUMBLED OVER:",
-   "num": 6,
-   "blockIdx": 8,
-   "sentence": "The Old Covenant required animals to be sacrificed as a representation of the atonement of sin that had come and would come through YahuShua HaMashiach (Jesus The Christ).",
-   "q": "required animals to be offered as a symbol of the atonement for sin",
-   "from": "required animals to be sacrificed as a representation of the atonement of sin"
-  },
-  {
    "id": "m321",
    "style": "misremembered",
    "tier": "medium",
@@ -940,6 +922,26 @@
    "sentence": "This is my house, and to IT am I married.",
    "q": "this is my church and to it i am married",
    "from": "This is my house, and to IT am I married."
+  },
+  {
+   "id": "m255",
+   "style": "misremembered",
+   "tier": "medium",
+   "form": "two-three-slips",
+   "group": "letters",
+   "col": "v5",
+   "collection": "Volume Five",
+   "level": "sentence",
+   "uk": "v5/brought-to-a-close",
+   "unit": "brought-to-a-close",
+   "title": "Brought to a Close",
+   "num": 28,
+   "blockIdx": 1,
+   "sentence": "Thus some of you have treated My table with contempt, while still others have likened My table unto the churches of men, whose ways are an abhorrence to Me, whose doctrines and traditions I hate!",
+   "q": "many of you have treated my table with disrespect",
+   "from": "some of you have treated My table with contempt",
+   "replaces": "m274",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "m127",
@@ -1605,23 +1607,6 @@
    "replaces": "n227"
   },
   {
-   "id": "n291",
-   "style": "title",
-   "tier": "hard",
-   "form": "words-wrong",
-   "group": "wtlb",
-   "col": "wtlb2",
-   "collection": "Words To Live By: Part Two",
-   "level": "unit",
-   "titleCol": "wtlb2",
-   "uk": "wtlb2/against-god",
-   "unit": "against-god",
-   "title": "Against God",
-   "fullTitle": "Against God",
-   "num": 28,
-   "q": "opposing god"
-  },
-  {
    "id": "n255",
    "style": "title",
    "tier": "hard",
@@ -1689,6 +1674,31 @@
    "fullTitle": "The Unending Fountain",
    "num": 12,
    "q": "the endless fountain"
+  },
+  {
+   "id": "n038",
+   "style": "title",
+   "tier": "hard",
+   "form": "reordered",
+   "group": "wtlb",
+   "col": "wtlb1",
+   "collection": "Words To Live By: Part One",
+   "level": "unit",
+   "titleCol": "wtlb1",
+   "uk": "wtlb1/a-return-to-the-garden",
+   "unit": "a-return-to-the-garden",
+   "title": "A Return to the Garden",
+   "fullTitle": "A Return to the Garden",
+   "num": 125,
+   "q": "the garden return",
+   "retired": [
+    {
+     "q": "garden return",
+     "why": "a reordered title keeps every one of the title's content words and drops at most two of its small words; this one dropped three small words, so keep one of them (to or the) while moving the words"
+    }
+   ],
+   "replaces": "n291",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   }
  ]
 }

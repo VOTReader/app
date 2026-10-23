@@ -1373,7 +1373,9 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-restored-note');        // utils/data-safety.js RESTORED_NOTE_KEY
     expect(LS_SKIP_LIST).toContain('vot-ls-cleanup-done');      // this cleanup's own done-flag
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
-    expect(LS_SKIP_LIST.length).toBe(16);
+    expect(LS_SKIP_LIST).toContain('vot-answers-path');         // AOGCG: the Answers reading path (device-local)
+    expect(LS_SKIP_LIST).toContain('vot-answers-recent');       // AOGCG: the Answers recent searches (device-local)
+    expect(LS_SKIP_LIST.length).toBe(18);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

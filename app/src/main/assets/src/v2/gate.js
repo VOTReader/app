@@ -318,14 +318,13 @@ export const GATE_STATES = {
     open: { sheet: 'recent' },
   },
   // dz17 (mw10; states.json 2g-2l): Answers Only God Can Give from Home, main's own data (the boot asks for the Answers
-  // corpus as a reader's first visit does). 2h: Browse by subject 92 px below the screen top; 2i: commandment VI's sheet;
-  // 2j: "christmas" typed (Back says Answers), the field keeping focus with the keyboard closed.
+  // corpus as a reader's first visit does). mw14 (10-22) hosts main's redesign (aogcg f01-f13), so design's 2g-2l
+  // pictures are of the old page until they are redrawn: 2g the home's top, 2h its Contents | A-Z, 2k a numbered group.
+  // 2i (a commandment's sheet), 2j (words typed) and 2l (the A-Z tab) lived in the route; main keeps them in its own
+  // module memory, so they have no state until a redraw asks for one.
   '2g-answers': { stack: ANSWERS },
-  '2h-answers-subjects': { stack: ANSWERS, scroll: { to: '.sec.ans-subj', gap: 9 } },
-  '2i-commandment': { stack: [{ place: 'home' }, { place: 'answers', cmd: 6 }] },
-  '2j-answers-search': { stack: [{ place: 'home' }, { place: 'answers', q: 'christmas' }] },
-  '2k-answers-subject': { stack: [...ANSWERS, { place: 'answers/subject', subject: 'the-end-of-this-age' }] },
-  '2l-answers-az': { stack: [...ANSWERS, { place: 'answers/a-z' }] },
+  '2h-answers-subjects': { stack: ANSWERS, scroll: { to: '.ans-landing-b', gap: 9 } },
+  '2k-answers-subject': { stack: [...ANSWERS, { place: 'answers-shelf', key: '1' }] },
   // states.json 9b-full-screen: Letter 2 full screen (every bar hidden), paragraph 1 at the top, the hint showing.
   '9b-full-screen': {
     stack: [{ place: 'home' }, { place: 'collection', collection: 'one' }, { place: 'letter', collection: 'one', n: 2 }],

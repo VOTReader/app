@@ -75,15 +75,28 @@ export function makeClasses({ D, B, KJV }) {
   };
   /** PARALLEL (rules.mjs, errata 2026-10-19): the other verses holding verse `uk`'s whole text (Luke 10:2 for Matthew
       9:38), looked for among the verses holding its first 3-gram. */
-  const parallels = (uk) => {
+  /** The KJV wording of verse `uk` (normalized), or null. */
+  const kjvText = (uk) => {
+    const m = /^(?:bible|matthew-study)\/([^:]+):(\d+):(\d+)$/.exec(uk);
+    const book = m && (m[1] === 'matthew-plain' ? 'matthew' : m[1]);
+    const v = m && ((KJV[book] || {})[m[2]] || []).find((x) => String(x.n) === m[3]);
+    return v ? norm(v.text) : null;
+  };
+  /* ...and for a query typed in the KJV's words (the 500's crossover/kjv cases), in the KJV wording too (errata
+     2026-10-22, sealed2 f001: both judges; Ezra 2:64 and Nehemiah 7:66 are word for word one sentence in the KJV, and
+     the NKJV reorders the first words of one). */
+  const parallels = (uk, kjv = false) => {
     const own = matthewTwin(uk);
     const d = own.map((k) => unitDoc[k]).find(Boolean) || unitDoc[uk];
     if (!d) return [];
-    const n = norm(d.text);
-    const w = n.trim().split(' ');
-    const at = w.length >= 3 ? verseGrams.get(w[0] + ' ' + w[1] + ' ' + w[2]) || [] : [];
-    return [...new Set(at.filter((i) => parallelHolds(n, verseNorm[i][1])).map((i) => verseNorm[i][0]))]
-      .filter((k) => !matthewTwin(k).some((t) => own.includes(t) || t === uk));
+    const out = new Set();
+    for (const n of [norm(d.text), kjv ? kjvText(uk) : null]) {
+      if (!n) continue;
+      const w = n.trim().split(' ');
+      const at = w.length >= 3 ? verseGrams.get(w[0] + ' ' + w[1] + ' ' + w[2]) || [] : [];
+      for (const i of at) if (parallelHolds(n, verseNorm[i][1])) out.add(verseNorm[i][0]);
+    }
+    return [...out].filter((k) => !matthewTwin(k).some((t) => own.includes(t) || t === uk));
   };
   // A unit's title, and a study chapter's chapter title alone (rules.mjs titleForms).
   const titleNorm = {};
@@ -155,8 +168,26 @@ export function makeClasses({ D, B, KJV }) {
   const isVerseKey = (k) => /^(bible|matthew-study)\//.test(k);
   const isLetterKey = (k) => /^(v[1-7]|timothy|flock|rebuke)\//.test(k);
 
+  /* A CASE'S OWN ERRATA (search200 sealed2, 2026-10-22; errata.md): where both judges of a case call its class wrong,
+     the case says so itself. `errata.also`: texts as right as the target, full members (a query naming only a study
+     answers to any of its chapters); `errata.near`: texts that answer it but are no original of it, near members (a
+     verse the target quotes, a letter with the same line); `errata.drop`: a text the rules took in that holds the
+     words only as a link (an index page). The rules above stand for every other case. */
   /** The target's equivalence class, the tier its original sits in, and whether it has one original at all. */
   function classOf(c) {
+    const cls = rulesClassOf(c);
+    const e = c.errata;
+    if (!e || (!e.also && !e.near && !e.drop)) return cls;
+    for (const k of e.also || []) for (const t of matthewTwin(k)) { cls.members.add(t); cls.near.delete(t); }
+    for (const k of e.near || []) for (const t of matthewTwin(k)) { cls.members.add(t); cls.near.add(t); }
+    for (const k of e.drop || []) for (const t of matthewTwin(k)) { cls.members.delete(t); cls.near.delete(t); cls.titled.delete(t); cls.sectioned.delete(t); }
+    if (c.level === 'verse') return cls;
+    const pool = [...cls.members].filter((k) => !cls.sectioned.has(k) && !cls.near.has(k));
+    return { ...cls, best: Math.min(...pool.map(TIER)), recurring: recurring(cls.members, isVerseKey, isLetterKey) };
+  }
+
+  /** classOf by the rules alone. */
+  function rulesClassOf(c) {
     const members = new Set();
     /** members a heading target names by their own title: opening one is arriving under the heading */
     const titled = new Set();
@@ -170,7 +201,7 @@ export function makeClasses({ D, B, KJV }) {
       if (c.uk2) for (const k of matthewTwin(c.uk2)) members.add(k);
       // ...one verse: a verse holding it whole says it too, as a near member (rules.mjs PARALLEL); a pair has none,
       // and a query naming the verse asks for it alone
-      else if (!namesVerse(norm(c.q || ''), c.ref)) for (const k of parallels(c.uk)) for (const t of matthewTwin(k)) if (!members.has(t)) { members.add(t); near.add(t); }
+      else if (!namesVerse(norm(c.q || ''), c.ref)) for (const k of parallels(c.uk, c.variant === 'kjv')) for (const t of matthewTwin(k)) if (!members.has(t)) { members.add(t); near.add(t); }
       return { members, titled, sectioned, near, best: 0, recurring: false };
     }
     if (c.level === 'unit') {
@@ -185,6 +216,10 @@ export function makeClasses({ D, B, KJV }) {
         for (const k of versesQuoted(c.sentence)) for (const t of matthewTwin(k)) members.add(t);
         // ...and one it quotes with a word or two changed answers it too, as a near member (rules.mjs NEAR QUOTE)
         for (const k of versesNear(c.sentence)) for (const t of matthewTwin(k)) if (!members.has(t)) { members.add(t); near.add(t); }
+      } else if (c.level === 'block') {
+        // A block's sentence quoting a verse (word for word or by NEAR QUOTE) answers a gist of the block too, as a near
+        // member: the block stays the original (rules.mjs QUOTED BLOCK, errata 2026-10-22, sealed2 f064 and f091)
+        for (const k of [...versesQuoted(c.sentence), ...versesNear(c.sentence)]) for (const t of matthewTwin(k)) if (!members.has(t)) { members.add(t); near.add(t); }
       }
       // An Answers heading that cites a letter ("Excerpt from: Let All in the Earth Be Brought into...") has that letter as its original.
       const cited = /^excerpt from:\s*(.+)$/i.exec(c.sentence.trim());

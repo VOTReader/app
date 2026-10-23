@@ -10,11 +10,14 @@
    chevron is the visible fallback for readers who don't know the
    pull-handle idiom. */
 
-export function SheetHandle({ onClose }) {
+/* `glyph` (the Answers sheets, AOGCG 2026-10-22): what the close button draws in place of the ‹,
+   their 20px × icon. The button, its name and its place are the same for every sheet. */
+/** @param {{ onClose: () => void, glyph?: any }} props */
+export function SheetHandle({ onClose, glyph }) {
   return (
     <div className="sheet-handle-row">
       <button type="button" className="sheet-handle-back" onClick={onClose} aria-label="Close">
-        ‹
+        {glyph || '‹'}
       </button>
       {/* The pill bar is a redundant touch affordance for sighted users —
           aria-hidden + tabIndex -1 keep it out of the accessibility tree so

@@ -9,7 +9,8 @@
    - scrollKeyForTab
    =================================================================== */
 
-import { answersSubjectById } from './answers-shelves.js';
+import { ANSWERS_GROUP_SHORT } from './answers-site.js';
+import { answersRetiredPlace } from './answers-retired.js';
 import { SONGS_SCREEN, decodeSongsRoute } from './songs-route.js';
 
 /**
@@ -95,11 +96,18 @@ export function describeTab(tab) {
   // Answers Only God Can Give — its landing is also the collection's
   // indexScreen, so it is named here before the generic index rule.
   if (s === 'answers-home') return { title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
-  if (s === 'answers-az') return { title: 'Every Topic, A–Z', subtitle: 'Answers Only God Can Give', resolved: true };
-  if (s === 'answers-subject') {
-    const _subj = answersSubjectById(tab.letterId);
-    return { title: _subj ? _subj.title : 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
+  // A shelf (its key rides letterId): a numbered group by our short name under the site's label.
+  if (s === 'answers-group') {
+    const _n = Number(tab.letterId);
+    const _short = ANSWERS_GROUP_SHORT[_n];
+    if (tab.letterId === 'other') return { title: 'Other Topics', subtitle: 'Answers Only God Can Give', resolved: true };
+    return _short ? { title: _short, subtitle: _n + '. Thus Says The Lord...', resolved: true }
+      : { title: 'Answers', subtitle: 'Answers Only God Can Give', resolved: true };
   }
+  if (s === 'answers-media') return { title: 'Charts & videos', subtitle: 'Answers Only God Can Give', resolved: true };
+  if (s === 'answers-saved') return { title: 'Saved answers', subtitle: 'Answers Only God Can Give', resolved: true };
+  // The retired subject and A–Z screens are named for where they reopen (answers-retired.js).
+  if (s === 'answers-subject' || s === 'answers-az') return describeTab(answersRetiredPlace({ ...tab }));
 
   // Volumes & letter collections (via COLLECTIONS registry)
   const _ltrCol = COL_BY_LETTER_SC.get(s);
@@ -248,7 +256,7 @@ export function scrollKeyForTab(tab) {
   if (s === 'bible-study-index') return `bible-study-index-${tab.studyId || ''}`;
   if (s === 'scripture-genre') return `scripture-genre-${tab.genreId || ''}`;
   if (s === 'hm-letter') return `entry-${tab.letterId}`;
-  if (s === 'answers-subject') return `answers-subject-${tab.letterId || ''}`;
+  if (s === 'answers-group') return `answers-group-${tab.letterId || ''}`;
   const _sc = COL_BY_LETTER_SC.get(s);
   if (_sc) {
     const pfx = _sc.kind === 'holy-days' ? 'holyday' : _sc.kind === 'letter' ? 'letter' : _sc.kind;

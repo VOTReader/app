@@ -6,7 +6,7 @@
    ANSWERS_COMMANDMENTS — the Ten Commandments tablets. The TOPICS under each
    commandment are NOT listed here: answersonlygodcangive.com files them itself
    (entry.group "Commandment N", written by tools/fetch-answers.py), and
-   answersCommandmentTopics reads that filing. Each row carries only its short
+   answersSiteShelves (answers-site.js) reads that filing. Each row carries only its short
    tablet label and its verse, copied verbatim from the app's NKJV (books.js,
    Exodus 20) — answers-shelves.test.js holds every verse to that text.
 
@@ -154,10 +154,28 @@ export const ANSWERS_SUBJECTS = Object.freeze([
 
 ]);
 
-const SUBJECT_BY_ID = new Map(ANSWERS_SUBJECTS.map((s) => [s.id, s]));
+/* The site's Main Page rides in ANSWERS as its LAST entry (aogcg phase 1a,
+   2026-10-19, tools/fetch-answers.py MAIN_ID): appended, so no topic's index
+   moves and every reader's marks stay put. It is not one of the 121 topics, so
+   the lists (landing, subjects, A–Z) are built from answersTopicEntries; a link
+   to the Main Page still opens it by id. */
+export const ANSWERS_MAIN_PAGE_ID = 'answers-main-page';
 
-/** A subject row by id, or null (a saved tab can name one this build dropped). */
-export function answersSubjectById(id) { return SUBJECT_BY_ID.get(id) || null; }
+let _topicsOf = null, _topicsLen = -1, _topics = [];
+
+/**
+ * The site's topics: every entry but the Main Page, in the corpus's order.
+ * The same array comes back for the same corpus array, so a screen that
+ * memoises on `entries` (the landing's search index) does not rebuild per render.
+ */
+export function answersTopicEntries(entries) {
+  if (!Array.isArray(entries)) return [];
+  if (entries === _topicsOf && entries.length === _topicsLen) return _topics;
+  _topicsOf = entries;
+  _topicsLen = entries.length;
+  _topics = entries.filter((e) => e && e.id !== ANSWERS_MAIN_PAGE_ID);
+  return _topics;
+}
 
 const SUBJECT_OF_TOPIC = new Map();
 ANSWERS_SUBJECTS.forEach((s) => s.topics.forEach((id) => SUBJECT_OF_TOPIC.set(id, s)));
@@ -171,12 +189,6 @@ export function answersFiledUnder(entry) {
   }
   const s = entry && SUBJECT_OF_TOPIC.get(entry.id);
   return s ? s.title : '';
-}
-
-/** The site's own filing for one commandment, in the site's order. */
-export function answersCommandmentTopics(entries, n) {
-  const group = 'Commandment ' + n;
-  return (entries || []).filter((e) => e && e.group === group);
 }
 
 /** Passages in a topic = its "~ [From …]" attribution lines (0 for a page of prose). */

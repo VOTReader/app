@@ -40,9 +40,10 @@ function applySavedScrollToEl(el, saved) {
 
 /**
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
- *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean }} props
+ *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean,
+ *   className?: string }} props  className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2)
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '' }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -306,7 +307,7 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   const Nav = landmarks ? 'nav' : 'div';
   const Main = landmarks ? 'main' : 'div';
   return (
-    <div className="screen-layout">
+    <div className={className ? 'screen-layout ' + className : 'screen-layout'}>
       <Nav className="top-nav">
         {navChildren}
         <ResumeReadingNavBtn />
@@ -331,8 +332,10 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
           exclusively by the 4 reading screens). Sits OUTSIDE .pager-track as
           a stickyNav sibling so swipe-settle transforms can't displace it;
           renders null unless the user has zero annotations (see the
-          component header). */}
-      {pager ? <AnnotationHint /> : null}
+          component header). Keyed by the visit (placeKey): the pill shows on the
+          one unit it first appeared on, and Next into the following letter or
+          topic is a new screen, where its recorded flag keeps it away (U15). */}
+      {pager ? <AnnotationHint key={placeKey} /> : null}
       {/* Hands-free reading transport — reading screens only, and never in
           an inert peek (the inert branch returns above). Portals itself to
           <body>, so a swipe-settle transform on .pager-track can't displace

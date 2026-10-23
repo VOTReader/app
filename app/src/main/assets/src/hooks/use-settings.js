@@ -194,6 +194,9 @@ export function useSettings({ savedSettings, theme }) {
       shareLink: "app",
       linkHighlight: false,
       showScrollNotch: true,
+      // Settings › Reading › Answers Reading Path (AOGCG, 2026-10-22): the Answers landing's ticks,
+      // "N read" counts and Continue row. A new key, so every profile starts on, as the row says.
+      answersReadingPath: true,
       arrowLayout: "off", // "split" | "right" | "left" | "nav" | "off"
       fontScale: "1", // WL1 — text-size multiplier, a continuous 0.8–3 (the Settings slider); drives --font-scale on <html>
       // Autoscroll. Speed is stored in LINES PER MINUTE, never px/s: the text-

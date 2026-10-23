@@ -68,7 +68,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {(topCropDp: number, maxDim: number, jpegQuality: number) => Promise<string>} takeScreenshot
  * @property {(theme: string, maxDim: number, jpegQuality: number) => Promise<string>} takeThemedScreenshot
  * @property {() => void} openFilePicker
- * @property {(suggestedName: string, content: string) => void} saveToFile
+ * @property {(suggestedName: string, content: string | Blob) => void} saveToFile
  * @property {(suggestedName: string, opts?: { onSlow?: (escape: () => void) => void }) => Promise<{ write: (chunk: Uint8Array) => Promise<void>, close: () => Promise<void>, abort: () => Promise<void> } | null>} openExportSink
  * @property {() => Promise<Blob | null>} pickImportFile
  * @property {(suggestedName: string) => void} v3ExportOpen
@@ -85,6 +85,7 @@ import { DiagnosticLog } from './diagnostic-log.js';
  * @property {() => string} getCrashLog
  * @property {() => void} clearGardenCache
  * @property {(text: string) => boolean} shareText
+ * @property {(pngBase64: string) => boolean} shareImage
  */
 
 /**
@@ -194,6 +195,9 @@ const androidImpl = {
   // it took the text; false for an empty one or one too long for a single share
   // (utils/copy-share.js then copies it instead).
   shareText: (text) => /** @type {any} */ (window).AndroidBridge.shareText(text),
+  // The Answers share card (O6): the phone's share sheet with a PNG drawn on the device (base64 over the
+  // bridge). True when it took the image; false for an empty or oversized one (utils/copy-share.js says so).
+  shareImage: (b64) => /** @type {any} */ (window).AndroidBridge.shareImage(b64),
 };
 
 // ── Web impl: placeholders (W1.3 / W1.4 / W1.5 fill in actual behavior) ─
@@ -464,7 +468,7 @@ function webDownloadBlob(blob, name) {
 
 /**
  * @param {string} suggestedName
- * @param {string} content
+ * @param {string | Blob} content
  * @returns {void}
  */
 function webSaveToFile(suggestedName, content) {
@@ -475,7 +479,8 @@ function webSaveToFile(suggestedName, content) {
   };
   try {
     // The type follows the name (W12): the notes export is a .md file, not JSON.
-    const type = /\.md$/i.test(suggestedName) ? 'text/markdown' : 'application/json';
+    // A PNG (the Answers share card, O6) arrives as a Blob and keeps its own type.
+    const type = /\.png$/i.test(suggestedName) ? 'image/png' : /\.md$/i.test(suggestedName) ? 'text/markdown' : 'application/json';
     webDownloadBlob(new Blob([content], { type }), suggestedName);
     report('ok');
   } catch (e) {
@@ -699,6 +704,47 @@ export function captureTargetEl() {
   return document.getElementById('root') || document.body;
 }
 
+/**
+ * Hide, in html2canvas's CLONE, every in-flow block that lies wholly off the
+ * screen (pf1, 2026-10-22). A thumbnail shows one screen of a reader, but
+ * html2canvas parses the whole cloned tree and measures every word (every
+ * character, with the letter-spacing nudge below) before it paints; a long
+ * letter's offscreen text was most of a capture: 1.19 s of a 1.2 s render on
+ * the S22 for a 20k-character letter, 0.49 s with this, and the same picture.
+ * html2canvas never descends into a visibility:hidden element, and hidden
+ * keeps the layout box, so nothing moves and every scroll offset still holds.
+ * Walks down only through elements that reach the screen; positioned
+ * (absolute/fixed/sticky) elements are left alone.
+ *
+ * @param {Document} doc       - the cloned document (scroll already restored)
+ * @param {number} [margin]    - CSS px kept beyond each screen edge
+ * @returns {number} how many elements were hidden
+ */
+export function hideOffscreenInClone(doc, margin = 200) {
+  const view = doc && doc.defaultView;
+  if (!view || !doc.body) return 0;
+  const vh = view.innerHeight || 0;
+  if (vh <= 0) return 0;
+  let hidden = 0;
+  /** @param {Element} el */
+  const walk = (el) => {
+    for (const child of Array.from(el.children)) {
+      const r = child.getBoundingClientRect();
+      if (r.height > 0 && (r.bottom < -margin || r.top > vh + margin)) {
+        const pos = view.getComputedStyle(child).position;
+        if (pos === 'static' || pos === 'relative') {
+          /** @type {HTMLElement} */ (child).style.visibility = 'hidden';
+          hidden++;
+          continue;
+        }
+      }
+      if (child.children.length) walk(child);
+    }
+  };
+  walk(doc.body);
+  return hidden;
+}
+
 /** @type {Promise<any> | null} */
 let _h2cPromise = null;
 /**
@@ -791,6 +837,8 @@ async function webTakeScreenshot(_topCropDp, maxDim, jpegQuality, forceTheme) {
             clonedDoc.head.appendChild(st);
           }
         } catch (_e) { /* style injection failed — render proceeds as before */ }
+        // Offscreen text is never painted into the card; skip its measuring.
+        try { hideOffscreenInClone(clonedDoc); } catch (_e) { /* render the full clone */ }
         return undefined;
       },
       // PERF-1: capture at scale 1, NOT devicePixelRatio×2. The result is downscaled to
@@ -1165,6 +1213,8 @@ const webImpl = {
   // sh1: the web's share sheet is navigator.share, which utils/copy-share.js
   // calls itself; there is no second one to reach, so the text is never taken.
   shareText: () => false,
+  // The share card (O6) likewise: copy-share.js shareCanvasImage hands the web navigator.share the file.
+  shareImage: () => false,
 
   // Category 3 — real web impls
   takeScreenshot: webTakeScreenshot,         // Tier A (html2canvas)

@@ -1,32 +1,35 @@
-/* AnswersScreens - Answers Only God Can Give in v2 (mw10; design dz17, pictures 2g-2l, laptop 2g 2i 2j; v2-gaps 16: v2
-   opened it as a plain collection). Main's AnswersHome, CommandmentSheet, AnswersResults, AnswersSubject and AnswersAZ
-   in the kit, words and data through answers-facts.js:
-   - the home (2g, 2h; Back says Home): title, lede, the field (2 letters search Answers as you type), The Ten Commandments
-     in the kit's two columns (each row one button), Browse by subject, Every Topic A-Z, main's source line;
-   - a commandment (2i): main's sheet as the kit's sheet (the laptop's centred dialog with its x); its reference opens the
-     chapter at the verse, a topic opens with Back reading "Commandment VI";
-   - searched (2j): Back says Answers and clears the words first (main); a topic opens at the passage that matched, the
-     words marked and the Find strip filled (search-landing.js, as a search hit); nothing found offers the whole library
-     (the Search tab with the words: openTab('search', { q }), zones' zs28 reads it);
-   - a subject (2k) and Every Topic A-Z (2l; a letter scrolls its group to the top), Back says Answers.
-   The home keeps its words and its open commandment in its route as it is left (main keeps them in module memory), so
-   Back from a topic returns to the same results or the same sheet. A route that names the collection 'answers' (Home
-   Recent's topic, Search's Go to) is turned into this place (CollectionScreen). */
-import { Icon } from '../Icon.jsx';
+/* AnswersScreens - Answers Only God Can Give in v2 (mw14, 2026-10-22: main's redesign by aogcg, final design f01-f13,
+   main 9c7ca376f). Main's screens hosted whole, as the Scripture Web is (mw13): main draws the pages, v2 gives them its
+   shell (the top bar's Back, the tabs, the player) and its kit (answers.css: main's Answers block with main's tokens named
+   in the kit's terms). bundle-d puts main's components on window (ui/_entry-d.js); main's nav bar, which each of them
+   draws inside its ScreenLayout, is hidden, so Back is v2's:
+   - the home (f01-f06; place 'answers'): the head with About, Start with a question (the field, six questions, More
+     questions), Continue, the Answer of the day (Share as a card), then Contents | A-Z. Main keeps its words, its tab and
+     its open sheet in module memory, so Back from a topic returns to the same results or sheet; a new way in (a new route
+     object: Home's tile, Search's Go to) starts it afresh (main's resetAnswersLanding). Words typed: Back says Answers and
+     clears them first (main's __screenBack, handed to the shell's setBack). Nothing found offers the whole library: the
+     Search tab with the words (openTab('search', { q }), zones' zs28 reads it);
+   - a shelf (a numbered group, Other Topics; 'answers-shelf'), Charts & videos ('answers-media'), Saved answers
+     ('answers-saved');
+   - a topic (f07-f11) is v2's letter page with main's AnswersTopic as its body (AnswersTopicBody below): the hero, the
+     Contents sheet and running head, the reading with its links and notes, Also see, the foot's Previous and Next in the
+     site's order. v2's paragraph sheet, marks, read-along and Find work over its paragraphs (main's wtlb keys).
+   A route that names the collection 'answers' (Home Recent's topic, Search's Go to) is turned into the home
+   (CollectionScreen). A gate boot draws main's data and stores nothing. */
 import { definePlace } from '../places.js';
-import { Sheet } from '../Sheet.jsx';
 import { useAnswersCorpusVersion, askAnswersCorpus } from '../corpus.js';
 import { refParts, findChapterRoute } from '../footnotes.js';
-import {
-  answersEntries, answersHome, commandmentSheet, commandmentName, answersResults, moreTopicsWords, MENTIONS_SHOWN,
-  answersSubject, subjectTitle, answersAZ, topicRoute,
-} from '../answers-facts.js';
+import { findLetterRoute } from '../letter-links.js';
+import { savedSettings } from '../settings-pages.js';
+import { readKey } from '../reading-record.js';
 
 const g = /** @type {any} */ (globalThis);
 
-/** main's lede words for the page (the pick's; main's eyebrow and longer line are dropped). */
-const TITLE = 'Answers Only God Can Give';
-const LEDE = 'The Lord sets the record straight';
+/** ANSWERS once its corpus has landed (the Main Page last), else null. */
+export function answersEntries(gl = g) {
+  const c = gl.__answersCorpus;
+  return c && c.loaded && Array.isArray(gl.ANSWERS) ? gl.ANSWERS : null;
+}
 
 /**
  * The topics, asking for the Answers corpus when they are not here yet (a gate boot asks too: its pictures are main's
@@ -57,272 +60,285 @@ function NotLoaded({ retry }) {
   );
 }
 
-/** A topic in a list: its short title (and the site's full title under it, in a commandment's sheet), passages, chevron. */
-function TopicRow({ row, onOpen }) {
-  return (
-    <button type="button" className="row ans-t" onClick={onOpen}>
-      <span className="tx"><span className="t">{row.t}</span>{row.s ? <span className="s">{row.s}</span> : null}</span>
-      {row.n > 0 && <span className="ans-n num" aria-label={row.n === 1 ? '1 passage' : row.n + ' passages'}>{row.n}</span>}
-      <span className="chev"><Icon name="chev" /></span>
-    </button>
-  );
-}
-
-/** One commandment as the kit's .grid2 cells: the numeral and its label, one control (the numeral is the label's twin). */
-function CommandmentCells({ c, last, on, onOpen }) {
-  const cls = (k) => k + (last ? ' last' : '') + (on ? ' on' : '');
-  return (
-    <>
-      <button type="button" className={cls('n')} tabIndex={-1} aria-hidden="true" onClick={onOpen}>{c.numeral}</button>
-      <button type="button" className={cls('c')} aria-label={c.aria} onClick={onOpen}>{c.label}</button>
-    </>
-  );
-}
-
-/** main's snippet: the words marked as 3b marks them. @param {{ segs: Array<{ text: string, hit: boolean }> }} props */
-function Snippet({ segs }) {
-  return <>{segs.map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>))}</>;
-}
-
-/** A div that opens like a button (a hit holds blocks a button may not). */
-const pressable = (onOpen) => ({
-  role: 'button', tabIndex: 0, onClick: onOpen,
-  onKeyDown: (/** @type {any} */ e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(); } },
-});
-
-/** 2j: the topic(s) the words name, then the other topics whose passages speak of them, or main's nothing-found. */
-function Results({ res, onTopic, onLibrary }) {
-  const [all, setAll] = React.useState(false);
-  React.useEffect(() => { setAll(false); }, [res.q]);
-  if (res.empty) {
-    return (
-      <div className="g results ans-res" role="status">
-        <div className="empty">
-          <div className="t">Nothing in Answers speaks of “{res.q}”.</div>
-          <button type="button" className="textbtn" onClick={() => onLibrary(res.q)}>Search the whole library for “{res.q}”</button>
-        </div>
-      </div>
-    );
+/** Whether the reader has read topic `id` (main's isRead('answers', id): vot-state readItems). */
+export function answersRead(id, gl = g) {
+  try {
+    const s = gl.StateStore && typeof gl.StateStore.get === 'function' ? gl.StateStore.get() : null;
+    return !!(s && s.readItems && Number(s.readItems[readKey('answers', id)]) > 0);
+  } catch (_e) {
+    return false;
   }
-  const shown = all ? res.mentions : res.mentions.slice(0, MENTIONS_SHOWN);
-  const more = all ? '' : moreTopicsWords(res.mentions.length);
+}
+
+/**
+ * The route that opens topic `id` on v2's letter page, or null when it is not in `entries`. A search hit lands on the
+ * passage it matched (`excerpt`) with its words marked and Find holding them (`find`: main's { terms, label }); a link to a section
+ * (`section`, the site's #fragment) brings that heading up.
+ * @param {any[] | null} entries @param {string} id
+ * @param {{ excerpt?: string | null, section?: string | null, find?: { terms?: string[], label?: string } | string | null }} [at]
+ */
+export function topicRoute(entries, id, at = {}) {
+  const e = (entries || []).find((x) => x && x.id === id);
+  if (!e || typeof e.num !== 'number') return null;
+  /** @type {Record<string, any>} */
+  const r = { place: 'letter', collection: 'answers', n: e.num };
+  if (at.section) r.section = String(at.section);
+  else if (at.excerpt) r.excerpt = at.excerpt;
+  // main hands a hit's words as { terms, label } (the label as typed)
+  const f = at.find;
+  const terms = f && typeof f === 'object' ? [].concat(f.terms || []).filter(Boolean) : f ? String(f).trim().split(/\s+/) : [];
+  if (terms.length) { r.match = terms; r.label = (f && typeof f === 'object' ? f.label : String(f).trim()) || terms.join(' '); }
+  return r;
+}
+
+/** A reference main hands on (a commandment's "Exodus 20:13"): the chapter at the verse. @param {string} ref @param {(r: any) => void} go */
+function goToRef(ref, go) {
+  const parts = refParts(ref);
+  if (!parts.length) return;
+  findChapterRoute(parts[0].parsed).then((r) => { if (r) go(r); });
+}
+
+/**
+ * The collection an attribution names ("Volume 2", "two", "The Lord's Rebuke"), by the label v2's letter links read
+ * (main's WtlbEntryView _attrCollectionLabel, which answers with the registry's label).
+ * @param {string} s @returns {string | null}
+ */
+export function attributionCollection(s, gl = g) {
+  const t = String(s || '').trim().toLowerCase();
+  if (!t) return null;
+  const words = ['one', 'two', 'three', 'four', 'five', 'six', 'seven'];
+  const vm = /^(?:volume\s+)?(\d|[a-z]+)$/.exec(t);
+  if (vm) {
+    const w = /^\d$/.test(vm[1]) ? words[Number(vm[1]) - 1] : vm[1];
+    if (w && words.includes(w)) return 'Volume ' + w.charAt(0).toUpperCase() + w.slice(1);
+  }
+  const cols = Array.isArray(gl.COLLECTIONS) ? gl.COLLECTIONS : [];
+  const col = cols.find((c) => c && ((c.registryLabel || '').toLowerCase() === t || (c.label || '').toLowerCase() === t));
+  return col ? col.label : String(s).trim();
+}
+
+/** A letter an Answers page names ({ collection, letterTitle, excerpt? }), opened on the passage when it says one. */
+function openLetter(target, go) {
+  if (!target) return;
+  const collection = attributionCollection(target.collection);
+  findLetterRoute({ collection: collection || target.collection, letterTitle: target.letterTitle }).then((r) => {
+    if (r) go(target.excerpt ? { ...r, excerpt: target.excerpt } : r);
+  });
+}
+
+/**
+ * main's __screenBack (a page's own first step back: the home's words cleared) as the shell's setBack while `on`: main
+ * sets and clears window.__screenBack itself, so the property is watched.
+ * @param {boolean} on @param {((step: { label: string, run: () => void } | null) => void) | undefined} setBack @param {string} label
+ */
+function useScreenBack(on, setBack, label) {
+  React.useEffect(() => {
+    if (!on || !setBack) return undefined;
+    let cur = null;
+    Object.defineProperty(g, '__screenBack', {
+      configurable: true,
+      get: () => cur,
+      set: (fn) => { cur = fn || null; setBack(cur ? { label, run: () => { if (cur) cur(); } } : null); },
+    });
+    return () => { delete g.__screenBack; g.__screenBack = null; setBack(null); };
+  }, [on, setBack, label]);
+}
+
+/** The props main's browse screens share (main's _answersNavProps + _answersBrowseProps). */
+function browseProps({ gate, go, pop, openTab, entries }) {
+  const settings = gate ? {} : savedSettings();
+  const pathOn = settings.answersReadingPath !== false;
+  return {
+    isRead: gate ? () => false : (id) => answersRead(id), pathOn, fontScale: settings.fontScale || 1,
+    onBack: pop, onSearch: () => openTab('search'), onHistory: () => {}, onSettings: () => openTab('settings'),
+    theme: undefined, onThemeChange: () => {},
+    onOpenTopic: (id, anchorText, _from, section, find) => {
+      const r = topicRoute(entries, id, { excerpt: anchorText, section, find });
+      if (r && !gate) go(r);
+    },
+  };
+}
+
+/** The routes whose home has been started afresh (a route object is one way in; Back remounts the same one). */
+const fresh = new WeakSet();
+
+/** @param {import('../places.js').PlaceProps} props */
+export function AnswersHomePlace({ route, gate, go, pop, openTab, onReady, setBack }) {
+  React.useState(() => {
+    if (!fresh.has(route)) { fresh.add(route); if (typeof g.resetAnswersLanding === 'function') g.resetAnswersLanding(); }
+    return null;
+  });
+  const { entries, status, retry } = useAnswers();
+  React.useEffect(() => { if (status !== 'loading') onReady(); }, [status, onReady]);
+  useScreenBack(!gate, setBack, 'Answers');
+  const Main = g.AnswersHome;
+  if (status === 'failed') return <NotLoaded retry={retry} />;
+  if (typeof Main !== 'function') return null;
+  const base = browseProps({ gate, go, pop, openTab, entries });
+  const settings = gate ? {} : savedSettings();
+  const pathOn = settings.answersReadingPath !== false;
   return (
-    <div className="g results ans-res">
-      {res.topics.length > 0 && (
-        <div className="grp">
-          <span className="label">{res.topicsLabel}</span>
-          {res.topics.map((t) => (
-            <div key={t.id} className="hit ans-hit" {...pressable(() => onTopic(t))}>
-              <div className="where">{t.where}</div>
-              <div className="tt">{t.t}</div>
-              {t.snippet && <div className="ex"><Snippet segs={t.snippet} /></div>}
-              {t.source && <div className="src">{t.source}</div>}
-            </div>
-          ))}
-        </div>
-      )}
-      {res.mentions.length > 0 && (
-        <>
-          <div className="sec ans-also"><span className="label">{res.mentionsLabel}</span></div>
-          <p className="ans-sum" role="status">{res.summary}</p>
-          <div className="ans-list end">
-            {shown.map((m) => <TopicRow key={m.id} row={m} onOpen={() => onTopic(m)} />)}
-          </div>
-          {more && <button type="button" className="more" onClick={() => setAll(true)}>{more}</button>}
-        </>
-      )}
+    <div className="ans-host">
+      <Main {...base} entries={entries} site={entries && typeof g.ANSWERS_SITE_META !== 'undefined' ? g.ANSWERS_SITE_META : null}
+        pathLast={pathOn && !gate && typeof g.readAnswersPath === 'function' ? g.readAnswersPath() : null}
+        onOpenGroup={(key) => go({ place: 'answers-shelf', key: String(key) })}
+        onOpenMedia={() => go({ place: 'answers-media' })}
+        onOpenSaved={() => go({ place: 'answers-saved' })}
+        onSearchLibrary={(q) => openTab('search', { q })}
+        onOpenLetter={(target) => { if (!gate) openLetter(target, go); }}
+        onGoToRef={(ref) => { if (!gate) goToRef(ref, go); }} />
     </div>
   );
 }
 
-/** 2i: a commandment, its verse and reference, then its topics most passages first. */
-function CommandmentSheet({ sheet, desktop, onClose, onTopic, onRef }) {
-  return (
-    <Sheet kind="ref cmd" label={sheet.overline + ': ' + sheet.label} desktop={desktop} closeX onClose={onClose}>
-      <span className="overline">{sheet.overline}</span>
-      <div className="ref-h">{sheet.label}</div>
-      <p className="ref-v">{sheet.verse}</p>
-      <button type="button" className="textbtn sm cmd-go" onClick={() => onRef(sheet.ref)}>{sheet.ref}<Icon name="arrowR" /></button>
-      <div className="ans-lab"><span className="label">{sheet.topicsLabel}</span>{sheet.passages && <span className="ans-k num">{sheet.passages}</span>}</div>
-      <div className="ans-list">
-        {sheet.rows.map((r) => <TopicRow key={r.id} row={r} onOpen={() => onTopic(r)} />)}
+/** One of main's browse screens past the home (a shelf, Charts & videos, Saved answers). */
+function browsePlace(name, extra) {
+  /** @param {import('../places.js').PlaceProps} props */
+  return function AnswersBrowsePlace({ route, gate, go, pop, openTab, onReady }) {
+    const { entries, status, retry } = useAnswers();
+    React.useEffect(() => { if (status !== 'loading') onReady(); }, [status, onReady]);
+    const Main = g[name];
+    if (status === 'failed') return <NotLoaded retry={retry} />;
+    if (!entries || typeof Main !== 'function') return null;
+    return (
+      <div className="ans-host">
+        <Main {...browseProps({ gate, go, pop, openTab, entries })} entries={entries}
+          site={typeof g.ANSWERS_SITE_META !== 'undefined' ? g.ANSWERS_SITE_META : null} {...(extra ? extra(route) : {})} />
       </div>
-    </Sheet>
-  );
+    );
+  };
 }
 
-/** @param {import('../places.js').PlaceProps} props */
-export function AnswersHome({ route, gate, desktop, go, replace, openTab, onReady, setBack }) {
-  const { entries, status, retry } = useAnswers();
-  const [query, setQuery] = React.useState(() => String(route.q || ''));
-  const [sheetN, setSheetN] = React.useState(() => (route.cmd != null ? Number(route.cmd) : null));
-  const words = React.useDeferredValue(query);
-  const home = React.useMemo(() => (entries ? answersHome(entries) : null), [entries]);
-  const res = React.useMemo(() => (entries ? answersResults(entries, words) : null), [entries, words]);
-  const sheet = entries && sheetN != null ? commandmentSheet(entries, sheetN) : null;
-  React.useEffect(() => { if (status !== 'loading') onReady(); }, [status, onReady]);
-  // Back with words typed clears them before it leaves the page (main's __screenBack); the bar then says Answers
-  const typed = !!query;
+/** A shelf's name for Back (main's: a numbered group's short name, else Other Topics). @param {any} r */
+export function shelfTitle(r) {
+  const found = typeof g.answersShelfByKey === 'function' ? g.answersShelfByKey(answersEntries(), String(r && r.key)) : null;
+  const shelf = found ? found.shelf : null;
+  return shelf ? (shelf.kind === 'tstl' ? shelf.short : 'Other Topics') : 'Answers';
+}
+
+/**
+ * A topic's page: main's AnswersTopic inside v2's letter body (`bodyRef`), with main's hand-offs as v2's routes. `onDrawn`
+ * says the paragraphs are on the page (main waits up to 300 ms for the sidecars, then draws plain), so a search landing
+ * finds them. `onRef` opens v2's reference sheet for a cite.
+ * @param {{ letter: any, bodyRef: any, route: any, gate: any, go: (r: any) => void, replace: (r: any) => void,
+ *   openTab: (id: string, extra?: any) => void, onRef: (ref: string) => void, onDrawn: () => void }} props
+ */
+export function AnswersTopicBody({ letter, bodyRef, route, gate, go, replace, openTab, onRef, onDrawn }) {
+  const Main = g.AnswersTopic;
+  const useMeta = typeof g.useAnswersMetaState === 'function' ? g.useAnswersMetaState : () => [null, false];
+  const [metaAll, metaFailed] = useMeta(true);
+  const [waited, setWaited] = React.useState(false);
   React.useEffect(() => {
-    if (!typed || !setBack) return undefined;
-    setBack({ label: 'Answers', run: () => setQuery('') });
-    return () => setBack(null);
-  }, [typed, setBack]);
-  const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
+    setWaited(false);
+    if (metaAll) return undefined;
+    const t = setTimeout(() => setWaited(true), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per topic; the sidecar's arrival ends the wait
+  }, [letter.id]);
+  const ready = !!metaAll || waited;
+  // the keyed paragraphs mount late (and again decorated): main's mark pass runs over them again
+  React.useEffect(() => {
+    if (!ready) return;
+    onDrawn();
+    if (!gate && typeof g.answersHlDomChanged === 'function') g.answersHlDomChanged();
+  }, [ready, !!metaAll, letter.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Leaves for `next`, this page keeping its words and open commandment for Back. */
-  const leave = (next, cmd = sheetN) => {
-    /** @type {Record<string, any>} */
-    const here = { ...route };
-    delete here.q;
-    delete here.cmd;
-    if (query) here.q = query;
-    if (cmd != null) here.cmd = cmd;
-    replace(here);
-    go(next);
-  };
-  // a topic the words found opens at the passage that matched, marked, the Find strip holding the words as typed (the
-  // results drawn can trail the field by a keystroke while the reader types: the words are the field's, not theirs)
-  const openHit = (row) => {
-    const r = topicRoute(entries, row.id);
-    const typedNow = query.trim();
-    const now = res && res.q === typedNow ? res : answersResults(entries, typedNow);
-    if (!r || !now) return;
-    leave({ ...r, match: now.words, label: typedNow, ...(row.at ? { excerpt: row.at } : {}) }, null);
-  };
-  const openListed = (row, cmd) => {
-    const r = topicRoute(entries, row.id);
-    if (r) leave(r, cmd);
-  };
-  const openRef = (ref) => {
-    const parts = refParts(ref);
-    if (!parts.length) return;
-    findChapterRoute(parts[0].parsed).then((r) => { if (r) leave(r); });
-  };
-  const library = (q) => openTab('search', { q });
-  const clear = () => { setQuery(''); if (inputRef.current) inputRef.current.focus(); };
-  // a gate boot draws the field as the picture does, keeping focus (gold edge, caret) with the keyboard closed
-  const drawnFocus = !!(gate && query);
+  // The running head (shown on scroll up once the hero has gone) is main's: it reads the page's scroller as
+  // .screen-scroll and draws into .screen-layout, so v2's scroller and its box wear those names while a topic is open.
+  React.useEffect(() => {
+    const sc = bodyRef.current && bodyRef.current.closest('.content');
+    const box = sc && sc.parentElement;
+    if (!sc || !box) return undefined;
+    sc.classList.add('screen-scroll');
+    box.classList.add('screen-layout', 'ans-layout');
+    box.style.setProperty('--dock-nav-bottom', Math.max(0, sc.offsetTop - 4) + 'px');
+    return () => { sc.classList.remove('screen-scroll'); box.classList.remove('screen-layout', 'ans-layout'); box.style.removeProperty('--dock-nav-bottom'); };
+  }, [bodyRef, letter.id]);
 
+  const [landed, setLanded] = React.useState(-1);
+  const timer = React.useRef(/** @type {any} */ (0));
+  React.useEffect(() => () => clearTimeout(timer.current), []);
+  React.useEffect(() => setLanded(-1), [letter.id]);
+  const key = (i) => (typeof g.wtlbHlKey === 'function' ? g.wtlbHlKey(letter.id, i) : 'wtlb:' + letter.id + ':' + i);
+  /** main's jumpToPara: the paragraph (or the made-up heading just before it) to the top, under the running head. */
+  const jump = React.useCallback((/** @type {number} */ index, /** @type {{ pulse?: boolean, el?: HTMLElement | null }} */ o = {}) => {
+    const root = bodyRef.current;
+    let el = o.el || (root && /** @type {HTMLElement | null} */ (root.querySelector('[data-hl-key="' + key(index) + '"]')));
+    if (!el) return;
+    const prev = /** @type {HTMLElement | null} */ (el.previousElementSibling);
+    if (!o.el && prev && prev.matches('h2.ans-sh:not([data-hl-key])')) el = prev;
+    const cover = typeof g.answersHeadCover === 'function' ? g.answersHeadCover() : 0;
+    el.style.scrollMarginTop = (cover + 8) + 'px';
+    el.scrollIntoView({ block: 'start' });
+    if (o.pulse === false) return;
+    setLanded(index);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setLanded(-1), 4000);
+  }, [bodyRef, letter.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A link to a section (the site's #fragment) brings its heading up once the topic is drawn, the first time only
+  const sectionDone = React.useRef(/** @type {any} */ (null));
+  React.useEffect(() => {
+    if (!ready || !route || !route.section || sectionDone.current === route || typeof g.answersAnchorPara !== 'function') return undefined;
+    sectionDone.current = route;
+    const meta = typeof g.answersMetaFor === 'function' ? g.answersMetaFor(letter.id) : null;
+    const at = g.answersAnchorPara(letter, route.section, meta);
+    if (at < 0) return undefined;
+    const t = setTimeout(() => jump(at), 150);
+    return () => clearTimeout(t);
+  }, [ready, route, letter, jump]);
+
+  const entries = answersEntries();
+  const settings = gate ? {} : savedSettings();
+  const pathOn = settings.answersReadingPath !== false;
+  const layout = typeof g.answersLayoutClass === 'function' ? g.answersLayoutClass(settings.fontScale || 1, false) : '';
+  const live = !gate;
+  const to = (r) => { if (r && live) go(r); };
+  const nav = {
+    entries,
+    isRead: live ? answersRead : () => false,
+    pathOn,
+    openTopic: (id, anchor) => to(topicRoute(entries, id, { section: anchor })),
+    // Previous and Next in the site's order read on, as the letter's next card does (no new Back step)
+    go: (id) => { const r = topicRoute(entries, id); if (r && live) replace(r); },
+    openGroup: (key) => to({ place: 'answers-shelf', key: String(key) }),
+    openLanding: () => to({ place: 'answers' }),
+    openStudy: (slug, url) => {
+      if (!live) return;
+      if (typeof g.getStudyById === 'function' && g.getStudyById(slug)) go({ place: 'study', study: slug });
+      else if (url) window.open(url, '_blank', 'noopener');
+    },
+    searchLibrary: (q) => { if (live) openTab('search', { q }); },
+    goToRef: (ref) => { if (live) goToRef(ref, go); },
+  };
+  const act = {
+    cite: (ref) => { if (live) onRef(ref); },
+    jump,
+    letter: (target) => { if (live) openLetter(target, go); },
+    // a source chip opens its letter ON the passage it closes
+    source: (pi) => {
+      if (!live) return;
+      const p = letter.paragraphs[pi];
+      const parts = /^~ \[From ["“”](.+?)["“”]\s*~\s*(.+?)\]$/.exec(String((p && p.text) || '').trim());
+      if (!parts) return;
+      const excerpt = typeof g.passageTextBefore === 'function' ? g.passageTextBefore(letter.paragraphs, pi) : '';
+      openLetter(excerpt ? { collection: parts[2], letterTitle: parts[1], excerpt } : { collection: parts[2], letterTitle: parts[1] }, go);
+    },
+  };
+  if (typeof Main !== 'function') return null;
   return (
-    <>
-      <div className="page-head g">
-        <h1 className="display">{TITLE}</h1>
-        <p className="lede">{LEDE}</p>
-        <div className={'field' + (drawnFocus ? ' focus' : '')} role="search">
-          <input ref={inputRef} className="q" type="text" value={query} placeholder="What does The Lord say about…"
-            aria-label="Search the topics" autoComplete="off" autoCorrect="off" spellCheck={false} enterKeyHint="search"
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }} />
-          {drawnFocus && <span className="caret" />}
-          {query ? <button type="button" className="clear" aria-label="Clear the search" onClick={clear}><Icon name="close" /></button>
-            : <Icon name="search" />}
-        </div>
-      </div>
-      {status === 'failed' && <NotLoaded retry={retry} />}
-      {res ? <Results res={res} onTopic={openHit} onLibrary={library} /> : home && (
-        <>
-          <div className="ans-sec">
-            <h2 className="h2">The Ten Commandments</h2>
-            <div className="grid2 cmds">
-              {[home.left, home.right].map((cmds, ci) => (
-                <div className="col" key={ci}>
-                  {cmds.map((c, i) => (
-                    <CommandmentCells key={c.n} c={c} last={i === cmds.length - 1} on={c.n === sheetN} onOpen={() => setSheetN(c.n)} />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="sec g ans-subj"><span className="label">Browse by subject</span></div>
-          <div className="rows end">
-            {home.subjects.map((s) => (
-              <TopicRow key={s.id} row={{ t: s.t, s: s.s, n: 0 }} onOpen={() => leave({ place: 'answers/subject', subject: s.id })} />
-            ))}
-            <TopicRow row={{ t: 'Every Topic, A–Z', s: home.all, n: 0 }} onOpen={() => leave({ place: 'answers/a-z' })} />
-          </div>
-          <p className="hint g ans-src">Gathered from answersonlygodcangive.com. Every passage opens the letter it came from.</p>
-        </>
-      )}
-      {sheet && (
-        <CommandmentSheet sheet={sheet} desktop={desktop} onClose={() => setSheetN(null)}
-          onTopic={(r) => openListed(r, sheet.n)} onRef={openRef} />
-      )}
-    </>
+    <div className={'ans-topic-host ' + layout}>
+      <Main entry={letter} entries={entries} meta={metaAll ? metaAll[letter.id] || null : null} metaAll={metaAll}
+        metaFailed={metaFailed} site={typeof g.ANSWERS_SITE_META !== 'undefined' ? g.ANSWERS_SITE_META : null} ready={ready}
+        inert={false} ts2={layout.includes('ans-ts2')} landedPara={landed} mainRef={bodyRef} isRead={nav.isRead}
+        pathOn={pathOn} findOn={!!(route && route.match && route.match.length)} nav={nav} act={act} />
+    </div>
   );
 }
 
-/** 2k: a subject's topics, most spoken of first. @param {import('../places.js').PlaceProps} props */
-export function AnswersSubjectScreen({ route, go, onReady }) {
-  const { entries, status, retry } = useAnswers();
-  const page = entries ? answersSubject(entries, route.subject) : null;
-  React.useEffect(() => { if (status !== 'loading') onReady(); }, [status, onReady]);
-  if (status === 'failed') return <NotLoaded retry={retry} />;
-  if (!entries) return null;
-  if (!page) return <div className="empty"><div className="t">This subject is not in Answers.</div></div>;
-  const open = (row) => { const r = topicRoute(entries, row.id); if (r) go(r); };
-  return (
-    <>
-      <div className="page-head g">
-        <span className="overline eyebrow">{TITLE}</span>
-        <h1 className="display">{page.title}</h1>
-        <p className="lede">{page.lede}</p>
-      </div>
-      <div className="g"><div className="ans-lab"><span className="label">Most spoken of first</span><span className="ans-k">Passages</span></div></div>
-      <div className="rows end ans-list">
-        {page.rows.map((r) => <TopicRow key={r.id} row={r} onOpen={() => open(r)} />)}
-      </div>
-    </>
-  );
-}
-
-/** 2l: every topic A-Z under its letter; a letter in the jump grid scrolls its group to the top. */
-export function AnswersAZScreen({ go, onReady }) {
-  const { entries, status, retry } = useAnswers();
-  const page = React.useMemo(() => (entries ? answersAZ(entries) : null), [entries]);
-  const listRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-  React.useEffect(() => { if (status !== 'loading') onReady(); }, [status, onReady]);
-  if (status === 'failed') return <NotLoaded retry={retry} />;
-  if (!page || !entries) return null;
-  const open = (row) => { const r = topicRoute(entries, row.id); if (r) go(r); };
-  // the reader's own tap: the page moves as a finger would move it (main's scrollIntoView)
-  const jump = (L) => {
-    const el = listRef.current && listRef.current.querySelector('[data-az-letter="' + L + '"]');
-    if (el) el.scrollIntoView({ block: 'start' });
-  };
-  return (
-    <>
-      <div className="page-head g">
-        <span className="overline eyebrow">{TITLE}</span>
-        <h1 className="display">Every Topic, A–Z</h1>
-        <p className="lede">{page.lede}</p>
-        <nav className="azj" aria-label="Jump to a letter">
-          {page.groups.map((grp) => (
-            <button key={grp.letter} type="button" aria-label={grp.letter === '#' ? 'Numbers' : grp.letter} onClick={() => jump(grp.letter)}>{grp.letter}</button>
-          ))}
-        </nav>
-      </div>
-      <div ref={listRef}>
-        {page.groups.map((grp) => (
-          <section key={grp.letter} aria-label={grp.letter === '#' ? 'Numbers' : grp.letter}>
-            <div className="g"><span className="label az-l" data-az-letter={grp.letter}>{grp.letter}</span></div>
-            <div className="rows end ans-list">
-              {grp.rows.map((r) => <TopicRow key={r.id} row={r} onOpen={() => open(r)} />)}
-            </div>
-          </section>
-        ))}
-      </div>
-    </>
-  );
-}
-
-/** What Back says on a page opened from the home: the commandment whose sheet was open, else Answers. */
-export function answersHomeTitle(r) {
-  return (r && r.cmd != null && commandmentName(r.cmd)) || 'Answers';
-}
-
-definePlace('answers', { Screen: AnswersHome, contentClass: 'content ans', title: answersHomeTitle });
-definePlace('answers/subject', {
-  Screen: AnswersSubjectScreen, contentClass: 'content ans', title: (r) => subjectTitle(r.subject) || 'Answers',
+definePlace('answers', { Screen: AnswersHomePlace, contentClass: 'content ans', title: () => 'Answers' });
+definePlace('answers-shelf', {
+  Screen: browsePlace('AnswersShelf', (r) => ({ groupKey: String(r.key) })), contentClass: 'content ans', title: shelfTitle,
 });
-definePlace('answers/a-z', { Screen: AnswersAZScreen, contentClass: 'content ans', title: () => 'Every Topic, A–Z' });
+definePlace('answers-media', { Screen: browsePlace('AnswersMedia'), contentClass: 'content ans', title: () => 'Charts & videos' });
+definePlace('answers-saved', { Screen: browsePlace('AnswersSaved'), contentClass: 'content ans', title: () => 'Saved answers' });

@@ -462,6 +462,36 @@ class AppInterfaceTest {
         assertEquals(1, host.shareSheetCalls.size)
     }
 
+    // ─── AOGCG O6: the Answers share card ───────────────────────────────
+
+    @Test
+    fun `shareImage hands the card's PNG to the host's image share sheet on the UI thread and says it did`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+
+        assertTrue(app.shareImage("iVBORw0KGgo="))
+
+        assertEquals(1, host.postedActions.size, "should hop through postToUi")
+        assertEquals(listOf("iVBORw0KGgo="), host.imageShareCalls)
+        assertTrue(host.shareSheetCalls.isEmpty(), "an image never goes to the text share sheet")
+    }
+
+    @Test
+    fun `shareImage refuses an empty card or one too large for a share, and opens nothing`() {
+        val host = FakeBridgeHost()
+        val (app, _, _) = newSubject(host = host)
+
+        assertFalse(app.shareImage(null))
+        assertFalse(app.shareImage(""))
+        assertFalse(app.shareImage("   "))
+        assertFalse(app.shareImage("A".repeat(AppInterface.MAX_SHARE_IMAGE_CHARS + 1)))
+        assertTrue(host.postedActions.isEmpty())
+        assertTrue(host.imageShareCalls.isEmpty())
+
+        assertTrue(app.shareImage("A".repeat(AppInterface.MAX_SHARE_IMAGE_CHARS)))
+        assertEquals(1, host.imageShareCalls.size)
+    }
+
     // ─── v3 streaming backup delegation (BACKUP-STREAMING-PLAN P3) ────
     // The base64 boundary (v3ExportChunk decode / v3ImportReadChunk encode) needs
     // android.util.Base64, which is a stub in this plain-JVM suite, so it is proven

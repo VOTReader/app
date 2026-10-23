@@ -1,7 +1,7 @@
 {
  "made": "2026-10-18T19:45:08.595Z",
  "by": "freeze-tri.mjs (search200)",
- "targetsHash": "b7cc67dfc81d4e12",
+ "targetsHash": "7d257873fc0da970",
  "counts": {
   "open/exact/easy": 60,
   "open/exact/medium": 70,
@@ -13,14 +13,19 @@
   "open/title/medium": 70,
   "open/title/hard": 70,
   "held/exact/easy": 20,
+  "unsealed/exact/easy": 1,
   "held/exact/medium": 20,
+  "unsealed/exact/medium": 1,
   "held/exact/hard": 20,
   "held/misremembered/easy": 20,
   "held/misremembered/medium": 20,
   "held/misremembered/hard": 20,
   "held/title/easy": 20,
   "held/title/medium": 20,
-  "held/title/hard": 20
+  "unsealed/title/medium": 1,
+  "held/title/hard": 20,
+  "unsealed/title/hard": 3,
+  "unsealed/misremembered/medium": 1
  },
  "cases": [
   {
@@ -11911,7 +11916,20 @@
    "blockIdx": 0,
    "sentence": "Therefore, judge no more by human standards, discern by right standards, according to My love and the knowledge you have received in Me.",
    "q": "\"judge no more by human standards, discern by right standards,\"",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "errata/errata",
+   "errata": {
+    "date": "2026-10-22",
+    "near": [
+     "v4/from-betrayal-to-victory",
+     "answers/regarding-judas-iscariot",
+     "answers/regarding-the-mistranslation-and-misinterpretation-of-the-scriptures"
+    ],
+    "log": "errata.md (sealed2)"
+   }
   },
   {
    "id": "e218",
@@ -12076,6 +12094,27 @@
    "sentence": "But what did you go out to see? A man clothed in soft garments? Indeed, those who wear soft clothing are in kings' houses.",
    "q": "soft garments indeed those who wear soft clothing are in kings houses",
    "held": true
+  },
+  {
+   "id": "e235",
+   "style": "exact",
+   "tier": "easy",
+   "form": "pasted-quoted",
+   "group": "bible",
+   "col": "bible",
+   "collection": "Bible (NKJV)",
+   "level": "verse",
+   "sentCol": "nt",
+   "uk": "bible/1corinthians:6:1",
+   "ref": "1 Corinthians 6:1",
+   "bookId": "1corinthians",
+   "chapter": 6,
+   "verse": 1,
+   "sentence": "Dare any of you, having a matter against another, go to law before the unrighteous, and not before the saints?",
+   "q": "\"go to law before the unrighteous, and not before the saints?\"",
+   "held": true,
+   "replaces": "e215",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "e016",
@@ -12349,7 +12388,11 @@
    "blockIdx": 1,
    "sentence": "And when does My servant become a prophet?",
    "q": "and when does my servant become a prophet",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "valid/valid"
   },
   {
    "id": "e315",
@@ -12442,6 +12485,26 @@
    "sentence": "Hold fast the pattern of sound words which you have heard from me, in faith and love which are in Christ Jesus.",
    "q": "pattern of sound words which you have heard",
    "held": true
+  },
+  {
+   "id": "e064",
+   "style": "exact",
+   "tier": "medium",
+   "form": "start",
+   "group": "letters",
+   "col": "v7",
+   "collection": "Volume Seven",
+   "level": "sentence",
+   "uk": "v7/punishment",
+   "unit": "punishment",
+   "title": "Punishment",
+   "num": 2,
+   "blockIdx": 0,
+   "sentence": "For from the dust had I formed you, and to the dust shall you return!",
+   "q": "for from the dust had i formed you",
+   "held": true,
+   "replaces": "e301",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
   },
   {
    "id": "e014",
@@ -14788,6 +14851,26 @@
    "held": true
   },
   {
+   "id": "n317",
+   "style": "title",
+   "tier": "medium",
+   "form": "word-dropped",
+   "group": "wtlb",
+   "col": "wtlb2",
+   "collection": "Words To Live By: Part Two",
+   "level": "unit",
+   "titleCol": "wtlb2",
+   "uk": "wtlb2/my-body-my-bride",
+   "unit": "my-body-my-bride",
+   "title": "My Body, My Bride",
+   "fullTitle": "My Body, My Bride",
+   "num": 32,
+   "q": "my body bride",
+   "held": true,
+   "replaces": "n335",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
+  },
+  {
    "id": "n335",
    "style": "title",
    "tier": "medium",
@@ -14803,7 +14886,12 @@
    "fullTitle": "Gifts of the Spirit",
    "num": 76,
    "q": "gifts of spirit",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "errata/unfair",
+   "note": "panel split (judge 1 errata, judge 2 unfair): kept open as written; errata.md (sealed2) has both reasons"
   },
   {
    "id": "n013",
@@ -14840,7 +14928,12 @@
    "fullTitle": "Worthless Images",
    "num": 42,
    "q": "worthless idols",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "errata/unfair",
+   "note": "panel split (judge 1 errata, judge 2 unfair): kept open as written; errata.md (sealed2) has both reasons"
   },
   {
    "id": "n135",
@@ -15167,6 +15260,53 @@
    "held": true
   },
   {
+   "id": "n044",
+   "style": "title",
+   "tier": "hard",
+   "form": "words-wrong",
+   "group": "letters",
+   "col": "v7",
+   "collection": "Volume Seven",
+   "level": "unit",
+   "titleCol": "v7",
+   "uk": "v7/thus-says-the-lord-against-las-vegas",
+   "unit": "thus-says-the-lord-against-las-vegas",
+   "title": "Thus Says The Lord against Las Vegas",
+   "fullTitle": "Thus Says The Lord against Las Vegas",
+   "num": 23,
+   "q": "thus says the lord concerning las vegas",
+   "held": true,
+   "retired": [
+    {
+     "q": "thus says the lord against reno",
+     "why": "the wrong word replaced the city's name, the one word that tells this title from other 'Thus Says The Lord against ...' titles; keep the place named and put the one wrong word elsewhere in the title"
+    }
+   ],
+   "replaces": "n032",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
+  },
+  {
+   "id": "n162",
+   "style": "title",
+   "tier": "hard",
+   "form": "words-wrong",
+   "group": "letters",
+   "col": "v2",
+   "collection": "Volume Two",
+   "gapFrom": "blessed",
+   "level": "unit",
+   "titleCol": "v2",
+   "uk": "v2/hearts-changed",
+   "unit": "hearts-changed",
+   "title": "Hearts Changed",
+   "fullTitle": "Hearts Changed",
+   "num": 11,
+   "q": "hearts transformed",
+   "held": true,
+   "replaces": "n377",
+   "origin": "replacement sealed 2026-10-22 (search200 sealed2)"
+  },
+  {
    "id": "n377",
    "style": "title",
    "tier": "hard",
@@ -15182,7 +15322,58 @@
    "title": "The Trumpet Call of God",
    "sentence": "The Trumpet Call of God",
    "q": "the trumpet blast of god",
-   "held": true
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "held",
+   "panel": "unfair/valid",
+   "note": "panel split (judge 1 unfair, judge 2 valid): kept open as written; errata.md (sealed2) has both reasons"
+  },
+  {
+   "id": "m274",
+   "style": "misremembered",
+   "tier": "medium",
+   "form": "two-three-slips",
+   "group": "studies",
+   "col": "bible-studies",
+   "collection": "Bible / Letter Studies",
+   "level": "sentence",
+   "uk": "bible-studies/grace-and-the-law-ch6",
+   "unit": "grace-and-the-law-ch6",
+   "title": "Grace AND The Law (Bible/Letter Study) — VERSES OFTEN STUMBLED OVER:",
+   "num": 6,
+   "blockIdx": 8,
+   "sentence": "The Old Covenant required animals to be sacrificed as a representation of the atonement of sin that had come and would come through YahuShua HaMashiach (Jesus The Christ).",
+   "q": "required animals to be offered as a symbol of the atonement for sin",
+   "from": "required animals to be sacrificed as a representation of the atonement of sin",
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "fresh",
+   "panel": "valid/valid"
+  },
+  {
+   "id": "n291",
+   "style": "title",
+   "tier": "hard",
+   "form": "words-wrong",
+   "group": "wtlb",
+   "col": "wtlb2",
+   "collection": "Words To Live By: Part Two",
+   "level": "unit",
+   "titleCol": "wtlb2",
+   "uk": "wtlb2/against-god",
+   "unit": "against-god",
+   "title": "Against God",
+   "fullTitle": "Against God",
+   "num": 28,
+   "q": "opposing god",
+   "held": false,
+   "set": "unsealed",
+   "origin": "unsealed 2026-10-22",
+   "unsealedFrom": "fresh",
+   "panel": "valid/unfair",
+   "note": "panel split (judge 1 valid, judge 2 unfair): kept open as written; errata.md (sealed2) has both reasons"
   }
  ]
 }

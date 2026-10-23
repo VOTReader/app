@@ -10,8 +10,9 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import {
-  ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersCommandmentTopics, answersPassageCount,
-  answersShortTitle, answersSortKey, answersIndexLetter, answersSubjectById,
+  ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersPassageCount,
+  answersShortTitle, answersSortKey, answersIndexLetter,
+  answersTopicEntries, ANSWERS_MAIN_PAGE_ID,
 } from './answers-shelves.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
@@ -21,7 +22,9 @@ function load(file, name) {
   runInNewContext(src, ctx);
   return ctx[name] || ctx.window[name];
 }
-const ANSWERS = load('answers.js', 'ANSWERS');
+const ALL = load('answers.js', 'ANSWERS');
+// The 121 topics the landing files; the site's Main Page rides after them (c72).
+const ANSWERS = answersTopicEntries(ALL);
 
 describe('ANSWERS_SUBJECTS — every topic has exactly one home on the landing', () => {
   const commandmentIds = ANSWERS.filter((e) => /^Commandment \d+$/.test(e.group)).map((e) => e.id);
@@ -43,10 +46,9 @@ describe('ANSWERS_SUBJECTS — every topic has exactly one home on the landing',
     expect(placed.size).toBe(ANSWERS.length);
   });
 
-  it('has nine subjects with unique ids, each findable by id', () => {
+  it('has nine subjects with unique ids', () => {
     expect(ANSWERS_SUBJECTS.length).toBe(9);
-    for (const s of ANSWERS_SUBJECTS) expect(answersSubjectById(s.id)).toBe(s);
-    expect(answersSubjectById('no-such-subject')).toBeNull();
+    expect(new Set(ANSWERS_SUBJECTS.map((s) => s.id)).size).toBe(9);
   });
 });
 
@@ -54,7 +56,7 @@ describe('ANSWERS_COMMANDMENTS — the tablets', () => {
   it('are the ten, in order, and every one files at least one of the site\'s topics', () => {
     expect(ANSWERS_COMMANDMENTS.map((c) => c.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
     for (const c of ANSWERS_COMMANDMENTS) {
-      expect(answersCommandmentTopics(ANSWERS, c.n).length, c.numeral).toBeGreaterThan(0);
+      expect(ANSWERS.filter((e) => e.group === 'Commandment ' + c.n).length, c.numeral).toBeGreaterThan(0);
     }
   });
 
@@ -96,6 +98,22 @@ describe('titles for lists', () => {
 describe('passage counts', () => {
   it('count the attribution lines, and add up to the site\'s 1,636', () => {
     expect(ANSWERS.reduce((a, e) => a + answersPassageCount(e), 0)).toBe(1636);
+  });
+  it('the Main Page quotes 12 more', () => {
+    expect(answersPassageCount(ALL[ALL.length - 1])).toBe(12);
+  });
+});
+
+describe('answersTopicEntries — the Main Page is in the corpus, not on the shelves', () => {
+  it('rides LAST in ANSWERS, and the topics are everything before it, in order', () => {
+    expect(ALL[ALL.length - 1].id).toBe(ANSWERS_MAIN_PAGE_ID);
+    expect(ALL.filter((e) => e.id === ANSWERS_MAIN_PAGE_ID).length).toBe(1);
+    expect(ANSWERS.length).toBe(121);
+    expect(ANSWERS).toEqual(ALL.slice(0, -1));
+  });
+  it('hands back the same array for the same corpus (screens memoise on it)', () => {
+    expect(answersTopicEntries(ALL)).toBe(answersTopicEntries(ALL));
+    expect(answersTopicEntries(null)).toEqual([]);
   });
 });
 

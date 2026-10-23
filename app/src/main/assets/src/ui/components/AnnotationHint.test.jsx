@@ -160,6 +160,44 @@ describe('AnnotationHint', () => {
     expect(screen.queryByText(HINT_TEXT)).toBeNull();
   });
 
+  /* U15 (AOGCG, 2026-10-22): the coach mark shows at most once per install. Shown and left alone
+     (no ✕, no long-press, no mark), it used to come back on every reading screen and every boot. */
+  it('shows at most once per install: shown once, it stays for that screen, then never again', () => {
+    setupStores();
+    const first = render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(screen.getByText(HINT_TEXT)).toBeTruthy();
+    expect(window.AnnHintDismissedFlagStore.is(), 'recorded the moment it is shown').toBe(true);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(screen.getByText(HINT_TEXT), 'and still there on this screen').toBeTruthy();
+    first.unmount();
+    render(<AnnotationHint />);                              // the next reading screen, or a cold boot
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(screen.queryByText(HINT_TEXT)).toBeNull();
+  });
+
+  /* Recording the flag as it shows re-renders through the flag's subscription; that render must not
+     read the fresh set as "someone dismissed it" (the pill mounted, unmounted, mounted again: the
+     entrance played twice and role=status spoke twice). act() flushes both renders, so only a DOM
+     observer sees the blink. */
+  it('appears once when it records the flag: no unmount and remount on the way in', async () => {
+    setupStores();
+    const { container } = render(<AnnotationHint />);
+    const seen = [];
+    const mo = new MutationObserver((recs) => {
+      for (const r of recs) {
+        for (const n of r.addedNodes) if (n.classList && n.classList.contains('ann-hint-pill')) seen.push('+');
+        for (const n of r.removedNodes) if (n.classList && n.classList.contains('ann-hint-pill')) seen.push('-');
+      }
+    });
+    mo.observe(container, { childList: true, subtree: true });
+    await act(async () => { vi.advanceTimersByTime(2600); });
+    await act(async () => { await Promise.resolve(); vi.advanceTimersByTime(50); });
+    mo.disconnect();
+    expect(seen).toEqual(['+']);
+    expect(window.AnnHintDismissedFlagStore.is()).toBe(true);
+  });
+
   it('never renders when the dismissal flag is already set at boot', () => {
     setupStores({ hintDismissed: true });                    // dismissed last session
     render(<AnnotationHint />);

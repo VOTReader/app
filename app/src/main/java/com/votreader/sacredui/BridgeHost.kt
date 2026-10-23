@@ -85,6 +85,13 @@ interface BridgeHost {
     fun launchShareSheet(text: String)
 
     /**
+     * The Answers share card (O6): decode [pngBase64] into the app's cache and open the share sheet with it as an
+     * image (ACTION_SEND, image/png, through the app's FileProvider). Called on the UI thread (AppInterface.shareImage
+     * hops there). A card that cannot be written or a sheet that cannot open is logged, never thrown.
+     */
+    fun launchImageShareSheet(pngBase64: String)
+
+    /**
      * Launch the SAF create-document picker for a v3 streaming export
      * (BACKUP-STREAMING-PLAN P3). Unlike [launchExportPicker] (v2: the whole
      * payload is handed over up front), this only obtains the destination URI

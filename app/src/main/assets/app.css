@@ -7628,7 +7628,7 @@
     .top-nav { gap: 1.92px; padding: 11.2px 8px 11.2px; padding-top: calc(var(--inset-top, 0px) + 11.2px); }
     .nav-home { font-size: var(--fsc-12); padding: 7.2px 8.8px; }
     .nav-back-icon { font-size: var(--fsc-36); padding: 0 5.6px; min-width: 44px; }
-    .nav-theme-btn, .nav-search-btn { padding: 8px; }
+    .nav-theme-btn, .nav-search-btn, .nav-more-btn { padding: 8px; }  /* the ⋯ button too: its 0.5rem grew the bar with Text Size, under the fixed --dock-nav-bottom */
     .reading-dot-nav { width: 40px; height: 40px; }
     .tabs-nav-btn { font-size: var(--fsc-11); padding: 5.6px 8px; gap: 4px; margin-left: 2.4px; }
     .nav-arrows { gap: 4.8px; }
@@ -8888,92 +8888,478 @@
       body.light .settings-help-btn { color: #fff; }
       .settings-help-note { font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted); margin: 8px 0 0; line-height: 1.4; }
 
-/* ── ANSWERS ONLY GOD CAN GIVE (ui/screens/AnswersHome.jsx) ──
-   The landing, one subject, and A–Z share the Volumes landing's header and
-   tiles; everything below is laid on the same 32.5rem column. */
-.answers-landing .home-sub { max-width:22rem; }
-.answers-section, .answers-results, .answers-az-list { width:100%; max-width:32.5rem; }
-.answers-section { margin-bottom:1.3rem; }
-.answers-label { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:0 0.5rem; }
-.answers-label > span:first-child { min-width:0; }
-.answers-label-count { font-family:var(--font-body); font-size:var(--fs-12); font-style:italic; letter-spacing:normal; text-transform:none; color:var(--cream-muted); }
-.answers-ask { display:flex; align-items:center; gap:0.6rem; width:100%; max-width:32.5rem; min-height:3.25rem; margin-bottom:1.3rem; padding:0 0.25rem 0 0.9rem; box-sizing:border-box; border:1px solid var(--gold-border); border-radius:10px; background:var(--gold-faint); color:var(--gold); }
-.answers-ask:focus-within { border-color:var(--gold); }
-.answers-ask > svg { width:20px; height:20px; flex-shrink:0; }
-.answers-ask-input { flex:1; min-width:0; min-height:44px; border:0; outline:none; background:transparent; color:var(--input-text); font-family:var(--font-body); font-size:var(--fs-18); }
-.answers-ask-input::placeholder { color:var(--cream-muted); font-style:italic; opacity:1; }
-.answers-ask-input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; }
-.answers-ask-clear { width:44px; height:44px; flex-shrink:0; display:flex; align-items:center; justify-content:center; border:0; background:none; color:var(--cream-muted); cursor:pointer; }
-.answers-ask-clear svg { width:18px; height:18px; }
-/* The Ten Commandments as two tablets, arched at the top. */
-/* Two tablets side by side while a tablet can be 8.5rem (at least 140 px)
-   wide; at a large Text Size (rem grows with it) they stack. */
-.answers-tablets { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(140px, 8.5rem)), 1fr)); gap:0.75rem; }
-.answers-tablet { display:flex; flex-direction:column; min-width:0; padding:1rem 0.25rem 0.3rem; border:1px solid var(--gold-border); border-radius:5rem 5rem 10px 10px / 2.75rem 2.75rem 10px 10px; background:var(--bg2); }
-.answers-tablet-range { padding-bottom:0.45rem; text-align:center; font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.28em; color:var(--gold-dim); }
-.answers-tablet-row { display:flex; align-items:center; gap:0.35rem; min-height:44px; padding:0.2rem 0.125rem; border:0; border-top:1px solid var(--border); border-radius:4px; background:none; color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-15); line-height:1.2; }
-.answers-tablet-label { flex:1 1 0; min-width:0; }
-/* 1.8rem holds "VIII" (the widest numeral, ~1.65rem) and leaves each label
-   one line beside it on a 360 px phone. */
-.answers-tablet-numeral { flex:0 0 1.8rem; text-align:center; font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold); }
-@media (hover:hover) { .answers-tablet-row:hover { background:var(--gold-faint); } }
-.answers-subjects .genre-tile { display:flex; flex-direction:column; justify-content:center; min-height:5.25rem; }
-.answers-subjects .answers-az-tile { background:var(--gold-faint); }
-/* A topic in any list: short title, passage count, chevron. */
-.answers-topic-list { display:flex; flex-direction:column; }
-.answers-topic-row { display:flex; align-items:center; gap:0.75rem; width:100%; min-height:3.25rem; padding:0.45rem 0.1rem; border:0; border-bottom:1px solid var(--border); background:none; color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); }
-.answers-topic-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:0.1rem; }
-.answers-topic-title { font-size:var(--fs-18); line-height:1.3; color:var(--cream-dim); }
-/* At a large Text Size one long word can be wider than its column: let it
-   break rather than push the page sideways. */
-.answers-topic-title, .answers-topic-full, .answers-hit-title, .answers-hit-eyebrow, .answers-hit-source,
-.answers-tablet-label, .answers-label > span, .answers-subjects .genre-tile-title, .answers-subjects .genre-tile-sub,
-.answers-sheet-verse p, .answers-landing .home-title,
-.answers-sheet .select-sheet-eyebrow, .answers-sheet .select-sheet-title { overflow-wrap:anywhere; }
-.answers-topic-full { font-size:var(--fs-13); font-style:italic; color:var(--cream-muted); }
-.answers-topic-count { font-size:var(--fs-14); color:var(--cream-muted); font-variant-numeric:tabular-nums; }
-.answers-topic-arrow { font-size:var(--fs-20); line-height:1; color:var(--gold-dim); }
-@media (hover:hover) { .answers-topic-row:hover .answers-topic-title { color:var(--gold-bright); } }
-/* "What does The Lord say about…" results. */
-.answers-hit-card { display:flex; flex-direction:column; gap:0.5rem; width:100%; margin-bottom:0.6rem; padding:0.8rem 1rem; box-sizing:border-box; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); text-align:left; cursor:pointer; font-family:var(--font-body); }
-.answers-hit-head { display:flex; align-items:center; gap:0.75rem; }
-.answers-hit-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:0.2rem; }
-.answers-hit-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
-.answers-hit-title { font-family:'Cinzel',serif; font-size:var(--fs-16); letter-spacing:0.04em; color:var(--gold); }
-.answers-hit-snippet { font-size:var(--fs-16); line-height:1.5; color:var(--cream-dim); }
-.answers-hit-mark { background:transparent; color:var(--gold-bright); font-weight:600; }
-.answers-hit-source { font-size:var(--fs-13); font-style:italic; color:var(--gold-dim); }
-.answers-hit-summary { margin:0.1rem 0 0.35rem; font-size:var(--fs-14); font-style:italic; color:var(--cream-muted); }
-.answers-more { min-height:44px; padding:0.3rem 0; border:0; background:none; color:var(--gold); text-align:left; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; }
-.answers-empty { margin:0.6rem 0; text-align:center; font-size:var(--fs-16); font-style:italic; color:var(--cream-muted); }
-.answers-source { overflow-wrap:anywhere; margin:0.4rem 0 1rem; text-align:center; font-size:var(--fs-13); font-style:italic; line-height:1.45; color:var(--cream-muted); }
-/* Every Topic, A–Z */
-.answers-az-jump { display:flex; flex-wrap:wrap; justify-content:center; gap:0.15rem; width:100%; max-width:32.5rem; margin-bottom:1rem; }
-/* A full finger per letter (walker, 2026-09-24: 36.8 px wide at 360 px). 44 px costs a fourth row of
-   letters on a phone; 2.3rem still wins once the text grows past it. */
-.answers-az-jump button { min-width:max(44px, 2.3rem); min-height:44px; border:0; border-radius:6px; background:none; color:var(--gold); cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-15); }
-@media (hover:hover) { .answers-az-jump button:hover { background:var(--gold-faint); } }
-.answers-az-letter { padding:0.2rem 0 0.25rem; border-bottom:1px solid var(--gold-border); scroll-margin-top:0.5rem; font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold); }
-/* A commandment's sheet: its verse, then its topics. */
-.answers-sheet-verse { margin:0 0 1.1rem; padding:0; text-align:center; }
-.answers-sheet-verse p { margin:0 0 0.4rem; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; line-height:1.45; color:var(--cream); }
-.answers-sheet-ref { min-height:44px; padding:0 0.6rem; border:0; background:none; cursor:pointer; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; color:var(--gold); }
-/* An Answers topic's contents (AnswersContents.jsx, 2026-09-25; picture: calls/ux-0925/r3-passages.png take 1):
-   a quiet line under the title that opens a sheet of its sections or passages. */
-.answers-contents-line { display:inline-flex; align-items:center; gap:0.35rem; min-height:44px; margin:0.35rem auto 0; padding:0 0.75rem; border:0; background:none; cursor:pointer; font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; color:var(--cream-muted); -webkit-tap-highlight-color:transparent; }
-.answers-contents-line svg { width:16px; height:16px; color:var(--gold); flex-shrink:0; }
-@media (hover:hover) { .answers-contents-line:hover { color:var(--cream); } }
-.answers-contents-line:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:6px; }
-.answers-contents-list { max-height:min(62vh, 36rem); overflow-y:auto; margin-top:0.4rem; overscroll-behavior:contain; }
-.answers-contents-row { display:block; width:100%; min-height:48px; padding:0.65rem 0.25rem; border:0; border-top:1px solid var(--border); background:none; cursor:pointer; text-align:left; color:var(--cream); font-family:var(--font-body); -webkit-tap-highlight-color:transparent; }
-.answers-contents-row:first-child { border-top:0; }
-.answers-contents-row:active { background:var(--gold-faint); }
-@media (hover:hover) { .answers-contents-row:hover { background:var(--gold-faint); } }
-.answers-contents-row:focus-visible { outline:2px solid var(--gold); outline-offset:-2px; }
-.answers-contents-row-title { display:flex; align-items:baseline; gap:0.5rem; font-size:var(--fs-18); line-height:1.3; overflow-wrap:anywhere; }
-.answers-contents-count { color:var(--gold); font-size:var(--fs-15); font-variant-numeric:tabular-nums; }
-.answers-contents-num { flex:0 0 1.9em; color:var(--gold-dim); font-size:var(--fs-15); font-variant-numeric:tabular-nums; }
-.answers-contents-row-sub { display:block; margin-top:0.15rem; font-size:var(--fs-14); font-style:italic; line-height:1.35; color:var(--cream-muted); overflow-wrap:anywhere; }
+/* ── ANSWERS ONLY GOD CAN GIVE (AnswersHome.jsx, AnswersShelf.jsx, AnswersMedia.jsx, AnswersSheets.jsx, AnswersTopic.jsx,
+   AnswersContents.jsx) · final design 2026-10-19, round 2 2026-10-20 ──
+   The landing, sheets, shelves, A–Z, search, Charts & videos, and the topic page (reading, running head, rail, Contents
+   sheet, foot). Main tokens only, plus the runtime-set --inset-*, --offline-strip-h and --dock-* that app.css already reads.
+   No new custom properties. Six type sizes at 412 px, Text Size 1: 36 / 30 / 24 / 18 / 15 / 13.
+   Radii: 12, 14 (kit sheet), 50%. Capped sizes follow .hero-title's precedent (min of a token and a vw term).
+   Round 2: values changed in place carry an "r2" comment; new rules are in the R2 block at the end. Every block
+   target is 48 tall (the kit rule); inline targets inside running text keep their 44 band (see the bands below). */
+
+/* Zero-specificity resets for the Answers surfaces; the kit's outline:none (app.css 779) gets a visible ring back */
+:where(.ans-page,.ans-sheet) button{padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+:where(.ans-page,.ans-sheet) a{color:inherit;text-decoration:none}
+:where(.ans-page,.ans-sheet) :is(a,button):focus-visible,.ans-runhead:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.ans-page,.ans-sheet,.ans-runhead{font-family:var(--font-body)}
+
+/* Type: one declaration per size, many selectors */
+.ans-display{font-weight:400;font-size:min(var(--fs-36),9vw);line-height:1.1;letter-spacing:-.005em;color:var(--cream);margin:0;overflow-wrap:break-word;text-wrap:balance}
+.ans-display.is-long{font-size:min(var(--fs-30),8vw);line-height:1.15;letter-spacing:0}
+.ans-line{display:block}
+.ans-h2,.ans-az-letter{font-weight:400;font-size:min(var(--fs-24),8vw);line-height:1.25;color:var(--cream);margin:0;text-wrap:balance}
+.ans-row-title,.ans-lede,.ans-tab,.ans-btn,.ans-num,.ans-search-input{font-size:min(var(--fs-18),7vw);line-height:1.35}
+.ans-row-sub,.ans-meta,.ans-metarow,.ans-chip,.ans-textbtn,.ans-count,.ans-note,.ans-src,.ans-contents-line,.ans-hit-src,.ans-credit,.ans-figcap,.ans-thumb-t,.ans-rail .ans-row-title{font-size:min(var(--fs-15),5.6vw);line-height:1.45}
+.ans-label{font-family:'Cinzel',serif;font-weight:400;font-size:clamp(var(--fsc-12),3.6vw,var(--fs-13));line-height:1.4;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim);margin:0}
+.ans-lead,.ans-lede,.ans-meta,.ans-metarow,.ans-row-sub,.ans-count,.ans-note,.ans-hit-src,.ans-credit,.ans-figcap,.ans-src{color:var(--cream-muted)}
+.ans-num,.ans-chev,.ans-ico,.ans-iconbtn,.ans-search-btn,.ans-disc,.ans-btn{color:var(--gold)}
+.ans-iconbtn,.ans-search-btn,.ans-disc,.ans-btn,.ans-zoom{display:grid;place-items:center} /* the icon boxes, the button, the chart stage */
+.ans-metarow,.ans-note,.ans-hit-src,.ans-src{font-style:italic}
+.ans-metarow{white-space:pre-line}
+.ans-metarow b,.ans-metarow strong{font-weight:400}
+.ans-read,.ans-now{color:var(--gold-dim);white-space:nowrap}
+.ans-now{font-style:italic}
+.ans-chev{width:18px;height:18px;flex:none}
+.ans-ico{width:20px;height:20px;flex:none}
+
+/* Hit bands on small targets. r2: the eyebrow (a target of its own) gets 48 (18.2 + 2×15). Cites, note refs and the
+   bare glyph sit inside running text and keep 44: a band wider than the line gap would take the long-press meant for
+   the words around them (WCAG 2.5.8's inline exception). The source chip link is 21.75 + 28 = 49.75 already.
+   An inline topic or letter link in the reading text takes the cites' 44 too (acceptance U10: it was 21 tall); a link
+   that IS its row (A12, A18: link rows and a one-name "Also see:") stays static, so its ::before fills the row instead */
+.ans-eyebrow,.ans-src a,.ans-bare,.ans-note-ref,.ans-chip,.ans-alsosee,.ans-reading :is(.wtlb-cite,.letter-link-ref){position:relative}
+.ans-eyebrow::before,.ans-src a::before,.ans-bare::before,.ans-note-ref::before,.ans-reading :is(.wtlb-cite,.letter-link-ref)::before{content:"";position:absolute;inset:-14px}
+.ans-eyebrow::before{inset:-15px} /* r2 */
+.ans-chip::before{content:"";position:absolute;inset:-4px 0}
+/* A cite's or link's own words (span.ans-tb, AnswersTopic.jsx) sit above every band: two bands overlap where links share
+   adjacent lines (an "Also see:" line's names are 24px apart), and the later link's band took the earlier link's middle */
+.ans-tb{position:relative;z-index:1}
+
+/* Page frame and landing header */
+.ans-page{padding:0 24px 48px;color:var(--cream)}
+.ans-head,.ans-ask-head,.ans-daily-head,.ans-sechead,.ans-results-sum,.ans-az-head{display:flex;align-items:center;justify-content:space-between;gap:4px 12px}
+.ans-head{min-height:48px;margin-top:12px} /* r2: 44 → 48 */
+.ans-iconbtn{width:48px;height:48px;margin-right:-12px} /* r2: 48 box; the icon keeps its place 2px inside the gutter */
+.ans-lede{margin:12px 0 0}
+
+/* Ask block: label, field, chips */
+.ans-ask{margin-top:24px}
+.ans-ask-head,.ans-daily-head{min-height:48px} /* r2 */
+.ans-ask-head{flex-wrap:wrap} /* r2: at every size, not only ts2: at 360 the label and "More questions ›" (about 385px) overflow
+   312, and without wrap each squeezed onto two lines ("START WITH A / QUESTION", "More / questions") */
+.ans-textbtn{display:flex;width:fit-content;align-items:center;gap:4px;min-height:48px;color:var(--cream-dim)} /* r2: 48; block-level (each stands on its own line), so no line-box strut pads it: at Text Size 3 an inline-flex one sat ~20px low */
+.ans-search{position:relative;margin-top:4px}
+.ans-search-input{display:block;width:100%;height:56px;padding:0 56px 0 16px;border:1px solid var(--border);border-radius:12px;background:var(--bg3);color:var(--input-text);outline:none;-webkit-appearance:none}
+.ans-search-input:focus{border-color:var(--cream-muted);box-shadow:inset 0 0 0 1px var(--cream-muted)} /* r2: a 2px muted edge, no gold box */
+.ans-search-input::placeholder{color:var(--cream-muted);font-style:italic;opacity:1}
+.ans-search-btn{position:absolute;top:0;right:0;width:56px;height:56px}
+.ans-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.ans-chip{min-height:40px;padding:6px 12px;border:1px solid var(--border);border-radius:12px;color:var(--cream-dim)}
+.ans-chip:active,.ans-row:active,.ans-hit:active,.ans-tablet:active{background:var(--gold-faint)}
+
+/* Rows */
+.ans-row{display:flex;align-items:center;gap:16px;width:100%;min-height:56px;padding:10px 0;border-bottom:1px solid var(--border);color:var(--cream)}
+.ans-row.is-2{min-height:76px}
+.ans-row-body{flex:1;min-width:0}
+.ans-row-title{display:block;overflow-wrap:break-word}
+.ans-row-sub{display:block;margin-top:2px}
+.ans-num{flex:0 0 max(40px,1.8em);font-variant-numeric:tabular-nums lining-nums}
+.ans-path{position:relative;margin-top:16px}
+/* r2: .ans-progress is gone (the path card has no bar) */
+
+/* The Ten Commandments: two columns, I-V down the left (variant B arch: ans-variant-b.css) */
+.ans-tablets{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(5,auto);grid-auto-flow:column;column-gap:24px}
+.ans-tablet{display:flex;flex-direction:column;justify-content:center;min-height:64px;padding:8px 0;border-bottom:1px solid var(--border);color:var(--cream)}
+.ans-tablet .ans-num{flex:none;font-size:min(var(--fs-15),5.6vw);line-height:1.45;letter-spacing:.04em}
+.ans-tablet .ans-row-title{display:flex;align-items:center;gap:6px}
+@media (max-width:380px){.ans-tablets{column-gap:16px}}
+
+/* Answer of the day */
+.ans-daily{margin-top:32px}
+.ans-daily .ans-metarow{margin-top:8px}
+.ans-quote{margin:8px 0 0;font-size:var(--fs-18);line-height:1.6;color:var(--cream)}
+.ans-daily .ans-src{margin:4px 0 0;text-align:right}
+.ans-daily-more{display:none}
+.ans-actions{display:flex;flex-wrap:wrap;gap:0 24px;margin-top:4px}
+/* the source chip's 14px band overlaps the buttons beside it (Share above it at Text Size 2+, the text buttons under it):
+   a tap on a button's edge is that button's, not the chip's (acceptance U10) */
+.ans-daily :is(.ans-iconbtn,.ans-textbtn){position:relative;z-index:1}
+
+/* Tabs and landing sections */
+.ans-tabs{display:flex;margin-top:32px;border-bottom:1px solid var(--border)}
+.ans-tab{position:relative;flex:1;min-height:48px;text-align:center;color:var(--cream-muted)}
+.ans-tab:is([aria-selected=true],[aria-checked=true]){color:var(--cream)}
+.ans-tab:is([aria-selected=true],[aria-checked=true])::after,.ans-az-key[aria-current=true]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:2px;background:var(--gold)}
+.ans-sechead,.ans-az-head{align-items:baseline}
+.ans-sechead{margin:40px 0 8px}
+.ans-count{white-space:nowrap;font-variant-numeric:tabular-nums}
+.ans-note{margin:0 0 8px}
+
+/* A-Z */
+.ans-az-strip{position:sticky;top:0;z-index:2;display:flex;overflow-x:auto;margin:0 -24px;padding:0 14px;background:var(--bg);border-bottom:1px solid var(--border);scrollbar-width:none}
+.ans-az-key{position:relative;flex:none;min-width:max(48px,2.4em);height:48px;text-align:center;color:var(--cream-dim);font-size:var(--fsc-18)} /* r2: 48 × 48 */
+.ans-az-key[aria-current=true]{color:var(--gold)}
+.ans-az-key[aria-current=true]::after{left:10px;right:10px;bottom:0}
+.ans-az-key:disabled{opacity:.4;cursor:default}
+.ans-az-head{position:sticky;top:49px;z-index:1;padding:16px 0 8px;background:var(--bg);border-bottom:1px solid var(--border)} /* r2: under the 48 + 1 strip */
+.ans-az-letter{color:var(--gold)}
+
+/* Search results, recent searches, saved answers */
+.ans-results-sum{flex-wrap:wrap;margin:16px 0 0}
+.ans-hit{display:block;width:100%;padding:12px 0 12px 16px;border-bottom:1px solid var(--border)}
+.ans-hit-snip{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--fs-18);line-height:1.6;color:var(--cream-dim)} /* r2: dim, so group titles lead; the term stays --cream 600 */
+.ans-hit-snip mark{background:none;color:var(--cream);font-weight:600}
+.ans-hit-src{display:block;margin-top:4px}
+.ans-hit-note{color:var(--cream-dim)} /* O5: a note's own words, under the words it is on */
+
+/* Topic hero */
+.ans-hero{padding:12px 0 16px;border-bottom:1px solid var(--border)}
+.ans-eyebrow{display:inline-flex;align-items:center;gap:2px}
+.ans-eyebrow .ans-chev,.ans-src a .ans-chev{width:14px;height:14px}
+.ans-hero .ans-display{margin-top:4px}
+.ans-meta{margin:8px 0 0}
+.ans-contents-line{display:block;width:100%;margin-top:8px;color:var(--cream-dim)}
+.ans-contents-line .ans-more{color:var(--cream);white-space:nowrap}
+.ans-banner{display:block;width:calc(100% + 48px);height:min(140px,34vw);margin:0 -24px;object-fit:cover} /* height: A28 */
+
+/* Reading */
+.ans-reading .letter-para{line-height:1.6;margin-bottom:1.1em}
+.ans-reading .is-justify{text-align:left}
+.ans-reading .ans-sh{margin:44px 0 16px;padding-top:20px;border-top:1px solid var(--border);font-weight:400;font-size:max(min(var(--fs-24),8vw),min(var(--fs-18),10vw));line-height:1.25;text-align:left;color:var(--cream)}
+/* r2 (§2.1 changed): a head never reads smaller than its text through Text Size 2, then holds at 10vw (36 at 360, 41.2 at 412),
+   the largest size at which every word of all 426 site heads stays whole ("Misinterpretation" 305 of 312px). hyphens:auto
+   cannot do this: Blink never hyphenates a capitalized English word (hyphenation.cc: hyphenate_capitalized_word_ =
+   !locale.StartsWith("en")), and every head is Title Case. At 54px, 65 of 426 heads broke mid-word at 360 ("Understand/ing") */
+.ans-reading .ans-sh b,.ans-reading .ans-sh strong{font-weight:inherit}
+.ans-reading .ans-sh.is-h3,.ans-foot-h3{margin:32px 0 8px;padding-top:0;border-top:0;font-weight:400;font-size:min(var(--fs-18),10vw);font-style:italic;line-height:1.4;color:var(--cream)} /* r2: the same 10vw stop ("Interpretation") */
+.ans-reading .ans-sh.is-first{margin-top:24px;padding-top:0;border-top:0}
+.ans-reading .ans-metarow{margin-bottom:.6em;line-height:1.45}
+.ans-reading .ans-src{margin:-.4em 0 1.1em;text-align:right}
+.ans-src-t{color:var(--cream-dim)}
+.ans-src-t::before{content:attr(data-w) " ";color:var(--cream-muted)} /* colour: A4 */
+/* .ans-src-c's " · " is A29's (a no-break space before it) */
+.ans-src a .ans-chev{vertical-align:-2px;margin-left:2px}
+.ans-reading .ans-orn{display:flex;align-items:center;justify-content:center;gap:12px;margin:28px 0;color:var(--gold-dim)}
+.ans-orn::before,.ans-orn::after{content:"";width:48px;height:1px;background:var(--border)}
+.ans-reading .ans-orn.is-minor{margin:16px 0}
+.ans-orn.is-minor::before,.ans-orn.is-minor::after{display:none}
+u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underline-offset:.28em;text-decoration-color:var(--cream-muted)}
+.ans-reading .ans-alsosee{display:flex;align-items:center;gap:12px;min-height:56px;padding:8px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);line-height:1.35} /* line-height: A31 */
+.ans-alsosee.is-multi{line-height:max(48px,1.35em)}.ans-alsosee.is-multi .ans-tb{padding-block:13px} /* several names: 48px rows, and each name's words a 45px+ box line by line (a name split over two lines has no 14px band: its ::before gets no width), still inline, "; " between */
+.ans-alsosee .ans-chev{margin-left:auto}
+.ans-reading .ans-linkrow,.ans-media{display:flex;align-items:center;gap:16px;min-height:76px;margin:0;padding:10px 0;border-bottom:1px solid var(--border);color:var(--cream)}
+.ans-linkrow[data-sub]::after,.ans-media-sub{content:attr(data-sub);display:block;color:var(--cream-muted);font-size:min(var(--fs-15),5.6vw)}
+.ans-disc{flex:none;width:40px;height:40px;border-radius:50%;background:var(--bg3);box-shadow:inset 0 0 0 1px var(--border)} /* r2: a 1px ring, so the disc shows on --bg and inside sheets (--bg3 on --bg3) */
+.ans-fig{margin:16px 0 24px}
+.ans-fig img,.ans-thumb img,.ans-card{display:block;width:100%;height:auto;border-radius:12px}
+.ans-figcap{display:flex;align-items:center;gap:6px;margin-top:8px}
+.ans-bare{display:inline-block;width:.8em;color:var(--tap-ref)} /* r2: the box is the glyph's own width (was .9em), so no extra gap before the next word */
+.ans-bare svg{width:.8em;height:.8em;position:relative;top:-.4em}
+.ans-note-ref{font-size:.72em;color:var(--gold)}
+
+/* Running head (absolute in .screen-layout, at the dock line) */
+.ans-runhead{position:absolute;top:calc(var(--dock-nav-bottom) + 4px + var(--offline-strip-h,0px));left:0;right:0;z-index:99;display:flex;align-items:center;gap:12px;width:100%;height:48px;padding:0 24px;border:0;border-bottom:1px solid var(--border);background:var(--bg);color:var(--cream);font-size:var(--fsc-15);text-align:left;transition:transform .2s ease,visibility .2s} /* r2: 48 tall */
+.ans-runhead.is-hidden{transform:translateY(-100%);visibility:hidden}
+/* r2: one clipped line, DOM [section][title + " · "], laid out row-reverse with wrap: both show while they fit together;
+   otherwise the title wraps onto the clipped second line and the section shows alone (when it alone is too long, R13 ends it
+   on a whole word + "…") */
+.ans-runhead-text{flex:1;min-width:0;display:flex;flex-flow:row-reverse wrap;justify-content:flex-end;align-content:flex-start;align-items:baseline;height:22px;line-height:22px;overflow:hidden}
+.ans-runhead-sec{color:var(--cream-dim)}
+.ans-runhead-num{color:var(--gold);font-variant-numeric:tabular-nums}
+.ans-runhead-bar{position:absolute;left:0;bottom:-1px;height:2px;background:var(--gold)}
+
+/* Sheets */
+.select-sheet.ans-sheet{padding:8px 24px calc(var(--inset-bottom,0px) + 28px);text-align:left}
+.ans-sheet.is-tall{height:calc(100vh - var(--dock-under-nav));max-height:none}
+/* O6 Share as a card: the 4:5 preview as large as leaves the theme control and Share in view; never under 220 wide
+   (a phone held sideways: the sheet scrolls), so the card the reader shares is always the card they see */
+.ans-card{max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));margin:16px auto 0;border:1px solid var(--border)} /* the rest with .ans-fig img */
+.ans-btn{width:100%;min-height:48px;margin-top:16px;border:1px solid var(--gold-border);border-radius:12px;background:var(--gold-faint)}
+body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over --bg3 read 4.22:1; --gold-bright reads 4.94:1 (AA) */
+.ans-btn:disabled{opacity:.45;cursor:default}
+.ans-sheet-head{position:sticky;top:-8px;z-index:1;padding-bottom:8px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.ans-toc-sec{position:relative;min-height:52px}
+.ans-toc-sec.is-current::before{content:"";position:absolute;left:-24px;top:0;bottom:0;width:3px;background:var(--gold)}
+.ans-toc-sec.is-l2{padding-left:24px}
+.ans-toc-ex{min-height:48px} /* r2: 48; its indent is A30 */
+.ans-verse{margin:12px 0 0;font-size:var(--fs-18);line-height:1.6;font-style:italic;color:var(--cream)} /* §2.1 Reading: uncapped, as the kit scripture sheet's verse */
+.ans-verse::before{content:"\201c"}.ans-verse.is-closed::after{content:"\201d"} /* the verse's own marks, drawn: a copy carries the words alone (passage-copy adds its quotes) */ /* §2.1 Reading: uncapped, as the kit scripture sheet's verse */
+
+/* Chart viewer: a tall kit sheet; pinch and pan live on the stage only */
+.ans-sheet.is-viewer{display:flex;flex-direction:column}
+.ans-zoom{flex:1;min-height:0;overflow:hidden;touch-action:none}
+.ans-zoom img{max-width:100%;max-height:100%;transform-origin:0 0}
+
+/* Foot, end card, False Doctrines index, Charts & videos */
+.ans-foot{margin-top:40px}
+.ans-credit{margin-top:32px}
+.ans-credit a{display:inline-flex;align-items:center;gap:4px;min-height:48px;color:var(--cream-dim)} /* r2 */
+.ans-end{margin-top:8px;padding:24px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.ans-reading .ans-fd{padding:12px 0;border-bottom:1px solid var(--border)}
+.ans-fd-line{display:block}
+.ans-fd-truth{display:flex;align-items:baseline;gap:8px;min-height:48px} /* r2; baseline: A23 */
+.ans-gallery{display:grid;grid-template-columns:1fr 1fr;gap:16px 12px}
+.ans-thumb img{aspect-ratio:3/2;object-fit:cover}
+
+/* Large text: Text Size 2 and up (class on the Answers .screen-layout at fontScale >= 2) */
+.ans-ts2 .ans-reading :is(.is-center,.letter-poetry){text-align:left}
+.ans-ts2 .ans-reading .letter-poetry{display:block;margin-left:0}
+.ans-ts2 .ans-contents-line .ans-names{display:none}
+.ans-ts2 .ans-reading{-webkit-hyphens:auto;hyphens:auto} /* heads inherit it, but Blink hyphenates only lowercase English words
+   (5+ letters, 2+2), so this serves the body; heads keep words whole by size (the 10vw stop above) */
+.ans-ts2 .ans-display:not(.is-long){font-size:min(var(--fs-36),10vw)} /* r2: the title meets the heads' 10vw stop at Text Size 2+
+   (36 at 360, was 32.4), so no head outgrows its page title; every word of the 120 titles fits ("Commandments" 280 of 312px) */
+.ans-ts2 .ans-daily-more{display:flex}
+.ans-ts2 .ans-daily:not(.is-open) :is(.ans-metarow,.ans-quote){display:none}
+.ans-ts2 .ans-tablets{grid-template-columns:1fr;grid-template-rows:none;grid-auto-flow:row}
+.ans-ts2 .ans-tablet{flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;min-height:56px} /* justify: A25 */
+.ans-ts2 .ans-tablet .ans-num{flex:0 0 max(40px,2.4em);font-size:min(var(--fs-18),7vw)} /* r2: 2.4em holds "VIII" (about 2em), so every label starts on one line */
+
+/* Desktop. The rail shows at 1024 and up only (A13) */
+.ans-rail{display:none}
+@media (min-width:600px){.ans-reading .is-justify{text-align:justify;hyphens:auto}}
+@media (min-width:1024px){
+  .screen-layout.ans-wide{--col-max:1120px}
+  .ans-landing{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:64px;padding:16px 48px 48px}
+  .ans-rail{display:block;position:sticky;top:24px;align-self:start;max-height:calc(100vh - var(--dock-under-nav) - 48px);overflow:auto} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
+  /* the rail and gap stop at their Text Size 1 sizes (17rem and 3rem of the 18px root): in rem they grew with Text Size and
+     took the column (1.6: 490px rail; 3: 918px, a 0px column). From Text Size 2 the page is one column, as on a phone:
+     the rail's titles no longer fit it, and the hero's Contents line opens the Contents sheet */
+  .ans-topic{display:grid;grid-template-columns:min(17rem,306px) minmax(0,70ch);gap:min(3rem,54px);justify-content:center}
+  .ans-ts2 :is(.ans-topic,.ans-landing){display:block} /* the landing too: its two columns overflowed 1280 at Text Size 3 */
+  .ans-ts2 .ans-rail{display:none}
+  .ans-rail .ans-toc-sec{padding-left:12px}
+  .ans-rail .ans-toc-sec.is-current::before{left:0}
+  .ans-runhead{display:none}
+}
+
+/* ── ADDITIONS, final mockups round 1 (2026-10-19) ──
+   Gaps found while building every frame on main's real app.min.css. Main tokens only, no new custom properties.
+   Everything above this line is work/proto/ans.css verbatim. */
+
+/* A1. Alignment classes need base rules once WtlbEntryView drops style={{textAlign}} (the .ans-ts2 rules above still win at 0,3,0) */
+.ans-reading .is-center{text-align:center}
+.ans-reading .is-right{text-align:right}
+
+/* A2. Inline icons: the read tick (14) and the external mark inside running text (.8em, like the bare glyph) */
+.ans-tick,.ans-chev.ans-kick{width:14px;height:14px;flex:none;vertical-align:-2px} /* (R2's kicker chevron too) */
+.ans-ext{width:.8em;height:.8em;margin-left:.2em;vertical-align:-.05em}
+
+/* A3. Flex rows: .ans-meta's margin-top is for block flow only */
+:is(.ans-head,.ans-results-sum) .ans-meta{margin:0}
+
+/* A4. Source chip: the generated word ("From", "Excerpt from") is muted; the title stays --cream-dim (in the ::before's
+   base rule) */
+
+/* A5. Link rows: the data-sub line sits under the title (as a flex item ::after would sit to its right);
+   row-gap 0, or the row's gap:16px would open between title and sub */
+.ans-reading .ans-linkrow[data-sub]{display:grid;grid-template-columns:40px minmax(0,1fr) auto;column-gap:16px;row-gap:0;align-content:center}
+.ans-linkrow[data-sub]>.ans-disc{grid-row:1/span 2;align-self:center}
+.ans-linkrow[data-sub]>.ans-linkrow-t{grid-column:2;grid-row:1;line-height:1.35}
+.ans-linkrow[data-sub]::after{grid-column:2;grid-row:2;margin-top:2px;line-height:1.45}
+.ans-linkrow[data-sub]>:is(.ans-ico,.ans-chev){grid-column:3;grid-row:1/span 2;align-self:center}
+
+/* A6. Chart gallery thumb: title 15 --cream, topics 15 muted. A button centres its content, so the thumb is a
+   top-aligned column: both images in a grid row start on one line however long the titles under them run */
+.ans-thumb{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;width:100%;text-align:left}
+.ans-thumb-t{display:block;margin-top:8px;color:var(--cream)} /* 15/1.45: the type block */
+
+/* A7. Empty search line (AnswersHome.jsx:187 string), 18 --cream */
+.ans-empty{margin:24px 0 0;font-size:min(var(--fs-18),7vw);line-height:1.35;color:var(--cream)}
+
+/* A8. Foot navigation block spacing */
+.ans-foot-nav{margin-top:32px}
+
+/* A9. Contents line chevron sits on the text, not the baseline */
+.ans-contents-line .ans-more{display:inline-flex;align-items:center;gap:2px}
+
+/* A10. Running head under the READING top bar: topic pages carry the kit bookmark button (a 48px box, app.css 7031),
+   so their bar is 71.4px, 4px below --dock-nav-bottom (67.4). Without the bookmark it is 67.4 again. */
+/* (the top sits in the running head's base rule) */
+body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offline-strip-h,0px))}
+
+/* A11. Kit pin from spec §9 item 7 (app.css 4217-4218): the tab count painted at 11px and grew with Text Size */
+.tabs-nav-btn-glyph{font-size:var(--fsc-14)}
+.tabs-nav-btn-count{font-size:var(--fsc-12)}
+
+/* A12. Link rows (Main Page :2, :78, :80): the paragraph's own link fills the whole row (one tap target)
+   and wears the row's look, not the kit's inline-link look (app.css 4193) */
+.ans-reading .ans-linkrow{position:relative}
+.ans-linkrow .letter-link-ref{color:inherit;font-style:inherit}
+/* (A18's one-name "Also see:" link too) the row's look, and the row as its target: static, so the ::before fills the row */
+.ans-linkrow .letter-link-ref,.ans-alsosee .ans-alsosee-a{border-bottom:0;padding-bottom:0;position:static;min-width:0}
+.ans-linkrow .letter-link-ref::before,.ans-alsosee .ans-alsosee-a::before{content:"";position:absolute;inset:0}
+
+/* A13. Desktop Contents rail parts (spec f07-desktop): progress track, compact rows, 15px titles.
+   One DOM at every width: the rail only shows at 1024 and up. */
+.ans-rail-track{position:relative;height:2px;margin:8px 0;background:var(--border)}
+.ans-rail-track .ans-runhead-bar{bottom:0}
+.ans-rail .ans-toc-sec{min-height:48px;padding-top:6px;padding-bottom:6px} /* r2 */
+/* (the rail titles' 15/1.45 is in the type block) */
+/* (the rail is display:none under 1024: the Desktop block's base rule) */
+
+/* A14. Landing tools rows (Charts & videos, Saved answers): margin-top 32 (spec 2.3) */
+.ans-tools{margin-top:32px}
+
+/* A15. Recent searches: the query reads in --cream-dim (spec f06c) */
+.ans-recent .ans-row-title{color:var(--cream-dim)}
+
+/* A16. Block spacing the spec gives that ans.css leaves at 0 (the global reset zeroes p margins) */
+.ans-az-strip + .ans-note,.ans-chips + .ans-textbtn{margin-top:12px}
+.ans-row + .ans-note{margin-top:8px}
+
+/* A17. The field's own button turns into the × "Clear search" (spec f06), so the UA's search-cancel glyph is
+   suppressed, as main already does for .search-input (app.css 3778) */
+.ans-search-input::-webkit-search-cancel-button{-webkit-appearance:none;appearance:none;display:none}
+
+/* A18. Also see: the lead never wraps ("Also / see:"), and the link may shrink below its longest word so a long title
+   breaks inside the column; at Text Size 2 and up the link drops under the lead */
+:is(.ans-alsosee,.ans-fd-truth) .ans-lead{flex:none} /* (A23's lead too) */
+/* (the link's min-width:0 is in A12's static rule) */
+/* (.ans-chev is flex:none already; Text Size 2's wrap is in A26) the row is the target (hairlines and chevron), so the
+   one-name link drops the kit's inline dotted rule (app.css 4193), as A12 does; a line of several names (.is-multi) keeps
+   it on each of its links, which are inline links (each its own target, the 44 band above), and draws no chevron */
+
+/* A19. Source chip: two lines share the words, so "7 ›" is never left alone on the second line */
+.ans-src{text-wrap:balance}
+
+/* A20. Chart viewer caption: an h2 wearing the row title, without the UA's bold */
+.ans-sheet-head .ans-row-title{margin:0;font-weight:400}
+
+/* A21. End card: one hairline above (the row before it already draws it) and one below; the h3 sits on the padding */
+.ans-row + .ans-end{margin-top:0;border-top:0}
+.ans-end > .ans-row:last-child{border-bottom:0}
+.ans-end .ans-foot-h3{margin-top:0}
+
+/* A22 (r2). Running head cells: each is one unbroken run; the section shortens only when it alone is too long, and then
+   after a whole word (R13). The round-1 grid cut the title mid-word: "Answers Only God Can G…", "False Doctrines Within the C…" */
+.ans-runhead-t,.ans-runhead-s{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+
+/* A23. False Doctrines "The Truth:" line: the lead never wraps ("The / Truth:") and sits on the title's first line,
+   the chevron keeps the right edge, centred; at Text Size 2 and up the title drops under the lead */
+/* (its lead's flex:none is in A18, align-items:baseline in the base rule, Text Size 2's wrap in A26) */
+.ans-fd-truth > strong:not(.ans-lead){min-width:0}
+.ans-fd-truth .ans-chev{margin-left:auto;align-self:center}
+
+/* A24. One rule between blocks: a bordered row right before a section head gives its bottom rule to the head's top rule */
+.ans-reading :is(.ans-fd,.ans-media,.ans-linkrow,.ans-alsosee):has(+ .ans-sh:not(.is-h3,.is-first)){border-bottom:0}
+.ans-foot-nav:has(+ .ans-reading > .ans-sh:first-child) > .ans-row:last-child{border-bottom:0}
+
+/* A25. Text Size 2 and up: a tablet row starts at the left like every other row */
+/* (in the Text Size 2 tablet rule) */
+
+/* A26. Text Size 2 and up: a section head's count, or a head row's second item ("Go to Scripture ›" beside
+   "Exodus 20:8 · NKJV"), drops under the first instead of squeezing both into two-line stacks or the gutter.
+   Sheets open outside .screen-layout, so .ans-ts2 never reaches them: a sheet's head row wraps at every size,
+   which changes nothing while both items fit on one line (Text Size 1 at 360 and up) */
+.ans-ts2 :is(.ans-sechead,.ans-head,.ans-reading .ans-alsosee,.ans-fd-truth),.ans-sheet .ans-head{flex-wrap:wrap} /* (A18's and A23's rows too) */
+
+/* A27. Commandment sheet: the heading under the sticky head clears its hairline */
+.ans-sheet-head + .ans-h2{margin-top:16px}
+
+/* A28. Main Page banner: its lettering spans the middle two thirds of the image, so at 140px a 360 screen's crop cuts
+   into the words; below 412 the height follows the width (34vw is 140px at 412) and the crop stays in the sky */
+/* (the height sits in the base rule) */
+
+/* A29. A line never starts with a middot: every " · " separator is bound to the word before it (U+00A0 in the
+   strings, as the meta and sub lines are built; here for the source chip's generated one) */
+.ans-src-c::before{content:"\00a0· "}
+
+/* A30. Contents sheet excerpt rows start on the section titles' line at every size: the indent is the number
+   column's own width (max(40px,1.8em) of the row title's size) plus the 16px gap, 56px at Text Size 1 as before */
+.ans-toc-ex,.ans-toc-more{padding-left:calc(max(40px,1.8 * min(var(--fs-18),7vw)) + 16px)} /* (R7's "Show N more" too) */
+/* A30b. A level-2 section's excerpts (class is-l2 on the excerpt row, as on its section row) also take the 24px l2
+   indent, so the passages of "1.2 Easter" start under "Easter", not under section 1's title */
+.ans-toc-ex.is-l2,.ans-toc-more.is-l2{padding-left:calc(max(40px,1.8 * min(var(--fs-18),7vw)) + 40px)}
+
+/* A31 (Codex critique 9). An "Also see:" row is a row, so a link that wraps sets at the row-title line height
+   (18/1.35, as .ans-linkrow-t) instead of the reading 1.6: two lines read as one row, 64px instead of 76px
+   (the declaration sits in the row's base rule) */
+
+/* A32 (Codex critique 10 and 12). A section break looks the same after a row as after a paragraph: a row's own
+   bottom padding already sits under its last line, so the head's 44px top margin drops to 32px there
+   (about 48px from the last line to the rule in both cases, instead of 60px after a row). The same holds where the
+   foot's last row hands its rule to a reading section that follows it (A24's second rule, Main Page foot) */
+.ans-reading :is(.ans-fd,.ans-media,.ans-linkrow,.ans-alsosee) + .ans-sh:not(.is-h3,.is-first),
+.ans-foot-nav + .ans-reading > .ans-sh:first-child:not(.is-h3,.is-first){margin-top:32px}
+
+/* ── ROUND 2 ADDITIONS (2026-10-20): the critique's fixes and the overlays that had no picture. Main tokens only ── */
+
+/* R1 (critique 6). Plain link rows: a paragraph that is exactly "• " plus one link (Trinity's six; 60 paragraphs in 18 topics)
+   is a row, not a gold inline link: the link's own words as the cream title (A12 gives the link the row's look and the whole
+   row as its target), a muted sub naming where it goes (data-sub: generated words, outside textContent), › in the app or ↗
+   outside, sr-only "• ", hairline. No disc: these lists run to 19 rows. Mixed sentences ("- See: A and B") keep inline links */
+.ans-reading .ans-linkrow.is-plain{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;row-gap:0;align-content:center}
+.ans-linkrow.is-plain>.ans-linkrow-t{grid-column:1;grid-row:1;line-height:1.35}
+.ans-linkrow.is-plain[data-sub]::after{grid-column:1;grid-row:2;margin-top:2px;line-height:1.45}
+.ans-linkrow.is-plain>:is(.ans-chev,.ans-ico){grid-column:2;grid-row:1/span 2;align-self:center}
+
+/* R2. Previous row: its 14px chevron sits in the kicker ("‹ Previous"), so the title starts on the Next row's line */
+.ans-kick{margin-right:2px} /* its size: A2 */
+
+/* R3. A–Z strip: the right edge fades while more keys lie beyond it (27 keys, about 8 in view at 412). The strip's scroll
+   handler adds .is-end once scrollLeft reaches the end. The fade is a sticky 48px veil in --bg over the last keys, not a
+   mask: a mask would also clear the strip's own background, and the list scrolling under the stuck strip showed through */
+.ans-az-strip::after{content:"";position:sticky;right:0;flex:0 0 48px;margin-left:-48px;background:linear-gradient(90deg,transparent,var(--bg));pointer-events:none}
+.ans-az-strip.is-end::after{display:none}
+
+/* R4. Chart viewer: the stage runs edge to edge (the sheet's 24px gutters are for text) */
+.ans-sheet.is-viewer .ans-zoom{margin:0 -24px}
+
+/* R5. Search on desktop: the results fill the left column under the field and the browse column stays beside them.
+   Below 1024 the browse column sits under the field, so the results replace it (one DOM at every width) */
+.ans-landing.is-query>.ans-landing-b{display:none}
+@media (min-width:1024px){.ans-landing.is-query>.ans-landing-b{display:block}}
+
+/* R6. Answers sheets: the kit SheetHandle's 44px close and grab rows become 48 (the kit's 48dp rule); kit sheets keep theirs */
+.ans-sheet .sheet-handle-back{width:48px;height:48px}
+.ans-sheet .sheet-handle-grab{height:48px}
+
+/* R7. Contents sheet: a section with more than 4 excerpts shows 3, then "Show N more ⌄" on the excerpts' own indent.
+   Block-level flex: as an inline-flex button it sat on a line box and took the sheet's strut (+20px above it at ts3) */
+.ans-toc-more{display:flex;width:100%;border-bottom:1px solid var(--border)} /* its indent is A30's */
+
+/* R8 (O2). The translation note inside the kit scripture sheet (portaled to body, so outside .ans-sheet's resets) */
+.ans-sc-note{margin-top:12px}
+.ans-sc-note .ans-note{margin:0}
+.ans-sc-note a{color:var(--cream-dim);text-decoration:none}
+.ans-sc-note a:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* R9. Kit pin (as A11): the scripture sheet's two Cinzel labels ("Scripture Reference", "Go to Scripture") paint at
+   --fs-10, under the 12px floor; pinned to --fs-12. App-wide: every scripture and footnote sheet (about +70 B) */
+.sc-sheet-tag,.fn-sheet-link-btn .fn-sheet-link-eyebrow{font-size:var(--fs-12)}
+
+/* R10 (O3). Note sheet: the note reads at 18/1.6 (.ans-quote); "‹ Back to note 1" sits above it after a nested marker */
+.ans-note-sheet .ans-note-text{margin:16px 0 4px}
+.ans-note-back{margin-top:8px}
+.ans-note-back + .ans-note-text{margin-top:4px}
+
+/* R11. Tablets, inline variant (f02i, shown to Corbin; stacked stays the default, §7): its two rules live in
+   html/ans-variant-inline.css, beside ans-variant-b.css, so the default sheet carries no unchosen variant */
+
+/* R12. One ↗ per external link. The Answers ↗ is the 20px SVG (§icons); main's external-link rule (app.css:2965,
+   a[target="_blank"]::after " \2197") would add a second, text ↗ beside it once the build gives these anchors
+   target="_blank" as the app does for every link that leaves it. It stands down wherever the SVG is drawn */
+a[target="_blank"]:has(svg.ans-ico,svg.ans-ext)::after,:is(.ans-linkrow,.ans-alsosee) a[target="_blank"]::after{content:none}
+
+/* R13. Running head: a section name too long for the bar ends on a whole word ("… God's Holy Days…"), never mid-word
+   ("(comp…"); the topic's short title still drops out first (A22's row-reverse wrap) */
+.ans-runhead-s{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:1;white-space:normal}
+
+/* R14. Also-see row: the link's own words in cream, as every row title (critique 6's rule: gold for numerals, icons and
+   chevrons only); the site's italics stay, and the gold › plus the whole-row target say it is a link */
+.ans-alsosee .letter-link-ref{color:var(--cream)}
+.ans-alsosee:active{background:var(--gold-faint)}
+
+.ans-az-strip~section{scroll-margin-top:49px}
+
+/* T1 (build, Topic stage). An external bare-link glyph is the SVG; main's text ↗ (app.css:2965) stands down for it too */
+.ans-bare[target="_blank"]::after{content:none}
+/* T2. The running head steps aside while auto-scroll or find runs; while it shows, a toast that drops in under the nav
+   sits under it instead (the dock lane, cz1); a sheet keeps its own height */
+:is(body.autoscroll-on,body:has(.find-pill)) .ans-runhead{visibility:hidden}
+@media (max-width:1023px){body:has(.ans-runhead:not(.is-hidden)):not(:has(.ans-sheet)){--dock-under-nav:calc(var(--dock-nav-bottom) + var(--offline-strip-h,0px) + 56px)}}
+
 /* A search landing in a Format B entry (WtlbEntryView landedPara): the matched
    paragraph glows twice in the letters' highlight gold and fades back out
    before the 4 s clear. The class was always set; it had no style. */
@@ -8986,10 +9372,6 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
   55% { background:rgba(var(--land-peak),0.30); }
   100% { background:rgba(var(--land-base),0); }
 }
-/* A topic page's source line (WtlbEntryView, entry.siteUrl). */
-.wtlb-source-line { margin:1.25rem 0 0.25rem; text-align:center; font-size:var(--fs-13); opacity:0.7; overflow-wrap:anywhere; }
-.wtlb-source-line a { color:var(--cream-dim); text-decoration:none; }
-@media (hover:hover) { .wtlb-source-line a:hover { color:var(--gold-bright); } }
 
 /* ── INSTALL AS AN APP (ip1, 2026-09-25; mockup lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png) ──
    A card at the end of a chapter or letter, above the prev/next cards; SHOW ME HOW opens a bottom sheet of

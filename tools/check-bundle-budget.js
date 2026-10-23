@@ -95,6 +95,10 @@ const BUDGETS = [
   // on its own branch against the spine's 1,367,470: GL +25.9 KB, canvas +31.1 KB, My Web +13.0 KB, navigation
   // +28.0 KB (the panel's +35 KB lands next, inside this room). All of it is the feature's own code; nothing
   // pulled in a library. Re-baselined UP by the same rule: 1,460,091 x 1.15 = 1,679,104.7 -> the hundred above.
+  // 2026-10-22, AOGCG Extras: build:d compiles every JSX element to one injected short factory
+  // (src/ui/jsx-inject.js) instead of "React.createElement": 1,678,740 -> 1,599,529 (-79,211 B), no
+  // behaviour change (smoke:ci PASS). The ceiling is not loosened and not lowered: the Answers stages spend
+  // part of the room, and what is left stays unclaimed.
   { file: 'bundle-d.js', measured: 1460091, max: 1679200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
@@ -170,7 +174,10 @@ const BUDGETS = [
   // 7716-8738 after sweb W3-W5: the docked panel, go-to, trail, rows, compact density, the list without WebGL2): 15.9 KB
   // -> 42.9 KB minified; ~2.5 KB more came with the main merge's sheets. Nothing pulled in (no font, no app.min.css).
   // Ceiling ~+15%: 169 KB, still far under app.min.css (370 KB).
-  { file: 'v2.min.css', measured: 147639, max: 169000 },
+  // mw14 (2026-10-22): v2 hosts main's Answers redesign whole, so answers.css carries app.css's Answers block verbatim
+  // (8891-9361, ~25 KB raw) with the kit sheet, SheetHandle, the switch and .sr-only; v2's old Answers rules went. Nothing
+  // pulled in (no font, no app.min.css). Ceiling ~+15%: 195 KB.
+  { file: 'v2.min.css', measured: 169146, max: 195000 },
   // ── lazy, but still fetched + parsed on the reader's device ──
   { file: 'bundle-a-bible.js', measured: 4995158, max: 5745000 },
   // c43 (2026-09-03): +matthew-nkjv.js (53,811 B minified); ceiling re-set to ~+15%.
@@ -205,8 +212,15 @@ const BUDGETS = [
   { file: 'src/data/audio-sync-sections.js', measured: 150000, max: 260000, optional: true },
   // Answers Only God Can Give (ANSWERS, tools/fetch-answers.py): 121 topic pages,
   // lazy — fetched the first time a reader opens Answers (utils/sync-loaders.js).
-  // Served raw like the timings; the site is complete, so +15 %.
-  { file: 'src/data/answers.js', measured: 2488915, max: 2862000 },
+  // Served raw like the timings; the site is complete, so +15 %. `measured` was
+  // 2,488,915 B when this row landed; c72 (2026-10-19, + the Main Page and the site
+  // chrome) measures 2,507,577. The ceiling is unchanged.
+  { file: 'src/data/answers.js', measured: 2507577, max: 2862000 },
+  // The Answers sidecars (ANSWERS_META, same converter, c72 2026-10-19): what the
+  // site shows beyond the words (sections, links, media, attributions, underlines),
+  // keyed by entry id, lazy (utils/sync-loaders.js loadAnswersMeta). +15 % over the 359,363 B it measured when the row
+  // landed; the shipped file (phase 1 complete) measures 367,773. The ceiling is unchanged.
+  { file: 'src/data/answers-meta.js', measured: 367773, max: 413300 },
 ];
 
 const kb = (n) => (n / 1000).toFixed(1) + ' KB';

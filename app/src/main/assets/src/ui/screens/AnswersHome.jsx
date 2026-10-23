@@ -1,269 +1,466 @@
+/** @jsx h */
+/** @jsxFrag Fragment */
 /* ═══════════════════════════════════════════════════════════════════════
    AnswersHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   Answers Only God Can Give (answersonlygodcangive.com, vendored as
-   src/data/answers.js). Three screens share this file:
+   The Answers Only God Can Give landing (route answers-home; AOGCG final
+   design f01, f02, f05, f06), top to bottom:
 
-     answers-home     the landing: the "What does The Lord say about…" box,
-                      the Ten Commandments tablets, the nine subjects
-     answers-subject  one subject's topics (the route passes letterId as the
-                      subject id)
-     answers-az       every topic, A–Z
+     the head (Topics & Doctrines, the (i) About), the title and the site's
+     tagline; "Start with a question" with the search field, six question
+     chips and "More questions"; the reading path (Continue in the site's
+     order, kept on this device); the Answer of the day; then Contents | A–Z.
 
-   A topic itself opens in WtlbEntryView (answers-entry). The routes hand
-   each screen `entries` (ANSWERS) only once the lazy corpus has landed.
+   Contents is the site's own sidebar in its order: the Main Page, the Ten
+   Commandments, Other Topics (its page outside the menu last), the twelve
+   numbered "Thus Says The Lord..." groups with our short names, the False
+   Doctrines index, then Charts & videos and the credit. A query of two or
+   more characters replaces everything under the field with the results,
+   grouped by topic: title matches first, then the site's order (U2: no
+   list anywhere is sorted by how much a topic says).
 
-   The landing keeps its query and its open commandment in module memory,
-   so Back from a topic returns to the same results or the same tablet.
-   Entering from the Home card clears it (resetAnswersLanding).
+   The landing keeps its query, its tab and its open sheet in module memory,
+   so Back from a topic returns to the same results, list or sheet (U5);
+   entering from the Home card clears it (resetAnswersLanding). The route
+   hands `entries` (ANSWERS, the Main Page included) once the lazy corpus has
+   landed, null before: the head, title and ask paint at once.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { h, Fragment } from '../jsx-h.js';
+import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle } from '../../utils/answers-shelves.js';
+import { ANSWERS_SIDEBAR, ANSWERS_FD_INDEX_ID, ANSWERS_FD_INDEX_TEXT, ANSWERS_GROUP_NOTE, ANSWERS_NOT_IN_MENU, answersSiteOrder } from '../../utils/answers-site.js';
 import {
-  ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, answersCommandmentTopics,
-  answersPassageCount, answersShortTitle, answersSortKey, answersIndexLetter, isAttribution,
-  answersSubjectById, answersFiledUnder,
-} from '../../utils/answers-shelves.js';
-import { buildAnswersIndex, searchAnswers, answersSnippet } from '../../utils/answers-search.js';
-import { sheetReference } from '../../utils/passage-copy.js';
+  NBSP, SEP, pl, ANSWERS_QUESTIONS, ANSWERS_AZ_KEYS, ANSWERS_TAGLINE, answersRowSub, answersSizeWords, answersBrowseShelves,
+  answersPlaceOf, answersAZGroups, answersSourceParts, answersInlinePieces, answersDailyPool, answersDailyPick,
+  answersOpenablePool, answersPathState, answersMediaIndex, answersMediaSummary, answersTopSections,
+  answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain, ANSWERS_TSTL_HEAD,
+} from '../../utils/answers-browse.js';
+import { answersIndexOf, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
+import { passageTextBefore } from '../../utils/answers-contents.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
+import { MoreQuestionsSheet, CommandmentSheet, AboutSheet } from '../sheets/AnswersSheets.jsx';
+import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
+import { answersSavedSum, answersCardFor, answersShownText } from '../../utils/answers-extras.js';
 
-let _landing = { query: '', sheetN: /** @type {number | null} */ (null) };
-export function resetAnswersLanding() { _landing = { query: '', sheetN: null }; }
+/** @typedef {{ kind: 'cmd', n: number } | { kind: 'more' } | { kind: 'about' } | { kind: 'card', card: any } | null} AnswersSheetState */
 
+let _landing = { query: '', tab: 'contents', sheet: /** @type {AnswersSheetState} */ (null), dailyOpen: false, all: false };
+export function resetAnswersLanding() { _landing = { query: '', tab: 'contents', sheet: null, dailyOpen: false, all: false }; }
 
-/** Up to two of a subject's most-spoken topics for its tile — short, and with no
- *  comma or trailing "..." of their own to muddle the list they sit in. */
-function tileExamples(topics) {
-  const ranked = topics.slice().sort(byPassagesDesc).map((e) => answersShortTitle(e.title));
-  const fit = ranked.slice(0, 5).filter((t) => t.length <= 22 && !/,|\.\.\.|…/.test(t)).slice(0, 2);
-  return fit.length ? fit : ranked.slice(0, 1);
+/* Recent searches: on this device only (f06c), the last five a reader went on to open. */
+const RECENT_KEY = 'vot-answers-recent';
+function readRecent() {
+  try { const v = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(v) ? v.filter((x) => typeof x === 'string').slice(0, 5) : []; } catch (_e) { return []; }
+}
+function writeRecent(list) {
+  try { if (list.length) localStorage.setItem(RECENT_KEY, JSON.stringify(list)); else localStorage.removeItem(RECENT_KEY); } catch (_e) { /* private mode: nothing kept */ }
+}
+function rememberQuery(q) {
+  const t = String(q || '').trim();
+  if (t.length < 2) return;
+  writeRecent([t].concat(readRecent().filter((x) => x.toLowerCase() !== t.toLowerCase())).slice(0, 5));
 }
 
-function byPassagesDesc(a, b) {
-  return answersPassageCount(b) - answersPassageCount(a) || answersSortKey(a.title).localeCompare(answersSortKey(b.title));
+/* The day's pool costs tens of ms on a phone; the corpus and its sidecars are fixed arrays once
+   loaded, so it is built once per array, not on every landing mount (the search index likewise:
+   answersIndexOf). */
+let _pool = { of: /** @type {any} */ (null), meta: /** @type {any} */ (null), v: /** @type {any} */ (null) };
+function dailyPoolOf(entries, meta) {
+  if (_pool.of !== entries || _pool.meta !== meta) _pool = { of: entries, meta, v: answersDailyPool(entries, meta) };
+  return _pool.v;
 }
 
-function useEntryMap(entries) {
-  return React.useMemo(() => new Map((entries || []).map((e) => [e.id, e])), [entries]);
-}
-
-function Ornament() {
-  return (
-    <div className="home-ornament">
-      <div className="home-ornament-line" />
-      <div className="home-ornament-diamond" />
-      <div className="home-ornament-line r" />
-    </div>
-  );
-}
-
-/**
- * A label row: CINZEL LABEL · italic count on the right.
- * @param {{ children?: any, count?: any }} props
- */
-function ShelfLabel({ children, count }) {
-  return (
-    <div className="genre-col-label answers-label">
-      <span>{children}</span>
-      {count ? <span className="answers-label-count">{count}</span> : null}
-    </div>
-  );
-}
-
-/**
- * One topic in a list: short title (plus the site's full title when asked), passages, ›.
- * @param {{ key?: any, entry: any, count?: number, showFull?: boolean, onOpen: () => void }} props
- */
-function TopicRow({ entry, count, showFull, onOpen }) {
-  const short = answersShortTitle(entry.title);
-  const n = count != null ? count : answersPassageCount(entry);
-  return (
-    <button type="button" className="answers-topic-row" onClick={onOpen}>
-      <span className="answers-topic-text">
-        <span className="answers-topic-title">{short}</span>
-        {showFull && short !== entry.title ? <span className="answers-topic-full">{entry.title}</span> : null}
-      </span>
-      {n > 0 ? <span className="answers-topic-count" aria-label={n === 1 ? '1 passage' : `${n} passages`}>{n}</span> : null}
-      <span className="answers-topic-arrow" aria-hidden="true">›</span>
-    </button>
-  );
-}
-
-/** @param {{ cmd: any, topics: any[], onOpenTopic: Function, onGoToRef?: Function, onDismiss: () => void }} props */
-function CommandmentSheet({ cmd, topics, onOpenTopic, onGoToRef, onDismiss }) {
-  React.useEffect(() => {
-    const prev = window.__closeSheet;
-    window.__closeSheet = onDismiss;
-    return () => { window.__closeSheet = prev || null; };
-  }, [onDismiss]);
-  const trapRef = useFocusTrap(true);
-  // The verse as books.js carries it opens a quotation it closes several
-  // verses later; set alone, the marks are dropped rather than left unpaired.
-  const verse = cmd.verse.replace(/^“/, '').replace(/”$/, '');
-  const total = topics.reduce((a, e) => a + answersPassageCount(e), 0);
-  return ReactDOM.createPortal(
-    <>
-      <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onDismiss} />
-      <div className="select-sheet answers-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="answers-cmd-title" onClick={(e) => e.stopPropagation()}>
-        <SheetHandle onClose={onDismiss} />
-        <div className="select-sheet-eyebrow">The {cmd.ordinal} Commandment</div>
-        <div className="select-sheet-title" id="answers-cmd-title">{cmd.label}</div>
-        <div className="select-sheet-ornament">
-          <div className="select-sheet-ornament-line" />
-          <div className="select-sheet-ornament-diamond">{'✦'}</div>
-          <div className="select-sheet-ornament-line r" />
-        </div>
-        {/* data-copy-ref: a copy of the verse ends with "Exodus 20:13 (NKJV)", the
-            translation of the words shown (answers-shelves.js), whatever Settings
-            picks for the reader; the reference button is left out of the copy. */}
-        <blockquote className="answers-sheet-verse" data-copy-ref={sheetReference(cmd.ref)}>
-          <p>{verse}</p>
-          {onGoToRef
-            ? <button type="button" className="answers-sheet-ref" onClick={() => onGoToRef(cmd.ref)}>{cmd.ref}</button>
-            : <span className="answers-sheet-ref">{cmd.ref}</span>}
-        </blockquote>
-        <ShelfLabel count={total > 0 ? `${total} passages` : null}>{topics.length === 1 ? '1 topic' : `${topics.length} topics`}</ShelfLabel>
-        <div className="answers-topic-list" data-autofocus>
-          {topics.map((e) => (
-            <TopicRow key={e.id} entry={e} showFull onOpen={() => onOpenTopic(e.id, null, 'Commandment ' + cmd.numeral)} />
-          ))}
-        </div>
-      </div>
-    </>,
-    document.body
-  );
-}
-
-/** @param {{ range: string, rows: any[], entries: any[], onPick: (n: number) => void }} props */
-function Tablet({ range, rows, entries, onPick }) {
-  return (
-    <div className="answers-tablet">
-      <div className="answers-tablet-range" aria-hidden="true">{range}</div>
-      {rows.map((c) => {
-        const n = answersCommandmentTopics(entries, c.n).length;
-        return (
-          <button key={c.n} type="button" className="answers-tablet-row" onClick={() => onPick(c.n)}
-            aria-label={`Commandment ${c.numeral}: ${c.label}. ${n === 1 ? '1 topic' : n + ' topics'}`}>
-            <span className="answers-tablet-numeral">{c.numeral}</span>
-            <span className="answers-tablet-label">{c.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-/** @param {{ segs: { text: string, hit: boolean }[] }} props */
-function HitSnippet({ segs }) {
-  return (
-    <span className="answers-hit-snippet">
-      {segs.map((s, i) => (s.hit ? <mark key={i} className="answers-hit-mark">{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>))}
-    </span>
-  );
-}
-
-/** "From “Pentecost” ~ Volume 6" for the passage that starts at paragraph `from`. */
-function attributionAfter(entry, from) {
-  const paras = (entry && entry.paragraphs) || [];
-  for (let i = Math.max(0, from); i < paras.length; i++) {
-    const t = paras[i] && paras[i].text;
-    if (isAttribution(t)) return t.replace(/^~ \[/, '').replace(/\]$/, '');
+/** "Volume 7" → "Volume Seven", the registry's label a letter tap resolves by (as the topic page's source lines). */
+function collectionLabel(vol) {
+  const s = String(vol || '').trim().toLowerCase();
+  const NUMS = { 1: 'One', 2: 'Two', 3: 'Three', 4: 'Four', 5: 'Five', 6: 'Six', 7: 'Seven' };
+  const m = s.startsWith('volume ') ? s.slice(7).trim() : s;
+  const n = /** @type {Record<string, string>} */ (NUMS)[m];
+  if (n) return 'Volume ' + n;
+  const word = Object.values(NUMS).find((w) => w.toLowerCase() === m);
+  if (word) return 'Volume ' + word;
+  if (typeof COLLECTIONS !== 'undefined') {
+    const col = COLLECTIONS.find((c) => c.registryLabel && (c.registryLabel.toLowerCase() === s || (c.label || '').toLowerCase() === s));
+    if (col) return col.registryLabel;
   }
-  return '';
+  return null;
 }
 
-const MENTIONS_SHOWN = 8;
+/** A Format B paragraph as the reading page draws its marks: bold, italic, line breaks, "(ref)". */
+function Inline({ text }) {
+  return (
+    <>
+      {answersInlinePieces(text).map((p, i) => {
+        if (p.br) return <br key={i} />;
+        const t = p.i ? <em>{p.t}</em> : p.t;
+        return p.b ? <strong key={i}>{t}</strong> : <React.Fragment key={i}>{t}</React.Fragment>;
+      })}
+    </>
+  );
+}
 
-/** @param {{ results: any, query: string, onOpenTopic: Function, onSearchLibrary?: Function }} props */
-function AnswersResults({ results, query, onOpenTopic, onSearchLibrary }) {
-  const [allMentions, setAllMentions] = React.useState(false);
-  React.useEffect(() => { setAllMentions(false); }, [query]);
-  const { topics, mentions, mentionPassages, words } = results;
-  const open = (row, from) => onOpenTopic(row.entry.id, row.firstPara >= 0 ? row.entry.paragraphs[row.firstPara].text : null, from);
-  const shown = allMentions ? mentions : mentions.slice(0, MENTIONS_SHOWN);
+/** "What does The Lord say about…", or "Search Answers…" when the long words would not fit the field (U9). */
+function usePlaceholder(inputRef) {
+  const LONG = 'What does The Lord say about…';
+  const [ph, setPh] = React.useState(LONG);
+  React.useLayoutEffect(() => {
+    const el = inputRef.current;
+    if (!el || typeof getComputedStyle !== 'function') return undefined;
+    const measure = () => {
+      let ctx = null;
+      try { ctx = document.createElement('canvas').getContext('2d'); } catch (_e) { ctx = null; }
+      if (!ctx) return;
+      const cs = getComputedStyle(el);
+      ctx.font = 'italic ' + cs.fontSize + ' ' + cs.fontFamily;
+      const room = el.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0');
+      if (room > 0) setPh(ctx.measureText(LONG).width <= room ? LONG : 'Search Answers…');
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [inputRef]);
+  return ph;
+}
+
+/**
+ * The Answer of the day (f01 #9-13): one whole excerpt by the local date, the same for everyone on
+ * that date: its dated header, every quote paragraph, its source; Read in context, Open to an answer.
+ */
+function DailyAnswer({ entries, byId, meta, now, onOpenTopic, onOpenLetter, onShare }) {
+  const pool = React.useMemo(() => dailyPoolOf(entries, meta), [entries, meta]);
+  const [open, setOpen] = React.useState(_landing.dailyOpen);
+  React.useEffect(() => { _landing.dailyOpen = open; }, [open]);
+  const pick = answersDailyPick(pool, now || new Date());
+  const e = pick ? byId.get(pick.id) : null;
+  if (!pick || !e) return null;
+  const P = e.paragraphs;
+  const src = answersSourceParts(P[pick.attr].text);
+  const wording = ((((meta && meta[pick.id]) || {}).attr || {})[pick.attr] || {}).wording || 'From';
+  const openSource = (ev) => {
+    ev.preventDefault();
+    const collection = src ? collectionLabel(src.collection) : null;
+    if (!src || !collection || !onOpenLetter) return;
+    const title = src.title.replace(/^[“"]/, '').replace(/[”"]$/, '');
+    const excerpt = passageTextBefore(P, pick.attr);
+    onOpenLetter(excerpt ? { collection, letterTitle: title, excerpt } : { collection, letterTitle: title });
+  };
+  // O6: today's excerpt as a card, its words as the page shows them, its source and date its own.
+  const share = () => {
+    const item = answersIndexOf(entries).find((t) => t.entry === e);
+    const words = pick.quote.map((i) => answersShownText(P[i].text)).join('\n');
+    onShare(answersCardFor(e, item, pick.quote[0], words, ((meta && meta[pick.id]) || {}).sections));
+  };
+  const randomAnswer = () => {
+    const all = answersOpenablePool(entries, meta);
+    if (!all.length) return;
+    const at = all[Math.floor(Math.random() * all.length)];
+    const t = byId.get(at.id);
+    if (t) onOpenTopic(at.id, t.paragraphs[at.index].text, 'Answers');
+  };
+  return (
+    <section className={'ans-daily' + (open ? ' is-open' : '')} aria-labelledby="ans-daily-h">
+      <div className="ans-daily-head">
+        <h2 className="ans-h2" id="ans-daily-h">Answer of the day</h2>
+        {onShare ? <button type="button" className="ans-iconbtn" aria-label="Share as a card" aria-haspopup="dialog" onClick={share}><AnsIcon name="share" /></button> : null}
+      </div>
+      {pick.head >= 0 ? <p className="ans-metarow"><Inline text={P[pick.head].text} /></p> : null}
+      <blockquote className="ans-quote">
+        {pick.quote.map((i, k) => (k ? <React.Fragment key={i}><br /><Inline text={P[i].text} /></React.Fragment> : <Inline key={i} text={P[i].text} />))}
+      </blockquote>
+      {src ? (
+        <p className="ans-src">
+          <a href="#" onClick={openSource} aria-label={`${wording} ${src.title}, ${src.collection}. Opens the letter.`}>
+            <span className="ans-src-t" data-w={wording}>{src.title}</span><span className="ans-src-c">{src.collection}</span><Chev />
+          </a>
+        </p>
+      ) : null}
+      <button type="button" className="ans-textbtn ans-daily-more" aria-expanded={open} onClick={() => setOpen(!open)}>
+        {open ? 'Hide today’s answer' : 'Show today’s answer'}<Chev dir="down" />
+      </button>
+      <div className="ans-actions">
+        <button type="button" className="ans-textbtn" onClick={() => onOpenTopic(pick.id, P[pick.quote[0]].text, 'Answers')}>Read in context<Chev /></button>
+        <button type="button" className="ans-textbtn" onClick={randomAnswer}><AnsIcon name="shuffle" />Open to an answer</button>
+      </div>
+    </section>
+  );
+}
+
+/** f05: every topic by title, under the sticky letter strip; the current letter follows the page. */
+function AZPanel({ entries, meta, isRead, onOpenTopic }) {
+  const groups = React.useMemo(() => answersAZGroups(entries), [entries]);
+  const present = new Set(groups.map((g) => g.letter));
+  const total = groups.reduce((a, g) => a + g.entries.length, 0);
+  const [cur, setCur] = React.useState(groups.length ? groups[0].letter : '#');
+  const [atEnd, setAtEnd] = React.useState(false);
+  const rootRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const stripRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  // A tapped key holds while the page travels to it and wherever that ends, until the reader moves the
+  // page: a last letter too short to reach the strip (W) would otherwise read as the one above it (V).
+  const pin = React.useRef(/** @type {string | null} */ (null));
+  // The current letter only READS the page's scroll (no scrollTop is written here): the last
+  // letter head at or above the strip's foot.
+  React.useEffect(() => {
+    const root = rootRef.current;
+    const scroller = root && root.closest ? root.closest('.screen-scroll') : null;
+    if (!root || !scroller) return undefined;
+    let raf = 0;
+    const read = () => {
+      raf = 0;
+      const strip = stripRef.current;
+      const line = strip ? strip.getBoundingClientRect().bottom + 2 : 0;
+      let now = null;
+      for (const s of root.querySelectorAll('section[data-az]')) {
+        if (s.getBoundingClientRect().top <= line) now = s.getAttribute('data-az');
+        else break;
+      }
+      if (pin.current) now = pin.current;
+      if (now) setCur(now);
+    };
+    const onScroll = () => { if (!raf) raf = requestAnimationFrame(read); };
+    // The reader's own hand on the page (a finger, the wheel, a key, the scrollbar) lets the page lead again.
+    const unpin = () => { pin.current = null; };
+    const MOVES = ['touchstart', 'wheel', 'pointerdown', 'keydown'];
+    scroller.addEventListener('scroll', onScroll, { passive: true });
+    for (const t of MOVES) scroller.addEventListener(t, unpin, { passive: true });
+    return () => {
+      scroller.removeEventListener('scroll', onScroll);
+      for (const t of MOVES) scroller.removeEventListener(t, unpin);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+  // The strip keeps the current key in view by scrolling ITSELF sideways (its own scrollLeft).
+  React.useEffect(() => {
+    const strip = stripRef.current;
+    const key = strip ? strip.querySelector('[aria-current="true"]') : null;
+    if (!strip || !key) return;
+    const k = /** @type {HTMLElement} */ (key);
+    if (k.offsetLeft < strip.scrollLeft || k.offsetLeft + k.offsetWidth > strip.scrollLeft + strip.clientWidth) {
+      strip.scrollLeft = Math.max(0, k.offsetLeft - strip.clientWidth / 2 + k.offsetWidth / 2);
+    }
+  }, [cur]);
+  const onStripScroll = () => {
+    const s = stripRef.current;
+    if (s) setAtEnd(s.scrollLeft + s.clientWidth >= s.scrollWidth - 2);
+  };
+  // A key jumps the way a finger would (scrollIntoView, the reader's own sanctioned move).
+  const jump = (L) => {
+    const el = rootRef.current && rootRef.current.querySelector(`section[data-az="${L}"]`);
+    if (!el) return;
+    pin.current = L;
+    el.scrollIntoView({ block: 'start', behavior: scrollBehavior() });
+    setCur(L);
+  };
+  return (
+    <div ref={rootRef}>
+      <nav className={'ans-az-strip' + (atEnd ? ' is-end' : '')} aria-label="Jump to letter" ref={stripRef} onScroll={onStripScroll}>
+        {ANSWERS_AZ_KEYS.map((L) => (
+          <button key={L} type="button" className="ans-az-key" disabled={!present.has(L)} aria-current={cur === L ? 'true' : undefined}
+            aria-label={L === '#' ? 'Numbers' : undefined} onClick={() => jump(L)}>{L}</button>
+        ))}
+      </nav>
+      <p className="ans-note">{`All ${total} topics by title, filed under their first main word: “Regarding The Holy Days of God” is under H.`}</p>
+      {groups.map((g) => (
+        <section key={g.letter} data-az={g.letter} aria-labelledby={'ans-az-' + (g.letter === '#' ? 'num' : g.letter)}>
+          <div className="ans-az-head">
+            <h2 className="ans-az-letter" id={'ans-az-' + (g.letter === '#' ? 'num' : g.letter)}>{g.letter}</h2>
+            <span className="ans-count">{pl(g.entries.length, 'topic')}</span>
+          </div>
+          {g.entries.map((e) => (
+            <AnsRow key={e.id} title={<LeadTitle title={e.title} />}
+              sub={<>{answersPlaceOf(entries, e.id) + SEP + answersSizeWords(e, meta && meta[e.id], { minutes: false })}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>}
+              onClick={() => onOpenTopic(e.id, null, 'Answers')} />
+          ))}
+        </section>
+      ))}
+    </div>
+  );
+}
+
+const GROUPS_SHOWN = 8;
+
+/** f06: the results, one group per topic, its first hit under it; f06b when nothing answers. */
+function Results({ entries, results, titleOnly, query, onOpenTopic, onSearchLibrary, onChip }) {
+  const [all, setAll] = React.useState(_landing.all);
+  React.useEffect(() => { _landing.all = all; }, [all]);
+  const prev = React.useRef(query);
+  React.useEffect(() => { if (prev.current !== query) { prev.current = query; setAll(false); } }, [query]);
   const q = query.trim();
-  if (!topics.length && !mentions.length) {
+  const loading = !!titleOnly;
+  const groups = loading ? titleOnly : (results ? results.groups : []);
+  if (!loading && !groups.length) {
+    const close = answersClosest(entries, q, answersShortTitle);
     return (
-      <div className="answers-results" role="status">
-        <p className="answers-empty">Nothing in Answers speaks of “{q}”.</p>
-        {onSearchLibrary && (
-          <button type="button" className="answers-more" onClick={() => onSearchLibrary(q)}>Search the whole library for “{q}”</button>
+      <div className="ans-results" role="status">
+        <p className="ans-empty">Nothing in Answers speaks of “{q}”.</p>
+        {close.length ? (
+          <>
+            <h2 className="ans-label">Closest topics</h2>
+            {close.map((e) => <AnsRow key={e.id} title={<LeadTitle title={e.title} />} sub={answersPlaceOf(entries, e.id)} onClick={() => onOpenTopic(e.id, null, 'Answers')} />)}
+          </>
+        ) : (
+          <div className="ans-chips">
+            {ANSWERS_QUESTIONS.slice(0, 6).map(([qq, id]) => <button key={id} type="button" className="ans-chip" onClick={() => onChip(id)}>{qq}</button>)}
+          </div>
         )}
+        {onSearchLibrary ? <button type="button" className="ans-textbtn" onClick={() => onSearchLibrary(q)}>Search the whole library for “{q}”<Chev /></button> : null}
       </div>
     );
   }
+  const words = results ? results.words : [];
+  const shown = all ? groups : groups.slice(0, GROUPS_SHOWN);
+  const more = groups.length - shown.length;
+  const paraText = (g) => (g.first ? g.entry.paragraphs[g.first.index].text : null);
+  // a passage hit opens on its paragraph with find-in-topic preset to the query (U8): the words the hit marked
+  const open = (g) => { rememberQuery(q); onOpenTopic(g.entry.id, paraText(g), 'Answers', null, words.length ? { terms: words, label: q.trim() } : null); };
   return (
-    <div className="answers-results">
-      {topics.length > 0 && (
-        <section className="answers-section" aria-label="Matching topics">
-          <ShelfLabel>{topics.length === 1 ? 'The topic' : 'Topics'}</ShelfLabel>
-          {topics.map((t, i) => {
-            const n = answersPassageCount(t.entry);
-            const filed = answersFiledUnder(t.entry);
-            const snipText = t.firstText || t.leadText;
-            const snipPara = t.firstPara >= 0 ? t.firstPara : t.leadPara;
-            const snippet = i === 0 && snipText ? answersSnippet(snipText, words) : null;
-            const source = i === 0 && snipPara >= 0 ? attributionAfter(t.entry, snipPara) : '';
-            return (
-              <button key={t.entry.id} type="button" className="answers-hit-card" onClick={() => open(t, 'Answers')}>
-                <span className="answers-hit-head">
-                  <span className="answers-hit-text">
-                    <span className="answers-hit-eyebrow">{[filed, n > 0 ? (n === 1 ? '1 passage' : `${n} passages`) : ''].filter(Boolean).join(' · ')}</span>
-                    <span className="answers-hit-title">{t.short}</span>
-                  </span>
-                  <span className="answers-topic-arrow" aria-hidden="true">›</span>
-                </span>
-                {snippet && <HitSnippet segs={snippet} />}
-                {source && <span className="answers-hit-source">{source}</span>}
+    <div className="ans-results">
+      <div className="ans-results-sum">
+        <p className="ans-meta" aria-live="polite">{loading ? 'Searching…' : answersSearchSum(results)}</p>
+        {onSearchLibrary ? <button type="button" className="ans-textbtn" onClick={() => { rememberQuery(q); onSearchLibrary(q); }}>Search all of VOTReader<Chev /></button> : null}
+      </div>
+      {shown.map((g) => {
+        const t = paraText(g);
+        const plain = t == null ? '' : (g.prose ? answersPlainLines(t) : answersPlainText(t));
+        const segs = !loading && t != null ? answersSnippet(plain, words) : null;
+        const src = !loading ? answersHitSource(g.entry, g.first, answersPlainText) : '';
+        return (
+          <React.Fragment key={g.entry.id}>
+            <AnsRow title={<LeadTitle title={g.entry.title} />} sub={answersSearchSub(entries, g)} onClick={() => open(g)} />
+            {segs ? (
+              <button type="button" className="ans-hit" onClick={() => open(g)}>
+                <span className="ans-hit-snip">{segs.map((s, i) => (s.hit ? <mark key={i}>{s.text}</mark> : <React.Fragment key={i}>{s.text}</React.Fragment>))}</span>
+                {src ? <span className="ans-hit-src">{src}</span> : null}
               </button>
-            );
-          })}
-        </section>
-      )}
-      {mentions.length > 0 && (
-        <section className="answers-section" aria-label="Topics whose passages mention it">
-          <ShelfLabel>{topics.length ? 'Also spoken of in' : 'Spoken of in'}</ShelfLabel>
-          <p className="answers-hit-summary" role="status">
-            {mentionPassages === 1 ? '1 passage' : `${mentionPassages} ${topics.length ? 'more ' : ''}passages`}, across {mentions.length === 1 ? '1 topic' : `${mentions.length} topics`}
-          </p>
-          <div className="answers-topic-list">
-            {shown.map((m) => (
-              <TopicRow key={m.entry.id} entry={m.entry} count={m.hits} onOpen={() => open(m, 'Answers')} />
-            ))}
-          </div>
-          {!allMentions && mentions.length > MENTIONS_SHOWN && (
-            <button type="button" className="answers-more" onClick={() => setAllMentions(true)}>
-              {mentions.length - MENTIONS_SHOWN} more {mentions.length - MENTIONS_SHOWN === 1 ? 'topic' : 'topics'}
-            </button>
-          )}
-        </section>
-      )}
+            ) : null}
+          </React.Fragment>
+        );
+      })}
+      {more > 0 ? (
+        <button type="button" className="ans-textbtn" aria-expanded="false" onClick={() => setAll(true)}>
+          {'Show ' + pl(more, 'more topic')}<Chev dir="down" />
+        </button>
+      ) : null}
     </div>
   );
 }
 
-/** @param {{ onBack: Function, backLabel: string, onSettings?: Function, onHistory?: Function, onSearch?: Function, theme?: any, onThemeChange?: Function, showHome?: boolean }} opts */
-function answersNav({ onBack, backLabel, onSettings, onHistory, onSearch, theme, onThemeChange, showHome }) {
-  return LibraryNav({ onBack, backLabel, showHome, onSettings, onHistory, onSearch, theme, onThemeChange });
-}
+/** Contents (f01, f02): the site's sidebar in its order. A memo, so typing in the field above never re-renders it. */
+const Contents = React.memo(/** @param {any} props */ function Contents(props) {
+  const { loaded, byId, shelves, meta, isRead, media, saved, site, onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, setSheet } = props;
+  const openTopic = (id) => onOpenTopic(id, null, 'Answers');
+  const openSheet = (s) => { if (loaded) setSheet(s); };
+  const sub = (e) => (
+    <>{answersRowSub(e, meta && meta[e.id])}{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</>
+  );
+  const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
+  const cmdShelves = shelves.commandments;
+  const cmdTotal = cmdShelves.reduce((a, s) => a + s.topics.length, 0);
+  const groupTotal = shelves.groups.reduce((a, s) => a + s.topics.length, 0);
+  const fdEntry = byId.get(ANSWERS_FD_INDEX_ID) || null;
+  const fdMeta = meta && meta[ANSWERS_FD_INDEX_ID];
+  const tstlHead = shelves.groups.length ? shelves.groups[0].label.replace(/^\d+\.\s*/, '') : ANSWERS_TSTL_HEAD;
+
+  const tablets = ANSWERS_COMMANDMENTS.map((c, i) => {
+    const s = cmdShelves[i];
+    const n = s ? s.topics.length : 0;
+    const read = !!(s && n && s.topics.every((e) => isRead(e.id)));
+    const label = (s ? s.label : ANSWERS_SIDEBAR[i]) + (loaded ? ' ' + (n === 1 ? '1 topic' : n + ' topics') + (read ? ', read' : '') : '');
+    return (
+      <button key={c.n} type="button" className="ans-tablet" aria-haspopup="dialog" aria-label={label} onClick={() => openSheet({ kind: 'cmd', n: c.n })}>
+        <span className="ans-num">{c.numeral}</span>
+        <span className="ans-row-title">{c.label}{read ? <ReadMark bare /> : null}</span>
+      </button>
+    );
+  });
+
+  return (
+    <div role="tabpanel" id="ans-panel-c" aria-labelledby="ans-tab-c">
+      <AnsRow title="Main Page" sub={main ? sub(main) : null} onClick={() => openTopic(ANSWERS_MAIN_PAGE_ID)} />
+      <div className="ans-sechead"><h2 className="ans-h2">The Ten Commandments</h2>{loaded ? <span className="ans-count">{pl(cmdTotal, 'topic')}</span> : null}</div>
+      <div className="ans-tablets">{tablets}</div>
+      {loaded ? (
+        <>
+          <div className="ans-sechead"><h2 className="ans-h2">Other Topics</h2><span className="ans-count">{pl(shelves.otherTopics.length, 'topic')}</span></div>
+          {shelves.otherTopics.map((e) => (
+            <AnsRow key={e.id} title={<LeadTitle title={e.title} />}
+              sub={shelves.other && shelves.other.notInMenu.includes(e) ? <>{answersRowSub(e, meta && meta[e.id])}{SEP}<em>{ANSWERS_NOT_IN_MENU}</em>{isRead(e.id) ? <>{SEP}<ReadMark /></> : null}</> : sub(e)}
+              onClick={() => openTopic(e.id)} />
+          ))}
+          <div className="ans-sechead"><h2 className="ans-h2">{tstlHead}</h2><span className="ans-count">{pl(groupTotal, 'topic')}</span></div>
+          <p className="ans-note">{ANSWERS_GROUP_NOTE}</p>
+          {shelves.groups.map((g) => {
+            const r = g.topics.filter((e) => isRead(e.id)).length;
+            return (
+              <AnsRow key={g.n} num={g.num} title={g.short}
+                sub={pl(g.topics.length, 'topic') + (r ? SEP + r + NBSP + 'read' : '')}
+                label={`${g.label} ${g.short}. ${pl(g.topics.length, 'topic').replace(NBSP, ' ')}${r ? `, ${r} read` : ''}`}
+                onClick={() => onOpenGroup && onOpenGroup(String(g.num))} />
+            );
+          })}
+          {shelves.index ? <div className="ans-sechead"><h2 className="ans-h2">{shelves.index.label}</h2></div> : null}
+          {fdEntry ? (
+            <AnsRow title={ANSWERS_FD_INDEX_TEXT} sub={fdMeta ? pl(answersTopSections(fdMeta).length, 'category') + ', each answered by The Truth' : null}
+              onClick={() => openTopic(ANSWERS_FD_INDEX_ID)} />
+          ) : null}
+          <div className="ans-tools">
+            <AnsRow icon="chart" title="Charts & videos" sub={answersMediaSummary(media)} onClick={() => onOpenMedia && onOpenMedia()} />
+            {saved && onOpenSaved ? <AnsRow icon="bookmark" title="Saved answers" sub={saved} onClick={() => onOpenSaved()} /> : null}
+          </div>
+          {site ? (
+            <p className="ans-credit">
+              {'From ' + answersDomain(site.site)}<br />{'Captured ' + site.capturedAt}<br />
+              <a href="#" role="button" aria-haspopup="dialog" onClick={(e) => { e.preventDefault(); openSheet({ kind: 'about' }); }}>About this collection<Chev /></a>
+            </p>
+          ) : null}
+        </>
+      ) : null}
+    </div>
+  );
+});
 
 /**
- * @param {{ entries: any[], onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
- *   onThemeChange?: any, onOpenTopic: Function, onOpenSubject: (id: string) => void, onOpenAZ: () => void,
- *   onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void }} props
+ * @param {{ entries: any[] | null, site?: any, isRead?: (id: string) => boolean, pathOn?: boolean, pathLast?: string | null,
+ *   fontScale?: any, now?: Date, onBack: () => void, onSearch?: any, onHistory?: any, onSettings?: any, theme?: any,
+ *   onThemeChange?: any, onOpenTopic: Function, onOpenGroup?: (key: string) => void, onOpenMedia?: () => void,
+ *   onOpenSaved?: () => void, onSearchLibrary?: (q: string) => void, onGoToRef?: (ref: string) => void, onOpenLetter?: (target: any) => void }} props
  */
-export function AnswersHome({ entries, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onOpenTopic, onOpenSubject, onOpenAZ, onSearchLibrary, onGoToRef }) {
+export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, pathLast = null, fontScale, now, onBack, onSearch, onHistory, onSettings, theme, onThemeChange,
+  onOpenTopic, onOpenGroup, onOpenMedia, onOpenSaved, onSearchLibrary, onGoToRef, onOpenLetter }) {
+  const meta = useAnswersMeta();
+  const loaded = Array.isArray(entries) && entries.length > 0;
+  const list = React.useMemo(() => (loaded ? /** @type {any[]} */ (entries) : []), [loaded, entries]);
+  const isRead = React.useCallback((id) => !!(pathOn && isReadRaw && isReadRaw(id)), [pathOn, isReadRaw]);
   const [query, setQuery] = React.useState(_landing.query);
-  const [sheetN, setSheetN] = React.useState(_landing.sheetN);
-  React.useEffect(() => { _landing = { query, sheetN }; }, [query, sheetN]);
-  const deferredQuery = React.useDeferredValue(query);
-  const index = React.useMemo(() => buildAnswersIndex(entries), [entries]);
-  const results = React.useMemo(() => (deferredQuery.trim().length >= 2 ? searchAnswers(index, deferredQuery) : null), [index, deferredQuery]);
-  const cmdTopicCount = ANSWERS_COMMANDMENTS.reduce((a, c) => a + answersCommandmentTopics(entries, c.n).length, 0);
-  const byId = useEntryMap(entries);
-  const subjectTopicTotal = ANSWERS_SUBJECTS.reduce((a, s) => a + s.topics.filter((id) => byId.has(id)).length, 0);
-  const cmd = sheetN != null ? ANSWERS_COMMANDMENTS.find((c) => c.n === sheetN) : null;
-  const closeSheet = React.useCallback(() => setSheetN(null), []);
-  // Back with a query typed clears the query before it leaves the screen.
+  const [tab, setTab] = React.useState(_landing.tab);
+  const [sheet, setSheet] = React.useState(/** @type {AnswersSheetState} */ (_landing.sheet));
+  const [focused, setFocused] = React.useState(false);
+  const [recent, setRecent] = React.useState(readRecent);
+  React.useEffect(() => { _landing.query = query; _landing.tab = tab; _landing.sheet = sheet; }, [query, tab, sheet]);
+  const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
+  const placeholder = usePlaceholder(inputRef);
+  const ts2 = answersLayoutClass(fontScale, false).includes('ans-ts2');
+
+  const byId = React.useMemo(() => new Map(list.map((e) => [e.id, e])), [list]);
+  const shelves = React.useMemo(() => answersBrowseShelves(list), [list]);
+  const order = React.useMemo(() => answersSiteOrder(list), [list]);
+  const posOf = React.useMemo(() => { const m = new Map(order.map((e, i) => [e.id, i])); return (id) => (m.has(id) ? m.get(id) : 1e6); }, [order]);
+  const index = React.useMemo(() => answersIndexOf(list), [list]);
+  const opts = React.useMemo(() => ({ pos: posOf, sections: (id) => (meta && meta[id] && meta[id].sections) || null }), [posOf, meta]);
+  const deferred = React.useDeferredValue(query);
+  const q = query.trim();
+  const isQuery = q.length >= 2;
+  const results = React.useMemo(() => (loaded && deferred.trim().length >= 2 ? answersSearch(index, deferred, opts) : null), [loaded, index, deferred, opts]);
+  const pending = isQuery && deferred.trim() !== q;
+  const titleOnly = React.useMemo(() => (pending && loaded ? answersTitleMatches(index, query, opts) : null), [pending, loaded, index, query, opts]);
+  const recentMode = focused && !q && recent.length > 0;
+  const media = React.useMemo(() => (loaded && meta ? answersMediaIndex(list, meta) : null), [loaded, list, meta]);
+  // O5: the Tools row counts the reader's marks live, and shows only when there are any.
+  const savedSum = answersSavedSum(useAnswersSaved(loaded ? list : null));
+
+  // Back with a query typed clears it before it leaves the screen (Android Back order, §2.5).
   React.useEffect(() => {
     if (!query) return undefined;
     const fn = () => { setQuery(''); return true; };
@@ -271,149 +468,115 @@ export function AnswersHome({ entries, onBack, onSearch, onHistory, onSettings, 
     return () => { if (window.__screenBack === fn) window.__screenBack = null; };
   }, [query]);
   const handleNavBack = () => { if (query) setQuery(''); else onBack(); };
+  const closeSheet = React.useCallback(() => setSheet(null), []);
+  const openTopic = (id, anchor, from, section, find) => (find ? onOpenTopic(id, anchor || null, from || 'Answers', section || null, find) : onOpenTopic(id, anchor || null, from || 'Answers'));
+  const chip = (id) => openTopic(id, null, 'Answers');
 
-  return (
-    <ScreenLayout navChildren={answersNav({ onBack: handleNavBack, backLabel: query ? 'Answers' : 'Home', showHome: false, onSettings, onHistory, onSearch, theme, onThemeChange })}>
-      <div className="home-screen volumes-landing answers-landing">
-        <div className="home-eyebrow">Topics &amp; Doctrines</div>
-        <h1 className="home-title">Answers Only God Can Give</h1>
-        <p className="home-sub">The Lord sets the record straight concerning a variety of topics, doctrines and traditions</p>
-        <Ornament />
-        <div className="answers-ask" role="search">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
-          <label htmlFor="answers-ask-input" className="sr-only">Search the topics</label>
-          <input
-            id="answers-ask-input"
-            className="answers-ask-input"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="What does The Lord say about…"
-            enterKeyHint="search"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-          />
-          {query ? (
-            <button type="button" className="answers-ask-clear" onClick={() => setQuery('')} aria-label="Clear the search">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-            </button>
-          ) : null}
-        </div>
+  const main = byId.get(ANSWERS_MAIN_PAGE_ID) || null;
 
-        {results ? (
-          <AnswersResults results={results} query={deferredQuery} onOpenTopic={onOpenTopic} onSearchLibrary={onSearchLibrary} />
-        ) : (
-          <>
-            <section className="answers-section" aria-label="The Ten Commandments">
-              <ShelfLabel count={`${cmdTopicCount} topics`}>The Ten Commandments</ShelfLabel>
-              <div className="answers-tablets">
-                <Tablet range="I – V" rows={ANSWERS_COMMANDMENTS.slice(0, 5)} entries={entries} onPick={setSheetN} />
-                <Tablet range="VI – X" rows={ANSWERS_COMMANDMENTS.slice(5)} entries={entries} onPick={setSheetN} />
-              </div>
-            </section>
-            <section className="answers-section" aria-label="Browse by subject">
-              <ShelfLabel count={`${subjectTopicTotal} topics`}>Browse by subject</ShelfLabel>
-              <div className="genre-columns answers-subjects">
-                {ANSWERS_SUBJECTS.map((s) => {
-                  const topics = s.topics.map((id) => byId.get(id)).filter(Boolean);
-                  const examples = tileExamples(topics);
-                  return (
-                    <button key={s.id} type="button" className="genre-tile answers-subject-tile" onClick={() => onOpenSubject(s.id)}>
-                      <div className="genre-tile-title">{s.title}</div>
-                      <div className="genre-tile-sub">{`${topics.length} topics · ${examples.join(', ')}…`}</div>
-                    </button>
-                  );
-                })}
-                <button type="button" className="genre-tile answers-subject-tile answers-az-tile" onClick={onOpenAZ}>
-                  <div className="genre-tile-title">Every Topic, A–Z</div>
-                  <div className="genre-tile-sub">{`All ${(entries || []).length} in one list`}</div>
-                </button>
-              </div>
-            </section>
-            <p className="answers-source">Gathered from answersonlygodcangive.com.<br />Every passage opens the letter it came from.</p>
-          </>
-        )}
-      </div>
-      {cmd && (
-        <CommandmentSheet
-          cmd={cmd}
-          topics={answersCommandmentTopics(entries, cmd.n).slice().sort(byPassagesDesc)}
-          onOpenTopic={onOpenTopic}
-          onGoToRef={onGoToRef}
-          onDismiss={closeSheet}
-        />
-      )}
-    </ScreenLayout>
-  );
-}
-
-export function AnswersSubject({ entries, subjectId, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onOpenTopic }) {
-  const subject = answersSubjectById(subjectId);
-  const byId = useEntryMap(entries);
-  const topics = subject ? subject.topics.map((id) => byId.get(id)).filter(Boolean).sort(byPassagesDesc) : [];
-  const total = topics.reduce((a, e) => a + answersPassageCount(e), 0);
-  const title = subject ? subject.title : 'Answers';
-  return (
-    <ScreenLayout navChildren={answersNav({ onBack, backLabel: 'Answers', onSettings, onHistory, onSearch, theme, onThemeChange })}>
-      <div className="home-screen volumes-landing answers-landing">
-        <div className="home-eyebrow">Answers Only God Can Give</div>
-        <h1 className="home-title">{title}</h1>
-        <p className="home-sub">{`${topics.length} topics · ${total} passages`}</p>
-        <Ornament />
-        <section className="answers-section" aria-label={title}>
-          <ShelfLabel count="Passages">Most spoken of first</ShelfLabel>
-          <div className="answers-topic-list">
-            {topics.map((e) => <TopicRow key={e.id} entry={e} onOpen={() => onOpenTopic(e.id, null, title)} />)}
-          </div>
-        </section>
-      </div>
-    </ScreenLayout>
-  );
-}
-
-export function AnswersAZ({ entries, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onOpenTopic }) {
-  const groups = React.useMemo(() => {
-    const sorted = (entries || []).slice().sort((a, b) => answersSortKey(a.title).localeCompare(answersSortKey(b.title)));
-    const out = [];
-    for (const e of sorted) {
-      const L = answersIndexLetter(e.title);
-      if (!out.length || out[out.length - 1].letter !== L) out.push({ letter: L, entries: [] });
-      out[out.length - 1].entries.push(e);
+  // The reading path (f01 #8): Continue in the site's order; off in Settings, always the start.
+  let path = null;
+  if (loaded && main) {
+    const st = pathOn ? answersPathState(list, isRead, pathLast) : { kind: 'start', entry: main, n: 0 };
+    const topics = order.length - 1;
+    if (st.kind === 'continue') {
+      path = { title: <>Continue: <LeadTitle title={st.entry.title} /></>, sub: st.n + NBSP + 'of ' + topics + NBSP + 'topics' + SEP + 'in the site’s order', id: st.entry.id };
+    } else if (st.kind === 'again') {
+      path = { title: 'Start again at the beginning', sub: 'Main Page' + SEP + 'in the site’s order', id: main.id };
+    } else {
+      path = { title: 'Start at the beginning', sub: ['Main Page', answersSizeWords(main, meta && meta[main.id])].filter(Boolean).join(SEP), id: main.id };
     }
-    return out;
-  }, [entries]);
-  const total = (entries || []).reduce((a, e) => a + answersPassageCount(e), 0);
-  const listRef = React.useRef(null);
-  // A letter jump is the reader's own tap: scrollIntoView moves the page the
-  // way a finger would, and nothing else is writing to it on this screen.
-  const jump = (L) => {
-    const el = listRef.current && listRef.current.querySelector(`[data-az-letter="${L}"]`);
-    if (el) el.scrollIntoView({ block: 'start' });
+  }
+
+  const openSheet = (s) => { if (loaded) setSheet(s); };
+  const cmdShelf = sheet && sheet.kind === 'cmd' ? shelves.commandments.find((s) => s.num === sheet.n) : null;
+  const contents = <Contents loaded={loaded} byId={byId} shelves={shelves} meta={meta} isRead={isRead} media={media} saved={savedSum} site={site}
+    onOpenTopic={onOpenTopic} onOpenGroup={onOpenGroup} onOpenMedia={onOpenMedia} onOpenSaved={onOpenSaved} setSheet={setSheet} />;
+
+  // A saved A–Z tab waits for the corpus: until then Contents shows, so it is the selected tab.
+  const az = tab === 'az' && loaded;
+  const onTabKey = (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(az ? 'contents' : 'az'); }
   };
+
   return (
-    <ScreenLayout navChildren={answersNav({ onBack, backLabel: 'Answers', onSettings, onHistory, onSearch, theme, onThemeChange })}>
-      <div className="home-screen volumes-landing answers-landing">
-        <div className="home-eyebrow">Answers Only God Can Give</div>
-        <h1 className="home-title">Every Topic, A–Z</h1>
-        <p className="home-sub">{`${(entries || []).length} topics · ${total} passages`}</p>
-        <Ornament />
-        <nav className="answers-az-jump" aria-label="Jump to a letter">
-          {groups.map((g) => (
-            <button key={g.letter} type="button" onClick={() => jump(g.letter)} aria-label={g.letter === '#' ? 'Numbers' : g.letter}>{g.letter}</button>
-          ))}
-        </nav>
-        <div className="answers-az-list" ref={listRef}>
-          {groups.map((g) => (
-            <section key={g.letter} className="answers-section" aria-label={g.letter === '#' ? 'Numbers' : g.letter}>
-              <div className="answers-az-letter" data-az-letter={g.letter}>{g.letter}</div>
-              <div className="answers-topic-list">
-                {g.entries.map((e) => <TopicRow key={e.id} entry={e} onOpen={() => onOpenTopic(e.id, null, 'Every Topic, A–Z')} />)}
+    <ScreenLayout className={answersLayoutClass(fontScale, true)}
+      navChildren={LibraryNav({ onBack: handleNavBack, backLabel: query ? 'Answers' : 'Home', showHome: true, onSettings, onHistory, onSearch, theme, onThemeChange })}>
+      <div className={'ans-page ans-landing' + (isQuery || recentMode ? ' is-query' : '')}>
+        <div className="ans-landing-a">
+          <div className="ans-head">
+            <p className="ans-label">Topics &amp; Doctrines</p>
+            <button type="button" className="ans-iconbtn" aria-label="About this collection" aria-haspopup="dialog" onClick={() => openSheet({ kind: 'about' })}><AnsIcon name="info" /></button>
+          </div>
+          <h1 className="ans-display"><span className="ans-line">Answers Only</span> <span className="ans-line">God Can Give</span></h1>
+          <p className="ans-lede">{(site && site.tagline) || ANSWERS_TAGLINE}</p>
+          <section className="ans-ask" aria-labelledby="ans-ask-h" role="search">
+            <div className="ans-ask-head">
+              <h2 className="ans-label" id="ans-ask-h">Start with a question</h2>
+              <button type="button" className="ans-textbtn" aria-haspopup="dialog" onClick={() => openSheet({ kind: 'more' })}>More questions<Chev /></button>
+            </div>
+            <div className="ans-search">
+              <input ref={inputRef} className="ans-search-input" type="search" enterKeyHint="search" autoComplete="off" autoCorrect="off" spellCheck={false}
+                value={query} placeholder={placeholder} aria-label="Search Answers"
+                onChange={(e) => setQuery(e.target.value)}
+                onFocus={() => { setRecent(readRecent()); setFocused(true); }}
+                onBlur={() => setFocused(false)}
+                onKeyDown={(e) => { if (e.key === 'Enter') rememberQuery(query); }} />
+              {query ? (
+                <button type="button" className="ans-search-btn" aria-label="Clear search" onClick={() => { setQuery(''); if (inputRef.current) inputRef.current.focus(); }}><AnsIcon name="close" /></button>
+              ) : (
+                <button type="button" className="ans-search-btn" aria-label="Search" onClick={() => { if (inputRef.current) inputRef.current.focus(); }}><AnsIcon name="search" /></button>
+              )}
+            </div>
+            {isQuery || recentMode ? null : (
+              <div className="ans-chips">
+                {ANSWERS_QUESTIONS.slice(0, 6).map(([qq, id]) => <button key={id} type="button" className="ans-chip" onClick={() => chip(id)}>{qq}</button>)}
               </div>
-            </section>
-          ))}
+            )}
+          </section>
+          {isQuery && loaded ? (
+            <Results entries={list} results={pending ? null : results} titleOnly={pending ? titleOnly : null} query={pending ? query : deferred}
+              onOpenTopic={openTopic} onSearchLibrary={onSearchLibrary} onChip={chip} />
+          ) : recentMode ? (
+            <div className="ans-results ans-recent">
+              <div className="ans-results-sum">
+                <p className="ans-label">Recent searches</p>
+                <button type="button" className="ans-textbtn" onPointerDown={(e) => e.preventDefault()} onClick={() => { writeRecent([]); setRecent([]); }}>Clear</button>
+              </div>
+              {recent.map((r) => (
+                <button key={r} type="button" className="ans-row" onPointerDown={(e) => e.preventDefault()} onClick={() => setQuery(r)}>
+                  <AnsIcon name="search" /><span className="ans-row-body"><span className="ans-row-title">{r}</span></span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              {path ? (
+                <div className="ans-path"><AnsRow title={path.title} sub={path.sub} onClick={() => openTopic(path.id)} /></div>
+              ) : null}
+              {loaded && meta ? <DailyAnswer entries={list} byId={byId} meta={meta} now={now} onOpenTopic={openTopic} onOpenLetter={onOpenLetter} onShare={(card) => setSheet({ kind: 'card', card })} /> : null}
+            </>
+          )}
+        </div>
+        <div className="ans-landing-b">
+          <div className="ans-tabs" role="tablist" aria-label="Browse Answers">
+            <button type="button" className="ans-tab" role="tab" id="ans-tab-c" aria-controls="ans-panel-c" aria-selected={!az}
+              tabIndex={az ? -1 : 0} onClick={() => setTab('contents')} onKeyDown={onTabKey}>Contents</button>
+            <button type="button" className="ans-tab" role="tab" id="ans-tab-az" aria-controls="ans-panel-az" aria-selected={az}
+              tabIndex={az ? 0 : -1} onClick={() => setTab('az')} onKeyDown={onTabKey}>A–Z</button>
+          </div>
+          {az ? (
+            <div role="tabpanel" id="ans-panel-az" aria-labelledby="ans-tab-az">
+              <AZPanel entries={list} meta={meta} isRead={isRead} onOpenTopic={openTopic} />
+            </div>
+          ) : contents}
         </div>
       </div>
+      {sheet && sheet.kind === 'more' && loaded ? <MoreQuestionsSheet byId={byId} meta={meta} onOpenTopic={openTopic} onClose={closeSheet} tall={ts2} /> : null}
+      {cmdShelf ? <CommandmentSheet shelf={cmdShelf} meta={meta} isRead={isRead} onOpenTopic={openTopic} onGoToRef={onGoToRef} onClose={closeSheet} tall={ts2} /> : null}
+      {sheet && sheet.kind === 'about' && site ? <AboutSheet site={site} onOpenTopic={openTopic} onClose={closeSheet} /> : null}
+      {sheet && sheet.kind === 'card' && loaded ? <AnswersCardSheet card={sheet.card} onClose={closeSheet} /> : null}
     </ScreenLayout>
   );
 }
+

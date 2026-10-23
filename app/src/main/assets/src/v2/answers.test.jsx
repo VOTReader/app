@@ -1,24 +1,22 @@
 // @ts-nocheck — reads main's Answers data from disk (node fs and vm, no node types in this tsconfig).
-/* v2 Answers Only God Can Give (mw10; design dz17, pictures 2g-2l): main's AnswersHome, CommandmentSheet,
-   AnswersResults, AnswersSubject and AnswersAZ words and counts on the real data/answers.js (read as main's own Answers
-   tests read it), and the pages: a commandment's sheet and Back reading "Commandment VI" from its topic, the words typed
-   (Back says Answers and clears them first, on the bar and on Android's Back), a hit opening at its passage, nothing found
-   handing the words to the Search tab, a subject, A-Z's jump, the collection route turned into this home, and the gates. */
+/* v2 Answers Only God Can Give (mw14): main's redesign hosted whole. bundle-d puts main's screens on window; here
+   stand-ins in their place record the props v2 hands them, so these tests pin v2's side: a topic opens on v2's letter
+   page with main's AnswersTopic as its body (a hit at its passage with Find holding its words, a link at its section),
+   a group, Charts & videos and Saved answers are v2 places whose Back says Answers, the words typed make Back say
+   Answers and clear them first (main's __screenBack), the whole-library search is the Search tab, the landing starts
+   afresh only on a new way in, the topic page's hand-offs (Next reads on with no new Back step, a cite opens v2's
+   reference sheet, an attribution its letter on the passage), and the collection route turned into this home. */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, cleanup, waitFor, act, fireEvent } from '@testing-library/react';
+import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { V2App } from './App.jsx';
 import { defineStart } from './places.js';
-import {
-  answersHome, commandmentSheet, commandmentName, answersResults, moreTopicsWords, answersSubject, answersAZ, topicRoute,
-} from './answers-facts.js';
+import { topicRoute, attributionCollection, answersRead } from './screens/AnswersScreens.jsx';
 
 const g = /** @type {any} */ (globalThis);
-const html = document.documentElement;
-const click = (el) => act(() => { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const ANSWERS = (() => {
@@ -26,302 +24,174 @@ const ANSWERS = (() => {
   runInNewContext(readFileSync(resolve(DATA, 'answers.js'), 'utf8').replace(/^(const|let) /gm, 'var '), ctx);
   return ctx.ANSWERS || ctx.window.ANSWERS;
 })();
+const SABBATH = ANSWERS.find((e) => e.id === 'god-speaks-about-the-sabbath');
 // main's collection record for Answers (scripture-resolution.js)
 const COL = { volKey: 'answers', readKey: 'answers', globalName: 'ANSWERS', prefaceGlobal: null, label: 'Answers Only God Can Give', kind: 'wtlb', indexScreen: 'answers-home' };
+const VOL2 = { volKey: 'two', readKey: 'volume-two', globalName: 'LETTERS_V2', prefaceGlobal: null, label: 'Volume Two', registryLabel: 'Volume Two', kind: 'letter' };
 
-/** The Answers corpus as sync-loaders publishes it: loaded (the topics on window) or failed. */
-function installAnswers({ loaded = true } = {}) {
-  g.COLLECTIONS = [COL];
-  g.COL_BY_KEY = new Map([['answers', COL]]);
+/** The props each stand-in last drew with, by name. */
+let seen = {};
+const stand = (name, cls) => function Stand(props) { seen[name] = props; return <div className={cls}>{name}</div>; };
+
+function install() {
+  g.COLLECTIONS = [COL, VOL2];
+  g.COL_BY_KEY = new Map([['answers', COL], ['two', VOL2]]);
   g.COL_BY_INDEX_SC = new Map([['answers-home', COL]]);
-  if (loaded) g.ANSWERS = ANSWERS;
-  g.__answersCorpus = { loaded, error: !loaded, subscribe: () => () => {}, getVersion: () => 1 };
-  g.__loadAnswersCorpus = vi.fn(() => (loaded ? Promise.resolve() : Promise.reject(new Error('offline'))));
+  g.ANSWERS = ANSWERS;
+  g.LETTERS_V2 = [{ id: 'v2-3', num: 3, title: 'Hearts Changed', blocks: [{ type: 'p', text: 'x' }] }];
+  g.__answersCorpus = { loaded: true, error: false, subscribe: () => () => {}, getVersion: () => 1 };
+  g.__loadAnswersCorpus = vi.fn(() => Promise.resolve());
+  g.AnswersHome = stand('AnswersHome', 'ans-page ans-landing');
+  g.AnswersShelf = stand('AnswersShelf', 'ans-page');
+  g.AnswersMedia = stand('AnswersMedia', 'ans-page');
+  g.AnswersSaved = stand('AnswersSaved', 'ans-page');
+  g.AnswersTopic = stand('AnswersTopic', 'ans-reading');
+  g.resetAnswersLanding = vi.fn();
+  g.useAnswersMetaState = () => [{}, false];
+  g.answersLayoutClass = () => 'ans-wide';
 }
 
 const undo = [];
 afterEach(() => {
   cleanup();
+  seen = {};
   while (undo.length) undo.pop()();
-  delete html.dataset.gate;
-  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'COL_BY_INDEX_SC', 'ANSWERS', '__answersCorpus', '__loadAnswersCorpus',
-    'splitCompoundRef', 'findBook', 'handleAndroidBack']) delete g[k];
+  for (const k of ['COLLECTIONS', 'COL_BY_KEY', 'COL_BY_INDEX_SC', 'ANSWERS', 'LETTERS_V2', '__answersCorpus', '__loadAnswersCorpus',
+    'AnswersHome', 'AnswersShelf', 'AnswersMedia', 'AnswersSaved', 'AnswersTopic', 'resetAnswersLanding', 'useAnswersMetaState',
+    'answersLayoutClass', 'handleAndroidBack', '__screenBack', 'StateStore']) delete g[k];
 });
 
 /** Boots V2App on `stack` (a real boot: no gate). */
 function boot(stack) {
-  installAnswers();
+  install();
   undo.push(defineStart(() => stack));
   return render(<V2App gateId={null} />);
 }
-const ANSWERS_HOME = [{ place: 'home' }, { place: 'answers' }];
-const barText = (c) => c.querySelector('.tb .title').textContent;
-const barBack = (c) => c.querySelector('.tb .ic[aria-label^="Back to"]');
-const rowTitles = (root) => [...root.querySelectorAll('.row.ans-t .t')].map((t) => t.textContent);
+const HOME = [{ place: 'home' }, { place: 'answers' }];
+const barText = (c) => c.querySelector('.tb').textContent;
+const run = (fn) => act(async () => { fn(); });
 
-describe("answers-facts: main's words and counts on main's data", () => {
-  it('the home: the commandments in two columns with main\'s aria, the nine subjects as 2g draws them, All 121', () => {
-    const h = answersHome(ANSWERS);
-    expect(h.left.map((c) => c.numeral + ' ' + c.label)).toEqual(['I No other gods', 'II No idols', 'III His name in vain', 'IV The Sabbath', 'V Honor parents']);
-    expect(h.right.map((c) => c.numeral)).toEqual(['VI', 'VII', 'VIII', 'IX', 'X']);
-    expect(h.right[0].aria).toBe('Commandment VI: Do not murder. 3 topics');
-    expect(h.subjects.map((s) => s.t + ' / ' + s.s)).toEqual([
-      'The Lord & His Messiah / 13 topics · The Name of The Lord, The Messiah…',
-      'His Word & His Prophets / 10 topics · Spiritual Gifts, The Volumes of Truth…',
-      'Sin, Repentance & Salvation / 8 topics · True Repentance, Forgiveness…',
-      'Walking With God / 14 topics · Pride, The Holy Days of God…',
-      'Churches & Doctrines of Men / 13 topics · I Am Calling You Out, The Churches of Men…',
-      'The End of This Age / 17 topics · The Coming of The Lord, The Day of The Lord…',
-      'Death, Judgment & The Kingdom / 11 topics · The Kingdom and Heaven, The Second Death…',
-      'The Nations & Creation / 10 topics · Creation, Israel…',
-      'Marriage, Family & Body / 6 topics · Homosexuality, Marriage…',
-    ]);
-    expect(h.all).toBe('All 121 in one list');
+describe('topicRoute: a topic as the route that opens it on the letter page', () => {
+  it('names the topic by its number; the Main Page is 0', () => {
+    expect(topicRoute(ANSWERS, SABBATH.id)).toEqual({ place: 'letter', collection: 'answers', n: SABBATH.num });
+    expect(topicRoute(ANSWERS, 'answers-main-page')).toEqual({ place: 'letter', collection: 'answers', n: 0 });
+    expect(topicRoute(ANSWERS, 'no-such-topic')).toBe(null);
   });
 
-  it("a commandment's sheet (2i): main's verse without its quote marks, its topics most passages first", () => {
-    const s = commandmentSheet(ANSWERS, 6);
-    expect([s.overline, s.label, s.verse, s.ref, s.topicsLabel, s.passages])
-      .toEqual(['The Sixth Commandment', 'Do not murder', 'You shall not murder.', 'Exodus 20:13', '3 topics', '42 passages']);
-    expect(s.rows.map((r) => [r.t, r.s, r.n])).toEqual([
-      ['Abortion', 'Thus Says The Lord Regarding Abortion', 33],
-      ['Committing Murder Within the Heart', 'God Speaks About Committing Murder Within the Heart', 5],
-      ['Capital Punishment and Suicide', 'Thus Says The Lord Regarding Capital Punishment and Suicide', 4],
-    ]);
-    expect(commandmentSheet(ANSWERS, 11)).toBe(null);
-    expect(commandmentName(6)).toBe('Commandment VI');
-    // the tenth's verse closes main's quotation: both marks go
-    expect(commandmentSheet(ANSWERS, 10).verse).toMatch(/^You shall not covet .*neighbor’s\.$/);
-  });
-
-  it('searched (2j): THE TOPIC with its snippet and source, then 11 more passages across 8 topics; under 2 letters nothing', () => {
-    const r = answersResults(ANSWERS, 'christmas');
-    expect(r.topicsLabel).toBe('The topic');
-    const t = r.topics[0];
-    expect([t.where, t.t, t.source]).toEqual(['Churches & Doctrines of Men · 21 passages', 'The Holidays of Men', 'From “Transgression” ~ Volume 2']);
-    expect(t.snippet.map((x) => x.text).join('')).toMatch(/^…people, a most foolish and deceived generation: These modern holidays called Christmas, Easter/);
-    expect(t.snippet.filter((x) => x.hit).map((x) => x.text)).toEqual(['Christmas']);
-    expect(t.at).toContain('These modern holidays called Christmas');
-    expect([r.mentionsLabel, r.summary]).toEqual(['Also spoken of in', '11 more passages, across 8 topics']);
-    expect(r.mentions.map((m) => m.t + ' ' + m.n)).toEqual([
-      'What is an Abomination to The Lord 4', 'Another Messiah 1', 'False Doctrines Within the Churches of Men Regarding... 1',
-      'I Am Calling You Out 1', 'Idolatry 1', 'Obedience 1', 'Those Who Take His Name in Vain 1', 'Woe to Those Who... 1',
-    ]);
-    expect(answersResults(ANSWERS, ' c ')).toBe(null);
-    expect(answersResults(ANSWERS, 'zzqqx')).toMatchObject({ empty: true, q: 'zzqqx' });
-    expect(moreTopicsWords(9)).toBe('1 more topic');
-    expect(moreTopicsWords(12)).toBe('4 more topics');
-    expect(moreTopicsWords(8)).toBe('');
-  });
-
-  it('with no topic named: "Spoken of in" and "n passages" (no "more")', () => {
-    const r = answersResults(ANSWERS, 'pharaoh');
-    expect(r.topics).toEqual([]);
-    expect(r.mentionsLabel).toBe('Spoken of in');
-    expect(r.summary).toMatch(/^\d+ passages?, across \d+ topics?$/);
-    expect(r.summary).not.toContain('more');
-  });
-
-  it('a subject (2k) and Every Topic A-Z (2l) as main counts and orders them; a topic opens as its page', () => {
-    const s = answersSubject(ANSWERS, 'the-end-of-this-age');
-    expect([s.title, s.lede]).toEqual(['The End of This Age', '17 topics · 315 passages']);
-    expect(s.rows.slice(0, 4).map((r) => r.t + ' ' + r.n))
-      .toEqual(['The Coming of The Lord 54', 'The Gathering Up (Rapture) 50', 'The One Who Stays, Lets 35', 'The Day of The Lord 29']);
-    expect(answersSubject(ANSWERS, 'nope')).toBe(null);
-    const az = answersAZ(ANSWERS);
-    expect(az.lede).toBe('121 topics · 1636 passages');
-    expect(az.groups.map((x) => x.letter).join('')).toBe('#ABCDEFGHIJKLMNOPRSTUVW');
-    expect(az.groups[0].rows.map((r) => r.t + ' ' + r.n)).toEqual(['The 144,000 Witnesses 22']);
-    expect(az.groups[1].rows.slice(0, 2).map((r) => r.t)).toEqual(['Abortion', 'Adding to or Taking Away From The Word of God']);
-    const abortion = ANSWERS.find((e) => /Abortion$/.test(e.title));
-    expect(topicRoute(ANSWERS, abortion.id)).toEqual({ place: 'letter', collection: 'answers', n: abortion.num });
+  it("a hit carries its passage and main's words ({ terms, label }); a section link its fragment, over a passage", () => {
+    expect(topicRoute(ANSWERS, SABBATH.id, { excerpt: 'the seventh day', find: { terms: ['seventh', 'day'], label: 'Seventh day' } }))
+      .toEqual({ place: 'letter', collection: 'answers', n: SABBATH.num, excerpt: 'the seventh day', match: ['seventh', 'day'], label: 'Seventh day' });
+    expect(topicRoute(ANSWERS, SABBATH.id, { excerpt: 'x', section: 'Here_is_Wisdom' }))
+      .toEqual({ place: 'letter', collection: 'answers', n: SABBATH.num, section: 'Here_is_Wisdom' });
+    expect(topicRoute(ANSWERS, SABBATH.id, { find: ' holy  days ' })).toMatchObject({ match: ['holy', 'days'], label: 'holy  days' });
   });
 });
 
-describe('the Answers pages', () => {
-  it("Home's row opens the Answers home; a route naming the collection 'answers' is turned into it", async () => {
-    const view = boot([{ place: 'home' }, { place: 'collection', collection: 'answers' }]);
-    await waitFor(() => expect(view.container.querySelector('.content.ans h1')).not.toBe(null));
-    expect(view.container.querySelector('h1').textContent).toBe('Answers Only God Can Give');
-    expect(view.container.querySelector('.lede').textContent).toBe('The Lord sets the record straight');
-    expect(view.container.querySelector('input.q').getAttribute('placeholder')).toBe('What does The Lord say about…');
-    expect(barText(view.container)).toBe('Home');
+describe('attributionCollection: the volume an attribution names, as v2 letter links read it', () => {
+  it('numbers and words are volumes; a registry label is its collection', () => {
+    g.COLLECTIONS = [VOL2, { label: "The Lord's Rebuke", registryLabel: 'Rebuke' }];
+    expect(attributionCollection('2')).toBe('Volume Two');
+    expect(attributionCollection('Volume seven')).toBe('Volume Seven');
+    expect(attributionCollection('rebuke')).toBe("The Lord's Rebuke");
+    expect(attributionCollection('Somewhere Else')).toBe('Somewhere Else');
+  });
+});
+
+describe("the hosted screens: main's Answers in v2's shell", () => {
+  it("the home is main's AnswersHome with the topics, Back says Home, and it starts afresh once per way in", async () => {
+    const { container } = boot(HOME);
+    await waitFor(() => expect(seen.AnswersHome).toBeTruthy());
+    expect(container.querySelector('.ans-host .ans-landing')).not.toBe(null);
+    expect(seen.AnswersHome.entries).toBe(ANSWERS);
+    expect(barText(container)).toContain('Home');
+    expect(g.resetAnswersLanding).toHaveBeenCalledTimes(1);
+    // a topic and Back: the same way in, so main's results, tab and sheet are kept
+    await run(() => seen.AnswersHome.onOpenTopic(SABBATH.id, null, 'Answers'));
+    await waitFor(() => expect(seen.AnswersTopic).toBeTruthy());
+    await run(() => g.handleAndroidBack());
+    await waitFor(() => expect(container.querySelector('.ans-landing')).not.toBe(null));
+    expect(g.resetAnswersLanding).toHaveBeenCalledTimes(1);
   });
 
-  it("a commandment opens its sheet; its topic opens with Back reading 'Commandment VI', and Back returns to the open sheet", async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('.grid2.cmds')).not.toBe(null));
-    const vi6 = container.querySelector('.grid2.cmds button[aria-label="Commandment VI: Do not murder. 3 topics"]');
-    expect(vi6.textContent).toBe('Do not murder');
-    // the numeral is the label's twin: one control for a screen reader
-    expect(container.querySelectorAll('.grid2.cmds button:not([aria-hidden])').length).toBe(10);
-    await click(vi6);
-    const sheet = document.querySelector('.sheet.cmd[role="dialog"]');
-    expect(sheet.querySelector('.ref-h').textContent).toBe('Do not murder');
-    expect(rowTitles(sheet)).toEqual(['Abortion', 'Committing Murder Within the Heart', 'Capital Punishment and Suicide']);
-    expect(container.querySelector('.grid2.cmds .c.on').textContent).toBe('Do not murder');
-    await click(sheet.querySelector('.row.ans-t'));
-    await waitFor(() => expect(barText(container)).toBe('Commandment VI'));
-    expect(document.querySelector('.sheet.cmd')).toBe(null);
-    await click(barBack(container));
-    await waitFor(() => expect(document.querySelector('.sheet.cmd .ref-h')).not.toBe(null));
-    expect(barText(container)).toBe('Home');
+  it('a hit opens its topic at the passage, the words handed to the page; the topic is main\'s, in v2\'s letter body', async () => {
+    const { container } = boot(HOME);
+    await waitFor(() => expect(seen.AnswersHome).toBeTruthy());
+    const at = SABBATH.paragraphs[5].text;
+    await run(() => seen.AnswersHome.onOpenTopic(SABBATH.id, at, 'Answers', null, { terms: ['sabbath'], label: 'sabbath' }));
+    await waitFor(() => expect(seen.AnswersTopic).toBeTruthy());
+    const t = seen.AnswersTopic;
+    expect(t.entry).toBe(SABBATH);
+    expect(t.findOn).toBe(true);
+    expect(t.mainRef.current).toBe(container.querySelector('.body.ans-body'));
+    expect(container.querySelector('.body.ans-body .ans-topic-host .ans-reading')).not.toBe(null);
+    expect(barText(container)).toContain('Answers');
   });
 
-  it("the commandment's reference opens its chapter at the verse, Back reading the commandment", async () => {
-    g.splitCompoundRef = (ref) => [{ ref, parsed: { rawBook: 'Exodus', chapter: '20', verse: '13' } }];
-    g.findBook = (b) => (b === 'Exodus' ? 'exodus' : null);
-    const { container } = boot([{ place: 'home' }, { place: 'answers', cmd: 6 }]);
-    await waitFor(() => expect(document.querySelector('.sheet.cmd .cmd-go')).not.toBe(null));
-    await click(document.querySelector('.sheet.cmd .cmd-go'));
-    await waitFor(() => expect(barText(container)).toBe('Commandment VI'));
+  it('a group, Charts & videos and Saved answers are v2 places; Back from each says Answers', async () => {
+    const { container } = boot(HOME);
+    await waitFor(() => expect(seen.AnswersHome).toBeTruthy());
+    await run(() => seen.AnswersHome.onOpenGroup(1));
+    await waitFor(() => expect(seen.AnswersShelf).toBeTruthy());
+    expect(seen.AnswersShelf.groupKey).toBe('1');
+    expect(barText(container)).toContain('Answers');
+    await run(() => g.handleAndroidBack());
+    await waitFor(() => expect(container.querySelector('.ans-landing')).not.toBe(null));
+    await run(() => seen.AnswersHome.onOpenMedia());
+    await waitFor(() => expect(seen.AnswersMedia).toBeTruthy());
+    await run(() => g.handleAndroidBack());
+    await waitFor(() => expect(container.querySelector('.ans-landing')).not.toBe(null));
+    await run(() => seen.AnswersHome.onOpenSaved());
+    await waitFor(() => expect(seen.AnswersSaved).toBeTruthy());
+    expect(barText(container)).toContain('Answers');
   });
 
-  it('words typed: results as you type; Back says Answers and clears them first, on the bar and on Android', async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));
-    const input = container.querySelector('input.q');
-    fireEvent.change(input, { target: { value: 'christmas' } });
-    await waitFor(() => expect(container.querySelector('.ans-hit .tt')).not.toBe(null));
-    expect(container.querySelector('.ans-hit .tt').textContent).toBe('The Holidays of Men');
-    expect(container.querySelector('.ans-hit mark').textContent).toBe('Christmas');
-    expect(container.querySelector('.grid2.cmds')).toBe(null);
-    expect(barText(container)).toBe('Answers');
-    expect(barBack(container).getAttribute('aria-label')).toBe('Back to Answers');
-    await click(barBack(container));
-    await waitFor(() => expect(container.querySelector('.grid2.cmds')).not.toBe(null));
-    expect(input.value).toBe('');
-    expect(barText(container)).toBe('Home');
-    // Android's Back: the words first, then the page
-    fireEvent.change(input, { target: { value: 'sabbath' } });
-    await waitFor(() => expect(barText(container)).toBe('Answers'));
-    let r;
-    await act(async () => { r = g.handleAndroidBack(); });
-    expect(r).toBe('true');
-    expect(input.value).toBe('');
-    await act(async () => { r = g.handleAndroidBack(); });
-    await waitFor(() => expect(container.querySelector('.content.ans')).toBe(null));
+  it("words typed: Back says Answers and clears them first (main's __screenBack), then leaves", async () => {
+    const { container } = boot(HOME);
+    await waitFor(() => expect(seen.AnswersHome).toBeTruthy());
+    const clear = vi.fn(() => { g.__screenBack = null; return true; });
+    await run(() => { g.__screenBack = clear; });
+    await waitFor(() => expect(barText(container)).toContain('Answers'));
+    await run(() => g.handleAndroidBack());
+    expect(clear).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(barText(container)).toContain('Home'));
+    expect(container.querySelector('.ans-landing')).not.toBe(null);
   });
 
-  it('a hit opens its topic at the passage (the words marked, Find holding them); Back returns to the words', async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));
-    fireEvent.change(container.querySelector('input.q'), { target: { value: 'christmas' } });
-    await waitFor(() => expect(container.querySelector('.ans-hit')).not.toBe(null));
-    await click(container.querySelector('.ans-hit'));
-    await waitFor(() => expect(barText(container)).toBe('Answers'));
-    await waitFor(() => expect(container.querySelector('.fnd input.q')).not.toBe(null));
-    expect(container.querySelector('.fnd input.q').value).toBe('christmas');
-    await click(barBack(container));
-    await waitFor(() => expect(container.querySelector('.content.ans input.q')).not.toBe(null));
-    expect(container.querySelector('.content.ans input.q').value).toBe('christmas');
-    expect(container.querySelector('.ans-hit .tt').textContent).toBe('The Holidays of Men');
-  });
-
-  it('a hit tapped while the results trail the field by a keystroke opens with the words as typed (live walk: "christma")', async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));
-    fireEvent.change(container.querySelector('input.q'), { target: { value: 'christma' } });
-    await waitFor(() => expect(container.querySelector('.ans-hit')).not.toBe(null));
-    // React keeps drawing the last results while the next keystroke's search is still under way
-    const real = g.React;
-    g.React = { ...real, useDeferredValue: (v) => { const d = real.useDeferredValue(v); return v === 'christmas' ? 'christma' : d; } };
-    undo.push(() => { g.React = real; });
-    fireEvent.change(container.querySelector('input.q'), { target: { value: 'christmas' } });
-    await click(container.querySelector('.ans-hit'));
-    await waitFor(() => expect(container.querySelector('.fnd input.q')).not.toBe(null));
-    expect(container.querySelector('.fnd input.q').value).toBe('christmas');
-  });
-
-  it('past eight mentions, main\'s "n more topics" shows the rest', async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));
-    const r = answersResults(ANSWERS, 'faith');
-    expect(r.mentions.length).toBeGreaterThan(8);
-    fireEvent.change(container.querySelector('input.q'), { target: { value: 'faith' } });
-    await waitFor(() => expect(container.querySelector('.ans-res > .more')).not.toBe(null));
-    expect(container.querySelectorAll('.ans-res .ans-list .row').length).toBe(8);
-    expect(container.querySelector('.ans-res > .more').textContent).toBe(moreTopicsWords(r.mentions.length));
-    await click(container.querySelector('.ans-res > .more'));
-    expect(container.querySelectorAll('.ans-res .ans-list .row').length).toBe(r.mentions.length);
-  });
-
-  it("nothing found: main's words, and the whole library searched for them in the Search tab", async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('input.q')).not.toBe(null));
-    fireEvent.change(container.querySelector('input.q'), { target: { value: 'zzqqx' } });
-    await waitFor(() => expect(container.querySelector('.ans-res .empty')).not.toBe(null));
-    expect(container.querySelector('.ans-res .empty .t').textContent).toBe('Nothing in Answers speaks of “zzqqx”.');
-    const lib = container.querySelector('.ans-res .empty .textbtn');
-    expect(lib.textContent).toBe('Search the whole library for “zzqqx”');
-    await click(lib);
+  it('the whole-library search is the Search tab with the words', async () => {
+    const { container } = boot(HOME);
+    await waitFor(() => expect(seen.AnswersHome).toBeTruthy());
+    await run(() => seen.AnswersHome.onSearchLibrary('zzqqx'));
     await waitFor(() => expect(container.querySelector('.tab.on').textContent).toBe('Search'));
     await waitFor(() => expect(container.querySelector('.field input.q').value).toBe('zzqqx'));
   });
 
-  it("a subject's page says Back to Answers; its topic says Back to the subject", async () => {
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('.sec.ans-subj')).not.toBe(null));
-    const subj = [...container.querySelectorAll('.rows .row.ans-t')].find((r) => r.querySelector('.t').textContent === 'The End of This Age');
-    await click(subj);
-    await waitFor(() => expect(container.querySelector('h1').textContent).toBe('The End of This Age'));
-    expect(barText(container)).toBe('Answers');
-    expect(container.querySelector('.page-head .lede').textContent).toBe('17 topics · 315 passages');
-    expect(rowTitles(container).slice(0, 2)).toEqual(['The Coming of The Lord', 'The Gathering Up (Rapture)']);
-    await click(container.querySelector('.row.ans-t'));
-    await waitFor(() => expect(barText(container)).toBe('The End of This Age'));
+  it("a topic's Next reads on with no new Back step; an attribution opens its letter on the passage", async () => {
+    const { container } = boot(HOME);
+    await waitFor(() => expect(seen.AnswersHome).toBeTruthy());
+    await run(() => seen.AnswersHome.onOpenTopic(SABBATH.id, null, 'Answers'));
+    await waitFor(() => expect(seen.AnswersTopic && seen.AnswersTopic.entry).toBe(SABBATH));
+    const next = ANSWERS.find((e) => e.num === SABBATH.num + 1);
+    await run(() => seen.AnswersTopic.nav.go(next.id));
+    await waitFor(() => expect(seen.AnswersTopic.entry).toBe(next));
+    await run(() => g.handleAndroidBack());
+    await waitFor(() => expect(container.querySelector('.ans-landing')).not.toBe(null));
+    // an attribution: its letter, landing on the passage
+    await run(() => seen.AnswersHome.onOpenTopic(SABBATH.id, null, 'Answers'));
+    await waitFor(() => expect(seen.AnswersTopic).toBeTruthy());
+    await run(() => seen.AnswersTopic.act.letter({ collection: '2', letterTitle: 'Hearts Changed', excerpt: 'x' }));
+    await waitFor(() => expect(container.querySelector('h1') && container.querySelector('h1').textContent).toBe('Hearts Changed'));
   });
 
-  it('Every Topic, A-Z: a jump letter scrolls its group to the top; Numbers reads #', async () => {
-    const seen = [];
-    const was = Element.prototype.scrollIntoView;
-    Element.prototype.scrollIntoView = function f() { seen.push(this.getAttribute('data-az-letter')); };
-    undo.push(() => { Element.prototype.scrollIntoView = was; });
-    const { container } = boot(ANSWERS_HOME);
-    await waitFor(() => expect(container.querySelector('.sec.ans-subj')).not.toBe(null));
-    const az = [...container.querySelectorAll('.rows .row.ans-t')].pop();
-    expect(az.textContent).toContain('All 121 in one list');
-    await click(az);
-    await waitFor(() => expect(container.querySelector('nav.azj')).not.toBe(null));
-    expect(container.querySelector('nav.azj button').getAttribute('aria-label')).toBe('Numbers');
-    expect(barText(container)).toBe('Answers');
-    await click(container.querySelector('nav.azj button[aria-label="M"]'));
-    expect(seen).toEqual(['M']);
-  });
-
-  it('the topics not loaded (offline before their first fetch): says so, ready, Try again asks again', async () => {
-    installAnswers({ loaded: false });
-    undo.push(defineStart(() => ANSWERS_HOME));
-    const { container } = render(<V2App gateId={null} />);
-    await waitFor(() => expect(container.querySelector('.empty .t')).not.toBe(null));
-    expect(container.querySelector('.empty .t').textContent).toBe('The topics could not be loaded.');
-    const asks = g.__loadAnswersCorpus.mock.calls.length;
-    await click(container.querySelector('.empty .textbtn'));
-    expect(g.__loadAnswersCorpus.mock.calls.length).toBe(asks + 1);
+  it("the collection route ('answers', from Home Recent or Search's Go to) is this home", async () => {
+    const { container } = boot([{ place: 'home' }, { place: 'collection', collection: 'answers' }]);
+    await waitFor(() => expect(container.querySelector('.ans-host .ans-landing')).not.toBe(null));
   });
 });
 
-describe('the Answers gates (2g-2l)', () => {
-  for (const id of ['2g-answers', '2h-answers-subjects', '2k-answers-subject', '2l-answers-az']) {
-    it(id + ' is ready on main\'s data', async () => {
-      installAnswers();
-      render(<V2App gateId={id} />);
-      await waitFor(() => expect(html.dataset.gate).toBe('ready'));
-    });
-  }
-
-  it('2i draws commandment VI open; 2j draws "christmas" typed, the field lit with its caret, Back saying Answers', async () => {
-    installAnswers();
-    const a = render(<V2App gateId="2i-commandment" />);
-    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
-    expect(document.querySelector('.sheet.cmd .overline').textContent).toBe('The Sixth Commandment');
-    expect(barText(a.container)).toBe('Home');
-    a.unmount();
-    delete html.dataset.gate;
-    const b = render(<V2App gateId="2j-answers-search" />);
-    await waitFor(() => expect(html.dataset.gate).toBe('ready'));
-    expect(b.container.querySelector('.field.focus input.q').value).toBe('christmas');
-    expect(b.container.querySelector('.field .caret')).not.toBe(null);
-    expect(barText(b.container)).toBe('Answers');
+describe('answersRead: a topic is read when vot-state counts it (main\'s isRead)', () => {
+  it("reads readItems['v1:answers:<id>']", () => {
+    g.StateStore = { get: () => ({ readItems: { ['v1:answers:' + SABBATH.id]: 2 } }) };
+    expect(answersRead(SABBATH.id)).toBe(true);
+    expect(answersRead('regarding-the-trinity')).toBe(false);
   });
 });

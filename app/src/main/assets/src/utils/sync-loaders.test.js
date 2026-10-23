@@ -17,7 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   loadAudioSync, audioSyncStore,
   loadBibleSync, bibleSyncStore,
-  loadAnswers,
+  loadAnswers, loadAnswersMeta,
   loadAudioSyncSections, audioSyncSectionsStore,
   resetSyncLoadersForTests,
 } from './sync-loaders.js';
@@ -253,5 +253,33 @@ describe('the Answers corpus (src/data/answers.js)', () => {
     await loadAnswers();
     expect(shared.load).toHaveBeenCalledTimes(1);
     expect(byPath('src/data/answers.js')).toBeNull();
+  });
+});
+
+describe('the Answers sidecars (src/data/answers-meta.js)', () => {
+  afterEach(() => { delete globalThis.__makeLazyLoader; });
+
+  it('is a no-op without the factory', async () => {
+    await expect(loadAnswersMeta()).resolves.toBeUndefined();
+  });
+
+  it('builds nothing until asked, then ONE loader for the literal path, requiring ANSWERS_META', async () => {
+    installFactory();
+    expect(byPath('src/data/answers-meta.js')).toBeNull();
+    await loadAnswersMeta();
+    await loadAnswersMeta();
+    const l = byPath('src/data/answers-meta.js');
+    expect(l).toBeTruthy();
+    expect(made.filter((x) => x.path === 'src/data/answers-meta.js').length).toBe(1);
+    expect(globalThis.__makeLazyLoader).toHaveBeenCalledWith('answers-meta', 'src/data/answers-meta.js', null, ['ANSWERS_META']);
+    expect(l.load).toHaveBeenCalledTimes(2);
+    expect(globalThis.__answersMetaCorpus).toBeUndefined();
+  });
+
+  it('a failed load resolves rather than throws', async () => {
+    installFactory();
+    await loadAnswersMeta();
+    byPath('src/data/answers-meta.js').load.mockImplementationOnce(() => Promise.reject(new Error('offline')));
+    await expect(loadAnswersMeta()).resolves.toBeUndefined();
   });
 });

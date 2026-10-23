@@ -1,10 +1,11 @@
 {
  "open": 600,
- "strict": 548,
+ "strict": 547,
  "top5": 600,
  "found": 600,
- "held": 175,
- "fresh": 88,
+ "held": 179,
+ "fresh": 90,
+ "unsealed": 3,
  "styleTier": {
   "exact/easy": 60,
   "exact/medium": 70,

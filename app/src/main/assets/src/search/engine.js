@@ -74,6 +74,25 @@ const NAV_ONLY_KINDS = new Set(['ref-bible', 'ref-letter', 'command']);
  */
 const NAV_TEXT_LIMIT = 5;
 
+/* A TEXT DESCRIBED, NOT QUOTED (search200 sealed2, 2026-10-22). A reader describing a text opens with what it is and how it
+   speaks ("letter saying now is the time for servants watchmen and trumpet", the panel's unsealed t498; "the part where
+   your own measure comes back to you"), and those words are none of the text's: "letter" and "saying" weighed as
+   subject words, and texts holding them led the one holding what the letter says. A query opening with a text's kind
+   (letter, passage, part, entry, verse, section) and a telling word (saying, says, that says, explaining, describing,
+   telling, where, about) is searched as what follows, two words or more. A kind typed alone ("the letter sent") is a
+   word of a title, and stays. */
+const DESCRIBED = /^\s*(?:the\s+|a\s+)?(?:letter|passage|part|entry|verse|section)\s+(?:saying|says|that\s+says|explaining|explains|describing|telling|where|about)\s+(?=\S+\s+\S)/i;
+/* ...but what follows may tell what the text is about, not what it says: "the letter where the lord speaks about
+   tithing" asks for the letter titled Tithing, and "the lord speaks about tithing", searched as the text's own words,
+   led a text where the Lord speaks and tithing is named in passing (the sealed2 red team, rt3-30..33). A speaking word
+   and "about" (of, on, concerning, regarding), up to three words in, tell a subject: the query is searched as typed. */
+const SUBJECT_TOLD = /^(?:\S+\s+){0,3}?(?:speaks?|spoke|speaking|talks?|talked|talking|teach(?:es)?|taught|writes?|wrote|tells?|told|explains?|explained|warns?|warned|discuss(?:es)?|discussed)\s+(?:about|of|on|concerning|regarding)\s+\S/i;
+/** A query with its describing opening left off (DESCRIBED), unless what follows tells a subject (SUBJECT_TOLD). */
+const undescribed = (/** @type {string} */ q) => {
+  const rest = q.replace(DESCRIBED, '');
+  return rest !== q && SUBJECT_TOLD.test(rest) ? q : rest;
+};
+
 /* Typo tolerance is a FALLBACK (2026-09-22). MiniSearch rounds fuzzy 0.2 to ONE edit
    on a three-letter word, so a correctly spelled "one" also matched "owe" and "gone",
    "son" matched "sun", "peace" matched "place": verses the reader never asked for, with
@@ -119,6 +138,21 @@ function tokenRunAt(toks, run) {
   }
   return -1;
 }
+/** True when `toks` holds every token of `run` in order within a stretch of at most `width` tokens. */
+function runWithin(/** @type {string[]} */ toks, /** @type {string[]} */ run, /** @type {number} */ width) {
+  if (!run.length) return true;
+  for (let i = 0; i < toks.length; i++) {
+    if (toks[i] !== run[0]) continue;
+    let j = 1;
+    for (let k = i + 1, end = Math.min(toks.length, i + width); k < end && j < run.length; k++) if (toks[k] === run[j]) j++;
+    if (j === run.length) return true;
+  }
+  return false;
+}
+/** Words a reprint may have cut from its original's line that the original still holds the typed run with (asWell). */
+const RUN_CUT = 2;
+/** A sentence's end, where the words a reprint cut (RUN_CUT) never reach across. */
+const SENTENCE_END = /[.!?]+/;
 /** True when `run` occurs in `toks` as consecutive tokens (an empty run always does). */
 const hasTokenRun = (/** @type {string[]} */ toks, /** @type {string[]} */ run) => tokenRunAt(toks, run) >= 0;
 
@@ -931,7 +965,7 @@ function docFreq(term) {
    of it holding most of the typed words, not on its first ("every preacher speaks blasphemy and
    every church altar is corrupted" opened a sentence above "blasphemy is heard from every pulpit"). */
 const LAND_REACH = 3;
-const LAND_MARGIN = 0.1;
+const LAND_MARGIN = 0.06;
 /** The sentences of a matched passage read for the one the typed words point at. */
 const LAND_SENTENCES = 3;
 /**
@@ -1256,6 +1290,10 @@ const ALIGN_MASS = 0.5;
 const ALIGN_CANDIDATES = 300;
 /** How much of the quote (align.js cov) a text holds, slips allowed for, to lead every text holding less (tier B). */
 const ALIGN_HELD = 0.75;
+/** How much of the quote a text holds to be held with no text holding ALIGN_HELD, when it holds it far better than the rest (search() below). */
+const ALIGN_CLEAR = 0.6;
+/** Texts at most holding a clear best alike (a text and its copy) for it to be held so. */
+const CLEAR_COPIES = 2;
 /** Two covs this near, and a small word's share of the quote (search() below), hold the quote alike: the words' order stands. */
 const ALIGN_TIE = 0.02;
 /** Typed words, one of them a content word, that read as a quote when held in a row. */
@@ -1624,18 +1662,27 @@ function citedOriginal(id, text, words) {
    cut from one letter and joined by "...", re-broken and re-capitalized, so no sentence of it is
    the letter's word for word and the matched place alone carries too few of the letter's runs
    (10 open misses: the entry first, its letter below). The whole entry's runs vote once for its
-   letter. */
-/** @type {Map<string, string|null>} entry id -> the letter it condenses */
+   letter.
+   AN ENTRY CUT FROM TWO LETTERS (search200 sealed2, 2026-10-22). Some entries join lines of two letters about evenly
+   (Words To Live By Part Two's "A Prophet": 18 of its runs are a Rebuke letter's, 10 a Little Flock letter's). The
+   letter had to lead the vote by twice the next one's, so that entry had no letter, and it led its original for a
+   line typed whole. A letter giving it CONDENSED_RUNS runs and more than half the leading letter's is one it is cut
+   from (the leader alone when it has twice the next one's, as before), most runs first; the first of them holding
+   the query as well as the entry does (originalsFirst) is its original there. */
+/** Runs an entry shares with a letter for that letter to be one it is cut from. */
+const CONDENSED_RUNS = 3;
+/** @type {Map<string, string[]>} entry id -> the letters it is cut from, most runs first (none: []) */
 const SOURCE_CACHE = new Map();
 function condensedFrom(/** @type {string} */ id, /** @type {string} */ text, /** @type {number} */ tier) {
-  if (SOURCE_CACHE.has(id)) return SOURCE_CACHE.get(id) || null;
+  const known = SOURCE_CACHE.get(id);
+  if (known) return known;
   const D = /** @type {Map<string, any>} */ (ORIGINAL_DOCS);
   /** @type {Map<string, number>} */ const votes = new Map();
   eachShingle(kjvEncode(text), (h) => {
     for (const x of /** @type {Map<number, string[]>} */ (SHINGLES).get(h) || []) if (x !== id && ORIGINAL_TIER[D.get(x).kind] < tier) votes.set(x, (votes.get(x) || 0) + 1);
   });
   const ranked = [...votes].sort((a, b) => b[1] - a[1]);
-  const src = ranked.length && ranked[0][1] >= 3 && (ranked.length < 2 || ranked[0][1] >= 2 * ranked[1][1]) ? ranked[0][0] : null;
+  const src = ranked.filter((r) => r[1] >= CONDENSED_RUNS && 2 * r[1] > ranked[0][1]).map((r) => r[0]);
   SOURCE_CACHE.set(id, src);
   return src;
 }
@@ -1750,9 +1797,9 @@ function typedAlts(/** @type {Array<{term:string, origin:number, literal?:boolea
  * @param {(doc:any) => boolean} named  the query names this text's title so: it keeps its place
  * @param {(id:string, doc:any) => number} near  how nearly a text holds the typed words in a row (0..1)
  * @param {string[]} [typed]  every typed word, the small ones too: a quote's excerpt is cut by them
- * @param {{has: (id:string) => boolean, cov: (id:string) => number}|null} [aligned]  B4's texts holding the quote with
- *   its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an original
- *   holding ALIGN_HELD of the quote as well
+ * @param {{has: (id:string) => boolean, cov: (id:string) => number, bar: number}|null} [aligned]  B4's texts holding the
+ *   quote with its slips (has), and how much of it a text holds (cov, align.js): a reprint held so gives way only to an
+ *   original holding the quote as well as the held do (bar: ALIGN_HELD, or a clear best's cov)
  * @param {Map<string, string[]>|null} [alts]  each typed word's synonyms, forms and title near-synonyms (typedAlts, encoded)
  */
 function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], aligned = null, alts = null) {
@@ -1786,12 +1833,28 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
      gives way only to an original holding it as well (B3, below), and "as well" read the words as typed: an Answers
      topic printing a letter's line with one word in another form ("My prophets" where the letter says "My prophet")
      held the run, the letter did not, and the topic led its original. An original holding every typed word in a row,
-     each as typed or in another form of it (passage.js lemma), holds it as well. */
+     each as typed or in another form of it (passage.js lemma), holds it as well.
+     ...OR WITH THE WORDS ITS REPRINT CUT (search200 sealed2, 2026-10-22). A Words To Live By entry prints a letter's line
+     with a small word or two cut ("I have written it on tablets of stone", where the letter says "For I have indeed
+     written it, even on tablets of stone"): the reader typing the entry's words held its run whole, the letter did not,
+     and the entry led its original. An original holding every typed word in order, so, within RUN_CUT words more than
+     were typed, holds it as well...
+     ...WITHIN ONE SENTENCE (sealed2 red team, rt3-08). The words a reprint cut sit inside its line: "the harlot has
+     deceived you" was read held by a letter's "the harlot! She has deceived you", two sentences, and the letter led
+     the Answers topic holding the line whole. The words between are counted within a sentence of the original (its
+     KJV wording read whole, as it has no sentence marks). */
   const typedLemmas = typed.map(lemma);
   /** Does text `x` hold the typed words as nearly as a reprint holding `own` of them in a row (near, 0..1)? */
-  const asWell = (/** @type {string} */ x, /** @type {any} */ d, /** @type {number} */ own) => near(x, d) >= own - 0.1 ||
-    (own >= 1 && typedLemmas.length >= RUN_MIN && !!d && !!d.text &&
-      tokenRunAt(joinApostropheS(withKjv(msIndex, msIndex._idToShortId.get(x), kjvEncode(d.text))).map(lemma), typedLemmas) >= 0);
+  const asWell = (/** @type {string} */ x, /** @type {any} */ d, /** @type {number} */ own) => {
+    if (near(x, d) >= own - 0.1) return true;
+    if (!(own >= 1 && typedLemmas.length >= RUN_MIN && !!d && !!d.text)) return false;
+    const mine = kjvEncode(d.text);
+    const both = withKjv(msIndex, msIndex._idToShortId.get(x), mine);
+    if (tokenRunAt(joinApostropheS(both).map(lemma), typedLemmas) >= 0) return true;
+    const w = typedLemmas.length + RUN_CUT;
+    const within = (/** @type {string[]} */ toks) => runWithin(joinApostropheS(toks).map(lemma), typedLemmas, w);
+    return d.text.split(SENTENCE_END).some((s) => within(kjvEncode(s))) || (both !== mine && within(both.slice(mine.length)));
+  };
   for (let i = 0; i < Math.min(out.length, ORIGINAL_REACH); i++) {
     const e = out[i];
     const tier = ORIGINAL_TIER[e.doc.kind];
@@ -1816,9 +1879,13 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
        letter or verse a sentence's key, its shingles, a cite or the model's passage names may hold another of its lines
        (a study's sentence beside the quote, or the verse a study quotes in another translation's words). */
     const holds = aligned && aligned.has(idOf.get(e) || '') ? aligned : null;
+    // ...a study held as a clear best (under ALIGN_HELD) gives way to the verse it quotes, its original, as keep() has it
+    // below: the study prints the verse's reference beside the quote ("John 3:16 For God so loved the world"), and the
+    // reference's numbers typed with the quote held the study clear of the verse (search200 sealed2, hunt rt1-shapes-27)
+    const quotes = holds && holds.bar < ALIGN_HELD && e.doc.kind === 'bible-study';
     const fit = (/** @type {string[]|null} */ f) => {
       if (!f || !holds) return f;
-      const k = f.filter((x) => holds.cov(x) >= ALIGN_HELD);
+      const k = f.filter((x) => holds.cov(x) >= holds.bar || (quotes && D.get(x).kind === 'verse'));
       return k.length ? k : null;
     };
     const keep = (/** @type {string[]|null} */ f) => {
@@ -1873,14 +1940,16 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
     }
     if (!found && (e.doc.kind === 'wtlb' || e.doc.kind === 'blessed')) {
       const id = idOf.get(e) || '';
-      const src = condensedFrom(id, e.doc.text, tier);
+      const srcs = condensedFrom(id, e.doc.text, tier);
       const pq = passageQuery(words);
-      const share = src ? eachWording(docLemmas(id, e.doc.text), (t) => bestWindow(pq.query, t, pq.span)) : 0;
-      const own = src ? near(id, e.doc) : 0;
+      const share = srcs.length ? eachWording(docLemmas(id, e.doc.text), (t) => bestWindow(pq.query, t, pq.span)) : 0;
+      const own = srcs.length ? near(id, e.doc) : 0;
       // The entry is cut from its letter: whatever of the query it holds, a letter holding as much comes first
       // (sr11, 2026-10-15: a bar of half the query kept "history has an end and christ is coming" on the entry at
       // 0.46 with its letter holding the same 0.46; Corbin, DECISIONS 10-14: the original first, the reprint second).
-      if (src && share > 0 && holdsAsWell(src, pq, share) && (own < NEAR_PHRASE_MIN || asWell(src, D.get(src), own))) found = fit([src]);
+      // Cut from two letters: the first of them holding it so (sealed2).
+      const src = share > 0 ? srcs.find((x) => holdsAsWell(x, pq, share) && (own < NEAR_PHRASE_MIN || asWell(x, D.get(x), own))) : undefined;
+      if (src) found = fit([src]);
     }
     if (!found && e.doc.kind === 'answers') {
       // A study or Holy Days text just below that holds the query as well, in one passage and in a row: it is what Answers reprints.
@@ -1902,7 +1971,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
         if (t === undefined || t >= tier || (titled && t < ORIGINAL_TIER['holy-day']) || !f.doc.text) continue;
         const fid = idOf.get(f) || '';
         if (share > 0 && eachWording(docLemmas(fid, f.doc.text), (t) => bestWindow(pq.query, t, pq.span)) >= share - REPRINT_COST && asWell(fid, f.doc, own) &&
-          (!holds || holds.cov(fid) >= ALIGN_HELD) && (!titled || holdsTopic(id, e.doc, fid, f.doc, words))) {
+          (!holds || holds.cov(fid) >= holds.bar) && (!titled || holdsTopic(id, e.doc, fid, f.doc, words))) {
           out.splice(r, 1);
           out.splice(i, 0, f);
           i++;
@@ -1946,7 +2015,7 @@ function originalsFirst(out, idOf, terms, allowed, named, near, typed = [], alig
       const vid = idOf.get(v) || '';
       const vNear = near(vid, v.doc);
       if (vNear < oNear) continue;
-      if (holds ? holds.has(vid) && holds.cov(vid) >= Math.max(ALIGN_HELD, oCov) : vNear >= NEAR_PHRASE_MIN && asWell(vid, v.doc, whole)) verses.push(v);
+      if (holds ? holds.has(vid) && holds.cov(vid) >= Math.max(holds.bar, oCov) : vNear >= NEAR_PHRASE_MIN && asWell(vid, v.doc, whole)) verses.push(v);
     }
     for (const v of verses) out.splice(out.indexOf(v), 1);
     out.splice(i, 0, ...verses);
@@ -2059,17 +2128,24 @@ function reprintSecond(out, terms, idOf, allowed) {
       if (/[.!?]\s*$/.test(s)) break;
     }
   }
-  // a reprint of the passage's own words: the first text below holding a run of them
+  /* a reprint of the passage's own words: the first text below holding a run of them, the one holding the most of its
+     runs first (search200 sealed2, 2026-10-22: a letter sharing only the sentence's last words, "for they have refused
+     to accept Me as I truly am", came up second, and the Answers topic reprinting the whole sentence stayed at #12) */
   let slot = 1;
   if (toks.length >= 5) {
     const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
     const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
-    for (let r = 1; r < Math.min(out.length, REPRINT_REACH); r++) {
+    let best = 0;
+    let most = 0;
+    for (let r = 1; r < Math.min(out.length, REPRINT_REACH) && most < res.length; r++) {
       const t = out[r].doc.text;
       if (!t || out[r].doc.kind === 'verse') continue;
-      if (res.some((re) => re.test(t))) { if (r > 1) out.splice(1, 0, out.splice(r, 1)[0]); slot = 2; break; }
+      let n = 0;
+      for (const re of res) if (re.test(t)) n++;
+      if (n > most) { most = n; best = r; }
     }
+    if (best) { if (best > 1) out.splice(1, 0, out.splice(best, 1)[0]); slot = 2; }
   }
   if (topic) return citedNext(out, st, slot, /** @type {Map<any, string>} */ (idOf), /** @type {(doc:any) => boolean} */ (allowed));
   if (!verses.length || !idOf || !allowed) return false;
@@ -2352,7 +2428,8 @@ async function search(query, options) {
     if (edge) parsed = edge;
     if (NAV_ONLY_KINDS.has(parsed.kind) && !parsed.alsoText) return { parsed, results: [], parsedTerms: [], textQuery: null };
   }
-  const textQ = typeof parsed.text === 'string' && parsed.text.trim() ? parsed.text : query;
+  const typedQ = typeof parsed.text === 'string' && parsed.text.trim() ? parsed.text : query;
+  const textQ = undescribed(typedQ);
 
   /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
      ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
@@ -2391,7 +2468,7 @@ async function search(query, options) {
      readings of one query, and the return carries both. */
   const navAlso = parsed.kind !== 'text';
   const useStop = options.useStopWords !== false;
-  const read = navAlso ? parseTextQuery(textQ) : parsed;
+  const read = navAlso || textQ !== typedQ ? parseTextQuery(textQ) : parsed;
   /* A BARE WORD BESIDE A QUOTED PHRASE IS A WORD THE TEXT HOLDS (sweep 2026-10-14 v001). Only the phrase was
      searched, so '"love one another" brethren' showed every text holding the phrase, ranked and marked as if
      "brethren" was never typed. It narrows the phrase as a +word does (a small word aside); a phrase and word
@@ -2945,6 +3022,8 @@ async function search(query, options) {
   const alignHeld = new Map();
   /** @type {((id: string) => number)|null} how much of the quote a text holds (align.js cov), for originalsFirst */
   let alignCovOf = null;
+  /** How much of the quote the texts held hold at least: ALIGN_HELD, or a clear best's (below), for originalsFirst */
+  let alignBar = ALIGN_HELD;
   const AS = ALIGN_ON && !p.phrase && !keyword && typedTokens.length >= ALIGN_MIN && !heldWhole.length ? storeNow() : null;
   if (AS) {
     const n = msIndex.documentCount || 1;
@@ -3036,6 +3115,8 @@ async function search(query, options) {
     let under = 0;
     /** @type {[ArrayLike<any>, number, number]|null} that candidate's tokens and span, for the typed words it holds */
     let underAt = null;
+    /** @type {Array<{id: string, cov: number, first: number, at: [ArrayLike<any>, number, number], added: boolean}>} the candidates under ALIGN_HELD */
+    const below = [];
     /* A TEXT HOLDING MORE OF THE TYPED WORDS IS NO TIE (search200 R4, 2026-10-18). Two covs within `tie` hold the quote
        alike only when neither text holds a typed word the other lacks (align.js alignMet): x over y when x holds every
        content word y holds and more, or the same content words and every small word y holds and more. */
@@ -3115,7 +3196,36 @@ async function search(query, options) {
       }
       // it opens where the first typed words are (clauses typed in the other order: on the first typed)
       if (a.cov >= ALIGN_HELD) alignHeld.set(id, { cov: a.cov, start: a.first, rank: 0, met: alignMet(at[0], at[1], at[2], w, cls) });
-      else if (a.cov > under && !nearAdded.has(id)) { under = a.cov; underAt = at; }
+      else {
+        if (a.cov > under && !nearAdded.has(id)) { under = a.cov; underAt = at; }
+        below.push({ id, cov: a.cov, first: a.first, at, added: nearAdded.has(id) });
+      }
+    }
+    /* A CLEAR BEST UNDER ALIGN_HELD (search200 sealed2, 2026-10-22; the fault hunt's slip C4 (b)). A text holding the
+       quote far better than every other text, short of ALIGN_HELD, got nothing: a study's line remembered with two of
+       its words traded ("offered as a symbol" for "sacrificed as a representation") held 0.748 of it, the next text
+       0.357, and verses holding its common words led (tri m274; the hunt's sli-18 0.66 against 0.49, sli-21 0.72
+       against 0.47). With no text holding ALIGN_HELD, the best holding ALIGN_CLEAR is held, with the texts holding it
+       alike (within a small word: its copy, its pair), when every other text holds it twice that less: a field of
+       texts holding it about as well (the Nehemiah 8:10 shape, fortress verses for "your fortress") holds nothing so,
+       nor does a passage many texts print alike (more than CLEAR_COPIES: "who willingly gave up His life... carried
+       the weight of the world's sin to the cross", in six texts, held 0.697 of "a servant who gives up his life every
+       day carrying his cross", a paraphrase of a Blessed line, and led it on the 500's open t359). The best other text
+       is then the one the held are told from (`under`). */
+    if (!alignHeld.size && below.length) {
+      let top = 0;
+      for (const b of below) if (b.cov > top) top = b.cov;
+      if (top >= ALIGN_CLEAR) {
+        const alike = below.filter((b) => top - b.cov <= tie);
+        let next = null;
+        for (const b of below) if (!b.added && top - b.cov > tie && (!next || b.cov > next.cov)) next = b;
+        if (alike.length <= CLEAR_COPIES && top - (next ? next.cov : 0) > 2 * tie) {
+          for (const b of alike) alignHeld.set(b.id, { cov: b.cov, start: b.first, rank: 0, met: alignMet(b.at[0], b.at[1], b.at[2], w, cls) });
+          alignBar = Math.min(...alike.map((b) => b.cov));
+          under = next ? next.cov : 0;
+          underAt = next ? next.at : null;
+        }
+      }
     }
     const underMet = underAt ? alignMet(underAt[0], underAt[1], underAt[2], w, cls) : null;
     /* Held, and told from the rest: a text holding the quote within a small word of one just under ALIGN_HELD holds it
@@ -3579,7 +3689,7 @@ async function search(query, options) {
   };
   if (msIndex === inUse) originalsFirst(out, idOf, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), (d) => allowed(d) && fresh(d),
     admittedDocs.size ? (/** @type {any} */ d) => admittedSo(d) || namedSo(d) : namedSo, nearTyped, typedTokens,
-    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf } : null, typedAlts(units, filtered));
+    alignHeld.size && alignCovOf ? { has: (id) => alignHeld.has(id), cov: alignCovOf, bar: alignBar } : null, typedAlts(units, filtered));
   // What those two added counts in its collection. A full one does not refuse it (the words' 400th
   // verse is no reason to drop the model's best text or an original): its last text gives way.
   if (perVolume) {

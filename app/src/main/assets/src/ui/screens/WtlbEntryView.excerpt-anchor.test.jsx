@@ -87,6 +87,15 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
     expect(seekOffsetSeen.at(-1)).toBe(0);
   });
 
+  it('a saved mark names its paragraph (Saved answers, O5): words a page repeats land on that copy, not the first', () => {
+    const twice = { ...ENTRY, paragraphs: [...ENTRY.paragraphs, { align: 'justify', text: ENTRY.paragraphs[0].text }] };
+    renderEntry({ entry: twice, surpriseAnchor: { type: 'excerpt', text: twice.paragraphs[2].text, letterId: ENTRY.id, para: 2 } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['wtlb:matters-of-the-heart:2']);
+    expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:2"]').className).toContain('pulse');
+    expect(document.querySelector('[data-hl-key="wtlb:matters-of-the-heart:0"]').className).not.toContain('pulse');
+  });
+
   it('moving to the next entry inside the 4 s does not carry the pulse or the seek there (v01-03)', () => {
     // Improvement sweep 2026-09-22, v01-reading-03: the entry changes in the SAME instance, the
     // anchor (made for the old entry) is skipped by the letterId guard - which returned before
@@ -136,11 +145,54 @@ describe('WtlbEntryView — an excerpt anchor lands on the paragraph that holds 
   });
 });
 
+/* aogcg 1b: a link to answersonlygodcangive.com/Topic#Section (a letter's Related Topics row) opens the
+   topic AT that section: the anchor names the site's MediaWiki fragment, resolved against the topic's
+   headings (or its sections sidecar once loaded), and the heading comes to the top the way the
+   Contents sheet's jump brings it there. */
+describe('WtlbEntryView — a section anchor lands on the section the link names', () => {
+  const TOPIC = {
+    id: 'regarding-pride', title: 'Regarding Pride', num: 105,
+    paragraphs: [
+      { align: 'center', text: '**Here is Wisdom**' },
+      { align: 'justify', text: 'Pride goes before destruction.' },
+      { align: 'right', text: '~ [From “Pride” ~ Words To Live By: Part One]' },
+      { align: 'center', text: '**For the Sake of Pride**' },
+      { align: 'justify', text: 'A haughty spirit before a fall.' },
+      { align: 'right', text: '~ [From “Pride” ~ Words To Live By: Part One]' },
+    ],
+    prevEntry: null, nextEntry: null,
+  };
+  const renderTopic = (anchor) => render(
+    <WtlbEntryView entry={TOPIC} volKey="answers" partLabel="Answers" theme="dark" markAsReadEnabled={false} footnotesMode={false}
+      onNavigate={() => {}} onHome={() => {}} surpriseAnchor={anchor} />,
+  );
+
+  it('scrolls the heading the fragment names into view and marks it landed', () => {
+    renderTopic({ type: 'section', letterId: 'regarding-pride', anchor: 'For_the_Sake_of_Pride' });
+    // A topic's body paints once its sidecar is in, or 300 ms on (AOGCG f07 Loading): the landing follows it.
+    act(() => { vi.advanceTimersByTime(350); });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['wtlb:regarding-pride:3']);
+    expect(document.querySelector('[data-hl-key="wtlb:regarding-pride:3"]').className).toContain('pulse');
+  });
+
+  it('a fragment the topic has no heading for, or one made for another topic, scrolls nothing', () => {
+    renderTopic({ type: 'section', letterId: 'regarding-pride', anchor: 'No_Such_Heading' });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual([]);
+    cleanup();
+    renderTopic({ type: 'section', letterId: 'regarding-faith', anchor: 'For_the_Sake_of_Pride' });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual([]);
+  });
+});
+
 describe('WtlbEntryView — an Answers topic renders before the letters have landed', () => {
   // WTLB_SCRIPTURES rides the VOT corpus; an Answers topic is its own corpus.
   // A restored tab reopened straight onto a topic after a reload threw
   // "WTLB_SCRIPTURES is not defined" and took the whole app to its error screen.
-  it('builds its footnotes with no WTLB_SCRIPTURES global at all', () => {
+  // AOGCG Topic stage: one cite style on a topic, inline (Book X:Y) only (U6), whatever footnotesMode says.
+  it('draws its cites inline with no WTLB_SCRIPTURES global at all, and no footnote bubbles or list', () => {
     delete globalThis.WTLB_SCRIPTURES;
     const topic = {
       id: 'regarding-pride', title: 'Regarding Pride', num: 105,
@@ -156,11 +208,13 @@ describe('WtlbEntryView — an Answers topic renders before the letters have lan
       <WtlbEntryView entry={topic} volKey="answers" partLabel="Answers" theme="dark" markAsReadEnabled={false} footnotesMode={true}
         onNavigate={() => {}} onHome={() => {}} />,
     )).not.toThrow();
-    expect(document.querySelector('.footnote-list')).toBeTruthy();
-    // Where it is filed, not its number in the site's page list.
-    expect(document.querySelector('.hero-eyebrow').textContent).toBe('Answers · Walking With God');
-    expect(document.querySelector('.related-card').textContent).toContain('The Messiah');
-    expect(document.querySelector('.wtlb-source-line a').getAttribute('href')).toBe('https://answersonlygodcangive.com/Regarding_Pride');
+    act(() => { vi.advanceTimersByTime(400); });
+    expect(document.querySelector('.ans-display').textContent).toBe('Regarding Pride');
+    expect(document.querySelector('.fn-ref')).toBeNull();
+    expect(document.querySelector('.footnote-list')).toBeNull();
+    expect(document.querySelector('a.wtlb-cite').textContent).toBe('(Proverbs 16:18)');
+    // the source line is a chip; its words stay the paragraph's own (D3)
+    expect(document.querySelector('[data-hl-key="wtlb:regarding-pride:1"]').textContent).toBe('~ [From “Pride” ~ Words To Live By: Part One]');
   });
 });
 
@@ -174,7 +228,7 @@ describe('WtlbEntryView — the body names its marks for the corpus remap (n4-02
       .toEqual(['wtlb:matters-of-the-heart:0', 'wtlb:matters-of-the-heart:1']);
   });
 
-  it('carries them with footnotes on too (the default for WTLB and Answers)', () => {
+  it('carries them with footnotes on too (as the Holy Days route draws its entries)', () => {
     renderEntry({ footnotesMode: true });
     expect(document.querySelector('[data-mark-entry]').getAttribute('data-mark-entry')).toBe('wtlb:matters-of-the-heart:');
   });

@@ -261,6 +261,17 @@ import { VotSearchMini } from '../search/engine.js';
 import { getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches } from '../search/recent-searches.js';
 import { ScriptureWebScreen, ensureScriptureWebData } from './screens/ScriptureWebScreen.jsx';
 import { webStartOfRef } from '../utils/scripture-web/ref-parse.js';
+// Answers Only God Can Give, hosted whole by v2's Answers places (v2/screens/AnswersScreens.jsx, mw14)
+import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
+import { AnswersShelf } from './screens/AnswersShelf.jsx';
+import { AnswersMedia } from './screens/AnswersMedia.jsx';
+import { AnswersSaved } from './screens/AnswersSaved.jsx';
+import { AnswersTopic, answersHlDomChanged, answersHeadCover } from './components/AnswersTopic.jsx';
+import { useAnswersMetaState, readAnswersPath, writeAnswersPath, answersLayoutClass } from './components/AnswersParts.jsx';
+import { isAnswersGroupKey, ANSWERS_SUBJECT_GROUP } from '../utils/answers-retired.js';
+import { answersSectionAnchor, answersAnchorPara, answersMetaFor } from '../utils/answers-sections.js';
+import { answersShelfByKey } from '../utils/answers-browse.js';
+import { passageTextBefore } from '../utils/answers-contents.js';
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
 import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
@@ -408,6 +419,9 @@ Object.assign(window, {
   VotSearchMini,
   getRecentSearches, addRecentSearch, removeRecentSearch, clearRecentSearches,
   ScriptureWebScreen, ensureScriptureWebData, webStartOfRef,
+  AnswersHome, resetAnswersLanding, AnswersShelf, AnswersMedia, AnswersSaved, AnswersTopic, answersHlDomChanged,
+  useAnswersMetaState, readAnswersPath, writeAnswersPath, answersLayoutClass, isAnswersGroupKey, ANSWERS_SUBJECT_GROUP,
+  answersSectionAnchor, answersAnchorPara, answersMetaFor, answersShelfByKey, answersHeadCover, passageTextBefore,
   MyProgressScreen,
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
   HistoryScreen,

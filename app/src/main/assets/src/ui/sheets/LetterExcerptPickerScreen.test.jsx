@@ -213,14 +213,24 @@ describe('LetterExcerptPickerScreen draws the reader\'s own text', () => {
     expect(block.querySelector('sup')).toBeNull();
   });
 
-  it('an Answers or Holy Days paragraph shows its reference as the footnote number its route renders', () => {
+  it('a Holy Days paragraph shows its reference as the footnote number its route renders', () => {
+    stubGlobals({ title: 'Faith', paragraphs: [{ text: 'Walk by faith {{ref:2 Corinthians 5:7}} and not by sight.' }] });
+    window.COLLECTIONS = [{ volKey: 'holydays', label: 'Regarding The Holy Days' }];
+    const refine = { target: { type: 'letter', letterId: 'faith', key: 'letter:faith:0', collection: 'Regarding The Holy Days' }, item: { label: 'Faith' } };
+    const { container } = render(<LetterExcerptPickerScreen {...baseProps} refineRequest={refine} />);
+    const block = container.querySelector('[data-block-key="0"]');
+    expect(block.textContent).toBe('Walk by faith 1 and not by sight.');
+    expect(block.querySelector('sup.picker-fn').textContent).toBe('1');
+  });
+
+  it('an Answers paragraph shows its reference inline, as the topic page draws it (U6)', () => {
     stubGlobals({ title: 'Faith', paragraphs: [{ text: 'Walk by faith {{ref:2 Corinthians 5:7}} and not by sight.' }] });
     window.COLLECTIONS = [{ volKey: 'answers', label: 'Answers Only God Can Give' }];
     const refine = { target: { type: 'letter', letterId: 'faith', key: 'letter:faith:0', collection: 'Answers Only God Can Give' }, item: { label: 'Faith' } };
     const { container } = render(<LetterExcerptPickerScreen {...baseProps} refineRequest={refine} />);
     const block = container.querySelector('[data-block-key="0"]');
-    expect(block.textContent).toBe('Walk by faith 1 and not by sight.');
-    expect(block.querySelector('sup.picker-fn').textContent).toBe('1');
+    expect(block.textContent).toBe('Walk by faith (2 Corinthians 5:7) and not by sight.');
+    expect(block.querySelector('sup.picker-fn')).toBeNull();
   });
 
   it('keeps the find row out of the scrolling body, so ‹ › stay in reach once a hit scrolls the letter', () => {

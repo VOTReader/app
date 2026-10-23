@@ -83,7 +83,9 @@ export function _validateTabState(s) {
   if (s.screen === "vot-letter" && !s.letterId) s.screen = "home";
   if (s.screen === "hm-letter" && !s.letterId) s.screen = "home";
   if (/^(wtlb-one-entry|wtlb-two-entry|blessed-entry|holy-days-entry|answers-entry)$/.test(s.screen) && !s.letterId) s.screen = "home";
-  if (s.screen === "answers-subject" && !s.letterId) s.screen = "answers-home";
+  // The retired Answers screens (the nine subjects, the A–Z screen) reopen where their topics live
+  // now: a subject on its site group's shelf or the landing, A–Z on the landing (answers-retired.js).
+  answersRetiredPlace(s);
   if (s.screen === "garden-view" && s.gardenPage == null) s.screen = "home";
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-index$/.test(s.screen)) s.screen = "volumes-home";
   if ((s.screen === "matthew-idx" || s.screen === "bible-idx") && !s.bookId) s.screen = "home";
@@ -98,6 +100,7 @@ export function _validateTabState(s) {
   return s;
 }
 
+import { answersRetiredPlace } from '../utils/answers-retired.js';
 import { StateStore } from '../stores/state-store.js';
 import { mergeStateStore } from '../stores/store-merge.js';
 import { takeResumeRecord, stateStoreUnloaded } from './use-persisted-state.js';

@@ -426,16 +426,15 @@
       return /letter-body|letter-para|letter-intro/.test(document.body.innerHTML);
     });
     await step('Answers', async function () {
-      // Home card -> landing -> a subject -> a topic. The topics are their own
-      // lazy file (src/data/answers.js, utils/sync-loaders.js): a deploy or an
-      // APK ignore pattern that drops it leaves the landing on "Loading..."
-      // forever, and fails HERE.
+      // Home card -> landing -> Other Topics -> a topic (the AOGCG redesign: the
+      // site's own contents). The tablets paint at once; the topic rows wait for
+      // their own lazy file (src/data/answers.js, utils/sync-loaders.js): a deploy
+      // or an APK ignore pattern that drops it leaves the lists empty forever, and
+      // fails HERE.
       if (!clickByText(/Topics & Doctrines/)) return false;
       var ok = false;
-      for (var w = 0; w < 40 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.answers-tablet-row').length === 10; }
-      if (!ok || document.querySelectorAll('.answers-subject-tile').length !== 10) return false;
-      if (!clickByText(/^The End of This Age/)) return false;
-      await sleep(300);
+      for (var w = 0; w < 60 && !ok; w++) { await sleep(150); ok = document.querySelectorAll('.ans-tablet').length === 10 && document.querySelectorAll('.ans-landing-b .ans-row').length >= 30; }
+      if (!ok) return false;
       if (!clickByText(/^The Coming of The Lord/)) return false;
       await sleep(400);
       return !!document.querySelector('[data-hl-key^="wtlb:the-coming-of-the-lord:"]');

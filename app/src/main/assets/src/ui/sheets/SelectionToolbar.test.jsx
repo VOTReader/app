@@ -31,6 +31,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll, dockTop } from './SelectionToolbar.jsx';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
 import { showToast as realShowToast, _resetToasts } from '../../utils/toast.js';
@@ -1910,5 +1911,95 @@ describe('SelectionToolbar — the Scripture Web door', () => {
     const b = readingContainer('bible:john:3:17', 'For God did not send');
     mount();
     expect(door(await raise(b, 0, 8))).toBeNull();
+  });
+});
+
+/* AOGCG O6: on a passage of an Answers topic (wtlb:<topic id>:<n>, ANSWERS loaded) the toolbar offers
+   "Share as a card" in the same full-width row the web's door uses; it opens the card sheet with the
+   passage verbatim and its own source. Nowhere else. */
+describe('SelectionToolbar — Share as a card (Answers)', () => {
+  const G = ['ANSWERS', 'ANSWERS_META', 'SheetHandle', 'useFocusTrap', 'ReactDOM'];
+  beforeEach(() => {
+    const w = /** @type {any} */ (window);
+    w.ANSWERS = [{ id: 'there-is-no-other', title: 'THERE IS NO OTHER', paragraphs: [
+      { text: 'For I am a Great King! Says The Lord.' }, { text: '~ [From “The Alarm of War” ~ Volume 7]' }] }];
+    w.SheetHandle = ({ onClose }) => <button type="button" onClick={onClose} aria-label="Close">x</button>;
+    w.useFocusTrap = () => ({ current: null });
+    w.ReactDOM = ReactDOM;
+  });
+  afterEach(() => { for (const g of G) delete /** @type {any} */ (window)[g]; delete /** @type {any} */ (window).__closeSheet; });
+
+  async function raise(c, start, end) {
+    stubSelection(rangeOver(c, start, end));
+    act(() => { fire(c, 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => {
+      fire(c, 'pointerup', { clientX: 80, clientY: 5 });
+      await new Promise((r) => setTimeout(r, 250));
+    });
+    return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
+  }
+  const door = (tb) => /** @type {HTMLButtonElement | null} */ (tb.querySelector('[data-door="card"]'));
+
+  it('an Answers passage: its own row under the six actions, opening the card with the words and their source', async () => {
+    const c = readingContainer('wtlb:there-is-no-other:0', 'For I am a Great King! Says The Lord.');
+    mount();
+    const tb = await raise(c, 0, 22);
+    const btn = door(tb);
+    expect(btn.textContent.trim()).toBe('Share as a card');
+    expect(btn.closest('.sel-toolbar-row').classList.contains('sel-toolbar-web')).toBe(true);
+    expect([...tb.querySelectorAll('.sel-toolbar-actions .sel-action-btn span')].map((s) => s.textContent))
+      .toEqual(['Note', 'Link', 'Copy', 'Share', 'Search', 'Bookmark']);
+    act(() => { btn.click(); });
+    expect(document.querySelector('.sel-toolbar')).toBeNull();
+    const sheet = document.querySelector('[role="dialog"][aria-label="Share as a card"]');
+    expect(sheet).not.toBeNull();
+    expect(sheet.querySelector('canvas').getAttribute('aria-label')).toBe('For I am a Great King! “The Alarm of War” · Volume 7');
+    act(() => { /** @type {HTMLElement} */ (sheet.querySelector('[aria-label="Close"]')).click(); });
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('a selection across two passages is cited by the passage it starts in', async () => {
+    const w = /** @type {any} */ (window);
+    w.ANSWERS = [{ id: 'there-is-no-other', title: 'THERE IS NO OTHER', paragraphs: [
+      { text: 'For I am a Great King! Says The Lord.' }, { text: '~ [From “The Alarm of War” ~ Volume 7]' },
+      { text: 'Be still, and know.' }, { text: '~ [From “A Second Letter” ~ Volume 3]' }] }];
+    const ps = ['For I am a Great King! Says The Lord.', '~ [From “The Alarm of War” ~ Volume 7]', 'Be still, and know.']
+      .map((t, i) => readingContainer('wtlb:there-is-no-other:' + i, t));
+    mount();
+    const r = document.createRange();
+    r.setStart(/** @type {any} */ (ps[0].firstChild), 4);
+    r.setEnd(/** @type {any} */ (ps[2].firstChild), 9);
+    r.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, top: 100, right: 80, bottom: 116, width: 80, height: 16 });
+    stubSelection(r);
+    act(() => { fire(ps[0], 'pointerdown', { clientX: 5, clientY: 5 }); });
+    await act(async () => { fire(ps[2], 'pointerup', { clientX: 80, clientY: 5 }); await new Promise((res) => setTimeout(res, 250)); });
+    act(() => { /** @type {HTMLElement} */ (door(/** @type {HTMLElement} */ (document.querySelector('.sel-toolbar')))).click(); });
+    const label = document.querySelector('[role="dialog"][aria-label="Share as a card"] canvas').getAttribute('aria-label');
+    expect(label.startsWith('I am a Great King!')).toBe(true);
+    expect(label.endsWith('“The Alarm of War” · Volume 7')).toBe(true);
+    expect(label).not.toContain('A Second Letter');
+  });
+
+  it('not on a selection with no words in it (nothing to set on a card)', async () => {
+    const c = readingContainer('wtlb:there-is-no-other:0', '** __ **');
+    mount();
+    const tb = await raise(c, 0, 8);
+    expect(tb).not.toBeNull();
+    expect(door(tb)).toBeNull();
+  });
+
+  it('not on Words To Live By, a letter, or before the Answers corpus is in', async () => {
+    const w = readingContainer('wtlb:devotion:1', 'Words To Live By');
+    mount();
+    expect(door(await raise(w, 0, 5))).toBeNull();
+    cleanup();
+    const l = readingContainer('letter:the-wide-path:4', 'Enter by the narrow gate');
+    mount();
+    expect(door(await raise(l, 0, 5))).toBeNull();
+    cleanup();
+    delete /** @type {any} */ (window).ANSWERS;
+    const a = readingContainer('wtlb:there-is-no-other:0', 'For I am a Great King!');
+    mount();
+    expect(door(await raise(a, 0, 5))).toBeNull();
   });
 });

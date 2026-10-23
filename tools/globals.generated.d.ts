@@ -7,12 +7,15 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 619 distinct identifiers.
+// Total: 640 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
 // The hooks are declared in hook-globals*.generated.d.ts (hook_global_types).
 declare const ANSWERS: any;
+declare const ANSWERS_META: any;
+declare const ANSWERS_SITE_META: any;
+declare const ANSWERS_SUBJECT_GROUP: any;
 declare const ARROW_LAYOUT_OPTIONS: any;
 declare const AUDIO_ALTERNATES: any;
 declare const AUDIO_MANIFEST: any;
@@ -26,6 +29,11 @@ declare const AnnHintDismissedFlagStore: any;
 declare const AnnotationActionChip: any;
 declare const AnnotationDomSync: any;
 declare const AnnotationStore: any;
+declare const AnswersHome: any;
+declare const AnswersMedia: any;
+declare const AnswersSaved: any;
+declare const AnswersShelf: any;
+declare const AnswersTopic: any;
 declare const App: any;
 declare const AppShellOverlays: any;
 declare const AppShellSheets: any;
@@ -376,6 +384,13 @@ declare const _verseRangeLabel: any;
 declare const addRecentSearch: any;
 declare const annotationSourceForKey: any;
 declare const announceLibraryChange: any;
+declare const answersAnchorPara: any;
+declare const answersHeadCover: any;
+declare const answersHlDomChanged: any;
+declare const answersLayoutClass: any;
+declare const answersMetaFor: any;
+declare const answersSectionAnchor: any;
+declare const answersShelfByKey: any;
 declare const applyActiveNoteState: any;
 declare const applyDOMBookmarks: any;
 declare const applyDOMHighlights: any;
@@ -469,6 +484,7 @@ declare const idbAllKeys: any;
 declare const idbDelete: any;
 declare const idbPut: any;
 declare const idbReadAll: any;
+declare const isAnswersGroupKey: any;
 declare const isContainerMagic: any;
 declare const isHiddenManna: any;
 declare const isNewerBackup: any;
@@ -508,11 +524,13 @@ declare const parseRefRange: any;
 declare const parseRefRanges: any;
 declare const parseRefStr: any;
 declare const parseScriptureRef: any;
+declare const passageTextBefore: any;
 declare const persistLink: any;
 declare const playerIsActive: any;
 declare const popSongsFrame: any;
 declare const progressCorporaReady: any;
 declare const pushSongsFrame: any;
+declare const readAnswersPath: any;
 declare const readContainer: any;
 declare const readingChipWpm: any;
 declare const readingFontById: any;
@@ -529,6 +547,7 @@ declare const renderCommentaryCite: any;
 declare const renderTextWithScripRefs: any;
 declare const renditionRemainingLabel: any;
 declare const replaceSongsTop: any;
+declare const resetAnswersLanding: any;
 declare const resolveVerseText: any;
 declare const resolveVotLetter: any;
 declare const root: any;
@@ -571,6 +590,7 @@ declare const trackSearchText: any;
 declare const translateVerse: any;
 declare const translationLabel: any;
 declare const translationName: any;
+declare const useAnswersMetaState: any;
 declare const useAudioPositions: any;
 declare const useSongKeep: any;
 declare const useSongLyrics: any;
@@ -583,6 +603,7 @@ declare const validateStorePayload: any;
 declare const votNoteVolLabel: any;
 declare const webStartOfRef: any;
 declare const withBackupLock: any;
+declare const writeAnswersPath: any;
 declare const writeContainer: any;
 declare const wtlbHlKey: any;
 

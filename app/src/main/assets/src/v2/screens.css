@@ -593,37 +593,6 @@
 .aa.pg .seg { margin-top: 8px; }
 .aa-pv { font-size: var(--fs-m); line-height: 1.4; color: var(--t-body); margin: 10px 0 0; }
 .g.settings.aax { margin-top: 18px; }
-/* dz17 (2026-10-15): v2-gaps 16, the Answers home (main's AnswersHome.jsx) to Corbin's pick (the middle phone of
-   corbin-style-ref.png): title, lede, field, a hairline, The Ten Commandments in the kit's .grid2, Browse by subject rows. */
-.content.ans .page-head .field { margin-top: 22px; }
-.content.ans .page-head .field .ph { color: var(--t3); }
-.ans-sec { margin: 26px var(--gut) 0; padding-top: 20px; border-top: 1px solid var(--line); }
-.grid2.cmds .col { align-content: start; max-width: none; margin: 0; }   /* not the desktop page .col (D2), as .grid2.vols */
-.ans-sec .h2 { margin-bottom: 8px; }
-.grid2.cmds .n.on, .grid2.cmds .c.on { background: rgba(var(--gold-rgb), .08); }
-.sec.ans-subj { padding-top: 28px; }
-.sec.ans-subj + .rows { margin-top: 4px; }
-.row.ans-t .ans-n { flex: none; font-size: var(--fs-xs); color: var(--t2); }
-.row.ans-t .chev { flex: none; }
-.ans-src { margin: 18px 0 28px; }
-.ans-lab { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 0 6px; }
-.ans-lab .ans-k { font-size: var(--fs-xs); color: var(--t2); }
-.ans-list .row:first-child { border-top: 0; }
-.ans-list.end .row:last-child { border-bottom: 1px solid var(--line); }
-.sheet.cmd, .dlg.cmd { max-height: 76%; overflow: hidden; }
-.cmd .ref-v { font-style: italic; }
-.cmd .cmd-go { height: 40px; gap: 6px; font-size: var(--fs-s); margin-top: 6px; }
-.cmd .cmd-go svg { width: 16px; height: 16px; }
-.cmd .ans-lab { margin-top: 12px; }
-.ans-res { padding-bottom: 24px; }
-.ans-res .grp { padding-top: 26px; }
-.ans .hit.ans-hit .ex { -webkit-line-clamp: 4; }
-.hit.ans-hit .src { font-size: var(--fs-xs); color: var(--t3); margin-top: 6px; }
-.sec.ans-also { padding-top: 22px; }
-.ans-sum { font-size: var(--fs-s); color: var(--t2); margin: 6px 0 4px; }
-.azj { display: grid; grid-template-columns: repeat(8, 1fr); margin: 18px -6px 4px; }
-.azj button { height: 44px; display: grid; place-items: center; font-size: var(--fs-m); color: var(--accent); }
-.label.az-l { display: block; margin: 22px 0 2px; color: var(--accent); font-size: var(--fs-s); }
 /* dz18 (2026-10-15): the Matthew Study Bible (main's ChapterIndex, ChapterView, StudyPanels, InlineNotes, ModeToggle).
    The index is 2e's numbered rows with main's minutes and notes weight; the chapter sets its verses as v2's Bible (2c); the study
    panels are kit cards; Study notes (PDF | Inline | Off) floats bottom right over the page, as main's does, and stays there. */

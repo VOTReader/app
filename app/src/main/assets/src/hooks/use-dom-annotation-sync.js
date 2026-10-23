@@ -229,6 +229,15 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
     () => (typeof window.__answersCorpus !== 'undefined') ? window.__answersCorpus.getVersion() : 0
   );
 
+  // A reading view whose keyed paragraphs mount after the screen did, or are replaced, says so
+  // (window.__hlDomV + a 'vot-hl-dom' event): an Answers topic paints its body once its sidecar is
+  // in (or 300 ms on, plain) and again decorated when it lands (AOGCG Topic stage). The pass re-runs
+  // over the new paragraphs, so the reader's marks are on them.
+  const hlDomV = React.useSyncExternalStore(
+    React.useCallback((cb) => { window.addEventListener('vot-hl-dom', cb); return () => window.removeEventListener('vot-hl-dom', cb); }, []),
+    () => /** @type {any} */ (window).__hlDomV || 0
+  );
+
   // The Library jump's scroll key waits for its mark (scrollToPendingMark).
   const placeRef = React.useRef(placeKey);
   const scrollMissRef = React.useRef(/** @type {ScrollWait | null} */ (null));
@@ -236,7 +245,7 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
   // differ is one a load triggered (the only kind a waiting jump may scroll on).
   // Compared when the pass runs, not when it is scheduled, because a newer
   // effect clears an older pass's timer before it fires.
-  const loadSig = [bibleCorpusV, matthewCorpusV, votCorpusV, answersCorpusV, studiesLoading].join('|');
+  const loadSig = [bibleCorpusV, matthewCorpusV, votCorpusV, answersCorpusV, studiesLoading, hlDomV].join('|');
   const passLoadSigRef = React.useRef(/** @type {string | null} */ (null));
   React.useEffect(() => () => { const w = scrollMissRef.current; scrollMissRef.current = null; if (w) w.stop(); }, []);
 

@@ -268,11 +268,37 @@ export function loadAnswers() {
   return l.load().catch(() => undefined);
 }
 
+/* ── The Answers sidecars — src/data/answers-meta.js (ANSWERS_META, ~360 KB) ──
+   The site detail tools/fetch-answers.py captures beside each topic's text
+   (sections, links, related groups, notes, media, refMeta, source-line
+   attributions, underlines, callouts, indents), keyed by entry id. answers.js
+   keeps only the reading fields, so a reader who opens Answers to read pays
+   nothing for these; a screen that renders them asks first. Same shape as the
+   timing files: one raw src/data file, shipped only because its path is a
+   literal here. Created on the first ask, not as this module evaluates, and
+   never published on window (nothing outside this module reaches it). */
+/** @type {LazyLoader | null} */
+let _answersMeta = null;
+
+/**
+ * Fetch the Answers sidecars (ANSWERS_META), once per page. Resolves on
+ * failure and where no loader exists, like loadAnswers.
+ * @returns {Promise<void>}
+ */
+export function loadAnswersMeta() {
+  if (!_answersMeta) {
+    if (!_hasFactory()) return Promise.resolve();
+    _answersMeta = /** @type {any} */ (globalThis).__makeLazyLoader('answers-meta', 'src/data/answers-meta.js', null, ['ANSWERS_META']);
+  }
+  return /** @type {LazyLoader} */ (_answersMeta).load().catch(() => undefined);
+}
+
 /** Test-only: forget every loader so a suite can install a fresh factory. */
 export function resetSyncLoadersForTests() {
   _audio = null;
   _sections = null;
   _answers = null;
+  _answersMeta = null;
   const g = /** @type {any} */ (globalThis);
   delete g.__answersLoader;
   delete g.__answersCorpus;
