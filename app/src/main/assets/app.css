@@ -4674,7 +4674,7 @@
        to a stub), then one meta line: progress · time · visits. */
     .history-entry-card .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; word-break:normal; overflow-wrap:break-word; }
     .history-entry-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:0.1rem 0.5rem; margin-top:0.3rem; }
-    .history-entry-meta > * + *::before { content:' B7'; margin-right:0.5rem; color:var(--gold-dim); }
+    .history-entry-meta > * + *::before { content:'·'; margin-right:0.5rem; color:var(--gold-dim); }
     .history-entry-meta .idx-min-chip { margin-left:0; align-self:baseline; }
     .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); white-space:nowrap; }
     /* Result tally under the search box — states the count in words so the
