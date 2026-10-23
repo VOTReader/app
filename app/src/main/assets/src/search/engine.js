@@ -2253,14 +2253,18 @@ function reprintSecond(out, terms, idOf, allowed) {
   if (toks.length >= 5) {
     const runs = toks.length <= REPRINT_RUN ? [toks] : [0, (toks.length - REPRINT_RUN) >> 1, toks.length - REPRINT_RUN].map((i) => toks.slice(i, i + REPRINT_RUN));
     const esc = (/** @type {string} */ t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const res = runs.map((run) => new RegExp('(?:^|[^a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
+    /* search200 audit n217 (s07.6): this scan cost 1.29 ms a search on a desktop over the open tri and hunt queries
+       (20 ms at most), up to 200 long texts and three patterns each. A word edge looked behind for, not matched, lets
+       the pattern start on its first letter (about a third less a text), and a text stops being read once the patterns
+       left cannot carry it past the best so far. The same text comes up. */
+    const res = runs.map((run) => new RegExp('(?<![a-z0-9])' + run.map(esc).join('[^a-z0-9]+') + '(?![a-z0-9])', 'i'));
     let best = 0;
     let most = 0;
     for (let r = 1; r < Math.min(out.length, REPRINT_REACH) && most < res.length; r++) {
       const t = out[r].doc.text;
       if (!t || out[r].doc.kind === 'verse') continue;
       let n = 0;
-      for (const re of res) if (re.test(t)) n++;
+      for (let k = 0; k < res.length && n + res.length - k > most; k++) if (res[k].test(t)) n++;
       if (n > most) { most = n; best = r; }
     }
     if (best) { if (best > 1) out.splice(1, 0, out.splice(best, 1)[0]); slot = 2; }
