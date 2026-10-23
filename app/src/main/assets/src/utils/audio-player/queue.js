@@ -470,6 +470,24 @@ function _booksAfter(volKey, bookId) {
  * @returns {boolean}
  */
 /**
+ * The tracks a plan's portion plays (playPortion's queue), also what the plan saves to the phone (mw18 S6).
+ * @param {Array<{ volKey: string, item: { id?: string, title?: string }, collectionLabel?: string | null, chapterNum?: number | null }> | null | undefined} items
+ * @returns {Track[]}
+ */
+export function portionTracks(items) {
+  /** @type {Track[]} */
+  const queue = [];
+  for (const p of Array.isArray(items) ? items : []) {
+    if (!p || !p.volKey || !p.item) continue;
+    const tracks = playbackTracks(p.volKey, p.item, p.collectionLabel || undefined);
+    const n = Math.floor(Number(p.chapterNum) || 0);
+    if (n >= 1 && tracks.length > 1) { if (n <= tracks.length) queue.push(tracks[n - 1]); }
+    else for (const t of tracks) queue.push(t);
+  }
+  return queue;
+}
+
+/**
  * Play a reading plan's portion for today (mw18 C5): the recordings of the
  * listed chapters and letters, in order, as ONE queue that ends with the
  * portion - never on into the rest of the book or collection. A custom queue
@@ -484,15 +502,7 @@ function _booksAfter(volKey, bookId) {
  */
 export function playPortion(opts) {
   const o = opts || /** @type {any} */ ({});
-  /** @type {Track[]} */
-  const queue = [];
-  for (const p of Array.isArray(o.items) ? o.items : []) {
-    if (!p || !p.volKey || !p.item) continue;
-    const tracks = playbackTracks(p.volKey, p.item, p.collectionLabel || undefined);
-    const n = Math.floor(Number(p.chapterNum) || 0);
-    if (n >= 1 && tracks.length > 1) { if (n <= tracks.length) queue.push(tracks[n - 1]); }
-    else for (const t of tracks) queue.push(t);
-  }
+  const queue = portionTracks(o.items);
   if (!queue.length) return false;
   if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
   _rememberOutgoingPosition();

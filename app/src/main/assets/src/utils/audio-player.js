@@ -80,6 +80,7 @@ import {
   playPortion,
   playSection,
   playTrack,
+  portionTracks,
   removeUpcoming,
   switchVoiceInPlace,
 } from './audio-player/queue.js';
@@ -202,6 +203,7 @@ export const AudioPlayer = {
   playSection,
   playBibleBook,
   playPortion,
+  portionTracks,
   playSongs,
   setShuffle,
   switchSongVersion,

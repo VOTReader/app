@@ -274,9 +274,10 @@ export function OfflineRowStatus({ tracks, name }) {
 
 /**
  * "Download all" beside Play all: asks first with the count, the size and the phone's free space.
- * @param {{ units: any[][], label: string }} props units = each row's reading (AudioPlayer.playbackTracks)
+ * @param {{ units: any[][], label: string, action?: string, savedText?: string }} props units = each row's reading
+ *   (AudioPlayer.playbackTracks); action and savedText reword the button and the done line (a reading plan's week, S6)
  */
-export function OfflineCollectionAction({ units, label }) {
+export function OfflineCollectionAction({ units, label, action = 'Download all', savedText = 'All on this phone' }) {
   const off = useOfflineAudio();
   const online = useOnline();
   const [asking, setAsking] = React.useState(false);
@@ -286,7 +287,7 @@ export function OfflineCollectionAction({ units, label }) {
   const focus = useKeepFocus(!u ? '' : u.status === 'saved' || u.status === 'downloading' ? u.status : 'ask');
   if (!off || !u) return null;
   if (u.status === 'saved') {
-    return <p className="offline-collection is-saved" {...focus}><CheckIcon /><span>All on this phone</span></p>;
+    return <p className="offline-collection is-saved" {...focus}><CheckIcon /><span>{savedText}</span></p>;
   }
   if (u.status === 'downloading') {
     return (
@@ -305,7 +306,7 @@ export function OfflineCollectionAction({ units, label }) {
     <div className="offline-collection" {...focus}>
       <button type="button" className="audio-library-secondary-action" disabled={!online}
         onClick={() => { off.refresh(); setAsking(true); }} aria-expanded={asking}>
-        <DownloadIcon /><span>Download all</span>
+        <DownloadIcon /><span>{action}</span>
       </button>
       {!online ? <p className="offline-collection-note">Needs a connection</p> : null}
       {asking && online ? (

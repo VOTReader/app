@@ -9,7 +9,7 @@ const METHODS = [
   'subscribe', 'getVersion', 'getShape', 'getState', 'getPreciseTime',
   'hasAudio', 'prewarm', 'firstReaderCode', 'collectionHasAudio', 'sectionsFor', 'sectionTracks',
   'readerLabel', 'renditionsFor', 'setPreferredReader', 'playbackTracks', 'playableNow', 'listenResume', 'listenHere',
-  'playLetter', 'playCollection', 'playSection', 'playBibleBook', 'playPortion', 'playSongs',
+  'playLetter', 'playCollection', 'playSection', 'playBibleBook', 'playPortion', 'portionTracks', 'playSongs',
   'setShuffle', 'switchSongVersion', 'setRepeat', 'setLoop', 'clearLoop', 'canLoop', 'isNative',
   'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter',
   'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'setPlaybackRate',

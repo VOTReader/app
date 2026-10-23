@@ -329,6 +329,13 @@ export function buildScreenRoutes({
   const listenPlanItem = (refs, label) => {
     const list = (Array.isArray(refs) ? refs : refs ? [refs] : []).filter(Boolean);
     if (!list.length) return;
+    const items = planPortion(list);
+    const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
+    if (!started) openPlanItem(list[0]);
+  };
+  // mw18 S6: the recordings of a plan's coming days, saved to the phone from Plan details (the same tracks Listen plays).
+  const planTracks = (refs) => AudioPlayer.portionTracks(planPortion((Array.isArray(refs) ? refs : []).filter(Boolean)));
+  function planPortion(list) {
     const items = [];
     for (const ref of list) {
       const col = _planCol(ref.bid);
@@ -342,9 +349,8 @@ export function buildScreenRoutes({
         if (audio) items.push({ volKey: audio.volKey, item: { id: bookId }, collectionLabel: audio.label, chapterNum: Number(ref.cid) });
       }
     }
-    const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
-    if (!started) openPlanItem(list[0]);
-  };
+    return items;
+  }
   // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to
   // it, idempotently, from the same render that owns the setting. 'auto' and
@@ -1170,6 +1176,7 @@ export function buildScreenRoutes({
         onRead={openPlanItem}
         onListen={listenPlanItem}
         onNote={goJournalEditor}
+        planTracks={planTracks}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

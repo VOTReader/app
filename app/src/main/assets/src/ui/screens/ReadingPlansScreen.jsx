@@ -19,6 +19,7 @@
 
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
+import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineAudioControls.jsx';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate, takePlanOpen, onPlanOpenAsk } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, lastActive, isReminderTime } from '../../utils/plan-reminder.js';
 import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
@@ -161,6 +162,37 @@ function useHold(onHold) {
   };
 }
 
+/**
+ * mw18 S6: the recordings of the plan's next 7 days, saved to the phone, each chapter or letter its own recording
+ * (DECISIONS 09-22: save per recording, never a whole edition). Only where downloads work (the Android app, or a
+ * browser that keeps recordings); the same confirm as a collection's Download all (count, size, free space).
+ * @param {{ plan: any, from: number, tracksOf: (refs: any[]) => any[] }} props
+ */
+function WeekAudio({ plan, from, tracksOf }) {
+  const off = useOfflineAudio();
+  const end = Math.min(from + 7, totalDays(plan));
+  const refs = [];
+  for (let d = Math.max(0, from); d < end; d++) for (const it of dayItems(plan, d)) refs.push(itemRef(it.k));
+  const refKey = refs.map((r) => r.bid + ':' + r.cid).join(',');
+  const tracks = React.useMemo(() => {
+    const seen = new Set();
+    return (off ? tracksOf(refs) : []).filter((t) => t && typeof t.url === 'string' && !seen.has(t.url) && seen.add(t.url));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the refs' text: a new array each render must not rebuild
+  }, [off, refKey, tracksOf]);
+  const urlKey = tracks.map((t) => t.url).join('\n');
+  React.useEffect(() => {
+    if (off && tracks.length) off.requestSizes(tracks.map((t) => t.url));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined urls
+  }, [off, urlKey]);
+  if (!off || !tracks.length) return null;
+  return (
+    <div className="plans-audio">
+      <OfflineCollectionAction units={tracks.map((t) => [t])} label={(end - from === 1 ? 'the last day' : 'the next ' + (end - from) + ' days') + ' of your plan'}
+        action={'Save this week’s audio'} savedText={'This week’s audio is on this phone'} />
+    </div>
+  );
+}
+
 /** @param {{ children: any, onHold: () => void, className?: string }} props */
 function Holdable({ children, onHold, className }) {
   return <div className={className} {...useHold(onHold)}>{children}</div>;
@@ -171,10 +203,11 @@ function Holdable({ children, onHold, className }) {
  *   onPlansMoved?: (left: any[]) => void, onRead: (next: any) => void, onListen?: (items: any[], name: string) => void,
  *   onNote?: (entryId: string) => void,
  *   onBack: () => void, backLabel?: string,
- *   onSearch?: () => void, onHistory?: () => void, onSettings?: () => void, theme?: string, onThemeChange?: (t: string) => void }} props
+ *   onSearch?: () => void, onHistory?: () => void, onSettings?: () => void, theme?: string, onThemeChange?: (t: string) => void,
+ *   planTracks?: (refs: any[]) => any[] }} props
  */
 export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _markAsReadEnabled, onPlansMoved, onRead, onListen, onNote, onBack, backLabel = 'Library',
-  onSearch, onHistory, onSettings, theme, onThemeChange }) {
+  onSearch, onHistory, onSettings, theme, onThemeChange, planTracks }) {
   const plans = usePlanRuns({ legacy: readingPlans, isRead, onLegacyMoved: onPlansMoved });
   const seq = useVolumesSeq(true);
   const now = useNow();
@@ -444,6 +477,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                     ) : null}
                   </div>
                   {row.behind > 0 && !row.paused ? <Behind plan={plan} row={row} now={now} /> : null}
+                  {planTracks && !row.finished ? <WeekAudio plan={plan} from={row.day} tracksOf={planTracks} /> : null}
                   {pacing === plan.id ? <PaceChoices plan={plan} now={now} onDone={() => setPacing(null)} /> : null}
                   {remindable && !row.finished ? (
                     <div className="plans-remind">
