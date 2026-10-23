@@ -768,6 +768,20 @@ describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.
     expect(chip()).toBe('Saved');
   });
 
+  // Refuter b34-r1: an older write landing must not say 'Saved' over a newer edit not yet written.
+  it("an older write's answer does not mark a newer, unwritten edit 'Saved'", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const pending = [];   // the draft logic asks whenSaved too: land every write the first save started
+    JournalStore.whenSaved = () => new Promise((res) => { pending.push(res); });
+    const landFirst = () => pending.splice(0).forEach((res) => res(true));
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'first' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'second' } });   // debounce pending
+    await act(async () => { landFirst(); await Promise.resolve(); await Promise.resolve(); });
+    expect(chip()).toBe('Saving…');
+  });
+
   it("keeps 'Saving…' while the write is still in flight", async () => {
     const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);

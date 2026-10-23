@@ -36,7 +36,8 @@
    settings come back (a toast says so). What the reader did to place, tabs
    and settings in the unloaded window is not kept: it was built on defaults.
    While the reader is typing in a field, the remount waits until they
-   leave it (ds5 s01.5), so a draft in an open editor or sheet survives.
+   leave it or pause (ds5 s01.5), so a draft in an open editor or sheet
+   survives; a field nobody types in, or a hold past 3 min, holds nothing.
    An import cannot overlap a remount - it refuses to run until every store
    has loaded (backup-flow _applyConfirmedImport).
    ═══════════════════════════════════════════════════════════════════════ */
@@ -55,11 +56,21 @@ const { useState, useEffect } = React;
 export const REMOUNT_COALESCE_MS = 250;
 /** ds5 s01.5: how often a remount held for the reader's typing looks again. */
 export const TYPING_RECHECK_MS = 1000;
+/** A focused field holds the remount only while the reader typed in it this recently. */
+export const TYPING_IDLE_MS = 30000;
+/** And never longer than this in all: the reader's saved place and settings must come back. */
+export const TYPING_HOLD_MAX_MS = 180000;
+
+let _lastTypedAt = 0;
+if (typeof document !== 'undefined') {
+  document.addEventListener('input', () => { _lastTypedAt = Date.now(); }, true);
+}
 
 const _TEXT_INPUT = /^(?:|text|search|email|url|tel|number|password)$/;
 /** True while a field the reader types into has focus. */
 function _readerIsTyping() {
   if (typeof document === 'undefined') return false;
+  if (Date.now() - _lastTypedAt > TYPING_IDLE_MS) return false;   // an autofocus field nobody types in
   const el = /** @type {any} */ (document.activeElement);
   if (!el || el === document.body) return false;
   if (el.isContentEditable) return true;
@@ -152,6 +163,7 @@ export function HydrationGate({ children }) {
       safetyTimer = setTimeout(() => { safetyTimer = null; DataSafety.run(); }, DataSafety.freshDatabase() ? 0 : SAFETY_DELAY_MS);
     };
     let waiting = lateRef.current;
+    /** @type {number|null} */ let holdStart = null;   // ds5 s01.5: when the typing hold began
     if (waiting.length === 0) {
       scheduleSafety();
       return () => { if (safetyTimer != null) clearTimeout(safetyTimer); };
@@ -168,7 +180,9 @@ export function HydrationGate({ children }) {
         timer = null;
         // ds5 s01.5: never pull the screen out from under the reader's typing. While a text field
         // has focus the remount waits (a draft held in component state would go with it).
-        if (_readerIsTyping()) { timer = setTimeout(fire, TYPING_RECHECK_MS); return; }
+        if (holdStart == null) holdStart = Date.now();
+        if (_readerIsTyping() && Date.now() - holdStart < TYPING_HOLD_MAX_MS) { timer = setTimeout(fire, TYPING_RECHECK_MS); return; }
+        holdStart = null;
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
         loadedCount = 0;
         _appReplacementPending = waiting.length > 0;

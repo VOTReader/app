@@ -340,6 +340,7 @@ export function JournalEditorScreen(props) {
       firstRunRef.current = false;
       return;
     }
+    saveSeqRef.current++;   // ds5 b34-r1: a newer edit voids an older write's 'Saved'
     setSavedLabel('Saving…');
     if (immediateSaveRef.current) {
       // A media block (image / voice memo) was just inserted — persist its
@@ -485,6 +486,7 @@ export function JournalEditorScreen(props) {
 
   function scheduleSave() {
     // Kept for callsite compatibility — the useEffect above does the real work.
+    saveSeqRef.current++;   // ds5 b34-r1: a newer edit voids an older write's 'Saved'
     setSavedLabel('Saving…');
   }
 
