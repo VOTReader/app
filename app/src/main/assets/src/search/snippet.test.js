@@ -531,3 +531,13 @@ describe('search200 B7: marks for what was typed, a run as one, never a dateline
     expect(matchExcerpt(TOPIC, ['lord']).startsWith('Lord, Our God')).toBe(true);
   });
 });
+
+/* search200 bugcheck #6: find in page stopped at 400 hits of a word (the snippet's cap for long bodies), so the
+   pill could never step past the 400th place of a word a long topic says more often. */
+describe('findPlaces: no cap on the hits find in page steps through', () => {
+  it('finds every one of 450 hits of a word', () => {
+    const t = Array.from({ length: 450 }, (_, i) => 'And the flood came on day ' + i + '.').join(' ');
+    const hits = findPlaces(t, ['flood'], 120).reduce((a, p) => a + p.hits.length, 0);
+    expect(hits).toBe(450);
+  });
+});

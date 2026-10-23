@@ -192,7 +192,7 @@ const FAMILY_CACHE = new Map();
  * @param {string[]} terms
  * @returns {Array<{ idx: number, len: number, term: string, primary: boolean, form?: boolean }>}
  */
-function occurrences(text, terms, marks = false) {
+function occurrences(text, terms, marks = false, cap = 400) {
   if (!text || !terms || !terms.length) return [];
   const whole = marks ? wholeOnlyMark : wholeOnly;
   const fams = familiesOf(terms);
@@ -207,7 +207,7 @@ function occurrences(text, terms, marks = false) {
     const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
     let idx = lower.indexOf(t);
     let n = 0;
-    while (idx >= 0 && n < 400) {
+    while (idx >= 0 && n < cap) {
       // longer terms come later, so the last write at a position is the longest
       if (startsWord(lower, idx) && !(whole(t) && WORD_CHAR.test(lower[idx + t.length] || ''))) { at.set(idx, { idx, len: t.length, term: f.fam, primary: f.primary }); n++; }
       idx = lower.indexOf(t, idx + t.length);
@@ -220,7 +220,7 @@ function occurrences(text, terms, marks = false) {
       const f = /** @type {{ fam: string, primary: boolean }} */ (fams.get(t));
       let v = joined.view.indexOf(t);
       let n = 0;
-      while (v >= 0 && n < 400) {
+      while (v >= 0 && n < cap) {
         const idx = joined.at(v);
         const len = joined.at(v + t.length - 1) + 1 - idx;
         const o = at.get(idx);
@@ -626,7 +626,8 @@ function placesBesides(text, occ, freq, maxLen, shownAt) {
  */
 export function findPlaces(text, terms, maxLen) {
   maxLen = maxLen || 120;
-  const occ = occurrences(text, terms, true);
+  // every hit: find in page steps through them all, where a snippet stops at 400 a term (search200 bugcheck #6)
+  const occ = occurrences(text, terms, true, Infinity);
   if (!occ.length) return [];
   const freq = familyCounts(occ);
   const places = cluster(occ, maxLen, freq);
