@@ -129,7 +129,7 @@ describe('SrchCard — more places in this letter', () => {
   it('says how many more places the letter holds, closed until asked', () => {
     const { container } = render(<SrchCard entry={letter()} terms={['flood']} onSelect={() => {}} isDirect={false} />);
     const toggle = container.querySelector('.srch-places-toggle');
-    expect(toggle.textContent).toContain('2 more places in this letter');
+    expect(toggle.textContent).toContain('2 more passages in this letter');
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelector('.srch-places')).toBeNull();
   });
@@ -158,7 +158,7 @@ describe('SrchCard — more places in this letter', () => {
 
   it('names the unit by kind: an Answers topic', () => {
     const { container } = render(<SrchCard entry={letter('answers')} terms={['flood']} onSelect={() => {}} isDirect={false} />);
-    expect(container.querySelector('.srch-places-toggle').textContent).toContain('2 more places in this topic');
+    expect(container.querySelector('.srch-places-toggle').textContent).toContain('2 more passages in this topic');
   });
 
   it('a verse, or a letter that says the word once, has no places row', () => {

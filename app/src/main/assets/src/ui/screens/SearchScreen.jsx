@@ -1100,7 +1100,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             (the old single button showed the OTHER order's name, which read as the current one). */}
         {sortToggleVisible && (
           <div className="srch-filter-row">
-            <span className="srch-sort-note">{bookOrder ? 'Genesis to Revelation, then Volume One onward' : 'Best matches first'}</span>
+            {/* One sort label (search200 audit 144): under Relevance the lit button says the order alone. */}
+            <span className="srch-sort-note">{bookOrder ? 'Genesis to Revelation, then Volume One onward' : ''}</span>
             <div className="srch-sort" role="group" aria-label="Order results">
               <button type="button" className={'srch-sort-btn' + (bookOrder ? '' : ' active')} aria-pressed={!bookOrder}
                 onClick={() => setSortMode('relevance')}>Relevance</button>
@@ -1114,7 +1115,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
 
         {!bookOrder && bestRow.length > 0 && (
           <div className="srch-top-results">
-            <h2 className="srch-section-label">Best Matches</h2>
+            {/* The row's heading stays for moving by headings (B9); on screen the Relevance button already names it. */}
+            <h2 className="sr-only">Best Matches</h2>
             {bestRow.map((c, i) => (
               <SrchCard key={'top' + i} entry={c.entry} also={c.also.length ? c.also : undefined} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} memo={listMemo} where="best" />
             ))}

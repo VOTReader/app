@@ -37,7 +37,7 @@ it('D: a title and the "more places" list mark related words the same way', () =
   const { container, getByText } = render(<SrchCard entry={entry} terms={['jesus', 'wept']} onSelect={() => {}} isDirect={false} />);
   const head = container.querySelector('.srch-card-ref');
   expect(head && kinds(head)).toEqual(['~YahuShua', 'Wept']);
-  fireEvent.click(getByText(/more place/));
+  fireEvent.click(getByText(/more passage/));
   const list = container.querySelector('.srch-places');
   expect(list && kinds(list).some((k) => k === '~YahuShua')).toBe(true);
   expect(list && kinds(list).some((k) => k === 'wept' || k === 'Jesus wept')).toBe(true);

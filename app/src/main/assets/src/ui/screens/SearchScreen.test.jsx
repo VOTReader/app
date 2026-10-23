@@ -629,6 +629,9 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     expect(sw('Relevance').getAttribute('aria-pressed')).toBe('true');
     expect(sw('Book order').getAttribute('aria-pressed')).toBe('false');
     expect(document.querySelector('.srch-top-results'), 'Best Matches').toBeTruthy();
+    // One sort label (search200 audit 144): the lit Relevance button says the order; no note or visible heading repeats it.
+    expect(document.querySelector('.srch-sort-note').textContent, 'no "Best matches first" note').toBe('');
+    expect(document.querySelector('.srch-top-results h2').className, 'the row keeps its heading for a screen reader only').toBe('sr-only');
     expect(groups().map((g) => g.getAttribute('data-open'))).toEqual(['false', 'false', 'false']);
     const relevanceShows = document.body.textContent;
     fireEvent.click(sw('Book order'));

@@ -8,7 +8,7 @@ import { recall, remember, docKey } from './srch-memory.js';
 import { formsToMark } from '../../utils/marked-forms.js';
 import { snippetText, markSpans } from './SrchSnippet.jsx';
 
-/* What one unit of a kind is called in "3 more places in this letter": the kinds
+/* What one unit of a kind is called in "3 more passages in this letter": the kinds
    whose one doc is a whole letter, entry, topic or study chapter, so its text can
    say the words in more than one place. A verse is one place by definition. */
 const PLACE_UNIT = {
@@ -19,6 +19,26 @@ const PLACE_UNIT = {
   answers: 'topic',
   'bible-study': 'chapter',
 };
+
+/* The collection a reprint is filed in ("Answers Only God Can Give"), from the screen's grouping globals; the kind's
+   badge label when they are absent. */
+function collectionOf(/** @type {any} */ doc) {
+  const key = typeof srchGroupKey === 'function' ? srchGroupKey(doc) : '';
+  const meta = key && typeof SRCH_GROUP_META === 'object' && SRCH_GROUP_META ? SRCH_GROUP_META[key] : null;
+  if (meta && meta.label) return meta.label;
+  const kind = typeof SRCH_KIND_LABEL === 'object' && SRCH_KIND_LABEL ? SRCH_KIND_LABEL[doc.kind] : null;
+  return (kind && kind.label) || 'another collection';
+}
+
+/* "Also in N places" did not say what a place is (search200 audit 144): the row names the collections the passage
+   is also in, in the reprints' order. One collection held twice says so; past three, the first two and a count. */
+export function alsoInLabel(/** @type {any[]} */ reprints) {
+  const names = [];
+  for (const r of reprints) { const c = collectionOf(r.doc); if (!names.includes(c)) names.push(c); }
+  if (names.length === 1) return reprints.length === 1 ? 'Also in ' + names[0] : 'Also ' + reprints.length + ' times in ' + names[0];
+  const shown = names.length > 3 ? names.slice(0, 2).concat([(names.length - 2) + ' more']) : names;
+  return 'Also in ' + shown.slice(0, -1).join(', ') + ' and ' + shown[shown.length - 1];
+}
 
 /**
  * The words a card marks. Merge the engine's per-result matched terms (MiniSearch only — the
@@ -208,7 +228,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
       {card}
       {reprints.length ? (
         <button type="button" className="srch-also-toggle" aria-expanded={alsoOpen} onClick={toggleAlso}>
-          <span>Also in {reprints.length} {reprints.length === 1 ? 'place' : 'places'}</span>
+          <span>{alsoInLabel(reprints)}</span>
           <span className={"srch-places-chevron" + (alsoOpen ? " open" : "")} aria-hidden="true">▸</span>
         </button>
       ) : null}
@@ -234,7 +254,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
         aria-expanded={placesOpen}
         onClick={togglePlaces}
       >
-        <span>{n} more {n === 1 ? 'place' : 'places'} in this {unit}</span>
+        <span>{n} more {n === 1 ? 'passage' : 'passages'} in this {unit}</span>
         <span className={"srch-places-chevron" + (placesOpen ? " open" : "")} aria-hidden="true">▸</span>
       </button> : null}
       {n && placesOpen ? (

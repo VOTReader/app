@@ -15,6 +15,8 @@ const scoffers = { score: 1, doc: { kind: 'answers', title: 'Regarding Scoffers'
 
 beforeEach(() => {
   /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { letter: { label: 'Letter', cls: 'badge-letter' }, answers: { label: 'Answers', cls: '' } };
+  /** @type {any} */ (globalThis).srchGroupKey = (doc) => doc.g || doc.kind;
+  /** @type {any} */ (globalThis).SRCH_GROUP_META = { answers: { label: 'Answers Only God Can Give' }, v2: { label: 'Volume Two' }, blessed: { label: 'The Blessed' } };
   /** @type {any} */ (globalThis).SrchSnippet = SrchSnippet;
   /** @type {any} */ (globalThis).VotSearchMini = { snippet, snippetAt, highlightSpans, morePlaces };
 });
@@ -26,15 +28,24 @@ describe('SrchCard — also in N places (B10 item 2)', () => {
     expect(container.querySelector('.srch-also-toggle')).toBeNull();
   });
 
-  it('says how many places the passage is also in, closed until asked', () => {
+  /* search200 audit 144: "Also in 1 place" did not say what a place is; the row names the collections. */
+  it('names the collections the passage is also in, closed until asked', () => {
     const one = render(<SrchCard entry={letter} also={[obedience]} terms={['etched']} onSelect={() => {}} isDirect={false} />);
     const toggle = one.container.querySelector('.srch-also-toggle');
-    expect(toggle.textContent).toContain('Also in 1 place');
+    expect(toggle.textContent).toBe('Also in Answers Only God Can Give▸');
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     expect(one.container.querySelector('.srch-also')).toBeNull();
     one.unmount();
     const two = render(<SrchCard entry={letter} also={[obedience, scoffers]} terms={['etched']} onSelect={() => {}} isDirect={false} />);
-    expect(two.container.querySelector('.srch-also-toggle').textContent).toContain('Also in 2 places');
+    expect(two.container.querySelector('.srch-also-toggle').textContent).toContain('Also 2 times in Answers Only God Can Give');
+    two.unmount();
+    const v2 = { score: 1, doc: { ...obedience.doc, kind: 'letter', g: 'v2', title: 'B' } };
+    const bl = { score: 1, doc: { ...obedience.doc, kind: 'blessed', g: 'blessed', title: 'C' } };
+    const mix = render(<SrchCard entry={letter} also={[v2, obedience]} terms={['etched']} onSelect={() => {}} isDirect={false} />);
+    expect(mix.container.querySelector('.srch-also-toggle').textContent).toContain('Also in Volume Two and Answers Only God Can Give');
+    mix.unmount();
+    const three = render(<SrchCard entry={letter} also={[v2, obedience, bl, scoffers]} terms={['etched']} onSelect={() => {}} isDirect={false} />);
+    expect(three.container.querySelector('.srch-also-toggle').textContent).toContain('Also in Volume Two, Answers Only God Can Give and The Blessed');
   });
 
   it('opens to each reprint, its title over where it is filed, and a reprint opens itself', () => {
