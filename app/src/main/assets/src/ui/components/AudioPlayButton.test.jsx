@@ -11,7 +11,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
 });
 vi.mock('../../utils/audio-player.js', () => ({ AudioPlayer: player }));
 
-import { HeroListen, STILL_LOADING_MS, resumePillText } from './AudioPlayButton.jsx';
+import { HeroListen, STILL_LOADING_MS, listenFace, resumePillText } from './AudioPlayButton.jsx';
 
 const JONAH_2 = { key: 'bible-brm-kjv:jonah', partLabel: 'Chapter 2', url: 'https://example.test/brm1_jonah_002.mp3' };
 
@@ -39,10 +39,27 @@ describe('HeroListen: RESUME · N MIN LEFT (ra4)', () => {
     expect(screen.getByRole('button', { name: 'Listen' })).toBeTruthy();
   });
 
-  it('offline and not on the phone: disabled plain Listen, never a resume it cannot make', () => {
+  // D4b (pictures 15, 21): the pill itself says Not on this phone, never a resume it cannot make.
+  it('offline and not on the phone: a disabled Not on this phone pill and the line why', () => {
     render(<HeroListen onClick={() => {}} canPlay={() => false} resume={() => ({ at: 85, left: 155 })} />);
-    const pill = screen.getByRole('button', { name: 'Listen' });
+    const pill = screen.getByRole('button', { name: 'Not on this phone' });
     expect(pill.disabled).toBe(true);
+    expect(screen.queryByRole('button', { name: /Resume/ })).toBeNull();
+    expect(screen.getByRole('status').textContent).toBe('You’re offline. This isn’t on this phone.');
+  });
+
+  it('offline, another edition’s copy on the phone plays instead, and says so', () => {
+    const play = vi.fn();
+    render(<HeroListen onClick={() => {}} canPlay={() => false} alt={() => ({ short: 'KJV · BRM', onClick: play })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('.hero-alt-line').textContent).toBe('Playing KJV · BRM, the copy on this phone');
+  });
+
+  it('listenFace: Listen · 12 min once the length is known, Resume outranks it', () => {
+    expect(listenFace({ playing: false, loading: false, late: false, resume: null, minutes: 12 }).text).toBe('Listen · 12 min');
+    expect(listenFace({ playing: false, loading: false, late: false, resume: { at: 60, left: 600 }, minutes: 12 }).text).toBe('Resume · 10 min left');
+    expect(listenFace({ playing: false, loading: false, late: false, resume: null }).text).toBe('Listen');
   });
 
   it('resumePillText: the nearest whole minute (3:11 left is 3, as the approved mock shows), never 0; no length is Resume alone', () => {

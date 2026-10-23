@@ -25,6 +25,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_RESUME_END_FRACTION, AUDIO_RESUME_MIN_SEC } from '../../utils/audio-track.js';
 import { useAudioPositions } from './AudioShelf.jsx';
 import { useSongsOnline } from './SongKeepParts.jsx';
+import { HeroDownload, NotOnPhone, useListenMinutes } from './OfflineAudioControls.jsx';
 
 /**
  * The Listen pill's words when a tap would resume (ra4): "Resume · N min left", N the nearest whole minute
@@ -72,15 +73,16 @@ export function pausedHere(st) {
  * What a Listen pill says for the recording it starts (U04.5, U10.2, UX sweep 2026-10-22: a pill read PAUSE at 0:00
  * for 20 to 30 s on a slow network). While that recording plays, Pause; while it loads, Loading… and, past
  * STILL_LOADING_MS, Still loading · Cancel (the tap pauses, which takes the start back); otherwise Resume · N min
- * left or Listen. `pause` is the glyph and the pressed state, `busy` the loading look.
- * @param {{ playing: boolean, loading: boolean, late: boolean, resume: { at: number, left: number } | null }} s
+ * left or Listen (Listen · 12 min once its length is known, player brief 3f). `pause` is the glyph and the pressed
+ * state, `busy` the loading look.
+ * @param {{ playing: boolean, loading: boolean, late: boolean, resume: { at: number, left: number } | null, minutes?: number | null }} s
  * @returns {{ text: string, label: string, pause: boolean, busy: boolean }}
  */
-export function listenFace({ playing, loading, late, resume }) {
+export function listenFace({ playing, loading, late, resume, minutes = null }) {
   if (playing) return { text: 'Pause', label: 'Pause the reading', pause: true, busy: false };
   if (loading && late) return { text: 'Still loading · Cancel', label: 'Still loading. Cancel', pause: true, busy: true };
   if (loading) return { text: 'Loading…', label: 'Loading the reading', pause: true, busy: true };
-  const text = resume ? resumePillText(resume) : 'Listen';
+  const text = resume ? resumePillText(resume) : minutes ? 'Listen · ' + minutes + ' min' : 'Listen';
   return { text, label: text, pause: false, busy: false };
 }
 
@@ -94,14 +96,15 @@ export function listenFace({ playing, loading, late, resume }) {
  * @param {{ at: number, left: number } | null} [props.resume] the 'listen' pill reads Resume · N min left
  * @param {{ text: string, label: string, pause: boolean, busy: boolean } | null} [props.face] the 'listen' pill's
  *   words and state while its recording is the one in the player (listenFace); it outranks `resume`
+ * @param {number | null} [props.minutes] the 'listen' pill reads Listen · 12 min
  * @param {string|number} [props.key] list key — declared because this repo's
  *   `React` is a global `any`, so JSX adds no React.Attributes of its own and
  *   an undeclared `key=` fails `npm run typecheck`.
  */
-export function AudioPlayButton({ variant = 'listen', label, onClick, className, disabled = false, resume = null, face = null }) {
+export function AudioPlayButton({ variant = 'listen', label, onClick, className, disabled = false, resume = null, face = null, minutes = null }) {
   const chip = variant === 'chip';
   const playAll = variant === 'playall';
-  const listen = chip || playAll ? null : face || listenFace({ playing: false, loading: false, late: false, resume });
+  const listen = chip || playAll ? null : face || listenFace({ playing: false, loading: false, late: false, resume, minutes });
   const text = chip ? (label || 'Play') : playAll ? 'Play All' : listen.text;
 
   return (
@@ -146,13 +149,19 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className,
  * player or saved-place change: a place to pick up turns the pill into Resume · N min left. `here` (U04.5) asks
  * whether this chapter or book is the recording in the player: then the pill says Pause, Loading… or Resume from
  * the bar's own clock, and its tap toggles the player instead of starting the chapter again.
+ * D4b (downloads brief 3a, 3j; pictures 15, 21): `tracks` (what the Listen plays) puts Listen · 4 min on the pill and
+ * the download control beside it; offline and not on the phone, the pill reads "Not on this phone" with "Download
+ * when online"; `alt` offers another edition's copy that IS on the phone ("Playing KJV · BRM, the copy on this phone").
  * @param {object} props
  * @param {() => void} props.onClick
  * @param {() => boolean} props.canPlay
  * @param {() => ({ at: number, left: number } | null)} [props.resume]
  * @param {() => boolean} [props.here]
+ * @param {() => any[]} [props.tracks]
+ * @param {string} [props.name] names a download ("Ruth · Chapter 1")
+ * @param {() => ({ short: string, onClick: () => void } | null)} [props.alt]
  */
-export function HeroListen({ onClick, canPlay, resume, here }) {
+export function HeroListen({ onClick, canPlay, resume, here, tracks, name = '', alt }) {
   useSongsOnline();
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   useAudioPositions();
@@ -162,18 +171,52 @@ export function HeroListen({ onClick, canPlay, resume, here }) {
   const playing = isHere && st.status === 'playing';
   const loading = isHere && st.status === 'loading';
   const late = useStillLoading(loading, (cur && cur.url) || '');
+  const list = tracks ? tracks() : [];
+  const minutes = useListenMinutes(list);
   // The recording already sounding here can always pause, offline or not.
   const off = !isHere && !canPlay();
+  const other = off && alt ? alt() : null;
+  if (off && !other) return <NotOnPhone tracks={list} name={name} />;
   const pickUp = off || playing || loading ? null : isHere ? pausedHere(st) : resume ? resume() : null;
-  const face = isHere ? listenFace({ playing, loading, late, resume: pickUp }) : null;
+  const face = isHere ? listenFace({ playing, loading, late, resume: pickUp, minutes }) : null;
   return (
     <>
       <div className="hero-play-row">
-        <AudioPlayButton onClick={isHere ? () => AudioPlayer.toggle() : onClick} disabled={off} resume={pickUp} face={face} />
+        <AudioPlayButton onClick={isHere ? () => AudioPlayer.toggle() : other ? other.onClick : onClick} resume={pickUp} face={face} minutes={minutes} />
+        {list.length && !other ? <HeroDownload tracks={list} name={name} /> : null}
       </div>
-      {off ? <p className="hero-offline-line" role="status">You’re offline. This recording isn’t on this phone.</p> : null}
+      {other ? <p className="hero-alt-line">{'Playing ' + other.short + ', the copy on this phone'}</p> : null}
     </>
   );
+}
+
+/**
+ * Everything a Bible chapter's (or, without `chapterNum`, a book's) HeroListen asks, from its edition: the edition's
+ * own chapter recording, and offline another offered edition's copy of the chapter on the phone (brief 3j).
+ * @param {{ volKey: string, label: string }} bibleAudio
+ * @param {{ id: string, title?: string }} book
+ * @param {number} [chapterNum]
+ */
+export function bibleHero(bibleAudio, book, chapterNum) {
+  const at = { volKey: bibleAudio.volKey, bookId: book.id, chapterNum };
+  const chapterOf = (/** @type {string} */ volKey) => (AudioPlayer.renditionsFor(volKey, { id: book.id }, null)[0] || { tracks: [] }).tracks
+    .filter((/** @type {any} */ t) => AudioPlayer.bibleChapterOfTrack(t) === chapterNum);
+  return {
+    onClick: () => AudioPlayer.playBibleBook({ ...at, label: bibleAudio.label }),
+    canPlay: () => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapterNum),
+    resume: () => AudioPlayer.listenResume(at),
+    here: () => AudioPlayer.listenHere(at),
+    // A book's Listen is the whole book: no Download beside it (a book downloads from its row or the Downloads tree).
+    tracks: () => (chapterNum ? chapterOf(bibleAudio.volKey) : []),
+    name: (book.title || book.id) + (chapterNum ? ' · Chapter ' + chapterNum : ''),
+    alt: () => {
+      if (!chapterNum) return null;
+      const eds = typeof BIBLE_AUDIO_EDITIONS !== 'undefined' ? Object.values(BIBLE_AUDIO_EDITIONS) : [];
+      const ed = eds.find((e) => e && e.volKey !== bibleAudio.volKey && !e.unreleased && AudioPlayer.hasAudio(e.volKey, book.id)
+        && AudioPlayer.playableNow(e.volKey, book.id, chapterNum) && chapterOf(e.volKey).length > 0);
+      return ed ? { short: ed.short || ed.label, onClick: () => AudioPlayer.playBibleBook({ volKey: ed.volKey, bookId: book.id, label: ed.label, chapterNum }) } : null;
+    },
+  };
 }
 
 /**

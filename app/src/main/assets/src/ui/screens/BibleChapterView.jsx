@@ -5,7 +5,7 @@
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer, AUDIO_TOAST_ID } from '../../utils/audio-player.js';
 import { showToast } from '../../utils/toast.js';
-import { HeroListen } from '../components/AudioPlayButton.jsx';
+import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
@@ -251,7 +251,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   letter hero pill; inert peeks keep it (same
                   pointer-events:none contract). */}
               {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-                <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapter.num)} resume={() => AudioPlayer.listenResume({ volKey: bibleAudio.volKey, bookId: book.id, chapterNum: chapter.num })} here={() => AudioPlayer.listenHere({ volKey: bibleAudio.volKey, bookId: book.id, chapterNum: chapter.num })} />
+                <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
               )}
             </div>
           </header>

@@ -233,10 +233,11 @@ describe('the hero row offline', () => {
     audio.playable = false;
     NetStatus.reportFailure();
     render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
-    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(true);
+    // D4b (picture 15): the reading's pill says Not on this phone.
+    expect(screen.getByRole('button', { name: 'Not on this phone' }).disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Hear it sung' }).disabled).toBe(true);
     expect(screen.getByRole('status').textContent).toBe('You’re offline. This reading and its songs aren’t on this phone.');
-    fireEvent.click(screen.getByRole('button', { name: 'Listen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Not on this phone' }));
     expect(player.playLetter).not.toHaveBeenCalled();
   });
 
@@ -255,14 +256,14 @@ describe('the hero row offline', () => {
     NetStatus.reportFailure();
     render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
     expect(screen.getByRole('button', { name: 'Hear it sung' }).disabled).toBe(false);
-    expect(screen.getByRole('status').textContent).toBe('You’re offline. This reading isn’t on this phone.');
+    expect(screen.getByRole('status').textContent).toBe('You’re offline. This isn’t on this phone.');
   });
 
   it('the row comes back when the network does', () => {
     audio.playable = false;
     NetStatus.reportFailure();
     render(<LetterListenRow volKey="wtlb1" letter={WTLB} collectionLabel="Part One" />);
-    expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Not on this phone' }).disabled).toBe(true);
     audio.playable = true;
     act(() => { window.dispatchEvent(new Event('online')); });
     expect(screen.getByRole('button', { name: 'Listen' }).disabled).toBe(false);

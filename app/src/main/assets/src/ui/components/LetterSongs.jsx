@@ -40,6 +40,7 @@ import { SongCatalog } from '../../utils/song-catalog.js';
 import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
 import { SongKeepAction, useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
+import { DownloadWhenOnline, HeroDownload, NotOnPhonePill, useListenMinutes } from './OfflineAudioControls.jsx';
 
 /** Songs of this letter shown in the card before "All N songs". */
 const CARD_SONGS = 3;
@@ -77,6 +78,9 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   // U10.2: a load that runs long says so (a hook, so above the early return).
   const lateLoad = useStillLoading(readingHere && st.status === 'loading', (cur && cur.url) || '');
   const recorded = AudioPlayer.hasAudio(volKey, letter.id);
+  // What Listen plays (the Letter Voice where that reader recorded it): its length on the pill, its download beside it.
+  const tracks = recorded && typeof AudioPlayer.playbackTracks === 'function' ? AudioPlayer.playbackTracks(volKey, letter, collectionLabel) : [];
+  const minutes = useListenMinutes(tracks);
   const songs = lettersSongs(showSongs, letterKey);
   if (!recorded && !songs.length) return null;
 
@@ -95,7 +99,7 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   // Offline: only what is on the phone can sound (online, playableNow is always true).
   const listenOff = recorded && !readingHere && !AudioPlayer.playableNow(volKey, letter.id);
   const singOff = songs.length > 0 && !online && !songHere && !songs.some((s) => SongKeep.isKept(s.id));
-  const offLine = offlineLine(listenOff, singOff);
+  const offLine = listenOff && !singOff ? 'You’re offline. This isn’t on this phone.' : offlineLine(listenOff, singOff);
   // ra4: "Resume · N min left" when the tap picks the reading up part-way. Loaded and paused here, the tap
   // un-pauses at the bar's own clock (the player's resume thresholds still apply); otherwise the player says
   // what a Listen would resume.
@@ -103,16 +107,19 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
     : readingHere ? pausedHere(st)
       : AudioPlayer.listenResume({ volKey, letter, collectionLabel });
   // U10.2: while this reading loads the pill says Loading…, never Pause at 0:00.
-  const face = listenFace({ playing: readingHere && st.status === 'playing', loading: readingHere && st.status === 'loading', late: lateLoad, resume });
+  const face = listenFace({ playing: readingHere && st.status === 'playing', loading: readingHere && st.status === 'loading', late: lateLoad, resume, minutes });
 
   return (
     <>
       <div className={'hero-play-row letter-listen-row' + (songs.length ? ' has-songs' : '')}>
-        {recorded ? (
-          <button type="button" className={'hero-play-pill letter-listen-pill' + (face.pause ? ' is-playing' : '') + (face.busy ? ' is-loading' : '')} onClick={listen} disabled={listenOff} aria-pressed={face.pause} aria-busy={face.busy || undefined} aria-label={face.label}>
+        {/* D4b (pictures 15, 16, 21): offline and not on the phone, the pill says so; else the download control sits beside it. */}
+        {recorded && listenOff ? <NotOnPhonePill /> : null}
+        {recorded && !listenOff ? (
+          <button type="button" className={'hero-play-pill letter-listen-pill' + (face.pause ? ' is-playing' : '') + (face.busy ? ' is-loading' : '')} onClick={listen} aria-pressed={face.pause} aria-busy={face.busy || undefined} aria-label={face.label}>
             {face.pause ? PAUSE : PLAY}<span>{face.text}</span>
           </button>
         ) : null}
+        {recorded && !listenOff ? <HeroDownload tracks={tracks} name={letter.title || 'this letter'} /> : null}
         {songs.length ? (
           <button type="button" className={'hero-play-pill letter-sung-pill' + (singing ? ' is-playing' : '')} onClick={sing} disabled={singOff} aria-pressed={singing} aria-label={singing ? 'Pause the song' : 'Hear it sung'}>
             {singing ? PAUSE : MUSIC_NOTE}<span>{singing ? 'Pause song' : 'Hear it sung'}</span>
@@ -120,6 +127,7 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
         ) : null}
       </div>
       {offLine ? <p className="hero-offline-line" role="status">{offLine}</p> : null}
+      {recorded && listenOff ? <DownloadWhenOnline tracks={tracks} name={letter.title || 'this letter'} /> : null}
     </>
   );
 }

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
 import {
-  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, downloadWhenOnline, formatBytes, offlineMenuItems, useOfflineState,
+  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, DownloadWhenOnline, HeroDownload, downloadWhenOnline, formatBytes, offlineMenuItems, useOfflineState,
 } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
@@ -442,6 +442,45 @@ describe('on-phone marks, the row menu and Download when online (D4)', () => {
     expect(container.textContent).toMatch(/Download Volume One\?/);
     fireEvent.click(getByRole('button', { name: /download 4 MB/i }));
     expect(s.download.mock.calls[0][0]).toHaveLength(4);
+  });
+});
+
+/* D4b (picture 15): the control beside a Listen pill, and Download when online under one that cannot play. */
+describe('beside the Listen pill (D4b)', () => {
+  it('Download · 10 MB, then a ring with 4 of 10 MB whose tap cancels, then a tick with On this phone', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 10e6);
+    const view = render(<HeroDownload tracks={[T('a')]} name="Chosen by God" />);
+    fireEvent.click(view.getByRole('button', { name: 'Download Chosen by God, 10 MB' }));
+    expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'Chosen by God' }]);
+    s.st.status.set(U('a'), 'downloading'); s.st.progress.set(U('a'), { bytes: 4e6 });
+    act(() => s.bump());
+    expect(view.container.querySelector('.hero-dl-cap').textContent).toBe('4 of 10 MB');
+    fireEvent.click(view.getByRole('button', { name: /^Cancel the download of Chosen by God/ }));
+    expect(s.cancel).toHaveBeenCalledWith([U('a')]);
+    s.st.status.delete(U('a')); save(s, 'a', 10e6);
+    act(() => s.bump());
+    expect(view.container.textContent).toBe('On this phone');
+  });
+
+  it('offline it offers nothing for a recording not on the phone (the pill says so), and still shows the tick', () => {
+    const s = fakeStore();
+    setOnline(false);
+    const view = render(<HeroDownload tracks={[T('a')]} name="A" />);
+    expect(view.container.textContent).toBe('');
+    save(s, 'a', 1e6);
+    act(() => s.bump());
+    expect(view.container.textContent).toBe('On this phone');
+  });
+
+  it('Download when online queues it and then says it will', () => {
+    const s = fakeStore();
+    const view = render(<DownloadWhenOnline tracks={[T('a')]} name="A" />);
+    fireEvent.click(view.getByRole('button', { name: 'Download when online' }));
+    expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'A' }]);
+    s.st.status.set(U('a'), 'queued');
+    act(() => s.bump());
+    expect(view.container.querySelector('.hero-dl-held').textContent).toBe('It will download when you’re back online.');
   });
 });
 

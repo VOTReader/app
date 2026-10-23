@@ -583,3 +583,135 @@ export function offlineMenuItems({ off, online, tracks, name }) {
   }
   return out;
 }
+
+/* ── The Listen hero (D4b; downloads brief 3a, 3j; pictures 15, 16, 21) ─────────────────────────────────────────── */
+
+/**
+ * The whole minutes a Listen plays, for "Listen · 12 min" (player brief 3f), from the lengths baked at build time
+ * (D1, the lazy AudioLengths table, loaded here on first use); null while any recording of it has none.
+ * @param {Array<{ url?: string }>} tracks @returns {number | null}
+ */
+export function useListenMinutes(tracks) {
+  const lengths = typeof AudioLengths !== 'undefined' ? AudioLengths : null;
+  React.useSyncExternalStore(lengths ? lengths.lengthsStore.subscribe : _noSub, lengths ? lengths.lengthsStore.getVersion : _zero);
+  React.useEffect(() => { if (lengths && !lengths.lengthsLoaded()) void lengths.lengthsReady(); }, [lengths]);
+  const list = Array.isArray(tracks) ? tracks : [];
+  if (!lengths || !list.length) return null;
+  let sec = 0;
+  for (const t of list) {
+    const s = t && typeof t.url === 'string' ? lengths.secondsOf(t.url) : null;
+    if (s == null) return null;
+    sec += s;
+  }
+  return Math.max(1, Math.round(sec / 60));
+}
+
+export function CloudOffIcon() {
+  return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 18.5h9.8a3.7 3.7 0 0 0 .9-7.3 5.6 5.6 0 0 0-9.4-3" /><path d="M6.3 9.2A4.7 4.7 0 0 0 7.5 18.5" /><path d="M4 4l16 16" /></svg>;
+}
+
+/** "4 of 10 MB": the unit said once when both halves share it. @param {number} done @param {number} total */
+function _ofBytes(done, total) {
+  const a = formatBytes(done) || '0 MB';
+  const b = formatBytes(total);
+  const unit = / (MB|GB)$/.exec(b);
+  return (unit && a.endsWith(unit[0]) ? a.slice(0, -unit[0].length) : a) + ' of ' + b;
+}
+
+/**
+ * Beside a Listen pill (picture 15): a round Download with its size under it; while it downloads, a ring with a stop
+ * square and "4 of 10 MB" (a tap cancels); once saved, a tick with "On this phone"; a failed one offers Retry.
+ * Nothing where downloads are not possible here, and nothing offline for a recording not on the phone: the pill
+ * itself says so then (NotOnPhone).
+ * @param {{ tracks: any[], name: string }} props tracks = what the Listen beside it plays
+ */
+export function HeroDownload({ tracks, name }) {
+  const off = useOfflineAudio();
+  const online = useOnline();
+  const list = (Array.isArray(tracks) ? tracks : []).filter((t) => t && typeof t.url === 'string');
+  const urls = list.map((t) => t.url);
+  const urlKey = urls.join('\n');
+  React.useEffect(() => {
+    if (off && urls.length) off.requestSizes(urls);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined urls: a new array each render must not re-ask
+  }, [off, urlKey]);
+  const u = off && urls.length ? unitState(off, urls) : null;
+  const focus = useKeepFocus(u ? u.status : '');
+  if (!off || !u) return null;
+  if (u.status === 'saved') {
+    return <p className="hero-dl is-saved" {...focus}><OnPhoneRing share={1} /><span>On this phone</span></p>;
+  }
+  if (u.status === 'downloading') {
+    let done = 0;
+    for (const x of urls) {
+      if (off.statusOf(x) === 'saved') done += off.sizeOf(x) || 0;
+      else { const p = off.progressOf(x); if (p) done += p.bytes; }
+    }
+    const cap = !u.started ? (waitsForWifi(off, urls) ? WAITING_WORDS : !online ? 'Waiting for a connection' : 'Waiting')
+      : u.bytes ? _ofBytes(done, u.bytes) : u.percent + '%';
+    return (
+      <button type="button" className="hero-dl is-busy" {...focus} onClick={() => _cancel(off, urls)} aria-label={'Cancel the download of ' + name + '. ' + cap}>
+        <svg className="hero-dl-ring" viewBox="0 0 24 24" aria-hidden="true">
+          <circle className="offline-ring-track" cx="12" cy="12" r="10" />
+          <circle className="offline-ring-arc" cx="12" cy="12" r="10" transform="rotate(-90 12 12)"
+            strokeDasharray={(2 * Math.PI * 10 * Math.max(0.04, u.started ? u.percent / 100 : 0)).toFixed(2) + ' ' + (2 * Math.PI * 10).toFixed(2)} />
+          <rect x="9" y="9" width="6" height="6" rx="1" />
+        </svg>
+        <span className="hero-dl-cap">{cap}</span>
+      </button>
+    );
+  }
+  if (!online) return null;
+  const todo = list.filter((t) => _leaving.has(t.url) || off.statusOf(t.url) !== 'saved');
+  const need = _need(off, todo);
+  const failed = u.status === 'failed';
+  return (
+    <button type="button" className={'hero-dl' + (failed ? ' is-failed' : '')} {...focus}
+      onClick={() => off.download(todo.map((t) => _item(t, name)))}
+      aria-label={(failed ? 'Download failed. Retry ' : 'Download ') + name + (need ? ', ' + formatBytes(need) : '')}>
+      <span className="hero-dl-icon">{failed ? <AlertIcon /> : <DownloadIcon />}</span>
+      <span className="hero-dl-cap">{failed ? (u.failed === 'space' ? 'No room · Retry' : 'Failed · Retry') : 'Download' + (need ? ' · ' + formatBytes(need) : '')}</span>
+    </button>
+  );
+}
+
+/** The disabled pill in a Listen's place, offline, for a recording not on the phone (pictures 15, 21). */
+export function NotOnPhonePill() {
+  return <button type="button" className="hero-play-pill is-off" disabled aria-label="Not on this phone"><CloudOffIcon /><span>Not on this phone</span></button>;
+}
+
+/**
+ * "Download when online" under a Listen that cannot play offline: queues it for the signal (downloadWhenOnline), then
+ * says it will. Nothing where downloads are not possible here.
+ * @param {{ tracks: any[], name: string }} props
+ */
+export function DownloadWhenOnline({ tracks, name }) {
+  const off = useOfflineAudio();
+  const list = (Array.isArray(tracks) ? tracks : []).filter((t) => t && typeof t.url === 'string');
+  if (!off || !list.length) return null;
+  if (unitState(off, list.map((t) => t.url)).status === 'downloading') {
+    return <p className="hero-offline-line hero-dl-held" role="status">It will download when you’re back online.</p>;
+  }
+  return (
+    <div className="hero-play-row is-off">
+      <button type="button" className="hero-dl-when" onClick={() => downloadWhenOnline(off, list.map((t) => _item(t, name)))}>
+        <DownloadIcon /><span>Download when online</span>
+      </button>
+    </div>
+  );
+}
+
+/**
+ * Offline, and the Listen's recording is not on the phone (pictures 15, 21): the pill itself says "Not on this phone",
+ * the line says why, and "Download when online" queues it for the signal.
+ * @param {{ tracks: any[], name: string, line?: string }} props
+ */
+export function NotOnPhone({ tracks, name, line = 'You’re offline. This isn’t on this phone.' }) {
+  return (
+    <>
+      <div className="hero-play-row is-off"><NotOnPhonePill /></div>
+      <p className="hero-offline-line" role="status">{line}</p>
+      <DownloadWhenOnline tracks={tracks} name={name} />
+    </>
+  );
+}
