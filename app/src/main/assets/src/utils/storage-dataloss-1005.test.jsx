@@ -16,7 +16,7 @@ import { CachedStore, _resetStoreRegistry } from '../stores/cached-store.js';
 import { mergeStateStore, allowProgressClear, _resetProgressClearForTests } from '../stores/store-merge.js';
 import { usePersistedState, RESUME_STATE_KEY } from '../hooks/use-persisted-state.js';
 import { useSavedState } from '../hooks/use-saved-state.js';
-import { HydrationGate, REMOUNT_COALESCE_MS } from '../components/HydrationGate.jsx';
+import { HydrationGate, REMOUNT_COALESCE_MS, TYPING_RECHECK_MS } from '../components/HydrationGate.jsx';
 import { DiagnosticLog, PERSIST_KEY } from './diagnostic-log.js';
 
 const marks = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => ['bible:john:' + (i + 1), 1]));
@@ -236,6 +236,35 @@ describe('HydrationGate remounts App when a late store loads', () => {
     expect(mounts).toBe(2);
     expect(container.textContent).toBe('["real"]');
     await settle(5000);
+    expect(mounts).toBe(2);
+  });
+
+  // ds5 s01.5: the remount threw away whatever the reader was typing in component state.
+  it('waits while the reader is typing in a field, then remounts once they leave it', async () => {
+    const realGet = IDBAdapter.get.bind(IDBAdapter);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    vi.spyOn(IDBAdapter, 'get').mockImplementation((store, key) => (store === 'vot-test-late2' ? gate.then(() => ['real']) : realGet(store, key)));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const late = CachedStore('vot-test-late2', [], { idb: true });
+    late._backgroundRetryDelays = [];
+    let mounts = 0;
+    function Child() {
+      React.useEffect(() => { mounts += 1; }, []);
+      return <textarea data-testid="draft" />;
+    }
+    const { getByTestId } = render(<HydrationGate><Child /></HydrationGate>);
+    await settle(3000);
+    await settle(10);
+    expect(mounts).toBe(1);
+    getByTestId('draft').focus();
+    release();
+    await settle(10);
+    await settle(REMOUNT_COALESCE_MS + 10);
+    await settle(TYPING_RECHECK_MS * 3);
+    expect(mounts).toBe(1);                    // still typing: the draft's component stays
+    getByTestId('draft').blur();
+    await settle(TYPING_RECHECK_MS + 10);
     expect(mounts).toBe(2);
   });
 });

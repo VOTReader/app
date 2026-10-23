@@ -743,3 +743,37 @@ describe('JournalEditorScreen — the screen has a heading', () => {
     expect(h1s[0].classList.contains('sr-only')).toBe(true);
   });
 });
+
+/* ds5 s20.3 (idea sweep 2026-10-22): the 'Saved' chip said Saved straight after a fire-and-forget
+   update, so a write that failed in IndexedDB still showed success. It now waits on whenSaved. */
+describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.3)", () => {
+  let realWhenSaved;
+  beforeEach(() => {
+    realWhenSaved = JournalStore.whenSaved;
+    globalThis.LibraryNav = (props) => props.leftExtras;
+  });
+  afterEach(() => { JournalStore.whenSaved = realWhenSaved; });
+  const chip = () => document.querySelector('.jrn-saved-ind').textContent;
+
+  it("says 'Not saved' when the store's write fails, and 'Saved' once one lands", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    JournalStore.whenSaved = () => Promise.resolve(false);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    expect(chip()).toBe('Not saved');
+    JournalStore.whenSaved = () => Promise.resolve(true);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited again' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    expect(chip()).toBe('Saved');
+  });
+
+  it("keeps 'Saving…' while the write is still in flight", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    JournalStore.whenSaved = () => new Promise(() => {});
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    expect(chip()).toBe('Saving…');
+  });
+});

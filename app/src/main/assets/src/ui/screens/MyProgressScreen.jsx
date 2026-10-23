@@ -141,6 +141,8 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   // (the module-load recompute only runs once per boot).
   React.useEffect(() => {
     if (typeof ReadingStreakStore !== 'undefined') ReadingStreakStore.recomputeFromLoad();
+    // ds5 s11.1: the journal streak follows the same rule (its module-load recompute ran once).
+    if (typeof JournalStatsStore !== 'undefined' && typeof JournalStatsStore.recomputeFromLoad === 'function') JournalStatsStore.recomputeFromLoad();
   }, []);
   const annVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof AnnotationStore !== 'undefined') ? AnnotationStore.subscribe(cb) : () => {}, []),

@@ -457,3 +457,18 @@ describe('MyProgressScreen — large libraries', () => {
     expect(container.querySelectorAll('.prg-src-row').length).toBe(1);
   });
 });
+
+/* ds5 s11.1 (idea sweep 2026-10-22): only the reading streak was re-checked on open, so an app
+   left running past midnight showed a broken journal streak as unbroken until a reload. */
+describe('MyProgressScreen — both streaks are re-checked on open (ds5 s11.1)', () => {
+  it('recomputes the journal streak beside the reading streak', () => {
+    setupGlobals();
+    const journal = vi.fn();
+    const reading = vi.fn();
+    /** @type {any} */ (globalThis).JournalStatsStore.recomputeFromLoad = journal;
+    /** @type {any} */ (globalThis).ReadingStreakStore.recomputeFromLoad = reading;
+    renderScreen();
+    expect(reading).toHaveBeenCalledTimes(1);
+    expect(journal).toHaveBeenCalledTimes(1);
+  });
+});

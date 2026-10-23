@@ -307,6 +307,7 @@ export function JournalEditorScreen(props) {
   // activeTextareaRef tracks { idx, el, caret } so insertion knows where to
   // split. caret stays current via onSelect/onKeyUp/onClick on the textarea.
   var activeTextareaRef = useRef(null);
+  var saveSeqRef = useRef(0);          // ds5 s20.3: which save the 'Saved' chip is waiting on
   var blocksContainerRef = useRef(null);
   var pendingFocusRef = useRef(null);  // { id, caret } to focus after the next render
   var firstRunRef = useRef(true);
@@ -347,13 +348,13 @@ export function JournalEditorScreen(props) {
       immediateSaveRef.current = false;
       _saveIfChanged(entryId, title, blocks, mood);
       _maybeRecordNewEntryStats(entryId, title, blocks);
-      setSavedLabel('Saved');
+      showSavedWhenDurable();
       return;
     }
     var t = setTimeout(function() {
       _saveIfChanged(entryId, title, blocks, mood);
       _maybeRecordNewEntryStats(entryId, title, blocks);
-      setSavedLabel('Saved');
+      showSavedWhenDurable();
     }, 1200);
     return function() { clearTimeout(t); };
   }, [entryId, title, blocks, mood]);
@@ -468,7 +469,18 @@ export function JournalEditorScreen(props) {
     if (!eid) return;
     _saveIfChanged(eid, titleRef.current, blocksRef.current, moodRef.current);
     _maybeRecordNewEntryStats(eid, titleRef.current, blocksRef.current);
-    setSavedLabel('Saved');
+    showSavedWhenDurable();
+  }
+
+  // ds5 s20.3: 'Saved' only once the store's last write has committed; a failed write says
+  // 'Not saved' instead of a false success. The newest save's answer wins.
+  function showSavedWhenDurable() {
+    var seq = ++saveSeqRef.current;
+    if (typeof JournalStore === 'undefined' || typeof JournalStore.whenSaved !== 'function') { setSavedLabel('Saved'); return; }
+    JournalStore.whenSaved().then(function(ok) {
+      if (!mountedRef.current || seq !== saveSeqRef.current) return;
+      setSavedLabel(ok ? 'Saved' : 'Not saved');
+    });
   }
 
   function scheduleSave() {
@@ -500,6 +512,12 @@ export function JournalEditorScreen(props) {
     });
     setConfirmDelIdx(null);
     setConfirmAudioDelete(null);
+    // ds5 s20.2: the caret's block index follows the splice, or a FAB insert after deleting a
+    // block above the caret lands one block off.
+    var caretInfo = activeTextareaRef.current;
+    if (caretInfo && caretInfo.idx != null && caretInfo.idx >= idx) {
+      activeTextareaRef.current = caretInfo.idx === idx ? null : Object.assign({}, caretInfo, { idx: caretInfo.idx - 1 });
+    }
     scheduleSave();
     undoOpenRef.current++;          // W16: closed by the last timer below
     // Macrotask so React has flushed the splice above (the tab-close idiom).
@@ -520,10 +538,15 @@ export function JournalEditorScreen(props) {
       };
       var restore = function() {
         if (expired) return;
-        hideToast('vot-toast-undo');
+        hideToast('vot-toast-undo-journal');
         // `undone` only when the block is really back: it skips the deferred
         // media delete and mark purge, which must still run when nothing was.
-        if (mountedRef.current) { undone = true; setBlocks(withRestored); scheduleSave(); return; }
+        if (mountedRef.current) {
+          undone = true;
+          var caretNow = activeTextareaRef.current;   // ds5 s20.2: the block comes back above the caret
+          if (caretNow && caretNow.idx != null && caretNow.idx >= idx) activeTextareaRef.current = Object.assign({}, caretNow, { idx: caretNow.idx + 1 });
+          setBlocks(withRestored); scheduleSave(); return;
+        }
         // TWO PATHS because the toast outlives the screen BY DESIGN: the
         // reader may tap Done/Home/Search and still reach for Undo over the
         // next screen. This editor is gone, so setBlocks would be a silent
@@ -553,12 +576,14 @@ export function JournalEditorScreen(props) {
       var label = removed.type === 'audio' ? 'Voice memo removed.'
         : removed.type === 'image' ? 'Image removed.' : 'Block deleted.';
       showToast({
-        id: 'vot-toast-undo',
+        // ds5 L2.7: its own id. A tab close's Undo (use-tab-actions) shares the look, not the toast:
+        // one id let either replace the other's button mid-window.
+        id: 'vot-toast-undo-journal',
         className: 'vot-toast vot-toast-undo',
         html: label + ' <button type="button" class="vot-undo-btn">Undo</button>',
         durationMs: 6000,
       });
-      var el = (typeof document !== 'undefined') && document.getElementById('vot-toast-undo');
+      var el = (typeof document !== 'undefined') && document.getElementById('vot-toast-undo-journal');
       var btn = el && el.querySelector('.vot-undo-btn');
       if (btn) btn.addEventListener('click', restore, { once: true });
       // n4-06: the block's marks (highlights, notes, bookmarks, link ends) go too,

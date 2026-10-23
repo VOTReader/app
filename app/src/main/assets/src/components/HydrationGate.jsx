@@ -35,6 +35,8 @@
    saved data; what changes on screen is that the reader's own place and
    settings come back (a toast says so). What the reader did to place, tabs
    and settings in the unloaded window is not kept: it was built on defaults.
+   While the reader is typing in a field, the remount waits until they
+   leave it (ds5 s01.5), so a draft in an open editor or sheet survives.
    An import cannot overlap a remount - it refuses to run until every store
    has loaded (backup-flow _applyConfirmedImport).
    ═══════════════════════════════════════════════════════════════════════ */
@@ -51,6 +53,21 @@ const { useState, useEffect } = React;
 
 /** Stores that load within this window of each other cause one remount. */
 export const REMOUNT_COALESCE_MS = 250;
+/** ds5 s01.5: how often a remount held for the reader's typing looks again. */
+export const TYPING_RECHECK_MS = 1000;
+
+const _TEXT_INPUT = /^(?:|text|search|email|url|tel|number|password)$/;
+/** True while a field the reader types into has focus. */
+function _readerIsTyping() {
+  if (typeof document === 'undefined') return false;
+  const el = /** @type {any} */ (document.activeElement);
+  if (!el || el === document.body) return false;
+  if (el.isContentEditable) return true;
+  const tag = (el.tagName || '').toLowerCase();
+  if (tag === 'textarea') return !el.readOnly && !el.disabled;
+  if (tag === 'input') return _TEXT_INPUT.test((el.getAttribute('type') || '').toLowerCase()) && !el.readOnly && !el.disabled;
+  return false;
+}
 /** The data-health check and daily snapshot wait this long after every store loads
  *  (utils/data-safety.js): never on the boot path. Except on a boot whose open had to
  *  create the database - a first run, or one the browser threw away (2026-10-11) - which
@@ -147,8 +164,11 @@ export function HydrationGate({ children }) {
       loadedCount += waiting.length - still.length;
       waiting = still;
       if (timer != null) clearTimeout(timer);
-      timer = setTimeout(() => {
+      const fire = () => {
         timer = null;
+        // ds5 s01.5: never pull the screen out from under the reader's typing. While a text field
+        // has focus the remount waits (a draft held in component state would go with it).
+        if (_readerIsTyping()) { timer = setTimeout(fire, TYPING_RECHECK_MS); return; }
         if (typeof DiagnosticLog !== 'undefined') DiagnosticLog.warn('hydration', 'remounted App: ' + loadedCount + ' store(s) loaded after the gate opened');
         loadedCount = 0;
         _appReplacementPending = waiting.length > 0;
@@ -156,7 +176,8 @@ export function HydrationGate({ children }) {
         if (waiting.length === 0) scheduleSafety();
         // The remount puts the reader back where their saved data says; say why.
         showToast({ id: 'vot-toast-late-load', className: 'vot-toast', text: 'Your saved library has finished loading.', durationMs: 4000 });
-      }, REMOUNT_COALESCE_MS);
+      };
+      timer = setTimeout(fire, REMOUNT_COALESCE_MS);
     };
     const unsubs = waiting.map((s) => s.subscribe(onChange));
     onChange();   // one may have loaded before this effect ran
