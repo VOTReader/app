@@ -16,7 +16,7 @@ import { CachedStore, _resetStoreRegistry } from '../stores/cached-store.js';
 import { mergeStateStore, allowProgressClear, _resetProgressClearForTests } from '../stores/store-merge.js';
 import { usePersistedState, RESUME_STATE_KEY } from '../hooks/use-persisted-state.js';
 import { useSavedState } from '../hooks/use-saved-state.js';
-import { HydrationGate, REMOUNT_COALESCE_MS, TYPING_RECHECK_MS, TYPING_IDLE_MS, TYPING_HOLD_MAX_MS } from '../components/HydrationGate.jsx';
+import { HydrationGate, REMOUNT_COALESCE_MS, TYPING_RECHECK_MS, TYPING_IDLE_MS } from '../components/HydrationGate.jsx';
 import { DiagnosticLog, PERSIST_KEY } from './diagnostic-log.js';
 
 const marks = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => ['bible:john:' + (i + 1), 1]));
@@ -264,13 +264,18 @@ describe('HydrationGate remounts App when a late store loads', () => {
     await settle(REMOUNT_COALESCE_MS + 10);
     await settle(TYPING_RECHECK_MS * 3);
     expect(mounts).toBe(1);                    // still typing: the draft's component stays
+    for (let i = 0; i < 8; i++) {              // refuter b34-r2: typing on for minutes keeps it
+      fireEvent.input(getByTestId('draft'), { target: { value: 'a thought ' + i } });
+      await settle(TYPING_IDLE_MS - 5000);
+    }
+    expect(mounts).toBe(1);
     getByTestId('draft').blur();
     await settle(TYPING_RECHECK_MS + 10);
     expect(mounts).toBe(2);
   });
 
   // Refuter b34-r1: an autofocus field nobody types in, or endless typing, must not hold it all session.
-  it('a focused field nobody typed in holds nothing; typing holds at most TYPING_HOLD_MAX_MS', async () => {
+  it('a focused field nobody typed in holds nothing', async () => {
     const realGet = IDBAdapter.get.bind(IDBAdapter);
     let release;
     const gate = new Promise((r) => { release = r; });
@@ -291,7 +296,6 @@ describe('HydrationGate remounts App when a late store loads', () => {
     await settle(10);
     await settle(REMOUNT_COALESCE_MS + 10);
     expect(mounts).toBe(2);
-    expect(TYPING_HOLD_MAX_MS).toBeGreaterThan(TYPING_IDLE_MS);
   });
 });
 
