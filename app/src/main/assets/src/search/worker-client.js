@@ -10,19 +10,34 @@
    that does not answer its first message within HELLO_TIMEOUT_MS, or one that
    dies or goes quiet on a request past that request's limit. Every request it
    had open is refused then, so each caller falls back at once instead of
-   waiting on an answer that will not come. */
+   waiting on an answer that will not come.
+
+   A WORKER THAT RAN COMES BACK (search200 audit n48, L3.6). One error used to keep every search on the page's
+   thread for the rest of the session. A worker that answered its hello and then failed is started again on the
+   next use after a cooldown (30 s, doubling), at most COMEBACK_MAX times a session. One that never ran (it cannot
+   load here) stays off. The meaning model is still held once: semantic.js keeps it on the page for the session
+   once the page has taken it, and never asks a worker that came back to run it. */
 
 const WORKER_URL = 'dist/bundle-w.js';
 const HELLO_TIMEOUT_MS = 8000;
+const COMEBACK_FIRST_MS = 30 * 1000;
+const COMEBACK_MAX = 3;
 
 /** @type {Worker|null} */ let worker = null;
 let broken = false;
+/** The worker now running answered its hello. */
+let ran = false;
+/** While broken: when the next use may start a worker again (Infinity: not this session). */
+let downUntil = Infinity;
+let comebacks = 0;
 let seq = 0;
 /** @type {Map<number, {resolve: (m: any) => void, reject: (e: Error) => void, onPart: (m: any) => void, heard: () => void}>} */
 const pending = new Map();
 
 function fail(/** @type {string} */ why) {
   broken = true;
+  downUntil = ran && comebacks < COMEBACK_MAX ? Date.now() + COMEBACK_FIRST_MS * 2 ** comebacks : Infinity;
+  ran = false;
   for (const p of pending.values()) p.reject(new Error(why));
   pending.clear();
   if (worker) { try { worker.terminate(); } catch { /* gone already */ } }
@@ -59,18 +74,27 @@ function request(op, data, onPart, quietMs) {
 /** Give the worker up: what it held is done on the page from now on, and its open requests are refused. */
 const close = (/** @type {string} */ why) => fail(why);
 
-const client = { request, close };
+/** One per worker started, so a caller can tell a worker that came back from the one it used before. */
+let client = { request, close };
 
-/** The search worker, started on first use; null where this page cannot have one. */
+/** The search worker, started on first use; null where this page cannot have one (or while one that failed cools down). */
 export function searchWorker() {
-  if (broken || typeof document === 'undefined' || typeof Worker !== 'function') return null;
+  if (typeof document === 'undefined' || typeof Worker !== 'function') return null;
+  if (broken) {
+    if (Date.now() < downUntil) return null;
+    broken = false;
+    comebacks++;
+  }
   if (!worker) {
     try {
       worker = new Worker(new URL(WORKER_URL, document.baseURI), { type: 'module' });
     } catch {
       broken = true;
+      downUntil = Infinity;
       return null;
     }
+    const w = worker;
+    client = { request, close };
     worker.onmessage = (e) => {
       const m = e.data || {};
       const p = pending.get(m.id);
@@ -89,7 +113,7 @@ export function searchWorker() {
     worker.onerror = () => fail('search worker failed');
     worker.onmessageerror = () => fail('search worker: a message could not be read');
     // a worker whose script never loads raises nothing: its first answer is the proof it runs
-    request('hello', {}, undefined, HELLO_TIMEOUT_MS).catch(() => {});
+    request('hello', {}, undefined, HELLO_TIMEOUT_MS).then(() => { if (worker === w) ran = true; }, () => {});
   }
   return client;
 }
@@ -99,5 +123,8 @@ export function resetSearchWorker() {
   if (worker) { try { worker.terminate(); } catch { /* gone already */ } }
   worker = null;
   broken = false;
+  ran = false;
+  downUntil = Infinity;
+  comebacks = 0;
   pending.clear();
 }

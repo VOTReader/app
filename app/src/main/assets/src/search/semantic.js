@@ -106,6 +106,8 @@ let starting = null;
 /** The worker could not hold it: this thread does, for the session. */
 let pageOnly = false;
 let workerUnits = 0;
+/** The worker that holds the model; a worker started after it failed (worker-client.js) does not. @type {any} */
+let onWorker = null;
 
 export function semanticStatus() { return { status, failure, units: man ? man.count : workerUnits, where }; }
 
@@ -149,6 +151,7 @@ export function startSemantic() {
     const run = w.request('meaning-start', { base: io.url('') }, undefined, START_QUIET_MS).then((/** @type {any} */ r) => {
       if (!r.ok) throw new Error(r.failure || 'semantic: the worker could not load the model');
       where = 'worker';
+      onWorker = w;
       failure = null;
       workerUnits = r.units || 0;
       nowReady();
@@ -372,12 +375,12 @@ export async function semanticDocs(/** @type {string} */ query, /** @type {(key:
     const w = io.worker();
     /** @type {any} */ let r = null;
     try {
-      if (!w) throw new Error('search worker gone');
+      if (!w || w !== onWorker) throw new Error('search worker gone');
       r = await w.request('meaning', { query, limit }, undefined, QUERY_WAIT_MS);
     } catch {
       // the worker died, went quiet, or answered that it could not run the model. One that answered is alive and still
       // holds its copy: it is given up first, so this thread's copy never sits beside it (sweep 2026-10-14 v017)
-      if (w && w.close) w.close('search worker: could not run the meaning model');
+      if (w && w === onWorker && w.close) w.close('search worker: could not run the meaning model');
       void toPage(); // this thread loads the model, behind this search
       return null;
     }
@@ -448,5 +451,5 @@ export function docUnitKey(/** @type {any} */ doc) {
 export function resetSemantic() {
   status = 'off'; starting = null; session = null; ort = null; vocab = null; man = null;
   V = null; SCALE = null; KEY = null; START = null; failure = null; retryMs = 0; retryAt = 0;
-  where = 'page'; pageOnly = false; workerUnits = 0; readyWaits = [];
+  where = 'page'; pageOnly = false; workerUnits = 0; onWorker = null; readyWaits = [];
 }

@@ -129,3 +129,65 @@ describe('the meaning model on the worker', () => {
     expect(loadedBeside, 'files this thread loaded while the worker still held the model').toEqual([]);
   });
 });
+
+/* ONE WORKER ERROR IS NOT FOR THE SESSION (search200 audit n48, L3.6). A worker that ran (it answered its hello)
+   and then died comes back after a cooldown, so one error does not keep search on the page's thread until the
+   next boot. A worker that never ran (the WebView cannot have one) stays off. The meaning model is never held
+   twice: once this thread holds it, a worker that comes back only restores the index. */
+describe('a worker that fails', () => {
+  it('comes back after the cooldown when it had run', async () => {
+    const first = searchWorker();
+    await vi.advanceTimersByTimeAsync(0);
+    const old = made;
+    old.onerror();
+    expect(searchWorker()).toBeNull();
+    await vi.advanceTimersByTimeAsync(31000);
+    const again = searchWorker();
+    expect(again).not.toBeNull();
+    expect(made).not.toBe(old);
+    expect(again).not.toBe(first);
+  });
+
+  it('stays off for the session when it never answered its hello', async () => {
+    script = {};
+    searchWorker();
+    await vi.advanceTimersByTimeAsync(9000);
+    expect(searchWorker()).toBeNull();
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(searchWorker()).toBeNull();
+  });
+
+  it('gives up for the session after a few comebacks', async () => {
+    for (let i = 0; i < 3; i++) {
+      expect(searchWorker()).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(0);
+      made.onerror();
+      await vi.advanceTimersByTimeAsync(11 * 60 * 1000);
+    }
+    expect(searchWorker()).not.toBeNull();
+    await vi.advanceTimersByTimeAsync(0);
+    made.onerror();
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    expect(searchWorker()).toBeNull();
+  });
+
+  it('that held the model: the worker that comes back is never asked to load it, and this thread holds the one copy', async () => {
+    const asked = /** @type {any[]} */ ([]);
+    script['meaning-start'] = (_m, post) => { asked.push(made); post({ done: true, ok: true, status: 'ready', units: 3 }); };
+    script.meaning = (_m, post) => post({ done: true, docs: [] });
+    expect(await startSemantic()).toBe(true);
+    expect(semanticStatus().where).toBe('worker');
+    made.onerror(); // dies between two searches
+    await vi.advanceTimersByTimeAsync(31000);
+    const fresh = searchWorker();
+    expect(fresh).not.toBeNull();
+    const q = watch(semanticDocs('love', (k) => k));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(q.state).toEqual({ value: null });
+    expect(semanticStatus().where).toBe('page');
+    expect(made.terminated, 'the worker that came back still restores the index').toBe(false);
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000);
+    searchWorker();
+    expect(asked.length, 'meaning-start sent to a worker').toBe(1);
+  });
+});
