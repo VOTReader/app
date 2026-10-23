@@ -49,7 +49,9 @@ describe('ReadingPlansScreen', () => {
     fireEvent.click(within(plan).getByRole('button', { name: 'Read today: Genesis 4-7' }));
     expect(p.onRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 4 });
     expect(within(plan).getByText(/days? behind/)).toBeTruthy();
-    act(() => { fireEvent.click(within(plan).getByRole('button', { name: 'Catch me up' })); });
+    fireEvent.click(within(plan).getByRole('button', { name: 'Catch up' }));
+    expect(within(plan).getByText(/^At this pace you finish /)).toBeTruthy();
+    act(() => { fireEvent.click(within(plan).getByRole('button', { name: /^Catch me up/ })); });
     expect(within(screen.getByRole('region', { name: 'Bible in a Year' })).queryByText(/days? behind/)).toBeNull();
   });
 
@@ -130,6 +132,61 @@ describe('ReadingPlansScreen', () => {
     expect(runs().map((r) => r.plan)).toEqual(['psalms']);
     expect(screen.getByRole('button', { name: 'Psalms, following' }).disabled).toBe(true);
     expect(screen.getByText('A day ticks when you read it through or listen to the end.')).toBeTruthy();
+  });
+
+  it('Spread it out keeps the planned finish and asks a little more each day (C3)', () => {
+    const run = startCatalogPlan('bible-year', null, daysAgo(6));
+    ReadingPlanStore.put(run);
+    render(<ReadingPlansScreen {...base()} />);
+    const plan = screen.getByRole('region', { name: 'Bible in a Year' });
+    fireEvent.click(within(plan).getByRole('button', { name: 'Catch up' }));
+    const spread = within(plan).getByRole('button', { name: /^Spread it out/ });
+    expect(spread.textContent).toMatch(/Keep .* · about \d+ min a day from now/);
+    act(() => { fireEvent.click(spread); });
+    const after = ReadingPlanStore.active()[0];
+    expect(after.target).toBe(run.target);
+    expect(screen.getByRole('region', { name: 'Bible in a Year' }).textContent).not.toMatch(/days? behind/);
+  });
+
+  it('pauses and resumes a plan from Plan details (C3)', () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Pause plan' })); });
+    expect(ReadingPlanStore.active()[0].status).toBe('paused');
+    expect(screen.getByText(/^Paused since /)).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Resume' })); });
+    expect(ReadingPlanStore.active()[0].status).toBe('running');
+  });
+
+  it('changes the pace and keeps what was read (C6)', () => {
+    let run = startCatalogPlan('bible-year', null, new Date());
+    run = tickItem(run, 'genesis:1', todayKey(new Date()), 1);
+    ReadingPlanStore.put(run);
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Change pace' }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: '90 days' })); });
+    const after = ReadingPlanStore.active()[0];
+    expect(after.pace).toEqual({ mode: 'days', n: 90 });
+    expect('genesis:1' in after.ticks).toBe(true);
+    expect(screen.getByText(/^Day 1 of 90/)).toBeTruthy();
+  });
+
+  it('marks today read by hand (a link, or holding the chapters), and un-marks it (C4)', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+      render(<ReadingPlansScreen {...base()} />);
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark today as read' })); });
+      expect(screen.getByRole('heading', { name: 'Done today' })).toBeTruthy();
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Not read yet' })); });
+      expect(screen.getByRole('heading', { name: 'Genesis 1-3' })).toBeTruthy();
+      const hold = document.querySelector('.plans-hold');
+      fireEvent.pointerDown(hold);
+      act(() => { vi.advanceTimersByTime(600); });
+      expect(screen.getByRole('heading', { name: 'Done today' })).toBeTruthy();
+    } finally { vi.useRealTimers(); }
   });
 
   it('never scores the reader', () => {

@@ -18,9 +18,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
-import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef } from '../../utils/plan-runs-view.js';
-import { startCatalogPlan, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
-import { monthCells, catchUp } from '../../data/plan-engine.js';
+import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate } from '../../utils/plan-runs-view.js';
+import { startCatalogPlan, planDef, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
+import { monthCells, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -62,6 +62,105 @@ function weekCells(plan, now) {
 const dayState = (s) => (s === 'read' ? 'done' : s);
 
 /**
+ * C3: a plan behind says so plainly and offers the two ways back: Catch me up (keep the daily amount, the
+ * finish moves) and Spread it out (keep the finish, a little more each day).
+ * @param {{ plan: any, row: any, now: Date }} props
+ */
+function Behind({ plan, row, now }) {
+  const spread = spreadPreview(plan, now);
+  return (
+    <div className="plans-behind">
+      <h4 className="plans-behind-title">{row.behind + (row.behind === 1 ? ' day' : ' days') + ' behind'}</h4>
+      <p className="plans-plan-sub">{'At this pace you finish ' + shortDate(row.projected) + ' (planned ' + shortDate(row.target) + ')'}</p>
+      <button type="button" className="plans-option" onClick={() => saveRun(catchUp(plan, new Date()))}>
+        <span className="plans-option-name">Catch me up</span>
+        <span className="plans-option-sub">{'Pick up from today · the finish moves to ' + shortDate(row.projected)}</span>
+      </button>
+      {spread ? (
+        <button type="button" className="plans-option" onClick={() => saveRun(spreadOut(plan, new Date()))}>
+          <span className="plans-option-name">Spread it out</span>
+          <span className="plans-option-sub">{'Keep ' + shortDate(row.target) + ' · about ' + spread.minutes + ' min a day from now'}</span>
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+const ALL_WEEK = [true, true, true, true, true, true, true];
+const WORK_WEEK = [false, true, true, true, true, true, false];
+
+/** The paces a plan offers (C6): the catalog's, else ones in the plan's own measure. @param {any} plan */
+function paceOptions(plan) {
+  const def = planDef(plan.plan);
+  const label = (/** @type {any} */ p) => (p.mode === 'minutes' ? 'About ' + p.n + ' min a day'
+    : p.mode === 'items' ? p.n + ' a day' : p.n === 365 ? '1 year' : p.n === 730 ? '2 years' : p.n + ' days');
+  /** @type {any[]} */
+  let list = def && def.paces ? def.paces.filter((/** @type {any} */ p) => p.mode !== 'by') : [];
+  if (!list.length) {
+    const mode = plan.pace ? plan.pace.mode : 'days';
+    if (mode === 'minutes') list = [5, 10, 15, 20].map((n) => ({ mode, n }));
+    else if (mode === 'items') list = [1, 2, 3].map((n) => ({ mode, n }));
+    else { const t = totalDays(plan); list = [Math.max(1, Math.round(t / 2)), t, t * 2].map((n) => ({ mode: 'days', n })); }
+  }
+  return list.map((p) => ({ ...p, label: label(p) }));
+}
+
+/**
+ * C6: change the pace or length of what is left, keeping everything read; finish by a date; weekdays only.
+ * @param {{ plan: any, now: Date, onDone: () => void }} props
+ */
+function PaceChoices({ plan, now, onDone }) {
+  const [by, setBy] = React.useState('');
+  const cur = plan.pace || null;
+  const workWeek = Array.isArray(plan.weekdays) && plan.weekdays.join() === WORK_WEEK.join();
+  const set = (/** @type {any} */ pace) => { saveRun(changePace(plan, pace, new Date())); onDone(); };
+  return (
+    <div className="plans-pace-pick" role="group" aria-label="Change pace">
+      <div className="plans-pick">
+        {paceOptions(plan).map((p) => (
+          <button key={p.mode + p.n} type="button" className="plans-chip" aria-pressed={!!cur && cur.mode === p.mode && cur.n === p.n}
+            onClick={() => set({ mode: p.mode, n: p.n })}>{p.label}</button>
+        ))}
+      </div>
+      <label className="plans-by">
+        <span>Finish by</span>
+        <input type="date" value={by} min={todayKey(now)} onChange={(e) => setBy(e.target.value)} />
+        <button type="button" className="today-link" disabled={!by} onClick={() => set({ mode: 'by', date: by })}>Set</button>
+      </label>
+      <label className="plans-by">
+        <input type="checkbox" checked={workWeek}
+          onChange={() => { saveRun(changeWeekdays(plan, workWeek ? ALL_WEEK : WORK_WEEK, new Date())); onDone(); }} />
+        <span>Weekdays only (Monday to Friday)</span>
+      </label>
+      <p className="plans-note">What you have read stays read.</p>
+    </div>
+  );
+}
+
+/**
+ * C4: hold for about half a second to mark a day read or not read (reading in print, or elsewhere).
+ * @param {() => void} onHold
+ */
+function useHold(onHold) {
+  const timer = React.useRef(/** @type {any} */ (null));
+  const held = React.useRef(false);
+  const clear = () => { if (timer.current) { clearTimeout(timer.current); timer.current = null; } };
+  React.useEffect(() => clear, []);
+  return {
+    onPointerDown: () => { held.current = false; clear(); timer.current = setTimeout(() => { held.current = true; timer.current = null; onHold(); }, 550); },
+    onPointerUp: clear, onPointerLeave: clear, onPointerCancel: clear,
+    onContextMenu: (/** @type {any} */ e) => { if (held.current) e.preventDefault(); },
+    /** A click that ends a hold is not a tap. @param {any} e */
+    onClickCapture: (e) => { if (held.current) { held.current = false; e.stopPropagation(); e.preventDefault(); } },
+  };
+}
+
+/** @param {{ children: any, onHold: () => void, className?: string }} props */
+function Holdable({ children, onHold, className }) {
+  return <div className={className} {...useHold(onHold)}>{children}</div>;
+}
+
+/**
  * @param {{ readingPlans: any, isRead: (bid: string, cid: any) => boolean, markAsReadEnabled?: boolean,
  *   onPlansMoved?: (left: any[]) => void, onRead: (next: any) => void, onListen?: (items: any[], name: string) => void,
  *   onBack: () => void, backLabel?: string,
@@ -75,6 +174,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   const [stopping, setStopping] = React.useState(/** @type {string | null} */ (null));
   const [open, setOpen] = React.useState(/** @type {string | null} */ (null));
   const [picking, setPicking] = React.useState(false);
+  const [pacing, setPacing] = React.useState(/** @type {string | null} */ (null));
   const [status, setStatus] = React.useState('');
   const rows = plans.map((r) => runRow(r, now));
   const running = new Set(plans.map((p) => p.plan));
@@ -102,6 +202,8 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
           const details = open === plan.id;
           const days = details ? monthCells(plan, now.getFullYear(), now.getMonth(), now) : [];
           const lead = days.length ? days[0].weekday : 0;
+          // C4: reading in print or elsewhere: the day's items ticked today (a hold on the chapters does the same).
+          const markToday = () => saveRun(markDay(plan, row.day, true, new Date()));
           return (
             <section key={plan.id} className="plans-plan" aria-label={row.name}>
               <span className="today-eyebrow">{plans.length > 1 ? row.name : 'Today'}</span>
@@ -114,6 +216,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                   <div className="plans-links">
                     {row.next ? <button type="button" className="today-link" onClick={() => onRead(row.next)}>Read ahead</button> : null}
                     {row.again ? <button type="button" className="today-link" onClick={() => onRead(row.again)}>Read again</button> : null}
+                    <button type="button" className="today-link" onClick={() => saveRun(markDay(plan, row.day, false, new Date()))}>Not read yet</button>
                   </div>
                 </>
               ) : (
@@ -129,7 +232,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                     ) : null}
                   </div>
                   {row.items.length > 1 ? (
-                    <>
+                    <Holdable className="plans-hold" onHold={markToday}>
                       <ol className="plans-items">
                         {row.items.map((it) => (
                           <li key={it.k}>
@@ -141,8 +244,10 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                         ))}
                       </ol>
                       <p className="plans-items-count">{row.todayTicked + ' of ' + row.todayCount + ' today'}</p>
-                    </>
+                    </Holdable>
                   ) : null}
+                  <button type="button" className="today-link plans-mark" onClick={markToday}
+                    title="Or hold the chapters for a moment">Mark today as read</button>
                 </>
               )}
               <div className="plans-week" role="group" aria-label="This week">
@@ -154,10 +259,15 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                   </span>
                 ))}
               </div>
-              {row.behind > 0 ? (
+              {row.paused ? (
+                <div className="plans-catchup">
+                  <span>{plan.paused ? 'Paused since ' + shortDate(plan.paused) : 'Paused'}</span>
+                  <button type="button" className="today-btn" onClick={() => saveRun(resumeRun(plan, new Date()))}>Resume</button>
+                </div>
+              ) : row.behind > 0 ? (
                 <div className="plans-catchup">
                   <span>{row.pace}</span>
-                  <button type="button" className="today-btn" onClick={() => saveRun(catchUp(plan, new Date()))}>Catch me up</button>
+                  <button type="button" className="today-link" aria-expanded={details} onClick={() => setOpen(plan.id)}>Catch up</button>
                 </div>
               ) : null}
               <div className="plans-foot">
@@ -181,12 +291,25 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                     </div>
                     <p className="plans-legend"><span className="plans-key" data-state="done" />read <span className="plans-key" data-state="missed" />missed</p>
                   </div>
+                  {row.behind > 0 && !row.paused ? <Behind plan={plan} row={row} now={now} /> : null}
+                  {pacing === plan.id ? <PaceChoices plan={plan} now={now} onDone={() => setPacing(null)} /> : null}
                   {stopping === plan.id ? (
                     <ConfirmStrip question={'Stop ' + row.name + '? Your reading stays marked.'} yesLabel="Yes, stop"
                       onCancel={() => setStopping(null)}
                       onConfirm={() => { setStopping(null); stopRun(plan, new Date()); }} />
                   ) : (
-                    <button type="button" className="today-link plans-stop" aria-label={'Stop ' + row.name} onClick={() => setStopping(plan.id)}>Stop plan</button>
+                    <div className="plans-detail-links">
+                      {row.finished ? null : (
+                        <button type="button" className="today-link" aria-expanded={pacing === plan.id}
+                          onClick={() => setPacing(pacing === plan.id ? null : plan.id)}>Change pace</button>
+                      )}
+                      {row.finished ? null : row.paused ? (
+                        <button type="button" className="today-link" onClick={() => saveRun(resumeRun(plan, new Date()))}>Resume plan</button>
+                      ) : (
+                        <button type="button" className="today-link" onClick={() => saveRun(pauseRun(plan, new Date()))}>Pause plan</button>
+                      )}
+                      <button type="button" className="today-link plans-stop" aria-label={'Stop ' + row.name} onClick={() => setStopping(plan.id)}>Stop plan</button>
+                    </div>
                   )}
                 </div>
               ) : null}

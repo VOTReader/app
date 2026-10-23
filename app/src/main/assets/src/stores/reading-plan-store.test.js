@@ -66,6 +66,13 @@ describe('mergePlanStore', () => {
     expect(out.length).toBe(1);
     expect(Object.keys(out[0].ticks).sort()).toEqual(['genesis:1', 'genesis:2']);
   });
+  it('a chapter un-marked in one tab stays un-marked when the other tab did not touch it (C4)', () => {
+    const base = { ...run(['genesis:1', 'genesis:2']), ticks: { 'genesis:1': '2026-10-21', 'genesis:2': '2026-10-21' } };
+    const ours = { ...base, ticks: { 'genesis:2': '2026-10-21' }, updated: 7 };
+    const theirs = { ...base, ticks: { ...base.ticks, 'genesis:3': '2026-10-22' }, updated: 6 };
+    const out = mergePlanStore([base], [ours], [theirs]);
+    expect(Object.keys(out[0].ticks).sort()).toEqual(['genesis:2', 'genesis:3']);
+  });
   it('a run removed in one tab stays removed; a run added in the other is kept', () => {
     const a = run(['genesis:1']), b = run(['exodus:1']);
     const out = mergePlanStore([a], [], [a, b]);

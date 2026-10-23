@@ -3201,7 +3201,23 @@
     .plans-day[data-state="today"] { border-color:var(--gold); }
     .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
     .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-stop { display:block; margin:0.35rem 0 0 auto; }
+    .plans-detail-links { display:flex; flex-wrap:wrap; justify-content:center; gap:0 1.25rem; margin-top:0.6rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
+    /* mw18 C3/C4/C6: behind, its two ways back, a new pace, marking a day (mockup r1-behind.png) */
+    .plans-behind { margin-top:0.8rem; padding-top:0.7rem; border-top:1px solid var(--gold-border); }
+    .plans-behind-title { margin:0; color:var(--cream); font-size:var(--fs-20); font-weight:400; }
+    .plans-option { display:flex; flex-direction:column; gap:0.2rem; width:100%; min-height:56px; margin-top:0.6rem; padding:0.65rem 0.9rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .plans-option-name { color:var(--gold); font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; }
+    .plans-option-sub { color:var(--cream-dim); font-size:var(--fs-15); }
+    @media (hover:hover) { .plans-option:hover { border-color:var(--gold); background:var(--gold-faint); } }
+    .plans-pace-pick { margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
+    .plans-pace-pick .plans-pick { padding:0 0 0.4rem; }
+    .plans-chip[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
+    .plans-by { display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; min-height:44px; color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-by input[type="date"] { min-height:40px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--cream); font:inherit; color-scheme:dark; }
+    body.light .plans-by input[type="date"] { color-scheme:light; }
+    .plans-by input[type="checkbox"] { width:20px; height:20px; accent-color:var(--gold); }
+    .plans-hold { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+    .plans-mark { display:block; margin:0 auto; font-size:var(--fs-13); }
     /* mw18 landing 1: Home's done state, the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
     .today-done { display:flex; align-items:center; gap:0.75rem; margin-top:0.35rem; }
     .today-links, .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }

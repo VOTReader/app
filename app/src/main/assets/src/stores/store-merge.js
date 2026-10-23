@@ -230,19 +230,29 @@ export function unionStrings(ours, theirs) {
 /* Reading plan runs (vot-reading-plans, mw18). */
 /**
  * Cross-tab merge: records by id (the newer copy of a run wins, deletions
- * honoured), then the ticks of both copies of a run are kept, so a chapter
- * read in one tab is never lost to a pace change made in another.
+ * honoured), then the ticks of both copies merge three ways against the base:
+ * a chapter read in one tab is never lost to a pace change made in another,
+ * and one un-marked in one tab (C4) stays un-marked unless the other tab
+ * changed it too.
  * @param {any} base @param {any} ours @param {any} theirs
  * @returns {any[]}
  */
 export function mergePlanStore(base, ours, theirs) {
   const merged = mergeRecordsById(base, ours, theirs);
   const byId = (/** @type {any} */ arr) => new Map((Array.isArray(arr) ? arr : []).filter((/** @type {any} */ r) => r && typeof r.id === 'string').map((r) => [r.id, r]));
-  const O = byId(ours), T = byId(theirs);
+  const B = byId(base), O = byId(ours), T = byId(theirs);
   return merged.map((/** @type {any} */ r) => {
     const o = O.get(r && r.id), t = T.get(r && r.id);
     if (!o || !t) return r;
-    return { ...r, ticks: { ...(t.ticks || {}), ...(o.ticks || {}), ...(r.ticks || {}) } };
+    const b = (B.get(r.id) || {}).ticks || {}, ot = o.ticks || {}, tt = t.ticks || {};
+    /** @type {Record<string, string>} */
+    const ticks = {};
+    for (const k of new Set([...Object.keys(ot), ...Object.keys(tt)])) {
+      // In the base and missing from either side: that side un-marked it.
+      if (k in b && (!(k in ot) || !(k in tt))) continue;
+      ticks[k] = k in ot ? ot[k] : tt[k];
+    }
+    return { ...r, ticks };
   });
 }
 
