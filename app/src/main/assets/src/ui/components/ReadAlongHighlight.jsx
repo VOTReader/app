@@ -299,6 +299,28 @@ function _syncFor(key, track, chapter, paintVolKey, sectionKey) {
 }
 
 /**
+ * The rows the wash would paint for a letter or a compilation track, cut to the part playing: the full player's
+ * "Now reading" card (LiveLine.jsx, pl-l2) reads the clause from these, so the card and the page cannot disagree.
+ * `sectionKey` names the letter under a compilation's clock. Null for a Bible chapter (its rows need the viewed
+ * chapter), before the timings land, or for a rendition with no timeline of its own.
+ * @param {any} track
+ * @param {string | null} [sectionKey]
+ * @returns {any[] | null}
+ */
+export function liveFragments(track, sectionKey) {
+  if (!track) return null;
+  const key = sectionKey || track.key;
+  if (!key || AudioPlayer.bibleChapterOfTrack(track) > 0) return null;
+  const rows = _syncFor(key, track, 0, '', sectionKey || undefined);
+  if (!rows || !rows.length) return null;
+  const perAsset = rows === _altRowsFor(track) || !!sectionKey;
+  const want = perAsset ? 0 : _partOf(key, track);
+  if (want < 0) return null;
+  const only = rows.filter((f) => (f[4] || 0) === want);
+  return only.length ? only : null;
+}
+
+/**
  * Binary search: index of the last fragment whose start ≤ t, or -1 when the
  * clock is still ahead of the first one. Pure — exported for the unit suite.
  *

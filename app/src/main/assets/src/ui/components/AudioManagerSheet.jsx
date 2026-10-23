@@ -35,6 +35,7 @@ import { useDragToClose } from './SheetHandle.jsx';
 import { hasTextDestination, PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { RowMenu } from './RowMenu.jsx';
 import { SpeedSheet, SleepSheet, VoiceSheet, UpNextSheet } from './PlayerSheets.jsx';
+import { LiveLine } from './LiveLine.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** @returns {any | null} */
@@ -445,12 +446,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
                   </button>
                 ) : null}
               </div>
-              {canRead ? (
-                <button type="button" className="np-live audio-manager-jump" onClick={openReading}
-                  aria-label={'Open the reading — ' + (heading || 'this recording') + '; playback continues'}>
-                  <span className="np-live-cue audio-manager-jump-cue">Open the reading <span aria-hidden="true">›</span></span>
-                </button>
-              ) : null}
+              <LiveLine track={current} time={state.time} title={heading || ''} onOpen={canRead ? openReading : null} />
               {state.failed ? (
                 <p className="np-status" role="status">
                   {state.failed === 'load' ? 'Couldn’t load this recording.' : 'This recording isn’t on this phone.'}

@@ -1408,6 +1408,13 @@
         border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); color: inherit; cursor: pointer;
       }
       .np-live-cue.audio-manager-jump-cue { margin: 0; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-18); letter-spacing: 0; }
+      .np-live-kicker { display: block; margin: 0 0 8px; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.22em; text-transform: uppercase; }
+      .np-live-text {
+        display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; margin: 0 0 10px;
+        font-family: var(--font-body); font-size: var(--fs-24); line-height: 1.35;
+      }
+      .np-live-lead { color: var(--cream-muted); }
+      .np-live-now { color: var(--cream); }
       .np-status { margin: 0; color: var(--cream-dim); font-size: var(--fs-15); }
       .now-playing .np-cover { --np-cover: min(68vw, clamp(96px, calc(100dvh - 30rem), 280px)); width: var(--np-cover); height: var(--np-cover); border-radius: 12px; }
       .now-playing .np-cover .song-cover-note { font-size: var(--fs-48); }
