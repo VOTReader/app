@@ -19,6 +19,7 @@
     "noteSourceLabel": "NoteRow tests stub it",
     "noteSourceSegments": "NoteRow tests stub it",
     "SongCatalog": "HomeScreen / About tests stub it with spies",
+    "SongVotes": "AudioSongsScreen reads it as a typeof-guarded free global like SongCatalog (sy4-3): its votes tests install it, and the other screen tests render the hub without it, so its tally loader never reaches the network from them",
     "loadBibleStudies": "HomeScreen / LinkPicker tests stub it with spies",
     "TourOverlay": "AppShellOverlays renders it as a typeof-guarded free global (it rode lazy bundle-e until lz1, 2026-10-13); the AppShellOverlays tests render the shell without it",
     "clampLpm": "read as a free global by SettingsScreen.jsx (lazy bundles e-h until lz1 folded them into d, 2026-10-13); its tests stub the global. Converting is a follow-up that rewrites those tests first.",
