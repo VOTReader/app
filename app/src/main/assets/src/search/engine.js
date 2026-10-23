@@ -184,6 +184,41 @@ function withoutPossessive(term) {
   const toks = kjvEncode(term);
   return toks.length >= 2 && toks[toks.length - 1] === 's' ? toks.slice(0, -1).join(' ') : term;
 }
+/* A QUESTION'S FRAME IS NOT ITS SUBJECT (search200 sweep, 2026-10-22). A reader asks "is halloween evil", "how do i
+   repent", "why should we fast": the opening words say it is a question, the rest says what about. Counted as subject
+   words, the frame closed the gates that turn the meaning model off: a subject of a word or two made a keyword search
+   ("is" aside, "halloween evil"), and a first result holding the frame with the subject in a row ("why should we ...")
+   was a quote found. The model, which reads a question well, had no vote. A short query (FRAME_MAX_WORDS or fewer)
+   that opens with a question word or an auxiliary is read by position: its lead words while they are frame words
+   (FRAME_WORDS: the question words, auxiliaries, subject pronouns and the "is it wrong to", "what happens when"
+   idioms) are its frame, the words after them its subject. The gates read the subject; the words are scored as typed
+   and the model reads the question whole. */
+/** A question's frame is read in this many typed words or fewer. */
+const FRAME_MAX_WORDS = 8;
+/** The words a question opens with. */
+const FRAME_OPENERS = new Set(['what', 'who', 'whom', 'whose', 'which', 'when', 'where', 'why', 'how', 'is', 'are', 'was',
+  'were', 'am', 'do', 'does', 'did', 'will', 'would', 'can', 'could', 'should', 'shall', 'may', 'might', 'must', 'has',
+  'have', 'had']);
+/** The words its lead may go on with. */
+const FRAME_WORDS = new Set([...FRAME_OPENERS, 'i', 'we', 'you', 'it', 'they', 'there', 'be', 'to', 'if',
+  'happen', 'happens', 'happened', 'wrong', 'okay', 'ok']);
+/**
+ * A question's frame and the words searched for it, or null for a query that is no question so read.
+ * @param {string} q  the query as typed, its contractions spelled out
+ * @returns {{frame: string, rest: string}|null}
+ */
+function questionFrame(q) {
+  const words = String(q).trim().split(/\s+/);
+  if (words.length < 2 || words.length > FRAME_MAX_WORDS) return null;
+  const bare = (/** @type {string} */ w) => w.toLowerCase().replace(/['’]s$/, '').replace(/[^a-z]/g, '');
+  if (!FRAME_OPENERS.has(bare(words[0]))) return null;
+  let k = 1;
+  while (k < words.length && FRAME_WORDS.has(bare(words[k]))) k++;
+  if (k >= words.length) return null;
+  const rest = words.slice(k).join(' ');
+  if (isStopTerm(rest)) return null;
+  return { frame: words.slice(0, k).join(' '), rest };
+}
 /** The query without its -words, each +word as its word: what the reader wants found. @param {string} q */
 function wantedQuery(q) {
   return String(q).split(/\s+/).filter((t) => !(t.length > 1 && t[0] === '-')).map((t) => (t.length > 1 && t[0] === '+' ? t.slice(1) : t)).join(' ');
@@ -2430,6 +2465,15 @@ async function search(query, options) {
   }
   const typedQ = typeof parsed.text === 'string' && parsed.text.trim() ? parsed.text : query;
   const textQ = undescribed(typedQ);
+  /* A question read by its frame (questionFrame), for the gates that turn the meaning on. Not a query some text holds
+     word for word, whole ("who do men say that i am" is Mark 8:27 asked, not a question about men): that is a quote.
+     Nor a run too common to settle it (runHolders null): a short question of common words is more likely a quote than
+     a subject. Nor one with operators or a quoted phrase. */
+  let frame = parsed.kind === 'text' && options.useStopWords !== false && !/["+]|(^|\s)-\S/.test(textQ) ? questionFrame(textQ) : null;
+  if (frame) {
+    const hs = runHolders(joinApostropheS(kjvEncode(textQ)));
+    if (!hs || hs.size) frame = null;
+  }
 
   /* THE RANKING GIVES THE PAGE TURNS (sr7, 2026-10-14). With the originals read, a first search still
      ranked in one block: 110-400 ms on a desktop, about 350 ms on the S22, under the reader's typing. In
@@ -3632,15 +3676,22 @@ async function search(query, options) {
   /** A title named keeps its place, and so does what the admission placed (and the quotes it left above it). */
   const namedOr = keptDocs.size ? (/** @type {any} */ d) => keptDocs.has(d) || named(d) : named;
   // A first result holding the typed words in a row, or one word off, is a quote found: no re-ordering.
-  const quoted = out.length && (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN;
-  const held = !keyword && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, namedOr) : 1;
+  // A question read by its frame is asked of its subject: the first holding the words after the frame in a row (two or
+  // more) is a quote found; one holding the frame with them is not ("why should we" is no quote of "fast").
+  const restToks = frame ? joinApostropheS(kjvEncode(frame.rest)) : null;
+  const quoted = out.length > 0 && (restToks
+    ? restToks.length >= 2 && eachWording(docTokens(idOf.get(out[0]) || '', out[0].doc), (t) => nearPhrase(t, restToks, STOP)) >= NEAR_PHRASE_MIN
+    : (nearOf[idOf.get(out[0]) || ''] || 0) >= NEAR_PHRASE_MIN);
+  // A question's subject in a word or two is still a question: the meaning reads it (no keyword search's gate).
+  const meantToo = !keyword || !!frame;
+  const held = meantToo && !p.phrase && !quoted ? bestPassageFirst(out, idOf, units, isStopTerm, namedOr) : 1;
   /** @type {Awaited<ReturnType<typeof semanticDocs>>} */ let sem = null;
   // A search the model was not ready for: its words' order stands, and says the meaning comes later (semanticReady).
   let meaningLater = false;
   // The index the words were read from. While the model runs, a build for another edition (the reader
   // changed translation) can swap its own in: from then on this search reads nothing more by id, since
   // that index would hand back the other edition's text. The words' results stand alone.
-  if (!keyword && !p.phrase && !quoted && parsed.kind === 'text') {
+  if (meantToo && !p.phrase && !quoted && parsed.kind === 'text') {
     // The model reads what the reader wants, not what they ruled out: no -word, and +word as the word.
     const meant = String(wanted);
     // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
