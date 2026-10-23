@@ -324,3 +324,35 @@ describe('the hero row: RESUME · N MIN LEFT (ra4)', () => {
     expect(screen.getByRole('button', { name: 'Pause the reading' }).textContent).toBe('Pause');
   });
 });
+
+/* U10.2 (UX sweep 2026-10-22): on a slow network the letter's pill said PAUSE at 0:00 for 20 to 30 s. */
+describe('the hero row while the reading loads (U10.2)', () => {
+  const LOADING = { queue: [{ key: 'one:the-letter', url: 'https://example.test/one.mp3' }], qi: 0, status: 'loading', time: 0, duration: 0 };
+
+  it('says Loading…, not Pause, and the tap takes the start back', () => {
+    setPlayerState(LOADING);
+    render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+    const pill = screen.getByRole('button', { name: 'Loading the reading' });
+    expect(pill.textContent).toBe('Loading…');
+    expect(pill.getAttribute('aria-pressed')).toBe('true');
+    expect(pill.getAttribute('aria-busy')).toBe('true');
+    fireEvent.click(pill);
+    expect(player.toggle).toHaveBeenCalledTimes(1);
+    expect(player.playLetter).not.toHaveBeenCalled();
+  });
+
+  it('after about 8 s says Still loading · Cancel; once it plays, Pause', () => {
+    vi.useFakeTimers();
+    try {
+      setPlayerState(LOADING);
+      const { rerender } = render(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+      act(() => { vi.advanceTimersByTime(8100); });
+      expect(screen.getByRole('button', { name: 'Still loading. Cancel' }).textContent).toBe('Still loading · Cancel');
+      setPlayerState({ ...LOADING, status: 'playing', time: 1, duration: 900 });
+      rerender(<LetterListenRow volKey="one" letter={ONE} collectionLabel="Volume One" />);
+      expect(screen.getByRole('button', { name: 'Pause the reading' }).textContent).toBe('Pause');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

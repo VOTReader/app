@@ -14,7 +14,7 @@
    component a second copy of the store. Every store mutation is act()-wrapped
    because the bar subscribes through useSyncExternalStore. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 
@@ -141,7 +141,32 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
     expect(barOpenClass()).toBe(true);
     expect(title()).toBe('The Seventh Day');
     expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume One · Read by Timothy');
-    expect(clock()).toBe('0:00');   // total unknown until metadata — never a fake 0:00 length
+    expect(clock()).toBe('Loading…');   // not started yet: never a Pause over a 0:00 that is not moving (U10.2)
+  });
+
+  /* U10.2 (UX sweep 2026-10-22): on a slow network the bar read 0:00 beside a Pause for 20 to 30 s. Until the
+     recording starts the clock's place says Loading…, and Still loading… once that runs past about 8 s. */
+  it('says Loading… until the recording starts, Still loading… past about 8 s, then the clock', () => {
+    vi.useFakeTimers();
+    try {
+      render(<AudioPlayerBar />);
+      playSingleLetter();
+      expect(clock()).toBe('Loading…');
+      act(() => { vi.advanceTimersByTime(7900); });
+      expect(clock()).toBe('Loading…');
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(clock()).toBe('Still loading…');
+      act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
+      emit('playing');
+      expect(clock()).toBe('0:00 / 4:00');
+      // A stall mid-recording keeps the place: the clock is what the reader needs then.
+      act(() => { el().currentTime = 65; el().dispatchEvent(new Event('timeupdate')); });
+      emit('waiting');
+      expect(AudioPlayer.getState().status).toBe('loading');
+      expect(clock()).toBe('1:05 / 4:00');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('shows the part label of a multi-part letter alongside the title', () => {

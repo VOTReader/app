@@ -71,6 +71,7 @@ import { _onVisible, syncKeepAlive } from './audio-player/media-session.js';
 import { _adoptDurableSnapshot, _restoreFromSaved } from './audio-player/persist.js';
 import {
   clearUpcoming,
+  listenHere,
   listenResume,
   moveUpcoming,
   playBibleBook,
@@ -182,6 +183,7 @@ export const AudioPlayer = {
   playbackTracks,
   playableNow,
   listenResume,
+  listenHere,
   playLetter,
   playCollection,
   playSection,

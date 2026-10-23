@@ -6,6 +6,7 @@ import { normalizeAudioTrack, songIdOfKey } from '../audio-track.js';
 import { songById } from '../song-catalog.js';
 import {
   bibleChapterStart,
+  _chapterOfTrack,
   _collectionItems,
   _locateTrack,
   playbackTracks,
@@ -119,6 +120,30 @@ export function listenResume(opts) {
   const saved = store && typeof store.getPosition === 'function' ? store.getPosition(track.url) : null;
   const d = saved ? Number(saved.d) || 0 : 0;
   return { at, left: d > at ? d - at : 0 };
+}
+
+/**
+ * Whether this letter, Bible chapter or Bible book is the recording in the player now (U04.5, UX sweep 2026-10-22:
+ * the Bible hero said Listen while its own chapter played, and a tap started the chapter again). Any part of a
+ * letter counts and any reader's voice of it, as the letter's own Listen has always counted (LetterListenRow); a
+ * chapter counts in any edition, because the page is the chapter. A book page counts any of its chapters. The
+ * pill then shows the player's own state (Pause, Loading…) and its tap toggles what is sounding.
+ *
+ * @param {{ volKey?: string, letter?: { id?: string } | null, bookId?: string, chapterNum?: number | null }} opts
+ * @returns {boolean}
+ */
+export function listenHere(opts) {
+  const o = opts || /** @type {any} */ ({});
+  const cur = _state.queue[_state.qi];
+  const key = cur && typeof cur.key === 'string' ? cur.key : '';
+  const at = key.indexOf(':');
+  if (at <= 0) return false;
+  if (o.bookId) {
+    if (!_isBibleVol(key.slice(0, at)) || key.slice(at + 1) !== o.bookId) return false;
+    const n = Math.floor(Number(o.chapterNum) || 0);
+    return !n || _chapterOfTrack(cur) === n;
+  }
+  return !!(o.letter && o.letter.id) && key === o.volKey + ':' + o.letter.id;
 }
 
 /* ── playback entry points ────────────────────────────────────────────── */
