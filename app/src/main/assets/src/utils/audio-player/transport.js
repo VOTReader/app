@@ -42,7 +42,7 @@ import {
   _setLastPersistSec,
 } from './persist.js';
 import { _stopWarming } from './prefetch.js';
-import { _rebuildInFlight, _rebuildRestored, _rebuildRestoredQueue } from './restore.js';
+import { _rebuildInFlight, _rebuildRestored, _rebuildRestoredQueue, _toggleRebuildStart } from './restore.js';
 import { _seamStop } from './seam.js';
 import { _resetSectionFollow, _setSecLastT } from './sections.js';
 import { _clearSleepTimer } from './sleep.js';
@@ -63,6 +63,8 @@ export function toggle() {
   // A restored bar has no live element yet — the first tap rebuilds the real
   // queue from the persisted descriptor and starts at the saved position.
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
+  // A tap while that rebuild waits for its corpus (the bar says Loading) takes the Play back, or asks again (s32.1).
+  if (_rebuildInFlight()) { _toggleRebuildStart(); return; }
   if (!_el) return;
   // Anything that isn't 'paused' is a live element — pause it and let the
   // 'pause' listener own the status flip (one source of truth).

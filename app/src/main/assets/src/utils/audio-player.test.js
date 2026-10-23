@@ -3031,6 +3031,31 @@ describe('audio-player — durable resume (position survives restart)', () => {
       expect(AudioPlayer.getState().restoring).toBe(false);
       expect(AudioPlayer.getState().queue).toHaveLength(4);
     });
+
+    it('Play shows loading while the corpus loads, and a Pause then stops the start: the bar stays the restored one (s32.1)', async () => {
+      delete globalThis.AUDIO_MANIFEST;
+      let land = () => {};
+      globalThis.__loadVotCorpus = () => new Promise((res) => { land = () => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }; });
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      AudioPlayer.toggle();                            // Play: the rebuild waits for the corpus
+      expect(AudioPlayer.getState().status).toBe('loading');
+      AudioPlayer.toggle();                            // Pause, before anything has started
+      expect(AudioPlayer.getState().status).toBe('paused');
+      land();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(FakeAudio.last).toBe(null);               // nothing started
+      let st = AudioPlayer.getState();
+      expect(st.status).toBe('paused');
+      expect(st.restoring).toBe(true);                 // still the restored bar, at its place
+      expect(st.time).toBe(123);
+      AudioPlayer.toggle();                            // Play again: the corpus is in, so it starts at once
+      await new Promise((r) => setTimeout(r, 0));
+      st = AudioPlayer.getState();
+      expect(st.queue).toHaveLength(4);
+      expect(el().src).toBe(URL_OF('idA2'));
+      expect(st.status).toBe('loading');
+    });
   });
 
   it('restores a v2 custom queue without needing the lazy corpus', async () => {
