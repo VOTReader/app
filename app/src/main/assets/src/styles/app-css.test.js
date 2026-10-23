@@ -835,7 +835,7 @@ describe('bottom dock stack (cz1)', () => {
   it('the rows live on :root, and body states fill them', () => {
     expect(decl(':root {\n        --dock-sys', '--dock-sys')).toBe('max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px))');
     expect(bare).toMatch(/--dock-floor:\s*max\(1\.4rem, calc\(var\(--dock-sys\) \+ 0\.4rem\)\)/);
-    expect(decl('body.audio-bar-open {', '--dock-player')).toBe('var(--audio-bar-h, 64px)');   // the bar's measured height (AudioPlayerBar)
+    expect(decl('body.audio-bar-open {', '--dock-player')).toBe('var(--audio-bar-h, 65px)');   // the bar's measured height (AudioPlayerBar)
     expect(decl('body.autoscroll-on {', '--dock-transport')).toBe('60px');
     expect(decl('body:has(.mode-toggle-wrap) {', '--dock-context')).toBe('72px');
   });

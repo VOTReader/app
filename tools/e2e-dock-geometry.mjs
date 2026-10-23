@@ -49,7 +49,9 @@ const ROOT_EXIT = (() => {
 
 // Stand-ins: [class(es), inner height px, inner width ('max' = as wide as the CSS allows), where it mounts].
 const PARTS = {
-  player:     '<div class="audio-bar"><div style="height:49px;flex:1"></div><button class="audio-bar-pull"></button></div>',
+  // The mini bar of the player brief (pl-l0 L1): 48 px controls in 8 px padding, no pull tab; the real one also writes its
+  // measured height to --audio-bar-h, which the mount below mirrors.
+  player:     '<div class="audio-bar"><div style="height:48px;flex:1"></div></div>',
   autoscroll: '<div class="ascroll-pill"><div style="height:44px;width:100vw"></div></div>',
   expanded:   '<div class="ascroll-pill is-expanded"><div style="height:44px;width:100vw"></div><div class="ascroll-row ascroll-dwell-row" style="height:44px"></div></div>',
   find:       '<div class="find-pill"><div style="height:44px;width:100vw"></div></div>',
@@ -102,6 +104,14 @@ try {
           document.body.classList.toggle('tour-prompt-open', c.includes('tour'));
           const tour = document.querySelector('.tour-prompt');
           if (tour) document.documentElement.style.setProperty('--tour-prompt-h', Math.round(tour.getBoundingClientRect().height) + 'px');
+          // As AudioPlayerBar measures itself: its height less the system inset's share of its bottom padding.
+          const bar = document.querySelector('.audio-bar');
+          document.documentElement.style.removeProperty('--audio-bar-h');
+          if (bar) {
+            const bs = getComputedStyle(bar);
+            const share = Math.max(0, (parseFloat(bs.paddingBottom) || 0) - (parseFloat(bs.paddingTop) || 0));
+            document.documentElement.style.setProperty('--audio-bar-h', Math.round(bar.getBoundingClientRect().height - share) + 'px');
+          }
           const sys = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-bottom')) || 0;
           const navBottom = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-top')) || 0) + 67.4;
           const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];

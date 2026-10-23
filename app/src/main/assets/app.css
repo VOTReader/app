@@ -614,7 +614,7 @@
         /* the top bar's bottom edge: .top-nav's 44px row + 22.4px padding + 1px border, as .chapter-nav-sticky has it */
         --dock-nav-bottom: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
       }
-      body.audio-bar-open { --dock-player: var(--audio-bar-h, 64px); }
+      body.audio-bar-open { --dock-player: var(--audio-bar-h, 65px); }   /* measured by AudioPlayerBar; 64 + its top border */
       body.autoscroll-on { --dock-transport: 60px; }
       body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
       body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
