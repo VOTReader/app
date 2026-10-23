@@ -33,7 +33,8 @@ import { searchData } from './search-data.js';
 import { buildMiniSearchOptions, MS_STORE_FIELDS, MS_SEARCH_DEFAULTS } from './search-config.js';
 import { buildDocs } from './index-builder.js';
 import { parseReference, fuzzyBookSuggest, levenshtein } from './ref-parser.js';
-import { edgeReading, readReference } from './ref-edge.js';
+import { edgeReading, readReference, restWords } from './ref-edge.js';
+import { scopeWord } from './scope-word.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { expandQueryTerms } from './synonyms.js';
 import { wordForms } from './word-forms.js';
@@ -2492,7 +2493,7 @@ async function ensureReady(options) {
  * `meaningLater`: a text search the meaning model was not ready for ran on the words alone; whenMeaningReady() says when to ask again.
  * @returns {Promise<{parsed:Object|null, results:Array<{score:number, doc:Object, terms?:string[], close?:boolean, placeStart?:number}>, parsedTerms?:string[], textQuery?:Object|null, capped?:string[], truncated?:boolean, corrections?:Array<{from:string, to:string}>, stopWordsOnly?:boolean, unquoted?:string, aborted?:boolean, meaningLater?:boolean}>}
  */
-async function search(query, options) {
+async function searchWords(query, options) {
   options = options || {};
   let limit = options.limit || 200;
   const corpus = options.corpus || 'all';
@@ -2523,7 +2524,7 @@ async function search(query, options) {
   await warmOriginals();
   await alignLexiconReady();
   // rebuild() dropped the index while this search waited (sweep 2026-10-14 v061): it waits for the new one
-  if (!msIndex) return search(query, options);
+  if (!msIndex) return searchWords(query, options);
   /* A REFERENCE TYPED WITH WORDS (search200 fix1, ref-edge.js): "john 3 16 for god so loved the world" is the
      verse's card, and the words beside the reference are what is searched under it (`textQ`), not its numbers and
      book name as words a text must hold. Read here, once the index can say the verse is there. */
@@ -2560,7 +2561,7 @@ async function search(query, options) {
     await yieldToPage();
     sliceEnd = now() + SLICE_MS;
     if (options.signal && options.signal.aborted) return { parsed, results: [], aborted: true };
-    if (msIndex !== inUse || TWIN_READ !== twinInUse) return search(query, options);
+    if (msIndex !== inUse || TWIN_READ !== twinInUse) return searchWords(query, options);
     return null;
   };
 
@@ -2797,7 +2798,7 @@ async function search(query, options) {
   if (corrections.length && !options._corrected) {
     const fixedQuery = applyCorrections(query, corrections);
     if (fixedQuery !== query.trim()) {
-      const again = await search(fixedQuery, { ...options, _corrected: true });
+      const again = await searchWords(fixedQuery, { ...options, _corrected: true });
       return { ...again, corrections: corrections.concat(again.corrections || []) };
     }
   }
@@ -3954,10 +3955,69 @@ async function search(query, options) {
      the screen can say what it did. */
   if (smallRun) return out.length ? { parsed, results: out, parsedTerms: [], textQuery: { ...p, phrase: null, run: smallRun.trim().replace(/\s+/g, ' ').toLowerCase() }, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections, meaningLater } : stopOnly;
   if (p.phrase && !out.length && !options._unquoted) {
-    const again = await search(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
+    const again = await searchWords(String(query).replace(/["\u201C\u201D\u201E\u201F]/g, ' '), { ...options, _unquoted: true });
     if (again.results && again.results.length) return { ...again, unquoted: p.phrase };
   }
   return { parsed, results: out, parsedTerms: filtered, textQuery: run ? { ...p, run } : p, capped: Object.keys(capped), truncated: over || (out.length >= limit && h < rankedIds.length), corrections, meaningLater };
+}
+
+/* A BOOK OR COLLECTION NAMED BESIDE THE WORDS (search200 sweep, scope-word.js). "malachi tithes", "faith in hebrews",
+   "answers only god can give hell": the name was a word the text must hold, so a verse naming the prophet, a study
+   citing the book or the collection's front page led, and the verses in the book or the topics in the collection sat
+   far down (Malachi 3:10 25th, Hebrews 11 past the 90th). The rest of the words are searched kept to the book or
+   collection, beside the query as typed. The kept search's best leads, with up to SCOPE_LIFT more holding as many of
+   the rest's words, when it holds at least as many of them as the plain lead (more, for a book named by an English
+   word), and the plain lead is not a text of the book or collection (its front page aside) holding as many, nor
+   holds the typed words in a row (a name typed with its title: "john the baptist"). Otherwise the plain reading stands. */
+/** How many of the kept search's texts lead, at most. */
+const SCOPE_LIFT = 3;
+/** A text's identity across two searches (each reshapes its own documents). @param {any} d */
+const docKey = (d) => (d.kind === 'verse' ? 'v|' + (d.bookId === 'matthew-plain' ? 'matthew' : d.bookId) + ':' + d.chapterNum + ':' + d.verseNum
+  : [d.kind, d.volumeId, d.letterId, d.studyChapterId, d.heading, d.title].join('|'));
+/** A title's words, lower case, apostrophes off. @param {string} t */
+const nameWords = (t) => String(t || '').toLowerCase().replace(/['‘’]/g, '').split(/[^a-z0-9]+/).filter(Boolean).join(' ');
+
+/**
+ * Execute a search: the words (searchWords), and a book or collection named beside them read as where they are.
+ * @param {string} query
+ * @param {Parameters<typeof searchWords>[1]} [options]
+ * @returns {ReturnType<typeof searchWords>}
+ */
+async function search(query, options) {
+  const plain = await searchWords(query, options);
+  const o = options || {};
+  const lead = plain.results && plain.results[0];
+  if (!lead || o.scope || plain.aborted || plain.unquoted || (plain.corrections && plain.corrections.length) || !plain.parsed || plain.parsed.kind !== 'text') return plain;
+  const sw = scopeWord(query);
+  if (!sw || !msIndex) return plain;
+  const want = restWords(sw.rest);
+  if (!want.length || refFacts().namesTitle(query)) return plain;
+  const inScope = (/** @type {any} */ d) => (sw.book ? d.kind === 'verse' && (d.bookId === 'matthew-plain' ? 'matthew' : d.bookId) === sw.book : (sw.volumes || []).includes(d.volumeId));
+  const typed = joinApostropheS(kjvEncode(query));
+  if (typed.length >= 2 && hasTokenRun(joinApostropheS(kjvEncode((lead.doc.text || '') + ' ' + (lead.doc.title || ''))), typed)) return plain;
+  /** @type {any[]} */ let kept = [];
+  const scopes = sw.book ? [{ bookId: sw.book === 'matthew' ? 'matthew-plain' : sw.book }] : (sw.volumes || []).map((v) => ({ volumeId: v }));
+  for (const scope of scopes) {
+    const r = await searchWords(sw.rest, { ...o, scope, limit: 10 });
+    if (r.aborted) return r;
+    kept = kept.concat(r.results || []);
+  }
+  if (!kept.length) return plain;
+  kept.sort((a, b) => b.score - a.score);
+  const D = searchData();
+  const isStop = (/** @type {string} */ w) => !!D.STOP_WORDS_TRIMMED && D.STOP_WORDS_TRIMMED.has(w);
+  const forms = want.map((w) => new Set([w, ...wordForms(w, isStop)]));
+  /** How many of the rest's words a text was found by (its own forms, or the word's start). @param {any} e */
+  const held = (e) => forms.filter((f, i) => (e.terms || []).some((/** @type {string} */ t) => f.has(t) || (want[i].length >= 4 && t.startsWith(want[i])))).length;
+  const top = held(kept[0]);
+  const plainHeld = held(lead);
+  if (!top || top < plainHeld || (sw.wordish && top === plainHeld)) return plain;
+  // a lead already in the book or collection (its front page aside) holding as many of the words keeps its place
+  if (inScope(lead.doc) && nameWords(lead.doc.title) !== sw.name && plainHeld >= top) return plain;
+  const lift = kept.filter((e) => held(e) === top).slice(0, SCOPE_LIFT);
+  const lifted = new Set(lift.map((e) => docKey(e.doc)));
+  const results = lift.concat(plain.results.filter((e) => !lifted.has(docKey(e.doc)))).slice(0, Math.max(plain.results.length, lift.length));
+  return { ...plain, results };
 }
 
 /**
