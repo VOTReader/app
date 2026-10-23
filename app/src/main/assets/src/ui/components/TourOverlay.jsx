@@ -140,6 +140,58 @@ export function _floorCapToLines(cap, geom) {
   }
   return cap;
 }
+/** The ring is wholly on screen (only then is the room beside it measured from its scroller). */
+export function ringOnScreen(ring, vh) { return !!ring && ring.top >= 0 && ring.top + ring.height <= vh; }
+
+/**
+ * WHERE THE CARD GOES, as a pure function of numbers (n247, s16.2: it was inline in the render, so only
+ * the whole overlay in jsdom could test it). Below the ring when it fits, else above when that fits,
+ * else on the side with more room, always clamped inside the viewport; a stop that shows something on
+ * the text docks on the bottom edge above the player bar. The comments on the constants above say why.
+ * @param {{ vh: number, ring: {left: number, top: number, width: number, height: number} | null,
+ *   top0: number, docked: boolean, afterPressed: boolean, barTop: number | null, scrollerTop: number,
+ *   cardNeed: number, cardH: number, geom: { rowOff: number, lines: {t: number, b: number}[] } }} g
+ *   top0: the ringed control's scroller top (0 when the ring is off screen); docked: the stop docks;
+ *   afterPressed: pressed with an afterTarget (the ring is the press's result).
+ */
+export function placeTourCard({ vh, ring, top0, docked: dockIn, afterPressed, barTop, scrollerTop, cardNeed, cardH, geom }) {
+  let docked = dockIn;
+  const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
+  /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_PX is the rule. A fraction of the screen is the
+     wrong unit for a card whose content is measured in lines: on a 640 px screen 36 % is 230 px
+     while the Listen stop's words need 270, so the card scrolled and its own sticky button row
+     covered the last sentence — "Tap it now, or press Next and I will do it for you." cut in half
+     on a first run (Native Builder on device at 320x640 dp, 2026-09-06; headless read −29 px at
+     320x640 CSS px against +13 px at 426x952). So the card may exceed the fraction up to what its
+     content needs, and never past the room DOCK_OPEN_PX leaves open. On a tall screen the
+     content is well under the fraction and nothing moves. */
+  const dockRoom = Math.floor(vh - dockBottom - (scrollerTop + DOCK_OPEN_PX));
+  const dockCap = Math.max(CARD_MIN_H, Math.min(Math.max(Math.round(vh * DOCK_MAX_FRAC), cardNeed || 0), dockRoom));
+  /* A PRESSED STOP WHOSE RING IS THE PRESS'S RESULT (the player stop: the voice row the sheet
+     revealed) docks only if the docked card clears that ring; otherwise it sits beside the ring like
+     any ringed stop — above it, in a landscape phone. Measured 800x360 at Text Size 1 (2026-09-13):
+     the docked card at 118..278 covered the chips it was pointing at (229..273). */
+  if (docked && ring && afterPressed && vh - dockBottom - Math.min(cardH || CARD_EST_H, dockCap) < ring.top + ring.height + CARD_GAP) docked = false;
+  const cap = _floorCapToLines(docked ? dockCap
+    : ring && ringOnScreen(ring, vh) ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE, geom);
+  const h = Math.min(cardH || CARD_EST_H, cap);
+  let below = false, cardTop = 0, dockPad = 0;
+  if (docked) {
+    cardTop = Math.max(CARD_EDGE, vh - dockBottom - h);
+    dockPad = vh - cardTop;
+  } else if (ring) {
+    const fitsBelow = ring.top + ring.height + CARD_GAP + h <= vh - CARD_EDGE;
+    const fitsAbove = ring.top - CARD_GAP - h >= CARD_EDGE;
+    below = fitsBelow || (!fitsAbove && ring.top < vh / 2);
+    cardTop = below ? ring.top + ring.height + CARD_GAP : ring.top - CARD_GAP - h;
+    cardTop = Math.min(Math.max(cardTop, CARD_EDGE), Math.max(CARD_EDGE, vh - CARD_EDGE - h));
+  }
+  const clear = !docked && ring ? (cardTop >= ring.top + ring.height || cardTop + h <= ring.top) : false;
+  const cardStyle = docked ? { bottom: Math.round(dockBottom) + 'px', maxHeight: Math.round(cap) + 'px' }
+    : ring ? { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' } : { bottom: '16px' };
+  return { docked, dockBottom, cap, h, below, cardTop, clear, dockPad, cardStyle };
+}
+
 function _sameRect(a, b) {
   return !!a && !!b && a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height;
 }
@@ -361,46 +413,16 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   // a card the reader cannot reach is a tour they cannot leave (Export at the bottom edge, and the
   // Letters tile at a large text size, both on a 699 px phone).
   // Room beside the ring, when the ring is on screen: the card is capped to it (see CARD_MIN_H).
-  const ringOn = !!ring && ring.top >= 0 && ring.top + ring.height <= vh;
-  const top0 = ringOn && targetRef.current ? _scrollerTop(targetRef.current) : 0;
-  let docked = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
-  dockPadRef.current = 0;
-  const dockBottom = CARD_EDGE + (barTop != null && barTop > 0 && barTop < vh ? vh - barTop : 0);
-  /* DOCK_MAX_FRAC is a preference, DOCK_OPEN_PX is the rule. A fraction of the screen is the
-     wrong unit for a card whose content is measured in lines: on a 640 px screen 36 % is 230 px
-     while the Listen stop's words need 270, so the card scrolled and its own sticky button row
-     covered the last sentence — "Tap it now, or press Next and I will do it for you." cut in half
-     on a first run (Native Builder on device at 320x640 dp, 2026-09-06; headless read −29 px at
-     320x640 CSS px against +13 px at 426x952). So the card may exceed the fraction up to what its
-     content needs, and never past the room DOCK_OPEN_PX leaves open. On a tall screen the
-     content is well under the fraction and nothing moves. */
-  const dockRoom = Math.floor(vh - dockBottom - (scrollerTopRef.current + DOCK_OPEN_PX));
-  const dockCap = Math.max(CARD_MIN_H, Math.min(Math.max(Math.round(vh * DOCK_MAX_FRAC), cardNeed || 0), dockRoom));
-  /* A PRESSED STOP WHOSE RING IS THE PRESS'S RESULT (the player stop: the voice row the sheet
-     revealed) docks only if the docked card clears that ring; otherwise it sits beside the ring like
-     any ringed stop — above it, in a landscape phone. Measured 800x360 at Text Size 1 (2026-09-13):
-     the docked card at 118..278 covered the chips it was pointing at (229..273). */
-  if (docked && ring && st.pressed && step.afterTarget && vh - dockBottom - Math.min(cardH || CARD_EST_H, dockCap) < ring.top + ring.height + CARD_GAP) docked = false;
-  const cap = _floorCapToLines(docked ? dockCap
-    : ringOn ? Math.max(CARD_MIN_H, vh - top0 - ring.height - CARD_GAP - CARD_EDGE) : vh - 2 * CARD_EDGE, geom);
-  const h = Math.min(cardH || CARD_EST_H, cap);
-  let below = false, cardTop = 0;
-  if (docked) {
-    cardTop = Math.max(CARD_EDGE, vh - dockBottom - h);
-    dockPadRef.current = vh - cardTop;
-  } else if (ring) {
-    const fitsBelow = ring.top + ring.height + CARD_GAP + h <= vh - CARD_EDGE;
-    const fitsAbove = ring.top - CARD_GAP - h >= CARD_EDGE;
-    below = fitsBelow || (!fitsAbove && ring.top < vh / 2);
-    cardTop = below ? ring.top + ring.height + CARD_GAP : ring.top - CARD_GAP - h;
-    cardTop = Math.min(Math.max(cardTop, CARD_EDGE), Math.max(CARD_EDGE, vh - CARD_EDGE - h));
-  }
-  const clear = !docked && ring ? (cardTop >= ring.top + ring.height || cardTop + h <= ring.top) : false;
+  const top0 = ringOnScreen(ring, vh) && targetRef.current ? _scrollerTop(targetRef.current) : 0;
+  const docks = !!(step && (step.act === 'press' || step.act === 'highlightDemo' || step.listening));
+  const { docked, h, below, cardTop, clear, dockPad, cardStyle } = placeTourCard({
+    vh, ring, top0, docked: docks, afterPressed: !!(st.pressed && step.afterTarget), barTop,
+    scrollerTop: scrollerTopRef.current, cardNeed, cardH, geom,
+  });
+  dockPadRef.current = dockPad;
   // A docked card names the scroller top its room was measured from: tools/dp-tourclip.mjs's growth arm
   // checks the card took that room (it measured the retired 55 % share before, sweep W77).
   const dockedTop = docked ? scrollerTopRef.current : undefined;
-  const cardStyle = docked ? { bottom: Math.round(dockBottom) + 'px', maxHeight: Math.round(cap) + 'px' }
-    : ring ? { top: Math.round(cardTop) + 'px', maxHeight: Math.round(cap) + 'px' } : { bottom: '16px' };
   // What the dims leave open: the ringed control, or, once Listen is pressed, the reading column
   // from the top of its scroller down to the card (the lit words are somewhere in it). A pressed
   // stop with an afterTarget rings that instead; a docked stop with no target at all (the closing

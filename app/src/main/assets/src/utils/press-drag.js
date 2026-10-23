@@ -74,6 +74,20 @@
  *   isDragging: () => boolean,
  * }}
  */
+/**
+ * The pickup buzz when a held item lifts (n228, s36.4): the phone's own haptic through the native bridge on
+ * the APK, which honours the system touch-feedback setting, and `webMs` of navigator.vibrate on the web as
+ * before. Style 1 is the bridge's click (AppInterface.haptic). Never throws.
+ * @param {number} webMs
+ */
+export function pickupBuzz(webMs) {
+  try {
+    const pb = typeof PlatformBridge !== 'undefined' ? /** @type {any} */ (PlatformBridge) : null;
+    if (pb && pb.isAndroid) { pb.haptic(1); return; }
+    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(webMs);
+  } catch (_e) { /* no haptics here */ }
+}
+
 export function createPressDrag(cfg) {
   const holdMs = cfg.holdMs != null ? cfg.holdMs : 1380;
   const glowMs = cfg.glowMs != null ? cfg.glowMs : 280;

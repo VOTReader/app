@@ -894,7 +894,7 @@ export function JournalEditorScreen(props) {
         ].join(';');
         document.body.appendChild(clone);
         dragCloneRef.current = clone;
-        if (navigator.vibrate) { try { navigator.vibrate(35); } catch (_e) { /* unsupported — ignore */ } }
+        pickupBuzz(35);
       },
       onDragMove: function(g, _x, y) {
         dragLastYRef.current = y;

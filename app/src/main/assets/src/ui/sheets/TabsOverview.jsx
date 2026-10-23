@@ -35,7 +35,7 @@
  * @param {number} boxW @param {number} boxH
  * @returns {boolean}
  */
-import { createPressDrag } from '../../utils/press-drag.js';
+import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 
 export function thumbAspectMismatch(naturalW, naturalH, boxW, boxH) {
   if (!naturalW || !naturalH || !boxW || !boxH) return false;
@@ -214,7 +214,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
           document.body.appendChild(ghost);
           g.data.ghost = ghost;
         }
-        if (navigator.vibrate) {try {navigator.vibrate(55);} catch (_e) { /* unsupported — ignore */ }}
+        pickupBuzz(55);
       },
       // ACTIVE DRAG: the ghost follows the finger in both axes; the nearest
       // slot becomes the target and siblings FLIP out of the way.

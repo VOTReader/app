@@ -27,6 +27,8 @@ import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '
 import { monthCells, dayItems, newRun, dayNum, weeksOnPlan, markOn, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+/** The week strip's spoken day names (n354: a lone "T" named two days). */
+const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const GROUPS = [['bible', 'The Bible'], ['letters', 'The Letters'], ['starter', 'Short starts']];
 const QUIET_ASKED = 'vot-plan-quiet-asked';
@@ -61,7 +63,7 @@ function weekCells(plan, now) {
     const key = d.getFullYear() + '-' + d.getMonth();
     if (!months[key]) months[key] = monthCells(plan, d.getFullYear(), d.getMonth(), now);
     const c = months[key][d.getDate() - 1];
-    out.push({ date: d.getDate(), state: c ? c.state : 'none', read: !!(c && c.read) });
+    out.push({ date: d.getDate(), state: c ? c.state : 'none', read: !!(c && c.read), day: c ? c.day : null, year: d.getFullYear(), month: d.getMonth() });
   }
   return out;
 }
@@ -340,11 +342,11 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
           const sy = shownMonth.getFullYear(), sm = shownMonth.getMonth();
           const days = details ? monthCells(plan, sy, sm, now) : [];
           /** C9: what a calendar day opens: today's next, a planned day's first item, or what was read that day. @param {any} d */
-          const dayRef = (d) => {
+          const dayRef = (d, y = sy, m = sm) => {
             if (d.state === 'today') return row.next;
             if (d.day != null) { const it = dayItems(plan, d.day)[0]; return it ? itemRef(it.k) : null; }
             if (!d.read) return null;
-            const key = sy + '-' + String(sm + 1).padStart(2, '0') + '-' + String(d.date).padStart(2, '0');
+            const key = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d.date).padStart(2, '0');
             const k = Object.keys(plan.ticks || {}).find((x) => plan.ticks[x] === key);
             return k ? itemRef(k) : null;
           };
@@ -403,13 +405,19 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                 </button>
               ) : null}
               <div className="plans-week" role="group" aria-label="This week">
-                {week.map((d, i) => (
-                  <span key={i} className="plans-day" data-state={dayState(d.state)} data-read={d.read || (d.state === 'today' && row.done) ? '1' : undefined}
-                    aria-label={WEEKDAYS[i] + ' ' + d.date + (d.state === 'none' ? '' : ', ' + (d.state === 'today' ? (row.done || d.read ? 'today, read' : 'today') : d.state))}>
-                    <span className="plans-weekday" aria-hidden="true">{WEEKDAYS[i]}</span>
-                    <span className="plans-day-mark" aria-hidden="true" />
-                  </span>
-                ))}
+                {week.map((d, i) => {
+                  /* n354 (A09.7, s21.9): a week day with a reading opens it, like the month page's days;
+                     every day says its whole name ("Tuesday 21, today"), not a lone "T". */
+                  const label = WEEKDAY_NAMES[i] + ' ' + d.date + (d.state === 'none' ? '' : ', ' + (d.state === 'today' ? (row.done || d.read ? 'today, read' : 'today') : d.state));
+                  const ref = d.state === 'missed' ? null : dayRef(d, d.year, d.month);
+                  const attrs = { className: 'plans-day', 'data-state': dayState(d.state), 'data-read': d.read || (d.state === 'today' && row.done) ? '1' : undefined };
+                  const inner = (<><span className="plans-weekday" aria-hidden="true">{WEEKDAYS[i]}</span><span className="plans-day-mark" aria-hidden="true" /></>);
+                  return ref ? (
+                    <button key={i} type="button" {...attrs} aria-label={'Open ' + label} onClick={() => onRead(ref)}>{inner}</button>
+                  ) : (
+                    <span key={i} {...attrs} role="img" aria-label={label}>{inner}</span>
+                  );
+                })}
               </div>
               {row.paused ? (
                 <div className="plans-catchup">

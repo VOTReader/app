@@ -107,6 +107,25 @@ describe('ReadingPlansScreen', () => {
     expect(within(plan).getByRole('group', { name: 'This week' }).querySelectorAll('.plans-day')).toHaveLength(7);
   });
 
+  /* n354 (A09.7, s21.9): the week strip's days were role-less spans; a day with a reading is a button that
+     opens it (today opens today's next), and every day says its whole name. */
+  it('this week: today opens its reading, a later planned day opens its own, every day is named in full', () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    const p = base();
+    render(<ReadingPlansScreen {...p} />);
+    const week = within(screen.getByRole('region', { name: 'Bible in a Year' })).getByRole('group', { name: 'This week' });
+    const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const day = new Date().getDay();
+    const today = within(week).getByRole('button', { name: new RegExp('^Open ' + names[day] + ' \\d+, today$') });
+    fireEvent.click(today);
+    expect(p.onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 1 });
+    if (day < 6) {
+      fireEvent.click(within(week).getByRole('button', { name: new RegExp('^Open ' + names[day + 1] + ' ') }));
+      expect(p.onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 4 });
+    }
+    for (const el of week.querySelectorAll('.plans-day')) expect(el.getAttribute('aria-label')).toMatch(/^(Open )?(Sun|Mon|Tues|Wednes|Thurs|Fri|Satur)day \d+/);
+  });
+
   it('a day read through says Done today, tomorrow’s portion, Read ahead and Read again (C2)', () => {
     let run = startCatalogPlan('bible-year', null, new Date());
     for (const k of ['genesis:1', 'genesis:2', 'genesis:3']) run = tickItem(run, k, todayKey(new Date()), 1);

@@ -330,6 +330,13 @@ export function buildScreenRoutes({
       _listOpen({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
     }
   };
+  /** Volume One, Letter 1 from an empty Home, Progress or History ("Start here"; n117, n131/n352): Back returns there. */
+  const _openFirstLetter = (/** @type {string} */ from) => {
+    const first = TourController.firstLetter();
+    setGenreId(null);
+    setActiveReadKey('vol:' + first.volKey, () => setLastReadForVol(first.volKey, first.id));
+    _listOpen({ screen: first.screen, letterId: first.id }, { sourceLetterTitle: from, silent: true });
+  };
   // mw18 S8: the reader's plan line (PlanRibbon) opens a plan's next item the way the Today card's Read does.
   /** @type {any} */ (window).__votOpenPlanItem = openPlanItem;
   // mw18 C5: Listen plays today's portion only (the refs from its first item not read yet), as one queue that
@@ -1228,6 +1235,7 @@ export function buildScreenRoutes({
         readItems={readItems}
         historyCount={readHistory.length}
         historyEnabled={settings.historyEnabled !== false}
+        onStartReading={() => _openFirstLetter('Progress')}
         theme={theme} onThemeChange={setTheme}
       />
     ),

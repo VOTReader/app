@@ -18,7 +18,7 @@
    bare Event — the handler only reads clientX/clientY. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createPressDrag } from './press-drag.js';
+import { createPressDrag, pickupBuzz } from './press-drag.js';
 
 let ctl;
 let onCommit, onAbortDrag, trace;
@@ -116,5 +116,38 @@ describe('createPressDrag — zombie watchdog', () => {
     expect(held.isDragging()).toBe(false);
     expect(onCommit).toHaveBeenCalledTimes(1); // engaged at 1380ms → commit policy
     held.destroy();
+  });
+});
+
+/* n228 (s36.4): the pickup buzz goes through the native haptic bridge on the APK (it honours the system
+   touch-feedback setting) and stays navigator.vibrate on the web. Globals restored after each case. */
+describe('pickupBuzz', () => {
+  const navDesc = Object.getOwnPropertyDescriptor(navigator, 'vibrate');
+  afterEach(() => {
+    delete /** @type {any} */ (globalThis).PlatformBridge;
+    if (navDesc) Object.defineProperty(navigator, 'vibrate', navDesc); else delete navigator.vibrate;
+  });
+
+  it('on the APK: the bridge click, and no web vibrate', () => {
+    const haptic = vi.fn();
+    const vibrate = vi.fn();
+    /** @type {any} */ (globalThis).PlatformBridge = { isAndroid: true, haptic };
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true, writable: true });
+    pickupBuzz(55);
+    expect(haptic).toHaveBeenCalledWith(1);
+    expect(vibrate).not.toHaveBeenCalled();
+  });
+
+  it('on the web: navigator.vibrate for the given ms, as before', () => {
+    const vibrate = vi.fn();
+    /** @type {any} */ (globalThis).PlatformBridge = { isAndroid: false, haptic: vi.fn() };
+    Object.defineProperty(navigator, 'vibrate', { value: vibrate, configurable: true, writable: true });
+    pickupBuzz(35);
+    expect(vibrate).toHaveBeenCalledWith(35);
+  });
+
+  it('never throws, with no bridge and no vibrate', () => {
+    Object.defineProperty(navigator, 'vibrate', { value: undefined, configurable: true, writable: true });
+    expect(() => pickupBuzz(55)).not.toThrow();
   });
 });

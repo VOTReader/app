@@ -4,7 +4,7 @@
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
-import { createPressDrag } from '../../utils/press-drag.js';
+import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 
@@ -247,7 +247,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           document.body.appendChild(ghost);
           g.data.ghost = ghost;
         }
-        if (navigator.vibrate) {try {navigator.vibrate(55);} catch (_e) { /* unsupported — ignore */ }}
+        pickupBuzz(55);
       },
       // ACTIVE DRAG: the ghost follows the finger vertically; the drop slot
       // is picked against the captured natural tops.

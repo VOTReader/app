@@ -22,7 +22,7 @@
 
 import { runName } from '../../data/plan-catalog.js';
 import { countMarks } from '../../utils/mark-kinds.js';
-import { createPressDrag } from '../../utils/press-drag.js';
+import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
@@ -333,7 +333,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
           document.body.appendChild(ghost);
           g.data.ghost = ghost;
         }
-        if (navigator.vibrate) { try { navigator.vibrate(55); } catch (_e) { /* unsupported */ } }
+        pickupBuzz(55);
       },
       onDragMove: (g, x, y) => {
         const ghost = g.data.ghost;

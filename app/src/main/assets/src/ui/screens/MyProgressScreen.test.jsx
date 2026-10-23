@@ -110,16 +110,32 @@ const fact = (container, label) => {
 const summaryOf = (container) => container.querySelector('.prg-summary').textContent;
 
 describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
-  it('renders zero-data as intentional: a plain sentence, 0-value rows, the annotate hint', () => {
+  /* n117 (A08.3): a new profile was the sentence and then a page of zero rows saying the same thing ten
+     times. It is now one line and one action: the sentence, and a button that opens the first letter. */
+  it('a new profile is one line and one action: no zero rows, a Start button', () => {
     setupGlobals();
-    const { container } = renderScreen();
+    const onStartReading = vi.fn();
+    const { container, getByRole } = renderScreen({ onStartReading });
     expect(summaryOf(container)).toBe('Nothing read yet. The chapters and letters you read are counted here.');
+    expect(container.querySelectorAll('.prg-fact').length).toBe(0);
+    expect(container.querySelector('.prg-section')).toBeNull();
+    expect(container.textContent).not.toContain('Loading your library');
+    fireEvent.click(getByRole('button', { name: 'Start with Volume One, Letter 1' }));
+    expect(onStartReading).toHaveBeenCalledTimes(1);
+  });
+
+  it('a new profile with Mark as Read off still says so', () => {
+    setupGlobals();
+    const { container } = renderScreen({ settings: { markAsRead: false } });
+    expect(container.textContent).toContain('Mark as Read is off');
+  });
+
+  it('one kept thing (a note) brings the rows back, zeros included', () => {
+    setupGlobals({ notes: 1 });
+    const { container, queryByRole } = renderScreen({ onStartReading: () => {} });
     expect(fact(container, 'Chapters & letters read')).toBe('0');
-    expect(fact(container, 'Reading streak')).toBe('0 days');
-    expect(fact(container, 'Entries')).toBe('0');
-    expect(fact(container, 'Journal streak')).toBe('0 days');
-    expect(container.textContent).toContain('Nothing marked yet');
-    expect(container.textContent).toContain('Loading your library…'); // corpora not loaded
+    expect(fact(container, 'Notes')).toBe('1');
+    expect(queryByRole('button', { name: 'Start with Volume One, Letter 1' })).toBeNull();
   });
 
   it('fills the sentence and the rows from readItems + reading streak + journal stats + journal count', () => {
@@ -265,7 +281,7 @@ describe('MyProgressScreen — journaling section', () => {
 
   it('omits the voice-memo row entirely at 0 minutes', async () => {
     setupGlobals({ entries: [], media: [{ type: 'image' }] });
-    const { container } = renderScreen();
+    const { container } = renderScreen({ historyCount: 1 });
     await flush();
     expect(container.textContent).toContain('Words written');
     expect(container.textContent).not.toContain('Voice memos');
@@ -273,7 +289,7 @@ describe('MyProgressScreen — journaling section', () => {
 
   it('hides the written-words row (not the section) when the word counter and media store are absent', () => {
     setupGlobals();
-    const { container } = renderScreen();
+    const { container } = renderScreen({ historyCount: 1 });
     expect(container.textContent).not.toContain('Words written');
     expect(fact(container, 'Entries')).toBe('0');   // entries and streak always answer
   });
@@ -299,7 +315,7 @@ describe('MyProgressScreen — reading section', () => {
   it('skips groups whose corpus total is still 0 (lazy corpus not yet loaded)', () => {
     const empty = { id: 'studies', label: 'Studies', genres: [{ label: 'x', books: [] }] };
     setupGlobals({ groups: [GROUP, empty] });
-    const { container } = renderScreen();
+    const { container } = renderScreen({ historyCount: 1 });
     const labels = [...container.querySelectorAll('.prg-row .prg-row-label')].map((n) => n.textContent);
     expect(labels).toEqual(['New Testament']);
   });
@@ -312,7 +328,7 @@ describe('MyProgressScreen — reading section', () => {
     const loadBible = vi.fn(() => Promise.resolve());
     Object.assign(window, { __votCorpus: corpus(true), __bibleCorpus: corpus(false), __loadVotCorpus: loadVot, __loadBibleCorpus: loadBible });
     try {
-      const { container, getByRole } = renderScreen();
+      const { container, getByRole } = renderScreen({ historyCount: 1 });
       expect(container.textContent).not.toContain('Loading your library…');
       expect(container.textContent).toContain('Couldn’t load your library.');
       const votBefore = loadVot.mock.calls.length, bibleBefore = loadBible.mock.calls.length;
@@ -404,7 +420,7 @@ describe('MyProgressScreen — listening block', () => {
 
   it('hides the block entirely when the library store is absent', () => {
     setupGlobals();
-    const { container } = renderScreen();
+    const { container } = renderScreen({ historyCount: 1 });
     expect(listenRows(container)).toBeNull();
     // …and the reading rows are untouched by its absence.
     expect(fact(container, 'Chapters & letters read')).toBe('0');

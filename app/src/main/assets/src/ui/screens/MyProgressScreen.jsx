@@ -70,7 +70,7 @@ function _fmtDuration(ms) {
   return Math.floor(min / 60) + 'h ' + (min % 60) + 'm';
 }
 
-export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled }) {
+export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, theme, onThemeChange, settings, readItems, historyCount, historyEnabled, onStartReading }) {
   // The reading table + most-annotated titles read the lazy corpora
   // (BOOKS for NT/OT totals, VOT for volume totals + letter titles,
   // MATTHEW + BIBLE_STUDIES for the Studies group). Pre-fire every
@@ -370,6 +370,13 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     const n = /** @type {number} */ (dayNum(r.finished)) - /** @type {number} */ (dayNum(r.start)) + 1;
     return 'Started ' + shortDate(r.start) + ' · finished ' + shortDate(r.finished) + ' · ' + n + (n === 1 ? ' day' : ' days');
   };
+  /* A NEW PROFILE IS ONE LINE AND ONE ACTION (n117, A08.3): it was the sentence and then a page of
+     zero rows (0 read, 0 days, 0 entries, 0 notes...) that said the same thing ten times. Nothing kept
+     anywhere: the sentence, a button that opens the first letter, and the Mark as Read note if it is off. */
+  const isEmpty = totalRead === 0 && readStreak === 0 && journalCount === 0 && streak === 0 && noteCount === 0
+    && linkCount === 0 && bookmarkCount === 0 && markCount === 0 && !(historyCount > 0) && voiceMins === 0
+    && listenFacts.length === 0 && planRows.length === 0 && finishedPlans.length === 0
+    && !(journalWords > 0) && !(readingStats && readingStats.totalWordsRead > 0);
   /** A section's small-capitals name, with an optional figure at the right. */
   const head = (id, name, meta) => (
     <div className="prg-section-head">
@@ -390,6 +397,14 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
 
         <p className="prg-summary">{summary}</p>
 
+        {isEmpty ? (
+          <>
+            {onStartReading ? (
+              <button type="button" className="today-btn prg-start" onClick={onStartReading}>Start with Volume One, Letter 1</button>
+            ) : null}
+            {!markAsReadOn ? <div className="prg-note">Mark as Read is off — reading progress isn’t being recorded. You can turn it on in Settings.</div> : null}
+          </>
+        ) : <>
         {wordDays ? (() => {
           const max = Math.max(0, ...wordDays.map((d) => d.words));
           const weekWords = wordDays.slice(-7).reduce((n, d) => n + d.words, 0);
@@ -520,6 +535,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
             ))
           )}
         </section>
+        </>}
       </div>
     </ScreenLayout>
   );
