@@ -2037,6 +2037,28 @@
       .song-vote-ask { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 .35rem; margin: .35rem 0 .25rem; }
       .song-vote-ask-q { color: var(--vote-taupe); font-size: var(--fs-16); font-style: italic; text-align: center; }
       .song-vote-pair.is-large .song-vote-svg { width: clamp(30px, 1.6rem, 36px); height: clamp(30px, 1.6rem, 36px); }
+      /* sy4-3 shelves (pictures song-voting 01-04): Popular / All-time loved / New as three tiles each, See all = one
+         page with three tabs. Tiles carry no vote UI and no numbers; a family with versions says "3 versions". */
+      .songs-section-titles { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 0 .6rem; min-width: 0; }
+      .songs-section-sub { color: var(--vote-taupe); font-size: var(--fs-14); font-style: italic; }
+      .songs-top-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
+      .songs-top-tile { display: flex; flex-direction: column; gap: .3rem; min-width: 0; padding: 0; border: 0; background: none; color: var(--cream); font: inherit; text-align: left; cursor: pointer; }
+      .songs-top-tile .songs-top-cover { width: 100%; height: auto; aspect-ratio: 1; border-radius: 6px; }
+      .songs-top-title { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: var(--fs-15); line-height: 1.25; overflow-wrap: anywhere; }
+      .songs-top-meta { margin-top: -.15rem; color: var(--vote-taupe); font-size: var(--fs-14); font-style: italic; }
+      .songs-top-tile:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; border-radius: 6px; }
+      @media (hover: hover) { .songs-top-tile:hover .songs-top-title { color: var(--gold-bright); } }
+      .vot-large-text .songs-top-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .vot-large-text .songs-top-tiles > :nth-child(n+3) { display: none; }
+      .songs-top-empty { padding: 1.1rem 1rem .5rem; text-align: center; }
+      .songs-top-empty p { margin: 0; color: var(--cream); font-size: var(--fs-16); }
+      .songs-top-tabs { display: flex; gap: 1.4rem; margin-top: .5rem; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+      .songs-top-tab { flex: none; min-height: 44px; padding: 0 .1rem; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--cream-dim); font: inherit; font-size: var(--fs-16); white-space: nowrap; cursor: pointer; }
+      .songs-top-tab.is-on { color: var(--gold); border-bottom-color: var(--gold); }
+      .songs-top-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+      .songs-top-line { margin: .6rem 0 0; color: var(--vote-taupe); font-size: var(--fs-15); font-style: italic; }
+      .vot-large-text .songs-top-tabs { flex-wrap: wrap; gap: 0 1rem; overflow: visible; }
+      .vot-large-text .songs-section-head .songs-see-all { white-space: nowrap; }
       /* The first thumbs-down (08): once per install, anchored to the thumb-down; OK or a tap elsewhere closes it. */
       .song-vote-note { position: fixed; z-index: 1000; display: flex; align-items: center; gap: .6rem; max-width: min(20rem, calc(100vw - 16px)); padding: .45rem .35rem .45rem .85rem; border: 1px solid #3a3220; border-radius: 8px; background: #14120e; color: var(--cream); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
       .song-vote-note p { margin: 0; font-size: var(--fs-15); line-height: 1.3; }

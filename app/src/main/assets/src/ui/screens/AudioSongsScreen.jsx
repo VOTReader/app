@@ -24,9 +24,22 @@ import { OfflineNote } from '../components/OfflineAudioControls.jsx';
 
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
-/** Rows of "New from the flock" on the hub; See all opens the ten. */
-const NEW_ON_HUB = 2;
 const NEW_TOTAL = 10;
+/* sy4-3 (Corbin 2026-10-22, pictures calls/song-voting-mockups 01-04): Popular, All-time loved and New as shelves of
+   tiles on the hub, each with See all: one page, three tabs. Popular = liked lately with real agreement and
+   All-time loved = liked most, both ranked by the daily votes.json (best version per family); New = newest by
+   first-seen date. A family shows once. No numbers. */
+/** Tiles on a hub shelf; See all opens the rest. */
+const SHELF_TILES = 3;
+/** Rows on the See all page's New tab. */
+const NEW_PAGE = 50;
+/** All-time loved stays hidden while it has fewer songs than this (sv-mock README: "too thin"). */
+const LOVED_MIN = 3;
+const TOP_TABS = [
+  { v: 'popular', label: 'Popular', line: 'Songs listeners have loved lately', play: 'Popular songs' },
+  { v: 'loved', label: 'All-time loved', line: 'Songs listeners have loved most', play: 'All-time loved' },
+  { v: 'new', label: 'New', line: 'Newest songs first', play: 'New from the flock' },
+];
 /** Collection tiles before "Show all": the four with the most songs (Codex critique of U1, picture final-02). */
 const TILES_FIRST = 4;
 /** The letter collections, in reading order, as tiles under From the letters. */
@@ -40,6 +53,11 @@ const SHELVES = [
 /** @returns {any} the catalog store, or null before bundle-d published it */
 function catalog() {
   return typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+}
+
+/** @returns {any} the vote store (bundle-d's SongVotes), or null */
+function votes() {
+  return typeof SongVotes !== 'undefined' ? SongVotes : null;
 }
 
 /** @param {any} song @returns {boolean} */
@@ -115,6 +133,27 @@ function songsOfIds(ids) {
   return out;
 }
 
+/** Ranked ids as songs, in order, one per family (votes.json already sends one; a hidden twin may repeat one). @param {string[]} ids */
+function rankedSongs(ids) {
+  const out = [];
+  const fams = new Set();
+  for (const s of songsOfIds(ids)) {
+    const f = s.f || s.id;
+    if (fams.has(f)) continue;
+    fams.add(f);
+    out.push(s);
+  }
+  return out;
+}
+
+/** A shelf's songs: Popular, All-time loved or New. `n` 0 = all. @param {string} v @param {number} n @returns {any[]} */
+function topSongs(v, n) {
+  if (v === 'new') return newestSongs(n || NEW_PAGE);
+  const store = votes();
+  const list = store ? rankedSongs(v === 'popular' ? store.popularIds() : store.lovedIds()) : [];
+  return n ? list.slice(0, n) : list;
+}
+
 /** Kept ids as songs, hidden ones included (a kept song must stay removable). @param {string[]} ids */
 function keptSongs(ids) {
   const cat = catalog();
@@ -153,6 +192,10 @@ function listContent(v, library) {
     };
   }
   if (v === 'new') return { eyebrow: 'New from the flock', title: 'New from the flock', families: null, songs: newestSongs(NEW_TOTAL), empty: 'No songs yet.' };
+  if (v.indexOf('top:') === 0) {
+    const tab = TOP_TABS.find((x) => 'top:' + x.v === v) || TOP_TABS[0];
+    return { eyebrow: 'Songs of the Letters', title: tab.label, families: null, songs: topSongs(tab.v, 0), empty: '' };
+  }
   // 'sung:' is the letter card's "All N songs of this letter ›": only the families that sing the letter's own
   // words (the verbatim gate, Corbin 2026-09-25). 'letter:' (the song page's link) lists every song made from it.
   const sung = v.indexOf('sung:') === 0;
@@ -267,12 +310,47 @@ function SongRowPlain({ song, playingId, active, onPlay, onOpen, onRemove }) {
 }
 const SongRow = React.memo(SongRowPlain, sameRowFor((p) => (p.playingId === p.song.id ? (p.active ? 2 : 1) : 0)));
 
-/** @param {{ title: string, id?: string, action?: any }} props */
-function SectionHead({ title, id, action }) {
+/** @param {{ title: string, id?: string, action?: any, sub?: string }} props */
+function SectionHead({ title, id, action, sub = '' }) {
   return (
     <div className="songs-section-head">
-      <h2 id={id}>{title}</h2>
+      {sub ? <span className="songs-section-titles"><h2 id={id}>{title}</h2><span className="songs-section-sub">{sub}</span></span> : <h2 id={id}>{title}</h2>}
       {action || null}
+    </div>
+  );
+}
+
+/**
+ * A shelf of song tiles (01): cover, title, and "3 versions" for a family with several. No vote UI on tiles.
+ * A tap plays the shelf from that song.
+ * @param {{ songs: any[], onPlay: (song: any) => void }} props
+ */
+function SongTiles({ songs, onPlay }) {
+  const cat = catalog();
+  return (
+    <div className="songs-top-tiles">
+      {songs.map((s) => {
+        const fam = cat.familyById(s.f);
+        const n = fam ? cat.versionsOf(fam).length : 1;
+        const title = fam && n > 1 ? fam.t : s.t;
+        return (
+          <button key={s.id} type="button" className="songs-top-tile" onClick={() => onPlay(s)} aria-label={'Play ' + title + (n > 1 ? ', ' + n + ' versions' : '')}>
+            <SongCover song={s} className="songs-top-cover" />
+            <span className="songs-top-title">{title}</span>
+            {n > 1 ? <span className="songs-top-meta">{n + ' versions'}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Empty Popular (02): what the shelf says instead of a list, and the way to New. @param {{ onNew: () => void }} props */
+function PopularEmpty({ onNew }) {
+  return (
+    <div className="songs-card songs-top-empty">
+      <p>Popular fills in as listeners like songs.</p>
+      <button type="button" className="songs-see-all" onClick={onNew}>Start with New<ChevronRightIcon /></button>
     </div>
   );
 }
@@ -305,6 +383,13 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, playerMark);
+  // sy4-3: the Popular and All-time loved shelves read the daily tallies.
+  const vstore = votes();
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (vstore ? vstore.subscribe(cb) : () => {}), [vstore]),
+    React.useCallback(() => (vstore ? vstore.getVersion() : 0), [vstore])
+  );
+  React.useEffect(() => { if (vstore) { void vstore.load(); void vstore.loadTally(); } }, [vstore]);
   // The letters' titles (the Find box and "From the letter") ride the lazy VOT corpus.
   React.useSyncExternalStore(
     React.useCallback((cb) => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.subscribe(cb) : () => {}, []),
@@ -339,6 +424,8 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
   } else if (top.k === 'song') {
     // Keyed by the song (s23.1): a song opened from another song's page is a new page, not the last one's open lists.
     body = <SongPage key={top.v} familyId={top.v} library={library} playingId={playingId} active={active} onPush={onPush} FamilyRow={FamilyRow} />;
+  } else if (top.k === 'list' && String(top.v || '').indexOf('top:') === 0) {
+    body = <SongsTopPage frame={top} playingId={playingId} active={active} onPush={onPush} onReplaceTop={onReplaceTop} />;
   } else if (top.k === 'list') {
     body = <SongsList frame={top} library={library} playingId={playingId} active={active} onPush={onPush} />;
   } else {
@@ -451,8 +538,17 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   // Rows are memoized: their taps call through these, so they act on the results and shelves as they are now.
   const playResultRow = useLatestFn(playResults);
   const openFamily = useLatestFn((f) => open({ k: 'song', v: f.id }));
-  const openSongFamily = useLatestFn((s) => open({ k: 'song', v: s.f }));
   const playNewRow = useLatestFn((s) => AudioPlayer.playSongs({ ids: newest.map((x) => x.id), startId: s.id, label: 'New from the flock' }));
+  const vstore = votes();
+  const tallyReady = !!(vstore && vstore.tallyLoaded);
+  const popular = tallyReady ? topSongs('popular', 0) : [];
+  const loved = tallyReady ? topSongs('loved', 0) : [];
+  const playShelf = useLatestFn((s, list, label) => AudioPlayer.playSongs({ ids: list.map((x) => x.id), startId: s.id, label }));
+  const playPopular = useLatestFn((s) => playShelf(s, popular, 'Popular songs'));
+  const playLoved = useLatestFn((s) => playShelf(s, loved, 'All-time loved'));
+  const seeAll = (v, label) => (
+    <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'top:' + v })} aria-label={'See all ' + label}>See all<ChevronRightIcon /></button>
+  );
   const savedCount = library ? songsOfIds(library.songSaved()).length : 0;
   // K1: the songs kept on this phone (and, after a restore, those the backup lists but the phone lacks).
   const keep = useSongKeep();
@@ -504,12 +600,22 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
         </section>
       ) : (
         <>
+          {tallyReady ? (
+            <section className="songs-section songs-top-shelf" aria-labelledby="songs-popular">
+              <SectionHead id="songs-popular" title="Popular" sub="Loved lately" action={popular.length ? seeAll('popular', 'popular songs') : null} />
+              {popular.length ? <SongTiles songs={popular.slice(0, SHELF_TILES)} onPlay={playPopular} /> : <PopularEmpty onNew={() => open({ k: 'list', v: 'top:new' })} />}
+            </section>
+          ) : null}
+          {tallyReady && popular.length && loved.length >= LOVED_MIN ? (
+            <section className="songs-section songs-top-shelf" aria-labelledby="songs-loved">
+              <SectionHead id="songs-loved" title="All-time loved" action={seeAll('loved', 'all-time loved songs')} />
+              <SongTiles songs={loved.slice(0, SHELF_TILES)} onPlay={playLoved} />
+            </section>
+          ) : null}
           {newest.length ? (
-            <section className="songs-section" aria-labelledby="songs-new">
-              <SectionHead id="songs-new" title="New from the flock" action={newest.length > NEW_ON_HUB ? <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'new' })}>See all<ChevronRightIcon /></button> : null} />
-              <div className="songs-card songs-list">
-                {newest.slice(0, NEW_ON_HUB).map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={playNewRow} onOpen={openSongFamily} />)}
-              </div>
+            <section className="songs-section songs-top-shelf" aria-labelledby="songs-new">
+              <SectionHead id="songs-new" title="New from the flock" action={newest.length > SHELF_TILES ? seeAll('new', 'new songs') : null} />
+              <SongTiles songs={newest.slice(0, SHELF_TILES)} onPlay={playNewRow} />
             </section>
           ) : null}
 
@@ -579,6 +685,54 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
           </section>
         </>
       )}
+    </>
+  );
+}
+
+/**
+ * See all (03, 04): one page, three tabs (Popular / All-time loved / New); a shelf's See all opens it on its tab. A
+ * family shows once ("Come Home · 3 versions ›"). A tap on a row plays the tab's list from there.
+ * @param {{ frame: any, playingId: string, active: boolean, onPush: (f: any) => void, onReplaceTop: (f: any) => void }} props
+ */
+function SongsTopPage({ frame, playingId, active, onPush, onReplaceTop }) {
+  const cat = catalog();
+  const tab = TOP_TABS.find((x) => 'top:' + x.v === frame.v) || TOP_TABS[0];
+  const store = votes();
+  const waiting = tab.v !== 'new' && !(store && store.tallyLoaded);
+  const songs = waiting ? [] : topSongs(tab.v, 0);
+  const playRow = useLatestFn((s) => AudioPlayer.playSongs({ ids: songs.map((x) => x.id), startId: s.id, label: tab.play }));
+  const openFamily = useLatestFn((f) => onPush({ k: 'song', v: f.id }));
+  const openSongFamily = useLatestFn((s) => onPush({ k: 'song', v: s.f }));
+  return (
+    <>
+      <header className="songs-hero songs-list-hero songs-top-hero">
+        <div className="songs-eyebrow">Songs of the Letters</div>
+        <div className="songs-top-tabs" role="tablist" aria-label="Song lists">
+          {TOP_TABS.map((x) => (
+            <button key={x.v} type="button" role="tab" id={'songs-top-' + x.v} aria-selected={x.v === tab.v}
+              className={'songs-top-tab' + (x.v === tab.v ? ' is-on' : '')} onClick={() => { if (x.v !== tab.v) onReplaceTop({ k: 'list', v: 'top:' + x.v }); }}>
+              {x.label}
+            </button>
+          ))}
+        </div>
+        <p className="songs-top-line">{tab.line}</p>
+      </header>
+      <section className="songs-section songs-top-list" role="tabpanel" aria-labelledby={'songs-top-' + tab.v}>
+        {songs.length ? (
+          <div className="songs-list">
+            {songs.map((s) => {
+              const fam = cat.familyById(s.f);
+              return fam && cat.versionsOf(fam).length > 1
+                ? <FamilyRow key={s.id} fam={fam} song={s} playingId={playingId} active={active} onPlay={playRow} onOpen={openFamily} />
+                : <SongRow key={s.id} song={s} playingId={playingId} active={active} onPlay={playRow} onOpen={openSongFamily} />;
+            })}
+          </div>
+        ) : waiting ? null : tab.v === 'new' ? (
+          <p className="songs-empty">No songs yet.</p>
+        ) : (
+          <PopularEmpty onNew={() => onReplaceTop({ k: 'list', v: 'top:new' })} />
+        )}
+      </section>
     </>
   );
 }
