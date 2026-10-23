@@ -782,6 +782,28 @@ describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.
     expect(chip()).toBe('Saving…');
   });
 
+  // ds5 b34 re-check (Opus refuter 10-23): the store retries a failed write by itself; once that
+  // retry lands, the chip must not keep saying 'Not saved' over a saved entry.
+  it("turns 'Not saved' into 'Saved' when the store's own retry lands, with no new edit", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      JournalStore.whenSaved = () => Promise.resolve(false);
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+      await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Not saved');
+      // Let the editor's own debounced save run (and fail) first: only the store's retry is left.
+      await act(async () => { vi.advanceTimersByTime(3000); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Not saved');
+      // The store's retry: a new write, and it lands.
+      /** @type {any} */ (JournalStore)._lastWrite = Promise.resolve();
+      JournalStore.whenSaved = () => Promise.resolve(true);
+      await act(async () => { vi.advanceTimersByTime(2100); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saved');
+    } finally { vi.useRealTimers(); }
+  });
+
   it("keeps 'Saving…' while the write is still in flight", async () => {
     const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);

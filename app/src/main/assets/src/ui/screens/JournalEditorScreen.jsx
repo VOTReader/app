@@ -16,6 +16,9 @@
    failing (refuter r1). Until then a draft goes only when the quota leaves no room,
    oldest first, the entry on screen last. */
 var JOURNAL_DRAFT_KEY = 'vot-journal-draft';
+/** After 'Not saved', how often and how long the chip looks for the store's own retry (its schedule ends by ~2 min). */
+var SAVED_RETRY_LOOK_MS = 2000;
+var SAVED_RETRY_LOOKS = 75;
 function _readJournalDrafts() {
   try {
     var o = JSON.parse(localStorage.getItem(JOURNAL_DRAFT_KEY) || 'null');
@@ -475,13 +478,28 @@ export function JournalEditorScreen(props) {
 
   // ds5 s20.3: 'Saved' only once the store's last write has committed; a failed write says
   // 'Not saved' instead of a false success. The newest save's answer wins.
+  // ds5 b34 re-check: a failed write is retried by the store on its own (cached-store
+  // _scheduleWriteRetry, 5-60 s apart, no bump), so after 'Not saved' the chip watches for the
+  // store's next write and asks again: a retry that lands says 'Saved'.
   function showSavedWhenDurable() {
     var seq = ++saveSeqRef.current;
     if (typeof JournalStore === 'undefined' || typeof JournalStore.whenSaved !== 'function') { setSavedLabel('Saved'); return; }
-    JournalStore.whenSaved().then(function(ok) {
-      if (!mountedRef.current || seq !== saveSeqRef.current) return;
-      setSavedLabel(ok ? 'Saved' : 'Not saved');
-    });
+    function ask() {
+      var write = JournalStore._lastWrite;
+      JournalStore.whenSaved().then(function(ok) {
+        if (!mountedRef.current || seq !== saveSeqRef.current) return;
+        setSavedLabel(ok ? 'Saved' : 'Not saved');
+        if (!ok) awaitRetry(write, 0);
+      });
+    }
+    function awaitRetry(failed, n) {
+      if (n >= SAVED_RETRY_LOOKS) return;   // the store's retries are over by then
+      setTimeout(function() {
+        if (!mountedRef.current || seq !== saveSeqRef.current) return;
+        if (JournalStore._lastWrite !== failed) ask(); else awaitRetry(failed, n + 1);
+      }, SAVED_RETRY_LOOK_MS);
+    }
+    ask();
   }
 
   function scheduleSave() {
