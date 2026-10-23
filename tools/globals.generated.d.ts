@@ -7,11 +7,12 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 615 distinct identifiers.
+// Total: 620 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
 // The hooks are declared in hook-globals*.generated.d.ts (hook_global_types).
+declare const ALL_WEEK: any;
 declare const ANSWERS: any;
 declare const ANSWERS_META: any;
 declare const ANSWERS_SITE_META: any;
@@ -73,6 +74,7 @@ declare const BIBLE_YLT: any;
 declare const BOOKS: any;
 declare const BOOKS_RESTORED: any;
 declare const BOOK_ALIASES: any;
+declare const BOOK_INDEX: any;
 declare const BibleChapterView: any;
 declare const BibleStudyChapterView: any;
 declare const BibleStudyIndex: any;
@@ -242,6 +244,7 @@ declare const React: typeof import('react');
 declare const ReactDOM: typeof import('react-dom') & typeof import('react-dom/client');
 declare const ReadingChromeProvider: any;
 declare const ReadingDotContext: any;
+declare const ReadingPlanStore: any;
 declare const ReadingPlansScreen: any;
 declare const ReadingStatsStore: any;
 declare const ReadingStreakStore: any;
@@ -252,6 +255,7 @@ declare const ResumeReadingNavBtn: any;
 declare const SCRIPTURE_GENRES: any;
 declare const SCRIPTURE_LAYOUT_OPTIONS: any;
 declare const SCRIPTURE_WEB_DATA: any;
+declare const SEVEN: any;
 declare const SONGS_SCREEN: any;
 declare const SRCH_CANONICAL_BOOK_IDS: any;
 declare const SRCH_CANONICAL_BOOK_INDEX: any;
@@ -316,6 +320,7 @@ declare const VolumeLetterIndex: any;
 declare const VolumesHome: any;
 declare const VotSearchData: any;
 declare const VotSearchMini: any;
+declare const WEEKDAYS: any;
 declare const WEEKDAY_NAMES: any;
 declare const WTLB_ONE: any;
 declare const WTLB_SCRIPTURES: any;

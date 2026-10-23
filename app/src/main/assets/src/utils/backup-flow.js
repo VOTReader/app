@@ -290,6 +290,7 @@ export function createBackupFlow(ctx) {
     'vot-notes':               { store: NoteStore,            method: 'replaceAll' },
     'vot-bookmarks':           { store: BookmarkStore,        method: 'replaceAll' },
     'vot-links':               { store: LinkStore,            method: 'replaceAll' },
+    'vot-reading-plans':       { store: ReadingPlanStore,     method: 'replaceAll' },
     'vot-notebooks':           { store: NotebookStore,        method: 'replaceAll' },
     'vot-journal':             { store: JournalStore,         method: 'replaceAll' },
     'vot-journal-notebooks':   { store: JournalNotebookStore, method: 'replaceAll' },

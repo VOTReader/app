@@ -123,6 +123,18 @@ import { useRefMirror } from './use-ref-mirror.js';
 import { COL_BY_KEY } from '../data/scripture-resolution.js';
 import { ReadingStreakStore } from '../stores/reading-streak-store.js';
 import { allowProgressClear } from '../stores/store-merge.js';
+import { ReadingPlanStore } from '../stores/reading-plan-store.js';
+
+/**
+ * A read, a full listen or a manual mark ticks the reading plans that hold it,
+ * whatever the Mark-as-read switch says: a running plan tracks its own days
+ * (mw18, Corbin's call 3b). Never throws into the read path.
+ * @param {string} bid @param {string | number} cid
+ */
+function notePlans(bid, cid) {
+  try { ReadingPlanStore.noteRead(bid, cid); }
+  catch (e) { console.warn('reading-plan tick failed', e); }
+}
 
 /**
  * App-level read-progress state. Owns readItems (the per-collection
@@ -164,6 +176,7 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   };
 
   const markRead = (bid, cid, payload) => {
+    notePlans(bid, cid);
     if (enabledRef.current === false) return;
     const key = getReadKey(bid, cid);
     const prev = readItems[key];
@@ -234,7 +247,6 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
       }
     };
     window.__votAudioListened = (volKey, itemId, chapterNum) => {
-      if (enabledRef.current === false) return;
       try {
         if (!itemId) return;
         if (typeof volKey === 'string' && volKey.indexOf('bible-') === 0) {
@@ -242,12 +254,17 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
           // nothing honest to credit — the completion still counts in the
           // Listening Library, but no chapter is claimed read.
           const chapter = Math.floor(Number(chapterNum) || 0);
-          if (chapter > 0) credit(getReadKey(itemId, chapter));
+          if (chapter > 0) {
+            notePlans(itemId, chapter);
+            if (enabledRef.current !== false) credit(getReadKey(itemId, chapter));
+          }
           return;
         }
         const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY) ? COL_BY_KEY.get(volKey) : null;
         const rk = col && col.readKey;
         if (!rk) return;
+        notePlans(rk, itemId);
+        if (enabledRef.current === false) return;
         credit(getReadKey(rk, itemId));
       } catch (e) { console.warn('listen count failed', e); }
     };

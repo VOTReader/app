@@ -227,6 +227,25 @@ export function unionStrings(ours, theirs) {
    in that store's native shape, so cached-store can assign it straight back
    to `_cache`. */
 
+/* Reading plan runs (vot-reading-plans, mw18). */
+/**
+ * Cross-tab merge: records by id (the newer copy of a run wins, deletions
+ * honoured), then the ticks of both copies of a run are kept, so a chapter
+ * read in one tab is never lost to a pace change made in another.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any[]}
+ */
+export function mergePlanStore(base, ours, theirs) {
+  const merged = mergeRecordsById(base, ours, theirs);
+  const byId = (/** @type {any} */ arr) => new Map((Array.isArray(arr) ? arr : []).filter((/** @type {any} */ r) => r && typeof r.id === 'string').map((r) => [r.id, r]));
+  const O = byId(ours), T = byId(theirs);
+  return merged.map((/** @type {any} */ r) => {
+    const o = O.get(r && r.id), t = T.get(r && r.id);
+    if (!o || !t) return r;
+    return { ...r, ticks: { ...(t.ticks || {}), ...(o.ticks || {}), ...(r.ticks || {}) } };
+  });
+}
+
 /** Bare id-bearing arrays: bookmarks, links. */
 export function mergeArrayStore(base, ours, theirs) {
   return mergeRecordsById(base, ours, theirs);

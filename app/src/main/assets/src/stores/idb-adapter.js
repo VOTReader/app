@@ -114,7 +114,9 @@ export const IDBAdapter = (function () {
   //       (idb-chunks.js, 2026-10-11). A v12 build would read the manifest as the
   //       store's value, so the bump makes it meet a VersionError instead (the
   //       "saved by a newer version" banner, nothing written, nothing lost).
-  const DB_VERSION = 13;
+  //  14 — added vot-reading-plans (mw18: each reading-plan run with its own
+  //       dated ticks, out of settings). Same additive pattern.
+  const DB_VERSION = 14;
 
   /**
    * The persistent `vot-*` stores, plus the `meta` store for migration
@@ -153,6 +155,7 @@ export const IDBAdapter = (function () {
     'vot-audio-library',
     'vot-audio-positions',
     'vot-tour-done',
+    'vot-reading-plans',
     'offline-songs',
     'meta',
   ]);

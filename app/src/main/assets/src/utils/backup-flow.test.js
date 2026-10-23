@@ -21,7 +21,7 @@ import { validateImportEnvelope, isNewerBackup } from './import-validators.js';
 import { summarizeBackupManifest, formatVerifyReport } from './backup-verify.js';
 
 const STORE_NAMES = [
-  'AnnotationStore', 'NoteStore', 'BookmarkStore', 'LinkStore', 'NotebookStore', 'JournalStore',
+  'AnnotationStore', 'NoteStore', 'BookmarkStore', 'LinkStore', 'ReadingPlanStore', 'NotebookStore', 'JournalStore',
   'JournalNotebookStore', 'JournalIndexStore', 'JournalStatsStore', 'ReadingStreakStore', 'ReadingStatsStore',
   'GardenPosStore', 'RecentNavStore', 'HistoryStore', 'ProphecyCardsStore', 'HomeOrderStore',
   'LibraryOrderStore', 'NoteDefaultStore', 'StateStore',

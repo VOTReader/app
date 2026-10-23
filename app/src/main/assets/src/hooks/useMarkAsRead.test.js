@@ -105,3 +105,23 @@ describe('useReadProgress — audio listen bridge: Bible chapters', () => {
     expect(result.current.readItems).toEqual({});
   });
 });
+
+describe('useReadProgress — reading plans tick even with Mark as read off (mw18, call 3b)', () => {
+  it('a completed read, a manual mark and a full listen each tick the running plan; the read record stays off', async () => {
+    const { ReadingPlanStore } = await import('../stores/reading-plan-store.js');
+    const { newRun } = await import('../data/plan-engine.js');
+    localStorage.clear();
+    ReadingPlanStore._resetForTests({ forceLoaded: true });
+    const run = newRun({ plan: 'x', tracks: [
+      { kind: 'bible', by: 'count', items: [{ k: 'genesis:1', w: 600 }, { k: 'genesis:2', w: 600 }] },
+      { kind: 'letters', by: 'words', items: [{ k: 'vol-one:the-wide-path', w: 900, t: 'The Wide Path' }] },
+    ], pace: { mode: 'days', n: 3 } }, new Date());
+    ReadingPlanStore.put(run);
+    const { result } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: false }));
+    act(() => result.current.markRead('genesis', 1, { words: 600, activeMs: 120000 }));
+    act(() => result.current.markRead('genesis', 2));
+    act(() => window.__votAudioListened('one', 'the-wide-path'));
+    expect(Object.keys(ReadingPlanStore.get(run.id).ticks).sort()).toEqual(['genesis:1', 'genesis:2', 'vol-one:the-wide-path']);
+    expect(result.current.readItems).toEqual({});
+  });
+});

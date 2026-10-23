@@ -72,7 +72,7 @@
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { storesNotLoaded, registeredStores, setStoreWriteFence, isStoreWriteFenced } from '../stores/cached-store.js';
 import {
-  mergeAnnotationsStore, mergeMapStore, mergeArrayStore, mergeListStore, mergeJournalIndexStore, mergeStateStore,
+  mergeAnnotationsStore, mergeMapStore, mergeArrayStore, mergePlanStore, mergeListStore, mergeJournalIndexStore, mergeStateStore,
 } from '../stores/store-merge.js';
 import { DiagnosticLog } from './diagnostic-log.js';
 import { StorageHealth } from './storage-health.js';
@@ -663,6 +663,7 @@ export function mergeForRestore(name, live, snap, opts) {
     case 'vot-annotations': return mergeAnnotationsStore(null, live, snap);
     case 'vot-notes': return mergeMapStore(null, live, snap);
     case 'vot-links': case 'vot-bookmarks': return mergeArrayStore(null, live, snap);
+    case 'vot-reading-plans': return mergePlanStore(null, live, snap);
     case 'vot-notebooks': case 'vot-journal': case 'vot-journal-notebooks': return mergeListStore(null, live, snap);
     case 'vot-journal-index': return mergeJournalIndexStore(null, live, snap);
     case 'vot-state': {

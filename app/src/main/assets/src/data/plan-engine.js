@@ -34,7 +34,7 @@ export const WORDS_PER_MIN = 200;
  * @typedef {{ id: string, plan: string, name?: string, created?: number, updated?: number, start: string,
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
- *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string }} PlanRun
+ *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string }} PlanRun
  */
 
 // ── dates ────────────────────────────────────────────────────────────────
@@ -292,7 +292,7 @@ export function monthCells(run, year, month, now) {
     const n = first + date - 1;
     const key = dateOf(n);
     /** @type {'read' | 'missed' | 'today' | 'ahead' | 'none'} */ let state = 'none';
-    let day = null;
+    /** @type {number | null} */ let day = null;
     if (start == null || n < start) state = 'none';
     else if (n === today) state = 'today';
     else if (n < today) state = readOn.has(key) ? 'read' : (isReadingDay(run, n) && !st.finished ? 'missed' : 'none');
