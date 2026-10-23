@@ -3927,6 +3927,17 @@ async function searchWords(query, options) {
   // A title named first was found by no passage: its same-titled reprints were admitted beside it.
   if ((!out.length || !titleTop.has(out[0])) && reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))),
     idOf, (d) => allowed(d) && fresh(d)) && out.length > limit) { out.length = limit; over = true; }
+  /* HOW SURE THE MEANING IS OF A RESULT (search200 ideas F). The screen's topic card names an Answers topic only when
+     the model is sure of it: each result the model ranked carries its cosine (`meaning`), however far down the words
+     put it ("what happens when we die?" listed keyword verses first and the topics that answer it last, the hub walk
+     2026-10-22). A note on the result, read by nothing here: the order above is unchanged. */
+  if (sem && sem.length) {
+    const cos = new Map(sem.map((s) => [s.id, s.score]));
+    for (let r = 0; r < out.length; r++) {
+      const c = cos.get(idOf.get(out[r]) || '');
+      if (c !== undefined) /** @type {any} */ (out[r]).meaning = c;
+    }
+  }
 
   /* CLOSE MATCHES (sr13, 2026-10-15). Book order lists the results in reading order, and most of a passage
      search's results hold a word or two of it: "I am The Lord and I do not change" found 1,344 texts, and Book
@@ -4020,6 +4031,52 @@ async function search(query, options) {
   const lifted = new Set(lift.map((e) => docKey(e.doc)));
   const results = lift.concat(plain.results.filter((e) => !lifted.has(docKey(e.doc)))).slice(0, Math.max(plain.results.length, lift.length));
   return { ...plain, results };
+}
+
+/** Whether the index holds a word (search200 ideas G: "Try fewer words" keeps the words some text holds). */
+function knows(/** @type {string} */ word) {
+  if (!msIndex) return false;
+  const toks = kjvEncode(String(word || ''));
+  return toks.length > 0 && toks.every((t) => termExists(t));
+}
+
+/**
+ * THE NEAREST TEXTS BY MEANING ALONE (search200 ideas G). A search that found nothing ("photosynthesis" under the
+ * Scriptures) shows the texts the on-device model ranks nearest what was typed, each with its cosine (`meaning`), so
+ * the screen can show those above its floor. The words play no part: no typed word reached them. Kept to the corpus
+ * and scope the search was, one text per passage (a reprint of one shown is left out), at most `limit`. Empty while
+ * the model is not ready, or for an index another edition swapped in meanwhile.
+ * @param {string} query
+ * @param {{corpus?:string, scope?:{bookId?:string, volumeId?:string}|null, limit?:number}} [options]
+ * @returns {Promise<Array<{score:number, meaning:number, doc:any, terms:string[], placeStart?:number}>>}
+ */
+async function nearest(query, options) {
+  options = options || {};
+  const q = String(query || '').trim();
+  if (!q || !ready || !msIndex) return [];
+  const inUse = msIndex;
+  const corpusFilter = options.corpus && options.corpus !== 'all' ? options.corpus : null;
+  const scope = options.scope || null;
+  const bookId = scope && scope.bookId ? scope.bookId : null;
+  const volumeId = scope && scope.volumeId ? scope.volumeId : null;
+  const sem = await semanticDocs(q, unitId, corpusFilter || bookId || volumeId ? MEANING_FILTERED : undefined);
+  if (!sem || msIndex !== inUse) return [];
+  const limit = options.limit || 3;
+  /** @type {Array<{score:number, meaning:number, doc:any, terms:string[], placeStart?:number}>} */
+  const out = [];
+  const seen = new Set();
+  for (const s of sem) {
+    if (out.length >= limit) break;
+    const f = msIndex.getStoredFields(s.id);
+    if (!f || (corpusFilter && f.corpus !== corpusFilter) || (bookId && f.bookId !== bookId) || (volumeId && f.volumeId !== volumeId)) continue;
+    const key = String(f.text || '').slice(0, 60);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const e = { score: 0, meaning: s.score, doc: reshapeDoc(f), terms: /** @type {string[]} */ ([]) };
+    if (f.kind !== 'verse' && s.start >= 0) /** @type {any} */ (e).placeStart = s.start;
+    out.push(e);
+  }
+  return out;
 }
 
 /**
@@ -4126,6 +4183,8 @@ export const VotSearchMini = {
   rebuild,
   parse: readReference,
   search,
+  nearest,
+  knows,
   suggest,
   snippet,
   snippetAt,

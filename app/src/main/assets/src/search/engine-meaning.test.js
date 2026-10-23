@@ -298,4 +298,34 @@ describe('meaning first', () => {
     const r = (await VotSearchMini.search(QUERY, { perVolume: 1 })).results;
     expect(r.filter((e) => e.doc.volumeId === 'v1').length).toBeLessThanOrEqual(1);
   });
+
+  /* HOW SURE THE MODEL IS (search200 ideas F and G): the first results it ranked carry its cosine, for the screen's
+     topic card; and a search that found nothing can ask for the texts nearest by meaning alone. */
+  it("each of the first results the model ranked carries its cosine, and the order is the one it was", async () => {
+    said.near = { creator: 1, fields: 0.5 };
+    const r = (await VotSearchMini.search('honour the one who made you while still a child')).results;
+    const creator = r.find((e) => e.doc.letterId === 'creator');
+    expect(creator && creator.meaning).toBeCloseTo(1 / Math.sqrt(1.25), 3);
+    expect(r[0].doc.letterId).toBe('creator');
+  });
+
+  it('nearest: the texts the model ranks nearest what was typed, by meaning alone, kept to the corpus and scope', async () => {
+    said.near = { creator: 1, silver: 0.6 };
+    const n = await VotSearchMini.nearest('zqxj vlorp', { limit: 2 });
+    expect(n.map((e) => e.doc.letterId)).toEqual(['creator', 'silver']);
+    expect(n[0].meaning).toBeGreaterThan(n[1].meaning);
+    expect(n[0].placeStart).toBe(STARTS.creator);
+    expect(await VotSearchMini.nearest('zqxj vlorp', { corpus: 'scriptures' }), 'no verse in this corpus').toEqual([]);
+    said.near = { creator: 1, lamps: 0.5 };
+    expect((await VotSearchMini.nearest('zqxj vlorp', { scope: { volumeId: 'answers' }, limit: 1 })).map((e) => e.doc.letterId)).toEqual(['lamps']);
+    resetSemantic();
+    expect(await VotSearchMini.nearest('zqxj vlorp'), 'no model, no nearest').toEqual([]);
+  });
+
+  it('knows: a word some text holds', () => {
+    expect(VotSearchMini.knows('vineyard')).toBe(true);
+    expect(VotSearchMini.knows('Vineyard!')).toBe(true);
+    expect(VotSearchMini.knows('photosynthesis')).toBe(false);
+    expect(VotSearchMini.knows('')).toBe(false);
+  });
 });
