@@ -538,7 +538,8 @@ export function WebPanel(props) {
 
   /** A thread row's actions (spec 4.6: [Open] [Follow]; the row itself shows that connection). */
   const rowProps = (/** @type {any} */ r) => ({
-    onMain: () => openPanel({ mode: 'connection', arc: r.index }),
+    // a row's card keeps the way back to this one ("Back to ..."): it is no step of the trail
+    onMain: () => openPanel({ mode: 'connection', arc: r.index }, { back: true }),
     mainLabel: r.other.label + ', ' + plural(r.votes, 'vote', 'votes') + ': show this connection',
     onOpen: () => onOpen(verseEndpoint(r.other)), openLabel: 'Open ' + r.other.label + ' in the reader',
     onFollow: () => followRow(r), followLabel: 'Follow the line from ' + r.here.label + ' to ' + r.other.label,
@@ -740,10 +741,14 @@ export function WebPanel(props) {
     : parent.kind === 'arc' ? connectionTitle(parent) : sheetEyebrow(parent)) : '';
   // the Follow trail (use-journey.js: the navigation stream keeps it): "Gen 3:15 › Isa 7:14 › Matt 1:23"
   const stack = journey && Array.isArray(journey.stack) ? journey.stack : [];
-  const crumbs = mode === 'connection' && stack.length >= 2 ? stack : null;
+  // shown while the card is the trail's own: a card opened from a row has its Back link instead (the
+  // dead-control hunt, 2026-10-22: the trail named the card before it "here" and its Back skipped it)
+  const crumbs = mode === 'connection' && stack.length >= 2 && !parent ? stack : null;
   // Back is the journey's alone: back() flies home and reopens what was open there on landing
   // (use-journey.js); a fly of the panel's own after it took that fly over, so nothing reopened
   const back = () => { if (journey && typeof journey.back === 'function') journey.back(); };
+  /** A crumb back along the trail: one Back a step, as many as it is from the top. @param {number} i */
+  const backTo = (i) => { if (crumbs) for (let k = crumbs.length - 1; k > i; k--) back(); };
   // the CC-BY credit, in My Web too (w4 integration): its legend ends on it, and while a panel is
   // open the legend hides, so this is where it stays on screen on PC (the hub's licence call)
   const credit = g.attribution ? <div className="sw-panel-credit">{g.attribution}</div> : null;
@@ -769,7 +774,9 @@ export function WebPanel(props) {
             <ol>
               {crumbs.map((c, i) => (
                 <li key={i} className={i === crumbs.length - 1 ? 'is-here' : undefined} aria-current={i === crumbs.length - 1 ? 'location' : undefined}>
-                  {crumbText(g, c)}
+                  {i === crumbs.length - 1 ? crumbText(g, c) : (
+                    <button type="button" className="sw-crumb" onClick={() => backTo(i)}>{crumbText(g, c)}</button>
+                  )}
                 </li>
               ))}
             </ol>

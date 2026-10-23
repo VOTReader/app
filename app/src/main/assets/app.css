@@ -8927,6 +8927,14 @@
     .sw-crumbs ol { display: flex; flex-wrap: wrap; gap: 0 6px; list-style: none; margin: 0; padding: 0; }
     .sw-crumbs li + li::before { content: '\203A'; margin-right: 6px; color: var(--sw-text-muted); }
     .sw-crumbs li.is-here { color: var(--sw-text); }
+    /* a step back along the trail: the words, tappable, with a 44 px hit like the trail's Back */
+    .sw-crumb {
+      position: relative; padding: 0; background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer;
+      text-decoration: underline; text-decoration-color: var(--sw-hairline); text-underline-offset: 3px;
+    }
+    .sw-crumb::after { content: ''; position: absolute; left: -3px; right: -3px; top: -12px; bottom: -12px; }
+    .sw-crumb:hover { color: var(--sw-text); text-decoration-color: currentColor; }
+    .sw-crumb:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; border-radius: 3px; }
     .sw-crumbs-back {
       flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
       background: none; border: 0; color: var(--sw-text-meta); cursor: pointer;

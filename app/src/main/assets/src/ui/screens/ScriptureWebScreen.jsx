@@ -297,6 +297,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // area they collapse to the go-to and a "more" menu (spec section 3)
   const panelOpen = listOpen || !!choices || !!detail;
   usePanelInset({ layout, open: panelOpen, panelInsetRef, wrapRef, schedule, onShrink: settleInset });
+  // the first visit's how-to-read card gives way to the first card the reader opens (the dead-control
+  // hunt, 2026-10-22: it lay over a verse card opened from Go to, and the tap meant for "Open in
+  // reader" closed the card); ? still opens it over a card already open
+  const panelWas = React.useRef(panelOpen);
+  React.useEffect(() => {
+    if (panelOpen && !panelWas.current && guideOpen) closeGuide();
+    panelWas.current = panelOpen;
+  }, [panelOpen, guideOpen, closeGuide]);
   const collapse = collapsedFor(layout, panelOpen);
   // too narrow beside a docked panel for the header and the strip side by side: the strip drops (w4)
   const stack = stackedFor(layout, panelOpen);

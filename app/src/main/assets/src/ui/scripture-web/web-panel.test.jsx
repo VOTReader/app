@@ -405,6 +405,25 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     // would take that one over (integration, w3)
     expect(props.flyTo).not.toHaveBeenCalled();
   });
+
+  // the dead-control hunt, 2026-10-22: "Whole web" looked tappable and did nothing
+  it('a step back along the trail is a button: it goes back as many steps as it is from the top', () => {
+    const back = vi.fn(() => null);
+    const journey = { stack: [{ verse: 1, label: 'Genesis 1:2' }, { verse: ISA_7_14, label: 'Isaiah 7:14' }, { verse: g.to[ARC], label: 'Matthew 1:23' }], push() {}, clear() {}, back };
+    const { panel } = mount({ detail: detail(), journey });
+    const steps = [...panel.querySelectorAll('.sw-crumbs .sw-crumb')];
+    expect(steps.map((b) => b.textContent)).toEqual(['Gen 1:2', 'Isa 7:14']);
+    expect(panel.querySelector('.sw-crumbs li.is-here .sw-crumb'), 'where the reader is is no button').toBeNull();
+    fireEvent.click(steps[0]);
+    expect(back).toHaveBeenCalledTimes(2);
+  });
+
+  it('a card opened from another card shows its Back link, not the trail', () => {
+    const journey = { stack: [{ verse: ISA_7_14, label: 'Isaiah 7:14' }, { verse: g.to[ARC], label: 'Matthew 1:23' }], push() {}, clear() {}, back() { return null; } };
+    const { panel } = mount({ detail: Object.assign(detail(), { parent: found({ kind: 'verse', verse: ISA_7_14 }) }), journey });
+    expect(panel.querySelector('.sw-crumbs')).toBeNull();
+    expect(panel.querySelector('.sw-back-link').textContent).toMatch(/Back to Isaiah 7:14/);
+  });
 });
 
 describe('verse mode: John 3:16', () => {
@@ -458,7 +477,8 @@ describe('verse mode: John 3:16', () => {
     const { panel, props } = mount({ detail: detail() });
     expect(panel.querySelector('.sw-group .sw-row-tag').textContent).toMatch(/^\d+ votes?$/);
     fireEvent.click(panel.querySelector('.sw-group .sw-row-main'));
-    expect(props.openPanel).toHaveBeenCalledWith({ mode: 'connection', arc: expect.any(Number) });
+    // the row's card keeps the way back to this one (the dead-control hunt, 2026-10-22)
+    expect(props.openPanel).toHaveBeenCalledWith({ mode: 'connection', arc: expect.any(Number) }, { back: true });
   });
 });
 
