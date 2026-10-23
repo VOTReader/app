@@ -323,7 +323,8 @@ export function useWebSelection({
       }
       return [{ kind: 'chapter', chapterIndex: ci }];
     }
-    return pickThreads(g, cam, view, px, py, 14 * v.DPR, CHOOSER_MOST)
+    // one past the chooser's most, so the tap can tell eight threads from the nearest eight of more (s27.3)
+    return pickThreads(g, cam, view, px, py, 14 * v.DPR, CHOOSER_MOST + 1)
       .map((hit) => ({ kind: 'arc', hit, distance: hit.distance }));
   }, [graph, camRef, viewRef, viewFor, mode, railOpts, showUnderlay, badgeBoxesRef, personalRef]);
 
@@ -633,6 +634,15 @@ export function useWebSelection({
     schedule();
   }, [focusRef, schedule]);
 
+  /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
+   * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so
+   * the shader held every other thread at 5 % ink until Escape or Back (sw1 B1, 2026-10-05). */
+  const closeCards = React.useCallback(() => {
+    setListOpen(false); setChoices(null); setDetail(null); setTip(null);
+    focusRef.current = focusState();
+    schedule();
+  }, [focusRef, schedule]);
+
   const tap = React.useCallback((cx, cy) => {
     // the elevator (landing 9): a tap on the track sets the camera's height -
     // the top of the track is the tallest apex, the bottom the baseline
@@ -649,7 +659,7 @@ export function useWebSelection({
         hit: { index: i, from: graph.from[i], to: graph.to[i], votes: graph.votes ? graph.votes[i] : 0 } });
       if (found) { commitFound(found); return; }
     }
-    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey, insetFor })) {
+    if (overlayHit && routeOverlayHit(overlayHit, { graph, flyTo, openPanel, journey, insetFor, closePanel: closeCards })) {
       // a pill's tap opens its group as it always has; with a cell it keeps its column's fan up
       // while that card is open (the phone's way to the fan): closing it, the empty-space clear and
       // any other card let it go (focusState), a fan chip's card asks the same cell
@@ -659,7 +669,8 @@ export function useWebSelection({
       }
       return;
     }
-    const candidates = hitCandidatesAt(cx, cy);
+    const reached = hitCandidatesAt(cx, cy);
+    const candidates = reached.slice(0, CHOOSER_MOST);
     const described = candidates.map(describe).filter(Boolean);
     if (!described.length) {
       focusRef.current = focusState();
@@ -669,7 +680,8 @@ export function useWebSelection({
     if (closeEnough && described.length > 1 && described.every((item) => item.kind === 'arc' ||
         item.kind === 'link' || item.kind === 'underlay')) {
       setChoices(described);
-      setChoiceCut(candidates.length >= CHOOSER_MOST);
+      // the nearest of more only when the pick found more than it lists (s27.3: eight read as cut)
+      setChoiceCut(reached.length > candidates.length);
       // its "Zoom to": the chapter under the tap only where the listed threads stand (chooserChapter)
       const v = viewRef.current, dpr = v.DPR || 1, cam = camRef.current;
       const base = viewFor().base + (cam.y > 0 ? cam.y : 0); // the baseline as drawn (pickArcs)
@@ -687,7 +699,7 @@ export function useWebSelection({
     }
     commitFound(described[0]);
   }, [liftAt, hitCandidatesAt, describe, viewRef, commitFound, schedule, focusRef, dropHover, setAnnounce,
-    overlayFrameRef, graph, flyTo, openPanel, journey, camRef, viewFor, insetFor]);
+    overlayFrameRef, graph, flyTo, openPanel, journey, camRef, viewFor, insetFor, closeCards]);
 
   /** Zoom in 2.5x about the tap (A4, the navigation stream): to where zoomAbout puts the camera,
    * eased through flyTo about the same point (instant under reduced motion). */
@@ -722,15 +734,6 @@ export function useWebSelection({
     if (dropHover() || had) schedule();
   }, [focusRef, dropHover, schedule]);
   React.useEffect(() => { handlersRef.current = { hover, tap, doubleTap, leave, snapshot }; }, [hover, tap, doubleTap, leave, snapshot]);
-
-  /** Close the cards (the chooser, the Nearby list, the connection sheet) and let go of the chosen
-   * line. Every close goes through here: the sheet's x once cleared the card but kept focusRef, so
-   * the shader held every other thread at 5 % ink until Escape or Back (sw1 B1, 2026-10-05). */
-  const closeCards = React.useCallback(() => {
-    setListOpen(false); setChoices(null); setDetail(null); setTip(null);
-    focusRef.current = focusState();
-    schedule();
-  }, [focusRef, schedule]);
 
   // Timothy's notes turned off: a card or a chooser on one of their threads closes, and a hover on
   // one lets go, as the thread is no longer drawn (w4: the card and the focus stayed on a hidden

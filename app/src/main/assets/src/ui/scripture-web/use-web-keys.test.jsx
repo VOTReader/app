@@ -193,3 +193,28 @@ describe('the keys clamp with the panel\'s slack', () => {
     expect((31102 - cam.x) * cam.ppv + 3200 / 2).toBeCloseTo(3200, 6);
   });
 });
+
+/* s26.2 (idea sweep 2026-10-22): Ctrl+= / Ctrl+- / Ctrl+0 zoomed and reset the web, and Alt+Left
+   panned it, so the browser's own page zoom and Back never ran. A key held with Ctrl, Cmd or Alt is
+   the browser's; the plain keys are the web's as before. */
+describe("the browser's own chords pass through", () => {
+  it('Ctrl+=, Ctrl+-, Ctrl+0, Cmd+= and Alt+Left move nothing and are not taken', () => {
+    const cam = { x: 15000, ppv: 2, total: 31102, y: 0 };
+    const { keys, p } = mountKeys({ camRef: { current: cam }, viewRef: { current: { W: 3200, H: 1800, DPR: 2 } } });
+    /** @type {Array<[string, Record<string, boolean>]>} */
+    const chords = [['=', { ctrlKey: true }], ['-', { ctrlKey: true }], ['0', { ctrlKey: true }],
+      ['=', { metaKey: true }], ['ArrowLeft', { altKey: true }]];
+    for (const [key, mods] of chords) {
+      const e = rootKey(key, mods);
+      keys().onKeyDown(e);
+      expect(e.preventDefault, key).not.toHaveBeenCalled();
+    }
+    expect(cam).toEqual({ x: 15000, ppv: 2, total: 31102, y: 0 });
+    expect(p.resetView).not.toHaveBeenCalled();
+    // the plain keys still drive the web
+    const plain = rootKey('=');
+    keys().onKeyDown(plain);
+    expect(plain.preventDefault).toHaveBeenCalled();
+    expect(cam.ppv).toBeGreaterThan(2);
+  });
+});

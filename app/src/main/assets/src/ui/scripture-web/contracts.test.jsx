@@ -883,6 +883,10 @@ describe("the chooser's Zoom to, from a tap", () => {
     const six = tapAt(fan(6), 400, ys).m.get().sel;
     expect(six.choices).toHaveLength(6);
     expect(six.choiceCut).toBe(false);
+    // s27.3: exactly CHOOSER_MOST is all of them, not "the nearest" of more
+    const eight = tapAt(fan(8), 400, ys).m.get().sel;
+    expect(eight.choices).toHaveLength(8);
+    expect(eight.choiceCut).toBe(false);
     const ten = tapAt(fan(10), 400, ys).m.get().sel;
     expect(CHOOSER_MOST).toBe(8);
     expect(ten.choices).toHaveLength(CHOOSER_MOST);
@@ -970,7 +974,9 @@ describe('the overlay\'s tap targets (CONTRACTS.md section 4)', () => {
     const c = get().cam.camRef.current;
     expect(verseToX(c, 800, 0)).toBeCloseTo(0, 6);
     expect(verseToX(c, 800, TOTAL)).toBeCloseTo(800, 6);
-    expect(get().sel.detail, "the open line stays: the tap was the name's").toMatchObject({ kind: 'arc', index: 1 });
+    // the name's tap closes what was open, as the go-to's book does (s24.4; it once left the line
+    // docked over the book); the framed canon above is what shows the tap was the name's
+    expect(get().sel.detail, "the name's tap closes the open line").toBeNull();
     expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis']);
   });
 });

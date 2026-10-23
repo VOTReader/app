@@ -1595,8 +1595,11 @@ function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha) {
     ctx.rotate(b.ang);
     haloText(ctx, p.cand.text, 0, -fpx * 0.08, fill, L);
     ctx.restore();
+    // TAP_MIN each way about the tag's centre (s25.2: a line of type plus 4 px a side was some 20 px
+    // tall); the core still wins where two targets overlap (hitOverlay)
     const cx = (b.x0 + b.x1) / 2, half = Math.max((b.x1 - b.x0) / 2, (TAP_MIN * s) / 2);
-    hits.push({ x0: cx - half, x1: cx + half, y0: b.y0 - 4 * s, y1: b.y1 + 4 * s, core: { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 },
+    const cy = (b.y0 + b.y1) / 2, halfY = Math.max((b.y1 - b.y0) / 2 + 4 * s, (TAP_MIN * s) / 2);
+    hits.push({ x0: cx - half, x1: cx + half, y0: cy - halfY, y1: cy + halfY, core: { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 },
       hit: { kind: 'thread', index: p.cand.i } });
   }
   ctx.restore();

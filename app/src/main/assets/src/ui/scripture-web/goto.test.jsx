@@ -51,22 +51,26 @@ const graph = () => ({
 
 /**
  * The web, as the screen wires it; `api.current` is every hook's latest answer.
- * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any, sheet?: boolean, insetFor?: Function }} [opts]
+ * @param {{ start?: any, cam?: { x: number, ppv: number }, keys?: boolean, frame?: { W: number, H: number, DPR: number }, web?: any, sheet?: boolean, insetFor?: Function, density?: { current: import('../../utils/scripture-web/decode.js').Density } }} [opts]
  *   keys: the root's onKeyDown is the web's own (use-web-keys.js), not a spy; frame: the canvas in
  *   device px (default an 800x600 PC frame); web: the graph (default graph()); sheet: the panel's
  *   own docked panel (web-panel.jsx) renders for what is open, as the screen renders it (its focus
  *   hand-back with it); insetFor: what the panel will cover once open, CSS px (the screen's
- *   usePanelLayout), given to the selection and the go-to as the screen gives it
+ *   usePanelLayout), given to the selection and the go-to as the screen gives it; density: the
+ *   density box ({ current }) the web reads at each render (default Famous), changed then redrawn
+ *   with the returned redraw()
  */
-function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web, sheet = false, insetFor } = {}) {
+function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W: 800, H: 600, DPR: 1 }, web, sheet = false, insetFor,
+  density: densityBox = { current: 'famous' } } = {}) {
   const g = web || graph();
   const api = { current: /** @type {any} */ (null) };
   const setAnnounce = vi.fn();
   const rootKeys = vi.fn();
   function Web() {
+    const density = densityBox.current;
     const frames = useFrameScheduler();
     const modeRef = React.useRef('canonical');
-    const camera = useWebCamera({ graph: g, density: 'famous', modeRef, schedule: frames.schedule, animate: frames.animate });
+    const camera = useWebCamera({ graph: g, density, modeRef, schedule: frames.schedule, animate: frames.animate });
     if (!camera.camRef.current) {
       camera.viewRef.current = { ...frame };
       camera.camRef.current = { x: cam.x, ppv: cam.ppv, total: TOTAL, y: 0 };
@@ -81,13 +85,13 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
     const railOpts = React.useCallback(() => ({}), []);
     const keepOutRef = React.useRef(null);
     const sel = useWebSelection({
-      graph: g, mode: 'canonical', density: 'famous', showUnderlay: false, resumeRef,
+      graph: g, mode: 'canonical', density, showUnderlay: false, resumeRef,
       camRef: camera.camRef, viewRef: camera.viewRef, focusRef: camera.focusRef, viewFor: camera.viewFor, yFrameFor: camera.yFrameFor,
       personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo: camera.flyTo, journey, schedule: frames.schedule, setAnnounce,
       insetFor,
     });
     const goTo = useGoTo({ graph: g, flyTo: camera.flyTo, openPanel: sel.openPanel, journey, lightThreads: sel.lightThreads, setAnnounce, start, insetFor,
-      closePanel: sel.closeCards, panel: sel.panel, density: 'famous', mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
+      closePanel: sel.closeCards, panel: sel.panel, density, mode: 'canonical', camRef: camera.camRef, viewRef: camera.viewRef,
       focusRef: camera.focusRef, panelInsetRef: camera.panelInsetRef, viewFor: camera.viewFor, onFrame: frames.onFrame, rootRef,
       keepOutRef, schedule: frames.schedule });
     const none = React.useRef(null);
@@ -113,7 +117,8 @@ function mountWeb({ start, cam = { x: 15551, ppv: 8 }, keys = false, frame = { W
     );
   }
   const view = render(<Web />);
-  return { ...view, g, api, setAnnounce, rootKeys, get: () => api.current };
+  const redraw = () => act(() => { view.rerender(<Web />); });
+  return { ...view, g, api, setAnnounce, rootKeys, redraw, get: () => api.current };
 }
 
 const box = (c) => c.querySelector('.sw-goto');
@@ -825,6 +830,20 @@ describe('the keys\' halves (G2): Enter or Space, and [ ]', () => {
     expect(step(1)).toBe(2);
     expect(step(-1)).toBe(0);
   });
+  // s24.5: the list was kept per verse whatever the density, so after a change [ and ] walked the
+  // old density's lines (here thread 2, which Essential does not draw)
+  it('[ and ] list the verse again when the density changes', () => {
+    const density = /** @type {{ current: any }} */ ({ current: 'famous' });
+    const web = { ...graph(), buckets: [{ off: 0, len: 3, off20: 1, off10: 3, segments: 8, chunks: [[100, 20100]] }] };
+    const { get, redraw } = mountWeb({ cam: { x: 100, ppv: 8 }, web, density });
+    act(() => { get().sel.openPanel({ mode: 'verse', verse: 100 }); });
+    const step = (d) => { act(() => { get().goTo.step(d); }); return get().sel.detail.index; };
+    expect(step(1)).toBe(2);
+    expect(step(1)).toBe(0);
+    density.current = 'essential';
+    redraw();
+    expect(step(1), 'Essential holds thread 0 alone at verse 100').toBe(0);
+  });
 });
 
 describe("through the web's own keys (use-web-keys.js)", () => {
@@ -997,6 +1016,20 @@ describe('routeOverlayHit (CONTRACTS.md section 4): what a tap on a drawn name d
     expect(Array.from(get().sel.detail.ids)).toEqual([1, 2]);
     expect(get().cam.camRef.current, 'no camera move').toEqual(cam);
     expect(get().journey.stack.length, 'no journey step').toBe(0);
+  });
+
+  // s24.4: the go-to's book closed what was open (w4), a tap on the drawn name left it docked
+  it('a book name closes the panel that was open and frames the book in the whole canvas', () => {
+    const { get } = mountWeb({ cam: { x: 9000, ppv: 8 } });
+    act(() => { get().sel.openPanel({ mode: 'group', chapter: 0 }); });
+    expect(get().sel.detail).toBeTruthy();
+    const flyTo = vi.fn();
+    const nav = { graph: graph(), flyTo, openPanel: get().sel.openPanel, journey: get().journey,
+      insetFor: () => ({ right: 300, bottom: 0 }), closePanel: get().sel.closeCards };
+    act(() => { expect(routeOverlayHit({ kind: 'book', book: 0 }, nav)).toBe(true); });
+    expect(get().sel.detail).toBeNull();
+    expect(flyTo.mock.calls[0][1]).toEqual({ insetRight: 0, insetBottom: 0 });
+    expect(get().journey.stack.at(-1)).toMatchObject({ label: 'Genesis', open: null });
   });
 
   it('nothing it can route: no graph, an unknown chapter, an unknown kind', () => {

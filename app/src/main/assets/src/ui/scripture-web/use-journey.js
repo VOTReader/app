@@ -20,8 +20,8 @@
              reader set out from: it seeds an empty trail, so the first Follow
              already has somewhere to come back to; left out, the trail asks
              the go-to where the reader is (connect's here). An entry with no
-             `open` (a book name's: the tap opens nothing) records what is open
-             at the push, the same way, so Back puts the panel back as it was
+             `open` (undefined; a book name's is null since s24.4, as it closes
+             the panel) records what is open at the push, the same way, so Back puts the panel back as it was
              there instead of leaving a later step's panel up. An arrival at the place
              one step back is a walk back (Follow on the same line, end to
              end): it steps back instead of growing the trail. The same place

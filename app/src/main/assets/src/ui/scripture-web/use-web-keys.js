@@ -113,6 +113,9 @@ export function useWebKeys({
       if (e.key === '[' || e.key === ']') { e.preventDefault(); goTo.step(e.key === ']' ? 1 : -1); return; }
       if (e.key === 'Backspace' && goTo.back) { e.preventDefault(); goTo.back(); return; }
     }
+    // a key held with Ctrl, Cmd or Alt is the browser's: Ctrl+= / Ctrl+- / Ctrl+0 zoom the page and
+    // Alt+Left goes back (s26.2: the web took them as its own zoom, reset and pan)
+    if (e.key !== 'Escape' && (e.ctrlKey || e.metaKey || e.altKey)) return;
     const v = viewRef.current;
     // r2: the keys drive the rail the pointer last touched (the Bible rail
     // until a gesture says otherwise); Reset (0) resets both
