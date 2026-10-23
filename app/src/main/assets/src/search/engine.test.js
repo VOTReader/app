@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { VotSearchMini } from './engine.js';
+import { VotSearchMini, dedupKey } from './engine.js';
 
 // ── Fixture corpus (window globals + VotSearchData), installed for the suite ──
 const VOT_DATA = {
@@ -404,5 +404,20 @@ describe('search-2 — a bare book name gets its card AND the text hits', () => 
     expect(r.parsed.kind).toBe('ref-bible');
     expect(r.parsed.chapter).toBe(1);
     expect(r.results).toEqual([]);
+  });
+});
+
+/* search200 bugcheck #5: the dedup key read a text's kind, place and first 60 characters, so two Answers topics that
+   open with the same dated header were one result and the second never showed. */
+describe('dedupKey', () => {
+  const HEAD = '2/15/07 From The Lord, Our God and Savior The Word of The Lord';
+  it('two units opening alike are two results', () => {
+    const a = { kind: 'answers', ref: 'Answers Only God Can Give', letterId: 'regarding-forgiveness', text: HEAD + ' ... forgiveness' };
+    const b = { kind: 'answers', ref: 'Answers Only God Can Give', letterId: 'regarding-sin', text: HEAD + ' ... sin' };
+    expect(dedupKey(a)).not.toBe(dedupKey(b));
+  });
+  it('one verse twice is still one result', () => {
+    const v = { kind: 'verse', ref: 'Matthew 1:2', text: 'Abraham begot Isaac, Isaac begot Jacob, and Jacob begot Judah and his brothers.' };
+    expect(dedupKey({ ...v, letterId: 'a' })).toBe(dedupKey({ ...v }));
   });
 });

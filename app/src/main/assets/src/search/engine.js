@@ -3450,9 +3450,9 @@ async function searchWords(query, options) {
   const allowed = (/** @type {any} */ d) => inScope(d) && holdsWords(d);
   /** A text not shown yet, marked shown (the dedup). */
   const fresh = (/** @type {any} */ d) => {
-    const dedupKey = d.kind + '|' + (d.ref || '') + '|' + (d.text || '').slice(0, 60);
-    if (seen[dedupKey]) return false;
-    seen[dedupKey] = true;
+    const key = dedupKey(d);
+    if (seen[key]) return false;
+    seen[key] = true;
     return true;
   };
 
@@ -4103,6 +4103,17 @@ function getState() {
 
 function getStats() {
   return Object.assign({}, stats);
+}
+
+/**
+ * The key a result is shown once by: one text in one place. Its unit is in it (search200 bugcheck #5): five pairs
+ * of Answers topics open with the same dated header, so the 60 characters a key read alone hid one topic of each
+ * pair ("Regarding Sin" under "Regarding Forgiveness"). A verse has no unit: the same verse twice still folds.
+ * @param {any} d
+ * @returns {string}
+ */
+export function dedupKey(d) {
+  return d.kind + '|' + (d.ref || '') + '|' + (d.kind === 'verse' ? '' : d.letterId || '') + '|' + (d.text || '').slice(0, 60);
 }
 
 export const VotSearchMini = {
