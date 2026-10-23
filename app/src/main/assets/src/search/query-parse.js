@@ -39,6 +39,9 @@ export function parseTextQuery(q) {
   const mustNot = [];
   let phrase = null;
   const parts = q.match(/"[^"]+"|\S+/g) || [];
+  /* Only NOT, OR and AND typed in capitals are glue (search200 bugcheck #3): "fear not", "judge not" and "love not
+     the world" lost their "not". A query typed all in capitals ("FEAR NOT") has no capitals to tell them by: words. */
+  const glue = q !== q.toUpperCase();
   for (let i = 0; i < parts.length; i++) {
     const p = parts[i];
     // The first quoted phrase is THE phrase; a later one replaced it (sweep low, REPORT.md:646) and is a run the
@@ -52,8 +55,7 @@ export function parseTextQuery(q) {
     }
     if (p.charAt(0) === '-' && p.length > 1) { mustNot.push(p.slice(1).toLowerCase()); continue; }
     if (p.charAt(0) === '+' && p.length > 1) { must.push(p.slice(1).toLowerCase()); continue; }
-    const up = p.toUpperCase();
-    if (up === 'NOT' || up === 'OR' || up === 'AND') continue; // boolean glue — eaten
+    if (glue && (p === 'NOT' || p === 'OR' || p === 'AND')) continue; // boolean glue — eaten
     terms.push(p.toLowerCase());
   }
   return { kind: 'text', phrase, cleanQuery: q.toLowerCase(), must, mustNot, terms };

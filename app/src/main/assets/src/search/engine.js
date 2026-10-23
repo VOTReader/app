@@ -2604,7 +2604,7 @@ async function searchWords(query, options) {
   /* ...but SMALL_RUN_MIN small words or more, unquoted, are a run of words (search200 B3): "and it was so" found
      nothing unless quoted. They are searched as the run, as if quoted (every text shown holds it), and the card marks
      the run; a run no text holds is the small words alone, as before. */
-  // (the words as typed: the parse eats "and", "or" and "not" as operators)
+  // (the words as typed: the parse eats "AND", "OR" and "NOT" typed in capitals as operators)
   const smallRun = useStop && !quotedRun && !p.phrase && !options._unquoted && !p.must.length && !p.mustNot.length &&
     terms.length && terms.every(isStopTerm) && kjvEncode(textQ).length >= SMALL_RUN_MIN ? String(textQ).trim() : '';
   const stopOnly = { parsed, results: [], parsedTerms: [], textQuery: null, stopWordsOnly: true };

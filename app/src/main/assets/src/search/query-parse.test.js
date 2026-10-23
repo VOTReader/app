@@ -47,3 +47,20 @@ describe('parseTextQuery', () => {
     expect(r.cleanQuery).toBe('love one another');
   });
 });
+
+/* search200 bugcheck #3: "fear not", "judge not", "love not the world" lost their "not" (the parse ate any case of
+   NOT/OR/AND as boolean glue). Only the operators typed in capitals are glue; a query typed all in capitals keeps them. */
+describe('parseTextQuery: lower-case not/or/and are words', () => {
+  it('keeps "not", "or" and "and" typed in lower case', () => {
+    expect(parseTextQuery('fear not').terms).toEqual(['fear', 'not']);
+    expect(parseTextQuery('love not the world').terms).toEqual(['love', 'not', 'the', 'world']);
+    expect(parseTextQuery('judge Not').terms).toEqual(['judge', 'not']);
+  });
+  it('still eats NOT, OR and AND typed in capitals beside other words', () => {
+    expect(parseTextQuery('mercy AND grace').terms).toEqual(['mercy', 'grace']);
+    expect(parseTextQuery('faith OR works').terms).toEqual(['faith', 'works']);
+  });
+  it('a query typed all in capitals keeps them as words', () => {
+    expect(parseTextQuery('FEAR NOT').terms).toEqual(['fear', 'not']);
+  });
+});
