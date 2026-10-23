@@ -8,6 +8,15 @@ import { render, screen, fireEvent, cleanup, act } from '@testing-library/react'
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { LiveLine, liveLineAt, rowWords } from './LiveLine.jsx';
 
+// The KJV's words for the Bible card's tests; any other edition or verse answers the NKJV base it is handed.
+const { KJV } = vi.hoisted(() => ({ KJV: { 'john|1|1': 'In the beginning was the Word,', 'john|1|2': 'The same was in the beginning with God.' } }));
+vi.mock('../../data/translations.js', () => ({
+  translateVerse: (bookId, ch, v, tr) => (tr === 'kjv' ? KJV[bookId + '|' + ch + '|' + v.n] : null) || v.text,
+  loadTranslation: () => Promise.resolve(),
+  holdTranslation: () => () => {},
+  isTranslationLoaded: () => true,
+}));
+
 class FakeAudio extends EventTarget {
   constructor() {
     super();
@@ -137,5 +146,43 @@ describe('LiveLine', () => {
     playLetter();
     const { container } = render(<LiveLine track={current()} time={0.5} title="" onOpen={null} />);
     expect(container.innerHTML).toBe('');
+  });
+});
+
+/* pl-l2b: a Bible chapter's card reads the verse under the clock, whole, from the verse onsets of the edition the
+   recording is, in that edition's words (the NKJV base where it is not loaded), its number dim before it. */
+describe('liveLineAt — a Bible chapter', () => {
+  beforeEach(() => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:john': [['brm2_john_001', '', 'Chapter 1'], ['brm2_john_002', '', 'Chapter 2']] };
+    globalThis.BIBLE_AUDIO_BOOKS = [['john', 'John']];
+    globalThis.BIBLE_SYNC_BRM_KJV = { john: { 1: [500, 1200, 0] } };   // verse 3 not proven
+    globalThis.resolveVerseText = ({ bookId, chapter, verse }) => 'NKJV ' + bookId + ' ' + chapter + ':' + verse;
+  });
+  afterEach(() => {
+    for (const k of ['BIBLE_AUDIO_MANIFEST', 'BIBLE_AUDIO_BOOKS', 'BIBLE_SYNC_BRM_KJV', 'resolveVerseText']) delete globalThis[k];
+  });
+  const playJohn = (n) => act(() => { AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'john', label: 'KJV', chapterNum: n }); });
+
+  it('is the verse being read, in the edition playing, its number as the lead', () => {
+    playJohn(1);
+    expect(liveLineAt(current(), 3)).toBeNull();                       // before verse 1 (the chapter heading)
+    expect(liveLineAt(current(), 6)).toEqual({ lead: '1', now: 'In the beginning was the Word,', key: 'bible-brm-kjv:john' });
+    expect(liveLineAt(current(), 20).now).toBe('The same was in the beginning with God.');   // verse 3 unproven: 2 holds
+  });
+
+  it('is nothing for a chapter with no timings, or before they load', () => {
+    playJohn(2);
+    expect(liveLineAt(current(), 6)).toBeNull();
+    delete globalThis.BIBLE_SYNC_BRM_KJV;
+    playJohn(1);
+    expect(liveLineAt(current(), 6)).toBeNull();
+  });
+
+  it('shows the verse on the card', () => {
+    playJohn(1);
+    act(() => tick(13));
+    render(<LiveLine track={current()} time={13} title="John 1" onOpen={() => {}} />);
+    expect(document.querySelector('.np-live-lead').textContent).toBe('2 ');
+    expect(document.querySelector('.np-live-now').textContent).toBe('The same was in the beginning with God.');
   });
 });

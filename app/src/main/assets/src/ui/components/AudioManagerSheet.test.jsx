@@ -1030,6 +1030,8 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     startGenesis2();
     openSheet();
 
+    // Counted in the book, not the queue that starts at the chapter picked (pl-l2b).
+    expect(document.querySelector('.np-kicker-at').textContent).toBe('Chapter 2 of 3');
     expect(voiceChip().getAttribute('aria-label')).toBe('Edition: KJV · BRM. Choose another');
     expect(voiceChip().textContent).toContain('KJV · BRM');
     openVoice();
@@ -1469,9 +1471,9 @@ describe('AudioManagerSheet — Bible rows name their chapter (A4)', () => {
     openSheet();
 
     expect(screen.getByRole('heading', { name: 'Psalms 117' })).toBeTruthy();
-    // Counted in chapters, and the byline does not repeat "Chapter 117" under a
+    // Counted in the book's chapters (pl-l2b; the queue's count read 'Chapter 1 of 34' over Psalms 117), and the byline does not repeat "Chapter 117" under a
     // title that already says 117 (2026-08-10, the title-unique rule).
-    expect(kicker()).toBe('KJV · Biblical Restoration Ministries · Chapter 1 of 34');
+    expect(kicker()).toBe('KJV · Biblical Restoration Ministries · Chapter 117 of 150');
     expect(byline()).toBeNull();
     // 150 rows that all read "Psalms" told the listener nothing about which one they were hearing.
     openUpNext();

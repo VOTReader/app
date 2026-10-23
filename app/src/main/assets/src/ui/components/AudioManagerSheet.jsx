@@ -325,8 +325,12 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const entry = live && marks ? marks.findIndex((m) => m.key === live.key) : -1;
   const heading = liveTitle || current.title;
   // Counted in recordings, as the bar and the collection screens count them (queuePlace).
-  const counted = queuePlace(queue, state.qi);
-  const kickerAt = songId || restoring || single || counted.of < 2 ? '' : placeNoun(current) + ' ' + counted.at + ' of ' + counted.of;
+  // A Bible chapter counts in its book ("Chapter 3 of 21" over John 3): a book plays from the chapter picked, so the
+  // queue's own count read "Chapter 1 of 19" there.
+  const bibleCh = AudioPlayer.bibleChapterOfTrack(current);
+  const bibleParts = bibleCh > 0 ? ((/** @type {any} */ (globalThis).BIBLE_AUDIO_MANIFEST || {})[current.key] || []) : [];
+  const counted = bibleParts.length >= bibleCh && bibleCh > 0 ? { at: bibleCh, of: bibleParts.length } : queuePlace(queue, state.qi);
+  const kickerAt = songId || restoring || (single && !bibleCh) || counted.of < 2 ? '' : placeNoun(current) + ' ' + counted.at + ' of ' + counted.of;
   const kickerFrom = songId ? (current.sub || 'Songs of the Letters') : (current.sub || (kickerAt ? '' : 'The Volumes of Truth'));
   // Suppressed when it would only echo the title: a per-chapter Bible track is titled "Genesis 2" and labelled
   // "Chapter 2" (2026-08-10). The label itself is untouched; see displayPartLabel.

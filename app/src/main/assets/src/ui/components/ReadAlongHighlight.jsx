@@ -301,8 +301,8 @@ function _syncFor(key, track, chapter, paintVolKey, sectionKey) {
 /**
  * The rows the wash would paint for a letter or a compilation track, cut to the part playing: the full player's
  * "Now reading" card (LiveLine.jsx, pl-l2) reads the clause from these, so the card and the page cannot disagree.
- * `sectionKey` names the letter under a compilation's clock. Null for a Bible chapter (its rows need the viewed
- * chapter), before the timings land, or for a rendition with no timeline of its own.
+ * `sectionKey` names the letter under a compilation's clock. Null for a Bible chapter (liveBibleFragments has its
+ * rows), before the timings land, or for a rendition with no timeline of its own.
  * @param {any} track
  * @param {string | null} [sectionKey]
  * @returns {any[] | null}
@@ -318,6 +318,21 @@ export function liveFragments(track, sectionKey) {
   if (want < 0) return null;
   const only = rows.filter((f) => (f[4] || 0) === want);
   return only.length ? only : null;
+}
+
+/**
+ * A Bible chapter track's rows for the full player's card (pl-l2b): its own chapter, in the edition the recording
+ * IS (the asset name, as the wash reads it), one `[seconds, verseNumber, -1, -1, 0]` row per proven verse. Null
+ * for any other track, a recording whose edition is unknown, or before that edition's timings load.
+ * @param {any} track
+ * @returns {any[] | null}
+ */
+export function liveBibleFragments(track) {
+  const chapter = track && track.key ? AudioPlayer.bibleChapterOfTrack(track) : 0;
+  if (!(chapter > 0)) return null;
+  const ed = resolveBibleAudio({ track }).paint;
+  if (!ed) return null;
+  return _bibleRowsFor(track.key.slice(track.key.indexOf(':') + 1), chapter, ed.volKey);
 }
 
 /**
