@@ -277,3 +277,30 @@ describe('a chapter picked from the index a search opened backs to that index, t
     expect(b.props.setFromSearchIndex).toHaveBeenCalledWith(false);
   });
 });
+
+/* A letter opened from a volume index or the Listening Library is not a search hit
+   (search200 audit 295/309, U08.2). The tab's find anchor from an older search still
+   named the letter, so FindInUnit raised the old "1 of 1" pill and hit marks on it.
+   Those opens now clear the anchor, as the list opens (_listOpen) already did. */
+describe('a letter opened from a volume index or the Library drops an old search\'s find', () => {
+  beforeEach(() => { G.VolumeLetterIndex = () => null; G.AudioLibraryScreen = () => null; });
+  afterEach(() => { delete G.VolumeLetterIndex; delete G.AudioLibraryScreen; });
+
+  it('a volume index pick clears the anchor', () => {
+    const { routes, props } = makeRoutes({ screen: 'vot-index', fromSearch: false, searchLanding: null });
+    const idx = find(routes['vot-index'](), G.VolumeLetterIndex);
+    expect(idx, 'the vot-index route did not render - this measured nothing').toBeTruthy();
+    idx.props.onSelect('the-wide-path');
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
+  });
+
+  it('a Listening Library Text open clears the anchor', () => {
+    const { routes, props } = makeRoutes({ screen: 'audio-library', fromSearch: false, searchLanding: null });
+    const lib = routes['audio-library']();
+    expect(lib, 'the audio-library route did not render - this measured nothing').toBeTruthy();
+    lib.props.onOpenTrack({ key: 'two:the-wide-path' });
+    expect(props.setSurpriseAnchor).toHaveBeenCalledWith(null);
+    expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
+  });
+});

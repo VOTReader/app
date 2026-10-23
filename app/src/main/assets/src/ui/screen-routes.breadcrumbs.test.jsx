@@ -54,7 +54,7 @@ function makeRoutes(overrides = {}) {
   const props = {
     setScreen: vi.fn(), setLetterId: vi.fn(), setActiveReadKey: vi.fn(), setLastReadForVol: vi.fn(),
     fromSearch: true, setFromSearch: vi.fn(),
-    setFromSurprise: vi.fn(),
+    setFromSurprise: vi.fn(), setSurpriseAnchor: vi.fn(),
     settings: {}, activeReadKey: null, lastReadLetterMap: {}, readItems: {},
     isRead: () => false, getReadKey: (rk, id) => `${rk}:${id}`,
     handleVolumeSelect: vi.fn(),

@@ -403,7 +403,9 @@ export function buildScreenRoutes({
   // search or a Surprise - but the reading screens' Back read those flags first
   // (fromSurprise, then fromSearch), so a stale one sent Back Home or to the search screen
   // instead of the index. (Search lands on none of these screens, so no search chain is cut.)
-  const _startNewTrail = () => { setFromSearch(false); if (typeof setFromSurprise === 'function') setFromSurprise(false); };
+  // It is not a search hit either, so it drops the tab's find anchor too: an older search's
+  // anchor naming the same letter raised its stale find pill there (search200 audit, U08.2).
+  const _startNewTrail = () => { setFromSearch(false); if (typeof setFromSurprise === 'function') setFromSurprise(false); setSurpriseAnchor(null); };
   // A chapter picked from a Bible or Matthew index has left any Surprise (a Surprise never
   // lands on an index), but keeps fromSearch: a book-level search result lands on those
   // indexes, and Back from its chapter still returns to the search.
@@ -549,6 +551,7 @@ export function buildScreenRoutes({
     const key = textKeyOf(track) || '';
     const divider = key.indexOf(':');
     if (divider < 1 || divider >= key.length - 1 || typeof COL_BY_KEY === 'undefined') return;
+    setSurpriseAnchor(null);   // a Library open is not a search hit: no old find pill (U08.2)
     const volKey = key.slice(0, divider);
     const id = key.slice(divider + 1);
     if (volKey.indexOf('bible-') === 0) {
