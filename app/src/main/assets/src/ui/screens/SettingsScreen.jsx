@@ -7,6 +7,7 @@ import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell, networkType } from '../../utils/download-gate.js';
 import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
+import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { openWhatsNew } from '../../utils/whats-new.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
@@ -594,7 +595,7 @@ const SHARE_LINK_OPTIONS = [
 
 const SETTINGS_TOPICS = {
   appearance: 'appearance theme light dark text size font typeface',
-  reading: 'reading bible translation chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
+  reading: 'reading bible translation offline editions download all chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
   listening: 'listening bible letter audio voice speed rate read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
   topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
@@ -1083,6 +1084,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               options={TRANSLATION_OPTIONS}
               onChange={(v) => onSetting("translation", v)}
             />
+            <OfflineEditionsRow translation={settings.translation || "nkjv"} />
             <SettingsRow
               label="Chapter Titles"
               desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."

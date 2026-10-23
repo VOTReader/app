@@ -1789,6 +1789,7 @@
       .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
       .settings-downloads-row .settings-row-value { grid-column:1; }
+      .offline-editions-bar { margin:0 0.95rem 0.45rem; }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }
