@@ -137,7 +137,7 @@ describe('deploy-web.yml - no repository code runs beside the Pages token (v10-0
     expect(runners.length, 'the build job was not found - this measured nothing').toBeGreaterThan(0);
     for (const [id, t] of runners) {
       // The gate also lists CI runs (actions: read, ci10); the build needs only the code.
-      expect(permissionsOf(t), `${id} permissions`).toBe(id === 'gate' ? 'contents: read, actions: read' : 'contents: read');
+      expect(permissionsOf(t), `${id} permissions`).toBe(id === 'gate' ? 'contents: read, actions: read, deployments: read' : 'contents: read');
     }
   });
 

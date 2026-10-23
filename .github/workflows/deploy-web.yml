@@ -111,10 +111,11 @@ jobs:
   gate:
     runs-on: ubuntu-latest
     timeout-minutes: 5   # n7-05: a handful of API reads
+    # up2: deployments: read, for when the site last published (a window is done once it has).
     permissions:
       contents: read
       actions: read
-      deployments: read   # up2: when the site last published (the window is done once it has)
+      deployments: read
     outputs:
       publish: ${{ steps.target.outputs.publish }}
       sha: ${{ steps.target.outputs.sha }}
