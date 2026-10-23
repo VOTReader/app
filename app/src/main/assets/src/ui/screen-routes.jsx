@@ -786,6 +786,31 @@ export function buildScreenRoutes({
     nav: _navTo(goScripturesHome, 'Scriptures'),
   });
 
+  /* s17.8: a History letter row opens its own letter. An old row has no
+     volumeScreen: it opens the collection whose letters hold its letterId
+     (loading the letters first when they have not landed), not Volume Two. A
+     letter no collection holds goes to its volume number's letter route, which
+     holds no such id either, so that route shows the dead-letter view. */
+  const _openHistoryLetter = (/** @type {any} */ entry, afterLoad = false) => {
+    let col = entry.volumeScreen ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
+    if (!col && entry.letterId) {
+      const vc = window.__votCorpus;
+      if (!afterLoad && vc && !vc.loaded && typeof window.__loadVotCorpus === 'function') {
+        const again = () => _openHistoryLetter(entry, true);
+        Promise.resolve(window.__loadVotCorpus()).then(again, again);
+        return;
+      }
+      for (const c of COL_BY_KEY.values()) {
+        if (c && c.letterScreen && colLetterArr(c).some((/** @type {any} */ x) => x && x.id === entry.letterId)) { col = c; break; }
+      }
+    }
+    if (!col) col = entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two');
+    const hc = col;
+    setGenreId(null);
+    setActiveReadKey('vol:' + hc.volKey, () => setLastReadForVol(hc.volKey, entry.letterId));
+    navigateToLink({ screen: hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History', silent: true });
+  };
+
   /**
    * @param {any} jsx     the route's element, or falsy when the letter did not resolve
    * @param {string} [volKey] the collection, for the dead-letter fallback. Pass it
@@ -1090,10 +1115,7 @@ export function buildScreenRoutes({
             setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: entry.studyChapterId })));
             navigateToLink({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
           } else if (entry.type === 'letter') {
-            var _hc = entry.volumeScreen && COL_BY_INDEX_SC.get(entry.volumeScreen) || (entry.volume === 1 ? COL_BY_KEY.get('one') : COL_BY_KEY.get('two'));
-            setGenreId(null);
-            setActiveReadKey('vol:' + _hc.volKey, () => setLastReadForVol(_hc.volKey, entry.letterId));
-            navigateToLink({ screen: _hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History', silent: true });
+            _openHistoryLetter(entry);
           } else {
             setGenreId(null);
             setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));

@@ -202,14 +202,68 @@ describe('screen-routes — P1-12 History onSelect routes through navigateToLink
     );
   });
 
-  it('letter entry → generic-screen endpoint resolved from the volume fallback', () => {
-    const { routes, props } = makeRoutes();
-    routes.history().props.onSelect({ type: 'letter', letterId: 'wide-path', volume: 1 });
-    expect(props.navigateToLink).toHaveBeenCalledWith(
-      { screen: 'vot-one-letter', letterId: 'wide-path' },
-      { sourceLetterTitle: 'History', silent: true },
-    );
-    expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:one', expect.any(Function));
+  /* s17.8: an old row (no volumeScreen) opened Volume Two whatever its letter.
+     It now opens the collection whose letters hold its letterId. */
+  describe('a letter row without volumeScreen (s17.8)', () => {
+    beforeEach(() => {
+      /** @type {any} */ (globalThis).COL_BY_KEY = new Map([
+        ['one', { volKey: 'one', letterScreen: 'vot-one-letter', letters: [{ id: 'wide-path' }] }],
+        ['two', { volKey: 'two', letterScreen: 'vot-letter', letters: [{ id: 'two-a' }] }],
+        ['three', { volKey: 'three', letterScreen: 'vot-three-letter', letters: [{ id: 'three-a' }] }],
+      ]);
+      /** @type {any} */ (globalThis).colLetterArr = (/** @type {any} */ col) => (col && col.letters) || [];
+      /** @type {any} */ (window).__votCorpus = { loaded: true };
+    });
+    afterEach(() => {
+      delete /** @type {any} */ (globalThis).colLetterArr;
+      delete /** @type {any} */ (window).__votCorpus;
+      delete /** @type {any} */ (window).__loadVotCorpus;
+    });
+
+    it('opens the collection that holds the letter, not Volume Two', () => {
+      const { routes, props } = makeRoutes();
+      routes.history().props.onSelect({ type: 'letter', letterId: 'three-a', volume: 2 });
+      expect(props.navigateToLink).toHaveBeenCalledWith(
+        { screen: 'vot-three-letter', letterId: 'three-a' },
+        { sourceLetterTitle: 'History', silent: true },
+      );
+      expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:three', expect.any(Function));
+    });
+
+    it('a Volume One letter still opens Volume One', () => {
+      const { routes, props } = makeRoutes();
+      routes.history().props.onSelect({ type: 'letter', letterId: 'wide-path', volume: 1 });
+      expect(props.navigateToLink).toHaveBeenCalledWith(
+        { screen: 'vot-one-letter', letterId: 'wide-path' },
+        { sourceLetterTitle: 'History', silent: true },
+      );
+    });
+
+    it('a letter no collection holds goes to a letter route that holds no such id: the dead-letter view', () => {
+      const { routes, props } = makeRoutes();
+      routes.history().props.onSelect({ type: 'letter', letterId: 'gone', volume: 2 });
+      // No collection holds 'gone', so the route _wrapVot renders _deadLetter
+      // ("This letter is no longer available"), never some other letter.
+      expect(props.navigateToLink).toHaveBeenCalledWith(
+        { screen: 'vot-letter', letterId: 'gone' },
+        { sourceLetterTitle: 'History', silent: true },
+      );
+    });
+
+    it('with the letters not loaded yet, loads them first, then opens the right collection', async () => {
+      /** @type {any} */ (window).__votCorpus = { loaded: false };
+      let land = () => {};
+      /** @type {any} */ (window).__loadVotCorpus = vi.fn(() => new Promise((r) => { land = () => { /** @type {any} */ (window).__votCorpus.loaded = true; r(undefined); }; }));
+      const { routes, props } = makeRoutes();
+      routes.history().props.onSelect({ type: 'letter', letterId: 'three-a', volume: 2 });
+      expect(props.navigateToLink).not.toHaveBeenCalled();
+      land();
+      await Promise.resolve(); await Promise.resolve();
+      expect(props.navigateToLink).toHaveBeenCalledWith(
+        { screen: 'vot-three-letter', letterId: 'three-a' },
+        { sourceLetterTitle: 'History', silent: true },
+      );
+    });
   });
 
   it('letter entry prefers volumeScreen over the volume-number fallback', () => {
