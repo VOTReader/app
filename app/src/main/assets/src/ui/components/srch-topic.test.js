@@ -1,7 +1,7 @@
 /* The topic card's pick (search200 ideas F): a question, an Answers topic among the first results, the model sure of
    it; the texts it quotes that the search found too. */
 import { describe, it, expect } from 'vitest';
-import { questionShaped, topicCandidate, pickTopic, topicQuotes, topicTexts, titleNames, TOPIC_MEANING_FLOOR, TOPIC_TITLED_FLOOR, TOPIC_TEXTS } from './srch-topic.js';
+import { questionShaped, topicCandidate, pickTopic, topicQuotes, topicTexts, titleNames, withOwnPassage, TOPIC_MEANING_FLOOR, TOPIC_TITLED_FLOOR, TOPIC_TEXTS } from './srch-topic.js';
 
 const topicDoc = { kind: 'answers', title: 'Regarding Tithing', text: 'Introduction. Beloved, I delight in that which one gives to another in My name, and by the works of their own hands; this is the tithe in which I delight most. Will a man rob God? Yet you have robbed Me!' };
 const hit = (doc, meaning) => ({ score: 1, doc, ...(meaning === undefined ? {} : { meaning }) });
@@ -96,5 +96,20 @@ describe('topicQuotes and topicTexts', () => {
     expect(texts.map((t) => t.entry.doc.ref)).toEqual(['Letters from Timothy · Letter 7', 'Malachi 3:8']);
     const many = Array.from({ length: 6 }, (_, i) => hit({ kind: 'verse', ref: 'V' + i, text: 'Will a man rob God? Yet you have robbed Me! ' + 'x'.repeat(i + 1) + ' ' + i }));
     expect(topicTexts(topic, many, (e) => e.doc.text)).toHaveLength(TOPIC_TEXTS);
+  });
+});
+
+/* The death card quoted the same sentence twice (the branch walk, 2026-10-22): a letter's passage the topic quotes,
+   then the topic's own passage, which opens with that very sentence. */
+describe('withOwnPassage', () => {
+  const topic = hit({ kind: 'answers', title: 'Regarding the First Death', text: 'x' }, 0.72);
+  const letter = hit({ kind: 'letter', title: 'Death and Awakening', text: 'y' });
+  const said = '“For I tell you the truth, if there is life during death, as it is commonly taught amongst the people, then none truly die.';
+  it("adds the topic's own passage when fewer than two texts show, unless one already says it", () => {
+    expect(withOwnPassage([{ entry: letter, passage: said }], topic, 'For I tell you the truth, if there is life during death, as it is commonly taught amongst the people, then none truly die. And if all')).toHaveLength(1);
+    const two = withOwnPassage([{ entry: letter, passage: said }], topic, 'The first death is a sleep.');
+    expect(two.map((t) => !!t.own)).toEqual([false, true]);
+    expect(withOwnPassage([], topic, 'The first death is a sleep.')).toHaveLength(1);
+    expect(withOwnPassage([], topic, '')).toHaveLength(0);
   });
 });

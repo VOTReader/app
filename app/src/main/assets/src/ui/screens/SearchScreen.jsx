@@ -7,7 +7,7 @@ import { applyCorrections } from '../../search/query-parse.js';
 import { foldReprints } from '../components/srch-reprints.js';
 import { cardPassage } from '../components/SrchCard.jsx';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
-import { pickTopic, topicTexts } from '../components/srch-topic.js';
+import { pickTopic, topicTexts, withOwnPassage } from '../components/srch-topic.js';
 import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
 import { fewerWords, nearestShown, NEAREST_SHOWN } from '../components/srch-empty.js';
 
@@ -787,12 +787,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     if (engineNav || !state.results.length || typeof state.q !== 'string') return null;
     const pick = pickTopic(state.q, state.results);
     if (!pick) return null;
-    /** @type {Array<{entry:any, passage:string, own?:boolean}>} */
-    let texts = topicTexts(pick.entry, state.results, (e) => cardPassage(e, state.terms, state.stopTyped));
-    if (texts.length < 2) {
-      const own = cardPassage(pick.entry, state.terms, state.stopTyped);
-      if (own) texts = texts.concat([{ entry: pick.entry, passage: own, own: true }]);
-    }
+    const found = topicTexts(pick.entry, state.results, (e) => cardPassage(e, state.terms, state.stopTyped));
+    const texts = withOwnPassage(found, pick.entry, found.length < 2 ? cardPassage(pick.entry, state.terms, state.stopTyped) : '');
     return { entry: pick.entry, texts };
   }, [engineNav, state.results, state.q, state.terms, state.stopTyped]);
 

@@ -173,3 +173,17 @@ export function topicTexts(topic, results, passageOf) {
   }
   return out;
 }
+
+/**
+ * The card's rows: the texts, and the topic's own passage after them when fewer than two show, unless a text already
+ * says it (the death card quoted one sentence twice: a letter the topic quotes, then the topic opening with it). Pure.
+ * @param {Array<{ entry: any, passage: string, own?: boolean }>} texts  topicTexts()
+ * @param {any} topic  the topic's entry
+ * @param {string} own  the topic's own passage (cardPassage)
+ * @returns {Array<{ entry: any, passage: string, own?: boolean }>}
+ */
+export function withOwnPassage(texts, topic, own) {
+  if (texts.length >= 2 || !own) return texts;
+  if (texts.some((t) => topicQuotes(plain(t.passage), own))) return texts;
+  return texts.concat([{ entry: topic, passage: own, own: true }]);
+}
