@@ -45,6 +45,8 @@ class FakeCache {
     return undefined;
   }
   async put(req, res) { this.store.set(this._key(req), res); }
+  // A real Cache lists Requests; the fake lists its URL keys (the SW reads either).
+  async keys() { return [...this.store.keys()]; }
 }
 class FakeCaches {
   constructor(fetchFn, resolveKeys) { this.map = new Map(); this._fetch = fetchFn; this._resolve = !!resolveKeys; }
@@ -975,6 +977,79 @@ describe('service-worker — Songs of the Letters routes (2026-09-24)', () => {
     await sw.caches.open('vot-songs-v1');
     await activate(sw);
     expect(await sw.caches.keys()).toContain('vot-songs-v1');
+  });
+
+  /* mw16 (seam walk 2026-10-22, O2): a letter first opened offline showed the note
+     tile for its song covers: a cover was cached only once seen online. A fresh
+     catalog now warms every listed song's 256 px cover in the background. */
+  describe('a fresh catalog warms the song covers (mw16 O2)', () => {
+    const CAT = 'https://app.test/songs/catalog.json';
+    const thumb = (id) => 'https://app.test/songs/thumbs/256/' + id + '.webp';
+    const A = 'aaaaaaaaaaa1', B = 'bbbbbbbbbbb2', C = 'ccccccccccc3', HID = 'ddddddddddd4';
+    const catalogBody = { songs: [{ id: A }, { id: B }, { id: C }, { id: HID, hid: true }, { id: '../x' }] };
+    const catalogResp = () => ({ ok: true, redirected: false, clone: () => ({ json: async () => catalogBody }) });
+    async function run(fetchImpl, seed) {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const sw = bootSW({ fetchImpl });
+        const cache = await songsCache(sw);
+        if (seed) await seed(cache);
+        const waited = [];
+        let p;
+        sw.handlers.fetch({ request: getReq(CAT), respondWith: (x) => { p = x; }, waitUntil: (w) => { waited.push(w); } });
+        await p;
+        await vi.advanceTimersByTimeAsync(20000);
+        // waitUntil grows while the catalog lands: settle until no new promise joins.
+        for (let n = -1; n !== waited.length;) { n = waited.length; await Promise.all(waited); }
+        return cache;
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+
+    it('fetches each listed cover the bucket lacks, never a hidden song or a malformed id', async () => {
+      const calls = [];
+      const cache = await run(async (r) => {
+        const url = typeof r === 'string' ? r : r.url;
+        calls.push(url);
+        return url === CAT ? catalogResp() : { ok: true, redirected: false, body: url };
+      }, async (c) => { await c.put(thumb(B), { body: 'kept' }); });
+      const covers = calls.filter((u) => u !== CAT);
+      expect(covers.sort()).toEqual([thumb(A), thumb(C)]);
+      expect(await cache.match(thumb(A))).toEqual({ ok: true, redirected: false, body: thumb(A) });
+      expect(await cache.match(thumb(B))).toEqual({ body: 'kept' });
+      expect(await cache.match(thumb(HID))).toBeFalsy();
+    });
+
+    it('a 404 cover is skipped, and a network failure stops the run', async () => {
+      const calls = [];
+      const cache = await run(async (r) => {
+        const url = typeof r === 'string' ? r : r.url;
+        calls.push(url);
+        if (url === CAT) return catalogResp();
+        if (url === thumb(A)) return { ok: false, status: 404 };
+        throw new TypeError('offline');
+      });
+      expect(await cache.match(thumb(A))).toBeFalsy();
+      expect(calls.filter((u) => u !== CAT).length).toBeLessThanOrEqual(3);   // no retry storm
+    });
+
+    it('waits before it starts, so a launch’s own requests go first', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const calls = [];
+        const sw = bootSW({ fetchImpl: async (r) => { const url = typeof r === 'string' ? r : r.url; calls.push(url); return url === CAT ? catalogResp() : { ok: true }; } });
+        let p;
+        sw.handlers.fetch({ request: getReq(CAT), respondWith: (x) => { p = x; }, waitUntil: () => {} });
+        await p;
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(calls).toEqual([CAT]);
+        await vi.advanceTimersByTimeAsync(10000);
+        expect(calls.length).toBe(4);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
 

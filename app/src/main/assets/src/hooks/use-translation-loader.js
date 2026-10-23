@@ -26,6 +26,37 @@
                          translateVerse() starts returning the loaded text.
    ═══════════════════════════════════════════════════════════════════════ */
 
+export const TRANSLATION_MISSING_TOAST_ID = 'vot-toast-translation-missing';
+
+/** True when the edition's text never arrived (its bible-<code>.js global is absent). @param {string} code */
+function translationMissing(code) {
+  return typeof window !== 'undefined' && !(/** @type {any} */ (window))['BIBLE_' + code.toUpperCase()];
+}
+
+/** The edition's short label from TRANSLATION_OPTIONS (index.html), else its code in capitals. @param {string} code */
+function translationLabel(code) {
+  const opts = typeof TRANSLATION_OPTIONS !== 'undefined' ? TRANSLATION_OPTIONS : [];
+  const opt = opts.find((o) => o.id === code);
+  return (opt && opt.label) || code.toUpperCase();
+}
+
+/** @param {string} code */
+function showMissingNotice(code) {
+  if (typeof showToast !== 'function') return;
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const label = translationLabel(code);
+  showToast({
+    id: TRANSLATION_MISSING_TOAST_ID, className: 'vot-toast', durationMs: 8000, ariaLive: 'assertive',
+    text: offline
+      ? label + ' isn’t on this phone yet, so the Bible shows NKJV for now. It downloads the next time you’re online.'
+      : label + ' didn’t load, so the Bible shows NKJV for now. It tries again the next time the app opens.',
+  });
+}
+
+function hideMissingNotice() {
+  if (typeof hideToast === 'function') hideToast(TRANSLATION_MISSING_TOAST_ID);
+}
+
 /**
  * @param {string | undefined} translation
  * @param {(f: (v: number) => number) => void} setTranslationTick
@@ -54,11 +85,23 @@ export function useTranslationLoader(translation, setTranslationTick) {
        WEB's label. Swept against WEB, the late ASV frees itself instead; only
        the live load re-renders. */
     let live = true;
-    loadTranslation(code).then(() => {
+    let retry = null;
+    const load = () => loadTranslation(code).then(() => {
       releaseTranslationsExcept(selectedRef.current);
-      if (live) setTranslationTick((v) => v + 1);
+      if (!live) return;
+      setTranslationTick((v) => v + 1);
+      if (!translationMissing(code)) { hideMissingNotice(); return; }
+      /* mw16 (seam walk O1): an edition picked offline before it was ever downloaded failed to
+         load and the Bible silently showed NKJV under the reader's choice. Say so plainly, and
+         load it the moment the connection is back. */
+      showMissingNotice(code);
+      if (!retry && typeof window !== 'undefined') {
+        retry = () => { window.removeEventListener('online', retry); retry = null; if (live) load(); };
+        window.addEventListener('online', retry);
+      }
     });
-    return () => { live = false; };
+    load();
+    return () => { live = false; if (retry) window.removeEventListener('online', retry); };
   // The setter is in the deps for exhaustive-deps' sake; App()'s is a useState setter, so
   // it never changes and the effect runs on the translation alone, as it did inline.
   }, [translation, setTranslationTick]);

@@ -116,3 +116,61 @@ describe('useTranslationLoader — the bundle-d helpers are absent (W25 refuter)
     expect(() => renderHook(() => useTranslationLoader('kjv', vi.fn()))).not.toThrow();
   });
 });
+
+/* mw16 (seam walk 2026-10-22, O1): RVR1960 picked offline before it was ever downloaded
+   failed to load (the SW had no copy and answered 503) and the Bible silently showed NKJV
+   under the reader's choice. A load that leaves the edition's global absent now says so,
+   and the edition loads again the moment the connection is back. */
+describe('useTranslationLoader — an edition that never arrived (mw16 O1)', () => {
+  let onLine;
+  beforeEach(() => {
+    g().showToast = vi.fn();
+    g().hideToast = vi.fn();
+    g().TRANSLATION_OPTIONS = [{ id: 'nkjv', label: 'NKJV' }, { id: 'rvr', label: 'RVR1960' }];
+    onLine = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+  });
+  afterEach(() => {
+    delete g().showToast; delete g().hideToast; delete g().TRANSLATION_OPTIONS; delete g().BIBLE_RVR;
+    onLine.mockRestore();
+  });
+
+  it('offline: says the edition is not on this phone and NKJV shows meanwhile', async () => {
+    renderHook(() => useTranslationLoader('rvr', vi.fn()));
+    resolveLoad(); await flush();
+    expect(g().showToast).toHaveBeenCalledTimes(1);
+    const opts = g().showToast.mock.calls[0][0];
+    expect(opts.text).toMatch(/^RVR1960 isn’t on this phone yet, so the Bible shows NKJV/);
+    expect(opts.text).toMatch(/next time you’re online/);
+  });
+
+  it('the connection coming back loads it again, and a load that lands clears the notice', async () => {
+    const tick = vi.fn();
+    renderHook(() => useTranslationLoader('rvr', tick));
+    resolveLoad(); await flush();
+    expect(g().loadTranslation).toHaveBeenCalledTimes(1);
+    onLine.mockReturnValue(true);
+    g().BIBLE_RVR = {};
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(g().loadTranslation).toHaveBeenCalledTimes(2);
+    resolveLoad(); await flush();
+    expect(tick).toHaveBeenCalledTimes(2);
+    expect(g().hideToast).toHaveBeenCalledWith('vot-toast-translation-missing');
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(g().loadTranslation).toHaveBeenCalledTimes(2);       // listened once, not forever
+  });
+
+  it('a loaded edition raises no notice', async () => {
+    g().BIBLE_RVR = {};
+    renderHook(() => useTranslationLoader('rvr', vi.fn()));
+    resolveLoad(); await flush();
+    expect(g().showToast).not.toHaveBeenCalled();
+  });
+
+  it('switching away before the connection returns stops listening', async () => {
+    const { rerender } = renderHook(({ t }) => useTranslationLoader(t, vi.fn()), { initialProps: { t: 'rvr' } });
+    resolveLoad(); await flush();
+    rerender({ t: 'nkjv' });
+    act(() => { window.dispatchEvent(new Event('online')); });
+    expect(g().loadTranslation).toHaveBeenCalledTimes(1);
+  });
+});

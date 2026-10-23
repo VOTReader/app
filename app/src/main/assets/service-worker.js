@@ -1149,6 +1149,7 @@ async function networkFirstCatalog(event) {
   const network = fetch(request).then(async (response) => {
     if (response && response.ok && !response.redirected) {
       try { await cache.put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
+      if (typeof event.waitUntil === 'function') event.waitUntil(warmSongThumbs(response.clone()));
     }
     return response;
   }).catch(() => null);
@@ -1163,6 +1164,51 @@ async function networkFirstCatalog(event) {
   if (cached) return markedCopy(cached);
   const response = first === 'late' ? await network : first;
   return response || new Response('Songs not available offline', { status: 503, statusText: 'Service Unavailable' });
+}
+
+/* mw16 (seam walk 2026-10-22, O2): a letter's song covers came only from the
+   covers a reader had already seen online, so a letter first opened offline
+   showed the plain note tile. After a fresh catalog, the 256 px cover of every
+   listed song (~2.5 KB each, ~3 MB for the catalog) is fetched into the songs
+   bucket in the background: a pause first so a launch's own requests go
+   ahead, a few at a time, only the ones the bucket lacks (covers are named by
+   song id and never change), and it stops at the first network failure. One
+   run at a time; an interrupted run continues after the next catalog. */
+const SONG_THUMB_WARM_DELAY_MS = 15000;
+const SONG_THUMB_WARM_AT_ONCE = 3;
+const SONG_THUMB_ID = /^[0-9a-f]{12}$/;
+let songThumbWarm = null;
+
+function warmSongThumbs(catalogResponse) {
+  if (!songThumbWarm) songThumbWarm = runSongThumbWarm(catalogResponse).catch(() => {}).finally(() => { songThumbWarm = null; });
+  return songThumbWarm;
+}
+
+async function runSongThumbWarm(catalogResponse) {
+  let catalog = null;
+  try { catalog = await catalogResponse.json(); } catch (_e) { return; }
+  const songs = catalog && Array.isArray(catalog.songs) ? catalog.songs : [];
+  const urls = songs.filter((s) => s && !s.hid && SONG_THUMB_ID.test(s.id))
+    .map((s) => new URL('/songs/thumbs/256/' + s.id + '.webp', self.location.origin).href);
+  if (!urls.length) return;
+  await new Promise((resolve) => setTimeout(resolve, SONG_THUMB_WARM_DELAY_MS));
+  const cache = await caches.open(SONGS_CACHE);
+  const have = new Set((await cache.keys()).map((k) => (typeof k === 'string' ? k : k.url)));
+  const todo = urls.filter((u) => !have.has(u));
+  let next = 0;
+  let offline = false;
+  const worker = async () => {
+    while (!offline && next < todo.length) {
+      const url = todo[next++];
+      try {
+        const response = await fetch(url);
+        if (response && response.ok && !response.redirected) await cache.put(url, response);
+      } catch (_e) {
+        offline = true;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: SONG_THUMB_WARM_AT_ONCE }, worker));
 }
 
 async function corpusFirst(request) {
