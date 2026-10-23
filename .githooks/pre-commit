@@ -301,6 +301,20 @@ if [ -n "$data_changed" ] || [ -n "$sync_tool_changed" ]; then
     echo "---------------------------------------------------------------"
     exit 1
   fi
+  # The section-gate fixture (test_batch_align_sections) copies six letters'
+  # section timings; a prose edit to one of them drifts the copy too, and only
+  # CI's unittest saw it (c74 'tothe' -> 'to the', 2026-10-22). Same gate, ~4 s.
+  # The path must be absolute (the gate resolves a relative one under src/data and
+  # treats a missing file as empty), so the output must name the fixture's letters.
+  fixture_out=$(AUDIO_SYNC_SECTIONS_FILE="$(git rev-parse --show-toplevel)/tools/fixtures/audio-sync-sections.fixture.js" node tools/check-audio-sync.js 2>&1)
+  if [ $? -ne 0 ] || ! echo "$fixture_out" | grep -q "6 letters in 2 compilations"; then
+    echo "$fixture_out" | grep -v "^\[audio-sync\] OK"
+    echo ""
+    echo "Read-along offset check FAILED on tools/fixtures/audio-sync-sections.fixture.js."
+    echo "A letter it copies changed text: move its rows the way src/data/audio-sync.js"
+    echo "moved, then: python -m unittest test_batch_align_sections"
+    exit 1
+  fi
   echo "[pre-commit] Read-along offsets OK."
   echo ""
 fi
