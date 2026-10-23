@@ -1748,7 +1748,7 @@
       .songs-eyebrow { color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); font-weight:600; letter-spacing:.22em; text-transform:uppercase; }
       .songs-screen h1 { margin:.2rem 0 0; color:var(--cream); font-family:inherit; font-size:var(--fs-30); font-weight:500; line-height:1.15; }
       .songs-intro { margin:.45rem 0 0; color:var(--cream-dim); font-size:var(--fs-16); font-style:italic; line-height:1.45; }
-      .songs-controls { display:grid; gap:.7rem; }
+      .songs-controls { display:grid; grid-template-columns:minmax(0,1fr); gap:.7rem; }
       .songs-shuffle, .songs-outline-action { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.5rem 1.2rem; border:1px solid var(--gold); border-radius:999px; font-family:inherit; font-size:var(--fs-16); font-weight:600; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
       .songs-shuffle { width:100%; background:var(--gold); color:var(--bg); }
       .songs-outline-action { background:transparent; color:var(--gold); }
@@ -1757,7 +1757,7 @@
       .songs-find:focus-within { border-color:var(--gold); }
       .songs-find > svg { width:20px; height:20px; flex:none; color:var(--cream-dim); }
       .songs-find label { flex:1; min-width:0; display:flex; }
-      .songs-find input { width:100%; min-height:44px; padding:0; border:0; background:transparent; color:var(--input-text); font:inherit; font-size:var(--fs-16); outline:none; -webkit-appearance:none; appearance:none; }
+      .songs-find input { width:100%; min-width:0; min-height:44px; padding:0; border:0; background:transparent; color:var(--input-text); font:inherit; font-size:var(--fs-16); outline:none; -webkit-appearance:none; appearance:none; }
       .songs-find input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; display:none; }
       .songs-find input::placeholder { color:var(--cream-dim); opacity:.85; }
       .songs-find-clear { width:44px; height:44px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--cream); cursor:pointer; }
@@ -1814,7 +1814,9 @@
       .songs-nav-mark svg { width:20px; height:20px; }
       .songs-nav-label { flex:1; min-width:0; color:var(--cream); font-size:var(--fs-18); }
       .songs-nav-count { color:var(--cream-dim); font-size:var(--fs-16); font-variant-numeric:tabular-nums; }
-      .songs-tiles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+      /* Two columns while a tile stays 10rem wide (rem grows with Text size), else one; never more than two. Two
+         fixed columns left a title 48 px at 150% and 0 px at 300% (pl-l0, Songs at large text). */
+      .songs-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(10rem, calc(50% - .3rem))), 1fr)); gap:.6rem; }
       .songs-tile { display:flex; align-items:center; gap:.6rem; min-height:76px; padding:.45rem .4rem .45rem .45rem; border:1px solid var(--border); border-radius:10px; background:var(--bg3); color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .songs-mosaic { flex:none; display:grid; grid-template-columns:repeat(2,28px); grid-template-rows:repeat(2,28px); gap:2px; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; }
       .songs-mosaic .song-cover { width:28px; height:28px; border:0; border-radius:0; }
@@ -1829,6 +1831,26 @@
       .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .songs-shelf-title { flex:1; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
       .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); text-align:right; }
+      /* Songs at large text (Text size 1.8 and up: the root class vot-large-text, as mw19 pins the reader): px
+         gutters, row covers and lengths hidden (the title needs the width; the bar hides its type mark the same way,
+         player brief 3a), a shelf's count under its title, the versions link free to wrap. At 300% the hub ran to 458-663 px on a 412 px screen. */
+      .vot-large-text .songs-screen { padding-left:16px; padding-right:16px; }
+      .vot-large-text .songs-shuffle, .vot-large-text .songs-outline-action { padding-left:16px; padding-right:16px; letter-spacing:0; }
+      .vot-large-text .songs-find { padding-left:12px; }
+      .vot-large-text .songs-row .song-cover, .vot-large-text .songs-row-len { display:none; }
+      .vot-large-text .songs-card .songs-row { padding:8px 10px 8px 8px; }
+      .vot-large-text .songs-row-line { flex-wrap:wrap; }
+      .vot-large-text .songs-row-versions { margin:0; white-space:normal; }
+      .vot-large-text .songs-shelf { flex-wrap:wrap; padding:12px 12px 12px 16px; }
+      .vot-large-text .songs-shelf-title { flex-basis:100%; letter-spacing:.04em; }
+      .vot-large-text .songs-shelf-count { margin-left:auto; }
+      .vot-large-text .songs-nav-mark { display:none; }
+      .vot-large-text .songs-nav-row { gap:12px; padding:8px 12px; }
+      .vot-large-text .songs-nav-label { min-width:auto; }
+      .vot-large-text .songs-chip { max-width:100%; padding:4px 14px; }
+      .vot-large-text .songs-mosaic { display:none; }
+      .vot-large-text .songs-tile { gap:12px; padding:8px 10px 8px 12px; }
+      .vot-large-text .songs-row-copy strong, .vot-large-text .songs-tile-copy strong { overflow-wrap:anywhere; }
       .songs-list-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.9rem; }
       .songs-list-actions .songs-play-all { width:auto; flex:1 1 10rem; }
       .songs-empty { margin:.5rem 0; color:var(--cream-dim); font-style:italic; }
