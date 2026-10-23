@@ -160,3 +160,37 @@ describe.each(CORPORA)('$path: `load` is not proof the bundle ran', (c) => {
     expect(window[c.corpus].error).toBe(true);
   });
 });
+
+/* s01.6: a script that neither loads nor errors (a stalled fetch) left the
+   route on a spinner forever. A watchdog turns that into the E1 error path,
+   whose "Try again" fetches the bundle again; a copy that lands late still
+   counts. */
+describe('a stalled corpus load (s01.6)', () => {
+  afterEach(() => { vi.useRealTimers(); });
+  const c = CORPORA[0];
+
+  it('RED: after the watchdog, a load that never settled is an E1 error and Try again fetches again', async () => {
+    vi.useFakeTimers();
+    installIndexLoaders();
+    const settled = window[c.load]().then(() => 'resolved', () => 'rejected');
+    vi.advanceTimersByTime(44000);
+    expect(window[c.corpus].error).toBe(false);
+    vi.advanceTimersByTime(2000);
+    expect(await settled).toBe('rejected');
+    expect(window[c.corpus].error, 'no E1 error, so the route spins forever').toBe(true);
+    window[c.load]().catch(() => {});
+    expect(injected(c.path)).toHaveLength(2);
+  });
+
+  it('a stalled copy that lands after the watchdog still loads the corpus', async () => {
+    vi.useFakeTimers();
+    installIndexLoaders();
+    window[c.load]().catch(() => {});
+    vi.advanceTimersByTime(46000);
+    expect(window[c.corpus].error).toBe(true);
+    run(members(c.list));
+    injected(c.path)[0].dispatchEvent(new Event('load'));
+    expect(window[c.corpus].loaded).toBe(true);
+    expect(window[c.corpus].error).toBe(false);
+  });
+});

@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-sNpUxC4C46R0hGLLIVQie9ZIFxi/SQ4pDWVfdCZzHUw=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-NJVgxbdmErm0m3DDvjIOVC32V+pEtLgRrhrdBwpYaFw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-Q2u0rMr34YsyjLnnqhOQpUDCIG06AJZ9Xo+9vzLExBw=' 'sha256-uzE9Bnem5vMmEuiYR7PIGTzeyWj2vaYZGc6+NnmXAbc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-NJVgxbdmErm0m3DDvjIOVC32V+pEtLgRrhrdBwpYaFw=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -267,6 +267,20 @@
         script.src = bundlePath;
         script.async = false;
         script.onload = function() { finish(); };
+        // s01.6: a fetch that stalls fires neither load nor error, which left
+        // the route on a spinner with no "Try again". After 45 s, fail it the
+        // E1 way; a copy that still lands later loads the corpus as normal.
+        var stalled = false;
+        var watchdog = setTimeout(function() {
+          if (corpus.loaded || corpus._promise !== mine) return;
+          stalled = true;
+          corpus._promise = null;
+          corpus._setError();
+          if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
+            try { window.DiagnosticLog.error('corpus', 'load stalled for ' + bundlePath); } catch (_e) {}
+          }
+          reject(new Error('Load stalled: ' + bundlePath));
+        }, 45000);
         // How many times another build's copy of this bundle has run to its end (the worker's appended line).
         var otherCopiesRun = function() {
           var marks = window.__votOtherCorpus;
@@ -274,6 +288,9 @@
         };
         var otherRunsBefore = otherCopiesRun();
         var finish = function() {
+          clearTimeout(watchdog);
+          // A stalled copy landing after a retry already loaded the corpus: nothing to do.
+          if (stalled && corpus.loaded) return;
           try {
             var missing = (requiredGlobals || []).filter(function(g) { return typeof window[g] === 'undefined'; });
             if (missing.length && otherCopiesRun() <= otherRunsBefore) {
@@ -290,7 +307,8 @@
             resolve();
           } catch (e) {
             // Script loaded but did not run, or its finishInit threw — same recovery path.
-            corpus._promise = null;
+            if (stalled) return;   // the watchdog already failed this attempt
+            if (corpus._promise === mine) corpus._promise = null;
             corpus._setError();
             if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
               try { window.DiagnosticLog.error('corpus', 'init failed for ' + name + ': ' + ((e && e.message) || e)); } catch (_e2) {}
@@ -303,7 +321,9 @@
           // the route can show a retry affordance instead of a perpetual
           // spinner (E1); and leave a diagnostic trace (E3 — the success path
           // logs a timing, the failure path previously logged nothing).
-          corpus._promise = null;
+          clearTimeout(watchdog);
+          if (stalled) return;   // the watchdog already failed this attempt
+          if (corpus._promise === mine) corpus._promise = null;
           corpus._setError();
           if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
             try { window.DiagnosticLog.error('corpus', 'failed to load ' + bundlePath); } catch (_e) {}
@@ -312,6 +332,7 @@
         };
         document.head.appendChild(script);
       });
+      var mine = corpus._promise;
       return corpus._promise;
     };
     return { corpus: corpus, load: load };
