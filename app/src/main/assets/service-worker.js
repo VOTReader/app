@@ -1182,18 +1182,19 @@ let songThumbWarm = null;
 let songThumbWarmNext = null;
 
 function warmSongThumbs(catalogResponse) {
-  if (songThumbWarm) { songThumbWarmNext = catalogResponse; return songThumbWarm; }
-  songThumbWarm = (async () => {
-    let next = catalogResponse;
-    while (next) {
-      const run = next;
-      next = null;
-      songThumbWarmNext = null;
-      try { await runSongThumbWarm(run); } catch (_e) { /* best effort: the next catalog tries again */ }
-      next = songThumbWarmNext;
-    }
-  })().finally(() => { songThumbWarm = null; });
+  songThumbWarmNext = catalogResponse;
+  if (!songThumbWarm) songThumbWarm = drainSongThumbWarm();
   return songThumbWarm;
+}
+
+async function drainSongThumbWarm() {
+  while (songThumbWarmNext) {
+    const run = songThumbWarmNext;
+    songThumbWarmNext = null;
+    try { await runSongThumbWarm(run); } catch (_e) { /* best effort: the next catalog tries again */ }
+  }
+  // The same synchronous step as the last check above: no catalog can queue in between and be dropped.
+  songThumbWarm = null;
 }
 
 async function runSongThumbWarm(catalogResponse) {
