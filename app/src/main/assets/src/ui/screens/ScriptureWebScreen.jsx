@@ -124,7 +124,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the one frame loop (use-frame-scheduler.js) and landscape, always
   // (use-forced-landscape.js): rotation, orientation lock, immersive, loc()
   const { drawRef, schedule, live, capFractionNow, animate, onFrame } = useFrameScheduler();
-  const { rotated, loc } = useForcedLandscape(schedule);
+  const { rotated, loc } = useForcedLandscape(schedule, onBack);
 
   // the graph asset, loaded once (use-web-renderer.js); Try again refetches
   const { graph, loadError, setLoadError, retryLoad } = useWebGraph();
