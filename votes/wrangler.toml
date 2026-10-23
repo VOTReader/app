@@ -1,0 +1,18 @@
+# VOTReader song votes (sync sy4). Deploy and operate: votes/README.md.
+name = "votes"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "votes"
+database_id = "7c437fe7-afc9-4a1e-a2c6-51279d642dd0"
+
+# Daily: forget IP/trait hashes after 30 days, rate rows after 2.
+[triggers]
+crons = ["17 9 * * *"]
+
+# No logs, traces or analytics of its own (Corbin 2026-09-25: no usage stats).
+[observability]
+enabled = false

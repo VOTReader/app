@@ -43,6 +43,7 @@ const config = defineConfig({
       'app/src/main/assets/*.test.{js,jsx}', // service-worker.test.js (SW lives at the assets root)
       'tools/**/*.test.{js,jsx}',
       'relay/**/*.test.js', // the offline-audio relay Worker (cf1)
+      'votes/**/*.test.js', // the song-votes Worker (sync sy4)
     ],
     // Default reporter ('default') is fine for v1. Add 'json' / 'junit'
     // when CI reporting needs structured output.
