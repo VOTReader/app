@@ -266,7 +266,7 @@ describe("the follow carries the reader's way back to the new reading", () => {
         setScreen: set('screen'), setBookId: set('bookId'), setChapterNum: set('chapterNum'), setLetterId: set('letterId'),
         setStudyId: set('studyId'), setStudyChapterId: set('studyChapterId'), setJournalEntryId: set('journalEntryId'),
       };
-      const tabField = (key) => { if (key !== 'fromLetterStack') throw new Error('unexpected tabField: ' + key); return [stack, setStack]; };
+      const tabField = (key) => { if (key === 'searchOrigin' || key === 'navOrigin') return [null, () => {}]; if (key !== 'fromLetterStack') throw new Error('unexpected tabField: ' + key); return [stack, setStack]; };
       const fls = useFromLetterStack({ tabField, ...nav, ...setters });
       useAudioFollow({ enabled: true, ...nav, ...setters, retargetTop: fls.retargetTop });
       return { nav, fls };

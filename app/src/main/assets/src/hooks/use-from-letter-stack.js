@@ -66,7 +66,10 @@
    PARAMS:
      tabField — the per-tab field accessor from App()'s tabs block; called
        as tabField('fromLetterStack') to get [state, setter] (the setter is
-       identity-stable, cached per-key by App()).
+       identity-stable, cached per-key by App()), and read-only as
+       tabField('searchOrigin') (useSearch's) and tabField('navOrigin')
+       (App's), so a detour from the top entry's destination does not
+       evict it.
      screen, bookId, chapterNum, letterId, studyId, studyChapterId,
        journalEntryId — current navigation position; read by _destMatches /
        the prune effect deps / backHint.
@@ -165,18 +168,42 @@ export function useFromLetterStack({
   // null case and matched against stale state, so the single-shot back
   // pill was being silently pruned in the primary cross-screen flow
   // (Notes index → Bible/Study → expected "Back to My Notes" pill).
-  const _destMatches = (dest) => {
+  const _matchesAt = (dest, at) => {
     if (!dest) return true;
-    if (dest.screen !== screen) return false;
-    if (dest.bookId != null && dest.bookId !== bookId) return false;
-    if (dest.chapterNum != null && dest.chapterNum !== chapterNum) return false;
-    if (dest.letterId != null && dest.letterId !== letterId) return false;
-    if (dest.studyId != null && dest.studyId !== studyId) return false;
-    if (dest.studyChapterId != null && dest.studyChapterId !== studyChapterId) return false;
+    if (dest.screen !== at.screen) return false;
+    if (dest.bookId != null && dest.bookId !== at.bookId) return false;
+    if (dest.chapterNum != null && dest.chapterNum !== at.chapterNum) return false;
+    if (dest.letterId != null && dest.letterId !== at.letterId) return false;
+    if (dest.studyId != null && dest.studyId !== at.studyId) return false;
+    if (dest.studyChapterId != null && dest.studyChapterId !== at.studyChapterId) return false;
     // 7th field. Old persisted tabs deserialize without it (undefined) — the
     // same `!= null` don't-care that covers an explicit null covers them.
-    if (dest.journalEntryId != null && dest.journalEntryId !== journalEntryId) return false;
+    if (dest.journalEntryId != null && dest.journalEntryId !== at.journalEntryId) return false;
     return true;
+  };
+  const _destMatches = (dest) => _matchesAt(dest, { screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId });
+
+  // A detour opened FROM the top entry's destination keeps the entry (the
+  // hub's seam walk, F5, 2026-10-22). Scripture Web's "Open in reader" landed
+  // Genesis 3:19; Search from there evicted the web's entry the moment Search
+  // opened, the entries under it went the same way render by render, and Back
+  // from Genesis 3 climbed the chapter list to Home. The letter's own entry
+  // (Answers > Punishment) had already gone when its footnote opened the web.
+  // A detour holds its own way back: Search's searchOrigin (use-search.js),
+  // and navOrigin with its returnOrigin chain for the web, the audio library
+  // and the rest (goNavOrigin). While one of them names the destination the
+  // reader is still on the way back there, so the prune waits, and the return
+  // makes the entry live again (pill and Back both). It is not live meanwhile:
+  // Back inside the detour is the detour's own.
+  const [searchOrigin] = tabField('searchOrigin');
+  const [navOrigin] = tabField('navOrigin');
+  const _detourFrom = (dest) => {
+    if (!dest) return false;
+    if (searchOrigin && _matchesAt(dest, searchOrigin)) return true;
+    for (let o = navOrigin, n = 0; o && n < 8; o = o.returnOrigin, n++) {
+      if (_matchesAt(dest, o)) return true;
+    }
+    return false;
   };
 
   // (See JSDoc above the export for hook contract.)
@@ -188,11 +215,11 @@ export function useFromLetterStack({
     if (fromLetterStack.length === 0) return;
     const top = fromLetterStack[fromLetterStack.length - 1];
     if (!top.destSnapshot) return;
-    if (!_destMatches(top.destSnapshot)) {
+    if (!_destMatches(top.destSnapshot) && !_detourFrom(top.destSnapshot)) {
       setFromLetterStack((prev) => prev.slice(0, -1));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- _destMatches is a local helper that closes over screen/bookId/chapterNum/letterId/studyId/studyChapterId/journalEntryId — all seven already in deps — so each re-fire gets a fresh helper. setFromLetterStack is a useState setter from useTabs (identity-stable). Adding either would either re-fire the effect on every render or no-op.
-  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, fromLetterStack]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- _destMatches and _detourFrom are local helpers that close over screen/bookId/chapterNum/letterId/studyId/studyChapterId/journalEntryId and searchOrigin — all already in deps — so each re-fire gets fresh helpers. setFromLetterStack is a useState setter from useTabs (identity-stable). Adding either would either re-fire the effect on every render or no-op.
+  }, [screen, bookId, chapterNum, letterId, studyId, studyChapterId, journalEntryId, searchOrigin, navOrigin, fromLetterStack]);
 
   // Carry the live top entry to a new destination (sweep v041). The audio
   // follower ("Turn the Page with the Audio", use-audio-follow.js) moves the
