@@ -21,6 +21,8 @@ beforeEach(() => {
     'the-wide-path': { title: 'The Wide Path', collection: 'Volume Two', screen: 'vot-letter' },
     'faith': { title: 'Faith', collection: 'Words To Live By: Part One', screen: 'wtlb-one-entry' },
     'manna-1': { title: 'The Bread of Life', collection: 'Hidden Manna', screen: 'hm-letter' },
+    'chosen-by-god': { kind: 'letter', title: 'Chosen by God', collection: 'Volume One', screen: 'vot-one-letter', entry: { id: 'chosen-by-god', num: 1 } },
+    'v1-preface': { kind: 'letter', title: 'Preface', collection: 'Volume One', screen: 'vot-one-letter', entry: { id: 'v1-preface', num: 0 } },
   })[id] || null;
 });
 
@@ -141,6 +143,24 @@ describe('passageCopy — letters and poems', () => {
     const out = /** @type {any} */ (passageCopy(range(body, 0, body, body.childNodes.length)));
     expect(out.text).toBe('"Hear the Word of The Lord.\n\nTherefore, turn from this\nWicked way you have chosen!"\n\nThe Wide Path (Volume Two)\n'
       + 'https://www.thevolumesoftruth.com/The_Wide_Path');
+  });
+
+  // U07.4 (hub 2026-10-23): a numbered letter's citation carries its number, the copy otherwise the same.
+  it('a numbered letter is cited "Volume One, Letter 1: Chosen by God"; a preface keeps its name and volume', () => {
+    const p = document.createElement('p');
+    p.className = 'letter-para';
+    p.setAttribute('data-hl-key', 'letter:chosen-by-god:0');
+    p.textContent = 'You are chosen.';
+    document.body.appendChild(p);
+    const out = /** @type {any} */ (passageCopy(range(p, 0, p, p.childNodes.length)));
+    expect(out.reference).toBe('Volume One, Letter 1: Chosen by God');
+    expect(out.text).toBe('"You are chosen."\n\nVolume One, Letter 1: Chosen by God\n' + out.link);
+    const q = document.createElement('p');
+    q.className = 'letter-para';
+    q.setAttribute('data-hl-key', 'letter:v1-preface:0');
+    q.textContent = 'Hear.';
+    document.body.appendChild(q);
+    expect(/** @type {any} */ (passageCopy(range(q, 0, q, q.childNodes.length))).reference).toBe('Preface (Volume One)');
   });
 
   it('<br> soft breaks (WTLB) are line breaks, not glued words', () => {

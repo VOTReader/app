@@ -176,10 +176,11 @@ function isTranslatedBook(id) {
  */
 
 /** What a copy of these blocks ends with, and where they live on the site.
-    A letter-family entry is named by its title and its collection, "Subject
-    to No Man (Volume Two)"; Hidden Manna keeps its title alone: it is reached
-    only through the Matthew study chain and is never named as a collection in
-    the open.
+    A numbered letter is cited with its collection and number, "Volume One,
+    Letter 1: Chosen by God" (U07.4); any other letter-family entry by its
+    title and its collection, "Embracing The Gift (Regarding The Holy Days)";
+    Hidden Manna keeps its title alone: it is reached only through the Matthew
+    study chain and is never named as a collection in the open.
     @param {string[]} keys  the copied blocks' keys, in reading order
     @returns {Origin} */
 function passageOrigin(keys) {
@@ -207,7 +208,10 @@ function passageOrigin(keys) {
   const ctx = typeof findEntryContext === 'function' ? findEntryContext(p[1], kind) : null;
   if (!ctx || !ctx.title) return none;
   if (ctx.screen === 'answers-entry') return answersOrigin(ctx, keys);
-  const reference = !ctx.collection || ctx.screen === 'hm-letter' ? ctx.title : ctx.title + ' (' + ctx.collection + ')';
+  const num = ctx.kind === 'letter' && ctx.entry && Number.isInteger(ctx.entry.num) && ctx.entry.num > 0 ? ctx.entry.num : 0;
+  const reference = !ctx.collection || ctx.screen === 'hm-letter' ? ctx.title
+    : num ? ctx.collection + ', Letter ' + num + ': ' + ctx.title
+      : ctx.title + ' (' + ctx.collection + ')';
   return { reference, target: siteTarget(ctx) };
 }
 
