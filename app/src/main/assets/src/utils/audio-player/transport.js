@@ -10,18 +10,22 @@ import {
   late,
   _library,
   _native,
+  NEXT_OFFLINE_MSG,
   _notify,
   _pendingRestore,
+  PREV_OFFLINE_MSG,
   _setPendingRestore,
   _setReadingRate,
   _setSource,
   _state,
+  _toast,
 } from './core.js';
 import { _setSongRecordPending } from './credit.js';
 import {
   _clearOfflineSkip,
   _clearStallWatchdog,
   _errorTime,
+  _forgetLastGood,
   _lastTick,
   _markPaused,
   _seekOnMetadata,
@@ -33,7 +37,7 @@ import {
 } from './engine.js';
 import { _clearLoop, _clearLoopTimer, LOOP_SLACK_S } from './loop.js';
 import { _clearMediaSession, _setAudioActive, _syncMediaSessionPosition, _syncNative } from './media-session.js';
-import { _holdsOtherForm, _srcFor, _unreachable } from './offline.js';
+import { _holdsOtherForm, _offlineRefuses, _srcFor, _unreachable } from './offline.js';
 import {
   _clearPersist,
   _persist,
@@ -106,11 +110,12 @@ export function toggle() {
 
 /**
  * Advance one track; extend into the next unit of the site order at the end of the queue, and
- * stop() only at the end of the order. Also the 'ended' handler.
+ * stop() only at the end of the order. Also the 'ended' handler, which passes `atSeam` true.
  *
+ * @param {boolean} [atSeam] the recording ended (nothing is left playing to keep): no offline refusal
  * @returns {void}
  */
-export function next() {
+export function next(atSeam) {
   if (!_state.queue.length) return;
   // A restored bar's queue is a placeholder. The rebuild alone resumes the SAVED recording, which is Play, not Next:
   // once the real queue is in, step past it (sweep v021). A tap while the rebuild still waits for its corpus joins
@@ -123,6 +128,14 @@ export function next() {
     void _rebuildRestored().then((built) => {
       if (built === 'queue' && (_state.qi + 1 < _state.queue.length || _repeatMode() === 'all')) next();
     });
+    return;
+  }
+  // RC.1 (UX sweep re-check 2026-10-22): offline, a Next onto recordings that are not on the phone stopped the one
+  // playing from its buffer and parked a 0:00 bar over Home. With nothing ahead on the phone it is refused before
+  // qi moves, and the one playing plays on; with something ahead on it, _start passes over the rest to reach it.
+  // A seam has nothing left to keep: it moves on and pauses on what cannot load, with the offline notice (item 8).
+  if (atSeam !== true && _state.qi + 1 < _state.queue.length && _offlineRefuses(_state.queue.slice(_state.qi + 1))) {
+    _toast(NEXT_OFFLINE_MSG);
     return;
   }
   _rememberOutgoingPosition();   // R8 — attribute the clock before qi moves
@@ -165,6 +178,8 @@ export function prev() {
   // Landing on the track already playing: a seek, not a reload — the stream
   // stays open and the position is the only thing that moves.
   if (target === _state.qi && _el) { seek(0); return; }
+  // RC.1: the same refusal stepping back onto a recording that is not on the phone.
+  if (_offlineRefuses([_state.queue[target]])) { _toast(PREV_OFFLINE_MSG); return; }
   _rememberOutgoingPosition();   // R8 — same rule stepping backwards
   _state.qi = target;
   _start();
@@ -340,6 +355,7 @@ export function stop() {
   // The boot snapshot is the part that must not resurrect the bar.
   _setPendingRestore(null);
   _setSource(null);
+  _forgetLastGood();
   _clearPersist();
   _clearStallWatchdog();
   _clearSleepTimer(false);
