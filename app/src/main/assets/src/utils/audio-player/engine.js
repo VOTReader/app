@@ -353,8 +353,11 @@ function _onError() {
   // its own rule (navigator.onLine), so its toast and a retry from the bar are unchanged.
   const err = _el && /** @type {any} */ (_el).error;
   const failed = _state.queue[_state.qi];
-  const lostSignal = !!(err && err.code === 2 && _streamed(failed));
-  if (lostSignal) NetStatus.reportFailure();
+  if (err && err.code === 2 && _streamed(failed)) NetStatus.reportFailure();
+  // A streamed recording that could not be reached: MediaError 2 (the network failed mid-load), or 4, which is what a
+  // fetch that fails outright reports before any metadata (the HTML spec's "cannot be fetched at all"; the S22 measured
+  // it for a DNS miss, 2026-09-13). The assets are known-good MP3s, so a 4 there is the network as well (U04.2).
+  const lostSignal = !!(err && (err.code === 2 || err.code === 4) && _streamed(failed));
   // U04.2: a step that died at the network before it ever sounded goes back to what was playing, paused where it
   // was; the element still holds the failed recording, so toggle() re-loads the restored one and seeks to its place.
   const back = _lastGood;

@@ -2119,7 +2119,7 @@ describe('audio-player — load errors', () => {
 
   it('a failure that is not the network keeps the plain load-failure line', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
-    el().error = { code: 4 };
+    el().error = { code: 3 };   // MEDIA_ERR_DECODE
     el().dispatchEvent(new Event('error'));
     expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Couldn’t load this track.');
   });
@@ -4792,11 +4792,42 @@ describe('audio-player — a failed step keeps what was playing (RC.1, U04.2)', 
     expect(toast()).toBe('No signal. This recording isn’t on your phone.');
   });
 
-  it('a failure that is not the network keeps the new recording and the plain line', () => {
+  /* A fetch that fails outright reports MediaError 4, not 2: before any metadata the HTML spec says "the media data
+     cannot be fetched at all" is SRC_NOT_SUPPORTED, and the S22 measured exactly that for a DNS miss (2026-09-13). A
+     dead zone's new recording never reaches metadata, so 4 is the case that matters most. */
+  it('a dead zone\'s usual failure, MediaError 4 before any metadata, puts back what was playing too', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     sounding(30);
     AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
     el().error = { code: 4 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idC'));
+    expect(AudioPlayer.getState().time).toBe(30);
+    expect(toast()).toBe('No signal. This recording isn’t on your phone.');
+  });
+
+  it('a second try at the same recording with nothing played between lands on it, so it can be stepped past', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    sounding(45);
+    AudioPlayer.next();
+    el().error = { code: 4 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idPreface'));
+    el().error = null;
+    AudioPlayer.next();
+    el().error = { code: 4 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idA1'));             // landed on it this time
+    el().error = null;
+    AudioPlayer.next();
+    expect(here()).toBe(URL_OF('idA2'));             // and the listener steps past it
+  });
+
+  it('a failure that is not the network keeps the new recording and the plain line', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    sounding(30);
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    el().error = { code: 3 };   // MEDIA_ERR_DECODE
     el().dispatchEvent(new Event('error'));
     expect(here()).toBe(URL_OF('idSolo'));
     expect(toast()).toBe('Couldn’t load this track.');
