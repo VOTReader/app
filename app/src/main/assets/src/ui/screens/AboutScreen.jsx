@@ -18,8 +18,24 @@ export function songMakers() {
   return Array.from(count.keys()).sort((a, b) => count.get(b) - count.get(a));
 }
 
+/** Re-render About when the song catalog lands, and ask for it once About has painted (s18.4): a fresh install opens
+    here, before Home asks for it (the same once-per-launch fetch, HomeScreen's useSongCatalogCount). */
+function useSongCatalog() {
+  const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (cat ? cat.subscribe(cb) : () => {}), [cat]),
+    () => (cat ? cat.getVersion() : 0)
+  );
+  React.useEffect(() => {
+    if (!cat || cat.loaded) return undefined;
+    const t = setTimeout(() => { if (!cat.loaded) void cat.load(); }, 1500);
+    return () => clearTimeout(t);
+  }, [cat]);
+}
+
 export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
   const [page, setPage] = React.useState(1);
+  useSongCatalog();
 
   const handleBack     = page === 2 ? () => setPage(1) : onBack;
   const handleContinue = page === 1 ? () => setPage(2) : onContinue;
