@@ -153,10 +153,13 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   };
 
   if (isDirect) {
+    // A verse card quotes the verse, so its head says it is the way in (search200 audit 6):
+    // "Open at John 3:16". A chapter keeps its bare reference over "Open chapter".
+    const atVerse = !!(entry.ref && entry.ref.verseStart);
     return (
       <button className="srch-card card-direct" onClick={() => onSelect(entry)}>
         <div className="srch-card-top">
-          <span className="srch-card-ref">{entry.__label}</span>
+          <span className="srch-card-ref">{atVerse ? 'Open at ' + entry.__label : entry.__label}</span>
         </div>
         <div className="srch-card-snippet">{entry.__sub || 'Go'}</div>
       </button>

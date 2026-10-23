@@ -356,3 +356,23 @@ it('a text only the meaning search found shows the passage it matched, not its o
   );
   expect(container.querySelector('.srch-card-snippet').textContent.startsWith('Remember now your Creator')).toBe(true);
 });
+
+/* search200 audit 6 (A03.2): a verse reference's card quotes the verse, so it read like one more result,
+   not the door into the reader. Its head says where it opens: "Open at John 3:16". A chapter's card keeps
+   its bare reference over "Open chapter", and a letter reference its own label. */
+describe('a direct reference card says where it opens (audit 6)', () => {
+  const head = (/** @type {any} */ e) => {
+    const { container } = render(<SrchCard entry={e} terms={[]} onSelect={() => {}} isDirect />);
+    const t = container.querySelector('.srch-card-ref').textContent;
+    cleanup();
+    return t;
+  };
+  it('a verse, a range: "Open at …"', () => {
+    expect(head({ __direct: true, __label: 'John 3:16', __sub: 'For God so loved the world', ref: { kind: 'ref-bible', chapter: 3, verseStart: 16 } })).toBe('Open at John 3:16');
+    expect(head({ __direct: true, __label: 'John 3:16-18', __sub: 'For God…', ref: { kind: 'ref-bible', chapter: 3, verseStart: 16, verseEnd: 18 } })).toBe('Open at John 3:16-18');
+  });
+  it('a chapter and a letter keep their label', () => {
+    expect(head({ __direct: true, __label: 'John 3', __sub: 'Open chapter', ref: { kind: 'ref-bible', chapter: 3 } })).toBe('John 3');
+    expect(head({ __direct: true, __label: 'Volume Two · Letter 5', __sub: 'Open letter', ref: { kind: 'ref-letter' } })).toBe('Volume Two · Letter 5');
+  });
+});
