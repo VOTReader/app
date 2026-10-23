@@ -164,12 +164,9 @@ function SegRow({ name, value, options, onChange }) {
  * @param {{ web: ReturnType<typeof useWebFilters>, graph: any }} p
  */
 export function FilterSheet({ web, graph }) {
-  const ref = React.useRef(/** @type {HTMLDivElement | null} */ (null));
-  React.useEffect(() => {
-    // the sheet takes the keyboard as it opens, so Tab starts in it
-    const first = ref.current && ref.current.querySelector('button');
-    if (first) first.focus({ preventScroll: true });
-  }, []);
+  // the keyboard goes in as it opens and back where it was as it closes (use-focus-trap.js); not
+  // modal: the web behind it is the point, showing what the filters leave
+  const ref = useFocusTrap(true, { modal: false });
   if (!graph) return null;
   const f = web.filters;
   const books = graph.books || [];
@@ -189,7 +186,7 @@ export function FilterSheet({ web, graph }) {
   );
   const count = web.on ? web.shown : -1;
   return (
-    <div className="sw-filter-sheet" ref={ref} role="dialog" aria-label="Filters" data-wheel-through="1">
+    <div className="sw-filter-sheet" ref={ref} role="dialog" aria-modal="false" aria-label="Filters" data-wheel-through="1">
       <div className="sw-filter-head">
         <h2>Filters</h2>
         <span className="sw-filter-count" aria-live="off">
