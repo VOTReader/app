@@ -308,7 +308,7 @@ var NAMED_PASSAGES = [
   { keys:['tongue is a fire','taming the tongue'],                         bookId:'james',         chapter:3 },
 
   // ─── OT narrative (Genesis) ───
-  { keys:['creation','creation account','creation story','in the beginning'], bookId:'genesis',    chapter:1 },
+  { keys:['creation story','in the beginning'],                            bookId:'genesis',       chapter:1 },
   { keys:['fall of man','fall','the fall','garden of eden','adam and eve'], bookId:'genesis',      chapter:3 },
   { keys:['cain and abel'],                                                bookId:'genesis',       chapter:4 },
   { keys:['noahs ark',"noah's ark",'the flood','noah and the flood'],      bookId:'genesis',       chapter:6,  chapterEnd:9 },
@@ -433,7 +433,8 @@ var SYNONYM_GROUPS = [
   ['holy spirit','holy ghost','ruach hakodesh','comforter','advocate','helper'],
   ['heaven','heavens','paradise','celestial'],
   ['hell','sheol','hades','gehenna','grave','pit','lake of fire'],
-  ['satan','devil','adversary','accuser','lucifer','dragon','serpent'],
+  // "adversary" is the enemy group's alone (a word in two groups read only the last; search200 bugcheck #8)
+  ['satan','devil','accuser','lucifer','dragon','serpent'],
   ['angel','angels','messenger','heavenly host'],
   ['prayer','supplication','intercession','petition'],
   ['sin','iniquity','transgression','trespass','wickedness'],
