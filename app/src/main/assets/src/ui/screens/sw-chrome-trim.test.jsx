@@ -32,6 +32,21 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DRAWN = [];
+/* search-data.js is a classic script that sets window.VotSearchData when it first runs, and a second
+   import() in this file is the cached module: it runs nothing. Each test puts the old value back, so keep
+   the table from the one run and hand it to every test that asks (shuffled seed 99 ran Back first). */
+let SEARCH_DATA = null;
+async function useSearchData() {
+  if (!SEARCH_DATA) {
+    const prev = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+    SEARCH_DATA = window.VotSearchData;
+    window.VotSearchData = prev;
+  }
+  window.VotSearchData = SEARCH_DATA;
+}
+
 vi.mock('../../utils/scripture-web/decode.js', async (importOriginal) => {
   const real = /** @type {any} */ (await importOriginal());
   return { ...real, decodeGraph: vi.fn(() => graph()) };
@@ -148,8 +163,7 @@ describe('the Scripture Web chrome, trimmed', () => {
   it('renders no dead "Go to": the search button that replaced it opens a working box', async () => {
     // the app's own book table (bundle-d ships it beside the web): the box reads names through it
     const prev = window.VotSearchData;
-    // @ts-ignore -- a classic script: it sets window.VotSearchData
-    await import('../../../search-data.js');
+    await useSearchData();
     const { container } = await mount();
     expect(screen.queryByRole('button', { name: /^go to$/i })).toBeNull();
     expect(container.querySelector('.sw-goto'), 'no box until asked').toBeNull();
@@ -172,8 +186,7 @@ describe('the Scripture Web chrome, trimmed', () => {
      one tap threw a reader who only meant to put the search away out to the Library. */
   it('Back with the box open puts the box away and stays on the web; the next Back leaves', async () => {
     const prev = window.VotSearchData;
-    // @ts-ignore -- a classic script: it sets window.VotSearchData
-    await import('../../../search-data.js');
+    await useSearchData();
     const onBack = vi.fn();
     const { container } = await mount({ onBack });
     fireEvent.click(screen.getByRole('button', { name: /go to a book, chapter or verse/i }));

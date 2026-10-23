@@ -37,7 +37,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { usePersistedState, RESUME_STATE_KEY, RESUME_STATE_MAX_AGE_MS, takeResumeState } from './use-persisted-state.js';
+import { usePersistedState, RESUME_STATE_KEY, RESUME_STATE_MAX_AGE_MS, takeResumeState, markSavedStateRead } from './use-persisted-state.js';
 import { useSavedState } from './use-saved-state.js';
 import { StateStore } from '../stores/state-store.js';
 import { IDBAdapter } from '../stores/idb-adapter.js';
@@ -82,6 +82,8 @@ afterEach(() => {
   // The export flush bridge is hook-owned; never leak a registration.
   delete /** @type {any} */ (window).__flushPersistState;
   delete /** @type {any} */ (window).__freezePersistState;
+  // ds5 s04.1's module flag: a throwing read left last would hold every later mount's writes.
+  markSavedStateRead(false);
 });
 
 /* ═══════════════════════════════════════════════════════════════════

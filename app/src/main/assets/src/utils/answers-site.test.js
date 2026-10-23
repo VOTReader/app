@@ -395,7 +395,9 @@ describe('answersSiteShelves', () => {
   });
 
   it('builds once per corpus array, and copes with none', () => {
-    expect(answersSiteShelves(A)).toBe(shelves);
+    // The cache holds one corpus, and other tests ask for other arrays first: compare
+    // two calls in a row, not with the collection-time `shelves`.
+    expect(answersSiteShelves(A)).toBe(answersSiteShelves(A));
     expect(answersSiteOrder(A)).toBe(answersSiteOrder(A));
     const empty = answersSiteShelves([]);
     expect(empty.length).toBe(24);

@@ -16,8 +16,16 @@
      - replaceAll (import path) not defaulting missing fields.
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { ReadingStreakStore } from './reading-streak-store.js';
+
+// The module wires a one-shot subscriber that runs recomputeFromLoad on the store's first change once
+// loaded (in the app: the hydration). Spend it here, or it fires inside whichever test writes first and
+// breaks a streak that test seeded days back (shuffled seed 2026).
+beforeAll(() => {
+  ReadingStreakStore._resetForTests({ forceLoaded: true });
+  ReadingStreakStore._bump();
+});
 
 beforeEach(() => {
   localStorage.clear();
