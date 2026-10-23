@@ -3945,6 +3945,27 @@ async function searchWords(query, options) {
   // A title named first was found by no passage: its same-titled reprints were admitted beside it.
   if ((!out.length || !titleTop.has(out[0])) && reprintSecond(out, (p.phrase ? [p.phrase] : run ? [run] : []).concat(filtered.filter((t) => !isStopTerm(t))),
     idOf, (d) => allowed(d) && fresh(d)) && out.length > limit) { out.length = limit; over = true; }
+  /* A QUESTION'S SUBJECT IS HELD (search200 wave 3, U02.5, 2026-10-23). "who is Timothy" listed, past the few texts
+     naming him, verses holding only "who is" ("he who is unjust"), above two hundred texts naming Timothy; "what is the
+     bride" led with twelve verses saying "what is". A text found by a question's frame words alone (questionFrame), or
+     by its small words, answers nothing asked: it goes after the texts holding a word of the subject, in its order. Not a text the model
+     ranked (it reads the question whole), a title named or one the admission placed. */
+  if (frame && out.length > 1) {
+    const frameSet = new Set(joinApostropheS(kjvEncode(frame.frame)));
+    const semIds = new Set((sem || []).map((s) => s.id));
+    const frameOnly = (/** @type {any} */ e) => {
+      const ts = e.terms || [];
+      return ts.every((/** @type {string} */ t) => frameSet.has(t) || STOP.has(t)) && !semIds.has(idOf.get(e) || '') &&
+        !named(e.doc) && !admittedDocs.has(e.doc) && !titleTop.has(e);
+    };
+    const asked = out.filter((e) => !frameOnly(e));
+    if (asked.length && asked.length < out.length) {
+      const rest = out.filter(frameOnly);
+      out.length = 0;
+      for (const e of asked) out.push(e);
+      for (const e of rest) out.push(e);
+    }
+  }
   /* HOW SURE THE MEANING IS OF A RESULT (search200 ideas F). The screen's topic card names an Answers topic only when
      the model is sure of it: each result the model ranked carries its cosine (`meaning`), however far down the words
      put it ("what happens when we die?" listed keyword verses first and the topics that answer it last, the hub walk
