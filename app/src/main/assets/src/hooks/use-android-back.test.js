@@ -978,6 +978,32 @@ describe('useAndroidBack — W1.5(d) popstate + root double-tap exit (web only)'
     expect(props.goNavOrigin).not.toHaveBeenCalled();
   });
 
+  it('a Back router that throws clears the suppress flag and keeps the app mounted (mw17 s02.3)', async () => {
+    const { isArmed } = await import('../utils/root-exit-toast.js');
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const props = baseProps({ screen: 'settings' });
+    props.goNavOrigin.mockImplementation(() => { throw new Error('router bug'); });
+    renderHook(() => useAndroidBack(props));
+    expect(() => pop()).not.toThrow();
+    expect(suppress).toHaveBeenCalledTimes(1);
+    expect(clear).toHaveBeenCalledTimes(1);    // the next real navigation pushes its entry
+    expect(pushSpy).toHaveBeenCalledTimes(1);  // the popped entry is put back: the app stays
+    expect(isArmed()).toBe(false);             // not treated as a Back at the root
+    expect(err).toHaveBeenCalled();
+    err.mockRestore();
+  });
+
+  it('Escape with a Back router that throws clears the suppress flag too (mw17 s02.3)', () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const props = baseProps({ screen: 'settings' });
+    props.goNavOrigin.mockImplementation(() => { throw new Error('router bug'); });
+    renderHook(() => useAndroidBack(props));
+    expect(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))).not.toThrow();
+    expect(suppress).toHaveBeenCalledTimes(1);
+    expect(clear).toHaveBeenCalledTimes(1);
+    err.mockRestore();
+  });
+
   it('a navigating back arms suppress and pushes nothing', () => {
     const props = baseProps({ screen: 'settings' });
     renderHook(() => useAndroidBack(props));

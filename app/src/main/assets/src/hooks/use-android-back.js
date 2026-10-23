@@ -180,6 +180,25 @@ import {
  * @param {Record<string, any>} args  the deliberately-wide param bag
  * @returns {void}
  */
+/**
+ * The web Back paths' call into handleAndroidBack: its "true"/"false", or
+ * "false" when it is not installed. A throw (a bug in a branch) used to skip
+ * every clear of the suppress flag that Escape and popstate arm first, so the
+ * next real navigation silently pushed no history entry (mw17 s02.3). It now
+ * clears the flag, logs, and answers "error".
+ * @returns {string}
+ */
+function runBackRouter() {
+  if (typeof window.handleAndroidBack !== 'function') return 'false';
+  try {
+    return window.handleAndroidBack();
+  } catch (e) {
+    clearSuppressNextHistoryPush();
+    console.error('[back] the Back router threw', e);
+    return 'error';
+  }
+}
+
 export function useAndroidBack({
   screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
   fromSearchIndex = false, setFromSearchIndex = undefined,
@@ -497,9 +516,8 @@ export function useAndroidBack({
       // uses so the back-induced state change doesn't trigger a
       // redundant pushState.
       suppressNextHistoryPush();
-      const result = (typeof window.handleAndroidBack === 'function')
-        ? window.handleAndroidBack()
-        : 'false';
+      const result = runBackRouter();
+      if (result === 'error') return;   // runBackRouter cleared the flag; nothing moved
       if (result === 'false') {
         // Root of stack — handleAndroidBack didn't navigate. Clear the
         // suppress flag so the next legitimate user nav pushes normally.
@@ -592,9 +610,13 @@ export function useAndroidBack({
       // handleAndroidBack returns the STRING "true" / "false" (not
       // boolean) — it's an @JavascriptInterface return value originally
       // shaped for Kotlin. Compare against 'false' as a string.
-      const result = (typeof window.handleAndroidBack === 'function')
-        ? window.handleAndroidBack()
-        : 'false';
+      const result = runBackRouter();
+      if (result === 'error') {
+        // The router threw and nothing moved, but this pop already spent an
+        // entry: put one back so the app stays, without arming the root exit.
+        pushHistoryEntry();
+        return;
+      }
       if (result !== 'false') {
         // Navigation happened. handleAndroidBack already updated state;
         // useHistorySync's effect will fire next render, see suppress
