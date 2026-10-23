@@ -230,6 +230,14 @@ describe('TourController — shouldPrompt', () => {
     expect(TourController.shouldPrompt({ screen: 'home' })).toBe(true);
     expect(TourController.shouldPrompt({ screen: 'settings' })).toBe(false);
   });
+  it('also prompts over the first letter, where first run lands (n114), and over no other letter', () => {
+    AboutSeenFlagStore.set();
+    const first = TourController.firstLetter();
+    expect(first).toEqual({ volKey: 'one', id: 'chosen-by-god', screen: 'vot-one-letter' });
+    expect(TourController.shouldPrompt({ screen: first.screen, letterId: first.id })).toBe(true);
+    expect(TourController.shouldPrompt({ screen: first.screen, letterId: 'the-wide-path' })).toBe(false);
+    expect(TourController.shouldPrompt({ screen: 'wtlb-entry', letterId: first.id })).toBe(false);
+  });
   it('never before About is seen, never after the flag, never while running, not after Maybe later', () => {
     expect(TourController.shouldPrompt({ screen: 'home' })).toBe(false);
     AboutSeenFlagStore.set();

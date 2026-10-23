@@ -35,7 +35,7 @@
    tabs hint: not precious, and a lost stamp only means the offer returns.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { TOUR_STEPS, TOUR_STOPS_WORD, TOUR_MINUTES_WORD, HIGHLIGHT_GESTURE_WORDS, nextIndex, prevIndex, findTarget } from './tour-steps.js';
+import { TOUR_STEPS, TOUR_STOPS_WORD, TOUR_MINUTES_WORD, HIGHLIGHT_GESTURE_WORDS, FIRST_LETTER, nextIndex, prevIndex, findTarget } from './tour-steps.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
 /** How long "Maybe later" keeps the Home offer away, across launches. */
@@ -253,6 +253,9 @@ export const TourController = {
       the same string the highlight stop opens with, owned by tour-steps.js, reached only through here. */
   highlightWords() { return HIGHLIGHT_GESTURE_WORDS; },
 
+  /** Volume One, Letter 1 ({ volKey, id, screen }), for first run's Begin Reading in bundle d (n114). */
+  firstLetter() { return FIRST_LETTER; },
+
   /** The minutes the same sentences promise ("about three minutes"), owned by tour-steps.js like the count. */
   minutesWord() { return TOUR_MINUTES_WORD; },
 
@@ -356,8 +359,11 @@ export const TourController = {
   },
 
   /** Home only, after About, not once the flag is set, not while running, not within three days of Maybe later. */
-  shouldPrompt(/** @type {{screen?: string}} */ { screen } = {}) {
-    if (screen !== 'home' || state.active || state.promptDismissed) return false;
+  /* Home, or the first letter (n114, A08.1): first run's Begin Reading opens that letter, so the
+     offer meets the reader there instead of waiting for Home. */
+  shouldPrompt(/** @type {{screen?: string, letterId?: string|null}} */ { screen, letterId } = {}) {
+    const here = screen === 'home' || (screen === FIRST_LETTER.screen && letterId === FIRST_LETTER.id);
+    if (!here || state.active || state.promptDismissed) return false;
     if (laterSnoozed()) return false;
     try {
       if (!AboutSeenFlagStore.is()) return false;

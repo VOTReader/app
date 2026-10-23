@@ -12,7 +12,8 @@
    a dialog — a reader who ignores it loses nothing.
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function TourPrompt({ screen }) {
+/** @param {{ screen: string, letterId?: string|null }} props */
+export function TourPrompt({ screen, letterId }) {
   const ctl = typeof TourController !== 'undefined' ? TourController : null;
   React.useSyncExternalStore(
     React.useCallback((cb) => (ctl ? ctl.subscribe(cb) : () => {}), [ctl]),
@@ -30,7 +31,7 @@ export function TourPrompt({ screen }) {
     React.useCallback((cb) => (_done ? _done.subscribe(cb) : () => {}), [_done]),
     () => (_done ? _done.getVersion() : 0)
   );
-  const show = !!(ctl && ctl.shouldPrompt({ screen }));
+  const show = !!(ctl && ctl.shouldPrompt({ screen, letterId }));
   // The strip is fixed over the foot of Home, and on a 699 px phone it covers the last tile
   // (Settings) with nothing to scroll it clear (emulator, 2026-09-04). Like the player bar
   // (body.audio-bar-open), it declares itself: a body class and its measured height, and

@@ -223,7 +223,7 @@ export function AppShellOverlays({
       })()}
       {/* "Show me around": the strip on Home and the tour itself, both bundle-d free globals
           (guarded like every shell free global: unit tests render the shell without them). */}
-      {typeof TourPrompt !== 'undefined' ? <TourPrompt screen={screen} /> : null}
+      {typeof TourPrompt !== 'undefined' ? <TourPrompt screen={screen} letterId={tabs && tabs[activeTabIdx] ? tabs[activeTabIdx].letterId : null} /> : null}
       {typeof TourOverlay !== 'undefined' ? <TourOverlay /> : null}
     </>
     </ErrorBoundary>

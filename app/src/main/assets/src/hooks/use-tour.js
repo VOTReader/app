@@ -25,8 +25,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { TourController } from '../utils/tour-controller.js';
+import { FIRST_LETTER } from '../utils/tour-steps.js';
 
-export const TOUR_LETTER = Object.freeze({ id: 'chosen-by-god', screen: 'vot-one-letter' });
+export const TOUR_LETTER = FIRST_LETTER;
 const TOUR_BIBLE = Object.freeze({ bookId: 'john', chapterNum: 3, screen: 'bible-ch' });
 
 export function useTour({ goHome, goJournalHub, goReadingPlans, goSettings, setScreen, setLetterId, setBookId, setChapterNum }) {

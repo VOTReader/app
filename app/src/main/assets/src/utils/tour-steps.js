@@ -95,6 +95,10 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
     Note", and the bar has no Highlight button. */
 export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A bar appears: tap a colour to highlight it, or choose Note, Link, Copy or Share.';
 
+/** THE FIRST LETTER (n114, A08.1): Volume One, Letter 1, "Chosen by God" (short, with a recording). The tour's
+    letter stops open it, first run's Begin Reading opens it, and the tour is offered over it there. */
+export const FIRST_LETTER = Object.freeze({ volKey: 'one', id: 'chosen-by-god', screen: 'vot-one-letter' });
+
 /** The full player's ⌄ button, as the card that points at it names it (sheets close with ×; ‹ is only Back). */
 const CLOSE_GLYPH = '⌄';
 

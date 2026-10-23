@@ -1110,7 +1110,17 @@ export function buildScreenRoutes({
     ),
     'about': () => (
       <AboutScreen
-        onContinue={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
+        onContinue={() => {
+          /* n114 (A08.1): first run's Begin Reading opens Volume One, Letter 1 (it landed on Home, three taps
+             from any reading); the tour is offered over that letter. About opened later, from (i), still goes back. */
+          const firstRun = !navOrigin && !AboutSeenFlagStore.is();
+          AboutSeenFlagStore.set();
+          if (!firstRun) { goNavOrigin(); return; }
+          const first = TourController.firstLetter();
+          _startNewTrail(); setLetterId(first.id);
+          setActiveReadKey('vol:' + first.volKey, () => setLastReadForVol(first.volKey, first.id));
+          setScreen(first.screen);
+        }}
         onBack={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
         onSearch={goSearch}
         onHistory={goHistory}
