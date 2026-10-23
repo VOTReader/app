@@ -20,6 +20,9 @@ const LEX = Object.assign(Object.create(null), {
   took: 'take', taken: 'take', knew: 'know', known: 'know', saw: 'see', seen: 'see', made: 'make', heard: 'hear', an: 'a',
 });
 const KEEP_EST = /(rest|best|test|west|nest|feast|beast|least|priest|forest|honest|harvest)$/;
+/** Words whose final -e is the word (search200 bugcheck #7): "thee" met every "the" at the rare word's weight, and
+ *  "thine" met "thin". */
+const KEEP_E = new Set(['thee', 'thine']);
 /** @type {Map<string, string>} */
 const LEMMAS = new Map();
 
@@ -43,7 +46,7 @@ export function lemma(t) {
     else if (l.length > 4 && /ed$/.test(l)) l = l.slice(0, -2);
   }
   // The final -e last, on the table's roots too: come, comes, came and cometh all meet as "com".
-  if (l.length > 3 && /e$/.test(l)) l = l.slice(0, -1);
+  if (l.length > 3 && /e$/.test(l) && !KEEP_E.has(l)) l = l.slice(0, -1);
   if (LEMMAS.size > 50000) LEMMAS.clear();
   LEMMAS.set(t, l);
   return l;

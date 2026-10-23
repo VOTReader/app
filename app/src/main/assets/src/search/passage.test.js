@@ -40,3 +40,15 @@ describe('bestWindow: the share of a query one passage holds', () => {
     expect(bestWindow([], text('lamb'), 12)).toBe(0);
   });
 });
+
+/* search200 bugcheck #7: "thee" lost its final -e and met every "the" (and "thine" met "thin"), at the rare word's weight. */
+describe('lemma: thee and thine stay themselves', () => {
+  it('thee is not the, thine is not thin', () => {
+    expect(lemma('thee')).not.toBe(lemma('the'));
+    expect(lemma('thine')).not.toBe(lemma('thin'));
+  });
+  it('a text holding "the" but no "thee" does not hold the typed thee', () => {
+    const query = q([['praise', 1], ['thee', 1], ['heart', 1]]);
+    expect(bestWindow(query, text('I will praise the LORD with my whole heart'), 12)).toBeCloseTo(2 / 3, 5);
+  });
+});
