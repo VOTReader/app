@@ -56,7 +56,11 @@ const BUDGETS = [
   // nothing pulled in. Re-baselined UP by the same rule: 310,748 x 1.15 =
   // 357,360.2 -> the hundred above.
   { file: 'bundle-b.js', measured: 310748, max: 357400 },   // stores/hooks/journal machinery/bridge
-  { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
+  // 2026-10-23, pl-l0 batch C (RC.13): one box per highlight and the note icon kept with its word, on both
+  // paint paths (React verses + the letters' DOM pass), added 1,865 B of real code; the delete-confirm
+  // helper it shares (mark-overlap.js uncoveredLine) is tree-shaken out. Re-baselined UP by the same
+  // rule: 23,103 x 1.15 = 26,568.5 -> the hundred above.
+  { file: 'bundle-c.js', measured: 23103, max: 26600 },    // renderer
   // 2026-09-22, landing 21: the four Personal Study screens (My Progress,
   // Notes, Links, Highlights) LEFT this bundle for bundle-g, -46,043 B off the
   // cold-boot parse path. Re-baselined DOWN (510,376 x 1.15 = 586,932 -> the

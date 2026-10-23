@@ -296,6 +296,46 @@ export const AudioLibraryStore = extendStore(
       return want;
     },
 
+    /** The saved shelf's cap, for the line that says a save pushed one off (utils/saved-shelf.js). */
+    maxSaved: MAX_SAVED_AUDIO_TRACKS,
+
+    /**
+     * s09.3 (idea sweep 2026-10-22): the saved recording a save of `track` would push off the full shelf (the oldest),
+     * or null: room left, already saved, or a song (songs keep their own shelf).
+     *
+     * @param {unknown} track
+     * @returns {SavedAudioTrack | null}
+     */
+    wouldEvict(track) {
+      const normalized = normalizeAudioTrack(track);
+      if (!normalized || songIdOfKey(normalized.key)) return null;
+      const saved = _readView(this).saved;
+      if (saved.length < MAX_SAVED_AUDIO_TRACKS || saved.some((item) => item.url === normalized.url)) return null;
+      return { ...saved[saved.length - 1] };
+    },
+
+    /**
+     * Undo of a save that pushed `pushed` off the full shelf: `track` comes off again and `pushed` goes back last,
+     * with its own savedAt.
+     *
+     * @param {unknown} track
+     * @param {SavedAudioTrack} pushed
+     * @returns {void}
+     */
+    undoEviction(track, pushed) {
+      const normalized = normalizeAudioTrack(track);
+      const back = normalizeAudioTrack(pushed);
+      if (!normalized || !back) return;
+      if (this._shouldDefer('undoEviction', track, pushed)) return;
+      const data = _writeableData(this);
+      data.saved = data.saved.filter((item) => item.url !== normalized.url);
+      if (!data.saved.some((item) => item.url === back.url)) data.saved.push({ ...back, savedAt: Number(pushed.savedAt) || Date.now() });
+      data.saved = data.saved.slice(0, MAX_SAVED_AUDIO_TRACKS);
+      this._cache = data;
+      this._save();
+      this._bump();
+    },
+
     /**
      * Put a playback start at the top of the bounded recent list. A repeat of
      * the same release asset moves its one row forward instead of creating

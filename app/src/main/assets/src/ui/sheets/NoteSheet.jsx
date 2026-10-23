@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { shareText } from '../../utils/copy-share.js';
 import { passageLinkFor } from '../../utils/passage-link.js';
@@ -141,9 +142,11 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
 
   // ds5 A06.1: the delete takes the note's mark with it, so the confirm says so, as the toolbar's
   // remove does. An icon-only note (a blank highlight) has no visible mark to name.
-  const deleteQuestion = (curStyle === 'highlight' && color === 'blank')
+  // RC.11: and when that mark sat over an older one, the older one comes back, so it says that too.
+  const deleteQuestion = [(curStyle === 'highlight' && color === 'blank')
     ? 'Delete this note?'
-    : `Delete this note and its ${curStyle === 'highlight' ? 'highlight' : curStyle === 'underline' ? 'underline' : 'squiggle'}?`;
+    : `Delete this note and its ${curStyle === 'highlight' ? 'highlight' : curStyle === 'underline' ? 'underline' : 'squiggle'}?`,
+  uncoveredLine([groupId], AnnotationStore)].filter(Boolean).join(' ');
 
   const remove = () => {
     AnnotationStore.removeGroup(groupId);

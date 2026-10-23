@@ -878,3 +878,127 @@ describe('noteNotebookColor + icon tinting [11b]', () => {
     expect(svg.style.stroke).toBe('var(--hl-teal)');
   });
 });
+
+/* RC.13 (UX sweep 2026-10-22): a highlight cut into pieces by an older mark under part of it showed gaps between its
+   pieces (sel/21: the blank older mark kept its padding, and every piece kept its own padding and rounding), and the
+   note icon after "teacher" wrapped alone onto the next line (sel/39: Chrome breaks before an inline-block even after a
+   word joiner, so only a nowrap wrapper keeps it). Now each run reads as one box, and the icon keeps its last word. */
+describe('RC.13 one highlight, one box; the note icon stays with its word', () => {
+  const TEXT = 'draw short, Timothy, and soon all things must come';
+  const marks = (root, id) => [...root.querySelectorAll('mark[data-hl-id="' + id + '"]')];
+  const has = (el, cls) => el.classList.contains(cls);
+  let store;
+  beforeEach(() => {
+    store = {};
+    window.AnnotationStore = {
+      get: (k) => store[k] || [],
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+    window.NoteStore = {
+      _notes: {},
+      get: (gid) => window.NoteStore._notes[gid] || null,
+      subscribe: () => () => {},
+      getVersion: () => 0,
+      getVersionForKey: () => 0,
+    };
+  });
+  afterEach(() => {
+    cleanup();
+    document.body.innerHTML = '';
+    delete window.AnnotationStore;
+    delete window.NoteStore;
+  });
+  const overlap = () => [
+    ann({ id: 'y', color: 'yellow', start: 12, end: 19, created: 1 }),   // "Timothy", the older mark
+    ann({ id: 'g', color: 'green', start: 0, end: 45, created: 2 }),     // "draw short, ... things must"
+  ];
+  const domSetup = () => {
+    document.body.innerHTML = '<span data-hl-key="k" data-hl-dom>' + TEXT + '</span>';
+    return /** @type {HTMLElement} */ (document.querySelector('[data-hl-key="k"]'));
+  };
+  const expectOneBox = (g) => {
+    expect(g.length).toBe(3);
+    expect(has(g[0], 'hl-cont-l')).toBe(false);
+    expect(has(g[0], 'hl-cont-r')).toBe(true);
+    expect(has(g[1], 'hl-cont-l') && has(g[1], 'hl-cont-r')).toBe(true);
+    expect(has(g[2], 'hl-cont-l')).toBe(true);
+    expect(has(g[2], 'hl-cont-r')).toBe(false);
+  };
+
+  it('React path: the inner seams of a cut highlight are marked as continuing; the blank older mark stays blank', () => {
+    store.k = overlap();
+    const { container } = render(<HighlightableText text={TEXT} hlKey="k" />);
+    expectOneBox(marks(container, 'g'));
+    const y = marks(container, 'y');
+    expect(y.length).toBe(1);
+    expect(has(y[0], 'hl-blank')).toBe(true);
+    expect(container.textContent).toBe(TEXT);
+  });
+
+  it('letters path: the same pieces carry the same continuation classes', () => {
+    store.k = overlap();
+    const c = domSetup();
+    applyDOMHighlights();
+    expectOneBox(marks(c, 'g'));
+    expect(has(marks(c, 'y')[0], 'hl-blank')).toBe(true);
+    expect(c.textContent).toBe(TEXT);
+  });
+
+  it('React path: the note icon and the last word sit in one nowrap wrapper; the text is unchanged', () => {
+    store.k = [ann({ id: 'g', color: 'green', start: 12, end: 45, created: 2 })];   // "Timothy, ... things must"
+    window.NoteStore._notes.g = { groupId: 'g', body: 'memo' };
+    const { container } = render(<HighlightableText text={TEXT} hlKey="k" />);
+    const keep = container.querySelector('.hl-keep');
+    expect(keep).not.toBeNull();
+    expect(keep.querySelector('.hl-note-icon')).not.toBeNull();
+    expect(keep.textContent).toBe('must');
+    const g = marks(container, 'g');
+    expect(g.map((m) => m.textContent)).toEqual(['Timothy, and soon all things ', 'must']);
+    expect(has(g[0], 'hl-cont-r') && has(g[1], 'hl-cont-l')).toBe(true);
+    expect(container.textContent).toBe(TEXT);
+  });
+
+  it('React path: a one-word highlight goes into the wrapper whole', () => {
+    store.k = [ann({ id: 'g', color: 'green', start: 12, end: 19, created: 2 })];   // "Timothy"
+    window.NoteStore._notes.g = { groupId: 'g', body: 'memo' };
+    const { container } = render(<HighlightableText text={TEXT} hlKey="k" />);
+    const keep = container.querySelector('.hl-keep');
+    expect(keep.textContent).toBe('Timothy');
+    expect(marks(container, 'g').length).toBe(1);
+  });
+
+  it('letters path: applyNoteIcons wraps the last word and the icon, again and again without nesting', () => {
+    store.k = [ann({ id: 'g', color: 'green', start: 12, end: 45, created: 2 })];
+    window.NoteStore._notes.g = { groupId: 'g', body: 'memo' };
+    const c = domSetup();
+    applyDOMHighlights();
+    applyNoteIcons();
+    applyNoteIcons();
+    const keeps = c.querySelectorAll('.hl-keep');
+    expect(keeps.length).toBe(1);
+    expect(keeps[0].textContent).toBe('must');
+    expect(keeps[0].querySelectorAll('.hl-note-icon').length).toBe(1);
+    expect(c.querySelectorAll('.hl-note-icon').length).toBe(1);
+    const g = marks(c, 'g');
+    expect(g.map((m) => m.textContent)).toEqual(['Timothy, and soon all things ', 'must']);
+    expect(has(g[0], 'hl-cont-r') && has(g[1], 'hl-cont-l')).toBe(true);
+    expect(c.textContent).toBe(TEXT);
+  });
+
+  it('letters path: a repaint after an edit leaves no wrapper behind', () => {
+    store.k = [ann({ id: 'g', color: 'green', start: 12, end: 45, created: 2 })];
+    window.NoteStore._notes.g = { groupId: 'g', body: 'memo' };
+    const c = domSetup();
+    applyDOMHighlights();
+    applyNoteIcons();
+    store.k = [ann({ id: 'g', color: 'blue', start: 12, end: 45, created: 2 })];   // recolor: a new signature
+    applyDOMHighlights();
+    expect(c.querySelectorAll('.hl-keep').length).toBe(0);
+    expect(c.querySelectorAll('mark').length).toBe(1);
+    expect(c.textContent).toBe(TEXT);
+    applyNoteIcons();
+    expect(c.querySelectorAll('.hl-keep').length).toBe(1);
+  });
+});

@@ -1822,10 +1822,13 @@
       .songs-tile-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:.1rem; }
       .songs-tile-copy strong { color:var(--cream); font-size:var(--fs-16); font-weight:400; line-height:1.25; }
       .songs-tile-copy small { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
-      .songs-shelves { display:grid; gap:.55rem; }
+      /* pl-l0 (player brief section 7): at 200% text a shelf row ran to 449 px on a 412 px screen. The grid's one
+         column grew to the row's min-content (the title's longest word plus a count that could not wrap); now the
+         column never passes the screen, the count wraps before the title has to, and the title keeps its words whole. */
+      .songs-shelves { display:grid; grid-template-columns:minmax(0,1fr); gap:.55rem; }
       .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .songs-shelf-title { flex:1; min-width:0; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
-      .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); white-space:nowrap; }
+      .songs-shelf-title { flex:1; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+      .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); text-align:right; }
       .songs-list-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.9rem; }
       .songs-list-actions .songs-play-all { width:auto; flex:1 1 10rem; }
       .songs-empty { margin:.5rem 0; color:var(--cream-dim); font-style:italic; }
@@ -4910,6 +4913,14 @@
        the note icon shows. No background, no decoration (no !important, so
        the .hl-note.is-active gold wash still shows the anchor when open). */
     .hl-blank { background: none; }
+    /* RC.13 (UX sweep 2026-10-22): one highlight, one box. A run cut into pieces (an older mark under part of it,
+       the note icon's word) keeps its padding and rounding at its two ends only, and a mark that paints nothing adds
+       no gap inside another's run. The note icon keeps its last word: Chrome breaks a line before an inline-block
+       even after a word joiner, so the word and the icon share a nowrap span. */
+    .hl-mark.hl-blank { padding: 0; }
+    .hl-mark.hl-cont-l { padding-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+    .hl-mark.hl-cont-r { padding-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .hl-keep { white-space: nowrap; }
     /* Trailing note icon — appears once per note group, after the
        last segment. Inline-block so it sits on the baseline; small
        enough not to disrupt line-height. */

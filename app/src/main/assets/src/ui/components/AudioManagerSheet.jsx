@@ -15,6 +15,7 @@ import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.js
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { hasTextDestination } from './AudioShelf.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** @returns {any | null} */
 function libraryStore() {
@@ -347,7 +348,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
         {songId ? (
           <SongDeskHead
             current={current} song={song} saved={saved} onClose={onClose}
-            onToggleSave={() => { if (library && typeof library.toggleSaved === 'function') library.toggleSaved(current); }}
+            onToggleSave={() => { toggleSavedRecording(library, current); }}
           />
         ) : (<>
         <div className="audio-manager-kicker">Listening now</div>
@@ -385,7 +386,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
             className={'audio-manager-save' + (saved ? ' is-saved' : '')}
             aria-pressed={saved}
             aria-label={saved ? 'Remove from saved recordings' : 'Save recording'}
-            onClick={() => { if (library && typeof library.toggleSaved === 'function') library.toggleSaved(current); }}
+            onClick={() => { toggleSavedRecording(library, current); }}
           >
             <svg viewBox="0 0 24 24" aria-hidden="true" fill={saved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 3.7l2.55 5.17 5.71.83-4.13 4.03.98 5.69L12 16.74l-5.11 2.68.98-5.69-4.13-4.03 5.71-.83L12 3.7z" />

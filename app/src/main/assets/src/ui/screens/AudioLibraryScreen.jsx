@@ -18,6 +18,7 @@
 
 import { studiesSummary } from './AudioStudiesScreen.jsx';
 import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote } from '../components/OfflineAudioControls.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -233,7 +234,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                   <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
                 </button>
               )}
-              <button type="button" className={'audio-library-icon-button audio-library-save-button' + (currentSaved ? ' is-saved' : '')} onClick={() => library && library.toggleSaved(current)} aria-label={currentSaved ? 'Remove current recording from saved recordings' : 'Save current recording'} aria-pressed={currentSaved} title={currentSaved ? 'Remove from saved recordings' : 'Save recording'}><StarIcon filled={currentSaved} /></button>
+              <button type="button" className={'audio-library-icon-button audio-library-save-button' + (currentSaved ? ' is-saved' : '')} onClick={() => toggleSavedRecording(library, current)} aria-label={currentSaved ? 'Remove current recording from saved recordings' : 'Save current recording'} aria-pressed={currentSaved} title={currentSaved ? 'Remove from saved recordings' : 'Save recording'}><StarIcon filled={currentSaved} /></button>
               {hasTextDestination(current) ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(current)} aria-label="Open current recording text" title="Open text"><TextIcon /></button> : null}
             </div>
             <NowProgress />

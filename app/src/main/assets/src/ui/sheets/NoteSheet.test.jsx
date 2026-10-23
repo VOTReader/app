@@ -348,4 +348,17 @@ describe('NoteSheet delete confirm names the mark that goes with the note (ds5 A
     expect(text).toContain('Delete this note?');
     expect(text).not.toContain('highlight');
   });
+
+  // RC.11 (UX sweep 2026-10-22, sel/21 -> sel/26): the green note's highlight covered an older yellow, and the
+  // yellow came back after the delete with no word. The confirm now says so.
+  it('says when the yellow under the note highlight shows again', () => {
+    setupStores({ body: 'my reflection' });
+    const green = { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'green', text: 'anchor', start: 0, end: 20, created: 2 };
+    window.AnnotationStore.getByGroup = () => [{ key: 'k', ann: green }];
+    window.AnnotationStore.get = () => [{ id: 'y1', groupId: 'y1', kind: 'highlight', color: 'yellow', start: 5, end: 9, created: 1 }, green];
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    openDelete(container);
+    expect(container.querySelector('.note-sheet-menu').textContent)
+      .toContain('Delete this note and its highlight? The yellow under it shows again.');
+  });
 });
