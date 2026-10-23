@@ -493,7 +493,7 @@ async function _assessImpl() {
   var remaining = (quota != null && usage != null) ? quota - usage : null;
   var persistedBool = persisted === true;
   // On the installed Android APK the WebView's IndexedDB/localStorage live in the
-  // app's PRIVATE data dir (android:allowBackup="false") — durable app data, NOT
+  // app's PRIVATE data dir — durable app data, NOT
   // subject to the browser's best-effort eviction that navigator.storage.persisted()
   // reflects. The API reports false there (no installed-PWA / site-engagement
   // heuristic can grant persistence inside a WebView), but nothing "cleans up" that

@@ -1,7 +1,8 @@
 /* Backup data plane — export-payload build + import-apply (U1/U14).
    ──────────────────────────────────────────────────────────────────
-   Export/Import is the ONLY backup mechanism in VOTReader
-   (allowBackup=false, no cloud sync, no account). Per
+   Export/Import is the only FULL backup in VOTReader (no cloud sync,
+   no account; Android's Google backup carries only the daily
+   SnapshotStore JSON, ds-backup 2026-10-23). Per
    [[user-data-paramount]] this is one of the most load-bearing
    surfaces in the codebase, so the DATA path is extracted here as
    pure, dependency-injected functions that can be exercised

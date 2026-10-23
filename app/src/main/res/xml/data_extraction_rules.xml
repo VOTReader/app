@@ -1,31 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+ backup/transfer opt-out (2026-08-09 audit fix).
+<!-- Android 12+ backup and device-transfer rules (ds-backup, Corbin 2026-10-23: Google backup on, to his own
+     Google account, audio downloads left out). Pre-12 twin: full_backup_content.xml (cloud rules only).
 
-     android:allowBackup="false" fully disables backup on Android 11 and
-     below, and still disables CLOUD backup on 12+ — but for apps targeting
-     SDK 31+ it no longer covers DEVICE-TO-DEVICE transfer (the new-phone
-     migration flow), which would copy the app's data dir (all IndexedDB /
-     DOM-storage user data lives there) without consulting allowBackup.
-     This file closes that gap so the manifest's local-only guarantee means
-     what it says on every Android version: the ONLY way user data leaves
-     the device is the user's own Settings → Your Data export.
+     <include> lists are used, so only what is named goes; everything else (the WebView's Service Worker
+     cache, cacheDir, no_backup, CrashRecord, filesDir/offline-audio) stays behind.
 
-     Every domain is excluded explicitly (path "." = the domain root);
-     an empty <cloud-backup/> element would mean "no rules = include all",
-     not "exclude all". -->
+     cloud-backup (Google's Auto Backup: 25 MB per app, over it the whole backup is skipped):
+       - files/snapshots/: SnapshotStore's daily JSON of the reader's data (every store, media not included),
+         ~0.5 MB each, up to 11 kept. The WebView's IndexedDB is NOT sent: it holds the kept songs' mp3s
+         (offline-songs, "can run to gigabytes") and journal media, which would blow the 25 MB. A restored
+         phone boots to an empty library beside a full snapshot and the page offers the restore.
+       - shared_prefs/plan_reminder.xml: the reading-plan reminder (rescheduled on the next app open/boot).
+       Not sent: song_votes_outbox.xml (transient; the votes Worker already has what was sent), web_cache.xml
+       (a per-install stamp), WebView prefs.
+
+     device-transfer (the new-phone copy; no size cap): the WebView's own storage as well, so the library,
+     journal media and settings arrive as they were. Kept songs ride inside IndexedDB here (they cannot be
+     split out of it); the downloaded chapter audio in filesDir/offline-audio does not. -->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="root" path="." />
-        <exclude domain="file" path="." />
-        <exclude domain="database" path="." />
-        <exclude domain="sharedpref" path="." />
-        <exclude domain="external" path="." />
+        <include domain="file" path="snapshots/" />
+        <include domain="sharedpref" path="plan_reminder.xml" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="root" path="." />
-        <exclude domain="file" path="." />
-        <exclude domain="database" path="." />
-        <exclude domain="sharedpref" path="." />
-        <exclude domain="external" path="." />
+        <include domain="file" path="snapshots/" />
+        <include domain="sharedpref" path="plan_reminder.xml" />
+        <include domain="root" path="app_webview/Default/IndexedDB/" />
+        <include domain="root" path="app_webview/Default/Local Storage/" />
+        <include domain="root" path="app_webview/Default/WebStorage/" />
     </device-transfer>
 </data-extraction-rules>

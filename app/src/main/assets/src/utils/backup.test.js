@@ -1,8 +1,8 @@
 // @ts-nocheck — tests construct partial payloads + fake ctx objects
 /* backup.js — export-payload build + import-apply + e2e round-trip (U1/U14).
    ──────────────────────────────────────────────────────────────────────
-   Export/Import is the ONLY backup mechanism in VOTReader (allowBackup=
-   false, no cloud, no account). The headline test here is the one U1 owed:
+   Export/Import is the only FULL backup in VOTReader (Google backup takes
+   only the daily snapshots; no account). The headline test here is the one U1 owed:
    a REAL end-to-end round-trip against the live stores + a fake IndexedDB —
 
        populate device A → export → wipe device → import → RELOAD → assert

@@ -60,10 +60,10 @@
          targetSdk change can't quietly re-enable it. All app resources load
          from the APK or HTTPS; an http:// link in content leaves via an
          external intent, so it never rides this WebView. -->
-    <!-- dataExtractionRules: on Android 12+ (targetSdk 31+), allowBackup="false"
-         no longer blocks DEVICE-TO-DEVICE transfer — only cloud backup. The
-         rules file excludes every domain from both, so the local-only data
-         policy holds on every Android version. See res/xml/data_extraction_rules.xml. -->
+    <!-- allowBackup="true" (ds-backup, Corbin 2026-10-23): Android's Google backup
+         to his own Google account, plus the new-phone transfer. What goes is an
+         include list: dataExtractionRules (Android 12+) and fullBackupContent
+         (11 and below). Downloaded audio stays out. See res/xml/data_extraction_rules.xml. -->
     <!-- enableOnBackInvokedCallback: predictive back. Android 16 (targetSdk 36)
          turns this on by default and stops delivering onBackPressed() /
          KEYCODE_BACK; declaring it makes Android 13-15 take the same
@@ -75,7 +75,7 @@
          26 — lint's note that it is ignored below 33 is exactly the point. -->
     <application
         android:name=".VOTReaderApp"
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:enableOnBackInvokedCallback="true"
         tools:ignore="UnusedAttribute"
         android:dataExtractionRules="@xml/data_extraction_rules"
