@@ -165,11 +165,25 @@ export function recordPlace(v, gl = g) {
 }
 
 /**
- * A finished read of `key` (main's markRead): one more in readItems; a read the detector measured (`payload`) also goes
- * to the reading record; either is a reading day. Nothing while the reader turned marking off.
+ * A read of main's read key ticks the reading plans that hold it (main's useMarkAsRead notePlans, mw18): before the
+ * Mark-as-read switch, as a running plan tracks its own days (Corbin's call 3b). Never throws into the read path.
+ * @param {string} key
+ */
+export function notePlans(key, gl = g) {
+  const m = /^v1:(.+):([^:]+)$/.exec(key || '');
+  const store = gl.ReadingPlanStore;
+  if (!m || !store || typeof store.noteRead !== 'function') return;
+  try { store.noteRead(m[1], /^\d+$/.test(m[2]) ? Number(m[2]) : m[2]); } catch (_e) { /* the read mark stands */ }
+}
+
+/**
+ * A finished read of `key` (main's markRead): the plans that hold it are ticked; one more in readItems; a read the
+ * detector measured (`payload`) also goes to the reading record; either is a reading day. Only the plan tick while the
+ * reader turned marking off.
  * @param {string} key @param {{ words: number, activeMs: number } | null} payload
  */
 export function recordRead(key, payload, gl = g) {
+  if (key) notePlans(key, gl);
   if (!key || settingsOf(gl).markAsRead === false) return false;
   let before = 0;
   const written = changeState((s) => { before = Number((s.readItems || {})[key]) || 0; return withRead(s, key); }, gl);

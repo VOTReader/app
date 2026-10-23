@@ -4,16 +4,17 @@
    the day, the portion, the plan's name (and the days to catch up, as Reading plans says it), the progress line with
    main's percent, Listen and Read from the first chapter or letter of today not read. Two: a row per plan with main's
    round check, one Listen to today for the first plan not done, the days behind summed as a quiet link. Plans opens
-   Reading plans. The facts are plans-facts.js's todayView (main's maths); what the taps open is the caller's. */
+   Reading plans. The facts are plans-facts.js's runsTodayView (main's plan runs; a gate's todayView); what the taps open is the
+   caller's. */
 import { Icon } from '../Icon.jsx';
 
 const days = (n) => n + (n === 1 ? ' day' : ' days');
 
 /**
- * @param {{ view: import('../plans-facts.js').TodayView | null, markOff?: boolean, onPlans: () => void,
+ * @param {{ view: import('../plans-facts.js').TodayView | null, onPlans: () => void,
  *   onRead: (it: import('../plans-facts.js').PlanItem) => void, onListen: (it: import('../plans-facts.js').PlanItem) => void }} props
  */
-export function TodayCard({ view, markOff = false, onPlans, onRead, onListen }) {
+export function TodayCard({ view, onPlans, onRead, onListen }) {
   if (!view || !view.running.length) return null;
   const head = (overline) => (
     <div className="tdy-h">
@@ -21,7 +22,6 @@ export function TodayCard({ view, markOff = false, onPlans, onRead, onListen }) 
       <button type="button" className="textbtn sm" onClick={onPlans}>Plans</button>
     </div>
   );
-  const foot = markOff ? <p className="fine">Mark as read is off, so days don’t tick. Turn it on in Settings.</p> : null;
 
   if (view.running.length === 1) {
     const r = view.running[0];
@@ -45,7 +45,6 @@ export function TodayCard({ view, markOff = false, onPlans, onRead, onListen }) 
             <button type="button" className="btn2 sm" aria-label={'Read ' + r.title} onClick={() => onRead(next)}>Read</button>
           </div>
         ) : null}
-        {foot}
       </section>
     );
   }
@@ -67,7 +66,6 @@ export function TodayCard({ view, markOff = false, onPlans, onRead, onListen }) 
         <button type="button" className="pill sm tdy-l" onClick={() => onListen(first)}><Icon name="play" size={18} />Listen to today</button>
       ) : null}
       {view.behind > 0 ? <button type="button" className="textbtn sm quiet tdy-b" onClick={onPlans}>{days(view.behind) + ' to catch up'}</button> : null}
-      {foot}
     </section>
   );
 }

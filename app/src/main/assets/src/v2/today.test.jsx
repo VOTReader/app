@@ -1,17 +1,31 @@
 /* Today's reading on Home and the plan's month (zones dz24, pictures 9h, 9i, 9a redrawn): todayView and monthView over
-   main's own plan maths; the 9h / 9i / 9a gates as drawn (the card under Recent, before the Volumes; October under the
-   plan's actions); a real boot over a fake StateStore (no plan, no card; one plan's Read / Listen / Plans; two plans' rows,
-   Listen to today and the days behind; Mark as read off; the card turning over at midnight). */
+   the rp1 maths the gates still draw with; runsTodayView and runMonth over main's plan runs (mw18 port, call 10A); the
+   9h / 9i / 9a gates as drawn (the card under Recent, before the Volumes; October under the plan's actions); a real boot
+   over ReadingPlanStore and a fake StateStore (no plan, no card; one plan's Read / Plans; two plans' rows, Listen to today
+   and the days behind; a read re-drawing the card; the card turning over at midnight). */
+import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, waitFor, act } from '@testing-library/react';
 import { V2App } from './App.jsx';
-import { todayView, monthView, gateToday, gateIsRead, gatePlans } from './plans-facts.js';
-import { localDateKey } from '../data/reading-plans.js';
+import { todayView, monthView, gateToday, gateIsRead, gatePlans, runsTodayView, runMonth } from './plans-facts.js';
+import { ReadingPlanStore } from '../stores/reading-plan-store.js';
+import { startCatalogPlan } from '../data/plan-catalog.js';
+import { dayItems, tickItem, todayKey, dateOf, dayNum } from '../data/plan-engine.js';
 
 const g = /** @type {any} */ (globalThis);
 const html = document.documentElement;
 const click = (el) => act(() => { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true })); });
 const text = (el) => (el ? el.textContent : null);
+const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); };
+const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(12, 0, 0, 0); return d; };
+
+/** Bible in a Year from `start`, each of its first `n` days read on its own date. */
+function bibleRead(start, n) {
+  let run = startCatalogPlan('bible-year', null, at(start));
+  const s0 = /** @type {number} */ (dayNum(start));
+  for (let d = 0; d < n; d++) for (const it of dayItems(run, d)) run = tickItem(run, it.k, dateOf(s0 + d), 0);
+  return run;
+}
 
 /** A Volumes sequence as main's volumeSequence builds it: the preface, then letters 1..n, one collection. */
 const seqOf = (n) => [{ bid: 'volume-one', cid: 'p1', title: 'A Word of Warning', volKey: 'one', short: 'Volume One' }]
@@ -140,12 +154,49 @@ describe('the gates', () => {
   });
 });
 
+describe('runsTodayView and runMonth (main’s runs)', () => {
+  const now = at('2026-10-15');
+
+  it('no run, no card; one run 38 days read of 39: the day, a day to catch up, its month', () => {
+    expect(runsTodayView([], now)).toBe(null);
+    const run = bibleRead('2026-09-06', 38);
+    const v = runsTodayView([run], now);
+    expect(v.running).toHaveLength(1);
+    expect(v.running[0]).toMatchObject({ overline: 'Today · Day 39 of 365', sub: 'Bible in a Year · 1 day to catch up', behind: 1 });
+    expect(v.first).toEqual(v.running[0].next);
+    expect(v.behind).toBe(1);
+    const m = runMonth(run, now);
+    expect(m.name).toBe('October');
+    expect(m.lead).toBe(4);
+    const states = m.days.map((d) => d.state);
+    expect(states.slice(0, 13).every((s) => s === 'done')).toBe(true);
+    expect(states.slice(13, 15)).toEqual(['missed', 'today']);
+    expect(states.slice(15).every((s) => s === 'ahead')).toBe(true);
+    expect(m.days[13].label).toBe('14, missed');
+    expect(m.days[14].label).toBe('15, today');
+    expect(v.running[0].month).toEqual(m);
+  });
+
+  it('two runs: Listen to today plays the first not done; every run done plays the first again', () => {
+    const bible = bibleRead('2026-09-06', 38);
+    let done = startCatalogPlan('bible-year', null, now);
+    for (const it of dayItems(done, 0)) done = tickItem(done, it.k, todayKey(now), 0);
+    const v = runsTodayView([done, bible], now);
+    expect(v.running.map((r) => r.done)).toEqual([true, false]);
+    expect(v.running[0].month.days[14]).toMatchObject({ state: 'today', done: true, label: '15, today, done' });
+    expect(v.first).toEqual(v.running[1].next);
+    const all = runsTodayView([done], now);
+    expect(all.first).toEqual(all.running[0].next);
+  });
+});
+
 describe('a real boot', () => {
   /** @type {any} */ let state;
   const ONE = { volKey: 'one', readKey: 'volume-one', globalName: 'LETTERS_V1', prefaceGlobal: 'PREFACE_V1', label: 'Volume One',
     short: 'Volume One', letterScreen: true };
-  const today = () => localDateKey(new Date());
-  const ago = (d) => localDateKey(new Date(Date.now() - d * 86400000));
+  const src = () => ({ colByKey: g.COL_BY_KEY, letters: g.colLetterArr, preface: g.colPreface, words: () => 100 });
+  /** Puts a run in the store. */
+  const put = (run) => { ReadingPlanStore.put(run); return run; };
 
   beforeEach(() => {
     state = { settings: {}, readItems: {} };
@@ -157,11 +208,15 @@ describe('a real boot', () => {
     g.COL_BY_KEY = new Map([['one', ONE]]);
     g.colLetterArr = () => g.LETTERS_V1;
     g.colPreface = () => g.PREFACE_V1;
+    localStorage.clear();
+    ReadingPlanStore._resetForTests({ forceLoaded: true });
+    g.ReadingPlanStore = ReadingPlanStore;
   });
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
-    for (const k of ['StateStore', 'COLLECTIONS', 'LETTERS_V1', 'PREFACE_V1', 'AudioPlayer', 'READING_CHAIN', 'COL_BY_KEY', 'colLetterArr', 'colPreface']) delete g[k];
+    for (const k of ['StateStore', 'COLLECTIONS', 'LETTERS_V1', 'PREFACE_V1', 'AudioPlayer', 'READING_CHAIN', 'COL_BY_KEY', 'colLetterArr',
+      'colPreface', 'ReadingPlanStore']) delete g[k];
   });
 
   it('no plan, no card (Home’s Reading plans row is the way in)', () => {
@@ -170,20 +225,21 @@ describe('a real boot', () => {
     expect([...container.querySelectorAll('.home-rows .row .t')].map(text)).toContain('Reading plans');
   });
 
-  it('one plan: Read opens today’s first chapter not read; Plans opens Reading plans; Listen with no player opens it', () => {
-    state.settings.readingPlans = [{ id: 'bible-year', start: today() }];
-    state.readItems = { 'v1:genesis:1': 1 };
+  it('one plan: Read opens today’s first chapter not read; no Mark-as-read line', () => {
+    put(tickItem(startCatalogPlan('bible-year', null, new Date()), 'genesis:1', todayKey(new Date()), 0));
+    state.settings.markAsRead = false;
     const { container } = render(<V2App gateId={null} />);
     const card = container.querySelector('.tdy');
     expect(text(card.querySelector('.tdy-t'))).toBe('Genesis 1–3');
     expect(text(card.querySelector('.overline'))).toBe('Today · Day 1 of 365');
+    expect(card.querySelector('.fine')).toBe(null);
     click(card.querySelector('[aria-label="Read Genesis 1–3"]'));
     expect(container.querySelector('.tdy')).toBe(null);
     expect(text(container.querySelector('.tb .title'))).toBe('Home');
   });
 
   it('Plans opens Reading plans with the month under the plan', () => {
-    state.settings.readingPlans = [{ id: 'bible-year', start: ago(3) }];
+    put(startCatalogPlan('bible-year', null, daysAgo(3)));
     const { container } = render(<V2App gateId={null} />);
     click(container.querySelector('.tdy .tdy-h .textbtn'));
     expect(text(container.querySelector('.page-head h1'))).toBe('Reading plans');
@@ -193,25 +249,24 @@ describe('a real boot', () => {
   });
 
   it('two plans: a row each with main’s check, Listen to today plays the first not done, the days behind link to Reading plans', () => {
-    state.settings.readingPlans = [{ id: 'volumes', start: today(), pace: 1 }, { id: 'bible-year', start: ago(1) }];
-    state.readItems = { 'v1:volume-one:p1': 1 };
-    const playCollection = vi.fn(() => true);
-    g.AudioPlayer = { collectionHasAudio: () => true, playCollection, playBibleBook: vi.fn() };
+    put(tickItem(startCatalogPlan('volumes', src(), new Date(), { pace: { mode: 'items', n: 1 } }), 'volume-one:p1', todayKey(new Date()), 0));
+    put(startCatalogPlan('bible-year', null, daysAgo(1)));
     const { container } = render(<V2App gateId={null} />);
     const card = container.querySelector('.tdy.two');
     expect(text(card.querySelector('.tdy-h .overline'))).toBe('Today');
     const rows = [...card.querySelectorAll('button.tdy-r')];
     expect(rows.map((r) => [text(r.querySelector('.t')), text(r.querySelector('.s')), r.querySelector('.tdy-c').className])).toEqual([
-      ['Volume One: A Word of Warning', 'The Volumes in Order', 'tdy-c on'],
-      ['Genesis 4–7', 'Bible in a Year', 'tdy-c']]);
-    expect(rows[0].getAttribute('aria-label')).toBe('Read Volume One: A Word of Warning, The Volumes in Order, done');
+      ['Volume One: A Word of Warning', 'Every letter, in order', 'tdy-c on'],
+      ['Genesis 1–3', 'Bible in a Year', 'tdy-c']]);
+    expect(rows[0].getAttribute('aria-label')).toBe('Read Volume One: A Word of Warning, Every letter, in order, done');
     expect(text(card.querySelector('.tdy-b'))).toBe('1 day to catch up');
     click(card.querySelector('.tdy-b'));
     expect(text(container.querySelector('.page-head h1'))).toBe('Reading plans');
   });
 
   it('Listen to today plays the first plan not done (the Volumes from its preface); a done plan is passed over', () => {
-    state.settings.readingPlans = [{ id: 'volumes', start: today(), pace: 1 }, { id: 'bible-year', start: today() }];
+    const vols = put(startCatalogPlan('volumes', src(), new Date(), { pace: { mode: 'items', n: 1 } }));
+    put(startCatalogPlan('bible-year', null, new Date()));
     const playCollection = vi.fn(() => true);
     g.AudioPlayer = { collectionHasAudio: () => true, playCollection, playBibleBook: vi.fn() };
     const first = render(<V2App gateId={null} />);
@@ -219,7 +274,8 @@ describe('a real boot', () => {
     expect(playCollection).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'one', startId: 'p1', collectionLabel: 'Volume One' }));
     first.unmount();
     // the Volumes done today: Listen to today goes to the Bible, whose audio is off here, so it opens Genesis 1
-    state.readItems = { 'v1:volume-one:p1': 1 };
+    ReadingPlanStore.noteRead('volume-one', 'p1');
+    expect(ReadingPlanStore.get(vols.id).ticks).toEqual({ 'volume-one:p1': todayKey(new Date()) });
     playCollection.mockClear();
     const { container } = render(<V2App gateId={null} />);
     click(container.querySelector('.tdy .tdy-l'));
@@ -227,31 +283,23 @@ describe('a real boot', () => {
     expect(container.querySelector('.tdy')).toBe(null);
   });
 
-  it('a Volumes row before the letters load is not a button that does anything', () => {
-    for (const k of ['READING_CHAIN', 'COL_BY_KEY']) delete g[k];
-    state.settings.readingPlans = [{ id: 'volumes', start: today(), pace: 1 }, { id: 'bible-year', start: today() }];
+  it('a read re-draws the card (the store says it changed)', () => {
+    put(startCatalogPlan('bible-year', null, new Date()));
     const { container } = render(<V2App gateId={null} />);
-    const rows = /** @type {HTMLButtonElement[]} */ ([...container.querySelectorAll('.tdy button.tdy-r')]);
-    expect(text(rows[0].querySelector('.t'))).toBe('Loading the Volumes…');
-    expect(rows[0].disabled).toBe(true);
-    expect(rows[1].disabled).toBe(false);
+    expect(text(container.querySelector('.tdy .tdy-s'))).toBe('Bible in a Year');
+    act(() => { for (const c of [1, 2, 3]) ReadingPlanStore.noteRead('genesis', c); });
+    expect(text(container.querySelector('.tdy .tdy-s'))).toBe('Bible in a Year · Done for today');
   });
 
-  it('Mark as read off: main’s line at the card’s foot', () => {
-    state.settings.readingPlans = [{ id: 'bible-year', start: today() }];
-    state.settings.markAsRead = false;
-    const { container } = render(<V2App gateId={null} />);
-    expect(text(container.querySelector('.tdy > .fine'))).toBe('Mark as read is off, so days don’t tick. Turn it on in Settings.');
-  });
-
-  it('the card turns over at local midnight while Home stays open', () => {
+  it('the card turns over at local midnight while Home stays open: an unread day is a day to catch up', () => {
+    put(startCatalogPlan('bible-year', null, new Date(2026, 9, 15, 12)));
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     vi.setSystemTime(new Date(2026, 9, 15, 23, 59, 59, 500));
-    state.settings.readingPlans = [{ id: 'bible-year', start: '2026-10-15' }];
     const { container } = render(<V2App gateId={null} />);
     expect(text(container.querySelector('.tdy .overline'))).toBe('Today · Day 1 of 365');
+    expect(text(container.querySelector('.tdy .tdy-s'))).toBe('Bible in a Year');
     act(() => { vi.advanceTimersByTime(1000); });
-    expect(text(container.querySelector('.tdy .overline'))).toBe('Today · Day 2 of 365');
-    expect(text(container.querySelector('.tdy .tdy-t'))).toBe('Genesis 4–7');
+    expect(text(container.querySelector('.tdy .overline'))).toBe('Today · Day 1 of 365');
+    expect(text(container.querySelector('.tdy .tdy-s'))).toBe('Bible in a Year · 1 day to catch up');
   });
 });

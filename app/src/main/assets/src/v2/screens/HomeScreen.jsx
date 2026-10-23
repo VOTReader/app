@@ -15,8 +15,8 @@ import { GATE_NOW } from '../gate.js';
 import { noticeSeen } from '../garden-facts.js';
 import { GardenNotice, noticeTier } from './GardenScreens.jsx';
 import { TodayCard } from './TodayCard.jsx';
-import { todayView, savedPlans, liveIsRead, liveSequence, gateIsRead, itemRoute, listenItem } from '../plans-facts.js';
-import { savedSettings } from '../settings-pages.js';
+import { todayView, runsTodayView, savedPlans, writePlans, liveIsRead, liveSequence, gateIsRead, itemRoute, listenItem } from '../plans-facts.js';
+import { usePlanRuns } from '../../utils/plan-runs-view.js';
 import { useNow } from '../../ui/components/TodayCard.jsx';
 
 /** Where a reader with nothing read yet starts. @type {import('../home-facts.js').HomeItem} */
@@ -105,15 +105,17 @@ export function HomeScreen({ gate, facts, go, onReady, desktop, device }) {
     if (!gate && wantsAnswers(home)) askAnswersCorpus().catch(() => { /* the loader flags the error; the topic stays out */ });
   }, [gate, home]);
   React.useEffect(() => { if (corpus !== 'loading') onReady(); }, [corpus, onReady]);
-  // Today's reading (9h, 9i): the plans in settings and main's read record, read again each time Home draws (it comes
-  // back to the top of the stack after a reading); the date turns over at midnight and on coming back to the front
+  // Today's reading (9h, 9i): main's plan runs (ReadingPlanStore, re-read when it changes; rp1's settings plans move in
+  // once); the date turns over at midnight and on coming back to the front. A gate draws its seeded rp1 plans as before.
+  const runs = usePlanRuns(gate ? {} : { legacy: savedPlans(), isRead: liveIsRead(), onLegacyMoved: writePlans });
   const seeded = gate ? (gate.facts && gate.facts.today) || null : null;
-  const plans = gate ? (seeded ? seeded.plans : []) : savedPlans();
+  const plans = seeded ? seeded.plans : [];
   const wantsVolumes = plans.some((p) => p.id === 'volumes');
   // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus is the trigger: liveSequence() reads the globals its load fills
   const seq = React.useMemo(() => (wantsVolumes ? liveSequence() : []), [wantsVolumes, corpus]);
   const now = useNow();
-  const today = todayView({ plans, now: seeded ? new Date(seeded.now) : now, isRead: gate ? gateIsRead(plans, seq) : liveIsRead(), seq });
+  const today = gate ? todayView({ plans, now: seeded ? new Date(seeded.now) : now, isRead: gateIsRead(plans, seq), seq })
+    : runsTodayView(runs, now);
   const openPlanItem = (it) => { const r = itemRoute(it); if (r) go(r); };
 
   const contDesc = home.continue ? describeItem(home.continue) : null;
@@ -184,7 +186,7 @@ export function HomeScreen({ gate, facts, go, onReady, desktop, device }) {
             {recent.map(({ it, d }, i) => <button key={i} type="button" className="chip" onClick={open(it)}>{d.chip}</button>)}
           </div>
         )}
-        <TodayCard view={today} markOff={!gate && savedSettings().markAsRead === false}
+        <TodayCard view={today}
           onPlans={() => go({ place: 'reading-plans' })} onRead={openPlanItem}
           onListen={(it) => { if (!listenItem(it)) openPlanItem(it); }} />
       </div>
