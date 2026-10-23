@@ -35,7 +35,7 @@ export const WORDS_PER_MIN = 200;
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
- *   known?: string }} PlanRun
+ *   known?: string, notes?: Record<string, string> }} PlanRun
  */
 
 // ── dates ────────────────────────────────────────────────────────────────

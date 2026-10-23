@@ -1169,6 +1169,7 @@ export function buildScreenRoutes({
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
         onRead={openPlanItem}
         onListen={listenPlanItem}
+        onNote={goJournalEditor}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

@@ -164,10 +164,11 @@ function Holdable({ children, onHold, className }) {
 /**
  * @param {{ readingPlans: any, isRead: (bid: string, cid: any) => boolean, markAsReadEnabled?: boolean,
  *   onPlansMoved?: (left: any[]) => void, onRead: (next: any) => void, onListen?: (items: any[], name: string) => void,
+ *   onNote?: (entryId: string) => void,
  *   onBack: () => void, backLabel?: string,
  *   onSearch?: () => void, onHistory?: () => void, onSettings?: () => void, theme?: string, onThemeChange?: (t: string) => void }} props
  */
-export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _markAsReadEnabled, onPlansMoved, onRead, onListen, onBack, backLabel = 'Library',
+export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _markAsReadEnabled, onPlansMoved, onRead, onListen, onNote, onBack, backLabel = 'Library',
   onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const plans = usePlanRuns({ legacy: readingPlans, isRead, onLegacyMoved: onPlansMoved });
   const seq = useVolumesSeq(true);
@@ -189,6 +190,27 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
     if (r) { saveRun(r); setStatus(''); setPicking(false); } else setStatus('Loading the Volumes… try again in a moment.');
   };
   const src = lettersIn ? letterSource() : null;
+  // S5: a reflection note for the day, kept in the Journal and opened again from the day (run.notes[day] = its id).
+  const journal = /** @type {any} */ (globalThis).JournalStore;
+  /** @param {any} plan @param {number} day */
+  const noteOf = (plan, day) => {
+    const id = plan.notes && plan.notes[String(day)];
+    return id && journal && typeof journal.get === 'function' && journal.get(id) ? id : null;
+  };
+  /** @param {any} plan @param {any} row */
+  const writeNote = (plan, row) => {
+    if (!onNote || !journal || typeof journal.add !== 'function') return;
+    const have = noteOf(plan, row.day);
+    if (have) { onNote(have); return; }
+    const health = /** @type {any} */ (globalThis).StorageHealth;
+    if (health && typeof health.checkFirstDataCreation === 'function' && health.checkFirstDataCreation().shouldBlock) return;
+    const e = journal.add({ title: row.name + ' · Day ' + (row.day + 1) + (row.label ? ' · ' + row.label : '') });
+    if (!e || !e.id) return;
+    // The editor records a new entry's stats on its first save (the key useJournalMutations sets).
+    try { localStorage.setItem('vot-journal-new-entry-stats', e.id); } catch (_e) { /* best-effort */ }
+    saveRun({ ...plan, notes: { ...(plan.notes || {}), [String(row.day)]: e.id }, updated: Date.now() });
+    onNote(e.id);
+  };
   // C11: finished plans, newest first; one finished in the last three days is celebrated, quietly.
   const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
   /** @type {any[]} */
@@ -290,6 +312,11 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                     title="Or hold the chapters for a moment">Mark today as read</button>
                 </>
               )}
+              {onNote && !row.finished ? (
+                <button type="button" className="today-link plans-note-link" onClick={() => writeNote(plan, row)}>
+                  {noteOf(plan, row.day) ? 'Your note for this day' : 'Write a note'}
+                </button>
+              ) : null}
               <div className="plans-week" role="group" aria-label="This week">
                 {week.map((d, i) => (
                   <span key={i} className="plans-day" data-state={dayState(d.state)} data-read={d.read || (d.state === 'today' && row.done) ? '1' : undefined}

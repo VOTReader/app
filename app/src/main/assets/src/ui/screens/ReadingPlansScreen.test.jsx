@@ -234,6 +234,26 @@ describe('ReadingPlansScreen', () => {
     expect(screen.getByText(/^\d+ weeks? on plan$/)).toBeTruthy();
   });
 
+  it('writes the day\u2019s note in the Journal, and opens the same note again from the day (S5)', () => {
+    const entries = [];
+    globalThis.JournalStore = {
+      add: (seed) => { const e = { id: 'j' + (entries.length + 1), title: seed.title }; entries.push(e); return e; },
+      get: (id) => entries.find((e) => e.id === id) || null,
+    };
+    try {
+      ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+      const onNote = vi.fn();
+      render(<ReadingPlansScreen {...base()} onNote={onNote} />);
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Write a note' })); });
+      expect(entries).toEqual([{ id: 'j1', title: 'Bible in a Year · Day 1 · Genesis 1-3' }]);
+      expect(onNote).toHaveBeenLastCalledWith('j1');
+      expect(ReadingPlanStore.active()[0].notes).toEqual({ 0: 'j1' });
+      fireEvent.click(screen.getByRole('button', { name: 'Your note for this day' }));
+      expect(onNote).toHaveBeenLastCalledWith('j1');
+      expect(entries.length).toBe(1);
+    } finally { delete globalThis.JournalStore; }
+  });
+
   it('never scores the reader', () => {
     ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(4)));
     const { container } = render(<ReadingPlansScreen {...base()} />);
