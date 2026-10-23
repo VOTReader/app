@@ -4670,7 +4670,13 @@
     .history-empty-body {
       font-size:var(--fs-16); line-height:1.65; color:var(--cream-muted); font-style:italic;
     }
-    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); flex-shrink:0; margin-left:0.5rem; white-space:nowrap; }
+    /* n130: a history row is label, full-width title (wraps at word boundaries, never clamped
+       to a stub), then one meta line: progress · time · visits. */
+    .history-entry-card .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; word-break:normal; overflow-wrap:break-word; }
+    .history-entry-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:0.1rem 0.5rem; margin-top:0.3rem; }
+    .history-entry-meta > * + *::before { content:' B7'; margin-right:0.5rem; color:var(--gold-dim); }
+    .history-entry-meta .idx-min-chip { margin-left:0; align-self:baseline; }
+    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); white-space:nowrap; }
     /* Result tally under the search box — states the count in words so the
        filtered emptiness below it is never mistaken for a broken screen. */
     .history-search-count {
@@ -4689,10 +4695,6 @@
     .history-show-all:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .history-show-all:active { background:var(--gold-faint); }
     @media (hover:hover) { .history-show-all:hover { background:var(--gold-faint); color:var(--gold); } }
-    /* The shared resume chip on a history row shares the right edge with the
-       visit time, so here (unlike an index card) it may shrink and ellipsize
-       rather than push the row wide. */
-    .history-day-section .idx-min-chip { min-width:0; flex-shrink:1; max-width:9.5rem; overflow:hidden; text-overflow:ellipsis; }
 
     /* ── HISTORY tree hierarchy ─────────────────────────────────────── */
     .history-year-section { margin-top:1.8rem; }
@@ -4764,9 +4766,9 @@
     }
     .history-chevron.is-open { transform:rotate(90deg); color:var(--gold); }
     .history-day-section .chapter-cards { padding-left:0.9rem; }
-    /* "3 visits" under the newest visit's time: a day's repeats of one reading are one row
-       (journey row 3, 2026-09-12; the Deduplicate chore left with it). */
-    .history-entry-visits { display:block; text-align:right; color:var(--cream-muted); }
+    /* "3 visits" beside the newest visit's time on the meta line: a day's repeats of one reading
+       are one row (journey row 3, 2026-09-12; the Deduplicate chore left with it). */
+    .history-entry-visits { font-family:var(--font-body); font-size:var(--fs-12); color:var(--cream-muted); white-space:nowrap; }
     .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }
@@ -7139,6 +7141,18 @@
     .notes-empty-hint {
       font-style: italic; font-size: var(--fs-15); line-height: 1.5;
     }
+    /* n116: the how-to on the Notebooks tab sits above the notebook rows, so it is shorter. */
+    .notes-empty-inline { padding: 1.2rem 1rem 1.4rem; }
+    /* n118: the one primary button an empty list screen carries (Bookmarks, Links, History). */
+    .empty-cta {
+      display: inline-block; min-height: 44px; margin-top: 1.2rem; padding: 0.6rem 1.6rem;
+      border-radius: 999px; border: 1px solid var(--gold); background: var(--gold);
+      color: var(--bg); font-family: 'Cinzel', serif; font-size: var(--fs-12);
+      letter-spacing: 0.14em; text-transform: uppercase; font-style: normal; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .empty-cta:active { background: var(--gold-bright); }
+    .empty-cta:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
 
     /* ── Sort menu popover (anchored under the sort button) ── */
 

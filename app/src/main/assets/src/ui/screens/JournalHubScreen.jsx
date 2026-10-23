@@ -332,22 +332,27 @@ export function JournalHubScreen(props) {
 
     return (
       <>
-        <div className="jrn-controls">
-          <input
-            className="jrn-search"
-            type="text"
-            placeholder="Search entries…"
-            value={query}
-            onChange={function(e) { setQuery(e.target.value); }}
-          />
-          <button
-            className="notes-index-sort-btn"
-            onClick={function() { setSortNewest(function(v) { return !v; }); }}
-            title="Toggle sort order"
-          >
-            {sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑'}
-          </button>
-        </div>
+        {/* One empty-state pattern (n118): an empty tab shows its how-to, no search or sort;
+            the New Entry button below is its one primary action. */}
+        {list.length > 0 && (
+          <div className="jrn-controls">
+            <input
+              className="jrn-search"
+              type="text"
+              placeholder="Search entries…"
+              aria-label={isPinnedTab ? 'Search pinned entries' : 'Search journal entries'}
+              value={query}
+              onChange={function(e) { setQuery(e.target.value); }}
+            />
+            <button
+              className="notes-index-sort-btn"
+              onClick={function() { setSortNewest(function(v) { return !v; }); }}
+              title="Toggle sort order"
+            >
+              {sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑'}
+            </button>
+          </div>
+        )}
         {filtered.length === 0 ? (
           <div className="jrn-empty">
             <div className="jrn-empty-title">

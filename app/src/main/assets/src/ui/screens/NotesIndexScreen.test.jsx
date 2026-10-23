@@ -280,3 +280,42 @@ describe('NotesIndexScreen opening tab', () => {
     expect(active(again.container)).toMatch(/All notes/i);
   });
 });
+
+/* n116 / n118 / n189: one empty-state pattern. An empty list shows its how-to and no search box; the
+   Notebooks tab teaches how a note is made while there are none; every search box has a name. */
+describe('NotesIndexScreen empty states and search names', () => {
+  it('the Notebooks tab carries the how-to-make-a-note hint while there are no notes', () => {
+    window.NoteStore.list = () => [];
+    const { container } = render(<NotesIndexScreen {...props} />);
+    expect(container.querySelector('.notes-tab.active').textContent).toMatch(/Notebooks/i);
+    expect(container.querySelector('.notes-empty-hint').textContent).toMatch(/Long-press text in any chapter, tap Note/);
+  });
+
+  it('the Notebooks tab shows no hint once a note exists', () => {
+    const { container } = render(<NotesIndexScreen {...props} />);
+    expect(container.querySelector('.notes-empty')).toBeNull();
+  });
+
+  it('an empty All notes list shows no search box; a full one names its box', () => {
+    localStorage.setItem('vot-notes-tab', 'all-notes');
+    window.NoteStore.list = () => [];
+    const empty = render(<NotesIndexScreen {...props} />);
+    expect(empty.container.querySelector('input.notes-index-search')).toBeNull();
+    empty.unmount();
+    window.NoteStore.list = () => NOTES;
+    const full = render(<NotesIndexScreen {...props} />);
+    expect(full.getByRole('searchbox', { name: 'Search all notes' })).toBeTruthy();
+  });
+
+  it('an empty notebook shows no search box; a full one names its box', () => {
+    const { container, getByText, getByRole } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(getByText('Faith'));
+    expect(getByRole('searchbox', { name: 'Search notes in this notebook' })).toBeTruthy();
+    cleanup();
+    window.NoteStore.list = () => [];
+    const again = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(again.getByText('Faith'));
+    expect(again.container.querySelector('input.notes-index-search')).toBeNull();
+    void container;
+  });
+});

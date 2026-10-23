@@ -285,7 +285,7 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
     renderScreen([chapter('psalms', 'Psalms', 1, today(5)), chapter('psalms', 'Psalms', 2, today(9))]);
     const cards = [...document.querySelectorAll('.chapter-card-btn')];
     expect(within(cards[0]).queryByText(/min left/)).toBeNull();
-    expect(within(cards[1]).getByText(/50% · ~\d+ min left/)).toBeTruthy();
+    expect(within(cards[1]).getByText(/50% read · ~\d+ min left/)).toBeTruthy();
   });
 
   it('gives an unresolvable book no chip at all', () => {
@@ -338,7 +338,7 @@ describe('HistoryScreen — resume chips on letter rows', () => {
     ]);
     const cards = [...document.querySelectorAll('.chapter-card-btn')];
     expect(within(cards[0]).queryByText(/min left/)).toBeNull();
-    expect(within(cards[1]).getByText(/50% · ~\d+ min left/)).toBeTruthy();
+    expect(within(cards[1]).getByText(/50% read · ~\d+ min left/)).toBeTruthy();
   });
 
   it('gives a legacy row with no volumeScreen no chip rather than guessing a collection', () => {
@@ -452,7 +452,7 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     setupGlobals();
     renderScreen(REPEATS);
     expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1', 'Chapter 1']);
-    expect(cardLabels()).toEqual(['Psalms', 'Psalms', 'Genesis']);
+    expect(cardLabels()).toEqual(['Psalms · Chapter 23', 'Psalms', 'Genesis']);
     expect(rowVisits()).toEqual(['', '3 visits', '']);
     // The day header counts ROWS, not visits — "Today · 3", never "· 5".
     expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 3');

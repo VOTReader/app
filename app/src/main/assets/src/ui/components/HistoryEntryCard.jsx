@@ -25,22 +25,26 @@ export function HistoryEntryCard({ entry, onSelect, chip = null }) {
   studyAbbrev(entry.studySlug, entry.studyTitle) :
   isLetter ? (_volCol ? _volCol.label : _legacyVol) : entry.bookTitle;
   const fallback = isLetter ? `Letter ${num}` : isStudy ? `Part ${num}` : `Chapter ${num}`;
+  /* n130 (A01.2/A07.10): the row used to be num | title | chip | time, four columns
+     fighting for 375 px, so a long title clamped to a stub and the bare number read like a
+     rank. Now the title has the full width and wraps at word boundaries, the number is named
+     on the label line ("Psalms · Chapter 23"), and progress, time and visits share one meta
+     line under the title. Untitled rows already say "Chapter 1" as their title. */
+  const label = title ? (cardLabel ? `${cardLabel} · ${fallback}` : fallback) : cardLabel;
   return (
-    <button className="chapter-card-btn" onClick={() => onSelect(entry)}>
-      <span className="chapter-card-num">{num}</span>
-      <div className="chapter-card-divider" />
+    <button className="chapter-card-btn history-entry-card" onClick={() => onSelect(entry)}>
       <div className="chapter-card-info">
         {/* Absent, not empty: an unresolvable row drops the line instead of
             printing '' (or, for a chapter row with no bookTitle, 'undefined'). */}
-        {cardLabel ? <div className="chapter-card-label">{cardLabel}</div> : null}
+        {label ? <div className="chapter-card-label">{label}</div> : null}
         <div className="chapter-card-title">{title || fallback}</div>
-      </div>
-      {chip}
-      <div className="history-entry-time">
-        {timeAgo(entry.ts)}
-        {/* A day's repeats of this reading are one row (HistoryScreen folds them); more than one
-            visit says so, under the newest visit's time. Absent, not "1 visits". */}
-        {entry.visits > 1 ? <span className="history-entry-visits">{entry.visits} visits</span> : null}
+        <div className="history-entry-meta">
+          {chip}
+          <span className="history-entry-time">{timeAgo(entry.ts)}</span>
+          {/* A day's repeats of this reading are one row (HistoryScreen folds them); more than one
+              visit says so beside the newest visit's time. Absent, not "1 visits". */}
+          {entry.visits > 1 ? <span className="history-entry-visits">{entry.visits} visits</span> : null}
+        </div>
       </div>
     </button>
   );

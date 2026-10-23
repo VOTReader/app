@@ -344,13 +344,17 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                 onConfirm={deleteCurrent}
               />
             )}
-            <input
-              className="notes-index-search"
-              type="search"
-              placeholder="Search notes…"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+            {/* One empty-state pattern (n118): an empty list shows no search box. */}
+            {drilledNotes.length > 0 && (
+              <input
+                className="notes-index-search"
+                type="search"
+                placeholder="Search notes…"
+                aria-label="Search notes in this notebook"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            )}
             {drilledNotes.length > 0 && (
               <div className="notes-index-controls">
                 <button
@@ -388,6 +392,14 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
           </>
         )}
         {/* ── NOTEBOOKS TAB (rows since 2026-09-25) ── */}
+        {/* n116: the Notebooks tab used to show only an empty Uncategorized row to a reader with
+            no notes; it now carries the same how-to as All notes' empty state. */}
+        {!drilledNbId && tab === 'notebooks' && allNotes.length === 0 && (
+          <div className="notes-empty notes-empty-inline">
+            <div className="notes-empty-title">No Notes Yet</div>
+            <div className="notes-empty-hint">Long-press text in any chapter, tap Note in the toolbar, and your notes will appear here. Notebooks gather them by theme.</div>
+          </div>
+        )}
         {!drilledNbId && tab === 'notebooks' && (
           <div className="nb-card-grid">
             <button
@@ -448,13 +460,16 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
         {/* ── ALL NOTES TAB ── */}
         {!drilledNbId && tab === 'all-notes' && (
           <>
-            <input
-              className="notes-index-search"
-              type="search"
-              placeholder="Search notes…"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-            />
+            {allNotes.length > 0 && (
+              <input
+                className="notes-index-search"
+                type="search"
+                placeholder="Search notes…"
+                aria-label="Search all notes"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            )}
             {allNotes.length > 0 && (
               <div className="notes-index-controls">
                 <button

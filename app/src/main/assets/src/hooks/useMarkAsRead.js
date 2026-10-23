@@ -239,6 +239,13 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   React.useEffect(() => {
     const credit = (key) => {
       setReadItems((p) => ({ ...p, [key]: (Number(p[key]) || 0) + 1 }));
+      // A full listen finishes the item, so a partial-read frontier left from an
+      // earlier visit is stale: without this the index and History kept
+      // showing "93% read" beside a check (n359).
+      if (typeof ReadingStatsStore !== 'undefined' && ReadingStatsStore) {
+        try { ReadingStatsStore.clearProgress(key); }
+        catch (e) { console.warn('reading-stats frontier clear failed', e); }
+      }
       // A full listen is as strong a "was here today" signal as a
       // completed read — keep the streak coherent with it.
       if (typeof ReadingStreakStore !== 'undefined' && ReadingStreakStore) {

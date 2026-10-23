@@ -58,6 +58,18 @@ describe('useReadProgress — audio listen bridge', () => {
     expect(on.result.current.readItems).toEqual({});
   });
 
+  it('a full listen clears the stale partial-read frontier (n359: Christmas stuck at 93%)', () => {
+    const clearProgress = vi.fn();
+    /** @type {any} */ (globalThis).ReadingStatsStore = { clearProgress };
+    try {
+      renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
+      act(() => window.__votAudioListened('one', 'the-wide-path'));
+      expect(clearProgress).toHaveBeenCalledWith('v1:vol-one:the-wide-path');
+      act(() => window.__votAudioListened('bible-brm-kjv', 'jonah', 3));
+      expect(clearProgress).toHaveBeenCalledWith('v1:jonah:3');
+    } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
+  });
+
   it('clears the bridge on unmount', () => {
     const { unmount } = renderHook(() => useReadProgress({ savedReadItems: {}, markAsReadEnabled: true }));
     unmount();

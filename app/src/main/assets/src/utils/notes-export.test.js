@@ -232,6 +232,26 @@ describe('shareNotesExport', () => {
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ text: 'Export failed. Please try again.' }));
   });
 
+  it('the Android app opens its own share sheet with the plain text, no .md file (n345)', () => {
+    vi.stubGlobal('navigator', {});
+    const saveToFile = vi.fn();
+    const shareText = vi.fn(() => true);
+    vi.stubGlobal('PlatformBridge', { isAndroid: true, saveToFile, shareText });
+    const md = composeNotesExport({ title: 'Devotional', notes: [{ body: 'Mine', fullText: 'For God so loved' }], now: 0 });
+    const out = shareNotesExport({ title: 'Devotional', filename: 'f.md', text: md });
+    expect(out).toBe('share');
+    expect(shareText).toHaveBeenCalledWith(notesAsPlainText(md));
+    expect(saveToFile).not.toHaveBeenCalled();
+  });
+
+  it('a text the Android sheet refuses (too long) is saved as a file instead', () => {
+    vi.stubGlobal('navigator', {});
+    const saveToFile = vi.fn();
+    vi.stubGlobal('PlatformBridge', { isAndroid: true, saveToFile, shareText: vi.fn(() => false) });
+    expect(shareNotesExport({ title: 'T', filename: 'f.md', text: 'doc' })).toBe('file');
+    expect(saveToFile).toHaveBeenCalledWith('f.md', 'doc');
+  });
+
   it('returns "none" when neither share nor the bridge exists (bare host)', () => {
     vi.stubGlobal('navigator', {});
     const out = shareNotesExport({ title: 'T', filename: 'f.md', text: 'doc' });

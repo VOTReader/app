@@ -4,7 +4,8 @@
    THE index-card reading chip, in one place. Two states:
 
      "~7 min"              a cold item, at the reader's own measured pace
-     "62% · ~3 min left"   an item the read tracker left a frontier inside
+     "62% read · ~3 min left"   an item the read tracker left a frontier inside
+                           ("read" since n359: a bare 62% read like a score)
 
    It shipped twice — ChapterIndex and VolumeLetterIndex each carried a
    private `minChip` that had drifted into byte-identical copies — and
@@ -56,7 +57,7 @@ export function readingMinChip(item, progressKey = null, wpm = null) {
       const pct = Math.min(99, Math.round(fraction * 100));
       const leftWords = weighted ? p.tw - p.w : Math.round(words * (1 - fraction));
       const left = readingMinutes(leftWords, wpm);
-      return <span className="idx-min-chip in-progress">{pct}% · ~{left} min left</span>;
+      return <span className="idx-min-chip in-progress">{pct}% read · ~{left} min left</span>;
     }
   }
   const m = readingMinutes(words, wpm);

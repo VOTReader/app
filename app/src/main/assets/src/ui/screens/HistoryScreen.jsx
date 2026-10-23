@@ -36,7 +36,7 @@ function _entrySearchText(entry) {
   return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
 }
 
-export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings, theme, onThemeChange }) {
+export function HistoryScreen({ history, onBack, onHome, onSelect, onSearch, onSettings, theme, onThemeChange }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
 
@@ -298,6 +298,8 @@ export function HistoryScreen({ history, onBack, onSelect, onSearch, onSettings,
             <div className="history-empty-sigil">✦</div>
             <div className="history-empty-title">The scroll is blank.</div>
             <div className="history-empty-body">Every chapter, letter, and study you visit will land here — a trail of what the Spirit has led you through. Begin reading and this will populate.</div>
+            {/* n118: one primary button, the same one every empty list screen carries. */}
+            {onHome && <button type="button" className="empty-cta" onClick={() => onHome()}>Start reading</button>}
           </div>
         ) : (
           <>

@@ -138,3 +138,19 @@ describe('JournalHubScreen card keyboard (W36)', () => {
     expect(onOpenEntry).toHaveBeenCalledTimes(3);
   });
 });
+
+/* n118 / n189: an empty tab shows its how-to and no search or sort; a full tab names its search box. */
+describe('JournalHubScreen empty state and search name', () => {
+  it('no entries: no search box or sort, the how-to stays', () => {
+    window.JournalStore.all = () => [];
+    const { container } = render(<JournalHubScreen onBack={() => {}} onCreateEntry={() => {}} />);
+    expect(container.querySelector('.jrn-search')).toBeNull();
+    expect(container.querySelector('.notes-index-sort-btn')).toBeNull();
+    expect(container.querySelector('.jrn-empty-title').textContent).toBe('No Entries Yet');
+  });
+
+  it('a full list names its search box', () => {
+    render(<JournalHubScreen onBack={() => {}} onCreateEntry={() => {}} />);
+    expect(screen.getByRole('textbox', { name: 'Search journal entries' })).toBeTruthy();
+  });
+});

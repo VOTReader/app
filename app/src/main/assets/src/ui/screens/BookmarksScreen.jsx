@@ -222,8 +222,8 @@ export function BookmarksScreen(props) {
     React.useCallback(function(cb) { return BookmarkStore.subscribe(cb); }, []),
     function() { return BookmarkStore.getVersion(); }
   );
-  // (onHome, historyEnabled props are accepted by the component's API but
-  //  this screen doesn't use them — removed local var bindings.)
+  // (props.onHome drives the empty state's one button; historyEnabled is
+  //  accepted by the component's API but unused here.)
 
   var useState = React.useState;
   var useMemo = React.useMemo;
@@ -340,24 +340,30 @@ export function BookmarksScreen(props) {
           </span>
         </header>
 
-        <input
-          className="notes-index-search"
-          type="search"
-          placeholder="Search bookmarks…"
-          value={searchQuery}
-          onChange={function(e) { setSearchQuery(e.target.value); }}
-        />
-
-        <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
-          <button
-            className="notes-index-sort-btn"
-            style={{ marginLeft: 'auto' }}
-            onClick={nextSort}
-            title="Cycle sort order"
-          >
-            {sortLabel}
-          </button>
-        </div>
+        {/* One empty-state pattern (n118): an empty list shows its how-to and one button,
+            no search box or sort. */}
+        {allBookmarks.length > 0 && (
+          <>
+            <input
+              className="notes-index-search"
+              type="search"
+              placeholder="Search bookmarks…"
+              aria-label="Search bookmarks"
+              value={searchQuery}
+              onChange={function(e) { setSearchQuery(e.target.value); }}
+            />
+            <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
+              <button
+                className="notes-index-sort-btn"
+                style={{ marginLeft: 'auto' }}
+                onClick={nextSort}
+                title="Cycle sort order"
+              >
+                {sortLabel}
+              </button>
+            </div>
+          </>
+        )}
 
         {allBookmarks.length === 0 && (
           <div className="notes-empty">
@@ -365,6 +371,9 @@ export function BookmarksScreen(props) {
             <div className="notes-empty-hint">
               Select text in any letter or Bible chapter, then tap Bookmark in the toolbar. Your bookmarks will appear here.
             </div>
+            {props.onHome && (
+              <button type="button" className="empty-cta" onClick={function() { props.onHome(); }}>Start reading</button>
+            )}
           </div>
         )}
 

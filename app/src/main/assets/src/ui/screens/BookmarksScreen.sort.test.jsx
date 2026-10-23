@@ -166,3 +166,22 @@ describe('BookmarkRow — Escape on a label edit never saves (ds5 s19.9)', () =>
     expect(saves).toEqual(['kept']);
   });
 });
+
+/* n118: one empty-state pattern. No bookmarks: the how-to and one primary button, no search or sort. */
+describe('BookmarksScreen — empty state', () => {
+  it('hides search and sort, keeps the instruction, offers one button that goes Home', () => {
+    globalThis.BookmarkStore = { ...globalThis.BookmarkStore, all: () => [] };
+    let home = 0;
+    const r = render(<BookmarksScreen onBack={() => {}} onHome={() => { home++; }} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />);
+    expect(r.container.querySelector('input')).toBeNull();
+    expect(sortBtn()).toBeNull();
+    expect(r.container.querySelector('.notes-empty-hint').textContent).toMatch(/tap Bookmark in the toolbar/);
+    fireEvent.click(r.getByRole('button', { name: 'Start reading' }));
+    expect(home).toBe(1);
+  });
+
+  it('a full list names its search box', () => {
+    const r = show();
+    expect(r.getByRole('searchbox', { name: 'Search bookmarks' })).toBeTruthy();
+  });
+});

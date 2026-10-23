@@ -10,7 +10,7 @@
    lands, and loads the studies when only they can decide. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { LinksScreen, _endpointResolves } from './LinksScreen.jsx';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'LinkStore', 'relativeDate', 'ConfirmStrip',
@@ -117,6 +117,8 @@ describe('LinksScreen broken-links callout (W49)', () => {
     act(() => { window.__votCorpus.land(); });
     expect(callout()).not.toBeNull();
     expect(callout().textContent).toMatch(/^1 link points/);
+    // n271: the hint names the visible row button, not a hidden long-press.
+    expect(callout().textContent).toMatch(/Tap ⋮ on a link to remove it\.$/);
   });
 
   it('loads the Bible Studies when only they can decide, then re-checks', async () => {
@@ -160,5 +162,23 @@ describe('LinksScreen broken-links callout (W49)', () => {
     } finally {
       globalThis.process.off('unhandledRejection', unhandled);
     }
+  });
+});
+
+/* n118 / n189: an empty Links list shows its how-to and one button; a full one names its search box. */
+describe('LinksScreen empty state and search name', () => {
+  it('no links: no search or sort, the instruction, one Start reading button', () => {
+    let home = 0;
+    const r = render(<LinksScreen onBack={() => {}} onHome={() => { home++; }} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />);
+    expect(r.container.querySelector('input')).toBeNull();
+    expect(r.container.querySelector('.notes-index-sort-btn')).toBeNull();
+    fireEvent.click(r.getByRole('button', { name: 'Start reading' }));
+    expect(home).toBe(1);
+  });
+
+  it('a full list names its search box', () => {
+    links = [{ id: 'l1', created: 1, source: bible('john'), target: letter('the-wide-path') }];
+    const r = show();
+    expect(r.getByRole('searchbox', { name: 'Search links' })).toBeTruthy();
   });
 });

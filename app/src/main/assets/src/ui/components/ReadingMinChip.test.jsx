@@ -70,9 +70,9 @@ describe('readingMinChip — the COLD chip', () => {
 describe('readingMinChip — the IN-PROGRESS chip', () => {
   const withProgress = (p) => { globalThis.ReadingStatsStore.getProgress = () => p; };
 
-  it('reads "N% · ~M min left" from a frontier the tracker left inside', () => {
+  it('reads "N% read · ~M min left" from a frontier the tracker left inside', () => {
     withProgress({ b: 10, c: [1, 2, 3, 4, 5, 6], tw: 0, w: 0 });
-    expect(chipOf(ITEM, 'v1:genesis:1', 300).text).toBe('60% · ~1 min left');
+    expect(chipOf(ITEM, 'v1:genesis:1', 300).text).toBe('60% read · ~1 min left');
   });
 
   it('prefers the WORD-weighted fraction over the block count when both are present', () => {
@@ -80,7 +80,7 @@ describe('readingMinChip — the IN-PROGRESS chip', () => {
     // block count would promise the reader far less remaining than there is.
     withProgress({ b: 10, c: [1, 2, 3, 4, 5, 6], tw: 900, w: 200 });
     const chip = chipOf(ITEM, 'v1:genesis:1', 300);
-    expect(chip.text).toBe('22% · ~2 min left');
+    expect(chip.text).toBe('22% read · ~2 min left');
   });
 
   it('caps at 99% — a finished item is not this chip\'s job to claim', () => {

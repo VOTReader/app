@@ -1131,6 +1131,7 @@ export function buildScreenRoutes({
       <HistoryScreen
         history={readHistory}
         onBack={goNavOrigin}
+        onHome={goHome}
         onSelect={(entry) => {
           // Wave 0 (P1-12): History was the only content entry point that set
           // nav state directly with NO origin capture, so Back from the entry

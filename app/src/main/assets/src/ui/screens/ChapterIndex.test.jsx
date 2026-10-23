@@ -149,7 +149,7 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
       getProgress: () => ({ b: 4, c: [0, 1], w: 100, tw: 1000, t: 1 }),
     };
     renderIndex({ book: WORDY_BOOK, progressKeyFor: () => 'v1:psalms:1' });
-    expect(document.querySelector('.idx-min-chip').textContent).toBe('10% · ~4 min left');
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('10% read · ~4 min left');
   });
 });
 

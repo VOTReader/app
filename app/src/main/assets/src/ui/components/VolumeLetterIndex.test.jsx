@@ -116,10 +116,10 @@ describe('VolumeLetterIndex — smart-resume progress chip ([26])', () => {
     };
     setupCounters();
     const { container } = renderIndex({ progressKeyFor: (id) => 'v1:vol:' + id });
-    expect(container.querySelector('.idx-min-chip').textContent).toBe('10% · ~4 min left');
+    expect(container.querySelector('.idx-min-chip').textContent).toBe('10% read · ~4 min left');
   });
 
-  it('an in-progress letter shows "N% · ~M min left" instead of the cold total', () => {
+  it('an in-progress letter shows "N% read · ~M min left" instead of the cold total', () => {
     /** @type {any} */ (globalThis).ReadingStatsStore = {
       measuredWpm: () => null,
       getProgress: (key) => key === 'v1:vol:the-wide-path' ? { b: 10, c: [0, 1, 2, 3, 4, 5], t: 1 } : null,
@@ -129,7 +129,7 @@ describe('VolumeLetterIndex — smart-resume progress chip ([26])', () => {
       const { container } = renderIndex({ progressKeyFor: (id) => 'v1:vol:' + id });
       const chip = container.querySelector('.idx-min-chip');
       expect(chip.classList.contains('in-progress')).toBe(true);
-      expect(chip.textContent).toMatch(/^60% · ~\d+ min left$/);
+      expect(chip.textContent).toMatch(/^60% read · ~\d+ min left$/);
     } finally { delete /** @type {any} */ (globalThis).ReadingStatsStore; }
   });
 

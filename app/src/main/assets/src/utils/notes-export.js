@@ -202,9 +202,9 @@ function _saveToFile(filename, text) {
 }
 
 /**
- * Hand a composed document to the platform: navigator.share where the
- * host provides it (mobile browsers; the Android WebView doesn't expose
- * it), else PlatformBridge.saveToFile — the SAF create-document picker
+ * Hand a composed document to the platform: the Android app's own share
+ * sheet (PlatformBridge.shareText), else navigator.share where the host
+ * provides it (mobile browsers), else PlatformBridge.saveToFile — the SAF create-document picker
  * on Android, a Blob download on web — which toasts its outcome.
  *
  * A share the user dismisses (AbortError) stays silent. Any other share
@@ -220,6 +220,15 @@ function _saveToFile(filename, text) {
  * @returns {'share' | 'file' | 'none'} which delivery path ran first
  */
 export function shareNotesExport({ title, filename, text }) {
+  // n345: the Android WebView has no navigator.share, so "Share as text" used to save a .md file
+  // there. The app's own share sheet (PlatformBridge.shareText, sh1) takes the plain text; one it
+  // refuses (longer than one share can carry) still saves the file.
+  try {
+    if (typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid === true
+      && typeof PlatformBridge.shareText === 'function' && PlatformBridge.shareText(notesAsPlainText(text)) === true) {
+      return 'share';
+    }
+  } catch (_e) { /* a throwing bridge falls through to the save path */ }
   if (typeof navigator !== 'undefined' && navigator.share) {
     navigator.share({ title, text: notesAsPlainText(text) }).catch((/** @type {unknown} */ err) => {
       if (err && /** @type {{ name?: string }} */ (err).name === 'AbortError') return;

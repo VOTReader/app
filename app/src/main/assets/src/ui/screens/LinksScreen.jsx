@@ -257,7 +257,7 @@ export function LinksScreen(props) {
     React.useCallback(function(cb) { return LinkStore.subscribe(cb); }, []),
     function() { return LinkStore.getVersion(); }
   );
-  // (onHome, historyEnabled props accepted by API but unused here.)
+  // (props.onHome drives the empty state's one button; historyEnabled is accepted but unused.)
 
   var useState = React.useState;
   var useMemo = React.useMemo;
@@ -404,26 +404,30 @@ export function LinksScreen(props) {
           </span>
         </header>
 
-        {/* Search */}
-        <input
-          className="notes-index-search"
-          type="search"
-          placeholder="Search links…"
-          value={searchQuery}
-          onChange={function(e) { setSearchQuery(e.target.value); }}
-        />
-
-        {/* Controls row: the sort CYCLE (C2-C [C10]) */}
-        <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
-          <button
-            className="notes-index-sort-btn"
-            style={{ marginLeft: 'auto' }}
-            onClick={nextSort}
-            title="Cycle sort order"
-          >
-            {sortLabel}
-          </button>
-        </div>
+        {/* Search, then the sort CYCLE (C2-C [C10]). One empty-state pattern (n118): an empty
+            list shows its how-to and one button, no search box or sort. */}
+        {allLinks.length > 0 && (
+          <>
+            <input
+              className="notes-index-search"
+              type="search"
+              placeholder="Search links…"
+              aria-label="Search links"
+              value={searchQuery}
+              onChange={function(e) { setSearchQuery(e.target.value); }}
+            />
+            <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
+              <button
+                className="notes-index-sort-btn"
+                style={{ marginLeft: 'auto' }}
+                onClick={nextSort}
+                title="Cycle sort order"
+              >
+                {sortLabel}
+              </button>
+            </div>
+          </>
+        )}
 
         {/* Broken links callout */}
         {brokenLinks.length > 0 && !searchQuery && (
@@ -440,7 +444,7 @@ export function LinksScreen(props) {
               {brokenLinks.length === 1
                 ? ' link points to content that can no longer be found (the source or target was deleted).'
                 : ' links point to content that can no longer be found (a source or target was deleted).'}
-              {' Long-press a link to remove it.'}
+              {' Tap ⋮ on a link to remove it.'}
             </span>
           </div>
         )}
@@ -452,6 +456,9 @@ export function LinksScreen(props) {
             <div className="notes-empty-hint">
               Select text in any letter or Bible chapter, tap Link in the toolbar, and pick a destination. Your links will appear here.
             </div>
+            {props.onHome && (
+              <button type="button" className="empty-cta" onClick={function() { props.onHome(); }}>Start reading</button>
+            )}
           </div>
         )}
 
