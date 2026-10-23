@@ -6,10 +6,12 @@
      cache, cacheDir, no_backup, CrashRecord, filesDir/offline-audio) stays behind.
 
      cloud-backup (Google's Auto Backup: 25 MB per app, over it the whole backup is skipped):
-       - files/snapshots/: SnapshotStore's daily JSON of the reader's data (every store, media not included),
-         ~0.5 MB each, up to 11 kept. The WebView's IndexedDB is NOT sent: it holds the kept songs' mp3s
-         (offline-songs, "can run to gigabytes") and journal media, which would blow the 25 MB. A restored
-         phone boots to an empty library beside a full snapshot and the page offers the restore.
+       - files/snapshot-cloud/: SnapshotStore's copy of its newest daily JSON of the reader's data (every
+         store, media not included; the page caps one at 16 MB). Not files/snapshots/ (up to 11 kept, so
+         a big library would pass the cap) and not the WebView's IndexedDB: it holds the kept songs' mp3s
+         (offline-songs, "can run to gigabytes") and journal media. A restored phone boots to an empty
+         library beside that snapshot and the page restores it (data-safety.js). Journal photos and voice
+         memos come back only from an Export.
        - shared_prefs/plan_reminder.xml: the reading-plan reminder (rescheduled on the next app open/boot).
        Not sent: song_votes_outbox.xml (transient; the votes Worker already has what was sent), web_cache.xml
        (a per-install stamp), WebView prefs.
@@ -18,8 +20,9 @@
      journal media and settings arrive as they were. Kept songs ride inside IndexedDB here (they cannot be
      split out of it); the downloaded chapter audio in filesDir/offline-audio does not. -->
 <data-extraction-rules>
-    <cloud-backup>
-        <include domain="file" path="snapshots/" />
+    <!-- disableIfNoEncryptionCapabilities: no screen lock, no end-to-end encryption, no cloud backup. -->
+    <cloud-backup disableIfNoEncryptionCapabilities="true">
+        <include domain="file" path="snapshot-cloud/" />
         <include domain="sharedpref" path="plan_reminder.xml" />
     </cloud-backup>
     <device-transfer>

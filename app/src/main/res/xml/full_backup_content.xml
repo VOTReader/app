@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Android 11-and-below twin of data_extraction_rules.xml's cloud-backup (ds-backup 2026-10-23): the same
-     include list, so the same small set goes to Google's backup on every version. Why IndexedDB stays out
-     (kept songs, 25 MB cap): see data_extraction_rules.xml. -->
+     include list, so the same small set goes to Google's backup on every version (here it also governs the
+     new-phone transfer, which restores from that snapshot the same way). Why: see data_extraction_rules.xml.
+     No requireFlags here: on 9-11 clientSideEncryption would also stop the new-phone transfer. -->
 <full-backup-content>
-    <include domain="file" path="snapshots/" />
+    <include domain="file" path="snapshot-cloud/" />
     <include domain="sharedpref" path="plan_reminder.xml" />
 </full-backup-content>

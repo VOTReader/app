@@ -181,10 +181,45 @@ class SnapshotStoreTest {
 
     @Test fun `a snapshot's bytes are forced to the disk before it takes its name (W9)`() {
         val named = File(File(dir, "snapshots"), "snap-20261001-120000.json")
-        val seen = mutableListOf<Boolean>()
-        store.sync = { out -> seen.add(named.exists()); out.fd.sync() }
+        val cloudCopy = File(File(dir, "snapshot-cloud"), "snap-20261001-120000.json")
+        val seen = mutableListOf<Pair<Boolean, Boolean>>()
+        store.sync = { out -> seen.add(named.exists() to cloudCopy.exists()); out.fd.sync() }
         assertTrue(store.save(j("a"), at(2026, 10, 1)))
-        assertEquals(listOf(false), seen)
+        // The snapshot, then its cloud copy (ds-backup): each synced before it has its name.
+        assertEquals(listOf(false to false, true to false), seen)
         assertEquals(j("a"), store.read(named.name))
+    }
+
+    // ds-backup: Google's cloud backup takes only snapshot-cloud/ (one copy of the newest
+    // snapshot), so the 25 MB per-app cap holds however many snapshots the phone keeps.
+    private fun cloud() = File(dir, "snapshot-cloud").listFiles()?.map { it.name }?.sorted() ?: emptyList()
+
+    @Test fun `the cloud copy is the newest snapshot, and only it`() {
+        assertTrue(store.save(j("1"), at(2026, 10, 1)))
+        assertTrue(store.save(j("2"), at(2026, 10, 2)))
+        assertEquals(listOf("snap-20261002-120000.json"), cloud())
+        assertEquals(j("2"), File(dir, "snapshot-cloud/snap-20261002-120000.json").readText())
+    }
+
+    @Test fun `a restored phone with only the cloud copy lists and reads it`() {
+        File(dir, "snapshot-cloud").mkdirs()
+        File(dir, "snapshot-cloud/snap-20261001-120000.json").writeText(j("c"))
+        assertEquals(listOf("snap-20261001-120000.json"), names())
+        assertEquals(j("c"), store.read("snap-20261001-120000.json"))
+    }
+
+    @Test fun `snapshots from before the cloud copy seed it with the newest`() {
+        assertTrue(store.save(j("1"), at(2026, 10, 1)))
+        assertTrue(store.save(j("2"), at(2026, 10, 2)))
+        File(dir, "snapshot-cloud").deleteRecursively()
+        names()
+        assertEquals(listOf("snap-20261002-120000.json"), SnapshotStore(File(dir, "snapshots")).let { it.listJson(); cloud() })
+    }
+
+    @Test fun `clear removes the cloud copy too`() {
+        assertTrue(store.save(j("1"), at(2026, 10, 1)))
+        assertTrue(store.clear())
+        assertEquals(emptyList(), cloud())
+        assertEquals(emptyList(), names())
     }
 }

@@ -39,8 +39,13 @@ import java.util.Locale
  * Thread-safe (every entry point is synchronized): bridge calls land on binder
  * threads. Every failure is quiet (false / "" / "[]"), never a throw across the
  * bridge.
+ *
+ * ds-backup (2026-10-23): [cloud] holds one copy of the newest snapshot, and it is all of this
+ * store that Google's cloud backup takes (res/xml/data_extraction_rules.xml): the whole set can
+ * pass the 25 MB per-app cap, and over it Android skips the backup outright. A phone restored
+ * from the cloud has only that copy; the first listing takes it back into [dir].
  */
-class SnapshotStore(private val dir: File) {
+class SnapshotStore(private val dir: File, private val cloud: File = File(dir.parentFile, "snapshot-cloud")) {
 
     companion object {
         const val KEEP_DAYS = 7
@@ -72,6 +77,7 @@ class SnapshotStore(private val dir: File) {
             FileOutputStream(tmp).use { out -> out.write(bytes); out.flush(); sync(out) }
             if (!tmp.renameTo(File(dir, name))) { tmp.delete(); return false }
             prune()
+            cloudCopy()
             true
         } catch (e: Exception) {
             Timber.w(e, "snapshot save failed")
@@ -82,6 +88,7 @@ class SnapshotStore(private val dir: File) {
     /** `[{name, size, at}]`, newest first; `at` is the time in the name (epoch ms). */
     @Synchronized
     fun listJson(): String = try {
+        if (!cloudChecked) { cloudChecked = true; cloudTakeBack(); cloudCopy() }
         val arr = JSONArray()
         for (f in snapshots()) {
             if (whole(f) == false) continue          // broken; one unreadable this time is listed (the page walks past it)
@@ -94,6 +101,7 @@ class SnapshotStore(private val dir: File) {
     @Synchronized
     fun read(name: String?): String {
         if (name == null || !NAME.matches(name)) return ""
+        if (!cloudChecked) { cloudChecked = true; cloudTakeBack(); cloudCopy() }
         val f = File(dir, name)
         return try { if (f.isFile) f.readText(Charsets.UTF_8) else "" } catch (e: Exception) { "" }
     }
@@ -104,7 +112,43 @@ class SnapshotStore(private val dir: File) {
         val files = dir.listFiles() ?: return true
         var ok = true
         for (f in files) if (f.name.startsWith("snap-") && !f.delete()) ok = false
+        for (f in cloud.listFiles() ?: emptyArray()) if (f.name.startsWith("snap-") && !f.delete()) ok = false
         return ok
+    }
+
+    /** Whether this process has matched [cloud] against [dir] yet (once: a restore lands before the app runs). */
+    private var cloudChecked = false
+
+    /** A restored phone: a cloud copy [dir] lacks comes back into it (copied whole, then named). */
+    private fun cloudTakeBack() {
+        try {
+            for (f in cloud.listFiles() ?: emptyArray()) {
+                if (!NAME.matches(f.name) || File(dir, f.name).exists()) continue
+                if (!dir.isDirectory && !dir.mkdirs()) return
+                if (!place(f, dir)) Timber.w("cloud snapshot %s not taken back", f.name)
+            }
+        } catch (e: Exception) { Timber.w(e, "cloud snapshot take-back failed") }
+    }
+
+    /** [cloud] = exactly the newest whole snapshot. Quiet on failure: the next save tries again. */
+    private fun cloudCopy() {
+        try {
+            val newest = snapshots().firstOrNull { whole(it) == true } ?: return
+            if (!File(cloud, newest.name).isFile) {
+                if (!cloud.isDirectory && !cloud.mkdirs()) return
+                if (!place(newest, cloud)) return
+            }
+            for (f in cloud.listFiles() ?: emptyArray()) if (f.name != newest.name) f.delete()
+        } catch (e: Exception) { Timber.w(e, "cloud snapshot copy failed") }
+    }
+
+    /** Copy [src] into [to] under its own name: bytes forced to the disk first, then renamed (W9). */
+    private fun place(src: File, to: File): Boolean {
+        val tmp = File(to, src.name + ".tmp")
+        FileOutputStream(tmp).use { out -> src.inputStream().use { it.copyTo(out) }; out.flush(); sync(out) }
+        if (tmp.renameTo(File(to, src.name))) return true
+        tmp.delete()
+        return false
     }
 
     /** Snapshot files, newest first. */

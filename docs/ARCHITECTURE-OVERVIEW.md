@@ -114,8 +114,8 @@ fixed in the data, never in the renderer.
   `vot-minisearch-cache` (`src/search/cache.js`).
 - **Backup** is `src/utils/backup.js` plus the streaming `VOTBACK1` container (`src/utils/backup-container.js`,
   `src/utils/backup-android.js`, Kotlin `StorageManager.kt`), with a read-only verify in
-  `src/utils/backup-verify.js`. Android Google backup is on since 2026-10-23 (`res/xml/data_extraction_rules.xml`: the daily
-  snapshots to the cloud, WebView storage on a phone transfer, no downloaded audio). CI runs
+  `src/utils/backup-verify.js`. Android Google backup is on since 2026-10-23 (`res/xml/data_extraction_rules.xml`: the newest
+  snapshot to the cloud, WebView storage on a phone transfer, no downloaded audio). CI runs
   `tools/e2e-restore-fresh.mjs` against a fresh profile.
 
 **Navigation state.** Tabs, history and back behaviour live in `src/hooks/use-tabs.js`, `src/hooks/use-nav.js`,
