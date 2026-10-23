@@ -162,8 +162,8 @@ export function NotebookPickerSheet({ groupId, onClose }) {
                     <button
                       className="nb-picker-row-delete"
                       onClick={(e) => { e.stopPropagation(); setConfirmDeleteNb(nb.id); }}
-                      title="Delete notebook"
-                      aria-label="Delete notebook"
+                      title={'Delete notebook ' + nb.name}
+                      aria-label={'Delete notebook ' + nb.name}
                     >×</button>
                   </div>
                 );

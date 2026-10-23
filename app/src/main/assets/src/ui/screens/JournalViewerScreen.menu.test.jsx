@@ -15,7 +15,7 @@
    (imported from the hub module, exactly how the bundle globalizes it). */
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { JournalViewerScreen } from './JournalViewerScreen.jsx';
 import { JournalHubScreen, JournalCardMenu } from './JournalHubScreen.jsx';
 
@@ -193,5 +193,30 @@ describe('JournalHubScreen — inline pin indicator (no timestamp overlap)', () 
     const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
     expect(container.querySelector('.jrn-card-pin-inline')).toBeNull();
     expect(container.querySelector('.jrn-card-pin-marker')).toBeNull();
+  });
+});
+
+/* id-datasafe 122: with the compact top bar (the default) the viewer's own ⋮ sat beside the
+   bar's ⋯. A pencil now edits and Pin / Delete head the ⋯ menu (utils/page-menu.js). */
+describe('JournalViewerScreen — a pencil, and Pin / Delete in the top bar ⋯ (id-datasafe 122)', () => {
+  beforeEach(() => { document.body.classList.add('compact-topbar'); });
+  afterEach(() => { document.body.classList.remove('compact-topbar'); });
+
+  it('shows a pencil instead of its own ⋮, and offers Pin and Delete to the ⋯ menu', async () => {
+    const { pageMenu } = await import('../../utils/page-menu.js');
+    setupGlobals();
+    const onEdit = vi.fn();
+    const { container, unmount } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
+    expect(container.querySelector('.jrn-entry-menu-btn')).toBeNull();
+    fireEvent.click(screen.getByLabelText('Edit entry'));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    const items = pageMenu();
+    expect(items.map((i) => i.label)).toEqual(['Unpin entry', 'Delete entry…']);
+    items[0].onSelect();
+    expect(window.JournalStore.togglePin).toHaveBeenCalledWith('e1');
+    act(() => { items[1].onSelect(); });
+    expect(screen.getByText('Delete this entry?')).toBeTruthy();   // straight to the first confirm
+    unmount();
+    expect(pageMenu()).toBeNull();                                 // gone with the screen
   });
 });

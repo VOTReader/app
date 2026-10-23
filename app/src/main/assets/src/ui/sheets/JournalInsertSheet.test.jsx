@@ -92,7 +92,7 @@ describe('bookmark drill', () => {
     window.BookmarkStore = { all: () => [] };
     mountSheet();
     fireEvent.click(screen.getByText('Bookmark'));
-    expect(screen.getByText('No bookmarks yet.')).toBeTruthy();
+    expect(screen.getByText(/^No bookmarks yet\. Select text in any chapter or letter and tap Bookmark\.$/)).toBeTruthy();
   });
 
   it('choosing a bookmark emits a bookmark-card with its id', () => {
@@ -138,6 +138,20 @@ describe('note drill', () => {
     const block = onInsertBlock.mock.calls[0][0];
     expect(block.type).toBe('note-card');
     expect(block.noteGroupId).toBe('ng1');
+  });
+
+  // id-datasafe 253 + 129: the empty picker says how to make a note; a long list says it stops at 200.
+  it('an empty picker says how to make a note; past 200 it says how many it shows', () => {
+    window.NoteStore = { list: () => [] };
+    mountSheet();
+    fireEvent.click(screen.getByText('Note'));
+    expect(screen.getByText(/No notes yet\. Select text in any chapter or letter and tap Note\./)).toBeTruthy();
+    cleanup();
+    window.NoteStore = { list: () => Array.from({ length: 230 }, (_, i) => ({ groupId: 'g' + i, body: 'note ' + i, updated: i })) };
+    mountSheet();
+    fireEvent.click(screen.getByText('Note'));
+    expect(document.querySelectorAll('.jrn-picker-item')).toHaveLength(200);
+    expect(screen.getByText('Showing 200 of 230 notes. Search to find the others.')).toBeTruthy();
   });
 });
 

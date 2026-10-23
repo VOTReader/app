@@ -338,3 +338,29 @@ describe('MoreMenuBtn — Bible translation (mw17 A02.1)', () => {
     expect(document.querySelector('.more-menu').textContent).not.toMatch(/Bible translation/);
   });
 });
+
+/* id-datasafe 122: a screen's own items (a journal entry's Pin and Delete) head the menu. */
+describe('MoreMenuBtn — the screen\'s own items (utils/page-menu.js)', () => {
+  afterEach(() => { globalThis.__votPageMenu = null; });
+
+  it('lists them first, closes, then runs the one tapped', () => {
+    const onPin = vi.fn();
+    globalThis.__votPageMenu = [
+      { key: 'pin', label: 'Pin entry', onSelect: onPin },
+      { key: 'delete', label: 'Delete entry…', danger: true, onSelect: vi.fn() },
+    ];
+    const { open, menu, item } = setup();
+    open();
+    const labels = [...document.querySelectorAll('.more-menu [role="menuitem"]')].map((b) => b.textContent.trim());
+    expect(labels.slice(0, 2)).toEqual(['Pin entry', 'Delete entry…']);
+    act(() => { fireEvent.click(item('Pin entry')); });
+    expect(onPin).toHaveBeenCalledTimes(1);
+    expect(menu()).toBeNull();
+  });
+
+  it('shows none on a screen that offers none', () => {
+    const { open } = setup();
+    open();
+    expect(document.querySelector('.more-menu-page-item')).toBeNull();
+  });
+});

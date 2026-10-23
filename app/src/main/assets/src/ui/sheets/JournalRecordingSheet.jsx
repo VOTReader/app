@@ -60,6 +60,13 @@ export function downsampleWave(arr, buckets) {
   return out;
 }
 
+/** What a denied microphone says: where to allow it, then Try again (id-datasafe 123). */
+function _micDeniedText() {
+  return PlatformBridge.isAndroid
+    ? 'Microphone access is off for VOTReader. Turn it on in Android Settings > Apps > VOTReader > Permissions > Microphone, then tap Try again.'
+    : "Microphone access is blocked. Allow it in this site's browser settings, then tap Try again.";
+}
+
 export function JournalRecordingSheet({ onSave, onClose }) {
   var useState = React.useState;
   var useEffect = React.useEffect;
@@ -147,6 +154,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
   // served url. Set only on the Android fetch path -- the file is still on disk
   // for the TTL window, so this is a real second chance, not a re-record.
   var retryFetchRef = useRef(null);
+  // id-datasafe 123: a mic denial offers Try again, which asks for the mic again (a new attempt
+  // of the session effect below); the message names where Android keeps the switch.
+  var micDeniedRef = useRef(false);
+  var _attempt = useState(0);
+  var attempt = _attempt[0]; var setAttempt = _attempt[1];
 
   // Cleanup helper — releases the bridge's recording resources + clears
   // UI intervals + frees the preview Blob URL. Idempotent; safe from any
@@ -519,9 +531,10 @@ export function JournalRecordingSheet({ onSave, onClose }) {
             : res === 'error:no-stream'
               ? 'Microphone access was not granted.'
               : res === 'error:permission'
-                ? 'Microphone permission denied. Enable mic access for this app, then try again.'
+                ? _micDeniedText()
                 : 'Could not start the recorder. Please try again.'
         );
+        micDeniedRef.current = res === 'error:permission' || res === 'error:no-stream';
         setStage('error');
         return;
       }
@@ -549,7 +562,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       if (granted) {
         startCapture();
       } else {
-        setError('Microphone permission denied. Enable mic access for this app, then try again.');
+        setError(_micDeniedText());
+        micDeniedRef.current = true;
         setStage('error');
       }
     };
@@ -581,8 +595,8 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       try { delete window.__onNativeRecordingPaused; } catch (_e) { window.__onNativeRecordingPaused = undefined; }
       cleanup();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: one recording session per sheet open. setError/setSeconds/setStage/setWaveFinal/setWaveLive are useState setters (identity-stable); persistRecording/stopRecording are local functions whose closure reads the same setters + refs that this effect's closure does — same lifecycle, no stale-value risk.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one recording session per attempt (a new one only after a mic denial's Try again). setError/setSeconds/setStage/setWaveFinal/setWaveLive are useState setters (identity-stable); persistRecording/stopRecording are local functions whose closure reads the same setters + refs that this effect's closure does — same lifecycle, no stale-value risk.
+  }, [attempt]);
 
   // Seconds tick — auto-stops at MAX_RECORDING_SECONDS (NTV-1 foreground cap).
   // Started on capture + RESTARTED on resume; CLEARED on pause so paused time is
@@ -865,7 +879,13 @@ export function JournalRecordingSheet({ onSave, onClose }) {
           <div className="jrn-rec-error">{error || 'Recording failed.'}</div>
           <div className="jrn-rec-actions">
             <button className="jrn-rec-cancel" onClick={discard}>Close</button>
-            {retryFetchRef.current && (
+            {micDeniedRef.current && (
+              <button
+                className="jrn-rec-confirm-btn"
+                onClick={function() { micDeniedRef.current = false; setError(''); setStage('requesting'); setAttempt(function(n) { return n + 1; }); }}
+              >Try again</button>
+            )}
+            {!micDeniedRef.current && retryFetchRef.current && (
               <button
                 className="jrn-rec-confirm-btn"
                 onClick={function() { setError(''); setStage('retrieving'); retryFetchRef.current(); }}
@@ -900,7 +920,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       var isPaused = stage === 'paused';
       return (
         <div className="jrn-rec-content">
-          <div className={"jrn-rec-status" + (isPaused ? ' is-paused' : '')}>{isPaused ? 'Paused' : 'Recording'}</div>
+          <div className={"jrn-rec-status" + (isPaused ? ' is-paused' : '')} role="status" aria-live="polite">{isPaused ? 'Paused' : 'Recording'}</div>
           <div className="jrn-rec-time">{fmtTime(seconds)}</div>
           {renderRecordingWave(waveLive)}
           {confirmingDiscard ? (

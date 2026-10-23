@@ -97,6 +97,23 @@ describe('JournalAudioBlock — the bytes are gone', () => {
     expect(screen.getByRole('slider')).toBeTruthy();
   });
 
+  // id-datasafe 125: a drag along the waveform scrubs; it only seeked on a tap.
+  it('a drag along the waveform scrubs, and a move with no press does nothing', async () => {
+    setupGlobals('blob:ok');
+    await renderSettled(<JournalAudioBlock mediaId="m_ok" duration={100} caption="Morning walk" />);
+    const slider = screen.getByRole('slider');
+    slider.getBoundingClientRect = () => /** @type {any} */ ({ left: 0, width: 200, top: 0, height: 20, right: 200, bottom: 20 });
+    fireEvent.pointerMove(slider, { clientX: 150, pointerId: 1 });
+    expect(slider.getAttribute('aria-valuenow')).toBe('0');
+    fireEvent.pointerDown(slider, { clientX: 20, pointerId: 1, button: 0 });
+    expect(slider.getAttribute('aria-valuenow')).toBe('10');
+    fireEvent.pointerMove(slider, { clientX: 120, pointerId: 1 });
+    expect(slider.getAttribute('aria-valuenow')).toBe('60');
+    fireEvent.pointerUp(slider, { clientX: 120, pointerId: 1 });
+    fireEvent.pointerMove(slider, { clientX: 180, pointerId: 1 });
+    expect(slider.getAttribute('aria-valuenow')).toBe('60');
+  });
+
   /* The third state, and the reason `src === null` cannot mean "missing" on
      its own: before the promise settles there is no url either. A block that
      renders MISSING on the first frame accuses the store of losing data every

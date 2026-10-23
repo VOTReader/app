@@ -310,8 +310,8 @@ describe('JournalEditorScreen — JRNL-1 drafts are kept per entry (sweep mw13)'
       const pending = confirm.splice(0);
       await act(async () => { pending.forEach((res) => res(true)); await Promise.resolve(); });
       expect(durable()).toBe(false);                  // not yet: the newer write is not confirmed
-      expect(confirm).toHaveLength(1);                // ...and it is being waited for
-      await act(async () => { confirm[0](true); await Promise.resolve(); });
+      expect(confirm.length).toBeGreaterThan(0);      // ...and it is being waited for (the chip waits too, id-datasafe 76)
+      await act(async () => { confirm.forEach((res) => res(true)); await Promise.resolve(); });
       expect(durable()).toBe(true);
       r.unmount();
     } finally { delete globalThis.isStoreWriteFenced; }
@@ -557,6 +557,29 @@ describe('JournalEditorScreen — P1-7: blank entries prune on exit', () => {
     const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
     unmount();
     expect(JournalStore.get(entry.id)).not.toBeNull();
+  });
+
+  // id-datasafe 178: later text blocks had no placeholder and no name a screen reader could tell apart.
+  it('every text block invites more and is named by its place', () => {
+    const entry = JournalStore.add({ title: 't', blocks: [
+      JournalHelpers.newBlock('p', { text: '' }), JournalHelpers.newBlock('h2', { text: '' }), JournalHelpers.newBlock('p', { text: '' }),
+    ] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const tas = [...document.querySelectorAll('.jrn-block-textarea')];
+    expect(tas.map((t) => t.getAttribute('aria-label'))).toEqual(['Paragraph 1', 'Heading 1', 'Paragraph 2']);
+    expect(tas.map((t) => t.getAttribute('placeholder'))).toEqual(['Start writing…', 'Heading', 'Keep writing…']);
+  });
+
+  // id-datasafe 126: a voice memo had no caption field in the editor (only a photo did).
+  it('a voice memo takes a caption, saved with the block', () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('audio', { mediaId: 'm_1', duration: 3 })] });
+    const { getByLabelText, unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const field = getByLabelText('Voice memo caption');
+    fireEvent.change(field, { target: { value: 'Morning walk' } });
+    fireEvent.blur(field);
+    unmount();
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.find((b) => b.type === 'audio').caption).toBe('Morning walk');
   });
 
   it('the prune clears a stale JRNL-1 draft for the removed entry', () => {
@@ -829,6 +852,41 @@ describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.
     } finally {
       JournalStore.isReady = ready;
       delete globalThis.isStoreWriteFenced;
+      vi.useRealTimers();
+    }
+  });
+
+  // Refuter r1 (id-datasafe 76): the fence can rise while the write waits on its lock; the write
+  // then resolves unwritten and whenSaved says true.
+  it("a write the fence stopped while it waited is not 'Saved'", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const pending = [];
+    JournalStore.whenSaved = () => new Promise((res) => { pending.push(res); });
+    try {
+      fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+      await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+      globalThis.isStoreWriteFenced = () => true;
+      await act(async () => { pending.splice(0).forEach((res) => res(true)); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saving…');
+    } finally { delete globalThis.isStoreWriteFenced; }
+  });
+
+  // Refuter r1 (id-datasafe 76): an entry opened before the store loaded lives only in its queue.
+  it("opens on 'Saving…' while the store has not loaded, and says 'Saved' once it has", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    const ready = JournalStore.isReady;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      JournalStore.whenSaved = () => Promise.resolve(true);
+      JournalStore.isReady = () => false;
+      render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+      expect(chip()).toBe('Saving…');
+      JournalStore.isReady = ready;
+      await act(async () => { vi.advanceTimersByTime(2100); await Promise.resolve(); await Promise.resolve(); });
+      expect(chip()).toBe('Saved');
+    } finally {
+      JournalStore.isReady = ready;
       vi.useRealTimers();
     }
   });

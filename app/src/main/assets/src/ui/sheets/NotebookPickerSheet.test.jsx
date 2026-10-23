@@ -68,6 +68,8 @@ describe('NotebookPickerSheet — buffered toggles', () => {
     const row = box.closest('.nb-picker-row');
     expect(row.getAttribute('role')).toBeNull();
     expect(box.contains(row.querySelector('.nb-picker-row-delete'))).toBe(false);
+    // id-datasafe 279: each Delete names its notebook.
+    expect(row.querySelector('.nb-picker-row-delete').getAttribute('aria-label')).toBe('Delete notebook Psalms Study');
     expect(box.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(box);
     expect(row.className).toContain('checked');

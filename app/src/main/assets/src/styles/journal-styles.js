@@ -82,6 +82,10 @@
   R('.jrn-card-time { opacity: 0.62; font-size: 0.85em; letter-spacing: 0.04em; }');
   R('.jrn-card-preview { font-family: var(--font-garamond); font-size: var(--fs-14); color: var(--cream-dim); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }');
   R('body.light .jrn-card-preview { color: #5a4f3d; }');
+  // id-datasafe 121: a search card's snippet marks the hit and says where it was found.
+  R('.jrn-card-snippet { -webkit-line-clamp: 3; }');
+  R('.jrn-card-snippet mark { background: var(--gold-faint); color: inherit; border-radius: 2px; padding: 0 1px; }');
+  R('.jrn-card-hit-where { color: var(--gold-dim); font-style: italic; }');
   R('.jrn-card-attachments { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }');
   R('.jrn-attach { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--gold-faint); border-radius: 4px; font-size: var(--fs-10); font-family: var(--font-cinzel); text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); }');
   R('.jrn-attach svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.8; }');
@@ -141,6 +145,9 @@
   R('.jrn-embed-letter, .jrn-embed-chapter, .jrn-embed-bookmark, .jrn-embed-note, .jrn-embed-journal { background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 14px 38px 14px 16px; cursor: pointer; position: relative; transition: background 0.15s, border-color 0.15s; }');
   R('body.light .jrn-embed-letter, body.light .jrn-embed-chapter, body.light .jrn-embed-bookmark, body.light .jrn-embed-note, body.light .jrn-embed-journal { background: #f3ecdc; }');
   R('.jrn-embed-letter:hover, .jrn-embed-chapter:hover, .jrn-embed-bookmark:hover, .jrn-embed-note:hover, .jrn-embed-journal:hover { border-color: var(--gold); }');
+  // id-datasafe 127: a deleted entry's card is no link: plain cursor, dim title, no hover.
+  R('.jrn-embed-journal.is-deleted, .jrn-embed-journal.is-deleted:hover { cursor: default; border-color: var(--gold-border); }');
+  R('.jrn-embed-journal.is-deleted .jrn-emb-title { color: var(--cream-dim); font-style: italic; }');
   // Notebook embed — compact row: icon, name, chevron. Tapping opens the
   // notebook's screen in the Notes hub.
   R('.jrn-embed-notebook { display: flex; align-items: center; gap: 12px; background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 8px; padding: 12px 14px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }');
@@ -207,6 +214,9 @@
   R('.jrn-embed-image img { width: 100%; display: block; max-height: 420px; object-fit: cover; }');
   R('.jrn-embed-image .jrn-img-caption { padding: 8px 14px; background: var(--bg2); font-family: var(--font-garamond); font-style: italic; font-size: var(--fs-13); color: var(--cream-dim); border: none; width: 100%; outline: none; }');
   R('body.light .jrn-embed-image .jrn-img-caption { background: #f3ecdc; color: #5a4f3d; }');
+  // id-datasafe 126: the voice memo's caption field, under its player.
+  R('.jrn-aud-caption-input { display: block; box-sizing: border-box; margin-top: 6px; padding: 8px 14px; background: var(--bg2); font-family: var(--font-garamond); font-style: italic; font-size: var(--fs-13); color: var(--cream-dim); border: 1px solid var(--gold-border); border-radius: 8px; width: 100%; outline: none; }');
+  R('body.light .jrn-aud-caption-input { background: #f3ecdc; color: #5a4f3d; }');
   R('.jrn-img-delete { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,0.55); color: var(--cream); width: 28px; height: 28px; border-radius: 50%; border: none; cursor: pointer; z-index: 2; display: flex; align-items: center; justify-content: center; }');
   R('.jrn-img-delete:hover { background: rgba(199, 92, 74, 0.7); }');
 

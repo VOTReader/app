@@ -45,6 +45,7 @@ import { copyText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
 import { SelectSheet } from './SelectField.jsx';
 import { translationName } from '../../data/translations.js';
+import { pageMenu } from '../../utils/page-menu.js';
 
 /**
  * @typedef {Object} NavMenuValue
@@ -103,6 +104,8 @@ export function MoreMenuBtn() {
   // The page on screen's website link, read as the menu opens (cp2).
   const [page, setPage] = React.useState(/** @type {{link:string,reference:string}|null} */ (null));
   const [fallback, setFallback] = React.useState(/** @type {string|null} */ (null));
+  // The screen's own items (utils/page-menu.js, id-datasafe 122), read as the menu opens.
+  const [pageItems, setPageItems] = React.useState(/** @type {any[]|null} */ (null));
   const [pickOpen, setPickOpen] = React.useState(false);
   const closePick = React.useCallback(() => setPickOpen(false), []);
   const btnRef = React.useRef(/** @type {HTMLButtonElement|null} */ (null));
@@ -123,6 +126,7 @@ export function MoreMenuBtn() {
     let here = null;
     try { here = pageSiteLink(); } catch (_e) { here = null; }   // a menu never breaks on a page it cannot name
     setPage(here);
+    setPageItems(pageMenu());
   }, [open]);
 
   // Focus the first item once the menu exists: it mounts one commit after `open`
@@ -238,6 +242,11 @@ export function MoreMenuBtn() {
           style={{ top: pos.top + 'px', right: pos.right + 'px' }}
           onKeyDown={onKeyDown}
         >
+          {pageItems ? pageItems.map((it) => (
+            <button key={it.key} type="button" role="menuitem" className={'more-menu-item more-menu-page-item' + (it.danger ? ' danger' : '')} onClick={go(it.onSelect)}>
+              <span>{it.label}</span>
+            </button>
+          )) : null}
           {page ? (
             <button type="button" role="menuitem" className="more-menu-item" onClick={copyPageLink}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">

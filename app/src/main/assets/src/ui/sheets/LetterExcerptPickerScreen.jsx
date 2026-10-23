@@ -255,7 +255,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         />
         {findTrim.length >= 2 && (
           <>
-            <span className="picker-find-count">{findMatches.length ? (Math.min(findIdx, findMatches.length - 1) + 1) + ' of ' + findMatches.length : '0 found'}</span>
+            <span className="picker-find-count" role="status" aria-live="polite">{findMatches.length ? (Math.min(findIdx, findMatches.length - 1) + 1) + ' of ' + findMatches.length : '0 found'}</span>
             <button type="button" className="picker-find-nav" onClick={() => findStep(-1)} disabled={!findMatches.length} aria-label="Previous match">{"‹"}</button>
             <button type="button" className="picker-find-nav" onClick={() => findStep(1)} disabled={!findMatches.length} aria-label="Next match">{"›"}</button>
           </>

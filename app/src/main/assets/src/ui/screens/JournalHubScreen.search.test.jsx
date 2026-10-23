@@ -154,3 +154,37 @@ describe('JournalHubScreen empty state and search name', () => {
     expect(screen.getByRole('textbox', { name: 'Search journal entries' })).toBeTruthy();
   });
 });
+
+/* id-datasafe 121 + 124: a search card showed the entry's opening lines, not the words that
+   matched, and the header kept counting every entry. */
+describe('JournalHubScreen search shows what matched (id-datasafe 121, 124)', () => {
+  it('a card shows the words around the hit, marked, and says when it was in a caption', () => {
+    const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
+    type(container, 'lighthouse');
+    const snip = /** @type {HTMLElement} */ (container.querySelector('.jrn-card-snippet'));
+    expect(snip.querySelector('mark').textContent).toBe('lighthouse');
+    expect(snip.textContent).toContain('Then the lighthouse keeper spoke.');
+    expect(snip.textContent.startsWith('…')).toBe(true);           // cut from a long paragraph
+    expect(snip.textContent.length).toBeLessThan(140);
+    type(container, 'harbor');
+    expect(container.querySelector('.jrn-card-snippet').textContent).toBe('In a caption: Harbor at dusk');
+    expect(container.querySelector('.jrn-card-snippet mark').textContent).toBe('Harbor');
+  });
+
+  it('a hit in the title alone keeps the usual preview', () => {
+    const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
+    type(container, 'morning');
+    expect(container.querySelector('.jrn-card-snippet')).toBeNull();
+    expect(container.querySelector('.jrn-card-preview').textContent).toBe('A short first paragraph.');
+  });
+
+  it('the header count follows the search', () => {
+    const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
+    const count = () => container.querySelector('.study-head-count').textContent;
+    expect(count()).toBe('2 entries');
+    type(container, 'mustard');
+    expect(count()).toBe('1 of 2 entries');
+    type(container, '');
+    expect(count()).toBe('2 entries');
+  });
+});

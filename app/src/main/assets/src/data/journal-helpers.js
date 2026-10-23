@@ -202,6 +202,46 @@ export var JournalHelpers = (function() {
     return parts.join('\n').toLowerCase();
   }
 
+  /* id-datasafe 121: the text around a search hit, for the hub's cards. `q` is the
+     lowercased, space-collapsed query the hub filters with. Looks where searchText
+     looks, title aside (the card shows the title anyway). Returns
+     { before, hit, after, where } (where: '' | 'excerpt' | 'caption' | 'tag'), or null
+     when only the title matches. About `span` characters, cut at word edges. */
+  var EXCERPT_TYPES = { 'journal-excerpt': 1, 'verse-block': 1, 'letter-card': 1 };
+  function searchSnippet(entry, q, span) {
+    if (!entry || !q) return null;
+    span = span || 120;
+    var parts = [];
+    var blocks = entry.blocks || [];
+    for (var i = 0; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (!b) continue;
+      var where = EXCERPT_TYPES[b.type] ? 'excerpt' : '';
+      if (typeof b.text === 'string') parts.push({ t: plainInline(b.text), where: where });
+      if (typeof b.cite === 'string') parts.push({ t: plainInline(b.cite), where: where });
+      if (typeof b.caption === 'string') parts.push({ t: plainInline(b.caption), where: 'caption' });
+      if (b.type === 'verse-block' && typeof b.ref === 'string') parts.push({ t: plainInline(b.ref), where: 'excerpt' });
+    }
+    if (entry.tags && entry.tags.length) parts.push({ t: plainInline(entry.tags.join(' ')), where: 'tag' });
+    for (var j = 0; j < parts.length; j++) {
+      var text = parts[j].t;
+      var at = text.toLowerCase().indexOf(q);
+      if (at < 0) continue;
+      var room = Math.max(0, span - q.length);
+      var from = Math.max(0, at - Math.floor(room / 3));
+      var to = Math.min(text.length, at + q.length + room - (at - from));
+      if (from > 0) { var sp = text.indexOf(' ', from); if (sp >= 0 && sp < at) from = sp + 1; }
+      if (to < text.length) { var sp2 = text.lastIndexOf(' ', to); if (sp2 > at + q.length) to = sp2; }
+      return {
+        before: (from > 0 ? '…' : '') + text.slice(from, at),
+        hit: text.slice(at, at + q.length),
+        after: text.slice(at + q.length, to) + (to < text.length ? '…' : ''),
+        where: parts[j].where,
+      };
+    }
+    return null;
+  }
+
   /* Short summary of embeds for the attachment chip row on entry cards. */
   function attachmentSummary(entry) {
     var counts = { image: 0, audio: 0, letter: 0, chapter: 0, verse: 0, bookmark: 0, note: 0, journal: 0 };
@@ -522,6 +562,7 @@ export var JournalHelpers = (function() {
     collectRefs: collectRefs,
     previewText: previewText,
     searchText: searchText,
+    searchSnippet: searchSnippet,
     attachmentSummary: attachmentSummary,
     formatDuration: formatDuration,
     resolveLetterCard: resolveLetterCard,

@@ -2,6 +2,8 @@
    JournalViewerScreen — Cluster B (esbuild bundle-b.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { usePageMenu } from '../../utils/page-menu.js';
+
 /* Shared utility for rendering inline markup in p/h2/quote text. */
 function jrnInteractiveProps(activate, role) {
   var semanticRole = role || 'button';
@@ -231,10 +233,21 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
   if (b.type === 'journal-card') {
     var je = (typeof JournalStore !== 'undefined') ? JournalStore.get(b.entryId) : null;
     var jcPreview = je ? JournalHelpers.previewText(je, 180) : '';
+    // id-datasafe 127: a deleted entry's card is inert and says so (a tap opened 'Entry Not Found').
+    // Not before the store has loaded: then the entry may only be on its way.
+    var jcGone = !je && typeof JournalStore !== 'undefined' && !(typeof JournalStore.isReady === 'function' && !JournalStore.isReady());
+    if (jcGone) {
+      return (
+        <div className="jrn-embed-journal is-deleted" aria-disabled="true">
+          <div className="jrn-emb-eyebrow">Linked Entry</div>
+          <h4 className="jrn-emb-title">This entry was deleted</h4>
+        </div>
+      );
+    }
     return (
       <div className="jrn-embed-journal" {...jrnInteractiveProps(function() { callbacks.onJournalCard && callbacks.onJournalCard(b.entryId); })}>
         <div className="jrn-emb-eyebrow">Linked Entry</div>
-        <h4 className="jrn-emb-title">{je ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled') : '(Deleted)'}</h4>
+        <h4 className="jrn-emb-title">{je ? (JournalHelpers.entryDisplayTitle(je) || 'Untitled') : 'Loading…'}</h4>
         {/* A link card shows a 2-line teaser (CSS-clamped), not an expandable
             body — tapping the card opens the full entry. No "Show more". */}
         {jcPreview && <div className="jrn-emb-body">{jcPreview}</div>}
@@ -493,6 +506,19 @@ export function JournalAudioBlock(props) {
     }
   }
 
+  // id-datasafe 125: a drag along the waveform scrubs (it only seeked on a tap). The pointer is
+  // captured so the drag keeps scrubbing past the bars' edges; pan-y leaves a vertical swipe
+  // to the page.
+  var scrubRef = React.useRef(false);
+  function scrubStart(e) {
+    if (e.button != null && e.button !== 0) return;
+    scrubRef.current = true;
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_e) { /* jsdom, old WebView */ }
+    seekFromEvent(e);
+  }
+  function scrubMove(e) { if (scrubRef.current) seekFromEvent(e); }
+  function scrubEnd() { scrubRef.current = false; }
+
   function seekFromKeyboard(e) {
     if (!audioRef.current) return;
     var total = duration || audioRef.current.duration || 0;
@@ -623,6 +649,10 @@ export function JournalAudioBlock(props) {
             <div
               className="jrn-aud-waveform"
               onClick={seekFromEvent}
+              onPointerDown={scrubStart}
+              onPointerMove={scrubMove}
+              onPointerUp={scrubEnd}
+              onPointerCancel={scrubEnd}
               onKeyDown={seekFromKeyboard}
               role="slider"
               tabIndex={0}
@@ -631,7 +661,7 @@ export function JournalAudioBlock(props) {
               aria-valuemax={Math.round(dur)}
               aria-valuenow={Math.round(curTime || 0)}
               aria-valuetext={timeStr}
-              style={{ cursor: 'pointer' }}
+              style={{ cursor: 'pointer', touchAction: 'pan-y' }}
             >
               {bars}
             </div>
@@ -694,6 +724,23 @@ export function JournalViewerScreen(props) {
   // narrow Android screens).
   var _menuOpen = useState(false);
   var menuOpen = _menuOpen[0]; var setMenuOpen = _menuOpen[1];
+  var _menuStep = useState(0);   // 1: the sheet opens on Delete's first confirm
+  var menuStep = _menuStep[0]; var setMenuStep = _menuStep[1];
+
+  // id-datasafe 122: a pencil edits, and Pin and Delete head the top bar's ⋯ menu
+  // (utils/page-menu.js), so the viewer no longer sets its own ⋮ beside that ⋯. Without
+  // the compact top bar there is no ⋯, and the ⋮ entry sheet stays.
+  var compactBar = typeof document !== 'undefined' && document.body.classList.contains('compact-topbar');
+  var entryPinned = !!(entry && entry.pinned);
+  var hasEntry = !!entry;
+  var pageItems = React.useMemo(function() {
+    if (!hasEntry || !compactBar) return null;
+    return [
+      { key: 'pin', label: entryPinned ? 'Unpin entry' : 'Pin entry', onSelect: function() { JournalStore.togglePin(entryId); } },
+      { key: 'delete', label: 'Delete entry…', danger: true, onSelect: function() { setMenuStep(1); setMenuOpen(true); } },
+    ];
+  }, [entryId, hasEntry, entryPinned, compactBar, setMenuOpen, setMenuStep]);
+  usePageMenu(pageItems);
 
   // A {{ref:}} tap can OUTLIVE this screen: when the Bible corpus is still
   // loading, onScriptureRef retries for up to 10s (40 x 250ms). Held here so a
@@ -847,7 +894,20 @@ export function JournalViewerScreen(props) {
   // ONE ⋯ nav icon opens the same entry-options sheet the hub cards use
   // (Edit / Pin / Delete-with-triple-confirm) — JournalCardMenu, with the
   // redundant "Open Entry" item hidden since we're already inside the entry.
-  var navExtras = (
+  var editBtn = onEdit ? (
+    <button
+      className="nav-search-btn jrn-entry-edit-btn"
+      onClick={function() { onEdit(); }}
+      title="Edit entry"
+      aria-label="Edit entry"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+      </svg>
+    </button>
+  ) : null;
+  var navExtras = compactBar ? editBtn : (
     <button
       className="nav-search-btn jrn-entry-menu-btn"
       onClick={function() { setMenuOpen(true); }}
@@ -922,7 +982,8 @@ export function JournalViewerScreen(props) {
         <JournalCardMenu
           entry={entry}
           hideOpen
-          onClose={function() { setMenuOpen(false); }}
+          startStep={menuStep}
+          onClose={function() { setMenuOpen(false); setMenuStep(0); }}
           onEdit={onEdit}
           onTogglePin={togglePin}
           onDelete={doDelete}

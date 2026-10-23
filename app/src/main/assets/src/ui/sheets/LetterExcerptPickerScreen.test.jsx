@@ -97,6 +97,8 @@ describe('LetterExcerptPickerScreen breadcrumb + footer', () => {
     fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'zzz-nowhere' } });
     expect(container.querySelector('.picker-find-count').textContent).toBe('0 found');
     expect(container.querySelector('.picker-find-hit')).toBeNull();
+    // id-datasafe 194: a screen reader hears the count change.
+    expect(container.querySelector('.picker-find-count').getAttribute('aria-live')).toBe('polite');
   });
 
   /* Owner-reported: on Android a long-press selection's touchend is delivered

@@ -774,6 +774,9 @@
       .more-menu-item-sub { font-size: var(--fsc-13); color: var(--cream-muted); }
       .more-menu-item:focus-visible, .more-menu-seg button:focus-visible, .more-menu-step button:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
       .more-menu-item:active { background: var(--gold-faint); }
+      /* id-datasafe 122: the screen's own items (a journal entry's Pin, Delete) head the menu, ruled off. */
+      .more-menu-page-item + .more-menu-item:not(.more-menu-page-item), .more-menu-page-item + .more-menu-row { border-top: 1px solid var(--border); }
+      .more-menu-page-item.danger { color: var(--danger); }
       @media (hover: hover) { .more-menu-item:hover { background: var(--gold-faint); } }
       .more-menu-row {
         display: flex; align-items: center; justify-content: space-between; gap: 16px;

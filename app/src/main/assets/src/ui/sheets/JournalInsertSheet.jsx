@@ -4,6 +4,9 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
+/** The note picker lists the newest this many (a long list is slow to draw). */
+var NOTE_PICKER_CAP = 200;
+
 export function JournalInsertSheet(props) {
   var useState = React.useState;
 
@@ -333,7 +336,7 @@ export function JournalInsertSheet(props) {
         {searchPill()}
         <div className="jrn-picker-results">
           {filtered.length === 0
-            ? <div className="jrn-picker-empty">{bms.length === 0 ? 'No bookmarks yet.' : 'No matches.'}</div>
+            ? <div className="jrn-picker-empty">{bms.length === 0 ? 'No bookmarks yet. Select text in any chapter or letter and tap Bookmark.' : 'No matches.'}</div>
             : filtered.map(function(b) {
                 return (
                   <button key={b.id} type="button" className="jrn-picker-item" onClick={function() { chooseBookmark(b); }}>
@@ -372,8 +375,8 @@ export function JournalInsertSheet(props) {
         {searchPill()}
         <div className="jrn-picker-results">
           {filtered.length === 0
-            ? <div className="jrn-picker-empty">{notes.length === 0 ? 'No notes yet.' : 'No matches.'}</div>
-            : filtered.slice(0, 200).map(function(n) {
+            ? <div className="jrn-picker-empty">{notes.length === 0 ? 'No notes yet. Select text in any chapter or letter and tap Note.' : 'No matches.'}</div>
+            : filtered.slice(0, NOTE_PICKER_CAP).map(function(n) {
                 var anchor = normalizeExcerptDisplay(n.fullText).substring(0, 80);
                 var label = (n.body || '').substring(0, 60) || anchor || 'Note';
                 var src = '';
@@ -388,6 +391,10 @@ export function JournalInsertSheet(props) {
                   </button>
                 );
               })}
+          {/* id-datasafe 129: the list stops at NOTE_PICKER_CAP; say so, and how to reach the rest. */}
+          {filtered.length > NOTE_PICKER_CAP && (
+            <div className="jrn-picker-empty jrn-picker-cap">{'Showing ' + NOTE_PICKER_CAP + ' of ' + filtered.length + ' notes. Search to find the others.'}</div>
+          )}
         </div>
       </>
     );

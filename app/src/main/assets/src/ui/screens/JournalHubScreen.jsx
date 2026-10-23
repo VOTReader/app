@@ -5,7 +5,7 @@
 export function JournalCardMenu(props) {
   var useState = React.useState;
   var entry = props.entry;
-  var _step = useState(0);
+  var _step = useState(props.startStep || 0);   // 1: open on Delete's first confirm (the viewer's ⋯ Delete)
   var step = _step[0]; var setStep = _step[1];
   useModalRegistry({ id: 'journal-card-menu', dismiss: close, active: !!entry });
   var trapRef = useFocusTrap(!!entry);
@@ -226,6 +226,8 @@ export function JournalHubScreen(props) {
   function renderCard(entry) {
     var title = JournalHelpers.entryDisplayTitle(entry);
     var preview = JournalHelpers.previewText(entry, 160);
+    // id-datasafe 121: in a search the card shows the words around the hit, marked.
+    var snip = searchQ && typeof JournalHelpers.searchSnippet === 'function' ? JournalHelpers.searchSnippet(entry, searchQ, 120) : null;
     var attachments = JournalHelpers.attachmentSummary(entry);
     var moodClass = entry.mood ? entry.mood : '';
 
@@ -267,7 +269,12 @@ export function JournalHubScreen(props) {
               <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
             </span>
           </div>
-          {preview && <p className="jrn-card-preview">{preview}</p>}
+          {snip ? (
+            <p className="jrn-card-preview jrn-card-snippet">
+              {snip.where && <span className="jrn-card-hit-where">{snip.where === 'excerpt' ? 'In an excerpt: ' : snip.where === 'caption' ? 'In a caption: ' : 'In a tag: '}</span>}
+              {snip.before}<mark>{snip.hit}</mark>{snip.after}
+            </p>
+          ) : preview && <p className="jrn-card-preview">{preview}</p>}
           {attachments.length > 0 && (
             <div className="jrn-card-attachments">
               {attachments.map(function(a, i) {
@@ -316,12 +323,13 @@ export function JournalHubScreen(props) {
     return t;
   }
 
+  var searchQ = query.trim().toLowerCase().replace(/\s+/g, ' ');
+  function matching(list) {
+    return searchQ ? list.filter(function(e) { return entrySearchText(e).indexOf(searchQ) >= 0; }) : list;
+  }
+
   function renderEntries(list, isPinnedTab) {
-    var q = query.trim().toLowerCase().replace(/\s+/g, ' ');
-    var filtered = q ? list.filter(function(e) {
-      return entrySearchText(e).indexOf(q) >= 0;
-    }) : list;
-    filtered = filtered.slice().sort(function(a, b) {
+    var filtered = matching(list).slice().sort(function(a, b) {
       var ad = a.updated || a.created || 0;
       var bd = b.updated || b.created || 0;
       if (ad !== bd) return sortNewest ? (bd - ad) : (ad - bd);
@@ -382,13 +390,18 @@ export function JournalHubScreen(props) {
   });
 
   var pinnedEntries = allEntries.filter(function(e) { return e.pinned; });
+  // id-datasafe 124: in a search the count follows it ("3 of 12 entries"), on the tab shown.
+  var tabEntries = tab === 'pinned' ? pinnedEntries : allEntries;
+  var countText = searchQ
+    ? matching(tabEntries).length + ' of ' + tabEntries.length + (tabEntries.length === 1 ? ' entry' : ' entries')
+    : allEntries.length + (allEntries.length === 1 ? ' entry' : ' entries');
 
   return (
     <ScreenLayout navChildren={navChildren}>
       <div className="jrn-hub">
         <header className="study-head inset">
           <h1 className="study-head-title">Journal</h1>
-          <span className="study-head-count">{allEntries.length + (allEntries.length === 1 ? ' entry' : ' entries')}</span>
+          <span className="study-head-count" aria-live="polite">{countText}</span>
         </header>
         <div className="jrn-tabs">
           <button className={'jrn-tab' + (tab === 'all' ? ' active' : '')} onClick={function() { setTab('all'); }}>All Entries</button>

@@ -312,8 +312,24 @@ describe('JournalRecordingSheet audio-session lifecycle', () => {
     render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
     act(() => { vi.advanceTimersByTime(10); });
 
-    expect(screen.getByText(/Microphone permission denied/)).toBeTruthy();
+    expect(screen.getByText(/Microphone access is (off|blocked)/)).toBeTruthy();
     expect(MockBridge.endAudioSession).toHaveBeenCalledTimes(1);
+  });
+
+  // id-datasafe 123: a denied mic showed only Close, with no word on where to allow it.
+  it('a denied mic names the Android switch and Try again asks for the mic again', () => {
+    MockBridge.isAndroid = true;
+    MockBridge.nativeRecordStart.mockReturnValueOnce('error:permission');
+    render(<JournalRecordingSheet onSave={() => {}} onClose={() => {}} />);
+    act(() => { vi.advanceTimersByTime(10); });
+    expect(screen.getByText(/Android Settings > Apps > VOTReader > Permissions > Microphone/)).toBeTruthy();
+    const ask = vi.spyOn(MockBridge, 'requestMicPermission');
+    fireEvent.click(screen.getByText('Try again'));
+    act(() => { vi.advanceTimersByTime(10); });
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(MockBridge.nativeRecordStart).toHaveBeenCalledTimes(2);
+    ask.mockRestore();
+    expect(screen.queryByText('Try again')).toBeNull();   // granted this time: recording
   });
 });
 

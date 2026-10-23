@@ -206,7 +206,9 @@ export function JournalEditorScreen(props) {
   // unused (underscore-marked); wire it from a picker if one is ever added.
   var mood = _mood[0]; var _setMood = _mood[1];
 
-  const [savedLabel, setSavedLabel] = useState('Saved');
+  // id-datasafe 76 (refuter r1): an entry opened before the store has loaded lives only in
+  // its queue: not 'Saved' until it settles (the mount effect below watches for that).
+  const [savedLabel, setSavedLabel] = useState(_journalStoreSettled() ? 'Saved' : 'Saving…');
 
   var _showInsert = useState(false);
   var showInsert = _showInsert[0]; var setShowInsert = _showInsert[1];
@@ -288,6 +290,9 @@ export function JournalEditorScreen(props) {
   // landing. The reorder itself commits SYNCHRONOUSLY at release now, so
   // nothing can be parked; commitSave() still flushes any debounced edit.
   useEffect(function() {
+    // id-datasafe 76 (refuter r1): opened on an unsettled store, the chip says 'Saving…' (its
+    // initial state) and turns to 'Saved' once the store settles and its write lands.
+    if (!_journalStoreSettled()) showSavedWhenDurable();
     return function() {
       mountedRef.current = false;
       if (dragCtl.current) dragCtl.current.destroy();
@@ -498,6 +503,10 @@ export function JournalEditorScreen(props) {
       var write = JournalStore._lastWrite;
       JournalStore.whenSaved().then(function(ok) {
         if (!mountedRef.current || seq !== saveSeqRef.current) return;
+        // Refuter r1: the fence can rise while the write waits on its lock, which then resolves
+        // unwritten; and a write started meanwhile carries these words too: wait for that one.
+        if (!_journalStoreSettled()) { setSavedLabel('Saving…'); awaitSettled(); return; }
+        if (ok && JournalStore._lastWrite !== write) { ask(); return; }
         setSavedLabel(ok ? 'Saved' : 'Not saved');
         if (!ok) awaitRetry(write, 0);
       });
@@ -1163,6 +1172,10 @@ export function JournalEditorScreen(props) {
       // measuring — the old per-render height:auto collapse forced a layout
       // at the SHORT height, which clamped the scroller's scrollTop on long
       // entries (the Android "scroll keeps jumping while editing" glitch).
+      // id-datasafe 178: every text block invites more and is named by its place, so a screen
+      // reader can tell them apart ("Paragraph 3", "Heading 1").
+      var sameKind = 0;
+      for (var k = 0; k <= idx; k++) if (blocks[k] && blocks[k].type === b.type) sameKind++;
       return (
         <div {...common}>
           <div className={'jrn-grow ' + (b.type === 'h2' ? 'jrn-grow-h2' : 'jrn-grow-p')} data-rep={b.text || ''}>
@@ -1170,7 +1183,8 @@ export function JournalEditorScreen(props) {
               className={'jrn-block-textarea' + (b.type === 'h2' ? ' h2' : '')}
               rows={1}
               value={b.text || ''}
-              placeholder={idx === 0 ? 'Start writing…' : ''}
+              placeholder={idx === 0 ? 'Start writing…' : b.type === 'h2' ? 'Heading' : 'Keep writing…'}
+              aria-label={(b.type === 'h2' ? 'Heading ' : 'Paragraph ') + sameKind}
               onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
               onFocus={function(e) { focusTextarea(idx, e.target); }}
               onSelect={function(e) { trackCaret(idx, e.target); }}
@@ -1257,6 +1271,16 @@ export function JournalEditorScreen(props) {
             onCancelDelete={function() { setConfirmAudioDelete(null); }}
             onConfirmDelete={function() { setConfirmAudioDelete(null); deleteBlock(idx); }}
             confirming={confirming}
+          />
+          {/* id-datasafe 126: a memo takes a caption as a photo does (it names the memo's row). */}
+          <input
+            type="text"
+            className="jrn-img-caption jrn-aud-caption-input"
+            placeholder="Caption (optional)"
+            aria-label="Voice memo caption"
+            value={b.caption || ''}
+            onChange={function(e) { patchBlock(idx, { caption: e.target.value }); }}
+            onBlur={function() { commitSave(); }}
           />
           {blockDragUI(idx)}
         </div>
