@@ -343,11 +343,26 @@ describe('a recordings screen in the phone app: downloads', () => {
     expect(screen.getByRole('button', { name: /download all/i })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'More for Letter C' }));
     const menu = screen.getByRole('menu', { name: 'More for Letter C' });
-    expect([...menu.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Download · 10 MB', 'Open the letter']);
+    expect([...menu.querySelectorAll('[role="menuitem"]')].map((b) => b.textContent)).toEqual(['Play next', 'Add to queue', 'Download · 10 MB', 'Open the letter']);
     // Letter C in the chosen reader V, both parts.
     fireEvent.click(screen.getByRole('menuitem', { name: 'Download · 10 MB' }));
     expect(store.download.mock.calls[0][0].map((t) => t.url)).toEqual([URL_OF('idC1v'), URL_OF('idC2v')]);
     expect(screen.queryByRole('menu')).toBeNull();
+  });
+
+  /* pl-l2 L3 (player brief 3c): Play next / Add to queue on every row that plays; the row's own reading, after what
+     plays (Play next) or at the end (Add to queue), and a toast says so. */
+  it('Play next and Add to queue line up the row\'s own reading, and say so', () => {
+    fakeStore();
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.playLetter({ volKey: 'one', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    const before = AudioPlayer.getState().queue.length;
+    renderScreen('one');
+    fireEvent.click(screen.getByRole('button', { name: 'More for Letter C' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Add to queue' }));
+    const q = AudioPlayer.getState().queue;
+    expect(q.slice(before).map((t) => t.url)).toEqual([URL_OF('idC1v'), URL_OF('idC2v')]);
+    expect(document.getElementById('vot-toast-audio').textContent).toBe('Added to Up next: Letter C');
   });
 
   it('a long-press on a row opens its menu, and Choose more… opens the Downloads tree at the collection', () => {

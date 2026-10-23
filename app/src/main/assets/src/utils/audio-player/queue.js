@@ -593,6 +593,25 @@ export function removeUpcoming(index) {
 }
 
 /**
+ * Put a removed future item back at `index` (Up next's swipe-remove Undo, brief 3c; ported from v2's rv5): the track
+ * as removeUpcoming took it out. Like removal it never touches the playing item's place or anything before it; the
+ * end of the queue is a place.
+ *
+ * @param {number} index
+ * @param {Track} track
+ * @returns {boolean}
+ */
+export function insertUpcoming(index, track) {
+  if (_pendingRestore || !track || typeof track !== 'object' || !track.url) return false;
+  const at = Math.floor(Number(index));
+  if (!Number.isFinite(at) || at <= _state.qi || at > _state.queue.length) return false;
+  const queue = _state.queue.slice();
+  queue.splice(at, 0, track);
+  _commitQueueEdit(queue);
+  return true;
+}
+
+/**
  * Reorder only future items. Keeping the current track fixed makes the
  * operation stable while a recording is streaming.
  *
@@ -620,6 +639,73 @@ export function clearUpcoming() {
   _commitQueueEdit(_state.queue.slice(0, _state.qi + 1), true);
   return true;
 }
+
+/**
+ * Clear upcoming with a way back (brief 3c, s13.2): what Clear took, and the run's source, which Clear ends (the
+ * queue stops going on into the site order). Null when there was nothing to clear.
+ * @returns {{ url: string, qi: number, after: Track[], source: any } | null}
+ */
+export function clearUpcomingWithUndo() {
+  if (_pendingRestore || _state.qi + 1 >= _state.queue.length) return null;
+  const token = { url: _state.queue[_state.qi].url, qi: _state.qi, after: _state.queue.slice(_state.qi + 1), source: _source };
+  return clearUpcoming() ? token : null;
+}
+
+/**
+ * Undo a Clear upcoming: the rows come back after the playing one, and the run goes on into the site order again as
+ * it did. Spent once anything moved: another recording playing, or something added since.
+ * @param {{ url: string, qi: number, after: Track[], source: any } | null} token what clearUpcomingWithUndo returned
+ * @returns {boolean}
+ */
+export function undoClearUpcoming(token) {
+  if (!token || _pendingRestore) return false;
+  const cur = _state.queue[_state.qi];
+  if (!cur || cur.url !== token.url || _state.qi !== token.qi || _state.qi + 1 < _state.queue.length) return false;
+  _commitQueueEdit(_state.queue.slice(0, _state.qi + 1).concat(token.after));
+  // The queue is again the one the source describes: its own descriptor, not the custom one an edit leaves.
+  if (token.source) { _setSource(token.source); _persist(); _notify(); }
+  return true;
+}
+
+/**
+ * Play next / Add to queue (brief 3c): `tracks` go right after the playing recording (after all of its parts), or at
+ * the end of the queue. With nothing playing they become the queue and start, like a lone row's tap. Refused over a
+ * restored bar whose queue is not rebuilt yet (its shape is unknown).
+ * @param {unknown} tracks a track or tracks (a letter's parts, a chapter, a song)
+ * @param {'next'|'end'} where
+ * @returns {boolean}
+ */
+function _enqueue(tracks, where) {
+  const list = /** @type {Track[]} */ ((Array.isArray(tracks) ? tracks : [tracks]).map(normalizeAudioTrack).filter(Boolean));
+  if (!list.length || _pendingRestore) return false;
+  const q = _state.queue;
+  const cur = q[_state.qi];
+  if (!cur || _state.status === 'idle') {
+    if (_offlineRefuses([list[0]])) { _offlineNotice(list[0]); return false; }
+    _rememberOutgoingPosition();
+    _setSource({ mode: 'custom', volKey: '', label: list[0].sub });
+    _state.queue = list;
+    _state.qi = 0;
+    _countPlay();
+    _startAt(_resumeAt);
+    return true;
+  }
+  let at = q.length;
+  if (where === 'next') {
+    at = _state.qi + 1;
+    while (at < q.length && cur.key && q[at].key === cur.key) at++;
+  }
+  const queue = q.slice();
+  queue.splice(at, 0, ...list);
+  _commitQueueEdit(queue);
+  return true;
+}
+
+/** @param {unknown} tracks @returns {boolean} */
+export function playNext(tracks) { return _enqueue(tracks, 'next'); }
+
+/** @param {unknown} tracks @returns {boolean} */
+export function addToQueue(tracks) { return _enqueue(tracks, 'end'); }
 
 /**
  * The desk's voice or edition switch on a queue the listener made (edited, or a plan's portion): the playing item

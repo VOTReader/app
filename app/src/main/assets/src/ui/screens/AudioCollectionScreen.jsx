@@ -19,6 +19,7 @@ import {
   useOfflineAudio, useOnline,
 } from '../components/OfflineAudioControls.jsx';
 import { RowMenu, openRowMenu } from '../components/RowMenu.jsx';
+import { queueMenuItems } from '../components/queue-menu.js';
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13); it
    rode lazy bundle-h from 2026-09-22, landing 24, and the player itself did
@@ -309,12 +310,16 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
                 const line = unavailable ? 'Not on this phone' : [meta, heldLine].filter(Boolean).join(' · ');
                 const opensText = canOpenText && hasTextDestination({ key });
                 const openText = () => onOpenText(current && current.key === key ? current : { key });
-                const menu = offline ? [
-                  ...offlineMenuItems({ off: offline, online, tracks: own, name: item.title || label }),
-                  ...(typeof window.__openDownloads === 'function'
-                    ? [{ id: 'choose', text: 'Choose more…', icon: 'choose', onSelect: () => window.__openDownloads({ tab: 'choose', focus: volKey }, label) }] : []),
-                  ...(opensText ? [{ id: 'open', text: 'Open the ' + (bible ? 'book' : itemNoun(col, 1)), icon: 'open', onSelect: openText }] : []),
-                ] : [];
+                // Play next / Add to queue (player brief 3c): every row that plays, downloads or not.
+                const menu = [
+                  ...(unavailable ? [] : queueMenuItems({ tracks: plays, name: item.title || label })),
+                  ...(offline ? [
+                    ...offlineMenuItems({ off: offline, online, tracks: own, name: item.title || label }),
+                    ...(typeof window.__openDownloads === 'function'
+                      ? [{ id: 'choose', text: 'Choose more…', icon: 'choose', onSelect: () => window.__openDownloads({ tab: 'choose', focus: volKey }, label) }] : []),
+                    ...(opensText ? [{ id: 'open', text: 'Open the ' + (bible ? 'book' : itemNoun(col, 1)), icon: 'open', onSelect: openText }] : []),
+                  ] : []),
+                ];
                 return (
                   <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '') + (unavailable ? ' is-unavailable' : '')}
                     onContextMenu={menu.length ? openRowMenu : undefined}>

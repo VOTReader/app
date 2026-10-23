@@ -747,6 +747,103 @@ describe('AudioManagerSheet — Up next sheet', () => {
 /* A whole Bible edition queues 1,189 chapters. Up next renders a WINDOW of 40
    rows each side with paged expanders — deliberately dumb, no virtual
    scroller — and everything up to 80 rows still renders whole. */
+/* pl-l2 L3 (brief 3c, picture 10): a row's grip drags it, a sideways swipe removes it with Undo, Clear upcoming has
+   Undo, rows carry their length and the head the time left, a Bible chapter its title. */
+describe('AudioManagerSheet — Up next editing (L3)', () => {
+  const row = (title) => within(upNext()).getByRole('button', { name: 'Play now: ' + title }).closest('.np-row');
+  const grip = (title) => within(upNext()).getByRole('button', { name: 'Reorder ' + title });
+  const undoBar = () => upNext().querySelector('.np-undo');
+  afterEach(() => { delete globalThis.AUDIO_LENGTHS; delete globalThis.BOOKS; vi.useRealTimers(); });
+
+  it('a swipe past the line removes the row and offers Undo, which puts it back', () => {
+    startCollection();
+    openSheet();
+    openUpNext();
+    const r = row('The Seventh Day');
+    fireEvent.pointerDown(r, { clientX: 300, clientY: 10, pointerId: 1 });
+    fireEvent.pointerMove(r, { clientX: 150, clientY: 12, pointerId: 1 });
+    expect(upNext().querySelector('.np-row-remove').textContent).toBe('Remove');
+    fireEvent.pointerUp(r, { clientX: 150, clientY: 12, pointerId: 1 });
+    expect(upcomingTitles()).toEqual(['The Wide Path', 'Grafted In']);
+    expect(undoBar().textContent).toContain('Removed The Seventh Day');
+    fireEvent.click(within(undoBar()).getByRole('button', { name: 'Undo' }));
+    expect(upcomingTitles()).toEqual(['The Wide Path', 'The Seventh Day', 'Grafted In']);
+    expect(undoBar()).toBeNull();
+  });
+
+  it('a short swipe settles back and removes nothing', () => {
+    startCollection();
+    openSheet();
+    openUpNext();
+    const r = row('The Seventh Day');
+    fireEvent.pointerDown(r, { clientX: 300, clientY: 10, pointerId: 1 });
+    fireEvent.pointerMove(r, { clientX: 250, clientY: 10, pointerId: 1 });
+    fireEvent.pointerUp(r, { clientX: 250, clientY: 10, pointerId: 1 });
+    expect(upcomingTitles()).toEqual(['The Wide Path', 'The Seventh Day', 'Grafted In']);
+  });
+
+  it('the grip drags a row down by whole rows, and arrow keys move it one place', () => {
+    startCollection();
+    openSheet();
+    openUpNext();
+    const g = grip('The Wide Path');
+    fireEvent.pointerDown(g, { clientX: 380, clientY: 100, pointerId: 2 });
+    fireEvent.pointerMove(g, { clientX: 380, clientY: 230, pointerId: 2 });
+    fireEvent.pointerUp(g, { clientX: 380, clientY: 230, pointerId: 2 });   // two 64 px rows
+    expect(upcomingTitles()).toEqual(['The Seventh Day', 'Grafted In', 'The Wide Path']);
+    fireEvent.keyDown(grip('The Wide Path'), { key: 'ArrowUp' });
+    expect(upcomingTitles()).toEqual(['The Seventh Day', 'The Wide Path', 'Grafted In']);
+    fireEvent.keyDown(grip('The Wide Path'), { key: 'Delete' });
+    expect(upcomingTitles()).toEqual(['The Seventh Day', 'Grafted In']);
+    expect(undoBar().textContent).toContain('Removed The Wide Path');
+  });
+
+  it('Clear upcoming says how many went, and Undo brings them back', () => {
+    startCollection();
+    openSheet();
+    openUpNext();
+    fireEvent.click(within(upNext()).getByRole('button', { name: 'Clear upcoming' }));
+    expect(upcomingTitles()).toEqual([]);
+    expect(undoBar().textContent).toContain('Cleared 3 from Up next');
+    fireEvent.click(within(undoBar()).getByRole('button', { name: 'Undo' }));
+    expect(upcomingTitles()).toEqual(['The Wide Path', 'The Seventh Day', 'Grafted In']);
+  });
+
+  it('the Undo goes after 5 seconds', () => {
+    vi.useFakeTimers();
+    startCollection();
+    openSheet();
+    openUpNext();
+    fireEvent.keyDown(grip('Grafted In'), { key: 'Delete' });
+    expect(undoBar()).not.toBeNull();
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(undoBar()).toBeNull();
+  });
+
+  it('rows carry their length, the head the time left in the queue', () => {
+    globalThis.AUDIO_LENGTHS = { idPreface: [1e6, 300], idA: [1e6, 372], idB: [1e6, 545], idC: [1e6, 3600] };
+    startCollection();
+    openSheet();
+    openUpNext();
+    const subs = Array.from(upNext().querySelectorAll('.np-upnext-list .audio-manager-queue-main small')).map((n) => n.textContent);
+    expect(subs[0]).toContain('6:12');
+    expect(subs[1]).toContain('9:05');
+    // 5:00 playing (nothing heard yet) + 6:12 + 9:05 + 60:00 = 80 min 17 s
+    expect(upNextSub()).toBe('3 left · 1 h 20 min');
+  });
+
+  it('a Bible chapter row names its chapter', () => {
+    globalThis.BOOKS = { genesis: { chapters: [{ num: 1, title: 'The Creation' }, { num: 2, title: 'The Garden' }] } };
+    globalThis.BIBLE_AUDIO_MANIFEST = { ...(globalThis.BIBLE_AUDIO_MANIFEST || {}) };
+    drive(() => AudioPlayer.playTrack({ key: 'bible-kjv:genesis', title: 'Genesis 1', sub: 'KJV', url: URL_OF('g1'), readerCode: '', partLabel: 'Chapter 1' }));
+    drive(() => AudioPlayer.addToQueue({ key: 'bible-kjv:genesis', title: 'Genesis 2', sub: 'KJV', url: URL_OF('g2'), readerCode: '', partLabel: 'Chapter 2' }));
+    openSheet();
+    openUpNext();
+    const sub = upNext().querySelector('.np-upnext-list .audio-manager-queue-main small').textContent;
+    expect(sub).toContain('The Garden');
+  });
+});
+
 describe('AudioManagerSheet — a very long queue', () => {
   const BIG_MANIFEST = {};
   const BIG_ITEMS = [];

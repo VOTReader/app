@@ -14,7 +14,7 @@ const METHODS = [
   'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter', 'sectionMarks',
   'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'setPlaybackRate',
   'getSleepRemainingSeconds', 'setSleepTimer', 'setSleepAtTrackEnd', 'setSleepAtQueueEnd', 'clearSleepTimer',
-  'playAt', 'removeUpcoming', 'moveUpcoming', 'clearUpcoming', 'switchVoiceInPlace', 'stop', 'stopWithUndo', 'undoStop', 'pauseIfPlaying', 'syncKeepAlive',
+  'playAt', 'removeUpcoming', 'insertUpcoming', 'moveUpcoming', 'clearUpcoming', 'clearUpcomingWithUndo', 'undoClearUpcoming', 'playNext', 'addToQueue', 'switchVoiceInPlace', 'stop', 'stopWithUndo', 'undoStop', 'pauseIfPlaying', 'syncKeepAlive',
 ];
 
 describe('audio-player public surface', () => {

@@ -10,7 +10,8 @@
                    rows; "Use this voice" switches, keeping Up next
      UpNextSheet   the whole queue: the playing row pinned with its own
                    Play/Pause and Next, played rows folded under "Earlier (N)",
-                   the upcoming rows to reorder or remove, Clear upcoming
+                   the upcoming rows to drag or swipe away (with Undo), Clear
+                   upcoming (with Undo), lengths and the time left
 
    Each is a bottom sheet over the player in the app's select-sheet grammar:
    the modal registry (Escape, Android Back), a focus trap, the handle. Like
@@ -18,12 +19,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths.js';
 import { displayPartLabel, queuePlace } from '../../utils/audio-track.js';
 import { AudioSpeedControl, AudioSpeedReadout } from './AudioSpeedControl.jsx';
 import { ConfirmStrip } from './ConfirmStrip.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { TrackOnPhone } from './OfflineAudioControls.jsx';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
+import { formatClock } from './AudioSeekSlider.jsx';
 import { NextIcon } from './SongParts.jsx';
 
 /** @param {string | null | undefined} value @returns {string} */
@@ -208,12 +211,138 @@ export function VoiceSheet({ voices, title, needsConfirm, single, onClose }) {
    played chapter can be picked again. A whole Bible edition queues 1,189
    chapters, and 1,189 rows of DOM is a real cost for a sheet that opens on a
    phone, so a long queue renders a WINDOW of upcoming rows with "Show more"
-   expanders; the played rows fold under "Earlier (N)". */
+   expanders; the played rows fold under "Earlier (N)".
+   Editing (pl-l2 L3): a row's grip drags it up or down (arrow keys on the grip
+   move it one place, Delete removes it); a sideways swipe removes it, a red
+   strip under it saying so; every removal and Clear upcoming says what went
+   with an Undo for 5 s. Screen readers keep a Move earlier / Move later /
+   Remove button per row. Rows carry their length ("Volume One · 6:12"), a
+   Bible chapter its title, the head the time left in the queue. */
 
 /** Above this many rows the window applies; below it the queue renders whole. */
 const QUEUE_WINDOW_MIN = 80;
 /** Rows past the current one, and the step each expander adds. */
 const QUEUE_PAGE = 40;
+/** How far a row slides sideways before letting go removes it. */
+const SWIPE_REMOVE_PX = 96;
+/** How long a removal's Undo stays. */
+const UNDO_MS = 5000;
+
+/** "3 h 10 min", "42 min", "under a minute". @param {number} seconds */
+export function queueTime(seconds) {
+  const m = Math.round(seconds / 60);
+  if (m < 1) return 'under a minute';
+  if (m < 60) return m + ' min';
+  const h = Math.floor(m / 60);
+  return h + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '');
+}
+
+/**
+ * A Bible chapter's title from the book's chrome ("The Fall"), or ''. U04.6.
+ * @param {any} track @returns {string}
+ */
+export function chapterTitleOf(track) {
+  const key = track && typeof track.key === 'string' ? track.key : '';
+  const m = track && typeof track.partLabel === 'string' ? track.partLabel.match(/^Chapter (\d+)$/) : null;
+  if (!m || key.lastIndexOf('bible-', 0) !== 0) return '';
+  const books = /** @type {any} */ (globalThis).BOOKS;
+  const book = books ? books[key.slice(key.indexOf(':') + 1)] : null;
+  const ch = book && Array.isArray(book.chapters) ? book.chapters.find((/** @type {any} */ c) => c && c.num === Number(m[1])) : null;
+  return ch && typeof ch.title === 'string' ? ch.title : '';
+}
+
+/**
+ * A row's two lines: "Christmas, part 2" over "Volume One · 7:08"; a chapter "Genesis 3" over "The Fall · 4:40".
+ * @param {any} track @returns {{ title: string, sub: string }}
+ */
+export function queueRowWords(track) {
+  const part = typeof track.partLabel === 'string' ? track.partLabel : '';
+  const n = part.match(/^Part (\d+)$/);
+  const title = trackLabel(track.title) + (n && Number(n[1]) > 1 ? ', part ' + n[1] : '');
+  const label = n ? '' : displayPartLabel(track.title, track.partLabel);
+  const secs = secondsOf(track.url);
+  const sub = [label, chapterTitleOf(track) || track.sub, secs ? formatClock(secs) : ''].filter(Boolean).join(' · ');
+  return { title, sub };
+}
+
+/**
+ * One upcoming (or played) row.
+ * @param {{ track: any, index: number, qi: number, count: number, played: boolean, onRemove: (index: number) => void }} props
+ */
+function QueueRow({ track, index, qi, count, played, onRemove }) {
+  const words = queueRowWords(track);
+  const ref = React.useRef(/** @type {HTMLLIElement | null} */ (null));
+  const drag = React.useRef(/** @type {null | { x: number, y: number, mode: 'grip' | 'swipe', id: number }} */ (null));
+  const [shift, setShift] = React.useState({ x: 0, y: 0 });
+  const canMoveUp = index > qi + 1;
+  const canMoveDown = index < count - 1;
+  const rowHeight = () => (ref.current && ref.current.getBoundingClientRect().height) || 64;
+  const start = (/** @type {'grip'|'swipe'} */ mode) => (/** @type {any} */ e) => {
+    if (played) return;
+    if (mode === 'grip') e.stopPropagation();
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_e) { /* a synthetic pointer */ }
+    drag.current = { x: e.clientX, y: e.clientY, mode, id: e.pointerId };
+  };
+  const move = (/** @type {any} */ e) => {
+    const d = drag.current;
+    if (!d || e.pointerId !== d.id) return;
+    if (d.mode === 'grip') setShift({ x: 0, y: e.clientY - d.y });
+    else if (Math.abs(e.clientX - d.x) > Math.abs(e.clientY - d.y) && Math.abs(e.clientX - d.x) > 8) setShift({ x: e.clientX - d.x, y: 0 });
+  };
+  const end = (/** @type {any} */ e) => {
+    const d = drag.current;
+    drag.current = null;
+    setShift({ x: 0, y: 0 });
+    if (!d || e.pointerId !== d.id) return;
+    if (d.mode === 'grip') {
+      const to = Math.max(qi + 1, Math.min(count - 1, index + Math.round((e.clientY - d.y) / rowHeight())));
+      if (to !== index) AudioPlayer.moveUpcoming(index, to);
+    } else if (Math.abs(e.clientX - d.x) >= SWIPE_REMOVE_PX) {
+      onRemove(index);
+    }
+  };
+  const cancel = () => { drag.current = null; setShift({ x: 0, y: 0 }); };
+  const moving = shift.x || shift.y;
+  return (
+    <li ref={ref} className={(played ? 'is-played' : '') + (moving ? ' is-moving' : '') + (shift.y ? ' is-dragging' : '')}>
+      {shift.x ? <span className={'np-row-remove' + (shift.x > 0 ? ' is-right' : '')} aria-hidden="true">Remove</span> : null}
+      <div className="np-row" style={moving ? { transform: 'translate(' + shift.x + 'px,' + shift.y + 'px)' } : undefined}
+        onPointerDown={played ? undefined : start('swipe')} onPointerMove={move} onPointerUp={end} onPointerCancel={cancel}>
+        <button
+          type="button"
+          className="audio-manager-queue-main"
+          onClick={() => { if (!moving) AudioPlayer.playAt(index); }}
+          aria-label={(played ? 'Play again: ' : 'Play now: ') + words.title}
+        >
+          <span className="audio-manager-queue-number">{index + 1}</span>
+          <span>
+            <strong>{words.title}</strong>
+            <small>{words.sub}<TrackOnPhone url={track.url} /></small>
+          </span>
+        </button>
+        {played ? null : (
+          <>
+            <button type="button" className="np-grip" aria-label={'Reorder ' + words.title} aria-keyshortcuts="ArrowUp ArrowDown Delete"
+              onPointerDown={start('grip')} onPointerMove={move} onPointerUp={end} onPointerCancel={cancel}
+              onKeyDown={(e) => {
+                if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onRemove(index); return; }
+                const by = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+                if (by && index + by > qi && index + by < count) { e.preventDefault(); AudioPlayer.moveUpcoming(index, index + by); }
+              }}>
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M5 8h14M5 12h14M5 16h14" /></svg>
+            </button>
+            {/* What a finger does by drag or swipe, as buttons a screen reader can reach. */}
+            <span className="np-row-sr">
+              <button type="button" className="sr-only" disabled={!canMoveUp} onClick={() => AudioPlayer.moveUpcoming(index, index - 1)} aria-label={'Move ' + words.title + ' earlier'} />
+              <button type="button" className="sr-only" disabled={!canMoveDown} onClick={() => AudioPlayer.moveUpcoming(index, index + 1)} aria-label={'Move ' + words.title + ' later'} />
+              <button type="button" className="sr-only" onClick={() => onRemove(index)} aria-label={'Remove ' + words.title + ' from queue'} />
+            </span>
+          </>
+        )}
+      </div>
+    </li>
+  );
+}
 
 /** @param {{ state: any, onClose: () => void }} props */
 export function UpNextSheet({ state, onClose }) {
@@ -225,53 +354,52 @@ export function UpNextSheet({ state, onClose }) {
   // What an expander did, announced politely. Rendered EMPTY and always present: a live region created together
   // with its content announces nothing.
   const [note, setNote] = React.useState('');
+  /** The last removal or Clear, with its way back, for UNDO_MS. */
+  const [undo, setUndo] = React.useState(/** @type {{ text: string, act: () => void } | null} */ (null));
+  React.useEffect(() => {
+    if (!undo) return undefined;
+    const timer = setTimeout(() => setUndo(null), UNDO_MS);
+    return () => clearTimeout(timer);
+  }, [undo]);
+  // The lengths are their own lazy table: asked for when the sheet opens, the rows re-render when it lands.
+  React.useSyncExternalStore(lengthsStore.subscribe, lengthsStore.getVersion);
+  React.useEffect(() => { void lengthsReady(); }, []);
   if (!current) return null;
   const restoring = !!state.restoring;
   const upcoming = queue.length - (state.qi + 1);
   const counted = queuePlace(queue, state.qi);
   const playing = state.status === 'playing' || state.status === 'loading';
-  const sub = restoring ? 'Resuming…' : upcoming > 0 ? upcoming + ' left' : 'Nothing after this one';
+  // Time left in the queue: the playing one's rest and every upcoming row's length, when all of them are known.
+  let left = Math.max(0, (Number(state.duration) || secondsOf(current.url) || 0) - (Number(state.time) || 0));
+  for (let i = state.qi + 1; i < queue.length && left >= 0; i++) { const s = secondsOf(queue[i].url); left = s ? left + s : -1; }
+  const sub = restoring ? 'Resuming…'
+    : [upcoming > 0 ? upcoming + ' left' : 'Nothing after this one', upcoming > 0 && left > 0 ? queueTime(left) : ''].filter(Boolean).join(' · ');
+  const curLeft = Math.max(0, (Number(state.duration) || 0) - (Number(state.time) || 0));
   const windowed = queue.length > QUEUE_WINDOW_MIN;
   const to = windowed ? Math.min(queue.length, state.qi + 1 + QUEUE_PAGE + laterPages * QUEUE_PAGE) : queue.length;
   const playedFrom = windowed ? Math.max(0, state.qi - QUEUE_PAGE - earlierPages * QUEUE_PAGE) : 0;
-  /** @param {any} track @param {number} index */
-  const row = (track, index) => {
-    const played = index < state.qi;
-    const canMoveUp = index > state.qi + 1;
-    const canMoveDown = index < queue.length - 1;
-    return (
-      <li key={track.url + ':' + index} className={played ? 'is-played' : ''}>
-        <button
-          type="button"
-          className="audio-manager-queue-main"
-          onClick={() => AudioPlayer.playAt(index)}
-          aria-label={(played ? 'Play again: ' : 'Play now: ') + trackLabel(track.title)}
-        >
-          <span className="audio-manager-queue-number">{index + 1}</span>
-          <span>
-            <strong>{trackLabel(track.title)}</strong>
-            <small>{[displayPartLabel(track.title, track.partLabel), track.sub].filter(Boolean).join(' · ')}<TrackOnPhone url={track.url} /></small>
-          </span>
-        </button>
-        {played ? null : (
-          <div className="audio-manager-queue-actions">
-            <button type="button" disabled={!canMoveUp} onClick={() => AudioPlayer.moveUpcoming(index, index - 1)} aria-label={'Move ' + trackLabel(track.title) + ' earlier'}>↑</button>
-            <button type="button" disabled={!canMoveDown} onClick={() => AudioPlayer.moveUpcoming(index, index + 1)} aria-label={'Move ' + trackLabel(track.title) + ' later'}>↓</button>
-            <button type="button" onClick={() => AudioPlayer.removeUpcoming(index)} aria-label={'Remove ' + trackLabel(track.title) + ' from queue'}>×</button>
-          </div>
-        )}
-      </li>
-    );
+  const remove = (/** @type {number} */ index) => {
+    const track = queue[index];
+    if (!track || !AudioPlayer.removeUpcoming(index)) return;
+    setUndo({ text: 'Removed ' + queueRowWords(track).title, act: () => { AudioPlayer.insertUpcoming(index, track); } });
   };
+  const clear = () => {
+    const token = AudioPlayer.clearUpcomingWithUndo();
+    if (token) setUndo({ text: 'Cleared ' + token.after.length + ' from Up next', act: () => { AudioPlayer.undoClearUpcoming(token); } });
+  };
+  /** @param {any} track @param {number} index */
+  const row = (track, index) => (
+    <QueueRow key={track.url + ':' + index} track={track} index={index} qi={state.qi} count={queue.length} played={index < state.qi} onRemove={remove} />
+  );
   return (
     <PlayerSheet
       id="np-upnext" title="Up next" sub={sub} onClose={onClose} className="np-upnext-sheet audio-manager-queue"
-      aside={upcoming > 0 && !restoring ? <button type="button" className="np-sheet-link" onClick={() => AudioPlayer.clearUpcoming()}>Clear upcoming</button> : null}
+      aside={upcoming > 0 && !restoring ? <button type="button" className="np-sheet-link" onClick={clear}>Clear upcoming</button> : null}
     >
       <div className="np-upnext-now" aria-current="true">
         <span className="np-upnext-now-copy">
-          <strong>{trackLabel(current.title)}</strong>
-          <small>{[restoring || counted.of < 2 ? null : counted.at + ' of ' + counted.of, current.sub].filter(Boolean).join(' · ')}<TrackOnPhone url={current.url} /></small>
+          <strong>{queueRowWords(current).title}</strong>
+          <small>{[restoring || counted.of < 2 ? null : counted.at + ' of ' + counted.of, current.sub, curLeft > 0 ? formatClock(curLeft) + ' left' : ''].filter(Boolean).join(' · ')}<TrackOnPhone url={current.url} /></small>
         </span>
         <button type="button" className="audio-manager-round np-upnext-play" onClick={() => AudioPlayer.toggle()} aria-label={playing ? 'Pause' : 'Play'}>
           {playing ? <PauseIcon /> : <PlayIcon />}
@@ -304,7 +432,13 @@ export function UpNextSheet({ state, onClose }) {
           setNote('Showing ' + (Math.min(queue.length, to + QUEUE_PAGE) - state.qi - 1) + ' of ' + upcoming + ' upcoming recordings.');
         }}>{'Show ' + Math.min(QUEUE_PAGE, queue.length - to) + ' later'}</button>
       ) : null}
-      {upcoming > 0 ? null : <p className="audio-manager-empty">Play a collection to line up more recordings. Your current recording will resume where you leave it.</p>}
+      {upcoming > 0 ? null : <p className="audio-manager-empty">Play a collection to line up more recordings, or choose Play next or Add to queue on any recording.</p>}
+      {undo ? (
+        <div className="np-undo" role="status">
+          <span>{undo.text}</span>
+          <button type="button" className="np-sheet-link" onClick={() => { undo.act(); setUndo(null); }}>Undo</button>
+        </div>
+      ) : null}
     </PlayerSheet>
   );
 }

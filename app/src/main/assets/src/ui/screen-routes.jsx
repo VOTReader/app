@@ -1092,6 +1092,7 @@ export function buildScreenRoutes({
         markAsReadEnabled={settings.markAsRead !== false}
         onPlanRead={openPlanItem}
         onPlanListen={listenPlanItem}
+        planTracks={planTracks}
         onEnableMarkAsRead={() => updateSetting('markAsRead', true)}
         onOpenPlans={goReadingPlans}
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}

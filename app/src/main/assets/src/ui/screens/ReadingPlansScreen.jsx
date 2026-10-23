@@ -17,7 +17,7 @@
    Free globals: React, ScreenLayout, LibraryNav, ConfirmStrip.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
+import { useVolumesSeq, useNow, PlanListen } from '../components/TodayCard.jsx';
 import { PlanBuilder } from './PlanBuilder.jsx';
 import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineAudioControls.jsx';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate, takePlanOpen, onPlanOpenAsk } from '../../utils/plan-runs-view.js';
@@ -366,8 +366,8 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                     <button type="button" className="today-btn" aria-label={'Read today: ' + row.label} disabled={!row.next}
                       onClick={() => { if (row.next) onRead(row.next); }}>Read</button>
                     {onListen ? (
-                      <button type="button" className="today-btn" aria-label={'Listen to today: ' + row.label} disabled={!row.listen.length}
-                        onClick={() => onListen(row.listen, row.name)}>Listen</button>
+                      <PlanListen refs={row.listen} tracksOf={planTracks} label={'Listen to today: ' + row.label} disabled={!row.listen.length}
+                        onListen={() => onListen(row.listen, row.name)} />
                     ) : null}
                   </div>
                   {row.items.length > 1 ? (

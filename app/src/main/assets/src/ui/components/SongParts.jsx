@@ -13,7 +13,7 @@
    plays, tokens only.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { songThumbUrl, songById, familyById, SONGS_HOST, SongCatalog } from '../../utils/song-catalog.js';
+import { songThumbUrl, songById, familyById, SONGS_HOST, SongCatalog, songTrack } from '../../utils/song-catalog.js';
 import { songIdOfKey } from '../../utils/audio-track.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
@@ -21,6 +21,8 @@ import { SongKeep } from '../../utils/song-keep.js';
 import { NetStatus, isNetworkError } from '../../utils/net-status.js';
 import { KeepIcon, useSongsOnline } from './SongKeepParts.jsx';
 import { SongVotePair } from './SongVoteParts.jsx';
+import { RowMenu, openRowMenu } from './RowMenu.jsx';
+import { queueMenuItems } from './queue-menu.js';
 
 /**
  * A length in seconds as the pictures print it: 4:12 (1:02:05 past an hour).
@@ -163,8 +165,11 @@ export function SongListRow({ song, title, line = '', versions = 0, onVersions, 
   const off = !useSongsOnline() && !kept && !current;
   // sy4-3: the length ends the meta line (pictures song-voting 05, player 15), so the vote pair has room at the right.
   const meta = line && len ? line + ' · ' + len : line || len;
+  // Play next / Add to queue (player brief 3c): the row's ⋯, and a long-press on the row.
+  const menu = song && song.id && !off ? queueMenuItems({ tracks: [songTrack(song)], name: title }) : [];
   return (
-    <div className={'songs-row song-tap-row' + (current ? ' is-current' : '') + (off ? ' is-unavailable' : '')}>
+    <div className={'songs-row song-tap-row' + (current ? ' is-current' : '') + (off ? ' is-unavailable' : '')}
+      onContextMenu={menu.length ? openRowMenu : undefined}>
       <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} disabled={off} />
       <SongCover song={song} />
       <span className="songs-row-copy">
@@ -183,6 +188,7 @@ export function SongListRow({ song, title, line = '', versions = 0, onVersions, 
       </span>
       {song && song.id ? <SongVotePair song={song} title={title} /> : null}
       {children}
+      {menu.length ? <RowMenu label={'More for ' + title} items={menu} /> : null}
       <SongPlayButton playing={playing} label={title} onClick={onPlay} disabled={off} />
     </div>
   );

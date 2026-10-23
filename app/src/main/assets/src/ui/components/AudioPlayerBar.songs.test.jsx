@@ -17,7 +17,8 @@ import { adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-ca
 import { SONG_FIXTURE, VERBATIM_FIXTURE } from '../../utils/song-catalog.fixture.js';
 import { AudioPlayerBar } from './AudioPlayerBar.jsx';
 import { textKeyOf, hasTextDestination } from './AudioShelf.jsx';
-import { _resetSongLyricsForTests, lyricLineAt } from './SongParts.jsx';
+import { _resetSongLyricsForTests, lyricLineAt, SongListRow } from './SongParts.jsx';
+import { songById } from '../../utils/song-catalog.js';
 
 class FakeAudio extends EventTarget {
   constructor() {
@@ -378,6 +379,21 @@ describe('the full player in song mode (pictures 08-09, pl-l2)', () => {
     act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
     desk = openLyrics(openDesk());
     expect(desk.querySelector('.song-lyrics-card').textContent).toContain('Instrumental');
+  });
+});
+
+describe('a song row\'s ⋯: Play next / Add to queue (pl-l2 L3)', () => {
+  it('lines the song up after the one playing, and says so', () => {
+    playFamilyA();
+    const before = AudioPlayer.getState().queue.length;
+    const song = songById('bbbbbbbbbbb1');
+    render(<SongListRow song={song} title="Lead Me To That Place" onPlay={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'More for Lead Me To That Place' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Play next' }));
+    const st = AudioPlayer.getState();
+    expect(st.queue).toHaveLength(before + 1);
+    expect(st.queue[st.qi + 1].key).toBe('song:bbbbbbbbbbb1');
+    expect(document.getElementById('vot-toast-audio').textContent).toBe('Playing next: Lead Me To That Place');
   });
 });
 

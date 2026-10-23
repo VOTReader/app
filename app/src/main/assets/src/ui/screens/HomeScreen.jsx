@@ -46,7 +46,7 @@ function useSongCatalogCount() {
 /** localStorage: the reader said "Not now" to Today's reading-plan offer (C8). */
 const PLAN_OFFER_KEY = 'vot-plans-offer-hidden';
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
   // mw18 C8: with no plan running (and the plans store loaded, so a plan never flashes the offer at boot),
@@ -332,7 +332,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           <div className="home-ornament-diamond" />
           <div className="home-ornament-line r" />
         </div>
-        <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled}
+        <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled} tracksOf={planTracks}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
           onEnableMarkAsRead={onEnableMarkAsRead} onOpenPlans={() => onOpenPlans && onOpenPlans()}
           offerStart={offerPlan} onHideOffer={hideOffer} />

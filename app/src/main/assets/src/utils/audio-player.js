@@ -70,19 +70,24 @@ import { canLoop, clearLoop, isNative, setLoop } from './audio-player/loop.js';
 import { _onVisible, syncKeepAlive } from './audio-player/media-session.js';
 import { _adoptDurableSnapshot, _restoreFromSaved } from './audio-player/persist.js';
 import {
+  addToQueue,
   clearUpcoming,
+  clearUpcomingWithUndo,
+  insertUpcoming,
   listenHere,
   listenResume,
   moveUpcoming,
   playBibleBook,
   playCollection,
   playLetter,
+  playNext,
   playPortion,
   playSection,
   playTrack,
   portionTracks,
   removeUpcoming,
   switchVoiceInPlace,
+  undoClearUpcoming,
 } from './audio-player/queue.js';
 import { _flushOnHide, _onBeforeUpdateReload, _resumeAfterUpdate } from './audio-player/restore.js';
 import { liveLetter, sectionLetterKeyAt, sectionMarks, sectionOpeningKey } from './audio-player/sections.js';
@@ -237,8 +242,13 @@ export const AudioPlayer = {
   clearSleepTimer,
   playAt,
   removeUpcoming,
+  insertUpcoming,
   moveUpcoming,
   clearUpcoming,
+  clearUpcomingWithUndo,
+  undoClearUpcoming,
+  playNext,
+  addToQueue,
   switchVoiceInPlace,
   stop,
   stopWithUndo,

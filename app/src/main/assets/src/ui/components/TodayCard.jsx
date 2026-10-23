@@ -16,6 +16,7 @@
 
 import { volumeSequence } from '../../data/reading-plans.js';
 import { usePlanRuns, runRow } from '../../utils/plan-runs-view.js';
+import { useListenMinutes } from './OfflineAudioControls.jsx';
 
 /** The Volumes in site order from the loaded corpus; [] until it is in. */
 function volumesNow() {
@@ -99,14 +100,32 @@ const portionOf = (r) => (r.loading ? 'Loading the Volumes…' : r.finished ? 'P
 const listenOf = (r) => (Array.isArray(r.listen) && r.listen.length ? r.listen : r.next ? [r.next] : []);
 
 /**
+ * A plan's Listen with how long today's portion plays (C5, player brief 3f): "Listen · 14 min" once every recording
+ * of it has a known length (the lazy lengths table), plain "Listen" until then. `tracksOf` turns the refs into the
+ * tracks Listen will play (screen-routes planTracks); absent, the button is the plain one.
+ * @param {{ refs: any[], tracksOf?: (refs: any[]) => any[], label: string, disabled?: boolean, onListen: () => void }} props
+ */
+export function PlanListen({ refs, tracksOf, label, disabled = false, onListen }) {
+  const key = (Array.isArray(refs) ? refs : []).map((r) => (r ? r.bid + ':' + r.cid : '')).join(',');
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the refs' text: a new array each render must not rebuild
+  const tracks = React.useMemo(() => (tracksOf && key ? tracksOf(refs) || [] : []), [key, tracksOf]);
+  const minutes = useListenMinutes(tracks);
+  return (
+    <button type="button" className="today-btn" aria-label={label + (minutes ? ', about ' + minutes + ' min' : '')} disabled={disabled} onClick={onListen}>
+      {minutes ? 'Listen · ' + minutes + ' min' : 'Listen'}
+    </button>
+  );
+}
+
+/**
  * mw18 landing 1 (C2, C10, C12): one plan reads "Today · Day 47 of 365", the portion, "Bible in a Year · 2 of 4 ·
  * about 13 min", Read and Listen; a day read through reads "Done today", tomorrow's portion, Read ahead and Read
  * again; two plans list each with its day number; "Mark as read is off" is a button that turns it on.
  * @param {{ rows: TodayRow[], onRead: (next: any, planId: string) => void, onListen: (items: any[], planId: string) => void,
  *   onOpenPlans: () => void, markAsReadEnabled?: boolean, onEnableMarkAsRead?: () => void,
- *   offerStart?: boolean, onHideOffer?: () => void }} props
+ *   offerStart?: boolean, onHideOffer?: () => void, tracksOf?: (refs: any[]) => any[] }} props
  */
-export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead, offerStart, onHideOffer }) {
+export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabled, onEnableMarkAsRead, offerStart, onHideOffer, tracksOf }) {
   if (!rows || !rows.length) {
     // C8: the way in when no plan runs (r2-home-states "No plan").
     if (!offerStart) return null;
@@ -185,7 +204,7 @@ export function TodayCard({ rows, onRead, onListen, onOpenPlans, markAsReadEnabl
           {ready ? (
             <div className="today-actions">
               <button type="button" className="today-btn" aria-label={'Read ' + r.label} onClick={() => onRead(r.next, r.id)}>Read</button>
-              <button type="button" className="today-btn" aria-label={'Listen to ' + r.label} onClick={() => onListen(listenOf(r), r.id)}>Listen</button>
+              <PlanListen refs={listenOf(r)} tracksOf={tracksOf} label={'Listen to ' + r.label} onListen={() => onListen(listenOf(r), r.id)} />
             </div>
           ) : null}
         </div>
