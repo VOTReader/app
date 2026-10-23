@@ -27,7 +27,7 @@ const PLACE_UNIT = {
  * word's own forms stay out (formsToMark).
  * @param {any} entry @param {string[]} terms @param {string[] | undefined} stopTyped
  */
-function cardTerms(entry, terms, stopTyped) {
+export function cardTerms(entry, terms, stopTyped) {
   return (entry && entry.terms && entry.terms.length)
     ? (terms || []).concat(formsToMark(entry.terms.filter((/** @type {string} */ t) => (terms || []).indexOf(t) < 0), terms, stopTyped || []))
     : terms;

@@ -7,6 +7,8 @@ import { applyCorrections } from '../../search/query-parse.js';
 import { foldReprints } from '../components/srch-reprints.js';
 import { cardPassage } from '../components/SrchCard.jsx';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
+import { pickTopic, topicTexts } from '../components/srch-topic.js';
+import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
 
 /** A verse reference card quotes at most this many verses of its range. */
 const REF_QUOTE_VERSES = 3;
@@ -774,6 +776,25 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   /* A section whose results all sit in Best Matches has no header under it (search200 B2 review): "Found 21
      matches across 8 sections" stood over three for "tittle". The summary then says the matches alone. */
   const sectionsListed = !(restGroups && restGroups.length > 0 && restGroups.length < grouped.length);
+  /* THE TOPIC A QUESTION ASKS FOR (search200 ideas F, mockups/F-topic-card). "what does the lord say about tithing"
+     asks for a topic: the card over Best Matches names the Answers topic among the results the model is surest of,
+     wherever the words put it, when it is sure enough (srch-topic.js pickTopic: a confident wrong topic is worse
+     than none), with two or three
+     texts it quotes that the search found too; a topic quoting none of them quotes its own passage. Relevance's
+     row, as Best Matches is: Book order is the list alone. */
+  const topic = React.useMemo(() => {
+    if (engineNav || !state.results.length || typeof state.q !== 'string') return null;
+    const pick = pickTopic(state.q, state.results);
+    if (!pick) return null;
+    /** @type {Array<{entry:any, passage:string, own?:boolean}>} */
+    let texts = topicTexts(pick.entry, state.results, (e) => cardPassage(e, state.terms, state.stopTyped));
+    if (texts.length < 2) {
+      const own = cardPassage(pick.entry, state.terms, state.stopTyped);
+      if (own) texts = texts.concat([{ entry: pick.entry, passage: own, own: true }]);
+    }
+    return { entry: pick.entry, texts };
+  }, [engineNav, state.results, state.q, state.terms, state.stopTyped]);
+
   // The switch matters when some group has two or more results to order, or when
   // there is a Best Matches row for Book order to set aside.
   const sortToggleVisible = bestRow.length > 0 || visibleGroups.some((g) => g.items.length > 1);
@@ -953,6 +974,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   else if (isDone && state.error) liveText = 'Error: ' + state.error;
   else if (isDone) {
     const said = directEntries.map((d) => d.__label + '.');
+    if (topic && !bookOrder) said.push('Answers Only God Can Give: ' + (topic.entry.doc.title || '') + '.');
     if (state.results.length > 0) {
       if (state.corrections.length > 0) said.push('Showing results for ' + correctedQuery(query, state.corrections) + '.');
       said.push(countText + '.');
@@ -1211,6 +1233,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             </div>
           </div>
         )}
+
+        {!bookOrder && topic ? <SrchTopicCard topic={topic} terms={state.terms} stopTyped={state.stopTyped} onSelect={handleSelect} /> : null}
 
         {!bookOrder && bestRow.length > 0 && (
           <div className="srch-top-results">
