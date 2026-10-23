@@ -15,7 +15,8 @@
    step inside this same frame, just before the draw, so a moving camera
    never needs a second requestAnimationFrame. One motion at a time: a newer
    one ends the one running (its onEnd(false)), as stop() does; a step that
-   returns false has arrived (onEnd(true)).
+   returns false has arrived (onEnd(true)), and one that throws has not: it
+   ends there (onEnd(false)), so a fly's promise never says it landed.
 
    onFrame(fn) (the navigation stream, w3) runs fn after each frame's draw,
    for the DOM that rides the camera (the go-to's verse chip and its edge
@@ -59,11 +60,12 @@ export function useFrameScheduler() {
         const now = performance.now();
         const ms = m.last ? now - m.last : 16;
         m.last = now;
-        let more = false;
-        try { more = m.step(ms, now) !== false; } catch (_e) { more = false; }
+        let more = false, threw = false;
+        try { more = m.step(ms, now) !== false; } catch (_e) { threw = true; }
         if (motionRef.current === m) {
           if (more) schedule();
-          else { motionRef.current = null; if (m.onEnd) m.onEnd(true); }
+          // s26.1: a step that threw ended the motion as arrived
+          else { motionRef.current = null; if (m.onEnd) m.onEnd(!threw); }
         }
       }
       drawRef.current();

@@ -419,15 +419,16 @@ describe('STOR5 — no navigator.locks: blind-write fallback + one-shot trace', 
     // The merge was skipped, but the data still durably landed (last-writer-wins).
     expect(idsIn('vot-test-nolocks')).toEqual(['X']);
     // STOR5: the degrade is traced once, to the 'store' channel...
-    const warn = /** @type {any} */ (globalThis).DiagnosticLog.warn;
-    expect(warn).toHaveBeenCalledTimes(1);
-    expect(warn.mock.calls[0][0]).toBe('store');
+    // (only the no-locks trace: this test store's name is not in STORE_NAMES, which warns too, ds5 s10.3)
+    const noLocks = () => /** @type {any} */ (globalThis).DiagnosticLog.warn.mock.calls.filter((c) => /navigator\.locks/.test(String(c[1])));
+    expect(noLocks()).toHaveLength(1);
+    expect(noLocks()[0][0]).toBe('store');
 
     // ...and NOT again on a second save of the same store (_warnedNoLocks guard).
     s.add(entry('Y'));
     await s.whenSaved();
     expect(idsIn('vot-test-nolocks')).toEqual(['X', 'Y']);
-    expect(warn).toHaveBeenCalledTimes(1);
+    expect(noLocks()).toHaveLength(1);
   });
 });
 

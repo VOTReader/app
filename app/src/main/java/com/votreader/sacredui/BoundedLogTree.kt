@@ -129,8 +129,14 @@ class BoundedLogTree(
         // quote marks) in the surrounding sentence is NOT consumed by
         // the redaction -- that would erase context-bearing words like
         // ": failed" that follow a path.
+        // ds5 refuter r2: folder and file names may hold spaces ("Private
+        // Notes/prayer.txt"), where the plain class stopped and leaked the
+        // rest. A space-joined run counts as path only when it reaches a
+        // `/` (a folder), ends in a file extension, or runs up to a colon
+        // (Java's file errors read "<path>: open failed"), so "[path] failed"
+        // keeps its word.
         private val SENSITIVE_PATH =
-            Regex("/(?:storage|data|sdcard|cache|system|mnt|root)/[\\w./-]*")
+            Regex("/(?:storage|data|sdcard|cache|system|mnt|root)/(?:[\\w.-]+(?: [\\w.-]+)*/)*(?:[\\w.-]+(?: [\\w.-]+)*(?=:)|[\\w.-]+(?: [\\w.-]+)*\\.[A-Za-z0-9]{1,8}\\b|[\\w.-]*)")
 
         // Preserve a useful HTTP(S) endpoint while stripping signed-query
         // credentials and opaque fragments from shareable diagnostics.

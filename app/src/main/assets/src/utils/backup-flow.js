@@ -290,6 +290,7 @@ export function createBackupFlow(ctx) {
     'vot-notes':               { store: NoteStore,            method: 'replaceAll' },
     'vot-bookmarks':           { store: BookmarkStore,        method: 'replaceAll' },
     'vot-links':               { store: LinkStore,            method: 'replaceAll' },
+    'vot-reading-plans':       { store: ReadingPlanStore,     method: 'replaceAll' },
     'vot-notebooks':           { store: NotebookStore,        method: 'replaceAll' },
     'vot-journal':             { store: JournalStore,         method: 'replaceAll' },
     'vot-journal-notebooks':   { store: JournalNotebookStore, method: 'replaceAll' },
@@ -1192,7 +1193,10 @@ export function createBackupFlow(ctx) {
       _scheduleBackupReload(600);
     } catch (e) {
       backupWarn('clear all personal data failed', e);
-      if (stillDeleting) {
+      // ds5 s33.1: the library database already went (only the media's delete failed):
+      // the same as one still deleting. A lifted fence would let the next save
+      // recreate a partial 'votreader' from what this page holds in memory.
+      if (stillDeleting || libraryDeleted) {
         // v033: the browser is still deleting a user-data database and cannot be
         // called off, so the database may go any moment. Lifting the fence now
         // would let a save recreate it with whatever this page holds in memory,
@@ -1203,7 +1207,7 @@ export function createBackupFlow(ctx) {
         // snapshots to restore it from), and the reader runs Clear All again.
         // DataSafety stays marked: this page saves no copy before the reload.
         _showToast('Clear did not finish. Reloading… then please try again.', 0);
-        _scheduleBackupReload(CLEAR_UNFINISHED_RELOAD_MS);
+        _scheduleBackupReload(stillDeleting ? CLEAR_UNFINISHED_RELOAD_MS : 600);
         return undefined;
       }
       // Wave-0: was alert('Clear failed. See console for details.') — native

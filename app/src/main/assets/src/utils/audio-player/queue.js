@@ -6,6 +6,7 @@ import { normalizeAudioTrack, songIdOfKey } from '../audio-track.js';
 import { songById } from '../song-catalog.js';
 import {
   bibleChapterStart,
+  _chapterOfTrack,
   _collectionItems,
   _locateTrack,
   playbackTracks,
@@ -119,6 +120,30 @@ export function listenResume(opts) {
   const saved = store && typeof store.getPosition === 'function' ? store.getPosition(track.url) : null;
   const d = saved ? Number(saved.d) || 0 : 0;
   return { at, left: d > at ? d - at : 0 };
+}
+
+/**
+ * Whether this letter, Bible chapter or Bible book is the recording in the player now (U04.5, UX sweep 2026-10-22:
+ * the Bible hero said Listen while its own chapter played, and a tap started the chapter again). Any part of a
+ * letter counts and any reader's voice of it, as the letter's own Listen has always counted (LetterListenRow); a
+ * chapter counts in any edition, because the page is the chapter. A book page counts any of its chapters. The
+ * pill then shows the player's own state (Pause, Loading…) and its tap toggles what is sounding.
+ *
+ * @param {{ volKey?: string, letter?: { id?: string } | null, bookId?: string, chapterNum?: number | null }} opts
+ * @returns {boolean}
+ */
+export function listenHere(opts) {
+  const o = opts || /** @type {any} */ ({});
+  const cur = _state.queue[_state.qi];
+  const key = cur && typeof cur.key === 'string' ? cur.key : '';
+  const at = key.indexOf(':');
+  if (at <= 0) return false;
+  if (o.bookId) {
+    if (!_isBibleVol(key.slice(0, at)) || key.slice(at + 1) !== o.bookId) return false;
+    const n = Math.floor(Number(o.chapterNum) || 0);
+    return !n || _chapterOfTrack(cur) === n;
+  }
+  return !!(o.letter && o.letter.id) && key === o.volKey + ':' + o.letter.id;
 }
 
 /* ── playback entry points ────────────────────────────────────────────── */
@@ -373,7 +398,7 @@ export function playTrack(track) {
  * @returns {void}
  */
 function _crossInto(track) {
-  if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return;
+  if (!_continues()) return;
   const volKey = _volKeyOf(track.key);
   const back = _source.fromSection;
   if (!volKey) {
@@ -444,14 +469,51 @@ function _booksAfter(volKey, bookId) {
  *
  * @returns {boolean}
  */
+/**
+ * Play a reading plan's portion for today (mw18 C5): the recordings of the
+ * listed chapters and letters, in order, as ONE queue that ends with the
+ * portion - never on into the rest of the book or collection. A custom queue
+ * with no volKey (_continues refuses it), so it is persisted whole and stops.
+ * A Bible chapter is its edition's chapter part; a letter is all its parts in
+ * the listener's Letter Voice. Items with no recording are passed over.
+ * Returns false (nothing changed) when none of them has one, or offline when
+ * none is on the phone (with the offline toast).
+ *
+ * @param {{ items: Array<{ volKey: string, item: { id?: string, title?: string }, collectionLabel?: string | null, chapterNum?: number | null }>, label?: string | null }} opts
+ * @returns {boolean}
+ */
+export function playPortion(opts) {
+  const o = opts || /** @type {any} */ ({});
+  /** @type {Track[]} */
+  const queue = [];
+  for (const p of Array.isArray(o.items) ? o.items : []) {
+    if (!p || !p.volKey || !p.item) continue;
+    const tracks = playbackTracks(p.volKey, p.item, p.collectionLabel || undefined);
+    const n = Math.floor(Number(p.chapterNum) || 0);
+    if (n >= 1 && tracks.length > 1) { if (n <= tracks.length) queue.push(tracks[n - 1]); }
+    else for (const t of tracks) queue.push(t);
+  }
+  if (!queue.length) return false;
+  if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
+  _rememberOutgoingPosition();
+  _setPendingRestore(null);
+  _setSource({ mode: 'custom', volKey: '', label: o.label || null });
+  _state.queue = queue;
+  _state.qi = 0;
+  _countPlay();
+  _startAt(_resumeAt);
+  return true;
+}
+
 function _extendQueue() {
   // A songs queue is refused here like a custom one: songs never continue into
   // letters (README §1.1) — a songs queue ends, or wraps under repeat 'all'.
-  if (!_source || (_source.mode !== 'collection' && _source.mode !== 'section')) return false;
+  if (!_continues()) return false;
   const last = _state.queue[_state.queue.length - 1];
   // A section run's tracks carry key null (one file, many letters); the run
   // belongs to its collection, so the site order continues from THAT (2026-09-20).
-  const volKey = _source.mode === 'section' ? (_source.volKey || '') : (last ? _volKeyOf(last.key) : '');
+  // An edited run's tracks may carry null keys the same way: its descriptor names the collection (s31.1).
+  const volKey = _source.mode === 'section' ? (_source.volKey || '') : ((last ? _volKeyOf(last.key) : '') || _source.volKey || '');
   if (!volKey) return false;
   const units = _isBibleVol(volKey)
     ? _booksAfter(volKey, /** @type {string} */ (last.key).slice(volKey.length + 1))
@@ -470,8 +532,15 @@ function _extendQueue() {
   return false;
 }
 
-/** @param {Track[]} queue */
-function _commitQueueEdit(queue) {
+/** Does this run go on into the next unit of the site order when it is spent? A collection or section run does,
+ *  and so does a run the listener edited out of one (s31.1): a custom source that still names its collection.
+ *  @returns {boolean} */
+function _continues() {
+  return !!_source && (_source.mode === 'collection' || _source.mode === 'section' || (_source.mode === 'custom' && !!_source.volKey));
+}
+
+/** @param {Track[]} queue @param {boolean} [ends] the listener cleared what was next: the run ends after this track */
+function _commitQueueEdit(queue, ends = false) {
   _state.queue = queue;
   const current = queue[_state.qi];
   // An edited SONGS queue stays a songs descriptor — its explicit ids, in the
@@ -480,7 +549,12 @@ function _commitQueueEdit(queue) {
   if (_source && _source.mode === 'songs' && queue.every(_isSong)) {
     _setSource({ ..._source, ids: queue.map((t) => songIdOfKey(t.key)), filter: null, startKey: null });
   } else {
-    _setSource({ mode: 'custom', volKey: '', label: current ? current.sub : null });
+    // The edited queue persists as it is (custom), and still names the collection it came out of, so the site order
+    // goes on after it (s31.1): taking one letter out of the run is not asking for the run to end. Clear upcoming is.
+    const volKey = !ends && _continues() ? _source.volKey || '' : '';
+    _setSource({ mode: 'custom', volKey, label: current ? current.sub : null });
+    // The order joins a run when its last track STARTS; an edit that leaves the playing track last is that moment.
+    if (volKey && _state.qi + 1 >= queue.length) _extendQueue();
   }
   // A queue edit is the one queue-SHAPE change with no track start behind it,
   // so the host media card's skip handlers have to be re-decided here.
@@ -550,7 +624,7 @@ export function moveUpcoming(from, to) {
 /** @returns {boolean} */
 export function clearUpcoming() {
   if (_pendingRestore || _state.qi + 1 >= _state.queue.length) return false;
-  _commitQueueEdit(_state.queue.slice(0, _state.qi + 1));
+  _commitQueueEdit(_state.queue.slice(0, _state.qi + 1), true);
   return true;
 }
 

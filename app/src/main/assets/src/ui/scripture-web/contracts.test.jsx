@@ -746,6 +746,22 @@ describe("closing the docked panel at a rail's end eases both rails back inside 
     });
   }
 
+  // s26.3: a second settle ended the first, whose end then zeroed the hold the second had just set,
+  // so any clamp mid-ease (a gesture, My Web's per frame) snapped the end back at once
+  it('a second close while the first still eases holds its own bound, and lands at the view\'s edge', () => {
+    const { cam, l, ends } = atEnds('canonical');
+    const c = cam.camRef.current;
+    cam.panelInsetRef.current = { right: 0, bottom: 0 };
+    cam.settleInset(PANEL / 2);   // a narrower panel's settle, easing
+    l.frame(16); l.frame(16);
+    cam.settleInset(PANEL);       // and the wider one's, before it lands
+    expect(cam.slackFor(c), "the newer settle's hold").toBe(PANEL * DPR);
+    let frames = 0;
+    while (l.frame(16) && frames < 100) frames++;
+    expect(cam.slackFor(c), 'let go once it lands').toBe(0);
+    for (const x of ends()) expect(x).toBeCloseTo(W, 6);
+  });
+
   it('a camera already inside the new bound is left where it stands, and no motion starts', () => {
     const { cam, l } = atEnds('personal');
     const bible = cam.camRef.current, vols = cam.camVRef.current;
@@ -883,6 +899,10 @@ describe("the chooser's Zoom to, from a tap", () => {
     const six = tapAt(fan(6), 400, ys).m.get().sel;
     expect(six.choices).toHaveLength(6);
     expect(six.choiceCut).toBe(false);
+    // s27.3: exactly CHOOSER_MOST is all of them, not "the nearest" of more
+    const eight = tapAt(fan(8), 400, ys).m.get().sel;
+    expect(eight.choices).toHaveLength(8);
+    expect(eight.choiceCut).toBe(false);
     const ten = tapAt(fan(10), 400, ys).m.get().sel;
     expect(CHOOSER_MOST).toBe(8);
     expect(ten.choices).toHaveLength(CHOOSER_MOST);
@@ -970,7 +990,9 @@ describe('the overlay\'s tap targets (CONTRACTS.md section 4)', () => {
     const c = get().cam.camRef.current;
     expect(verseToX(c, 800, 0)).toBeCloseTo(0, 6);
     expect(verseToX(c, 800, TOTAL)).toBeCloseTo(800, 6);
-    expect(get().sel.detail, "the open line stays: the tap was the name's").toMatchObject({ kind: 'arc', index: 1 });
+    // the name's tap closes what was open, as the go-to's book does (s24.4; it once left the line
+    // docked over the book); the framed canon above is what shows the tap was the name's
+    expect(get().sel.detail, "the name's tap closes the open line").toBeNull();
     expect(get().journey.stack.map((e) => e.label)).toEqual(['Genesis']);
   });
 });

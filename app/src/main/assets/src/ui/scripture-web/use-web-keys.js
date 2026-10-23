@@ -49,12 +49,15 @@ const TEXT_FIELD = { INPUT: 1, TEXTAREA: 1, SELECT: 1 };
  *   box Escape closes first and whose open, selectCentre and step the keys call;
  *   slackFor (optional, use-web-camera.js): the camera clamp's room for the docked
  *   panel, device px, so the keys stop where flyTo and the gestures do
+ *   filtersOpen, closeFilters: the Filters sheet (web-filters.jsx), the layer under the go-to;
+ *   returnShown, returnBack: the way back to the verse a choice zoomed out of (use-web-selection.js)
  * @returns {{ onKeyDown: (e: any) => void }}
  */
 export function useWebKeys({
   graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
   camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-  resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor,
+  resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor, filtersOpen, closeFilters,
+  returnShown, returnBack,
 }) {
   const goToOpen = !!(goTo && goTo.isOpen);
   /** Close whatever is on top of the web, one layer a call: the guide, then
@@ -64,15 +67,19 @@ export function useWebKeys({
   const closeTopOverlay = React.useCallback(() => {
     // the go-to box is the newest layer, over the panel it may have opened
     if (goToOpen) { goTo.close(); return true; }
+    // the Filters sheet (web-filters.jsx), over the web and its panel
+    if (filtersOpen) { closeFilters(); return true; }
+    // the way back to the verse a choice zoomed out of (use-web-selection.js): Back takes it
+    if (returnShown) { returnBack(); return true; }
     if (guideOpen) { closeGuide(); return true; }
     if (emptyShown) { dismissEmpty(); return true; }
     if (listOpen || choices || detail || tip) { closeCards(); return true; }
     return false;
-  }, [goToOpen, goTo, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
+  }, [goToOpen, goTo, filtersOpen, closeFilters, returnShown, returnBack, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
   // Android Back and the app's Escape dispatcher close the top overlay first
   // instead of leaving the web (the hover chip alone is not worth a Back).
   useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
-    active: !!(goToOpen || guideOpen || emptyShown || listOpen || choices || detail) });
+    active: !!(goToOpen || filtersOpen || returnShown || guideOpen || emptyShown || listOpen || choices || detail) });
 
   // / and Ctrl+K: the go-to, from anywhere on the screen but a text field. The capture phase puts
   // it ahead of the app's document listener, which reads defaultPrevented and leaves / alone.
@@ -113,6 +120,9 @@ export function useWebKeys({
       if (e.key === '[' || e.key === ']') { e.preventDefault(); goTo.step(e.key === ']' ? 1 : -1); return; }
       if (e.key === 'Backspace' && goTo.back) { e.preventDefault(); goTo.back(); return; }
     }
+    // a key held with Ctrl, Cmd or Alt is the browser's: Ctrl+= / Ctrl+- / Ctrl+0 zoom the page and
+    // Alt+Left goes back (s26.2: the web took them as its own zoom, reset and pan)
+    if (e.key !== 'Escape' && (e.ctrlKey || e.metaKey || e.altKey)) return;
     const v = viewRef.current;
     // r2: the keys drive the rail the pointer last touched (the Bible rail
     // until a gesture says otherwise); Reset (0) resets both

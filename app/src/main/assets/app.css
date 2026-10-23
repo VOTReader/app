@@ -608,9 +608,12 @@
       body:has(.mode-toggle-wrap) { --dock-context: 72px; }  /* the 59px Study Notes card + 8 + air */
       body:has(.jrn-fab) { --dock-context: 72px; }
       /* cz5 (Corbin 02:59: "Media player should be auto hidden when viewing ... the garden images"): a full-screen
-         image view hides the mini player and the whole dock; playback goes on, and they come back on leaving. */
-      body:has(.garden-fullscreen) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
-      body:has(.garden-fullscreen) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
+         image view hides the mini player and the whole dock, and they come back on leaving. The Scripture Web too
+         (Corbin 2026-10-22 23:4x: "media player should not be present on certain screen like scripture web"), and its
+         load-error panel, the screen's root when WebGL fails. Audio does not play on either (23:5x): entering one
+         pauses it (useNoAudioHere), so the bar is back on leaving paused at the same spot, one tap from resuming. */
+      body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
+      body:has(.garden-fullscreen, .sw-root, .sw-fallback) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
       body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
@@ -769,7 +772,10 @@
          mirrors live changes. px font sizes do NOT scale — the journal +
          highlights injected CSS was converted to rem so they track the scale. */
       html { font-size: calc(100% * var(--font-scale, 1)); }
-      body { font-family: var(--font-body); background: var(--bg); color: var(--cream); min-height: 100vh; transition: background 0.3s ease, color 0.3s ease; overflow-x: hidden; max-width: 100vw; }
+      /* min-height 100dvh, not 100vh alone: on mobile Chrome 100vh is the viewport with the toolbar hidden, so with it
+         showing the document outgrew the glass and every jump to a hit (a scrollIntoView) scrolled the document too,
+         sliding the top bar under the toolbar (pf2, Corbin's S22 2026-10-22). app-css.test.js pins it. */
+      body { font-family: var(--font-body); background: var(--bg); color: var(--cream); min-height: 100vh; min-height: 100dvh; transition: background 0.3s ease, color 0.3s ease; overflow-x: hidden; max-width: 100vw; }
       /* Form controls do not inherit font-family: Chrome gives a <button> its own system font, so the
          previous/next cards at every letter's end painted their titles in Arial/Roboto under a serif page
          (zones L1, 2026-10-05; tools/e2e-phone-fit.mjs F1). Any class that names a family still wins. */
@@ -2136,6 +2142,10 @@
         vertical-align: super; margin-right: 0.15em; letter-spacing: 0.05em;
         line-height: 1;
       }
+      /* rs1: the number ends in a space ("16 ") that must not collapse at the
+         end of its gutter box, or Chrome reads "16For" as one word and a
+         long-press on a verse's first word takes its number too (S22). */
+      .verse-num { white-space: pre; }
     
       /* ── STUDY MODE PANELS ── */
       .study-panels {
@@ -2895,6 +2905,9 @@
     .footnote-list-verse .sc-sheet-compound { gap:0.75rem; }
     .footnote-list-verse .sc-sheet-compound-label { font-size:var(--fs-10); }
     .sc-sheet-loading { color:var(--gold-dim); font-size:var(--fs-14); font-style:italic; animation:pulse 1.4s ease infinite; }
+    /* screen-routes _fallbackView (mw17 s17.3): loading, failed loads, stale tabs. */
+    .route-fallback { display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:14px; text-align:center; padding:0 24px; }
+    .route-fallback-btn { padding:8px 20px; border-radius:999px; border:1px solid currentColor; background:transparent; color:inherit; font:inherit; cursor:pointer; opacity:0.85; }
     .scripture-ref-chevron { margin-left:auto; padding-left:0.5rem; color:var(--gold-dim); font-size:var(--fs-16); flex-shrink:0; align-self:center; }
     .scripture-ref-note { cursor:default; }
     @media (hover: hover) { .scripture-ref-note:hover, .scripture-ref-note:focus-visible { background:var(--study-note) !important; border-color:var(--study-border) !important; outline:none; } }
@@ -2921,6 +2934,10 @@
     body.light ::highlight(vot-reading) { background-color: rgba(122,92,16,0.16); }
     body.light ::highlight(vot-find) { background-color: rgba(122,92,16,0.18); }
     body.light ::highlight(vot-find-current) { background-color: rgba(122,92,16,0.38); text-decoration-color: #7a5c10; }
+    /* The landed sentence (utils/landing-mark.js): Scripture Web's Open letter marks the words
+       that cite the verse for the landing's 4 s, between the find wash and the current place. */
+    ::highlight(vot-landing) { background-color: rgba(214,179,95,0.34); }
+    body.light ::highlight(vot-landing) { background-color: rgba(122,92,16,0.26); }
     /* Find in the unit (FindInUnit): every place the searched words appear, and,
        stronger and underlined, the place being looked at. Gold like the result
        cards' marks, never a highlighter colour a reader's own marks could wear. */
@@ -3029,6 +3046,10 @@
     /* ── Scriptures landing: fill screen, no scroll ── */
     .scriptures-landing { padding:1.2rem 1.3rem 0.8rem; justify-content:flex-start; }
     .scriptures-landing .home-eyebrow { margin-bottom:0.4rem; }
+    /* mw17 A02.1: the eyebrow opens the translation picker; it keeps the eyebrow's look. */
+    .home-eyebrow-pick { display:block; margin-left:auto; margin-right:auto; background:none; border:0; padding:0.25rem 0.5rem; min-height:44px; cursor:pointer; font:inherit; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; color:var(--gold); border-radius:6px; }
+    .home-eyebrow-pick:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+    .home-eyebrow-chev { margin-left:0.4em; font-size:0.85em; opacity:0.75; }
     .scriptures-landing .home-title { font-size:var(--fs-24); margin-bottom:0.2rem; }
     .scriptures-landing .home-ornament { margin-bottom:1.2rem; }
     .scriptures-landing .genre-columns { max-width:33.75rem; gap:0.65rem; }
@@ -3164,14 +3185,6 @@
     /* rp1: the Plans screen (ReadingPlansScreen.jsx; mockup r2-plans.png) */
     .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:1.25rem 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }   /* 1.25rem top: the personal-study header's one inset */
     .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
-    .plans-offer { display:grid; grid-template-columns:repeat(auto-fit, minmax(11rem, 1fr)); gap:0.75rem; margin:0.5rem 0 1.25rem; }
-    .plans-offer-card { display:flex; flex-direction:column; align-items:center; gap:0.4rem; padding:1rem 0.85rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); text-align:center; }
-    .plans-offer-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
-    .plans-offer-sub { margin:0; color:var(--cream-dim); font-size:var(--fs-14); }
-    .plans-start { width:100%; margin-top:0.4rem; }
-    .plans-pace { display:flex; gap:0.35rem; flex-wrap:wrap; justify-content:center; }
-    .plans-pace button { min-height:44px; padding:0 0.7rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    .plans-pace button.on { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
     .plans-eyebrow { margin:0.5rem 0 0.6rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
     .plans-plan { margin:0 0 0.9rem; padding:0.9rem 1rem 0.6rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
     .plans-plan-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
@@ -3188,7 +3201,124 @@
     .plans-day[data-state="today"] { border-color:var(--gold); }
     .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
     .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-stop { display:block; margin:0.35rem 0 0 auto; }
+    .plans-detail-links { display:flex; flex-wrap:wrap; justify-content:center; gap:0 1.25rem; margin-top:0.6rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
+    /* mw18 C3/C4/C6: behind, its two ways back, a new pace, marking a day (mockup r1-behind.png) */
+    .plans-behind { margin-top:0.8rem; padding-top:0.7rem; border-top:1px solid var(--gold-border); }
+    .plans-behind-title { margin:0; color:var(--cream); font-size:var(--fs-20); font-weight:400; }
+    .plans-option { display:flex; flex-direction:column; gap:0.2rem; width:100%; min-height:56px; margin-top:0.6rem; padding:0.65rem 0.9rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .plans-option-name { color:var(--gold); font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; }
+    .plans-option-sub { color:var(--cream-dim); font-size:var(--fs-15); }
+    @media (hover:hover) { .plans-option:hover { border-color:var(--gold); background:var(--gold-faint); } }
+    .plans-pace-pick { margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
+    .plans-pace-pick .plans-pick { padding:0 0 0.4rem; }
+    .plans-chip[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
+    .plans-by { display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; min-height:44px; color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-by input[type="date"] { min-height:40px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--cream); font:inherit; color-scheme:dark; }
+    body.light .plans-by input[type="date"] { color-scheme:light; }
+    .plans-by input[type="checkbox"] { width:20px; height:20px; accent-color:var(--gold); }
+    .plans-hold { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+    .plans-mark { display:block; margin:0 auto; font-size:var(--fs-13); }
+    /* mw18 landing 1: Home's done state, the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
+    .today-done { display:flex; align-items:center; gap:0.75rem; margin-top:0.35rem; }
+    .today-links, .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }
+    .today-btn:disabled { opacity:0.5; cursor:default; }
+    .plans-plan .today-eyebrow { display:block; margin-bottom:0.25rem; }
+    .plans-done { display:flex; align-items:center; gap:0.65rem; }
+    .plans-actions { margin:0.6rem 0 0.2rem; }
+    .plans-actions .today-btn { flex:1; }
+    .plans-items { display:flex; flex-wrap:wrap; justify-content:center; gap:0.25rem 0.6rem; list-style:none; margin:0.75rem 0 0; padding:0.7rem 0 0; border-top:1px solid var(--gold-border); }
+    .plans-item { display:flex; flex-direction:column; align-items:center; gap:0.2rem; min-width:44px; min-height:44px; padding:0.2rem 0.3rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .plans-item-label { max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .plans-items-count { margin:0.1rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
+    .plans-week { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.2rem; margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); text-align:center; }
+    .plans-week .plans-day { min-height:40px; }
+    .plans-day[data-read="1"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
+    .plans-day[data-state="ahead"] .plans-day-mark { border:1px solid var(--gold-border); border-radius:50%; box-sizing:border-box; }
+    .plans-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.75rem; margin-top:0.5rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
+    .plans-counts { color:var(--cream-dim); font-size:var(--fs-14); }
+    .plans-foot .today-link { color:var(--gold); }
+    .plans-details { margin-top:0.25rem; }
+    .plans-legend { margin:0.5rem 0 0; color:var(--cream-muted); font-size:var(--fs-13); text-align:center; }
+    .plans-key { display:inline-block; width:9px; height:9px; margin:0 0.3rem 0 0.6rem; border-radius:50%; vertical-align:middle; box-sizing:border-box; }
+    .plans-key[data-state="done"] { background:var(--gold); opacity:0.8; }
+    .plans-key[data-state="missed"] { border:1.5px solid var(--gold); }
+    .plans-group { margin:0 0 0.9rem; }
+    .plans-group-title { display:flex; align-items:center; gap:0.6rem; margin:0.4rem 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
+    .plans-group-title::after { content:""; flex:1; height:1px; background:var(--gold-border); }
+    .plans-list { list-style:none; margin:0; padding:0; }
+    .plans-list > li + li { border-top:1px solid var(--gold-border); }
+    .plans-row { display:flex; align-items:center; gap:0.85rem; width:100%; min-height:56px; padding:0.5rem 0.2rem; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .plans-row:disabled { cursor:default; }
+    .plans-row-icon { flex:none; color:var(--gold); opacity:0.85; }
+    .plans-row-text { display:flex; flex-direction:column; flex:1; min-width:0; }
+    .plans-row-name { color:var(--cream); font-size:var(--fs-18); }
+    .plans-row-sub { color:var(--cream-dim); font-size:var(--fs-14); }
+    .plans-row:disabled .plans-row-sub { color:var(--gold); font-style:italic; }
+    .plans-row-chev { flex:none; color:var(--gold); }
+    .plans-row:disabled .plans-row-chev { visibility:hidden; }
+    @media (hover:hover) { .plans-row:not(:disabled):hover { background:var(--gold-faint); } .plans-item:hover { color:var(--cream); } }
+    .plans-pick { display:flex; flex-wrap:wrap; gap:0.4rem; padding:0 0 0.7rem 2.6rem; }
+    .plans-chip { min-height:44px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .plans-note:empty { display:none; }
+    /* mw18: Build your own plan (PlanBuilder.jsx; mockups r1-build-pick.png, r1-build-goal.png) */
+    .plans-build-row { margin-top:0.2rem; border-top:1px solid var(--gold-border); }
+    .plans-build .study-head .today-eyebrow { display:block; margin-bottom:0.3rem; }
+    .build-tabs { display:grid; grid-template-columns:1fr 1fr; margin:0.4rem 0 0.75rem; border:1px solid var(--gold-border); border-radius:8px; overflow:hidden; }
+    .build-tabs button { min-height:44px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
+    .build-tabs button[aria-selected="true"] { color:var(--gold); background:var(--gold-faint); box-shadow:inset 0 0 0 1px var(--gold); }
+    .build-list, .build-letters, .build-chips { list-style:none; margin:0; padding:0; }
+    .build-list > li + li { border-top:1px solid var(--gold-border); }
+    .build-row-wrap { display:flex; align-items:center; }
+    .build-row, .build-radio { display:flex; align-items:center; gap:0.8rem; width:100%; min-height:52px; padding:0.4rem 0.2rem; border:0; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); text-align:left; cursor:pointer; }
+    .build-row-text { display:flex; flex-direction:column; min-width:0; }
+    .build-row-name { color:var(--cream); }
+    .build-row-sub { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
+    .build-box { border-radius:5px; }
+    .build-radio .build-box { border-radius:50%; }
+    .build-box[data-done="some"] { background:linear-gradient(var(--gold), var(--gold)) center / 10px 2px no-repeat; }
+    .build-expand { flex:none; width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); cursor:pointer; }
+    .build-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(44px, 1fr)); gap:0.3rem; padding:0 0 0.7rem; }
+    .build-grid button { min-height:44px; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-15); cursor:pointer; }
+    .build-grid button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
+    .build-letters { padding:0 0 0.5rem 1.6rem; }
+    .build-letter { min-height:44px; font-size:var(--fs-15); }
+    .build-bar { position:sticky; bottom:0; z-index:2; margin:0.75rem -1rem 0; padding:0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--gold-border); background:var(--bg2); }
+    .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; }
+    .build-chip { display:inline-flex; align-items:center; gap:0.15rem; padding-left:0.7rem; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-size:var(--fs-14); }
+    .build-chip button { min-width:36px; min-height:36px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+    .build-bar-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+    .build-summary { color:var(--cream); font-size:var(--fs-15); }
+    .build-card { margin:0 0 0.75rem; padding:0.7rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
+    .build-card-title { margin:0 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
+    .build-goal { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.5rem; }
+    .build-goal .build-radio { width:auto; flex:1 1 12rem; }
+    .build-stepper { display:inline-flex; align-items:center; border:1px solid var(--gold-border); border-radius:8px; }
+    .build-stepper button { width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-20); cursor:pointer; }
+    .build-stepper button:disabled { opacity:0.4; cursor:default; }
+    .build-stepper-value { min-width:4.5rem; text-align:center; color:var(--cream); }
+    .build-input { min-height:44px; padding:0 0.6rem; border:1px solid var(--gold-border); border-radius:8px; background:var(--bg); color:var(--cream); font:inherit; font-size:var(--fs-16); color-scheme:dark; }
+    body.light .build-input { color-scheme:light; }
+    .build-goal input[type="number"] { width:6.5rem; }
+    .build-name { width:100%; box-sizing:border-box; }
+    .build-days { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; padding-top:0.3rem; }
+    .build-days button { min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    .build-days button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); }
+    .build-each-main { margin:0.2rem 0 0.1rem; color:var(--gold); font-size:var(--fs-20); }
+    .build-each p { margin:0.1rem 0; }
+    .build-each .today-btn-wide { margin-top:0.8rem; }
+    /* mw18 C9/C11: the month pages and its days open their reading; finished plans (mockup r1-complete.png) */
+    .plans-month-head { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.4rem; }
+    .plans-month-head .plans-month-name { margin:0; min-width:9rem; }
+    .plans-month-step { width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-24); line-height:1; cursor:pointer; }
+    button.plans-day { width:100%; margin:0; background:transparent; color:inherit; font:inherit; font-size:var(--fs-15); cursor:pointer; }
+    @media (hover:hover) { button.plans-day:hover { border-color:var(--gold-border); } }
+    .plans-complete { text-align:center; }
+    .plans-complete-check { display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; margin:0.2rem 0 0.4rem; border:1.5px solid var(--gold); border-radius:50%; color:var(--gold); }
+    .plans-complete-title { margin:0; color:var(--cream); font-size:var(--fs-24); font-weight:400; }
+    .plans-complete-title span { display:block; color:var(--gold); }
+    .plans-complete .plans-actions { justify-content:center; }
+    .plans-finished { margin-bottom:1rem; }
+    .plans-finished-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; min-height:56px; padding:0.35rem 0.2rem; }
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }
@@ -5818,7 +5948,15 @@
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 12px;
     }
+    /* #10: the dot is 18 px; the button around it is the 44 px a finger needs, laid out as the dot. */
+    .note-sheet-color-hit {
+      display: flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; margin: -13px; padding: 0;
+      background: none; border: none; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
     .note-sheet-color-dot {
+      display: block;
       width: 18px; height: 18px; border-radius: 50%;
       border: 1.5px solid rgba(255,255,255,0.15);
       flex-shrink: 0; padding: 0;
@@ -5903,7 +6041,7 @@
        arrives with unsaved note text (honest-Save, 2026-07-12). */
     .note-sheet-discard-confirm { margin-top: 12px; width: 100%; }
     .note-sheet-save {
-      flex: 1;
+      flex: 1; min-height: 44px;
       padding: 11px; border-radius: 8px; cursor: pointer;
       font-family: 'Cinzel', serif; font-size: var(--fs-11);
       letter-spacing: 0.16em; text-transform: uppercase;
@@ -5921,7 +6059,7 @@
     }
     .note-sheet-save.disabled:active, .note-sheet-save:disabled:active { background: transparent; }
     .note-sheet-secondary {
-      flex: 1;
+      flex: 1; min-height: 44px;
       padding: 11px; border-radius: 8px; cursor: pointer;
       font-family: 'Cinzel', serif; font-size: var(--fs-11);
       letter-spacing: 0.16em; text-transform: uppercase;
@@ -6428,6 +6566,7 @@
       outline: none;
     }
     body.light .nb-drilled-rename { background: var(--bg); color: var(--input-text); }
+    .nb-drilled-rename-note { margin: 0.35rem 0 0; font-family: var(--font-body); font-size: var(--fs-14); color: var(--danger); }
 
     .notes-index-search {
       width: 100%; padding: 11px 16px;
@@ -7044,6 +7183,15 @@
       stroke-width: 1.6;
     }
     .inline-bookmark-icon-multi { color: var(--gold); }
+    /* #10 (idea sweep 2026-10-22): the note, link and bookmark markers are 14-16 px glyphs, hard to hit on a
+       phone. An invisible box the size of the line around each takes a tap near it; it stops short of the lines
+       above and below, whose words keep their own taps (tap-to-seek, a long-press to select). The glyph stays on
+       top, so of two markers side by side each keeps its own. */
+    .hl-note-icon, .inline-link-icon, .inline-bookmark-icon { position: relative; }
+    .hl-note-icon::before, .inline-link-icon::before, .inline-bookmark-icon::before {
+      content: ''; position: absolute; inset: -8px -10px;
+    }
+    .hl-note-icon svg, .inline-link-icon svg, .inline-bookmark-icon svg { position: relative; z-index: 1; }
     /* Bookmark create sheet — pre-commit form, reuses link-picker overlay
        chrome (navpick-sheet) for consistency with the new-link flow. */
     .bkm-create-sheet { min-height: auto; }
@@ -7248,7 +7396,7 @@
     }
     .bkm-row-more {
       background: none; border: none; cursor: pointer;
-      color: var(--cream-muted); padding: 2px;
+      color: var(--cream-muted); padding: 14px; margin: -12px;   /* 44 px to hit, laid out as 20 (#10) */
       -webkit-tap-highlight-color: transparent;
       transition: color 0.12s;
     }
@@ -7367,6 +7515,7 @@
       display: flex; align-items: center; justify-content: center;
       line-height: 1;
       box-shadow: 0 0 0 1.5px var(--bg);
+      z-index: 2;   /* above the glyph (#10) */
     }
     body.light .hl-note-icon-badge::after { box-shadow: 0 0 0 1.5px var(--bg3); }
 
@@ -7701,10 +7850,31 @@
        pickers, tests) ignore user-select entirely. */
     button, .top-nav, .sheet-handle-row, .fn-sheet-num-row, .sc-sheet-tag,
     .settings-section-label, .bottom-nav-card, .mode-toggle-wrap,
-    .back-hint-row, .mini-title, .tabs-overview-header, .tabs-overview-meta {
+    .back-hint-row, .mini-title, .tabs-overview-header, .tabs-overview-meta,
+    .audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .chapter-nav-sticky, .vot-toast, .scroll-notch-marker,
+    .ornament-divider, .install-card-sentinel {
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     input, textarea { user-select: text; -webkit-user-select: text; }
+    /* (5) rs1: while a selection's end is being dragged (selection-drag.js sets
+       body.sel-dragging), the chrome over and around the reading column takes
+       no touches, so the browser puts the end on the words under the finger,
+       even under the mini player. Over the player it took the page's last text
+       in DOCUMENT order instead: the rest of the chapter, the swipe previews
+       and the player, selected at once (S22, 2026-10-22). The selection toolbar
+       steps aside too. */
+    body.sel-dragging .top-nav, body.sel-dragging .audio-bar, body.sel-dragging .audio-bar-pull,
+    body.sel-dragging .ascroll-pill, body.sel-dragging .find-pill, body.sel-dragging .mode-toggle-wrap,
+    body.sel-dragging .chapter-nav-sticky, body.sel-dragging .ann-hint-pill, body.sel-dragging .mini-title,
+    body.sel-dragging .back-hint-row, body.sel-dragging .vot-toast, body.sel-dragging .sel-toolbar {
+      pointer-events: none;
+    }
+    /* ...and only the reading column takes a selection's end: dragged past a
+       chapter's last line, the end went to an empty marker after the column,
+       off the screen, and the browser then sent no menu at the lift. A child's
+       own none (buttons, the "Back to" row) still holds inside the column. */
+    body.sel-dragging { user-select: none; -webkit-user-select: none; }
+    body.sel-dragging .screen-scroll { user-select: text; -webkit-user-select: text; }
 
     /* ═══════════════════════════════════════════════════════════════════
        THE SCRIPTURE WEB (bundle-f)
@@ -8568,6 +8738,102 @@
 
     .sw-root.sw-compact .sw-key-gradient { width: 48px; }
     .sw-root.sw-compact .sw-key-arc { width: 20px; height: 7px; }
+    /* THE FILTERS (web-filters.jsx; Corbin 2026-10-22 chose the mix of mockups A, B and C). The
+       canon's cues are chips: the legend lets the pointer through but its chips take it; a chip
+       reads as the cue it was until it is on, then it takes the gold with an edge. The hit is
+       taller than the face (::after), so the one-line legend keeps its height. */
+    .sw-legend .sw-chip { pointer-events: auto; }
+    /* room in the legend's clipped box for a chip's hit, the words where they were */
+    .sw-legend { padding: 6px 0; margin-bottom: -6px; }
+    .sw-chip {
+      position: relative; display: inline-flex; align-items: center; gap: 5px;
+      margin: 0; padding: 1px 6px; border: 1px solid transparent; border-radius: 999px;
+      background: transparent; color: inherit; font: inherit; line-height: inherit; cursor: pointer;
+      transition: var(--transition);
+    }
+    .sw-chip::after { content: ''; position: absolute; left: -2px; right: -2px; top: -6px; bottom: -6px; }
+    .sw-chip:hover { color: var(--sw-text); }
+    .sw-chip:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 1px; }
+    .sw-chip.is-on { color: var(--sw-gold); border-color: var(--sw-active-border); background: var(--sw-active-fill); }
+    /* the ramp's two ends are its chips, the gradient between them */
+    .sw-key-ramp { gap: 0; }
+    .sw-key-ramp .sw-chip { padding: 1px 5px; }
+    .sw-key-ramp .sw-key-gradient { margin: 0 2px; }
+    .sw-chip-more { color: var(--sw-text-meta); }
+    .sw-chip-more svg { flex: none; display: block; }
+    /* the pill: what is on and the count it leaves, centred under the top bar (the bar's row is the
+       title's and the controls', and on a PC they meet in the middle), at the top with the controls
+       hidden, there either way */
+    .sw-filter-pill {
+      position: absolute; z-index: 5; left: 50%; transform: translateX(-50%);
+      top: calc(var(--sw-chrome-top, 10px) + 76px);
+      display: inline-flex; align-items: stretch; max-width: calc(100% - 48px); min-width: 0;
+      background: var(--sw-control-fill); border: 1px solid var(--sw-active-border); border-radius: 22px;
+      font-family: var(--sw-font); font-size: var(--fsc-15); color: var(--sw-gold);
+    }
+    .sw-filter-pill button {
+      position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 36px;
+      background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer;
+    }
+    .sw-filter-pill button::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
+    .sw-filter-pill button:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; border-radius: 20px; }
+    .sw-filter-pill-body { padding: 0 6px 0 16px; min-width: 0; }
+    .sw-filter-pill-words { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .sw-filter-pill-count { color: var(--sw-text-meta); font-variant-numeric: tabular-nums; }
+    .sw-filter-pill-clear { padding: 0 12px 0 6px; color: var(--sw-text-meta); }
+    .sw-filter-pill-clear:hover { color: var(--sw-text); }
+    .sw-root.sw-compact .sw-filter-pill { top: calc(var(--sw-chrome-top, 10px) + 64px); font-size: var(--fsc-13); }
+    .sw-root.sw-compact .sw-filter-pill button { min-height: 32px; }
+    .sw-root.sw-chrome-hidden .sw-filter-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+    /* THE WAY BACK (use-web-selection.js returnTo): under the title, where the eye goes after the
+       zoom out, until the reader takes the camera; at the top with the controls hidden */
+    .sw-return-pill {
+      position: absolute; z-index: 5; left: 24px; top: calc(var(--sw-chrome-top, 10px) + 76px);
+      gap: 6px; padding: 0 16px 0 10px; border-radius: 22px; border-color: var(--sw-active-border); color: var(--sw-gold);
+    }
+    .sw-root.sw-compact .sw-return-pill { left: 16px; top: calc(var(--sw-chrome-top, 10px) + 64px); }
+    .sw-root.sw-chrome-hidden .sw-return-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+    /* a docked panel takes the right: the pill centres on the web left of it */
+    .sw-root.sw-panel-open[data-panel="dock"] .sw-filter-pill {
+      left: calc((100% - var(--sw-panel-w, 42%)) / 2); max-width: calc(100% - var(--sw-panel-w, 42%) - 32px);
+    }
+    .sw-root.sw-narrow .sw-filter-pill { top: auto; bottom: calc(84px + var(--sw-safe-bottom)); max-width: calc(100% - 28px); }
+    /* the sheet: every filter, over the web's foot, the web behind it showing what they leave */
+    .sw-filter-sheet {
+      position: absolute; z-index: 7; left: 50%; transform: translateX(-50%);
+      bottom: calc(12px + var(--sw-safe-bottom)); width: min(620px, calc(100% - 32px)); max-height: calc(100% - 96px);
+      display: flex; flex-direction: column; box-sizing: border-box;
+      background: var(--sw-control-fill); border: 1px solid var(--sw-panel-edge); border-radius: 14px;
+      font-family: var(--sw-font); color: var(--sw-text);
+      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    }
+    .sw-filter-head { display: flex; align-items: center; gap: 14px; padding: 10px 10px 8px 18px; border-bottom: 1px solid var(--sw-hairline); }
+    .sw-filter-head h2 { margin: 0; font-size: var(--fsc-18); font-weight: 500; color: var(--sw-title); }
+    .sw-filter-count { color: var(--sw-text-meta); font-size: var(--fsc-15); font-variant-numeric: tabular-nums; }
+    .sw-filter-clear {
+      margin-left: auto; position: relative; min-height: 36px; padding: 0 8px;
+      background: transparent; border: 0; color: var(--sw-gold); font: inherit; font-size: var(--fsc-15); cursor: pointer;
+    }
+    .sw-filter-clear:disabled { color: var(--sw-text-muted); cursor: default; }
+    .sw-filter-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 0; border-radius: 6px; }
+    .sw-filter-close { width: 40px; min-width: 40px; height: 40px; border-radius: 50%; }
+    .sw-filter-body { overflow-y: auto; overscroll-behavior: contain; padding: 6px 18px 14px; }
+    .sw-filter-row { display: flex; align-items: center; gap: 14px; padding: 7px 0; }
+    .sw-filter-name { flex: 0 0 92px; color: var(--sw-text-meta); font-size: var(--fsc-15); }
+    .sw-filter-seg { flex-wrap: wrap; }
+    .sw-filter-toggles, .sw-filter-books { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .sw-filter-and { color: var(--sw-text-muted); }
+    .sw-filter-book .sw-select { position: static; opacity: 1; appearance: auto; width: auto; height: auto;
+      min-height: 38px; padding: 0 10px; max-width: 190px;
+      background: var(--sw-control-fill); color: var(--sw-text); border: 1px solid var(--sw-control-border); border-radius: 6px;
+      font-family: var(--sw-font); font-size: var(--fsc-15); }
+    .sw-root.sw-compact .sw-filter-sheet { bottom: calc(6px + var(--sw-safe-bottom)); max-height: calc(100% - 64px); }
+    .sw-root.sw-compact .sw-filter-head { padding: 4px 6px 4px 14px; }
+    .sw-root.sw-compact .sw-filter-body { padding: 2px 14px 8px; }
+    .sw-root.sw-compact .sw-filter-row { padding: 4px 0; }
+    .sw-root.sw-compact .sw-filter-name { flex-basis: 78px; font-size: var(--fsc-13); }
+    .sw-root.sw-compact .sw-filter-seg .sw-seg-btn { min-height: 32px; padding: 0 10px; font-size: var(--fsc-14); }
+    .sw-root.sw-compact .sw-filter-book .sw-select { min-height: 32px; font-size: var(--fsc-14); }
     /* The canvas carried a CC-BY credit line of its own until 2026-09-11; it printed over the
        book labels in landscape. Since Q5 it is the legend's tail (.sw-legend .sw-credit). */
     .sw-live {
@@ -8780,7 +9046,7 @@
         font-family: var(--font-body);
         /* Never taller than the screen: at a large text size the card is the only way out
            (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
-        max-height: calc(100vh - 24px); overflow-y: auto;
+        max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto;
       }
       /* As tall as its words and no taller (journey F1.1, 2026-09-12). The 33vh cap of 2026-09-05
          ("never more than a third of the screen": at Text Size 1.8 the strip was 350 px of 800)
@@ -8795,7 +9061,7 @@
       /* On a short screen (landscape, the player open) it scrolls inside itself rather than climb onto the nav.
          While it shows, toasts drop in under the nav (first run on Home is where the root-exit toast shows):
          the 80px it leaves free there is that lane (a two-line toast is 68px). */
-      .tour-prompt { max-height: calc(100vh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); }
+      .tour-prompt { max-height: calc(100vh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); max-height: calc(100dvh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); }
       body.tour-prompt-open { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
       /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
          later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
@@ -9082,10 +9348,10 @@ u.ans-u{text-decoration-line:underline;text-decoration-thickness:1px;text-underl
 
 /* Sheets */
 .select-sheet.ans-sheet{padding:8px 24px calc(var(--inset-bottom,0px) + 28px);text-align:left}
-.ans-sheet.is-tall{height:calc(100vh - var(--dock-under-nav));max-height:none}
+.ans-sheet.is-tall{height:calc(100vh - var(--dock-under-nav));height:calc(100dvh - var(--dock-under-nav));max-height:none}
 /* O6 Share as a card: the 4:5 preview as large as leaves the theme control and Share in view; never under 220 wide
    (a phone held sideways: the sheet scrolls), so the card the reader shares is always the card they see */
-.ans-card{max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));margin:16px auto 0;border:1px solid var(--border)} /* the rest with .ans-fig img */
+.ans-card{max-width:max(220px,calc((100vh - var(--dock-under-nav) - 310px)*.8));max-width:max(220px,calc((100dvh - var(--dock-under-nav) - 310px)*.8));margin:16px auto 0;border:1px solid var(--border)} /* the rest with .ans-fig img */
 .ans-btn{width:100%;min-height:48px;margin-top:16px;border:1px solid var(--gold-border);border-radius:12px;background:var(--gold-faint)}
 body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over --bg3 read 4.22:1; --gold-bright reads 4.94:1 (AA) */
 .ans-btn:disabled{opacity:.45;cursor:default}
@@ -9133,7 +9399,7 @@ body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over -
 @media (min-width:1024px){
   .screen-layout.ans-wide{--col-max:1120px}
   .ans-landing{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);gap:64px;padding:16px 48px 48px}
-  .ans-rail{display:block;position:sticky;top:24px;align-self:start;max-height:calc(100vh - var(--dock-under-nav) - 48px);overflow:auto} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
+  .ans-rail{display:block;position:sticky;top:24px;align-self:start;max-height:calc(100vh - var(--dock-under-nav) - 48px);max-height:calc(100dvh - var(--dock-under-nav) - 48px);overflow:auto} /* r2: the landing's left column is no longer sticky (it is taller than the screen) */
   /* the rail and gap stop at their Text Size 1 sizes (17rem and 3rem of the 18px root): in rem they grew with Text Size and
      took the column (1.6: 490px rail; 3: 918px, a 0px column). From Text Size 2 the page is one column, as on a phone:
      the rail's titles no longer fit it, and the hero's Contents line opens the Contents sheet */

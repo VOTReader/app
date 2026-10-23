@@ -146,3 +146,35 @@ describe('AudioSongsScreen -- (n3-04) long lists skip the rows off screen', () =
     expect(css).toMatch(/body\.scroll-restoring \.songs-list > \.songs-row \{ content-visibility: ?visible; \}/);
   });
 });
+
+describe('AudioSongsScreen -- (s23.1) a song opened from another song starts fresh', () => {
+  const row = (id, f, i) => ({
+    id, f, t: 'Song ' + f, v: 'Version ' + i, st: ['pop'], dl: 'sung', lang: 'en', src: { k: 'none', id: '', c: 'l' },
+    d: 180, b: 3000000, sh: 1, cr: null, lyr: 0, rd: null, fs: '2025-09-21', hid: false, dup: null,
+  });
+  const family = (f, pre, n) => Array.from({ length: n }, (_, i) => row(pre + i, f, i));   // song ids are 12 hex digits
+  const TWO = {
+    schema: 1, version: 'two.1', generated: '', readings: [], styles: {},
+    songs: family('fam-x', 'abababababa', 6).concat(family('fam-y', 'cdcdcdcdcdc', 6)),
+    families: [
+      { id: 'fam-x', t: 'Song X', feat: 'abababababa0', n: 6, col: 'wtlb1', src: { k: 'none', id: '', c: 'l' }, lb: 'original' },
+      { id: 'fam-y', t: 'Song Y', feat: 'cdcdcdcdcdc0', n: 6, col: 'wtlb1', src: { k: 'none', id: '', c: 'l' }, lb: 'original' },
+    ],
+  };
+  const props = (route) => ({
+    route, onPush: vi.fn(), onReplaceTop: vi.fn(), onBack: vi.fn(), rootBackLabel: 'Home',
+    onSearch: () => {}, onHistory: () => {}, onSettings: () => {}, theme: 'dark', onThemeChange: () => {},
+  });
+
+  it('the next song\'s page shows its versions folded, not the last page\'s "all versions"', () => {
+    _resetSongCatalogForTests();
+    adoptSongCatalog(TWO);
+    const more = () => document.querySelector('.song-page-more');
+    const { rerender } = render(<AudioSongsScreen {...props([{ k: 'song', v: 'fam-x' }])} />);
+    expect(more()).not.toBeNull();
+    act(() => { more().click(); });
+    expect(more()).toBeNull();                         // Song X: all 6 versions open
+    rerender(<AudioSongsScreen {...props([{ k: 'song', v: 'fam-x' }, { k: 'song', v: 'fam-y' }])} />);
+    expect(more()).not.toBeNull();                     // Song Y starts folded
+  });
+});

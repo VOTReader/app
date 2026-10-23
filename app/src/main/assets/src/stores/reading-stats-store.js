@@ -42,7 +42,7 @@
    ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
-import { _jrnDateStr } from './journal-stats-store.js';
+import { _jrnDateStr, _count } from './journal-stats-store.js';
 
 /**
  * @typedef {{
@@ -88,20 +88,6 @@ function _isPaceSample(s) {
   if (!(s.w > 0) || !(s.ms > 0) || !isFinite(s.w) || !isFinite(s.ms)) return false;
   var wpm = s.w / s.ms * 60000;
   return wpm >= WPM_MIN && wpm <= WPM_MAX;
-}
-
-/**
- * v062: a lifetime total or one day's word count as the finite, non-negative
- * number the writers keep. A backup's numbers arrived unchecked, so a string
- * total ("100") made the next completion's `total + words` concatenate into
- * "100300", which My Progress then showed and saved. A numeric string keeps
- * its value; anything else (junk, negative, NaN, Infinity) counts as 0.
- * @param {any} x
- * @returns {number}
- */
-function _count(x) {
-  var n = (typeof x === 'number' || typeof x === 'string') ? Number(x) : NaN;
-  return isFinite(n) && n > 0 ? n : 0;
 }
 
 // A wordsByDay key exactly as _jrnDateStr writes it: a local YYYY-MM-DD date.

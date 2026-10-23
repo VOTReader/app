@@ -36,6 +36,22 @@ describe('WebFallbackList keeps its place (n6-05)', () => {
     // any other way in opens on History's chapter, as before
     expect(list(g, 1).container.querySelector('.sw-fallback-list').getAttribute('data-chapter')).toBe('Genesis 2');
   });
+
+  // s24.3: Try again drew the web, the reader panned on, and the web then lost its context for
+  // good: the list reopened on the chapter Try again left behind, not where the web stood
+  it('a live web that lost its context opens where it stood, over a stale resume point', () => {
+    const g = graph();
+    const first = list(g, 0);
+    fireEvent.click(screen.getByRole('button', { name: 'Next chapter' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));   // resume point: Genesis 2
+    first.unmount();
+    const lost = render(<WebFallbackList graph={g} initialChapter={2} fromWeb
+      onOpen={noop} onRetry={noop} onBack={noop} verseText={() => ''} />);
+    expect(lost.container.querySelector('.sw-fallback-list').getAttribute('data-chapter')).toBe('Genesis 3');
+    lost.unmount();
+    // and the stale point is spent, not kept for a later mount
+    expect(list(g, 0).container.querySelector('.sw-fallback-list').getAttribute('data-chapter')).toBe('Genesis 1');
+  });
 });
 
 /* n6-06 (sweep 2): the list moved one chapter at a time through 1,189

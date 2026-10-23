@@ -224,7 +224,9 @@ export function AudioManagerSheet({ open, state, onClose }) {
      itself. Centring it on every open put a phone's sheet at scrollTop 352 with the voice row at
      y −103 (the Tour Reviewer, 360x800 at Text Size 1, 2026-09-13): the reader opened the desk and
      the first thing to see was the queue, the picker gone above. The sheet now opens at its top,
-     the voice row in view. */
+     the voice row in view. And only a reader who has scrolled down to the queue is followed
+     (U04.3, UX sweep 2026-10-22): with Play/Pause on screen the desk stays still, because centring
+     the row there scrolled the title and transport away under the finger that had just pressed Next. */
   const prevQiRef = React.useRef(/** @type {number|null} */ (null));
   React.useEffect(() => {
     if (!renders) { prevQiRef.current = null; return undefined; }
@@ -232,17 +234,23 @@ export function AudioManagerSheet({ open, state, onClose }) {
     prevQiRef.current = state.qi;
     if (prevQi === null || prevQi === state.qi) return undefined;
     const node = currentRowRef.current;
-    // jsdom has no scrollIntoView; a guarded no-op keeps the suite silent.
-    if (!node || typeof node.scrollIntoView !== 'function') return undefined;
-    const sheet = typeof node.closest === 'function' ? node.closest('.audio-manager-sheet') : null;
-    if (sheet && typeof sheet.getBoundingClientRect === 'function') {
-      const row = node.getBoundingClientRect();
-      const box = sheet.getBoundingClientRect();
-      // Already on screen: a short queue must not scroll the desk past its own
-      // transport just to reveal a row that was visible all along.
-      if (box.height > 0 && row.top >= box.top && row.bottom <= box.bottom) return undefined;
+    const sheet = node && typeof node.closest === 'function' ? node.closest('.audio-manager-sheet') : null;
+    if (!sheet || typeof sheet.getBoundingClientRect !== 'function') return undefined;
+    const box = sheet.getBoundingClientRect();
+    // Nothing laid out (jsdom, or a desk not yet painted): nothing to follow.
+    if (!(box.height > 0)) return undefined;
+    const transport = sheet.querySelector('.audio-manager-transport');
+    if (transport) {
+      const t = transport.getBoundingClientRect();
+      const mid = (t.top + t.bottom) / 2;
+      if (mid > box.top && mid < box.bottom) return undefined;
     }
-    node.scrollIntoView({ block: 'center' });
+    const row = node.getBoundingClientRect();
+    // Already on screen: a short queue must not scroll the desk past its own
+    // transport just to reveal a row that was visible all along.
+    if (row.top >= box.top && row.bottom <= box.bottom) return undefined;
+    // Centred by moving the desk alone: scrollIntoView also scrolls every scroller behind it.
+    sheet.scrollTop += (row.top + row.bottom) / 2 - (box.top + box.bottom) / 2;
     return undefined;
     // `state.qi` (2026-08-10): the desk left open through an auto-advance kept
     // the OLD row centred while the playing one drifted off — on a 1,189-row

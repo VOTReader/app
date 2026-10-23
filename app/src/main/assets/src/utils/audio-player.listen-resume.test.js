@@ -125,3 +125,39 @@ describe('listenResume — what a Listen tap would pick up (ra4)', () => {
     expect(AudioPlayer.listenResume({ volKey: 'vol1', letter: LETTER_C })).toBeNull();
   });
 });
+
+/* U04.5 (UX sweep 2026-10-22): the Bible hero said Listen while its own chapter played, and a tap started the
+   chapter again. A Listen pill asks the player whether its passage is the recording loaded now; then it says
+   Pause (or Loading…) and its tap toggles what is sounding, as the letter's Listen already did. */
+describe('listenHere — is this passage the recording in the player (U04.5)', () => {
+  it('nothing loaded: no', () => {
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 1 })).toBe(false);
+    expect(AudioPlayer.listenHere({ volKey: 'vol1', letter: LETTER_C })).toBe(false);
+  });
+
+  it('a Bible chapter: that chapter, from any edition\'s page; not the next one; a book page counts any chapter', () => {
+    AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jonah', label: 'KJV', chapterNum: 2 });
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 2 })).toBe(true);
+    expect(AudioPlayer.listenHere({ volKey: 'bible-web', bookId: 'jonah', chapterNum: 2 })).toBe(true);
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 3 })).toBe(false);
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'jonah' })).toBe(true);
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'ruth', chapterNum: 2 })).toBe(false);
+    // The book queues on: once chapter 3 plays, chapter 2's page is no longer the one sounding.
+    AudioPlayer.next();
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 2 })).toBe(false);
+    expect(AudioPlayer.listenHere({ volKey: 'bible-brm-kjv', bookId: 'jonah', chapterNum: 3 })).toBe(true);
+  });
+
+  it('a letter: any part of it, in any reader\'s voice; never another letter', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'A' }, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.listenHere({ volKey: 'vol1', letter: { id: 'letter-a' } })).toBe(true);
+    AudioPlayer.next();
+    expect(AudioPlayer.getState().queue[AudioPlayer.getState().qi].partLabel).toBe('Part 2');
+    expect(AudioPlayer.listenHere({ volKey: 'vol1', letter: { id: 'letter-a' } })).toBe(true);
+    expect(AudioPlayer.listenHere({ volKey: 'vol1', letter: LETTER_C })).toBe(false);
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: LETTER_C, collectionLabel: 'Volume One' });
+    expect(el().src).toBe(URL_OF('idCv'));
+    expect(AudioPlayer.listenHere({ volKey: 'vol1', letter: LETTER_C })).toBe(true);
+  });
+});

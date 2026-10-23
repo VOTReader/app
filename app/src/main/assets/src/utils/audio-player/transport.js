@@ -10,18 +10,22 @@ import {
   late,
   _library,
   _native,
+  NEXT_OFFLINE_MSG,
   _notify,
   _pendingRestore,
+  PREV_OFFLINE_MSG,
   _setPendingRestore,
   _setReadingRate,
   _setSource,
   _state,
+  _toast,
 } from './core.js';
 import { _setSongRecordPending } from './credit.js';
 import {
   _clearOfflineSkip,
   _clearStallWatchdog,
   _errorTime,
+  _forgetLastGood,
   _lastTick,
   _markPaused,
   _seekOnMetadata,
@@ -33,7 +37,7 @@ import {
 } from './engine.js';
 import { _clearLoop, _clearLoopTimer, LOOP_SLACK_S } from './loop.js';
 import { _clearMediaSession, _setAudioActive, _syncMediaSessionPosition, _syncNative } from './media-session.js';
-import { _holdsOtherForm, _srcFor, _unreachable } from './offline.js';
+import { _holdsOtherForm, _offlineRefuses, _srcFor, _unreachable } from './offline.js';
 import {
   _clearPersist,
   _persist,
@@ -42,7 +46,7 @@ import {
   _setLastPersistSec,
 } from './persist.js';
 import { _stopWarming } from './prefetch.js';
-import { _rebuildInFlight, _rebuildRestored, _rebuildRestoredQueue } from './restore.js';
+import { _rebuildInFlight, _rebuildRestored, _rebuildRestoredQueue, _toggleRebuildStart } from './restore.js';
 import { _seamStop } from './seam.js';
 import { _resetSectionFollow, _setSecLastT } from './sections.js';
 import { _clearSleepTimer } from './sleep.js';
@@ -63,6 +67,8 @@ export function toggle() {
   // A restored bar has no live element yet — the first tap rebuilds the real
   // queue from the persisted descriptor and starts at the saved position.
   if (_pendingRestore) { void _rebuildRestoredQueue(); return; }
+  // A tap while that rebuild waits for its corpus (the bar says Loading) takes the Play back, or asks again (s32.1).
+  if (_rebuildInFlight()) { _toggleRebuildStart(); return; }
   if (!_el) return;
   // Anything that isn't 'paused' is a live element — pause it and let the
   // 'pause' listener own the status flip (one source of truth).
@@ -104,11 +110,12 @@ export function toggle() {
 
 /**
  * Advance one track; extend into the next unit of the site order at the end of the queue, and
- * stop() only at the end of the order. Also the 'ended' handler.
+ * stop() only at the end of the order. Also the 'ended' handler, which passes `atSeam` true.
  *
+ * @param {boolean} [atSeam] the recording ended (nothing is left playing to keep): no offline refusal
  * @returns {void}
  */
-export function next() {
+export function next(atSeam) {
   if (!_state.queue.length) return;
   // A restored bar's queue is a placeholder. The rebuild alone resumes the SAVED recording, which is Play, not Next:
   // once the real queue is in, step past it (sweep v021). A tap while the rebuild still waits for its corpus joins
@@ -123,12 +130,20 @@ export function next() {
     });
     return;
   }
+  // RC.1 (UX sweep re-check 2026-10-22): offline, a Next onto recordings that are not on the phone stopped the one
+  // playing from its buffer and parked a 0:00 bar over Home. With nothing ahead on the phone it is refused before
+  // qi moves, and the one playing plays on; with something ahead on it, _start passes over the rest to reach it.
+  // A seam has nothing left to keep: it moves on and pauses on what cannot load, with the offline notice (item 8).
+  if (atSeam !== true && _state.qi + 1 < _state.queue.length && _offlineRefuses(_state.queue.slice(_state.qi + 1))) {
+    _toast(NEXT_OFFLINE_MSG);
+    return;
+  }
   _rememberOutgoingPosition();   // R8 — attribute the clock before qi moves
   // The end of the queue is the end of the ORDER, not merely of a unit: the site order was
   // already appended when this unit's last track STARTED (_start → _extendQueue, so the boundary
   // track is warmed during this one), and nothing between that start and this end can turn a
-  // refused extension into a granted one — a queue edit switches the source to 'custom', which
-  // _extendQueue refuses. So a queue that still ends here has nowhere to go: stop().
+  // refused extension into a granted one — a queue edit that leaves the playing track last extends
+  // at once (s31.1), and Clear upcoming ends the run. So a queue that still ends here has nowhere to go: stop().
   // (A second _extendQueue() call lived here until 2026-09-12; verifier-2 measured that nothing
   // exercised it and its comment's reason was false.)
   // …unless a songs queue repeats: 'all' wraps to its top instead of ending.
@@ -163,6 +178,8 @@ export function prev() {
   // Landing on the track already playing: a seek, not a reload — the stream
   // stays open and the position is the only thing that moves.
   if (target === _state.qi && _el) { seek(0); return; }
+  // RC.1: the same refusal stepping back onto a recording that is not on the phone.
+  if (_offlineRefuses([_state.queue[target]])) { _toast(PREV_OFFLINE_MSG); return; }
   _rememberOutgoingPosition();   // R8 — same rule stepping backwards
   _state.qi = target;
   _start();
@@ -338,6 +355,7 @@ export function stop() {
   // The boot snapshot is the part that must not resurrect the bar.
   _setPendingRestore(null);
   _setSource(null);
+  _forgetLastGood();
   _clearPersist();
   _clearStallWatchdog();
   _clearSleepTimer(false);
@@ -373,6 +391,9 @@ export function stop() {
  * @returns {void}
  */
 export function pauseIfPlaying() {
+  // A restored bar's Play still waiting for its corpus (the bar says Loading, s32.1) has no element to pause: take
+  // the start back, or it would begin once the corpus lands (a screen with no audio, Corbin 2026-10-22 23:5x).
+  if (_rebuildInFlight() && _state.status === 'loading') { _toggleRebuildStart(); return; }
   if ((_state.status === 'playing' || _state.status === 'loading') && _el) {
     _el.pause();
     _markPaused();

@@ -19,6 +19,7 @@ import {
   LOAD_FAIL_MSG,
   _mapFor,
   _native,
+  NO_SIGNAL_MSG,
   _notify,
   _offline,
   OFFLINE_MSG,
@@ -27,6 +28,8 @@ import {
   _setEl,
   _setNative,
   _setReadingRate,
+  _setSource,
+  _source,
   _state,
   _toast,
 } from './core.js';
@@ -94,6 +97,19 @@ let _stallRetried = false;
 let _prewarmKey = /** @type {string | null} */ (null);
 /** Write from another module of the player (the binding is read-only outside this one). @param {typeof _prewarmKey} v */
 export function _setPrewarmKey(v) { _prewarmKey = v; }
+/* U04.2 (UX sweep 2026-10-22): the last recording that really sounded, and where, kept until another one sounds. A
+   step that dies at the network (MediaError 2) before it ever sounds puts it back, paused at its place: Play All in a
+   dead zone stopped Deliverance at 1:49 for a Pangs that never loaded, and parked the reader on Pangs at 0:00. */
+/** @type {{ queue: any[], qi: number, time: number, duration: number, source: any, url: string, ended: boolean } | null} */
+let _lastGood = null;
+/** The recording in the bar has sounded: it is the place to come back to. */
+function _noteGood() {
+  const t = _state.queue[_state.qi];
+  _lastGood = t ? { queue: _state.queue, qi: _state.qi, time: _state.time, duration: _state.duration, source: _source, url: t.url, ended: false } : null;
+}
+/** A stopped session has nothing to come back to. */
+export function _forgetLastGood() { _lastGood = null; }
+
 /** The watchdog is valid only while playback is actively loading. */
 export function _clearStallWatchdog() {
   if (_stallTimer) { clearTimeout(_stallTimer); _stallTimer = null; }
@@ -159,6 +175,7 @@ function _ensureEl() {
 
   el.addEventListener('playing', () => {
     _setStatus('playing');
+    _noteGood();
     _recordSongStart();
     // A streamed recording playing is the network answering (NetStatus: the app's own requests are the probe).
     if (_streamed(_state.queue[_state.qi])) NetStatus.reportOk();
@@ -186,6 +203,13 @@ function _ensureEl() {
   el.addEventListener('timeupdate', () => {
     _state.time = el.currentTime || 0;
     if (el.duration) _state.duration = el.duration;
+    // The place to come back to follows the recording that sounded (its queue too: an edit or an extension
+    // replaces the array under it).
+    const cur = _state.queue[_state.qi];
+    if (_lastGood && cur && cur.url === _lastGood.url) {
+      _lastGood.queue = _state.queue; _lastGood.qi = _state.qi; _lastGood.time = _state.time;
+      _lastGood.duration = _state.duration; _lastGood.source = _source;
+    }
     if (_state.sleepEndsAt && Date.now() >= _state.sleepEndsAt) { _sleepTimerFire(); return; }   // an overdue timeout
     if (_state.loop && _loopTick()) return;   // a repeated passage wrapped (or ended): the seek notified
     _syncSleepVolume();       // the sleep fade (a no-op unless a sleep mode is in its last stretch)
@@ -215,6 +239,8 @@ function _ensureEl() {
     // An 'ended' always belongs to queue[qi]: a src swap fires 'emptied', never 'ended', so no url
     // guard is needed here — and none would work, el.src being the RESOLVED absolute URL.
     const finished = _state.queue[_state.qi];
+    // Heard to its end: an advance that fails is not undone onto it (U04.2).
+    if (_lastGood && finished && finished.url === _lastGood.url) _lastGood.ended = true;
     // A repeated passage that runs to the recording's end wraps here, before anything counts the recording finished.
     // The last pass pauses at the end, and it is not the whole recording heard: no listen credit.
     const looped = _state.loop ? _loopEnded() : '';
@@ -231,7 +257,7 @@ function _ensureEl() {
       // rate and buffering both move it), so the END EVENT is the trigger.
       if (_state.sleepAtTrackEnd) _sleepAtTrackEndFire();
       else if (late._repeatMode() === 'one') late._replayCurrent();
-      else late.next();
+      else late.next(true);
     } finally { _setFinishedUrl(null); }
   });
   el.addEventListener('error', _onError);
@@ -326,13 +352,37 @@ function _onError() {
   // navigator.onLine says otherwise (a dead Wi-Fi): the network-only pills go quiet (NetStatus). The player keeps
   // its own rule (navigator.onLine), so its toast and a retry from the bar are unchanged.
   const err = _el && /** @type {any} */ (_el).error;
-  if (err && err.code === 2 && _streamed(_state.queue[_state.qi])) NetStatus.reportFailure();
+  const failed = _state.queue[_state.qi];
+  if (err && err.code === 2 && _streamed(failed)) NetStatus.reportFailure();
+  // A streamed recording that could not be reached: MediaError 2 (the network failed mid-load), or 4, which is what a
+  // fetch that fails outright reports before any metadata (the HTML spec's "cannot be fetched at all"; the S22 measured
+  // it for a DNS miss, 2026-09-13). The assets are known-good MP3s, so a 4 there is the network as well (U04.2).
+  const lostSignal = !!(err && (err.code === 2 || err.code === 4) && _streamed(failed));
+  // U04.2: a step that died at the network before it ever sounded goes back to what was playing, paused where it
+  // was; the element still holds the failed recording, so toggle() re-loads the restored one and seeks to its place.
+  const back = _lastGood;
+  if (lostSignal && back && !back.ended && failed && back.url !== failed.url) {
+    _lastGood = null;
+    _state.queue = back.queue;
+    _state.qi = back.qi;
+    _setSource(back.source);
+    _state.time = back.time;
+    _state.duration = back.duration;
+    _errorTime = back.time;
+    _lastTick = Math.floor(back.time);
+    _setStatus('paused');
+    _mediaSession(back.queue[back.qi]);
+    _persist();
+    _toast(NO_SIGNAL_MSG);
+    return;
+  }
   // Keep queue + qi + position: toggle() retries from here.
   _errorTime = _state.time;
   _setStatus('paused');
   _persist();
-  // A downloaded recording failing offline is a load failure, not a missing connection.
-  _toast(_unreachable(_state.queue[_state.qi]) ? OFFLINE_MSG : LOAD_FAIL_MSG);
+  // A downloaded recording failing offline is a load failure, not a missing connection; a streamed one that died at
+  // the network with the phone online is a dead zone (U04.2's line).
+  _toast(_unreachable(failed) ? OFFLINE_MSG : lostSignal ? NO_SIGNAL_MSG : LOAD_FAIL_MSG);
 }
 
 /**

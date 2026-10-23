@@ -124,6 +124,12 @@ describe('Share as a card (O6)', () => {
     expect(answersWrap('supercalifragilistic x', 50, m)).toEqual(['supercalifragilistic', 'x']);
   });
 
+  it('never opens a line with the cite\'s "·" (idea sweep 10-22, s30.3)', () => {
+    const m = (s) => s.length * 10;
+    // "“Punishment” ·" is 140 wide against 130: the separator stays with its word all the same
+    expect(answersWrap('“Punishment” · Volume 7', 130, m)).toEqual(['“Punishment” ·', 'Volume 7']);
+  });
+
   it('lays the passage out large when short and smaller when long, always above the foot, the site last', () => {
     const measurer = (font) => { const px = parseInt(font.replace('italic ', ''), 10); return (s) => s.length * px * 0.5; };
     const short = answersCardLayout({ passage: 'I AM The Lord.', cite: '“Title” · Volume 1', date: '1/2/03' }, measurer, 'serif');

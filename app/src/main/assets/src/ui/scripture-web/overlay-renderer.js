@@ -39,6 +39,7 @@ import {
   verseToX, xToVerse, arcShape, arcHeightAt, arcAnchored, footX, fitPPV, maxCamY, ALTITUDE_MARKS, spanAtHeight, spanT,
 } from '../../utils/scripture-web/geometry.js';
 import { refOfVerse, labelFeed, eachLabelThread } from '../../utils/scripture-web/pick.js';
+import { filterSerial } from '../../utils/scripture-web/filters.js';
 import { fansOf, bucketDrawCount } from '../../utils/scripture-web/decode.js';
 import { distanceRampRGB } from '../../utils/scripture-web/palette.js';
 import { placeRailLabelsRanked } from '../../utils/scripture-web/rail-labels.js';
@@ -1472,7 +1473,9 @@ function drawPlates(ctx, g, cam, L, fs, grid) {
     const head = isHold && !compact ? String(r.bookTitle).toUpperCase() + ' ' + r.chapter : '';
     const prefix = isHold && compact ? spaced(r.abbr) + ' ' + r.chapter + ':' + r.verse : num;
     const width = c.x1 - c.x0 - 2 * pad;
-    const key = [c.v, Math.round(width), Math.round(bottom - top), compact ? 1 : 0, head ? 1 : 0, prefix, body.length].join('|');
+    // keyed on the words themselves (s25.6: on their length, a translation whose verse ran to the
+    // same length drew the other's lines)
+    const key = [c.v, Math.round(width), Math.round(bottom - top), compact ? 1 : 0, head ? 1 : 0, prefix, body].join('|');
     let lay = layouts.get(key);
     if (!lay) {
       const words = body ? body.split(' ') : [];
@@ -1595,8 +1598,11 @@ function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha) {
     ctx.rotate(b.ang);
     haloText(ctx, p.cand.text, 0, -fpx * 0.08, fill, L);
     ctx.restore();
+    // TAP_MIN each way about the tag's centre (s25.2: a line of type plus 4 px a side was some 20 px
+    // tall); the core still wins where two targets overlap (hitOverlay)
     const cx = (b.x0 + b.x1) / 2, half = Math.max((b.x1 - b.x0) / 2, (TAP_MIN * s) / 2);
-    hits.push({ x0: cx - half, x1: cx + half, y0: b.y0 - 4 * s, y1: b.y1 + 4 * s, core: { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 },
+    const cy = (b.y0 + b.y1) / 2, halfY = Math.max((b.y1 - b.y0) / 2 + 4 * s, (TAP_MIN * s) / 2);
+    hits.push({ x0: cx - half, x1: cx + half, y0: cy - halfY, y1: cy + halfY, core: { x0: b.x0, x1: b.x1, y0: b.y0, y1: b.y1 },
       hit: { kind: 'thread', index: p.cand.i } });
   }
   ctx.restore();
@@ -2105,7 +2111,7 @@ function drawChips(ctx, g, cam, L, fs, grid, m, labelled, quiet) {
   // the same camera and layout as last frame keep last frame's keepers: the memory the pass
   // would read is last frame's placement, which was chosen from them, so none of it is lost
   const key = [cam.x, cam.ppv, camY, fs.density, W, Wc, gutter, every, view.base, view.squash, inset,
-    centre ? centre.x0 : -1, centre ? centre.x1 : -1].join('|');
+    centre ? centre.x0 : -1, centre ? centre.x1 : -1, filterSerial(g)].join('|');
   if (!m.chipCache || m.chipCache.key !== key) {
     m.chipCache = {
       key,
@@ -2155,7 +2161,7 @@ function drawChips(ctx, g, cam, L, fs, grid, m, labelled, quiet) {
 /** The leg labels' feed (labelFeed with the fly-overs), kept while the camera and the frame stand still. */
 function legFeed(g, cam, L, fs, m) {
   const view = fs.view;
-  const key = [cam.x, cam.ppv, L.camY, fs.density, L.W, view.base, view.squash, L.inset].join('|');
+  const key = [cam.x, cam.ppv, L.camY, fs.density, L.W, view.base, view.squash, L.inset, filterSerial(g)].join('|');
   if (!m.feedCache || m.feedCache.key !== key) {
     m.feedCache = {
       key,

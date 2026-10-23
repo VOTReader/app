@@ -174,4 +174,13 @@ object MainActivityLogic {
         statusCode: Int
     ): String? =
         if (isGardenHost) "Garden asset HTTP $statusCode for host ${host ?: "<unknown>"}" else null
+
+    /**
+     * ds5 s42.3: the WebView cache is cleared only on the first launch after an install or update,
+     * when the old cached modules would be served; an ordinary cold start keeps it. Daily builds can
+     * keep their versionCode, so the stamp carries the package's lastUpdateTime too.
+     */
+    fun webCacheStamp(versionCode: Long, lastUpdateTime: Long): String = "$versionCode:$lastUpdateTime"
+
+    fun shouldClearWebCache(previous: String?, current: String): Boolean = previous != current
 }

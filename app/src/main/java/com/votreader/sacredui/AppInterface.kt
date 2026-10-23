@@ -247,14 +247,19 @@ class AppInterface(
         // then restore TO communication mode and never return to normal —
         // stranding the device on earpiece routing. The normal path (mode is
         // NORMAL at start) is unchanged.
-        if (am.mode != AudioManager.MODE_IN_COMMUNICATION) {
-            vm.previousAudioMode = am.mode
-        }
-        try {
-            am.mode = AudioManager.MODE_IN_COMMUNICATION
-            audioSessionLive = true
-        } catch (e: Exception) {
-            Timber.w(e, "startAudioSession setMode failed")
+        // ds5 s41.4: outside our own session, a mode already IN_COMMUNICATION is another app's call.
+        // Leave the device-global mode alone at both ends (audioSessionLive stays false, so the end
+        // restores nothing); the mic still records under the call's mode.
+        if (!audioSessionLive && am.mode == AudioManager.MODE_IN_COMMUNICATION) {
+            Timber.i("startAudioSession: another app holds MODE_IN_COMMUNICATION; mode left alone")
+        } else {
+            if (!audioSessionLive) vm.previousAudioMode = am.mode
+            try {
+                am.mode = AudioManager.MODE_IN_COMMUNICATION
+                audioSessionLive = true
+            } catch (e: Exception) {
+                Timber.w(e, "startAudioSession setMode failed")
+            }
         }
         // #3 ("polite" journaling): request TRANSIENT-EXCLUSIVE audio focus so
         // other media (music, a podcast) PAUSES while the user records, then
@@ -633,11 +638,13 @@ class AppInterface(
      * DebugTree is planted instead of BoundedLogTree, so there's no
      * captured buffer to read). The contract from JS's perspective
      * is "always a valid JSON array string", which both branches
-     * honour.
+     * honour. ds5 s41.1: the last fatal crash and the system's recent exit
+     * reasons ([CrashRecord]) lead the tail, since the in-memory tree dies
+     * with the process.
      */
     @JavascriptInterface
     fun getCrashLog(): String {
-        return VOTReaderApp.releaseTree?.toJson() ?: "[]"
+        return CrashRecord.merge(CrashRecord.entriesJson(), VOTReaderApp.releaseTree?.toJson() ?: "[]")
     }
 
     /**

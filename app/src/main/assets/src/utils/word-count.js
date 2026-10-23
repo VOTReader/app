@@ -61,6 +61,7 @@ function segWords(seg) {
  */
 function blockWords(block) {
   if (!block || typeof block !== 'object') return 0;
+  if (block.type === 'prophecy-group') return 0;   // ds5 s40.4: by rule, not by its fields
   let n = 0;
   if (Array.isArray(block.segments)) for (const s of block.segments) n += segWords(s);
   if (Array.isArray(block.lines)) {

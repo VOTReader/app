@@ -1252,6 +1252,23 @@ describe('PlatformBridge — Web recording (MediaRecorder + AnalyserNode)', () =
     expect(mockTracks[0].stop).toHaveBeenCalled();
   });
 
+  // ds5 s36.2: MediaRecorder.start can throw (NotSupportedError, InvalidStateError on a dead track).
+  it('nativeRecordStart returns "error:<reason>" when start() throws, and lets go of the mic and the AudioContext', async () => {
+    bridge.requestMicPermission();
+    await new Promise((r) => setTimeout(r, 0));
+    const Real = /** @type {any} */ (globalThis).MediaRecorder;
+    /** @type {any} */ (globalThis).MediaRecorder = function (/** @type {any} */ stream, /** @type {any} */ opts) {
+      const r = new Real(stream, opts);
+      r.start = vi.fn(() => { throw new Error('track ended'); });
+      return r;
+    };
+    /** @type {any} */ (globalThis.MediaRecorder).isTypeSupported = Real.isTypeSupported;
+    expect(bridge.nativeRecordStart()).toBe('error:track ended');
+    expect(mockTracks[0].stop).toHaveBeenCalled();
+    expect(mockAudioCtxClose).toHaveBeenCalled();
+    expect(bridge.nativeRecordStart()).toBe('error:no-stream');   // nothing left half-started
+  });
+
   it('nativeRecordStart returns "error:no-stream" when called before requestMicPermission', () => {
     expect(bridge.nativeRecordStart()).toBe('error:no-stream');
   });

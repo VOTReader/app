@@ -32,7 +32,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
-import { SelectionToolbar, computeToolbarPlacement, computeEdgeAutoScroll, dockTop } from './SelectionToolbar.jsx';
+import { SelectionToolbar, computeToolbarPlacement } from './SelectionToolbar.jsx';
+import { dockTop } from './selection-drag.js';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
 import { showToast as realShowToast, _resetToasts } from '../../utils/toast.js';
 
@@ -575,33 +576,30 @@ describe('SelectionToolbar — verse-number crossing (Android menu + copy)', () 
 });
 
 describe('computeToolbarPlacement — near-top placement policy', () => {
-  // toolbarH 150, navBottom 60 → minY = 60+8+150 = 218; lineH 28 → gap 56.
+  // toolbarH 150, navBottom 60 → minY = 60+8+150 = 218; lineH 28 → half a line above (14), a line below (32:
+  // the end handle hangs under the last line).
   const base = { toolbarH: 150, navBottom: 60, viewportH: 800, lineH: 28 };
 
-  it('fits above: sits a two-line gap above the selection, no scroll', () => {
+  it('fits above: sits a little above the selection, no scroll', () => {
     expect(computeToolbarPlacement({ ...base, selTop: 400, selBottom: 420, maxScrollUp: 500 }))
-      .toEqual({ y: 344, scrollUp: 0 }); // 400 − 56
+      .toEqual({ y: 386, scrollUp: 0 }); // 400 − 14
   });
 
-  it('near the top with scroll room: scrolls up exactly the deficit and pins under the nav', () => {
-    // above = 100−56 = 44 < 218 → deficit 174. After scrollTop −= 174 the
-    // selection sits at 274, and y=218 is exactly two lines (56px) above it.
+  it('near the top: sits below the selection, clear of its end handle, and the page does not move (rs1)', () => {
+    // above = 100−14 = 86 < 218. The old policy scrolled the page 174 px here before it looked below; on the S22
+    // that moved the page 69 to 149 px under every long-press in the middle of the screen. Below: 120 + 32 + 150.
     expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 120, maxScrollUp: 500 }))
-      .toEqual({ y: 218, scrollUp: 174 });
+      .toEqual({ y: 302, scrollUp: 0 });
   });
 
-  it('at the very top of the document (not enough scroll room): flips fully below, never a partial scroll', () => {
-    // deficit 174 > maxScrollUp 40 → below = 120 + 56 + 150 = 326 (toolbar TOP
-    // lands at 326−150 = 176, a two-line gap under selBottom 120). scrollUp
-    // must be 0 — a partial scroll can't make room above, so it would just
-    // jump the content for nothing.
+  it('at the very top of the document (no scroll room): fully below, never a partial scroll', () => {
     expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 120, maxScrollUp: 40 }))
-      .toEqual({ y: 326, scrollUp: 0 });
+      .toEqual({ y: 302, scrollUp: 0 });
   });
 
   it('viewport-spanning selection (nothing fits): clamps under the nav so the end handle stays reachable', () => {
-    // below = 700+56+150 = 906 > 792 → last resort.
-    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 700, maxScrollUp: 0 }))
+    // below = 700+32+150 = 882 > 792; the assist would push the end (700) past the screen → last resort.
+    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 700, maxScrollUp: 500 }))
       .toEqual({ y: 218, scrollUp: 0 });
   });
 
@@ -612,28 +610,32 @@ describe('computeToolbarPlacement — near-top placement policy', () => {
     // selBottom 700 leaves no room below either, so it clamps under the nav.
     expect(computeToolbarPlacement({ ...base, selTop: -1900, selBottom: 700, maxScrollUp: 2563 }))
       .toEqual({ y: 218, scrollUp: 0 });
-    // Same off-screen start, but with room below -> flips below, still no scroll.
+    // Same off-screen start, but with room below -> below, still no scroll.
     expect(computeToolbarPlacement({ ...base, selTop: -1900, selBottom: 200, maxScrollUp: 2563 }))
-      .toEqual({ y: 406, scrollUp: 0 });
+      .toEqual({ y: 382, scrollUp: 0 });
   });
 
-  it('the assist is capped at one toolbar-plus-gap of travel (a huge deficit flips instead)', () => {
-    // selTop 70 is on-screen, but deficit = 218 - (70-56) = 204 > 150+56=206?
-    // no: 204 <= 206, so this one still assists (the near-top case it exists for).
-    expect(computeToolbarPlacement({ ...base, selTop: 70, selBottom: 90, maxScrollUp: 900 }))
-      .toEqual({ y: 218, scrollUp: 204 });
-    // A taller toolbar makes minY larger, pushing the deficit past the cap.
-    const tall = { ...base, toolbarH: 40 };  // minY = 108, cap = 40+56 = 96
-    // selTop 20 -> above = -36, deficit = 144 > 96 -> refuse, flip below.
-    expect(computeToolbarPlacement({ ...tall, selTop: 20, selBottom: 40, maxScrollUp: 900 }))
-      .toEqual({ y: 136, scrollUp: 0 });
+  it('the assist only fills the gap neither side leaves, capped, and never pushes the end off the screen', () => {
+    // A short screen (420): above = 150−14 = 136 < 218; below = 250+32+150 = 432 > 412 → assist 82.
+    const short = { ...base, viewportH: 420 };
+    expect(computeToolbarPlacement({ ...short, selTop: 150, selBottom: 250, maxScrollUp: 900 }))
+      .toEqual({ y: 218, scrollUp: 82 });
+    // A deficit past one toolbar-plus-gap (164) is refused: 218 − (62−14) = 170.
+    expect(computeToolbarPlacement({ ...short, selTop: 62, selBottom: 250, maxScrollUp: 900 }))
+      .toEqual({ y: 218, scrollUp: 0 });
+    // The end would land at 340 + 82 = 422, past the screen's 412: refused (rs1).
+    expect(computeToolbarPlacement({ ...short, selTop: 150, selBottom: 340, maxScrollUp: 900 }))
+      .toEqual({ y: 218, scrollUp: 0 });
   });
 
-  it('the gap tracks the text line height (2 lines) and is sane-bounded', () => {
-    // Largest text size: lineH 48 → gap 96.
-    expect(computeToolbarPlacement({ ...base, lineH: 48, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(404);
-    // Absurd computed lineHeight clamps at 120.
-    expect(computeToolbarPlacement({ ...base, lineH: 500, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(380);
+  it('the gaps track the text line height and are sane-bounded', () => {
+    // Largest text size: lineH 48 → 24 above.
+    expect(computeToolbarPlacement({ ...base, lineH: 48, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(476);
+    // Absurd computed lineHeight clamps at 40 above.
+    expect(computeToolbarPlacement({ ...base, lineH: 500, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(460);
+    // Below: the gap is at least 32 (the handle), at most 80.
+    expect(computeToolbarPlacement({ ...base, lineH: 10, selTop: 100, selBottom: 120, maxScrollUp: 0 }).y).toBe(302);
+    expect(computeToolbarPlacement({ ...base, lineH: 500, selTop: 100, selBottom: 120, maxScrollUp: 0 }).y).toBe(350);
   });
 });
 
@@ -644,7 +646,7 @@ describe('SelectionToolbar — near-top selection never sits under the toolbar (
      keeps jsdom's 0, matching production geometry closely enough to drive the
      placement math. No .top-nav in the test DOM → navBottom falls back to 60,
      so minY = 218; the rangeOver rect is top 100 / bottom 116 and jsdom's
-     lineHeight is unparseable → lineH falls back to 28 → gap 56. */
+     lineHeight is unparseable → lineH falls back to 28 → 14 above, 32 below. */
   let restoreSize;
   beforeEach(() => {
     const ow = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
@@ -681,15 +683,15 @@ describe('SelectionToolbar — near-top selection never sits under the toolbar (
     return { scroller: s, container: p };
   }
 
-  it('with scroll room: auto-scrolls the container up by the deficit and sits two lines above (RED pre-fix: no scroll, toolbar shoved onto the selection)', () => {
+  it('with scroll room: the toolbar sits BELOW the selection, clear of it, and the page does not move (rs1; the 2026-07-29 fix scrolled 174 px)', () => {
     const { scroller, container } = scrollerWithContainer(500);
     mount();
-    stubSelection(rangeOver(container, 0, 14)); // rect top 100 → deficit 174
+    stubSelection(rangeOver(container, 0, 14)); // rect top 100, bottom 116
     act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
     const tb = /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
     expect(tb).not.toBeNull();
-    expect(scroller.scrollTop).toBe(326);   // 500 − 174
-    expect(tb.style.top).toBe('218px');     // bottom edge = two lines above the slid-down selection
+    expect(scroller.scrollTop).toBe(500);
+    expect(tb.style.top).toBe('298px');     // bottom edge; its TOP at 148, a line under the selection's 116
   });
 
   it('at the top of the document (scrollTop 0): places the toolbar fully BELOW the selection (RED pre-fix: clamped on top of it)', () => {
@@ -700,8 +702,8 @@ describe('SelectionToolbar — near-top selection never sits under the toolbar (
     const tb = /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
     expect(tb).not.toBeNull();
     expect(scroller.scrollTop).toBe(0);     // nothing to reveal — no pointless jump
-    // y 322 → toolbar TOP at 322−150 = 172, a two-line gap under selBottom 116.
-    expect(tb.style.top).toBe('322px');
+    // y 298 → toolbar TOP at 298−150 = 148, a line's gap under selBottom 116.
+    expect(tb.style.top).toBe('298px');
   });
 });
 
@@ -807,168 +809,10 @@ describe('SelectionToolbar — P1-11a accessible names', () => {
   });
 });
 
-describe('computeEdgeAutoScroll — the handle-drag edge decision (2026-07-29)', () => {
-  /* The owner: "once you open highlight it locks scroll ... it'd be better if
-     you could just scroll normally." Verified on-device (vot_api34, CDP) that
-     the NATIVE layer never blocked scrolling — an identical synthetic drag
-     scrolled 192px both with and without a live selection, and the selection
-     survived. What actually broke the feel: a toolbar placed once and never
-     moved (content scrolled 200px, toolbar moved 0px), and no natural gesture
-     for extending a selection past the viewport. The ▲/▼ nudge row is retired
-     in favour of real scrolling + this edge auto-scroll. */
-  const BOX = { boxTop: 60, boxBottom: 760, band: 90 };
-
-  it('a focus edge in the BOTTOM band scrolls down', () => {
-    expect(computeEdgeAutoScroll({ focusTop: 740, focusBottom: 750, ...BOX })).toBe(1);
-  });
-
-  it('a focus edge in the TOP band scrolls up', () => {
-    expect(computeEdgeAutoScroll({ focusTop: 80, focusBottom: 100, ...BOX })).toBe(-1);
-  });
-
-  it('mid-container is a no-scroll zone', () => {
-    expect(computeEdgeAutoScroll({ focusTop: 400, focusBottom: 420, ...BOX })).toBe(0);
-  });
-
-  it('the band edges are exact (just inside arms, just outside does not)', () => {
-    // bottom band arms below 760 − 90 = 670
-    expect(computeEdgeAutoScroll({ focusTop: 660, focusBottom: 671, ...BOX })).toBe(1);
-    expect(computeEdgeAutoScroll({ focusTop: 640, focusBottom: 670, ...BOX })).toBe(0);
-    // top band arms above 60 + 90 = 150
-    expect(computeEdgeAutoScroll({ focusTop: 149, focusBottom: 169, ...BOX })).toBe(-1);
-    expect(computeEdgeAutoScroll({ focusTop: 150, focusBottom: 170, ...BOX })).toBe(0);
-  });
-
-  it('an oversized band is clamped to half the box, so the two ends can never both arm', () => {
-    // A band wider than half the box would otherwise make every point satisfy
-    // BOTH edge tests (up and down at once = thrash). Clamped to 350 here, the
-    // regions meet at the midpoint (410) and the split stays single-valued.
-    const tall = { boxTop: 60, boxBottom: 760, band: 5000 };
-    expect(computeEdgeAutoScroll({ focusTop: 409, focusBottom: 409, ...tall })).toBe(-1);
-    expect(computeEdgeAutoScroll({ focusTop: 411, focusBottom: 411, ...tall })).toBe(1);
-    // Sweeping a collapsed edge end to end: every -1 precedes every 1 (one
-    // clean crossover, no flip-flop), and the only non-directional point is
-    // the exact midpoint knife-edge — never a whole dead zone.
-    const dirs = [];
-    for (let y = 60; y <= 760; y += 25) {
-      dirs.push(computeEdgeAutoScroll({ focusTop: y, focusBottom: y, ...tall }));
-    }
-    expect(dirs.lastIndexOf(-1)).toBeLessThan(dirs.indexOf(1));
-    expect(dirs.filter((d) => d === 0).length).toBeLessThanOrEqual(1);
-  });
-
-  it('a degenerate box never scrolls', () => {
-    expect(computeEdgeAutoScroll({ focusTop: 0, focusBottom: 0, boxTop: 100, boxBottom: 100, band: 90 })).toBe(0);
-  });
-
-  /* cp1 sweep: an edge far outside the box is a selection the reader scrolled
-     away from, not a handle under a finger. It used to arm (-1 for anything
-     above the top band), so one stray selectionchange wound the page all the
-     way back to the selection. */
-  it('an edge far outside the box never arms; one just past the box (finger over the bar below) still does', () => {
-    expect(computeEdgeAutoScroll({ focusTop: -1900, focusBottom: -1884, ...BOX })).toBe(0);
-    expect(computeEdgeAutoScroll({ focusTop: 2600, focusBottom: 2616, ...BOX })).toBe(0);
-    expect(computeEdgeAutoScroll({ focusTop: 40, focusBottom: 56, ...BOX })).toBe(-1);
-    expect(computeEdgeAutoScroll({ focusTop: 790, focusBottom: 806, ...BOX })).toBe(1);
-  });
-});
-
-describe('edge auto-scroll interval — per-tick re-probe (2026-07-30)', () => {
-  /* Regression: the interval used to check only isCollapsed per tick; the
-     band/stop evaluation ran only on selectionchange. Releasing the handle
-     INSIDE the band fires no further events (Android swallows the
-     post-selection pointerup/touchend, and scrolling alone doesn't change the
-     selection), so the container kept auto-scrolling to its end. The band is
-     now re-probed on every tick: a released edge glides out of the band and
-     stops, and a focus jump straight into the opposite band reverses instead
-     of keeping the stale closure direction. */
-
-  /** Scroller (box 60..760, band arms below 670 / above 150) holding a
-      [data-hl-key] paragraph, with a MUTABLE focus rect: the probe's collapsed
-      clone yields no rects in jsdom (forced below), so the component falls
-      back to the selection range's getBoundingClientRect — stubbed here to
-      read `focusRect.value`. */
-  function armedScroller(focusRect) {
-    const s = document.createElement('div');
-    s.style.overflowY = 'auto';
-    Object.defineProperty(s, 'scrollHeight', { configurable: true, get: () => 2000 });
-    Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 700 });
-    let st = 500;
-    Object.defineProperty(s, 'scrollTop', {
-      configurable: true, get: () => st,
-      set: (v) => { st = Math.min(Math.max(0, v), 2000 - 700); },
-    });
-    s.getBoundingClientRect = () => /** @type {any} */ ({ top: 60, bottom: 760, left: 0, right: 400, width: 400, height: 700 });
-    document.body.appendChild(s);
-    const p = document.createElement('p');
-    p.setAttribute('data-hl-key', 'bible:test:1:1');
-    p.textContent = 'The Revelation of Jesus Christ which God gave unto Him';
-    s.appendChild(p);
-    const r = rangeOver(p, 0, 14);
-    r.getBoundingClientRect = () => /** @type {any} */ (focusRect.value);
-    return { scroller: s, container: p, range: r };
-  }
-
-  let _origGetClientRects;
-  beforeEach(() => {
-    _origGetClientRects = Range.prototype.getClientRects;
-    Range.prototype.getClientRects = function () { return /** @type {any} */ ([]); };
-  });
-  afterEach(() => {
-    Range.prototype.getClientRects = _origGetClientRects;
-    vi.useRealTimers();
-  });
-
-  /** Raise the toolbar, then dispatch one selectionchange (under fake timers)
-      to arm the auto-scroll interval. All advances stay < 350ms so the
-      unrelated computeAndShow debounce never fires. */
-  function arm(focusRect) {
-    const parts = armedScroller(focusRect);
-    mount();
-    stubSelection(parts.range);
-    act(() => { fire(parts.container, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    expect(document.querySelector('.sel-toolbar')).not.toBeNull();
-    vi.useFakeTimers();
-    act(() => { document.dispatchEvent(new Event('selectionchange')); });
-    return parts;
-  }
-
-  it('released inside the band: scrolling stops once the edge scrolls out (RED pre-fix: ran to the container end)', () => {
-    const focusRect = { value: { top: 700, bottom: 716 } };   // bottom band
-    const { scroller } = arm(focusRect);
-    act(() => { vi.advanceTimersByTime(48); });               // 3 ticks × 24px
-    expect(scroller.scrollTop).toBe(500 + 3 * 24);
-    // Handle released — NO further selectionchange arrives. The scrolled
-    // content carried the frozen edge out of the band.
-    focusRect.value = { top: 400, bottom: 416 };
-    act(() => { vi.advanceTimersByTime(16); });               // first out-of-band probe stops it
-    const settled = scroller.scrollTop;
-    act(() => { vi.advanceTimersByTime(160); });              // event silence — must stay put
-    expect(scroller.scrollTop).toBe(settled);
-  });
-
-  it('a focus jump straight into the OPPOSITE band reverses direction (no stale closure dir)', () => {
-    const focusRect = { value: { top: 700, bottom: 716 } };   // bottom band → stepping down
-    const { scroller } = arm(focusRect);
-    act(() => { vi.advanceTimersByTime(32); });
-    const high = scroller.scrollTop;
-    expect(high).toBeGreaterThan(500);
-    focusRect.value = { top: 80, bottom: 96 };                // top band, no event in between
-    act(() => { vi.advanceTimersByTime(32); });
-    expect(scroller.scrollTop).toBeLessThan(high);            // now stepping UP
-  });
-
-  it('collapse mid-scroll stops the interval', () => {
-    const focusRect = { value: { top: 700, bottom: 716 } };
-    const { scroller } = arm(focusRect);
-    act(() => { vi.advanceTimersByTime(32); });
-    stubSelection(null);                                      // selection collapsed
-    act(() => { vi.advanceTimersByTime(16); });
-    const settled = scroller.scrollTop;
-    act(() => { vi.advanceTimersByTime(160); });
-    expect(scroller.scrollTop).toBe(settled);
-  });
-});
+/* The handle-drag edge scroll (2026-07-29/30: computeEdgeAutoScroll and its per-tick re-probe) became
+   selection-drag.js in rs1 (2026-10-22): its guarantees (bands, a still middle, a degenerate box, stopping at a
+   lift and on a collapse, reversing for the opposite band, never winding the page back to a selection the reader
+   scrolled away from) are pinned in selection-drag.test.js. */
 
 describe('SelectionToolbar — the ▲/▼ nudge row is retired', () => {
   function scrollerWithContainer(scrollTop) {
@@ -1638,6 +1482,29 @@ describe('SelectionToolbar — steps aside while the selection or the page is mo
     expect(toolbar()?.classList.contains('is-adjusting'), 'settled: back').toBe(false);
   });
 
+  it('stays aside while a handle is still held (selection-drag), however long, and rises at the lift', () => {
+    // rs1: raised in the middle of a drag, its placement could scroll the page under the finger (S22).
+    const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ, which God gave Him');
+    mount();
+    stubSelection(rangeOver(c, 4, 14));
+    act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+    vi.useFakeTimers();
+    try {
+      document.body.classList.add('sel-dragging');      // selection-drag.js: an end is being dragged
+      stubSelection(rangeOver(c, 4, 30));
+      act(() => { document.dispatchEvent(new Event('selectionchange')); });
+      act(() => { vi.advanceTimersByTime(3000); });     // the finger rests at the edge while the page scrolls
+      expect(toolbar()?.classList.contains('is-adjusting'), 'held: stays aside').toBe(true);
+      document.body.classList.remove('sel-dragging');   // the lift: selection-drag lets go first (capture phase)
+      act(() => { fire(c, 'contextmenu', { clientX: 5, clientY: 5 }); });
+      expect(toolbar()?.classList.contains('is-adjusting')).toBe(false);
+      act(() => { vi.advanceTimersByTime(1000); });
+      expect(toolbar()?.classList.contains('is-adjusting')).toBe(false);
+    } finally {
+      document.body.classList.remove('sel-dragging');
+    }
+  });
+
   it('the raised selection\'s own late selectionchange (after the long-press contextmenu) does not blink it', () => {
     const c = readingContainer('bible:test:1:1', 'The Revelation of Jesus Christ, which God gave Him');
     mount();
@@ -1832,7 +1699,7 @@ describe('dockTop: the toolbar measures its room below the selection against the
   });
   it('keeps the toolbar off the player: below the selection only when it fits above the dock', () => {
     const base = { selTop: 100, selBottom: 700, toolbarH: 48, navBottom: 67, lineH: 28, maxScrollUp: 0 };
-    expect(computeToolbarPlacement({ ...base, viewportH: 915 }).y).toBe(804);
+    expect(computeToolbarPlacement({ ...base, viewportH: 915 }).y).toBe(780);   // 700 + a line (32, rs1) + 48
     expect(computeToolbarPlacement({ ...base, viewportH: 745 }).y).toBe(123);
   });
 });
@@ -1956,6 +1823,20 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
     expect(sheet.querySelector('canvas').getAttribute('aria-label')).toBe('For I am a Great King! “The Alarm of War” · Volume 7');
     act(() => { /** @type {HTMLElement} */ (sheet.querySelector('[aria-label="Close"]')).click(); });
     expect(document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it('the web\'s door on an Answers topic names a topic, not a letter (seam walk 10-22 F6)', async () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    try {
+      const c = readingContainer('wtlb:there-is-no-other:0', 'For I am a Great King! Says The Lord.');
+      mount();
+      const tb = await raise(c, 0, 22);
+      const web = /** @type {HTMLButtonElement} */ (tb.querySelector('[data-door="web"]'));
+      expect(web.textContent.trim()).toBe('See this topic’s scriptures');
+      act(() => { web.click(); });
+      expect(open).toHaveBeenCalledWith('this-letter');
+    } finally { delete /** @type {any} */ (window).__openScriptureWeb; }
   });
 
   it('a selection across two passages is cited by the passage it starts in', async () => {

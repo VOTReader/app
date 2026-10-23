@@ -641,6 +641,89 @@ background: linear-gradient(to right, #c252b8 0%, #b054c7 14%, #8f5cd9 30%, #4f7
 }
 .sw-root.sw-compact .sw-key-gradient { width: 48px; }
 .sw-root.sw-compact .sw-key-arc { width: 20px; height: 7px; }
+.sw-legend .sw-chip { pointer-events: auto; }
+.sw-legend { padding: 6px 0; margin-bottom: -6px; }
+.sw-chip {
+position: relative; display: inline-flex; align-items: center; gap: 5px;
+margin: 0; padding: 1px 6px; border: 1px solid transparent; border-radius: 999px;
+background: transparent; color: inherit; font: inherit; line-height: inherit; cursor: pointer;
+transition: var(--transition);
+}
+.sw-chip::after { content: ''; position: absolute; left: -2px; right: -2px; top: -6px; bottom: -6px; }
+.sw-chip:hover { color: var(--sw-text); }
+.sw-chip:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 1px; }
+.sw-chip.is-on { color: var(--sw-gold); border-color: var(--sw-active-border); background: var(--sw-active-fill); }
+.sw-key-ramp { gap: 0; }
+.sw-key-ramp .sw-chip { padding: 1px 5px; }
+.sw-key-ramp .sw-key-gradient { margin: 0 2px; }
+.sw-chip-more { color: var(--sw-text-meta); }
+.sw-chip-more svg { flex: none; display: block; }
+.sw-filter-pill {
+position: absolute; z-index: 5; left: 50%; transform: translateX(-50%);
+top: calc(var(--sw-chrome-top, 10px) + 76px);
+display: inline-flex; align-items: stretch; max-width: calc(100% - 48px); min-width: 0;
+background: var(--sw-control-fill); border: 1px solid var(--sw-active-border); border-radius: 22px;
+font-family: var(--sw-font); font-size: var(--fsc-15); color: var(--sw-gold);
+}
+.sw-filter-pill button {
+position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 36px;
+background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer;
+}
+.sw-filter-pill button::after { content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px; }
+.sw-filter-pill button:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; border-radius: 20px; }
+.sw-filter-pill-body { padding: 0 6px 0 16px; min-width: 0; }
+.sw-filter-pill-words { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sw-filter-pill-count { color: var(--sw-text-meta); font-variant-numeric: tabular-nums; }
+.sw-filter-pill-clear { padding: 0 12px 0 6px; color: var(--sw-text-meta); }
+.sw-filter-pill-clear:hover { color: var(--sw-text); }
+.sw-root.sw-compact .sw-filter-pill { top: calc(var(--sw-chrome-top, 10px) + 64px); font-size: var(--fsc-13); }
+.sw-root.sw-compact .sw-filter-pill button { min-height: 32px; }
+.sw-root.sw-chrome-hidden .sw-filter-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+.sw-return-pill {
+position: absolute; z-index: 5; left: 24px; top: calc(var(--sw-chrome-top, 10px) + 76px);
+gap: 6px; padding: 0 16px 0 10px; border-radius: 22px; border-color: var(--sw-active-border); color: var(--sw-gold);
+}
+.sw-root.sw-compact .sw-return-pill { left: 16px; top: calc(var(--sw-chrome-top, 10px) + 64px); }
+.sw-root.sw-chrome-hidden .sw-return-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+.sw-root.sw-panel-open[data-panel="dock"] .sw-filter-pill {
+left: calc((100% - var(--sw-panel-w, 42%)) / 2); max-width: calc(100% - var(--sw-panel-w, 42%) - 32px);
+}
+.sw-root.sw-narrow .sw-filter-pill { top: auto; bottom: calc(84px + var(--sw-safe-bottom)); max-width: calc(100% - 28px); }
+.sw-filter-sheet {
+position: absolute; z-index: 7; left: 50%; transform: translateX(-50%);
+bottom: calc(12px + var(--sw-safe-bottom)); width: min(620px, calc(100% - 32px)); max-height: calc(100% - 96px);
+display: flex; flex-direction: column; box-sizing: border-box;
+background: var(--sw-control-fill); border: 1px solid var(--sw-panel-edge); border-radius: 14px;
+font-family: var(--sw-font); color: var(--sw-text);
+-webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+}
+.sw-filter-head { display: flex; align-items: center; gap: 14px; padding: 10px 10px 8px 18px; border-bottom: 1px solid var(--sw-hairline); }
+.sw-filter-head h2 { margin: 0; font-size: var(--fsc-18); font-weight: 500; color: var(--sw-title); }
+.sw-filter-count { color: var(--sw-text-meta); font-size: var(--fsc-15); font-variant-numeric: tabular-nums; }
+.sw-filter-clear {
+margin-left: auto; position: relative; min-height: 36px; padding: 0 8px;
+background: transparent; border: 0; color: var(--sw-gold); font: inherit; font-size: var(--fsc-15); cursor: pointer;
+}
+.sw-filter-clear:disabled { color: var(--sw-text-muted); cursor: default; }
+.sw-filter-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 0; border-radius: 6px; }
+.sw-filter-close { width: 40px; min-width: 40px; height: 40px; border-radius: 50%; }
+.sw-filter-body { overflow-y: auto; overscroll-behavior: contain; padding: 6px 18px 14px; }
+.sw-filter-row { display: flex; align-items: center; gap: 14px; padding: 7px 0; }
+.sw-filter-name { flex: 0 0 92px; color: var(--sw-text-meta); font-size: var(--fsc-15); }
+.sw-filter-seg { flex-wrap: wrap; }
+.sw-filter-toggles, .sw-filter-books { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.sw-filter-and { color: var(--sw-text-muted); }
+.sw-filter-book .sw-select { position: static; opacity: 1; appearance: auto; width: auto; height: auto;
+min-height: 38px; padding: 0 10px; max-width: 190px;
+background: var(--sw-control-fill); color: var(--sw-text); border: 1px solid var(--sw-control-border); border-radius: 6px;
+font-family: var(--sw-font); font-size: var(--fsc-15); }
+.sw-root.sw-compact .sw-filter-sheet { bottom: calc(6px + var(--sw-safe-bottom)); max-height: calc(100% - 64px); }
+.sw-root.sw-compact .sw-filter-head { padding: 4px 6px 4px 14px; }
+.sw-root.sw-compact .sw-filter-body { padding: 2px 14px 8px; }
+.sw-root.sw-compact .sw-filter-row { padding: 4px 0; }
+.sw-root.sw-compact .sw-filter-name { flex-basis: 78px; font-size: var(--fsc-13); }
+.sw-root.sw-compact .sw-filter-seg .sw-seg-btn { min-height: 32px; padding: 0 10px; font-size: var(--fsc-14); }
+.sw-root.sw-compact .sw-filter-book .sw-select { min-height: 32px; font-size: var(--fsc-14); }
 .sw-live {
 position: absolute; width: 1px; height: 1px; overflow: hidden;
 clip-path: inset(50%); white-space: nowrap;

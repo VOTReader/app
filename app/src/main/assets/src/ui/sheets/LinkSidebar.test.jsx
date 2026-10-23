@@ -15,6 +15,7 @@ function stubStore(links) {
     getVersion: () => 1,
     getForKey: () => links,
     getForKeyPrefix: () => links,
+    getTouching: () => links,
   };
 }
 afterEach(() => { cleanup(); delete window.LinkStore; });
@@ -40,5 +41,25 @@ describe('LinkSidebar chrome', () => {
     const { container } = render(<LinkSidebar hlKey="bible:john:3:16" onClose={() => {}} onNavigate={() => {}} />);
     expect(container.querySelector('.link-sidebar-count')).toBeNull();
     expect(container.querySelector('.link-sidebar-empty')).toBeTruthy();
+  });
+});
+
+describe('LinkSidebar on a Bible verse (mw17 s29.4)', () => {
+  it('lists a partial-verse link its verse icon counted, instead of "No links yet"', async () => {
+    const { LinkStore } = await import('../../stores/link-store.js');
+    localStorage.clear();
+    LinkStore._resetForTests({ forceLoaded: true });
+    localStorage.setItem('vot-links', JSON.stringify([{
+      id: 'p1', created: 1,
+      source: { type: 'letter', key: 'letter:wide-path:2', label: 'The Wide Path' },
+      target: { type: 'bible', key: 'bible:john:3:16:12-40', label: 'John 3:16', bookId: 'john', chapter: 3, verse: 16, text: 'the world' },
+    }]));
+    window.LinkStore = LinkStore;
+    window.LinkCard = ({ lnk }) => <div className="stub-card">{lnk.id}</div>;
+    render(<LinkSidebar hlKey="bible:john:3:16" onClose={() => {}} onNavigate={() => {}} />);
+    expect(screen.queryByText('No links yet')).toBeNull();
+    expect(document.querySelector('.link-sidebar-count').textContent).toBe('1 link');
+    expect(document.querySelector('.stub-card').textContent).toBe('p1');
+    delete window.LinkCard;
   });
 });

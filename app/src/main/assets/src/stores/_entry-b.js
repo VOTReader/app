@@ -59,6 +59,7 @@ import { NoteDefaultStore } from './note-default-store.js';
 import { NotebookStore } from './notebook-store.js';
 import { RecentNavStore } from './recent-nav-store.js';
 import { hlId, lnkId, LinkStore, persistLink } from './link-store.js';
+import { ReadingPlanStore } from './reading-plan-store.js';
 import { bkmId, BookmarkStore } from './bookmark-store.js';
 import { JournalMediaStore } from './journal-media-store.js';
 import { _jrnDateStr, _jrnDaysBetween, JournalStatsStore } from './journal-stats-store.js';
@@ -219,7 +220,7 @@ Object.assign(window, {
   LibraryOrderStore, DEFAULT_LIBRARY_ORDER,
   AnnotationStore, HighlightStore,
   NoteStore, NoteDefaultStore, NotebookStore, RecentNavStore,
-  hlId, lnkId, LinkStore, persistLink,
+  hlId, lnkId, LinkStore, persistLink, ReadingPlanStore,
   bkmId, BookmarkStore,
   JournalMediaStore,
   _jrnDateStr, _jrnDaysBetween,

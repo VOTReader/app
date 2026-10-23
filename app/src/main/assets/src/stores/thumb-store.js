@@ -43,8 +43,13 @@ const _queue = writeQueue();
 /** Object-store name inside THUMB_DB. */
 export const THUMB_STORE = 'thumbs';
 
+/** A blocked open (an old connection holding the upgrade) waits this long for the
+ *  blocker to let go, then settles null so queued writes stop waiting (ds5 s12.2). */
+export const THUMB_BLOCKED_GIVE_UP_MS = 10000;
+
 /** Module-private singleton promise; cached so re-opens reuse the same
- *  connection. Reset only by explicit IDB invalidation (currently never). */
+ *  connection. Dropped on versionchange, and when an open fails or is blocked
+ *  (ds5 s12.2), so the next call opens again. */
 export let _thumbDbPromise = /** @type {Promise<IDBDatabase | null> | null} */ (null);
 
 /**
@@ -56,7 +61,24 @@ export let _thumbDbPromise = /** @type {Promise<IDBDatabase | null> | null} */ (
  */
 export function openThumbDB() {
   if (_thumbDbPromise) return _thumbDbPromise;
-  const p = new Promise((resolve) => {
+  let settled = false;
+  /** @type {Promise<IDBDatabase | null> | null} */
+  let self = null;
+  /** ds5 s12.2: a failed or blocked open resolves null and is not kept, so one
+   *  transient failure no longer turns thumbnails off until a reload. */
+  /** @type {ReturnType<typeof setTimeout> | null} */
+  let giveUp = null;
+  const fail = () => {
+    if (giveUp) { clearTimeout(giveUp); giveUp = null; }
+    if (settled) return;
+    settled = true;
+    if (self && _thumbDbPromise === self) _thumbDbPromise = null;
+    resolve(null);
+  };
+  /** @type {(v: IDBDatabase | null) => void} */
+  let resolve = () => {};
+  const p = new Promise((res) => {
+    resolve = res;
     try {
       const req = indexedDB.open(THUMB_DB, THUMB_DB_VERSION);
       req.onupgradeneeded = (e) => {
@@ -65,6 +87,12 @@ export function openThumbDB() {
       };
       req.onsuccess = (e) => {
         const db = /** @type {IDBOpenDBRequest} */ (e.target).result;
+        // A blocked open already settled null; the connection that arrives once
+        // the blocker closes is unused, and left open it would block the next
+        // upgrade or Clear All's delete in turn.
+        if (settled) { try { db.close(); } catch (_e) { /* best-effort close */ } return; }
+        settled = true;
+        if (giveUp) { clearTimeout(giveUp); giveUp = null; }
         // storage-backup-4: without this, the connection stays open for the
         // life of the page and indexedDB.deleteDatabase('vot-thumbs')
         // (Settings → Clear All My Data) fires onblocked instead of
@@ -74,15 +102,21 @@ export function openThumbDB() {
         // and drop the cached promise so the next openThumbDB() reopens.
         db.onversionchange = () => {
           try { db.close(); } catch (_e) { /* best-effort close */ }
-          if (_thumbDbPromise === p) _thumbDbPromise = null;
+          if (_thumbDbPromise === self) _thumbDbPromise = null;
         };
         resolve(db);
       };
-      req.onerror = () => resolve(null);
-    } catch (_e) {resolve(null);}
+      req.onerror = fail;
+      // An old connection holding the upgrade fires blocked and may never let go:
+      // without a limit the promise never settled and every queued write waited on
+      // it. A blocker that closes in time still lets this open (and its writes) through.
+      req.onblocked = () => { if (!settled && !giveUp) giveUp = setTimeout(fail, THUMB_BLOCKED_GIVE_UP_MS); };
+    } catch (_e) { fail(); }
   });
-  _thumbDbPromise = p;
-  return _thumbDbPromise;
+  self = p;
+  // an open that threw has already failed: cache nothing, the next call tries again
+  if (!settled) _thumbDbPromise = p;
+  return p;
 }
 
 /**

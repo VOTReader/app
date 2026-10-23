@@ -367,12 +367,21 @@ describe('AnswersShelf — a group of the site (f04, f04b)', () => {
 });
 
 describe('AnswersMedia — Charts & videos (f13)', () => {
-  it('says Loading… while the sidecars load, and says so if they never arrive (no blank page)', async () => {
-    window.ANSWERS_META = undefined;                                 // no loader in this host: the load resolves empty
-    render(<AnswersMedia {...base} />);
-    expect(document.querySelector('.ans-page [role="status"]').textContent).toBe('Loading…');
-    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(document.querySelector('.ans-page [role="status"]').textContent).toBe('Couldn’t load the list of charts and videos.');
+  it('says Loading… while the sidecars load, says so if they never arrive (no blank page), and Try again loads them', async () => {
+    vi.useFakeTimers();
+    try {
+      const meta = window.ANSWERS_META;
+      window.ANSWERS_META = undefined;                               // no loader in this host: the load resolves empty
+      render(<AnswersMedia {...base} />);
+      const status = () => document.querySelector('.ans-page [role="status"]');
+      expect(status().textContent).toBe('Loading…');
+      await act(async () => { await vi.advanceTimersByTimeAsync(3100); });   // the hook's two tries, 3 s apart
+      expect(status().textContent).toBe('Couldn’t load the list of charts and videos. Try again');
+      window.ANSWERS_META = meta;
+      await act(async () => { fireEvent.click(status().querySelector('button')); await vi.advanceTimersByTimeAsync(0); });
+      expect(status()).toBeNull();
+      expect(texts('.ans-sechead .ans-h2')[0]).toBe('Charts');
+    } finally { vi.useRealTimers(); }
   });
   it('lists every chart, video, playlist, channel, audio and PDF; only charts stay in the app', () => {
     render(<AnswersMedia {...base} />);

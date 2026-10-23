@@ -214,9 +214,10 @@ export function describeFound(found, { g, personal, cam, v, viewFor, density }) 
   if (found.kind === 'bundle') {
     const cell = found.cell;
     const first = refOfVerse(g, cell.lo), last = refOfVerse(g, cell.hi);
+    // a run of chapters joins with an ASCII hyphen, as rangeLabel does (Permanent Rule 1; s37.3)
     const label = cell.verse ? first.label
       : cell.chapterLo === cell.chapterHi ? first.bookTitle + ' ' + first.chapter
-      : first.bookTitle + ' ' + first.chapter + ' – ' + (last.bookTitle === first.bookTitle ? '' : last.bookTitle + ' ') + last.chapter;
+      : first.bookTitle + ' ' + first.chapter + '-' + (last.bookTitle === first.bookTitle ? '' : last.bookTitle + ' ') + last.chapter;
     const chapter = g.chapters[cell.chapterLo];
     return { kind: 'bundle', cell, label, lo: cell.lo, hi: cell.hi,
       connections: countTouching(g, cell.lo, cell.hi, density),

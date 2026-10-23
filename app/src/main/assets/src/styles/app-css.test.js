@@ -855,8 +855,16 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('body:has(.find-pill) .mode-toggle-wrap {', 'display')).toBe('none');
   });
   it('a full-screen Garden image hides the player and the whole dock (cz5)', () => {
-    expect(decl('body:has(.garden-fullscreen) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) {', 'display')).toBe('none');
-    expect(decl('body:has(.garden-fullscreen) {', '--dock-player')).toBe('0px');
+    expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) {', 'display')).toBe('none');
+    expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) {', '--dock-player')).toBe('0px');
+  });
+  /* Corbin 2026-10-22 23:4x: "media player should not be present on certain screen like scripture web". The web is
+     a full-screen view like the Garden: the same rule hides the bar over it (and over its load-error panel, the
+     screen's root when WebGL fails). Entering either also pauses the audio (useNoAudioHere, 23:5x). */
+  it('the Scripture Web hides the player and the whole dock, as the Garden does', () => {
+    const rule = bare.match(/body:has\(([^)]*)\) :is\(\.audio-bar, \.ascroll-pill, \.find-pill, \.mode-toggle-wrap\)\s*\{\s*display:\s*none/);
+    expect(rule && rule[1].split(',').map((s) => s.trim())).toEqual(['.garden-fullscreen', '.sw-root', '.sw-fallback']);
+    expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) {', '--dock-transport')).toBe('0px');
   });
   it('every dock surface is opaque, and the reading text scrolls clear of the stack (cz7)', () => {
     for (const sel of ['\n    .ascroll-pill {', '\n    .find-pill {', '.ann-hint-pill', '.mode-toggle {']) {
@@ -902,4 +910,58 @@ describe('app.css — a box that holds a paragraph\'s inline runs never drops th
       for (const r of own) expect(r.body, r.selectors.join(', ')).not.toMatch(/display\s*:\s*(inline-)?(table|flex|grid)\b/);
     });
   }
+});
+/* ── pf2 top bar under Chrome's toolbar (readalong, 2026-10-22) ────────────
+   Corbin's S22, Chrome, 18:41: a letter opened from search showed only the
+   lower half of the top bar, the rest under Chrome's toolbar. `body
+   { min-height: 100vh }` is the LARGE viewport on mobile Chrome (toolbar
+   hidden), so while the toolbar shows the document is taller than the glass
+   (705 vs 649 px there) and has room to scroll. Every jump to a hit (search,
+   Find next/prev, deep links, a returning Scripture Web, a focused field)
+   is a scrollIntoView, which scrolls each scrollable ancestor, the document
+   too: 35.7 px on the S22, and the fixed-height screen slid up with it. The
+   body is sized by the dynamic viewport, so the document never outgrows the
+   glass and has nothing to scroll; the 100vh line stays first as the
+   fallback for engines without dvh. Headless Chrome has no toolbar, so the
+   law is pinned here and the S22 measures the effect. */
+describe('app.css — the document is never taller than the visible viewport', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const bodyBlocks = [...bare.matchAll(/(?:^|[}\s])body\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  it('body min-height is 100dvh, after a 100vh fallback', () => {
+    const mins = bodyBlocks.flatMap((b) => [...b.matchAll(/min-height\s*:\s*([^;]+);/g)].map((m) => m[1].trim()));
+    expect(mins, 'body is sized by 100vh alone: the document outgrows the glass under Chrome\'s toolbar and a jump scrolls the top bar off').toContain('100dvh');
+    expect(mins.indexOf('100vh'), 'the 100vh fallback must come BEFORE 100dvh or it overrides it').toBeLessThan(mins.lastIndexOf('100dvh'));
+    expect(mins[mins.length - 1]).toBe('100dvh');
+  });
+  it('no html/body/#root rule sizes the document by 100vh without a dvh line after it', () => {
+    const roots = [...bare.matchAll(/(?:^|[}\s,])(html|body|#root)\s*\{([^}]*)\}/g)];
+    for (const [, sel, block] of roots) {
+      const decls = [...block.matchAll(/(?<![\w-])(min-height|height)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]);
+      for (const prop of ['height', 'min-height']) {
+        const vals = decls.filter(([p]) => p === prop).map(([, v]) => v);
+        if (vals.some((v) => /\b100vh\b/.test(v))) expect(vals[vals.length - 1], `${sel} { ${prop} } ends on 100vh`).toMatch(/dvh/);
+      }
+    }
+  });
+});
+
+/* s00.3: in a mobile browser 100vh is the viewport with the URL bar hidden, so
+   a box sized by it runs under the bar while the bar shows: the tour card's
+   Skip/Next and the Answers sheet's buttons went out of reach. Each sizes by
+   100dvh, after its 100vh fallback line. */
+describe('app.css — tour and Answers boxes are sized by the visible viewport (s00.3)', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const blocks = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter((m) => /\.(tour-card|tour-prompt|ans-sheet\.is-tall|ans-card|ans-rail)\b/.test(m[1]) && /100vh/.test(m[2]));
+  it('found the boxes', () => { expect(blocks.length).toBeGreaterThanOrEqual(5); });
+  it('every 100vh line has a 100dvh line for the same property after it', () => {
+    for (const [, sel, body] of blocks) {
+      const decls = [...body.matchAll(/(?<![\w-])([a-z-]+)\s*:\s*([^;]+)/g)].map((m) => [m[1], m[2].trim()]);
+      decls.forEach(([prop, val], i) => {
+        if (!/100vh/.test(val)) return;
+        const later = decls.slice(i + 1).find(([p, v]) => p === prop && v === val.replace(/100vh/g, '100dvh'));
+        expect(later, sel.trim() + ' { ' + prop + ' } has no 100dvh line after its 100vh fallback').toBeTruthy();
+      });
+    }
+  });
 });

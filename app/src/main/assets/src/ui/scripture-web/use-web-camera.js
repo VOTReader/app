@@ -98,6 +98,8 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   // the slack a closing panel leaves while the cameras ease back inside the view (device px), eased
   // to the new inset's by settleInset's motion; 0 at rest (w4 fix round 2)
   const settleSlackRef = React.useRef(0);
+  // which settle owns that hold (settleInset): a newer one takes it over
+  const settleRunRef = React.useRef(0);
 
   /** The vertical frame (web-frame.webFrame) for the current view and mode. */
   const frame = React.useCallback(() => webFrame(viewRef.current, modeRef.current === 'personal'), [modeRef]);
@@ -303,6 +305,11 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   const settleInset = React.useCallback((/** @type {number} */ wasRight = 0) => {
     const v = viewRef.current;
     if (!v.W) return;
+    // a settle still easing (the panel closed twice in quick succession) gives way to this one: the
+    // new bound is read without its hold, and its end no longer lets go of this one's (s26.3: it
+    // zeroed the hold the newer settle had just set, so the next clamp snapped)
+    const held = settleSlackRef.current;
+    settleSlackRef.current = 0;
     const flying = !!flyStopRef.current;
     const cams = [];
     const cam = camRef.current;
@@ -315,7 +322,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
       const to = clampCamera({ x: c.x, ppv: c.ppv, total: c.total, y: c.y }, v.W, zoomCapFor(c), yFrameFor(c) || undefined, slackFor(c));
       return Math.abs(to.x - c.x) * c.ppv > 0.5;
     });
-    if (!past.length) return;
+    if (!past.length) { settleSlackRef.current = held; return; }
     const now = (panelInsetRef.current && panelInsetRef.current.right > 0 ? panelInsetRef.current.right : 0) * (v.DPR || 1);
     const from = (wasRight > 0 ? wasRight : 0) * (v.DPR || 1);
     if (!animate || flying || prefersReducedMotion() || !(from > now)) {
@@ -328,7 +335,9 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
     const ends = past.map((c) => clampCamera({ x: c.x, ppv: c.ppv, total: c.total, y: c.y }, v.W, zoomCapFor(c),
       yFrameFor(c) || undefined, slackFor(c)).x);
     let t = 0;
-    settleSlackRef.current = from;
+    const run = ++settleRunRef.current;
+    // the hold never pulls in past where a settle it replaced still let a camera stand
+    settleSlackRef.current = Math.max(from, held);
     animate((dt) => {
       t = Math.min(1, t + dt / INSET_EASE_MS);
       const k = t >= 1 ? 0 : 1 - easeInOutCubic(t);
@@ -338,7 +347,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
       });
       if (t >= 1) { settleSlackRef.current = 0; for (const c of past) clampNow(c); }
       return t < 1;
-    }, () => { settleSlackRef.current = 0; });
+    }, () => { if (settleRunRef.current === run) settleSlackRef.current = 0; });
   }, [zoomCapFor, yFrameFor, slackFor, modeRef, schedule, animate]);
 
   // A6: where the camera came to rest. Each drawn frame compares the camera with the last one;

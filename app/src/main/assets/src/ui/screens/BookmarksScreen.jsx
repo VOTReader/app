@@ -36,6 +36,7 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editing
   var useRef = React.useRef;
 
   var inputRef = useRef(null);
+  var cancelledRef = useRef(false);   // ds5 s19.9: Escape cancelled; the unmount's blur must not save
 
   var _editState = useState(bkm.label || '');
   var editValue = _editState[0];
@@ -48,6 +49,7 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editing
 
   useEffect(function() {
     if (isEditing) {
+      cancelledRef.current = false;
       setEditValue(bkm.label || '');
       setTimeout(function() {
         if (inputRef.current) {
@@ -60,6 +62,7 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editing
   }, [isEditing]);
 
   var commitEdit = function() {
+    if (cancelledRef.current) return;
     var v = editValue.trim();
     if (v) onEditSave(bkm.id, v);
     else onEditCancel();
@@ -67,7 +70,7 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editing
 
   var onKeyDown = function(e) {
     if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
-    else if (e.key === 'Escape') { onEditCancel(); }
+    else if (e.key === 'Escape') { cancelledRef.current = true; onEditCancel(); }
   };
 
   return (

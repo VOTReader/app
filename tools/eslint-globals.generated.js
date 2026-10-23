@@ -6,9 +6,10 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 640 distinct identifiers.
+// Total: 646 distinct identifiers.
 
 export const projectGlobals = {
+  ALL_WEEK: "readonly",
   ANSWERS: "readonly",
   ANSWERS_META: "readonly",
   ANSWERS_SITE_META: "readonly",
@@ -76,6 +77,7 @@ export const projectGlobals = {
   BOOKS: "readonly",
   BOOKS_RESTORED: "readonly",
   BOOK_ALIASES: "readonly",
+  BOOK_INDEX: "readonly",
   BibleChapterView: "readonly",
   BibleStudyChapterView: "readonly",
   BibleStudyIndex: "readonly",
@@ -216,6 +218,7 @@ export const projectGlobals = {
   ModeToggle: "readonly",
   MultiNotePopover: "readonly",
   MyProgressScreen: "readonly",
+  NT_FROM: "readonly",
   NavButtons: "readonly",
   NetStatus: "readonly",
   NextIcon: "readonly",
@@ -248,6 +251,7 @@ export const projectGlobals = {
   ReadAlongHighlight: "readonly",
   ReadingChromeProvider: "readonly",
   ReadingDotContext: "readonly",
+  ReadingPlanStore: "readonly",
   ReadingPlansScreen: "readonly",
   ReadingStatsStore: "readonly",
   ReadingStreakStore: "readonly",
@@ -258,6 +262,7 @@ export const projectGlobals = {
   SCRIPTURE_GENRES: "readonly",
   SCRIPTURE_LAYOUT_OPTIONS: "readonly",
   SCRIPTURE_WEB_DATA: "readonly",
+  SEVEN: "readonly",
   SONGS_SCREEN: "readonly",
   SRCH_CANONICAL_BOOK_IDS: "readonly",
   SRCH_CANONICAL_BOOK_INDEX: "readonly",
@@ -322,6 +327,7 @@ export const projectGlobals = {
   VolumesHome: "readonly",
   VotSearchData: "readonly",
   VotSearchMini: "readonly",
+  WEEKDAYS: "readonly",
   WEEKDAY_NAMES: "readonly",
   WTLB_ONE: "readonly",
   WTLB_SCRIPTURES: "readonly",

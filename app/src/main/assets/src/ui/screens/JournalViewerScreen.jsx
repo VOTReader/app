@@ -892,7 +892,15 @@ export function JournalViewerScreen(props) {
           <h1 className={'jrn-viewer-title' + (displayTitle ? '' : ' untitled')}>{displayTitle || 'Untitled'}</h1>
           <div className="jrn-viewer-date">
             {JournalHelpers.longDate(entry.created)}
-            <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.created)}</span>
+            {/* s20.8: an entry edited more than a minute after it was written says
+                when, with the edit's date too when that is another day. */}
+            {entry.updated && entry.created && entry.updated - entry.created > 60000 ? (
+              <span className="jrn-card-time">{' · Written ' + JournalHelpers.shortTime(entry.created) + ' · edited '
+                + (JournalHelpers.longDate(entry.updated) !== JournalHelpers.longDate(entry.created) ? JournalHelpers.longDate(entry.updated) + ' · ' : '')
+                + JournalHelpers.shortTime(entry.updated)}</span>
+            ) : (
+              <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.created)}</span>
+            )}
             {entry.pinned && ' · Pinned'}
           </div>
         </div>

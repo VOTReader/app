@@ -67,10 +67,12 @@ import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
 import { TipChip, HowToReadGuide, EmptyWebNotice, loadErrorPanel, legendFor } from '../scripture-web/panels.jsx';
+import { useWebFilters, legendChips, FilterPill, FilterSheet } from '../scripture-web/web-filters.jsx';
 import { startChapter, webChapter } from '../../utils/scripture-web/chapter-connections.js';
 import { graphStats, densityLine, myWebHeadline, myWebSkippedLine } from '../../utils/scripture-web/describe.js';
 import { verseText } from '../../utils/scripture-web/panel-model.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
+import { useNoAudioHere } from '../components/AudioPlayerBar.jsx';
 
 /* The zoom ceiling (maxZoomOf), the frame, the render arguments and the y
    frame live in utils/scripture-web/web-frame.js, pure and tested; the
@@ -112,6 +114,8 @@ function readChromeHidden() {
  *   over the resume point. The go-to (goto.jsx) takes it; the stub ignores it.
  */
 export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSetting, start }) {
+  // No audio on the Scripture Web (Corbin 2026-10-22 23:5x): entering pauses the player where it is.
+  useNoAudioHere();
   // Taken once per mount (a ref survives StrictMode's second render; the module slot does not).
   // A start wins over it (a door in from the reader): the mode, the camera and the open card all
   // start fresh on the canon, and the resume point is spent either way. Seeding the mode from it
@@ -124,7 +128,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // the one frame loop (use-frame-scheduler.js) and landscape, always
   // (use-forced-landscape.js): rotation, orientation lock, immersive, loc()
   const { drawRef, schedule, live, capFractionNow, animate, onFrame } = useFrameScheduler();
-  const { rotated, loc } = useForcedLandscape(schedule, wrapRef);
+  const { rotated, loc } = useForcedLandscape(schedule, onBack, wrapRef);
 
   // the graph asset, loaded once (use-web-renderer.js); Try again refetches
   const { graph, loadError, setLoadError, retryLoad } = useWebGraph();
@@ -281,7 +285,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   const {
     tip, choices, choiceChapter, choiceCut, detail, listOpen, setTip, setChoices, setDetail, setListOpen,
     handlersRef, dropHover, liftAt, listItems, commitFound, closeCards, followThread, followRow, zoomTo,
-    openPanel, lightThreads, panel,
+    openPanel, lightThreads, panel, returnTo, returnBack, dropReturn,
   } = useWebSelection({
     graph, mode, density, showUnderlay, resumeRef, camRef, viewRef, focusRef, viewFor, yFrameFor,
     personalRef, railOpts, elevatorRef, badgeBoxesRef, overlayFrameRef, flyTo, journey, schedule, setAnnounce, relink, settledAt,
@@ -338,11 +342,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       loc, dpr: () => viewRef.current.DPR, cam: () => camRef.current, camFor,
       view: () => viewRef.current, handlers: () => handlersRef.current,
       // a gesture takes the camera: the chip drops and a running fly stops
-      live: () => { live(); dropHover(); cancelFly(); },
+      live: () => { live(); dropHover(); cancelFly(); dropReturn(); },
       schedule, maxZoom: (c) => zoomCapFor(c || camRef.current), clampCamera: clampWithSlack, zoomAbout: zoomWithSlack, xToVerse,
       yFrame: yFrameFor, lift: liftAt, animate,
     });
-  }, [graph, listShown, loadError, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, yFrameFor, liftAt, viewRef, camRef,
+  }, [graph, listShown, loadError, glRetry, schedule, loc, camFor, zoomCapFor, live, dropHover, cancelFly, dropReturn, yFrameFor, liftAt, viewRef, camRef,
     handlersRef, animate, clampWithSlack, zoomWithSlack]);
 
   /** Reset one rail's camera to fit (r2: each rail has its own). */
@@ -414,12 +418,20 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     setMode(next);
   }, [closeCards, journey, cancelFly, camRef, modeRef, viewRef, zoomCapFor, schedule]);
 
+  // the filters (web-filters.jsx): the legend's chips, the sheet and the pill, the canon's only
+  const web = useWebFilters({ graph, mode, density, schedule, setAnnounce });
+  const { setSheetOpen } = web;
+  const closeFilters = React.useCallback(() => setSheetOpen(false), [setSheetOpen]);
+
   // Escape, Android Back and the web's own keys (use-web-keys.js): one layer
   // closes a press, then the keys pan, climb, zoom and reset
+  // a key that moves the camera takes it, as a gesture does: the way back goes with it
+  const takeCamera = React.useCallback(() => { cancelFly(); dropReturn(); }, [cancelFly, dropReturn]);
   const { onKeyDown } = useWebKeys({
+    filtersOpen: web.canon && web.sheetOpen, closeFilters, returnShown: !!returnTo, returnBack,
     graph, guideOpen: guideShown, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
-    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor,
+    resetView, onBack, dropHover, setAnnounce, schedule, cancelFly: takeCamera, goTo, slackFor,
   });
 
   const openEndpoint = React.useCallback((endpoint) => {
@@ -443,8 +455,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const lastCh = (hist || []).find((h) => h && h.type === 'chapter' && h.bookId && h.chapterNum);
     return (
       <WebFallbackList graph={graph}
-        initialChapter={was >= 0 ? was : startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
-        onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse })}
+        initialChapter={was >= 0 ? was : startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)} fromWeb={was >= 0}
+        // the reader's back pill names the web, as openEndpoint's does (s22.4: it came back unlabelled)
+        onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse },
+          { sourceLetterTitle: 'The Scripture Web' })}
         onRetry={retryGL} onMyWeb={() => switchMode('personal')}
         onBack={onBack} verseText={(ref) => verseText(ref, translation)} />
     );
@@ -493,7 +507,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                something the reader had not asked about (Corbin, 2026-09-11:
                "just keep x connections"); the density hint that flashes on a
                switch is where the two densities are explained. */
-            : (stats && <p>{stats.shown.toLocaleString()} connections</p>)}
+            : (stats && <p>{web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections'}</p>)}
           {/* the density's line after a switch: seen here, said by .sw-live (one live region) */}
           {hint ? <div className="sw-hint" aria-hidden="true">{hint}</div> : null}
         </div>
@@ -550,7 +564,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
             Timothy&rsquo;s notes · {contextCount > 0 ? contextCount.toLocaleString() : '…'}
           </button>
         )}
-        <button type="button" className="sw-btn" onClick={fromMenu(resetView)} aria-label="Reset the view">Reset</button>
+        {/* Reset brings the whole web back: the view, and the filters with it */}
+        <button type="button" className="sw-btn" onClick={fromMenu(() => { resetView(); web.clear(); })} aria-label="Reset the view">Reset</button>
         </div>
         {collapse ? (
           <button type="button" ref={moreBtnRef} className={'sw-btn sw-btn-icon sw-more-btn' + (menuOpen ? ' is-on' : '')}
@@ -593,6 +608,16 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} mode={mode}
         home={() => wrapRef.current} />}
       {goTo.box}
+      {/* the way back to the verse a choice zoomed out of (use-web-selection.js returnTo) */}
+      {returnTo && graph ? (
+        <button type="button" className="sw-btn sw-return-pill" onClick={returnBack}
+          aria-label={'Back to ' + returnTo.label + ', zoomed in where you were'}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
+          Back to {returnTo.label}
+        </button>
+      ) : null}
+      {web.canon && graph ? <FilterPill web={web} /> : null}
+      {web.canon && graph && web.sheetOpen ? <FilterSheet web={web} graph={graph} /> : null}
       {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
       {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby
@@ -608,7 +633,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       ) : null}
 
       {/* the key, and the OpenBible.info credit as its tail (Q5): read, not hidden; its glyphs are */}
-      <div className="sw-legend"><div className="sw-legend-line">{legendFor(mode, graph && graph.attribution)}</div></div>
+      <div className="sw-legend"><div className="sw-legend-line">{legendFor(mode, graph && graph.attribution, web.canon && graph ? legendChips({ web }) : null)}</div></div>
       {mode === 'personal' && railZoom.top ? (
         <button type="button" className="sw-btn sw-rail-reset sw-rail-reset-top" aria-label="Reset the Volumes rail"
           data-wheel-through="1" onClick={() => resetRail('top')}>Reset Volumes</button>

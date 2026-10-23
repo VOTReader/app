@@ -135,3 +135,34 @@ describe('BookmarksScreen — large libraries', () => {
     expect(resolves).toBe(60);
   });
 });
+
+/* ds5 s19.9 (idea sweep 2026-10-22): Escape cancels a label edit, but the input also saves on
+   blur, and a browser may blur it as it unmounts: the cancelled text could still be saved. */
+describe('BookmarkRow — Escape on a label edit never saves (ds5 s19.9)', () => {
+  it('a blur that follows Escape does not save the typed label', async () => {
+    const { BookmarkRow } = await import('./BookmarksScreen.jsx');
+    const saves = [];
+    const cancels = [];
+    const bkm = BOOKMARKS[0];
+    render(<BookmarkRow bkm={bkm} source="Zeta 1" onNavigate={() => {}} onLongPress={() => {}}
+      editingId={bkm.id} onEditSave={(id, v) => saves.push(v)} onEditCancel={() => cancels.push(1)} />);
+    const input = document.querySelector('.bkm-row-edit-input');
+    fireEvent.change(input, { target: { value: 'typed then cancelled' } });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    fireEvent.blur(input);                       // the blur some browsers fire on the way out
+    expect(saves).toEqual([]);
+    expect(cancels.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('Enter still saves', async () => {
+    const { BookmarkRow } = await import('./BookmarksScreen.jsx');
+    const saves = [];
+    const bkm = BOOKMARKS[0];
+    render(<BookmarkRow bkm={bkm} source="Zeta 1" onNavigate={() => {}} onLongPress={() => {}}
+      editingId={bkm.id} onEditSave={(id, v) => saves.push(v)} onEditCancel={() => {}} />);
+    const input = document.querySelector('.bkm-row-edit-input');
+    fireEvent.change(input, { target: { value: 'kept' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(saves).toEqual(['kept']);
+  });
+});

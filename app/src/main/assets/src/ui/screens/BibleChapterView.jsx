@@ -37,6 +37,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   // W25: name the recording's edition only once its text is on the page; a
   // download in flight (or one that failed) still reads NKJV.
   const recordingTextShown = matchingRecording && isTranslationLoaded(translation);
+  // rs1: the edition whose words are on the page, which a copied reference names (utils/passage-copy.js).
+  const shownTranslation = isTranslationLoaded(translation) ? translation : 'nkjv';
   /* "Book · Chapter N" is what the narrator announces before verse 1: the
      read-along's lead-in sits there (ReadAlongHighlight, 2026-09-22). */
   // The verse-number key builder read-along paints through. useCallback is NOT
@@ -232,7 +234,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   letter hero pill; inert peeks keep it (same
                   pointer-events:none contract). */}
               {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-                <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapter.num)} resume={() => AudioPlayer.listenResume({ volKey: bibleAudio.volKey, bookId: book.id, chapterNum: chapter.num })} />
+                <HeroListen onClick={() => AudioPlayer.playBibleBook({ volKey: bibleAudio.volKey, bookId: book.id, label: bibleAudio.label, chapterNum: chapter.num })} canPlay={() => AudioPlayer.playableNow(bibleAudio.volKey, book.id, chapter.num)} resume={() => AudioPlayer.listenResume({ volKey: bibleAudio.volKey, bookId: book.id, chapterNum: chapter.num })} here={() => AudioPlayer.listenHere({ volKey: bibleAudio.volKey, bookId: book.id, chapterNum: chapter.num })} />
               )}
             </div>
           </header>
@@ -241,7 +243,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
       <div className="page-wrapper">
         {/* data-copy-key: words copied here outside a verse (a heading) still
             name the chapter and the reader's translation (utils/passage-copy.js). */}
-        <div className="chapter-body" ref={bodyRef} data-copy-key={'bible:' + book.id + ':' + chapter.num}>
+        <div className="chapter-body" ref={bodyRef} data-copy-key={'bible:' + book.id + ':' + chapter.num} data-translation={shownTranslation}>
           {showSectionHeadings && headingsFocusHidden && chapter.sections.some((s) => s.heading || s.letter) && (
             <button
               className="hero-subtitle-restore headings-restore"
@@ -261,7 +263,10 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               const vText = translateVerse(book.id, chapter.num, v, translation);
               return (
                 <span key={vi} id={`v-${v.n}`} lang={verseLang} className={`verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
-                  <span className="verse-num">{v.n}</span>
+                  {/* The space ends the number's word (rs1): "16For" was one word, so a long-press on a verse's
+                      first word took its number too. app.css keeps it from collapsing at the end of the gutter
+                      box (white-space: pre), where it shows nothing. */}
+                  <span className="verse-num">{v.n}{' '}</span>
                   <HighlightableText text={vText} hlKey={vHlKey} />
                   <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />
                   <BookmarkIcon hlKey={vHlKey} />

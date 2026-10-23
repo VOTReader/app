@@ -185,7 +185,9 @@ export function setupSettingsGlobals(overrides = {}) {
     // which is how these arrived as seven unrelated-looking failures.
     'LibraryOrderStore', 'NoteDefaultStore', 'AnnHintDismissedFlagStore',
     // review-tutorial: the fifth flag, carried in the backup like the fourth.
-    'TourDoneFlagStore']) put(s, fakeStore());
+    'TourDoneFlagStore',
+    // mw18: the reading plan runs joined the backup.
+    'ReadingPlanStore']) put(s, fakeStore());
 
   // Backup/import plumbing — reachable only from buttons a render test never presses.
   for (const f of ['buildExportPayload', 'applyImportPayload', 'buildV3Manifest', 'applyV3',

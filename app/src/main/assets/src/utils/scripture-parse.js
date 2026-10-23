@@ -126,10 +126,17 @@ export function parseRefRange(ref) {
   // data gate (e.g. "12:18–20") still splits into gold verse numbers instead of
   // rendering white (the renderer only inlays verse-sup when the range parses).
   const clean = ref.replace(/[–—]/g, '-').replace(/\s*\(.*?\)\s*/g, "").trim();
-  // Comma-separated verses: "7:7, 9" or "7:7, 9, 11"
-  const cm = clean.match(/:(\d+(?:\s*,\s*\d+)+)$/);
+  // Comma-separated verses: "7:7, 9" or "7:7, 9, 11", and mixed range-and-
+  // comma lists ("5:3-4, 6, 8", s36.1) whose ranges expand into the list.
+  const cm = clean.match(/:(\d+(?:\s*-\s*\d+)?(?:\s*,\s*\d+(?:\s*-\s*\d+)?)+)$/);
   if (cm) {
-    const nums = cm[1].split(/\s*,\s*/).map(Number);
+    /** @type {number[]} */
+    const nums = [];
+    for (const part of cm[1].split(/\s*,\s*/)) {
+      const [a, b] = part.split(/\s*-\s*/).map(Number);
+      if (b == null) { nums.push(a); continue; }
+      for (let v = a; v <= b; v++) nums.push(v);
+    }
     if (nums.length >= 2) return { start: nums[0], end: nums[nums.length - 1], verses: nums };
   }
   const m = clean.match(/:(\d+)(?:-(\d+))?$/);

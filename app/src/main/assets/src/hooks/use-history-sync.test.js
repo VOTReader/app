@@ -63,6 +63,7 @@ function nav(overrides) {
     studyChapterId: null,
     genreId: null,
     gardenPage: null,
+    journalEntryId: null,
     ...overrides,
   };
 }
@@ -99,6 +100,14 @@ describe('useHistorySync — nav-key changes', () => {
       initialProps: { k: nav({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 }) },
     });
     rerender({ k: nav({ screen: 'bible-ch', bookId: 'exodus', chapterNum: 1 }) });
+    expect(_pushCalls.length).toBe(2); // the W38 boot seed + this nav
+  });
+
+  it('pushes on a journal entry-to-entry link (mw17 s03.1: the screen stays journal-viewer)', () => {
+    const { rerender } = renderHook(({ k }) => useHistorySync(k), {
+      initialProps: { k: nav({ screen: 'journal-viewer', journalEntryId: 'a' }) },
+    });
+    rerender({ k: nav({ screen: 'journal-viewer', journalEntryId: 'b' }) });
     expect(_pushCalls.length).toBe(2); // the W38 boot seed + this nav
   });
 

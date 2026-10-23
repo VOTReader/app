@@ -239,7 +239,7 @@ export function useGoTo(web) {
   chipRef.current = chip;
   const chipElRef = React.useRef(null);
   const edgeKeyRef = React.useRef('|');
-  const stepRef = React.useRef({ verse: -1, list: /** @type {number[]} */ ([]) });
+  const stepRef = React.useRef({ verse: -1, density: '', list: /** @type {number[]} */ ([]) });
   const startedRef = React.useRef(false);
 
   const say = React.useCallback((s) => { if (typeof setAnnounce === 'function') setAnnounce(s); }, [setAnnounce]);
@@ -474,14 +474,17 @@ export function useGoTo(web) {
     const f = focusRef.current;
     const s = stepRef.current;
     let verse;
-    if (f.arc >= 0 && s.verse >= 0 && s.list.indexOf(f.arc) >= 0) verse = s.verse;
+    // the list is the verse's at a density: a density change lists the verse again (s24.5: [ and ]
+    // walked the density it was first pressed at, through lines no longer drawn)
+    const kept = s.density === density;
+    if (kept && f.arc >= 0 && s.verse >= 0 && s.list.indexOf(f.arc) >= 0) verse = s.verse;
     else if (f.arc >= 0 && f.arc < graph.count) {
       const c = centreVerse(), a = graph.from[f.arc], b = graph.to[f.arc];
       verse = Math.abs(a - c) <= Math.abs(b - c) ? a : b;
     } else if (f.range && f.range[0] === f.range[1]) verse = f.range[0];
     else verse = centreVerse();
-    const list = s.verse === verse && s.list.length ? s.list : nearbyThreads(graph, verse, verse, density, 0);
-    stepRef.current = { verse, list };
+    const list = kept && s.verse === verse && s.list.length ? s.list : nearbyThreads(graph, verse, verse, density, 0);
+    stepRef.current = { verse, density, list };
     if (!list.length) { say('No lines at ' + refOfVerse(graph, verse).label); return false; }
     const at = list.indexOf(f.arc);
     const next = at < 0 ? (dir > 0 ? 0 : list.length - 1) : (at + (dir > 0 ? 1 : list.length - 1)) % list.length;
@@ -692,8 +695,9 @@ export function useGoTo(web) {
  * moving no camera (exits.js). A camera move is a journey arrival, pushed before the camera moves (the trail
  * asks the go-to where it set out from).
  * @param {import('./overlay-renderer.js').OverlayHit | null} hit
- * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any, insetFor?: Function }} nav
+ * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any, insetFor?: Function, closePanel?: Function }} nav
  *   insetFor: what the panel a chapter opens will cover, CSS px, so it is framed beside it (w4)
+ *   closePanel: a book opens nothing, so what was open closes, as the go-to's book does (s24.4)
  * @returns {boolean} whether the tap was handled
  */
 export function routeOverlayHit(hit, nav) {
@@ -705,10 +709,15 @@ export function routeOverlayHit(hit, nav) {
     const place = hit.kind === 'book' ? bookPlace(g, hit.book) : chapterPlace(g, ci);
     if (!place) return false;
     const frame = frameOf(g, place);
-    const open = hit.kind === 'chapter' ? { mode: 'group', chapter: ci } : undefined;
+    // a book's name opens nothing, so what was open closes and the book is framed in the whole
+    // canvas, as the go-to's book does (s24.4: John 3:16's panel stayed docked over the book). Its
+    // crumb opens nothing (null); the trail's origin, read at the push, keeps the panel for Back
+    const closes = hit.kind === 'book' && typeof nav.closePanel === 'function';
+    const open = hit.kind === 'chapter' ? { mode: 'group', chapter: ci } : closes ? null : undefined;
     if (nav.journey) nav.journey.push({ verse: place.lo, label: place.label, open, span: [frame.x0, frame.x1] });
     if (open && typeof nav.openPanel === 'function') nav.openPanel(open);
-    const cover = open && typeof nav.insetFor === 'function' ? nav.insetFor() : null;
+    if (closes) nav.closePanel();
+    const cover = closes ? { right: 0, bottom: 0 } : open && typeof nav.insetFor === 'function' ? nav.insetFor() : null;
     if (typeof nav.flyTo === 'function') nav.flyTo(frame, cover ? { insetRight: cover.right, insetBottom: cover.bottom } : undefined);
     return true;
   }

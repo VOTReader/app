@@ -337,7 +337,8 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
   } else if (top.k === 'readings') {
     body = <ReadWithMusic state={state} />;
   } else if (top.k === 'song') {
-    body = <SongPage familyId={top.v} library={library} playingId={playingId} active={active} onPush={onPush} FamilyRow={FamilyRow} />;
+    // Keyed by the song (s23.1): a song opened from another song's page is a new page, not the last one's open lists.
+    body = <SongPage key={top.v} familyId={top.v} library={library} playingId={playingId} active={active} onPush={onPush} FamilyRow={FamilyRow} />;
   } else if (top.k === 'list') {
     body = <SongsList frame={top} library={library} playingId={playingId} active={active} onPush={onPush} />;
   } else {

@@ -1920,6 +1920,16 @@ describe('formatImportSpaceWarning', () => {
   });
   it('returns empty when free space cannot be determined (no quota/usage)', () => {
     expect(formatImportSpaceWarning(5 * MB, {})).toBe('');
+    expect(formatImportSpaceWarning(5 * MB, { quota: 200 * MB })).toBe('');      // no usage: unknown
+    expect(formatImportSpaceWarning(5 * MB, { usage: 50 * MB })).toBe('');       // no quota: unknown
+  });
+  // ds5 s34.3: a reported quota already used up gave free <= 0, read as "unknown": no warning
+  // exactly when the device is full.
+  it('warns when the device reports no free space at all', () => {
+    const w = formatImportSpaceWarning(5 * MB, { quota: 200 * MB, usage: 200 * MB });
+    expect(w).toContain('Note:');
+    expect(w).toContain('no free space');
+    expect(formatImportSpaceWarning(5 * MB, { quota: 200 * MB, usage: 230 * MB })).toContain('no free space');
   });
 });
 

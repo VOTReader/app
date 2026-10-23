@@ -83,6 +83,7 @@ const STORE_SHAPES = {
   'vot-note-default': 'object',            // {style, color}; replaceAll routes through set(), which normalizes
   'vot-bookmarks': 'array',
   'vot-links': 'array',
+  'vot-reading-plans': 'array',
   'vot-recent-nav': 'array',
   'vot-history': 'array',
   'vot-home-order': 'stringArray',         // tile-id[] — store does NOT coerce

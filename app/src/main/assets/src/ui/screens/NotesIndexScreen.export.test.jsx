@@ -17,6 +17,7 @@ vi.mock('../../utils/notes-export.js', async (importOriginal) => {
 });
 import { shareNotesExport } from '../../utils/notes-export.js';
 import { NotesIndexScreen } from './NotesIndexScreen.jsx';
+import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 
 const NOTES = [
   { groupId: 'g1', keys: ['letter:the-wide-path:0'], color: 'yellow', body: 'thought one', fullText: 'anchor one', created: 1, updated: 2, notebookIds: ['nb1'] },
@@ -35,6 +36,7 @@ const GLOBALS = {
   ConfirmStrip: () => null,
   NoteRow: ({ note }) => <div className="note-row-stub">{note.groupId}</div>,
   noteSourceLabel: (n) => (n.keys && n.keys[0]) || 'Note',
+  normalizeExcerptDisplay,   // the search filter reads it (ds5 s21.1 tests type a query)
 };
 
 beforeEach(() => { Object.assign(window, GLOBALS); });
@@ -80,6 +82,27 @@ describe('NotesIndexScreen Share as text', () => {
     expect(arg.title).toBe('My Notes');
     expect(arg.filename).toMatch(/^My Notes \d{4}-\d{2}-\d{2}\.md$/);
     expect(arg.text).toContain('## bible:genesis:1:1');
+  });
+
+  // ds5 s21.1: a search narrows what Share sends to what the reader sees.
+  it('All Notes Share sends only the notes a search shows', () => {
+    const utils = renderScreen();
+    fireEvent.click(utils.getByText('All Notes'));
+    fireEvent.change(utils.getByPlaceholderText('Search notes…'), { target: { value: 'thought two' } });
+    fireEvent.click(utils.getByTitle('Share all notes as text'));
+    const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
+    expect(arg.text).toContain('thought two');
+    expect(arg.text).not.toContain('thought one');
+  });
+
+  it('a drilled notebook Share sends only the notes a search shows', () => {
+    const utils = renderScreen();
+    drillInto(utils, 'Devotional');
+    fireEvent.change(utils.getByPlaceholderText('Search notes…'), { target: { value: 'thought one' } });
+    fireEvent.click(utils.getByTitle('Share notebook as text'));
+    const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
+    expect(arg.text).toContain('thought one');
+    expect(arg.text).not.toContain('thought two');
   });
 
   it('hides Share in a drilled view with no notes (nothing to export)', () => {

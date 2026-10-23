@@ -51,7 +51,7 @@
 
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverGLSL, spanInkGLSL, CLIP_MARGIN, glslFloat, frameHeights,
-  STROKE_MIN_CSS, STROKE_DEEP_CSS, STROKE_FIT_CSS, skyLocalize,
+  STROKE_MIN_CSS, STROKE_DEEP_CSS, STROKE_FIT_CSS, skyLocalize, verseLift,
 } from '../../utils/scripture-web/geometry.js';
 import {
   CENTRE_BRIGHT, CENTRE_WIDTH, FLYOVER_LEG_WIDTH, TAP_CONTEXT, rgba01, inkWidth,
@@ -60,6 +60,7 @@ import {
 import { topSet, topDraws, isCompact, frameSetAt, TOP_ORDER } from '../../utils/scripture-web/frame-set.js';
 import { rampGLSL, cssColorToRGB } from '../../utils/scripture-web/palette.js';
 import { fansOf } from '../../utils/scripture-web/decode.js';
+import { FILTER_GHOST, filterMasksOf } from '../../utils/scripture-web/filters.js';
 
 /** Density steps, in the order the control cycles them. */
 export const DENSITY_STEPS = ['essential', 'famous'];
@@ -97,6 +98,8 @@ precision highp float;
 precision highp int;
 uniform highp sampler2D uArcs;   // per thread: (from, to, fanA, fanB), ARC_TEX_W texels a row
 uniform highp sampler2D uVotes;  // per thread: its votes
+uniform highp sampler2D uKeep;   // per thread: 1 kept by the filters, 0 a ghost (filters.js)
+uniform float uFiltered;         // 1 while a filter is on (uKeep is read), 0 otherwise
 uniform vec2  uRes;          // the frame, full-resolution device px (the backing may be smaller: uPx)
 uniform float uCamXHi, uCamXLo;  // the camera's x, split: hi = floor(x), lo = x - hi (float32 at the ceiling)
 uniform float uPPV, uBase, uSquash;
@@ -106,6 +109,7 @@ uniform vec2  uFrameH;       // the heights a body must reach to be in the frame
 uniform float uPx;           // full-resolution px per backing px: 1 at rest, more in a gesture (E2)
 uniform float uWidth, uAlpha, uTotal;
 uniform float uWidthFit;     // the span-ink law's hairline: STROKE_FIT_CSS device px a CSS px (geometry.spanFitHalf)
+uniform float uLift;         // the verse zoom's weight: 1, up to VERSE_LIFT deep in (geometry.verseLift)
 uniform float uSegments;     // this run's segment count: the most any thread in it asked for
 uniform float uVoteMix;      // 0 = votes drive alpha (overview), 1 = width (depth)
 uniform vec2  uFocusRange;   // verse range kept lit (lo > hi = no focus)
@@ -129,6 +133,7 @@ void main(){
   ivec2 at = ivec2(i & 1023, i >> 10);
   vec4 arc = texelFetch(uArcs, at, 0);
   float aVotes = texelFetch(uVotes, at, 0).r;
+  float aKeep = uFiltered > .5 ? texelFetch(uKeep, at, 0).r : 1.;
   float a = arc.x, b = arc.y, aFanA = arc.z, aFanB = arc.w;
   // each foot stands in its verse's own cell, in the order of its far end
   // (geometry.footX; the picker computes the same). The camera's x comes
@@ -196,6 +201,8 @@ void main(){
   // so the 1-4 chapter arches the plateau inks are not lifted past it.
   float cT = uCentreT*inCentre*centreShortness(tSpan);
   halfW *= mix(1., ${glslFloat(CENTRE_WIDTH)}, cT);
+  // The verse zoom's weight (geometry.verseLift): every line heavier as the camera dives to one verse.
+  halfW *= uLift;
 
   // The chosen and hovered lines are not styled here: the top pass redraws
   // them over this one in their own ink and width, at every zoom (sw1 B2).
@@ -233,7 +240,8 @@ void main(){
   float aOut = min(uAlpha*aStrength*spanGain(shortness), 1.)*dim*mix(1., ${glslFloat(CENTRE_BRIGHT)}, cT)*thin;
   // past full ink the centre's boost lifts the colour instead, clamped
   col = min(col*max(aOut, 1.), vec3(1.));
-  vCol = vec4(col, min(aOut, 1.));
+  // a thread the filters leave out is a ghost of its ink (filters.js FILTER_GHOST)
+  vCol = vec4(col, min(aOut, 1.)*mix(${glslFloat(FILTER_GHOST)}, 1., aKeep));
   vEdge = side;
   vHalfW = halfW;
   vInk = vec2(glowHalf, uGlow.y);
@@ -359,12 +367,13 @@ const TOP_LOOK = {
  * @param {boolean} compact
  * @param {number} [tapFade]  0..1, the frame's (uTapFade)
  * @param {number} [px]  full-resolution px per backing px (E2; 1 at rest)
+ * @param {number} [lift]  the verse zoom's weight (geometry.verseLift; 1 when left out)
  * @returns {{ coreHalf: number, haloHalf: number, core: number[], halo: number[], ribbon: number, cap: number,
  *   keyHalf: number, key: number[] }}
  */
-export function topLook(kind, dpr, compact, tapFade, px) {
+export function topLook(kind, dpr, compact, tapFade, px, lift) {
   const look = TOP_LOOK[kind];
-  const d = dpr > 0 ? dpr : 1;
+  const d = (dpr > 0 ? dpr : 1) * (lift > 1 ? lift : 1);
   const p = px > 0 ? px : 1;
   const wide = inkWidth(look.core, compact) * d;
   const half = (look.minDevicePx && wide < look.minDevicePx ? look.minDevicePx : wide) / 2;
@@ -495,8 +504,8 @@ export function createRenderer(canvas, graph, opts = {}) {
   }
   gl.useProgram(program);
 
-  const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
-    'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uAlpha', 'uTotal',
+  const U = uniformsOf(gl, program, ['uArcs', 'uVotes', 'uKeep', 'uFiltered', 'uRes', 'uCamXHi', 'uCamXLo', 'uCamY', 'uPPV',
+    'uBase', 'uSquash', 'uFlyLocalize', 'uFrameH', 'uPx', 'uFeather', 'uWidth', 'uWidthFit', 'uLift', 'uAlpha', 'uTotal',
     'uSegments', 'uVoteMix', 'uFocusRange', 'uFocusArc', 'uTapFade', 'uCentre', 'uCentreT', 'uGlow']);
   const TU = uniformsOf(gl, topProgram, ['uRes', 'uCamXHi', 'uCamXLo', 'uPPV', 'uBase', 'uSquash', 'uCamY',
     'uSegments', 'uRibbonHalf', 'uRibbon', 'uCoreHalf', 'uHaloHalf', 'uFeather', 'uCore', 'uHalo',
@@ -530,9 +539,16 @@ export function createRenderer(canvas, graph, opts = {}) {
   };
   const arcTex = texture(0, gl.RGBA32F, gl.RGBA, arcData);
   const voteTex = texture(1, gl.R32F, gl.RED, voteData);
+  // the filters' keep mask (filters.js), the same shape, filled when the masks in force change
+  const keepData = new Float32Array(ARC_TEX_W * rows);
+  const keepTex = texture(2, gl.R32F, gl.RED, keepData);
+  /** @type {object | null} */
+  let keepHeld = null;
   gl.activeTexture(gl.TEXTURE0);
   U.i1('uArcs', 0);
   U.i1('uVotes', 1);
+  U.i1('uKeep', 2);
+  U.f1('uFiltered', 0);
 
   // The id stream: the frame's visible set in rank order (frame-set.js),
   // uploaded only when the set changes (a new camera), into one buffer as
@@ -588,13 +604,13 @@ export function createRenderer(canvas, graph, opts = {}) {
   gl.bindVertexArray(vao);
 
   // Each kind's look, rebuilt only when what it reads changes (E3).
-  /** @type {Record<string, {dpr:number, compact:boolean, fade:number, px:number, look:any}>} */
+  /** @type {Record<string, {dpr:number, compact:boolean, fade:number, px:number, lift:number, look:any}>} */
   const looks = Object.create(null);
-  const lookOf = (kind, dpr, compact, fade, px) => {
+  const lookOf = (kind, dpr, compact, fade, px, lift) => {
     const held = looks[kind];
-    if (held && held.dpr === dpr && held.compact === compact && held.fade === fade && held.px === px) return held.look;
-    const look = topLook(kind, dpr, compact, fade, px);
-    looks[kind] = { dpr, compact, fade, px, look };
+    if (held && held.dpr === dpr && held.compact === compact && held.fade === fade && held.px === px && held.lift === lift) return held.look;
+    const look = topLook(kind, dpr, compact, fade, px, lift);
+    looks[kind] = { dpr, compact, fade, px, lift, look };
     return look;
   };
   const heights = new Float64Array(2);
@@ -614,9 +630,10 @@ export function createRenderer(canvas, graph, opts = {}) {
     topStats.instances = 0; topStats.vertices = 0; topStats.draws = 0;
     if (!set.count) return;
     const compact = isCompact(v.height / dpr);
+    const lift = verseLift(ppv / dpr);
     for (let k = 0; k < TOP_ORDER.length; k++) {
       const kind = TOP_ORDER[k];
-      topPads[k] = lookOf(kind, dpr, compact, TOP_LOOK[kind].recedes ? tapFade : 0, px).ribbon;
+      topPads[k] = lookOf(kind, dpr, compact, TOP_LOOK[kind].recedes ? tapFade : 0, px, lift).ribbon;
     }
     const f = topFrame;
     f.width = v.width; f.base = v.base; f.camX = camX; f.camY = camY; f.ppv = ppv; f.squash = v.squash; f.dpr = dpr;
@@ -645,7 +662,7 @@ export function createRenderer(canvas, graph, opts = {}) {
     TU.f1('uFeather', px);
     for (let ri = 0; ri < drawn.runs.length; ri++) {
       const run = drawn.runs[ri];
-      const look = lookOf(run.kind, dpr, compact, TOP_LOOK[run.kind].recedes ? tapFade : 0, px);
+      const look = lookOf(run.kind, dpr, compact, TOP_LOOK[run.kind].recedes ? tapFade : 0, px, lift);
       TU.f1('uSegments', run.segments);
       TU.f1('uRibbonHalf', look.ribbon);
       TU.f1('uRibbon', look.ribbon);
@@ -785,9 +802,23 @@ export function createRenderer(canvas, graph, opts = {}) {
       U.f1('uFeather', px);
       U.f1('uWidth', v.strokeWidth);
       U.f1('uWidthFit', STROKE_FIT_CSS * dpr);
+      U.f1('uLift', verseLift(ppv / dpr));
       U.f1('uAlpha', v.alpha);
       U.f1('uTotal', graph.total);
       U.f1('uVoteMix', v.voteMix || 0);
+      // the filters in force: the mask is uploaded only when it changes
+      const masks = filterMasksOf(graph);
+      if (masks !== keepHeld) {
+        keepHeld = masks;
+        if (masks) {
+          for (let i = 0; i < count; i++) keepData[i] = masks.threads[i];
+          gl.activeTexture(gl.TEXTURE2);
+          gl.bindTexture(gl.TEXTURE_2D, keepTex);
+          gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, ARC_TEX_W, rows, gl.RED, gl.FLOAT, keepData);
+          gl.activeTexture(gl.TEXTURE0);
+        }
+      }
+      U.f1('uFiltered', masks ? 1 : 0);
       // the near glow's reach in device px and its alpha share: the phone's (a compact frame) is
       // shorter and lighter (sw-ink NEAR_GLOW_COMPACT_CSS / NEAR_GLOW_COMPACT_ALPHA), the same at every zoom
       const compactFrame = isCompact(v.height / dpr);
@@ -839,6 +870,7 @@ export function createRenderer(canvas, graph, opts = {}) {
       for (const a of topAttribs) gl.deleteBuffer(a.buf);
       gl.deleteTexture(arcTex);
       gl.deleteTexture(voteTex);
+      gl.deleteTexture(keepTex);
       gl.deleteVertexArray(vao);
       gl.deleteVertexArray(topVao);
       gl.deleteProgram(program);

@@ -126,6 +126,28 @@ export function maxZoomFor(total, widthCss) {
 /** The share of the frame's width one verse fills at the camera's ceiling (the verse zoom). */
 export const VERSE_FILL = 0.8;
 
+/** How much heavier every thread draws at the verse zoom than at the tap rule's ceiling (Corbin,
+ * 2026-10-22, on the before-and-after pair at 2.2: "I did want heavier lines"; a little past it). */
+export const VERSE_LIFT = 2.5;
+/** CSS px a verse where the lift is whole: two octaves past PPV_MAX_CSS. */
+export const VERSE_LIFT_FULL_CSS = PPV_MAX_CSS * 4;
+
+/**
+ * THE VERSE ZOOM'S WEIGHT (Corbin, 2026-10-22: "The lines maybe should feel a little heavier when
+ * fully zoomed in"). Past the tap rule's ceiling the camera dives to one verse, and every thread
+ * there is long against the frame: the span-ink law held them at the overview's hairline, dim on
+ * black, and only the chosen one read. From PPV_MAX_CSS to VERSE_LIFT_FULL_CSS every width, the
+ * main pass's and the top pass's alike, eases up to VERSE_LIFT, so the chosen line keeps its lead.
+ * 1 at every zoom the web had before the verse zoom.
+ * @param {number} ppvCss  CSS px a verse (the camera's ppv over the DPR)
+ * @returns {number}
+ */
+export function verseLift(ppvCss) {
+  if (!(ppvCss > PPV_MAX_CSS)) return 1;
+  const t = smoothstep(Math.log2(PPV_MAX_CSS), Math.log2(VERSE_LIFT_FULL_CSS), Math.log2(ppvCss));
+  return 1 + (VERSE_LIFT - 1) * t;
+}
+
 /**
  * THE CAMERA'S CEILING (the verse zoom): one verse VERSE_FILL of the frame's width, on every frame
  * (phone, PC, either orientation), so the zoom is VERSE_FILL x total whatever the width. Never under

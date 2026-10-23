@@ -332,4 +332,57 @@ describe('ThumbStore — IDB unavailable', () => {
     });
     await expect(m.openThumbDB()).resolves.toBeNull();
   });
+
+  // ds5 s12.2: one failed or blocked open used to be cached for the session, and a
+  // blocked open (an old connection holding the v1 -> v2 upgrade) never settled at all,
+  // stalling every queued thumbnail write behind it.
+  it('a failed open is not cached: the next call opens again', async () => {
+    let n = 0;
+    const db = { onversionchange: null, close() {} };
+    const m = await freshModuleWith({
+      open: () => {
+        const req = /** @type {any} */ ({});
+        n++;
+        if (n === 1) queueMicrotask(() => req.onerror());
+        else queueMicrotask(() => req.onsuccess({ target: { result: db } }));
+        return req;
+      },
+    });
+    await expect(m.openThumbDB()).resolves.toBeNull();
+    await expect(m.openThumbDB()).resolves.toBe(db);
+    expect(n).toBe(2);
+  });
+
+  // Refuter r1: a blocker that lets go soon must still get the write through, as before.
+  it('a blocked open still opens when the blocker lets go in time', async () => {
+    vi.useFakeTimers();
+    try {
+      const db = { onversionchange: null, close: vi.fn() };
+      let req = /** @type {any} */ (null);
+      const m = await freshModuleWith({
+        open: () => { req = {}; queueMicrotask(() => req.onblocked && req.onblocked()); return req; },
+      });
+      const p = m.openThumbDB();
+      await vi.advanceTimersByTimeAsync(2000);
+      req.onsuccess({ target: { result: db } });     // the old tab closed
+      await expect(p).resolves.toBe(db);
+      expect(db.close).not.toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a blocker that never lets go settles null after a while, and a connection that comes later is closed', async () => {
+    vi.useFakeTimers();
+    try {
+      const late = { onversionchange: null, close: vi.fn() };
+      let req = /** @type {any} */ (null);
+      const m = await freshModuleWith({
+        open: () => { req = {}; queueMicrotask(() => req.onblocked && req.onblocked()); return req; },
+      });
+      const p = m.openThumbDB();
+      await vi.advanceTimersByTimeAsync(m.THUMB_BLOCKED_GIVE_UP_MS + 10);
+      await expect(p).resolves.toBeNull();
+      req.onsuccess({ target: { result: late } });
+      expect(late.close).toHaveBeenCalled();
+    } finally { vi.useRealTimers(); }
+  });
 });

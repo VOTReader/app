@@ -318,7 +318,18 @@ describe('endpointFor: the navigateToLink endpoint that opens the paragraph', ()
     expect(vc.endpointFor(c)).toEqual({
       type: 'letter', key: 'letter:the-wide-path:3', letterId: 'the-wide-path', screen: 'vot-letter',
       volKey: 'two', collection: 'Volume Two', label: 'The Wide Path',
+      surpriseAnchor: { type: 'excerpt', text: c.excerpt.replace(/^…|…$/g, ''), letterId: 'the-wide-path', para: 3 },
     });
+    expect(c.excerpt.length, 'the citing sentence rides along').toBeGreaterThan(20);
+  });
+
+  // The hub's seam walk F1 (2026-10-22): Open letter landed a screen early, the citing sentence unmarked.
+  it('lands as a search hit does: the citation’s own block, its sentence without the cut marks', () => {
+    const ep = vc.endpointFor({ volKey: 'two', letterId: 'x', paragraph: 7, excerpt: '…the penalty of sin is death…' });
+    expect(ep.surpriseAnchor).toEqual({ type: 'excerpt', text: 'the penalty of sin is death', letterId: 'x', para: 7 });
+    const w = vc.endpointFor({ volKey: 'wtlb1', entryId: 'e', paragraph: 2 });
+    expect(w.surpriseAnchor).toEqual({ type: 'excerpt', text: '', letterId: 'e', para: 2 });
+    expect('surpriseAnchor' in vc.endpointFor({ studyId: 's', chapterId: 'c', paragraph: 2 }), 'a study chapter lands by its key').toBe(false);
   });
 
   it('a Words To Live By entry, a Blessed entry, and both kinds of Holy Days entry', () => {

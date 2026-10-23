@@ -12,6 +12,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, act, fireEvent, screen } from '@testing-library/react';
 import { computeAccessibleName } from 'dom-accessibility-api';
 import { gardenSwipeDir, GardenView } from './GardenView.jsx';
+import { AudioPlayer } from '../../utils/audio-player.js';
 
 const GLOBALS = [
   'PlatformBridge', 'gardenTierLimits', 'gardenIsCached', 'gardenPreload',
@@ -265,5 +266,26 @@ describe('GardenView — pinch must not leak into the swipe test (gap-garden-vie
     fireTouch(area(), 'touchcancel', [], [{ clientX: 250, clientY: 200 }]); // interrupted mid-drag
 
     expect(onPageChange).not.toHaveBeenCalled();
+  });
+});
+
+/* Corbin 2026-10-22 23:5x: "Audio should not play in those two screens" (the Garden and the Scripture Web). Entering
+   the Garden pauses the player where it is; the bar hides over it (app.css cz5) and nothing resumes by itself. */
+describe('GardenView — no audio here', () => {
+  it('entering the Garden pauses the player once, and leaving resumes nothing', () => {
+    setupGardenGlobals(mkPos());
+    const pause = vi.spyOn(AudioPlayer, 'pauseIfPlaying').mockImplementation(() => {});
+    const toggle = vi.spyOn(AudioPlayer, 'toggle').mockImplementation(() => {});
+    try {
+      const view = renderGarden();
+      expect(pause).toHaveBeenCalledTimes(1);
+      view.rerender(<GardenView page={2} onPageChange={() => {}} onBack={() => {}} theme="dark" onThemeChange={() => {}} tier="std" />);
+      expect(pause).toHaveBeenCalledTimes(1);          // a page turn is not a new entry
+      view.unmount();
+      expect(toggle).not.toHaveBeenCalled();
+    } finally {
+      pause.mockRestore();
+      toggle.mockRestore();
+    }
   });
 });

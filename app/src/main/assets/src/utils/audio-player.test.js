@@ -1971,8 +1971,9 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     }
   });
 
-  /* The Codex refutation of 2026-09-24 (out/offline-refute.md). */
-  it('Next onto a recording not on the phone stops the one playing (M1)', async () => {
+  /* The Codex refutation of 2026-09-24 (out/offline-refute.md). A Next there is refused since RC.1 (below: the one
+     playing plays on); a queue row the listener picks still lands, and M1 holds for it. */
+  it('a queue row onto a recording not on the phone stops the one playing (M1)', async () => {
     await downloaded(['idA1']);
     setOnline(false);
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
@@ -1980,7 +1981,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     el().dispatchEvent(new Event('playing'));
     el().currentTime = 36;
     el().dispatchEvent(new Event('timeupdate'));
-    AudioPlayer.next();   // part 2 is not on the phone, and nothing after it is
+    AudioPlayer.playAt(1);   // part 2 is not on the phone, and nothing after it is
     const s = AudioPlayer.getState();
     expect(s.queue[s.qi].url).toBe(URL_OF('idA2'));
     expect(s.status).toBe('paused');
@@ -2130,6 +2131,14 @@ describe('audio-player — load errors', () => {
     expect(s.status).toBe('paused');
     expect(s.queue).toHaveLength(2);
     expect(s.qi).toBe(0);
+    // A streamed recording that failed at the network, with the phone online: a dead zone (U04.2's wording).
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('No signal. This recording isn’t on your phone.');
+  });
+
+  it('a failure that is not the network keeps the plain load-failure line', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    el().error = { code: 3 };   // MEDIA_ERR_DECODE
+    el().dispatchEvent(new Event('error'));
     expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Couldn’t load this track.');
   });
 
@@ -3049,6 +3058,51 @@ describe('audio-player — durable resume (position survives restart)', () => {
       expect(AudioPlayer.getState().restoring).toBe(false);
       expect(AudioPlayer.getState().queue).toHaveLength(4);
     });
+
+    it('Play shows loading while the corpus loads, and a Pause then stops the start: the bar stays the restored one (s32.1)', async () => {
+      delete globalThis.AUDIO_MANIFEST;
+      let land = () => {};
+      globalThis.__loadVotCorpus = () => new Promise((res) => { land = () => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }; });
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      AudioPlayer.toggle();                            // Play: the rebuild waits for the corpus
+      expect(AudioPlayer.getState().status).toBe('loading');
+      AudioPlayer.toggle();                            // Pause, before anything has started
+      expect(AudioPlayer.getState().status).toBe('paused');
+      land();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(FakeAudio.last).toBe(null);               // nothing started
+      let st = AudioPlayer.getState();
+      expect(st.status).toBe('paused');
+      expect(st.restoring).toBe(true);                 // still the restored bar, at its place
+      expect(st.time).toBe(123);
+      AudioPlayer.toggle();                            // Play again: the corpus is in, so it starts at once
+      await new Promise((r) => setTimeout(r, 0));
+      st = AudioPlayer.getState();
+      expect(st.queue).toHaveLength(4);
+      expect(el().src).toBe(URL_OF('idA2'));
+      expect(st.status).toBe('loading');
+    });
+
+    /* Corbin 2026-10-22 23:5x: audio does not play on the Garden or the Scripture Web; entering one calls
+       pauseIfPlaying. A Play still waiting for its corpus has no element to pause: it must not start later. */
+    it('pauseIfPlaying during that wait takes the start back too', async () => {
+      delete globalThis.AUDIO_MANIFEST;
+      let land = () => {};
+      globalThis.__loadVotCorpus = () => new Promise((res) => { land = () => { globalThis.AUDIO_MANIFEST = MANIFEST; res(); }; });
+      localStorage.setItem('vot-audio-pos', JSON.stringify(SNAPSHOT));
+      await load();
+      AudioPlayer.toggle();                            // Play: the rebuild waits for the corpus
+      expect(AudioPlayer.getState().status).toBe('loading');
+      AudioPlayer.pauseIfPlaying();
+      expect(AudioPlayer.getState().status).toBe('paused');
+      land();
+      await new Promise((r) => setTimeout(r, 0));
+      expect(FakeAudio.last).toBe(null);               // nothing started
+      const st = AudioPlayer.getState();
+      expect(st.status).toBe('paused');
+      expect(st.time).toBe(123);                       // paused at the same spot, one tap from resuming
+    });
   });
 
   it('restores a v2 custom queue without needing the lazy corpus', async () => {
@@ -3066,6 +3120,30 @@ describe('audio-player — durable resume (position survives restart)', () => {
     expect(AudioPlayer.getState().queue.map((track) => track.url)).toEqual([URL_OF('idPreface'), URL_OF('idC')]);
     expect(AudioPlayer.getState().qi).toBe(1);
     expect(el().src).toBe(URL_OF('idC'));
+  });
+
+  it('an edited run restores at once and asks for the corpus its site order needs, without waiting for it (s31.1)', async () => {
+    const first = { key: 'vol1:preface', title: 'Preface', sub: 'Volume One', readerCode: 'B', partLabel: null, url: URL_OF('idPreface') };
+    const second = { key: 'vol1:letter-c', title: 'Letter C', sub: 'Volume One', readerCode: 'T', partLabel: null, url: URL_OF('idC') };
+    delete globalThis.AUDIO_MANIFEST;                // a cold boot: the letters' corpus is not in memory
+    const loadCorpus = vi.fn(() => new Promise(() => {}));
+    globalThis.__loadVotCorpus = loadCorpus;
+    try {
+      localStorage.setItem('vot-audio-pos', JSON.stringify({
+        v: 2, mode: 'custom', volKey: 'vol1', label: 'Volume One', qi: 1, key: second.key, time: 31,
+        track: second, customQueue: [first, second],
+      }));
+      await load();
+      AudioPlayer.toggle();
+      expect(el().src).toBe(URL_OF('idC'));          // the queue never waited for the corpus
+      expect(loadCorpus).toHaveBeenCalledTimes(1);
+      const st = AudioPlayer.getState();
+      expect(st.queue.map((track) => track.url)).toEqual([URL_OF('idPreface'), URL_OF('idC')]);
+      expect(st.sourceMode).toBe('custom');
+    } finally {
+      delete globalThis.__loadVotCorpus;
+      globalThis.AUDIO_MANIFEST = MANIFEST;
+    }
   });
 
   it('a startId queue persists its horizon and rebuilds forward-only after a reboot', async () => {
@@ -4622,5 +4700,164 @@ describe('audio-player — screen-off playback: the seam, the re-arm, the honest
     bridge.setAudioActive.mockClear();
     setVisibility('visible');
     expect(bridge.setAudioActive).toHaveBeenCalledWith(true);
+  });
+});
+
+/* RC.1 + U04.2 (UX sweep re-check 2026-10-22): a step onto a recording that cannot load must not kill the one playing.
+   Really offline, Next and Previous are refused before the queue moves when nothing that way is on the phone (RC.1).
+   With the phone online but every request failing (a dead zone), a switch that dies at the network before it ever
+   sounds puts back what was playing, paused at its place, and says why (U04.2). */
+describe('audio-player — a failed step keeps what was playing (RC.1, U04.2)', () => {
+  async function downloaded(ids) {
+    bridge.offlineAudioState = () => JSON.stringify({ items: ids.map((id) => ({ url: URL_OF(id), key: '', title: '', bytes: 1, savedAt: 1 })), totalBytes: ids.length, freeBytes: 1e9, active: null, queued: [] });
+    const { OfflineAudio } = await import('./offline-audio.js');
+    OfflineAudio.refresh();
+  }
+  const toast = () => { const t = document.getElementById(AUDIO_TOAST_ID); return t ? t.textContent : null; };
+  /** The recording sounds and its clock reaches `at`. */
+  const sounding = (at) => { el().currentTime = at; el().dispatchEvent(new Event('playing')); el().dispatchEvent(new Event('timeupdate')); };
+  const here = () => { const s = AudioPlayer.getState(); return s.queue[s.qi] ? s.queue[s.qi].url : null; };
+
+  it('offline, Next with nothing ahead on the phone is refused: the one playing from its buffer plays on (RC.1)', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    sounding(45);
+    setOnline(false);
+    AudioPlayer.next();
+    expect(here()).toBe(URL_OF('idPreface'));
+    expect(AudioPlayer.getState().status).toBe('playing');
+    expect(el().src).toBe(URL_OF('idPreface'));
+    expect(el().paused).toBe(false);
+    expect(toast()).toBe('No connection. The next recording isn’t on this phone.');
+  });
+
+  it('offline, Next still reaches a recording further on that IS on the phone', async () => {
+    await downloaded(['idC']);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    sounding(45);
+    setOnline(false);
+    AudioPlayer.next();
+    expect(here()).toBe(URL_OF('idC'));
+  });
+
+  it('offline, Next onto a part not on the phone keeps the part playing, and files no clock under the other (RC.1, M1)', async () => {
+    await downloaded(['idA1']);
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
+    sounding(36);
+    setOnline(false);
+    AudioPlayer.next();   // part 2 is not on the phone, and nothing after it is
+    expect(here()).toBe(URL_OF('idA1'));
+    expect(el().paused).toBe(false);
+    el().currentTime = 41;
+    el().dispatchEvent(new Event('timeupdate'));
+    const snap = JSON.parse(localStorage.getItem('vot-audio-pos'));
+    expect(snap.track.url).toBe(URL_OF('idA1'));
+  });
+
+  it('offline, Previous onto a recording not on the phone is refused the same way (RC.1)', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    AudioPlayer.next();
+    expect(here()).toBe(URL_OF('idA1'));
+    sounding(1);
+    setOnline(false);
+    AudioPlayer.prev();
+    expect(here()).toBe(URL_OF('idA1'));
+    expect(AudioPlayer.getState().status).toBe('playing');
+    expect(toast()).toBe('No connection. The previous recording isn’t on this phone.');
+  });
+
+  it('a dead zone: a new queue that dies at the network before it sounds puts back what was playing (U04.2)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    sounding(109);
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' }, collectionLabel: 'Volume Two' });
+    expect(here()).toBe(URL_OF('idSolo'));
+    el().error = { code: 2 };
+    el().dispatchEvent(new Event('error'));
+    const s = AudioPlayer.getState();
+    expect(here()).toBe(URL_OF('idC'));
+    expect(s.queue).toHaveLength(1);
+    expect(s.time).toBe(109);
+    expect(s.status).toBe('paused');
+    expect(toast()).toBe('No signal. This recording isn’t on your phone.');
+    // One tap resumes it where it was.
+    el().error = null;
+    AudioPlayer.toggle();
+    expect(el().src).toBe(URL_OF('idC'));
+    el().dispatchEvent(new Event('loadedmetadata'));
+    expect(el().currentTime).toBe(109);
+  });
+
+  it('a dead zone: a Next that dies at the network goes back to the recording it left', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    sounding(45);
+    AudioPlayer.next();
+    expect(here()).toBe(URL_OF('idA1'));
+    el().error = { code: 2 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idPreface'));
+    expect(AudioPlayer.getState().time).toBe(45);
+    expect(AudioPlayer.getState().status).toBe('paused');
+  });
+
+  it('an advance at a recording\'s end is not undone: the failed next one stays, for a retry from the bar', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    sounding(10);
+    el().dispatchEvent(new Event('ended'));
+    expect(here()).toBe(URL_OF('idA2'));
+    el().error = { code: 2 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idA2'));
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(toast()).toBe('No signal. This recording isn’t on your phone.');
+  });
+
+  /* A fetch that fails outright reports MediaError 4, not 2: before any metadata the HTML spec says "the media data
+     cannot be fetched at all" is SRC_NOT_SUPPORTED, and the S22 measured exactly that for a DNS miss (2026-09-13). A
+     dead zone's new recording never reaches metadata, so 4 is the case that matters most. */
+  it('a dead zone\'s usual failure, MediaError 4 before any metadata, puts back what was playing too', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    sounding(30);
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    el().error = { code: 4 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idC'));
+    expect(AudioPlayer.getState().time).toBe(30);
+    expect(toast()).toBe('No signal. This recording isn’t on your phone.');
+  });
+
+  it('a second try at the same recording with nothing played between lands on it, so it can be stepped past', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+    sounding(45);
+    AudioPlayer.next();
+    el().error = { code: 4 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idPreface'));
+    el().error = null;
+    AudioPlayer.next();
+    el().error = { code: 4 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idA1'));             // landed on it this time
+    el().error = null;
+    AudioPlayer.next();
+    expect(here()).toBe(URL_OF('idA2'));             // and the listener steps past it
+  });
+
+  it('a failure that is not the network keeps the new recording and the plain line', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    sounding(30);
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    el().error = { code: 3 };   // MEDIA_ERR_DECODE
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idSolo'));
+    expect(toast()).toBe('Couldn’t load this track.');
+  });
+
+  it('a stopped session has nothing to go back to', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    sounding(30);
+    AudioPlayer.stop();
+    AudioPlayer.playLetter({ volKey: 'vol2', letter: { id: 'solo', title: 'Solo' } });
+    el().error = { code: 2 };
+    el().dispatchEvent(new Event('error'));
+    expect(here()).toBe(URL_OF('idSolo'));
   });
 });

@@ -170,6 +170,20 @@ class BoundedLogTreeTest {
     }
 
     @Test
+    fun `sanitize redacts folder and file names that hold spaces`() {
+        // ds5 refuter r2: the redaction stopped at the first space and kept "Notes/prayer.txt".
+        assertEquals(
+            "[path]: open failed: ENOENT (No such file or directory)",
+            BoundedLogTree.sanitize("/storage/emulated/0/Private Notes/prayer.txt: open failed: ENOENT (No such file or directory)"),
+        )
+        assertEquals("open [path] failed", BoundedLogTree.sanitize("open /storage/emulated/0/My Notes/my prayer list.txt failed"))
+        assertEquals("Pick from [path] failed", BoundedLogTree.sanitize("Pick from /storage/emulated/0/Download failed"))
+        // Refuter r3: a spaced name with no extension, up to Java's ": " after the path.
+        assertEquals("[path]: open failed: ENOENT", BoundedLogTree.sanitize("/storage/emulated/0/Private Notes/my prayer: open failed: ENOENT"))
+        assertEquals("[path]: Permission denied", BoundedLogTree.sanitize("/storage/emulated/0/Private Notes: Permission denied"))
+    }
+
+    @Test
     fun `sanitize redacts data path`() {
         val out = BoundedLogTree.sanitize("cacheDir = /data/user/0/com.votreader.sacredui/cache")
         assertEquals("cacheDir = [path]", out)

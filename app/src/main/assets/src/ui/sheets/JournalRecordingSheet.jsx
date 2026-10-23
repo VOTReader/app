@@ -269,8 +269,11 @@ export function JournalRecordingSheet({ onSave, onClose }) {
       function finalize(audioBlob) {
         // Before `cancelled`: the confirmed discard is what unmounted the sheet.
         if (discardedRef.current) { dropDiscarded(null); return; }
-        if (cancelled) return;
+        // ds5 s28.1: NOT `if (cancelled) return` here. A fetch that lands after the sheet closed
+        // without a discard (Close on the retrieving stage) still commits the take, unlinked, for
+        // the Hub banner; the put's .then below stops at `cancelled` before any UI.
         if (!audioBlob || audioBlob.size === 0) {
+          if (cancelled) return;
           // Nothing to retry: Try again would fetch the same empty file (W15).
           retryFetchRef.current = null;
           setError(NOTHING_RECORDED);

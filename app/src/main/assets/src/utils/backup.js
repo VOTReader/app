@@ -1025,11 +1025,18 @@ export async function applyV3(manifest, entries, ctx) {
  */
 export function formatImportSpaceWarning(mediaTotalBytes, estimate) {
   if (!mediaTotalBytes || mediaTotalBytes <= 0 || !estimate) return '';
-  const quota = typeof estimate.quota === 'number' ? estimate.quota : 0;
-  const usage = typeof estimate.usage === 'number' ? estimate.usage : 0;
+  // ds5 s34.3: a missing number is unknown (no warning); a reported quota already used up
+  // is the device being full, the case the warning is for.
+  const quota = estimate.quota, usage = estimate.usage;
+  if (typeof quota !== 'number' || !(quota > 0) || typeof usage !== 'number' || !isFinite(usage)) return '';
   const free = quota - usage;
-  if (free <= 0 || mediaTotalBytes <= free) return '';
   const mb = (n) => (n / (1024 * 1024)).toFixed(n >= 1024 * 1024 * 1024 ? 0 : 1) + ' MB';
+  if (free <= 0) {
+    return '\n\nNote: this backup’s media is about ' + mb(mediaTotalBytes) +
+      ', and this device reports no free space for the app. The import may not ' +
+      'complete; free up space first if you can.';
+  }
+  if (mediaTotalBytes <= free) return '';
   return '\n\nNote: this backup’s media is about ' + mb(mediaTotalBytes) +
     ', but only about ' + mb(free) + ' appears free on this device. The import may not ' +
     'complete; free up space first if you can.';

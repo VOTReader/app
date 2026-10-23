@@ -154,3 +154,13 @@ describe('ReadingStreakStore — a local date that went back (sweep mw13)', () =
     expect(s.lastReadDate).toBe(before.lastReadDate);
   });
 });
+
+describe('ReadingStreakStore — imported counts are numbers (ds5 s11.2)', () => {
+  it('a backup with string counts keeps their values; junk counts as 0', () => {
+    ReadingStreakStore.replaceAll(/** @type {any} */ ({ currentStreak: '0', longestStreak: '12', totalDays: '30x', lastReadDate: null }));
+    const s = ReadingStreakStore.get();
+    expect(s.longestStreak).toBe(12);
+    expect(s.totalDays).toBe(0);
+    expect(typeof s.currentStreak).toBe('number');
+  });
+});

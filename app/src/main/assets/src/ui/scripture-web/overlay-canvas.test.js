@@ -15,7 +15,7 @@ import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pic
 import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
 import { css, TAP_CONTEXT } from '../../utils/scripture-web/sw-ink.js';
-import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE, FAN_MOST, FAN_MOST_COMPACT, fanAt } from './overlay-renderer.js';
+import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE, FAN_MOST, FAN_MOST_COMPACT, fanAt, TAP_MIN } from './overlay-renderer.js';
 import { exitCensus } from '../../utils/scripture-web/exits.js';
 
 // the fan's census, spied on (its own law: it runs only while a fan is up)
@@ -1453,6 +1453,10 @@ describe('the verse zoom: one verse fills the frame, every link its own labelled
         // the verse fills 0.8 of the frame, so its neighbours show a tenth each at the edges
         const near = (v) => Math.abs(v - JOHN3_16) <= 1;
         expect(near(g.from[i]) || near(g.to[i]), 'a tag on screen belongs to a verse on screen').toBe(true);
+        // s25.2: a finger's target each way, not a line of type tall
+        const dpr = FRAMES[name].DPR;
+        expect((t.x1 - t.x0) / dpr, 'tap target width').toBeGreaterThanOrEqual(TAP_MIN - 1e-6);
+        expect((t.y1 - t.y0) / dpr, 'tap target height').toBeGreaterThanOrEqual(TAP_MIN - 1e-6);
       }
       for (let a = 0; a < threads.length; a++) {
         for (let b = a + 1; b < threads.length; b++) {
@@ -1479,6 +1483,25 @@ describe('the verse zoom: one verse fills the frame, every link its own labelled
     const drawn = withText.texts().map((c) => c.t).join(' ');
     expect(drawn).toContain('loved');
     expect(rec.texts().map((c) => c.t).join(' '), 'no text source, no words').not.toContain('loved');
+  });
+
+  // s25.6: the plates' layouts were keyed on the text's length, so another translation's verse of
+  // the same length drew the first one's lines
+  it('a verse of the same length in other words draws its own words', () => {
+    const one = 'For God so loved the world that He gave His only begotten Son';
+    const two = one.replace('loved', 'cared');
+    const paintWith = (words) => {
+      const fs = frameAt('pc', deep('pc'), JOHN3_16 + 0.5);
+      fs.textOf = (v) => (v === JOHN3_16 ? words : '');
+      const r = recorder(); r.ctx.translate = () => {}; r.ctx.rotate = () => {}; r.ctx.clip = () => {};
+      paintCanonOverlay(r.ctx, fs);
+      return r.texts().map((c) => c.t).join(' ');
+    };
+    expect(two.length).toBe(one.length);
+    expect(paintWith(one)).toContain('loved');
+    const drawn = paintWith(two);
+    expect(drawn).toContain('cared');
+    expect(drawn).not.toContain('loved');
   });
 });
 

@@ -27,7 +27,7 @@ let links, bookmarks;
 beforeEach(() => {
   links = [];
   bookmarks = [];
-  window.LinkStore = { getForKeyPrefix: () => links, getForKey: () => links, subscribe: () => () => {}, getVersion: () => 0 };
+  window.LinkStore = { getForKeyPrefix: () => links, getForKey: () => links, getTouching: () => links, subscribe: () => () => {}, getVersion: () => 0 };
   window.BookmarkStore = { getForKeyPrefix: () => bookmarks, subscribe: () => () => {}, getVersion: () => 0 };
 });
 afterEach(() => {

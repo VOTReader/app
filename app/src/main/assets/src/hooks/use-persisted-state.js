@@ -251,6 +251,14 @@ export function takeResumeRecord(opts) {
  * without the state machine (LS mode) counts as loaded.
  * @returns {boolean}
  */
+/** ds5 s04.1: the last useSavedState read threw (set by it, read at this hook's first render). */
+let _savedReadFailed = false;
+/** @param {boolean} failed */
+export function markSavedStateRead(failed) { _savedReadFailed = !!failed; }
+/** True when the read the app mounted on threw: it rendered {} - defaults, not the reader's
+ *  state - so, like a mount over an unloaded store (item 9), it must write nothing. */
+export function savedStateReadFailed() { return _savedReadFailed; }
+
 export function stateStoreUnloaded() {
   const store = /** @type {any} */ (StateStore);
   return typeof store.getState === 'function' && store.getState() !== 'loaded';
@@ -314,7 +322,10 @@ export function usePersistedState({
   // Header item 9: decided once, at the first render, and never revisited -
   // the union this mount renders came from what useSavedState read then.
   const unloadedRef = React.useRef(/** @type {boolean | null} */ (null));
-  if (unloadedRef.current === null) unloadedRef.current = stateStoreUnloaded();
+  // ds5 s04.1: a read that threw rendered defaults just the same: held the same way.
+  const readFailedRef = React.useRef(/** @type {boolean | null} */ (null));
+  if (readFailedRef.current === null) readFailedRef.current = savedStateReadFailed();
+  if (unloadedRef.current === null) unloadedRef.current = stateStoreUnloaded() || readFailedRef.current;
   /* n4-05: hand a union to the store; once it is on disk it is the base of the
      next leave record. A later write that lands first is never overtaken by an
      older one. Refs only, so every render's copy is the same function. */
@@ -343,7 +354,9 @@ export function usePersistedState({
   // ── Mount-only: install the guaranteed-flush listeners + unmount flush.
   React.useEffect(() => {
     if (unloadedRef.current && typeof DiagnosticLog !== 'undefined') {
-      DiagnosticLog.warn('state-guard', 'App mounted before vot-state loaded: its writes are held until the remount');
+      DiagnosticLog.warn('state-guard', readFailedRef.current
+        ? 'vot-state could not be read: this session shows defaults and writes nothing over the stored record'
+        : 'App mounted before vot-state loaded: its writes are held until the remount');
     }
     /* `patch` is the update reload's door (sw-register's `vot:before-update-reload`):
        a function applied to the LATEST union — pending or already written — and

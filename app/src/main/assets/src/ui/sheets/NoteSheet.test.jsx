@@ -69,6 +69,14 @@ describe('NoteSheet empty-note action', () => {
     expect(dialog.getAttribute('aria-modal')).toBe('true');
   });
 
+  it('the colour dot is drawn inside a button a finger can hit (#10)', () => {
+    setupStores({ body: 'Saved note' });
+    render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    const btn = screen.getByRole('button', { name: 'Change note color' });
+    expect(btn.className).toBe('note-sheet-color-hit');
+    expect(btn.querySelector('.note-sheet-color-dot').getAttribute('data-color')).toBe('yellow');
+  });
+
   it('read mode on an EMPTY note renders the "Add note text" button', () => {
     setupStores({ body: '' });
     render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
@@ -302,5 +310,40 @@ describe('NoteSheet edit-mode style and colour buttons', () => {
     expect(screen.getByRole('button', { name: 'Underline' }).getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByRole('button', { name: 'Squiggle underline' }).getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByRole('button', { name: 'yellow' }).getAttribute('aria-pressed')).toBe('true');
+  });
+});
+
+/* ds5 A06.1 (idea sweep 2026-10-22): Delete note removes the note's mark too, and the confirm said
+   only 'Delete this note?'. It now names the mark, as the toolbar's remove confirm does. */
+describe('NoteSheet delete confirm names the mark that goes with the note (ds5 A06.1)', () => {
+  const openDelete = (container) => {
+    fireEvent.click(container.querySelector('.note-sheet-menu-btn'));
+    fireEvent.click(screen.getByText('Delete note'));
+  };
+
+  it('a coloured highlight: "Delete this note and its highlight?"', () => {
+    setupStores({ body: 'my reflection' });
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    openDelete(container);
+    expect(container.querySelector('.note-sheet-menu').textContent).toContain('Delete this note and its highlight?');
+  });
+
+  it('an underline names the underline', () => {
+    setupStores({ body: 'my reflection' });
+    window.AnnotationStore.getByGroup = () => [{ key: 'k', ann: { id: 'g1', groupId: 'g1', kind: 'underline', color: 'blue', text: 'anchor' } }];
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    openDelete(container);
+    expect(container.querySelector('.note-sheet-menu').textContent).toContain('Delete this note and its underline?');
+  });
+
+  it('an icon-only note (blank highlight) asks only about the note', () => {
+    setupStores({ body: 'my reflection' });
+    const get = window.NoteStore.get;
+    window.NoteStore.get = () => ({ ...get(), color: 'blank' });
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    openDelete(container);
+    const text = container.querySelector('.note-sheet-menu').textContent;
+    expect(text).toContain('Delete this note?');
+    expect(text).not.toContain('highlight');
   });
 });

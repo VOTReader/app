@@ -361,7 +361,7 @@ function App() {
     prophecyCardStatesRef, saveProphecyCardStates,
     setLastReadForVol,
     selectMatthewCh, selectBibleCh, selectScriptureBook: handleScriptureSelect,
-    goToLastRead, searchLanding, setSearchLanding,
+    goToLastRead, lastReadPlace, searchLanding, setSearchLanding,
   } = useReadingPositionNav({
     bookId, screen, chapterNum, letterId, studyId, studyChapterId,
     activeReadKey, lastReadLetterMap, lastReadChapters,
@@ -462,7 +462,7 @@ function App() {
      prevent back-induced navigations from re-pushing entries. */
   useHistorySync({
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
-    genreId, gardenPage,
+    genreId, gardenPage, journalEntryId,
   });
 
   /* useBibleStudies() call → moved UP to right after useReadingDwell
@@ -712,7 +712,7 @@ function App() {
         (top nav, ResumeReadingNavBtn owns its eligibility list) and the
         autoscroll transport (portaled pill). Config only — per-screen wiring
         reaches the pill from ScreenLayout, where it exists. */}
-    <ReadingChromeProvider screen={screen} dotEnabled={!!(settings.showReadingDot && activeReadKey)} onGo={goToLastRead} settings={settings} updateSetting={updateSetting} nav={{ theme, onThemeChange: setTheme, onSettings: goSettings, onHistory: goHistory }}>
+    <ReadingChromeProvider screen={screen} dotEnabled={!!(settings.showReadingDot && activeReadKey)} onGo={goToLastRead} dotPlace={activeReadKey ? lastReadPlace() : null} settings={settings} updateSetting={updateSetting} nav={{ theme, onThemeChange: setTheme, onSettings: goSettings, onHistory: goHistory, onPlans: goReadingPlans }}>
       {null}
 
       {/* All 4 ephemeral overlays (welcome modal, tabs overview +

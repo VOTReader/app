@@ -278,3 +278,31 @@ describe('NotebookStore — [11] setColor()', () => {
     expect(NotebookStore.getVersion()).toBe(v0);
   });
 });
+
+describe('NotebookStore — rename() keeps names unique (ds5 s11.3)', () => {
+  it('refuses a name another notebook already has, in any case, and reports it', () => {
+    NotebookStore.add('Devotional');
+    const nb = /** @type {any} */ (NotebookStore.add('Study'));
+    expect(NotebookStore.rename(nb.id, '  devotional ')).toBe(false);
+    expect(/** @type {any} */ (NotebookStore.get(nb.id)).name).toBe('Study');
+  });
+
+  it('refuses the duplicate while the store is still loading too (refuter r1: it said true and then dropped it)', () => {
+    NotebookStore._resetForTests();                         // idb-backed: 'pending', writes queue
+    try {
+      expect(NotebookStore.getState()).toBe('pending');
+      NotebookStore.add('Devotional');
+      NotebookStore.add('Study');
+      const nb = /** @type {any} */ (NotebookStore._load().list.find((n) => n.name === 'Study'));
+      expect(NotebookStore.rename(nb.id, 'DEVOTIONAL')).toBe(false);
+    } finally {
+      NotebookStore._resetForTests({ forceLoaded: true });
+    }
+  });
+
+  it('still lets a notebook change the case of its own name', () => {
+    const nb = /** @type {any} */ (NotebookStore.add('study'));
+    expect(NotebookStore.rename(nb.id, 'Study')).toBe(true);
+    expect(/** @type {any} */ (NotebookStore.get(nb.id)).name).toBe('Study');
+  });
+});

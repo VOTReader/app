@@ -199,7 +199,8 @@ export function answersWrap(text, width, measure) {
     let line = '';
     for (const w of words) {
       const next = line ? line + ' ' + w : w;
-      if (line && measure(next) > width) { out.push(line); line = w; } else line = next;
+      // a lone separator never opens a line ("Title · Volume 7"): it stays with the word before it
+      if (line && w !== '·' && measure(next) > width) { out.push(line); line = w; } else line = next;
     }
     out.push(line);
   }

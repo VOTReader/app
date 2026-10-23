@@ -60,6 +60,7 @@ export const USER_DATA_STORES = [
   'vot-notes',
   'vot-bookmarks',
   'vot-links',
+  'vot-reading-plans',   // reading-plan runs and their ticks (IDB v14, mw18)
   'vot-notebooks',
   'vot-journal',
   'vot-journal-notebooks',

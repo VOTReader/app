@@ -50,6 +50,7 @@ import {
 import { refOfVerse } from '../../utils/scripture-web/pick.js';
 import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citations.js';
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 /** Citations shown before "Show n more". */
 export const CITED_SHOWN = 2;
@@ -153,10 +154,21 @@ function Section({ title, collapsible = false, startOpen = true, children, class
   const [open, setOpen] = React.useState(startOpen);
   const shown = !collapsible || open;
   const name = typeof title === 'string' ? title : undefined;
+  // A section opened at the panel's foot shows its rows (Corbin, 2026-10-22: "More from Nehemiah
+  // 1:5 · 8 connections" opened with its rows under the edge, so the toggle seemed to do nothing).
+  // `nearest` leaves a section already in view alone, shows a short one whole and brings a tall
+  // one's head to the top, in the panel's own layout, so a turned phone (.sw-rotated) is right too.
+  const ref = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const opened = React.useRef(false);
+  React.useEffect(() => {
+    if (!opened.current || !open || !ref.current || typeof ref.current.scrollIntoView !== 'function') return;
+    opened.current = false;
+    ref.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+  }, [open]);
   return (
-    <section className={'sw-sec ' + className}>
+    <section className={'sw-sec ' + className} ref={ref}>
       {collapsible ? (
-        <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} aria-label={name} onClick={() => setOpen(!open)}>
+        <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} aria-label={name} onClick={() => { opened.current = !open; setOpen(!open); }}>
           <span className="sw-sec-title">{metaItems(title)}</span><Chevron open={open} />
         </button>
       ) : <h3 className="sw-sec-head" aria-label={name}><span className="sw-sec-title">{metaItems(title)}</span></h3>}
@@ -291,8 +303,9 @@ function Quote({ text, children }) {
 }
 
 /** CITED IN THE VOLUMES · n (omitted at 0): each citing passage with its letter, collection, quote and
- * "Open letter ›" at the citing paragraph (B4). `showCites` names the passage each one cites. */
-function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
+ * "Open letter ›" at the citing paragraph (B4). `showCites` names the passage each one cites;
+ * `onRetry`, when the Bible Studies failed to load, loads them again (their quotes read them). */
+function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel, onRetry = null }) {
   const [all, setAll] = React.useState(false);
   if (!cited.length) return null;
   const keys = letterKeys(g);
@@ -325,6 +338,12 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
           );
         })}
       </ul>
+      {onRetry ? (
+        <p className="sw-panel-empty sw-cite-failed">
+          The study text did not load.{' '}
+          <button type="button" className="sw-link" onClick={onRetry}>Try again</button>
+        </p>
+      ) : null}
       {cited.length > shown.length ? (
         <button type="button" className="sw-more" onClick={() => setAll(true)}>Show {cited.length - shown.length} more</button>
       ) : null}
@@ -354,7 +373,21 @@ function ZoomRow({ g, chapterIndex, zoomTo }) {
 function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
   const [open, setOpen] = React.useState(() => new Set(groups.length ? [groups[0].book] : []));
   const [more, setMore] = React.useState(() => new Set());
-  const toggle = (book) => setOpen((s) => { const n = new Set(s); if (n.has(book)) n.delete(book); else n.add(book); return n; });
+  // a group opened by its header shows its rows, as a Section does (the dead-control hunt,
+  // 2026-10-22: "Deuteronomy · 46" opened with every row under the panel's edge)
+  const items = React.useRef(/** @type {Map<number, HTMLLIElement>} */ (new Map()));
+  const opened = React.useRef(/** @type {number | null} */ (null));
+  React.useEffect(() => {
+    const book = opened.current;
+    opened.current = null;
+    const el = book == null ? null : items.current.get(book);
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+  }, [open]);
+  const toggle = (book) => setOpen((s) => {
+    const n = new Set(s);
+    if (n.has(book)) n.delete(book); else { n.add(book); opened.current = book; }
+    return n;
+  });
   return (
     <ul className="sw-groups">
       {groups.map((grp) => {
@@ -362,7 +395,8 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
         const rows = more.has(grp.book) ? grp.rows : grp.rows.slice(0, GROUP_ROWS);
         const ids = grp.rows.map((r) => r.index);
         return (
-          <li className="sw-group" key={grp.book}>
+          <li className="sw-group" key={grp.book}
+            ref={(el) => { if (el) items.current.set(grp.book, el); else items.current.delete(grp.book); }}>
             <button type="button" className="sw-group-head" aria-expanded={isOpen} onClick={() => toggle(grp.book)}
               onMouseEnter={() => light(ids)} onMouseLeave={() => light(null)}
               onFocus={() => light(ids)} onBlur={() => light(null)}>
@@ -445,6 +479,10 @@ export function WebPanel(props) {
   const votV = useCorpusVersion('__votCorpus');
   // the Bible Studies, loaded when a study citation is on show without them (its excerpt reads them)
   const [studiesV, setStudiesV] = React.useState(0);
+  // the load failed (loadBibleStudies resolves false, or threw): the cited section says so and
+  // offers Try again, as the Studies screen does (n6-09), not quotes missing for good (s27.2)
+  const [studiesFailed, setStudiesFailed] = React.useState(false);
+  const [studiesTry, setStudiesTry] = React.useState(0);
 
   // the mode's model, read at render; read again when a corpus or the Studies land (one shape per
   // mode, so typed loosely here; panel-model.js types each)
@@ -464,9 +502,15 @@ export function WebPanel(props) {
   React.useEffect(() => {
     if (!wantStudies || typeof BIBLE_STUDIES !== 'undefined' || typeof loadBibleStudies !== 'function') return undefined;
     let live = true;
-    Promise.resolve(loadBibleStudies()).then(() => { if (live) setStudiesV((n) => n + 1); });
+    Promise.resolve(loadBibleStudies()).then((ok) => {
+      if (!live) return;
+      setStudiesFailed(ok === false);
+      setStudiesV((n) => n + 1);
+    }, () => { if (live) setStudiesFailed(true); });
     return () => { live = false; };
-  }, [wantStudies]);
+  }, [wantStudies, studiesTry]);
+  const retryStudies = studiesFailed && wantStudies
+    ? () => { setStudiesFailed(false); setStudiesTry((n) => n + 1); } : null;
 
   // the lit set this mode keeps (verse mode: the threads it lists; exits mode: the lines it counts,
   // lit when it opened); a row lights its own over it
@@ -558,7 +602,8 @@ export function WebPanel(props) {
             <VerseBlock key={e.verse} block={e} onOpen={onOpen} extra={e.verse === farVerse ? follow : null} />
           ))}
         </div>
-        <CitedSection g={g} cited={cited} showCites={() => true} startOpen={!compact} onOpen={onOpen} openPanel={openPanel} />
+        <CitedSection g={g} cited={cited} showCites={() => true} startOpen={!compact} onOpen={onOpen} openPanel={openPanel}
+          onRetry={retryStudies} />
         {model.more.map((m, i) => (
           <Section key={m.verse} collapsible startOpen={i === 0} className="sw-sec-more"
             title={'More from ' + m.ref.label + ' · ' + plural(m.total, 'connection', 'connections')}>
@@ -580,7 +625,7 @@ export function WebPanel(props) {
           meta={plural(n, 'connection', 'connections') + (cited.length ? ' · cited in the Volumes ' + timesWord(cited.length) : '')} />
         <div className="sw-sec sw-verses"><VerseBlock block={model} heading={false} onOpen={onOpen} /></div>
         <CitedSection g={g} cited={cited} showCites={(c) => c.cites !== model.ref.label} startOpen={!compact}
-          onOpen={onOpen} openPanel={openPanel} />
+          onOpen={onOpen} openPanel={openPanel} onRetry={retryStudies} />
         <Section title={'Connections · ' + n.toLocaleString()} className="sw-sec-more">
           {n ? (
             <React.Fragment>

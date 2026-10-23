@@ -248,3 +248,49 @@ describe('w-audio-continue — the queue is the site order, one unit ahead', () 
     expect(AudioPlayer.getState().status).toBe('idle');
   });
 });
+
+/* s31.1 (idea sweep 2026-10-22): removing or moving one upcoming track turned the run into a custom queue, which
+   the site order refused, so listen-through stopped at the edited collection's end. An edited run now keeps the
+   collection it belongs to and goes on into the next one; only Clear upcoming ends it. */
+describe('s31.1 — an up-next edit keeps the site order', () => {
+  it('a collection run with one upcoming track removed still goes on into the next collection', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS.vol1, collectionLabel: 'Volume One' });
+    expect(urls()).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idC')]);
+    expect(AudioPlayer.removeUpcoming(1)).toBe(true);           // Letter A, Part 2
+    expect(AudioPlayer.getState().sourceMode).toBe('custom');   // still the fact a voice switch warns about
+    ended();                                                     // Letter C, the edited run's last track
+    expect(el().src).toBe(URL_OF('idC'));
+    expect(urls()).toEqual([URL_OF('idA1'), URL_OF('idC'), URL_OF('idSolo')]);
+    ended();
+    expect(el().src).toBe(URL_OF('idSolo'));
+    const s = AudioPlayer.getState();
+    expect(s.status).not.toBe('idle');
+    expect(s.sourceMode).toBe('collection');                    // the crossing hands the run to Volume Two
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).volKey).toBe('vol2');
+  });
+
+  it('an edit that leaves the playing track last extends at once', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS.vol1, collectionLabel: 'Volume One', startId: 'letter-a' });
+    AudioPlayer.next();                                          // Part 2 plays; Letter C is still after it
+    expect(AudioPlayer.removeUpcoming(2)).toBe(true);           // take Letter C out: Part 2 is now the last
+    expect(urls()).toEqual([URL_OF('idA1'), URL_OF('idA2'), URL_OF('idSolo')]);
+    ended();
+    expect(el().src).toBe(URL_OF('idSolo'));
+  });
+
+  it('a reordered run goes on too', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS.vol1, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.moveUpcoming(2, 1)).toBe(true);          // Letter C before Part 2
+    ended();
+    ended();                                                     // Part 2 is the last: Volume Two joins
+    expect(urls()).toEqual([URL_OF('idA1'), URL_OF('idC'), URL_OF('idA2'), URL_OF('idSolo')]);
+  });
+
+  it('Clear upcoming ends the run after the playing track', () => {
+    AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS.vol1, collectionLabel: 'Volume One' });
+    expect(AudioPlayer.clearUpcoming()).toBe(true);
+    ended();
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(el().srcHistory).not.toContain(URL_OF('idSolo'));
+  });
+});

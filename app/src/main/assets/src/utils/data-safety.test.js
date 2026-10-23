@@ -16,6 +16,7 @@ import { applyImportPayload } from './backup.js';
 import { pruneSnapshotNames, snapshotName, snapshotTime, KEEP_DAYS, KEEP_WEEKS } from './snapshot-sink.js';
 import { announceLibraryChange, heldByOtherTab } from './other-tabs.js';
 import { createBackupFlow } from './backup-flow.js';
+import { DiagnosticLog } from './diagnostic-log.js';
 
 // W8: what this page tells the other open tabs (the channel itself: other-tabs.test.js).
 vi.mock('./other-tabs.js', async (importOriginal) => ({ ...(/** @type {any} */ (await importOriginal())), announceLibraryChange: vi.fn(), heldByOtherTab: vi.fn(() => false) }));
@@ -321,6 +322,24 @@ describe('refuter findings (datasafe 10-05 second pass)', () => {
     expect(announceLibraryChange).not.toHaveBeenCalled();
   });
 
+  it('ds5 s16.1: a Restore that cannot run says why (another tab; an unreadable copy)', async () => {
+    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
+    const sink = memorySink();
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(Date.now() - 86400000);
+    await DataSafety.run({ sink });
+    vi.useRealTimers();
+    await IDBAdapter.put('vot-annotations', 'v', {});
+    await IDBAdapter.put('vot-notes', 'v', {});
+    await IDBAdapter.put('vot-state', 'v', {});
+    expect(await DataSafety.run({ sink })).toBe('damaged');
+    vi.mocked(heldByOtherTab).mockReturnValueOnce(true);
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(false);
+    expect(document.getElementById('vot-toast-restore').textContent).toMatch(/another tab/i);
+    sink.read = async () => 'not json';
+    expect(await DataSafety.restoreMissing({ sink, reload: vi.fn() })).toBe(false);
+    expect(document.getElementById('vot-toast-restore').textContent).toMatch(/could not be read.*unchanged/i);
+  });
+
   /* W8 refuter round 2 (2026-10-13): Import and Clear All hold the backup Web Lock, Restore did not,
      so a Restore in one tab and an Import in another could write the library at once (the Restore's
      stale read landing over the import). Restore now holds the same lock, or does nothing. */
@@ -562,6 +581,34 @@ describe('wipe-proof (2026-10-11: the owner phone lost its database again, and R
     expect(await DataSafety.run({ sink, reload })).toBe('damaged');
     expect(reload).not.toHaveBeenCalled();
     expect(StorageHealth.getReport().dataMissing).not.toBeNull();
+  });
+
+  it('ds5 s34.1: a library past the snapshot cap is logged and shown, and leave checks stay armed', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    const warn = vi.spyOn(DiagnosticLog, 'warn');
+    DataSafety._resetForTests({ maxSnapshotBytes: 200 });
+    expect(await DataSafety.run({ sink })).toBe('too-big');
+    expect(warn.mock.calls.some((c) => c[0] === 'data-health' && /too big/.test(String(c[1])))).toBe(true);
+    const st = await DataSafety.status({ sink });
+    expect(st.tooBig).toBeGreaterThan(200);
+    expect(await DataSafety.saveLatest({ sink })).not.toBe('off');   // the leave check still runs
+    warn.mockRestore();
+    DataSafety._resetForTests();
+    expect((await DataSafety.status({ sink })).tooBig).toBe(0);
+  });
+
+  it('ds5 s34.2: an auto-restore that could not run (another tab holds the backup lock) leaves the hour unspent', async () => {
+    const sink = memorySink();
+    await snapshotYesterday(sink);
+    await wipe();
+    const req = vi.spyOn(navigator.locks, 'request').mockImplementation((name, o, cb) => Promise.resolve().then(() => cb(null)));
+    expect(await DataSafety.run({ sink, reload: vi.fn() })).toBe('damaged');
+    req.mockRestore();
+    DataSafety._resetForTests(); setStoreWriteFence(false);
+    const reload = vi.fn();
+    expect(await DataSafety.run({ sink, reload })).toBe('restored');     // the next boot still may
+    expect(reload).toHaveBeenCalledTimes(1);
   });
 
   // Refuter 10-11: an empty library the reader chose (a progress reset, Clear All whose

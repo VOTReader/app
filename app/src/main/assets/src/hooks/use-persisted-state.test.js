@@ -635,3 +635,28 @@ describe('usePersistedState — window.__freezePersistState (the restore / wipe 
     expect(setSpy).toHaveBeenCalledTimes(1);
   });
 });
+
+/* ds5 s04.1: a vot-state read that throws handed App {} - the same as an empty store - and the
+   mount write then put those defaults over the reader's real tabs and settings. A failed read
+   holds this mount's writes (as header item 9 does for an unloaded store). */
+describe('usePersistedState — a failed saved-state read writes nothing (ds5 s04.1)', () => {
+  it('the mount after a throwing read leaves the store untouched', () => {
+    const get = vi.spyOn(StateStore, 'get').mockImplementation(() => { throw new Error('corrupt record'); });
+    const { result } = renderHook(() => useSavedState());
+    expect(result.current).toEqual({});
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    expect(setSpy).not.toHaveBeenCalled();
+    get.mockRestore();
+  });
+
+  it('a later mount whose read works writes again', () => {
+    const get = vi.spyOn(StateStore, 'get').mockImplementation(() => { throw new Error('corrupt record'); });
+    renderHook(() => useSavedState());
+    get.mockReturnValue(/** @type {any} */ ({ theme: 'light' }));
+    get.mockImplementation(() => /** @type {any} */ ({ theme: 'light' }));
+    renderHook(() => useSavedState());
+    renderHook((p) => usePersistedState(p), { initialProps: makeState() });
+    expect(setSpy).toHaveBeenCalledTimes(1);
+    get.mockRestore();
+  });
+});

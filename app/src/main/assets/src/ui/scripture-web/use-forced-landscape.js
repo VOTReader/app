@@ -6,7 +6,8 @@
    Split out of ScriptureWebScreen unchanged (F0, 2026-10-18): whether the
    root is CSS-rotated (a portrait phone: Q11, below), the orientation lock where
    the platform offers one, immersive mode while the web is open (and the
-   unlock on the way out), and loc(), which maps a pointer's viewport
+   unlock on the way out), the browser's fullscreen exit as the way out of the
+   web (F4, 2026-10-22), and loc(), which maps a pointer's viewport
    coordinates into the rotated screen's own CSS space. */
 
 import { rotatePointer } from '../../utils/scripture-web/geometry.js';
@@ -30,12 +31,16 @@ export function wantsRotation() {
   } catch (_e) { return false; }
 }
 
+/** How long a fullscreen exit waits to see the page still shown before it counts as leaving (ms). */
+export const EXIT_SETTLE_MS = 250;
+
 /**
  * @param {() => void} schedule  the frame loop's (use-frame-scheduler.js)
+ * @param {() => void} [onLeave]  the web's Back (the screen's onBack)
  * @param {{ current: Element | null }} [rootRef]  the screen's root: loc() measures pointers from its box
  * @returns {{ rotated: boolean, loc: (e: { clientX: number, clientY: number }) => { x: number, y: number } }}
  */
-export function useForcedLandscape(schedule, rootRef) {
+export function useForcedLandscape(schedule, onLeave, rootRef) {
   // A canon needs its width. On a phone the Scripture Web presents in
   // LANDSCAPE, always (owner call, 2026-09-10: "landscape by default, no
   // rotate option"). Where the platform will flip the display,
@@ -100,6 +105,33 @@ export function useForcedLandscape(schedule, rootRef) {
       // locked, are both normal — swallow either.
       try { screen.orientation.unlock(); } catch (_e) { /* nothing to unlock */ }
     };
+  }, []);
+
+  // The browser's way out of fullscreen is the way out of the web (the hub's seam walk F4,
+  // 2026-10-22). Chrome on a phone spends the first Back on leaving fullscreen, and the page
+  // never sees it: the web stayed up in a cramped 705x274 strip under the browser's bars, and
+  // two more presses got out. Fullscreen comes in only with the web (immersive, above) and
+  // nothing in it leaves fullscreen, so its end while the web is up means the reader asked out:
+  // leave, as Esc already does on a desktop. Leaving the app ends fullscreen too, so the exit
+  // counts only if the page is still shown a moment later.
+  const onLeaveRef = React.useRef(onLeave);
+  onLeaveRef.current = onLeave;
+  React.useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    let held = !!document.fullscreenElement;
+    let timer = 0;
+    const onChange = () => {
+      const now = !!document.fullscreenElement;
+      if (held && !now) {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+          if (document.visibilityState === 'visible' && !document.fullscreenElement && onLeaveRef.current) onLeaveRef.current();
+        }, EXIT_SETTLE_MS);
+      }
+      held = now;
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => { clearTimeout(timer); document.removeEventListener('fullscreenchange', onChange); };
   }, []);
 
   // loc() reads the rotation from a ref so it can stay identity-stable; keep

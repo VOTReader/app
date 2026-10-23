@@ -139,6 +139,12 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     if (typeof NoteDefaultStore !== 'undefined') NoteDefaultStore.set(style, c);
   };
 
+  // ds5 A06.1: the delete takes the note's mark with it, so the confirm says so, as the toolbar's
+  // remove does. An icon-only note (a blank highlight) has no visible mark to name.
+  const deleteQuestion = (curStyle === 'highlight' && color === 'blank')
+    ? 'Delete this note?'
+    : `Delete this note and its ${curStyle === 'highlight' ? 'highlight' : curStyle === 'underline' ? 'underline' : 'squiggle'}?`;
+
   const remove = () => {
     AnnotationStore.removeGroup(groupId);
     NoteStore.remove(groupId);
@@ -181,12 +187,13 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
         {/* Header: color dot (tappable) · "Note" · ⋯ menu (read mode only) */}
         <div className="note-sheet-header">
           <button
-            className="note-sheet-color-dot ann-chip-color-btn"
-            data-color={color}
+            className="note-sheet-color-hit"
             onClick={openColorPicker}
             title="Change color"
             aria-label="Change note color"
-          />
+          >
+            <span className="note-sheet-color-dot ann-chip-color-btn" data-color={color} aria-hidden="true" />
+          </button>
           <div className="note-sheet-title" id="note-sheet-title">{mode === 'edit' ? (note.body ? 'Edit note' : 'New note') : 'Note'}</div>
           {mode === 'read' && (
             <button
@@ -366,7 +373,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
               <div className="note-sheet-menu">
                 {confirmDelete ? (
                   <ConfirmStrip
-                    question="Delete this note?"
+                    question={deleteQuestion}
                     onCancel={() => setConfirmDelete(false)}
                     onConfirm={remove}
                   />

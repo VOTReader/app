@@ -18,8 +18,24 @@ export function songMakers() {
   return Array.from(count.keys()).sort((a, b) => count.get(b) - count.get(a));
 }
 
+/** Re-render About when the song catalog lands, and ask for it once About has painted (s18.4): a fresh install opens
+    here, before Home asks for it (the same once-per-launch fetch, HomeScreen's useSongCatalogCount). */
+function useSongCatalog() {
+  const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (cat ? cat.subscribe(cb) : () => {}), [cat]),
+    () => (cat ? cat.getVersion() : 0)
+  );
+  React.useEffect(() => {
+    if (!cat || cat.loaded) return undefined;
+    const t = setTimeout(() => { if (!cat.loaded) void cat.load(); }, 1500);
+    return () => clearTimeout(t);
+  }, [cat]);
+}
+
 export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
   const [page, setPage] = React.useState(1);
+  useSongCatalog();
 
   const handleBack     = page === 2 ? () => setPage(1) : onBack;
   const handleContinue = page === 1 ? () => setPage(2) : onContinue;
@@ -89,6 +105,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                   <p>Highlight, underline, bookmark, and note — anywhere.</p>
                   <p>A private journal with photos, voice memos, and a full feature suite — kept on your device.</p>
                   <p>Full-text search across the entire library.</p>
+                  <p>Reading plans: the Bible in a year, the letters, or any mix you build, a few minutes a day at your own pace.</p>
                   {/* B1 (2026-08-10): this line claimed "nothing is downloaded
                       except the Garden images", which stopped being true the
                       day audio shipped — every Listen streams an MP3. The

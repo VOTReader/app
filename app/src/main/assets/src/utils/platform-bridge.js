@@ -1111,7 +1111,14 @@ function webNativeRecordStart() {
     }
   } catch (_e) { /* analyser is optional */ }
 
-  rec.start(250);  // 250 ms chunk interval — preserved from production code
+  // ds5 s36.2: a throwing start keeps the bridge's 'error:<reason>' contract and lets go of the mic
+  // and the AudioContext, like every other failure above.
+  try {
+    rec.start(250);  // 250 ms chunk interval — preserved from production code
+  } catch (e) {
+    _webRecorderCleanup();
+    return 'error:' + ((/** @type {any} */ (e) && /** @type {any} */ (e).message) || e);
+  }
   _webRecorder.startTimeMs = Date.now();
   _webRecorder.accumulatedMs = 0;
   _webRecorder.state = 'recording';

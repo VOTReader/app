@@ -228,7 +228,19 @@ export const AnnotationStore = extendStore(
      */
     replaceAll(data) {
       if (this._shouldDefer('replaceAll', data)) return;
-      this._cache = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
+      var src = (data && typeof data === 'object' && !Array.isArray(data)) ? data : /** @type {any} */ ({});
+      // ds5 s09.2: the validator checks only that each value is an array, so a
+      // null segment in a backup reached the cache, and removeGroup's
+      // h.groupId threw for every later removal. Keep object segments only;
+      // a key left with none is dropped, as removeGroup drops an emptied one.
+      /** @type {AnnotationData} */
+      var clean = {};
+      Object.keys(src).forEach(function (k) {
+        if (!Array.isArray(src[k])) return;
+        var segs = src[k].filter(function (h) { return h && typeof h === 'object' && !Array.isArray(h); });
+        if (segs.length) clean[k] = segs;
+      });
+      this._cache = clean;
       this._save();
       this._bump();
     }

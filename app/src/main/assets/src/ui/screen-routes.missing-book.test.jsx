@@ -96,3 +96,20 @@ describe.each(['bible-idx', 'bible-ch'])('%s: a persisted bookId that no longer 
     expect(screen.getByText(/Loading Bible/)).toBeTruthy();
   });
 });
+
+/* s21.2: a stale genreId (a tab saved before a genre was renamed) rendered a
+   blank screen: ScriptureGenre returned null with no header and no way out. */
+describe('scripture-genre: a genreId no genre has (s21.2)', () => {
+  beforeEach(() => { globalThis.SCRIPTURE_GENRES = { ot: [{ id: 'law', label: 'Law', books: [] }], nt: [] }; });
+  afterEach(() => { delete globalThis.SCRIPTURE_GENRES; });
+  it('renders a message, the top bar, and a way back to the Scriptures', () => {
+    const { routes, props } = makeRoutes({ genreId: 'retired-genre' });
+    const el = routes['scripture-genre']();
+    expect(el).toBeTruthy();
+    render(el);
+    expect(navProps).not.toBeNull();
+    expect(navProps.backLabel).toBe('Scriptures');
+    fireEvent.click(screen.getByRole('button', { name: /Back to Scriptures/ }));
+    expect(props.goScripturesHome).toHaveBeenCalledTimes(1);
+  });
+});

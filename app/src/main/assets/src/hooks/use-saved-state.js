@@ -90,7 +90,11 @@ export function _validateTabState(s) {
   if (/^vot-(one|three|four|five|six|seven|timothy|flock|rebuke)-index$/.test(s.screen)) s.screen = "volumes-home";
   if ((s.screen === "matthew-idx" || s.screen === "bible-idx") && !s.bookId) s.screen = "home";
   if (s.screen === "search") s.screen = "home";
-  if (s.screen === "scripture-genre" && !s.genreId) s.screen = "scriptures-home";
+  // s21.2: a genre that no longer exists (renamed, retired) reopens on the
+  // Scriptures too. SCRIPTURE_GENRES may not exist yet at boot: only a genre
+  // list that is present can reject an id.
+  if (s.screen === "scripture-genre" && (!s.genreId || (typeof SCRIPTURE_GENRES !== 'undefined' && SCRIPTURE_GENRES
+    && ![...(SCRIPTURE_GENRES.ot || []), ...(SCRIPTURE_GENRES.nt || [])].some((g) => g && g.id === s.genreId)))) s.screen = "scriptures-home";
   if (s.screen === "bible-study-chapter" && (!s.studyId || !s.studyChapterId)) s.screen = "studies-home";
   if (s.screen === "bible-study-index" && !s.studyId) s.screen = "studies-home";
   // Journal screens reopen on the hub after a reload: the tab keeps its
@@ -103,7 +107,7 @@ export function _validateTabState(s) {
 import { answersRetiredPlace } from '../utils/answers-retired.js';
 import { StateStore } from '../stores/state-store.js';
 import { mergeStateStore } from '../stores/store-merge.js';
-import { takeResumeRecord, stateStoreUnloaded } from './use-persisted-state.js';
+import { takeResumeRecord, stateStoreUnloaded, markSavedStateRead } from './use-persisted-state.js';
 
 /**
  * Read + validate vot-state exactly once on mount. Source-of-truth
@@ -140,6 +144,7 @@ import { takeResumeRecord, stateStoreUnloaded } from './use-persisted-state.js';
  */
 export function useSavedState() {
   return React.useMemo(() => {
+    markSavedStateRead(false);
     try {
       // The leave record, when this boot is the far side of a reload; the
       // store otherwise. Read-and-clear is one call.
@@ -203,6 +208,11 @@ export function useSavedState() {
       _validateTabState(s);
       if (Array.isArray(s.tabs)) s.tabs.forEach(_validateTabState);
       return s;
-    } catch (_e) { return {}; }
+    } catch (_e) {
+      // ds5 s04.1: {} here is NOT an empty store; usePersistedState holds every
+      // write of this mount so the defaults never land over the stored record.
+      markSavedStateRead(true);
+      return {};
+    }
   }, []);
 }

@@ -19,7 +19,7 @@ var AUDIO_SYNC_SECTIONS = {
 },
 "1xFRVnuKEBAjhk3ccHkl6nWkJFv7zo7rL":{
 "wtlb2:introduction":[[3.0, 0, 2, 18, 0], [4.51, 0, 24, 32, 0], [5.66, 1, 1, 21, 0]],
-"wtlb2:the-bridegroom-approaches":[[90.0, 0, -1, -1, 0], [94.34, 0, 35, 197, 0], [106.0, 0, 198, 222, 0]],
+"wtlb2:the-bridegroom-approaches":[[90.0, 0, -1, -1, 0], [94.34, 0, 35, 198, 0], [106.0, 0, 199, 223, 0]],
 "wtlb2:the-only-way":[[150.25, 0, 0, 40, 0]]
 }
 };

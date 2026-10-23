@@ -93,6 +93,14 @@ describe('BibleChapterView — the recording\'s edition (W25)', () => {
     expect(banner()).toBeNull();
   });
 
+  it('the chapter body names the edition its words are in, for a copied reference (rs1)', async () => {
+    const { container } = render(view());
+    const shown = () => container.querySelector('.chapter-body').getAttribute('data-translation');
+    expect(shown()).toBe('nkjv');                      // still downloading: the words are NKJV
+    await landKjv();
+    expect(shown()).toBe('kjv');
+  });
+
   it('the reader\'s own translation switch cannot free the edition under the mounted chapter', async () => {
     const { unmount } = render(view());
     await landKjv();

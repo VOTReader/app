@@ -23,6 +23,11 @@ export const AUDIO_TOAST_ID = 'vot-toast-audio';
 
 export const OFFLINE_MSG = 'Playing audio requires an internet connection.';
 export const LOAD_FAIL_MSG = 'Couldn’t load this track.';
+/** A streamed recording that died at the network (MediaError 2) with the phone still online: a dead zone (U04.2). */
+export const NO_SIGNAL_MSG = 'No signal. This recording isn’t on your phone.';
+/** Offline, a Next or Previous with nothing that way on the phone: refused, so the one playing plays on (RC.1). */
+export const NEXT_OFFLINE_MSG = 'No connection. The next recording isn’t on this phone.';
+export const PREV_OFFLINE_MSG = 'No connection. The previous recording isn’t on this phone.';
 
 /**
  * Stream URL for a track. The manifest stores Google Drive file ids, but the

@@ -243,3 +243,19 @@ describe('applyDOMLinks — icon placement & slide-off (T4)', () => {
     expect(icon.previousSibling.className).toContain('fn-ref');
   });
 });
+
+describe('applyDOMLinks with a malformed link (s06.9)', () => {
+  it('skips the bad link and still places icons in later containers', () => {
+    document.body.innerHTML =
+      '<div id="a" data-hl-key="a" data-hl-dom>Alpha text</div>' +
+      '<div id="b" data-hl-key="b" data-hl-dom>Beta text</div>';
+    window.LinkStore = {
+      getForKeyPrefix: (k) => k === 'a'
+        ? [{ source: {}, target: { key: 'a' } }, { source: { key: 5 }, target: { key: 'a:0-5' } }]
+        : [{ source: { key: 'other:1', end: 2 }, target: { key: 'b:0-4' } }],
+    };
+    expect(() => applyDOMLinks()).not.toThrow();
+    expect(document.getElementById('a').querySelectorAll('.inline-link-icon').length).toBe(1);
+    expect(document.getElementById('b').querySelectorAll('.inline-link-icon').length).toBe(1);
+  });
+});

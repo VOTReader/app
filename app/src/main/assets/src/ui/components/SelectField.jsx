@@ -13,17 +13,7 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
   const [showDesc, setShowDesc] = React.useState(false);
   const fieldId = React.useId();
   const sheetId = `select-sheet-${fieldId}`;
-  const titleId = `select-sheet-title-${fieldId}`;
-  useModalRegistry({ id: sheetId, dismiss: () => setOpen(false), active: open });
-  const trapRef = useFocusTrap(open);
   const selected = options.find((o) => o.id === value) || options[0];
-
-  React.useEffect(() => {
-    if (!open) return;
-    const prev = window.__closeSheet;
-    window.__closeSheet = () => setOpen(false);
-    return () => { window.__closeSheet = prev || null; };
-  }, [open]);
 
   return (
     <div className="settings-row">
@@ -45,42 +35,69 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
         </button>
       </div>
       {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
-      {open && (
-        <>
-          <div className="select-sheet-backdrop open" aria-hidden="true" onClick={() => setOpen(false)} />
-          <div id={sheetId} className="select-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
-            <SheetHandle onClose={() => setOpen(false)} />
-            {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
-            <div className="select-sheet-title" id={titleId}>{title || label}</div>
-            <div className="select-sheet-ornament">
-              <div className="select-sheet-ornament-line" />
-              <div className="select-sheet-ornament-diamond">{"✦"}</div>
-              <div className="select-sheet-ornament-line r" />
-            </div>
-            <div className="select-sheet-options">
-              {options.map((opt) => {
-                const isSelected = opt.id === value;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    className={`select-sheet-option${isSelected ? " selected" : ""}`}
-                    aria-pressed={isSelected}
-                    onClick={() => { onChange(opt.id); setOpen(false); }}
-                  >
-                    <div className="select-sheet-option-main">
-                      <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
-                      {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
-                      {isSelected ? <span className="select-sheet-option-check" aria-hidden="true">{"✓"}</span> : null}
-                    </div>
-                    {opt.desc ? <div className="select-sheet-option-desc">{opt.desc}</div> : null}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </>
-      )}
+      <SelectSheet id={sheetId} open={open} onClose={() => setOpen(false)} eyebrow={eyebrow} title={title || label}
+        value={value} options={options} onChange={onChange} />
     </div>
   );
+}
+
+/* SelectSheet — SelectField's bottom sheet on its own, for a picker opened
+   from somewhere other than a Settings row (mw17, 2026-10-22: the Bible
+   translation from the Scriptures home eyebrow and a chapter's ⋯ menu).
+   Renders nothing while closed; picking an option calls onChange, then
+   onClose. `portal` moves it to <body> for callers inside the top bar. */
+/** @param {{ id?: string, open: boolean, onClose: () => void, eyebrow?: string, title: string, value: string,
+     options: any[], onChange: (v: string) => void, portal?: boolean }} props */
+export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false }) {
+  const ownId = React.useId();
+  const sheetId = id || `select-sheet-${ownId}`;
+  const titleId = `select-sheet-title-${ownId}`;
+  useModalRegistry({ id: sheetId, dismiss: onClose, active: open });
+  const trapRef = useFocusTrap(open);
+
+  React.useEffect(() => {
+    if (!open) return;
+    const prev = window.__closeSheet;
+    window.__closeSheet = onClose;
+    return () => { window.__closeSheet = prev || null; };
+  }, [open, onClose]);
+
+  if (!open) return null;
+  const sheet = (
+    <>
+      <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onClose} />
+      <div id={sheetId} className="select-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby={titleId} onClick={(e) => e.stopPropagation()}>
+        <SheetHandle onClose={onClose} />
+        {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
+        <div className="select-sheet-title" id={titleId}>{title}</div>
+        <div className="select-sheet-ornament">
+          <div className="select-sheet-ornament-line" />
+          <div className="select-sheet-ornament-diamond">{"✦"}</div>
+          <div className="select-sheet-ornament-line r" />
+        </div>
+        <div className="select-sheet-options">
+          {options.map((opt) => {
+            const isSelected = opt.id === value;
+            return (
+              <button
+                key={opt.id}
+                type="button"
+                className={`select-sheet-option${isSelected ? " selected" : ""}`}
+                aria-pressed={isSelected}
+                onClick={() => { onChange(opt.id); onClose(); }}
+              >
+                <div className="select-sheet-option-main">
+                  <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
+                  {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
+                  {isSelected ? <span className="select-sheet-option-check" aria-hidden="true">{"✓"}</span> : null}
+                </div>
+                {opt.desc ? <div className="select-sheet-option-desc">{opt.desc}</div> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+  return portal ? ReactDOM.createPortal(sheet, document.body) : sheet;
 }

@@ -9,14 +9,14 @@
    and never ran that next write; these tests run it, against fake-indexeddb. */
 import 'fake-indexeddb/auto';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, render, act, cleanup } from '@testing-library/react';
+import { renderHook, render, act, cleanup, fireEvent } from '@testing-library/react';
 import { StateStore } from '../stores/state-store.js';
 import { IDBAdapter } from '../stores/idb-adapter.js';
 import { CachedStore, _resetStoreRegistry } from '../stores/cached-store.js';
 import { mergeStateStore, allowProgressClear, _resetProgressClearForTests } from '../stores/store-merge.js';
 import { usePersistedState, RESUME_STATE_KEY } from '../hooks/use-persisted-state.js';
 import { useSavedState } from '../hooks/use-saved-state.js';
-import { HydrationGate, REMOUNT_COALESCE_MS } from '../components/HydrationGate.jsx';
+import { HydrationGate, REMOUNT_COALESCE_MS, TYPING_RECHECK_MS, TYPING_IDLE_MS } from '../components/HydrationGate.jsx';
 import { DiagnosticLog, PERSIST_KEY } from './diagnostic-log.js';
 
 const marks = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => ['bible:john:' + (i + 1), 1]));
@@ -236,6 +236,65 @@ describe('HydrationGate remounts App when a late store loads', () => {
     expect(mounts).toBe(2);
     expect(container.textContent).toBe('["real"]');
     await settle(5000);
+    expect(mounts).toBe(2);
+  });
+
+  // ds5 s01.5: the remount threw away whatever the reader was typing in component state.
+  it('waits while the reader is typing in a field, then remounts once they leave it', async () => {
+    const realGet = IDBAdapter.get.bind(IDBAdapter);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    vi.spyOn(IDBAdapter, 'get').mockImplementation((store, key) => (store === 'vot-test-late2' ? gate.then(() => ['real']) : realGet(store, key)));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const late = CachedStore('vot-test-late2', [], { idb: true });
+    late._backgroundRetryDelays = [];
+    let mounts = 0;
+    function Child() {
+      React.useEffect(() => { mounts += 1; }, []);
+      return <textarea data-testid="draft" />;
+    }
+    const { getByTestId } = render(<HydrationGate><Child /></HydrationGate>);
+    await settle(3000);
+    await settle(10);
+    expect(mounts).toBe(1);
+    getByTestId('draft').focus();
+    fireEvent.input(getByTestId('draft'), { target: { value: 'a thought' } });
+    release();
+    await settle(10);
+    await settle(REMOUNT_COALESCE_MS + 10);
+    await settle(TYPING_RECHECK_MS * 3);
+    expect(mounts).toBe(1);                    // still typing: the draft's component stays
+    for (let i = 0; i < 8; i++) {              // refuter b34-r2: typing on for minutes keeps it
+      fireEvent.input(getByTestId('draft'), { target: { value: 'a thought ' + i } });
+      await settle(TYPING_IDLE_MS - 5000);
+    }
+    expect(mounts).toBe(1);
+    getByTestId('draft').blur();
+    await settle(TYPING_RECHECK_MS + 10);
+    expect(mounts).toBe(2);
+  });
+
+  // Refuter b34-r1: an autofocus field nobody types in, or endless typing, must not hold it all session.
+  it('a focused field nobody typed in holds nothing', async () => {
+    const realGet = IDBAdapter.get.bind(IDBAdapter);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    vi.spyOn(IDBAdapter, 'get').mockImplementation((store, key) => (store === 'vot-test-late3' ? gate.then(() => ['real']) : realGet(store, key)));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const late = CachedStore('vot-test-late3', [], { idb: true });
+    late._backgroundRetryDelays = [];
+    let mounts = 0;
+    function Child() {
+      React.useEffect(() => { mounts += 1; }, []);
+      return <textarea data-testid="draft" />;
+    }
+    const { getByTestId } = render(<HydrationGate><Child /></HydrationGate>);
+    await settle(3000);
+    await settle(TYPING_IDLE_MS + 10);      // whatever was typed before is long idle
+    getByTestId('draft').focus();           // autofocus, no typing
+    release();
+    await settle(10);
+    await settle(REMOUNT_COALESCE_MS + 10);
     expect(mounts).toBe(2);
   });
 });

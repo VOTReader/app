@@ -7,6 +7,7 @@
    matches the accessible name (label-in-name), pinned here.
 */
 
+import 'fake-indexeddb/auto';   // mw18: the rp1 test saves runs in ReadingPlanStore (IDB); a failed save's toast would leak
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
 import { HomeScreen } from './HomeScreen.jsx';
@@ -81,13 +82,18 @@ describe('HomeScreen — shortcuts and demand loading', () => {
 
   /* rp1: with a reading plan, today's card sits under the title and above Search
      (r2-home-one.png); with none, Home is as it was; a Bible plan never wakes the Volumes. */
-  it('(rp1) shows the Today card above Search only while a plan runs', () => {
+  it('(rp1) shows the Today card above Search only while a plan runs', async () => {
     setupGlobals();
+    // mw18: plans are runs in ReadingPlanStore; an rp1 settings plan is moved in on the way.
+    const { ReadingPlanStore } = await import('../../stores/reading-plan-store.js');
+    localStorage.clear();
+    ReadingPlanStore._resetForTests({ forceLoaded: true });
+    window.ReadingPlanStore = ReadingPlanStore;
     window.__loadVotCorpus = vi.fn(() => Promise.resolve());
     const onPlanRead = vi.fn();
     const today = new Date();
     const start = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-    const { container } = renderHome({ readingPlans: [{ id: 'bible-year', start }], isRead: () => false, markAsReadEnabled: true, onPlanRead });
+    const { container } = renderHome({ readingPlans: [{ id: 'bible-year', start }], isRead: () => false, markAsReadEnabled: true, onPlanRead, onPlansMoved: vi.fn() });
     const card = container.querySelector('.today-card');
     expect(card).not.toBeNull();
     expect(card.textContent).toContain('Genesis 1-3');
@@ -98,8 +104,16 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(onPlanRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
     cleanup();
+    ReadingPlanStore.replaceAll([]);
     const bare = renderHome({ readingPlans: [], isRead: () => false });
+    // mw18 C8: with no plan, Today offers one; Not now hides it on this device, and it stays hidden
+    expect(bare.container.querySelector('.today-card').textContent).toContain('Start a reading plan');
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(bare.container.querySelector('.today-card')).toBeNull();
+    cleanup();
+    expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.today-card')).toBeNull();
+    localStorage.removeItem('vot-plans-offer-hidden');
+    delete window.ReadingPlanStore;
   });
 
   it('honors disabled Search and History in quick access', () => {

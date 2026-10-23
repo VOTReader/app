@@ -38,6 +38,11 @@ import {
 import { bucketDrawCount, fansOf } from './decode.js';
 import { walkDrawnRuns } from './chunk-walk.js';
 import { prophecySet, frameSet, inFrame, drawOrder } from './frame-set.js';
+import { kept, pairKept } from './filters.js';
+
+/** The most threads one pick returns: one past the tap chooser's eight, so the tap can tell eight
+ * threads from the nearest eight of more (s27.3). */
+const PICK_MOST = 9;
 
 /**
  * Nearest arc to a screen point.
@@ -118,7 +123,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const base = view.base + (cam.y > 0 ? cam.y : 0);
   const { fanA, fanB } = fansOf(g);
   const ppv = cam.ppv;
-  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const cap = Math.max(1, Math.min(limit || 4, PICK_MOST));
   const best = [];
   const verseAtPoint = xToVerse(cam, width, px);
   // a verse of slack for the chunk cull: a foot stands anywhere in its verse's cell (footX)
@@ -132,7 +137,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   for (const bucket of g.buckets) {
     walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
-        if (!inFrame(set, i)) continue;
+        if (!inFrame(set, i) || !kept(g, i)) continue;
         if (target && !target(i, g.from[i], g.to[i])) continue;
         // the feet as drawn: in their verses' cells, by rank (geometry.footX)
         const x0 = footX(cam, width, g.from[i], fanA[i]);
@@ -182,12 +187,13 @@ export function pickProphecy(g, cam, view, px, py, tol, limit) {
   if (!ps.count) return [];
   const { width, squash } = view;
   const base = view.base + (cam.y > 0 ? cam.y : 0);
-  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const cap = Math.max(1, Math.min(limit || 4, PICK_MOST));
   const best = [];
   const target = focusedPickFilter(view, g);
   const chosen = view.focusProphecy != null ? view.focusProphecy : -1;
   for (let k = 0; k < ps.count; k++) {
     if (ps.twin[k] !== k) continue;   // a pair given twice is one thread, found as the first
+    if (!pairKept(g, k)) continue;    // a ghost is not there to tap (filters.js)
     if (target && k !== chosen && !target(ps.arcOf[k], ps.from[k], ps.to[k])) continue;
     const x0 = footX(cam, width, ps.from[k], ps.fanA[k]);
     const x1 = footX(cam, width, ps.to[k], ps.fanB[k]);
@@ -225,7 +231,7 @@ export function pickThreads(g, cam, view, px, py, tol, limit) {
   // the ruler's top (view.base, whatever cam.y), so a line sunk through it by
   // a camera looking up is not drawn there and is not picked there either
   if (py > view.base + tol) return [];
-  const cap = Math.max(1, Math.min(limit || 4, 8));
+  const cap = Math.max(1, Math.min(limit || 4, PICK_MOST));
   const ps = prophecySet(g);
   const hits = pickArcs(g, cam, view, px, py, tol, cap).map((h) => {
     const k = ps.pairOf.get(h.index);
@@ -253,9 +259,11 @@ export function pickThreads(g, cam, view, px, py, tol, limit) {
  */
 export function visibleArcs(g, cam, view, limit) {
   const set = frameSet(g, cam, view);
-  const n = set.count < limit ? set.count : Math.max(0, Math.floor(limit));
-  const out = new Array(n);
-  for (let k = 0; k < n; k++) out[k] = set.list[k];
+  const cap = Math.max(0, Math.floor(limit));
+  /** @type {number[]} */
+  const out = [];
+  // a ghost (filters.js) is drawn but not seen: it is not in the list
+  for (let k = 0; k < set.count && out.length < cap; k++) if (kept(g, set.list[k])) out.push(set.list[k]);
   return out;
 }
 
@@ -331,6 +339,7 @@ export function eachLabelThread(g, cam, view, opts, visit) {
   for (const bucket of g.buckets) {
     const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
       for (let i = start; i < end; i++) {
+        if (!kept(g, i)) continue;   // a ghost is not labelled (filters.js)
         const x0 = footX(cam, width, g.from[i], fanA[i]);
         const x1 = footX(cam, width, g.to[i], fanB[i]);
         if (x1 < 0 || x0 > width) continue;
@@ -755,6 +764,7 @@ export function footBundles(g, cam, view, dpr) {
   for (let j = footStart[first]; j < end; j++) {
     const rank = foot[j] >> 1;
     const i = ids[rank];
+    if (!kept(g, i)) continue;   // a ghost is not counted (filters.js)
     const ca = cellAt(g.from[i]), cb = cellAt(g.to[i]);
     // a thread with both feet in one cell counts once, at its from-foot
     const isTo = (foot[j] & 1) === 1;
@@ -801,6 +811,7 @@ export function bundleGroups(g, cam, view, lo, hi, limit) {
       const a = g.from[i], b = g.to[i];
       const aIn = a >= lo && a <= hi, bIn = b >= lo && b <= hi;
       if (!aIn && !bIn) continue;
+      if (!kept(g, i)) continue;
       const x0 = footX(cam, width, a, fanA[i]), x1 = footX(cam, width, b, fanB[i]);
       const anchored = arcAnchored(x0, x1, width);
       if (!anchored) continue;

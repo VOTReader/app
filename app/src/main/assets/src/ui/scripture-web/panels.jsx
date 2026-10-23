@@ -137,7 +137,12 @@ export function HowToReadGuide({ onClose, canSearch, credit, mode, home }) {
   );
 }
 
-export function legendFor(mode, credit) {
+/**
+ * @param {string} mode @param {string} [credit]
+ * @param {any[] | null} [chips]  the canon's key as filter chips (web-filters.legendChips), in place
+ *   of the plain key: the same cues, tappable
+ */
+export function legendFor(mode, credit, chips) {
   // The key names only what the web draws (digest item 22): the chapter-length bars' key left
   // with the spec's legend, which has none, and My Web never drew bars.
   // My Web (w3, r2-05): two families, named as the picture names them,
@@ -169,7 +174,8 @@ export function legendFor(mode, credit) {
   // a line of its own on the canvas (round 3), so it can never print over the
   // book labels. My Web's legend ends on it too (w4, above). A phone's key is
   // one line (w4): the ramp's far end is "far" there (app.css shows one of the
-  // two words).
+  // two words). With the filters (web-filters.jsx) the cues are their chips, the credit after them.
+  if (chips) return [...chips, <span className="sw-credit" key="credit">{credit || WEB_CREDIT}</span>];
   return [
     <span className="sw-key sw-key-ramp" key="ramp">
       <span>nearby</span><i className="sw-key-gradient" aria-hidden="true" />

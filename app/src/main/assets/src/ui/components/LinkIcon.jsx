@@ -14,7 +14,9 @@ export function LinkIcon({ hlKey, onClick, prefix }) {
   // When `prefix` is true, hlKey is treated as a prefix and any link whose
   // endpoint key starts with that prefix counts. Used by letter/wtlb blocks
   // because excerpts append ":start-end" to the block-level key.
-  const links = prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getForKey(hlKey);
+  // A verse counts what its Links sidebar lists (mw17 s29.4): part of the
+  // verse and a span covering it, not only the whole verse.
+  const links = prefix ? LinkStore.getForKeyPrefix(hlKey) : LinkStore.getTouching(hlKey);
   if (!links || links.length === 0) return null;
   return (
     // W65 (sweep 2026-10-13): a named button; Enter/Space open what a tap opens (renderer/icon-button.js).

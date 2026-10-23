@@ -145,4 +145,20 @@ describe('LinksScreen broken-links callout (W49)', () => {
     show();
     expect(window.loadBibleStudies).not.toHaveBeenCalled();
   });
+
+  it('a failed Bible Studies load is caught, not an unhandled rejection (s21.5)', async () => {
+    window.__votCorpus.loaded = true;
+    links = [{ id: 'l1', created: 1, source: studyCh('lamb-of-god-1'), target: bible('romans') }];
+    const unhandled = vi.fn();
+    globalThis.process.on('unhandledRejection', unhandled);
+    try {
+      window.loadBibleStudies = vi.fn(() => Promise.reject(new Error('offline')));
+      show();
+      expect(window.loadBibleStudies).toHaveBeenCalledTimes(1);
+      await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+      expect(unhandled).not.toHaveBeenCalled();
+    } finally {
+      globalThis.process.off('unhandledRejection', unhandled);
+    }
+  });
 });

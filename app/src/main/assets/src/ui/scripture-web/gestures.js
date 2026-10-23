@@ -22,7 +22,8 @@
    IS the scripture-web-2/8 defect, not a symptom of something else.
    `.sw-empty`/`.sw-legend`/`.sw-credit` are deliberately NOT listed: all
    three are `pointer-events: none` in app.css, so they can never be
-   `e.target` in the first place — adding them here would be dead code.
+   `e.target` in the first place — adding them here would be dead code
+   (the legend's filter chips are buttons, listed as every button is).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { prefersReducedMotion } from '../../utils/reduced-motion.js';
@@ -34,7 +35,8 @@ import { prefersReducedMotion } from '../../utils/reduced-motion.js';
  * control lands outside a `.sw-*` wrapper).
  */
 export const SW_CHROME_SELECTOR =
-  '.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, .sw-choice, .sw-list, .sw-goto, button, input, select, textarea';
+  '.sw-controls, .sw-topbar, .sw-sheet, .sw-tip, .sw-choice, .sw-list, .sw-goto, .sw-filter-sheet, .sw-filter-pill, '
+  + 'button, input, select, textarea';
 
 /** True when `target` is the chrome itself, or nested inside it. */
 export function isChromeTarget(target) {

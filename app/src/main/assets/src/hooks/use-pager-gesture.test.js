@@ -619,3 +619,21 @@ describe('usePagerGesture (React wiring)', () => {
     document.body.removeChild(el);
   });
 });
+
+describe('fling after a pause (s04.3)', () => {
+  const flick = (endTs) => {
+    const { io, calls } = makeIO();
+    const g = createPagerGesture(io);
+    g.start(startEv(300, 100));
+    g.move(moveEv(250, 100, 1000));  // dx -50
+    g.move(moveEv(200, 100, 1030));  // dx -100 — fast, but short of the distance threshold
+    g.end({ timeStamp: endTs });
+    return calls.commits;
+  };
+  it('a lift right after the flick commits', () => {
+    expect(flick(1040)).toEqual(['next']);
+  });
+  it('a lift that comes well after the last move zeroes the velocity (no commit)', () => {
+    expect(flick(1300)).toEqual([]);
+  });
+});

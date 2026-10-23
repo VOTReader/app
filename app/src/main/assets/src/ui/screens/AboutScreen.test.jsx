@@ -8,7 +8,7 @@
 */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
 import { AboutScreen } from './AboutScreen.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
@@ -101,6 +101,30 @@ describe('AboutScreen — the Songs of the Letters credit (L8)', () => {
     expect(songMakers()).toEqual(['hmarie777', 'Sky of Sapphire']);
     Songs._resetSongCatalogForTests();
     delete /** @type {any} */ (globalThis).SongCatalog;
+  });
+
+  it('asks for the catalog and names the makers when it lands while About is open (s18.4)', async () => {
+    vi.useFakeTimers();
+    const Songs = await import('../../utils/song-catalog.js');
+    Songs._resetSongCatalogForTests();
+    const load = vi.spyOn(Songs.SongCatalog, 'load').mockImplementation(() => Promise.resolve(true));
+    try {
+      setupGlobals();
+      /** @type {any} */ (globalThis).SongCatalog = Songs.SongCatalog;
+      renderAbout();                                      // a fresh install opens here, before Home asks for songs
+      const credit = () => document.querySelector('.about-songs-credit').textContent;
+      expect(credit()).not.toMatch(/With songs by/);
+      act(() => { vi.advanceTimersByTime(2000); });
+      expect(load).toHaveBeenCalled();
+      const song = (id, cr) => ({ id, t: 'S', f: 'f' + id, v: '', st: [], dl: 'sung', lang: 'en', src: { k: 'none' }, d: 1, b: 1, sh: 1, cr, lyr: 0, rd: null, fs: '', hid: false, dup: null });
+      act(() => { Songs.adoptSongCatalog({ schema: 1, songs: [song('aaaaaaaaaaa1', 'hmarie777')], families: [] }); });
+      expect(credit()).toMatch(/With songs by hmarie777/);
+    } finally {
+      load.mockRestore();
+      vi.useRealTimers();
+      Songs._resetSongCatalogForTests();
+      delete /** @type {any} */ (globalThis).SongCatalog;
+    }
   });
 });
 

@@ -34,6 +34,8 @@ class VOTReaderApp : Application() {
             val tree = BoundedLogTree()
             releaseTree = tree
             Timber.plant(tree)
+            // ds5 s41.1: keep the last fatal crash past the process's death, for the Export's tail.
+            CrashRecord.install(this)
         }
 
         // #2: WebView forbids two processes sharing one data directory. This app is

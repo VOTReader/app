@@ -864,6 +864,39 @@ describe('JournalRecordingSheet native re-read + delete handshake (journal-3 2a-
     expect(window.JournalMediaStore.delete).not.toHaveBeenCalled();
     expect(MockBridge.nativeDeleteRecording).not.toHaveBeenCalled();
   });
+
+  /* ds5 s28.1: one step earlier than the CONTROL above. Close while Try again is still FETCHING:
+     the take arrives after the sheet is gone and must still be committed (unlinked, for the Hub
+     banner), not dropped with the served file left to the native sweep. */
+  it('Close while Try again is still fetching the take keeps it', async () => {
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => Promise.reject(new Error('blip'))));
+    window.JournalMediaStore.put = vi.fn(() => Promise.resolve('media-1'));
+    render(<EditorHost />);
+    act(() => { vi.advanceTimersByTime(10); });
+    act(() => { vi.advanceTimersByTime(1300); });
+    fireEvent.click(screen.getByLabelText('Finish'));
+    await act(async () => {
+      window.__onNativeRecordingComplete(null, 4000, 'audio/mp4', undefined, SERVED);
+      await vi.advanceTimersByTimeAsync(10000);
+    });
+    let settleFetch;
+    globalThis.fetch = /** @type {any} */ (vi.fn(() => new Promise((res) => {
+      settleFetch = () => res({ ok: true, blob: () => Promise.resolve(new Blob(['audio'], { type: 'audio/mp4' })) });
+    })));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(window.JournalMediaStore.put).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText('Close'));
+    expect(screen.queryByRole('dialog')).toBeNull();
+
+    await act(async () => { settleFetch(); await vi.advanceTimersByTimeAsync(100); });
+    expect(window.JournalMediaStore.put).toHaveBeenCalledTimes(1);
+    expect(window.JournalMediaStore.put.mock.calls[0][0]).toMatchObject({ type: 'audio', unlinked: true, sourceName: SERVED_NAME });
+    expect(window.JournalMediaStore.delete).not.toHaveBeenCalled();
+  });
 });
 
 /* ds2 (2026-10-13): a take lives in memory until it is saved, so an app update waits while

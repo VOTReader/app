@@ -24,6 +24,17 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { OfflineLibraryBanner, useTopStrip } from './OfflineLibraryBanner.jsx';
+import { showToast } from '../../utils/toast.js';
+
+/** ds5 s16.1: a banner action that failed says so; the banner itself stays. Runs fn now (a throw is a rejection). */
+function _attempt(/** @type {() => any} */ fn) {
+  try { return Promise.resolve(fn()); } catch (e) { return Promise.reject(e); }
+}
+
+/** @param {string} text */
+function _say(text) {
+  try { showToast({ id: 'vot-toast-restore', className: 'vot-toast', text, durationMs: 6000 }); } catch (_e) { /* no document */ }
+}
 
 /**
  * @returns {import('../../utils/storage-health.js').StorageHealthReport}
@@ -119,9 +130,14 @@ export function StorageHealthBanner({ onNavigateSettings }) {
         text: `Some of your data looks missing. On ${_snapDate(dataMissing.at)} you had ${_what(dataMissing.then)}; now ${_what(dataMissing.now)}. Restore adds back what is missing and keeps everything you have made since.`,
         dismissable: true,
         buttons: [
-          { label: 'Restore', primary: true, onClick: () => { if (typeof DataSafety !== 'undefined') Promise.resolve(DataSafety.restoreMissing()).catch(() => {}); } },
+          // restoreMissing answers its own false paths (ds5 s16.1); a throw is answered here.
+          { label: 'Restore', primary: true, onClick: () => { if (typeof DataSafety !== 'undefined') _attempt(() => DataSafety.restoreMissing()).catch(() => _say('Restore could not run. Your library is unchanged.')); } },
           // The drop was the reader's own (a big delete): stop offering, snapshot what is here now.
-          { label: 'Keep as is', onClick: () => { if (typeof DataSafety !== 'undefined') Promise.resolve(DataSafety.acceptCurrent()).catch(() => {}); } },
+          { label: 'Keep as is', onClick: () => {
+            if (typeof DataSafety === 'undefined') return;
+            const failed = () => _say('Kept as is, but a fresh copy could not be saved just now. It will be tried again.');
+            _attempt(() => DataSafety.acceptCurrent()).then((r) => { if (r === 'failed') failed(); }, failed);
+          } },
         ],
       };
     }

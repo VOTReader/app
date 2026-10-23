@@ -28,7 +28,7 @@
    identical at 'loaded' state.
 */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HistoryStore } from './history-store.js';
 
 beforeEach(() => {
@@ -445,5 +445,24 @@ describe('HistoryStore — list() invariants', () => {
     const ref1 = HistoryStore.list();
     const ref2 = HistoryStore.list();
     expect(ref1).toBe(ref2);  // same reference (no defensive copy)
+  });
+});
+
+describe('HistoryStore — a visit made before the store loads keeps its time (ds5 s10.5)', () => {
+  it('the deferred add replays with the time of the visit, not the time of hydration', () => {
+    vi.useFakeTimers();
+    try {
+      HistoryStore._resetForTests();          // idb-backed, no forceLoaded -> 'pending'
+      expect(HistoryStore.getState()).toBe('pending');
+      vi.setSystemTime(new Date(2026, 9, 22, 23, 59, 58));
+      const visited = Date.now();
+      HistoryStore.add({ type: 'letter', id: 'L1', title: 'One' });
+      vi.setSystemTime(new Date(2026, 9, 23, 0, 0, 30));   // hydration lands past midnight
+      HistoryStore._rebaseAndPromote([]);
+      expect(HistoryStore.list()[0].ts).toBe(visited);
+    } finally {
+      vi.useRealTimers();
+      HistoryStore._resetForTests({ forceLoaded: true });
+    }
   });
 });

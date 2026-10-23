@@ -19,6 +19,7 @@ import {
   _isBibleVol,
   late,
   _manifest,
+  _notify,
   _pendingRestore,
   _setPendingRestore,
   _setSource,
@@ -133,9 +134,20 @@ function _migrateWholeBookResume(r, queue) {
  *  @typedef {'queue' | 'placeholder' | false} RebuildOutcome */
 let _rebuilding = /** @type {Promise<RebuildOutcome> | null} */ (null);
 let _waiting = false;
+/* s32.1: the bar says Loading while the rebuild waits, so its button is Pause; a Pause tapped then takes the Play
+   back. The rebuild then starts nothing and hands the bar its descriptor again (still the restored one, at its
+   place), and the next Play starts at once from the corpus now in memory. */
+let _startWanted = true;
 
 /** The rebuild a restored bar's tap started, while it still waits for a corpus; null otherwise. @returns {Promise<RebuildOutcome> | null} */
 export function _rebuildInFlight() { return _rebuilding; }
+
+/** A Play/Pause tap while a rebuild waits for its corpus: whether it starts once the corpus lands flips (s32.1). */
+export function _toggleRebuildStart() {
+  _startWanted = !_startWanted;
+  _state.status = _startWanted ? 'loading' : 'paused';
+  _notify();
+}
 
 /**
  * Rebuild the full queue a _restoreFromSaved() bar stands in for, then start
@@ -187,6 +199,9 @@ async function _rebuild() {
   // the desk, not hidden again by the one-track placeholder for as long as the corpus takes (sweep v021).
   _waiting = true;
   _state.restoring = true;
+  _startWanted = true;
+  _state.status = 'loading';
+  _notify();
   try {
     if (r.mode === 'songs') {
       try { await loadSongCatalog(); } catch (_e) { /* no catalog — fall through to the placeholder track */ }
@@ -196,12 +211,20 @@ async function _rebuild() {
           if (!_bibleManifest() && typeof g.__loadBibleCorpus === 'function') await g.__loadBibleCorpus();
         } else if (!_manifest() && typeof g.__loadVotCorpus === 'function') await g.__loadVotCorpus();
       } catch (_e) { /* corpus load failed — fall through to the placeholder track */ }
+    } else if (r.volKey) {
+      // s31.1: an edited run goes on into the next unit of the site order, which needs the corpus by the time its
+      // last track starts. Its own queue does not, so the load is asked for here and not waited on.
+      const load = _isBibleVol(r.volKey) ? (_bibleManifest() ? null : g.__loadBibleCorpus) : (_manifest() ? null : g.__loadVotCorpus);
+      if (typeof load === 'function') {
+        try { void Promise.resolve(load()).catch(() => {}); } catch (_e) { /* no corpus: the run ends where it is */ }
+      }
     }
   } finally {
     _waiting = false;
     _state.restoring = !!_pendingRestore;
   }
   if (_state.queue !== placeholder) return false;
+  if (!_startWanted) { _setPendingRestore(r); _notify(); return false; }
   /** @type {Track[]} */
   let queue = [];
   if (r.mode === 'custom') {

@@ -8,8 +8,8 @@ import { describe, it, expect } from 'vitest';
 const METHODS = [
   'subscribe', 'getVersion', 'getState', 'getPreciseTime',
   'hasAudio', 'prewarm', 'firstReaderCode', 'collectionHasAudio', 'sectionsFor', 'sectionTracks',
-  'readerLabel', 'renditionsFor', 'setPreferredReader', 'playbackTracks', 'playableNow', 'listenResume',
-  'playLetter', 'playCollection', 'playSection', 'playBibleBook', 'playSongs',
+  'readerLabel', 'renditionsFor', 'setPreferredReader', 'playbackTracks', 'playableNow', 'listenResume', 'listenHere',
+  'playLetter', 'playCollection', 'playSection', 'playBibleBook', 'playPortion', 'playSongs',
   'setShuffle', 'switchSongVersion', 'setRepeat', 'setLoop', 'clearLoop', 'canLoop', 'isNative',
   'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter',
   'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'setPlaybackRate',

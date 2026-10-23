@@ -144,6 +144,11 @@ describe('parseRefRange', () => {
     expect(result).toEqual({ start: 7, end: 11, verses: [7, 9, 11] });
   });
 
+  it('expands a mixed range-and-comma ref (s36.1)', () => {
+    expect(parseRefRange('Matthew 5:3-4, 6, 8')).toEqual({ start: 3, end: 8, verses: [3, 4, 6, 8] });
+    expect(parseRefRange('5:3, 5-7')).toEqual({ start: 3, end: 7, verses: [3, 5, 6, 7] });
+  });
+
   it('parses a comma-form with two verses', () => {
     expect(parseRefRange('5:7, 9')).toEqual({ start: 7, end: 9, verses: [7, 9] });
   });

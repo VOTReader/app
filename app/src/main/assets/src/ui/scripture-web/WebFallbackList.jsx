@@ -27,7 +27,10 @@ const plural = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
    initialChapter (History's newest chapter) came back as the chapter just
    visited, and Try again remounts the list: both lost the reader's place.
    Set by those two exits, used once by the next mount; any other way in
-   opens on History's chapter as before. */
+   opens on History's chapter as before. A live web that lost its context
+   (fromWeb) names a fresher place than any resume point: a Try again that
+   drew the web left one behind, and it reopened the list there, not where
+   the reader had since panned to (s24.3). */
 /** @type {number | null} */
 let resumeChapter = null;
 
@@ -37,14 +40,15 @@ export function _resetFallbackPlace() { resumeChapter = null; }
 /**
  * @param {{ graph: any, initialChapter: number, onOpen: (ref: any) => void,
  *   onRetry: () => void, onBack: () => void, verseText: (ref: any) => string,
- *   onMyWeb?: () => void }} props
+ *   onMyWeb?: () => void, fromWeb?: boolean }} props
  *   onMyWeb: My web draws in Canvas2D, so it opens without WebGL2 (w3 item 31)
+ *   fromWeb: initialChapter is where a live web stood when it lost its context
  */
-export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText, onMyWeb }) {
+export function WebFallbackList({ graph, initialChapter, onOpen, onRetry, onBack, verseText, onMyWeb, fromWeb = false }) {
   const [ci, setCi] = React.useState(() => {
     const at = resumeChapter;
     resumeChapter = null;
-    return at != null && graph.chapters[at] ? at : initialChapter;
+    return !fromWeb && at != null && graph.chapters[at] ? at : initialChapter;
   });
   const data = React.useMemo(() => chapterConnections(graph, ci), [graph, ci]);
   const ch = graph.chapters[ci];

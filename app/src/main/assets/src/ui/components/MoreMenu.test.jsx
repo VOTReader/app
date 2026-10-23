@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, fireEvent, cleanup, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { MoreMenuBtn, NavMenuContext, stepFontScale } from './MoreMenu.jsx';
+import { useFocusTrap } from '../../hooks/use-focus-trap.js';
 
 beforeEach(() => { globalThis.ReactDOM = ReactDOM; });
 afterEach(() => { cleanup(); });
@@ -59,6 +60,13 @@ describe('MoreMenuBtn — the compact bar', () => {
       expect(item(name), name).toBeTruthy();
     }
     expect(document.activeElement, 'focus lands on the first item').toBe(item('History'));
+  });
+
+  it('offers Reading plans when the app wires it (mw18 C8), and opens them', () => {
+    const { value, open, item } = setup({ onPlans: vi.fn() });
+    open();
+    act(() => { fireEvent.click(item('Reading plans')); });
+    expect(value.onPlans).toHaveBeenCalled();
   });
 
   it('leaves out History when History itself is off', () => {
@@ -298,5 +306,35 @@ describe('MoreMenuBtn — Copy website link (cp2)', () => {
     const box = document.querySelector('.copy-fallback-text');
     expect(box.value).toBe('https://www.thevolumesoftruth.com/The_Wide_Path');
     expect(document.querySelector('.copy-fallback-help').textContent).toBe('Copy the selected link below, or try again.');
+  });
+});
+
+describe('MoreMenuBtn — Bible translation (mw17 A02.1)', () => {
+  const OPTS = [{ id: 'nkjv', label: 'NKJV', desc: 'New King James Version — the default' }, { id: 'rvr', label: 'Reina-Valera 1960', desc: 'Reina-Valera 1960 — Spanish' }];
+  beforeEach(() => { globalThis.TRANSLATION_OPTIONS = OPTS; globalThis.useFocusTrap = useFocusTrap; });
+  afterEach(() => { delete globalThis.TRANSLATION_OPTIONS; });
+
+  it('on a Bible chapter it names the current translation and switches it from the picker', () => {
+    const onTranslation = vi.fn();
+    const { open, item, menu } = setup({ translationHere: true, translation: 'nkjv', onTranslation });
+    open();
+    const row = [...document.querySelectorAll('.more-menu [role="menuitem"]')].find((b) => /Bible translation/.test(b.textContent));
+    expect(row).toBeTruthy();
+    expect(row.textContent).toMatch(/New King James Version/);
+    act(() => { fireEvent.click(row); });
+    expect(menu()).toBeNull();
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog && dialog.textContent).toMatch(/Bible Translation/);
+    const rvr = [...dialog.querySelectorAll('button')].find((b) => /Reina-Valera/.test(b.textContent));
+    act(() => { fireEvent.click(rvr); });
+    expect(onTranslation).toHaveBeenCalledWith('rvr');
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    void item;
+  });
+
+  it('is not offered off a Bible chapter', () => {
+    const { open } = setup({ translationHere: false, translation: 'nkjv', onTranslation: vi.fn() });
+    open();
+    expect(document.querySelector('.more-menu').textContent).not.toMatch(/Bible translation/);
   });
 });

@@ -90,12 +90,16 @@ export function applyDOMLinks() {
     // only ever a destination (target side) — renders dimmer (gold-dim).
     var byEndPos = {};
     links.forEach(function(link) {
+      // s06.9: one malformed link is skipped; it never aborts the icons
+      // for the rest of the page.
+      try {
+      if (!link) return;
       // isSourceHere = the source endpoint belongs to this container
-      var srcKey = link.source ? link.source.key : null;
+      var srcKey = link.source && typeof link.source.key === 'string' ? link.source.key : null;
       var isSourceHere = srcKey && (srcKey === hlKey || srcKey.indexOf(keyPrefix) === 0);
 
       [link.source, link.target].forEach(function(ep) {
-        if (!ep || !ep.key) return;
+        if (!ep || typeof ep.key !== 'string' || !ep.key) return;
         if (ep.key !== hlKey && ep.key.indexOf(keyPrefix) !== 0) return;
         var startPos = null, endPos = null;
         var m = ep.key.match(/:(\d+)-(\d+)$/);
@@ -121,13 +125,15 @@ export function applyDOMLinks() {
           anySource: prev.anySource || !!isSourceHere
         };
       });
+      } catch (_e) { /* malformed link: skip it */ }
     });
     if (Object.keys(byEndPos).length === 0) {
       // Legacy link (no :start-end suffix) — fall back to one icon at
       // end of block, same as the prior end-of-paragraph behavior.
       // For the legacy path, check if any link is sourced from this container.
       var legacyAnySource = links.some(function(l) {
-        return l.source && (l.source.key === hlKey || l.source.key.indexOf(keyPrefix) === 0);
+        var k = l && l.source && l.source.key;
+        return typeof k === 'string' && (k === hlKey || k.indexOf(keyPrefix) === 0);
       });
       container.appendChild(_buildLinkIcon(hlKey, links.length, legacyAnySource));
       return;

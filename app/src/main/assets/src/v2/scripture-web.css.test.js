@@ -25,6 +25,8 @@ const NO_RULE = new Set([
   'sw-choice-row', // the chooser's and Nearby's rows keep it as a hook (app.css names it in a comment only)
   'sw-a11y-help', 'sw-goto-opt', // ids (aria-describedby, the go-to's option ids 'sw-goto-opt-' + k)
   'sw-ink', // utils/scripture-web/sw-ink.js, an import path
+  'sw-filter', // the filter sheet's ids ('sw-filter-' + name, aria-labelledby)
+  'sw-cite-failed', // a hook on the panel's empty line (main styles it as sw-panel-empty)
 ]);
 
 const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');

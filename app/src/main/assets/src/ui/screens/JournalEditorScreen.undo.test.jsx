@@ -35,7 +35,7 @@ beforeEach(() => {
   globalThis.createPressDrag = createPressDrag;
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   // showToast must materialize a real node — the undo wiring queries
-  // #vot-toast-undo for its button (production toast does the same).
+  // #vot-toast-undo-journal for its button (production toast does the same).
   globalThis.showToast = vi.fn((opts) => {
     let el = document.getElementById(opts.id);
     if (!el) { el = document.createElement('div'); el.id = opts.id; document.body.appendChild(el); }
@@ -59,7 +59,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
-  const t = document.getElementById('vot-toast-undo');
+  const t = document.getElementById('vot-toast-undo-journal');
   if (t) t.remove();
 });
 
@@ -91,7 +91,7 @@ describe('JournalEditorScreen — [16] Undo survives the screen it was raised on
     cleanup();
     expect(JournalStore.get(entry.id).blocks.map((b) => b.text)).toEqual(['second']);
 
-    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     expect(JournalStore.get(entry.id).blocks.map((b) => b.text)).toEqual(['first', 'second']);
   });
 
@@ -106,9 +106,9 @@ describe('JournalEditorScreen — [16] Undo survives the screen it was raised on
     globalThis.hideToast.mockClear();
 
     expect(() => {
-      act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+      act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     }).not.toThrow();
-    expect(globalThis.hideToast).toHaveBeenCalledWith('vot-toast-undo');
+    expect(globalThis.hideToast).toHaveBeenCalledWith('vot-toast-undo-journal');
     expect(JournalStore.get(entry.id)).toBeNull();   // not resurrected
   });
 });
@@ -120,9 +120,9 @@ describe('JournalEditorScreen — [16] session undo', () => {
       JournalHelpers.newBlock('p', { text: 'second' }),
     ]);
     deleteFirstBlock();
-    expect(globalThis.showToast).toHaveBeenCalledWith(expect.objectContaining({ id: 'vot-toast-undo' }));
+    expect(globalThis.showToast).toHaveBeenCalledWith(expect.objectContaining({ id: 'vot-toast-undo-journal' }));
     expect(Array.from(document.querySelectorAll('.jrn-block-textarea')).map((t) => t.value)).toEqual(['second']);
-    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     expect(Array.from(document.querySelectorAll('.jrn-block-textarea')).map((t) => t.value)).toEqual(['first', 'second']);
   });
 
@@ -131,7 +131,7 @@ describe('JournalEditorScreen — [16] session undo', () => {
     deleteFirstBlock();
     // Deletion left the default empty paragraph.
     expect(Array.from(document.querySelectorAll('.jrn-block-textarea')).map((t) => t.value)).toEqual(['']);
-    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     expect(Array.from(document.querySelectorAll('.jrn-block-textarea')).map((t) => t.value)).toEqual(['only']);
   });
 
@@ -142,7 +142,7 @@ describe('JournalEditorScreen — [16] session undo', () => {
     ]);
     deleteFirstBlock();
     expect(globalThis.JournalMediaStore.delete).not.toHaveBeenCalled(); // not yet
-    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     flushTimers(8000);
     expect(globalThis.JournalMediaStore.delete).not.toHaveBeenCalled(); // undone → never
   });
@@ -195,7 +195,7 @@ describe('JournalEditorScreen - a deleted block takes its marks (n4-06)', () => 
     deleteFirstBlock();
     flushTimers(7000);
     expect(document.querySelectorAll('.jrn-block-del-btn')).toHaveLength(1);
-    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     flushTimers(1000);
     expect(document.querySelectorAll('.jrn-block-del-btn'), 'the editor still holds one block').toHaveLength(1);
     expect(JournalStore.get(entry.id).blocks.map((b) => b.text)).toEqual(['second']);
@@ -204,7 +204,7 @@ describe('JournalEditorScreen - a deleted block takes its marks (n4-06)', () => 
     const purge = vi.spyOn(JournalStore, 'purgeBlockMarks').mockReturnValue(0);
     openEntry([JournalHelpers.newBlock('p', { text: 'first' }), JournalHelpers.newBlock('p', { text: 'second' })]);
     deleteFirstBlock();
-    act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+    act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
     flushTimers(7000);
     expect(purge).not.toHaveBeenCalled();
   });
@@ -221,7 +221,7 @@ describe('JournalEditorScreen - W16 Undo after Done on an entry the exit prune r
     render(React.createElement(JournalEditorScreen, { entryId: entry.id, onBack: () => {} }));
     return entry;
   }
-  const tapUndo = () => act(() => { document.querySelector('#vot-toast-undo .vot-undo-btn').click(); });
+  const tapUndo = () => act(() => { document.querySelector('#vot-toast-undo-journal .vot-undo-btn').click(); });
 
   it('Undo brings the pruned entry back with its block, and the block\'s media stays', () => {
     const entry = openUntitled([{ ...JournalHelpers.newBlock('image', {}), mediaId: 'm9' }]);
@@ -334,5 +334,33 @@ describe('JournalEditorScreen - W16 Undo after Done on an entry the exit prune r
     } finally {
       delete globalThis.JournalStatsStore;
     }
+  });
+});
+
+/* ds5 s20.2 (idea sweep 2026-10-22): deleteBlock spliced the list but kept the caret's old block
+   index, so a FAB insert after deleting a block ABOVE the caret landed one block off. */
+describe('JournalEditorScreen — the caret index follows a block delete (ds5 s20.2)', () => {
+  beforeEach(() => {
+    globalThis.JournalInsertSheet = ({ onRecordAudio }) =>
+      React.createElement('button', { 'data-testid': 'open-rec', onClick: onRecordAudio }, 'rec');
+    globalThis.JournalRecordingSheet = ({ onSave }) =>
+      React.createElement('button', { 'data-testid': 'rec-save', onClick: () => onSave({ mediaId: 'm_test', duration: 3, samples: null }) }, 'save');
+  });
+
+  it('an insert after deleting a block above the caret lands below the caret block', () => {
+    const entry = openEntry([
+      JournalHelpers.newBlock('p', { text: 'first' }),
+      JournalHelpers.newBlock('p', { text: 'second' }),
+      JournalHelpers.newBlock('p', { text: 'third' }),
+    ]);
+    const ta = document.querySelectorAll('.jrn-block-textarea')[1];   // caret in 'second'
+    ta.setSelectionRange(2, 2);
+    fireEvent.focus(ta);
+    deleteFirstBlock();
+    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
+    fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
+    const saved = JournalStore.get(entry.id).blocks;
+    expect(saved.map((b) => b.type === 'audio' ? 'audio' : b.text)).toEqual(['second', 'audio', 'third']);
   });
 });

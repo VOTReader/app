@@ -2,7 +2,7 @@
    SettingsScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { settingsGlance } from '../../utils/settings-glance.js';
+import { settingsGlance, daysAgo } from '../../utils/settings-glance.js';
 import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell } from '../../utils/download-gate.js';
@@ -507,22 +507,23 @@ function AllProgressClearRow({ totalRead, totalItems, hasMarks, hasPartial, onCl
   );
 }
 
-/** "today", "yesterday", or "N days ago" for a past time. @param {number} at */
-function _daysAgo(at) {
-  const day = (t) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
-  const n = Math.round((day(Date.now()) - day(at)) / 86400000);
-  return n <= 0 ? 'today' : n === 1 ? 'yesterday' : n + ' days ago';
-}
+const _daysAgo = (/** @type {number} */ at) => daysAgo(at);
 
 /** datasafe 10-05: when this device last finished an export (backup-flow.js LAST_EXPORT_KEY). */
-function _lastBackupText() {
+function _lastBackupAt() {
   let at = 0;
   try { at = Number(localStorage.getItem('vot-last-export')) || 0; } catch (_e) { /* no storage */ }
+  return at;
+}
+function _lastBackupText() {
+  const at = _lastBackupAt();
   return at ? 'Exported ' + _daysAgo(at) : 'Not exported from this device yet';
 }
 
-/** @param {{ where: string | null, count: number, newestAt: number }} st */
+/** @param {{ where: string | null, count: number, newestAt: number, tooBig?: number }} st */
 function _snapshotText(st) {
+  // ds5 s34.1: past the cap no copy is taken; say so where the copies are described.
+  if (st.tooBig) return 'Paused: your library is too big for an automatic copy (' + Math.round(st.tooBig / 1048576) + ' MB). Export a backup to keep a copy.';
   if (!st.count) return 'The first is taken shortly after the app opens';
   const where = st.where === 'phone' ? 'kept on this phone' : 'kept in this browser (cleared with its site data)';
   return 'Newest ' + _daysAgo(st.newestAt) + ' · ' + st.count + ' ' + where;
@@ -577,14 +578,20 @@ const SETTINGS_TOPICS = {
 };
 
 export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount }) {
-  React.useSyncExternalStore(
+  const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
   );
-  React.useSyncExternalStore(
+  const votVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__votCorpus !== 'undefined') ? window.__votCorpus.getVersion() : 0
   );
+  // The Studies rows count Matthew and the Bible studies (mw17 A09.3).
+  const matthewVer = React.useSyncExternalStore(
+    React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
+    () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
+  );
+  const [studiesTick, setStudiesTick] = React.useState(0);
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
     () => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.getVersion() : 0
@@ -612,11 +619,20 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const progressOpen = groupOpen('progress');
   // Only the progress table needs the corpora. Changing a font or exporting
   // a backup must not parse the whole library as a side effect.
+  // The Studies rows need Matthew and the Bible studies too: without them the
+  // table read Studies 0 / 0 on a first open (mw17 A09.3, as My Progress loads them).
   React.useEffect(() => {
-    if (!progressOpen) return;
-    for (const load of [window.__loadBibleCorpus, window.__loadVotCorpus]) {
+    if (!progressOpen) return undefined;
+    for (const load of [window.__loadBibleCorpus, window.__loadVotCorpus, window.__loadMatthewCorpus]) {
       if (typeof load === 'function') load().catch((e) => console.warn('Progress corpus load failed', e));
     }
+    let alive = true;
+    if (typeof loadBibleStudies === 'function') {
+      Promise.resolve(loadBibleStudies())
+        .then(() => { if (alive) setStudiesTick((t) => t + 1); })
+        .catch((e) => console.warn('Progress studies load failed', e));
+    }
+    return () => { alive = false; };
   }, [progressOpen]);
   // "Show me around" (review-tutorial): when the tour's stop needs a group open
   // (the backup stop rings Export inside Your Data), open it — whether Settings
@@ -645,7 +661,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   // of the deployed service-worker.js that installs nothing.
   const [buildInfo, setBuildInfo] = React.useState({ state: 'loading', running: null, server: null });
   // datasafe 10-05: the automatic snapshots' line in Your Data (DataSafety lives in bundle-b).
-  const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number } | null} */ (null));
+  const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number, tooBig?: number } | null} */ (null));
   // dl-weekly: the weekly copy in Downloads (phone app, Android 10+).
   const [weekly, setWeekly] = React.useState(/** @type {{ supported: boolean, on: boolean, count: number, newestAt: number } | null} */ (null));
   React.useEffect(() => {
@@ -917,7 +933,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
      My Progress dashboard). buildProgressGroups() returns [] until the
      BOOKS + VOT corpora are loaded — the subscriptions above re-render
      this screen when they land. */
-  const PROGRESS_GROUPS = buildProgressGroups();
+  // Built when a corpus lands, not on every keystroke in the find box (s23.2). The
+  // corpora themselves are keys too: a screen that loaded one bumps no tick here.
+  const _matthewNow = typeof MATTHEW !== 'undefined' ? MATTHEW : null;
+  const _studiesNow = typeof BIBLE_STUDIES !== 'undefined' ? BIBLE_STUDIES : null;
+  const PROGRESS_GROUPS = React.useMemo(() => buildProgressGroups(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- buildProgressGroups reads the lazy corpora as globals; these keys say when they changed
+    [bibleVer, votVer, matthewVer, studiesTick, _matthewNow, _studiesNow]);
   const countFor = (bid) => countReadFor(readItems, bid);
   const frontierData = (typeof ReadingStatsStore !== 'undefined' && typeof ReadingStatsStore.get === 'function')
     ? ReadingStatsStore.get()
@@ -925,12 +947,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const frontierKeys = Object.keys((frontierData && frontierData.progress) || {})
     .filter((key) => key.indexOf(`${READ_VERSION_ID}:`) === 0);
   const hasFrontierFor = (bid) => frontierKeys.some((key) => key.indexOf(`${READ_VERSION_ID}:${bid}:`) === 0);
-  const allBooks = PROGRESS_GROUPS.flatMap((g) => g.genres.flatMap((gr) => gr.books));
   // The numerator counts the same books the denominator sums. Answers and Hidden Manna marks
   // (v1:answers:*, v1:hidden-manna:*) have no row here, so counting every readItems key let
   // "All Scriptures" pass the sum of the rows, and even its own total (sweep v075).
-  const totalRead = allBooks.reduce((s, b) => s + countFor(b.id), 0);
-  const totalItems = allBooks.reduce((s, b) => s + b.total, 0);
+  const { totalRead, totalItems } = React.useMemo(() => {
+    const allBooks = PROGRESS_GROUPS.flatMap((g) => g.genres.flatMap((gr) => gr.books));
+    return {
+      totalRead: allBooks.reduce((s, b) => s + countReadFor(readItems, b.id), 0),
+      totalItems: allBooks.reduce((s, b) => s + b.total, 0),
+    };
+  }, [PROGRESS_GROUPS, readItems]);
   // Clear All wipes every read mark, off-table ones too, so it stays live while any exists.
   const hasAnyMark = Object.keys(readItems || {}).length > 0;
   const sectionBooks = (grp) => grp.genres.flatMap((gr) => gr.books);
@@ -958,6 +984,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
   const glance = settingsGlance({
     settings, theme, textPercent: textScalePercent, fontLabel: selectedFontLabel,
     readerLabel, gardenLabel: gardenTier ? gardenTier.label + ' images' : null,
+    lastBackupAt: _lastBackupAt(),
   });
 
   return (

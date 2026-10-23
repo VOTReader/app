@@ -22,11 +22,11 @@ import { clampLpm, clampEndDwell } from '../../hooks/use-autoscroll.js';
 // Re-exported here because this is the seam everything else already imports.
 export { clampEndDwell };
 
-export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, updateSetting, nav, children }) {
+export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = null, settings, updateSetting, nav, children }) {
   const s = settings || {};
   // Deliberately un-memoized (carried over from app.jsx): goToLastRead reads
   // live nav state from its closure, and the sole consumer is one tiny button.
-  const dotValue = { screen, enabled: !!dotEnabled, onGo };
+  const dotValue = { screen, enabled: !!dotEnabled, onGo, place: dotPlace };
   const autoValue = React.useMemo(() => ({
     enabled: !!s.autoScroll,
     speedLpm: clampLpm(s.autoScrollLpm),
@@ -50,8 +50,13 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, settings, upda
     onThemeChange: n.onThemeChange || (() => {}),
     onSettings: n.onSettings || (() => {}),
     onHistory: n.onHistory || (() => {}),
+    onPlans: n.onPlans || null,
     fontScale: String(s.fontScale || '1'),
     onFontScale: (v) => { if (updateSetting) updateSetting('fontScale', v); },
+    // A Bible chapter's menu also switches the translation (mw17 A02.1).
+    translationHere: screen === 'bible-ch',
+    translation: String(s.translation || 'nkjv'),
+    onTranslation: (v) => { if (updateSetting) updateSetting('translation', v); },
   };
 
   return (

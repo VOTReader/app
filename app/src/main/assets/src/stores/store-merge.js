@@ -227,6 +227,35 @@ export function unionStrings(ours, theirs) {
    in that store's native shape, so cached-store can assign it straight back
    to `_cache`. */
 
+/* Reading plan runs (vot-reading-plans, mw18). */
+/**
+ * Cross-tab merge: records by id (the newer copy of a run wins, deletions
+ * honoured), then the ticks of both copies merge three ways against the base:
+ * a chapter read in one tab is never lost to a pace change made in another,
+ * and one un-marked in one tab (C4) stays un-marked unless the other tab
+ * changed it too.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any[]}
+ */
+export function mergePlanStore(base, ours, theirs) {
+  const merged = mergeRecordsById(base, ours, theirs);
+  const byId = (/** @type {any} */ arr) => new Map((Array.isArray(arr) ? arr : []).filter((/** @type {any} */ r) => r && typeof r.id === 'string').map((r) => [r.id, r]));
+  const B = byId(base), O = byId(ours), T = byId(theirs);
+  return merged.map((/** @type {any} */ r) => {
+    const o = O.get(r && r.id), t = T.get(r && r.id);
+    if (!o || !t) return r;
+    const b = (B.get(r.id) || {}).ticks || {}, ot = o.ticks || {}, tt = t.ticks || {};
+    /** @type {Record<string, string>} */
+    const ticks = {};
+    for (const k of new Set([...Object.keys(ot), ...Object.keys(tt)])) {
+      // In the base and missing from either side: that side un-marked it.
+      if (k in b && (!(k in ot) || !(k in tt))) continue;
+      ticks[k] = k in ot ? ot[k] : tt[k];
+    }
+    return { ...r, ticks };
+  });
+}
+
 /** Bare id-bearing arrays: bookmarks, links. */
 export function mergeArrayStore(base, ours, theirs) {
   return mergeRecordsById(base, ours, theirs);

@@ -326,6 +326,23 @@ describe('useReadingPositionNav — selectScriptureBook', () => {
   });
 });
 
+// ── lastReadPlace (mw17 s15.1) ──────────────────────────────────────────
+
+describe('useReadingPositionNav — lastReadPlace names where goToLastRead goes', () => {
+  it('a letter, a study chapter, a Bible chapter, Matthew; null when there is nowhere to go', () => {
+    expect(setup({ activeReadKey: 'vol:two', lastReadLetterMap: { two: 'the-wide-path' } }).result.current.lastReadPlace())
+      .toEqual({ screen: 'vot-letter', letterId: 'the-wide-path' });
+    expect(setup({ activeReadKey: 'bible-study-purity', lastReadChapters: { 'bible-study-purity': 'p1' } }).result.current.lastReadPlace())
+      .toEqual({ screen: 'bible-study-chapter', studyId: 'purity', studyChapterId: 'p1' });
+    expect(setup({ activeReadKey: 'genesis', lastReadChapters: { genesis: 4 } }).result.current.lastReadPlace())
+      .toEqual({ screen: 'bible-ch', bookId: 'genesis', chapterNum: 4 });
+    expect(setup({ activeReadKey: 'matthew', lastReadChapters: { matthew: 5 } }).result.current.lastReadPlace())
+      .toEqual({ screen: 'matthew-ch', bookId: 'matthew', chapterNum: 5 });
+    expect(setup({ activeReadKey: null }).result.current.lastReadPlace()).toBeNull();
+    expect(setup({ activeReadKey: 'vol:two', lastReadLetterMap: {} }).result.current.lastReadPlace()).toBeNull();
+  });
+});
+
 // ── goToLastRead ────────────────────────────────────────────────────────
 
 describe('useReadingPositionNav — goToLastRead (branch dispatch)', () => {

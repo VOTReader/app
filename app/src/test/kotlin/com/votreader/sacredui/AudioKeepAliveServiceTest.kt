@@ -182,6 +182,26 @@ class AudioKeepAliveServiceTest {
     // ─── sf1 (2026-09-24): screen-off playback on Android 17 ──────────
 
     @Test
+    fun `a start right after a stop is issued again, though the old service has not been destroyed yet`() {
+        // ds5 s41.2: setActive(false) only asked the service to stop; `foreground` stayed true until
+        // onDestroy, so a start inside that window (a quick letter switch: idle, then playing) hit the
+        // "already in the foreground" early return, and the service then went down with audio still
+        // playing, no anchor and no card.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val controller = Robolectric.buildService(AudioKeepAliveService::class.java).create()
+        try {
+            controller.get().onStartCommand(Intent(app, AudioKeepAliveService::class.java), 0, 1)
+            while (shadowOf(app).nextStartedService != null) { /* drain what came before */ }
+            AudioKeepAliveService.setActive(app, false)        // onDestroy has not run yet
+            assertTrue(AudioKeepAliveService.setActive(app, true))
+            assertNotNull(shadowOf(app).nextStartedService, "the start after a stop must be issued")
+        } finally {
+            controller.destroy()
+            AudioKeepAliveService.setActive(app, false)
+        }
+    }
+
+    @Test
     fun `setActive true on a service already in the foreground asks for no second foreground start`() {
         // The player raises the keep-alive at every track seam. From the background (screen off) a
         // startForegroundService is refused on API 31+, and its throw took the card down with it, so the

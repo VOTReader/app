@@ -33,8 +33,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { AudioPlayer } from '../../utils/audio-player.js';
-import { AUDIO_RESUME_END_FRACTION, AUDIO_RESUME_MIN_SEC, isSongKey, songIdOfKey } from '../../utils/audio-track.js';
-import { resumePillText } from './AudioPlayButton.jsx';
+import { isSongKey, songIdOfKey } from '../../utils/audio-track.js';
+import { listenFace, pausedHere, useStillLoading } from './AudioPlayButton.jsx';
 import { useAudioPositions } from './AudioShelf.jsx';
 import { SongCatalog } from '../../utils/song-catalog.js';
 import { SongListRow, songCountLabel, currentSongId, playerIsActive, ChevronRightIcon } from './SongParts.jsx';
@@ -71,14 +71,16 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   const online = useSongsOnline();
   useSongCatalog(showSongs);
   const letterKey = volKey + ':' + letter.id;
+  const st = AudioPlayer.getState();
+  const cur = Array.isArray(st.queue) ? st.queue[st.qi] : null;
+  const readingHere = !!(cur && cur.key === letterKey);
+  // U10.2: a load that runs long says so (a hook, so above the early return).
+  const lateLoad = useStillLoading(readingHere && st.status === 'loading', (cur && cur.url) || '');
   const recorded = AudioPlayer.hasAudio(volKey, letter.id);
   const songs = lettersSongs(showSongs, letterKey);
   if (!recorded && !songs.length) return null;
 
-  const st = AudioPlayer.getState();
-  const cur = Array.isArray(st.queue) ? st.queue[st.qi] : null;
   const active = playerIsActive(st);
-  const readingHere = !!(cur && cur.key === letterKey);
   const songHere = !!(cur && isSongKey(cur.key) && songs.some((s) => s.id === songIdOfKey(cur.key)));
   const listen = () => {
     if (readingHere) { AudioPlayer.toggle(); return; }
@@ -100,14 +102,15 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
   const resume = !recorded || listening || listenOff ? null
     : readingHere ? pausedHere(st)
       : AudioPlayer.listenResume({ volKey, letter, collectionLabel });
-  const listenText = listening ? 'Pause' : resume ? resumePillText(resume) : 'Listen';
+  // U10.2: while this reading loads the pill says Loading…, never Pause at 0:00.
+  const face = listenFace({ playing: readingHere && st.status === 'playing', loading: readingHere && st.status === 'loading', late: lateLoad, resume });
 
   return (
     <>
       <div className={'hero-play-row letter-listen-row' + (songs.length ? ' has-songs' : '')}>
         {recorded ? (
-          <button type="button" className={'hero-play-pill letter-listen-pill' + (listening ? ' is-playing' : '')} onClick={listen} disabled={listenOff} aria-pressed={listening} aria-label={listening ? 'Pause the reading' : listenText}>
-            {listening ? PAUSE : PLAY}<span>{listenText}</span>
+          <button type="button" className={'hero-play-pill letter-listen-pill' + (face.pause ? ' is-playing' : '') + (face.busy ? ' is-loading' : '')} onClick={listen} disabled={listenOff} aria-pressed={face.pause} aria-busy={face.busy || undefined} aria-label={face.label}>
+            {face.pause ? PAUSE : PLAY}<span>{face.text}</span>
           </button>
         ) : null}
         {songs.length ? (
@@ -119,18 +122,6 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
       {offLine ? <p className="hero-offline-line" role="status">{offLine}</p> : null}
     </>
   );
-}
-
-/**
- * The reading loaded and paused on this letter as a resume, or null: the same thresholds as the player's own
- * resume (from AUDIO_RESUME_MIN_SEC in until AUDIO_RESUME_END_FRACTION of the way through).
- * @param {any} st the player's state @returns {{ at: number, left: number } | null}
- */
-function pausedHere(st) {
-  const t = Number(st && st.time) || 0;
-  const d = Number(st && st.duration) || 0;
-  if (!st || st.status !== 'paused' || t < AUDIO_RESUME_MIN_SEC || (d > 0 && t >= d * AUDIO_RESUME_END_FRACTION)) return null;
-  return { at: t, left: d > t ? d - t : 0 };
 }
 
 /**

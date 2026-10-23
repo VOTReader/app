@@ -262,7 +262,8 @@ export function JournalHubScreen(props) {
                   <path d="M8 12 L3 19" />
                 </svg>
               )}
-              {JournalHelpers.shortDate(entry.updated || entry.created)}
+              {/* A05.3: a time from an edit says so (more than a minute after it was written). */}
+              {(entry.updated && entry.created && entry.updated - entry.created > 60000 ? 'Edited ' : '') + JournalHelpers.shortDate(entry.updated || entry.created)}
               <span className="jrn-card-time">{' · ' + JournalHelpers.shortTime(entry.updated || entry.created)}</span>
             </span>
           </div>

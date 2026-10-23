@@ -54,8 +54,9 @@ describe('ResumeReadingNavBtn — nav-bar resume dot', () => {
     // marker-glyph.test.jsx keeps the two apart). The name is the one the
     // Settings row and the tour use for the same control (Orchestrator,
     // 2026-09-10): one control, one name in every place it is spoken of.
-    expect(btn.getAttribute('aria-label')).toBe('Reading Position Marker');
-    expect(btn.getAttribute('title')).toBe('Reading Position Marker');
+    // mw17 s15.1: the spoken name is the action; the hover title keeps the Settings name first.
+    expect(btn.getAttribute('aria-label')).toBe('Continue reading');
+    expect(btn.getAttribute('title')).toBe('Reading Position Marker: continue reading');
     const glyph = btn.querySelector('svg.rdg-glyph');
     expect(glyph).not.toBe(null);
     expect(glyph.getAttribute('aria-hidden')).toBe('true');
@@ -84,5 +85,30 @@ describe('ResumeReadingNavBtn — nav-bar resume dot', () => {
     const { container } = renderDot({ screen: 'volumes-home', enabled: true, onGo });
     fireEvent.click(container.querySelector('.reading-dot-nav'));
     expect(onGo).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ResumeReadingNavBtn — named by where it goes (mw17 s15.1)', () => {
+  beforeEach(() => {
+    /** @type {any} */ (globalThis).BOOKS = { genesis: { id: 'genesis', title: 'Genesis' } };
+    /** @type {any} */ (globalThis).OT_BOOK_IDS = new Set(['genesis']);
+  });
+  afterEach(() => {
+    delete (/** @type {any} */ (globalThis).BOOKS);
+    delete (/** @type {any} */ (globalThis).OT_BOOK_IDS);
+  });
+
+  it('says the action and the place, e.g. "Continue reading: Genesis 1"', () => {
+    const place = { screen: 'bible-ch', bookId: 'genesis', chapterNum: 1 };
+    const { container } = renderDot({ screen: 'home', enabled: true, onGo: vi.fn(), place });
+    const btn = container.querySelector('.reading-dot-nav');
+    expect(btn.getAttribute('aria-label')).toBe('Continue reading: Genesis 1');
+    expect(btn.getAttribute('title')).toBe('Reading Position Marker: continue reading Genesis 1');
+  });
+
+  it('falls back to "Continue reading" when the place cannot be named yet (corpus not loaded)', () => {
+    const place = { screen: 'bible-ch', bookId: 'exodus', chapterNum: 3 };
+    const { container } = renderDot({ screen: 'home', enabled: true, onGo: vi.fn(), place });
+    expect(container.querySelector('.reading-dot-nav').getAttribute('aria-label')).toBe('Continue reading');
   });
 });

@@ -78,11 +78,17 @@ function setup(nav = {}) {
   const { result, rerender } = renderHook(
     (navProps) => {
       const [stack, setStack] = React.useState([]);
+      // searchOrigin (useSearch's) and navOrigin (App's) are tabFields, read-only
+      // here: a rerender's `searchOrigin` / `navOrigin` stands for them (null
+      // when no detour is open).
+      const { searchOrigin = null, navOrigin = null, ...nav } = navProps;
       const tabField = (key) => {
+        if (key === 'searchOrigin') return [searchOrigin, () => {}];
+        if (key === 'navOrigin') return [navOrigin, () => {}];
         if (key !== 'fromLetterStack') throw new Error('unexpected tabField: ' + key);
         return [stack, setStack];
       };
-      return useFromLetterStack({ tabField, ...NAV, ...navProps, ...setters });
+      return useFromLetterStack({ tabField, ...NAV, ...nav, ...setters });
     },
     { initialProps: nav },
   );
@@ -191,6 +197,48 @@ describe('useFromLetterStack — prune effect', () => {
     expect(result.current.fromLetterStack).toHaveLength(0);
     expect(result.current.backHint).toBeNull();
     expect(result.current.backActive).toBe(false);
+  });
+
+  // The hub's seam walk, F5 (2026-10-22): the web's Open in reader, then Search
+  // from the verse, then a hit. The entry used to go the moment Search opened.
+  it('a search detour from the destination keeps the entry; back at the destination it is live again', () => {
+    const at = { screen: 'bible-ch', bookId: 'john', chapterNum: 3 };
+    const origin = { ...at, letterId: null, studyId: null, studyChapterId: null };
+    const { result, rerender } = setup(at);
+    act(() => { result.current.pushFromLetter(entry({ destSnapshot: bibleDest, sourceLetterTitle: 'The Scripture Web' })); });
+    rerender({ screen: 'search', searchOrigin: origin });
+    expect(result.current.fromLetterStack, 'Search open').toHaveLength(1);
+    expect(result.current.backActive, 'Back on Search goes by its own origin').toBe(false);
+    rerender({ screen: 'vot-two-letter', letterId: 'letter-5', searchOrigin: origin });
+    expect(result.current.fromLetterStack, 'a hit open').toHaveLength(1);
+    expect(result.current.backHint, 'no pill on the hit').toBeNull();
+    rerender({ screen: 'search', searchOrigin: origin });
+    rerender(at);  // goSearchOrigin: back where Search was opened, its origin cleared
+    expect(result.current.fromLetterStack).toHaveLength(1);
+    expect(result.current.backHint).toEqual({ title: 'The Scripture Web', volumeLabel: null });
+    expect(result.current.backActive).toBe(true);
+  });
+
+  it('a letter that opens the web keeps its entry (navOrigin), down its returnOrigin chain too', () => {
+    const letterDest = { screen: 'vot-seven-letter', bookId: null, chapterNum: null, letterId: 'punishment', studyId: null, studyChapterId: null };
+    const at = { screen: 'vot-seven-letter', letterId: 'punishment' };
+    const origin = { ...at, bookId: null, chapterNum: null, studyId: null, studyChapterId: null, returnOrigin: null };
+    const { result, rerender } = setup(at);
+    act(() => { result.current.pushFromLetter(entry({ destSnapshot: letterDest, sourceLetterTitle: 'Answers' })); });
+    rerender({ screen: 'scripture-web', navOrigin: origin });
+    expect(result.current.fromLetterStack, 'the web open').toHaveLength(1);
+    rerender({ screen: 'audio-library', navOrigin: { screen: 'scripture-web', returnOrigin: origin } });
+    expect(result.current.fromLetterStack, 'a detour from the detour').toHaveLength(1);
+    rerender(at);  // goNavOrigin, twice
+    expect(result.current.backHint).toEqual({ title: 'Answers', volumeLabel: null });
+  });
+
+  it('a search opened somewhere else does not hold the entry', () => {
+    const { result, rerender } = setup({ screen: 'bible-ch', bookId: 'john', chapterNum: 3 });
+    act(() => { result.current.pushFromLetter(entry({ destSnapshot: bibleDest })); });
+    const elsewhere = { screen: 'bible-ch', bookId: 'john', chapterNum: 4, letterId: null, studyId: null, studyChapterId: null };
+    rerender({ screen: 'search', searchOrigin: elsewhere });
+    expect(result.current.fromLetterStack).toHaveLength(0);
   });
 
   it('NEVER prunes an entry without a destSnapshot (the letter→letter chain)', () => {

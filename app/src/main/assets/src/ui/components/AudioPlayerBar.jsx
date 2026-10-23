@@ -22,7 +22,17 @@ import { useSongsOnline } from './SongKeepParts.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
 import { AudioManagerSheet } from './AudioManagerSheet.jsx';
+import { useStillLoading } from './AudioPlayButton.jsx';
 import { AudioSeekSlider, formatClock as fmt } from './AudioSeekSlider.jsx';
+
+/**
+ * A screen where audio does not play (Corbin 2026-10-22 23:5x: "Audio should not play in those two screens", the
+ * Garden and the Scripture Web): entering it pauses the player where it is. The bar hides over it (app.css cz5) and
+ * is back on leaving, paused at the same spot, one tap from resuming; nothing resumes by itself.
+ */
+export function useNoAudioHere() {
+  React.useEffect(() => { AudioPlayer.pauseIfPlaying(); }, []);
+}
 
 export function AudioPlayerBar() {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
@@ -51,6 +61,13 @@ export function AudioPlayerBar() {
   React.useEffect(() => {
     if (!open) setManagerOpen(false);
   }, [open]);
+
+  // U10.2 (UX sweep 2026-10-22): a recording that has not started yet (no length, the clock still at its start)
+  // says Loading… where the clock goes, and Still loading… past STILL_LOADING_MS: on a slow network the bar read
+  // 0:00 beside a Pause for 20 to 30 s. A stall mid-recording keeps the clock. A hook, so above the early return.
+  const head = (st.queue || [])[st.qi];
+  const starting = st.status === 'loading' && !(st.duration > 0) && !((Number(st.time) || 0) >= 1);
+  const lateStart = useStillLoading(starting, (head && head.url) || '');
 
   if (!open) return null;
 
@@ -205,7 +222,7 @@ export function AudioPlayerBar() {
                   the part that ellipsizes, and the place must not vanish with it. */}
               {place && !st.loop ? <span className="audio-bar-pos">{place}</span> : null}
               {/* Until metadata lands the total is unknown, not 0:00. */}
-              <span className="audio-bar-time">{dur ? fmt(st.time) + ' / ' + fmt(dur) : fmt(st.time)}</span>
+              <span className="audio-bar-time">{starting ? (lateStart ? 'Still loading…' : 'Loading…') : dur ? fmt(st.time) + ' / ' + fmt(dur) : fmt(st.time)}</span>
             </span>
           </span>
         </button>

@@ -177,6 +177,13 @@ describe('_validateTabState — 13 coercion rules', () => {
     it('coerces scripture-genre without genreId to scriptures-home', () => {
       expect(validate({ screen: 'scripture-genre' }).screen).toBe('scriptures-home');
     });
+    it('coerces a genreId no genre has (s21.2) to scriptures-home, once SCRIPTURE_GENRES exists', () => {
+      /** @type {any} */ (globalThis).SCRIPTURE_GENRES = { ot: [{ id: 'law' }], nt: [{ id: 'gospels' }] };
+      try {
+        expect(validate({ screen: 'scripture-genre', genreId: 'retired-genre' }).screen).toBe('scriptures-home');
+        expect(validate({ screen: 'scripture-genre', genreId: 'gospels' }).screen).toBe('scripture-genre');
+      } finally { delete /** @type {any} */ (globalThis).SCRIPTURE_GENRES; }
+    });
     it('passes scripture-genre + genreId through unchanged', () => {
       expect(validate({ screen: 'scripture-genre', genreId: 'gospels' }).screen).toBe('scripture-genre');
     });

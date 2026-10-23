@@ -743,3 +743,51 @@ describe('JournalEditorScreen — the screen has a heading', () => {
     expect(h1s[0].classList.contains('sr-only')).toBe(true);
   });
 });
+
+/* ds5 s20.3 (idea sweep 2026-10-22): the 'Saved' chip said Saved straight after a fire-and-forget
+   update, so a write that failed in IndexedDB still showed success. It now waits on whenSaved. */
+describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.3)", () => {
+  let realWhenSaved;
+  beforeEach(() => {
+    realWhenSaved = JournalStore.whenSaved;
+    globalThis.LibraryNav = (props) => props.leftExtras;
+  });
+  afterEach(() => { JournalStore.whenSaved = realWhenSaved; });
+  const chip = () => document.querySelector('.jrn-saved-ind').textContent;
+
+  it("says 'Not saved' when the store's write fails, and 'Saved' once one lands", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    JournalStore.whenSaved = () => Promise.resolve(false);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    expect(chip()).toBe('Not saved');
+    JournalStore.whenSaved = () => Promise.resolve(true);
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited again' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    expect(chip()).toBe('Saved');
+  });
+
+  // Refuter b34-r1: an older write landing must not say 'Saved' over a newer edit not yet written.
+  it("an older write's answer does not mark a newer, unwritten edit 'Saved'", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const pending = [];   // the draft logic asks whenSaved too: land every write the first save started
+    JournalStore.whenSaved = () => new Promise((res) => { pending.push(res); });
+    const landFirst = () => pending.splice(0).forEach((res) => res(true));
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'first' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'second' } });   // debounce pending
+    await act(async () => { landFirst(); await Promise.resolve(); await Promise.resolve(); });
+    expect(chip()).toBe('Saving…');
+  });
+
+  it("keeps 'Saving…' while the write is still in flight", async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'body' })] });
+    render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    JournalStore.whenSaved = () => new Promise(() => {});
+    fireEvent.change(document.querySelector('.jrn-editor-title'), { target: { value: 'edited' } });
+    await act(async () => { window.dispatchEvent(new Event('pagehide')); await Promise.resolve(); });
+    expect(chip()).toBe('Saving…');
+  });
+});
