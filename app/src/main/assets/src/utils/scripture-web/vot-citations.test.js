@@ -288,13 +288,14 @@ describe('citationsForVerse (the shipped asset + the real corpus)', () => {
 
 /* ── citations of a letter ────────────────────────────────────────────── */
 
-describe('citationsForLetter / letterCiteSites', () => {
-  it('The Wide Path cites Psalm 2:12, ascending and unique', () => {
-    const vs = vc.citationsForLetter(graph, 'two/the-wide-path');
+/* citationsForLetter (the cited verses, ascending) had no caller but these tests: gone, its
+   cases now ask letterCiteSites, the one the panel reads (ideas audit L6.8) */
+describe('letterCiteSites', () => {
+  it('The Wide Path cites Psalm 2:12; no letter, or no graph, cites nothing', () => {
+    const vs = vc.letterCiteSites(graph, 'two/the-wide-path').map((r) => r.verse);
     expect(vs).toContain(vid('psalms', 2, 12));
-    expect(vs).toEqual([...new Set(vs)].sort((a, b) => a - b));
-    expect(vc.citationsForLetter(graph, 'two/no-such-letter')).toEqual([]);
-    expect(vc.citationsForLetter(null, 'two/the-wide-path')).toEqual([]);
+    expect(vc.letterCiteSites(graph, 'two/no-such-letter')).toEqual([]);
+    expect(vc.letterCiteSites(null, 'two/the-wide-path')).toEqual([]);
   });
 
   it('every site of a study chapter, in reading order, each able to open its paragraph', () => {
@@ -303,7 +304,6 @@ describe('citationsForLetter / letterCiteSites', () => {
     expect(rows.length).toBeGreaterThan(20);
     for (let i = 1; i < rows.length; i++) expect(rows[i].paragraph >= rows[i - 1].paragraph).toBe(true);
     expect(rows.some((r) => r.sub && r.sub[0] === 'nt')).toBe(true);
-    expect(new Set(rows.map((r) => r.verse))).toEqual(new Set(vc.citationsForLetter(graph, key)));
     expect(vc.letterCiteSites(graph, 'nope/nope')).toEqual([]);
   });
 });

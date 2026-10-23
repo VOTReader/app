@@ -8528,8 +8528,8 @@
       position: absolute; z-index: 10; top: var(--sw-goto-top, 24px);
       left: var(--sw-goto-x, calc((100% - var(--sw-goto-inset, 0px)) / 2)); transform: translateX(-50%);
       width: var(--sw-goto-w, min(640px, calc(100% - var(--sw-goto-inset, 0px) - 48px)));
-      background: rgba(36, 45, 47, 0.96); border: 1px solid #3A4547; border-radius: 14px;
-      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: #E9EEEF; font-family: var(--sw-font);
+      background: rgba(36, 45, 47, 0.96); border: 1px solid var(--sw-control-border); border-radius: 14px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55); color: var(--sw-text); font-family: var(--sw-font);
       overflow: hidden;
     }
     /* compact takes the header row (w4; the spec's 64 / 64 at top 8 met Back edge to edge, its
@@ -8559,12 +8559,12 @@
     .sw-root:has(> .sw-goto.is-compact) .sw-tip { visibility: hidden; }
     .sw-goto-field { display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 18px; }
     .sw-goto.is-compact .sw-goto-field { flex: none; height: 48px; padding: 0 14px; gap: 10px; }
-    .sw-goto-icon { flex: none; width: 20px; height: 20px; color: #B7BFC1; }
+    .sw-goto-icon { flex: none; width: 20px; height: 20px; color: var(--sw-text-meta); }
     .sw-goto-input {
       flex: 1; min-width: 0; height: 100%; padding: 0; background: transparent; border: 0; outline: none;
-      color: #F5F5F3; font-family: var(--sw-font); font-size: var(--fsc-20); caret-color: #C4A469;
+      color: var(--sw-title); font-family: var(--sw-font); font-size: var(--fsc-20); caret-color: var(--sw-gold);
     }
-    .sw-goto-input::placeholder { color: #959DA0; }
+    .sw-goto-input::placeholder { color: var(--sw-text-muted); }
     /* the box is the field (r3-04): the global [role="combobox"] ring would draw a box inside the
        box, so the box itself shows where the keyboard is */
     .sw-goto-input:focus-visible { outline: none; }
@@ -8577,27 +8577,27 @@
     }
     .sw-goto-row {
       display: flex; align-items: baseline; height: 48px; padding: 0 14px; border-radius: 8px;
-      white-space: nowrap; overflow: hidden; cursor: pointer; font-size: var(--fsc-18); line-height: 48px; color: #E9EEEF;
+      white-space: nowrap; overflow: hidden; cursor: pointer; font-size: var(--fsc-18); line-height: 48px; color: var(--sw-text);
     }
     .sw-goto.is-compact .sw-goto-row { height: 44px; line-height: 44px; font-size: var(--fsc-16); }
-    .sw-goto-row.is-sel { background: #2C3537; }
+    .sw-goto-row.is-sel { background: var(--sw-hairline); }
     .sw-goto-ref, .sw-goto-sub { flex: none; }
     /* each part is a flex item, whose leading space would collapse ("John 3· whole chapter") */
     .sw-goto-sub, .sw-goto-text { white-space: pre; }
     .sw-goto-text {
       flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis;
-      font-size: var(--fsc-16); color: #B7BFC1;
+      font-size: var(--fsc-16); color: var(--sw-text-meta);
     }
     .sw-goto.is-compact .sw-goto-text { font-size: var(--fsc-14); }
     .sw-goto-hint {
-      margin: 6px 24px 0; padding: 12px 0 14px; border-top: 1px solid #3A4547;
-      font-size: var(--fsc-16); color: #959DA0;
+      margin: 6px 24px 0; padding: 12px 0 14px; border-top: 1px solid var(--sw-control-border);
+      font-size: var(--fsc-16); color: var(--sw-text-muted);
     }
     .sw-goto.is-compact .sw-goto-hint { margin: 4px 18px 0; padding: 8px 0 10px; font-size: var(--fsc-14); }
     .sw-goto-list + .sw-goto-hint { margin-top: 6px; }
     .sw-goto-chip, .sw-goto-edge {
-      position: absolute; z-index: 4; background: #1C2527; border: 1px solid rgba(196, 164, 105, 0.7);
-      border-radius: 6px; color: #E9EEEF; font-family: var(--sw-font); white-space: nowrap;
+      position: absolute; z-index: 4; background: var(--sw-panel); border: 1px solid var(--sw-active-border);
+      border-radius: 6px; color: var(--sw-text); font-family: var(--sw-font); white-space: nowrap;
     }
     .sw-goto-chip {
       left: 0; top: 0; visibility: hidden; pointer-events: none;
@@ -8609,8 +8609,8 @@
       top: max(23%, calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 8px));
       min-height: 44px; padding: 0 14px; font-size: var(--fsc-15); cursor: pointer;
     }
-    .sw-goto-edge:hover { border-color: #C4A469; }
-    .sw-goto-edge:focus-visible { outline: 2px solid #C4A469; outline-offset: 2px; }
+    .sw-goto-edge:hover { border-color: var(--sw-gold); }
+    .sw-goto-edge:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     .sw-goto-edge-left { left: var(--sw-goto-gutter, 24px); }
     /* compact is goto.jsx's rule (a root 500 px tall or less), not .sw-narrow: the phone in
        landscape is 891 px wide, so the narrow keying left it the PC sizes (review 2026-10-18) */

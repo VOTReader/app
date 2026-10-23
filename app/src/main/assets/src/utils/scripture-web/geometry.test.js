@@ -43,7 +43,7 @@ function makeGraph(pairs) {
     books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 },
             { id: 'beta', title: 'Beta', abbr: 'Bet', start: 20 }],
   chapters, chapterOfVerse, densityTiers: [20, 7],
-    attribution: 'OpenBible.info (CC-BY)', votEdges: [], prophecy: [], votLinks: [],
+    attribution: 'OpenBible.info (CC-BY)', votEdges: [], prophecy: [], votLinks: [], chunkSize: 256,
   };
 }
 

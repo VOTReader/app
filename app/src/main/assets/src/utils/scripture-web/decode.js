@@ -43,7 +43,7 @@ import { expandCites, expandStudyLinks } from './vot-citations.js';
  *   votLinks:Array<{kind:'studyLetter', studyId:string, chapterId:string, volKey:string,
  *     letterId:string, p?:number, sub?:[string, number]}>,
  *   mirrors?:Record<string, string>,
- *   chunkSize?:number
+ *   chunkSize:number
  * }} ScriptureGraph
  * votEdges: one per (verse, letter), each with its citation sites (`at`);
  * prophecy: a Bible Study's Old Testament prophecy (a) and New Testament
@@ -131,6 +131,8 @@ export function decodeGraph(data) {
     chapters: data.chapters,
     chapterOfVerse,
     densityTiers: data.densityTiers || [20, 7],
+    // the buckets' draw-run length; the graph owns it (it was patched on after decoding, s37.6)
+    chunkSize: data.chunkSize || 256,
     attribution: data.attribution || '',
     votEdges: data.votCites ? expandCites(data.votCites) : (data.votEdges || []),
     prophecy: data.studyLinks ? links.prophecy : (data.prophecy || []),

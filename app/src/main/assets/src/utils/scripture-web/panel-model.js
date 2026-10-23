@@ -110,27 +110,39 @@ export function citedRows(g, verses, corpus) {
  * @returns {{ total: number, groups: ThreadGroup[], ids: number[] }}
  */
 export function threadsFrom(g, lo, hi, density, skip = -1) {
+  const arcs = [];
+  for (const i of arcsTouching(g, lo, hi, density, 0)) if (i !== skip) arcs.push(i);
+  return groupByOtherBook(g, arcs, (a, b) => {
+    const aIn = a >= lo && a <= hi;
+    return aIn && (!(b >= lo && b <= hi) || a <= b) ? a : b;
+  });
+}
+
+/**
+ * Arcs as rows grouped by the book of their other end, in canon order, strongest first inside each
+ * group (then in canon order): the shape threadsFrom and exitsModel share (ideas audit s38.3).
+ * @param {any} g @param {number[]} arcs  valid arc ids
+ * @param {(a: number, b: number) => number} hereOf  which foot (from a, to b) is the near end
+ * @returns {{ total: number, groups: ThreadGroup[], ids: number[] }}
+ */
+function groupByOtherBook(g, arcs, hereOf) {
   /** @type {Map<number, ThreadRow[]>} */
   const byBook = new Map();
-  const ids = [];
-  for (const i of arcsTouching(g, lo, hi, density, 0)) {
-    if (i === skip) continue;
+  for (const i of arcs) {
     const a = g.from[i], b = g.to[i];
-    const aIn = a >= lo && a <= hi;
-    const here = aIn && (!(b >= lo && b <= hi) || a <= b) ? a : b;
+    const here = hereOf(a, b);
     const other = here === a ? b : a;
     const ref = refOfVerse(g, other);
     const book = g.chapters[ref.chapterIndex][0];
     if (!byBook.has(book)) byBook.set(book, []);
     /** @type {ThreadRow[]} */ (byBook.get(book)).push({ index: i, here: refOfVerse(g, here), hereVerse: here, other: ref, otherVerse: other, votes: g.votes[i] });
-    ids.push(i);
   }
   const groups = [...byBook.keys()].sort((x, y) => x - y).map((book) => {
     const rows = /** @type {ThreadRow[]} */ (byBook.get(book));
     rows.sort((x, y) => y.votes - x.votes || x.otherVerse - y.otherVerse);
     return { book, title: g.books[book].title, rows };
   });
-  return { total: ids.length, groups, ids };
+  return { total: arcs.length, groups, ids: arcs };
 }
 
 /**
@@ -292,27 +304,11 @@ export function rangeModel(g, lo, hi, density) {
  * @returns {{ threads: { total: number, groups: ThreadGroup[], ids: number[] }, zoom: number }}
  */
 export function exitsModel(g, detail) {
-  /** @type {Map<number, ThreadRow[]>} */
-  const byBook = new Map();
-  const ids = [];
   const cell = detail.cell || null;
-  for (const i of Array.from(detail.ids || [])) {
-    if (!(i >= 0 && i < g.count)) continue;
-    const a = g.from[i], b = g.to[i];
-    const here = cell ? (a >= cell.lo && a <= cell.hi ? a : b) : detail.side === 'left' ? b : a;
-    const other = here === a ? b : a;
-    const ref = refOfVerse(g, other);
-    const book = g.chapters[ref.chapterIndex][0];
-    if (!byBook.has(book)) byBook.set(book, []);
-    /** @type {ThreadRow[]} */ (byBook.get(book)).push({ index: i, here: refOfVerse(g, here), hereVerse: here, other: ref, otherVerse: other, votes: g.votes[i] });
-    ids.push(i);
-  }
-  const groups = [...byBook.keys()].sort((x, y) => x - y).map((book) => {
-    const rows = /** @type {ThreadRow[]} */ (byBook.get(book));
-    rows.sort((x, y) => y.votes - x.votes || x.otherVerse - y.otherVerse);
-    return { book, title: g.books[book].title, rows };
-  });
-  return { threads: { total: ids.length, groups, ids }, zoom: cell ? g.chapterOfVerse[cell.lo] : -1 };
+  const arcs = Array.from(detail.ids || []).filter((i) => i >= 0 && i < g.count);
+  const threads = groupByOtherBook(g, arcs,
+    (a, b) => (cell ? (a >= cell.lo && a <= cell.hi ? a : b) : detail.side === 'left' ? b : a));
+  return { threads, zoom: cell ? g.chapterOfVerse[cell.lo] : -1 };
 }
 
 /**

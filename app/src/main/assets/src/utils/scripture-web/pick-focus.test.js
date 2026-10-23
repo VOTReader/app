@@ -22,7 +22,7 @@ function makeGraph(pairs) {
     total, count: n, from, to, votes,
     buckets: [{ off: 0, len: n, off20: n, off10: n, segments: 32, chunks: [] }],
     books: [{ id: 'alpha', title: 'Alpha', abbr: 'Alp', start: 0 }, { id: 'beta', title: 'Beta', abbr: 'Bet', start: 20 }],
-    chapters, chapterOfVerse, densityTiers: [20, 7], attribution: '', votEdges: [], prophecy: [], votLinks: [],
+    chapters, chapterOfVerse, densityTiers: [20, 7], attribution: '', votEdges: [], prophecy: [], votLinks: [], chunkSize: 256,
   };
 }
 const VIEW = (over) => Object.assign({

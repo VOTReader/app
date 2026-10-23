@@ -175,9 +175,7 @@ export function useWebGraph() {
     ensureScriptureWebData(dataRetry > 0)
       .then((data) => {
         if (!alive) return;
-        const g = decodeGraph(data);
-        g.chunkSize = data.chunkSize || 256;
-        setGraph(g);
+        setGraph(decodeGraph(data));
       })
       .catch((e) => { if (alive) setLoadError(e && e.message ? e.message : String(e)); });
     return () => { alive = false; };
@@ -194,7 +192,10 @@ export function useWebGraph() {
  * @param {() => void} schedule
  */
 export function useChromeTokens(theme, schedule) {
-  const chromeRef = React.useRef(readChromeTokens());
+  // read once, at the mount (useRef(readChromeTokens()) ran getComputedStyle on every render and
+  // threw it away; ideas audit s27.4), then on each theme flip below
+  const chromeRef = React.useRef(/** @type {ReturnType<typeof readChromeTokens>} */ (/** @type {any} */ (null)));
+  if (chromeRef.current === null) chromeRef.current = readChromeTokens();
   // Re-read chrome tokens whenever the theme flips. The settings prop covers
   // the in-app toggle, but light/dark is ultimately carried by a class on
   // <body> — watch that too, or a theme change from anywhere else leaves the

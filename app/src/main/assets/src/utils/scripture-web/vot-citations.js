@@ -15,8 +15,8 @@
        this verse, in reading order (collection, then letter, then paragraph),
        each with the citing sentence(s) and a reader key that opens the letter
        AT that paragraph;
-     citationsForLetter(graph, key)  the verses one letter (or study chapter)
-       cites, ascending;
+     letterCiteSites(graph, key)  every place one letter (or study chapter)
+       cites a verse, in reading order;
      excerptFor(corpus, letterKey, paragraph, cite)  the sentence(s) around
        one citation, clean (no footnote numbers, no inline references, no
        emphasis markers), at most EXCERPT_MAX characters.
@@ -610,19 +610,6 @@ function letterIndex(edges) {
   }
   LETTER_INDEX.set(edges, idx);
   return idx;
-}
-
-/**
- * The verses one letter, entry or study chapter cites, ascending (the start
- * of each cited passage: where the Web draws it).
- * @param {any} graph @param {string} letterKey  as letterKeyOf builds it
- * @returns {number[]}
- */
-export function citationsForLetter(graph, letterKey) {
-  const edges = edgesOf(graph);
-  if (!edges.length) return [];
-  const list = letterIndex(edges).get(String(letterKey || '')) || [];
-  return [...new Set(list.map((e) => e.v))].sort((a, b) => a - b);
 }
 
 /**

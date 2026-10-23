@@ -128,7 +128,7 @@ export function pickArcs(g, cam, view, px, py, tol, limit) {
   const verseAtPoint = xToVerse(cam, width, px);
   // a verse of slack for the chunk cull: a foot stands anywhere in its verse's cell (footX)
   const verseTolerance = tol / ppv + 1;
-  const chunkSize = g.chunkSize || 256;
+  const chunkSize = g.chunkSize;
   const lo = verseAtPoint - verseTolerance, hi = verseAtPoint + verseTolerance;
   // the frame's visible set (E1): a thread the renderer did not draw is not there to tap
   const set = frameSet(g, cam, view);
@@ -334,7 +334,7 @@ export function eachLabelThread(g, cam, view, opts, visit) {
   const limit = opts && opts.limit > 0 ? opts.limit : 50000;
   const { fanA, fanB } = fansOf(g);
   const lo = xToVerse(cam, width, 0) - 1, hi = xToVerse(cam, width, width) + 1;
-  const chunkSize = g.chunkSize || 256;
+  const chunkSize = g.chunkSize;
   let n = 0;
   for (const bucket of g.buckets) {
     const full = walkDrawnRuns(bucket, bucketDrawCount(bucket, density), chunkSize, lo, hi, (start, end) => {
