@@ -656,3 +656,17 @@ describe('the verse zoom: the camera ceiling, the flight cap and exact feet (Cor
     }
   });
 });
+
+// Corbin, 2026-10-22: "The lines maybe should feel a little heavier when fully zoomed in".
+describe('verseLift: the verse zoom’s weight', () => {
+  it('is 1 at every zoom the web had before the verse zoom, and eases to VERSE_LIFT two octaves past it', () => {
+    expect(geo.verseLift(0)).toBe(1);
+    expect(geo.verseLift(geo.PPV_MAX_CSS)).toBe(1);
+    expect(geo.verseLift(geo.VERSE_LIFT_FULL_CSS)).toBeCloseTo(geo.VERSE_LIFT, 9);
+    expect(geo.verseLift(geo.VERSE_LIFT_FULL_CSS * 8)).toBeCloseTo(geo.VERSE_LIFT, 9);
+    const mid = geo.verseLift(geo.PPV_MAX_CSS * 2);
+    expect(mid).toBeGreaterThan(1);
+    expect(mid).toBeLessThan(geo.VERSE_LIFT);
+  });
+});
+
