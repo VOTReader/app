@@ -105,6 +105,18 @@ describe('liveLetter(): the letter a compilation is reading', () => {
     expect(AudioPlayer.liveLetter()).toEqual({ key: 'wtlb1:come-love-awaits-you', title: 'Come, Love Awaits You' });
   });
 
+  it('getShape names the letter under the clock: it moves when the letter changes, not with the clock (s18.3)', () => {
+    startPart1();
+    tick(5);
+    const intro = AudioPlayer.getShape();
+    expect(intro.endsWith('|wtlb1:introduction')).toBe(true);
+    tick(6);
+    expect(AudioPlayer.getShape(), 'the same letter a second later').toBe(intro);
+    tick(63);
+    expect(AudioPlayer.getShape()).not.toBe(intro);
+    expect(AudioPlayer.getShape().endsWith('|wtlb1:come-love-awaits-you')).toBe(true);
+  });
+
   it('is null for a keyed recording', () => {
     globalThis.AUDIO_MANIFEST = { 'one:a': [['idA', 'B']] };
     AudioPlayer.playLetter({ volKey: 'one', letter: { id: 'a', title: 'A' }, collectionLabel: 'Volume One' });
