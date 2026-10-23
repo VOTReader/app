@@ -124,6 +124,23 @@ export function allowedSiteRootFiles() {
   return names;
 }
 
+/**
+ * Root files the site may carry but need not: Pages control files, and whats-new.json, which the deploy writes in a
+ * step AFTER this check and which never stops a deploy (up3, 2026-10-23: requiring it here failed every publish; the
+ * app reads a missing list as an empty one).
+ */
+export const OPTIONAL_SITE_ROOT_FILES = new Set(['CNAME', '.nojekyll', 'whats-new.json']);
+
+/**
+ * The allowed root files a staged site lacks (the service worker would fail to install, or the deploy floor is gone).
+ * @param {string} siteDir an absolute path @returns {string[] | null} null when CORE_ASSETS cannot be read
+ */
+export function missingSiteRootFiles(siteDir) {
+  const allowed = allowedSiteRootFiles();
+  if (!allowed) return null;
+  return [...allowed].filter((name) => !OPTIONAL_SITE_ROOT_FILES.has(name) && !existsSync(resolve(siteDir, name)));
+}
+
 /** Every './src/...' path the service worker precaches, as an assets-relative path. */
 function swPrecachedSrcPaths() {
   const sw = readFileSync(resolve(assetsDir, 'service-worker.js'), 'utf-8');
@@ -190,11 +207,8 @@ function main() {
           fail(`the staged site publishes a root file the app never asks for: ${name}. Either add it to CORE_ASSETS in service-worker.js, or exclude it in deploy-web.yml's staging step. Nothing reaches the public site by default.`);
         }
       }
-      for (const name of allowed) {
-        if (name === 'CNAME' || name === '.nojekyll') continue; // optional by nature
-        if (!existsSync(resolve(root, site, name))) {
-          fail(`CORE_ASSETS names '${name}' but it is MISSING from the staged site — the service worker would fail to install on every client.`);
-        }
+      for (const name of missingSiteRootFiles(resolve(root, site)) || []) {
+        fail(`CORE_ASSETS names '${name}' but it is MISSING from the staged site — the service worker would fail to install on every client.`);
       }
     }
   }

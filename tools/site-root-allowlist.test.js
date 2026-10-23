@@ -10,10 +10,11 @@
  * allowed just because it sits next to the ones that are.
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { allowedSiteRootFiles } from './list-runtime-src-assets.js';
+import { allowedSiteRootFiles, missingSiteRootFiles, OPTIONAL_SITE_ROOT_FILES } from './list-runtime-src-assets.js';
 
 describe('the published site root', () => {
   const allowed = allowedSiteRootFiles();
@@ -76,5 +77,15 @@ describe('the published site root', () => {
     const control = new Set(['service-worker.js', 'CNAME', '.nojekyll', 'build-sha.txt', 'index.html']);
     const unreferenced = [...allowed].filter((name) => !control.has(name) && !texts.some((t) => t.includes(name)));
     expect(unreferenced).toEqual([]);
+  });
+
+  it('a staged site without whats-new.json passes: the deploy writes it after this check (up3)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'site-'));
+    try {
+      for (const name of allowedSiteRootFiles()) if (!OPTIONAL_SITE_ROOT_FILES.has(name)) writeFileSync(join(dir, name), 'x');
+      expect(missingSiteRootFiles(dir)).toEqual([]);
+      rmSync(join(dir, 'build-sha.txt'));
+      expect(missingSiteRootFiles(dir)).toEqual(['build-sha.txt']);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
