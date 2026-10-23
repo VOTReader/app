@@ -10,7 +10,7 @@ import {
   normalizeAudioTrack,
   songIdOfKey,
 } from '../audio-track.js';
-import { cleanSongSwaps, loadSongCatalog, normalizeSongFilter } from '../song-catalog.js';
+import { cleanDownIds, cleanSongSwaps, loadSongCatalog, normalizeSongFilter } from '../song-catalog.js';
 import {
   _followLibraryRate,
   _g,
@@ -244,6 +244,7 @@ function _snapshot() {
     ids: songs ? songs.ids : undefined,
     wrap: songs && songs.wrap ? true : undefined,
     swaps: songs && songs.swaps ? songs.swaps : undefined,
+    down: songs && songs.down ? songs.down : undefined,
     repeat: songs && _state.repeat !== 'off' ? _state.repeat : undefined,
     at: Date.now(),   // which copy is newer, when the two channels disagree at boot
   };
@@ -269,7 +270,7 @@ const SONG_IDS_PERSIST = 1000;
  * explicit ids list longer than SONG_IDS_PERSIST is cut to the window that
  * starts at the playing song, and the snapshot's startKey and qi move with it.
  * @param {any} src @param {Track} track @param {number} qi
- * @returns {{ filter: any, one: boolean, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number, wrap: boolean, swaps: Record<string, string> | null }}
+ * @returns {{ filter: any, one: boolean, seed: number, shuffle: boolean, ids: string[] | undefined, startKey: string | null, qi: number, wrap: boolean, swaps: Record<string, string> | null, down: string[] | null }}
  */
 function _songsSnapshotFields(src, track, qi) {
   let ids = Array.isArray(src.ids) ? src.ids.filter(isSongId) : undefined;
@@ -281,7 +282,13 @@ function _songsSnapshotFields(src, track, qi) {
     qi = 0;
   }
   return { filter: ids ? undefined : normalizeSongFilter(src.filter), one: !ids && !!src.one, seed: Number(src.seed) >>> 0, shuffle: !!src.shuffle, ids, startKey, qi,
-    wrap: !ids && !!src.wrap, swaps: ids ? null : cleanSongSwaps(src.swaps) };
+    wrap: !ids && !!src.wrap, swaps: ids ? null : cleanSongSwaps(src.swaps), down: !ids && src.shuffle ? _downList(src.down) : null };
+}
+
+/** The thumbs-down ids a shuffled songs source was made with (sy4-3), as a list, or null. @param {unknown} down */
+function _downList(down) {
+  const set = cleanDownIds(down);
+  return set ? Array.from(set) : null;
 }
 
 export function _clearPersist() {
@@ -415,6 +422,7 @@ function _applySnapshot(s) {
       ids: songIds,
       wrap: mode === 'songs' && !songIds && s.wrap === true,
       swaps: mode === 'songs' && !songIds ? cleanSongSwaps(s.swaps) : null,
+      down: mode === 'songs' && !songIds && s.shuffle === true ? _downList(s.down) : null,
     });
     _restoredAt = typeof s.at === 'number' ? s.at : 0;
     _state.queue = [track];

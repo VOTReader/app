@@ -614,6 +614,38 @@ export function seededShuffle(list, seed) {
   return out;
 }
 
+/** How likely a thumbs-down song is to come early, against 1 for any other (sy4-3 slice 5). */
+export const SONG_DOWN_WEIGHT = 0.2;
+/** How many thumbs-down ids a queue descriptor carries. */
+const DOWN_MAX = 500;
+
+/**
+ * A seeded shuffle that plays this device's thumbs-down songs LESS (Corbin 2026-10-22: a thumbs-down "only lowers that
+ * song in this device's own shuffle"): each item draws u in [0,1) from the seed and sorts by u^(1/w) (the
+ * Efraimidis-Spirakis weighted order), w = 1, or SONG_DOWN_WEIGHT for a thumbs-down song, so one tends to come late
+ * but can still come. With none in the list it is exactly seededShuffle. Same seed, same order.
+ * @template T @param {T[]} list @param {number} seed @param {(item: T) => boolean} isDown @returns {T[]}
+ */
+export function weightedShuffle(list, seed, isDown) {
+  if (!list.some(isDown)) return seededShuffle(list, seed);
+  const next = _rng(seed);
+  return list
+    .map((item, i) => ({ item, i, k: Math.pow(next(), isDown(item) ? 1 / SONG_DOWN_WEIGHT : 1) }))
+    .sort((a, b) => b.k - a.k || a.i - b.i)
+    .map((x) => x.item);
+}
+
+/**
+ * The thumbs-down ids a queue descriptor carries (captured when the shuffle is made, so a rebuild at boot orders the
+ * queue exactly as it was played), as a Set; null for none. @param {unknown} down @returns {Set<string> | null}
+ */
+export function cleanDownIds(down) {
+  if (!Array.isArray(down)) return null;
+  const out = new Set();
+  for (const id of down) { if (isSongId(id)) out.add(id); if (out.size >= DOWN_MAX) break; }
+  return out.size ? out : null;
+}
+
 /**
  * Begin a list at the song the listener chose. The chosen song takes its own
  * SLOT — itself, or, in a one-version-per-family list, its family's pick (a
@@ -670,7 +702,8 @@ export function cleanSongSwaps(swaps) {
  *   startKey `song:<id>` the queue begins at (see _fromStart).
  *   wrap     with startKey and no shuffle: the whole list rotated to begin there (what Shuffle off asks).
  *   swaps    {catalog version id: chosen version id}: the listener's version switches in a one-take-per-song queue.
- * @param {{ ids?: unknown, filter?: unknown, one?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown, wrap?: unknown, swaps?: unknown } | null | undefined} desc
+ *   down     the thumbs-down ids when the shuffle was made: they come later (weightedShuffle).
+ * @param {{ ids?: unknown, filter?: unknown, one?: unknown, shuffle?: unknown, seed?: unknown, startKey?: unknown, wrap?: unknown, swaps?: unknown, down?: unknown } | null | undefined} desc
  * @returns {Song[]}
  */
 export function songQueue(desc) {
@@ -694,7 +727,10 @@ export function songQueue(desc) {
     const versions = _matchingVersions(fam, f);
     if (one) list.push(versions[0]); else for (const s of versions) list.push(s);
   }
-  if (d.shuffle) list = seededShuffle(list, Number(d.seed) >>> 0);
+  if (d.shuffle) {
+    const down = cleanDownIds(d.down);
+    list = down ? weightedShuffle(list, Number(d.seed) >>> 0, (s) => down.has(s.id)) : seededShuffle(list, Number(d.seed) >>> 0);
+  }
   const ordered = _fromStart(list, startId, !!d.shuffle, one, !!d.wrap);
   // Swaps apply to the queue as ordered, so the start and its horizon are the catalog's; only a one-take-per-song
   // queue carries them (any other switch makes the queue an explicit list; refutation of s2r M1/M2).

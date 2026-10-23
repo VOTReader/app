@@ -672,3 +672,71 @@ describe('the media card for a song', () => {
     expect(session.metadata.artwork).toBeUndefined();
   });
 });
+
+describe('a thumbs-down plays less in this device\'s shuffle (sy4-3 slice 5, Corbin 2026-10-22)', () => {
+  const meanAt = (keys, ids) => {
+    const at = ids.map((id) => keys.indexOf('song:' + id)).filter((i) => i >= 0);
+    return at.reduce((a, b) => a + b, 0) / at.length;
+  };
+
+  it('thumbs-down songs come later on average, and none is dropped', async () => {
+    const big = bigSongCatalog(200);
+    await load(big);
+    const Votes = await import('./song-votes.js');
+    const down = big.songs.filter((_s, i) => i % 10 === 0).map((s) => s.id);   // 20 of 200
+    for (const id of down) Votes.setSongVote(id, -1);
+    let later = 0;
+    for (const seed of [11, 22, 33, 44, 55]) {
+      AudioPlayer.playSongs({ filter: {}, shuffle: true, seed });
+      const keys = AudioPlayer.getState().queue.map((t) => t.key);
+      expect(keys).toHaveLength(200);
+      const others = big.songs.map((s) => s.id).filter((id) => down.indexOf(id) < 0);
+      if (meanAt(keys, down) > meanAt(keys, others) + 30) later++;
+    }
+    expect(later).toBe(5);
+  });
+
+  it('a liked song or no vote shuffles exactly as before', async () => {
+    const big = bigSongCatalog(50);
+    await load(big);
+    AudioPlayer.playSongs({ filter: {}, shuffle: true, seed: 99 });
+    const before = AudioPlayer.getState().queue.map((t) => t.key);
+    const Votes = await import('./song-votes.js');
+    Votes.setSongVote(big.songs[3].id, 1);
+    AudioPlayer.playSongs({ filter: {}, shuffle: true, seed: 99 });
+    expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual(before);
+  });
+
+  it('a restore rebuilds the order it was played in, even if the votes changed since', async () => {
+    const big = bigSongCatalog(120);
+    await load(big);
+    let Votes = await import('./song-votes.js');
+    for (const s of big.songs.slice(0, 15)) Votes.setSongVote(s.id, -1);
+    AudioPlayer.playSongs({ filter: {}, shuffle: true, seed: 4242 });
+    const original = AudioPlayer.getState().queue.map((t) => t.url);
+    AudioPlayer.next(); AudioPlayer.next();
+    AudioPlayer.toggle();                          // snapshot written
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).down).toHaveLength(15);
+
+    await load(big);                               // a new session with no thumbs-down at all
+    Votes = await import('./song-votes.js');
+    expect(Votes.downVotedIds()).toEqual([]);
+    AudioPlayer.toggle();
+    await vi.waitFor(() => expect(AudioPlayer.getState().sourceMode).toBe('songs'));
+    expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual(original);
+    expect(AudioPlayer.getState().qi).toBe(2);
+  });
+
+  it('an explicit list shuffles with the same lean', async () => {
+    const big = bigSongCatalog(100);
+    await load(big);
+    const Votes = await import('./song-votes.js');
+    const ids = big.songs.map((s) => s.id);
+    const down = ids.slice(0, 10);
+    for (const id of down) Votes.setSongVote(id, -1);
+    AudioPlayer.playSongs({ ids, shuffle: true, seed: 7 });
+    const keys = AudioPlayer.getState().queue.map((t) => t.key);
+    expect(keys).toHaveLength(100);
+    expect(meanAt(keys, down)).toBeGreaterThan(meanAt(keys, ids.slice(10)) + 20);
+  });
+});

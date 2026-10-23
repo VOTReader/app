@@ -8,7 +8,9 @@ import {
   seededShuffle,
   songById,
   songQueue,
+  weightedShuffle,
 } from '../song-catalog.js';
+import { downVotedIds } from '../song-votes.js';
 import { _songTracks } from './catalog.js';
 import {
   _el,
@@ -42,6 +44,18 @@ import { _forgetPosition, _persist, _rememberOutgoingPosition, _setLastPersistSe
 /** Most ids a caller may hand playSongs — "every saved song" is the longest (500). */
 const SONG_IDS_MAX = 1000;
 
+
+/** sy4-3: this device's thumbs-down songs when a shuffle is made (they play less), or null. @returns {string[] | null} */
+function _downNow() {
+  const ids = downVotedIds();
+  return ids.length ? ids.slice(0, 500) : null;
+}
+
+/** A shuffle of song ids that plays this device's thumbs-down songs less. @param {string[]} ids @param {number} seed */
+function _shuffleIds(ids, seed) {
+  const down = new Set(_downNow() || []);
+  return down.size ? weightedShuffle(ids, seed, (id) => down.has(id)) : seededShuffle(ids, seed);
+}
 
 /** A fresh shuffle seed (uint32, never 0 so a seeded source reads as one). @returns {number} */
 function _newSeed() {
@@ -78,12 +92,12 @@ export function playSongs(opts) {
     // plain one is forward-only from it, like every other queue.
     const ids = o.ids.filter(isSongId).slice(0, SONG_IDS_MAX);
     const startId = startKey ? /** @type {string} */ (o.startId) : '';
-    const order = shuffle ? (startId ? [startId] : []).concat(seededShuffle(ids.filter((id) => id !== startId), seed)) : ids;
+    const order = shuffle ? (startId ? [startId] : []).concat(_shuffleIds(ids.filter((id) => id !== startId), seed)) : ids;
     const list = songQueue({ ids: order, startKey: shuffle ? null : startKey });
     desc = { mode: 'songs', volKey: 'song', label, ids: list.map((s) => s.id), filter: null, one: false, seed, shuffle, startKey: null };
   } else {
     const one = typeof o.onePerFamily === 'boolean' ? o.onePerFamily : shuffle;
-    desc = { mode: 'songs', volKey: 'song', label, ids: null, filter: normalizeSongFilter(o.filter), one, seed, shuffle, startKey };
+    desc = { mode: 'songs', volKey: 'song', label, ids: null, filter: normalizeSongFilter(o.filter), one, seed, shuffle, startKey, down: shuffle ? _downNow() : null };
   }
   const queue = _songTracks(songQueue(desc));
   if (!queue.length) return false;
@@ -205,10 +219,10 @@ export function setShuffle(on) {
   if (Array.isArray(src.ids)) {
     const curId = songIdOfKey(cur.key);
     const rest = src.ids.filter((id) => id !== curId);
-    desc = { ...src, ids: [curId].concat(want ? seededShuffle(rest, seed) : rest), seed, shuffle: want, startKey: null };
+    desc = { ...src, ids: [curId].concat(want ? _shuffleIds(rest, seed) : rest), seed, shuffle: want, startKey: null };
   } else {
     // Off, the whole list turns to begin at the song playing: nothing is dropped (sweep n3-01).
-    desc = { ...src, seed, shuffle: want, startKey: cur.key, wrap: true };
+    desc = { ...src, seed, shuffle: want, startKey: cur.key, wrap: true, down: want ? _downNow() : null };
   }
   const queue = _songTracks(songQueue(desc));
   if (!queue.length || queue[0].url !== cur.url) return false;
