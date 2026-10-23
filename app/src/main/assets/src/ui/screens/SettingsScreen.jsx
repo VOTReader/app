@@ -7,6 +7,7 @@ import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell } from '../../utils/download-gate.js';
 import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
+import { openWhatsNew } from '../../utils/whats-new.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -1469,6 +1470,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 disabled={buildInfo.state === 'loading'}
                 onClick={(e) => { e.stopPropagation(); refreshBuildInfo(); }}
               >Check</button>
+            </DataInfoRow>
+            {/* up1: the changes behind recent updates, in plain words (WhatsNewSheet) */}
+            <DataInfoRow label="What's new">
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); void openWhatsNew(); }}>Show</button>
             </DataInfoRow>
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />

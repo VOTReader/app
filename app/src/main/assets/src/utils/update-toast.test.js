@@ -25,12 +25,20 @@ vi.mock('./build-version.js', () => ({
   getBuildVersion: vi.fn(async () => SW_VERSION.value),
   fetchServerBuildVersion: vi.fn(async () => APK_VERSION.value),
 }));
+/* up1: what the release changed for the reader (utils/whats-new.js reads ./whats-new.json). One item by default, so a
+   new build has something to announce; a case sets [] for a release with nothing a reader would notice. */
+const NOTES = { value: [{ t: 2, text: 'A change a reader would notice.' }] };
+vi.mock('./whats-new.js', () => ({
+  takeNewItems: vi.fn(async () => NOTES.value),
+  openWhatsNew: vi.fn(async () => {}),
+}));
 vi.mock('./toast.js', async (importOriginal) => {
   const real = await importOriginal();
   return { ...real, showToast: vi.fn(real.showToast) };
 });
 
 import { showToast } from './toast.js';
+import { openWhatsNew } from './whats-new.js';
 import { announceUpdateIfAny, offerListeningResume, markUpdateReload, _resetUpdateToast, LAST_SEEN_BUILD_KEY, UPDATE_RELOAD_FLAG, UPDATED_TOAST_ID, UPDATED_TOAST_TEXT, UPDATED_TOAST_LISTEN_TEXT } from './update-toast.js';
 import { LS_SKIP_LIST } from '../stores/cached-store.js';
 
@@ -46,6 +54,8 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     APK_VERSION.value = null;
     BRIDGE.isAndroid = false;
     vi.mocked(showToast).mockClear();
+    vi.mocked(openWhatsNew).mockClear();
+    NOTES.value = [{ t: 2, text: 'A change a reader would notice.' }];
     const stale = document.getElementById(UPDATED_TOAST_ID);
     if (stale) stale.remove();
   });
@@ -62,13 +72,31 @@ describe('announceUpdateIfAny — one toast per new build, on any screen', () =>
     expect(await announceUpdateIfAny()).toBe('shown');
     expect(showToast).toHaveBeenCalledTimes(1);
     const opts = vi.mocked(showToast).mock.calls[0][0];
-    expect(opts.text).toBe('VOTReader was just updated.');
+    expect(opts.text).toBe("Updated · What's new");
     expect(opts.durationMs).toBeGreaterThanOrEqual(3000);
-    expect(opts.durationMs).toBeLessThanOrEqual(5000);
+    expect(opts.durationMs).toBeLessThanOrEqual(8000);
     expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
     // Once: a second boot on the same build is silent.
     expect(await announceUpdateIfAny()).toBe('same');
     expect(showToast).toHaveBeenCalledTimes(1);
+  });
+
+  it('up1: a release with nothing a reader would notice says nothing, and the build is still recorded', async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    NOTES.value = [];
+    expect(await announceUpdateIfAny()).toBe('quiet');
+    expect(showToast).not.toHaveBeenCalled();
+    expect(localStorage.getItem(LAST_SEEN_BUILD_KEY)).toBe(NEW);
+  });
+
+  it("up1: one tap on \"Updated · What's new\" opens the list of this release's changes", async () => {
+    localStorage.setItem(LAST_SEEN_BUILD_KEY, OLD);
+    expect(await announceUpdateIfAny()).toBe('shown');
+    const el = document.getElementById(UPDATED_TOAST_ID);
+    expect(el.textContent).toBe("Updated · What's new");
+    expect(el.getAttribute('role')).toBe('button');
+    el.click();
+    expect(openWhatsNew).toHaveBeenCalledWith([{ t: 2, text: 'A change a reader would notice.' }]);
   });
 
   /* THE RELOAD FLAG (w-toast-reload-flag, 2026-09-11). The live 90 → 91 crossing: the reloaded
@@ -301,7 +329,7 @@ describe('offerListeningResume — the update toast carries the tap', () => {
     const el = document.getElementById(UPDATED_TOAST_ID);
     expect(el).not.toBeNull();
     expect(el.textContent).toBe(UPDATED_TOAST_LISTEN_TEXT);
-    expect(UPDATED_TOAST_LISTEN_TEXT).toBe('VOTReader was just updated. Tap to continue listening.');
+    expect(UPDATED_TOAST_LISTEN_TEXT).toBe('Updated · Tap to continue listening');
     expect(el.getAttribute('role')).toBe('button');
     /* app.css: .vot-toast is pointer-events:none (a toast is not a target). A toast that IS the
        target opts in with .vot-toast-action (the export-escape precedent), and showToast sets

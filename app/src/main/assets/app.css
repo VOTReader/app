@@ -2755,6 +2755,11 @@
     .fn-sheet-nav-btn:hover:not(:disabled), .fn-sheet-nav-btn:focus-visible:not(:disabled) { background:rgba(200,164,86,0.1); border-color:var(--gold); }
     .fn-sheet-nav-btn:disabled { opacity:0.32; cursor:default; }
     .fn-sheet-ref { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.75rem; display:block; }
+    /* up1: What's new (WhatsNewSheet): a day per heading, the changes as a plain list */
+    .whats-new-day { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); margin:0.9rem 0 0.35rem; font-weight:400; }
+    .whats-new-list { margin:0; padding-left:1.15rem; color:var(--cream); font-size:var(--fs-16); line-height:1.55; }
+    .whats-new-list li { margin:0.3rem 0; }
+    .whats-new-none { color:var(--cream-dim); font-style:italic; margin:0.6rem 0 0; }
     .fn-sheet-verse { font-size:var(--fs-16); line-height:1.75; color:var(--cream-dim); font-style:italic; }
     .fn-sheet-note { font-size:var(--fs-16); color:var(--cream-dim); line-height:1.6; font-style:italic; }
     .fn-sheet-verse-missing { font-size:var(--fs-15); color:var(--cream-muted); line-height:1.55; font-style:italic; padding:0.6rem 0.9rem; border-left:2px solid var(--gold-border); background:rgba(200,164,86,0.04); border-radius:0 4px 4px 0; }

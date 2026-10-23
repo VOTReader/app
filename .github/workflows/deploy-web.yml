@@ -271,6 +271,20 @@ jobs:
           echo "Staged file count: $(find _site -type f | wc -l)"
           echo "Runtime src/data files staged: $(ls _site/src/data/ | wc -l)"
 
+      - name: What's new (the reader-facing changes since the live build)
+        # up1 (2026-10-23): the app says "Updated · What's new" once per release and opens this
+        # list (utils/whats-new.js). tools/whats-new.mjs takes the feat/fix commits GitHub's
+        # compare lists between the live build-sha.txt and this commit, in plain words, added to
+        # the live list. Read-only token, no repository code beyond the tool; any failure keeps
+        # the live list (or an empty one) and never stops the deploy.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          base=$(curl -fsS --max-time 20 https://votreader.github.io/app/build-sha.txt | tr -d '[:space:]') || base=''
+          curl -fsS --max-time 20 https://votreader.github.io/app/whats-new.json -o "$RUNNER_TEMP/prev-whats-new.json" || echo '{}' > "$RUNNER_TEMP/prev-whats-new.json"
+          BASE="$base" HEAD="$(git rev-parse HEAD)" node tools/whats-new.mjs --compare --prev "$RUNNER_TEMP/prev-whats-new.json" --out _site/whats-new.json
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:

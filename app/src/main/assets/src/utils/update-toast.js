@@ -1,6 +1,14 @@
 /* ═════════════════════════════════════════════════
-   update-toast — "VOTReader was just updated." once per new build
+   update-toast — "Updated · What's new" once per release
    ═════════════════════════════════════════════════
+   up1 (Corbin 2026-10-23: "VOTReader has been flashing 'VOTReader was just
+   updated' at me all day long"). The web publishes twice a day, a new build
+   no longer takes over mid-session (sw-register.js), and the toast is now
+   "Updated · What's new": shown only when the release changed something a
+   reader would notice (utils/whats-new.js reads the list the deploy or the
+   APK build wrote), at most once per release, and one tap opens that list.
+   A release with nothing to tell says nothing. Below, the 09-10 history.
+
    Corbin (2026-09-10): "add a brief toast that indicates when a update just
    happened" and "toast and update should happen no matter what screen user
    happens to be on".
@@ -70,6 +78,7 @@
 import { PlatformBridge } from './platform-bridge.js';
 import { getBuildVersion, fetchServerBuildVersion } from './build-version.js';
 import { showToast, hideToast } from './toast.js';
+import { takeNewItems, openWhatsNew } from './whats-new.js';
 
 /** localStorage key. Listed in cached-store.js's LS_SKIP_LIST so the one-time
  *  vot-* sweep leaves it alone. */
@@ -95,9 +104,9 @@ function takeUpdateReload() {
   } catch (_e) { return false; }
 }
 export const UPDATED_TOAST_ID = 'vot-toast-updated';
-export const UPDATED_TOAST_TEXT = 'VOTReader was just updated.';
-export const UPDATED_TOAST_LISTEN_TEXT = 'VOTReader was just updated. Tap to continue listening.';
-const UPDATED_TOAST_MS = 4000;
+export const UPDATED_TOAST_TEXT = "Updated · What's new";
+export const UPDATED_TOAST_LISTEN_TEXT = 'Updated · Tap to continue listening';
+const UPDATED_TOAST_MS = 6000;
 /** The tap-toast stays longer: it carries an action, and the bar's Play button
  *  remains after it goes. */
 const UPDATED_TOAST_LISTEN_MS = 8000;
@@ -106,9 +115,15 @@ const UPDATED_TOAST_LISTEN_MS = 8000;
 let pendingResume = null;
 /** true from the moment this boot's announcement was shown */
 let announced = false;
+/** true once the listening offer took the toast: the What's new one must not replace it */
+let listenShown = false;
 
 /** @param {() => void} onTap */
-function showListeningToast(onTap) {
+function showListeningToast(onTap) { showActionToast(UPDATED_TOAST_LISTEN_TEXT, UPDATED_TOAST_LISTEN_MS, onTap); }
+
+/** The update toast as a button: one tap runs onTap and the toast goes.
+ * @param {string} text @param {number} durationMs @param {() => void} onTap */
+function showActionToast(text, durationMs, onTap) {
   /** @type {HTMLElement | null} */
   let el = null;
   // W55: the element outlives this showing (toast.js reuses it by id), so when the
@@ -126,7 +141,7 @@ function showListeningToast(onTap) {
   const tap = () => { hideToast(UPDATED_TOAST_ID); onTap(); };
   /** @param {KeyboardEvent} e */
   const onKey = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } };
-  showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text: UPDATED_TOAST_LISTEN_TEXT, durationMs: UPDATED_TOAST_LISTEN_MS, onHide: disarm });
+  showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text, durationMs, onHide: disarm });
   el = document.getElementById(UPDATED_TOAST_ID);
   if (!el) return;
   // .vot-toast is pointer-events:none (app.css): a toast is not a target. This one
@@ -149,11 +164,11 @@ function showListeningToast(onTap) {
  */
 export function offerListeningResume(onTap) {
   if (typeof onTap !== 'function') return;
-  if (announced) { showListeningToast(onTap); return; }
+  if (announced) { listenShown = true; showListeningToast(onTap); return; }
   pendingResume = onTap;
 }
 /** Tests only: one boot per module in the app, many per module in a test file. */
-export function _resetUpdateToast() { pendingResume = null; announced = false; }
+export function _resetUpdateToast() { pendingResume = null; announced = false; listenShown = false; }
 if (typeof window !== 'undefined') /** @type {any} */ (window).__votUpdateToastResume = offerListeningResume;
 
 /** The build this page is running, or null when nobody can say. Web: the
@@ -179,7 +194,7 @@ function controlled() {
  * Compare the running build with the last one this profile saw; announce a
  * change once. Resolves to which of the four answers it took, for tests and
  * for anyone reading a boot log.
- * @returns {Promise<'unknown'|'first'|'same'|'shown'|'reloading'>}
+ * @returns {Promise<'unknown'|'first'|'same'|'shown'|'quiet'|'reloading'>}
  */
 export async function announceUpdateIfAny() {
   if (typeof window !== 'undefined' && /** @type {any} */ (window).__votSwTookOver) return 'reloading';   // see the header: not ours to decide
@@ -192,7 +207,7 @@ export async function announceUpdateIfAny() {
     // stayed silent. A silent worker cannot withhold the toast either. The key is then
     // bookkeeping — Android's cold start and the 'same' read below — written when the
     // build is known and left alone when it is not (a null is not a value).
-    const out = announce();
+    const out = await announce();
     const running = await runningBuild();
     if (running) { try { localStorage.setItem(LAST_SEEN_BUILD_KEY, running); } catch (_e) { /* private mode */ } }
     return out;
@@ -204,16 +219,21 @@ export async function announceUpdateIfAny() {
   if (seen === running) return 'same';
   try { localStorage.setItem(LAST_SEEN_BUILD_KEY, running); } catch (_e) { /* private mode: announce anyway, next boot repeats */ }
   if (seen == null) return 'first';
-  return announce();
+  return await announce();
 }
 
 /** Show the one announcement of this boot: the listening offer if the player already
- *  asked for the tap, the plain toast otherwise. */
-function announce() {
+ *  asked for the tap; else "Updated · What's new" when the release changed something a
+ *  reader would notice ('quiet', and no toast, when it did not or the list could not be read).
+ *  @returns {Promise<'shown'|'quiet'>} */
+async function announce() {
   announced = true;
   const resume = pendingResume;
   pendingResume = null;
-  if (resume) showListeningToast(resume);
-  else showToast({ id: UPDATED_TOAST_ID, className: 'vot-toast', text: UPDATED_TOAST_TEXT, durationMs: UPDATED_TOAST_MS });
-  return /** @type {'shown'} */ ('shown');
+  if (resume) { listenShown = true; showListeningToast(resume); void takeNewItems(); return 'shown'; }
+  const items = await takeNewItems();
+  if (listenShown) return 'shown';   // the player asked for the tap while the list was read: that toast stays
+  if (!items.length) return 'quiet';
+  showActionToast(UPDATED_TOAST_TEXT, UPDATED_TOAST_MS, () => { void openWhatsNew(items); });
+  return 'shown';
 }

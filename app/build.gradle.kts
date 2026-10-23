@@ -272,6 +272,37 @@ androidComponents {
         variant.outputs.forEach { it.versionCode.set(storeVersionCode) }
     }
 }
+
+// up1 (2026-10-23): "Updated · What's new" in the APK. The web's list is written by the deploy; the APK has no deploy,
+// so every build writes assets/whats-new.json from the local history with the same tool (tools/whats-new.mjs --git),
+// and the app shows the changes newer than the build the phone had. A machine without node (or git) gets an empty
+// list: the update then says nothing, and the build never fails over it.
+abstract class WhatsNewTask : DefaultTask() {
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+    @get:Internal abstract val repoDir: DirectoryProperty
+
+    @TaskAction
+    fun write() {
+        val out = outputDir.get().asFile.also { it.mkdirs() }.resolve("whats-new.json")
+        val ok = try {
+            val p = ProcessBuilder("node", "tools/whats-new.mjs", "--git", "--out", out.absolutePath)
+                .directory(repoDir.get().asFile).redirectErrorStream(true).start()
+            p.inputStream.readBytes()
+            p.waitFor() == 0 && out.isFile
+        } catch (e: Exception) { false }
+        if (!ok) out.writeText("{\"since\":null,\"items\":[]}\n")
+    }
+}
+val generateWhatsNew = tasks.register<WhatsNewTask>("generateWhatsNew") {
+    outputDir.set(layout.buildDirectory.dir("generated/whatsnew"))
+    repoDir.set(rootProject.layout.projectDirectory)
+    outputs.upToDateWhen { false }   // the history moves with every commit; the tool takes well under a second
+}
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(generateWhatsNew, WhatsNewTask::outputDir)
+    }
+}
 // An unsigned store bundle is useless to Play: asked for one without the key, fail at the variant's first task, not
 // after R8 and packaging. (A whole-project `assemble`/`build` still makes an unsigned store output, as it does for release.)
 val storeSigned = android.signingConfigs.findByName("upload") != null

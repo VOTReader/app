@@ -1363,6 +1363,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-journal-new-entry-stats');
     expect(LS_SKIP_LIST).toContain('vot-restore-inflight');     // use-restore-guard
     expect(LS_SKIP_LIST).toContain('vot-last-seen-build');      // utils/update-toast.js
+    expect(LS_SKIP_LIST).toContain('vot-whats-new-seen');       // utils/whats-new.js (up1)
     expect(LS_SKIP_LIST).toContain('vot-diag-ring');            // utils/diagnostic-log.js PERSIST_KEY
     expect(LS_SKIP_LIST).toContain('vot-health-skip');          // utils/data-safety.js HEALTH_SKIP_KEY
     expect(LS_SKIP_LIST).toContain('vot-health-progress');      // utils/data-safety.js PROGRESS_RESET_KEY (W9)
@@ -1375,7 +1376,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
     expect(LS_SKIP_LIST).toContain('vot-answers-path');         // AOGCG: the Answers reading path (device-local)
     expect(LS_SKIP_LIST).toContain('vot-answers-recent');       // AOGCG: the Answers recent searches (device-local)
-    expect(LS_SKIP_LIST.length).toBe(18);
+    expect(LS_SKIP_LIST.length).toBe(19);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

@@ -94,6 +94,14 @@ describe('deploy-web.yml - the deploy waits for green CI (v12-01)', () => {
     expect(code(all.gate || '')).toMatch(/LIVE_SHA_URL: https:\/\/votreader\.github\.io\/app\/build-sha\.txt/);
   });
 
+  it("publishes the What's new list beside the build, after the staging check, without failing the deploy (up1)", () => {
+    const build = code(jobs().build || '');
+    const step = build.indexOf("- name: What's new");
+    expect(step, "the What's new step").toBeGreaterThan(build.indexOf('node tools/list-runtime-src-assets.js --check --site _site'));
+    expect(step).toBeLessThan(build.indexOf('- name: Upload Pages artifact'));
+    expect(build).toContain('node tools/whats-new.mjs --compare --prev "$RUNNER_TEMP/prev-whats-new.json" --out _site/whats-new.json');
+  });
+
   it('a re-run never publishes: "Re-run failed jobs" keeps the gate\'s old pick (the ci10 refutation)', () => {
     // An older run whose build or deploy failed, re-run after a newer deploy, would publish its
     // older commit over the newer one. Both jobs that can lead to a publish run on attempt 1 only.
