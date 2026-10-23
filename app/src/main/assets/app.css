@@ -769,7 +769,10 @@
          mirrors live changes. px font sizes do NOT scale — the journal +
          highlights injected CSS was converted to rem so they track the scale. */
       html { font-size: calc(100% * var(--font-scale, 1)); }
-      body { font-family: var(--font-body); background: var(--bg); color: var(--cream); min-height: 100vh; transition: background 0.3s ease, color 0.3s ease; overflow-x: hidden; max-width: 100vw; }
+      /* min-height 100dvh, not 100vh alone: on mobile Chrome 100vh is the viewport with the toolbar hidden, so with it
+         showing the document outgrew the glass and every jump to a hit (a scrollIntoView) scrolled the document too,
+         sliding the top bar under the toolbar (pf2, Corbin's S22 2026-10-22). app-css.test.js pins it. */
+      body { font-family: var(--font-body); background: var(--bg); color: var(--cream); min-height: 100vh; min-height: 100dvh; transition: background 0.3s ease, color 0.3s ease; overflow-x: hidden; max-width: 100vw; }
       /* Form controls do not inherit font-family: Chrome gives a <button> its own system font, so the
          previous/next cards at every letter's end painted their titles in Arial/Roboto under a serif page
          (zones L1, 2026-10-05; tools/e2e-phone-fit.mjs F1). Any class that names a family still wins. */

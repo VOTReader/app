@@ -903,3 +903,36 @@ describe('app.css — a box that holds a paragraph\'s inline runs never drops th
     });
   }
 });
+/* ── pf2 top bar under Chrome's toolbar (readalong, 2026-10-22) ────────────
+   Corbin's S22, Chrome, 18:41: a letter opened from search showed only the
+   lower half of the top bar, the rest under Chrome's toolbar. `body
+   { min-height: 100vh }` is the LARGE viewport on mobile Chrome (toolbar
+   hidden), so while the toolbar shows the document is taller than the glass
+   (705 vs 649 px there) and has room to scroll. Every jump to a hit (search,
+   Find next/prev, deep links, a returning Scripture Web, a focused field)
+   is a scrollIntoView, which scrolls each scrollable ancestor, the document
+   too: 35.7 px on the S22, and the fixed-height screen slid up with it. The
+   body is sized by the dynamic viewport, so the document never outgrows the
+   glass and has nothing to scroll; the 100vh line stays first as the
+   fallback for engines without dvh. Headless Chrome has no toolbar, so the
+   law is pinned here and the S22 measures the effect. */
+describe('app.css — the document is never taller than the visible viewport', () => {
+  const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+  const bodyBlocks = [...bare.matchAll(/(?:^|[}\s])body\s*\{([^}]*)\}/g)].map((m) => m[1]);
+  it('body min-height is 100dvh, after a 100vh fallback', () => {
+    const mins = bodyBlocks.flatMap((b) => [...b.matchAll(/min-height\s*:\s*([^;]+);/g)].map((m) => m[1].trim()));
+    expect(mins, 'body is sized by 100vh alone: the document outgrows the glass under Chrome\'s toolbar and a jump scrolls the top bar off').toContain('100dvh');
+    expect(mins.indexOf('100vh'), 'the 100vh fallback must come BEFORE 100dvh or it overrides it').toBeLessThan(mins.lastIndexOf('100dvh'));
+    expect(mins[mins.length - 1]).toBe('100dvh');
+  });
+  it('no html/body/#root rule sizes the document by 100vh without a dvh line after it', () => {
+    const roots = [...bare.matchAll(/(?:^|[}\s,])(html|body|#root)\s*\{([^}]*)\}/g)];
+    for (const [, sel, block] of roots) {
+      const decls = [...block.matchAll(/(?<![\w-])(min-height|height)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]);
+      for (const prop of ['height', 'min-height']) {
+        const vals = decls.filter(([p]) => p === prop).map(([, v]) => v);
+        if (vals.some((v) => /\b100vh\b/.test(v))) expect(vals[vals.length - 1], `${sel} { ${prop} } ends on 100vh`).toMatch(/dvh/);
+      }
+    }
+  });
+});
