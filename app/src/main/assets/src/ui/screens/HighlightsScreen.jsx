@@ -108,6 +108,8 @@ export function _collectMarks() {
     for (var i = 0; i < arr.length; i++) {
       var a = arr[i];
       if (!isMarkKind(a.kind)) continue;
+      // A note made with "No color (icon only)" marks no text: it is a note (Notes lists it), not a mark (A06.4).
+      if (a.color === 'blank') continue;
       var gid = a.groupId || a.id;
       var g = groups[gid];
       if (!g) {
