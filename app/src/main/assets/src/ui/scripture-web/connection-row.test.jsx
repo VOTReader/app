@@ -15,15 +15,24 @@ describe('ConnectionRow', () => {
     const onMain = vi.fn(), onOpen = vi.fn(), onFollow = vi.fn();
     const { container } = ul(<ConnectionRow title="Romans 4:7" tag="182 votes" text="Blessed are those"
       onMain={onMain} mainLabel="Romans 4:7, 182 votes"
-      onOpen={onOpen} openLabel="Open Romans 4:7 in the reader"
+      onOpen={onOpen} openLabel="Open in reader: Romans 4:7"
       onFollow={onFollow} followLabel="Follow the line to Romans 4:7" />);
     expect(container.querySelector('li.sw-row .sw-row-main .sw-row-ref').textContent).toBe('Romans 4:7');
     expect(container.querySelector('.sw-row-tag').textContent).toBe('182 votes');
     expect(container.querySelector('.sw-row-text').textContent).toBe('Blessed are those');
     fireEvent.click(screen.getByRole('button', { name: 'Romans 4:7, 182 votes' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Open Romans 4:7 in the reader' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open in reader: Romans 4:7' }));
     fireEvent.click(screen.getByRole('button', { name: 'Follow the line to Romans 4:7' }));
     expect([onMain.mock.calls.length, onOpen.mock.calls.length, onFollow.mock.calls.length]).toEqual([1, 1, 1]);
+  });
+
+  it("a named row keeps its verse as the main button's description (s24.1)", () => {
+    ul(<ConnectionRow title="Romans 4:7" text="Blessed are those" onMain={() => {}} mainLabel="Romans 4:7, 182 votes" />);
+    const main = screen.getByRole('button', { name: 'Romans 4:7, 182 votes', description: 'Blessed are those' });
+    expect(document.getElementById(main.getAttribute('aria-describedby')).textContent).toBe('Blessed are those');
+    cleanup();
+    ul(<ConnectionRow title="Romans 4:7" onMain={() => {}} mainLabel="Romans 4:7" />);
+    expect(screen.getByRole('button', { name: 'Romans 4:7' }).hasAttribute('aria-describedby')).toBe(false);
   });
 
   it('lights on hover and on keyboard focus, and lets go when focus leaves the row', () => {

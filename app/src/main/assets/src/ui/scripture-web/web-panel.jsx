@@ -40,7 +40,7 @@
 
 import { ConnectionRow } from './connection-row.jsx';
 import {
-  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel,
+  connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, openInReaderLabel,
   verseEndpoint, verseTextFor, WHOLE_WEB, exitsWords,
 } from '../../utils/scripture-web/describe.js';
 import {
@@ -257,7 +257,7 @@ function VerseBlock({ block, heading = true, onOpen, extra = null }) {
       <p className={'sw-verse-text' + (block.text ? '' : ' is-pending')}>{block.text || 'The verse is still loading.'}</p>
       <div className="sw-links">
         <button type="button" className="sw-link" onClick={() => onOpen(block.endpoint)}
-          aria-label={'Open ' + block.ref.label + ' in the reader'}>Open in reader <span aria-hidden="true">›</span></button>
+          aria-label={openInReaderLabel(block.ref.label)}>Open in reader <span aria-hidden="true">›</span></button>
         {extra}
       </div>
     </div>
@@ -541,8 +541,9 @@ export function WebPanel(props) {
     // a row's card keeps the way back to this one ("Back to ..."): it is no step of the trail
     onMain: () => openPanel({ mode: 'connection', arc: r.index }, { back: true }),
     mainLabel: r.other.label + ', ' + plural(r.votes, 'vote', 'votes') + ': show this connection',
-    onOpen: () => onOpen(verseEndpoint(r.other)), openLabel: 'Open ' + r.other.label + ' in the reader',
-    onFollow: () => followRow(r), followLabel: 'Follow the line from ' + r.here.label + ' to ' + r.other.label,
+    // one wording with the open connection's own Open in reader and Follow to (ideas audit A10.4)
+    onOpen: () => onOpen(verseEndpoint(r.other)), openLabel: openInReaderLabel(r.other.label),
+    onFollow: () => followRow(r), followLabel: followLabel(r.other.label),
     onLight: (/** @type {boolean} */ on) => light(on ? [r.index] : null),
   });
   const votesTag = (/** @type {any} */ r) => plural(r.votes, 'vote', 'votes');
@@ -652,7 +653,7 @@ export function WebPanel(props) {
         {endpoint ? (
           <div className="sw-links sw-sec">
             <button type="button" className="sw-link" onClick={() => onOpen(endpoint)}
-              aria-label={'Open ' + (endpoint.label || title) + ' in the reader'}>Open in reader <span aria-hidden="true">›</span></button>
+              aria-label={openInReaderLabel(endpoint.label || title)}>Open in reader <span aria-hidden="true">›</span></button>
           </div>
         ) : null}
         <Section title={'Connections · ' + n.toLocaleString()} className="sw-sec-more">
@@ -702,7 +703,7 @@ export function WebPanel(props) {
               <ConnectionRow key={r.verse + '-' + r.verseEnd} title={r.label} text={r.text}
                 onMain={() => openPanel({ mode: 'verse', verse: r.verse }, { back: true })}
                 mainLabel={r.label + ': show its connections'}
-                onOpen={() => onOpen(r.endpoint)} openLabel={'Open ' + r.label + ' in the reader'} />
+                onOpen={() => onOpen(r.endpoint)} openLabel={openInReaderLabel(r.label)} />
             ))}
           </ul>
         </Section>
@@ -720,7 +721,7 @@ export function WebPanel(props) {
             const preview = (ep && ep.type === 'bible' && !card.preview ? verseTextFor(ep) : '') || card.preview;
             return (
               <button type="button" className="sw-card" key={i} disabled={!ep}
-                aria-label={ep ? 'Open ' + card.label + ' in the reader' : card.label}
+                aria-label={ep ? openInReaderLabel(card.label) : card.label}
                 onClick={() => ep && onOpen(ep)}>
                 <span className="sw-card-eyebrow">{card.eyebrow}</span>
                 <span className="sw-card-label">{card.label}</span>

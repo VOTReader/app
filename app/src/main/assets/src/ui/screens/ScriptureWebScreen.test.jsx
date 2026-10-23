@@ -602,7 +602,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       const before = DRAWN[DRAWN.length - 1];
       expect(before.focusArc, 'PRECONDITION: a line is chosen').toBe(0);
       const go = [...first.container.querySelectorAll('.sw-sheet button')]
-        .find((b) => /^Open .* in the reader$/.test(b.getAttribute('aria-label') || ''));
+        .find((b) => /^Open in reader: /.test(b.getAttribute('aria-label') || ''));
       expect(go, 'PRECONDITION: the card offers a verse to open').toBeTruthy();
       fireEvent.click(go);
       expect(opened.length).toBe(1);

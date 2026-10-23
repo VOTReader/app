@@ -151,7 +151,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(refs).toEqual(['Isaiah 7:14', 'Matthew 1:23']);
     expect([...panel.querySelectorAll('.sw-verse-text')].map((e) => e.textContent))
       .toEqual(['TEXT isaiah 7:14', 'TEXT matthew-plain 1:23']);
-    const open = byLabel(/^Open Isaiah 7:14 in the reader$/);
+    const open = byLabel(/^Open in reader: Isaiah 7:14$/);
     expect(open).toHaveLength(1);
     fireEvent.click(open[0]);
     expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ type: 'bible', bookId: 'isaiah', chapter: 7, verse: 14 }));
@@ -231,7 +231,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
   });
 
   it('MORE FROM each end: the first open, grouped by book, rows with Open and Follow, the sort said', () => {
-    const { panel, byLabel, props } = mount({ detail: detail() });
+    const { panel, props } = mount({ detail: detail() });
     const more = [...panel.querySelectorAll('.sw-sec-more')];
     expect(more).toHaveLength(2);
     expect(more[0].querySelector('.sw-sec-title').textContent).toMatch(/^More from Isaiah 7:14 · \d+ connections?$/);
@@ -246,8 +246,10 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     // the first book is open; its rows never list the chosen thread
     const rows = more[0].querySelectorAll('.sw-group .sw-row');
     expect(rows.length).toBeGreaterThan(0);
-    const follows = byLabel(/^Follow the line from Isaiah 7:14 to /);
+    // a row's Follow says what the open connection's says: Follow to the other end (A10.4)
+    const follows = [...more[0].querySelectorAll('.sw-group .sw-row-follow')];
     expect(follows.length).toBe(rows.length);
+    for (const f of follows) expect(f.getAttribute('aria-label')).toMatch(/^Follow to /);
     fireEvent.click(follows[0]);
     expect(props.followRow).toHaveBeenCalledWith(expect.objectContaining({ hereVerse: ISA_7_14 }));
     expect(props.followRow.mock.calls[0][0].index).not.toBe(ARC);
@@ -597,7 +599,7 @@ describe('letter mode', () => {
     expect(matt.querySelector('.sw-row-text').textContent).toBe('TEXT matthew-plain 1:23');
     fireEvent.click(matt.querySelector('.sw-row-main'));
     expect(props.openPanel).toHaveBeenCalledWith({ mode: 'verse', verse: expect.any(Number) }, { back: true });
-    fireEvent.click(byLabel(/^Open Matthew 1:23 in the reader$/)[0]);
+    fireEvent.click(byLabel(/^Open in reader: Matthew 1:23$/)[0]);
     expect(props.onOpen).toHaveBeenCalledWith(expect.objectContaining({ bookId: 'matthew-plain', chapter: 1, verse: 23 }));
   });
 
@@ -679,7 +681,7 @@ describe("exits mode: a fan chip's lines, by the book they go to", () => {
   });
 
   it('the panel: its head, "Connections · n" the chip\'s count, rows with Open and Follow, the lines lit as it opened', () => {
-    const { panel, byLabel, props } = mount({ detail });
+    const { panel, props } = mount({ detail });
     expect(modeOfDetail(detail)).toBe('exits');
     expect(subjectKey('exits', detail, null)).toBe('x:' + detail.key);
     expect(panel.getAttribute('data-mode')).toBe('exits');
@@ -688,8 +690,9 @@ describe("exits mode: a fan chip's lines, by the book they go to", () => {
     expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · ' + grp.count);
     const rows = panel.querySelectorAll('.sw-group .sw-row');
     expect(rows.length).toBeGreaterThan(0);
-    const follows = byLabel(/^Follow the line from Isaiah 54:/);
+    const follows = [...panel.querySelectorAll('.sw-group .sw-row-follow')];
     expect(follows.length).toBe(rows.length);
+    for (const f of follows) expect(f.getAttribute('aria-label')).toMatch(/^Follow to /);
     expect(panel.querySelectorAll('.sw-group .sw-row-open').length, 'each row has its Open').toBe(rows.length);
     fireEvent.click(follows[0]);
     expect(props.followRow).toHaveBeenCalledWith(expect.objectContaining({ hereVerse: expect.any(Number) }));

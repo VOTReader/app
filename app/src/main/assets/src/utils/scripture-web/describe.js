@@ -104,6 +104,12 @@ export function followLabel(label) {
   return 'Follow to ' + label;
 }
 
+/** Open's name, everywhere it is drawn: it begins with the words the button shows ("Open in
+ * reader", a row's "Open"), so a voice saying what it sees finds it (ideas audit A10.4). */
+export function openInReaderLabel(label) {
+  return 'Open in reader: ' + label;
+}
+
 /** The live region as Follow pans to a thread's far foot. */
 export function followAnnouncement(label) {
   return 'Following the line to ' + label;

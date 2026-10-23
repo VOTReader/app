@@ -30,6 +30,10 @@
 export function ConnectionRow({ title, tag, text, skin = 'panel', onMain, mainLabel, onOpen, openLabel,
   onFollow, followLabel, onLight, active, mainClass }) {
   const fallback = skin === 'fallback';
+  // a named row keeps its verse: the name replaces the button's words, so the preview is its
+  // description (ideas audit s24.1)
+  const textId = React.useId();
+  const described = mainLabel && text ? textId : undefined;
   const c = fallback
     ? { li: undefined, main: 'swf-row', top: 'swf-row-top', ref: 'swf-ref', tag: 'swf-tier', text: 'swf-snip' }
     : { li: 'sw-row' + (active ? ' is-on' : ''), main: 'sw-row-main', top: 'sw-row-top', ref: 'sw-row-ref', tag: 'sw-row-tag', text: 'sw-row-text' };
@@ -42,12 +46,12 @@ export function ConnectionRow({ title, tag, text, skin = 'panel', onMain, mainLa
   } : {};
   return (
     <li className={c.li} {...light}>
-      <button type="button" className={c.main} onClick={onMain} aria-label={mainLabel}>
+      <button type="button" className={c.main} onClick={onMain} aria-label={mainLabel} aria-describedby={described}>
         <span className={c.top}>
           <span className={c.ref}>{title}</span>
           {tag ? <span className={c.tag}>{tag}</span> : null}
         </span>
-        {text != null ? <span className={c.text}>{text}</span> : null}
+        {text != null ? <span className={c.text} id={described}>{text}</span> : null}
       </button>
       {(onOpen || onFollow) && (
         <span className="sw-row-actions">
