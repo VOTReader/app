@@ -258,6 +258,26 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
 
   // Corbin, 2026-10-22: "More from Nehemiah 1:5 · 8 connections" opened with its rows under the
   // panel's edge, so the toggle seemed to do nothing.
+  // the dead-control hunt, 2026-10-22: "Deuteronomy · 46" opened with every row under the edge
+  it('a book group opened by its header brings itself into view; the first, open at mount, does not', () => {
+    const seen = [];
+    const was = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (o) { seen.push([this.className, o && o.block]); };
+    try {
+      const { panel } = mount({ detail: detail() });
+      const heads = [...panel.querySelectorAll('.sw-sec-more')[0].querySelectorAll('.sw-group-head')];
+      expect(heads.length).toBeGreaterThan(1);
+      expect(seen).toEqual([]);
+      fireEvent.click(heads[1]);
+      expect(heads[1].getAttribute('aria-expanded')).toBe('true');
+      expect(seen).toEqual([['sw-group', 'nearest']]);
+      fireEvent.click(heads[1]);
+      expect(seen, 'closing moves nothing').toHaveLength(1);
+    } finally {
+      Element.prototype.scrollIntoView = was;
+    }
+  });
+
   it('a section opened by its toggle brings itself into view; mounting open or closing does not', () => {
     const seen = [];
     const was = Element.prototype.scrollIntoView;

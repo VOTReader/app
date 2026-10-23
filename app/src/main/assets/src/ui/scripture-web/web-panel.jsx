@@ -373,7 +373,21 @@ function ZoomRow({ g, chapterIndex, zoomTo }) {
 function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
   const [open, setOpen] = React.useState(() => new Set(groups.length ? [groups[0].book] : []));
   const [more, setMore] = React.useState(() => new Set());
-  const toggle = (book) => setOpen((s) => { const n = new Set(s); if (n.has(book)) n.delete(book); else n.add(book); return n; });
+  // a group opened by its header shows its rows, as a Section does (the dead-control hunt,
+  // 2026-10-22: "Deuteronomy · 46" opened with every row under the panel's edge)
+  const items = React.useRef(/** @type {Map<number, HTMLLIElement>} */ (new Map()));
+  const opened = React.useRef(/** @type {number | null} */ (null));
+  React.useEffect(() => {
+    const book = opened.current;
+    opened.current = null;
+    const el = book == null ? null : items.current.get(book);
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+  }, [open]);
+  const toggle = (book) => setOpen((s) => {
+    const n = new Set(s);
+    if (n.has(book)) n.delete(book); else { n.add(book); opened.current = book; }
+    return n;
+  });
   return (
     <ul className="sw-groups">
       {groups.map((grp) => {
@@ -381,7 +395,8 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
         const rows = more.has(grp.book) ? grp.rows : grp.rows.slice(0, GROUP_ROWS);
         const ids = grp.rows.map((r) => r.index);
         return (
-          <li className="sw-group" key={grp.book}>
+          <li className="sw-group" key={grp.book}
+            ref={(el) => { if (el) items.current.set(grp.book, el); else items.current.delete(grp.book); }}>
             <button type="button" className="sw-group-head" aria-expanded={isOpen} onClick={() => toggle(grp.book)}
               onMouseEnter={() => light(ids)} onMouseLeave={() => light(null)}
               onFocus={() => light(ids)} onBlur={() => light(null)}>
