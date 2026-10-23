@@ -342,7 +342,7 @@ class AudioKeepAliveService : Service() {
             // A platform drawable: a notification small icon is drawn as a white
             // silhouette, so the launcher mipmap would render as a blob. No new
             // resource needed for a transport glyph the platform already ships.
-            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(npTitle)
             .setContentText(npArtist)
             .setContentIntent(contentIntent)

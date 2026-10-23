@@ -213,6 +213,23 @@ describe('native-audio - the <audio> surface', () => {
     el.setMeta({ title: 'Letter Three' });
   });
 
+  it('the picture and the kind ride the load and a new-text change (pl-l5); none is sent as none', () => {
+    const art = 'data:image/png;base64,AAAA';
+    const el = new NativeAudio({ meta: () => ({ title: 'Christmas', artist: 'Read by Benjamin', album: 'Volume One', art, kind: 'spoken' }) });
+    el.src = A;
+    el.play();
+    const load = JSON.parse(bridge.audioLoad.mock.calls[0][0]);
+    expect(load.art).toBe(art);
+    expect(load.kind).toBe('spoken');
+    el.setMeta({ title: 'Christmas', artist: 'Read by Benjamin', album: 'Volume One', art, kind: 'spoken' });   // as loaded
+    expect(bridge.audioMeta).not.toHaveBeenCalled();
+    el.setMeta({ title: 'A song', artist: 'Songs of the Letters', album: '', art: 'https://votreader.github.io/songs/thumbs/512/x.webp', kind: 'song' });
+    expect(JSON.parse(bridge.audioMeta.mock.calls[0][0])).toEqual({ title: 'A song', artist: 'Songs of the Letters', album: '',
+      art: 'https://votreader.github.io/songs/thumbs/512/x.webp', kind: 'song' });
+    el.setMeta({ title: 'Plain' });
+    expect(Object.keys(JSON.parse(bridge.audioMeta.mock.calls[1][0]))).toEqual(['title', 'artist', 'album']);
+  });
+
   it('the clock starts from when native read the position, not from when the event arrived (n1-04)', () => {
     const el = new NativeAudio();
     el.src = A;

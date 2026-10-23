@@ -6,6 +6,7 @@
 import { BIBLE_AUDIO_EDITIONS, songIdOfKey } from '../audio-track.js';
 import { songById, songThumbUrl } from '../song-catalog.js';
 import { readerLabel } from './catalog.js';
+import { coverArt } from './cover-art.js';
 import {
   _el,
   _g,
@@ -276,8 +277,8 @@ export function _cardArtist(track) {
     const edition = Object.values(BIBLE_AUDIO_EDITIONS).find((entry) => entry && entry.volKey === volKey);
     if (edition) return edition.short || edition.label;
   }
-  const reader = readerLabel(track.readerCode);
-  return 'The Volumes of Truth' + (reader ? ' · ' + reader : '');
+  // The reader, as a lock screen's artist line names one (pl-l5); the app's name stands in when none is known.
+  return readerLabel(track.readerCode) || 'The Volumes of Truth';
 }
 
 /**
@@ -308,12 +309,28 @@ function _setCardMetadata(ms, track) {
   if (typeof MM !== 'function') return;
   /** @type {any} */
   const meta = { title: _cardTitle(track), artist: _cardArtist(track), album: _cardAlbum(track) };
-  // A song the catalog knows has a cover: the publisher cuts a 512 px thumb for
-  // every song. Desktop Chrome, iPhone and the lock screen read it from here.
-  const song = _isSong(track) ? songById(songIdOfKey(track.key)) : null;
-  const art = song ? songThumbUrl(song, 512) : '';
-  if (art) meta.artwork = [{ src: art, sizes: '512x512', type: 'image/webp' }];
+  // Desktop Chrome, iPhone and the lock screen read the picture from here.
+  const art = _cardArt(track);
+  if (art) meta.artwork = [{ src: art, sizes: '512x512', type: art.startsWith('data:image/png') ? 'image/png' : 'image/webp' }];
   ms.metadata = new MM(meta);
+}
+
+/**
+ * The picture on a media card (pl-l5): a song the catalog knows has its cover (the publisher cuts a 512 px thumb for
+ * every song); every other recording gets its collection's cover (cover-art.js). '' when there is none to give.
+ * @param {Track} track @returns {string}
+ */
+export function _cardArt(track) {
+  if (_isSong(track)) {
+    const song = songById(songIdOfKey(track.key));
+    return song ? songThumbUrl(song, 512) : '';
+  }
+  return coverArt(track.sub);
+}
+
+/** @param {Track} track @returns {'song' | 'spoken'} what the native card's buttons are for: prev/next or ±15 */
+export function _cardKind(track) {
+  return _isSong(track) ? 'song' : 'spoken';
 }
 
 /**
@@ -381,14 +398,14 @@ function _installNativeTransport() {
 }
 
 /**
- * The lock-screen text for the recording at `url`.
+ * The lock-screen text, picture and kind for the recording at `url`.
  * @param {string} url
- * @returns {{ title: string, artist: string, album: string }}
+ * @returns {{ title: string, artist: string, album: string, art?: string, kind?: string }}
  */
 export function _nativeMeta(url) {
   const t = _state.queue[_state.qi];
   if (!t || t.url !== url) return { title: '', artist: '', album: '' };
-  return { title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t) };
+  return { title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t), art: _cardArt(t), kind: _cardKind(t) };
 }
 
 // This module's verbs that the modules below it call (core.js `late`).

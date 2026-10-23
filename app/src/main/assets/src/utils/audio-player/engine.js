@@ -36,7 +36,9 @@ import { _notifyListened, _recordSongStart } from './credit.js';
 import { _clearLoop, _loopEnded, _loopTick, _loopToNative } from './loop.js';
 import {
   _cardAlbum,
+  _cardArt,
   _cardArtist,
+  _cardKind,
   _cardTitle,
   _installMediaArbiter,
   _mediaSession,
@@ -274,7 +276,7 @@ function _ensureEl() {
  * the order) or needs the page (a recording not on the phone while offline: the page substitutes or pauses).
  * Repeat 'one' is this recording again. A song plays at 1x; a reading at the reading speed. Nothing while a passage
  * repeats (ra2): one that runs to the recording's end goes round from there, it does not cross into the next.
- * @returns {{ url: string, title: string, artist: string, album: string, rate: number }[]}
+ * @returns {{ url: string, title: string, artist: string, album: string, art: string, kind: string, rate: number }[]}
  */
 function _nativeUpcoming() {
   if (_state.sleepAtTrackEnd || _pendingRestore || _state.loop) return [];
@@ -292,7 +294,10 @@ function _nativeUpcoming() {
     }
   } else if (late._repeatMode() === 'all') t = _state.queue[0];
   if (!t || !isVotAudioUrl(t.url) || _unreachable(t)) return [];
-  return [{ url: t.url, title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t), rate: _isSong(t) ? 1 : _readingRate }];
+  return [{
+    url: t.url, title: _cardTitle(t), artist: _cardArtist(t), album: _cardAlbum(t), art: _cardArt(t), kind: _cardKind(t),
+    rate: _isSong(t) ? 1 : _readingRate,
+  }];
 }
 
 

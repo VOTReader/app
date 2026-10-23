@@ -84,6 +84,38 @@ object NativeAudioLogic {
     /** Page text shown on the lock screen and in the notification, bounded. */
     fun label(text: String?): String = (text ?: "").take(MAX_TEXT)
 
+    /** A recording's lock-screen picture (pl-l5): the collection cover the page drew, or a song's cover on its host. */
+    sealed interface Art {
+        class Bytes(val data: ByteArray) : Art
+        data class Link(val url: String) : Art
+    }
+
+    /**
+     * The page's picture for a recording, checked (the page is not trusted): a PNG, JPEG or WebP data url of at most
+     * about 512 KB, or a song thumb on the songs host over https. Anything else is no picture.
+     */
+    fun artOf(art: String?): Art? {
+        if (art.isNullOrEmpty()) return null
+        if (art.startsWith("https://")) {
+            if (art.length > MAX_URL) return null
+            val rest = art.substring("https://".length)
+            val authority = rest.substringBefore('/').substringBefore('?').substringBefore('#')
+            return if (authority.lowercase() == SONGS_HOST && rest.substring(authority.length).startsWith("/songs/thumbs/")) Art.Link(art) else null
+        }
+        val comma = art.indexOf(',')
+        if (comma < 0 || art.length > MAX_ART_CHARS || art.substring(0, comma) !in ART_HEADS) return null
+        val bytes = try { java.util.Base64.getDecoder().decode(art.substring(comma + 1)) } catch (e: IllegalArgumentException) { return null }
+        return if (bytes.isNotEmpty()) Art.Bytes(bytes) else null
+    }
+
+    /** A song gets prev and next on the lock screen; everything else is spoken word, with ±15 s (pl-l5). */
+    fun spoken(kind: String?): Boolean = kind != "song"
+
+    private const val SONGS_HOST = "votreader.github.io"
+    private val ART_HEADS = setOf("data:image/png;base64", "data:image/jpeg;base64", "data:image/webp;base64")
+    /** Base64 of about 512 KB; the page's covers are near 30 KB. */
+    const val MAX_ART_CHARS = 700_000
+
     /** Seam number [seq]: the recording [from] ended and [url] began, natively, at [at] (epoch ms). */
     data class Seam(val seq: Long, val from: String, val url: String, val at: Long)
 

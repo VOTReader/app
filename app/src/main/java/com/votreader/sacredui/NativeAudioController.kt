@@ -5,12 +5,14 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
@@ -56,7 +58,11 @@ class NativeAudioController(
     /** The Activity is gone ([shutdown]): a late call must not connect a controller nothing would release (n1-08). */
     @Volatile private var closed = false
 
-    private class Track(val url: String, val title: String, val artist: String, val album: String, val rate: Float)
+    private class Track(
+        val url: String, val title: String, val artist: String, val album: String, val rate: Float,
+        /** The lock-screen picture and whether it is spoken word (±15 s) or a song (prev/next), pl-l5. */
+        val art: NativeAudioLogic.Art?, val spoken: Boolean,
+    )
 
     // ── the port (binder threads) ─────────────────────────────────────
 
@@ -125,6 +131,8 @@ class NativeAudioController(
         val title = NativeAudioLogic.label(o.optString("title"))
         val artist = NativeAudioLogic.label(o.optString("artist"))
         val album = NativeAudioLogic.label(o.optString("album"))
+        val art = NativeAudioLogic.artOf(o.optString("art"))
+        val spoken = NativeAudioLogic.spoken(o.optString("kind"))
         onMain { c ->
             val i = c.currentMediaItemIndex
             val item = c.currentMediaItem ?: return@onMain
@@ -134,7 +142,7 @@ class NativeAudioController(
             c.replaceMediaItem(
                 i,
                 item.buildUpon()
-                    .setMediaMetadata(MediaMetadata.Builder().setTitle(title).setArtist(artist).setAlbumTitle(album.ifEmpty { null }).build())
+                    .setMediaMetadata(metadata(title, artist, album, art, spoken))
                     .build(),
             )
         }
@@ -357,6 +365,8 @@ class NativeAudioController(
             NativeAudioLogic.label(o.optString("artist")),
             NativeAudioLogic.label(o.optString("album")),
             NativeAudioLogic.clampRate(o.optDouble("rate", 1.0)),
+            NativeAudioLogic.artOf(o.optString("art")),
+            NativeAudioLogic.spoken(o.optString("kind")),
         )
     }
 
@@ -370,10 +380,26 @@ class NativeAudioController(
         .setMediaId("${++serial}|${t.url}")
         .setUri(t.url)
         .setRequestMetadata(MediaItem.RequestMetadata.Builder().setMediaUri(t.url.toUri()).build())
-        .setMediaMetadata(
-            MediaMetadata.Builder().setTitle(t.title).setArtist(t.artist).setAlbumTitle(t.album.ifEmpty { null }).build(),
-        )
+        .setMediaMetadata(metadata(t.title, t.artist, t.album, t.art, t.spoken))
         .build()
+
+    /** What the lock screen, notification, Bluetooth and car show: the text, the picture, and the kind, which
+     *  [PlaybackService] turns into ±15 s or prev/next buttons (pl-l5). */
+    @OptIn(UnstableApi::class)
+    private fun metadata(title: String, artist: String, album: String, art: NativeAudioLogic.Art?, spoken: Boolean): MediaMetadata =
+        MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setAlbumTitle(album.ifEmpty { null })
+            .setMediaType(if (spoken) MediaMetadata.MEDIA_TYPE_AUDIO_BOOK_CHAPTER else MediaMetadata.MEDIA_TYPE_MUSIC)
+            .apply {
+                when (art) {
+                    is NativeAudioLogic.Art.Bytes -> setArtworkData(art.data, MediaMetadata.PICTURE_TYPE_FRONT_COVER)
+                    is NativeAudioLogic.Art.Link -> setArtworkUri(art.url.toUri())
+                    null -> Unit
+                }
+            }
+            .build()
 
     private companion object {
         const val TICK_MS = 1_000L

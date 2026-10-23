@@ -8,6 +8,7 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.ForwardingPlayer
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultDataSource
@@ -16,6 +17,7 @@ import androidx.media3.datasource.ResolvingDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.session.CommandButton
 import androidx.media3.session.DefaultMediaNotificationProvider
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
@@ -68,6 +70,9 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
+            // The lock screen's, notification's and headset's skip back and forward: 15 s, as the app's own buttons.
+            .setSeekBackIncrementMs(SKIP_MS)
+            .setSeekForwardIncrementMs(SKIP_MS)
             .build()
         val open = PendingIntent.getActivity(
             this, 0,
@@ -79,8 +84,23 @@ class PlaybackService : MediaSessionService() {
             .setSessionActivity(open)
             .build()
         setMediaNotificationProvider(
-            DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(android.R.drawable.ic_media_play) },
+            DefaultMediaNotificationProvider.Builder(this).build().apply { setSmallIcon(R.drawable.ic_notification) },
         )
+        // pl-l5: spoken word gets -15 and +15 beside play (next and previous behind them); a song, prev and next.
+        player.addListener(object : Player.Listener {
+            override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) = layoutFor(mediaMetadata)
+        })
+        layoutFor(player.mediaMetadata)
+    }
+
+    /** Which buttons are showing: spoken word or a song (null before the first). */
+    private var spoken: Boolean? = null
+
+    private fun layoutFor(metadata: MediaMetadata) {
+        val now = metadata.mediaType != MediaMetadata.MEDIA_TYPE_MUSIC
+        if (now == spoken) return
+        spoken = now
+        session?.setMediaButtonPreferences(buttons(now))
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -160,6 +180,24 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
+        const val SKIP_MS = 15_000L
+
+        /**
+         * The system surfaces' buttons (pl-l5, player brief 3h). Spoken word: -15 in the back slot and +15 in the
+         * forward slot, so the lock screen's compact row reads -15, play, +15; previous and next follow in the
+         * expanded notification. A song: none, so Media3 draws its own prev, play, next.
+         */
+        fun buttons(spoken: Boolean): List<CommandButton> = if (!spoken) emptyList() else listOf(
+            CommandButton.Builder(CommandButton.ICON_SKIP_BACK_15).setPlayerCommand(Player.COMMAND_SEEK_BACK)
+                .setDisplayName("Back 15 seconds").setSlots(CommandButton.SLOT_BACK).build(),
+            CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_15).setPlayerCommand(Player.COMMAND_SEEK_FORWARD)
+                .setDisplayName("Forward 15 seconds").setSlots(CommandButton.SLOT_FORWARD).build(),
+            CommandButton.Builder(CommandButton.ICON_PREVIOUS).setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
+                .setDisplayName("Previous").setSlots(CommandButton.SLOT_OVERFLOW).build(),
+            CommandButton.Builder(CommandButton.ICON_NEXT).setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)
+                .setDisplayName("Next").setSlots(CommandButton.SLOT_OVERFLOW).build(),
+        )
+
         /** The page's transport receiver (MainActivity sets it; cleared in its onDestroy). Same shape as the keep-alive's. */
         @Volatile
         var commandSink: ((String, Long) -> Unit)? = null

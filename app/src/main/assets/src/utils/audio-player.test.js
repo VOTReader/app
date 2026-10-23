@@ -10,6 +10,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { AUDIO_RESUME_REWIND_SEC } from './audio-track.js';
+import { _resetCoverArt } from './audio-player/cover-art.js';
 
 /** Mimics the bits of HTMLAudioElement this module touches. */
 class FakeAudio extends EventTarget {
@@ -2638,7 +2639,7 @@ describe('audio-player — native media card (setAudioNowPlaying + __votMediaCom
     // Track start ('loading') already pushes metadata so the card titles
     // itself before the first byte arrives.
     expect(bridge.setAudioNowPlaying).toHaveBeenCalledWith(
-      'Letter A — Part 1', 'The Volumes of Truth · Read by Benjamin',
+      'Letter A — Part 1', 'Read by Benjamin',
       true,               // buffering counts as playing — same rule as the web session
       expect.any(Number), expect.any(Number), expect.any(Number)
     );
@@ -2780,11 +2781,17 @@ describe('audio-player — Media Session', () => {
     };
     Object.defineProperty(window.navigator, 'mediaSession', { configurable: true, value: session });
     globalThis.MediaMetadata = class { constructor(o) { Object.assign(this, o); } };
+    // A canvas that draws: a letter's card carries its collection's cover (pl-l5).
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    const toDataURL = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.getContext = () => ({ fillRect() {}, strokeRect() {}, fillText() {}, measureText: () => ({ width: 100 }) });
+    HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,VOLUMEONE';
     try {
       AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
       expect(session.metadata.title).toBe('Letter A — Part 1');
-      expect(session.metadata.artist).toBe('The Volumes of Truth · Read by Benjamin');
+      expect(session.metadata.artist).toBe('Read by Benjamin');
       expect(session.metadata.album).toBe('Volume One');
+      expect(session.metadata.artwork).toEqual([{ src: 'data:image/png;base64,VOLUMEONE', sizes: '512x512', type: 'image/png' }]);
       expect(typeof session.handlers.nexttrack).toBe('function');
       el().duration = 60;
       el().dispatchEvent(new Event('durationchange'));
@@ -2800,6 +2807,9 @@ describe('audio-player — Media Session', () => {
       expect(session.handlers.seekto).toBe(null);
       expect(session.playbackState).toBe('none');
     } finally {
+      HTMLCanvasElement.prototype.getContext = getContext;
+      HTMLCanvasElement.prototype.toDataURL = toDataURL;
+      _resetCoverArt();
       delete window.navigator.mediaSession;
       delete globalThis.MediaMetadata;
     }

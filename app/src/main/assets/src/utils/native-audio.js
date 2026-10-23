@@ -36,8 +36,8 @@
    (JsEvent.NativeAudio).
    ═══════════════════════════════════════════════════════════════════════ */
 
-/** @typedef {{ title?: string, artist?: string, album?: string }} NativeMeta */
-/** @typedef {{ url: string, title?: string, artist?: string, album?: string, rate?: number }} NativeNext */
+/** @typedef {{ title?: string, artist?: string, album?: string, art?: string, kind?: string }} NativeMeta */
+/** @typedef {{ url: string, title?: string, artist?: string, album?: string, art?: string, kind?: string, rate?: number }} NativeNext */
 /** @typedef {{ meta?: (url: string) => NativeMeta, upcoming?: () => NativeNext[] }} NativeHooks */
 
 /** How long (wall seconds) currentTime may run on past native's last word before it waits for the next. Wall time,
@@ -59,6 +59,18 @@ const _g = () => /** @type {any} */ (globalThis);
 function nativeBridge() {
   const b = typeof window !== 'undefined' ? /** @type {any} */ (window).AndroidBridge : null;
   return b && typeof b.audioLoad === 'function' && typeof b.audioJournal === 'function' ? b : null;
+}
+
+/**
+ * The card fields native is sent, as strings; the picture and kind (pl-l5) only when there are some.
+ * @param {NativeMeta} meta @returns {NativeMeta}
+ */
+function metaOf(meta) {
+  /** @type {NativeMeta} */
+  const m = { title: String(meta.title || ''), artist: String(meta.artist || ''), album: String(meta.album || '') };
+  if (meta.art) m.art = String(meta.art);
+  if (meta.kind) m.kind = String(meta.kind);
+  return m;
 }
 
 /**
@@ -257,13 +269,13 @@ class NativeAudio extends EventTarget {
       this._heard = false;
       this._loadedAt = Date.now();
       this._nativeUrl = this._src;
-      const meta = this._meta(this._src);
-      this._metaSent = JSON.stringify({ title: String(meta.title || ''), artist: String(meta.artist || ''), album: String(meta.album || '') });
+      const meta = metaOf(this._meta(this._src));
+      this._metaSent = JSON.stringify(meta);
       const upcoming = this._upcoming();
       this._upcomingSent = JSON.stringify(upcoming);
       b.audioLoad(JSON.stringify({
         url: this._src, startMs: this._startMs, rate: this._rate, volume: this._volume, autoplay: false,
-        title: meta.title || '', artist: meta.artist || '', album: meta.album || '', upcoming,
+        ...meta, upcoming,
       }));
       this._pos = this._startMs / 1000;
       this._anchorAt = now();
@@ -310,8 +322,7 @@ class NativeAudio extends EventTarget {
    */
   setMeta(meta) {
     if (!this._loaded || !meta) return;
-    const m = { title: String(meta.title || ''), artist: String(meta.artist || ''), album: String(meta.album || '') };
-    const json = JSON.stringify(m);
+    const json = JSON.stringify(metaOf(meta));
     if (json === this._metaSent) return;
     this._metaSent = json;
     const b = nativeBridge();

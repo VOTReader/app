@@ -181,4 +181,32 @@ class NativeAudioLogicTest {
         assertTrue(toEnd.holds(3_600_000))
         assertFalse(toEnd.holds(5_000))
     }
+
+    @Test
+    fun `the lock-screen picture is a bounded image data url or a song thumb on the songs host (pl-l5)`() {
+        val png = NativeAudioLogic.artOf("data:image/png;base64,iVBORw0KGgo=")
+        assertTrue(png is NativeAudioLogic.Art.Bytes)
+        assertEquals(8, (png as NativeAudioLogic.Art.Bytes).data.size)
+        assertTrue(NativeAudioLogic.artOf("data:image/jpeg;base64,/9j/4AAQ") is NativeAudioLogic.Art.Bytes)
+        val thumb = "https://votreader.github.io/songs/thumbs/512/s-0001.webp"
+        assertEquals(NativeAudioLogic.Art.Link(thumb), NativeAudioLogic.artOf(thumb))
+        assertNull(NativeAudioLogic.artOf(null))
+        assertNull(NativeAudioLogic.artOf(""))
+        assertNull(NativeAudioLogic.artOf("data:image/svg+xml;base64,PHN2Zz4="))      // not a type the notification decodes
+        assertNull(NativeAudioLogic.artOf("data:image/png;base64,!!!not base64!!!"))
+        assertNull(NativeAudioLogic.artOf("data:image/png;base64,"))
+        assertNull(NativeAudioLogic.artOf("data:image/png;base64," + "A".repeat(NativeAudioLogic.MAX_ART_CHARS)))
+        assertNull(NativeAudioLogic.artOf("https://votreader.github.io.evil.example/songs/thumbs/512/x.webp"))
+        assertNull(NativeAudioLogic.artOf("https://votreader.github.io/private/x.webp"))
+        assertNull(NativeAudioLogic.artOf("http://votreader.github.io/songs/thumbs/512/x.webp"))
+        assertNull(NativeAudioLogic.artOf("file:///data/data/com.votreader.sacredui/x.png"))
+    }
+
+    @Test
+    fun `only a song is not spoken word, so an older page that names no kind gets the 15 s buttons`() {
+        assertFalse(NativeAudioLogic.spoken("song"))
+        assertTrue(NativeAudioLogic.spoken("spoken"))
+        assertTrue(NativeAudioLogic.spoken(null))
+        assertTrue(NativeAudioLogic.spoken(""))
+    }
 }
