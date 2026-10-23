@@ -3,6 +3,12 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { handle, sweep, traitKey, ORIGINS, RATE_PER_HOUR, WINDOW_MS } from '../src/index.js';
+import { webcrypto } from 'node:crypto';
+
+// the Worker runtime has Web Crypto; the hook's vmThreads pool (test:hook) does not
+if (!globalThis.crypto || !globalThis.crypto.subtle) {
+  Object.defineProperty(globalThis, 'crypto', { value: webcrypto, configurable: true });
+}
 
 /** The slice of the D1 API the Worker uses, over node:sqlite. */
 function d1() {
