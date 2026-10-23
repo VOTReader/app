@@ -100,6 +100,26 @@ describe('BibleChapterView — the KJV for this visit (idea A)', () => {
     expect(row()).toBeNull();
   });
 
+  /* search200 resume1 walk: "the way of the slothful" opened Proverbs 15 in the KJV ten verses above 15:19. The landing
+     centred the verse at 150 ms; the KJV arrived after it (a lazy edition) and the row and the new words moved it off. */
+  it('a KJV that arrives after the landing centres the landed verse again, once', () => {
+    const kjv = globalThis.BIBLE_KJV;
+    delete globalThis.BIBLE_KJV;
+    const calls = [];
+    Element.prototype.scrollIntoView = function (o) { calls.push([this.id, o && o.block]); };
+    const anchor = { type: 'verse', verses: [13], edition: 'kjv' };
+    const { rerender } = render(at(20, anchor));
+    vi.advanceTimersByTime(200);
+    expect(verse(13)).toContain('You shall not murder.');
+    const landed = calls.length;
+    globalThis.BIBLE_KJV = kjv;
+    rerender(at(20, anchor));
+    expect(verse(13)).toContain('Thou shalt not kill.');
+    expect(calls.slice(landed)).toEqual([['v-13', 'center']]);
+    rerender(at(20, anchor));
+    expect(calls.length).toBe(landed + 1);
+  });
+
   it('a swipe peek (inert) never takes the visit', () => {
     render(at(20, { type: 'verse', verses: [13], edition: 'kjv' }, { inert: true }));
     expect(verse(13)).toContain('You shall not murder.');

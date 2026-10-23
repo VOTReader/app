@@ -87,6 +87,16 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
     // the reader's own tap, one instant write (the class of the landing's scroll): the verse holds its place
     if (Math.abs(drift) >= 1 && typeof sc.scrollTo === 'function') sc.scrollTo({ top: Math.max(0, sc.scrollTop + drift), behavior: /** @type {ScrollBehavior} */ ('instant') });
   }, [translation]);
+  /* The visit's words can arrive after the landing centred its verse (a lazy KJV, search200 resume1 walk: "the way of
+     the slothful" showed Proverbs 15:6-10, the KJV row and words having moved 15:19 off): when they show, the landed
+     verse is centred again, once per visit. */
+  const visitCentredRef = React.useRef(/** @type {any} */ (null));
+  React.useLayoutEffect(() => {
+    if (!visitShown || !visit || visitCentredRef.current === visit) return;
+    visitCentredRef.current = visit;
+    const el = bodyRef.current ? /** @type {HTMLElement | null} */ (bodyRef.current.querySelector('#v-' + visit.verse)) : null;
+    if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: /** @type {ScrollBehavior} */ ('instant'), block: 'center' });
+  }, [visitShown, visit]);
   /* "Book · Chapter N" is what the narrator announces before verse 1: the
      read-along's lead-in sits there (ReadAlongHighlight, 2026-09-22). */
   // The verse-number key builder read-along paints through. useCallback is NOT
