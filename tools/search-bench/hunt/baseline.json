@@ -1,8 +1,8 @@
 {
- "pass": 969,
- "strict": 944,
- "top5": 1020,
- "found": 1098,
+ "pass": 1173,
+ "strict": 1100,
+ "top5": 1253,
+ "found": 1359,
  "family": {
   "parallel": 64,
   "paraphrase": 67,
@@ -17,6 +17,12 @@
   "scoped": 69,
   "short": 77,
   "slip": 71,
+  "sw-answers": 33,
+  "sw-gist": 34,
+  "sw-names": 41,
+  "sw-phone": 45,
+  "sw-questions": 23,
+  "sw-short": 28,
   "titles": 66,
   "topical": 25,
   "wording": 73
