@@ -1,6 +1,6 @@
 // @ts-nocheck
 /* answers-browse — the words, places and lists the Answers browse screens show (AOGCG Browse). */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -52,6 +52,17 @@ describe('copy rules', () => {
     expect(answersMinutes({ words: 50 })).toBe(1);
     expect(answersMinutes({ words: 2500 })).toBe(13);
     expect(answersMinutes(null)).toBe(1);
+    // the reader's measured pace when there is one (idea audit 10-23, L6.4)
+    expect(answersMinutes({ words: 2500 }, 250)).toBe(10);
+    vi.useFakeTimers();
+    try {
+      globalThis.ReadingStatsStore = { measuredWpm: () => 125 };
+      vi.setSystemTime(Date.now() + 60000);          // past the 2 s cache
+      expect(answersMinutes({ words: 2500 })).toBe(20);
+      globalThis.ReadingStatsStore = { measuredWpm: () => null };
+      vi.setSystemTime(Date.now() + 60000);
+      expect(answersMinutes({ words: 2500 })).toBe(13);
+    } finally { delete globalThis.ReadingStatsStore; vi.useRealTimers(); }
     expect(answersMediaKinds({ media: [{ kind: 'download' }, { kind: 'image', at: 3 }, { kind: 'audio' }, { kind: 'playlist' }, { kind: 'image', at: -1 }] }))
       .toEqual(['video', 'audio', 'chart', 'downloads']);
   });

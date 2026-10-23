@@ -13,7 +13,7 @@
    Pure data: no DOM, no React. The page's own renderer is untouched.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { isAttribution } from './answers-shelves.js';
+import { isAttribution, isDateHead } from './answers-shelves.js';
 
 const HEADING_RE = /^\*\*([^*]+)\*\*$/;
 const ALL_ITALIC_RE = /^_[\s\S]*_$/;
@@ -146,7 +146,6 @@ export function isQuotedWords(p) {
   return !!text && !isAttribution(text) && text !== '✦' && !headingOf(p, text);
 }
 
-const HEADER_LINE_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
 
 /**
  * The words of the passage a source line closes: the body paragraphs between the previous
@@ -166,7 +165,7 @@ export function passageTextBefore(paragraphs, sourceIndex) {
     const text = p && typeof p.text === 'string' ? p.text.trim() : '';
     if (!text) continue;
     if (isAttribution(text) || text === '✦' || headingOf(p, text)) break;
-    if (HEADER_LINE_RE.test(text)) continue;
+    if (isDateHead(text)) continue;
     out.unshift(text);
   }
   return out.join(' ')

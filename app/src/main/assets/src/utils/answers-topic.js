@@ -18,18 +18,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { pl, SEP, NBSP, answersMinutes, answersSizeWords, answersTopSections, answersRowSub, answersDomain, isDateHead } from './answers-browse.js';
-import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle, isAttribution } from './answers-shelves.js';
+import { ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersShortTitle, isAttribution, isTrumpetSection } from './answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteShelfOf } from './answers-site.js';
 import { answersSource } from './answers-contents.js';
 import { splitFormatBInline } from './format-b-inline.js';
 
-const TRUMPET = 'Be a Part of The Trumpet Call';
 const FD_LEAD = 'False Doctrine:';
 
-/** The site's closing "Be a Part of The Trumpet Call" heading: boilerplate, never counted or numbered. */
-export function isTrumpetSection(s) {
-  return String((s && s.title) || '').startsWith(TRUMPET);
-}
+export { isTrumpetSection };
 
 /** A topic over this many words offers Fold in its Contents (f10b: the eight longest). */
 export const ANSWERS_FOLD_WORDS = 8000;

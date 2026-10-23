@@ -379,7 +379,7 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
   return (
     <div role="tabpanel" id="ans-panel-c" aria-labelledby="ans-tab-c">
       <AnsRow title="Main Page" sub={main ? sub(main) : null} onClick={() => openTopic(ANSWERS_MAIN_PAGE_ID)} />
-      <div className="ans-sechead"><h2 className="ans-h2">The Ten Commandments</h2>{loaded ? <span className="ans-count">{pl(cmdTotal, 'topic')}</span> : null}</div>
+      <div className="ans-sechead"><h2 className="ans-h2">The Ten Commandments</h2>{loaded ? <span className="ans-count">{pl(cmdTotal, 'topic') + ' across all ten'}</span> : null}</div>
       <div className="ans-tablets">{tablets}</div>
       {loaded ? (
         <>

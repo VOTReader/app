@@ -28,7 +28,7 @@
    "144,000").
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { isAttribution, answersShortTitle, ANSWERS_SUBJECTS } from './answers-shelves.js';
+import { isAttribution, isDateHead, isTrumpetSection, answersShortTitle, ANSWERS_SUBJECTS } from './answers-shelves.js';
 import { ANSWERS_URL_INDEX } from './answers-url-index.js';
 
 /** What a question wraps around its subject; dropped only in the second pass. */
@@ -85,7 +85,6 @@ function subjectWordsFor(id) {
   return _subjectsById.get(id) || [];
 }
 
-const HEADER_RE = /^_\d{1,2}\/\d{1,2}\/\d{2,4}_/;
 const DIVIDER_RE = /^\s*(?:✦|~|†)\s*$/;
 /** A topic's closing links: a bold heading alone ("**Also See**", "**Audio**"), a link line ("• …", "📖 …"), a bare URL. */
 const NAV_PARA_RE = /^\s*(?:\*\*[^*]+\*\*|(?:•|\u{1F4D6}).*|https?:\/\/\S+)\s*$/u;
@@ -136,7 +135,7 @@ export function buildAnswersIndex(entries) {
         cur = { paras: [], src: -1, date: '' };
         return;
       }
-      if (typeof raw === 'string' && HEADER_RE.test(raw)) { if (!cur.date) cur.date = raw.slice(1, raw.indexOf('_', 1)); return; }
+      if (isDateHead(raw)) { if (!cur.date) cur.date = raw.slice(1, raw.indexOf('_', 1)); return; }
       if (typeof raw !== 'string' || DIVIDER_RE.test(raw)) return;
       const plain = answersPlainText(raw);
       if (plain) cur.paras.push({ index: i, plain, fold: answersFold(plain) });
@@ -249,7 +248,7 @@ function searchPass(index, words, opts) {
     if (t.prose) {
       // A page of prose counts its level-1 sections (the index's categories) that hold every word.
       const tops = ((typeof opts.sections === 'function' && opts.sections(t.entry.id)) || []).filter((s) => s.level === 1);
-      const secs = tops.filter((s) => !String(s.title || '').startsWith('Be a Part of The Trumpet Call'));
+      const secs = tops.filter((s) => !isTrumpetSection(s));
       const paras = t.passages.length ? t.passages[0].paras : [];
       if (secs.length) {
         total = secs.length;

@@ -53,7 +53,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     render(<AnswersHome {...base} />);
     const panel = document.querySelector('.ans-landing-b');
     expect(texts('.ans-sechead .ans-h2', panel)).toEqual(['The Ten Commandments', 'Other Topics', 'Thus Says The Lord...', 'Index of False Doctrines Within the Churches of Men']);
-    expect(texts('.ans-sechead .ans-count', panel).map(NB)).toEqual(['19 topics', '16 topics', '85 topics']);
+    expect(texts('.ans-sechead .ans-count', panel).map(NB)).toEqual(['19 topics across all ten', '16 topics', '85 topics']);
     expect(texts('.ans-tablet .ans-num')).toEqual(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']);
     expect(panel.querySelector('.ans-row .ans-row-title').textContent).toBe('Main Page');
     const groups = [...panel.querySelectorAll('.ans-row')].filter((r) => r.querySelector('.ans-num'));
@@ -397,6 +397,16 @@ describe('AnswersMedia — Charts & videos (f13)', () => {
     fireEvent.click(document.querySelector('.ans-thumb'));
     const viewer = screen.getByRole('dialog');
     expect(viewer.querySelector('img').getAttribute('src')).toBe('answers-chart-chronology.jpg');
-    expect(viewer.textContent).toContain('Pinch or double-tap to zoom');
+    expect(viewer.textContent).toContain('Pinch, double-tap or scroll to zoom');
+    // keys and the wheel zoom too (idea audit 10-23, s28.5)
+    const stage = viewer.querySelector('.ans-zoom');
+    const img = viewer.querySelector('img');
+    expect(stage.getAttribute('tabindex')).toBe('0');
+    fireEvent.keyDown(stage, { key: '+' });
+    expect(img.style.transform).toContain('scale(1.25)');
+    fireEvent.keyDown(stage, { key: '0' });
+    expect(img.style.transform).toBe('');
+    fireEvent.wheel(stage, { deltaY: -400, clientX: 0, clientY: 0 });
+    expect(img.style.transform).toMatch(/scale\(2\.71/);
   });
 });

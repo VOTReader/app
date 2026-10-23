@@ -169,7 +169,8 @@ const DOUBLE_TAP_ZOOM = 2.5;
 
 /**
  * O4: a chart in a tall sheet. Pinch and pan live on the stage only (the page's own pinch stays
- * off); a double tap zooms to 2.5x at the finger, or back out. The image is precached.
+ * off); a double tap zooms to 2.5x at the finger, or back out; a mouse wheel zooms at the cursor and the
+ * stage's keys zoom (+ - 0) and pan (arrows) (idea audit 10-23, s28.5). The image is precached.
  * @param {{ chart: { title: string, src: string }, onClose: () => void }} props
  */
 export function ChartViewer({ chart, onClose }) {
@@ -241,11 +242,34 @@ export function ChartViewer({ chart, onClose }) {
       if (pts.size < 2) pinch = null;
       if (!pts.size) pan = null;
     };
+    // a mouse wheel zooms at the cursor; the keys zoom at the middle (+ - 0) and pan (arrows)
+    const onWheel = (/** @type {WheelEvent} */ e) => {
+      e.preventDefault();
+      zoomAt(view.current.s * Math.exp(-e.deltaY / 400), local({ x: e.clientX, y: e.clientY }));
+    };
+    const onKey = (/** @type {KeyboardEvent} */ e) => {
+      const mid = { x: img.offsetWidth / 2, y: img.offsetHeight / 2 };
+      const v = view.current;
+      const step = 48;
+      if (e.key === '+' || e.key === '=') zoomAt(v.s * 1.25, mid);
+      else if (e.key === '-' || e.key === '_') zoomAt(v.s / 1.25, mid);
+      else if (e.key === '0') zoomAt(1, mid);
+      else if (v.s > 1 && e.key.startsWith('Arrow')) {
+        if (e.key === 'ArrowLeft') v.x += step; else if (e.key === 'ArrowRight') v.x -= step;
+        else if (e.key === 'ArrowUp') v.y += step; else v.y -= step;
+        apply();
+      } else return;
+      e.preventDefault();
+    };
     stage.addEventListener('pointerdown', onDown);
     stage.addEventListener('pointermove', onMove);
     stage.addEventListener('pointerup', onUp);
     stage.addEventListener('pointercancel', onUp);
+    stage.addEventListener('wheel', onWheel, { passive: false });
+    stage.addEventListener('keydown', onKey);
     return () => {
+      stage.removeEventListener('wheel', onWheel);
+      stage.removeEventListener('keydown', onKey);
       stage.removeEventListener('pointerdown', onDown);
       stage.removeEventListener('pointermove', onMove);
       stage.removeEventListener('pointerup', onUp);
@@ -254,10 +278,10 @@ export function ChartViewer({ chart, onClose }) {
   }, []);
   return (
     <AnsSheet label={chart.title} tall viewer onClose={onClose} head={<h2 className="ans-row-title">{chart.title}</h2>}>
-      <div className="ans-zoom" ref={stageRef}>
+      <div className="ans-zoom" ref={stageRef} tabIndex={0} role="group" aria-label={chart.title + ': + and - zoom, arrows move'}>
         <img ref={imgRef} src={chart.src} alt={chart.title + ', a chart'} draggable={false} />
       </div>
-      {zoomed ? null : <p className="ans-meta">Pinch or double-tap to zoom</p>}
+      {zoomed ? null : <p className="ans-meta">Pinch, double-tap or scroll to zoom</p>}
     </AnsSheet>
   );
 }

@@ -23,7 +23,7 @@
 
 import {
   ANSWERS_COMMANDMENTS, ANSWERS_MAIN_PAGE_ID, answersPassageCount, answersTopicEntries,
-  answersSortKey, answersIndexLetter, isAttribution,
+  answersSortKey, answersIndexLetter, isAttribution, isDateHead, isTrumpetSection,
 } from './answers-shelves.js';
 import { ANSWERS_FD_INDEX_ID, answersSiteShelves, answersSiteShelfOf, answersSiteOrder, answersSiteNav } from './answers-site.js';
 
@@ -60,25 +60,30 @@ export function answersLeadSplit(title) {
 
 /* ── Sizes ─────────────────────────────────────────────────────────── */
 
-/** A paragraph that is a dated header: "_7/5/10_ From The Lord…". */
-export function isDateHead(text) {
-  if (typeof text !== 'string' || text.charAt(0) !== '_') return false;
-  const end = text.indexOf('_', 1);
-  if (end < 4 || end > 11) return false;
-  const parts = text.slice(1, end).split('/');
-  const digits = (p) => p.split('').every((ch) => ch >= '0' && ch <= '9');
-  return parts.length === 3 && parts[0].length >= 1 && parts[0].length <= 2 && parts[1].length >= 1 && parts[1].length <= 2
-    && parts[2].length >= 2 && parts[2].length <= 4 && parts.every(digits);
-}
+export { isDateHead };
 
 /** The date a dated header carries ("7/5/10"), or ''. */
 export function dateOfHead(text) {
   return isDateHead(text) ? text.slice(1, text.indexOf('_', 1)) : '';
 }
 
-/** Reading minutes: the sidecar's word count at 200 a minute, never under 1. */
-export function answersMinutes(meta) {
-  return Math.max(1, Math.round(((meta && meta.words) || 0) / 200));
+let _pace = { at: -1e9, wpm: /** @type {number | null} */ (null) };
+/** The reader's measured pace (ReadingStatsStore, the reading chip's), read once a few seconds: a list asks per row. */
+function measuredPace() {
+  const now = Date.now();
+  if (now - _pace.at > 2000) {
+    const S = typeof ReadingStatsStore !== 'undefined' ? /** @type {any} */ (ReadingStatsStore) : null;
+    let wpm = null;
+    try { wpm = S && typeof S.measuredWpm === 'function' ? S.measuredWpm() : null; } catch (_e) { wpm = null; }
+    _pace = { at: now, wpm: wpm > 0 ? wpm : null };
+  }
+  return _pace.wpm;
+}
+
+/** Reading minutes: the sidecar's word count at the reader's measured pace, else 200 a minute; never under 1. */
+export function answersMinutes(meta, wpm) {
+  const pace = wpm || measuredPace() || 200;
+  return Math.max(1, Math.round(((meta && meta.words) || 0) / pace));
 }
 
 /** The kinds of media a topic holds, in the fixed order rows name them. */
@@ -106,11 +111,6 @@ export function answersLetterCount(entry) {
   let n = 0;
   for (const p of (entry && entry.paragraphs) || []) if (isDateHead(p && p.text)) n++;
   return n;
-}
-
-/** A section the site closes every page with, which is not one of its categories. */
-function isTrumpetSection(s) {
-  return String((s && s.title) || '').startsWith('Be a Part of The Trumpet Call');
 }
 
 /** The page's level-1 sections (the False Doctrines index: its categories). */

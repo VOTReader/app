@@ -203,6 +203,22 @@ export function isAttribution(text) {
   return typeof text === 'string' && /^~ \[From /.test(text);
 }
 
+/** A paragraph that is a dated header: "_7/5/10_ From The Lord…" (the one rule; browse, search and Contents read it). */
+export function isDateHead(text) {
+  if (typeof text !== 'string' || text.charAt(0) !== '_') return false;
+  const end = text.indexOf('_', 1);
+  if (end < 4 || end > 11) return false;
+  const parts = text.slice(1, end).split('/');
+  const digits = (p) => p.split('').every((ch) => ch >= '0' && ch <= '9');
+  return parts.length === 3 && parts[0].length >= 1 && parts[0].length <= 2 && parts[1].length >= 1 && parts[1].length <= 2
+    && parts[2].length >= 2 && parts[2].length <= 4 && parts.every(digits);
+}
+
+/** The site's closing "Be a Part of The Trumpet Call" heading: boilerplate, never counted or numbered. */
+export function isTrumpetSection(s) {
+  return String((s && s.title) || '').startsWith('Be a Part of The Trumpet Call');
+}
+
 /**
  * A list label: the site's lead-in dropped so a list reads by subject —
  * "Regarding Pride" → "Pride", "God Speaks About The Sabbath" → "The Sabbath".

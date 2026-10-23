@@ -9610,6 +9610,8 @@
 .ans-row-body{flex:1;min-width:0}
 .ans-row-title{display:block;overflow-wrap:break-word}
 .ans-row-sub{display:block;margin-top:2px}
+/* a row keeps its sub line while the sidecar loads, so the list does not reflow when it lands (idea audit 10-23, s30.1) */
+.ans-row-sub:empty::before{content:"\00a0"}
 .ans-num{flex:0 0 max(40px,1.8em);font-variant-numeric:tabular-nums lining-nums}
 .ans-path{position:relative;margin-top:16px}
 /* r2: .ans-progress is gone (the path card has no bar) */
