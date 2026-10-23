@@ -302,7 +302,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
           <div className="audio-library-section-head">
             <div><span>Pick up again</span><h2 id="audio-library-recent">Recently played</h2><p>{recent.length ? 'Your latest starts, newest first.' : 'Your listening trail will appear here.'}</p></div>
             <div className="audio-library-section-tail">
-              <strong aria-label={recent.length + ' recent recordings'}>{recent.length}</strong>
+              <strong><span aria-hidden="true">{recent.length}</span><span className="sr-only">{recent.length + ' recent recordings'}</span></strong>
               {recent.length ? <button type="button" className="audio-library-clear" onClick={() => clearHistory(library)}>Clear history</button> : null}
               <button
                 type="button"

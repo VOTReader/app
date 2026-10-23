@@ -76,7 +76,7 @@ export function AudioSavedScreen({ onBack, backLabel = 'Listening Library', onOp
         <section className="audio-library-section" aria-labelledby="audio-saved-list">
           <div className="audio-library-section-head">
             <div><span>Keep close</span><h2 id="audio-saved-list">Your shelf</h2><p>{saved.length ? 'Starred recordings, newest first.' : 'Your favorites will wait here.'}</p></div>
-            <strong aria-label={saved.length + ' saved recordings'}>{shown.length}{normalizedQuery && shown.length !== saved.length ? <small> of {saved.length}</small> : null}</strong>
+            <strong><span aria-hidden="true">{shown.length}{normalizedQuery && shown.length !== saved.length ? <small> of {saved.length}</small> : null}</span><span className="sr-only">{saved.length + ' saved recordings'}</span></strong>
           </div>
           {shown.length ? (
             <div className="audio-library-list">{shown.map((track) => <AudioShelfRow key={track.url} track={track} source="saved" onOpenTrack={onOpenTrack} />)}</div>

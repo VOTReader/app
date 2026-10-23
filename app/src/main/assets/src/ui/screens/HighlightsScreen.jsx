@@ -251,10 +251,23 @@ export function HighlightsScreen(props) {
     if (ep && onNavigateToSource) onNavigateToSource(ep, { sourceLetterTitle: 'My Highlights' });
   }
 
+  // s19.5: an empty filtered list names what filtered it and offers the way back.
+  var TYPE_WORDS = { highlight: 'highlights', underline: 'underlines', squiggle: 'squiggles' };
+  function filterWords() {
+    var parts = [];
+    if (colorFilter) parts.push(colorFilter);
+    parts.push(typeFilter !== 'all' ? TYPE_WORDS[typeFilter] || typeFilter : 'marks');
+    var words = parts.join(' ');
+    return query.trim() ? '“' + query.trim() + '” in ' + words : words;
+  }
+  function showAll() { setQuery(''); setTypeFilter('all'); setColorFilter(null); }
+
   function typeChip(val, label) {
     return (
       <button
+        type="button"
         className={'hlx-type-chip' + (typeFilter === val ? ' active' : '')}
+        aria-pressed={typeFilter === val}
         onClick={function() { setTypeFilter(val); }}
       >{label}</button>
     );
@@ -309,7 +322,9 @@ export function HighlightsScreen(props) {
               <div className="hlx-filter-row">
                 <span className="hlx-sort-label">Color</span>
                 <button
+                  type="button"
                   className={'hlx-color-all' + (colorFilter === null ? ' active' : '')}
+                  aria-pressed={colorFilter === null}
                   onClick={function() { setColorFilter(null); }}
                 >All</button>
                 {presentColors.map(function(c) {
@@ -321,6 +336,7 @@ export function HighlightsScreen(props) {
                       style={{ backgroundColor: _hlColorHex(c) }}
                       title={c.charAt(0).toUpperCase() + c.slice(1)}
                       aria-label={'Filter ' + c}
+                      aria-pressed={colorFilter === c}
                       onClick={function() { setColorFilter(colorFilter === c ? null : c); }}
                     />
                   );
@@ -335,7 +351,10 @@ export function HighlightsScreen(props) {
                 <div className="hlx-empty-title">{marks.length === 0 ? 'No Marks Yet' : 'No Matches'}</div>
                 <div className="hlx-empty-hint">{marks.length === 0
                   ? 'Select any passage while reading and tap a color to highlight or underline it. Your marks collect here.'
-                  : 'Try a different search term.'}</div>
+                  : 'Nothing matches ' + filterWords() + '.'}</div>
+                {marks.length > 0 && (
+                  <button type="button" className="notes-index-sort-btn hlx-show-all" onClick={showAll}>Show all</button>
+                )}
               </div>
             )
           : (

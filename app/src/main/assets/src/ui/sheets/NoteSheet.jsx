@@ -75,9 +75,11 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   const freshUnsaved = !!startInEditMode && !note.body;
   const dirty = body.trim() !== (note.body || '').trim();
 
+  // s29.2: saving an edit of a note that already had words goes back to reading it; a new note closes as before.
   const save = () => {
+    const edited = !!(note.body || '').trim();
     NoteStore.update(groupId, { body });
-    onClose();
+    if (edited) setMode('read'); else onClose();
   };
 
   /** @param {'cancel' | 'close'} intent */

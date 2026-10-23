@@ -123,7 +123,8 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                   {noteChip(ch)}
                 </div>
                 {hasBookmark(ch.num) && (
-                  <span className="chapter-card-bookmark" aria-label="Bookmarked" title="Bookmarked">
+                  <span className="chapter-card-bookmark" title="Bookmarked">
+                    <span className="sr-only">Bookmarked</span>
                     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                     </svg>
@@ -131,8 +132,8 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                 )}
                 {minChip(ch)}
                 {markAsReadEnabled && isRead(ch.num) && (
-                  <span className="read-check" aria-label={(readCount && readCount(ch.num) > 1) ? `Read ${readCount(ch.num)} times` : 'Read'}>
-                    {"✓"}
+                  <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.num) > 1) ? `Read ${readCount(ch.num)} times` : 'Read'}</span>
+                    <span aria-hidden="true">{"✓"}</span>
                     {readCount && readCount(ch.num) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.num)}</span>}
                   </span>
                 )}

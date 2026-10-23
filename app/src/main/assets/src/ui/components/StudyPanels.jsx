@@ -52,7 +52,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
               const volLabel = votNoteVolLabel(n);
               const hm = isHiddenManna(n);
               const badge = hm ? (
-                <span className="vot-note-hm" title={"Hidden Manna — The Word of The Lord Spoken to Timothy"}>HM</span>
+                <span className="vot-note-hm" title={"Hidden Manna — The Word of The Lord Spoken to Timothy"}>Hidden Manna</span>
               ) : canTap ? (
                 <span className="vot-note-chevron">{"›"}</span>
               ) : null;

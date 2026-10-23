@@ -73,7 +73,7 @@ describe('AudioVolumesScreen', () => {
     expect(one.textContent).toContain('Recordings available');
     expect(two.textContent).toContain('No recordings yet');
     expect(screen.queryByText('Hidden Manna')).toBeNull();
-    expect(screen.getByLabelText('2 collections').textContent).toBe('2');
+    expect(screen.getByText('2 collections').parentElement.querySelector('[aria-hidden]').textContent).toBe('2');
   });
 
   // Downloads brief section 7 item 16 (RC.3): with no signal it said "Recordings available" over rows that need one.

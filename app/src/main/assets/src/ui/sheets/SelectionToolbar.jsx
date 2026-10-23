@@ -18,6 +18,10 @@ import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TI
 import { startSelectionDrag, selectionDragging, dockTop } from './selection-drag.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
+import { snapshotGroups, offerUndoRemoved, offerUndoAdded } from '../../utils/annotation-undo.js';
+
+/** The Undo toast's word for a new mark (U06.2). @param {string} kind */
+const markedLabel = (kind) => (kind === 'underline' ? 'Underlined' : kind === 'squiggle' ? 'Squiggled' : 'Highlighted');
 
 /** True when `n`'s nearest ancestor inside `container` is footnote/note/link/
     bookmark decoration chrome (marker digit or icon glyph), not reading text.
@@ -980,6 +984,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             created: Date.now()
           });
         });
+        if (planned.length) offerUndoAdded(groupId, markedLabel(kind));   // U06.2
       }
     } else {
       // Single container — only remove EXACT-RANGE matches (recolor flow).
@@ -1013,6 +1018,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           color: color, text: hlDisplayText(container, containerText, snap.start, snap.end),
           created: Date.now()
         });
+        offerUndoAdded(id, markedLabel(kind));   // U06.2: a near miss on the wrong colour comes off in one tap
       }
     }
     window.getSelection().removeAllRanges();
@@ -1046,10 +1052,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const removeHighlight = React.useCallback(() => {
     if (!selInfo) return;
     suppressRef.current = true;
-    selectionGroups().forEach(function(gid) {
-      AnnotationStore.removeGroup(gid);
-      NoteStore.remove(gid);   // ANN2: the confirm now discloses this note deletion
+    const gone = snapshotGroups(selectionGroups());   // A06.6: a 5 s Undo puts it back, note and all
+    gone.forEach(function(s) {
+      AnnotationStore.removeGroup(s.gid);
+      NoteStore.remove(s.gid);   // ANN2: the confirm now discloses this note deletion
     });
+    offerUndoRemoved(gone, gone.some((s) => s.note) ? 'Highlight and note removed' : 'Highlight removed');
     window.getSelection().removeAllRanges();
     setVisible(false);
     setTimeout(() => { suppressRef.current = false; }, 300);
@@ -1502,9 +1510,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             title="Highlight"
             aria-label="Highlight"
             aria-pressed={activeStyle === 'highlight'}
-          >
-            A
-          </button>
+          ><span className="sel-style-glyph">A</span><span className="sel-style-name">Highlight</span></button>
           <button
             type="button"
             className={"sel-style-btn sel-style-btn-underline" + (activeStyle === 'underline' ? ' active' : '')}
@@ -1512,9 +1518,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             title="Underline"
             aria-label="Underline"
             aria-pressed={activeStyle === 'underline'}
-          >
-            A
-          </button>
+          ><span className="sel-style-glyph">A</span><span className="sel-style-name">Underline</span></button>
           <button
             type="button"
             className={"sel-style-btn sel-style-btn-squiggle" + (activeStyle === 'squiggle' ? ' active' : '')}
@@ -1522,9 +1526,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             title="Squiggle underline"
             aria-label="Squiggle underline"
             aria-pressed={activeStyle === 'squiggle'}
-          >
-            A
-          </button>
+          ><span className="sel-style-glyph">A</span><span className="sel-style-name">Squiggle</span></button>
           <div className="sel-toolbar-divider" />
           <div className="sel-toolbar-colors">
             {HL_COLORS.map(c => {

@@ -112,6 +112,23 @@ describe('HighlightsScreen — the migrated stylesheet [C9]', () => {
   });
 });
 
+// s19.5 + s19.1 (n91, n188): the filters announce their state; an empty filtered list names the filter and offers Show all.
+describe('HighlightsScreen — filters', () => {
+  it('chips carry aria-pressed, and an empty result names the filter with Show all', () => {
+    show();
+    const chip = (name) => [...document.querySelectorAll('.hlx-type-chip')].find((b) => b.textContent === name);
+    expect(chip('All').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(chip('Squiggles'));
+    expect(chip('Squiggles').getAttribute('aria-pressed')).toBe('true');
+    expect(chip('All').getAttribute('aria-pressed')).toBe('false');
+    expect(document.querySelector('.hlx-empty-hint').textContent).toBe('Nothing matches squiggles.');
+    fireEvent.click(document.querySelector('.hlx-show-all'));
+    expect(rows().length).toBe(2);
+    fireEvent.change(box(), { target: { value: 'zzz' } });
+    expect(document.querySelector('.hlx-empty-hint').textContent).toBe('Nothing matches “zzz” in marks.');
+  });
+});
+
 /* Sweep W69: _collectMarks() walked, grouped and sorted the whole AnnotationStore into a fresh
    array per render, so both memos keyed on it missed, and the search and every row resolved each
    source label again. Now one walk and one label per mark per store version. */

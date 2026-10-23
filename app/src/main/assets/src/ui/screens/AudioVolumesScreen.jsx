@@ -95,7 +95,7 @@ export function AudioVolumesScreen({ onBack, backLabel = 'Listening Library', on
         <section className="audio-library-section" aria-labelledby="audio-volumes-list">
           <div className="audio-library-section-head">
             <div><span>Collection by collection</span><h2 id="audio-volumes-list">Collections</h2></div>
-            <strong aria-label={collections.length + ' collections'}>{collections.length}</strong>
+            <strong><span aria-hidden="true">{collections.length}</span><span className="sr-only">{collections.length + ' collections'}</span></strong>
           </div>
           <div className="audio-library-shelf">
             {collections.map((collection) => {

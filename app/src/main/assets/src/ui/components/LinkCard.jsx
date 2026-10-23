@@ -4,6 +4,7 @@
 
 import { relativeDate } from '../../utils/dates.js';
 import { keyTouchesVerse } from '../../utils/hl-keys.js';
+import { offerUndoLinkRemoved } from '../../utils/annotation-undo.js';
 
 export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const [expanded, setExpanded] = React.useState(false);
@@ -33,7 +34,7 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   );
-  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); };
+  const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); offerUndoLinkRemoved(lnk); };   // A06.6
   return (
     <div className="link-card">
       <div

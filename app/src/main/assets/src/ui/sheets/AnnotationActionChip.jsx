@@ -4,6 +4,7 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
+import { snapshotGroups, offerUndoRemoved } from '../../utils/annotation-undo.js';
 
 /**
  * Where the chip's top edge goes (cz2, 2026-10-05). It opens 10 px under the tap; when that would cross the bottom
@@ -41,7 +42,10 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
     const insetBottom = parseFloat(cs.getPropertyValue('--inset-bottom')) || 0;
     const nav = document.querySelector('.top-nav');
     const navBottom = nav ? nav.getBoundingClientRect().bottom : (parseFloat(cs.getPropertyValue('--inset-top')) || 0);
-    el.style.top = chipTop(chip.y, el.getBoundingClientRect().height, window.innerHeight, insetBottom, navBottom) + 'px';
+    const box = el.getBoundingClientRect();
+    el.style.top = chipTop(chip.y, box.height, window.innerHeight, insetBottom, navBottom) + 'px';
+    // s28.7: the left edge clamps on the chip's real width (the per-mode estimate let a wide chip run off the right).
+    if (box.width > 0) el.style.left = Math.max(8, Math.min(chip.x - box.width / 2, window.innerWidth - box.width - 8)) + 'px';
   });
   if (!chip) return null;
   const { x, y, hlKey, groupId } = chip;
@@ -59,9 +63,11 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   const cy = Math.max(8, y + 10);
 
   const remove = () => {
+    const gone = snapshotGroups([groupId]);   // A06.6
     AnnotationStore.removeGroup(groupId);
     NoteStore.remove(groupId);
     onClose();
+    offerUndoRemoved(gone, isNote ? 'Note removed' : kindLabel.charAt(0).toUpperCase() + kindLabel.slice(1) + ' removed');
   };
 
   const recolor = (color) => {
@@ -212,7 +218,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
               title="Highlight"
               aria-label="Highlight"
               aria-pressed={kind !== 'underline' && kind !== 'squiggle'}
-            >A</button>
+            ><span className="sel-style-glyph">A</span><span className="sel-style-name">Highlight</span></button>
             <button
               type="button"
               className={'sel-style-btn sel-style-btn-underline' + (kind === 'underline' ? ' active' : '')}
@@ -220,7 +226,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
               title="Underline"
               aria-label="Underline"
               aria-pressed={kind === 'underline'}
-            >A</button>
+            ><span className="sel-style-glyph">A</span><span className="sel-style-name">Underline</span></button>
             <button
               type="button"
               className={'sel-style-btn sel-style-btn-squiggle' + (kind === 'squiggle' ? ' active' : '')}
@@ -228,7 +234,7 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
               title="Squiggle underline"
               aria-label="Squiggle underline"
               aria-pressed={kind === 'squiggle'}
-            >A</button>
+            ><span className="sel-style-glyph">A</span><span className="sel-style-name">Squiggle</span></button>
           </div>
         )}
       </div>

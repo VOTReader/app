@@ -13,6 +13,7 @@
    W69). Built on first use, so a page that never shows an old date never pays for it. */
 /** @type {Intl.DateTimeFormat | null} */
 let _monthDay = null;
+let _monthDayYear = null;
 
 /**
  * Format a past timestamp as a sentence-cased relative string ("Just now",
@@ -35,6 +36,11 @@ export function relativeDate(ts) {
   if (d < 7) return d + (d === 1 ? ' day ago' : ' days ago');
   const w = Math.floor(d / 7);
   if (d < 30) return w + (w === 1 ? ' week ago' : ' weeks ago');
+  // s34.4: a date from an earlier calendar year names the year ("Mar 3, 2025"), or it reads as this spring.
+  if (new Date(ts).getFullYear() < new Date().getFullYear()) {
+    if (!_monthDayYear) _monthDayYear = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return _monthDayYear.format(ts);
+  }
   if (!_monthDay) _monthDay = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
   return _monthDay.format(ts);
 }

@@ -122,7 +122,7 @@ export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', on
         <section className="audio-library-section" aria-labelledby="audio-studies-list">
           <div className="audio-library-section-head">
             <div><span>Study by study</span><h2 id="audio-studies-list">Studies</h2></div>
-            <strong aria-label={studies.length + ' studies'}>{studies.length}</strong>
+            <strong><span aria-hidden="true">{studies.length}</span><span className="sr-only">{studies.length + ' studies'}</span></strong>
           </div>
           {studies.length ? (
             <p className="audio-studies-split">{withAudio + ' with audio · ' + (studies.length - withAudio) + ' to read'}</p>

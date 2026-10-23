@@ -75,6 +75,14 @@ describe('relativeDate', () => {
   });
 });
 
+// s34.4 (n93): a date from an earlier calendar year carries its year; this year's stay Month-Day.
+describe('relativeDate across a year', () => {
+  it('names the year for an earlier year, not for this one', () => {
+    expect(relativeDate(NOW - 400 * DAY)).toMatch(/2022/);
+    expect(relativeDate(NOW - 40 * DAY)).not.toMatch(/2023/);
+  });
+});
+
 describe('timeAgo', () => {
   it('"just now" under a minute', () => {
     expect(timeAgo(NOW - 30_000)).toBe('just now');

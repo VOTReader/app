@@ -81,7 +81,7 @@
       /* n4-06: hideToast only drops .show, so a faded Undo stayed tappable; a late tap
          restored a block whose marks were already gone. */
       .vot-toast-undo:not(.show) { pointer-events:none; }
-      .vot-toast-undo .vot-undo-btn { margin-left:0.7em; background:none; border:none; padding:0; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+      .vot-toast-undo .vot-undo-btn { margin-left:0.4em; background:none; border:none; padding:0 0.3em; min-height:44px; display:inline-flex; align-items:center; vertical-align:middle; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
       body.light .vot-toast-undo .vot-undo-btn { color:var(--gold-strong,#9a7b2e); }
 
       /* export-escape — the "Save the usual way" offer shown when the save
@@ -5278,7 +5278,7 @@
       stroke: var(--gold); fill: none;
       stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round;
     }
-    .hl-note-icon:hover { opacity: 1; transform: scale(1.12); }
+    @media (hover: hover) { .hl-note-icon:hover { opacity: 1; transform: scale(1.12); } }   /* s00.4: a tap on Android left it scaled */
     body.light .hl-note-icon svg { stroke: #8a6914; }
     /* Per-color icon stroke. Yellow notes keep the default gold (var(--gold))
        since gold reads as "yellow" in this app's palette. Picking any other
@@ -5359,7 +5359,7 @@
     .ann-chip-confirm-yes:active { background: rgba(244,143,177,0.18); color: var(--accent-pink); }
     /* Color row inside the chip (replaces buttons when 🎨 is tapped). */
     .ann-chip-colors {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 8px;
       padding: 9px 11px;
       max-width: min(360px, calc(100vw - 16px));
       overflow-x: auto;
@@ -5367,7 +5367,7 @@
     }
     .ann-chip-colors::-webkit-scrollbar { display: none; }
     .ann-chip-color-btn {
-      width: 22px; height: 22px; border-radius: 50%;
+      width: 34px; height: 34px; border-radius: 50%;   /* U06.2 / RC.10: the toolbar's size, a thumb's target */
       border: 1.5px solid transparent;
       cursor: pointer; flex-shrink: 0;
       -webkit-tap-highlight-color: transparent;
@@ -5442,8 +5442,11 @@
       transition: border-color 0.12s, background 0.12s, color 0.12s;
       flex-shrink: 0;
     }
-    .sel-style-btn-underline { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
-    .sel-style-btn-squiggle { text-decoration: underline; text-decoration-style: wavy; text-decoration-thickness: 1.6px; text-underline-offset: 2px; }
+    .sel-style-btn-underline .sel-style-glyph { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
+    .sel-style-btn-squiggle .sel-style-glyph { text-decoration: underline; text-decoration-style: wavy; text-decoration-thickness: 1.6px; text-underline-offset: 2px; }
+    /* A06.5: each glyph says what it is under it. */
+    .sel-style-btn:has(.sel-style-name) { width: auto; min-width: 44px; height: auto; min-height: 44px; padding: 2px 6px; flex-direction: column; gap: 1px; }
+    .sel-style-name { font-family: var(--font-ui, system-ui, sans-serif); font-size: var(--fsc-10, 10px); font-weight: 500; letter-spacing: 0; line-height: 1.1; }
     .sel-style-btn.active {
       border-color: var(--gold); background: var(--gold-faint);
       color: var(--gold);
@@ -5452,12 +5455,12 @@
        360 or 412 px phone purple, teal, brown and gray sat out of sight past the bar's edge with nothing to
        say they were there (tools/e2e-phone-fit.mjs W1). Same colours, same size. */
     .sel-toolbar-colors {
-      display: flex; align-items: center; flex-wrap: wrap; gap: 6px;
+      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
       flex-grow: 1; min-width: 0;
       padding: 2px 0;
     }
     .sel-color-btn {
-      width: 26px; height: 26px; border-radius: 50%;
+      width: 34px; height: 34px; border-radius: 50%;   /* U06.2: 26 px dots at a 32 px pitch took near misses */
       border: 2px solid transparent; cursor: pointer;
       transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
       -webkit-tap-highlight-color: transparent;
@@ -5649,7 +5652,8 @@
       touch-action: manipulation;
       background: transparent !important;
     }
-    .inline-link-icon:active, .inline-link-icon:hover { opacity: 1; transform: scale(1.12); }
+    .inline-link-icon:active { opacity: 1; transform: scale(1.12); }
+    @media (hover: hover) { .inline-link-icon:hover { opacity: 1; transform: scale(1.12); } }
     .inline-link-icon svg {
       width: 100%; height: 100%;
       stroke: var(--gold-dim); fill: none;
@@ -6338,7 +6342,7 @@
       cursor: pointer; -webkit-tap-highlight-color: transparent;
       transition: transform 0.12s, box-shadow 0.12s;
     }
-    .note-sheet-color-dot:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(214,179,95,0.25); }
+    @media (hover: hover) { .note-sheet-color-dot:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(214,179,95,0.25); } }
     .note-sheet-color-dot:active { transform: scale(0.92); }
     .note-sheet-title {
       flex: 1;
@@ -7553,7 +7557,8 @@
       -webkit-tap-highlight-color: transparent;
       transition: color 0.15s, transform 0.15s;
     }
-    .inline-bookmark-icon:hover, .inline-bookmark-icon:active { color: var(--gold); transform: scale(1.12); }
+    .inline-bookmark-icon:active { color: var(--gold); transform: scale(1.12); }
+    @media (hover: hover) { .inline-bookmark-icon:hover { color: var(--gold); transform: scale(1.12); } }
     .inline-bookmark-icon svg {
       width: 100%; height: 100%;
       stroke: currentColor; fill: currentColor;
@@ -7656,7 +7661,8 @@
     }
     /* The box itself is the target now, so no halo paints over a neighbour; tools/e2e-phone-fit.mjs (W2)
        checks the reading top bar still fits 360 px with every top-bar button on. */
-    .nav-bookmark-btn:hover, .nav-bookmark-btn:active { color: var(--gold); transform: scale(1.08); }
+    .nav-bookmark-btn:active { color: var(--gold); transform: scale(1.08); }
+    @media (hover: hover) { .nav-bookmark-btn:hover { color: var(--gold); transform: scale(1.08); } }
     .nav-bookmark-btn-active { color: var(--gold); }
     .nav-bookmark-btn svg { width: 18px; height: 18px; display: block; }
     /* Creation-pulse: when a bookmark was just added (within ~3s), the

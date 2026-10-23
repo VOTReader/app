@@ -10,8 +10,8 @@ import { readingChipWpm, readingMinChip } from './ReadingMinChip.jsx';
 function ReadCheck({ count }) {
   if (!count) return null;
   return (
-    <span className="read-check" aria-label={count > 1 ? `Read ${count} times` : 'Read'}>
-      {"✓"}
+    <span className="read-check"><span className="sr-only">{count > 1 ? `Read ${count} times` : 'Read'}</span>
+      <span aria-hidden="true">{"✓"}</span>
       {count > 1 && <span className="read-check-count" aria-hidden="true">{"×" + count}</span>}
     </span>
   );

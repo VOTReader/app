@@ -92,7 +92,7 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
   it('a re-read letter renders ✓ ×N with an AT label', () => {
     const { container } = renderIndex({ markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
     const mark = container.querySelector('.read-check');
-    expect(mark.getAttribute('aria-label')).toBe('Read 3 times');
+    expect(mark.querySelector('.sr-only').textContent).toBe('Read 3 times');   // s16.4: sr-only text, not aria-label on a span
     expect(container.querySelector('.read-check-count').textContent).toBe('×3');
   });
 
@@ -104,7 +104,7 @@ describe('VolumeLetterIndex — count-aware read marks (re-read UX)', () => {
 
   it('keeps the re-read count in the two-col compact cards', () => {
     const { container } = renderIndex({ columns: 2, markAsReadEnabled: true, isRead: () => true, readCount: () => 3 });
-    expect(container.querySelector('.two-col-meta .read-check').getAttribute('aria-label')).toBe('Read 3 times');
+    expect(container.querySelector('.two-col-meta .read-check .sr-only').textContent).toBe('Read 3 times');
   });
 });
 

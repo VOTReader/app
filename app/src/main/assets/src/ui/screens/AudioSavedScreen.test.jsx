@@ -103,7 +103,7 @@ describe('AudioSavedScreen', () => {
     fireEvent.change(screen.getByRole('textbox', { name: 'Search saved recordings' }), { target: { value: 'narrow' } });
     expect(screen.queryByText('The Wide Path')).toBeNull();
     expect(screen.getByText('The Narrow Path')).toBeTruthy();
-    expect(screen.getByLabelText('2 saved recordings').textContent).toBe('1 of 2');
+    expect(screen.getByText('2 saved recordings').parentElement.querySelector('[aria-hidden]').textContent).toBe('1 of 2');
 
     fireEvent.change(screen.getByRole('textbox', { name: 'Search saved recordings' }), { target: { value: 'zzz' } });
     expect(screen.getByText(/No saved recordings match/)).toBeTruthy();

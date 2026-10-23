@@ -310,7 +310,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
         <section className="audio-library-section" aria-labelledby="audio-collection-list">
           <div className="audio-library-section-head">
             <div><span>{bible ? 'Book by book' : 'In order'}</span><h2 id="audio-collection-list">Recordings</h2></div>
-            <strong aria-label={playable.length + ' recordings'}>{playable.length}</strong>
+            <strong><span aria-hidden="true">{playable.length}</span><span className="sr-only">{playable.length + ' recordings'}</span></strong>
           </div>
           {playable.length ? (
             <div className="audio-library-list">

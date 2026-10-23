@@ -46,7 +46,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
             : <div className="chapter-card-title untitled">Part {ch.num}</div>
           }
         </div>
-        {markAsReadEnabled && isRead(ch.id) && <span className="read-check" aria-label={(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}>{"✓"}{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>}
+        {markAsReadEnabled && isRead(ch.id) && <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}</span><span aria-hidden="true">{"✓"}</span>{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>}
       </button>
     );
   };
@@ -106,7 +106,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
                         <div className="part-group-title">{part.title}</div>
                         {part.subtitle && <div className="part-group-subtitle">{part.subtitle}</div>}
                       </div>
-                      {markAsReadEnabled && ch && isRead(ch.id) && <span className="read-check" aria-label={(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}>{"✓"}{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>}
+                      {markAsReadEnabled && ch && isRead(ch.id) && <span className="read-check"><span className="sr-only">{(readCount && readCount(ch.id) > 1) ? `Read ${readCount(ch.id)} times` : 'Read'}</span><span aria-hidden="true">{"✓"}</span>{readCount && readCount(ch.id) > 1 && <span className="read-check-count" aria-hidden="true">{"×" + readCount(ch.id)}</span>}</span>}
                     </button>
                   );
                 }

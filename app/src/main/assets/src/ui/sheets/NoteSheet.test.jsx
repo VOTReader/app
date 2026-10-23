@@ -187,6 +187,20 @@ describe('NoteSheet honest-Save close semantics (2026-07-12)', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
+  // s29.2 (n90): saving an edit of an existing note goes back to reading it, not out of the sheet.
+  it('Save on an EXISTING note returns to read mode instead of closing', () => {
+    setupStores({ body: 'original words' });
+    const onClose = vi.fn();
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={onClose} />);
+    fireEvent.click(container.querySelector('.note-sheet-menu-btn'));
+    fireEvent.click(screen.getByText('Edit note'));
+    fireEvent.change(container.querySelector('.note-sheet-textarea'), { target: { value: 'changed words' } });
+    fireEvent.click(screen.getByText('Save'));
+    expect(window.NoteStore.update).toHaveBeenCalledWith('g1', { body: 'changed words' });
+    expect(onClose).not.toHaveBeenCalled();
+    expect(container.querySelector('.note-sheet-textarea')).toBeNull();
+  });
+
   it('Cancel on an EXISTING note with edits gates, then reverts to read mode without writing', () => {
     setupStores({ body: 'original words' });
     const onClose = vi.fn();
