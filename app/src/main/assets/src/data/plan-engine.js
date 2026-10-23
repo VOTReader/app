@@ -34,7 +34,8 @@ export const WORDS_PER_MIN = 200;
  * @typedef {{ id: string, plan: string, name?: string, created?: number, updated?: number, start: string,
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
- *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string }} PlanRun
+ *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
+ *   known?: string }} PlanRun
  */
 
 // ── dates ────────────────────────────────────────────────────────────────
@@ -281,6 +282,7 @@ export function monthCells(run, year, month, now) {
   const today = /** @type {number} */ (dayNum(todayKey(now)));
   const start = dayNum(run.start);
   const end = dayNum(st.projected);
+  const known = run.known ? dayNum(run.known) : null;   // a moved rp1 plan: no dates before this
   const readOn = new Set(Object.values(run.ticks || {}).filter(Boolean));
   const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
   const out = [];
@@ -295,7 +297,7 @@ export function monthCells(run, year, month, now) {
     /** @type {number | null} */ let day = null;
     if (start == null || n < start) state = 'none';
     else if (n === today) state = 'today';
-    else if (n < today) state = readOn.has(key) ? 'read' : (isReadingDay(run, n) && !st.finished ? 'missed' : 'none');
+    else if (n < today) state = readOn.has(key) ? 'read' : (isReadingDay(run, n) && !st.finished && !(known != null && n < known) ? 'missed' : 'none');
     else if (!st.finished && end != null && n <= end && isReadingDay({ ...run, paused: undefined }, n)) {
       state = 'ahead';
       day = planned++;

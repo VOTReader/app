@@ -18,7 +18,7 @@
 
 import { BIBLE_BOOKS } from './reading-plans.js';
 import { BIBLE_CHAPTER_WORDS } from './plan-bible-words.js';
-import { newRun, runStatus } from './plan-engine.js';
+import { newRun, runStatus, todayKey } from './plan-engine.js';
 
 /** @typedef {import('./plan-engine.js').PlanItem} PlanItem */
 /** @typedef {import('./plan-engine.js').PlanTrack} PlanTrack */
@@ -171,10 +171,13 @@ export function migrateRp1(old, isRead, src, existing, now) {
     const [y, m, d] = p.start.split('-').map(Number);
     const startDate = new Date(y, m - 1, d, 12);
     const pace = p.id === 'bible-year' ? { mode: 'days', n: 365 } : { mode: 'items', n: Math.max(1, Math.floor(Number(p.pace) || 1)) };
-    const run = newRun({ plan: p.id, tracks, pace: /** @type {PlanPace} */ (pace) }, startDate);
+    // A fixed id: two tabs moving the same plan make the same run, which the cross-tab merge keeps once.
+    const run = newRun({ id: 'rp1_' + p.id + '_' + p.start, plan: p.id, tracks, pace: /** @type {PlanPace} */ (pace) }, startDate);
     run.created = now.getTime();
     run.updated = now.getTime();
     run.from = 'rp1';
+    // rp1 kept no dates for what was read, so the days before the move are unknown, never "missed".
+    run.known = todayKey(now);
     for (const it of tracks[0].items) {
       const i = it.k.lastIndexOf(':');
       if (isRead(it.k.slice(0, i), it.k.slice(i + 1))) run.ticks[it.k] = '';

@@ -1,8 +1,9 @@
 // @ts-nocheck - ScreenLayout / LibraryNav are free globals, as the other personal-study screens
 /* ReadingPlansScreen: start, follow and stop a plan. rp1's look (lanes/myweb/out/mockups/rp1/r2-plans.png);
    since mw18 the plans are runs in ReadingPlanStore with the flexible engine. */
+import 'fake-indexeddb/auto';   // the runs are really saved: the rp1 move waits for that save
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, fireEvent, screen, within, act } from '@testing-library/react';
+import { render, cleanup, fireEvent, screen, within, act, waitFor } from '@testing-library/react';
 import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
@@ -62,12 +63,24 @@ describe('ReadingPlansScreen', () => {
     expect(ReadingPlanStore.all()[0].status).toBe('stopped');
   });
 
-  it('moves rp1\'s settings plan into a run and clears it from settings', () => {
+  it('moves rp1\'s settings plan into a run and clears it from settings once the run is saved', async () => {
     const p = base({ readingPlans: [{ id: 'bible-year', start: todayKey(daysAgo(1)) }], isRead: (b, c) => b === 'genesis' && c <= 3 });
     render(<ReadingPlansScreen {...p} />);
     expect(runs().map((r) => r.plan)).toEqual(['bible-year']);
-    expect(p.onPlansMoved).toHaveBeenCalledWith([]);
+    await waitFor(() => expect(p.onPlansMoved).toHaveBeenCalledWith([]));
     expect(within(screen.getByRole('region', { name: 'Bible in a Year' })).getByText(/^Day 2 of 365/)).toBeTruthy();
+  });
+
+  it('keeps rp1\'s settings plan when the run could not be saved', async () => {
+    const whenSaved = ReadingPlanStore.whenSaved;
+    ReadingPlanStore.whenSaved = () => Promise.resolve(false);
+    try {
+      const p = base({ readingPlans: [{ id: 'bible-year', start: todayKey(daysAgo(1)) }] });
+      render(<ReadingPlansScreen {...p} />);
+      await act(async () => { await Promise.resolve(); });
+      expect(runs().length).toBe(1);
+      expect(p.onPlansMoved).not.toHaveBeenCalled();
+    } finally { ReadingPlanStore.whenSaved = whenSaved; }
   });
 
   it('never scores the reader', () => {

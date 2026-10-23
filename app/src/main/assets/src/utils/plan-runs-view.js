@@ -93,7 +93,10 @@ export function usePlanRuns(opt = {}) {
     for (const r of moved) store.put(r);
     const has = (/** @type {any} */ p) => store.all().some((r) => r.plan === p.id && r.start === p.start);
     const left = legacyList.filter((p) => p && (p.id === 'bible-year' || p.id === 'volumes') && !has(p));
-    if (left.length !== legacyList.length && typeof onLegacyMoved === 'function') onLegacyMoved(left);
+    if (left.length === legacyList.length || typeof onLegacyMoved !== 'function') return;
+    // Settings let go of the old plans only once the runs are on disk: a failed save keeps them to move next time.
+    const saved = typeof store.whenSaved === 'function' ? store.whenSaved() : Promise.resolve(true);
+    void saved.then((ok) => { if (ok) onLegacyMoved(left); }, () => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps -- version / corpusVersion are the triggers: a store load or the Volumes landing lets the move run
   }, [store, version, corpusVersion, legacyList.length]);
   // eslint-disable-next-line react-hooks/exhaustive-deps -- version is the trigger: the store's array is read at call time

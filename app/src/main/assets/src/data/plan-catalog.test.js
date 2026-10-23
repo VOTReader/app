@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { PLAN_CATALOG, bibleItems, collectionItems, startCatalogPlan, migrateRp1, bookTitle, runName } from './plan-catalog.js';
-import { runStatus, dayItems, itemsLabel, totalDays } from './plan-engine.js';
+import { runStatus, dayItems, itemsLabel, totalDays, monthCells } from './plan-engine.js';
 import { biblePortion, BIBLE_CHAPTER_COUNT } from './reading-plans.js';
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
@@ -84,6 +84,16 @@ describe('moving rp1 plans into runs', () => {
     const st = runStatus(r, at('2026-10-22'));
     expect(st.day).toBe(1);
     expect(st.todayTicked).toBe(1);
+  });
+  it('a moved plan has a fixed id (two tabs moving it make one run) and never calls the days before the move missed', () => {
+    const r = migrateRp1([{ id: 'bible-year', start: '2026-10-01' }], (b, c) => b === 'genesis' && Number(c) <= 3, src, [], at('2026-10-22'))[0];
+    expect(r.id).toBe('rp1_bible-year_2026-10-01');
+    const oct = monthCells(r, 2026, 9, at('2026-10-22'));
+    expect(oct.filter((c) => c.date < 22).map((c) => c.state)).not.toContain('missed');
+    // from the move on, a day with nothing read is missed again
+    const later = monthCells(r, 2026, 9, at('2026-10-25'));
+    expect(later.find((c) => c.date === 23).state).toBe('missed');
+    expect(later.find((c) => c.date === 21).state).not.toBe('missed');
   });
   it('the Volumes plan keeps its letters a day; it waits (no run) until the Volumes load; it never runs twice', () => {
     const old = [{ id: 'volumes', start: '2026-10-01', pace: 2 }];

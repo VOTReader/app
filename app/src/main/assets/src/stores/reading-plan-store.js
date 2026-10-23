@@ -27,10 +27,11 @@ import { tickItem, todayKey } from '../data/plan-engine.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun} PlanRun */
 
-/** A record worth keeping: an id, a plan, a start, and tracks. @param {any} r */
+/** A record worth keeping: an id, a plan, a start, and tracks of items (a broken import never reaches the engine). @param {any} r */
 function _valid(r) {
   return !!(r && typeof r === 'object' && typeof r.id === 'string' && r.id && typeof r.plan === 'string'
-    && typeof r.start === 'string' && Array.isArray(r.tracks) && Array.isArray(r.segs));
+    && typeof r.start === 'string' && Array.isArray(r.segs) && Array.isArray(r.tracks)
+    && r.tracks.every((/** @type {any} */ t) => t && Array.isArray(t.items)));
 }
 
 /** The read keys a read of (bid, cid) ticks: 'matthew' reads count for 'matthew-plain' too. */
