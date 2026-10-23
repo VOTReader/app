@@ -39,6 +39,10 @@
      isAnyOpen()                — boolean. O(1) (Map.size).
      openIds()                  — string[] in insertion order. For debug.
      peek()                     — { id, dismiss } | null. Last registered.
+     subscribe(cb)              — cb() after each register, and each
+                                  unregister that removed one; returns the
+                                  unsubscribe.
+                                  (The audio page-follow waits on it: s02.2.)
      _reset()                   — TEST-ONLY. Clears registry between runs.
 
    API — REACT HOOK (named export `useModalRegistry`):
@@ -67,6 +71,13 @@ import { useRefMirror } from './use-ref-mirror.js';
 
 /** @type {Map<string, () => void>} */
 const _registry = new Map();
+/** @type {Set<() => void>} */
+const _watchers = new Set();
+function _changed() {
+  for (const cb of Array.from(_watchers)) {
+    try { cb(); } catch (e) { console.warn('[modal-registry] watcher threw', e); }
+  }
+}
 
 /**
  * Imperative modal-registry API. Used by the app-level Escape dispatcher
@@ -92,6 +103,7 @@ export const modalRegistry = {
     // Map's insertion order — peek() = topmost-by-most-recently-registered.
     _registry.delete(entry.id);
     _registry.set(entry.id, entry.dismiss);
+    _changed();
   },
 
   /**
@@ -103,7 +115,7 @@ export const modalRegistry = {
    */
   unregister(id) {
     if (!id) return;
-    _registry.delete(id);
+    if (_registry.delete(id)) _changed();
   },
 
   /**
@@ -138,6 +150,18 @@ export const modalRegistry = {
     }
     if (!lastDismiss) return null;
     return { id: lastId, dismiss: lastDismiss };
+  },
+
+  /**
+   * Hear every change to the set of open modals.
+   *
+   * @param {() => void} cb
+   * @returns {() => void} unsubscribe
+   */
+  subscribe(cb) {
+    if (typeof cb !== 'function') return () => {};
+    _watchers.add(cb);
+    return () => { _watchers.delete(cb); };
   },
 
   /**

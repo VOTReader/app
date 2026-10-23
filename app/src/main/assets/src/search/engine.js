@@ -2460,8 +2460,8 @@ async function search(query, options) {
 
      The card is untouched — SearchScreen already renders direct entries ABOVE the
      results list — so the reader who wanted the book loses nothing and the reader
-     who wanted the word stops being told there is nothing. Owner's decision
-     (2026-09-06): card first, text below, capped.
+     who wanted the word stops being told there is nothing. Agent design
+     (2026-09-06): card first, text below, capped; the full results stay reachable.
 
      `parsed` stays the NAV kind, because that is what builds the card; the text
      pipeline needs the same query parsed as TEXT, which is what `p` is. Two

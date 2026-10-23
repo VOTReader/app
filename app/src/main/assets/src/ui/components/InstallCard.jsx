@@ -2,16 +2,19 @@
    InstallCard — "Keep VOTReader on your home screen" (ip1, 2026-09-25)
    ═══════════════════════════════════════════════════════════════════════
    Built to lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png (two ChatGPT
-   image rounds). A card at the END of a chapter or letter, above the
-   prev/next cards: part of the page, never a popup over the reading.
+   image rounds), then (UX wave 3, U01.3/U06.5) folded to one line UNDER the
+   prev/next cards: "Keep VOTReader on your home screen · Install · Not now".
+   The card sat between the text and Next letter, about 2,700 px tall at
+   300%, so reaching the next letter meant scrolling past it. Part of the
+   page, never a popup over the reading.
    utils/install-offer.js decides (installFlow, shouldOffer, dismiss):
      - browser only: never in the APK, an installed app, Firefox desktop or
        an in-app browser;
      - after a finished chapter (a read item, or the reader scrolled to
        this chapter's end with mark-as-read off: their own scroll, not a
        search jump that lands there, search200 UX B1);
-     - one place a session; Maybe later (or the X) snoozes it 21 days,
-       Don't ask again or three dismissals end it; an install ends it.
+     - one place a session; Not now snoozes it 21 days, three of them end
+       it; an install ends it.
    Chromium that handed over beforeinstallprompt gets a real INSTALL
    VOTREADER button (the browser's own dialog). Everyone else gets SHOW ME
    HOW: numbered steps, each with a picture (install/*.jpg, cropped from
@@ -221,23 +224,16 @@ export function InstallCard({ unitKey, inert = false }) {
       <div ref={sentinel} className="install-card-sentinel" aria-hidden="true" />
       {show && (
         <section ref={cardRef} className="install-card" aria-labelledby={'install-card-title-' + unitKey}>
-          <button type="button" className="install-card-close" onClick={() => end('later')} aria-label="Not now">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
-          <img className="install-card-icon" src="icons/icon-192.png" alt="" width="64" height="64" />
-          <h2 className="install-card-title" id={'install-card-title-' + unitKey}>
+          <img className="install-card-icon" src="icons/icon-192.png" alt="" width="28" height="28" />
+          <span className="install-card-title" id={'install-card-title-' + unitKey}>
             {desktop ? 'Keep VOTReader on this computer' : 'Keep VOTReader on your home screen'}
-          </h2>
-          <p className="install-card-body">
-            {desktop
-              ? 'Open it like an app, in its own window. Your reading and notes stay on this computer.'
-              : 'Open it like an app, with one tap. Your reading and notes stay on this phone. It only takes a few taps.'}
-          </p>
-          <button type="button" className="install-card-primary" onClick={onPrimary}>
-            {flow === 'prompt' ? 'Install VOTReader' : 'Show me how'}
-          </button>
-          <button type="button" className="install-card-later" onClick={() => end('later')}>Maybe later</button>
-          <button type="button" className="install-card-never" onClick={() => end('never')}>{"Don't ask again"}</button>
+          </span>
+          <span className="install-card-actions">
+            <button type="button" className="install-card-primary" onClick={onPrimary}>
+              {flow === 'prompt' ? 'Install' : 'Show me how'}
+            </button>
+            <button type="button" className="install-card-later" onClick={() => end('later')}>Not now</button>
+          </span>
         </section>
       )}
       {stepsFor && STEPS[/** @type {keyof typeof STEPS} */ (stepsFor)] && (

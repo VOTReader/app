@@ -26,6 +26,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { _bookmarkSourceEndpoint, _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
+import { WhatsNewSheet } from './WhatsNewSheet.jsx';
 
 export function AppShellSheets({
   // Selection toolbar handlers
@@ -157,6 +158,8 @@ export function AppShellSheets({
       } catch (_e) { /* the ack itself must never throw */ }
     }}>
     <>
+      {/* up1: "Updated · What's new" and Settings' What's new row open it by a window event */}
+      <WhatsNewSheet />
       <SelectionToolbar
         onLinkRequest={openLinkPicker}
         onNoteRequest={openNoteSheet}

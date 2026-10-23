@@ -112,7 +112,7 @@ export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, on
                       privacy promise it was really making (nothing of YOURS
                       leaves) is unchanged and stays; the download claim is now
                       the truth. */}
-                  <p>Fully offline to read. Tapping Listen streams that recording, and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files. Your notes, highlights and journal never leave this device.</p>
+                  <p>Fully offline to read. Tapping Listen streams that recording (download a recording and it plays with no connection), and the <em>Return to the Garden</em> images load the same way, from this app&rsquo;s own release files. Your notes, highlights and journal never leave this device.</p>
                 </div>
               </>
             )}

@@ -18,6 +18,7 @@
 
 import { studiesSummary } from './AudioStudiesScreen.jsx';
 import { useOfflineAudio, formatBytes, DownloadIcon, OfflineNote } from '../components/OfflineAudioControls.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** Recent list disclosure state. Deliberately localStorage, not the tab state:
  *  it is a shelf preference, not a place the reader navigated to. */
@@ -25,6 +26,34 @@ const RECENT_OPEN_KEY = 'vot-audio-recent-open';
 /** Rows shown before "Show all" — enough to recognize the trail, short enough
  *  that Browse stays reachable without a long scroll. */
 const RECENT_PREVIEW = 8;
+
+/**
+ * The offline line counts what is on the phone (RC.2, UX re-check 2026-10-22): "Recordings on this phone still
+ * play" over a phone with none on it promised what it could not keep.
+ * @param {any} off the offline store, or null where recordings cannot be kept
+ * @returns {string}
+ */
+function offlineShelfLine(off) {
+  const n = off && typeof off.items === 'function' ? off.items().length : 0;
+  if (!n) return 'You’re offline. No recordings are saved on this phone yet.';
+  return 'You’re offline. ' + (n === 1 ? '1 recording on this phone still plays.' : n + ' recordings on this phone still play.');
+}
+
+/**
+ * The now-playing card's scrubber and clock: the one part of the screen that moves every second, so the one part
+ * that re-renders with it (s18.3). The ONE scrubber (AUDIO-MANAGER.md rule 6); the decorative progressbar it
+ * replaced could be read but never moved.
+ */
+function NowProgress() {
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  const state = AudioPlayer.getState();
+  return (
+    <div className="audio-library-progress-wrap">
+      <AudioSeekSlider className="audio-library-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
+      <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{state.duration ? clock(state.duration) : 'Streaming'}</span></div>
+    </div>
+  );
+}
 
 /** @param {number} value @returns {string} */
 function clock(value) {
@@ -96,7 +125,8 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Not the 1 Hz clock: only the now-playing card's scrubber draws it, and it subscribes on its own (s18.3).
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   useAudioPositions();
 
   // The VOT registry and manifest are lazy. Warming them here lets the browse
@@ -179,7 +209,7 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
           <h1>Listening Library</h1>
           <p className="audio-library-intro">A quiet place for the recordings you return to, the ones you just heard, and every source waiting to be explored.</p>
         </header>
-        <OfflineNote text="You’re offline. Recordings on this phone still play." />
+        <OfflineNote text={offlineShelfLine(offline)} />
 
         {current ? (
           <section className={'audio-library-now' + (active ? ' is-active' : '')} aria-labelledby="audio-library-now-title">
@@ -204,15 +234,10 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
                   <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
                 </button>
               )}
-              <button type="button" className={'audio-library-icon-button audio-library-save-button' + (currentSaved ? ' is-saved' : '')} onClick={() => library && library.toggleSaved(current)} aria-label={currentSaved ? 'Remove current recording from saved recordings' : 'Save current recording'} aria-pressed={currentSaved} title={currentSaved ? 'Remove from saved recordings' : 'Save recording'}><StarIcon filled={currentSaved} /></button>
+              <button type="button" className={'audio-library-icon-button audio-library-save-button' + (currentSaved ? ' is-saved' : '')} onClick={() => toggleSavedRecording(library, current)} aria-label={currentSaved ? 'Remove current recording from saved recordings' : 'Save current recording'} aria-pressed={currentSaved} title={currentSaved ? 'Remove from saved recordings' : 'Save recording'}><StarIcon filled={currentSaved} /></button>
               {hasTextDestination(current) ? <button type="button" className="audio-library-icon-button" onClick={() => onOpenTrack(current)} aria-label="Open current recording text" title="Open text"><TextIcon /></button> : null}
             </div>
-            <div className="audio-library-progress-wrap">
-              {/* The ONE scrubber (AUDIO-MANAGER.md rule 6). The decorative
-                  progressbar this replaces could be read but never moved. */}
-              <AudioSeekSlider className="audio-library-seek" ariaLabel="Playback position" time={state.time} duration={state.duration} />
-              <div className="audio-library-progress-time"><span>{clock(state.time)}</span><span>{state.duration ? clock(state.duration) : 'Streaming'}</span></div>
-            </div>
+            <NowProgress />
           </section>
         ) : (
           <section className="audio-library-now audio-library-empty-now" aria-labelledby="audio-library-empty-title">
@@ -243,27 +268,6 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
             </button>
           </div>
         </section>
-
-        {/* Downloads to the phone (item 8): shown once something is on it; Android only. */}
-        {offline && (downloads.length || busy) ? (
-          <section className="audio-library-section audio-library-offline-row" aria-label="On this phone">
-            <div className="audio-library-shelf">
-              <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
-                <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
-                <span className="audio-library-shelf-copy">
-                  <strong>On this phone</strong>
-                  <small>{busy
-                    ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
-                    : (downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes()) + ' · plays with no signal'}</small>
-                </span>
-                <span className="audio-library-shelf-tail">
-                  <b>{downloads.length}</b>
-                  <ArrowIcon />
-                </span>
-              </button>
-            </div>
-          </section>
-        ) : null}
 
         <section className="audio-library-section" aria-labelledby="audio-library-recent">
           <div className="audio-library-section-head">
@@ -300,6 +304,30 @@ export function AudioLibraryScreen({ onBack, backLabel = 'Home', onOpenCollectio
             ) : null}
           </div>
         </section>
+
+        {/* Downloads (item 8; downloads brief D3, picture 01): under Recently played, above Browse, wherever this app
+            keeps recordings; shown before the first one too, so the place is known before it is needed (section 7
+            item 15). */}
+        {offline ? (
+          <section className="audio-library-section audio-library-offline-row" aria-label="Downloads">
+            <div className="audio-library-shelf">
+              <button type="button" className="audio-library-shelf-row" onClick={() => { if (onOpenOffline) onOpenOffline(); }}>
+                <span className="audio-library-shelf-mark" aria-hidden="true"><DownloadIcon /></span>
+                <span className="audio-library-shelf-copy">
+                  <strong>Downloads</strong>
+                  <small>{busy
+                    ? 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go'
+                    : !downloads.length ? 'Download for offline listening'
+                    : downloads.length + ' on this phone · ' + formatBytes(offline.totalBytes())}</small>
+                </span>
+                <span className="audio-library-shelf-tail">
+                  <b>{downloads.length}</b>
+                  <ArrowIcon />
+                </span>
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="audio-library-section audio-library-browse" aria-labelledby="audio-library-browse">
           <div className="audio-library-section-head"><div><span>Explore the source</span><h2 id="audio-library-browse">Browse the recordings</h2><p>Open a source to hear it letter by letter, or book by book.</p></div></div>

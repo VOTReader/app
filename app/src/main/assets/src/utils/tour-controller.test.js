@@ -142,8 +142,8 @@ describe('TourController — moving', () => {
     TourController.next(); TourController.next();      // demonstrate, stay; then → scripture-web
     expect(onClick).toHaveBeenCalledTimes(1);         // once, and only on the stop that asked for it
     expect(TourController.getState().step.id).toBe('scripture-web');
-    // Five stops on (songs joined the Home stops, 2026-09-25), at the Bible stop, the pill on this page is pressed again — and only then.
-    TourController.next(); TourController.next(); TourController.next(); TourController.next(); TourController.next();
+    // Six stops on (songs joined the Home stops 2026-09-25, plans 2026-10-23), at the Bible stop, the pill on this page is pressed again — and only then.
+    for (let i = 0; i < 6; i++) TourController.next();
     expect(TourController.getState().step.id).toBe('bible');
     expect(n.openBible).toHaveBeenCalledTimes(1);     // the bible stop's enter
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -361,7 +361,7 @@ describe('TourController — a Listen stop stays, and the tour ends what it star
     TourController.next(); TourController.next();   // press Listen, → highlight: stopped once
     TourController.next(); TourController.next();   // demonstrate, → scripture-web: the demonstration starts no audio
     expect(audio.stop).toHaveBeenCalledTimes(1);
-    for (let i = 0; i < 5; i++) TourController.next();                    // songs, journal, backup, settings → bible
+    for (let i = 0; i < 6; i++) TourController.next();                    // songs, journal, plans, backup, settings → bible
     expect(TourController.getState().step.id).toBe('bible');
     expect(audio.stop).toHaveBeenCalledTimes(1);
   });
@@ -619,7 +619,7 @@ describe('TourController — the letter Listen stop seeks to the first lit claus
     pill(); toListen();
     TourController.next(); TourController.next();      // press Listen, → highlight
     TourController.next(); TourController.next();      // demonstrate, → scripture-web
-    for (let i = 0; i < 5; i++) TourController.next(); // songs, journal, backup, settings → bible
+    for (let i = 0; i < 6; i++) TourController.next(); // songs, journal, plans, backup, settings → bible
     expect(TourController.getState().step.id).toBe('bible');
     TourController.next();                              // press
     state = { time: 0, duration: 200 }; notify();

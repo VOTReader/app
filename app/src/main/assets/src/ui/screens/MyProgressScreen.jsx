@@ -25,6 +25,9 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { isMarkKind } from '../../utils/mark-kinds.js';
+import { usePlanRuns, runRow, shortDate } from '../../utils/plan-runs-view.js';
+import { runName } from '../../data/plan-catalog.js';
+import { dayNum } from '../../data/plan-engine.js';
 
 /* Free globals, not imports: this screen ships in bundle-d (the lazy Personal
    Study bundle-g until lz1) and reads onIdle from the window slots
@@ -282,7 +285,9 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
   const summary = (() => {
     const bits = [];
     if (totalRead > 0) bits.push(plural(totalRead, 'chapter or letter read', 'chapters and letters read'));
-    if (readStreak >= 2) bits.push(_articleFor(readStreak) + ' ' + readStreak + '-day reading streak');
+    // A 1-day streak is said only when nothing else is (U01.2): "Nothing read yet" above "Reading streak 1 day"
+    // contradicted itself for a reader whose day counted but who finished nothing yet.
+    if (readStreak >= 2 || (readStreak === 1 && totalRead === 0)) bits.push(_articleFor(readStreak) + ' ' + readStreak + '-day reading streak');
     if (journalCount > 0) bits.push(plural(journalCount, 'journal entry', 'journal entries'));
     if (bits.length === 0) return 'Nothing read yet. The chapters and letters you read are counted here.';
     const s = bits.length === 1 ? bits[0] : bits.slice(0, -1).join(', ') + ' and ' + bits[bits.length - 1];
@@ -346,6 +351,29 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
       ))}
     </dl>
   );
+  // mw18 S7: each running plan's line, the plans finished, and what all plans cover with an item in two plans
+  // counted once ("1,230 chapters and letters across your plans").
+  const planRuns = usePlanRuns();
+  const planNow = new Date();
+  const planRows = planRuns.map((r) => runRow(r, planNow));
+  const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
+  /** @type {any[]} */
+  const allPlans = planStore && typeof planStore.all === 'function' ? planStore.all() : [];
+  const finishedPlans = allPlans.filter((r) => r.status === 'finished' && r.finished)
+    .sort((a, b) => (a.finished < b.finished ? 1 : a.finished > b.finished ? -1 : 0));
+  const planCoverage = (() => {
+    const keys = new Set(), read = new Set();
+    for (const r of allPlans) {
+      if (r.status === 'stopped') continue;
+      for (const t of r.tracks || []) for (const it of t.items || []) { keys.add(it.k); if (it.k in (r.ticks || {})) read.add(it.k); }
+    }
+    return keys.size ? read.size.toLocaleString('en-US') + ' of ' + keys.size.toLocaleString('en-US') + ' read' : '';
+  })();
+  /** @param {any} r */
+  const finishedLine = (r) => {
+    const n = /** @type {number} */ (dayNum(r.finished)) - /** @type {number} */ (dayNum(r.start)) + 1;
+    return 'Started ' + shortDate(r.start) + ' · finished ' + shortDate(r.finished) + ' · ' + n + (n === 1 ? ' day' : ' days');
+  };
   /** A section's small-capitals name, with an optional figure at the right. */
   const head = (id, name, meta) => (
     <div className="prg-section-head">
@@ -439,6 +467,29 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
             </div>
           )}
         </section>
+
+        {planRows.length || finishedPlans.length ? (
+          <section className="prg-section" aria-labelledby="prg-h-plans">
+            {head('prg-h-plans', 'Reading plans', planCoverage)}
+            {planRows.map((r) => (
+              <div key={r.id} className="prg-row">
+                <div className="prg-row-head">
+                  <span className="prg-row-label">{r.name}</span>
+                  <span className="prg-row-tally">{(r.finished ? 'Complete' : 'Day ' + (r.day + 1) + ' of ' + r.totalDays) + ' · ' + r.counts}</span>
+                </div>
+                <div className="prg-bar" aria-hidden="true">
+                  <div className="prg-bar-fill" style={{ width: (r.itemsTotal ? Math.round(r.itemsDone * 100 / r.itemsTotal) : 0) + '%' }} />
+                </div>
+              </div>
+            ))}
+            {finishedPlans.map((r) => (
+              <div key={r.id} className="prg-history-row">
+                <span className="prg-history-label">{runName(r, null)}</span>
+                <span className="prg-row-tally">{finishedLine(r)}</span>
+              </div>
+            ))}
+          </section>
+        ) : null}
 
         <section className="prg-section" aria-labelledby="prg-h-journal">
           {head('prg-h-journal', 'Journal')}

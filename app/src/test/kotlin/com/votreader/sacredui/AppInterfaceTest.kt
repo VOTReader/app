@@ -119,6 +119,26 @@ class AppInterfaceTest {
     }
 
     @Test
+    fun `the reading-plan reminder asks for notifications even after the media card's ask, and opens their settings`() {
+        var asks = 0
+        var settings = 0
+        val fake = FakeBridgeHost()
+        val host = object : BridgeHost by fake {
+            override fun askNotificationsPermission() { asks++ }
+            override fun openNotificationSettings() { settings++ }
+        }
+        val app = AppInterface(host, mockk(relaxed = true), mockk(relaxed = true))
+        app.planReminderAsk()
+        app.planReminderSettings()
+        assertEquals(1, asks)
+        assertEquals(1, settings)
+        assertEquals(0, fake.notificationsPermissionAskCount)
+        // A host without its own ask falls back to the media card's.
+        AppInterface(fake, mockk(relaxed = true), mockk(relaxed = true)).planReminderAsk()
+        assertEquals(1, fake.notificationsPermissionAskCount)
+    }
+
+    @Test
     fun `audio methods drive the native port, keep the WebView running while it plays, and ask for the media card`() {
         val port = FakePort()
         val fake = FakeBridgeHost()

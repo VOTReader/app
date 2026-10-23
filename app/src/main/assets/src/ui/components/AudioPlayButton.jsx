@@ -132,7 +132,10 @@ export function AudioPlayButton({ variant = 'listen', label, onClick, className,
           <path d="M8 5v14l11-7z" />
         </svg>
       )}
-      <span>{text}</span>
+      {/* RC.8: at large text "· N min left" drops (app.css .vot-large-text .pill-left), so Resume fits the phone. */}
+      {text.startsWith('Resume · ')
+        ? <span>Resume<span className="pill-left">{text.slice('Resume'.length)}</span></span>
+        : <span>{text}</span>}
     </button>
   );
 }

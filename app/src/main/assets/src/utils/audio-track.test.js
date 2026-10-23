@@ -29,6 +29,7 @@ import {
   bibleEditionOfAsset,
   bibleAudioEdition,
   displayPartLabel,
+  queuePlace,
   isVotAudioUrl,
   normalizeAudioTrack,
   resolveBibleAudio,
@@ -234,6 +235,27 @@ describe('audio-track — display registries the listening UI renders from', () 
    parses. The mini-player bar and the listening desk therefore printed the
    number twice in one glance ("Genesis 2 · Chapter 2"). displayPartLabel is the
    display rule that stops the echo, and ONLY the echo. */
+describe('audio-track — queuePlace counts recordings, not tracks (player brief s7: 31 vs 30)', () => {
+  const L = (id, part) => ({ key: 'vol1:' + id, partLabel: part || null });
+  const CH = (book, n) => ({ key: 'bible-brm-kjv:' + book, partLabel: 'Chapter ' + n });
+
+  it("a letter's parts are one recording", () => {
+    const q = [L('preface'), L('a', 'Part 1'), L('a', 'Part 2'), L('c')];
+    expect([0, 1, 2, 3].map((qi) => queuePlace(q, qi))).toEqual([
+      { at: 1, of: 3 }, { at: 2, of: 3 }, { at: 2, of: 3 }, { at: 3, of: 3 },
+    ]);
+  });
+
+  it("a book's chapters are recordings of their own, and keyless section tracks count one each", () => {
+    expect(queuePlace([CH('genesis', 1), CH('genesis', 2), CH('exodus', 1)], 1)).toEqual({ at: 2, of: 3 });
+    expect(queuePlace([{ key: null }, { key: null }], 1)).toEqual({ at: 2, of: 2 });
+  });
+
+  it('the same letter again after another counts again', () => {
+    expect(queuePlace([L('a'), L('b'), L('a')], 2)).toEqual({ at: 3, of: 3 });
+  });
+});
+
 describe('audio-track — displayPartLabel (the title-unique rule)', () => {
   it('suppresses a chapter label the title already ends with', () => {
     expect(displayPartLabel('Genesis 2', 'Chapter 2')).toBe(null);

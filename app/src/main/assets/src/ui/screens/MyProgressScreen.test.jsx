@@ -151,6 +151,12 @@ describe('MyProgressScreen — summary + empty states (brand-new user)', () => {
     expect(fact(container, 'Reading streak')).toBe('1 day');
   });
 
+  it('a day that counted with nothing finished says the 1-day streak, never "Nothing read yet" (U01.2)', () => {
+    setupGlobals({ readStreak: 1 });
+    const { container } = renderScreen();
+    expect(summaryOf(container)).toBe('A 1-day reading streak.');
+  });
+
   it('draws no gold-outlined stat boxes any more', () => {
     setupGlobals({ stats: { words: 100, wpm: 214 } });
     const { container } = renderScreen();
@@ -470,5 +476,31 @@ describe('MyProgressScreen — both streaks are re-checked on open (ds5 s11.1)',
     renderScreen();
     expect(reading).toHaveBeenCalledTimes(1);
     expect(journal).toHaveBeenCalledTimes(1);
+  });
+});
+
+// mw18 S7: plans in My Progress: a line per running plan, the plans finished, and coverage with an item in two
+// plans counted once.
+describe('MyProgressScreen — reading plans', () => {
+  afterEach(() => { delete globalThis.ReadingPlanStore; });
+
+  it('a line per plan with its day and counts, finished plans with their dates, coverage counted once', async () => {
+    const { ReadingPlanStore } = await import('../../stores/reading-plan-store.js');
+    const { startCatalogPlan } = await import('../../data/plan-catalog.js');
+    const { tickItem, todayKey } = await import('../../data/plan-engine.js');
+    localStorage.clear();
+    ReadingPlanStore._resetForTests({ forceLoaded: true });
+    globalThis.ReadingPlanStore = ReadingPlanStore;
+    const today = todayKey(new Date());
+    ReadingPlanStore.put(tickItem(startCatalogPlan('bible-year', null, new Date()), 'proverbs:1', today, 1));
+    ReadingPlanStore.put({ ...tickItem(startCatalogPlan('proverbs', null, new Date()), 'proverbs:1', today, 1), status: 'finished', finished: today });
+    setupGlobals();
+    const { container } = renderScreen({ historyEnabled: false });
+    const sec = container.querySelector('[aria-labelledby="prg-h-plans"]');
+    expect(sec.textContent).toContain('Bible in a Year');
+    expect(sec.textContent).toMatch(/Day 1 of 365 · 1 of 1,189 chapters/);
+    expect(sec.querySelector('.prg-history-row').textContent).toMatch(/Proverbs in 31 days.*Started .* · finished .* · 1 day/);
+    // Proverbs 1-31 sit in both plans: 1,189 chapters in all, proverbs:1 read once.
+    expect(sec.querySelector('.prg-section-meta').textContent).toBe('1 of 1,189 read');
   });
 });

@@ -55,8 +55,16 @@ const BUDGETS = [
   // wiped database, idb-adapter's dataLoss record) added 6,333 B of real code,
   // nothing pulled in. Re-baselined UP by the same rule: 310,748 x 1.15 =
   // 357,360.2 -> the hundred above.
-  { file: 'bundle-b.js', measured: 310748, max: 357400 },   // stores/hooks/journal machinery/bridge
-  { file: 'bundle-c.js', measured: 19014, max: 22000 },    // renderer
+  // 2026-10-23, up1: main had grown to ~356.9 KB by ordinary work since 10-11 (12 days of lane landings); the
+  // update wait (sw-register: take over only at open or after 10+ min away, never while playing) added ~1 KB of
+  // real code, nothing pulled in, and tipped it 481 B over. Re-baselined UP by the same rule: 357,881 x 1.15 =
+  // 411,563.2 -> the hundred above.
+  { file: 'bundle-b.js', measured: 357881, max: 411600 },   // stores/hooks/journal machinery/bridge
+  // 2026-10-23, pl-l0 batch C (RC.13): one box per highlight and the note icon kept with its word, on both
+  // paint paths (React verses + the letters' DOM pass), added 1,865 B of real code; the delete-confirm
+  // helper it shares (mark-overlap.js uncoveredLine) is tree-shaken out. Re-baselined UP by the same
+  // rule: 23,103 x 1.15 = 26,568.5 -> the hundred above.
+  { file: 'bundle-c.js', measured: 23103, max: 26600 },    // renderer
   // 2026-09-22, landing 21: the four Personal Study screens (My Progress,
   // Notes, Links, Highlights) LEFT this bundle for bundle-g, -46,043 B off the
   // cold-boot parse path. Re-baselined DOWN (510,376 x 1.15 = 586,932 -> the
@@ -210,6 +218,10 @@ const BUDGETS = [
   // 352 letters x ~15 rows x ~28 B ≈ 150 KB projected, lazy like audio-sync.js and
   // loaded only while a Part/Section compilation plays. Optional until it lands.
   { file: 'src/data/audio-sync-sections.js', measured: 150000, max: 260000, optional: true },
+  // Recording lengths (AUDIO_LENGTHS, tools/gen-audio-lengths.py, downloads brief 3d): [bytes, seconds] for
+  // 4,515 recordings, 168,220 B raw / 66 KB gzipped, lazy (fetched the first time a size or a length is wanted).
+  // +50 % for new editions and recordings.
+  { file: 'src/data/audio-lengths.js', measured: 168220, max: 252000 },
   // Answers Only God Can Give (ANSWERS, tools/fetch-answers.py): 121 topic pages,
   // lazy — fetched the first time a reader opens Answers (utils/sync-loaders.js).
   // Served raw like the timings; the site is complete, so +15 %. `measured` was

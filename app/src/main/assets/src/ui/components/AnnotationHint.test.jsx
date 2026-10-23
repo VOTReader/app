@@ -11,7 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
-import { AnnotationHint } from './AnnotationHint.jsx';
+import { AnnotationHint, HINT_FADE_AFTER_MS } from './AnnotationHint.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { InstallCard, _resetInstallCardSession } from './InstallCard.jsx';
 import * as TS from '../../utils/tour-steps.js';
@@ -134,7 +134,7 @@ describe('AnnotationHint', () => {
     setupStores();
     const first = render(<AnnotationHint />);
     act(() => { vi.advanceTimersByTime(2600); });
-    fireEvent.click(screen.getByLabelText('Dismiss tip'));
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(screen.queryByText(HINT_TEXT)).toBeNull();
     // The dismissal is recorded durably, not just in component state.
     expect(window.AnnHintDismissedFlagStore.is()).toBe(true);
@@ -210,7 +210,7 @@ describe('AnnotationHint', () => {
     delete window.AnnHintDismissedFlagStore;                 // bare-test host
     const first = render(<AnnotationHint />);
     act(() => { vi.advanceTimersByTime(2600); });
-    fireEvent.click(screen.getByLabelText('Dismiss tip'));
+    fireEvent.click(screen.getByRole('button', { name: 'Got it' }));
     expect(window.__annHintDismissed).toBe(true);
     first.unmount();
     render(<AnnotationHint />);
@@ -227,7 +227,7 @@ describe('AnnotationHint', () => {
     setupStores();
     render(<AnnotationHint />);
     act(() => { vi.advanceTimersByTime(2600); });
-    const close = screen.getByLabelText('Dismiss tip');
+    const close = screen.getByRole('button', { name: 'Got it' });
     expect(close.tagName).toBe('BUTTON');
     const pill = document.querySelector('.ann-hint-pill');
     expect(pill.querySelectorAll('button, a, input, [tabindex]').length).toBe(1);
@@ -368,5 +368,71 @@ describe('AnnotationHint — waits while the install card is on screen (search20
     expect(document.querySelector('.install-card'), 'PRECONDITION: the card is shown').toBeTruthy();
     act(() => { vi.advanceTimersByTime(2600); });
     expect(pill()).toBeTruthy();
+  });
+});
+
+/* U05.6/U10.7 (UX wave 3): the tip stayed over the text until dismissed; it now goes by itself. */
+describe('AnnotationHint goes by itself', () => {
+  it('fades after about 20 s, then is gone', () => {
+    setupStores();
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(screen.getByText(HINT_TEXT)).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(HINT_FADE_AFTER_MS); });
+    expect(document.querySelector('.ann-hint-pill.is-fading')).toBeTruthy();
+    act(() => { vi.advanceTimersByTime(700); });
+    expect(document.querySelector('.ann-hint-pill')).toBeNull();
+  });
+
+  it('fades once the reader has scrolled about two screens', () => {
+    setupStores();
+    const page = document.createElement('div');
+    document.body.appendChild(page);
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    const scrollTo = (y) => { page.scrollTop = y; page.dispatchEvent(new Event('scroll')); };
+    act(() => { scrollTo(0); scrollTo(window.innerHeight); });
+    expect(document.querySelector('.ann-hint-pill.is-fading')).toBeNull();
+    act(() => { scrollTo(window.innerHeight * 2.5); });
+    expect(document.querySelector('.ann-hint-pill.is-fading')).toBeTruthy();
+    page.remove();
+  });
+
+  // Seen in Chrome (mw19): its scroll events come coalesced, so the first one already lands far down the page;
+  // the page's own position as the tip shows is the start, not that first event.
+  it('counts the first scroll from where the page stood as the tip showed', () => {
+    setupStores();
+    const page = document.createElement('div');
+    page.className = 'screen-scroll';
+    document.body.appendChild(page);
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    act(() => { page.scrollTop = window.innerHeight * 2.5; page.dispatchEvent(new Event('scroll')); });
+    expect(document.querySelector('.ann-hint-pill.is-fading')).toBeTruthy();
+    page.remove();
+  });
+
+  it('fades when the reader reaches the end of a short page', () => {
+    setupStores();
+    const page = document.createElement('div');
+    page.className = 'screen-scroll';
+    Object.defineProperty(page, 'clientHeight', { value: 900 });
+    Object.defineProperty(page, 'scrollHeight', { value: 1500 });
+    document.body.appendChild(page);
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    const scrollTo = (y) => { page.scrollTop = y; page.dispatchEvent(new Event('scroll')); };
+    act(() => { scrollTo(300); });
+    expect(document.querySelector('.ann-hint-pill.is-fading'), 'part way down: still up').toBeNull();
+    act(() => { scrollTo(600); });
+    expect(document.querySelector('.ann-hint-pill.is-fading'), 'at the end: it goes').toBeTruthy();
+    page.remove();
+  });
+
+  it('says Got it, a word, not a bare ×', () => {
+    setupStores();
+    render(<AnnotationHint />);
+    act(() => { vi.advanceTimersByTime(2600); });
+    expect(screen.getByRole('button', { name: 'Got it' })).toBeTruthy();
   });
 });

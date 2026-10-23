@@ -35,16 +35,16 @@ def load_tool():
     return m
 
 
-def fixture(tmp, chapters, extra_rows=(), skip_bytes=()):
+def fixture(tmp, chapters, extra_rows=(), skip_bytes=(), list_folder=LIST_FOLDER, disk_folder=DISK_FOLDER):
     """A listing + an archive folder: `chapters` are (n, basename) pairs; every basename gets a
     file on disk unless it is in skip_bytes; extra_rows are appended to the listing verbatim."""
     archive = os.path.join(tmp, "archive")
-    os.makedirs(os.path.join(archive, DISK_FOLDER))
+    os.makedirs(os.path.join(archive, disk_folder))
     rows = []
     for n, base in chapters:
-        rows.append({"path": LIST_FOLDER + "/" + base, "id": "id-%03d" % n})
+        rows.append({"path": list_folder + "/" + base, "id": "id-%03d" % n})
         if base not in skip_bytes:
-            with open(os.path.join(archive, DISK_FOLDER, base), "wb") as f:
+            with open(os.path.join(archive, disk_folder, base), "wb") as f:
                 f.write(b"\xff\xfb" + bytes([n]))
     rows += list(extra_rows)
     listing = os.path.join(tmp, "listing.json")
@@ -68,6 +68,19 @@ class DriveIndex(unittest.TestCase):
         self.assertEqual(idx[("matthew", 1)][1], "id-001")            # the asset is the Drive id
         self.assertTrue(idx[("matthew", 1)][0].endswith("TSOT_Matthew-Chapter-001.MP3"))   # the .MP3 one
         self.assertIn(DISK_FOLDER, idx[("matthew", 2)][0])              # resolved through the full-width folder name
+
+    def test_a_renumbered_drive_folder_still_indexes(self):
+        # Tim renamed the folder on Drive (2026-10): "18. TSOT New Testament (read by ...)" became
+        # "TSOT New Testament - Matthew (read by ...)" -- the list number gone, the book named. A
+        # plain startswith(driveFolder) indexed 0 chapters. The number is Drive's sort order, not
+        # identity, so it is optional on both sides (audio-renditions-lib.mjs reads it the same way).
+        with tempfile.TemporaryDirectory() as tmp:
+            listing, archive = fixture(tmp, [(1, "TSOT_Matthew-Chapter-001.MP3"), (2, "TSOT_Matthew-Chapter-002.mp3")],
+                                       list_folder='TSOT New Testament - Matthew (read by "Bejamin")',
+                                       disk_folder="TSOT New Testament - Matthew (read by ＂Bejamin＂)")
+            idx = self.m.drive_index(self.cfg, listing_path=listing, archive_root=archive)
+        self.assertEqual(sorted(idx), [("matthew", 1), ("matthew", 2)])
+        self.assertEqual(idx[("matthew", 2)][1], "id-002")
 
     def test_refuses_a_chapter_with_an_id_but_no_bytes(self):
         with tempfile.TemporaryDirectory() as tmp:

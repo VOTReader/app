@@ -692,6 +692,31 @@ class AppInterface(
     @JavascriptInterface
     fun weeklyCopyClear(): Boolean = vm.weeklyCopies.clear()
 
+    // ─── The daily reading-plan reminder (rp-s1, call 4A) ───────────────
+    // Called directly (guarded window.AndroidBridge) by src/utils/plan-reminder.js.
+    // JSON in, JSON out; the contract is PlanReminder's KDoc. Prefs and AlarmManager
+    // are thread-safe, so these run on the binder thread.
+
+    /** The plans whose reminder is on (an empty list turns it off). Returns `{"ok","allowed","next","quiet"}`. */
+    @JavascriptInterface
+    fun planReminderSet(json: String?): String = PlanReminder.set(host.activityContext.applicationContext, json)
+
+    /** The same status, changing nothing. */
+    @JavascriptInterface
+    fun planReminderStatus(): String = PlanReminder.status(host.activityContext.applicationContext)
+
+    /** Ask for the notification permission (API 33+); JsEvent.NotificationsResult carries the answer. */
+    @JavascriptInterface
+    fun planReminderAsk() { host.askNotificationsPermission() }
+
+    /** Open the app's notification settings (after a refusal Android stops asking). */
+    @JavascriptInterface
+    fun planReminderSettings() { host.openNotificationSettings() }
+
+    /** The plan a reminder tap opened, once; "" when none. */
+    @JavascriptInterface
+    fun planReminderOpened(): String = PlanReminder.takeOpened(host.activityContext.applicationContext)
+
     // ─── Downloaded recordings (listening item 8) ───────────────────────
     // JSON in, JSON out. The page's JSON is untrusted; OfflineAudioStore parses it
     // (a bad shape is a quiet no-op). Runs on the binder thread: the store is

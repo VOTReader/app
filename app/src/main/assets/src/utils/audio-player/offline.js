@@ -117,7 +117,7 @@ export const SONG_OFFLINE_TOAST_ID = 'vot-toast-song-offline';
 export function _offlineNotice(track) {
   if (!_isSong(/** @type {any} */ (track))) { _toast(OFFLINE_MSG); return; }
   showToast({
-    id: SONG_OFFLINE_TOAST_ID, className: 'vot-toast vot-toast-action', durationMs: 6000, ariaLive: 'assertive',
+    id: SONG_OFFLINE_TOAST_ID, className: 'vot-toast vot-toast-action', durationMs: 6000, ariaLive: 'polite',
     html: 'This song isn’t on this phone. Songs you keep play without internet. <button type="button" class="vot-escape-btn">Kept songs ›</button>',
   });
   const el = typeof document !== 'undefined' ? document.getElementById(SONG_OFFLINE_TOAST_ID) : null;

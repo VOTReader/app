@@ -35,7 +35,7 @@ export const WORDS_PER_MIN = 200;
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
- *   known?: string }} PlanRun
+ *   known?: string, notes?: Record<string, string>, remind?: string }} PlanRun
  */
 
 // ── dates ────────────────────────────────────────────────────────────────
@@ -461,6 +461,45 @@ export function markDay(run, d, done, now) {
   const next = { ...run, ticks, updated: now.getTime() };
   if (!done && next.status === 'finished') { next.status = 'running'; delete next.finished; }
   return done ? finishIfDone(next, key) : next;
+}
+
+/**
+ * S4, weeks on plan (never a streak alarm): how many weeks in a row, Sunday to Saturday, every reading day had
+ * something of the plan read on it. This week counts once a day of it is read and none before today missed; a week the plan had not
+ * started is not counted, and the first one short ends the count. A missed day repaired by hand (markOn) counts.
+ * @param {PlanRun} run @param {Date} now
+ */
+export function weeksOnPlan(run, now) {
+  const start = dayNum(run.start), today = dayNum(todayKey(now));
+  if (start == null || today == null) return 0;
+  const readOn = new Set(Object.values(run.ticks || {}).filter(Boolean));
+  let sunday = today - weekdayOf(today), weeks = 0;
+  for (; sunday + 6 >= start; sunday -= 7) {
+    let days = 0, ok = true;
+    for (let n = Math.max(sunday, start); n <= Math.min(sunday + 6, today); n++) {
+      if (!isReadingDay(run, n)) continue;
+      if (readOn.has(dateOf(n))) { days++; continue; }
+      if (n === today) continue;   // today not read yet: still open, it neither counts nor ends the week
+      ok = false;
+      break;
+    }
+    if (!ok) break;
+    if (days) weeks++;
+  }
+  return weeks;
+}
+
+/**
+ * S4 repair: the reader read on `dateKey` (in print, elsewhere): the plan's next unfinished day is ticked with that
+ * date, so the plan moves on and that day counts as read.
+ * @param {PlanRun} run @param {string} dateKey @param {Date} now
+ */
+export function markOn(run, dateKey, now) {
+  const st = runStatus(run, now);
+  if (st.finished) return run;
+  const ticks = { ...(run.ticks || {}) };
+  for (const it of dayItems(run, st.day)) if (!(it.k in ticks)) ticks[it.k] = dateKey;
+  return finishIfDone({ ...run, ticks, updated: now.getTime() }, todayKey(now));
 }
 
 /** A run whose every day is read is finished on `dateKey`. */

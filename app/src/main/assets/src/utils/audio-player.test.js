@@ -397,6 +397,21 @@ describe('audio-player — next / prev / seek / stop', () => {
     expect(el().loadCalls).toBe(1);  // …and load() drops the Drive connection
   });
 
+  it('the end of the order says so, by the collection the bar named (player brief s7: it vanished silently)', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().status).toBe('idle');
+    const toast = document.getElementById(AUDIO_TOAST_ID);
+    expect(toast.textContent).toBe('Finished · Volume One.');
+    expect(toast.getAttribute('aria-live')).toBe('polite');
+  });
+
+  it('Close is not an ending: no Finished line', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    AudioPlayer.stop();
+    expect(document.getElementById(AUDIO_TOAST_ID)).toBeNull();
+  });
+
   it('prev restarts the current track when more than 3s in', () => {
     AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
     AudioPlayer.next();
@@ -601,6 +616,29 @@ describe('audio-player — listening controls + arbitration', () => {
     expect(JSON.parse(localStorage.getItem('vot-audio-pos')).customQueue.map((track) => track.url)).toEqual(before);
     expect(AudioPlayer.insertUpcoming(urls().length, gone)).toBe(true); // at the very end is a place too
     expect(urls()).toHaveLength(before.length + 1);
+  });
+
+  it('a custom queue is saved from one copy per queue, not re-copied on every write (player brief s7)', () => {
+    const put = vi.fn(async () => {});
+    globalThis.IDBAdapter = { put, get: vi.fn(async () => null), delete: vi.fn(async () => {}) };
+    try {
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One' });
+      AudioPlayer.next();
+      expect(AudioPlayer.moveUpcoming(3, 2)).toBe(true);   // an edited queue persists as custom
+      el().dispatchEvent(new Event('playing'));
+      const saved = () => put.mock.calls.map((c) => c[2]).filter((s) => s && s.mode === 'custom').map((s) => s.customQueue);
+      for (const t of [5, 10, 15]) { el().currentTime = t; el().dispatchEvent(new Event('timeupdate')); }
+      const ticks = saved().slice(-3);
+      expect(ticks).toHaveLength(3);
+      expect(new Set(ticks).size).toBe(1);                  // one saved copy, written three times
+      // an edit is a new queue, and the next write carries it
+      expect(AudioPlayer.removeUpcoming(3)).toBe(true);
+      const after = saved().at(-1);
+      expect(after).not.toBe(ticks[0]);
+      expect(after.map((t) => t.url)).toEqual([URL_OF('idPreface'), URL_OF('idA1'), URL_OF('idC')]);
+    } finally {
+      delete globalThis.IDBAdapter;
+    }
   });
 
   it('pauses the VOT stream when a journal or other DOM audio element starts', () => {
@@ -1692,6 +1730,21 @@ describe('audio-player — the default letter reader', () => {
     expect(AudioPlayer.getState().queue.map((t) => t.url)).toEqual([URL_OF('idC')]);
   });
 
+  it("a letter screen warms the recording Listen will start: the preferred reader's, else the primary (player brief s7)", () => {
+    AudioPlayer.setPreferredReader('V');
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    expect(el().src).toBe(URL_OF('idA1v'));
+    // the voice changed while the letter stays open: the warm follows it
+    AudioPlayer.setPreferredReader('M');
+    AudioPlayer.prewarm('vol1', 'letter-a');
+    expect(el().src).toBe(URL_OF('idA1'));
+    // Listen keeps the warm load (no second fetch of the same recording)
+    const warmed = el();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    expect(el()).toBe(warmed);
+    expect(el().src).toBe(URL_OF('idA1'));
+  });
+
   it("'auto', an unknown code, and a non-string all mean the manifest's own pick", () => {
     for (const value of ['auto', 'Z', '', null, 42]) {
       AudioPlayer.setPreferredReader(value);
@@ -1861,6 +1914,24 @@ describe('audio-player — gentle queue prefetch', () => {
   });
 });
 
+describe('audio-player — getShape moves on every change but the clock (s18.3)', () => {
+  it('a clock tick moves the version, not the shape; a pause or a new recording moves both', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    el().dispatchEvent(new Event('playing'));
+    const shape = AudioPlayer.getShape();
+    const version = AudioPlayer.getVersion();
+    el().currentTime = 3;
+    el().dispatchEvent(new Event('timeupdate'));
+    expect(AudioPlayer.getVersion()).toBeGreaterThan(version);
+    expect(AudioPlayer.getShape(), 'a Listening screen does not redraw for the clock').toBe(shape);
+    el().dispatchEvent(new Event('pause'));
+    const paused = AudioPlayer.getShape();
+    expect(paused).not.toBe(shape);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.getShape()).not.toBe(paused);
+  });
+});
+
 describe('audio-player — offline', () => {
   it('playLetter leaves state idle and toasts the offline notice', () => {
     setOnline(false);
@@ -1869,8 +1940,8 @@ describe('audio-player — offline', () => {
     expect(AudioPlayer.getState().queue).toHaveLength(0);
     const toast = document.getElementById(AUDIO_TOAST_ID);
     expect(toast).toBeTruthy();
-    expect(toast.textContent).toBe('Playing audio requires an internet connection.');
-    expect(toast.getAttribute('aria-live')).toBe('assertive');
+    expect(toast.textContent).toBe('Not on this phone. Connect to listen.');
+    expect(toast.getAttribute('aria-live'), 'a notice, not an interruption (s31.6)').toBe('polite');
     expect(toast.classList.contains('vot-toast')).toBe(true);
   });
 
@@ -1935,7 +2006,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     const s = AudioPlayer.getState();
     expect(s.status).toBe('paused');
     expect(s.queue[s.qi].url).toBe(URL_OF('idA2'));
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
     // Back online, Play loads the recording the bar names (not the one that ended).
     setOnline(true);
     AudioPlayer.toggle();
@@ -2088,7 +2159,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     AudioPlayer.stop();
     AudioPlayer.playTrack({ key: 'vol1:letter-a', title: 'Letter A', url: URL_OF('idA1') });
     expect(AudioPlayer.getState().status).toBe('idle');
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
   });
 
   // SHOULD 5: a letter the listener CHOSE is refused when it is not on the phone, even if a later one is.
@@ -2101,7 +2172,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
       setOnline(false);
       AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
       expect(AudioPlayer.getState().status).toBe('idle');
-      expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+      expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
       AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS, collectionLabel: 'Volume One', startId: 'letter-a' });
       expect(AudioPlayer.getState().status).toBe('idle');
       // Play all (no chosen start) still plays what is on the phone.
@@ -2118,7 +2189,7 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
     expect(AudioPlayer.getState().status).toBe('idle');
     expect(AudioPlayer.getState().queue).toHaveLength(0);
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
   });
 });
 
@@ -2146,7 +2217,7 @@ describe('audio-player — load errors', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     setOnline(false);
     el().dispatchEvent(new Event('error'));
-    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Playing audio requires an internet connection.');
+    expect(document.getElementById(AUDIO_TOAST_ID).textContent).toBe('Not on this phone. Connect to listen.');
   });
 
   it('stop() teardown does not fire a spurious failure toast', () => {

@@ -5,7 +5,9 @@
 import { settingsGlance, daysAgo } from '../../utils/settings-glance.js';
 import { createBackupFlow } from '../../utils/backup-flow.js';
 import { OfflineAudio } from '../../utils/offline-audio.js';
-import { canTell } from '../../utils/download-gate.js';
+import { canTell, networkType } from '../../utils/download-gate.js';
+import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
+import { openWhatsNew } from '../../utils/whats-new.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -331,6 +333,36 @@ function SongsKeptRow() {
           <span className="settings-select-chev">{"›"}</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Settings › Listening › Downloads & storage (downloads brief 3a, picture 18): what is on the phone with a bar, opening
+ * the Downloads screen's On this phone tab. Only where this app keeps downloads.
+ */
+function DownloadsStorageRow() {
+  const off = OfflineAudio;
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (off ? off.subscribe(cb) : () => {}), [off]),
+    () => (off ? off.getVersion() : 0)
+  );
+  const open = /** @type {any} */ (window).__openDownloads;
+  if (!off || !off.available() || typeof open !== 'function') return null;
+  const n = off.items().length;
+  const used = off.totalBytes();
+  const free = off.freeBytes();
+  const fmt = (/** @type {number} */ b) => (b >= 1e9 ? (b / 1e9).toFixed(1).replace(/\.0$/, '') + ' GB' : Math.max(1, Math.round(b / 1e6)) + ' MB');
+  const value = [n ? (n === 1 ? '1 recording' : n + ' recordings') + ' · ' + fmt(used) : 'None yet', free >= 0 ? fmt(free) + ' free' : ''].filter(Boolean).join(' · ');
+  const share = free > 0 && used > 0 ? Math.max(2, Math.min(100, (used / (used + free)) * 100)) : 0;
+  return (
+    <div className="settings-row">
+      <button type="button" className="settings-downloads-row" aria-label={'Downloads and storage: ' + value + '. Open'} onClick={() => open({ tab: 'phone' }, 'Settings')}>
+        <span className="settings-row-label">Downloads &amp; storage</span>
+        {share ? <span className="settings-downloads-bar" aria-hidden="true"><span style={{ width: share + '%' }} /></span> : null}
+        <span className="settings-row-value">{value}</span>
+        <span className="settings-select-chev" aria-hidden="true">{"›"}</span>
+      </button>
     </div>
   );
 }
@@ -1277,14 +1309,17 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               onToggle={() => onToggle("showLetterSongs")}
             />
             <SongsKeptRow />
+            <DownloadsStorageRow />
             {/* Download only on Wi-Fi (ra6, Corbin 2026-10-14, brief design-10): off by default; on, recordings and
                 kept songs wait while the phone is on mobile data (utils/download-gate.js). Only where this app keeps
-                downloads; a browser that cannot tell Wi-Fi from mobile data says so rather than promise it. */}
-            {OfflineAudio.available() && (
+                downloads, and only where it can tell Wi-Fi from mobile data: elsewhere the switch did nothing (downloads
+                brief 2026-10-23, section 7 item 10), so it is not offered. */}
+            {OfflineAudio.available() && canTell() && (
               <SettingsRow
                 label="Download only on Wi-Fi"
-                desc={'Downloads wait until you are on Wi-Fi, so they never use mobile data. One already on its way stops and starts again on Wi-Fi.'
-                  + (canTell() ? '' : ' This browser cannot tell Wi-Fi from mobile data, so here downloads always go ahead.')}
+                desc={settings.downloadWifiOnly === true
+                  ? "Downloads wait until you are on Wi-Fi, so they never use mobile data. One already on its way stops and starts again on Wi-Fi."
+                  : "Off: downloads use mobile data too." + (networkType() ? " Big ones ask first." : "")}
                 checked={settings.downloadWifiOnly === true}
                 onToggle={() => onToggle("downloadWifiOnly")}
               />
@@ -1428,7 +1463,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               eyebrow="Copy & Share"
               title="Share Includes"
               label="Share Includes"
-              desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy always adds the website link."
+              desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy adds the website link wherever the passage has a page there."
               value={settings.shareLink === 'site' ? 'site' : 'app'}
               options={SHARE_LINK_OPTIONS}
               onChange={(v) => onSetting("shareLink", v)}
@@ -1469,8 +1504,15 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
                 onClick={(e) => { e.stopPropagation(); refreshBuildInfo(); }}
               >Check</button>
             </DataInfoRow>
+            {/* up1: the changes behind recent updates, in plain words (WhatsNewSheet) */}
+            <DataInfoRow label="What's new">
+              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); void openWhatsNew(); }}>Show</button>
+            </DataInfoRow>
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />
+            {/* U09.5: the web's offline library, standing (the APK carries every book in itself). */}
+            {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
+              ? <DataInfoRow label="Offline library" value={<OfflineLibraryStatus />} /> : null}
             <DataInfoRow label="Your data" value={userDataDisplayText} />
             {dataSamples.length > 0 && (
               <DataInfoRow label="Growth" value={<StorageTrendValue samples={dataSamples} />} />

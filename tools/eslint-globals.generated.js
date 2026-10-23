@@ -6,7 +6,7 @@
 // _entry.js (renderer), index.html top-level decls + window.X = …,
 // src/data/*.js top-level UPPER_CASE_DECL, plus a hand-maintained
 // VENDOR list inside the generator script.
-// Total: 646 distinct identifiers.
+// Total: 649 distinct identifiers.
 
 export const projectGlobals = {
   ALL_WEEK: "readonly",
@@ -16,6 +16,7 @@ export const projectGlobals = {
   ANSWERS_SUBJECT_GROUP: "readonly",
   ARROW_LAYOUT_OPTIONS: "readonly",
   AUDIO_ALTERNATES: "readonly",
+  AUDIO_LENGTHS: "readonly",
   AUDIO_MANIFEST: "readonly",
   AUDIO_SECTIONS: "readonly",
   AUDIO_SYNC: "readonly",
@@ -37,6 +38,7 @@ export const projectGlobals = {
   AppShellSheets: "readonly",
   ArrowIcon: "readonly",
   AudioCollectionScreen: "readonly",
+  AudioLengths: "readonly",
   AudioLibraryScreen: "readonly",
   AudioLibraryStore: "readonly",
   AudioManagerSheet: "readonly",
@@ -293,6 +295,7 @@ export const projectGlobals = {
   SongKeepCard: "readonly",
   SongListRow: "readonly",
   SongPlayButton: "readonly",
+  SongVotes: "readonly",
   SrchCard: "readonly",
   SrchGroup: "readonly",
   SrchSnippet: "readonly",

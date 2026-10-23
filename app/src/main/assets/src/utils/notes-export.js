@@ -137,6 +137,16 @@ export function composeNotesExport({ title, notes, resolveLabel, now }) {
 }
 
 /**
+ * The composed document as plain text, for a share sheet (U07.1): a message app shows "# My Notes" and "> “…”" as
+ * typed. Headings lose their marks, quotes their "> "; the saved .md file keeps the Markdown.
+ * @param {string} markdown composeNotesExport's output
+ * @returns {string}
+ */
+export function notesAsPlainText(markdown) {
+  return String(markdown || '').split('\n').map((l) => l.replace(/^#{1,6} /, '').replace(/^> ?/, '')).join('\n');
+}
+
+/**
  * Filename for the saved artifact — "<title> notes 2026-07-03.md"
  * (" notes" is skipped when the title already says it, so "My Notes"
  * doesn't become "My Notes notes"). Strips filesystem-reserved chars;
@@ -206,12 +216,12 @@ function _saveToFile(filename, text) {
  * @param {object} opts
  * @param {string} opts.title     - share-sheet title
  * @param {string} opts.filename  - suggested filename for the save path
- * @param {string} opts.text      - the composed document
+ * @param {string} opts.text      - the composed document (Markdown; a share sheet gets it as plain text)
  * @returns {'share' | 'file' | 'none'} which delivery path ran first
  */
 export function shareNotesExport({ title, filename, text }) {
   if (typeof navigator !== 'undefined' && navigator.share) {
-    navigator.share({ title, text }).catch((/** @type {unknown} */ err) => {
+    navigator.share({ title, text: notesAsPlainText(text) }).catch((/** @type {unknown} */ err) => {
       if (err && /** @type {{ name?: string }} */ (err).name === 'AbortError') return;
       try {
         if (typeof PlatformBridge !== 'undefined') _saveToFile(filename, text);

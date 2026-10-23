@@ -16,6 +16,7 @@ import { ReadingDotContext } from './ResumeReadingNavBtn.jsx';
 import { AutoScrollContext } from './AutoScrollControl.jsx';
 import { NavMenuContext } from './MoreMenu.jsx';
 import { clampLpm, clampEndDwell } from '../../hooks/use-autoscroll.js';
+import { usePlanReminders } from '../../utils/plan-runs-view.js';
 
 // The dwell clamp moved next to clampLpm in the transport module (the pill's
 // own stepper needs it, and importing this file from there would be a cycle).
@@ -43,6 +44,9 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = nul
   // compact-bar and history switches, and the text size it steps. Un-memoized
   // for the same reason as dotValue: `nav` is a fresh object each App render.
   const n = nav || {};
+  // rp-s1: the daily reading-plan reminder follows the runs; a tapped one opens its plan. Here, not in App, because
+  // this provider is App's always-mounted chrome and already holds the way to the plans.
+  usePlanReminders(() => { if (screen !== 'reading-plans' && n.onPlans) n.onPlans(); });
   const menuValue = {
     enabled: s.compactTopBar !== false,
     historyEnabled: s.historyEnabled !== false,

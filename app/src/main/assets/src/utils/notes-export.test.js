@@ -6,7 +6,7 @@
    sheet and the SAF picker / Blob download — not reachable in jsdom). */
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { composeNotesExport, notesExportFilename, shareNotesExport, _absoluteDate } from './notes-export.js';
+import { composeNotesExport, notesExportFilename, shareNotesExport, _absoluteDate, notesAsPlainText } from './notes-export.js';
 
 // Local-time construction keeps the absolute-date assertions independent
 // of the host timezone (the composer formats in local time).
@@ -143,6 +143,19 @@ describe('shareNotesExport', () => {
     expect(out).toBe('share');
     expect(share).toHaveBeenCalledWith({ title: 'Devotional', text: 'doc' });
     expect(saveToFile).not.toHaveBeenCalled();
+  });
+
+  it('the share sheet gets plain text, the saved file keeps the Markdown (U07.1)', () => {
+    const md = composeNotesExport({ title: 'Devotional', notes: [{ body: 'Mine', fullText: 'For God so loved' }], now: 0 });
+    expect(md).toMatch(/^# Devotional/);
+    const share = vi.fn((/** @type {any} */ _d) => Promise.resolve());
+    vi.stubGlobal('navigator', { share });
+    shareNotesExport({ title: 'Devotional', filename: 'f.md', text: md });
+    const sent = /** @type {any} */ (share.mock.calls[0])[0].text;
+    expect(sent).toBe(notesAsPlainText(md));
+    expect(sent).not.toMatch(/^(#|>)/m);
+    expect(sent).toMatch(/^Devotional$/m);
+    expect(sent).toMatch(/^“For God so loved”$/m);
   });
 
   it('falls back to PlatformBridge.saveToFile and toasts success via __onExportComplete', () => {

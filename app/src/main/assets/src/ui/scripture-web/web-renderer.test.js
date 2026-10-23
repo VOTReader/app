@@ -372,7 +372,7 @@ describe('chrome tokens are one palette, but the text size is still the reader\'
 
   it('IGNORES the body class the app sets — this screen has one palette', () => {
     /* The inverse of what this case used to assert, and deliberately kept
-       rather than deleted: the old case pinned a feature the owner asked to be
+       rather than deleted: the old case pinned a feature that has since been
        removed, so the honest replacement is the property that is now true.
        Deleting it would have left nothing watching the same line. */
     document.body.classList.remove('light');

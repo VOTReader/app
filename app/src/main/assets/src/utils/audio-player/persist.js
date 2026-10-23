@@ -222,9 +222,7 @@ function _snapshot() {
   const queueForCustomSource = _pendingRestore && Array.isArray(_pendingRestore.queue)
     ? _pendingRestore.queue
     : _state.queue;
-  const customQueue = src.mode === 'custom'
-    ? queueForCustomSource.map(normalizeAudioTrack).filter(Boolean)
-    : undefined;
+  const customQueue = src.mode === 'custom' ? _savedCustomQueue(queueForCustomSource) : undefined;
   const songs = src.mode === 'songs' ? _songsSnapshotFields(src, savedTrack, qi) : null;
   return {
     v: 2,
@@ -238,6 +236,7 @@ function _snapshot() {
     startIndex: typeof src.startIndex === 'number' ? src.startIndex : undefined,
     startPartIndex: src.startPartIndex ? src.startPartIndex : undefined,
     startReader: src.startReader || undefined,
+    portion: src.portion ? true : undefined,
     filter: songs ? songs.filter : undefined,
     one: songs && songs.one ? true : undefined,
     seed: songs && songs.seed ? songs.seed : undefined,
@@ -250,10 +249,20 @@ function _snapshot() {
   };
 }
 
-/** How many ids an explicit songs list may persist. Longer lists persist the
- *  window FROM the playing song forward — the forward-only horizon every other
- *  rebuild keeps — so the snapshot stays small whatever the list. */
-const SONG_IDS_PERSIST = 50;
+/* A custom queue's saved form, made once per queue (player brief 2026-10-22, section 7): every write re-copied
+   every track of it. A queue edit replaces the array (queue.js slices, then commits), so its identity is the key. */
+let _customSaved = /** @type {{ queue: Track[] | null, saved: any[] }} */ ({ queue: null, saved: [] });
+/** @param {Track[]} queue @returns {any[]} */
+function _savedCustomQueue(queue) {
+  if (_customSaved.queue !== queue) _customSaved = { queue, saved: queue.map(normalizeAudioTrack).filter(Boolean) };
+  return _customSaved.saved;
+}
+
+/** How many ids an explicit songs list may persist: the same 1000 playSongs
+ *  takes (songs.js SONG_IDS_MAX), so a restart keeps the whole queue. Longer
+ *  lists persist the window FROM the playing song forward — the forward-only
+ *  horizon every other rebuild keeps. */
+const SONG_IDS_PERSIST = 1000;
 
 /**
  * The songs half of a snapshot: the compact descriptor, never the queue. An
@@ -332,6 +341,21 @@ export async function _adoptDurableSnapshot() {
 }
 
 /**
+ * The record a reload would restore the live session from, for Close's Undo (player brief 3a): the same record, so
+ * every queue kind (custom edits, songs, a plan portion) comes back as a reload would bring it.
+ * @returns {any} null when there is nothing to bring back
+ */
+export function _undoSnapshot() {
+  try { const s = _snapshot(); return s && s !== 'clear' ? s : null; } catch (_e) { return null; }
+}
+
+/**
+ * Put an _undoSnapshot record back on the bar, paused at its place, the way a reload does.
+ * @param {any} rec @returns {boolean} whether the record was usable
+ */
+export function _applyUndoSnapshot(rec) { return _applySnapshot(rec); }
+
+/**
  * Boot-time restore: show the bar paused at the saved position. Pure display
  * state — one placeholder queue entry from the snapshot; the real queue is
  * rebuilt by _rebuildRestoredQueue() on the first transport tap.
@@ -383,6 +407,7 @@ function _applySnapshot(s) {
       // null keeps the two readings from being confused later.
       startPartIndex: Number.isInteger(s.startPartIndex) && s.startPartIndex > 0 ? s.startPartIndex : null,
       startReader: typeof s.startReader === 'string' ? s.startReader : null,
+      portion: mode === 'custom' && s.portion === true,
       filter: mode === 'songs' && !songIds ? normalizeSongFilter(s.filter) : null,
       one: mode === 'songs' && !songIds && s.one === true,
       seed: mode === 'songs' ? (Number(s.seed) >>> 0) : 0,

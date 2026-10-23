@@ -136,6 +136,8 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(hook).toMatch(/if grep -q '"test:hook"' package\.json; then\n\s*heavy_run vitest npm run test:hook\n\s*else\n\s*heavy_run vitest npm run test:coverage\n/);
     expect(hook).toMatch(/^\s*heavy_run vitest-tools npx vitest run tools\/$/m);
     expect(hook).toMatch(/^\s*heavy_run gradle "\$GRADLE_CMD" :app:testDebugUnitTest :app:jacocoTestCoverageVerification$/m);
+    // nw-gradle (10-23): the stale-Kotlin-daemon retry runs through heavy_run too, only after an 'it is internal' failure
+    expect(hook).toMatch(/grep -q "it is internal" "\$glog"; then\n(.*\n)?\s*heavy_run gradle env 'ORG_GRADLE_PROJECT_kotlin\.compiler\.execution\.strategy=in-process' "\$GRADLE_CMD" :app:testDebugUnitTest/);
     const takes = hook.split('\n').filter((l) => /gate_take/.test(l) && !l.trim().startsWith('#'));
     expect(takes).toHaveLength(1);
   });

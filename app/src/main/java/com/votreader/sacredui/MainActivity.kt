@@ -244,6 +244,32 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         }
     }
 
+    // rp-s1: the reader said yes to a reading-plan reminder, so ask even if the media card's
+    // once-per-process ask already ran (Android itself stops showing the prompt after two refusals).
+    override fun askNotificationsPermission() {
+        if (Build.VERSION.SDK_INT < 33) { bridge.callOptional(JsEvent.NotificationsResult, PlanReminder.allowed(this)); return }
+        runOnUiThread {
+            notifPermAsked = true
+            val granted = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (granted) { bridge.callOptional(JsEvent.NotificationsResult, true); return@runOnUiThread }
+            try { notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS) }
+            catch (e: Exception) { Timber.w(e, "notification permission ask failed") }
+        }
+    }
+
+    override fun openNotificationSettings() {
+        runOnUiThread {
+            try {
+                startActivity(
+                    Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, packageName)
+                )
+            } catch (e: Exception) { Timber.w(e, "notification settings did not open") }
+        }
+    }
+
     /**
      * The WebView is no longer capable of playing once it is torn down. Keep
      * the ViewModel flag and foreground-service notification in lockstep so a
@@ -595,6 +621,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // from ensureNotificationsPermission's API-33 gate.
         notifPermLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             Timber.i("POST_NOTIFICATIONS %s", if (granted) "granted — media card visible" else "denied — media card hidden")
+            // rp-s1: the reading-plan reminder's offer waits on this answer.
+            bridge.callOptional(JsEvent.NotificationsResult, granted)
         }
 
         // System transport (QS media card / lock screen / headset) → the JS
@@ -678,6 +706,8 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // Only a fresh launch carries one: a restore, or a relaunch from Recents, must not replay the link.
             val launchedFromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
             val sharedKey = if (savedInstanceState == null && !launchedFromHistory) SharedLink.keyOf(intent.dataString) else null
+            // rp-s1: opened by a reading-plan reminder; the page takes the plan with planReminderOpened() once it boots.
+            if (savedInstanceState == null && !launchedFromHistory) PlanReminder.noteOpened(this, intent)
             webView.loadUrl(SharedLink.bootUrl(sharedKey))
         }
 
@@ -1504,6 +1534,12 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         super.onNewIntent(intent)
         setIntent(intent)
         if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
+        // rp-s1: a reading-plan reminder tapped with the app open. Kept for planReminderOpened() too, so a page
+        // still booting (no receiver yet) takes it when it is ready; a running page takes it now and clears it.
+        PlanReminder.noteOpened(this, intent)?.let { plan ->
+            if (::webView.isInitialized) bridge.callOptional(JsEvent.PlanReminderOpen, plan)
+            return
+        }
         val key = SharedLink.keyOf(intent.dataString) ?: return
         if (!::webView.isInitialized) return
         bridge.callWithResult(SharedLink.openInPageJs(key)) { result ->

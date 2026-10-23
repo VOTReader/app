@@ -173,6 +173,25 @@ describe('offline-audio — in the phone app', () => {
     expect(JSON.parse(b.offlineAudioSizes.mock.calls[1][0])).toEqual([U2]);
   });
 
+  // Downloads brief section 7 item 9: a failed lookup hid the Download all total until the screen was opened again.
+  it('a size that went unanswered is asked again on its own, a few times, while the screen stays open', async () => {
+    vi.useFakeTimers();
+    try {
+      const b = fakeBridge();
+      OfflineAudio.requestSizes([U1, U2]);
+      await Promise.resolve();
+      send({ type: 'sizes', sizes: { [U1]: 5 }, asked: [U1, U2] });
+      expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(8000);
+      expect(b.offlineAudioSizes).toHaveBeenCalledTimes(2);
+      expect(JSON.parse(b.offlineAudioSizes.mock.calls[1][0])).toEqual([U2]);
+      send({ type: 'sizes', sizes: { [U2]: 7 }, asked: [U2] });
+      expect(OfflineAudio.sizeOf(U2)).toBe(7);
+      await vi.advanceTimersByTimeAsync(120000);
+      expect(b.offlineAudioSizes).toHaveBeenCalledTimes(2);   // answered: no more asks
+    } finally { vi.useRealTimers(); }
+  });
+
   it('every row of a screen asking in one turn is one call to the phone (n2-02)', async () => {
     const b = fakeBridge();
     const url = (i) => U1.replace('.mp3', '-' + i + '.mp3');
@@ -266,5 +285,40 @@ describe('offline-audio — in the phone app', () => {
     expect(() => /** @type {any} */ (window).__votOfflineAudio(JSON.stringify({ type: 'progress' }))).not.toThrow();
     b.offlineAudioState.mockImplementation(() => { throw new Error('native threw'); });
     expect(() => OfflineAudio.refresh()).not.toThrow();
+  });
+});
+
+/* Downloads brief 2026-10-23, 3d: sizes are baked (tools/gen-audio-lengths.py -> AUDIO_LENGTHS, a lazy file), so a
+   whole set's total is known at once and the phone is asked only for what the build did not see. */
+describe('offline-audio — baked sizes', () => {
+  afterEach(() => { delete /** @type {any} */ (globalThis).AUDIO_LENGTHS; delete /** @type {any} */ (globalThis).__makeLazyLoader; });
+
+  it('a baked size answers at once and is never asked of the phone', async () => {
+    const b = fakeBridge();
+    /** @type {any} */ (globalThis).AUDIO_LENGTHS = { 'one-christmas-B': [18_000_000, 600] };
+    expect(OfflineAudio.sizeOf(U1)).toBe(18_000_000);
+    OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toEqual([U2]);
+  });
+
+  it('a size asked before the table lands waits for it, then asks only what it lacks', async () => {
+    const b = fakeBridge();
+    let land = () => {};
+    const corpus = { loaded: false, error: false, subscribe: () => () => {}, getVersion: () => 0 };
+    /** @type {any} */ (globalThis).__makeLazyLoader = vi.fn(() => ({
+      corpus,
+      load: () => new Promise((res) => { land = () => { /** @type {any} */ (globalThis).AUDIO_LENGTHS = { 'one-christmas-B': [18_000_000, 600] }; corpus.loaded = true; res(undefined); }; }),
+    }));
+    const heard = vi.fn();
+    OfflineAudio.subscribe(heard);
+    OfflineAudio.requestSizes([U1, U2]);
+    await Promise.resolve();
+    expect(b.offlineAudioSizes).not.toHaveBeenCalled();
+    land();
+    await vi.waitFor(() => expect(b.offlineAudioSizes).toHaveBeenCalledTimes(1));
+    expect(JSON.parse(b.offlineAudioSizes.mock.calls[0][0])).toEqual([U2]);
+    expect(OfflineAudio.sizeOf(U1)).toBe(18_000_000);
+    expect(heard).toHaveBeenCalled();                    // the screens repaint with the totals
   });
 });

@@ -1419,6 +1419,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
+  'vot-whats-new-seen',           // utils/whats-new.js — the newest change this profile was told about
   'vot-diag-ring',                // utils/diagnostic-log.js — storage-health warnings kept across reloads
   'vot-health-skip',              // utils/data-safety.js — an import / Clear All's reload is not a data loss
   'vot-health-progress',          // utils/data-safety.js PROGRESS_RESET_KEY — a progress reset's read marks (W9)

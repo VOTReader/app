@@ -18,8 +18,10 @@
    on Home and the desk's "Open the reading" is two taps away. An open sheet other
    than the listening desk (a note being written, the highlight bar, a scripture
    sheet) also holds the follow — a page must not swap under a finger mid-note;
-   the desk is the player's own UI and does not block. A held follow is not
-   retried; the next boundary is judged afresh.
+   the desk is the player's own UI and does not block. A held follow catches up
+   as soon as the last such sheet closes (s02.2, idea sweep 2026-10-22): the page
+   then opens the reading playing at that moment, if it still shows the one the
+   audio left (a held follow used to be dropped, and the page never caught up).
 
    TWO NAVIGATIONS, BECAUSE TWO BACK SEMANTICS. The MANUAL path already exists:
    the listening desk's title tap (AudioManagerSheet, owner request 2026-08-09)
@@ -205,16 +207,15 @@ export function useAudioFollow(p) {
     const player = g.AudioPlayer;
     if (!player || typeof player.subscribe !== 'function' || typeof player.getState !== 'function') return undefined;
     let prev = unitOf(player);
-    const unsub = player.subscribe(() => {
-      const cur = unitOf(player);
-      if (!cur) return;                        // stopped, or a section run: no unit to follow into
-      if (sameUnit(cur, prev)) return;         // same reading (a part boundary inside one letter, a tick)
-      const from = prev;
-      prev = cur;
+    /** The reading the page still shows while an open sheet holds the follow (s02.2). */
+    let held = /** @type {any} */ (null);
+    /** @param {any} from the reading the page shows @param {any} cur the one playing now */
+    const follow = (from, cur) => {
+      held = null;
       const pane = ref.current;
       if (pane.enabled === false) return;      // the row is off: the audio goes on, the screen stays
       if (!from || !paneShows(pane, from)) return;   // the live-pane rule
-      if (heldByOverlay()) return;
+      if (heldByOverlay()) { held = from; return; }
       suppressNextHistoryPush();
       const dest = openReading(pane, cur);
       // The reader's way back rides along (sweep v041): a tap-through entry
@@ -224,7 +225,25 @@ export function useAudioFollow(p) {
       // this callback), so the prune effect sees the moved pane and the
       // carried entry together.
       if (dest && typeof pane.retargetTop === 'function') pane.retargetTop(dest);
+    };
+    const unsub = player.subscribe(() => {
+      const cur = unitOf(player);
+      if (!cur) return;                        // stopped, or a section run: no unit to follow into
+      if (sameUnit(cur, prev)) return;         // same reading (a part boundary inside one letter, a tick)
+      // Under a hold the page still shows the reading the hold began on: judge against that one.
+      const from = held || prev;
+      prev = cur;
+      if (held && sameUnit(cur, held)) return;   // the audio came back to the page's reading: nothing to move
+      follow(from, cur);
     });
-    return unsub;
+    // The last sheet holding a follow closed: open the reading playing now (unless it is the one on the page).
+    const unwatch = modalRegistry.subscribe(() => {
+      if (!held || heldByOverlay()) return;
+      const from = held;
+      const cur = unitOf(player);
+      if (!cur || sameUnit(cur, from)) { held = null; return; }
+      follow(from, cur);
+    });
+    return () => { unsub(); unwatch(); };
   }, []);
 }

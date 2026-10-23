@@ -27,6 +27,7 @@
 import { isSongUrl, resolveBibleAudio } from './audio-track.js';
 import { WebOfflineAudio } from './offline-audio-web.js';
 import { loadAudioSync, loadBibleSync, loadAudioSyncSections } from './sync-loaders.js';
+import { bytesOf, lengthsReady, lengthsSettled } from './audio-lengths.js';
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale: boolean }} SavedItem */
 /** @typedef {'saved' | 'downloading' | 'queued' | 'failed' | 'none'} OfflineStatus */
@@ -38,6 +39,8 @@ let _version = 0;
 let _saved = new Map();
 let _totalBytes = 0;
 let _freeBytes = -1;
+/** The browser said it may clear downloads under storage pressure (web only; native files are the app's own). */
+let _evictable = false;
 /** Download only on Wi-Fi (ra6): what is queued waits for Wi-Fi now (the store's state says so). */
 let _waiting = false;
 /** @type {Set<string>} */
@@ -57,6 +60,12 @@ let _asked = new Map();
 /** @type {Set<string>} */
 let _sizesToSend = new Set();
 let _sizesFlushQueued = false;
+/** Lookups that came back unanswered are asked again on their own, at these delays (brief section 7 item 9: the
+ *  Download all total hid until the screen was opened again). */
+const SIZE_RETRY_MS = [8000, 30000, 90000];
+let _sizeRetry = 0;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _sizeRetryTimer = null;
 /** What a screen reader hears next (n2-06): a batch started, the queue finished, a download failed. Not per percent. */
 let _news = { seq: 0, text: '' };
 /** @param {string} text */
@@ -130,6 +139,7 @@ function refresh() {
   }
   _totalBytes = Number(s.totalBytes) || 0;
   _freeBytes = typeof s.freeBytes === 'number' ? s.freeBytes : -1;
+  _evictable = s.persisted === false;
   _waiting = s.waiting === true;
   _queued = new Set((Array.isArray(s.queued) ? s.queued : []).filter((u) => typeof u === 'string'));
   const a = s.active;
@@ -192,6 +202,11 @@ function _onEvent(json) {
       // what this answer was for (it names them), not what another call still has on its way (n2-02).
       const asked = Array.isArray(e.asked) ? e.asked : [..._sizesAsked];
       for (const u of asked) if (typeof u === 'string' && !_sizes.has(u)) _sizesAsked.delete(u);
+      const missed = asked.filter((u) => typeof u === 'string' && !_sizes.has(u) && !_saved.has(u));
+      if (!missed.length) _sizeRetry = 0;
+      else if (_sizeRetry < SIZE_RETRY_MS.length && !_sizeRetryTimer) {
+        _sizeRetryTimer = setTimeout(() => { _sizeRetryTimer = null; OfflineAudio.requestSizes(missed); }, SIZE_RETRY_MS[_sizeRetry++]);
+      }
       break;
     }
     default:
@@ -277,7 +292,7 @@ export const OfflineAudio = {
    * the other carries on from where it was (cf1).
    * @param {string} url @param {string} src @returns {boolean}
    */
-  webSameRecording: (url, src) => !_nativeBridge() && !!src && (src === url || src === WebOfflineAudio.localFor(url)),
+  webSameRecording: (url, src) => !_nativeBridge() && !!src && (src === url || WebOfflineAudio.isCopyOf(url, src)),
   refresh,
   /** @param {string} url */
   isSaved: (url) => statusOf(url) === 'saved',
@@ -287,13 +302,14 @@ export const OfflineAudio = {
   /** @param {string} url @returns {string | null} network | space | short | size | disk */
   failureOf: (url) => _failed.get(url) || null,
   /**
-   * Bytes of `url`: a download's own size, else one looked up (requestSizes), else null.
+   * Bytes of `url`: a download's own size, else one looked up (requestSizes), else the build's (AUDIO_LENGTHS,
+   * downloads brief 3d), else null.
    * @param {string} url @returns {number | null}
    */
   sizeOf: (url) => {
     const saved = _saved.get(url);
     if (saved && saved.bytes > 0) return saved.bytes;
-    return _sizes.get(url) || null;
+    return _sizes.get(url) || bytesOf(url) || null;
   },
   /**
    * Ask the phone for the sizes of `urls` not yet known (answered by a 'sizes' event).
@@ -302,7 +318,13 @@ export const OfflineAudio = {
   requestSizes(urls) {
     const b = _bridge();
     if (!b || typeof b.offlineAudioSizes !== 'function') return;
-    const want = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === 'string' && !_saved.has(u) && !_sizes.has(u) && !_sizesAsked.has(u));
+    // The build's sizes first (a lazy file): asked before it lands, this waits for it, repaints the screens with what
+    // it knows, and asks the phone only for what the build did not see (a recording uploaded after it).
+    if (!lengthsSettled()) {
+      lengthsReady().then(() => { _notify(); OfflineAudio.requestSizes(urls); });
+      return;
+    }
+    const want = (Array.isArray(urls) ? urls : []).filter((u) => typeof u === 'string' && !_saved.has(u) && !_sizes.has(u) && !_sizesAsked.has(u) && !bytesOf(u));
     if (!want.length) return;
     for (const u of want) { _sizesAsked.add(u); _sizesToSend.add(u); }
     if (_sizesFlushQueued) return;
@@ -330,6 +352,8 @@ export const OfflineAudio = {
     return Math.max(0, _totalBytes - songs);
   },
   freeBytes: () => { if (!_loaded) refresh(); return _freeBytes; },
+  /** @returns {boolean} this browser may clear the downloads when space runs low (it refused persistent storage) */
+  evictable: () => { if (!_loaded) refresh(); return _evictable; },
   /** @returns {boolean} downloads wait for Wi-Fi now (Download only on Wi-Fi is on and the phone is on mobile data) */
   waiting: () => { if (!_loaded) refresh(); return _waiting; },
   /**
@@ -408,8 +432,10 @@ export const OfflineAudio = {
   _reset() {
     _listeners.clear();
     _saved = new Map(); _queued = new Set(); _failed = new Map(); _sizes = new Map(); _sizesAsked = new Set(); _asked = new Map();
-    _sizesToSend = new Set(); _sizesFlushQueued = false; _news = { seq: 0, text: '' };
-    _active = null; _totalBytes = 0; _freeBytes = -1; _waiting = false; _loaded = false; _version = 0;
+    _sizesToSend = new Set(); _sizesFlushQueued = false;
+    if (_sizeRetryTimer) clearTimeout(_sizeRetryTimer);
+    _sizeRetryTimer = null; _sizeRetry = 0; _news = { seq: 0, text: '' };
+    _active = null; _totalBytes = 0; _freeBytes = -1; _evictable = false; _waiting = false; _loaded = false; _version = 0;
     _install();
   },
 };

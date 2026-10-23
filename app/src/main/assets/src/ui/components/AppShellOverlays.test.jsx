@@ -114,3 +114,35 @@ describe('Garden tier choice', () => {
     expect(opts.every((b) => b.getAttribute('type') === 'button')).toBe(true);
   });
 });
+
+// U09.6: offline, the gate's Wi-Fi and size talk led on to "Failed to load"; it says it needs a connection instead.
+describe('Garden gate offline', () => {
+  it('says the pictures need a connection and offers only Go Back', () => {
+    const was = Object.getOwnPropertyDescriptor(window.navigator, 'onLine');
+    Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
+    try {
+      render(
+        <AppShellOverlays
+          settings={{ tabsEnabled: true, gardenTier: 'standard' }} updateSetting={noop}
+          screen="home"
+          tabsOverviewOpen={false} setTabsOverviewOpen={noop}
+          tabs={[]} activeTabIdx={0} tabThumbnails={{}} MAX_TABS={9}
+          switchToTab={noop} closeTab={noop} openNewTab={noop}
+          closeOtherTabs={noop} closeTabsToTheRight={noop} closeAllTabs={noop}
+          deduplicateTabs={noop} reorderTabs={noop}
+          renameTab={noop} togglePinTab={noop}
+          tabActionIdx={null} setTabActionIdx={noop}
+          lastTabCloseStrikesRef={{ current: 0 }}
+          disableTabsPromptOpen={false} setDisableTabsPromptOpen={noop}
+          gardenWarningOpen={true} setGardenWarningOpen={noop}
+          setScreen={noop}
+        />,
+      );
+      expect(document.getElementById('garden-warning-title').textContent).toBe('No connection');
+      expect(document.querySelectorAll('.garden-tier-option').length).toBe(0);
+      expect([...document.querySelectorAll('.garden-warning-btn')].map((b) => b.textContent)).toEqual(['Go Back']);
+    } finally {
+      if (was) Object.defineProperty(window.navigator, 'onLine', was); else delete /** @type {any} */ (window.navigator).onLine;
+    }
+  });
+});

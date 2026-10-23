@@ -45,6 +45,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- RECEIVE_BOOT_COMPLETED - a "normal" (non-runtime) permission. rp-s1: an alarm does not survive a reboot, so
+         PlanReminderReceiver sets the reading-plan reminder's alarm again after one. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <!-- usesCleartextTraffic="false" is DOCUMENTATION, not new hardening: with
@@ -141,6 +144,20 @@
                 <action android:name="androidx.media3.session.MediaSessionService" />
             </intent-filter>
         </service>
+
+        <!-- rp-s1: the daily reading-plan reminder (PlanReminder.kt). The alarm's PendingIntent names this receiver
+             explicitly; the system's own broadcasts (reboot, update, clock and time-zone changes, after which the
+             alarm is set again) reach an unexported receiver too. -->
+        <receiver
+            android:name=".PlanReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
     </application>
 

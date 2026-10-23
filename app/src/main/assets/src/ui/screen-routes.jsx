@@ -49,6 +49,7 @@ import { textKeyOf } from './components/AudioShelf.jsx';
 import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop } from '../utils/songs-route.js';
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
+import { openDownloadsAt } from './screens/AudioOfflineScreen.jsx';
 import { AnswersShelf } from './screens/AnswersShelf.jsx';
 import { AnswersMedia } from './screens/AnswersMedia.jsx';
 import { AnswersSaved } from './screens/AnswersSaved.jsx';
@@ -321,12 +322,21 @@ export function buildScreenRoutes({
       navigateToLink({ type: 'bible', bookId: next.bid, chapter: next.cid }, { sourceLetterTitle: 'Today', silent: true });
     }
   };
+  // mw18 S8: the reader's plan line (PlanRibbon) opens a plan's next item the way the Today card's Read does.
+  /** @type {any} */ (window).__votOpenPlanItem = openPlanItem;
   // mw18 C5: Listen plays today's portion only (the refs from its first item not read yet), as one queue that
   // stops when the portion ends: each Bible chapter in the reader's audio edition, each letter in its
   // collection's recording. Items with no recording are passed over; with none, Read opens the first.
   const listenPlanItem = (refs, label) => {
     const list = (Array.isArray(refs) ? refs : refs ? [refs] : []).filter(Boolean);
     if (!list.length) return;
+    const items = planPortion(list);
+    const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
+    if (!started) openPlanItem(list[0]);
+  };
+  // mw18 S6: the recordings of a plan's coming days, saved to the phone from Plan details (the same tracks Listen plays).
+  const planTracks = (refs) => AudioPlayer.portionTracks(planPortion((Array.isArray(refs) ? refs : []).filter(Boolean)));
+  function planPortion(list) {
     const items = [];
     for (const ref of list) {
       const col = _planCol(ref.bid);
@@ -340,9 +350,8 @@ export function buildScreenRoutes({
         if (audio) items.push({ volKey: audio.volKey, item: { id: bookId }, collectionLabel: audio.label, chapterNum: Number(ref.cid) });
       }
     }
-    const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
-    if (!started) openPlanItem(list[0]);
-  };
+    return items;
+  }
   // Default LETTER voice (Settings → Listening → Letter Voice). The player is a
   // plain module — it can't read React state — so the preference is pushed to
   // it, idempotently, from the same render that owns the setting. 'auto' and
@@ -601,6 +610,13 @@ export function buildScreenRoutes({
   // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
   // Already on the Songs screen (the desk's "Song page ›" over a song list), the frames go on top of its stack, so
   // Back returns to the list. From anywhere else Back returns to that page, the root pill naming it (W-03).
+  // Downloads (downloads brief D3b): a collection or edition header's "Choose…" opens the tree there, Settings'
+  // Downloads & storage opens On this phone; Back returns to the page it came from, the pill naming it.
+  window.__openDownloads = (at, label) => {
+    openDownloadsAt(at);
+    setNavOrigin({ screen, letterId, label: label || '', returnOrigin: navOrigin || null });
+    setScreen('audio-library-offline');
+  };
   window.__openSongs = (frames, label) => {
     if (screen === SONGS_SCREEN) {
       // W2-03: the page already on top is not stacked again (its copy made the first Back go nowhere).
@@ -1058,6 +1074,7 @@ export function buildScreenRoutes({
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onOpenSongs={() => _openSongs([{ k: 'hub' }], { screen: 'home' })}
         onNotes={goNotesIndex}
+        onHighlights={goHighlightsIndex}
         onBookmarks={goBookmarksIndex}
         onScriptureWeb={() => {
           // Same entry as the Library's: capture Home as the origin so back returns here.
@@ -1105,8 +1122,8 @@ export function buildScreenRoutes({
           // Wave 0 (sticky genreId): entering content from History is a
           // non-genre entry — clear genreId so a later index-level Back
           // can't misroute into a genre visited in an earlier session leg.
-          // `silent: true` — History is the ONE link surface the owner wants
-          // pill-less (you already know where you came from). The back-stack
+          // `silent: true` — History is the ONE pill-less link surface (agent
+          // design: you already know where you came from). The back-stack
           // entry is still pushed, so Back from the destination returns to
           // History; only the visible pill is suppressed.
           if (entry.type === 'study-chapter') {
@@ -1167,6 +1184,8 @@ export function buildScreenRoutes({
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
         onRead={openPlanItem}
         onListen={listenPlanItem}
+        onNote={goJournalEditor}
+        planTracks={planTracks}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
@@ -1267,7 +1286,8 @@ export function buildScreenRoutes({
       <JournalEditorScreen
         onSettings={goSettings}
         entryId={journalEntryId}
-        onBack={() => goJournalViewer(journalEntryId)}
+        // U03.6: an entry just made with New entry goes Back to the Journal list (its read-only view was a second Back away).
+        onBack={() => { if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId); }}
         onHome={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1408,11 +1428,12 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
-    // Downloads to the phone (listening item 8): the hub's "On this phone" row.
+    // Downloads (listening item 8; downloads brief D3): the Library's Downloads card.
     'audio-library-offline': () => (
       <AudioOfflineScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel={(navOrigin && navOrigin.label) || 'Listening Library'}
+        bibleAudio={settings.bibleAudio}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

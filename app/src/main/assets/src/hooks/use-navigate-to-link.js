@@ -244,7 +244,7 @@ export function useNavigateToLink({
       sourceLetterTitle: (meta && meta.sourceLetterTitle) || null,
       sourceVolumeLabel: (meta && meta.sourceVolumeLabel) || null,
       // `silent` suppresses the pill but not the back target — History links
-      // are the one path the owner wants pill-less (see useFromLetterStack).
+      // are the one pill-less path (agent design; see useFromLetterStack).
       silent: !!(meta && meta.silent),
       destSnapshot: destSnapshot
     };

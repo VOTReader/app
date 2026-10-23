@@ -1,7 +1,7 @@
 /* plan-catalog (mw18): the call-1A plans, frozen items, and rp1's plans moved into runs. */
 
 import { describe, it, expect } from 'vitest';
-import { PLAN_CATALOG, bibleItems, collectionItems, startCatalogPlan, migrateRp1, bookTitle, runName } from './plan-catalog.js';
+import { PLAN_CATALOG, bibleItems, collectionItems, startCatalogPlan, migrateRp1, bookTitle, runName, chronoItems } from './plan-catalog.js';
 import { runStatus, dayItems, itemsLabel, totalDays, monthCells } from './plan-engine.js';
 import { biblePortion, BIBLE_CHAPTER_COUNT } from './reading-plans.js';
 
@@ -36,8 +36,8 @@ describe('Bible items', () => {
 
 describe('the catalog', () => {
   it('has the call-1A plans and every one starts', () => {
-    expect(PLAN_CATALOG.map((p) => p.id)).toEqual(['bible-year', 'new-testament', 'psalms', 'proverbs', 'gospels',
-      'seven-volumes', 'letters-year', 'volumes', 'collection', 'blessed', 'timothy', 'holy-days', 'matthew-study']);
+    expect(PLAN_CATALOG.map((p) => p.id)).toEqual(['bible-year', 'new-testament', 'psalms', 'proverbs', 'gospels',   // + S3, letters by date
+      'seven-volumes', 'letters-year', 'volumes', 'letters-chrono', 'collection', 'blessed', 'timothy', 'holy-days', 'matthew-study']);
     for (const p of PLAN_CATALOG) {
       const run = startCatalogPlan(p.id, src, at('2026-10-22'), { volKey: 'one' });
       if (p.id === 'seven-volumes' || p.id === 'letters-year' || p.id === 'volumes') { expect(run).not.toBeNull(); continue; }
@@ -102,5 +102,27 @@ describe('moving rp1 plans into runs', () => {
     expect(dayItems(runs[0], 0).length).toBe(2);
     expect(migrateRp1(old, () => false, src, runs, at('2026-10-22'))).toEqual([]);
     expect(migrateRp1([{ id: 'x', start: '2026-10-01' }, { id: 'bible-year', start: 'bad' }], () => false, src, [], at('2026-10-22'))).toEqual([]);
+  });
+});
+
+describe('Letters by date (S3)', () => {
+  it('orders every letter by its date; a preface leads its collection; the undated come last in site order', () => {
+    const col = (volKey, readKey, label, letters, preface) => ({ col: { volKey, readKey, label, letterScreen: volKey + '-letter' }, letters, preface });
+    const L = (id, date) => ({ id, title: id, date, words: 400 });
+    const cols = [
+      col('four', 'volume-four', 'Volume Four', [L('f1', '1/5/06'), L('f2', '9/1/06')], { id: 'f-pre', title: 'Preface', date: '', words: 100 }),
+      col('seven', 'volume-seven', 'Volume Seven', [L('s1', '3/28/07'), L('s2', '6/2/06')], null),
+      col('wtlb1', 'wtlb-one', 'WTLB One', [{ id: 'w1', title: 'w1', words: 50 }], null),
+      col('blessed', 'the-blessed', 'The Blessed', [{ id: 'b1', title: 'b1', words: 50 }], null),
+      col('flock', 'letters-flock', 'Flock', [L('fl1', '11/14/04')], null),
+    ];
+    const s = {
+      colByKey: new Map(cols.map((c) => [c.col.volKey, c.col])),
+      letters: (c) => cols.find((x) => x.col === c).letters,
+      preface: (c) => cols.find((x) => x.col === c).preface,
+      words: (e) => e.words,
+    };
+    expect(chronoItems(s).map((it) => it.k.split(':')[1])).toEqual(['fl1', 'f-pre', 'f1', 's2', 'f2', 's1', 'w1', 'b1']);
+    expect(PLAN_CATALOG.find((p) => p.id === 'letters-chrono').name).toBe('Letters by date');
   });
 });

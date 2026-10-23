@@ -39,7 +39,7 @@ import { _countPlay } from './credit.js';
 import { _seekOnMetadata, _start, _startAt } from './engine.js';
 import { _syncMediaSessionActions } from './media-session.js';
 import { _offlineNotice, _offlineRefuses } from './offline.js';
-import { _persist, _rememberOutgoingPosition, _resumeAt } from './persist.js';
+import { _persist, _rememberOutgoingPosition, _resumeAt, _setLastPersistSec } from './persist.js';
 import { playSongs } from './songs.js';
 
 /** @typedef {import('../audio-player.js').Track} Track */
@@ -56,9 +56,9 @@ import { playSongs } from './songs.js';
 export function playBibleBook(opts) {
   const o = opts || /** @type {any} */ ({});
   const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
-  // Queue scope is THE BOOK (owner directive 2026-08-10): a chapter tap
-  // queues that book's remaining chapters, never the rest of the Bible up
-  // front. Since w-audio-continue (2026-09-11) the queue EXTENDS into the next
+  // Queue scope is THE BOOK (Corbin 2026-08-09 23:14: "playing one bible chapter
+  // should not queue the entire bible, only the book"): a chapter tap queues
+  // that book's remaining chapters, never the rest of the Bible up front. Since w-audio-continue (2026-09-11) the queue EXTENDS into the next
   // book of the same edition as the last chapter ends (_extendQueue, _booksAfter)
   // — the horizon is a book at a time, the walk is the whole edition.
   const items = books.filter((b) => b[0] === o.bookId).map((b) => ({ id: b[0], title: b[1] }));
@@ -470,6 +470,24 @@ function _booksAfter(volKey, bookId) {
  * @returns {boolean}
  */
 /**
+ * The tracks a plan's portion plays (playPortion's queue), also what the plan saves to the phone (mw18 S6).
+ * @param {Array<{ volKey: string, item: { id?: string, title?: string }, collectionLabel?: string | null, chapterNum?: number | null }> | null | undefined} items
+ * @returns {Track[]}
+ */
+export function portionTracks(items) {
+  /** @type {Track[]} */
+  const queue = [];
+  for (const p of Array.isArray(items) ? items : []) {
+    if (!p || !p.volKey || !p.item) continue;
+    const tracks = playbackTracks(p.volKey, p.item, p.collectionLabel || undefined);
+    const n = Math.floor(Number(p.chapterNum) || 0);
+    if (n >= 1 && tracks.length > 1) { if (n <= tracks.length) queue.push(tracks[n - 1]); }
+    else for (const t of tracks) queue.push(t);
+  }
+  return queue;
+}
+
+/**
  * Play a reading plan's portion for today (mw18 C5): the recordings of the
  * listed chapters and letters, in order, as ONE queue that ends with the
  * portion - never on into the rest of the book or collection. A custom queue
@@ -484,20 +502,12 @@ function _booksAfter(volKey, bookId) {
  */
 export function playPortion(opts) {
   const o = opts || /** @type {any} */ ({});
-  /** @type {Track[]} */
-  const queue = [];
-  for (const p of Array.isArray(o.items) ? o.items : []) {
-    if (!p || !p.volKey || !p.item) continue;
-    const tracks = playbackTracks(p.volKey, p.item, p.collectionLabel || undefined);
-    const n = Math.floor(Number(p.chapterNum) || 0);
-    if (n >= 1 && tracks.length > 1) { if (n <= tracks.length) queue.push(tracks[n - 1]); }
-    else for (const t of tracks) queue.push(t);
-  }
+  const queue = portionTracks(o.items);
   if (!queue.length) return false;
   if (_offlineRefuses(queue)) { _toast(OFFLINE_MSG); return false; }
   _rememberOutgoingPosition();
   _setPendingRestore(null);
-  _setSource({ mode: 'custom', volKey: '', label: o.label || null });
+  _setSource({ mode: 'custom', volKey: '', label: o.label || null, portion: true });
   _state.queue = queue;
   _state.qi = 0;
   _countPlay();
@@ -628,6 +638,67 @@ export function clearUpcoming() {
   return true;
 }
 
+/**
+ * The desk's voice or edition switch on a queue the listener made (edited, or a plan's portion): the playing item
+ * goes to the chosen recordings IN PLACE and starts again, and the rest of the queue stays as the listener made it.
+ * A letter swaps its own parts for the chosen reader's; a Bible edition swaps this chapter and every chapter of the
+ * old edition after it, each to the same chapter. The desk used to rebuild the queue from the corpus, which dropped
+ * the edits and turned a plan's portion into a whole book (player brief 2026-10-22, section 7).
+ *
+ * @param {{ volKey: string, reader?: string | null, label?: string | null }} opts a Bible switch names the edition's
+ *   volKey and label; a letter switch names its own volKey and the reader
+ * @returns {boolean} false when nothing could be switched in place (the caller rebuilds instead)
+ */
+export function switchVoiceInPlace(opts) {
+  const o = opts || /** @type {any} */ ({});
+  const q = _state.queue;
+  const cur = q[_state.qi];
+  if (_pendingRestore || !cur || !o.volKey) return false;
+  const oldVol = _volKeyOf(cur.key);
+  if (!oldVol) return false;   // a section run's track names no item
+  const itemId = cur.key.slice(oldVol.length + 1);
+  let queue;
+  let qi = _state.qi;
+  if (_chapterOfTrack(cur) > 0) {
+    if (!_isBibleVol(o.volKey)) return false;
+    const books = Array.isArray(_g().BIBLE_AUDIO_BOOKS) ? _g().BIBLE_AUDIO_BOOKS : [];
+    /** @type {Map<string, Track[]>} */
+    const byBook = new Map();
+    const chapterIn = (/** @type {Track} */ t) => {
+      const id = t.key.slice(oldVol.length + 1);
+      if (!byBook.has(id)) {
+        const book = books.find((b) => b[0] === id);
+        byBook.set(id, _tracksFor(o.volKey, { id, title: book ? book[1] : '' }, o.label || null));
+      }
+      const n = _chapterOfTrack(t);
+      return /** @type {Track[]} */ (byBook.get(id)).find((x) => _chapterOfTrack(x) === n) || null;
+    };
+    const first = chapterIn(cur);
+    if (!first) return false;
+    queue = q.map((t, i) => (i > _state.qi && _volKeyOf(t.key) === oldVol && _chapterOfTrack(t) > 0 ? chapterIn(t) || t : t));
+    queue[_state.qi] = first;
+  } else {
+    const item = { id: itemId, title: cur.title };
+    const chosen = o.reader ? _renditionByReader(o.volKey, item, cur.sub, o.reader) : null;
+    const run = chosen ? chosen.tracks : _tracksFor(o.volKey, item, cur.sub);
+    if (!run.length) return false;
+    let a = _state.qi;
+    while (a > 0 && q[a - 1].key === cur.key) a--;
+    let b = _state.qi;
+    while (b + 1 < q.length && q[b + 1].key === cur.key) b++;
+    queue = q.slice(0, a).concat(run, q.slice(b + 1));
+    qi = a;
+  }
+  if (_offlineRefuses([queue[qi]])) { _offlineNotice(queue[qi]); return true; }
+  _rememberOutgoingPosition();   // R8: the clock belongs to the recording leaving
+  if (_source && oldVol !== o.volKey && _source.volKey === oldVol) _setSource({ ..._source, volKey: o.volKey });
+  _state.qi = qi;
+  _commitQueueEdit(queue);
+  _start();
+  _setLastPersistSec(-1);
+  _persist();
+  return true;
+}
 
 // This module's verbs that the modules below it call (core.js `late`).
 Object.assign(late, { _crossInto, _extendQueue });

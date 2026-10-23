@@ -227,6 +227,49 @@ export const audioSyncSectionsStore = {
 /** @type {any} */ (globalThis).__audioSyncSectionsStore = audioSyncSectionsStore;
 /** @type {any} */ (globalThis).__loadAudioSyncSections = loadAudioSyncSections;
 
+/* ── Recording lengths (AUDIO_LENGTHS), bytes and seconds per asset ──
+   Not a timing file, but the same shape: baked by tools/gen-audio-lengths.py (downloads brief 3d, player U04.1),
+   fetched the first time something wants a size or a length (utils/audio-lengths.js), never on the boot path. */
+/** @type {LazyLoader | null} */
+let _lengths = null;
+
+/** @returns {LazyLoader | null} */
+function _lengthsLoader() {
+  if (_lengths) return _lengths;
+  if (!_hasFactory()) return null;
+  _lengths = /** @type {any} */ (globalThis).__makeLazyLoader('audio-lengths', 'src/data/audio-lengths.js', null);
+  return _lengths;
+}
+
+/**
+ * Fetch the recording lengths (AUDIO_LENGTHS), once per page. Resolves on failure and where no loader exists.
+ * @returns {Promise<void>}
+ */
+export function loadAudioLengths() {
+  const l = _lengthsLoader();
+  if (!l) return Promise.resolve();
+  return l.load().catch(() => undefined);
+}
+
+/** The lengths have landed or failed to, or this page has no loader to fetch them with. @returns {boolean} */
+export function audioLengthsSettled() {
+  if (!_hasFactory() && !_lengths) return true;
+  const l = _lengthsLoader();
+  return !l || l.corpus.loaded || l.corpus.error;
+}
+
+/** useSyncExternalStore contract for the recording lengths' arrival. */
+export const audioLengthsStore = {
+  /** @param {() => void} cb */
+  subscribe(cb) {
+    const l = _lengthsLoader();
+    return l ? l.corpus.subscribe(cb) : () => {};
+  },
+  getVersion() {
+    return _lengths ? _lengths.corpus.getVersion() : 0;
+  },
+};
+
 /* ── Answers Only God Can Give — src/data/answers.js (ANSWERS, ~2.5 MB) ──
    Not a timing file, but the same shape for the same reasons: one raw
    src/data file, fetched the first time a reader opens Answers, shipped by

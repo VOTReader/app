@@ -497,12 +497,12 @@ def run_belt(key, s, asset=None):
                 row["clamped"] = True
             row["ship_t"] = t
             last_t = t
-            # Interpolated rows DO ship (owner directive 2026-08-26). The old
+            # Interpolated rows DO ship (agent design, 2026-08-26). The old
             # rule — paint only belt-proven onsets — meant an unproven clause
             # went dark and the wash jumped over it, which reads as the feature
             # being broken. An onset spread across the gap by _interpolate_runs
             # is a little loose but always in the right passage, and that is the
-            # trade the owner asked for. UNSPOKEN rows are still never shipped:
+            # trade worth making. UNSPOKEN rows are still never shipped:
             # those words are provably absent from the recording, so painting
             # them would wash text the voice is not reading. They carry no t at
             # all and never reach here.

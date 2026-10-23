@@ -15,6 +15,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { AUDIO_RESUME_END_FRACTION, isSongKey, songIdOfKey } from '../../utils/audio-track.js';
 import { songById } from '../../utils/song-catalog.js';
 import { formatClock } from './AudioSeekSlider.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 
 /** AudioLibraryStore lives in bundle-b; resolved at call time, never imported. */
 export function audioLibraryStore() { return /** @type {any} */ (globalThis).AudioLibraryStore || null; }
@@ -241,7 +242,7 @@ export function AudioShelfRow({ track, source, onOpenTrack, onRemove }) {
         <button
           type="button"
           className={'audio-library-icon-button audio-library-save-button' + (isSaved ? ' is-saved' : '')}
-          onClick={() => library && library.toggleSaved(track)}
+          onClick={() => toggleSavedRecording(library, track)}
           aria-label={isSaved ? 'Remove ' + trackName(track) + ' from saved recordings' : 'Save ' + trackName(track)}
           aria-pressed={isSaved}
           title={isSaved ? 'Remove from saved recordings' : 'Save recording'}

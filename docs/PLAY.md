@@ -1,6 +1,6 @@
 # Google Play: where VOTReader stands
 
-Corbin, 2026-10-05 01:5x: Timothy gave permission. "Just get it there", do not publish yet.
+Timothy gave permission (2026-10-05). Google Play is parked whole until Corbin raises it (DECISIONS 10-14 00:23).
 This page is the handover: what is built, how to build it, and what is left that only Corbin can do.
 
 ## What exists now

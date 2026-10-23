@@ -13,6 +13,7 @@
    reads as maybe-usable, and is still in tab and screen-reader order.
    "Invisible and uninteractable" means GONE. */
 
+import { OfflineAudio } from '../../utils/offline-audio.js';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
 import { screen, cleanup, fireEvent, within, act, waitFor } from '@testing-library/react';
@@ -370,17 +371,31 @@ describe('Listening group', () => {
     } finally { delete window.AndroidBridge; }
   });
 
-  it('Download only on Wi-Fi: a browser that cannot tell Wi-Fi from mobile data says so; none where nothing downloads', () => {
+  // Downloads brief section 7 item 10: where the browser cannot tell Wi-Fi from mobile data the switch did nothing.
+  it('Download only on Wi-Fi: not offered where Wi-Fi cannot be told from mobile data, nor where nothing downloads', () => {
     window.AndroidBridge = { offlineAudioState: () => '{}' };   // a store, but no way to tell (as a desktop browser)
     try {
       renderSettings({ downloadWifiOnly: true });
-      expect(within(row('Download only on Wi-Fi')).getByRole('switch').getAttribute('aria-checked')).toBe('true');
-      fireEvent.click(within(row('Download only on Wi-Fi')).getByRole('button', { name: /show description/i }));
-      expect(row('Download only on Wi-Fi').textContent).toContain('This browser cannot tell Wi-Fi from mobile data');
+      expect(groupRowLabels('Listening')).not.toContain('Download only on Wi-Fi');
     } finally { delete window.AndroidBridge; }
     cleanup();
     renderSettings();
     expect(groupRowLabels('Listening')).not.toContain('Download only on Wi-Fi');
+  });
+
+  // Downloads brief 3a, picture 18: Downloads & storage, with what is on the phone, opens On this phone.
+  it('Downloads & storage says what is on the phone and opens On this phone', () => {
+    window.AndroidBridge = { offlineAudioState: () => JSON.stringify({ items: [{ url: 'https://x.test/a.mp3', key: 'one:a', title: 'A', bytes: 251e6, savedAt: 1 }], totalBytes: 251e6, freeBytes: 10.7e9 }), offlineAudioWifiOnly: vi.fn() };
+    window.__openDownloads = vi.fn();
+    try {
+      OfflineAudio._reset();
+      renderSettings();
+      const labels = groupRowLabels('Listening');
+      expect(labels.indexOf('Downloads & storage')).toBe(labels.indexOf('Download only on Wi-Fi') - 1);
+      const btn = screen.getByRole('button', { name: /^Downloads and storage: 1 recording · 251 MB · 10.7 GB free/ });
+      fireEvent.click(btn);
+      expect(window.__openDownloads).toHaveBeenCalledWith({ tab: 'phone' }, 'Settings');
+    } finally { delete window.AndroidBridge; delete window.__openDownloads; }
   });
 
   it('no keep store on this browser, no Songs kept row', () => {

@@ -272,8 +272,10 @@ describe('NoteSheet Share outcome (A15)', () => {
       unmount();
     }
     expect(sent.length).toBe(2);
-    expect(sent[0].text.startsWith('anchor\n\nSaved note')).toBe(true);
-    expect(sent[0].text).toContain('3:16');
+    // U07.2: quoted and cited, the note marked as the reader's own, so it can't read as Scripture.
+    expect(sent[0].text.startsWith('\u201Canchor\u201D \u2014 ')).toBe(true);
+    expect(sent[0].text.split('\n')[0]).toContain('3:16');
+    expect(sent[0].text).toContain('\n\nMy note: Saved note\n\n');
     expect(sent[0].text).toContain('?p=bible%3Ajohn%3A3%3A16');
     expect(sent[1].text).toBe('anchor\n\nSaved note');
   });
@@ -345,5 +347,18 @@ describe('NoteSheet delete confirm names the mark that goes with the note (ds5 A
     const text = container.querySelector('.note-sheet-menu').textContent;
     expect(text).toContain('Delete this note?');
     expect(text).not.toContain('highlight');
+  });
+
+  // RC.11 (UX sweep 2026-10-22, sel/21 -> sel/26): the green note's highlight covered an older yellow, and the
+  // yellow came back after the delete with no word. The confirm now says so.
+  it('says when the yellow under the note highlight shows again', () => {
+    setupStores({ body: 'my reflection' });
+    const green = { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'green', text: 'anchor', start: 0, end: 20, created: 2 };
+    window.AnnotationStore.getByGroup = () => [{ key: 'k', ann: green }];
+    window.AnnotationStore.get = () => [{ id: 'y1', groupId: 'y1', kind: 'highlight', color: 'yellow', start: 5, end: 9, created: 1 }, green];
+    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    openDelete(container);
+    expect(container.querySelector('.note-sheet-menu').textContent)
+      .toContain('Delete this note and its highlight? The yellow under it shows again.');
   });
 });

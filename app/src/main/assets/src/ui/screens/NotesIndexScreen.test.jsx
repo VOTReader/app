@@ -57,7 +57,7 @@ function setupGlobals() {
 
 const GLOBALS = ['noteSourceLabel', 'noteSourceSegments', 'relativeDate', 'NoteStore', 'NotebookStore', 'ScreenLayout', 'LibraryNav', 'NoteRow'];
 
-beforeEach(setupGlobals);
+beforeEach(() => { setupGlobals(); localStorage.removeItem('vot-notes-tab'); });
 afterEach(() => {
   cleanup();
   GLOBALS.forEach(g => { delete window[g]; });
@@ -259,5 +259,24 @@ describe('NotesIndexScreen — large libraries', () => {
     act(() => { ver = 2; if (ping) ping(); });
     expect(lists).toBe(2);
     expect(container.querySelectorAll('.note-row').length).toBe(3);
+  });
+});
+
+/* U03.8/U08.4: Notes opened on Notebooks, a lone "Uncategorized" row, a tap away from every note. */
+describe('NotesIndexScreen opening tab', () => {
+  const active = (c) => c.querySelector('.notes-tab.active').textContent;
+  it('opens on All notes while the reader has no notebook of their own', () => {
+    window.NotebookStore = { ...window.NotebookStore, list: () => [] };
+    const { container } = render(<NotesIndexScreen {...props} />);
+    expect(active(container)).toMatch(/All notes/i);
+  });
+
+  it('opens on Notebooks when there are notebooks, then on whichever tab the reader last chose', () => {
+    const first = render(<NotesIndexScreen {...props} />);
+    expect(active(first.container)).toMatch(/Notebooks/i);
+    fireEvent.click([...first.container.querySelectorAll('.notes-tab')].find((b) => /All notes/i.test(b.textContent)));
+    first.unmount();
+    const again = render(<NotesIndexScreen {...props} />);
+    expect(active(again.container)).toMatch(/All notes/i);
   });
 });

@@ -21,13 +21,16 @@ import {
 /** Shared DOM id so every audio message replaces the previous one. */
 export const AUDIO_TOAST_ID = 'vot-toast-audio';
 
-export const OFFLINE_MSG = 'Playing audio requires an internet connection.';
+/** Offline, and nothing asked for is on the phone: says what to do (downloads brief 2026-10-23, section 7 item 4). */
+export const OFFLINE_MSG = 'Not on this phone. Connect to listen.';
 export const LOAD_FAIL_MSG = 'Couldn’t load this track.';
 /** A streamed recording that died at the network (MediaError 2) with the phone still online: a dead zone (U04.2). */
 export const NO_SIGNAL_MSG = 'No signal. This recording isn’t on your phone.';
 /** Offline, a Next or Previous with nothing that way on the phone: refused, so the one playing plays on (RC.1). */
 export const NEXT_OFFLINE_MSG = 'No connection. The next recording isn’t on this phone.';
 export const PREV_OFFLINE_MSG = 'No connection. The previous recording isn’t on this phone.';
+/** The end of a reading plan's portion (player brief 2026-10-22, 3g). Any other queue's end names its collection. */
+export const PORTION_DONE_MSG = 'Today’s listening is done.';
 
 /**
  * Stream URL for a track. The manifest stores Google Drive file ids, but the
@@ -61,7 +64,7 @@ export function _setNative(v) { _native = v; }
 const _listeners = new Set();
 let _version = 0;
 /** @type {AudioPlayerState} */
-export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null };
+export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, rate: 1, sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, restoring: false, sourceMode: /** @type {'letter'|'collection'|'section'|'custom'|'songs'|''} */ (''), shuffle: false, repeat: /** @type {'off'|'one'|'all'} */ ('off'), loop: null, failed: null };
 /** The READING speed — the listener's chosen rate for letters and chapters.
  *  `_state.rate` is the EFFECTIVE rate of what is playing, which is 1 for a
  *  song: the reader's 1.5× must not warp music (W3-05), and it must come back
@@ -105,21 +108,32 @@ export const _assetUrlFor = (volKey, id) => (_isBibleVol(volKey)
   : trackUrl(id));
 
 export function _notify() {
+  _shapeVersion++;
+  _notifyTick();
+}
+
+/** Bumped by every notify but the 1 Hz clock tick (s18.3, idea sweep 2026-10-22). */
+let _shapeVersion = 0;
+/** The clock's whole second moved, nothing else: subscribers re-read the clock; the shape version stays. */
+export function _notifyTick() {
   _version++;
   _syncNativeUpcoming();
   for (const cb of _listeners) {
     try { cb(); } catch (e) { console.warn('[audio] subscriber threw', e); }
   }
 }
+/** The snapshot for a screen that draws no clock (with liveLetter: the facade's getShape). @returns {number} */
+export function getShapeVersion() { return _shapeVersion; }
 
 /** @returns {boolean} */
 export function _offline() {
   return typeof navigator !== 'undefined' && navigator.onLine === false;
 }
 
-/** @param {string} text */
+/** Polite, like the bar's own states (player brief 2026-10-22, 3g; s31.6): an assertive notice cut into whatever
+ *  the screen reader was saying, over the audio the listener had started. @param {string} text */
 export function _toast(text) {
-  showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast', text, ariaLive: 'assertive' });
+  showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast', text, ariaLive: 'polite' });
 }
 
 /** Keep native's next recording in step with the queue and its modes (cheap: one short JSON compare). */
@@ -145,7 +159,7 @@ function _syncNativeUpcoming() {
  * is a few dozen bytes here, where a `custom` queue would re-serialize 900
  * tracks into IDB every second. song-catalog.js's songQueue() turns it back
  * into the same queue.
- * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null, wrap?: boolean, swaps?: Record<string, string> | null, fromSection?: any } | null} */
+ * @type {{ mode: 'letter'|'collection'|'section'|'custom'|'songs', volKey: string, label: string|null, startKey?: string|null, startIndex?: number|null, startReader?: string|null, startPartIndex?: number|null, portion?: boolean, filter?: any, one?: boolean, seed?: number, shuffle?: boolean, ids?: string[] | null, wrap?: boolean, swaps?: Record<string, string> | null, fromSection?: any } | null} */
 export let _source = null;
 /** Descriptor waiting for its queue rebuild (set only by _restoreFromSaved). */
 export let _pendingRestore = /** @type {any} */ (null);

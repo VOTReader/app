@@ -71,7 +71,8 @@ function studyCountLine(study) {
  * }} props
  */
 export function AudioStudiesScreen({ onBack, backLabel = 'Listening Library', onOpenStudy, onReadStudy, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Not the 1 Hz clock: nothing here draws it (s18.3).
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   // The recordings ride the lazy VOT corpus (the manifest) and the studies are
   // their own lazy file: warm both, and re-render as each lands.
   React.useEffect(() => {

@@ -32,6 +32,8 @@
    reuseEndpoint), so journal card/excerpt modes get them for free.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { navItemPreview } from '../../utils/nav-index.js';
+
 /**
  * The three corpus scopes, in SearchScreen's order + vocabulary
  * (.srch-corpus-row). `id` is the engine's own `corpus` option value, so the
@@ -53,6 +55,20 @@ function readerTranslation() {
     const s = typeof StateStore !== 'undefined' && StateStore ? StateStore.get() : null;
     return (s && s.settings && s.settings.translation) || 'nkjv';
   } catch (_e) { return 'nkjv'; }
+}
+
+/**
+ * U03.2: a verse row shows the verse's words ("He who has the bride…"), not only "John 3:29 · New Testament", so
+ * the reader can tell it is the verse they meant. '' when the item names no verse or its text is not loaded.
+ * @param {any} item @returns {string}
+ */
+function verseWords(item) {
+  if (!item || !item.verse) return '';
+  let t = '';
+  try { t = String(navItemPreview(item) || '').replace(/\s+/g, ' ').trim(); } catch (_e) { return ''; }
+  if (t.length <= 70) return t;
+  const cut = t.slice(0, 70);
+  return cut.slice(0, cut.lastIndexOf(' ') > 40 ? cut.lastIndexOf(' ') : 70) + '…';
 }
 
 export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, onRequestRefine, lastCreatedLink, onLinkCreated, mode, onPickTarget }) {
@@ -278,7 +294,9 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
       </div>
       <div className="navpick-row-text">
         <div className="navpick-row-label">{item.label}</div>
-        {extra ? <div className="navpick-row-snippet">{extra}</div> : <div className="navpick-row-cat">{item.category || ''}</div>}
+        {extra ? <div className="navpick-row-snippet">{extra}</div>
+          : verseWords(item) ? <div className="navpick-row-snippet">{verseWords(item)}</div>
+            : <div className="navpick-row-cat">{item.category || ''}</div>}
       </div>
     </button>
   );

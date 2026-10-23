@@ -4,10 +4,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const { loaders, web } = vi.hoisted(() => ({
-  loaders: { loadAudioSync: vi.fn(), loadBibleSync: vi.fn(), loadAudioSyncSections: vi.fn() },
+  loaders: {
+    loadAudioSync: vi.fn(), loadBibleSync: vi.fn(), loadAudioSyncSections: vi.fn(),
+    // The recording lengths (D1): settled with no table, so sizes are asked of the store as before.
+    loadAudioLengths: vi.fn(() => Promise.resolve()), audioLengthsSettled: vi.fn(() => true),
+  },
   web: { supported: () => true, offlineAudioState: () => JSON.stringify({ items: [], totalBytes: 0, freeBytes: 1e9, active: null, queued: [] }), offlineAudioSave: vi.fn() },
 }));
-vi.mock('./sync-loaders.js', () => loaders);
+vi.mock('./sync-loaders.js', () => ({ ...loaders, audioLengthsStore: { subscribe: () => () => {}, getVersion: () => 0 } }));
 vi.mock('./offline-audio-web.js', () => ({ WebOfflineAudio: web }));
 vi.mock('./audio-track.js', async (importOriginal) => {
   const real = /** @type {any} */ (await importOriginal());

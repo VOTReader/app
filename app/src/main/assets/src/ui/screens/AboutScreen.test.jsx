@@ -80,6 +80,11 @@ describe('AboutScreen — page 2 describes the app that actually shipped', () =>
     expect(text).toMatch(/Listen streams/i);
   });
 
+  // Downloads brief 2026-10-23, section 7 item 21: it said only "Tapping Listen streams that recording".
+  it('says a downloaded recording plays with no connection', () => {
+    expect(page2()).toMatch(/download a recording and it plays with no connection/i);
+  });
+
   it('still promises the reader that their own data stays on the device', () => {
     expect(page2()).toMatch(/your notes, highlights and journal never leave this device/i);
   });

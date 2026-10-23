@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { uncoveredLine } from '../../renderer/mark-overlap.js';
 
 /**
  * Where the chip's top edge goes (cz2, 2026-10-05). It opens 10 px under the tap; when that would cross the bottom
@@ -175,7 +176,8 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
         )}
         {mode === 'confirm' && (
           <ConfirmStrip
-            question={`Remove this ${kindLabel}?`}
+            // RC.11: a mark it covers comes back, so the question says so.
+            question={[`Remove this ${kindLabel}?`, uncoveredLine([groupId], AnnotationStore)].filter(Boolean).join(' ')}
             yesLabel="Yes, remove"
             onCancel={() => setMode('main')}
             onConfirm={remove}

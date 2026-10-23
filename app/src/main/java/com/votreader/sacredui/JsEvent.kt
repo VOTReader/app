@@ -71,4 +71,10 @@ sealed class JsEvent(val fn: String) {
     // playing, want, buffering, ended, reason?, from?, code?, name?, http?}. utils/native-audio.js turns each into
     // the events an <audio> would fire.
     data object NativeAudio : JsEvent("__votNativeAudio")
+    // rp-s1: a reading-plan reminder was tapped while the page was running; one string, the plan's id.
+    // (A cold start leaves it for AppInterface.planReminderOpened.) utils/plan-reminder.js installs it.
+    data object PlanReminderOpen : JsEvent("__votPlanReminderOpen")
+    // rp-s1: the answer to the notification-permission ask (true = allowed). Fires for either asker
+    // (the media card's or the reminder's); utils/plan-reminder.js re-reads the status on it.
+    data object NotificationsResult : JsEvent("__votNotificationsResult")
 }

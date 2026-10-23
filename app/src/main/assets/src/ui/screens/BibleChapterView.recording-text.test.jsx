@@ -58,6 +58,8 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  const toastEl = document.getElementById('vot-toast-audio');
+  if (toastEl) toastEl.remove();
   delete _translationLoaded.kjv;
   STUBBED.forEach((k) => { delete globalThis[k]; });
   if (priorScrollIntoView === undefined) delete Element.prototype.scrollIntoView;
@@ -71,7 +73,7 @@ const view = () => (
   <BibleChapterView book={JOHN} chapter={JOHN.chapters[0]} translation="nkjv" theme="dark"
     markAsReadEnabled={false} onNavigate={() => {}} />
 );
-const banner = () => screen.queryByText(/to match the recording/);
+const banner = () => document.querySelector('.hero-audio-text');   // the hero line (the RC.12 toast says it too)
 const landKjv = async () => {
   globalThis.BIBLE_KJV = { john: { 3: [{ n: 16, text: 'For God so loved (kjv)' }] } };
   _translationLoaded.kjv = true;
@@ -110,5 +112,41 @@ describe('BibleChapterView — the recording\'s edition (W25)', () => {
     unmount();
     releaseTranslationsExcept('nkjv');                 // nobody shows it now: freed
     expect(globalThis.BIBLE_KJV).toBeUndefined();
+  });
+});
+
+/* RC.12 (UX sweep 2026-10-22): the hero line is the only sign of the switch, and a Listen started mid-chapter has it
+   off-screen. Each switch says so once in a polite toast: KJV on, and the reader's own edition back on Close. */
+describe('BibleChapterView — the edition switch is announced (RC.12)', () => {
+  const toast = () => {
+    const el = document.getElementById('vot-toast-audio');
+    return el && el.classList.contains('show') ? el.textContent : null;
+  };
+  it('toasts as the KJV text arrives, and again when the recording closes', async () => {
+    const { rerender } = render(view());
+    expect(toast()).toBeNull();                        // still downloading: nothing switched yet
+    await landKjv();
+    expect(toast()).toBe('Showing the KJV text, to match the recording.');
+    document.getElementById('vot-toast-audio').classList.remove('show');
+    recording = '';                                    // Close: the player is idle
+    rerender(view());
+    expect(toast()).toBe('Back to the NKJV text.');
+  });
+
+  it('a chapter that opens already in KJV leaves it to the hero line', () => {
+    globalThis.BIBLE_KJV = { john: { 3: [{ n: 16, text: 'For God so loved (kjv)' }] } };
+    _translationLoaded.kjv = true;
+    render(view());
+    expect(banner()).not.toBeNull();
+    expect(toast()).toBeNull();
+  });
+
+  it('a swipe peek never speaks', async () => {
+    render(
+      <BibleChapterView book={JOHN} chapter={JOHN.chapters[0]} translation="nkjv" theme="dark"
+        markAsReadEnabled={false} inert={true} />,
+    );
+    await landKjv();
+    expect(toast()).toBeNull();
   });
 });

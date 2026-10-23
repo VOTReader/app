@@ -66,6 +66,8 @@ export function useJournalMutations({ setJournalEntryId, setScreen }) {
     // Hand the new entry's id to the editor for first-save stats recording
     // (see header). The same key literal lives in JournalEditorScreen.jsx.
     try { localStorage.setItem('vot-journal-new-entry-stats', e.id); } catch (_e) { /* best-effort */ }
+    // Back from a new entry returns to this list (U03.6), not to the entry's read-only view.
+    if (typeof window !== 'undefined' && window.navHandoff) window.navHandoff.set('journalNewEntry', e.id);
     setJournalEntryId(e.id);
     setScreen('journal-editor');
   };

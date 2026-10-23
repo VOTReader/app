@@ -82,6 +82,16 @@ describe('useJournalMutations — createAndEditJournal', () => {
     expect(localStorage.getItem('vot-journal-new-entry-stats')).toBe('jrn-1');
   });
 
+  it('tells the editor route the entry is new, so Back returns to the Journal list (U03.6)', async () => {
+    const { navHandoff } = await import('../utils/nav-handoff.js');
+    window.navHandoff = navHandoff;
+    try {
+      const { result } = setup();
+      act(() => { result.current.createAndEditJournal(); });
+      expect(navHandoff.take('journalNewEntry')).toBe('jrn-1');
+    } finally { delete window.navHandoff; }
+  });
+
   it('still creates + navigates when the marker write is unavailable (localStorage throws)', () => {
     const setSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied'); });
     const { result, setters } = setup();

@@ -52,6 +52,7 @@
      navigator.wakeLock fire-and-forget per [[explicit-async-decision]].
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { keepReadersLine } from '../utils/keep-line.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
 
@@ -80,6 +81,9 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
 const DEFAULT_FLIPS = Object.freeze([
   Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
 ]);
+
+/** The text scale from which the app lays out for large text (the root class vot-large-text). */
+export const LARGE_TEXT_SCALE = 1.8;
 
 /**
  * What a saved profile still owes from the rounds it has not been through: `{ key: newDefault }`
@@ -298,7 +302,13 @@ export function useSettings({ savedSettings, theme }) {
     // values ("1"/"1.15"/"1.3"/"1.5") all fall inside the range.
     const _fs = parseFloat(String(settings.fontScale));
     const _fsSafe = Number.isFinite(_fs) ? Math.min(3, Math.max(0.8, _fs)) : 1;
-    document.documentElement.style.setProperty("--font-scale", String(_fsSafe));
+    // U10.1: a new size keeps the line being read where it was on screen (the same scrollTop threw it ~290 px).
+    const _fsNow = document.documentElement.style.getPropertyValue("--font-scale") || "1";
+    if (_fsNow !== String(_fsSafe)) keepReadersLine(() => document.documentElement.style.setProperty("--font-scale", String(_fsSafe)));
+    else document.documentElement.style.setProperty("--font-scale", String(_fsSafe));
+    // Wave 3 (J-w3g1.1): one root class for the large sizes (1.8 and up), where gutters, letter-spacing and long
+    // one-line labels stop fitting a phone; app.css keys its large-text rules on it.
+    document.documentElement.classList.toggle("vot-large-text", _fsSafe >= LARGE_TEXT_SCALE);
     // Platform mirror — bridge owns the platform branch. Android passes
     // through to native window flags; web is a CSS-only no-op for the
     // status bar + navigator.wakeLock fire-and-forget for the screen-on

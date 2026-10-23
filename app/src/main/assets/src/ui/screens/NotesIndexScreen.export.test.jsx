@@ -39,7 +39,7 @@ const GLOBALS = {
   normalizeExcerptDisplay,   // the search filter reads it (ds5 s21.1 tests type a query)
 };
 
-beforeEach(() => { Object.assign(window, GLOBALS); });
+beforeEach(() => { Object.assign(window, GLOBALS); localStorage.removeItem('vot-notes-tab'); });
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();

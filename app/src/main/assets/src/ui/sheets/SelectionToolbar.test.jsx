@@ -1786,15 +1786,23 @@ describe('SelectionToolbar — the Scripture Web door', () => {
    passage verbatim and its own source. Nowhere else. */
 describe('SelectionToolbar — Share as a card (Answers)', () => {
   const G = ['ANSWERS', 'ANSWERS_META', 'SheetHandle', 'useFocusTrap', 'ReactDOM'];
+  /** @type {Record<string, PropertyDescriptor | undefined>} */
+  let saved = {};
   beforeEach(() => {
     const w = /** @type {any} */ (window);
+    // vitest.setup.js installs some of these (useFocusTrap) for every test: put them back after, never delete them.
+    saved = Object.fromEntries(G.map((g) => [g, Object.getOwnPropertyDescriptor(w, g)]));
     w.ANSWERS = [{ id: 'there-is-no-other', title: 'THERE IS NO OTHER', paragraphs: [
       { text: 'For I am a Great King! Says The Lord.' }, { text: '~ [From “The Alarm of War” ~ Volume 7]' }] }];
     w.SheetHandle = ({ onClose }) => <button type="button" onClick={onClose} aria-label="Close">x</button>;
     w.useFocusTrap = () => ({ current: null });
     w.ReactDOM = ReactDOM;
   });
-  afterEach(() => { for (const g of G) delete /** @type {any} */ (window)[g]; delete /** @type {any} */ (window).__closeSheet; });
+  afterEach(() => {
+    const w = /** @type {any} */ (window);
+    for (const g of G) { delete w[g]; const d = saved[g]; if (d) Object.defineProperty(w, g, d); }
+    delete w.__closeSheet;
+  });
 
   async function raise(c, start, end) {
     stubSelection(rangeOver(c, start, end));

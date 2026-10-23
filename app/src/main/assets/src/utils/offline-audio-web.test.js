@@ -46,6 +46,7 @@ beforeEach(() => {
   define(globalThis, 'fetch', fetchMock);
   define(navigator, 'serviceWorker', { controller: { scriptURL: SW_URL } });
   define(navigator, 'storage', { estimate: async () => ({ quota: 1e9, usage: 1e6 }), persist: vi.fn(async () => true) });
+  try { localStorage.clear(); } catch (_e) { /* no storage */ }
   WebOfflineAudio._reset();
   OfflineAudio._reset();
 });
@@ -86,7 +87,7 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.available()).toBe(false);
   });
 
-  it('saves a recording through the relay, and with no signal the player loads the service worker copy', async () => {
+  it('saves a recording through the relay, and the player loads the service worker copy, signal or none', async () => {
     await ready();
     define(navigator, 'onLine', false);
     expect(OfflineAudio.webSrc(URL_OF('a'))).toBe(URL_OF('a'));   // not saved: GitHub's own URL
@@ -96,12 +97,29 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.items()).toEqual([expect.objectContaining({ url: URL_OF('a'), key: 'one:a', title: 'A Letter', bytes: 5000 })]);
     expect(OfflineAudio.totalBytes()).toBe(5000);
     expect(OfflineAudio.webSrc(URL_OF('a'))).toBe('https://votreader.github.io/app/offline-audio/audio-v1/a.mp3');
-    // With a signal a saved recording streams from GitHub as before: a browser whose media skips the worker loses nothing.
+    // With a signal too, a saved recording plays its saved copy (brief section 7 item 2): on a weak signal the stream
+    // failed and said "No signal" with the file on the phone.
     define(navigator, 'onLine', true);
-    expect(OfflineAudio.webSrc(URL_OF('a'))).toBe(URL_OF('a'));
+    expect(OfflineAudio.webSrc(URL_OF('a'))).toBe('https://votreader.github.io/app/offline-audio/audio-v1/a.mp3');
     expect(navigator.storage.persist).toHaveBeenCalledTimes(1);
     const stored = await (await caches.open(OFFLINE_AUDIO_CACHE)).match(URL_OF('a'));
     expect((await stored.arrayBuffer()).byteLength).toBe(5000);
+  });
+
+  // Brief section 7 item 3: the persist() answer was ignored, so downloads this browser may clear carried no warning.
+  it('says when the browser will not promise to keep the downloads, and stays quiet when it does', async () => {
+    define(navigator, 'storage', { estimate: async () => ({ quota: 1e9, usage: 1e6 }), persisted: async () => false, persist: vi.fn(async () => false) });
+    await ready();
+    expect(OfflineAudio.evictable()).toBe(true);
+    OfflineAudio.download([{ url: URL_OF('p'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('p'))).toBe(true));
+    expect(navigator.storage.persist).toHaveBeenCalledTimes(1);
+    expect(OfflineAudio.evictable()).toBe(true);
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    define(navigator, 'storage', { estimate: async () => ({ quota: 1e9, usage: 1e6 }), persisted: async () => true, persist: vi.fn(async () => true) });
+    await ready();
+    expect(OfflineAudio.evictable()).toBe(false);
   });
 
   it('what was saved is still there after a reload', async () => {
@@ -110,9 +128,46 @@ describe('offline-audio-web (cf1)', () => {
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
     WebOfflineAudio._reset();
     OfflineAudio._reset();
-    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);          // not read yet
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
     expect(OfflineAudio.items()[0]).toEqual(expect.objectContaining({ key: 'two:b', title: 'Título “quoted”', bytes: 5000 }));
+  });
+
+  // Downloads brief 2026-10-23 section 7 item 18: the cache was read one entry at a time at a cold start, so for a
+  // moment nothing looked saved (Play on a saved row offline said "needs a connection").
+  it('what was saved looks saved at the first look after a reload, before the cache is read', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('b'), key: 'two:b', title: 'B' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true);
+    expect(WebOfflineAudio.srcFor(URL_OF('b'))).toBe('https://votreader.github.io/app/offline-audio/audio-v1/b.mp3');
+    expect(OfflineAudio.items()[0]).toEqual(expect.objectContaining({ key: 'two:b', title: 'B', bytes: 5000 }));
+  });
+
+  it('a recording the browser cleared from the cache stops looking saved once the cache is read', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('b'), key: 'two:b', title: 'B' }, { url: URL_OF('c'), key: 'two:c', title: 'C' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('c'))).toBe(true));
+    await (await caches.open(OFFLINE_AUDIO_CACHE)).delete(URL_OF('b'));   // evicted under storage pressure
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true);              // the index still says so for a moment
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false));
+    expect(OfflineAudio.isSaved(URL_OF('c'))).toBe(true);
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);             // and the index learned it
+  });
+
+  it('a removed recording does not look saved after a reload', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('b'), key: 'two:b', title: 'B' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(true));
+    OfflineAudio.remove([URL_OF('b')]);
+    WebOfflineAudio._reset();
+    OfflineAudio._reset();
+    expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);
   });
 
   it('a cut-off download is failed and nothing half-saved stays', async () => {
@@ -225,18 +280,33 @@ describe('offline-audio-web (cf1)', () => {
     expect(await (await caches.open(OFFLINE_AUDIO_CACHE)).match(URL_OF('x'))).toBeDefined();
   });
 
-  it('keeps the saved copy the element already plays when the signal comes back', async () => {
+  it('loads the saved copy whatever the signal and whatever the element held', async () => {
     await ready();
     OfflineAudio.download([{ url: URL_OF('h'), key: 'k', title: 't' }]);
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('h'))).toBe(true));
     const local = 'https://votreader.github.io/app/offline-audio/audio-v1/h.mp3';
     expect(OfflineAudio.webSrc(URL_OF('h'), local)).toBe(local);             // online, holding the copy
-    expect(OfflineAudio.webSrc(URL_OF('h'), URL_OF('h'))).toBe(URL_OF('h')); // online, streaming
+    expect(OfflineAudio.webSrc(URL_OF('h'), URL_OF('h'))).toBe(local);       // online, streaming: the next load takes the copy
     define(navigator, 'onLine', false);
     expect(OfflineAudio.webSrc(URL_OF('h'), URL_OF('h'))).toBe(local);       // offline: the copy, even from a stream
     expect(OfflineAudio.webSameRecording(URL_OF('h'), local)).toBe(true);
     expect(OfflineAudio.webSameRecording(URL_OF('h'), URL_OF('h'))).toBe(true);
     expect(OfflineAudio.webSameRecording(URL_OF('h'), URL_OF('other'))).toBe(false);
+  });
+
+  // Refuter of dl-d0 batch A: online the element now holds the saved copy, so a Remove while paused left it holding a
+  // URL that no longer counted as the same recording, and Play reloaded it from 0:00 instead of where it was paused.
+  it('the saved copy the element holds is still the same recording after it is removed', async () => {
+    await ready();
+    OfflineAudio.download([{ url: URL_OF('r'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r'))).toBe(true));
+    const local = OfflineAudio.webSrc(URL_OF('r'));
+    expect(local).toBe('https://votreader.github.io/app/offline-audio/audio-v1/r.mp3');
+    OfflineAudio.remove([URL_OF('r')]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r'))).toBe(false));
+    expect(OfflineAudio.webSrc(URL_OF('r'))).toBe(URL_OF('r'));
+    expect(OfflineAudio.webSameRecording(URL_OF('r'), local)).toBe(true);
+    expect(OfflineAudio.webSameRecording(URL_OF('other'), local)).toBe(false);
   });
 
   it('with no worker controlling the page a saved recording loads the GitHub URL', async () => {

@@ -43,38 +43,30 @@ name: Deploy Web (PWA → GitHub Pages)
 # flip is the fallback if the workflow token cannot enable Pages.
 
 on:
-  # THE DEPLOY WAITS FOR GREEN CI (2026-09-24, improvement sweep v12-01). It used
-  # to fire on the push itself, beside CI, and re-run a SUBSET of CI's gates; CI-red
-  # commits went live that way (1b23d1e0, a5b66a31, b3113383, 60e84ce3: CI failed,
-  # Deploy succeeded), and the user-facing checks that ran only in CI (smoke:ci's
-  # black-screen walk, e2e:read, e2e:readalong, bible-sync, drive routing) guarded
-  # nothing that shipped. workflow_run is the cross-workflow `needs:` the old
-  # comments said did not exist: this workflow starts when a CI run on main
-  # COMPLETES, and publishes the NEWEST commit on main whose CI is green (the gate
-  # job, tools/deploy-target.mjs), whatever run woke it: green, red or cancelled.
-  # The published commit comes from main's green CI history, never from the run
-  # that triggered this one, so a fork's pull request from a branch named main
-  # can wake a deploy but cannot choose what it builds. Cost: a change goes live
-  # about ten minutes after its push instead of about four.
+  # TWO RELEASES A DAY (up1, 2026-10-23). Corbin: "VOTReader has been flashing 'VOTReader was
+  # just updated' at me all day long ... have VOTReader clients just take updates like in the
+  # morning and at night?" (DECISIONS 10-23, superseding 08-11's "any kind of change should
+  # always automatically deploy": every change still deploys, at the next window). CI still runs
+  # every test on every push, so a failure shows at once; only the publish waits for 06:00 and
+  # 21:00 America/Denver. Cron is UTC, so each window lists both hours it can fall on (summer
+  # time UTC-6, winter time UTC-7) and the gate's tools/release-window.mjs lets through the one
+  # that is the Denver hour that day, read from the run's own cron line (a scheduled run often
+  # starts late; the hour it starts in must not choose the window).
   #
-  # ci10 (2026-09-25): ci9 published only the triggering commit, and only while it
-  # was still main's tip. On a busy main no green run was ever the tip, and nothing
-  # went live for over an hour (runs 36100134740, 36100861220, 36102158492).
+  # What publishes is unchanged (ci10): the NEWEST commit on main whose CI is green
+  # (tools/deploy-target.mjs), never older than what is live (the build-sha.txt floor). A window
+  # with nothing new publishes nothing. Scheduled runs come only from the default branch, so a
+  # fork's branch named main cannot wake one.
   #
-  # Every push to main still deploys once its CI is green (owner directive
-  # 2026-08-11: "any kind of change should always automatically deploy"). There is
-  # NO `paths:` filter, deliberately: the published bytes come from `npm run
-  # build`, whose output depends on far more than any list (tools/minify-bundle.mjs,
-  # every tools/gen-*.mjs, .nvmrc, the esbuild version in package-lock), and an
-  # allow-list once let a commit that changed what SHOULD be live match no path,
-  # deploy nothing and say nothing. A redundant redeploy is nearly free and a no-op
-  # for clients: the build is deterministic, so identical source produces an
-  # identical CACHE_VERSION and the browser's update check installs nothing.
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
-    branches: [main]
-  # The manual override: deploy HEAD of the chosen ref even though CI is red (a
+  # Until 10-23 this ran on every completed CI run on main (workflow_run, 2026-09-24 v12-01);
+  # that is what put a new build on readers' screens dozens of times a day.
+  schedule:
+    - cron: '0 12 * * *'   # 06:00 MDT
+    - cron: '0 13 * * *'   # 06:00 MST
+    - cron: '0 3 * * *'    # 21:00 MDT (the next UTC day)
+    - cron: '0 4 * * *'    # 21:00 MST (the next UTC day)
+  # SHIP NOW, and the manual override: deploy HEAD of main now, between windows, for a live
+  # break (a crash, data loss, the app won't open; the hub fires it), even though CI is red (a
   # flaky e2e, say). The build job re-proves the publish gates itself on this path.
   workflow_dispatch:
 
@@ -94,7 +86,7 @@ permissions: {}
 # backwards: the gate publishes only a pick strictly newer than the live
 # build-sha.txt (the floor; the run listing alone once answered stale), and
 # serialized runs keep that floor current. One cost: a
-# manual override still WAITING when a CI run completes is replaced by that run,
+# manual override still WAITING when a release window starts is replaced by that run,
 # which publishes the newest green commit, not the red tip; dispatch it again.
 concurrency:
   group: pages
@@ -115,10 +107,19 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main
-          sparse-checkout: tools/deploy-target.mjs
+          sparse-checkout: |
+            tools/deploy-target.mjs
+            tools/release-window.mjs
           sparse-checkout-cone-mode: false
           persist-credentials: false
+      - name: Is this a release window? (06:00 / 21:00 Denver; a dispatch always is)
+        id: window
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: node tools/release-window.mjs
       - name: Pick the newest commit on main whose CI is green
+        if: steps.window.outputs.due == 'true'
         # The ci9 refutation (2026-09-24) still holds: an older commit's CI re-run
         # must never publish over a newer build, and a tag or fork branch named main
         # must never publish at all. The picker takes only commits on main (an
@@ -137,7 +138,7 @@ jobs:
     needs: gate
     # First attempt only (the ci10 refutation): "Re-run failed jobs" keeps the gate's
     # old pick, so a re-run of an older run whose build or deploy failed would publish
-    # its commit over a newer deploy. The next CI completion re-picks anyway; to retry
+    # its commit over a newer deploy. The next window re-picks anyway; to retry
     # by hand, dispatch the workflow (a fresh run, a fresh pick).
     if: needs.gate.outputs.publish == 'true' && github.run_attempt == 1
     runs-on: ubuntu-latest
@@ -165,7 +166,7 @@ jobs:
         run: npm ci
 
       - name: Gate — the publish checks, on the MANUAL path only (BLD-1 + BLD2)
-        # On the workflow_run path CI has already run every one of these, and
+        # On the scheduled path CI has already run every one of these, and
         # everything this list used to leave out (smoke:ci's black-screen walk, the
         # coverage floors, e2e:read, e2e:readalong, bible-sync, drive routing,
         # check:s22, the budgets), on this exact SHA: the gate picked it from main's
@@ -269,6 +270,20 @@ jobs:
           node tools/list-runtime-src-assets.js --check --site _site
           echo "Staged file count: $(find _site -type f | wc -l)"
           echo "Runtime src/data files staged: $(ls _site/src/data/ | wc -l)"
+
+      - name: What's new (the reader-facing changes since the live build)
+        # up1 (2026-10-23): the app says "Updated · What's new" once per release and opens this
+        # list (utils/whats-new.js). tools/whats-new.mjs takes the feat/fix commits GitHub's
+        # compare lists between the live build-sha.txt and this commit, in plain words, added to
+        # the live list. Read-only token, no repository code beyond the tool; any failure keeps
+        # the live list (or an empty one) and never stops the deploy.
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          base=$(curl -fsS --max-time 20 https://votreader.github.io/app/build-sha.txt | tr -d '[:space:]') || base=''
+          curl -fsS --max-time 20 https://votreader.github.io/app/whats-new.json -o "$RUNNER_TEMP/prev-whats-new.json" || echo '{}' > "$RUNNER_TEMP/prev-whats-new.json"
+          BASE="$base" HEAD="$(git rev-parse HEAD)" node tools/whats-new.mjs --compare --prev "$RUNNER_TEMP/prev-whats-new.json" --out _site/whats-new.json
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5

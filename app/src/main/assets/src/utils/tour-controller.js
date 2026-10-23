@@ -12,7 +12,7 @@
      TourOverlay              next() · back() · skip() · targetPressed() ·
                               clearHighlightDemo()
      App (hooks/use-tour.js)  attachNav({ goHome, openLetter, openBible,
-                              goJournalHub, openSettingsData, ensureListening })
+                              goJournalHub, goReadingPlans, openSettingsData, ensureListening })
 
    A stop's `enter` runs through that nav every time the stop becomes
    current, forwards or back, so the picture always matches the words.

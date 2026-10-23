@@ -102,7 +102,8 @@ export function recordingsLine(col, items, playable, preface) {
  * }} props
  */
 export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening Library', onOpenText, onSearch, onHistory, onSettings, theme, onThemeChange }) {
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
+  // Not the 1 Hz clock: nothing here draws it (s18.3).
+  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   useAudioPositions();
 
   const bible = isBibleVol(volKey);
@@ -225,8 +226,13 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
               <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
                 <PlayIcon /><span>{playAllLabel}</span>
               </button>
-              {/* A collection at once; a Bible edition only a book at a time (its rows), never the whole edition. */}
+              {/* A collection at once; a Bible edition a book at a time from its rows until the Downloads picker (downloads
+                  brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
               {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} /> : null}
+              {/* The Downloads tree opened at this collection or edition (downloads brief 3a, picture 14). */}
+              {offline && !study && typeof window.__openDownloads === 'function' ? (
+                <button type="button" className="audio-collection-choose" onClick={() => window.__openDownloads({ tab: 'choose', focus: volKey }, label)}>Choose…</button>
+              ) : null}
             </div>
           ) : null}
         </header>

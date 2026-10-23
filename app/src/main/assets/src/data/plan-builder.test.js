@@ -1,7 +1,7 @@
 /* plan-builder (mw18): the reader's own plan from any mix of Bible and letters, with its daily breakdown. */
 
 import { describe, it, expect } from 'vitest';
-import { BIBLE_GROUPS, pickItems, pickName, defaultName, builderTracks, builderSpec, builderPreview, chapterCount } from './plan-builder.js';
+import { BIBLE_GROUPS, pickItems, pickName, pickChips, defaultName, builderTracks, builderSpec, builderPreview, chapterCount } from './plan-builder.js';
 import { newRun, runStatus, dayItems, totalDays } from './plan-engine.js';
 
 const at = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 9); };
@@ -40,6 +40,24 @@ describe('plan-builder', () => {
     expect(pickName({ t: 'l', volKey: 'seven', ids: ['a', 'b', 'c'] }, src)).toBe('Volume Seven: 3 letters');
     expect(defaultName([{ t: 'b', bid: 'genesis', ch: null }, { t: 'l', volKey: 'seven', ids: null }], src)).toBe('Genesis and Volume Seven');
     expect(defaultName([{ t: 'b', bid: 'john', ch: null }, { t: 'b', bid: 'genesis', ch: null }, { t: 'l', volKey: 'seven', ids: null }], src)).toBe('John, Genesis and more');
+  });
+
+  it('shows a whole testament or the whole Bible as one chip, never 66 (mw-pb1)', () => {
+    const books = (/** @type {string} */ id) => BIBLE_GROUPS.find((g) => g.id === id).books.map((bid) => ({ t: 'b', bid, ch: null }));
+    const all = pickChips(books('all'), src);
+    expect(all.map((c) => c.label)).toEqual(['Whole Bible · 66 books · 1,189 ch']);
+    expect(all[0].keys.length).toBe(66);
+    expect(pickChips([...books('ot'), ...books('nt')], src).map((c) => c.name)).toEqual(['Whole Bible']);   // OT + NT is the whole Bible
+    expect(pickChips([{ t: 'l', volKey: 'seven', ids: null }, ...books('nt'), { t: 'b', bid: 'genesis', ch: [1] }], src).map((c) => c.label))
+      .toEqual(['Volume Seven', 'New Testament · 27 books · 260 ch', 'Genesis 1']);
+    // one book cut to some chapters breaks its testament back into books
+    const ot = books('ot'); ot[0] = { t: 'b', bid: ot[0].bid, ch: [1, 2] };
+    expect(pickChips(ot, src).map((c) => c.label)).toEqual(['Genesis 1-2', 'Exodus to Malachi · 38 books · 879 ch']);
+    // a run in Bible order is one chip; two in a row, or out of order, stay books
+    const b = (/** @type {string} */ bid) => ({ t: 'b', bid, ch: null });
+    expect(pickChips([b('ruth'), b('judges'), b('joshua'), b('john'), b('acts')], src).map((c) => c.name)).toEqual(['Ruth', 'Judges', 'Joshua', 'John', 'Acts']);
+    expect(pickChips([b('joshua'), b('judges'), b('ruth'), b('john')], src).map((c) => c.name)).toEqual(['Joshua to Ruth', 'John']);
+    expect(defaultName(books('all'), src)).toBe('Whole Bible');
   });
 
   it('keeps the order picked, or Bible order; an item picked twice is read once', () => {

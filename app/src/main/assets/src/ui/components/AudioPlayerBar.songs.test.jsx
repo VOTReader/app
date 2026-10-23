@@ -96,7 +96,7 @@ afterEach(() => {
 
 const playFamilyA = () => act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-a' } }); });
 
-describe('the mini-player song skin (final-08)', () => {
+describe('the mini-player song skin (final-08, player brief picture 03)', () => {
   it('shows the cover, the title, the version, a FILLED play/pause, next and close; no slider, a 3 px line instead', () => {
     playFamilyA();
     render(<AudioPlayerBar />);
@@ -104,13 +104,14 @@ describe('the mini-player song skin (final-08)', () => {
     expect(bar.className).toContain('is-song');
     expect(bar.querySelector('.audio-bar-cover img').getAttribute('src')).toBe('https://votreader.github.io/songs/thumbs/256/aaaaaaaaaaa1.webp');
     expect(bar.querySelector('.audio-bar-title').textContent).toBe('Come, Love Awaits You');
-    expect(bar.querySelector('.audio-bar-song-sub').textContent).toBe('Loading…');   // buffering
+    expect(bar.querySelector('.audio-bar-line2').textContent).toBe('Loading…');   // buffering
     emit('playing');
-    expect(bar.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
-    expect(within(bar).getByRole('button', { name: 'Pause' }).className).toContain('audio-bar-song-play');
+    expect(bar.querySelector('.audio-bar-line2').textContent).toBe('Country · hmarie777');
+    expect(within(bar).getByRole('button', { name: 'Pause' }).className).toContain('audio-bar-play');
     expect(bar.querySelector('.audio-bar-seek')).toBeNull();
     expect(bar.querySelector('.audio-bar-line')).not.toBeNull();
-    expect(bar.querySelector('.audio-bar-pull')).not.toBeNull();
+    expect(bar.querySelector('.audio-bar-pull')).toBeNull();                     // the pull tab is gone (brief 3a)
+    expect(within(bar).queryByRole('button', { name: 'Back 15 seconds' })).toBeNull();   // songs: Play / Next / Close
     fireEvent.click(within(bar).getByRole('button', { name: 'Next song' }));
     expect(AudioPlayer.getState().qi).toBe(1);
     fireEvent.click(within(bar).getByRole('button', { name: 'Close player' }));
@@ -123,8 +124,8 @@ describe('the mini-player song skin (final-08)', () => {
     act(() => { AudioPlayer.toggle(); });
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     render(<AudioPlayerBar />);
-    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Not on this phone');
-    expect(document.querySelector('.audio-bar-song-play').className).toContain('is-unavailable');
+    expect(document.querySelector('.audio-bar-line2').textContent).toBe('Not on this phone');
+    expect(document.querySelector('.audio-bar-play').className).toContain('is-unavailable');
   });
 
   it('the bar hears the signal go and come back by itself, with no player event (K2)', () => {
@@ -132,13 +133,13 @@ describe('the mini-player song skin (final-08)', () => {
     emit('playing');
     act(() => { AudioPlayer.toggle(); });
     render(<AudioPlayerBar />);
-    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
+    expect(document.querySelector('.audio-bar-line2').textContent).toBe('Country · hmarie777');
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
     act(() => { window.dispatchEvent(new Event('offline')); });
-    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Not on this phone');
+    expect(document.querySelector('.audio-bar-line2').textContent).toBe('Not on this phone');
     Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
     act(() => { window.dispatchEvent(new Event('online')); });
-    expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
+    expect(document.querySelector('.audio-bar-line2').textContent).toBe('Country · hmarie777');
   });
 
   it('offline, a song KEPT on this phone never says it is not on it (K1)', async () => {
@@ -153,18 +154,22 @@ describe('the mini-player song skin (final-08)', () => {
       act(() => { AudioPlayer.toggle(); });
       Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
       render(<AudioPlayerBar />);
-      expect(document.querySelector('.audio-bar-song-sub').textContent).toBe('Country · hmarie777');
-      expect(document.querySelector('.audio-bar-song-play').className).not.toContain('is-unavailable');
+      expect(document.querySelector('.audio-bar-line2').textContent).toBe('Country · hmarie777');
+      expect(document.querySelector('.audio-bar-play').className).not.toContain('is-unavailable');
     } finally { delete globalThis.OfflineSongsStore; SongKeep._reset(); }
   });
 
-  it('a reading keeps the reading skin exactly: its round play, its slider', () => {
+  it('a reading has the book mark and Back 15 in place of Next, and no slider either', () => {
     act(() => { AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'The Wide Path' }, collectionLabel: 'Volume One' }); });
     render(<AudioPlayerBar />);
     const bar = document.querySelector('.audio-bar');
     expect(bar.className).not.toContain('is-song');
-    expect(bar.querySelector('.audio-bar-seek')).not.toBeNull();
+    expect(bar.querySelector('.audio-bar-mark svg')).not.toBeNull();
+    expect(bar.querySelector('.audio-bar-cover')).toBeNull();
+    expect(bar.querySelector('.audio-bar-seek')).toBeNull();
     expect(bar.querySelector('.audio-bar-play')).not.toBeNull();
+    expect(within(bar).getByRole('button', { name: 'Back 15 seconds' })).toBeTruthy();
+    expect(within(bar).queryByRole('button', { name: 'Next song' })).toBeNull();
   });
 
   it('the bar and desk buttons take the reading serif, and the journal button lifts over the bar (W3-07, W3-01)', () => {
@@ -180,7 +185,7 @@ describe('the mini-player song skin (final-08)', () => {
 describe('the listening desk in song mode (final-04)', () => {
   const openDesk = () => {
     render(<AudioPlayerBar />);
-    fireEvent.click(document.querySelector('.audio-bar-song-summary'));
+    fireEvent.click(document.querySelector('.audio-bar-summary'));
     return screen.getByRole('dialog');
   };
 
@@ -416,7 +421,7 @@ describe('the listening desk: the verbatim gate', () => {
 
   const openDesk = () => {
     render(<AudioPlayerBar />);
-    fireEvent.click(document.querySelector('.audio-bar-song-summary'));
+    fireEvent.click(document.querySelector('.audio-bar-summary'));
     return screen.getByRole('dialog');
   };
 

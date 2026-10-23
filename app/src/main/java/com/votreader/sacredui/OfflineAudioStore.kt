@@ -24,8 +24,8 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
 /**
- * Recordings downloaded to the phone (listening item 8; Corbin 2026-09-22: "yes after reset" - one recording, a
- * collection or a Bible book at a time, never a whole edition, which is 3-5 GB).
+ * Recordings downloaded to the phone (listening item 8; Corbin 2026-09-22: "yes after reset"). One recording, a
+ * collection or a Bible book at a time was agent design, retired 10-23: Corbin's downloads picks allow a whole edition (3-5 GB).
  *
  * Why native: the release assets answer without Access-Control-Allow-Origin (both the github.com 302 and the
  * release-assets 206), so a page cannot read their bytes, and an opaque cached copy cannot answer the media element's

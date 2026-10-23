@@ -34,6 +34,7 @@
 import { resolveAnchor } from './anchor-resolve.js';
 import { chromeAwareView, viewIndexOf } from './anchor-view.js';
 import { makeIconButton, iconButtonProps, iconPoint } from './icon-button.js';
+import { annVisible, annAbove } from './mark-overlap.js';
 
 /* Snap an annotation's range to whole WORDS — so a highlight/underline/note never
    lands mid-word, and never swallows the trailing comma/colon/period the drag
@@ -145,21 +146,9 @@ export function snapSelectionRange(container, text, start, end) {
   return snapRangeToWords(text, start, end, boundaries);
 }
 
-/* An annotation's effective VISIBILITY — does it paint anything? A blank
-   highlight (or a legacy kind:'note', which aliases to blank) shows nothing, so
-   it never suppresses a colored annotation beneath it in an overlap: blank is
-   transparent and lets the layer below show. */
-export function annVisible(ann) {
-  if (!ann || ann.kind === 'note') return false;
-  return !!(ann.color && ann.color !== 'blank');
-}
-
-/* Overlap stacking order: the most-recently CREATED annotation wins, with the
-   id as a stable tiebreaker. "a is above b" === a is more recent than b. */
-export function annAbove(a, b) {
-  const ac = a.created || 0, bc = b.created || 0;
-  return ac > bc || (ac === bc && (a.id || '') > (b.id || ''));
-}
+/* annVisible (does a mark paint anything?) and annAbove (the newest mark wins an
+   overlap) live in mark-overlap.js, which the delete sheets share (RC.11). */
+export { annVisible, annAbove };
 
 /* For a VISIBLE annotation, the merged sub-ranges of [ann.start, ann.end] where
    a MORE-RECENT visible annotation also covers — i.e. where ann's own paint must
@@ -228,6 +217,10 @@ function annMarkClass(ann, isFirst, isLast, suppress) {
   // A dotted hairline says "your note is anchored somewhere in this verse"
   // without pretending to be the highlight they actually drew.
   if (ann._approx) cls += ' hl-approx';
+  // RC.13: a highlight cut into pieces (a mark under part of it, the note icon's word) reads as one box, with its
+  // padding and rounding only at the run's two ends (app.css .hl-cont-l / .hl-cont-r).
+  if (!isFirst) cls += ' hl-cont-l';
+  if (!isLast) cls += ' hl-cont-r';
   if (hasNote) {
     cls += ' hl-note';
     if (isFirst) cls += ' first-segment';
@@ -240,6 +233,12 @@ function annMarkClass(ann, isFirst, isLast, suppress) {
    sweep-line algorithm. Sorted boundaries → constant-active-set segments
    → inside-out <mark> nesting per segment using reduceRight (outer = i=0,
    inner = i=N-1; CSS cascade gives "more-specific overrides broader"). */
+/** Where the last word of `s` starts (spaces after it go with it); 0 when `s` is one word. @param {string} s */
+function lastWordStart(s) {
+  const m = /\S+\s*$/.exec(s);
+  return m ? m.index : 0;
+}
+
 /* A1+A5: the React-path note icon (Bible/Matthew verses). Rendered INLINE at the
    highlighted-phrase end inside HighlightableText, mirroring the imperative
    applyNoteIcons markup so SelectionToolbar's tap routing + applyActiveNoteState
@@ -444,26 +443,39 @@ export const HighlightableText = React.memo(/** @param {{ text: string, hlKey: s
         // Inside-out: reduceRight wraps innermost (i = active.length - 1)
         // first, working outward. Outer element (i = 0) is what React keys
         // off — gets the segment-level key; inner elements get composite keys.
-        const markEl = seg.active.reduceRight((child, ann, i) => {
+        // A piece is this segment's text or part of it: moreAfter / moreBefore say
+        // the segment goes on past the piece (the note icon's word is split off below).
+        const marksFor = (pieceText, keySuffix, moreAfter, moreBefore) => seg.active.reduceRight((child, ann, i) => {
           const kind = ann.kind || 'highlight';
-          const isFirst = firstSegByGroup.get(ann.groupId) === segIdx;
-          const isLast = lastSegByGroup.get(ann.groupId) === segIdx;
+          const isFirst = !moreBefore && firstSegByGroup.get(ann.groupId) === segIdx;
+          const isLast = !moreAfter && lastSegByGroup.get(ann.groupId) === segIdx;
           const isOutermost = i === 0;
           const suppress = annVisible(ann) && !!topVisible && ann.id !== topVisible.id;
           const props = {
-            key: isOutermost ? 'm' + segIdx : 'm' + segIdx + '_' + i,
+            key: (isOutermost ? 'm' + segIdx : 'm' + segIdx + '_' + i) + keySuffix,
             className: annMarkClass(ann, isFirst, isLast, suppress),
             'data-hl-id': ann.id,
             'data-group-id': ann.groupId,
             'data-kind': kind,
           };
-          if (isOutermost && seg.noBreakAfter) props['data-no-break-after'] = '1';
+          if (isOutermost && seg.noBreakAfter && !moreAfter) props['data-no-break-after'] = '1';
           return <mark {...props}>{child}</mark>;
-        }, segText);
+        }, pieceText);
         // A1+A5: a note ending on this segment gets its icon inline, right after
         // the highlighted phrase (React-owned — no imperative DOM mutation).
         const ni = noteIconsBySeg.get(segIdx);
-        return ni ? [markEl, renderNoteIcon(segIdx, ni, hlKey)] : markEl;
+        if (!ni) return marksFor(segText, '', false, false);
+        // RC.13: Chrome breaks a line before an inline-block even after a word
+        // joiner, so the icon could wrap alone onto the next line; the phrase's
+        // last word goes into one nowrap span with it (app.css .hl-keep).
+        const cut = lastWordStart(segText);
+        const keep = (
+          <span key={'k' + segIdx} className="hl-keep">
+            {cut > 0 ? marksFor(segText.slice(cut), 't', false, true) : marksFor(segText, '', false, false)}
+            {renderNoteIcon(segIdx, ni, hlKey)}
+          </span>
+        );
+        return cut > 0 ? [marksFor(segText.slice(0, cut), '', true, false), keep] : keep;
       })}
     </span>
   );
@@ -515,6 +527,7 @@ export function applyNoteIcons() {
   // remove nor splitText-insert into those — mutating React-owned DOM is the
   // latent NotFoundError. React verses carry data-hl-key but NOT data-hl-dom.
   document.querySelectorAll('[data-hl-dom] .hl-note-icon').forEach(el => el.remove());
+  document.querySelectorAll('[data-hl-dom] .hl-keep').forEach(unwrapKeep);
   // ANN4: heal the text-node fragmentation a prior icon insertion's splitText
   // (findNoteIconInsertionPoint) leaves behind. applyDOMHighlights normalizes at
   // the start of its pass, but its A4 signature-skip now short-circuits that pass
@@ -591,6 +604,75 @@ export function applyNoteIcons() {
     } else if (primary.mark.parentNode) {
       primary.mark.parentNode.appendChild(icon);
     }
+    keepWithWord(icon, container);
+  });
+}
+
+/** @param {Element} el */
+function unwrapKeep(el) {
+  const parent = el.parentNode;
+  if (!parent) return;
+  while (el.firstChild) parent.insertBefore(el.firstChild, el);
+  parent.removeChild(el);
+}
+
+/* RC.13 (the letters' half of HighlightableText's .hl-keep): Chrome breaks a
+   line before an inline-block even after a word joiner, so a note icon could
+   wrap alone onto the next line. The word the icon follows and the icon move
+   into one nowrap span. A Range cut from the word's start to the icon splits
+   any mark around the word into two (each keeps its attributes); the text is
+   unchanged, so stored offsets hold. */
+function keepWithWord(icon, container) {
+  if (!container || !icon.parentNode || !container.contains(icon)) return;
+  const texts = [];
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+  while (walker.nextNode()) {
+    const tn = walker.currentNode;
+    if (!(icon.compareDocumentPosition(tn) & Node.DOCUMENT_POSITION_PRECEDING)) break;
+    if (tn.nodeValue) texts.push(tn);
+  }
+  const last = texts[texts.length - 1];
+  // An icon after a space has no word to keep.
+  if (!last || /\s/.test(last.nodeValue.charAt(last.nodeValue.length - 1))) return;
+  // Where the word starts: after the last space, which may sit a few text nodes back.
+  let node = texts[0], off = 0;
+  for (let ti = texts.length - 1; ti >= 0; ti--) {
+    const v = texts[ti].nodeValue;
+    const ws = v.search(/\s\S*$/);
+    if (ws < 0) continue;
+    if (ws === v.length - 1) { node = texts[ti + 1]; off = 0; } else { node = texts[ti]; off = ws + 1; }
+    break;
+  }
+  // A word that starts a mark takes the mark whole (no emptied twin is left to paint a sliver).
+  /** @type {Node} */
+  let from = node;
+  while (off === 0 && !from.previousSibling && from.parentNode && from.parentNode !== container && !from.parentNode.contains(icon)) {
+    from = from.parentNode;
+  }
+  const range = document.createRange();
+  if (off === 0) range.setStartBefore(from);
+  else range.setStart(node, off);
+  range.setEndBefore(icon);
+  // The marks the cut runs through are split: the half before it continues right, the half in the span continues left.
+  const split = [];
+  for (let el = node.parentNode; el && el !== container && !el.contains(icon); el = el.parentNode) {
+    if (el.nodeName === 'MARK') split.push(el);
+  }
+  const moved = range.extractContents();
+  const keep = document.createElement('span');
+  keep.className = 'hl-keep';
+  range.insertNode(keep);
+  keep.appendChild(moved);
+  keep.appendChild(icon);
+  split.forEach((el) => {
+    if (keep.contains(el) || !el.textContent) return;   // moved whole, not split
+    const id = el.getAttribute('data-hl-id');
+    const twin = id && keep.querySelector('mark[data-hl-id="' + id.replace(/"/g, '\\"') + '"]');
+    if (!twin) return;
+    el.classList.add('hl-cont-r');
+    el.classList.remove('last-segment');
+    twin.classList.add('hl-cont-l');
+    twin.classList.remove('first-segment');
   });
 }
 
@@ -657,6 +739,7 @@ export function applyDOMHighlights() {
       parent.removeChild(mark);
     }
     container.querySelectorAll('.hl-note-icon').forEach(function(el) { el.remove(); });
+    container.querySelectorAll('.hl-keep').forEach(unwrapKeep);
     container.normalize();
 
     if (!anns.length) { container.setAttribute('data-hl-sig', sig); return; }
@@ -753,6 +836,11 @@ export function applyDOMHighlights() {
           m.appendChild(midNode);
           annMarks.push(m);
         }
+      }
+      // RC.13: one box per run, as annMarkClass marks the React path's pieces.
+      for (var mi = 0; mi < annMarks.length; mi++) {
+        if (mi > 0) annMarks[mi].classList.add('hl-cont-l');
+        if (mi < annMarks.length - 1) annMarks[mi].classList.add('hl-cont-r');
       }
       // Note icon anchors: first-segment on this annotation's first mark (only
       // the first instance of a multi-segment group owns it), last-segment on

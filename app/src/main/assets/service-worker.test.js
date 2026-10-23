@@ -118,7 +118,7 @@ async function otherCorpusAfter(res, len) {
   return win.__votOtherCorpus;
 }
 
-function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined, scriptPath = undefined } = {}) {
+function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, clientCount = 1, resolveKeys = false, registration = undefined, scriptPath = undefined, windows = null } = {}) {
   const handlers = {};
   const cacheModes = [];   // every mode the install precache actually requested
   const attempts = new Map();   // url -> how many times install fetched it
@@ -149,14 +149,15 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
   const claimed = { count: 0 };
   // service-worker-4: fake connected clients, so install's PRECACHE_INCOMPLETE
   // broadcast (self.clients.matchAll) has somewhere to land.
-  const fakeClients = Array.from({ length: clientCount }, () => ({
+  const fakeClients = windows || Array.from({ length: clientCount }, () => ({
     postMessage: (msg) => postedMessages.push(msg),
   }));
+  const skipped = { count: 0 };
   const self = {
     addEventListener: (t, fn) => { handlers[t] = fn; },
     // scriptPath: where the worker is served (the PWA's is /app/service-worker.js); unset, the location has no path.
     location: scriptPath ? { origin: 'https://app.test', pathname: scriptPath } : { origin: 'https://app.test' },
-    skipWaiting: () => {},
+    skipWaiting: () => { skipped.count += 1; return Promise.resolve(); },
     clients: { claim: async () => { claimed.count += 1; }, matchAll: async () => fakeClients },
     registration,
   };
@@ -166,7 +167,7 @@ function bootSW({ fail = [], corrupt = [], flakyOnce = [], fetchImpl = null, cli
   // eslint-disable-next-line no-new-func
   const run = new Function('self', 'caches', 'fetch', 'console', 'Request', 'crypto', SW_SRC);
   run(self, caches, fetchFn, { log() {}, warn: (...args) => warnLog.push(args), error() {} }, FakeRequest, webcrypto);
-  return { handlers, caches, claimed, cacheModes, attempts, warnLog, postedMessages };
+  return { handlers, caches, claimed, cacheModes, attempts, warnLog, postedMessages, skipped };
 }
 
 // Drive the fetch handler: returns the promise passed to respondWith, or
@@ -194,6 +195,51 @@ async function coreCache(sw) {
   const name = (await sw.caches.keys()).find((k) => k.startsWith('vot-core-'));
   return sw.caches.open(name);
 }
+
+describe('a new build waits for a quiet moment (up1, Corbin 2026-10-23)', () => {
+  const win = (id, visibilityState) => ({ id, type: 'window', visibilityState, postMessage: () => {} });
+  async function ask(sw, sourceId) {
+    let work = Promise.resolve();
+    sw.handlers.message({ data: { type: 'SKIP_WAITING' }, source: { id: sourceId }, waitUntil: (p) => { work = p; } });
+    await work;
+  }
+
+  it('install does not skip waiting: the open page keeps its build until it asks', async () => {
+    const sw = bootSW();
+    await install(sw);
+    expect(sw.skipped.count).toBe(0);
+  });
+
+  it('the page that asks takes over when no other window of the app is on screen', async () => {
+    const sw = bootSW({ windows: [win('me', 'visible'), win('other', 'hidden')] });
+    await ask(sw, 'me');
+    expect(sw.skipped.count).toBe(1);
+  });
+
+  it('another window still on screen refuses it: that reader would be reloaded mid-session', async () => {
+    const sw = bootSW({ windows: [win('me', 'hidden'), win('other', 'visible')] });
+    await ask(sw, 'me');
+    expect(sw.skipped.count).toBe(0);
+  });
+
+  it('a hidden window that says it is busy (playing, or a note open) refuses it; one that is not, does not', async () => {
+    const busyWin = (busy) => ({ id: 'other', type: 'window', visibilityState: 'hidden', postMessage: (_m, ports) => ports[0].postMessage({ busy }) });
+    const a = bootSW({ windows: [win('me', 'visible'), busyWin(true)] });
+    await ask(a, 'me');
+    expect(a.skipped.count).toBe(0);
+    const b = bootSW({ windows: [win('me', 'visible'), busyWin(false)] });
+    await ask(b, 'me');
+    expect(b.skipped.count).toBe(1);
+  });
+
+  it('an ask with no source (an older page) is still honoured when nothing else is on screen', async () => {
+    const sw = bootSW({ windows: [win('a', 'hidden')] });
+    let work = Promise.resolve();
+    sw.handlers.message({ data: { type: 'SKIP_WAITING' }, waitUntil: (p) => { work = p; } });
+    await work;
+    expect(sw.skipped.count).toBe(1);
+  });
+});
 
 describe('service-worker install (P1pwa / P2pwa)', () => {
   it('caches the critical shell AND best-effort assets on a clean install', async () => {
@@ -1334,6 +1380,8 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(res.status).toBe(503);
     expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeFalsy();
     expect(registration.count).toBe(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'the pages are told (up1)').toBe(1);
   });
 
   it('a code file this build lacks: its own bytes from the network are served and kept', async () => {
@@ -1361,6 +1409,8 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(res.status).toBe(503);
     expect(await (await sw.caches.open(CURRENT_CORPUS)).match(TIMINGS)).toBeFalsy();
     expect(registration.count).toBe(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'the pages are told (up1)').toBe(1);
   });
 
   it('online, another build\'s corpus text is served for now, never kept, and marked for search', async () => {
@@ -1372,6 +1422,8 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(await otherCorpusAfter(res, otherBuildBytes(KJV).length)).toEqual([KJV]);
     expect(await (await sw.caches.open(CURRENT_CORPUS)).match(KJV)).toBeFalsy();
     expect(registration.count).toBe(1);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(sw.postedMessages.filter((m) => m && m.type === 'ANOTHER_BUILD').length, 'text that loaded tells nobody: the reader is reading it (up1 r2)').toBe(0);
   });
 
   it('this build\'s own corpus bytes carry no mark', async () => {

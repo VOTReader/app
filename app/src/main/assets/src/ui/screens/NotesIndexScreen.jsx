@@ -28,6 +28,13 @@ export function filterNotesByQuery(notes, query) {
   );
 }
 
+/** localStorage: the Notes tab the reader last chose. */
+const NOTES_TAB_KEY = 'vot-notes-tab';
+/** @returns {'notebooks' | 'all-notes' | null} */
+function _lastTab() {
+  try { const t = localStorage.getItem(NOTES_TAB_KEY); return t === 'notebooks' || t === 'all-notes' ? t : null; } catch (_e) { return null; }
+}
+
 export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, navOrigin = null, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
   // on any add/remove/rename/membership change.
@@ -53,7 +60,11 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   // before we navigate away and consumed on this mount, so the back-pill ("Back
   // to Devotional") actually lands back in the Devotional drilled view.
   const _notesRet = (typeof window !== 'undefined' && window.navHandoff) ? window.navHandoff.peek('notesReturnCtx') : null;
-  const [tab, setTab] = React.useState((_notesRet && _notesRet.tab) || 'notebooks'); // 'notebooks' | 'all-notes'
+  // Which tab opens (U03.8/U08.4): the one the reader last chose; before any choice, All notes while no notebook of
+  // their own exists (Notebooks would show a lone "Uncategorized" row, one tap away from every note).
+  const [tab, setTabState] = React.useState(() => (_notesRet && _notesRet.tab) || _lastTab() || (notebooks.length ? 'notebooks' : 'all-notes')); // 'notebooks' | 'all-notes'
+  /** @param {'notebooks' | 'all-notes'} t */
+  const setTab = (t) => { setTabState(t); try { localStorage.setItem(NOTES_TAB_KEY, t); } catch (_e) { /* the default next time */ } };
   const [drilledNbId, setDrilledNbId] = React.useState((_notesRet && _notesRet.drilledNbId) || null); // null | 'uncategorized' | <notebookId>
   // "Back to <source>" pill — set when this screen was opened as a link-out
   // (e.g. a journal entry's Notebook card). Mirrors the reading screens'
@@ -293,7 +304,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   : <>
                       {/* ds5 s21.1: Share sends what the reader sees, a search's matches included. */}
                       {drilledNotesShown.length > 0 && (
-                        <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotesShown)} title="Share notebook as text">Share</button>
+                        <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotesShown)} title="Share notebook as text">Share as text</button>
                       )}
                       {drilledNb && <>
                         <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>

@@ -49,6 +49,10 @@
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
 
+/** U10.7: how long the tip stays before it fades by itself, and how long the fade takes. */
+export const HINT_FADE_AFTER_MS = 20000;
+const HINT_FADE_MS = 600;
+
 export function AnnotationHint() {
   // Store subscriptions — any first annotation/note/bookmark re-renders
   // this component and extinguishes the hint. Guarded typeof access: the
@@ -122,6 +126,39 @@ export function AnnotationHint() {
     BookmarkStore.count() > 0;
 
   const visible = !(hasAnyData || dismissed || !delayDone || yielding);
+  // U10.7: the tip goes by itself, after about 20 s up, two screens of the reader's scrolling, or the reader reaching
+  // the page's end (it stayed over the text through the letter's end). It fades, then leaves; the durable flag was
+  // already set when it showed. Each page's position is taken as the tip shows: a browser coalesces scroll events, so
+  // a first event can come a whole screen down, and a short letter has less than two screens to scroll.
+  const [fading, setFading] = React.useState(false);
+  React.useEffect(() => {
+    if (!visible) return undefined;
+    let moved = 0;
+    /** @type {WeakMap<EventTarget, number>} */
+    const last = new WeakMap();
+    document.querySelectorAll('.screen-scroll').forEach((el) => last.set(el, el.scrollTop));
+    last.set(document, window.scrollY || 0);
+    const onScroll = (/** @type {Event} */ e) => {
+      const t = /** @type {any} */ (e.target);
+      const el = t && typeof t.scrollTop === 'number' ? t : null;
+      const top = el ? el.scrollTop : (window.scrollY || 0);
+      const key = t || document;
+      const was = last.get(key);
+      last.set(key, top);
+      if (was == null || top === was) return;
+      moved += Math.abs(top - was);
+      const atEnd = !!el && el.scrollHeight > el.clientHeight && top + el.clientHeight >= el.scrollHeight - 2;
+      if (atEnd || moved > 2 * (window.innerHeight || 800)) setFading(true);
+    };
+    const timer = setTimeout(() => setFading(true), HINT_FADE_AFTER_MS);
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => { clearTimeout(timer); document.removeEventListener('scroll', onScroll, { capture: true }); };
+  }, [visible]);
+  React.useEffect(() => {
+    if (!fading) return undefined;
+    const t = setTimeout(() => setDismissed(true), HINT_FADE_MS);
+    return () => clearTimeout(t);
+  }, [fading]);
   React.useEffect(() => {
     if (!visible || shownAt.current != null) return;
     if (!_flag) { window.__annHintDismissed = true; shownAt.current = 0; return; }
@@ -133,7 +170,7 @@ export function AnnotationHint() {
   if (!visible) return null;
 
   return (
-    <div className="ann-hint-pill" role="status">
+    <div className={'ann-hint-pill' + (fading ? ' is-fading' : '')} role="status">
       <svg className="ann-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M9 11.5V5.5a1.5 1.5 0 0 1 3 0v5" />
         <path d="M12 10.5v-1a1.5 1.5 0 0 1 3 0v2" />
@@ -148,8 +185,7 @@ export function AnnotationHint() {
           if (_flag) _flag.set(); else window.__annHintDismissed = true;
           setDismissed(true);
         }}
-        aria-label="Dismiss tip"
-      >×</button>
+      >Got it</button>
     </div>
   );
 }

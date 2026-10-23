@@ -45,6 +45,32 @@ export function useTopStrip(shown) {
 /** @param {number} n @param {string} one @param {string} many */
 function count(n, one, many) { return n === 1 ? '1 ' + one : n + ' ' + many; }
 
+/**
+ * U09.5 (UX wave 3): what Settings > Your Data says of the offline library, standing (the banner only appears after a
+ * download run, so a reader could not see whether the books would open on a plane).
+ * @param {string} phase @param {number} missing @returns {string}
+ */
+export function offlineLibraryWords(phase, missing) {
+  if (phase === 'complete' || phase === 'fixed') return 'Ready. Every book opens without a connection.';
+  if (phase === 'retrying') return 'Downloading ' + count(missing, 'missing file', 'missing files') + '…';
+  if (phase === 'incomplete' || phase === 'still' || phase === 'dismissed') return 'Not ready. ' + count(missing, 'file is', 'files are') + ' missing.';
+  return 'Not ready yet.';
+}
+
+/** The Settings line, with Retry while files are missing. */
+export function OfflineLibraryStatus() {
+  React.useSyncExternalStore(OfflineLibrary.subscribe, OfflineLibrary.getVersion);
+  React.useEffect(() => { OfflineLibrary.start(); }, []);
+  const { phase, missing } = OfflineLibrary.getState();
+  const retry = phase === 'incomplete' || phase === 'still' || phase === 'dismissed';
+  return (
+    <span className="offline-library-status">
+      {offlineLibraryWords(phase, missing)}
+      {retry ? <>{' '}<button type="button" className="settings-clear-btn" onClick={() => { OfflineLibrary.retry(); }}>Retry</button></> : null}
+    </span>
+  );
+}
+
 export function OfflineLibraryBanner() {
   React.useSyncExternalStore(OfflineLibrary.subscribe, OfflineLibrary.getVersion);
   React.useEffect(() => { OfflineLibrary.start(); }, []);

@@ -13,13 +13,26 @@
         background: var(--bg);
         z-index: 9999;
       }
+      .hydration-loading { flex-direction: column; gap: 1rem; }
       .hydration-loading-text {
         font-family: var(--font-cinzel, Georgia, serif);
         color: var(--gold);
         font-size: var(--fs-24);
         letter-spacing: 0.04em;
         opacity: 0.85;
+        /* U09.1 (UX wave 3): on a slow network the first open showed a still word for about 55 s. It breathes, and
+           after 4 s a line says why it is taking a while. CSS only, so it runs before any script has arrived. */
+        animation: hydrationBreathe 2.4s ease-in-out infinite;
       }
+      .hydration-loading::after {
+        content: 'The first open can take a minute on a slow connection.';
+        max-width: 18rem; padding: 0 1.5rem; text-align: center;
+        font-family: var(--font-body, Georgia, serif); font-style: italic; font-size: var(--fs-15); line-height: 1.4;
+        color: var(--cream-muted, #b9b2a3);
+        opacity: 0; animation: hydrationLate 0.6s ease 4s forwards;
+      }
+      @keyframes hydrationBreathe { 0%, 100% { opacity: 0.85; } 50% { opacity: 0.45; } }
+      @keyframes hydrationLate { to { opacity: 1; } }
       body.light .hydration-loading { background: #f7f2e8; }
 
       /* Generic .vot-toast — bottom-of-screen transient notification.
@@ -601,7 +614,7 @@
         /* the top bar's bottom edge: .top-nav's 44px row + 22.4px padding + 1px border, as .chapter-nav-sticky has it */
         --dock-nav-bottom: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
       }
-      body.audio-bar-open { --dock-player: 96px; }
+      body.audio-bar-open { --dock-player: var(--audio-bar-h, 65px); }   /* measured by AudioPlayerBar; 64 + its top border */
       body.autoscroll-on { --dock-transport: 60px; }
       body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
       body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
@@ -614,6 +627,11 @@
          pauses it (useNoAudioHere), so the bar is back on leaving paused at the same spot, one tap from resuming. */
       body:has(.garden-fullscreen, .sw-root, .sw-fallback) :is(.audio-bar, .ascroll-pill, .find-pill, .mode-toggle-wrap) { display: none; }
       body:has(.garden-fullscreen, .sw-root, .sw-fallback) { --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px; }
+      /* The keyboard is up (use-keyboard-inset.js marks html.kb-up): the mini player steps aside and gives its lane
+         back, so nothing being typed sits under it; the notification, lock screen and headset still control the
+         audio (player brief 2026-10-22, 3a, approved 10-23). */
+      html.kb-up .audio-bar { display: none; }
+      html.kb-up body { --dock-player: 0px; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
       body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
@@ -1203,132 +1221,119 @@
       .hd-playlist-label { grid-column: 2; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
       .hd-playlist-sub { grid-column: 2; font-family: var(--font-body); font-size: var(--fs-13); color: var(--cream-muted); }
 
-      /* ── AUDIO PLAYER — streaming letters (bar + pills + chips) ── */
+      /* ── AUDIO PLAYER — the mini bar (player brief 2026-10-22, 3a and 3g; pictures player-mockups/01-04) ── */
       /* The mini-player (AudioPlayerBar) is PINNED CHROME: fixed to the
          bottom, mounted once, above every screen but UNDER the bottom sheets
          (z 200/201) and toasts (9998) — a sheet must always cover it, hence
-         z-index 150. Two consequences for the rules below:
-           - type inside .audio-bar names the --fsc-* px twins, like .top-nav.
-             Chrome must NOT grow with Settings → Text Size (the --fs-* rem
-             steps do). The in-flow pills and chips further down DO use --fs-*.
-           - no backdrop-filter. The bar covers scrolling content, and blur on
-             scroll-covering chrome was purged for perf.
+         z-index 150. 64 px at 100% text: 8 px padding round 48 px controls.
+         Its TEXT follows Text size (brief 3a: title at least 15 px, line 2 at
+         least 13 px, the bar grows rather than cut the source to a stub); its
+         chrome (gaps, paddings, 48 px controls) is pinned in px, so the row's
+         buttons never squeeze the title to nothing (2026-09-13). The dock reads
+         the bar's measured height (--audio-bar-h, AudioPlayerBar). No
+         backdrop-filter: blur on scroll-covering chrome was purged for perf.
          Colors are plain theme vars, so light mode needs no override except
-         the drop shadow (a dark halo reads as grime on cream — same tweak
-         .ascroll-pill makes). */
+         the drop shadow (a dark halo reads as grime on cream). */
       .audio-bar {
         position: fixed; left: 8px; right: 8px; bottom: 0; z-index: 150;
         margin: 0 auto; max-width: 720px;
-        /* Chrome pinned in px past Text Size 1 (2026-09-13): at 3 on a 320 phone the rem gap read 24 px
-           and the side padding 28.8, and the row's buttons, gaps and paddings came to 318 of its 304 px —
-           the title, the summary button and the seek measured 0 px wide. Identical at 1 (8 and 9.6 px). */
-        display: flex; align-items: center; gap: min(0.5rem, 10px);
-        padding: min(0.5rem, 10px) min(0.6rem, 12px) calc(max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)) + min(0.5rem, 10px));
+        display: flex; flex-wrap: wrap; align-items: center; gap: min(0.5rem, 4px);
+        padding: min(0.5rem, 8px) min(0.6rem, 8px) calc(max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)) + min(0.5rem, 8px));
         background: var(--bg3);
         border: 1px solid var(--gold-border); border-bottom: 0;
         border-radius: 14px 14px 0 0;
         box-shadow: 0 -6px 22px rgba(0,0,0,0.45);
       }
       body.light .audio-bar { box-shadow: 0 -6px 22px rgba(0,0,0,0.18); }
-      .audio-bar-play {
-        flex-shrink: 0; width: 44px; height: 44px; padding: 0; border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        background: var(--gold-faint); border: 1px solid var(--gold-border);
-        color: var(--gold); cursor: pointer;
-      }
-      .audio-bar-play svg { width: 20px; height: 20px; }
-      @media (hover: hover) { .audio-bar-play:hover { border-color: var(--gold); } }
-      /* Buffering pulses the button in place rather than swapping in a
-         spinner — the tap target never moves under a finger already on it. */
-      .audio-bar-play.is-loading { animation: audio-bar-pulse 1.1s ease-in-out infinite; }
-      @keyframes audio-bar-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
-      .audio-bar-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      /* The title area is a real disclosure button: the compact bar is a
-         transport surface, while a tap on its context opens the full listening
-         desk. Keeping the seek input outside avoids nesting controls. */
+      /* The top edge is the progress (brief 3a: no seek on the bar; seeking lives in the controls it opens). */
+      .audio-bar-line { position: absolute; top: 0; left: 14px; right: 14px; height: 3px; overflow: hidden; border-radius: 0 0 2px 2px; background: var(--gold-border); pointer-events: none; }
+      .audio-bar-line > span { display: block; height: 100%; background: var(--gold); }
+      /* The title area is a real disclosure button: a tap on it opens the
+         listening controls. The transport buttons sit beside it, never in it. */
+      /* At large text on a narrow phone the controls drop to a row of their own, right-aligned, rather than leave the
+         title a few letters wide (300% at 360 px read "Christ…"): the text keeps at least six of its own ems. */
       .audio-bar-summary {
-        min-width: 0; padding: 0; border: 0; background: none; color: inherit;
+        flex: 1 1 0; min-width: min(100%, 6em); min-height: 48px; font-size: var(--fs-15); padding: 0; border: 0; background: none; color: inherit;
         text-align: left; cursor: pointer; border-radius: 4px;
-        display: flex; align-items: center; gap: 6px;
+        display: flex; align-items: center; gap: 10px;
       }
-      .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      .audio-bar-summary:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
       @media (hover: hover) { .audio-bar-summary:hover .audio-bar-title { color: var(--gold-bright); } }
-      /* Pull-tab notch: joined to the middle of the bar's upper boundary —
-         same plate and border as the bar, no bottom edge, overlapping the
-         bar's top hairline by 2px so the join is seamless. Decorative twin
-         of the labeled summary button (tabIndex -1, aria-hidden). */
-      .audio-bar-pull {
-        position: absolute; top: 0; left: 50%;
-        transform: translate(-50%, calc(-100% + 2px));
-        width: 76px; height: 26px; padding: 0 0 2px;
+      /* The type mark: a song's cover, a gold book for letters and chapters. It steps aside at large text (brief 3a),
+         where the words need the room. */
+      .audio-bar-mark {
+        flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
-        background: var(--bg3);
-        border: 1px solid var(--gold-border); border-bottom: 0;
-        border-radius: 12px 12px 0 0;
-        color: var(--gold); cursor: pointer;
+        background: var(--gold-faint); border: 1px solid var(--gold-border); color: var(--gold);
       }
-      .audio-bar-pull svg { width: 22px; height: 22px; }
-      @media (hover: hover) { .audio-bar-pull:hover { color: var(--gold-bright); border-color: var(--gold); } }
+      .audio-bar-mark svg { width: 24px; height: 24px; }
+      .audio-bar.is-song .audio-bar-mark { background: none; border: 0; }
+      .audio-bar-cover { width: 40px; height: 40px; border-radius: 8px; }
+      .audio-bar-cover .song-cover-note { font-size: var(--fsc-20); }
+      .vot-large-text .audio-bar-mark { display: none; }
+      .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
       .audio-bar-title {
-        display: block; font-size: var(--fsc-13); color: var(--cream); line-height: 1.25;
+        display: block; font-size: var(--fs-15); color: var(--cream); line-height: 1.25;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
+      .vot-large-text .audio-bar-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
       .audio-bar-part { color: var(--cream-muted); }
+      /* Line 2 wraps rather than cut "Volume One · 3 of 30 · 12 min left" short (picture 04); the chips stay whole. */
       .audio-bar-sub {
-        display: flex; align-items: baseline; gap: 0.5rem;
-        font-size: var(--fsc-11); color: var(--cream-muted); line-height: 1.3;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
+        font-size: var(--fs-13); color: var(--cream-muted); line-height: 1.3;
       }
-      .audio-bar-src { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-      /* A repeating passage (rp1 part 3) takes the source's place, in gold. */
-      .audio-bar-loop { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--gold); }
-      /* Place in the queue ("· 3 of 12"). Never shrinks: the SOURCE line is the
-         part allowed to ellipsize, and the gap here is the sub-line's own. */
-      .audio-bar-pos { flex-shrink: 0; margin-left: -0.22rem; color: var(--cream-dim); font-variant-numeric: tabular-nums; }
-      .audio-bar-time { flex-shrink: 0; color: var(--cream-dim); font-variant-numeric: tabular-nums; }
-      /* Native range input, themed for BOTH engines: the Android WebView /
-         Chrome side needs -webkit-slider-*, a desktop-PWA Firefox the
-         -moz-range-* twins. appearance:none drops the platform track in each;
-         the thumb's -5px margin centers a 14px circle on the 4px track
-         (webkit only — Firefox centers the thumb itself). */
-      /* A 24 px tall HIT box around the same thin track (WCAG 2.5.8; ux2,
-         2026-09-22): at 14 px a finger aimed at the seek landed on "Open
-         listening controls" above it. Block, not the input's default inline:
-         an inline range sits on a text line box, which is what the old 14 px
-         input's 18 px footprint was. The margins give back exactly that
-         footprint (24 - 2 - 4 = 18) - 2 px up into the column gap, never into
-         the summary button, and 4 px down into the bar's own bottom padding -
-         so the bar keeps its height; the drawn track sits 3 px lower. */
-      .audio-bar-seek {
-        -webkit-appearance: none; appearance: none;
-        display: block; width: 100%; height: 24px; margin: -2px 0 -4px; padding: 0;
-        background: transparent; cursor: pointer;
+      .audio-bar-line2 { min-width: 0; font-variant-numeric: tabular-nums; }
+      .audio-bar-seg { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+      .audio-bar-line2.is-loop { color: var(--gold); }
+      .audio-bar-line2.is-offline { color: var(--cream-dim); }
+      .audio-bar-line2.is-failed .audio-bar-seg { white-space: normal; }
+      .audio-bar-line2.is-failed .audio-bar-seg::before {
+        content: '!'; display: inline-flex; align-items: center; justify-content: center;
+        width: 1.2em; height: 1.2em; margin-right: 0.4em; box-sizing: border-box;
+        border: 1.5px solid var(--gold); border-radius: 50%; color: var(--gold); font-weight: 700; line-height: 1;
       }
-      .audio-bar-seek:disabled { opacity: 0.4; cursor: default; }
-      .audio-bar-seek:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      /* Played portion: ONE inline custom property (--seek-pct, written by
-         AudioSeekSlider) drives both engines' track pseudo-elements — custom
-         properties inherit into them, so the gradient stop is the only thing
-         that has to change as the clock advances. Hard stops, not a blend:
-         the boundary IS the position. */
-      .audio-bar-seek::-webkit-slider-runnable-track {
-        height: 4px; border-radius: 2px;
-        background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%));
+      .audio-bar-chip {
+        flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px; padding: 0 4px;
+        border: 1px solid var(--gold-border); border-radius: 6px; color: var(--gold);
+        font-variant-numeric: tabular-nums; line-height: 1.4; white-space: nowrap;
       }
-      .audio-bar-seek::-webkit-slider-thumb {
-        -webkit-appearance: none; appearance: none;
-        width: 14px; height: 14px; border-radius: 50%;
-        background: var(--gold); border: 0; margin-top: -5px;
+      .audio-bar-chip svg { width: 0.95em; height: 0.95em; }
+      /* Controls: 48 px each (brief 3a). Back 15 dims while it cannot work; its slot then holds Cancel (past 8 s of
+         loading) or Retry (after a failure), in words. */
+      .audio-bar-back, .audio-bar-next, .audio-bar-close, .audio-bar-act {
+        flex-shrink: 0; min-width: 48px; height: 48px; padding: 0; border-radius: 999px;
+        display: flex; align-items: center; justify-content: center;
+        background: none; border: none; cursor: pointer; color: var(--gold);
       }
-      .audio-bar-seek::-moz-range-track {
-        height: 4px; border-radius: 2px;
-        background: linear-gradient(to right, var(--gold) var(--seek-pct, 0%), var(--gold-border) var(--seek-pct, 0%));
+      .audio-bar-back svg { width: 30px; height: 30px; }
+      .audio-bar-next svg, .audio-bar-close svg { width: 24px; height: 24px; }
+      .audio-bar-back:disabled { opacity: 0.4; cursor: default; }
+      .audio-bar-close { margin-left: 4px; }   /* 8 px before Close (brief 3a) */
+      .audio-bar-controls { flex: none; margin-left: auto; display: flex; align-items: center; gap: min(0.5rem, 4px); }
+      .audio-bar-act { padding: 0 6px; font-size: var(--fs-15); }
+      .audio-bar-play {
+        position: relative; flex-shrink: 0; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        background: var(--gold); color: var(--bg); cursor: pointer;
       }
-      .audio-bar-seek::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--gold); border: 0; }
-      /* Scrub preview: the thumb follows the finger locally and the seek lands
-         once on release, so the bubble is the only readout of where the drag
-         currently is. Pinned in px like the bar's own clock — a readout tied
-         to a thumb position must not resize under the Text Size setting. */
+      .audio-bar-play svg { width: 22px; height: 22px; }
+      .audio-bar-play.is-unavailable { opacity: 0.45; }
+      /* Loading turns in place inside the button: the tap target never moves under a finger already on it. */
+      .audio-bar-spinner { animation: audio-bar-spin 0.9s linear infinite; }
+      @keyframes audio-bar-spin { to { transform: rotate(360deg); } }
+      /* The listening desk's Play still pulses while it loads. */
+      @keyframes audio-bar-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
+      .audio-bar button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      @media (hover: hover) {
+        .audio-bar-play:hover { background: var(--gold-bright); }
+        :is(.audio-bar-back, .audio-bar-next, .audio-bar-close, .audio-bar-act):not(:disabled):hover { background: var(--gold-faint); }
+      }
+      :is(.audio-bar-back, .audio-bar-next, .audio-bar-close, .audio-bar-act):not(:disabled):active { background: var(--gold-faint); }
+      @media (max-width: 360px) { .audio-bar-summary { gap: 8px; } }
+      @media (prefers-reduced-motion: reduce) { .audio-bar-spinner { animation: none; } }
+      /* Scrub preview (AudioSeekSlider, the listening desk's seek): the thumb follows the finger locally and the seek
+         lands once on release, so the bubble is the only readout of where the drag currently is. Pinned in px — a
+         readout tied to a thumb position must not resize under the Text Size setting. */
       .audio-seek-wrap { position: relative; }
       .audio-seek-bubble {
         position: absolute; bottom: calc(100% + 3px); transform: translateX(-50%);
@@ -1339,50 +1344,10 @@
         box-shadow: 0 2px 9px rgba(0, 0, 0, 0.42);
       }
       body.light .audio-seek-bubble { box-shadow: 0 2px 9px rgba(0, 0, 0, 0.14); }
-      .audio-bar-nav, .audio-bar-close {
-        flex-shrink: 0; width: 40px; height: 40px; padding: 0; border-radius: 999px;
-        display: flex; align-items: center; justify-content: center;
-        background: none; border: none; cursor: pointer; color: var(--gold-dim);
-      }
-      .audio-bar-close { color: var(--cream-muted); }
-      .audio-bar-nav svg, .audio-bar-close svg { width: 20px; height: 20px; }
-      @media (hover: hover) { .audio-bar-nav:hover, .audio-bar-close:hover { color: var(--gold); } }
-      .audio-bar-nav:active, .audio-bar-close:active { background: var(--gold-faint); }
-      /* Room for the bar: .screen-scroll is the ONE scroll container per screen; its end padding is the
-         bottom dock's live height (the cz7 rule by the dock tokens). */
-      @media (prefers-reduced-motion: reduce) {
-        /* The global W10-lite block near-zeros the duration, which would park
-           the pulse at an arbitrary opacity; state it statically instead. */
-        .audio-bar-play.is-loading { animation: none; opacity: 0.55; }
-      }
       /* The bar's and the desk's buttons speak in the reading serif (W3-07: a button does not inherit its font, so
          the bar's title fell back to a sans). :where() keeps this at zero specificity, under every class that names
          its own family (the Cinzel labels). */
       :where(.audio-bar, .audio-manager-sheet) button { font-family: inherit; }
-      /* ── SONGS OF THE LETTERS: the bar's song skin (L3, picture final-08). Same 70 px bar and pull-tab; a 48 px
-         cover, the title and the version, a FILLED 48 px play/pause, next and close at 44 px, and a 3 px progress
-         line along the top edge instead of the slider (seeking lives in the desk). Type in --fsc px like the rest
-         of the bar. ── */
-      .audio-bar.is-song { gap: 4px; }
-      .audio-bar-line { position: absolute; top: 0; left: 14px; right: 14px; height: 3px; overflow: hidden; border-radius: 0 0 2px 2px; background: var(--gold-border); pointer-events: none; }
-      .audio-bar-line > span { display: block; height: 100%; background: var(--gold); }
-      .audio-bar-song-summary { flex: 1; height: 54px; gap: 10px; margin-right: 4px; }
-      .audio-bar-cover { width: 48px; height: 48px; border-radius: 8px; }
-      .audio-bar-cover .song-cover-note { font-size: var(--fsc-20); }
-      .audio-bar.is-song .audio-bar-title { font-size: var(--fsc-15); }
-      .audio-bar-song-sub { display: block; overflow: hidden; color: var(--cream-muted); font-size: var(--fsc-13); font-style: italic; line-height: 1.3; white-space: nowrap; text-overflow: ellipsis; }
-      .audio-bar-song-sub.is-offline { color: var(--cream-dim); }
-      .audio-bar-song-play { position: relative; flex-shrink: 0; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 50%; background: var(--gold); color: var(--bg); cursor: pointer; }
-      .audio-bar-song-play svg { width: 22px; height: 22px; }
-      .audio-bar-song-play.is-loading::after { content: ""; position: absolute; inset: -4px; border: 2px solid transparent; border-top-color: var(--gold); border-radius: 50%; animation: song-bar-spin 1s linear infinite; }
-      @keyframes song-bar-spin { to { transform: rotate(360deg); } }
-      .audio-bar-song-play.is-unavailable { opacity: 0.45; }
-      .audio-bar-song-play:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
-      .audio-bar.is-song .audio-bar-nav, .audio-bar.is-song .audio-bar-close { width: 44px; height: 44px; }
-      .audio-bar-song-next { color: var(--gold); }
-      @media (hover: hover) { .audio-bar-song-play:hover { background: var(--gold-bright); } }
-      @media (prefers-reduced-motion: reduce) { .audio-bar-song-play.is-loading::after { animation: none; border-color: var(--gold-border); } }
-      @media (max-width: 360px) { .audio-bar.is-song { gap: 2px; } .audio-bar-song-summary { gap: 8px; margin-right: 2px; } }
       /* ── SONGS OF THE LETTERS: the listening desk in song mode (L3 + L5, picture final-04). A 72 px cover head with
          "Open the letter ›", the Versions card in the Voice card's grammar, a transport with words under the icons,
          and the lyrics card whose current line takes the read-along wash (--reading-wash, the ::highlight colour). ── */
@@ -1650,6 +1615,137 @@
       .offline-confirm-go:disabled { opacity:.45; cursor:default; }
       .audio-offline-remove { min-height:36px; padding:.2rem .7rem; border:1px solid var(--gold-border); border-radius:7px; background:transparent; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:.035em; cursor:pointer; }
       .audio-offline-remove-all { margin-top:1rem; }
+      /* The Downloads screen (downloads brief 2026-10-23, D3; pictures 03-07 in D:/Swarm/calls/downloads-mockups/): tabs,
+         the Choose tree with tri-state boxes and a chapter grid, its sticky footer and the Apply / mobile-data sheets.
+         Brick = marked for removal (README #C4664A). */
+      .dl-screen, .dl-sheet { --dl-brick:#c4664a; --dl-surface:#14120e; }
+      body.light .dl-screen, body.light .dl-sheet { --dl-brick:#9b3a2a; --dl-surface:#ece5d4; }
+      .dl-hero { padding-bottom:.4rem; }
+      .dl-tabs { display:flex; gap:1.6rem; margin:0 0 .4rem; border-bottom:1px solid var(--gold-border); }
+      .dl-tab { min-height:48px; padding:.4rem .1rem; border:0; border-bottom:3px solid transparent; margin-bottom:-1px; background:none; color:var(--cream-dim); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+      .dl-tab.is-on { color:var(--cream); border-bottom-color:var(--gold); }
+      .dl-phone-head { margin:.3rem 0 .6rem; }
+      .dl-choose { padding-bottom:.5rem; }
+      .dl-loading, .dl-held { margin:.8rem 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-held { color:var(--gold); font-style:normal; }
+      .dl-group { border-bottom:1px solid var(--gold-border); }
+      .dl-children > .dl-group:last-child, .dl-children > div:last-child > .dl-group { border-bottom:0; }
+      .dl-level-1 .dl-children, .dl-level-2 .dl-children { padding-left:.9rem; }
+      .dl-level-0 > .dl-children { border-top:1px solid var(--gold-border); }
+      .dl-row { display:flex; align-items:flex-start; gap:.35rem; min-height:56px; }
+      .dl-row-main { flex:1 1 auto; min-width:0; display:flex; align-items:flex-start; gap:.5rem; padding:.7rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .dl-row-copy { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
+      .dl-row-copy strong { color:var(--cream); font-weight:400; font-size:var(--fs-18); line-height:1.25; overflow-wrap:anywhere; }
+      .dl-level-0 > .dl-row .dl-row-copy strong { font-size:var(--fs-20); }
+      .dl-row-copy small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); line-height:1.4; }
+      .dl-chevron { flex:0 0 auto; width:26px; height:26px; margin-top:.15rem; fill:none; stroke:var(--gold); stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; transition:transform .2s ease; }
+      .dl-chevron.is-open { transform:rotate(180deg); }
+      .dl-box { flex:0 0 48px; width:48px; height:48px; margin-top:.25rem; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; cursor:pointer; }
+      .dl-box-mark { width:calc(12px + .625rem); height:calc(12px + .625rem); border:1.6px solid var(--gold-dim); border-radius:5px; display:inline-flex; align-items:center; justify-content:center; }
+      .dl-box-mark svg { width:80%; height:80%; fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-box.is-all .dl-box-mark { background:var(--gold); border-color:var(--gold); }
+      .dl-box.is-all svg { stroke:#17130a; }
+      body.light .dl-box.is-all svg { stroke:var(--bg); }
+      .dl-box.is-some .dl-box-mark { border-color:var(--gold); }
+      .dl-box.is-some svg { stroke:var(--gold); }
+      .dl-box.is-remove .dl-box-mark { border-color:var(--dl-brick); }
+      .dl-box:focus-visible .dl-box-mark, .dl-chip:focus-visible, .dl-tab:focus-visible, .dl-row-main:focus-visible, .dl-link:focus-visible, .dl-footer-go:focus-visible, .dl-range:focus-visible, .dl-edition:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .dl-mark { display:inline-flex; align-items:center; gap:.4rem; margin-top:.15rem; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-mark svg { flex:0 0 auto; width:20px; height:20px; fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; }
+      .dl-mark.is-some .dl-mark-ring { stroke:var(--gold-border); }
+      .dl-mark.is-some .dl-mark-arc { stroke:var(--gold); stroke-width:2.2; }
+      .dl-remove-note { color:var(--dl-brick); font-size:var(--fs-14); }
+      .dl-unit { min-height:52px; border-top:1px solid var(--gold-faint); }
+      .dl-unit .dl-row-main { align-items:center; justify-content:space-between; flex-wrap:wrap; gap:.2rem .8rem; padding:.55rem 0; }
+      .dl-unit-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
+      .dl-unit-meta { flex:0 0 auto; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-show-all { margin:.2rem 0 .5rem calc(48px + .35rem); }
+      .dl-tools { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem 1rem; padding:0 0 .8rem calc(48px + .35rem); }
+      .dl-link { min-height:44px; padding:.3rem 0; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; text-align:left; }
+      .dl-voice { flex:0 1 auto; min-width:0; max-width:100%; }
+      .dl-voice select { min-height:44px; width:100%; max-width:100%; text-overflow:ellipsis; padding:.3rem 2rem .3rem .8rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); }
+      .dl-voice select option { background:var(--bg); color:var(--cream); }
+      .dl-editions { display:flex; flex-wrap:wrap; gap:.5rem; padding:0 0 .5rem calc(48px + .35rem); }
+      .dl-edition { min-height:44px; padding:.3rem .9rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .dl-edition.is-on { background:var(--gold); color:#17130a; }
+      body.light .dl-edition.is-on { color:var(--bg); }
+      .dl-chapters { padding:0 0 1rem; }
+      .dl-chapters-head { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem .8rem; margin:0 0 .6rem; }
+      .dl-chapters-hint { flex:1 1 8em; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-range { min-height:40px; padding:.2rem 1rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .dl-range.is-on { background:var(--gold); color:#17130a; }
+      body.light .dl-range.is-on { color:var(--bg); }
+      .dl-chip-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(max(44px, 2.6em), 1fr)); gap:.45rem; }
+      .dl-chip { position:relative; min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); cursor:pointer; touch-action:manipulation; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+      /* hub 03:14: on the phone = a tick on a quiet fill; picked to add = the strong gold. */
+      .dl-chip.is-kept { background:var(--gold-faint); border-color:var(--gold-dim); }
+      .dl-chip.is-add { background:var(--gold); border-color:var(--gold); color:#17130a; }
+      body.light .dl-chip.is-add { color:var(--bg); }
+      .dl-chip.is-remove { border-color:var(--dl-brick); color:var(--dl-brick); text-decoration:line-through; }
+      .dl-chip.is-from { box-shadow:0 0 0 2px var(--gold-bright); }
+      .dl-chip-tick { position:absolute; top:2px; right:2px; width:12px; height:12px; fill:none; stroke:var(--gold); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-footer { position:sticky; bottom:calc(var(--dock-player) + var(--dock-sys)); z-index:3; display:flex; flex-wrap:wrap; align-items:center; gap:.6rem 1rem; margin:1rem -1rem 0; padding:.8rem 1rem; border-top:1px solid var(--gold-border); background:var(--dl-surface); }
+      .dl-footer-text { flex:1 1 12em; min-width:0; }
+      .dl-footer-text p { margin:0; color:var(--cream); font-size:var(--fs-16); line-height:1.35; }
+      .dl-footer-text .dl-footer-sub { margin-top:.15rem; color:var(--cream-dim); font-size:var(--fs-14); }
+      .dl-footer-warn { color:var(--dl-brick); }
+      .dl-footer-go { flex:0 0 auto; min-height:48px; max-width:100%; padding:.4rem 1.2rem; border:1px solid var(--gold); border-radius:8px; background:var(--gold); color:#17130a; font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      body.light .dl-footer-go { color:var(--bg); }
+      .dl-footer-go:disabled { background:transparent; border-color:var(--gold-dim); color:var(--cream-dim); cursor:default; }
+      .dl-sheet .dl-sheet-title { text-align:left; }
+      .dl-sheet-body { max-height:50vh; overflow-y:auto; margin:.6rem 0 0; }
+      .dl-sheet-kicker { margin:.9rem 0 .2rem; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
+      .dl-sheet-kicker.is-remove { color:var(--dl-brick); }
+      .dl-sheet-row { display:flex; align-items:flex-start; gap:.8rem; padding:.6rem 0; border-bottom:1px solid var(--gold-border); color:var(--gold); }
+      .dl-sheet-row.is-remove { color:var(--dl-brick); }
+      .dl-sheet-row .offline-icon { flex:0 0 auto; width:24px; height:24px; margin-top:.15rem; }
+      .dl-sheet-row span { display:flex; flex-direction:column; min-width:0; }
+      .dl-sheet-row strong { color:var(--cream); font-weight:400; font-size:var(--fs-18); overflow-wrap:anywhere; }
+      .dl-sheet-row small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-sheet-summary { margin:.8rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
+      .dl-sheet-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:1rem; }
+      .dl-sheet-actions > button { flex:1 1 9em; min-height:48px; font-family:inherit; font-size:var(--fs-16); }
+      /* On this phone (pictures 11-13): the storage bar, sections like the tree, a × per recording, ⋯ per group. */
+      .dl-storage { margin:.9rem 0 .2rem; }
+      .dl-storage-bar { display:flex; height:14px; border-radius:7px; background:var(--gold-faint); border:1px solid var(--gold-border); overflow:hidden; }
+      .dl-storage-rec { background:var(--gold); }
+      .dl-storage-songs { background:var(--gold-dim); border-left:2px solid var(--bg); }
+      .dl-storage-line { margin:.45rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-sort { display:flex; justify-content:flex-end; margin:.2rem 0 0; }
+      .dl-sort select { min-height:44px; max-width:100%; padding:.2rem .4rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); text-align:right; }
+      .dl-sort select option { background:var(--bg); color:var(--cream); }
+      .dl-shelf-section { margin:.6rem 0 0; }
+      .dl-shelf-kicker { margin:.8rem 0 .1rem; color:var(--gold); font-family:'Cinzel',serif; font-weight:400; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
+      .dl-shelf-branch { border-bottom:1px solid var(--gold-border); }
+      .dl-shelf-head { display:flex; align-items:flex-start; gap:.5rem; }
+      .dl-shelf-mark { flex:0 0 auto; width:26px; height:26px; margin-top:.85rem; fill:none; stroke:var(--gold); stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
+      .dl-icon-btn { flex:0 0 48px; width:48px; height:48px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; background:none; color:var(--gold); cursor:pointer; }
+      .dl-shelf-head .dl-icon-btn { margin-top:.4rem; }
+      .dl-icon-btn svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; }
+      .dl-icon-btn svg circle { fill:currentColor; stroke:none; }
+      .dl-icon-btn:focus-visible, .dl-shelf-play:focus-visible, .dl-remove-all:focus-visible, .dl-menu-item:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .dl-shelf-rows { padding:0 0 .4rem calc(26px + .5rem); }
+      .dl-shelf-row { display:flex; align-items:center; gap:.4rem; min-height:52px; border-top:1px solid var(--gold-faint); }
+      .dl-shelf-play { flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.1rem .8rem; padding:.5rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .dl-shelf-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
+      .dl-shelf-size { flex:0 0 auto; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-shelf-more { margin:.1rem 0 .3rem; }
+      .dl-remove-all { display:block; min-height:48px; margin:1.2rem auto .4rem; padding:.3rem 1rem; border:0; background:none; color:var(--dl-brick); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+      .dl-remove-line { display:flex; align-items:flex-start; gap:.6rem; text-align:left; color:var(--cream-dim); }
+      .dl-remove-line .offline-icon { flex:0 0 auto; width:24px; height:24px; color:var(--dl-brick); }
+      .dl-sheet-actions .dl-remove-go { background:var(--dl-brick); border-color:var(--dl-brick); color:#17130a; }
+      body.light .dl-sheet-actions .dl-remove-go { color:#fff; }
+      .dl-menu { display:flex; flex-direction:column; margin:.6rem 0 0; }
+      .dl-menu-item { min-height:52px; padding:.4rem .2rem; border:0; border-bottom:1px solid var(--gold-border); background:none; color:var(--cream); font:inherit; font-size:var(--fs-18); text-align:left; cursor:pointer; }
+      .dl-menu-item.is-remove { color:var(--dl-brick); border-bottom:0; }
+      .audio-library-hero-actions .audio-collection-choose, .audio-collection-choose { min-height:44px; padding:.3rem .2rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
+      .audio-collection-choose:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .settings-downloads-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.3rem .6rem; width:100%; min-height:56px; padding:.3rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      .settings-downloads-row .settings-row-label { grid-column:1; }
+      .settings-downloads-row .settings-select-chev { grid-column:2; grid-row:1 / span 3; color:var(--gold); }
+      .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
+      .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
+      .settings-downloads-row .settings-row-value { grid-column:1; }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible, .audio-offline-remove:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
       .audio-library-search > svg { flex:0 0 auto; width:17px; height:17px; color:var(--gold-dim); }
@@ -1730,7 +1826,7 @@
       .songs-eyebrow { color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); font-weight:600; letter-spacing:.22em; text-transform:uppercase; }
       .songs-screen h1 { margin:.2rem 0 0; color:var(--cream); font-family:inherit; font-size:var(--fs-30); font-weight:500; line-height:1.15; }
       .songs-intro { margin:.45rem 0 0; color:var(--cream-dim); font-size:var(--fs-16); font-style:italic; line-height:1.45; }
-      .songs-controls { display:grid; gap:.7rem; }
+      .songs-controls { display:grid; grid-template-columns:minmax(0,1fr); gap:.7rem; }
       .songs-shuffle, .songs-outline-action { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.5rem 1.2rem; border:1px solid var(--gold); border-radius:999px; font-family:inherit; font-size:var(--fs-16); font-weight:600; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
       .songs-shuffle { width:100%; background:var(--gold); color:var(--bg); }
       .songs-outline-action { background:transparent; color:var(--gold); }
@@ -1739,7 +1835,7 @@
       .songs-find:focus-within { border-color:var(--gold); }
       .songs-find > svg { width:20px; height:20px; flex:none; color:var(--cream-dim); }
       .songs-find label { flex:1; min-width:0; display:flex; }
-      .songs-find input { width:100%; min-height:44px; padding:0; border:0; background:transparent; color:var(--input-text); font:inherit; font-size:var(--fs-16); outline:none; -webkit-appearance:none; appearance:none; }
+      .songs-find input { width:100%; min-width:0; min-height:44px; padding:0; border:0; background:transparent; color:var(--input-text); font:inherit; font-size:var(--fs-16); outline:none; -webkit-appearance:none; appearance:none; }
       .songs-find input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; display:none; }
       .songs-find input::placeholder { color:var(--cream-dim); opacity:.85; }
       .songs-find-clear { width:44px; height:44px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--cream); cursor:pointer; }
@@ -1796,7 +1892,9 @@
       .songs-nav-mark svg { width:20px; height:20px; }
       .songs-nav-label { flex:1; min-width:0; color:var(--cream); font-size:var(--fs-18); }
       .songs-nav-count { color:var(--cream-dim); font-size:var(--fs-16); font-variant-numeric:tabular-nums; }
-      .songs-tiles { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+      /* Two columns while a tile stays 10rem wide (rem grows with Text size), else one; never more than two. Two
+         fixed columns left a title 48 px at 150% and 0 px at 300% (pl-l0, Songs at large text). */
+      .songs-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(10rem, calc(50% - .3rem))), 1fr)); gap:.6rem; }
       .songs-tile { display:flex; align-items:center; gap:.6rem; min-height:76px; padding:.45rem .4rem .45rem .45rem; border:1px solid var(--border); border-radius:10px; background:var(--bg3); color:inherit; font:inherit; text-align:left; cursor:pointer; }
       .songs-mosaic { flex:none; display:grid; grid-template-columns:repeat(2,28px); grid-template-rows:repeat(2,28px); gap:2px; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; }
       .songs-mosaic .song-cover { width:28px; height:28px; border:0; border-radius:0; }
@@ -1804,10 +1902,33 @@
       .songs-tile-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:.1rem; }
       .songs-tile-copy strong { color:var(--cream); font-size:var(--fs-16); font-weight:400; line-height:1.25; }
       .songs-tile-copy small { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
-      .songs-shelves { display:grid; gap:.55rem; }
+      /* pl-l0 (player brief section 7): at 200% text a shelf row ran to 449 px on a 412 px screen. The grid's one
+         column grew to the row's min-content (the title's longest word plus a count that could not wrap); now the
+         column never passes the screen, the count wraps before the title has to, and the title keeps its words whole. */
+      .songs-shelves { display:grid; grid-template-columns:minmax(0,1fr); gap:.55rem; }
       .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .songs-shelf-title { flex:1; min-width:0; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
-      .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); white-space:nowrap; }
+      .songs-shelf-title { flex:1; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
+      .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); text-align:right; }
+      /* Songs at large text (Text size 1.8 and up: the root class vot-large-text, as mw19 pins the reader): px
+         gutters, row covers and lengths hidden (the title needs the width; the bar hides its type mark the same way,
+         player brief 3a), a shelf's count under its title, the versions link free to wrap. At 300% the hub ran to 458-663 px on a 412 px screen. */
+      .vot-large-text .songs-screen { padding-left:16px; padding-right:16px; }
+      .vot-large-text .songs-shuffle, .vot-large-text .songs-outline-action { padding-left:16px; padding-right:16px; letter-spacing:0; }
+      .vot-large-text .songs-find { padding-left:12px; }
+      .vot-large-text .songs-row .song-cover, .vot-large-text .songs-row-len { display:none; }
+      .vot-large-text .songs-card .songs-row { padding:8px 10px 8px 8px; }
+      .vot-large-text .songs-row-line { flex-wrap:wrap; }
+      .vot-large-text .songs-row-versions { margin:0; white-space:normal; }
+      .vot-large-text .songs-shelf { flex-wrap:wrap; padding:12px 12px 12px 16px; }
+      .vot-large-text .songs-shelf-title { flex-basis:100%; letter-spacing:.04em; }
+      .vot-large-text .songs-shelf-count { margin-left:auto; }
+      .vot-large-text .songs-nav-mark { display:none; }
+      .vot-large-text .songs-nav-row { gap:12px; padding:8px 12px; }
+      .vot-large-text .songs-nav-label { min-width:auto; }
+      .vot-large-text .songs-chip { max-width:100%; padding:4px 14px; }
+      .vot-large-text .songs-mosaic { display:none; }
+      .vot-large-text .songs-tile { gap:12px; padding:8px 10px 8px 12px; }
+      .vot-large-text .songs-row-copy strong, .vot-large-text .songs-tile-copy strong { overflow-wrap:anywhere; }
       .songs-list-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.9rem; }
       .songs-list-actions .songs-play-all { width:auto; flex:1 1 10rem; }
       .songs-empty { margin:.5rem 0; color:var(--cream-dim); font-style:italic; }
@@ -2365,23 +2486,22 @@
       }
       /* ── First-run annotation tip (AnnotationHint) ── */
       .ann-hint-pill {
-        position: fixed; left: 50%; transform: translateX(-50%);
+        /* U05.6 (UX wave 3): a full-width strip along the bottom, not a centred pill (at 300% the pill was a 646 px
+           column with its close half off-screen). */
+        position: fixed; left: 0; right: 0;
         /* Message lane, above the context row (cz1: the Study Notes toggle sat on its ✕). */
         bottom: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context));
         z-index: 190; /* under the mode-toggle pill (200) + sheets */
         display: flex; align-items: center; gap: 10px;
-        /* width:max-content defeats the left:50% shrink-to-fit trap (a
-           transform-centered fixed box otherwise sizes against the half
-           viewport and wraps needlessly narrow). */
-        width: max-content;
-        max-width: min(320px, calc(100vw - 5.5rem));
-        padding: 10px 6px 10px 14px;
+        justify-content: center;
+        padding: 6px 6px 6px 14px;
         /* No backdrop-filter (2026-07-28): floats over scrolling text; the
            96%-opaque bg needs no blur. */
         background: var(--bg3);  /* cz7: opaque */
-        border: 1px solid var(--gold-border); border-radius: 14px;
-        box-shadow: 0 6px 24px rgba(0,0,0,0.5);
+        border-top: 1px solid var(--gold-border);
+        box-shadow: 0 -4px 18px rgba(0,0,0,0.4);
         animation: annHintIn 0.5s ease;
+        transition: opacity 0.6s ease;
         /* Wave-0 (P1-1): the pill teaches the long-press gesture yet sat
            ON TOP of the reading text — a long-press landing under the pill
            selected the pill's own label and raised the native Copy menu,
@@ -2395,7 +2515,8 @@
         -webkit-user-select: none;
       }
       body.light .ann-hint-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-      @keyframes annHintIn { from { opacity: 0; transform: translateX(-50%) translateY(8px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+      @keyframes annHintIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+      .ann-hint-pill.is-fading { opacity: 0; }   /* U10.7: it goes by itself */
       /* ux3 (A15 critique, 2026-09-22): while this tip pill is up, a toast sits ABOVE it instead of on its words
          ("Copied" covered "Long-press any text..."). The pill starts at the
          same base offset and is up to three lines tall on a 320 px phone;
@@ -2414,8 +2535,8 @@
            events here so the ✕ still dismisses (P1-1). */
         pointer-events: auto;
         background: none; border: none; cursor: pointer;
-        color: var(--gold-dim); font-size: var(--fs-18); line-height: 1;
-        padding: 10px 12px; flex-shrink: 0;
+        color: var(--gold); font-family: var(--font-body); font-size: var(--fs-16); line-height: 1;
+        min-height: 44px; padding: 0 12px; flex-shrink: 0; text-decoration: underline; text-underline-offset: 3px;
         -webkit-tap-highlight-color: transparent;
       }
       .ann-hint-close:active { color: var(--gold); }
@@ -2687,7 +2808,7 @@
     }
     .sheet-handle-back:active { color:var(--gold-bright); }
     @media (hover:hover) { .sheet-handle-back:hover { color:var(--gold-bright); } }
-    .sheet-handle-grab {
+    .sheet-handle-grab { touch-action: none; /* U06.8: the pill takes the drag, the page does not scroll */
       grid-column:2; width:132px; height:44px; padding:0;
       background:none; border:none; cursor:pointer;
       display:flex; align-items:center; justify-content:center;
@@ -2712,6 +2833,11 @@
     .fn-sheet-nav-btn:hover:not(:disabled), .fn-sheet-nav-btn:focus-visible:not(:disabled) { background:rgba(200,164,86,0.1); border-color:var(--gold); }
     .fn-sheet-nav-btn:disabled { opacity:0.32; cursor:default; }
     .fn-sheet-ref { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.75rem; display:block; }
+    /* up1: What's new (WhatsNewSheet): a day per heading, the changes as a plain list */
+    .whats-new-day { font-family:'Cinzel',serif; font-size:var(--fs-14); color:var(--gold-bright); margin:0.9rem 0 0.35rem; font-weight:400; }
+    .whats-new-list { margin:0; padding-left:1.15rem; color:var(--cream); font-size:var(--fs-16); line-height:1.55; }
+    .whats-new-list li { margin:0.3rem 0; }
+    .whats-new-none { color:var(--cream-dim); font-style:italic; margin:0.6rem 0 0; }
     .fn-sheet-verse { font-size:var(--fs-16); line-height:1.75; color:var(--cream-dim); font-style:italic; }
     .fn-sheet-note { font-size:var(--fs-16); color:var(--cream-dim); line-height:1.6; font-style:italic; }
     .fn-sheet-verse-missing { font-size:var(--fs-15); color:var(--cream-muted); line-height:1.55; font-style:italic; padding:0.6rem 0.9rem; border-left:2px solid var(--gold-border); background:rgba(200,164,86,0.04); border-radius:0 4px 4px 0; }
@@ -3202,8 +3328,16 @@
     .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
     .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
     .plans-detail-links { display:flex; flex-wrap:wrap; justify-content:center; gap:0 1.25rem; margin-top:0.6rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
+    /* rp-s1: the daily reminder's offer, its quiet ask, and its time in the details */
+    .plans-remind-ask { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-remind { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 1rem; margin-top:0.6rem; padding-top:0.5rem; border-top:1px solid var(--gold-border); }
+    .plans-remind-time { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem 0.6rem; color:var(--cream-dim); font-size:var(--fs-15); }
+    .plans-remind-time input { min-height:44px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:var(--cream); font:inherit; }
+    .plans-remind .plans-note { flex-basis:100%; margin:0; }
     /* mw18 C3/C4/C6: behind, its two ways back, a new pace, marking a day (mockup r1-behind.png) */
     .plans-behind { margin-top:0.8rem; padding-top:0.7rem; border-top:1px solid var(--gold-border); }
+    /* mw18 S6: this week's recordings, saved to the phone from Plan details */
+    .plans-audio { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
     .plans-behind-title { margin:0; color:var(--cream); font-size:var(--fs-20); font-weight:400; }
     .plans-option { display:flex; flex-direction:column; gap:0.2rem; width:100%; min-height:56px; margin-top:0.6rem; padding:0.65rem 0.9rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
     .plans-option-name { color:var(--gold); font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; }
@@ -3283,11 +3417,16 @@
     .build-letters { padding:0 0 0.5rem 1.6rem; }
     .build-letter { min-height:44px; font-size:var(--fs-15); }
     .build-bar { position:sticky; bottom:0; z-index:2; margin:0.75rem -1rem 0; padding:0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px)); border-top:1px solid var(--gold-border); background:var(--bg2); }
-    .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; }
-    .build-chip { display:inline-flex; align-items:center; gap:0.15rem; padding-left:0.7rem; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-size:var(--fs-14); }
+    /* mw-pb1: the bar never outgrows the screen - the picks scroll inside it (about two rows of chips, less at large text) */
+    .build-chips { display:flex; flex-wrap:wrap; gap:0.35rem; margin-bottom:0.45rem; max-height:min(5.6rem, 22vh); overflow-y:auto; overscroll-behavior:contain; }
+    .build-chip { display:inline-flex; align-items:center; gap:0.15rem; max-width:100%; padding-left:0.7rem; overflow-wrap:anywhere; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-size:var(--fs-14); }
     .build-chip button { min-width:36px; min-height:36px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-18); cursor:pointer; }
-    .build-bar-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; }
+    .build-bar-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 0.75rem; }
+    .build-bar-row .today-btn { margin-left:auto; max-width:100%; }
     .build-summary { color:var(--cream); font-size:var(--fs-15); }
+    /* mw-pb1: at large text the bar keeps to about half the screen - fewer chip rows show, the word count goes (Next keeps it) */
+    .vot-large-text .build-chips { max-height:15vh; }
+    .vot-large-text .build-summary-words { display:none; }
     .build-card { margin:0 0 0.75rem; padding:0.7rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
     .build-card-title { margin:0 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
     .build-goal { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.5rem; }
@@ -3318,7 +3457,14 @@
     .plans-complete-title span { display:block; color:var(--gold); }
     .plans-complete .plans-actions { justify-content:center; }
     .plans-finished { margin-bottom:1rem; }
+    .plans-note-link { display:block; margin:0.15rem auto 0; font-size:var(--fs-13); }
+    .plans-weeks { margin:0.35rem 0 0; color:var(--gold); font-size:var(--fs-14); text-align:center; }
     .plans-finished-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; min-height:56px; padding:0.35rem 0.2rem; }
+    /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
+    .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-body); font-size:var(--fs-14); box-sizing:border-box; }
+    .plan-ribbon-text { flex:1 1 auto; }
+    .plan-ribbon-next { min-height:44px; padding:0 0.4rem; border:0; background:transparent; color:var(--gold); font:inherit; cursor:pointer; text-align:left; }
+    .plan-ribbon-hide { width:44px; min-height:44px; margin-left:auto; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-18); cursor:pointer; }
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }
@@ -3774,6 +3920,9 @@
     .select-sheet::-webkit-scrollbar-track { background:transparent; }
     .select-sheet::-webkit-scrollbar-thumb { background:var(--gold-dim); border-radius:2px; }
     @keyframes selectSheetSlideUp { to { transform:translateY(0); } }
+    /* U10.5: the note, notebook and link sheets rise from the bottom edge. selectSheetSlideUp has no start, so a
+       sheet with no transform of its own popped in where it stood. */
+    @keyframes sheetRiseIn { from { transform:translateY(100%); } to { transform:translateY(0); } }
     /* (.select-sheet-handle RETIRED — see the SheetHandle block by .fn-sheet.) */
     .select-sheet-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); text-align:center; margin-bottom:0.35rem; }
     .select-sheet-title { font-family:'Cinzel Decorative',serif; font-size:var(--fs-20); color:var(--gold-bright); text-align:center; letter-spacing:0.08em; line-height:1.25; }
@@ -4874,6 +5023,14 @@
        the note icon shows. No background, no decoration (no !important, so
        the .hl-note.is-active gold wash still shows the anchor when open). */
     .hl-blank { background: none; }
+    /* RC.13 (UX sweep 2026-10-22): one highlight, one box. A run cut into pieces (an older mark under part of it,
+       the note icon's word) keeps its padding and rounding at its two ends only, and a mark that paints nothing adds
+       no gap inside another's run. The note icon keeps its last word: Chrome breaks a line before an inline-block
+       even after a word joiner, so the word and the icon share a nowrap span. */
+    .hl-mark.hl-blank { padding: 0; }
+    .hl-mark.hl-cont-l { padding-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+    .hl-mark.hl-cont-r { padding-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+    .hl-keep { white-space: nowrap; }
     /* Trailing note icon — appears once per note group, after the
        last segment. Inline-block so it sits on the baseline; small
        enough not to disrupt line-height. */
@@ -4972,7 +5129,7 @@
     }
     .ann-chip-confirm-btn {
       background: none; border: 1px solid transparent;
-      padding: 6px 10px; border-radius: 6px;
+      padding: 6px 10px; border-radius: 6px; min-height: 44px; min-width: 44px;
       font-family: 'Cinzel', serif; font-size: var(--fs-10);
       letter-spacing: 0.10em; text-transform: uppercase;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -5938,7 +6095,7 @@
       width: 100%; max-width: 480px;
       background: var(--bg3); border-top: 1px solid var(--gold-border);
       border-radius: 18px 18px 0 0; padding: 16px 18px 22px;
-      animation: selectSheetSlideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+      animation: sheetRiseIn 0.28s cubic-bezier(0.32,0.72,0,1);
       /* 100% binds to the overlay's content area (viewport minus both
          insets) so the sheet always sits inside the safe region. */
       max-height: 100%; overflow-y: auto;
@@ -5973,7 +6130,9 @@
     }
     .note-sheet-menu-btn {
       background: none; border: none;
-      width: 32px; height: 32px;
+      /* 44 px to the finger (wave 3 re-check A06.2: the last 32 px control on the sheet); the negative margin keeps
+         the header row's height and the glyph where it sat. */
+      width: 44px; height: 44px; margin: -6px;
       display: flex; align-items: center; justify-content: center;
       color: var(--cream-muted); cursor: pointer;
       border-radius: 6px;
@@ -6773,7 +6932,7 @@
       border-top: 1px solid var(--gold-border);
       border-radius: 18px 18px 0 0;
       padding: 18px 16px 24px;
-      animation: selectSheetSlideUp 0.28s cubic-bezier(0.32,0.72,0,1);
+      animation: sheetRiseIn 0.28s cubic-bezier(0.32,0.72,0,1);
       max-height: 100%; overflow-y: auto;
     }
     .nb-picker-header {
@@ -7128,7 +7287,7 @@
       border-top: 1px solid var(--gold-border);
       border-radius: 18px 18px 0 0;
       padding: 12px 0 28px;
-      animation: selectSheetSlideUp 0.25s cubic-bezier(0.32,0.72,0,1);
+      animation: sheetRiseIn 0.25s cubic-bezier(0.32,0.72,0,1);
       max-height: 100%; overflow-y: auto;
     }
     /* (.link-action-handle RETIRED — see the SheetHandle block by .fn-sheet.
@@ -9154,7 +9313,7 @@
         font-family: var(--font-body); font-size: min(var(--fs-16), 18px); text-decoration: underline;
       }
       .tour-wait {
-        position: fixed; left: 12px; right: 12px; bottom: 16px; z-index: 322; text-align: center;
+        position: fixed; left: 12px; right: 12px; bottom: var(--dock-message, 16px); z-index: 322; text-align: center;
         font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-muted);
         background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 16px; padding: 12px;
       }
@@ -9656,29 +9815,22 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */
 .install-card-sentinel { height: 1px; }
 .install-card {
-  position: relative; box-sizing: border-box; width: calc(100% - 2rem); max-width: 30rem; margin: 0.5rem auto 1.75rem;
-  padding: 1.5rem 1.25rem 1rem; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg2);
-  color: var(--cream); text-align: center; font-family: var(--font-body);
+  /* One line under Next (U01.3/U06.5): icon, the offer, Install or Show me how, Not now. Wraps, never clips. */
+  box-sizing: border-box; width: calc(100% - 2rem); max-width: 34rem; margin: 0.25rem auto 1.5rem; padding: 0.4rem 0;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.25rem 0.75rem;
+  border-top: 1px solid var(--gold-border); color: var(--cream-dim); font-family: var(--font-body); text-align: center;
 }
-.install-card-close {
-  position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;
-  background: none; border: 0; color: var(--gold); cursor: pointer;
+.install-card-icon { width: 28px; height: 28px; border-radius: 7px; flex: none; }
+.install-card-title { font-size: var(--fs-16); line-height: 1.35; color: var(--cream-dim); }
+.install-card-actions { display: inline-flex; flex-wrap: wrap; gap: 0 0.5rem; }
+.install-card-primary, .install-card-later {
+  min-height: 44px; padding: 0 0.5rem; background: none; border: 0; cursor: pointer;
+  font-family: var(--font-body); font-size: var(--fs-16); color: var(--gold); text-decoration: underline; text-underline-offset: 3px;
 }
-.install-card-close svg { width: 20px; height: 20px; }
-.install-card-icon { display: block; width: 64px; height: 64px; margin: 0 auto 0.75rem; border-radius: 16px; }
-.install-card-title { margin: 0 0 0.5rem; font-family: var(--font-body); font-size: var(--fs-24); font-weight: 600; line-height: 1.2; color: var(--cream); }
-.install-card-body { margin: 0 auto 1.1rem; max-width: 24rem; font-size: var(--fs-18); line-height: 1.45; color: var(--cream-dim); }
-.install-card-primary, .install-card-later, .install-steps-done {
+.install-card-later { color: var(--cream-muted); }
+.install-steps-done {
   display: block; width: 100%; min-height: 48px; padding: 0 16px; border-radius: 10px; cursor: pointer;
   font-family: var(--font-cinzel); font-size: var(--fs-14); font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
-}
-.install-card-primary { background: var(--gold); color: #000; border: 1px solid var(--gold); }
-body.light .install-card-primary { color: #fff; }
-.install-card-later { margin-top: 0.6rem; background: transparent; color: var(--cream); border: 1px solid var(--gold-border);
-  font-family: var(--font-body); font-size: var(--fs-18); font-weight: 400; letter-spacing: 0; text-transform: none; }
-.install-card-never {
-  display: block; margin: 0.35rem auto 0; min-height: 44px; padding: 0 12px; background: none; border: 0; cursor: pointer;
-  font-family: var(--font-body); font-size: min(var(--fs-16), 18px); color: var(--gold); text-decoration: underline;
 }
 .install-card button:focus-visible, .install-steps button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
 
@@ -9703,3 +9855,26 @@ body.light .install-step-num { color: #fff; }
 .install-step-note { margin-top: 0.25rem; font-size: var(--fs-15); line-height: 1.35; color: var(--cream-dim); }
 .install-step-pic { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--gold-border); }
 .install-steps-done { margin-top: 0.9rem; background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+
+/* U01.1: "Mark as read" at a letter's end, "✓ Read · Undo" once it is. Quiet: a link, not a card. */
+.mark-read-row { display: flex; align-items: center; justify-content: center; gap: 0 1rem; margin: 0.25rem auto 0.75rem; font-family: var(--font-body); font-size: var(--fs-16); }
+.mark-read-btn, .mark-read-undo { min-height: 44px; padding: 0 0.5rem; background: none; border: 0; cursor: pointer; font: inherit; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+.mark-read-undo { color: var(--cream-muted); }
+.mark-read-done { color: var(--gold); }
+
+/* Wave 3 large text (J-w3g1.1): rules for text sizes of 1.8 and up, keyed on the root class use-settings sets. */
+.vot-large-text .pill-left { display: none; }   /* RC.8: "RESUME · 1 MIN LE" was cut at both screen edges at 300% */
+/* U05.5: the verse number sits inline before its words; its 1.8rem gutter (86 px at 300%) left 8 to 10 letters a line. */
+.vot-large-text .verses-block .verse { padding-left: 0; }
+.vot-large-text .verses-block .verse .verse-num { position: static; margin-right: 0.35em; vertical-align: 0.15em; }
+/* U05.1: a footnote is one column, its number inline: the number's column squeezed the card to a word a line
+   ("OPE N IN APP", "Graf ted"). */
+.vot-large-text .footnote-list-item { display: block; padding: 6px 8px; }
+.vot-large-text .footnote-list-item > .footnote-list-num { display: inline; margin-right: 0.35em; }
+.vot-large-text .footnote-list-link-btn.fn-list-rich { margin-top: 0.3rem; }
+/* J-w3g1.1: spaced capitals (Cinzel eyebrows, headers) spread a fifth of an em per letter, which at 300% pushed
+   short labels onto three lines. In the reading area every letter gap is held to 1 px at large sizes. */
+.vot-large-text .screen-scroll * { letter-spacing: min(0.04em, 1px) !important; }
+/* J-w3g1.1: card padding in rem tripled with the text (a 48 px inset each side at 300%); held to phone px. */
+.vot-large-text :is(.bottom-nav-card, .related-card) { padding: 12px 14px; }
+.vot-large-text .bottom-nav { gap: 10px; }

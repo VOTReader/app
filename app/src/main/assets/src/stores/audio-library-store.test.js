@@ -438,3 +438,38 @@ describe('AudioLibraryStore — per-row reads on a full library (sweep v019)', (
     expect(AudioLibraryStore.songSaved()).toEqual([sid(3)]);
   });
 });
+
+/* s09.3 (idea sweep 2026-10-22): the saved shelf holds 100 recordings, and the 101st pushed the oldest off with no
+   word. The store says which one a save would push off, and puts it back on Undo. */
+describe('AudioLibraryStore — a full saved shelf (s09.3)', () => {
+  const full = () => AudioLibraryStore.replaceAll({
+    saved: Array.from({ length: MAX_SAVED_AUDIO_TRACKS }, (_u, i) => ({ ...track(i + 1), savedAt: i + 1 })),
+  });
+  const song = { key: 'song:00000000000a', title: 'Song', sub: null, url: 'https://votreader.github.io/songs-1/00000000000a.mp3', readerCode: '', partLabel: 'Pop' };
+
+  it('wouldEvict names the oldest saved recording once the shelf is full', () => {
+    full();
+    expect(AudioLibraryStore.wouldEvict(track(500))).toMatchObject({ title: 'Letter 1', url: track(1).url, savedAt: 1 });
+    expect(AudioLibraryStore.maxSaved).toBe(MAX_SAVED_AUDIO_TRACKS);
+  });
+
+  it('pushes nothing off with room left, for one already saved, or for a song (songs have their own shelf)', () => {
+    expect(AudioLibraryStore.wouldEvict(track(500))).toBeNull();
+    full();
+    expect(AudioLibraryStore.wouldEvict(track(7))).toBeNull();
+    expect(AudioLibraryStore.wouldEvict(song)).toBeNull();
+  });
+
+  it('undoEviction takes the new one off and puts the pushed one back, last, with its own date', () => {
+    full();
+    const pushed = AudioLibraryStore.wouldEvict(track(500));
+    AudioLibraryStore.toggleSaved(track(500));
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(false);
+    AudioLibraryStore.undoEviction(track(500), pushed);
+    expect(AudioLibraryStore.isSaved(track(500))).toBe(false);
+    expect(AudioLibraryStore.isSaved(track(1))).toBe(true);
+    const saved = AudioLibraryStore.saved();
+    expect(saved).toHaveLength(MAX_SAVED_AUDIO_TRACKS);
+    expect(saved[saved.length - 1]).toMatchObject({ url: track(1).url, savedAt: 1 });
+  });
+});

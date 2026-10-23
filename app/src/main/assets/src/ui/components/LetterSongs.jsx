@@ -125,6 +125,28 @@ export function LetterListenRow({ volKey, letter, collectionLabel, showSongs = t
 }
 
 /**
+ * The letter's outside recordings (its own audio file, SoundCloud): web pages, so offline the card goes and the hero
+ * row above says what can play (downloads brief 2026-10-23, section 7 item 5: tapped offline, the link opened a page
+ * that could not load, beside a Listen that had said why it could not play).
+ * @param {{ letter: { audioUrl?: string, soundcloudUrl?: string } }} props
+ */
+export function LetterAudioLinks({ letter }) {
+  const online = useSongsOnline();
+  if (!online || !(letter.audioUrl || letter.soundcloudUrl)) return null;
+  return (
+    <div className="related-card">
+      <div className="related-card-title">Audio</div>
+      {letter.audioUrl && (
+        <a className="related-link" href={letter.audioUrl} target="_blank" rel="noopener noreferrer">♪ Audio Recording</a>
+      )}
+      {letter.soundcloudUrl && (
+        <a className="related-link" href={letter.soundcloudUrl} target="_blank" rel="noopener noreferrer">♪ Listen on SoundCloud</a>
+      )}
+    </div>
+  );
+}
+
+/**
  * The one calm line under a hero row whose pills went quiet offline, or '' when nothing is off.
  * @param {boolean} listenOff @param {boolean} singOff @returns {string}
  */

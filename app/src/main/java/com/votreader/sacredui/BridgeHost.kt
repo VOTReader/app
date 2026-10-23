@@ -143,6 +143,19 @@ interface BridgeHost {
     fun ensureNotificationsPermission()
 
     /**
+     * rp-s1: open this app's notification settings, where a reader who refused the permission (Android stops asking
+     * after the second refusal) can turn the reading-plan reminder on. A no-op on a host without an Activity.
+     */
+    fun openNotificationSettings() {}
+
+    /**
+     * rp-s1: the reader asked for a reading-plan reminder, so ask for POST_NOTIFICATIONS now, even when
+     * [ensureNotificationsPermission]'s once-per-process ask already ran. The answer reaches the page as
+     * JsEvent.NotificationsResult. Hosts without their own default to that ask.
+     */
+    fun askNotificationsPermission() = ensureNotificationsPermission()
+
+    /**
      * Start/stop [AudioKeepAliveService] — the mediaPlayback foreground service
      * that anchors the process while an audio letter streams. Mirrors the
      * setAudioActive bridge edge exactly.

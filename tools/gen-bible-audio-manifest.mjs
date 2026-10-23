@@ -158,9 +158,15 @@ for (const [id, e] of Object.entries(BIBLE_AUDIO_EDITIONS)) {
   // (TSOT_Matthew-Chapter-001.MP3), and a case-sensitive match drops chapter 1
   // and reads like a gap in the archive.
   const re = new RegExp('Chapter-(\\d{3})\\.mp3$', 'i');
+  // The leading list number ("18. ") is Drive's sort order, not identity: Tim
+  // renamed the folder to "TSOT New Testament - Matthew (read by ...)" in 2026-10
+  // and a plain prefix match found no chapters. Optional on both sides, as in
+  // audio-renditions-lib.mjs and tools/batch-align-bible.py's drive_index().
+  const unnumbered = (s) => s.replace(/^\d+\. /, '');
+  const folder = unnumbered(e.driveFolder);
   const found = new Map();
   for (const f of listing) {
-    if (!f.path.startsWith(e.driveFolder)) continue;
+    if (!unnumbered(f.path).startsWith(folder)) continue;
     const m = re.exec(f.path.split('/').pop());
     if (!m) continue;                       // a non-chapter file in the folder
     const n = parseInt(m[1], 10);

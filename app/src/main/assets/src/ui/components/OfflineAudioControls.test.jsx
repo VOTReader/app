@@ -7,8 +7,9 @@
    phone's free space. "On this phone" lists every download with its size and a Remove, and Remove all asks first.
    Only in the Android app: on the web the store is unavailable and none of this renders. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render } from '@testing-library/react';
-import { OfflineRowStatus, OfflineCollectionAction, formatBytes } from './OfflineAudioControls.jsx';
+import { _resetToasts } from '../../utils/toast.js';
+import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
+import { OfflineRowStatus, OfflineCollectionAction, formatBytes, useOfflineState } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
 const U = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
@@ -53,6 +54,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  _resetToasts();   // a Remove's Undo toast lives in document.body, outside cleanup's reach (shuffle seed 20261023)
   setOnline(true);
   for (const k of ['OfflineAudio', 'ScreenLayout', 'LibraryNav', 'AudioPlayer']) delete globalThis[k];
 });
@@ -156,13 +158,68 @@ describe('a recording row: what the phone holds, and the next step', () => {
     expect(queryByRole('button')).toBeNull();
   });
 
+  it('offline, the row of the recording playing says it plays from the buffer, not that it needs a connection (RC.5)', () => {
+    fakeStore();
+    setOnline(false);
+    globalThis.AudioPlayer = { ...globalThis.AudioPlayer, getShape: () => 'x', getState: () => ({ status: 'playing', queue: [T('a')], qi: 0 }) };
+    const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
+    expect(container.textContent).toMatch(/Playing from the buffer/);
+    expect(container.textContent).not.toMatch(/Needs a connection/);
+    const other = render(<OfflineRowStatus tracks={[T('b')]} name="Letter b" />);
+    expect(other.container.textContent).toMatch(/Needs a connection/);
+  });
+
   it('follows the store live (a download finishing turns the row)', () => {
     const s = fakeStore();
     s.st.status.set(U('a'), 'queued');
     const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/Downloading/);
+    // Queued behind another: Waiting, with no empty bar (brief section 7 item 7: it read "Downloading 0%").
+    expect(container.textContent).toMatch(/^Waiting/);
+    expect(container.querySelector('[role="progressbar"]')).toBeNull();
+    act(() => { s.st.status.set(U('a'), 'downloading'); s.st.progress.set(U('a'), { bytes: 0, total: -1 }); s.bump(); });
+    expect(container.textContent).toMatch(/Downloading 0%/);
+    expect(container.querySelector('[role="progressbar"]')).not.toBeNull();
     act(() => { save(s, 'a', 5_000_000); s.bump(); });
     expect(container.textContent).toMatch(/On this phone · 5 MB/);
+  });
+});
+
+// Downloads brief section 7 item 6: a whole Bible book started on one tap, with no size or room check (Genesis, 206 MB).
+describe('a book row asks before it downloads', () => {
+  const BOOK = ['g1', 'g2', 'g3', 'g4', 'g5'];
+  it('a book asks with its count, size and the free space; Cancel downloads nothing, Download downloads it', () => {
+    const s = fakeStore();
+    for (const id of BOOK) s.st.sizes.set(U(id), 40e6);
+    const { getByRole, container } = render(<OfflineRowStatus tracks={BOOK.map((id) => T(id))} name="Genesis" />);
+    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
+    expect(s.download).not.toHaveBeenCalled();
+    const ask = getByRole('group', { name: 'Download Genesis' });
+    expect(ask.textContent).toContain('5 recordings · 200 MB');
+    expect(ask.textContent).toContain('Free space on this phone: 5 GB');
+    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }));
+    expect(container.querySelector('.offline-confirm')).toBeNull();
+    expect(s.download).not.toHaveBeenCalled();
+    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
+    fireEvent.click(getByRole('button', { name: 'Download 200 MB' }));
+    expect(s.download).toHaveBeenCalledWith(BOOK.map((id) => expect.objectContaining({ url: U(id) })));
+  });
+
+  it('with no room it says so and will not start', () => {
+    const s = fakeStore();
+    s.st.free = 100e6;
+    for (const id of BOOK) s.st.sizes.set(U(id), 40e6);
+    const { getByRole } = render(<OfflineRowStatus tracks={BOOK.map((id) => T(id))} name="Genesis" />);
+    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
+    expect(getByRole('group', { name: 'Download Genesis' }).textContent).toContain('Not enough room');
+    expect(getByRole('button', { name: 'Download 200 MB' }).disabled).toBe(true);
+  });
+
+  it('a letter in two parts still downloads on one tap', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('p1'), 9e6); s.st.sizes.set(U('p2'), 9e6);
+    const { getByRole } = render(<OfflineRowStatus tracks={[T('p1'), T('p2')]} name="Christmas" />);
+    fireEvent.click(getByRole('button', { name: /download christmas to this phone/i }));
+    expect(s.download).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -263,14 +320,25 @@ describe('Download all, beside Play all', () => {
     s.st.sizes.set(U('b'), 60_000_000); s.st.sizes.set(U('b2'), 40_000_000); s.st.sizes.set(U('c'), 110_000_000);
     s.st.free = 1_480_000_000;
     const { getByRole, container } = render(<OfflineCollectionAction units={units} label="Volume One" />);
-    fireEvent.click(getByRole('button', { name: /download all/i }));
+    // One of three already on the phone: it says so, and offers the rest (brief section 7 item 8).
+    expect(container.textContent).toMatch(/1 of 3 on this phone/);
+    fireEvent.click(getByRole('button', { name: /download the rest/i }));
     expect(container.textContent).toMatch(/Download Volume One\?/);
-    expect(container.textContent).toMatch(/3 recordings · 210 MB/);
+    // Counted in recordings as the rows count them: b in two parts is one (item 12).
+    expect(container.textContent).toMatch(/2 recordings · 210 MB/);
     expect(container.textContent).toMatch(/Free space on this phone: 1.5 GB/);
     // Downloads run while the app is open (SHOULD 9 of the refutation: no background service yet).
     expect(container.textContent).toMatch(/Keep VOTReader open until it finishes/);
     fireEvent.click(getByRole('button', { name: /download 210 MB/i }));
     expect(s.download.mock.calls[0][0].map((t) => t.url)).toEqual([U('b'), U('b2'), U('c')]);
+  });
+
+  it('a size not known yet leaves the total open ("at least"), not hidden (brief section 7 item 9)', () => {
+    const s = fakeStore();
+    s.st.sizes.set(U('a'), 10_000_000); s.st.sizes.set(U('b'), 60_000_000);   // b2 and c not answered yet
+    const { getByRole, container } = render(<OfflineCollectionAction units={units} label="Volume One" />);
+    fireEvent.click(getByRole('button', { name: /download all/i }));
+    expect(container.textContent).toMatch(/3 recordings · at least 70 MB/);
   });
 
   it('refuses a download the phone has no room for', () => {
@@ -295,56 +363,114 @@ describe('Download all, beside Play all', () => {
   });
 });
 
-describe('On this phone (the shelf)', () => {
-  it('lists every download with its size, plays one, removes one, and asks before removing all', () => {
+describe('On this phone (the shelf, pictures 11-13)', () => {
+  beforeEach(() => { globalThis.COLLECTIONS = [{ volKey: 'one', label: 'Volume One' }, { volKey: 'two', label: 'Volume Two' }]; });
+  afterEach(() => { delete globalThis.COLLECTIONS; delete globalThis.BIBLE_AUDIO_EDITIONS; delete globalThis.BIBLE_AUDIO_BOOKS; });
+
+  it('groups downloads like the tree, plays one, and asks before removing all', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
     save(s, 'b', 12_000_000, 'Matthew 1');
-    const { container, getAllByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.querySelector('h1').textContent).toBe('On this phone');
-    expect(container.textContent).toMatch(/2 recordings · 30 MB/);
-    const rows = container.querySelectorAll('.audio-offline-item');
-    expect([...rows].map((r) => r.querySelector('strong').textContent)).toEqual(['Matthew 1', 'I Am The Passover']);
-    fireEvent.click(getAllByRole('button', { name: /^remove matthew 1/i })[0]);
-    expect(s.remove).toHaveBeenCalledWith([U('b')]);
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(container.querySelector('h1').textContent).toBe('Downloads');
+    expect(getByRole('tab', { name: 'On this phone' }).getAttribute('aria-selected')).toBe('true');
+    expect(container.querySelector('.dl-storage-line').textContent).toBe('Recordings 30 MB · 5 GB free on this phone');
+    expect(container.querySelector('.dl-shelf-kicker').textContent).toBe('The Volumes of Truth');
+    const head = container.querySelector('.dl-shelf-head');
+    expect(head.textContent).toMatch(/Volume One2 recordings · 30 MB/);
+    expect([...container.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['I Am The Passover', 'Matthew 1']);
     fireEvent.click(getByRole('button', { name: /^play i am the passover/i }));
     expect(globalThis.AudioPlayer.playTrack).toHaveBeenCalledWith(expect.objectContaining({ url: U('a'), key: 'one:a', title: 'I Am The Passover' }));
-    fireEvent.click(getByRole('button', { name: /^remove all/i }));
+    fireEvent.click(getByRole('button', { name: 'Remove all downloads' }));
     expect(s.removeAll).not.toHaveBeenCalled();
-    expect(container.textContent).toMatch(/Remove all 2 recordings \(30 MB\) from this phone\?/);
-    fireEvent.click(getByRole('button', { name: /^yes, remove all/i }));
+    const sheet = getByRole('dialog');
+    expect(sheet.textContent).toMatch(/Remove all downloads from this phone\?/);
+    expect(sheet.textContent).toMatch(/2 recordings · 30 MB\. You can download them again any time\./);
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Remove' }));
     expect(s.removeAll).toHaveBeenCalledTimes(1);
   });
 
-  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own Remove is the whole job.
+  // Downloads brief section 7 item 14: a single Remove had no Undo. The row steps aside at once; the file goes when the
+  // toast does, so Undo keeps the very file.
+  it('a single × can be taken back for 5 s, and the file goes only when that time is up', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fakeStore();
+      save(s, 'a', 18_000_000, 'I Am The Passover');
+      save(s, 'b', 12_000_000, 'Matthew 1');
+      const { container, getByRole, queryAllByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      fireEvent.click(getByRole('button', { name: /^remove matthew 1 from this phone/i }));
+      expect(queryAllByRole('button', { name: /^remove matthew 1/i })).toHaveLength(0);
+      const toast = document.getElementById('vot-toast-offline-removed');
+      expect(toast.textContent).toBe('Removed Matthew 1 · 12 MBUndo');
+      expect(s.remove).not.toHaveBeenCalled();
+      act(() => { toast.querySelector('.vot-undo-btn').click(); });
+      expect(s.remove).not.toHaveBeenCalled();
+      expect(container.querySelectorAll('.dl-shelf-row')).toHaveLength(2);
+      fireEvent.click(getByRole('button', { name: /^remove matthew 1 from this phone/i }));
+      act(() => { vi.advanceTimersByTime(5100); });
+      expect(s.remove).toHaveBeenCalledWith([U('b')]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('a letter in parts is one row, and its × takes every part', () => {
+    vi.useFakeTimers();
+    try {
+      const s = fakeStore();
+      s.st.saved.set(U('x1'), { url: U('x1'), key: 'one:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 1 });
+      s.st.saved.set(U('x2'), { url: U('x2'), key: 'one:x', title: 'Christmas · Part 2', bytes: 6e6, savedAt: 2 });
+      const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      expect([...container.querySelectorAll('.dl-shelf-row')].map((r) => r.textContent)).toEqual(['Christmas11 MB']);
+      fireEvent.click(getByRole('button', { name: /^remove christmas from this phone/i }));
+      act(() => { vi.advanceTimersByTime(5100); });
+      expect(s.remove).toHaveBeenCalledWith([U('x1'), U('x2')]);
+    } finally { vi.useRealTimers(); }
+  });
+
+  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own × is the whole job.
   it('a shelf of one offers no Remove all', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
     const { container, queryByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.querySelectorAll('.audio-offline-item')).toHaveLength(1);
+    expect(container.querySelectorAll('.dl-shelf-row')).toHaveLength(1);
     expect(getByRole('button', { name: /^remove i am the passover/i })).toBeTruthy();
-    expect(queryByRole('button', { name: /^remove all/i })).toBeNull();
+    expect(queryByRole('button', { name: 'Remove all downloads' })).toBeNull();
   });
 
-  it('groups a Bible book by edition, chapters in their order, and removes the book after asking (n2-04)', () => {
+  it('a Bible book sits under its edition, chapters in order, and its ⋯ removes it after asking (n2-04, picture 12)', () => {
     const s = fakeStore();
     globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
+    globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis']];
     const ch = (n, at) => s.st.saved.set(U('gen' + n), { url: U('gen' + n), key: 'bible-brm-kjv:genesis', title: 'Genesis · Chapter ' + n, bytes: 1_000_000, savedAt: at });
     ch(10, 1); ch(2, 3); ch(1, 2);
-    save(s, 'a', 18_000_000, 'I Am The Passover');   // added last: its group comes first
+    save(s, 'a', 18_000_000, 'I Am The Passover');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    const groups = container.querySelectorAll('.audio-offline-item');
-    expect(groups).toHaveLength(2);
-    const book = groups[1];
-    expect(book.querySelector('.audio-offline-group-head strong').textContent).toBe('Genesis · KJV · BRM');
-    expect(book.textContent).toMatch(/3 recordings · 3 MB/);
-    const rows = [...book.querySelectorAll('.audio-library-row:not(.audio-offline-group-head) strong')].map((x) => x.textContent);
-    expect(rows).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
-    fireEvent.click(getByRole('button', { name: /^remove genesis · kjv · brm, 3 recordings/i }));
+    expect([...container.querySelectorAll('.dl-shelf-kicker')].map((k) => k.textContent)).toEqual(['The Volumes of Truth', 'The Bible · KJV · BRM']);
+    fireEvent.click(getByRole('button', { name: /^Genesis3 chapters · 3 MB/ }));
+    const book = container.querySelectorAll('.dl-shelf-branch')[1];
+    expect([...book.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
+    fireEvent.click(getByRole('button', { name: 'More for Genesis' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Remove · 3 MB' }));
     expect(s.remove).not.toHaveBeenCalled();
-    fireEvent.click(getByRole('button', { name: /^yes, remove$/i }));
+    const sheet = getByRole('dialog');
+    expect(sheet.textContent).toMatch(/Remove Genesis from this phone\?/);
+    expect(sheet.textContent).toMatch(/3 chapters · 3 MB/);
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Remove' }));
     expect(s.remove).toHaveBeenCalledWith([U('gen1'), U('gen2'), U('gen10')]);
-    delete globalThis.BIBLE_AUDIO_EDITIONS;
+  });
+
+  it('sorts by size, and a group\'s Choose more opens the tree', () => {
+    const s = fakeStore();
+    s.st.saved.set(U('t'), { url: U('t'), key: 'two:t', title: 'Big one', bytes: 90e6, savedAt: 1 });
+    save(s, 'a', 18_000_000, 'Small one');
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    const heads = () => [...container.querySelectorAll('.dl-shelf-head strong')].map((x) => x.textContent);
+    expect(heads()).toEqual(['Volume One', 'Volume Two']);
+    fireEvent.change(container.querySelector('.dl-sort select'), { target: { value: 'size' } });
+    expect(heads()).toEqual(['Volume Two', 'Volume One']);
+    fireEvent.click(getByRole('button', { name: 'More for Volume Two' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Choose more…' }));
+    expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
   });
 
   it('groupShelf keeps a download with no key on its own, and a letter\'s parts together', () => {
@@ -382,9 +508,40 @@ describe('On this phone (the shelf)', () => {
     expect(s.download).toHaveBeenCalledWith(failed);
   });
 
-  it('an empty shelf says how to fill it', () => {
+  it('nothing on the phone opens Choose; the empty shelf says how to fill it', () => {
     fakeStore();
-    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.textContent).toMatch(/Nothing is on this phone yet/);
+    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
+    fireEvent.click(getByRole('tab', { name: 'On this phone' }));
+    expect(container.textContent).toMatch(/Nothing is on this phone yet\. In Choose, tick what you want/);
+  });
+});
+
+/* Downloads brief 2026-10-23, 3h: one hook counts for every badge, the picker and the player's offline ticks (L4). */
+describe('useOfflineState', () => {
+  afterEach(() => { delete globalThis.AudioLengths; });
+  function Probe({ target }) {
+    const st = useOfflineState(target);
+    return <output>{JSON.stringify(st)}</output>;
+  }
+  const read = (c) => JSON.parse(c.querySelector('output').textContent);
+
+  it('counts what is on the phone, the bytes and the baked seconds of a set', () => {
+    const s = fakeStore();
+    save(s, 'a', 100);
+    s.st.sizes.set(U('b'), 300);
+    globalThis.AudioLengths = { secondsOf: (u) => ({ [U('a')]: 60, [U('b')]: 90 })[u] ?? null, lengthsStore: { subscribe: () => () => {}, getVersion: () => 0 } };
+    const { container } = render(<Probe target={[U('a'), { url: U('b') }]} />);
+    expect(read(container)).toEqual(expect.objectContaining({ status: 'none', saved: 1, count: 2, bytes: 400, remaining: 300, seconds: 150 }));
+  });
+
+  it('seconds are null while any recording of the set has none; null where downloads are not possible', () => {
+    const s = fakeStore();
+    globalThis.AudioLengths = { secondsOf: (u) => (u === U('a') ? 60 : null), lengthsStore: { subscribe: () => () => {}, getVersion: () => 0 } };
+    const { container, rerender } = render(<Probe target={[U('a'), U('b')]} />);
+    expect(read(container).seconds).toBeNull();
+    s.available = () => false;
+    rerender(<Probe target={[U('a')]} />);
+    expect(read(container)).toBeNull();
   });
 });

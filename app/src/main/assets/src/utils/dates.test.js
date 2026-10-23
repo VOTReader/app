@@ -1,6 +1,6 @@
 /* W7.1a coverage recovery — utils/dates.js (relativeDate + timeAgo).
    ─────────────────────────────────────────────────────────────────
-   These relative-time formatters back the "5m ago" / "3w ago" labels in
+   These relative-time formatters back the "5 min ago" / "3 weeks ago" labels (whole words since U07.8: "1m" in capitals read as a month) in
    the journal + history UI but were previously 0%-covered. Retiring the
    legacy migrations (W7.1a) removed well-covered dead code, dipping the
    global coverage average a hair below the floor; rather than lower the
@@ -31,24 +31,24 @@ describe('relativeDate', () => {
     expect(relativeDate(NOW)).toBe('Just now');
   });
 
-  it('"Nm ago" for 1..59 minutes', () => {
-    expect(relativeDate(NOW - 5 * MIN)).toBe('5m ago');
-    expect(relativeDate(NOW - 59 * MIN)).toBe('59m ago');
+  it('"N min ago" for 1..59 minutes', () => {
+    expect(relativeDate(NOW - 5 * MIN)).toBe('5 min ago');
+    expect(relativeDate(NOW - 59 * MIN)).toBe('59 min ago');
   });
 
-  it('"Nh ago" for 1..23 hours', () => {
-    expect(relativeDate(NOW - 1 * HR)).toBe('1h ago');
-    expect(relativeDate(NOW - 23 * HR)).toBe('23h ago');
+  it('"N hr ago" for 1..23 hours', () => {
+    expect(relativeDate(NOW - 1 * HR)).toBe('1 hr ago');
+    expect(relativeDate(NOW - 23 * HR)).toBe('23 hr ago');
   });
 
-  it('"Nd ago" for 1..6 days', () => {
-    expect(relativeDate(NOW - 1 * DAY)).toBe('1d ago');
-    expect(relativeDate(NOW - 6 * DAY)).toBe('6d ago');
+  it('"N days ago" for 1..6 days', () => {
+    expect(relativeDate(NOW - 1 * DAY)).toBe('1 day ago');
+    expect(relativeDate(NOW - 6 * DAY)).toBe('6 days ago');
   });
 
-  it('"Nw ago" for 7..29 days', () => {
-    expect(relativeDate(NOW - 7 * DAY)).toBe('1w ago');
-    expect(relativeDate(NOW - 29 * DAY)).toBe('4w ago');
+  it('"N weeks ago" for 7..29 days', () => {
+    expect(relativeDate(NOW - 7 * DAY)).toBe('1 week ago');
+    expect(relativeDate(NOW - 29 * DAY)).toBe('4 weeks ago');
   });
 
   it('falls back to a Month-Day locale date at >= 30 days', () => {
@@ -80,24 +80,24 @@ describe('timeAgo', () => {
     expect(timeAgo(NOW - 30_000)).toBe('just now');
   });
 
-  it('"Nm ago" for 1..59 minutes', () => {
-    expect(timeAgo(NOW - 5 * MIN)).toBe('5m ago');
+  it('"N min ago" for 1..59 minutes', () => {
+    expect(timeAgo(NOW - 5 * MIN)).toBe('5 min ago');
   });
 
-  it('"Nh ago" for 1..23 hours', () => {
-    expect(timeAgo(NOW - 3 * HR)).toBe('3h ago');
+  it('"N hr ago" for 1..23 hours', () => {
+    expect(timeAgo(NOW - 3 * HR)).toBe('3 hr ago');
   });
 
-  it('"Nd ago" for 1..6 days', () => {
-    expect(timeAgo(NOW - 3 * DAY)).toBe('3d ago');
+  it('"N days ago" for 1..6 days', () => {
+    expect(timeAgo(NOW - 3 * DAY)).toBe('3 days ago');
   });
 
-  it('"Nw ago" for 7..34 days (weeks < 5)', () => {
-    expect(timeAgo(NOW - 7 * DAY)).toBe('1w ago');
-    expect(timeAgo(NOW - 28 * DAY)).toBe('4w ago');
+  it('"N weeks ago" for 7..34 days (weeks < 5)', () => {
+    expect(timeAgo(NOW - 7 * DAY)).toBe('1 week ago');
+    expect(timeAgo(NOW - 28 * DAY)).toBe('4 weeks ago');
   });
 
-  it('"Nmo ago" at >= 5 weeks', () => {
-    expect(timeAgo(NOW - 60 * DAY)).toBe('2mo ago');
+  it('"N months ago" at >= 5 weeks', () => {
+    expect(timeAgo(NOW - 60 * DAY)).toBe('2 months ago');
   });
 });

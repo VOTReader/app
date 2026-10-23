@@ -15,6 +15,7 @@
    because the bar subscribes through useSyncExternalStore. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 
@@ -58,7 +59,6 @@ const ITEMS = [
   { id: 'letter-c', title: 'The Seventh Day' },
 ];
 
-const URL_OF = (id) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/' + id + '.mp3';
 
 /* A per-chapter Bible edition (the shipped shape): parts ARE chapters, so the
    player titles each track by its chapter AND labels the part "Chapter N".
@@ -91,13 +91,14 @@ function playWholeCollection() {
 
 const bar = () => screen.queryByRole('region', { name: 'Audio player' });
 const barOpenClass = () => document.body.classList.contains('audio-bar-open');
-const seekInput = () => screen.getByRole('slider', { name: 'Seek' });
-const clock = () => document.querySelector('.audio-bar-time').textContent;
 const title = () => document.querySelector('.audio-bar-title').textContent;
-const position = () => {
-  const node = document.querySelector('.audio-bar-pos');
-  return node ? node.textContent : null;
-};
+/** Line 2 under the title: source · place · time left, or the state the bar is in (player brief 3a, 3g). */
+const line2 = () => document.querySelector('.audio-bar-line2').textContent;
+/** Media length and clock, as metadata and timeupdate land. */
+const clockAt = (time, duration) => act(() => {
+  if (duration != null) { el().duration = duration; el().dispatchEvent(new Event('durationchange')); }
+  el().currentTime = time; el().dispatchEvent(new Event('timeupdate'));
+});
 
 beforeEach(() => {
   globalThis.Audio = FakeAudio;
@@ -113,6 +114,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   AudioPlayer.stop();
+  _resetToasts();   // a Close's Undo toast lives in document.body, outside cleanup's reach (shuffle seed 20261023)
   modalRegistry._reset();
   const arbiter = globalThis.__votAudioArbiter;
   if (typeof arbiter === 'function') document.removeEventListener('play', arbiter, true);
@@ -140,39 +142,93 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
     expect(bar()).toBeTruthy();
     expect(barOpenClass()).toBe(true);
     expect(title()).toBe('The Seventh Day');
-    expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume One · Read by Timothy');
-    expect(clock()).toBe('Loading…');   // not started yet: never a Pause over a 0:00 that is not moving (U10.2)
+    expect(line2()).toBe('Loading…');   // not started yet: never a Pause over a 0:00 that is not moving (U10.2)
+    emit('playing');
+    expect(line2()).toBe('Volume One');   // the reader and edition move to the full player (brief 3a)
   });
 
   /* U10.2 (UX sweep 2026-10-22): on a slow network the bar read 0:00 beside a Pause for 20 to 30 s. Until the
-     recording starts the clock's place says Loading…, and Still loading… once that runs past about 8 s. */
-  it('says Loading… until the recording starts, Still loading… past about 8 s, then the clock', () => {
+     recording starts line 2 says Loading…, and Still loading once that runs past 8 s, with Cancel in Back 15's
+     slot (brief 3g; a link inside line 2 would be a button inside the summary button). */
+  it('says Loading… until the recording starts, Still loading with Cancel past 8 s, then the time left', () => {
     vi.useFakeTimers();
     try {
       render(<AudioPlayerBar />);
       playSingleLetter();
-      expect(clock()).toBe('Loading…');
+      expect(line2()).toBe('Loading…');
+      expect(screen.getByRole('button', { name: 'Back 15 seconds' }).disabled).toBe(true);   // nothing to step back in
       act(() => { vi.advanceTimersByTime(7900); });
-      expect(clock()).toBe('Loading…');
+      expect(line2()).toBe('Loading…');
+      expect(screen.queryByRole('button', { name: 'Cancel loading' })).toBeNull();
       act(() => { vi.advanceTimersByTime(200); });
-      expect(clock()).toBe('Still loading…');
+      expect(line2()).toBe('Still loading');
+      expect(screen.getByRole('button', { name: 'Cancel loading' }).textContent).toBe('Cancel');
+      expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).toBeNull();
       act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
       emit('playing');
-      expect(clock()).toBe('0:00 / 4:00');
-      // A stall mid-recording keeps the place: the clock is what the reader needs then.
-      act(() => { el().currentTime = 65; el().dispatchEvent(new Event('timeupdate')); });
+      expect(line2()).toBe('Volume One · 4 min left');
+      expect(screen.getByRole('button', { name: 'Back 15 seconds' }).disabled).toBe(false);
+      // A stall mid-recording keeps the place: the time left is what the reader needs then.
+      clockAt(65);
       emit('waiting');
       expect(AudioPlayer.getState().status).toBe('loading');
-      expect(clock()).toBe('1:05 / 4:00');
+      expect(line2()).toBe('Volume One · 3 min left');
+      clockAt(200);
+      expect(line2()).toBe('Volume One · 0:40 left');   // m:ss under a minute
     } finally {
       vi.useRealTimers();
     }
   });
 
+  it('Cancel takes back a load that is taking too long, and leaves the bar paused on it', () => {
+    vi.useFakeTimers();
+    try {
+      render(<AudioPlayerBar />);
+      playSingleLetter();
+      act(() => { vi.advanceTimersByTime(8100); });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel loading' }));
+      expect(AudioPlayer.getState().status).toBe('paused');
+      expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a recording that fails says Couldn’t load, with Retry in Back 15’s slot (brief 3g)', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    act(() => { el().error = { code: 3 }; el().dispatchEvent(new Event('error')); });
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(line2()).toBe('Couldn’t load');
+    expect(document.querySelector('.audio-bar-line2').classList.contains('is-failed')).toBe(true);
+    expect(document.querySelector('.audio-bar-summary').getAttribute('aria-label')).toContain('Couldn’t load');
+    expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).toBeNull();
+    el().played = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(el().played).toBe(true);
+    el().error = null;
+    emit('playing');
+    expect(line2()).toBe('Volume One');
+    expect(screen.getByRole('button', { name: 'Back 15 seconds' })).toBeTruthy();
+  });
+
+  it('shows the sleep and speed chips beside line 2 only while they are set (brief 3a)', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    emit('playing');
+    expect(document.querySelectorAll('.audio-bar-chip')).toHaveLength(0);
+    drive(() => { AudioPlayer.setSleepTimer(15); AudioPlayer.setPlaybackRate(1.5); });
+    const chips = [...document.querySelectorAll('.audio-bar-chip')].map((c) => c.textContent);
+    expect(chips).toEqual(['15m', '1.5×']);
+    expect(document.querySelector('.audio-bar-summary').getAttribute('aria-label')).toContain('sleep in 15 min, speed 1.5×');
+    drive(() => { AudioPlayer.clearSleepTimer(); AudioPlayer.setPlaybackRate(1); });
+    expect(document.querySelectorAll('.audio-bar-chip')).toHaveLength(0);
+  });
+
   it('shows the part label of a multi-part letter alongside the title', () => {
     render(<AudioPlayerBar />);
     playWholeCollection();
-    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));   // preface → Wide Path, Part 1
+    drive(() => AudioPlayer.next());   // preface → Wide Path, Part 1
 
     expect(title()).toBe('The Wide Path · Part 1');
     expect(document.querySelector('.audio-bar-part').textContent).toBe(' · Part 1');
@@ -212,7 +268,8 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
       // Letter C is vol1's last recording: the queue already carries Volume Two behind it.
       emit('ended');                                                   // the seam
       expect(title()).toBe('Volume Two · Solo Letter');                // the first track after the crossing
-      expect(document.querySelector('.audio-bar-src').textContent).toMatch(/^Volume Two · /);   // the sub names it too
+      emit('playing');
+      expect(line2()).toMatch(/^Volume Two\b/);   // the sub names it too
     } finally {
       delete globalThis.COLLECTIONS; delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
     }
@@ -284,75 +341,56 @@ describe('AudioPlayerBar — transport', () => {
     expect(screen.getByRole('button', { name: 'Pause' })).toBeTruthy();
   });
 
-  it('offers next only for a real queue, and walks it through the store', () => {
+  /* Brief 3a: spoken word is Back 15 / Play / Close. Seek and previous/next live in the listening controls the bar
+     opens (the 166x24 slider was too small a target). */
+  it('offers Back 15, Play and Close: no previous, next or seek on the bar', () => {
     render(<AudioPlayerBar />);
-    playSingleLetter();
-    expect(screen.queryByRole('button', { name: 'Next track' })).toBeNull();
-
     playWholeCollection();
-    expect(title()).toBe('A Word of Warning');
-    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
-    expect(AudioPlayer.getState().qi).toBe(1);
-    expect(el().src).toBe(URL_OF('idA1'));
-
-    fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
-    expect(AudioPlayer.getState().qi).toBe(0);
-    expect(title()).toBe('A Word of Warning');
+    emit('playing');
+    const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
+    expect(names.slice(1)).toEqual(['Back 15 seconds', 'Pause', 'Close player']);
+    expect(screen.queryByRole('slider')).toBeNull();
+    expect(document.querySelector('.audio-bar-pull')).toBeNull();
   });
 
-  /* A saved recording played on its own used to have NO restart control at all:
-     next was meaningless so the whole prev/next pair was hidden, and the desk
-     disabled prev. The glyph stays; only what it promises changes. */
-  it('keeps prev as a Restart control on a queue of one, with next still hidden', () => {
+  it('Back 15 steps back fifteen seconds in the same recording', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
-
-    const restart = screen.getByRole('button', { name: 'Restart' });
-    expect(restart.classList.contains('audio-bar-nav')).toBe(true);
-    expect(screen.queryByRole('button', { name: 'Previous track' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Next track' })).toBeNull();
-
-    act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
-    act(() => { el().currentTime = 45; el().dispatchEvent(new Event('timeupdate')); });
+    emit('playing');
+    clockAt(45, 240);
     const srcAssignments = el().srcHistory.length;
-
-    fireEvent.click(restart);
-    expect(el().currentTime).toBe(0);
-    expect(AudioPlayer.getState().time).toBe(0);
-    expect(AudioPlayer.getState().qi).toBe(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Back 15 seconds' }));
+    expect(el().currentTime).toBe(30);
+    expect(AudioPlayer.getState().time).toBe(30);
     expect(el().srcHistory).toHaveLength(srcAssignments);   // a seek, not a re-fetch
-
-    // A real queue relabels the same control.
-    playWholeCollection();
-    expect(screen.queryByRole('button', { name: 'Restart' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Previous track' })).toBeTruthy();
   });
 
-  it('reads out the position within the QUEUE, and stays quiet for a lone recording', () => {
+  it('reads out the position within the QUEUE in recordings, and stays quiet for a lone recording', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
-    expect(position()).toBe(null);              // "1 of 1" is noise, not information
+    emit('playing');
+    expect(line2()).toBe('Volume One');          // "1 of 1" is noise, not information
 
-    playWholeCollection();
-    expect(position()).toBe('· 1 of 4');
-    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
-    expect(position()).toBe('· 2 of 4');
-    // …counted within the queue, beside the source line, never inside it.
-    expect(document.querySelector('.audio-bar-src').textContent).toBe('Volume One · Read by Benjamin');
+    playWholeCollection();                      // the preface, Letter A in two parts, Letter C: three recordings
+    emit('playing');
+    expect(line2()).toBe('Volume One · 1 of 3');
+    drive(() => AudioPlayer.next());
+    emit('playing');
+    expect(line2()).toBe('Volume One · 2 of 3');
+    drive(() => AudioPlayer.next());
+    emit('playing');
+    expect(line2(), "Letter A's second part is still the second recording (31 vs 30, player brief s7)").toBe('Volume One · 2 of 3');
+    drive(() => AudioPlayer.next());
+    emit('playing');
+    expect(line2()).toBe('Volume One · 3 of 3');
   });
 
-  it('clamps prev at the head of the queue and closes itself past the end', () => {
+  it('closes itself past the end of the queue', () => {
     render(<AudioPlayerBar />);
     playWholeCollection();
-
-    // The bar has no disabled boundary states — the store owns the clamping.
-    fireEvent.click(screen.getByRole('button', { name: 'Previous track' }));
-    expect(AudioPlayer.getState().qi).toBe(0);
-    expect(bar()).toBeTruthy();
-
-    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+    for (let i = 0; i < 3; i++) drive(() => AudioPlayer.next());
     expect(title()).toBe('The Seventh Day');                 // last track in the queue
-    fireEvent.click(screen.getByRole('button', { name: 'Next track' }));
+    drive(() => AudioPlayer.next());
     expect(AudioPlayer.getState().status).toBe('idle');       // past the end = done
     expect(bar()).toBeNull();
     expect(barOpenClass()).toBe(false);
@@ -373,124 +411,27 @@ describe('AudioPlayerBar — transport', () => {
     expect(barOpenClass()).toBe(false);
     expect(localStorage.getItem('vot-audio-pos')).toBe(null);
   });
-});
 
-describe('AudioPlayerBar — inline seek', () => {
-  it('stays disabled while the length is unknown and never advertises max=0', () => {
+  it('✕ says Stopped with an Undo for 5 s that brings the session back where it was (brief 3a)', async () => {
     render(<AudioPlayerBar />);
-    playSingleLetter();
-
-    const input = seekInput();
-    expect(input.disabled).toBe(true);
-    expect(input.max).toBe('1');                              // floored, never 0
-    expect(input.getAttribute('aria-valuetext')).toBe('0:00 of unknown length');
-
-    act(() => { el().currentTime = 123; el().dispatchEvent(new Event('timeupdate')); });
-    expect(seekInput().disabled).toBe(true);
-    expect(seekInput().getAttribute('aria-valuetext')).toBe('2:03 of unknown length');
-    // Unknown length paints EMPTY, not full, and the clock never invents a
-    // 0:00 total for a track that is plainly longer than that.
-    expect(seekInput().value).toBe('0');
-    expect(clock()).toBe('2:03');
-  });
-
-  it('follows the clock once metadata lands, and seeks the element when dragged', () => {
-    render(<AudioPlayerBar />);
-    playSingleLetter();
-    act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
-
-    expect(seekInput().disabled).toBe(false);
-    expect(seekInput().max).toBe('240');
-
-    act(() => { el().currentTime = 65; el().dispatchEvent(new Event('timeupdate')); });
-    expect(seekInput().value).toBe('65');                     // store → input
-    expect(clock()).toBe('1:05 / 4:00');
-
-    fireEvent.change(seekInput(), { target: { value: '150' } });
-    expect(el().currentTime).toBe(150);                       // input → element
-    expect(AudioPlayer.getState().time).toBe(150);
-    expect(seekInput().value).toBe('150');
-    expect(seekInput().getAttribute('aria-valuetext')).toBe('2:30 of 4:00');
-    expect(clock()).toBe('2:30 / 4:00');
-  });
-});
-
-describe('AudioPlayerBar — the scrub commits on release', () => {
-  /** A known-length track, 30s in. */
-  function playWithLength() {
-    playSingleLetter();
-    act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
-    act(() => { el().currentTime = 30; el().dispatchEvent(new Event('timeupdate')); });
-  }
-  const bubble = () => document.querySelector('.audio-seek-bubble');
-
-  it('previews under the finger and seeks ONCE when it lifts', () => {
-    render(<AudioPlayerBar />);
-    playWithLength();
-
-    const input = seekInput();
-    fireEvent.pointerDown(input);
-    fireEvent.change(input, { target: { value: '90' } });
-    fireEvent.change(input, { target: { value: '150' } });
-
-    // Nothing committed yet: with a durable position store behind seek(), a
-    // commit per drag pixel would be a seek + a write per pixel.
-    expect(el().currentTime).toBe(30);
-    expect(AudioPlayer.getState().time).toBe(30);
-    expect(clock()).toBe('0:30 / 4:00');
-    // …while the thumb and its readout follow the drag.
-    expect(seekInput().value).toBe('150');
-    expect(bubble().textContent).toBe('2:30');
-
-    fireEvent.pointerUp(input);
-    expect(el().currentTime).toBe(150);
-    expect(AudioPlayer.getState().time).toBe(150);
-    expect(bubble()).toBeNull();
-  });
-
-  it('commits immediately when no pointer is down — the keyboard path', () => {
-    render(<AudioPlayerBar />);
-    playWithLength();
-
-    // An arrow key fires the same value change with no pointer involved; a
-    // keyboard listener must not have to lift a finger to be heard.
-    fireEvent.change(seekInput(), { target: { value: '60' } });
-    expect(el().currentTime).toBe(60);
-    expect(bubble()).toBeNull();
-  });
-
-  it('a cancelled gesture drops the preview and leaves the clock alone', () => {
-    render(<AudioPlayerBar />);
-    playWithLength();
-
-    const input = seekInput();
-    fireEvent.pointerDown(input);
-    fireEvent.change(input, { target: { value: '200' } });
-    expect(bubble()).toBeTruthy();
-
-    fireEvent.pointerCancel(input);
-    expect(bubble()).toBeNull();
-    expect(el().currentTime).toBe(30);          // the store's position re-asserts
-    expect(seekInput().value).toBe('30');
-  });
-
-  it('paints the played portion from the position percent', () => {
-    render(<AudioPlayerBar />);
-    playWithLength();
-    // ONE inline custom property drives both engines' track pseudo-elements.
-    expect(seekInput().getAttribute('style')).toContain('--seek-pct: 12.50%');
-
-    act(() => { el().currentTime = 120; el().dispatchEvent(new Event('timeupdate')); });
-    expect(seekInput().getAttribute('style')).toContain('--seek-pct: 50.00%');
-  });
-
-  it('paints an unknown length EMPTY rather than full', () => {
-    render(<AudioPlayerBar />);
-    playSingleLetter();
-    act(() => { el().currentTime = 123; el().dispatchEvent(new Event('timeupdate')); });
-    expect(seekInput().disabled).toBe(true);
-    expect(seekInput().value).toBe('0');
-    expect(seekInput().getAttribute('style')).toContain('--seek-pct: 0.00%');
+    playWholeCollection();
+    drive(() => AudioPlayer.next());
+    emit('playing');
+    clockAt(42, 300);
+    fireEvent.click(screen.getByRole('button', { name: 'Close player' }));
+    expect(bar()).toBeNull();
+    const toast = document.getElementById('vot-toast-audio-stopped');
+    expect(toast.textContent).toBe('StoppedUndo');
+    expect(toast.classList.contains('show')).toBe(true);
+    await act(async () => {
+      fireEvent.click(toast.querySelector('.vot-undo-btn'));
+      await new Promise((r) => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    expect(bar()).toBeTruthy();
+    expect(title()).toBe('The Wide Path · Part 1');
+    expect(AudioPlayer.getState().time).toBe(42);
+    expect(toast.classList.contains('show')).toBe(false);
   });
 });
 
@@ -499,12 +440,12 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     const { container } = render(<AudioPlayerBar />);
     playSingleLetter();
 
-    const summary = screen.getByRole('button', { name: 'Open listening controls' });
+    const summary = screen.getByRole('button', { name: /Open listening controls\.$/ });
     expect(summary.getAttribute('aria-expanded')).toBe('false');
     expect(document.querySelector('.audio-manager-sheet')).toBeNull();
 
     fireEvent.click(summary);
-    expect(screen.getByRole('button', { name: 'Open listening controls' }).getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: /Open listening controls\.$/ }).getAttribute('aria-expanded')).toBe('true');
     const sheet = screen.getByRole('dialog');
     expect(sheet.classList.contains('audio-manager-sheet')).toBe(true);
     expect(document.body.contains(sheet)).toBe(true);
@@ -512,22 +453,25 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     expect(screen.getByRole('heading', { name: 'The Seventh Day' })).toBeTruthy();
   });
 
-  it('opens from the redundant pull tab, which stays out of the accessibility tree', () => {
-    const { container } = render(<AudioPlayerBar />);
+  it('the summary names what is playing, where, and how far, then what it opens (s13.1)', () => {
+    render(<AudioPlayerBar />);
     playSingleLetter();
-
-    const pull = container.querySelector('.audio-bar-pull');
-    expect(pull.getAttribute('aria-hidden')).toBe('true');
-    expect(pull.tabIndex).toBe(-1);
-
-    fireEvent.click(pull);
-    expect(screen.getByRole('dialog')).toBeTruthy();
+    const label = () => document.querySelector('.audio-bar-summary').getAttribute('aria-label');
+    expect(label()).toBe('Loading The Seventh Day, Volume One. Open listening controls.');
+    act(() => {
+      el().duration = 240; el().dispatchEvent(new Event('durationchange'));
+      el().dispatchEvent(new Event('playing'));
+      el().currentTime = 65; el().dispatchEvent(new Event('timeupdate'));
+    });
+    expect(label()).toBe('Now playing The Seventh Day, Volume One, 1:05 of 4:00. Open listening controls.');
+    act(() => { el().dispatchEvent(new Event('pause')); });
+    expect(label()).toBe('Paused on The Seventh Day, Volume One, 1:05 of 4:00. Open listening controls.');
   });
 
   it('closes the desk with the queue it controls when playback stops', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
-    fireEvent.click(screen.getByRole('button', { name: 'Open listening controls' }));
+    fireEvent.click(screen.getByRole('button', { name: /Open listening controls\.$/ }));
     expect(screen.getByRole('dialog')).toBeTruthy();
     expect(modalRegistry.openIds()).toContain('audio-manager-sheet');
 
@@ -538,6 +482,6 @@ describe('AudioPlayerBar — the listening desk disclosure', () => {
     // …and it does not come back on its own with the next recording.
     playSingleLetter();
     expect(screen.queryByRole('dialog')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Open listening controls' }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: /Open listening controls\.$/ }).getAttribute('aria-expanded')).toBe('false');
   });
 });

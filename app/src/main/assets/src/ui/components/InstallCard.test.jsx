@@ -121,7 +121,7 @@ describe('InstallCard: the browser\'s own install', () => {
     act(() => { window.dispatchEvent(e); });
     const { container } = render(<InstallCard unitKey="a" />);
     const btn = card(container).querySelector('.install-card-primary');
-    expect(btn.textContent).toBe('Install VOTReader');
+    expect(btn.textContent).toBe('Install');
     await act(async () => { fireEvent.click(btn); await Promise.resolve(); await Promise.resolve(); });
     expect(prompt).toHaveBeenCalledTimes(1);
     expect(card(container)).toBeNull();
@@ -138,7 +138,7 @@ describe('InstallCard: the browser\'s own install', () => {
     e.prompt = vi.fn(() => Promise.resolve()); e.userChoice = Promise.resolve({ outcome: 'accepted' });
     act(() => { window.dispatchEvent(e); });
     let v = render(<InstallCard unitKey="a" />);
-    expect(card(v.container).querySelector('.install-card-primary').textContent).toBe('Install VOTReader');
+    expect(card(v.container).querySelector('.install-card-primary').textContent).toBe('Install');
     act(() => { window.dispatchEvent(new Event('appinstalled')); });
     expect(card(v.container), 'no SHOW ME HOW for an app already installed').toBeNull();
     expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
@@ -158,7 +158,7 @@ describe('InstallCard: the browser\'s own install', () => {
 });
 
 describe('InstallCard: saying no', () => {
-  it('Maybe later hides it and snoozes it; the X is the same', () => {
+  it('Not now hides it and snoozes it, and counts the dismissal', () => {
     let v = render(<InstallCard unitKey="a" />);
     act(() => { fireEvent.click(card(v.container).querySelector('.install-card-later')); });
     expect(card(v.container)).toBeNull();
@@ -166,17 +166,15 @@ describe('InstallCard: saying no', () => {
     cleanup(); _resetInstallCardSession();
     v = render(<InstallCard unitKey="a" />);
     expect(card(v.container), 'snoozed').toBeNull();
-    cleanup(); _resetInstallCardSession(); localStorage.removeItem(KEY);
-    v = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(v.container).querySelector('.install-card-close')); });
     expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ dismissals: 1 });
   });
 
-  it('Don\'t ask again ends it for good', () => {
+  /* U01.3/U06.5: the card is one line under Next now: the offer, Install (or Show me how) and Not now. */
+  it('is one line: the offer, its one action and Not now, nothing else to read', () => {
     const v = render(<InstallCard unitKey="a" />);
-    act(() => { fireEvent.click(card(v.container).querySelector('.install-card-never')); });
-    expect(card(v.container)).toBeNull();
-    expect(JSON.parse(localStorage.getItem(KEY))).toMatchObject({ never: true });
+    const c = card(v.container);
+    expect([...c.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Show me how', 'Not now']);
+    expect(c.querySelector('.install-card-body')).toBeNull();
   });
 });
 

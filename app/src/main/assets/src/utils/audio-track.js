@@ -624,6 +624,31 @@ export function displayPartLabel(title, partLabel) {
   return label;
 }
 
+/**
+ * Where the playing track sits in its queue, counted in RECORDINGS the way the
+ * collection screens count them: a letter split into parts is one recording, so
+ * Volume One reads "2 of 30", never "2 of 31" (player brief 2026-10-22,
+ * section 7). A per-chapter Bible track is a recording of its own although the
+ * book's chapters share one key, and a track with no key (a section run's)
+ * counts on its own.
+ *
+ * @param {ReadonlyArray<{ key?: string | null, partLabel?: string | null } | null | undefined>} queue
+ * @param {number} qi
+ * @returns {{ at: number, of: number }}
+ */
+export function queuePlace(queue, qi) {
+  let of = 0;
+  let at = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const t = queue[i];
+    const before = i > 0 ? queue[i - 1] : null;
+    const chapter = !!(t && typeof t.partLabel === 'string' && /^Chapter \d+$/.test(t.partLabel.trim()));
+    if (!t || !t.key || chapter || !before || before.key !== t.key) of++;
+    if (i === qi) at = of;
+  }
+  return { at, of };
+}
+
 /* ── durable-resume policy ────────────────────────────────────────────────
    Shared here rather than owned by the player, because the Listening Library
    surfaces have to describe the SAME judgment the player acts on: a row that

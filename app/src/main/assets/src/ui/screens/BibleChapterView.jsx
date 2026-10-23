@@ -3,11 +3,13 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { savedScrollFor } from '../components/pager-preview.jsx';
-import { AudioPlayer } from '../../utils/audio-player.js';
+import { AudioPlayer, AUDIO_TOAST_ID } from '../../utils/audio-player.js';
+import { showToast } from '../../utils/toast.js';
 import { HeroListen } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
+import { PlanRibbon } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
@@ -39,6 +41,21 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
   const recordingTextShown = matchingRecording && isTranslationLoaded(translation);
   // rs1: the edition whose words are on the page, which a copied reference names (utils/passage-copy.js).
   const shownTranslation = isTranslationLoaded(translation) ? translation : 'nkjv';
+  // RC.12: the hero line is the only sign of the switch, and a Listen started mid-chapter has it off-screen, so each
+  // switch says so once (KJV on, the reader's own edition back on Close). A chapter that opens already switched
+  // leaves it to the hero line; a swipe peek never speaks.
+  const textShownBefore = React.useRef(recordingTextShown);
+  React.useEffect(() => {
+    if (textShownBefore.current === recordingTextShown) return;
+    textShownBefore.current = recordingTextShown;
+    if (inert) return;
+    showToast({
+      id: AUDIO_TOAST_ID, className: 'vot-toast', ariaLive: 'polite',
+      text: recordingTextShown
+        ? 'Showing the ' + translationLabel(translation) + ' text, to match the recording.'
+        : 'Back to the ' + translationLabel(shownTranslation) + ' text.',
+    });
+  }, [recordingTextShown, inert, translation, shownTranslation]);
   /* "Book · Chapter N" is what the narrator announces before verse 1: the
      read-along's lead-in sits there (ReadAlongHighlight, 2026-09-22). */
   // The verse-number key builder read-along paints through. useCallback is NOT
@@ -324,7 +341,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
             <div className="ornament-divider-symbol">✦</div>
             <div className="ornament-divider-line" />
           </div>
-          <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
+          <PlanRibbon bid={book.id} cid={chapter.num} inert={inert} />
           <div className="bottom-nav">
             {prevCh ? (
               <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
@@ -360,6 +377,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               </div>
             )}
           </div>
+          {/* U01.3: the install offer is one line under Previous/Next, so the chapter ends on Next. */}
+          <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
         </div>
       </div>
       {/* Read-along, on the same !inert contract as LetterView: the swipe peek

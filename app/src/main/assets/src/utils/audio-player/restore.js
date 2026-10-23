@@ -324,7 +324,7 @@ async function _rebuild() {
   // A songs source keeps the session's repeat (_applySnapshot restored it).
   _setSource(r.mode === 'songs'
     ? { mode: 'songs', volKey: 'song', label: r.label, startKey: r.startKey || null, filter: r.filter, one: !!r.one, seed: r.seed, shuffle: !!r.shuffle, ids: r.ids, wrap: !!r.wrap, swaps: r.swaps || null }
-    : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null });
+    : { mode: r.mode, volKey: r.volKey, label: r.label, startKey: r.startKey || null, startIndex: r.startIndex, startReader: r.startReader || null, startPartIndex: r.startPartIndex || null, portion: !!r.portion });
   _state.queue = queue;
   _state.qi = qi;
   // The snapshot's own clock is authoritative here — it is the freshest thing

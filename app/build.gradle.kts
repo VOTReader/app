@@ -69,7 +69,7 @@ android {
             .getOrElse("1.0")
     }
 
-    // ln5 (Play, Corbin 2026-10-05 01:5x "just get it there", do not publish): the Play UPLOAD key.
+    // ln5 (Play; Timothy gave permission 10-05, Play is parked until Corbin raises it): the Play UPLOAD key.
     // Play App Signing holds the real app-signing key, so a lost upload key is reset in the Play
     // Console, not fatal. The keystore lives outside git (D:/VOTReader-keys, a copy in OneDrive
     // Backups); its password is never in a file Gradle reads - tools/play-bundle.ps1 decrypts it from
@@ -272,6 +272,37 @@ androidComponents {
         variant.outputs.forEach { it.versionCode.set(storeVersionCode) }
     }
 }
+
+// up1 (2026-10-23): "Updated · What's new" in the APK. The web's list is written by the deploy; the APK has no deploy,
+// so every build writes assets/whats-new.json from the local history with the same tool (tools/whats-new.mjs --git),
+// and the app shows the changes newer than the build the phone had. A machine without node (or git) gets an empty
+// list: the update then says nothing, and the build never fails over it.
+abstract class WhatsNewTask : DefaultTask() {
+    @get:OutputDirectory abstract val outputDir: DirectoryProperty
+    @get:Internal abstract val repoDir: DirectoryProperty
+
+    @TaskAction
+    fun write() {
+        val out = outputDir.get().asFile.also { it.mkdirs() }.resolve("whats-new.json")
+        val ok = try {
+            val p = ProcessBuilder("node", "tools/whats-new.mjs", "--git", "--out", out.absolutePath)
+                .directory(repoDir.get().asFile).redirectErrorStream(true).start()
+            p.inputStream.readBytes()
+            p.waitFor() == 0 && out.isFile
+        } catch (e: Exception) { false }
+        if (!ok) out.writeText("{\"since\":null,\"items\":[]}\n")
+    }
+}
+val generateWhatsNew = tasks.register<WhatsNewTask>("generateWhatsNew") {
+    outputDir.set(layout.buildDirectory.dir("generated/whatsnew"))
+    repoDir.set(rootProject.layout.projectDirectory)
+    outputs.upToDateWhen { false }   // the history moves with every commit; the tool takes well under a second
+}
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(generateWhatsNew, WhatsNewTask::outputDir)
+    }
+}
 // An unsigned store bundle is useless to Play: asked for one without the key, fail at the variant's first task, not
 // after R8 and packaging. (A whole-project `assemble`/`build` still makes an unsigned store output, as it does for release.)
 val storeSigned = android.signingConfigs.findByName("upload") != null
@@ -339,7 +370,8 @@ val coveredClasses = listOf(
     "com/votreader/sacredui/MainActivityLogic*.class",
     "com/votreader/sacredui/AppInterface*.class",
     "com/votreader/sacredui/GardenImageCache*.class",
-    "com/votreader/sacredui/NativeAudioLogic*.class"
+    "com/votreader/sacredui/NativeAudioLogic*.class",
+    "com/votreader/sacredui/PlanReminderLogic*.class"
 )
 
 // Helper that returns the class tree filtered to the covered set.
@@ -432,6 +464,7 @@ tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
         classFloor("AppInterface", "0.52")        // measured  58.2% (135/232)
         classFloor("GardenImageCache", "0.48")    // measured  54.4% (74/136)
         classFloor("NativeAudioLogic", "0.95")    // m3, new: plain JVM, NativeAudioLogicTest
+        classFloor("PlanReminderLogic", "0.95")   // rp-s1, new: plain JVM, PlanReminderLogicTest
     }
 }
 

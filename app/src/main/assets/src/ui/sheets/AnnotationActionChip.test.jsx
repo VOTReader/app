@@ -140,6 +140,24 @@ describe('AnnotationActionChip style switcher', () => {
     expect(screen.getByText('Cancel')).toBeTruthy();
     expect(screen.getByText('Yes, remove')).toBeTruthy();
   });
+
+  // RC.11 (UX sweep 2026-10-22): removing a mark that sits over an older one brings the older one back.
+  it('the confirm says when an older mark under it shows again', () => {
+    const green = { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'green', text: 'draw short, Timothy', start: 0, end: 19, created: 2 };
+    const yellow = { id: 'y1', groupId: 'y1', kind: 'highlight', color: 'yellow', text: 'Timothy', start: 12, end: 19, created: 1 };
+    setupStores(green);
+    window.AnnotationStore.get = () => [yellow, green];
+    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    fireEvent.click(screen.getByTitle('Remove'));
+    expect(screen.getByText('Remove this highlight? The yellow under it shows again.')).toBeTruthy();
+  });
+
+  it('nothing under it: the plain question', () => {
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'green', text: 'hi', start: 0, end: 2, created: 2 });
+    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    fireEvent.click(screen.getByTitle('Remove'));
+    expect(screen.getByText('Remove this highlight?')).toBeTruthy();
+  });
 });
 
 describe('chipTop: the chip stays on the screen (cz2)', () => {

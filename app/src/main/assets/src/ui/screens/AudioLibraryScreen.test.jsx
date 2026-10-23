@@ -7,6 +7,7 @@ const { player, setPlayerState } = vi.hoisted(() => {
   const player = {
     subscribe: () => () => {},
     getVersion: () => 0,
+    getShape: () => '0|',
     getState: () => playerState,
     collectionHasAudio: vi.fn(() => true),
     readerLabel: () => null,
@@ -250,6 +251,36 @@ describe('AudioLibraryScreen -- the hub', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove The Narrow Path from recently played' }));
     expect(globalThis.AudioLibraryStore.removeRecent).toHaveBeenCalledWith(recentTrack.url);
     expect(globalThis.AudioLibraryStore.clearRecent).not.toHaveBeenCalled();
+  });
+});
+
+describe('AudioLibraryScreen -- the offline line counts what is on the phone (RC.2)', () => {
+  const setOnline = (v) => Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => v });
+  const offlineWith = (n) => {
+    setOnline(false);
+    globalThis.OfflineAudio = {
+      available: () => true, subscribe: () => () => {}, getVersion: () => 0, news: () => null,
+      items: () => Array.from({ length: n }, (_, i) => ({ url: 'https://example.test/' + i + '.mp3', bytes: 1, savedAt: i })),
+      pending: () => ({ busy: 0 }), totalBytes: () => n,
+    };
+  };
+  afterEach(() => { delete globalThis.OfflineAudio; setOnline(true); });
+  const line = () => document.querySelector('.offline-note').textContent;
+
+  it('with nothing saved, it says so instead of promising recordings that still play', () => {
+    offlineWith(0);
+    renderScreen();
+    expect(line()).toBe('You’re offline. No recordings are saved on this phone yet.');
+  });
+
+  it('counts the recordings that do still play', () => {
+    offlineWith(2);
+    renderScreen();
+    expect(line()).toBe('You’re offline. 2 recordings on this phone still play.');
+    cleanup();
+    offlineWith(1);
+    renderScreen();
+    expect(line()).toBe('You’re offline. 1 recording on this phone still plays.');
   });
 });
 

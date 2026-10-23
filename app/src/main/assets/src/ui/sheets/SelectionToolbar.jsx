@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { AnswersCardSheet } from './AnswersCardSheet.jsx';
@@ -1477,9 +1478,11 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           the toolbar. */}
       {confirmingRemove ? (
         <ConfirmStrip
-          question={removeNoteCount > 0
+          question={[removeNoteCount > 0
             ? `Remove this highlight and ${removeNoteCount === 1 ? 'its note' : removeNoteCount + ' notes'}? The note text will be deleted.`
-            : 'Remove this highlight?'}
+            : 'Remove this highlight?',
+          // RC.11: a mark the removed ones covered comes back.
+          uncoveredLine([...selectionGroups()], AnnotationStore)].filter(Boolean).join(' ')}
           yesLabel="Yes, remove"
           onCancel={() => setConfirmingRemove(false)}
           onConfirm={() => { removeHighlight(); setConfirmingRemove(false); }}

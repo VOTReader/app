@@ -14,9 +14,12 @@
  *     only read here; no deploy ever deletes it.
  *
  * Update lifecycle (fully automatic):
- *   New SW calls self.skipWaiting() on install → takes over immediately.
- *   'controllerchange' fires in sw-register.js → page reloads onto the
- *   new build, at a moment the user can't see it (boot window or backgrounded).
+ *   A new SW installs and WAITS (up1, Corbin 2026-10-23: no update mid-session).
+ *   It takes over when the browser closes the app's last page, or when a page
+ *   asks with SKIP_WAITING (sw-register.js: at app open, or on a return after
+ *   10+ min away, never while a recording plays), and only if no OTHER window
+ *   of the app is on screen. 'controllerchange' then fires in sw-register.js
+ *   and the page reloads onto the new build.
  *
  * STALE-CACHE RESILIENCE — two layers, because a fresh cache KEY does not prove
  * fresh BYTES:
@@ -45,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-da38409db8';
+const CACHE_VERSION = 'v1.0.2-bee44021b3';
 const CORPUS_VERSION = 'c74'; // c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). The text stays put: 15 paragraphs gain one {{ref:}} marker each in place where the site links a passage the old converter dropped (2 Peter 3:16 x8, Isaiah 64:5-6 x4, John 15:1-14 x2, 1 Corinthians 5:7-8 x1; refs 1,103 -> 1,118), no paragraph is added, dropped or moved in any of the 121 topics, so every reader's marks stay where they are. The site's Main Page joins LAST as answers-main-page (82 paragraphs). What the site shows beyond the words (sections, links, related groups, notes, media, refMeta, attributions, underlines, callouts, indents) is captured as sidecars in a NEW lazy file, src/data/answers-meta.js (ANSWERS_META, ~359 KB, loaded through utils/sync-loaders.js loadAnswersMeta, nothing renders it yet), and the site chrome as ANSWERS_SITE_META at the end of answers.js; answers.js 2,487,070 -> 2,507,577 B. // PREVIOUS c72->c73 (2026-10-20): the Matthew Study Bible checked line by line against the official PDF (trumpetcallofgod.com, InDesign export 2025-12-02, its text layer; 627 Volumes of Truth notes on both sides, verse text identical in all 28 chapters). Six fixes in src/data/matthew.js: 25:34-45 named the Flock letter "Serve Me as I Have Loved You, Says The Lord" but quotes Words To Live By: Part Two "Serve Me As I Have Loved You" (the excerpt is there, and the PDF names it); "The Way of The Lord Is Equal" moves from chapter 24 to chapter 25 as 25:14-30 (the PDF lists it in chapter 25 under a misprinted 24:14-30; the parable of the talents); 22:30 cites 1 John 3:2, not John 3:2; 11:13-14 gains its lost cite Malachi 4:4-6; the 16:18 note on "church" is whole again (it stopped at "an assembly"); 16:6, 11-12 "Do This in Remembrance of Me" gets back the PDF's note on *women. scripture-web-data.js regenerated from it. // PREVIOUS c71->c72 (2026-10-18): the Scripture Web's citations of scripture by the Volumes become first-class data (lane sweb, w2 data): src/data/scripture-web-data.js goes to version 2. Its flat votEdges / prophecy / votLinks give way to votCites (one row per letter or study chapter in reading order, each citation an anchor, never text: the block a reader lands on plus the footnote number, the inline reference's ordinal or the span a Study Bible note quotes, the prophecy-group part, the last verse of a range), mirrors (each of the 16 Holy Days entries -> the letter it re-presents) and studyLinks (132 prophecy pairs, was 51; 645 study letter-links, was 109). 2,648 edges, one per verse and letter (2,098 before, duplicates included), from 2,895 sites; Holy Days Format A edges now carry entryId (they opened on vot-letter); 3 stale study edges are gone. 747,114 -> 692,980 B raw, 236,727 -> 259,229 B gzip. No letter, study or Bible text changes. // PREVIOUS c70->c71 (2026-10-15): Bible read-along, two verse onsets hand-measured (align al6). WOP Isaiah 30:18 started 1.33 s late, inside "will wait" (both legs began there; "Therefore the LORD" was cut off): 210.44 -> 209.11 s. WEB Isaiah 52:6 started 0.95 s early, at the start of the 1 s pause after "all day long": 69.89 -> 70.84 s (this recording skips the verse's first sentence and opens on "Therefore they shall know"). Each is the measured onset less 0.04 s (al4's rule for soft starts). Evidence: a fresh whisper large-v3 transcript, a 0.1 s cut sweep by two models, silencedetect and a two-band energy trace; refuter blind (Opus 5.5 high, which candidate was live hidden): onset 209.15 (med; bracket 208.96-209.22) and 70.88 (high; the silence ends at 70.88). Only these two slots change; timed counts unchanged (wop 31,053 / web 31,078 of 31,102). Belts record the old onset under handOnset; old belts in _pre-al6/. // PREVIOUS c69->c70 (2026-10-14): a Spanish Bible joins the alternate translations: the Reina-Valera 1960 (id rvr, src/data/bible-rvr.js, var BIBLE_RVR, 4.4 MB, lazy like the other editions, never precached), imported by tools/regen-rvr.js from YouVersion's RVR1960 (bible.com version 149, the Sociedades Biblicas Unidas text), 66 books / 1,189 chapters / 31,102 verses on the KJV numbering (Psalm 47:10 and 3 John 15 joined into the verse before, as the KJV prints them). Cross-checked letter by letter against bolls.life's RV1960 and a GitHub copy of YouVersion's text: 30,723 verses agree in all three; every other difference is an old typo in one copy that the publisher's text corrects (align es1). // PREVIOUS c68->c69 (2026-10-14): Bible read-along, 99 verse onsets move later onto the voice (align al4, tools/_alignlib.py FILL_GUARD v2). Where c67's fill re-belt kept a move back, the onset sat on whisper's word start, which begins early in the pause after the previous verse; it is now leg A's onset less 0.04 s, never before whisper's (web 11, wop 54, brm 34 slots; no verse lights or darkens: timed stays wop 31,053 / web 31,078 / brm 31,097 of 31,102). Refuter, blind (which leg was which hidden; 40 stratified rows of the 103 candidates; audio envelope in two bands, silencedetect, a small.en cut test): the true onset sat at leg A + 0.02 s median and whisper - 0.46 s, 7 of 40 on the previous word's final s or t; with the 0.04 s back the new onset is 33 better / 6 same / 1 worse (Job 22:6) than the live one. validate-bible-sync --all-editions OK (FULL). // PREVIOUS c67->c68 (2026-10-05): V1.018 The Signs of the Coming of the Son of Man gains Benjamin's text-to-speech reading (Drive 12aNgnsJY0EIGOGCp-yENhsBbeLZRu4Eh, already on audio-v1) as its primary recording; the old reading (1qtXkMFoHqA7QiYuLc9bAICFgAo7Y2oL0) stays as the V alternate. Re-timed both (align watch-land): Benjamin 74/74 fragments shipped (50 confirmed, 24 probed, 0 review, coverage 0.996); old reading 74/74 as a new alternate timeline (38 confirmed, 35 probed, 1 review). check-audio-sync, check-audio-manifest, validate:data OK (67,760 items, 0 errors). // PREVIOUS c66->c67 (2026-09-27): Bible read-along, whisper holes filled across the three whole-Bible editions (align fill2: 1,218 chapters whose transcript had a hole re-heard surgically, hole by hole, and re-belted with their own witness; tools/_alignlib.py tx_fill, hone-bible passes TX_FILL_MIN and stamps txFill/txHoles). What ships is a refuted subset: 465 onsets move, each either back 1 s or more or back off the transcriber's 30-s seek point (e.g. web Matthew 21:3 30.0 -> 27.09 s, 'If anyone' after the pause), and 15 verses light (web +6, wop +8, brm +1); no verse darkens. Timed now wop 31,053 / web 31,078 / brm 31,097 of 31,102. Refuters judged by the audio envelope: round 1 (60 raw moves) 36 better / 24 worse, from two causes - forward moves onto a later clause where the fill transcript missed or garbled the verse opening, and sub-second moves to whisper's early start inside the pause - so every such move keeps its live value (1,859 rows); round 2 (45 fresh kept moves + all 20 newly lit) 45 better / 0 worse, lit 13 right / 2 loose / 5 wrong, and the 5 wrong stay dark. validate-bible-sync --all-editions OK (FULL, 4 editions). // PREVIOUS c65->c66 (2026-09-26): Bible read-along onsets re-placed from the transcript each chapter already has (align tx_anchor v2, tools/_alignlib.py; hone-bible runs it after the belt and stamps txAnchor). Two kinds of onset move, nothing else: (1) a REVIEW verse the belt had spread between its proven neighbours moves to where the transcript says its opening (first word and the next heard in a row, the verse's first name at its place, after the previous verse's onset); (2) a name-list verse whose first name was misheard, so its onset sat on the second name, moves back to the heard first name. Each new onset goes to the end of the pause the whisper start sits in (whisper stretches a word back over the silence 0.4-2 s), or keeps leg A's onset inside the matched words where there is no silence map (WOP's music bed). 541 onsets move (web 321, wop 133, brm 87); no verse lights or darkens: timed stays wop 31,045 / web 31,072 / brm 31,096 of 31,102. Three refuters on fresh 60-row samples judged by the audio envelope: v1 22 worse (not shipped), v3 4 worse, v4 41 better / 17 same / 2 worse; the two worse causes are filtered out (a subset, no value changed), leaving 0 worse on all 180 refuted rows. validate-bible-sync --all-editions OK (FULL, 4 editions). // PREVIOUS c64->c65 (2026-09-26): sweep-2 corpus rows (align s6a). (1) Two WOP NKJV verses never lit: 1 Samuel 30:15 and Isaiah 52:4 shipped the SAME onset as the verse above them (leg B had heard the verse before them and the shipper clamped the early onset up to its neighbour, a tie the binary search resolves to the later verse). ship() now leaves a row at or before the onset above it dark (0 = unproven) and validate-bible-sync refuses a tie as well as a backwards step: WOP timed 31,047 -> 31,045, no other slot moves in any edition (v14-corpus-03). (2) The Bible Studies lose 57 spaces before punctuation ('not a person , nor', 'Volume 4 )') and 3 doubled cites ('{{ref:Acts 2:27}} ({{ref:Acts 2:27}})'), import artifacts the site does not have; validate-schemas STUDY1 now refuses both (v14-corpus-02). (3) segmentRenderText no longer puts a space after an opening quote or before a closing one at a segment seam: 187 quote marks in the Studies sat a space away from their words (v14-corpus-01; no letter changes). The Purity study's six read-along timelines were re-aligned on the new text (check:audio-sync OK, coverage 0.973-0.996). // PREVIOUS c63->c64 (2026-09-25): Bible read-along, whisper holes filled (align tx-fill fill1 + tol3 re-belt of 128 planned chapters, 15 of them held back after a refuter found name-list onsets anchored on the second name and guessed REVIEW onsets in filled holes): 35 chapters change, net +28 verses lit (wop +2 in 5 chapters, web +10 in 13, brm +16 in 17), 56 onsets moved, mostly the verse just after a hole whose onset had stuck at the transcriber's 30 s seek point (e.g. web Ecclesiastes 9:2 31.12 -> 23.56 s, 'All things' heard at 22.9). Timed now wop 31,047 / web 31,072 / brm 31,096 of 31,102; validate-bible-sync --all-editions OK. Plus V5 'Do Not Look Back; Escape to The Father's House' gets its apostrophe (sweep-2 n8-05). // PREVIOUS c62->c63 (2026-09-25): six Answers source lines named The Blessed's Introduction for passages it does not hold (improvement sweep n5-04): a bare The_Blessed link resolved to the Introduction every time. tools/fetch-answers.py now picks the entry holding the passage's lines, so The Coming of The Lord @223 and Regarding the Gathering Up @27 / @182 name "Blessed Are Those Who Believe in Me", Regarding Patience @38 / @89 "Blessed Are Those Who Serve Me as I Have Loved Them" and Regarding Obedience @138 "Blessed Are Those Who Walk in My Ways", and their source taps open those entries. Those six paragraphs change in place; no paragraph moves (the converter's new shift gate passes), so every reader's marks stay put. // PREVIOUS c61->c62 (2026-09-25): Answers Only God Can Give loses its leaked wiki markup. tools/fetch-answers.py only split sections on `==Heading==`, so the six topics written with single-`=` headings (The Coming of The Lord, The One Who Stays Lets, Visions, Regarding the Day of The Lord, Regarding Spiritual Gifts, Regarding the Holidays of Men) shipped 37 raw "=Heading=" lines as body text, their Related Topics links as prose and their Navigation boilerplate; they now convert like every other heading, and those six topics gain their Related Topics cards. The site's "Videos" section (a YouTube playlist link the app does not carry, a dead line on 11 pages) is dropped like Navigation. answers.js 10,104 -> 10,009 paragraphs, 1,636 attributions unchanged; 105 of 121 topics byte-identical; 15 lose only trailing sections, and one (Regarding Spiritual Gifts) moves its paragraphs from 88 on by one, where a raw heading had shared a paragraph with the text under it. // PREVIOUS c60->c61 (2026-09-22): the whisper witness learns to hear a Hebrew name list. The strict witness had read 162 Bible verses UNSPOKEN across the three whole-Bible editions with the recordings plainly speaking them ("pashur amariah malkijah" for "Pashhur, Amariah, Malchijah"), so tools/batch-align-bible.py grows a per-chapter --name-tolerant witness: a proper noun of the chapter (capitalised, five letters or more, off a stoplist) may match a near hearing by consonant skeleton or 80 % of its folded letters; ordinary words never ("there"/"three" sound alike and must not). Re-belted the 132 chapters carrying an UNSPOKEN verse (name lists: Joshua 15/18/19 border towns, Ezra 2/10, Nehemiah 7/10/12, 1 Chronicles genealogies, 2 Samuel 23): unproven verses fall 180 -> 115 (WOP 84 -> 57, BRM 41 -> 22, WEB 55 -> 36); Nehemiah 10 (WOP) goes 19/39 -> 38/39 and its GATE_PINS pin retires (the register is empty). 215 already-timed slots in those chapters move to a probe-verified onset (the strict belt had spread them between distant proven neighbours); 23 rows there are now interpolated between closer proven neighbours; 1 verse (WOP Ezra 10:35) goes dark, UNSPOKEN under both witnesses. The 28 tsot-matthew belts were re-cut under the prompt faa10620 changed (timings byte-identical). Totals: BRM 31,080 / WOP 31,045 / WEB 31,062 of 31,102; Matthew 1,071/1,071. Proof: validate-bible-sync --all-editions OK (FULL, 4 editions), test_batch_align_bible_ship 11/11 (2 new, RED on the old matcher). // PREVIOUS c59->c60 (2026-09-20): WTLB II Section 1 (Intro-28) joins the compilation read-along: audio-sync-sections.js now carries all 14 compilations, 347 letter timelines / 4,135 rows / 111,325 B (was 13 / 320 / 3,848 / 103,754 B at c59). The reader skips "The Bridegroom Approaches" and "I Am The Lord's" in that recording; tools/batch-align-sections.py now notices a skipped letter (unspoken share > 0.5) after the first belt, remembers it beside the belt (sections__<id>.large-v3.json.skipped.json) and belts again without it, so the 27 letters the reader does read sit where the transcript hears them (Splendor 180 s, Bitter 351 s, Sanctuary 408 s) instead of piled onto one instant; "Marriage" (0.500 coverage, a two-sentence letter half-read) is EXCLUDED by the letters' 0.60 gate and the page follows past it. Proof: check-audio-sync (30,821 rows / 815 timelines + 347 letters in 14 compilations, 96.1 %), validate:data 66,539 / 0, bundle budget, test_batch_align_sections 4/4. // PREVIOUS c58->c59 (2026-09-20): the WTLB compilations get their read-along: new lazy file src/data/audio-sync-sections.js (AUDIO_SYNC_SECTIONS[assetId][volKey:letterId] = rows in the AUDIO_SYNC shape on the compilation file's own clock; generator tools/batch-align-sections.py, gate leg in check-audio-sync.js, loader line lit in utils/sync-loaders.js) carries 13 of the 14 compilations: WTLB I Parts 1-7 (147 letters) and WTLB II Sections 2-7 (173 letters) = 320 letter timelines / 3,848 rows / 103,754 B, every one on a word boundary and in playback order. WTLB II Section 1 (Intro-28) is ABSENT on purpose: the recording skips "The Bridegroom Approaches" and "I Am The Lord's" (unspoken 0.95 / 1.00) and the forced-alignment leg dragged the ten letters after them onto one instant (Splendor .. Sanctuary all at 402.0 s); the generator now refuses an asset whose letters tie or whose recording skips a letter before ones it reads (asset_errors, tested), so Section 1 plays without the wash until a second belt without the skipped letters is run. Also this commit: 13 letters re-aligned on their recordings after the manifest moved (audio-sync.js 750 letters, 65 alternate timelines, 12 new): Benjamin-voice primaries for Regarding The Celebration Of Christmas (V1.012), Seek The Lord And He Will Open The Way (V1.017) and A Return To The Garden (WTLB2.125, misnumbered upstream = the wtlb1 letter), their TTS readings kept as alternates; Timothy's recording of My Anger Runs Deep (seven, num 67); and the nine trimmed re-uploads of WTLB II (The Only Truth, Splendor, The Almighty, The Riches Of Eden, A Trumpet And Alarm, The Perfect Reflection, The Prince Of Peace, Acquiesce, It Is Time - 1.4-2.8 s shorter, re-timed on the new bytes; the release archive (audio-v1) carries the new bytes as of this push). Manifest regenerated on the fresh Drive listing (730 letters, 831 assets; 4 primaries move). Proof: check-audio-sync (30,534 rows / 815 timelines + 320 letters in 13 compilations, 96.1 % of touched characters timed), check:audio-manifest, validate:data (66,539 items, 0 errors), bundle budget, runtime-src-assets 17, apk-assets 19, test_batch_align_ship 10/10 + test_batch_align_sections 4/4. // PREVIOUS c57->c58 (2026-09-20): read-along for The Word of Promise (WOP, dramatized NKJV) grows by the 26 Old Testament book(s) the 2026-09-20 01:22-06:08 CUDA window completed: Amos (9), Daniel (12), Ecclesiastes (12), Ezekiel (48), Habakkuk (3), Haggai (2), Hosea (14), Isaiah (66), Jeremiah (52), Job (42), Joel (3), Jonah (4), Joshua (24), Judges (21), Lamentations (5), Malachi (4), Micah (7), Nahum (3), Nehemiah (13), Obadiah (1), Proverbs (31), Psalms (150), Ruth (4), Song of Solomon (8), Zechariah (14), Zephaniah (3) = 555 chapters, so bible-sync-wop-nkjv.js now carries 1,189 chapters / 66 books / 31,102 verse slots / 30,999 timed / 103 unproven / 0 excluded by versification / 182,968 B (was 634 / 40 / 19,060 / 19,017 / 43 / 0 / 112,758 B at c57, the WOP numbers unchanged since c55). Held back, a book ships WHOLE OR NOT AT ALL (partial_books, mirrored in validate-bible-sync.py): none. Aligned on the RTX 5080 under the gate lock as a declared CUDA window (rc 0 at 06:08, 283.7 card-min this run, 0 memory kills under the 14 GB ceiling) against books.js's NKJV, settings 6f92bb1867 (family bible-wop-nkjv). Every new chapter cleared the 0.60 proven gate except ONE, shipped below it by GATE_PINS (tools/batch-align-bible.py, mirrored in validate-bible-sync.py): nehemiah 10 at 0.487 is a seal-list of names, 19/39 verses proven and shipped, the other 20 left dark (witness-deaf, not misaligned; a name-tolerant witness pass is a TODO) so Nehemiah ships whole with chapter 10 by ruling; 11 flagged REVIEW below the 0.90 silent-ship bar: haggai 1 (0.867); joshua 15 (0.794); joshua 19 (0.843); nehemiah 7 (0.795); nehemiah 10 (0.487); nehemiah 12 (0.872); psalms 101 (0.875); psalms 120 (0.857); psalms 123 (0.750); psalms 138 (0.875); zechariah 6 (0.867). The 60 new zero slots, by name: ezekiel 17:11; ezekiel 37:15; ezekiel 40:1; haggai 1:3; isaiah 8:5; jeremiah 33:23; job 3:2; job 12:4; job 14:1; job 27:1; job 29:1; job 35:1; job 40:1; job 42:1; joshua 13:18; joshua 15:29; joshua 15:31; joshua 15:34; joshua 15:35; joshua 15:36; joshua 15:50; joshua 18:27; joshua 19:3; joshua 19:20; joshua 19:42; joshua 19:43; joshua 19:44; joshua 19:45; joshua 19:46; judges 10:1; nehemiah 7:17; nehemiah 7:41; nehemiah 10:3; nehemiah 10:4; nehemiah 10:5; nehemiah 10:6; nehemiah 10:7; nehemiah 10:10; nehemiah 10:11; nehemiah 10:12; nehemiah 10:13; nehemiah 10:15; nehemiah 10:16; nehemiah 10:18; nehemiah 10:19; nehemiah 10:20; nehemiah 10:21; nehemiah 10:22; nehemiah 10:23; nehemiah 10:24; nehemiah 10:25; nehemiah 10:27; nehemiah 12:6; psalms 101:1; psalms 103:1; psalms 120:1; psalms 123:1; psalms 138:1; zechariah 4:2; zechariah 6:9 (the c57 43 unchanged). Proof: validate-bible-sync.py FULL (every chapter matches its corpus, its ffprobed audio and its belt; every current belt of a whole book is shipped) and the identities by name (shipped chapters == gate-clearing belts of whole books; zero slots == untimed rows + versification gaps). // PREVIOUS c56->c57 (2026-09-20): c56 put "My Anger Runs Deep" in date order at num 44 and reflowed nums 44-66, which broke a load-bearing invariant: for Volume Seven the corpus num IS the Drive file number (V7.044 Lost Sheep ... V7.066 The Last Trumpet), and Drive's own V7.045 is a different letter - the Anger recording is a Bonus Track in folder 7. Nums 44-66 are restored byte-for-byte and the letter is appended as num 67, last in the array so the index screen (which renders in array order and prints letter.num) and the number agree. Its id and audio key are unchanged: my-anger-runs-deep / seven:my-anger-runs-deep.
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -317,17 +320,17 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
  */
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
-  './': 'cb712267b4c5e9dcaf48a07ebded3c072f0e4bdcbe80224c57f21d9b77be8722',
-  './dist/app.min.css': '0941606abcaeaa3d1bf1375ca5cfe9804c7268ba5f13a8d80528799538b15e68',
+  './': '7b07fd91df42a1f0269277a495d4d821a24f2d92cd93e384e85c1fca64f12cca',
+  './dist/app.min.css': 'b9a71aa9bd2239938334844b864f8fda9eed4b19cb4a537247c39c69e3eeb6ce',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': '22e36b39b7c8427b8ea0a83fb1e2cfda2e4c6bb4ee59858fab37f00826bdef7d',
-  './dist/bundle-c.js': '1880cfa2947e723facddd36f6b77293caa3398f08bcb0119fcf94d1d38060bef',
-  './dist/bundle-d.js': 'ace375729f95aece9b01c1d99a67bbab040dcf1dd9c8498ef21c240bc9ef6753',
-  './dist/bundle-v2.js': '8ce6533582c728fe318896262058892be411f6d70966816d22781f1e1d60f1c5',
+  './dist/bundle-b.js': '4d48444f8b499a0014a9de7e3f17ace36a8da81a3a2e3685aaa37c0ced62cc12',
+  './dist/bundle-c.js': 'f36900d90bab1b84c5336cc47963ad93606c401ae3546e85d55bcff806776336',
+  './dist/bundle-d.js': 'fd48949145dff893eb69d3f3f5085b6cc7156409a18a0acea2af8b373dac657a',
+  './dist/bundle-v2.js': 'ebb99be5bff7bd10ae3985f6bee2548e6f414920b48e37eba8c6d8378b525c72',
   './dist/bundle-w.js': 'addfb583fe17334762c64ee368a793eeb2cfe254b01403ea1b508b5429fa5e9b',
   './dist/v2.min.css': '0045ff1c94fbfbe5c78fd81718a1be8f5845e430c1da0e46a47b877987474bda',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
-  './index.html': 'cb712267b4c5e9dcaf48a07ebded3c072f0e4bdcbe80224c57f21d9b77be8722',
+  './index.html': '7b07fd91df42a1f0269277a495d4d821a24f2d92cd93e384e85c1fca64f12cca',
   './manifest.json': '381e32b853fbfa44d5c8c0e2f4b789d460a7f2c5f74036cc5d376622843c09ba',
   './offline.html': '0f9bfc634800dd8cb74ae86d3f2b0a72b1c79b91747f293ec010d33e9a28a607',
   './search-kjv-twin.json': 'ab14c48ce301351256986283805b0d8113d528dbd531ef6bad711042bbe447d6',
@@ -422,6 +425,7 @@ const ASSET_REVISIONS = {
   './icons/icon-512.png': 'c1a735e2d7a9d211d711288cd60a90f5a8fe7de5db63dc4a86c371673130ed15',
   './src/data/answers-meta.js': '92ca168bda0ce2b61ad8e5c9decd4d7cb21fcfa242af868cb87f265bd2b904eb',
   './src/data/answers.js': 'a291d3608d84d6d2bcf5dfd2c6d0524e2103d5c7bc3b657cd113d2ac518ba6eb',
+  './src/data/audio-lengths.js': 'c0476aeafb8e2e5a892d63b072943ad1b6dd4648b8f9b1d5cefb29ccb510055a',
   './src/data/audio-sync-sections.js': 'a48bd0c2f2352ca5ef21b903fe0f5dc9a6048f0b0492b6cf15d845edd54547ac',
   './src/data/audio-sync.js': '46671f942b2a13ec672369f0384960ac9166f194e034d61bd889995331cbc5f9',
   './src/data/bible-asv.js': '552b7ae92a206f103f53f51f33cc8b90365156244aab6b7c47f8da5d16d6a34b',
@@ -562,9 +566,8 @@ async function addVerified(cache, url, expected) {
 }
 
 self.addEventListener('install', (event) => {
-  // Take over immediately — don't wait for the old SW's tabs to close.
-  // controllerchange fires in sw-register.js, which reloads the page.
-  self.skipWaiting();
+  // No skipWaiting here (up1, 2026-10-23): the new build waits until the page asks at a quiet moment (the
+  // SKIP_WAITING message below) or the app's last page closes. Taking over at once reloaded readers mid-session.
   event.waitUntil((async () => {
     try {
       await installCore();
@@ -895,9 +898,17 @@ async function isThisBuilds(response, want) {
   return (await sha256Stripped(await response.clone().arrayBuffer())) === want;
 }
 
-/** The network holds another build: look for it now, not at the page's next check. At most once a minute. */
+/** The network holds another build: look for it now, not at the page's next check (at most once a minute). With
+    `failed` (a 503: another build's code or timings, so what the page asked for did not load), also tell the pages
+    (up1): a new build no longer takes over on its own, and sw-register takes or offers it. Another build's TEXT is
+    served (marked) and told nobody: the reader is reading it. @param {boolean} [failed] */
 let _updateAskedAt = 0;
-function askForUpdate() {
+function askForUpdate(failed) {
+  if (failed) try {
+    Promise.resolve(self.clients.matchAll({ type: 'window' }))
+      .then((all) => { for (const c of all || []) { try { c.postMessage({ type: 'ANOTHER_BUILD' }); } catch (_e) { /* gone */ } } })
+      .catch(() => {});
+  } catch (_e) { /* no clients API */ }
   const reg = self.registration;
   if (!reg || typeof reg.update !== 'function' || Date.now() - _updateAskedAt < 60 * 1000) return;
   _updateAskedAt = Date.now();
@@ -922,13 +933,42 @@ async function otherBuildCopy(response, key) {
   return new Response(out, { status: response.status, statusText: response.statusText, headers });
 }
 
-// ── Message: page-triggered activation (belt-and-suspenders) ────
-// Install already calls skipWaiting(); this path exists for a SW left
-// WAITING by an older page (installed before skipWaiting-on-install) —
-// sw-register.js posts SKIP_WAITING at registration to unstick it.
+// ── Message: page-triggered activation (up1) ────
+// The one way a waiting build takes over while the app is open: sw-register.js
+// asks at app open, after 10+ min away, or when its build could not serve what the
+// reader asked for. The takeover reloads EVERY page it claims, so it is refused
+// while another window of the app is on screen, or busy out of sight: playing a
+// recording, or holding a note, memo or backup (each page answers BUSY; one that
+// does not answer within BUSY_WAIT_MS, an older build's, counts as not busy).
+const BUSY_WAIT_MS = 1500;
+/** Whether a hidden window says it is busy. @param {any} client */
+function askBusy(client) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = (/** @type {boolean} */ v) => { if (!done) { done = true; resolve(v); } };
+    try {
+      const ch = new MessageChannel();
+      ch.port1.onmessage = (e) => finish(!!(e && e.data && e.data.busy));
+      client.postMessage({ type: 'BUSY' }, [ch.port2]);
+    } catch (_e) { finish(false); return; }
+    setTimeout(() => finish(false), BUSY_WAIT_MS);
+  });
+}
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
+    const asker = event.source && event.source.id;
+    const work = (async () => {
+      /** @type {any[]} */ let others = [];
+      try {
+        const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        others = all.filter((c) => c && c.id !== asker);
+      } catch (_e) { /* cannot tell: take over, as the page asked */ }
+      if (others.some((c) => c.visibilityState === 'visible')) return;
+      const busy = await Promise.all(others.map(askBusy));
+      if (busy.some(Boolean)) return;
+      await self.skipWaiting();
+    })();
+    if (typeof event.waitUntil === 'function') event.waitUntil(work);
   }
   // GET_VERSION — let the PAGE ask which build is actually serving it.
   //
@@ -975,6 +1015,101 @@ self.addEventListener('message', (event) => {
   }
 });
 
+// ── Song votes: Background Sync drains the outbox (sy4-3) ───────
+// Corbin 2026-10-22: a 👍 made with no signal sends when the link is back, even
+// with the app closed. The page keeps the outbox in IDB ('votreader' / meta /
+// 'song-votes-outbox', utils/song-votes.js) and registers the 'song-votes' sync
+// tag when a send fails; the browser fires it once online. Only 👍 or its
+// clearing is ever in it (👎 never leaves the device). The Worker is idempotent
+// per (install, song, at): a vote the page also sent is harmless. The database
+// is opened at its current version only: a worker must never create or
+// upgrade the app's database (an upgrade here is aborted).
+const SONG_VOTE_URL = 'https://votes.votreader.workers.dev/v1/vote';
+const SONG_VOTE_OUTBOX = 'song-votes-outbox';
+const SONG_VOTE_MAX_AGE_MS = 89 * 24 * 3600 * 1000;
+
+function openAppDb() {
+  return new Promise((resolve) => {
+    let req;
+    try { req = indexedDB.open('votreader'); } catch (_e) { resolve(null); return; }
+    req.onupgradeneeded = () => { try { req.transaction.abort(); } catch (_e) { /* the open fails below */ } };
+    req.onsuccess = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('meta')) { db.close(); resolve(null); return; }
+      resolve(db);
+    };
+    req.onerror = () => resolve(null);
+    req.onblocked = () => resolve(null);
+  });
+}
+
+function metaOp(db, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('meta', mode);
+    let out;
+    fn(tx.objectStore('meta'), (v) => { out = v; });
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
+}
+
+async function postSongVote(body) {
+  if (!body || Date.now() - Number(body.at) > SONG_VOTE_MAX_AGE_MS) return 'drop';
+  try {
+    const res = await fetch(SONG_VOTE_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+      credentials: 'omit', cache: 'no-store',
+    });
+    if (res.status >= 200 && res.status < 300) return 'sent';
+    return res.status === 400 ? 'drop' : 'keep';
+  } catch (_e) {
+    return 'keep';
+  }
+}
+
+async function drainSongVotes() {
+  const db = await openAppDb();
+  if (!db) return;
+  try {
+    const outbox = await metaOp(db, 'readonly', (store, done) => {
+      const r = store.get(SONG_VOTE_OUTBOX);
+      r.onsuccess = () => done(r.result);
+    });
+    if (!outbox || typeof outbox !== 'object') return;
+    const list = Object.values(outbox).filter((b) => b && typeof b.song === 'string').sort((a, b) => a.at - b.at);
+    const settled = [];
+    let kept = false;
+    for (const body of list) {
+      const r = await postSongVote(body);
+      if (r === 'keep') { kept = true; break; }
+      settled.push(body);
+    }
+    if (settled.length) {
+      // Remove what was sent, unless a newer vote for the song took its place meanwhile.
+      await metaOp(db, 'readwrite', (store) => {
+        const r = store.get(SONG_VOTE_OUTBOX);
+        r.onsuccess = () => {
+          const cur = r.result && typeof r.result === 'object' ? r.result : {};
+          for (const b of settled) {
+            const c = cur[b.song];
+            if (c && c.at === b.at && c.v === b.v) delete cur[b.song];
+          }
+          store.put(cur, SONG_VOTE_OUTBOX);
+        };
+      });
+    }
+    // A rejection asks the browser to fire the sync again later (its own backoff).
+    if (kept) throw new Error('song votes wait for the network');
+  } finally {
+    db.close();
+  }
+}
+
+self.addEventListener('sync', (event) => {
+  if (event.tag === 'song-votes') event.waitUntil(drainSongVotes());
+});
+
 // ── Fetch: cache-first for core, cache-on-use for corpus ────────
 
 self.addEventListener('fetch', (event) => {
@@ -990,7 +1125,8 @@ self.addEventListener('fetch', (event) => {
   // Recordings saved for offline on the web (cf1): the player points a saved
   // one at <scope>/offline-audio/<tag>/<file>.mp3 and this answers from
   // OFFLINE_AUDIO_CACHE, byte ranges included (Safari will not play media
-  // without 206s). Streaming never comes here: it stays on GitHub's own URL.
+  // without 206s). A saved one comes here whatever the signal (downloads brief
+  // 2026-10-23, item 2); one not saved streams from GitHub's own URL.
   const savedAudio = OFFLINE_AUDIO_PATH.exec(url.pathname);
   if (savedAudio) {
     event.respondWith(offlineAudioResponse(event.request, OFFLINE_AUDIO_RELEASES + savedAudio[1] + '/' + savedAudio[2]));
@@ -1003,6 +1139,11 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(semanticResponse(event.request, SEMANTIC_MANIFEST.test(url.pathname)));
     return;
   }
+
+  // What's new (up1): the list the deploy writes beside index.html after the release is built, so no build's
+  // precache or integrity map can name it. Straight to the network, never kept: an old copy would announce an
+  // older release. Offline the page says nothing.
+  if (url.pathname === SW_DIR + 'whats-new.json') return;
 
   // An older build's page asking for a screen bundle this build folded into bundle-d (lz1): reload it onto this build.
   if (url.pathname.startsWith(SW_DIR) && RETIRED_SCREEN_FILE.test(url.pathname.slice(SW_DIR.length))) {
@@ -1020,6 +1161,11 @@ self.addEventListener('fetch', (event) => {
   if (/^\/songs-\d+\//.test(url.pathname)) return;
   if (url.pathname === '/songs/catalog.json') {
     event.respondWith(networkFirstCatalog(event));
+    return;
+  }
+  // sy4-3: the song tallies beside it, network-first the same way (no cover warm-up: no song list in it).
+  if (url.pathname === '/songs/votes.json') {
+    event.respondWith(networkFirstCatalog(event, false));
     return;
   }
   if (url.pathname.startsWith('/songs/thumbs/') || url.pathname.startsWith('/songs/lyrics/')) {
@@ -1075,7 +1221,7 @@ async function coreFirst(request) {
     const want = key && ASSET_INTEGRITY[key];
     if (want && response.ok && !response.redirected) {
       if (!(await isThisBuilds(response, want))) {
-        askForUpdate();
+        askForUpdate(true);
         return new Response('Another build', { status: 503, statusText: 'Service Unavailable' });
       }
       try { await (await caches.open(CORE_CACHE)).put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
@@ -1150,13 +1296,13 @@ function markedCopy(cached) {
   }
 }
 
-async function networkFirstCatalog(event) {
+async function networkFirstCatalog(event, warm = true) {
   const request = event.request;
   const cache = await caches.open(SONGS_CACHE);
   const network = fetch(request).then(async (response) => {
     if (response && response.ok && !response.redirected) {
       try { await cache.put(request, response.clone()); } catch (_e) { /* quota: still serve */ }
-      if (typeof event.waitUntil === 'function') event.waitUntil(warmSongThumbs(response.clone()));
+      if (warm && typeof event.waitUntil === 'function') event.waitUntil(warmSongThumbs(response.clone()));
     }
     return response;
   }).catch(() => null);
@@ -1249,8 +1395,8 @@ async function corpusFirst(request) {
     if (response.ok && !response.redirected) {
       // W27: another build's bytes are never kept under this build's name (THIS BUILD'S BYTES above).
       if (want && !(await isThisBuilds(response, want))) {
+        if (TIMING_FILE.test(key)) { askForUpdate(true); return new Response('Another build\'s timings', { status: 503, statusText: 'Service Unavailable' }); }
         askForUpdate();
-        if (TIMING_FILE.test(key)) return new Response('Another build\'s timings', { status: 503, statusText: 'Service Unavailable' });
         return otherBuildCopy(response, key);
       }
       const cache = await caches.open(CORPUS_CACHE);

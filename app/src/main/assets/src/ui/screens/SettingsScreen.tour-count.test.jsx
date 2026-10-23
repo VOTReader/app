@@ -30,7 +30,7 @@ describe('SettingsScreen — the Help note counts the stops the tour actually ha
     renderSettings();
     // Neither the count nor the minutes: a number the page cannot read is a number it must not state.
     expect(note()).toContain('a few stops, a few minutes');
-    expect(note()).not.toMatch(/\b(five|six|seven|eight|nine|ten|eleven|twelve) stops\b/);
+    expect(note()).not.toMatch(/\b(five|six|seven|eight|nine|ten|eleven|twelve|thirteen) stops\b/);
     expect(note()).not.toMatch(/\b(two|three|four) minutes\b/);
   });
 });
