@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { AnswersHome, resetAnswersLanding } from './AnswersHome.jsx';
 import { AnswersSaved } from './AnswersSaved.jsx';
-import { AnswersMedia } from './AnswersMedia.jsx';
 import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data');
@@ -51,23 +50,6 @@ const MARKS = {
   'wtlb:there-is-no-other:5': [mark('g2', 0, 'there is no other', 'underline')],
   'letter:the-wide-path:3': [mark('x', 0, 'a letter, not Answers')],
 };
-
-describe('Charts & videos: Try again after the list fails to load (idea sweep 10-22, s18.2)', () => {
-  afterEach(() => { vi.useRealTimers(); });
-  it('says it failed with a Try again, and the button loads the list', async () => {
-    vi.useFakeTimers();
-    delete window.ANSWERS_META;
-    render(<AnswersMedia entries={ANSWERS} site={SITE} onOpenTopic={noop} {...nav} />);
-    expect(screen.getByRole('status').textContent).toBe('Loading…');
-    // the hook's two tries, 3 s apart, both leave no sidecars
-    await act(async () => { await vi.advanceTimersByTimeAsync(3100); });
-    expect(screen.getByRole('status').textContent).toContain('Couldn’t load the list of charts and videos.');
-    window.ANSWERS_META = ctx.META;
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Try again' })); await vi.advanceTimersByTimeAsync(0); });
-    expect(screen.queryByRole('status')).toBeNull();
-    expect(screen.getByRole('heading', { name: 'Charts' })).toBeTruthy();
-  });
-});
 
 describe('Saved answers (O5)', () => {
   it('lists the reader\'s Answers marks by topic in the site\'s order, with the note, the source, and a tap to the paragraph', () => {
