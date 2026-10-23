@@ -56,6 +56,7 @@ import { indexAssembler } from './index-transfer.js';
 import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords, titleShare, nearWords } from './titles.js';
 import { alignClasses, alignWeights, alignScore, alignMet } from './align.js';
 import { parseLexicon } from './lexicon.js';
+import { buildNoteDocs, notesSearcherAsync } from './notes-index.js';
 
 /**
  * The parse kinds a direct-nav card answers ALONE.
@@ -4219,6 +4220,40 @@ async function nearest(query, options) {
   return out;
 }
 
+/* STUDY NOTES, CHAPTER SUMMARIES AND HEADINGS (Corbin 2026-10-23, DECISIONS item 5): searched in an index of their own
+   (notes-index.js), so search() and its ranking are untouched; the screen lists them as one group after the collections.
+   Built on the first call from the corpora the main index loaded (ensureReady), again only when a corpus object is
+   replaced (another load), never cached. */
+/** @type {{ books: any, plain: any, mt: any, searcher: Promise<Awaited<ReturnType<typeof notesSearcherAsync>>>, size: number, buildMs: number } | null} */
+let NOTES = null;
+/**
+ * The study notes, chapter summaries and headings holding the typed words, best first, kept to the corpus and scope.
+ * @param {string} query
+ * @param {{useStopWords?: boolean, corpus?: string, scope?: {bookId?: string, volumeId?: string}|null, limit?: number, translation?: string}} [options]
+ * @returns {Promise<Array<{score: number, doc: any, terms: string[]}>>}
+ */
+async function searchNotes(query, options) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  await ensureReady(options);
+  const books = typeof BOOKS !== 'undefined' ? BOOKS : null;
+  const mt = typeof MATTHEW !== 'undefined' ? MATTHEW : null;
+  const plain = books ? books['matthew-plain'] : null;
+  if (!NOTES || NOTES.books !== books || NOTES.plain !== plain || NOTES.mt !== mt) {
+    const t0 = now();
+    const docs = buildNoteDocs();
+    const built = { books, plain, mt, size: docs.length, buildMs: -1, searcher: notesSearcherAsync(docs) };
+    built.searcher.then(() => { built.buildMs = Math.round(now() - t0); }, () => { if (NOTES === built) NOTES = null; });
+    NOTES = built;
+  }
+  return (await NOTES.searcher).search(q, options);
+}
+
+/** The notes index's size and build time (-1 while it builds), once asked for (benchmarks, the console). */
+function notesStats() {
+  return NOTES ? { docs: NOTES.size, buildMs: NOTES.buildMs } : null;
+}
+
 /**
  * Autocomplete suggestions (named passages + book names + commands).
  * @param {string} query
@@ -4323,6 +4358,9 @@ export const VotSearchMini = {
   rebuild,
   parse: readReference,
   search,
+  // study notes, chapter summaries and headings: their own index and their own group (notes-index.js)
+  searchNotes,
+  notesStats,
   nearest,
   knows,
   suggest,

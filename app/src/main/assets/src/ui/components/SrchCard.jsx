@@ -71,6 +71,8 @@ function cardHeads(doc) {
     headline = doc.title.slice(cut + 3);
     locLine = study + (num ? ' \u00b7 Chapter ' + num : '');
   }
+  // A study note leads with its verse and names the letter it quotes under it (notes-index.js keeps that in `heading`).
+  if (doc.kind === 'study-note' && doc.heading) locLine = doc.heading;
   return { named, headline, locLine };
 }
 

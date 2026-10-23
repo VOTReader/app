@@ -193,6 +193,19 @@ describe('SrchCard for a Bible study chapter', () => {
   });
 });
 
+/* Study notes join search as their own group (Corbin 2026-10-23): a note's card leads with its verse and names the
+   letter it quotes under it, badged as a study note. */
+describe('SrchCard for a Matthew Study Bible note', () => {
+  it('leads with the verse and names the letter the note quotes', () => {
+    /** @type {any} */ (globalThis).SRCH_KIND_LABEL = { 'study-note': { label: 'Study Note', cls: 'badge-note' } };
+    const e = { score: 1, doc: { kind: 'study-note', title: '', heading: 'Volume Two \u00b7 Concerning the Meek', ref: 'Matthew 5:3-12', text: 'The meek shall inherit.', bookId: 'matthew', chapterNum: 5, verseNum: 3, translation: 'nkjv' } };
+    const { container } = render(<SrchCard entry={e} terms={['meek']} onSelect={() => {}} isDirect={false} />);
+    expect(container.querySelector('.srch-card-ref').textContent).toBe('Matthew 5:3-12');
+    expect(container.querySelector('.srch-card-loc').textContent).toBe('Volume Two \u00b7 Concerning the Meek');
+    expect(container.querySelector('.srch-card-badge').textContent).toBe('Study Note');
+  });
+});
+
 /* search200 B6 (polish): a letter found by its title showed no mark anywhere when its body never says the words
    ("the watchman" opens The Watchman, whose text says "watchmen" or nothing). The headline marks them. */
 describe('SrchCard marks the typed words in a title headline (search200 B6)', () => {

@@ -101,7 +101,7 @@ describe("groupInSiteOrder (the website's collection order)", () => {
     expect(byOrder).toEqual([
       'bible', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6', 'v7',
       'rebuke', 'wtlb1', 'wtlb2', 'blessed', 'flock', 'timothy', 'holydays',
-      'matthew', 'matthew-study', 'bible-studies', 'answers', 'letters', 'other',
+      'matthew', 'matthew-study', 'bible-studies', 'answers', 'letters', 'notes', 'other',
     ]);
   });
 

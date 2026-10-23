@@ -554,6 +554,28 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
   // The search the list on screen came from (see `done` above): its groups' keys and their memory.
   const listMemo = state.memo || memo;
 
+  /* STUDY NOTES, CHAPTER SUMMARIES AND HEADINGS (Corbin 2026-10-23, DECISIONS item 5). The engine keeps them in an
+     index of their own (searchNotes, search/notes-index.js), asked once the list is on screen, so the ranked results
+     are the search's alone; the screen lists them as one group after every collection (renderNotes, below). Only a
+     search of words asks: a reference or a command has no words to find there. Keyed by the list's memo. */
+  const [notes, setNotes] = React.useState(/** @type {{ memo: string, items: any[] }} */ ({ memo: '', items: [] }));
+  React.useEffect(() => {
+    if (state.phase !== 'done' || !state.memo || state.error || !state.parsed || state.parsed.kind !== 'text') return undefined;
+    const E = pickEngine();
+    if (!E || typeof E.searchNotes !== 'function') return undefined;
+    let stale = false;
+    const forMemo = state.memo;
+    E.searchNotes(state.q, {
+      translation: settings.translation || 'nkjv',
+      useStopWords: settings.searchUseStopWords !== false,
+      corpus: settings.searchCorpus || 'all',
+      scope: searchScope || null,
+    }).then((items) => { if (!stale) setNotes({ memo: forMemo, items: Array.isArray(items) ? items : [] }); }).catch(() => {});
+    return () => { stale = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the list's memo names the query, tab, scope and settings it was searched with.
+  }, [state.memo, state.phase]);
+  const noteItems = notes.memo && notes.memo === state.memo && state.parsed && state.parsed.kind === 'text' ? notes.items : [];
+
   /* A NEW SEARCH LANDS AT THE TOP (search200 B2). Refining a query while scrolled down
      showed the new list from mid-list ("forgive one another" scrolled to 500, refined to
      "seventy times": the new list opened at 680). A list from a new search is a screen
@@ -692,6 +714,23 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           defaultOpen={bookOrder || groups.length === 1 || state.results.length <= 30}
         />
       ))}
+    </div>
+  );
+
+  /** The study notes, chapter summaries and headings: one group, after the collections (opened as a short list's are). */
+  const renderNotes = () => (
+    <div className="srch-groups srch-notes">
+      <SrchGroup
+        key={'notes|' + listMemo}
+        gkey="notes"
+        items={noteItems}
+        terms={state.terms}
+        stopTyped={state.stopTyped}
+        onSelect={handleSelect}
+        memo={listMemo}
+        view="relevance"
+        defaultOpen={state.results.length <= 30}
+      />
     </div>
   );
 
@@ -1295,6 +1334,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
           </>
         ) : listGroups.length > 0 && renderGroups(listGroups, bookOrder ? 'book' : 'relevance', true)}
 
+        {/* after the collections, never above one; under "No results" when no text holds the words (below) */}
+        {noteItems.length > 0 && state.results.length > 0 ? renderNotes() : null}
+
         {query && state.phase === 'done' && letterRefMissing && (
           <div className="srch-corrected">{letterRefMissing}</div>
         )}
@@ -1346,6 +1388,8 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             {state.stopWordsOnly ? null : pickRows}
           </>
         )}
+
+        {noteItems.length > 0 && state.results.length === 0 ? renderNotes() : null}
 
         {/* Nothing to search for: an emoji or punctuation alone left a blank screen. */}
         {query && query.trim() && !/[\p{L}\p{N}]/u.test(query) && (
