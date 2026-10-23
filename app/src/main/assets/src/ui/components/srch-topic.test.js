@@ -1,7 +1,7 @@
 /* The topic card's pick (search200 ideas F): a question, an Answers topic among the first results, the model sure of
    it; the texts it quotes that the search found too. */
 import { describe, it, expect } from 'vitest';
-import { questionShaped, topicCandidate, pickTopic, topicQuotes, topicTexts, TOPIC_MEANING_FLOOR, TOPIC_TEXTS } from './srch-topic.js';
+import { questionShaped, topicCandidate, pickTopic, topicQuotes, topicTexts, titleNames, TOPIC_MEANING_FLOOR, TOPIC_TITLED_FLOOR, TOPIC_TEXTS } from './srch-topic.js';
 
 const topicDoc = { kind: 'answers', title: 'Regarding Tithing', text: 'Introduction. Beloved, I delight in that which one gives to another in My name, and by the works of their own hands; this is the tithe in which I delight most. Will a man rob God? Yet you have robbed Me!' };
 const hit = (doc, meaning) => ({ score: 1, doc, ...(meaning === undefined ? {} : { meaning }) });
@@ -42,8 +42,39 @@ describe('topicCandidate and pickTopic', () => {
     const results = [hit(letter, 0.9), hit(topicDoc, TOPIC_MEANING_FLOOR)];
     expect(pickTopic('what does the lord say about tithing', results)).not.toBeNull();
     expect(pickTopic('tithing', results), 'not a question').toBeNull();
-    expect(pickTopic('what does the lord say about tithing', [hit(letter), hit(topicDoc, TOPIC_MEANING_FLOOR - 0.001)]), 'under the floor').toBeNull();
+    expect(pickTopic('what does the lord say about tithing', [hit(letter), hit(topicDoc, TOPIC_TITLED_FLOOR - 0.001)]), 'under the titled floor').toBeNull();
     expect(pickTopic('what does the lord say about tithing', [hit(letter), hit(topicDoc)]), 'the model did not rank it').toBeNull();
+  });
+});
+
+/* The topic its own title names (search200 ideas F, the hub's death question): "what happens when we die?" ranks
+   Regarding the First Death surest at 0.72-0.74, under the plain floor, where right and wrong picks mix. A question
+   whose words the topic's title holds ("die" and Death, "tithe" and Tithing) is sure at a lower floor. Cosines are
+   the open cases' and the walk's (tools/search-bench/topic-floor.mjs). */
+describe('a topic its title names', () => {
+  const answers = (title, meaning) => hit({ kind: 'answers', title, text: 'x' }, meaning);
+  const verses = Array.from({ length: 14 }, (_, i) => hit({ kind: 'verse', ref: 'Ecclesiastes 3:' + (i + 1), text: 'what happens' }, 0.6));
+  it('the title holds a word of the question, or its family (die, death, dead)', () => {
+    expect(titleNames('what happens when we die?', 'Regarding the First Death')).toBe(true);
+    expect(titleNames('is it wrong not to tithe', 'Regarding Tithing')).toBe(true);
+    expect(titleNames('will christians be raptured', 'Regarding the Gathering Up (Rapture)')).toBe(true);
+    expect(titleNames('did judas go to hell', 'Regarding Judas Iscariot')).toBe(true);
+    expect(titleNames('how do we reach sinners with the good news', 'Regarding Sin'), 'a sinner is not sin').toBe(false);
+    expect(titleNames('is being gay a sin', 'Regarding Unforgiveness')).toBe(false);
+    expect(titleNames('what does the lord say about it', 'Thus Says The Lord Regarding Abortion'), 'the title\'s frame words').toBe(false);
+  });
+  it('shows the death question its topic, under the plain floor', () => {
+    const death = answers('Regarding the First Death', 0.7229);
+    const results = [...verses, answers('Regarding Worldly Suffering', 0.7076), death];
+    expect(pickTopic('what happens when we die?', results)?.entry).toBe(death);
+    expect(pickTopic('what happens when we die', [...verses, answers('Regarding the First Death', 0.7379)])).not.toBeNull();
+  });
+  it('stays hidden when unsure: no title word under the plain floor, or a title word under the titled floor', () => {
+    expect(pickTopic('is being gay a sin', [answers('Regarding Unforgiveness', 0.7603)])).toBeNull();
+    expect(pickTopic('how do we reach sinners with the good news if we are supposed to stay separate', [answers('Regarding Sin', 0.7461)])).toBeNull();
+    expect(pickTopic('whose garments do you wear', [answers('Regarding the Wearing of Jewelry', 0.7008)])).toBeNull();
+    expect(pickTopic('what happens when we die?', [answers('Regarding the First Death', TOPIC_TITLED_FLOOR - 0.001)])).toBeNull();
+    expect(pickTopic('where do we go when we die?', [answers('Thus Says The Lord Regarding Abortion', 0.7114)])).toBeNull();
   });
 });
 

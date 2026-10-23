@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act, cleanup } from '@testing-library/react';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 import { SearchScreen } from './SearchScreen.jsx';
-import { TOPIC_MEANING_FLOOR } from '../components/srch-topic.js';
+import { TOPIC_MEANING_FLOOR, TOPIC_TITLED_FLOOR } from '../components/srch-topic.js';
 import { NEAREST_MEANING_FLOOR } from '../components/srch-empty.js';
 import { srchSortCanonical, SRCH_CANONICAL_BOOK_INDEX } from '../../utils/search.js';
 
@@ -104,7 +104,7 @@ describe('F: the topic card a question gets', () => {
     const death = { kind: 'answers', title: 'Regarding the First Death', ref: 'Answers Only God Can Give', volumeId: 'answers', g: 'answers',
       text: 'Many have asked what happens when we die. For what happens to the sons of men also happens to animals 0; one thing befalls them.' };
     const churches = { kind: 'answers', title: 'Regarding the Churches of Men', ref: 'Answers Only God Can Give', volumeId: 'answers', g: 'answers', text: 'Woe to the churches.' };
-    const results = [...verses, { score: 1, meaning: TOPIC_MEANING_FLOOR - 0.05, doc: churches }, { score: 0.5, meaning: TOPIC_MEANING_FLOOR + 0.06, doc: death }];
+    const results = [...verses, { score: 1, meaning: 0.7076, doc: churches }, { score: 0.5, meaning: 0.7229, doc: death }];
     /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'text' }, parsedTerms: ['happens', 'die'], results }));
     await typeAndWait(baseProps(), 'what happens when we die?');
     const card = document.querySelector('.srch-topic');
@@ -113,7 +113,7 @@ describe('F: the topic card a question gets', () => {
   });
 
   it('shows nothing for a topic the model is not sure of, or ranked no cosine', async () => {
-    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'text' }, parsedTerms: ['tithing'], results: tithing(TOPIC_MEANING_FLOOR - 0.01) }));
+    /** @type {any} */ (window).VotSearchMini.search = vi.fn(() => Promise.resolve({ parsed: { kind: 'text' }, parsedTerms: ['tithing'], results: tithing(TOPIC_TITLED_FLOOR - 0.01) }));
     const r = await typeAndWait(baseProps(), 'what does the lord say about tithing');
     expect(document.querySelector('.srch-topic')).toBeNull();
     r.unmount();

@@ -43,9 +43,48 @@ export function questionShaped(query) {
    open cases, 43 had an Answers topic the model ranked: every one at 0.770 or more was right (12), the nearest wrong
    one sat at 0.7655 ("how can anyone know god without first acknowledging him": a topic on capital punishment), and
    the floor keeps 0.01 clear of it: 8 shown, 8 right. Under it the right and wrong picks mix (0.72: 17 right, 9
-   wrong), so the hub walk's "what happens when we die?", whose surest topic is Regarding the First Death at 0.72-0.74,
-   gets no card yet. */
+   wrong), so a topic under it needs its title too (TOPIC_TITLED_FLOOR). */
 export const TOPIC_MEANING_FLOOR = 0.775;
+/* A TOPIC ITS OWN TITLE NAMES (the hub's death question, 2026-10-22). "what happens when we die?" ranks Regarding the
+   First Death surest at 0.72-0.74, where the plain floor shows nothing. A question whose words the topic's title holds
+   ("die" and Death, "tithe" and Tithing, "raptured" and Rapture) is sure lower: on the same open cases, of the topics
+   at 0.70 or more whose title names a word of the question, every one was right (doubt, resurrections, tithing,
+   Judas, rapture, science, heaven: 15 shown, 15 right, 0 wrong, from 8). The one wrong with a title word, "whose garments do you wear" (Wearing of Jewelry),
+   sat at 0.7008; this floor keeps 0.009 clear of it. */
+export const TOPIC_TITLED_FLOOR = 0.71;
+/* The words a topic's title frames itself with ("Thus Says The Lord Regarding ...", "God Speaks About ..."): no
+   question names a topic by these. */
+const TITLE_FRAME = new Set(['regarding', 'thus', 'says', 'say', 'the', 'lord', 'god', 'speaks', 'speak', 'about', 'and',
+  'who', 'those', 'there', 'other', 'you', 'out', 'are', 'our', 'his', 'its', 'for', 'from', 'with', 'what', 'not', 'no']);
+/* The families whose forms differ before their ending, which a shared start cannot see: a question asks with the verb
+   ("when we die"), a topic's title names the noun ("the First Death"). */
+const FAMILIES = [['die', 'died', 'dies', 'dying', 'dead', 'death', 'deaths']];
+const FAMILY_OF = new Map();
+FAMILIES.forEach((f, i) => { for (const w of f) FAMILY_OF.set(w, i); });
+/** Words of a string, lowercase, letters and digits only. */
+const wordsOf = (/** @type {string} */ s) => String(s || '').toLowerCase().replace(/[‘’']/g, '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+/** Two words are one family: the same, a FAMILIES pair, or a start of four letters or more in common (tithe, tithing). */
+function kin(/** @type {string} */ a, /** @type {string} */ b) {
+  if (a === b) return true;
+  const fa = FAMILY_OF.get(a);
+  if (fa !== undefined && fa === FAMILY_OF.get(b)) return true;
+  let n = 0;
+  while (n < a.length && n < b.length && a[n] === b[n]) n++;
+  return n >= 4;
+}
+
+/**
+ * Whether a topic's title names a word of the question (or its family), its frame words aside. Pure.
+ * @param {string} query
+ * @param {string} title
+ * @returns {boolean}
+ */
+export function titleNames(query, title) {
+  const named = wordsOf(title).filter((w) => w.length >= 3 && !TITLE_FRAME.has(w));
+  if (!named.length) return false;
+  const asked = wordsOf(query).filter((w) => w.length >= 3);
+  return asked.some((q) => named.some((t) => kin(q, t)));
+}
 /** How many texts the card quotes, at most. */
 export const TOPIC_TEXTS = 3;
 /** How far down the results a text the topic quotes is looked for. */
@@ -71,7 +110,7 @@ export function topicCandidate(results) {
 
 /**
  * The topic the card names, or null: a question, an Answers topic among the results, and the model sure of it
- * (its cosine at TOPIC_MEANING_FLOOR or more). Pure.
+ * (its cosine at TOPIC_MEANING_FLOOR or more, or at TOPIC_TITLED_FLOOR when its title names a word of the question). Pure.
  * @param {string} query
  * @param {Array<{doc:any, meaning?:number}>} results
  * @returns {{ entry: any, rank: number, meaning: number } | null}
@@ -80,7 +119,8 @@ export function pickTopic(query, results) {
   if (!questionShaped(query)) return null;
   const c = topicCandidate(results);
   if (!c) return null;
-  return c.meaning >= TOPIC_MEANING_FLOOR ? c : null;
+  if (c.meaning >= TOPIC_MEANING_FLOOR) return c;
+  return c.meaning >= TOPIC_TITLED_FLOOR && titleNames(query, c.entry.doc.title || '') ? c : null;
 }
 
 /** Lowercase words, accents and punctuation off, in one string with a space either side. */
