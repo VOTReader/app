@@ -50,6 +50,7 @@ import {
 import { refOfVerse } from '../../utils/scripture-web/pick.js';
 import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citations.js';
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
+import { scrollBehavior } from '../../utils/reduced-motion.js';
 
 /** Citations shown before "Show n more". */
 export const CITED_SHOWN = 2;
@@ -153,10 +154,21 @@ function Section({ title, collapsible = false, startOpen = true, children, class
   const [open, setOpen] = React.useState(startOpen);
   const shown = !collapsible || open;
   const name = typeof title === 'string' ? title : undefined;
+  // A section opened at the panel's foot shows its rows (Corbin, 2026-10-22: "More from Nehemiah
+  // 1:5 · 8 connections" opened with its rows under the edge, so the toggle seemed to do nothing).
+  // `nearest` leaves a section already in view alone, shows a short one whole and brings a tall
+  // one's head to the top, in the panel's own layout, so a turned phone (.sw-rotated) is right too.
+  const ref = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const opened = React.useRef(false);
+  React.useEffect(() => {
+    if (!opened.current || !open || !ref.current || typeof ref.current.scrollIntoView !== 'function') return;
+    opened.current = false;
+    ref.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() });
+  }, [open]);
   return (
-    <section className={'sw-sec ' + className}>
+    <section className={'sw-sec ' + className} ref={ref}>
       {collapsible ? (
-        <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} aria-label={name} onClick={() => setOpen(!open)}>
+        <button type="button" className="sw-sec-head sw-sec-toggle" aria-expanded={open} aria-label={name} onClick={() => { opened.current = !open; setOpen(!open); }}>
           <span className="sw-sec-title">{metaItems(title)}</span><Chevron open={open} />
         </button>
       ) : <h3 className="sw-sec-head" aria-label={name}><span className="sw-sec-title">{metaItems(title)}</span></h3>}

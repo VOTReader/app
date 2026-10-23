@@ -256,6 +256,25 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(more[1].querySelectorAll('.sw-group').length).toBeGreaterThan(0);
   });
 
+  // Corbin, 2026-10-22: "More from Nehemiah 1:5 · 8 connections" opened with its rows under the
+  // panel's edge, so the toggle seemed to do nothing.
+  it('a section opened by its toggle brings itself into view; mounting open or closing does not', () => {
+    const seen = [];
+    const was = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (o) { seen.push([this.className, o && o.block]); };
+    try {
+      const { panel } = mount({ detail: detail() });
+      expect(seen, 'the first end opens on its own, unscrolled').toEqual([]);
+      const more = [...panel.querySelectorAll('.sw-sec-more')];
+      fireEvent.click(more[1].querySelector('.sw-sec-toggle'));
+      expect(seen).toEqual([['sw-sec sw-sec-more', 'nearest']]);
+      fireEvent.click(more[1].querySelector('.sw-sec-toggle'));
+      expect(seen, 'closing moves nothing').toHaveLength(1);
+    } finally {
+      Element.prototype.scrollIntoView = was;
+    }
+  });
+
   it('a row under the pointer lights its thread, and lets go when the pointer leaves', () => {
     const { panel, props } = mount({ detail: detail() });
     const row = panel.querySelector('.sw-sec-more .sw-row');
