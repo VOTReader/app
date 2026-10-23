@@ -207,8 +207,25 @@ describe('GardenView — accessible names (Wave 0)', () => {
   it('the jump-to-page number input is labeled', () => {
     setupGardenGlobals(mkPos());
     renderGarden({ page: 5 });
-    fireEvent.click(screen.getByRole('button', { name: '5 / 209' }));
+    fireEvent.click(screen.getByRole('button', { name: '5 / 209: jump to a page' }));
     expect(screen.getByRole('spinbutton', { name: 'Jump to page' })).toBeTruthy();
+  });
+
+  // ideas audit A10.2: the counter is a pill that says it jumps, and the field has its Go
+  it('the page pill opens the jump; Go jumps, and a tap on Go is not a walk away', () => {
+    setupGardenGlobals(mkPos());
+    const onPageChange = vi.fn();
+    renderGarden({ page: 5, onPageChange });
+    const pill = screen.getByRole('button', { name: /^5 \/ 209/ });
+    expect(pill.querySelector('.garden-page-chevron')).toBeTruthy();
+    fireEvent.click(pill);
+    const field = screen.getByRole('spinbutton', { name: 'Jump to page' });
+    fireEvent.change(field, { target: { value: '120' } });
+    const go = screen.getByRole('button', { name: 'Go' });
+    fireEvent.blur(field, { relatedTarget: go });
+    fireEvent.click(go);
+    expect(onPageChange).toHaveBeenCalledWith(120);
+    expect(screen.queryByRole('spinbutton', { name: 'Jump to page' })).toBeNull();
   });
 });
 

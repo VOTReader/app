@@ -3823,7 +3823,11 @@
     .garden-top-bar { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; gap:1rem; padding:max(1.2rem, var(--inset-top, 0px)) 1rem 1.2rem; background:linear-gradient(to bottom,rgba(0,0,0,0.5),transparent); }
     .garden-back-btn { background:none; border:none; color:rgba(255,255,255,0.85); width:2rem; height:2rem; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
     .garden-back-btn svg { width:1.4rem; height:1.4rem; }
-    .garden-page-counter { background:none; border:none; font-family:var(--font-cinzel); font-size:var(--fs-13); color:rgba(255,255,255,0.7); letter-spacing:0.05em; cursor:pointer; padding:0.2rem 0.5rem; }
+    .garden-page-counter { display:inline-flex; align-items:center; gap:0.35rem; min-height:44px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); border-radius:999px; font-family:var(--font-cinzel); font-size:var(--fs-13); color:rgba(255,255,255,0.85); letter-spacing:0.05em; cursor:pointer; padding:0 0.9rem; }
+    .garden-page-counter:hover { background:rgba(255,255,255,0.16); }
+    .garden-page-counter:focus-visible, .garden-jump-go:focus-visible { outline:2px solid var(--white); outline-offset:2px; }
+    .garden-page-chevron { flex:none; opacity:0.75; }
+    .garden-jump-go { min-height:44px; min-width:44px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:999px; color:var(--white); font-family:var(--font-cinzel); font-size:var(--fs-13); letter-spacing:0.05em; cursor:pointer; padding:0 0.8rem; }
     .garden-jump-form { display:flex; align-items:center; gap:0.3rem; }
     .garden-jump-input { width:3rem; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:4px; color:var(--white); font-family:var(--font-cinzel); font-size:var(--fs-13); text-align:center; padding:0.2rem 0.3rem; outline:none; -moz-appearance:textfield; }
     .garden-jump-input::-webkit-inner-spin-button, .garden-jump-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }

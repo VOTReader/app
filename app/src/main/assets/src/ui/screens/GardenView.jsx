@@ -432,15 +432,26 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
               className="garden-jump-input"
               value={jumpInput}
               onChange={(e) => setJumpInput(e.target.value)}
-              onBlur={() => {setJumpMode(false);setJumpInput("");}}
+              onKeyDown={(e) => {if (e.key === "Escape") {e.stopPropagation();setJumpMode(false);setJumpInput("");}}}
+              onBlur={(e) => {
+                // a tap on Go moves focus inside the form: that is the jump, not a walk away
+                if (e.currentTarget.form && e.currentTarget.form.contains(/** @type {Node} */ (e.relatedTarget))) return;
+                setJumpMode(false);setJumpInput("");
+              }}
               placeholder={`1–${GARDEN_TOTAL}`}
               aria-label="Jump to page"
             />
             <span className="garden-jump-hint">/ {GARDEN_TOTAL}</span>
+            <button type="submit" className="garden-jump-go">Go</button>
           </form>
         ) : (
-          <button className="garden-page-counter" onClick={() => setJumpMode(true)}>
+          // a pill with a chevron, so the counter reads as the way to another page (ideas audit A10.2)
+          <button className="garden-page-counter" onClick={() => setJumpMode(true)}
+            aria-label={`${page} / ${GARDEN_TOTAL}: jump to a page`}>
             {page} / {GARDEN_TOTAL}
+            <svg className="garden-page-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
           </button>
         )}
       </div>
