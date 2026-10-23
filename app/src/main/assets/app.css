@@ -2139,6 +2139,10 @@
         vertical-align: super; margin-right: 0.15em; letter-spacing: 0.05em;
         line-height: 1;
       }
+      /* rs1: the number ends in a space ("16 ") that must not collapse at the
+         end of its gutter box, or Chrome reads "16For" as one word and a
+         long-press on a verse's first word takes its number too (S22). */
+      .verse-num { white-space: pre; }
     
       /* ── STUDY MODE PANELS ── */
       .study-panels {
@@ -7715,10 +7719,31 @@
        pickers, tests) ignore user-select entirely. */
     button, .top-nav, .sheet-handle-row, .fn-sheet-num-row, .sc-sheet-tag,
     .settings-section-label, .bottom-nav-card, .mode-toggle-wrap,
-    .back-hint-row, .mini-title, .tabs-overview-header, .tabs-overview-meta {
+    .back-hint-row, .mini-title, .tabs-overview-header, .tabs-overview-meta,
+    .audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .chapter-nav-sticky, .vot-toast, .scroll-notch-marker,
+    .ornament-divider, .install-card-sentinel {
       user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
     }
     input, textarea { user-select: text; -webkit-user-select: text; }
+    /* (5) rs1: while a selection's end is being dragged (selection-drag.js sets
+       body.sel-dragging), the chrome over and around the reading column takes
+       no touches, so the browser puts the end on the words under the finger,
+       even under the mini player. Over the player it took the page's last text
+       in DOCUMENT order instead: the rest of the chapter, the swipe previews
+       and the player, selected at once (S22, 2026-10-22). The selection toolbar
+       steps aside too. */
+    body.sel-dragging .top-nav, body.sel-dragging .audio-bar, body.sel-dragging .audio-bar-pull,
+    body.sel-dragging .ascroll-pill, body.sel-dragging .find-pill, body.sel-dragging .mode-toggle-wrap,
+    body.sel-dragging .chapter-nav-sticky, body.sel-dragging .ann-hint-pill, body.sel-dragging .mini-title,
+    body.sel-dragging .back-hint-row, body.sel-dragging .vot-toast, body.sel-dragging .sel-toolbar {
+      pointer-events: none;
+    }
+    /* ...and only the reading column takes a selection's end: dragged past a
+       chapter's last line, the end went to an empty marker after the column,
+       off the screen, and the browser then sent no menu at the lift. A child's
+       own none (buttons, the "Back to" row) still holds inside the column. */
+    body.sel-dragging { user-select: none; -webkit-user-select: none; }
+    body.sel-dragging .screen-scroll { user-select: text; -webkit-user-select: text; }
 
     /* ═══════════════════════════════════════════════════════════════════
        THE SCRIPTURE WEB (bundle-f)

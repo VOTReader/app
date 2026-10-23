@@ -10,8 +10,11 @@ import { answersIsTopicKey, answersCardFor, answersCardWords } from '../../utils
 import { answersIndexOf } from '../../utils/answers-search.js';
 import { withPassageLink } from '../../utils/passage-link.js';
 import { _bookmarkSourceLabel } from '../../utils/bookmark-source.js';
-import { passageCopy, passageLabel, translationTag, readingBlocksIn, quotedPassage } from '../../utils/passage-copy.js';
+import { passageCopy, passageLabel, translationTag, quotedPassage } from '../../utils/passage-copy.js';
+import { readingBlocksIn, readingRange } from '../../utils/reading-range.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
+// A dragged selection stays in the reading column and scrolls it gently at the edges (rs1); the bottom dock's top.
+import { startSelectionDrag, selectionDragging, dockTop } from './selection-drag.js';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
 
@@ -145,30 +148,26 @@ function findScrollParent(node) {
       4. Viewport-spanning selection (nothing fits anywhere): clamp under the
          nav as before — the selection's end handle in the lower half of the
          screen stays reachable.
+    rs1 (2026-10-22): BELOW comes before any scroll, and the gaps are what the
+    handles need. Android's handles hang below their lines, so above the first
+    line a little air will do; below, the toolbar clears the end handle under
+    the last line by one line. With the old two-line gaps the toolbar (about
+    300 px with its Listen and Scripture Web rows) fit on neither side of a
+    long-press in the middle of an S22's screen, and the assist moved the page
+    69 to 149 px under every such press.
     @param {{ selTop: number, selBottom: number, toolbarH: number,
               navBottom: number, viewportH: number, lineH: number,
               maxScrollUp: number }} a
     @returns {{ y: number, scrollUp: number }} */
-/** The top edge of the bottom dock (zones, 2026-10-05): the highest visible floating bottom control - the mini
-    player and its pull tab, the auto-scroll and find pills, the Study Notes toggle - or the viewport's bottom when none
-    shows. The toolbar measures its "below the selection" room against this, so it never lands on the player or a pill
-    (it sits above them in z, so it covered their buttons).
-    @param {Document} [doc] @param {number} [vh] @returns {number} */
-export function dockTop(doc = document, vh = window.innerHeight) {
-  let top = vh;
-  for (const el of doc.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .mode-toggle-wrap')) {
-    const r = el.getBoundingClientRect();
-    if (r.width && r.height && r.top < top && getComputedStyle(el).display !== 'none') top = r.top;
-  }
-  return top;
-}
-
 export function computeToolbarPlacement({ selTop, selBottom, toolbarH, navBottom, viewportH, lineH, maxScrollUp }) {
   const margin = 8;
-  const gap = Math.min(Math.max(2 * lineH, 40), 120); // "two lines", sane-bounded
+  const gapAbove = Math.min(Math.max(lineH / 2, 12), 40);
+  const gapBelow = Math.min(Math.max(lineH, 32), 80);
   const minY = navBottom + margin + toolbarH; // lowest y whose toolbar TOP still clears the nav
-  const above = selTop - gap;
+  const above = selTop - gapAbove;
   if (above >= minY) return { y: above, scrollUp: 0 };
+  const below = selBottom + gapBelow + toolbarH;
+  if (below <= viewportH - margin) return { y: below, scrollUp: 0 };
   const deficit = minY - above;
   // ASSIST-SCROLL GUARD (2026-07-29). The assist exists for a selection sitting
   // JUST under the nav: scroll up a little, and the toolbar fits above it. It
@@ -177,41 +176,11 @@ export function computeToolbarPlacement({ selTop, selBottom, toolbarH, navBottom
   // Measured before this guard: extending a selection down past the viewport
   // (now easy, with real scrolling + edge auto-scroll) left selTop ~-1900, so
   // the release yanked the reader back ~2000px. The selection must also still
-  // be the thing on screen: cap the assist at one toolbar-plus-gap of travel.
-  const assistable = selTop >= navBottom && deficit <= toolbarH + gap;
+  // be the thing on screen: cap the assist at one toolbar-plus-gap of travel,
+  // and (rs1) never push its end, where the finger let go, off the screen.
+  const assistable = selTop >= navBottom && deficit <= toolbarH + gapAbove && selBottom + deficit <= viewportH - margin;
   if (assistable && deficit <= maxScrollUp) return { y: minY, scrollUp: deficit };
-  const below = selBottom + gap + toolbarH;
-  if (below <= viewportH - margin) return { y: below, scrollUp: 0 };
   return { y: minY, scrollUp: 0 };
-}
-
-/** Which way (if any) the reading container should auto-scroll while a native
-    selection handle is dragged. The dragged (focus) edge sitting inside the
-    `band` at either end of the scroller's box means the user is reaching past
-    the viewport, so the container steps toward that edge — the standard
-    e-reader gesture, and the replacement for the retired ▲/▼ nudge buttons.
-
-    Extracted as a pure helper (same discipline as computeToolbarPlacement) so
-    the decision is pinned by test without jsdom layout: jsdom does no layout,
-    so an effect that reads live rects can't be exercised faithfully.
-
-    @param {{ focusTop: number, focusBottom: number, boxTop: number,
-              boxBottom: number, band: number }} a
-    @returns {-1|0|1} -1 = scroll up, 1 = scroll down, 0 = leave it alone */
-export function computeEdgeAutoScroll({ focusTop, focusBottom, boxTop, boxBottom, band }) {
-  if (!(boxBottom > boxTop)) return 0;              // degenerate box — never scroll
-  // A band taller than half the box would arm both ends at once; clamp so the
-  // middle of a short container is always a no-scroll zone.
-  const b = Math.max(0, Math.min(band, (boxBottom - boxTop) / 2));
-  // A moving edge far OUTSIDE the box is not under a finger: it is a
-  // selection the reader scrolled away from (the toolbar stays up and follows
-  // it), and the first stray selectionchange would otherwise wind the page all
-  // the way back to it (cp1 sweep). A band's reach past the box still arms:
-  // the finger can rest just past the scroller, over the bar below it.
-  if (focusBottom < boxTop - b || focusTop > boxBottom + b) return 0;
-  if (focusTop < boxTop + b) return -1;
-  if (focusBottom > boxBottom - b) return 1;
-  return 0;
 }
 
 /** Two ranges over the same boundary points.
@@ -554,74 +523,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     };
   }, [visible, selInfo, placeFromSelection, findHlContainer]);
 
-  // EDGE AUTO-SCROLL while a native selection handle is being dragged. The
-  // handle drag fires `selectionchange` continuously, so no touch tracking is
-  // needed: whenever the selection's moving edge sits inside the edge band we
-  // step the container toward it on an interval. The band is RE-PROBED ON
-  // EVERY TICK, not only on selectionchange — after the handle is released
-  // inside the band no further events arrive (Android swallows the
-  // post-selection pointerup/touchend, and scrolling alone doesn't change the
-  // selection), so an event-only stop would run away to the container end.
-  // Per-tick probing stops the moment the edge leaves the band (a released
-  // edge glides at most BAND px before scrolling out of it), the selection
-  // collapses, or the toolbar hides, and re-reads direction each step so a
-  // focus jump straight from one band to the other can't keep a stale
-  // direction. Step size is small (one line-ish) so the text glides.
-  React.useEffect(() => {
-    if (!visible) return undefined;
-    const BAND = 90;      // px from the scroller's edge that arms auto-scroll
-    const STEP = 24;      // px per tick
-    const TICK = 16;      // ms
-    let timer = null;
-    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
-
-    // Where does the selection's MOVING edge sit? { dir, scroller } while the
-    // edge is inside a band, null when auto-scroll should not run.
-    const probe = () => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
-      let scroller = null;
-      let focusRect = null;
-      try {
-        const range = sel.getRangeAt(0);
-        scroller = findScrollParent(findHlContainer(range.startContainer) || range.startContainer);
-        // The MOVING edge is the focus node — collapse a clone onto it so the
-        // band test tracks the handle the user is actually dragging, not the
-        // whole (possibly viewport-spanning) selection.
-        const pr = document.createRange();
-        pr.setStart(sel.focusNode, sel.focusOffset);
-        pr.setEnd(sel.focusNode, sel.focusOffset);
-        const rects = pr.getClientRects();
-        focusRect = (rects && rects.length) ? rects[0] : range.getBoundingClientRect();
-      } catch (_e) { return null; }
-      if (!scroller || !focusRect) return null;
-      const box = scroller.getBoundingClientRect();
-      const dir = computeEdgeAutoScroll({
-        focusTop: focusRect.top,
-        focusBottom: focusRect.bottom,
-        boxTop: box.top,
-        boxBottom: box.bottom,
-        band: BAND,
-      });
-      return dir === 0 ? null : { dir, scroller };
-    };
-
-    const tick = () => {
-      const hit = probe();
-      if (!hit) { stop(); return; }
-      const before = hit.scroller.scrollTop;
-      hit.scroller.scrollTop += hit.dir * STEP;   // assignment clamps at both ends
-      if (hit.scroller.scrollTop === before) stop();  // hit an end — nothing more to give
-    };
-
-    const evaluate = () => {
-      if (!probe()) { stop(); return; }
-      if (!timer) timer = setInterval(tick, TICK);
-    };
-
-    document.addEventListener('selectionchange', evaluate);
-    return () => { stop(); document.removeEventListener('selectionchange', evaluate); };
-  }, [visible, findHlContainer]);
+  // EDGE AUTO-SCROLL and the drag guard (rs1, 2026-10-22): selection-drag.js keeps a dragged end in the
+  // reading column and scrolls the column gently while an end is held at its edge. It replaces an effect
+  // that stepped 24 px every 16 ms (1500 px/s), ran only while the toolbar was up, and measured an end with no
+  // box of its own (one the browser had put on a hidden toast past the app) by the whole selection's box, so
+  // that escape read as "at the top" and wound the page up. Started once: the toolbar is always mounted.
+  React.useEffect(() => startSelectionDrag(), []);
 
   React.useEffect(() => {
     // Compute and show the toolbar from the current selection
@@ -632,7 +539,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         setVisible(false);
         return;
       }
-      const range = sel.getRangeAt(0);
+      const live = sel.getRangeAt(0);
+      // rs1: every action reads the reading text the selection covers (utils/reading-range.js). An end on a verse
+      // number or in the space between two verses belongs to the verse beside it, and a number alone is its verse,
+      // so taking in a number never reshapes the toolbar (it lost Listen from here and Repeat, Corbin 2026-10-22).
+      const covered = readingRange(live);
+      const range = covered ? covered.range : live;
       // Strip .fn-ref bubbles, .hl-note-icon elements, and .verse-num labels from
       // the selection text so footnote numbers, note icons, and verse numbers
       // don't bleed into notes/search/bookmarks. The verse number also lives
@@ -712,7 +624,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // LISTEN FROM HERE (item 7): where the voice would start for this
       // selection, or null when the text under it has no recording (the pane
       // on screen decides; see utils/listen-from.js).
-      const listen = listenFromTarget(sel);
+      const listen = listenFromTarget(range);
       if (isMultiVerse) {
         // Cross-container selection: every reading block the range reaches.
         // readingBlocksIn, not every [data-hl-key] it intersects: a select-all
@@ -720,7 +632,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         // next chapters, pager-peek), and a highlight made then was saved on
         // both neighbours' verses too (measured on John 7: 53 live marks and
         // 130 in the peeks). Note icons carry their block's key as well.
-        const allHlContainers = readingBlocksIn(range);
+        const allHlContainers = covered ? covered.blocks : readingBlocksIn(range);
         if (allHlContainers.length === 0) { setVisible(false); return; }
         // REPEAT THIS PASSAGE (rp1 part 3): the blocks the pane can loop, taken with Listen's target.
         const repeat = listen ? repeatTarget(allHlContainers.map((c) => c.getAttribute('data-hl-key') || '')) : null;
@@ -746,7 +658,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         const repeat = listen ? repeatTarget([hlKey]) : null;
         setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: existing || null, multiVerse: false, listen, repeat });
       }
-      const rect = range.getBoundingClientRect();
+      const rect = live.getBoundingClientRect();
       const toolbarW = 320;
       let x = rect.left + rect.width / 2 - toolbarW / 2;
       x = Math.max(8, Math.min(x, window.innerWidth - toolbarW - 8));
@@ -757,7 +669,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       // BOTTOM just under the selection, i.e. its body on top of the text.
       const y = rect.top - 10;
       setPos({ x, y });
-      shownRangeRef.current = range.cloneRange();
+      shownRangeRef.current = live.cloneRange();
       setAdjusting(false);
       setVisible(true);
       // hint1 (lw1): the reader has long-pressed, so the first-run "Hold your
@@ -823,10 +735,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         if (moved) setAdjusting(true);
         if (!moved && dragRef.current) return;
         if (selChangeTimerRef.current) clearTimeout(selChangeTimerRef.current);
-        selChangeTimerRef.current = setTimeout(function() {
+        // rs1: a handle still held (selection-drag.js) waits for the lift, whose contextmenu raises the toolbar,
+        // as Android's own menu does. Raised mid-drag, its placement scrolled the page under the finger.
+        const raise = () => {
+          if (selectionDragging()) { selChangeTimerRef.current = setTimeout(raise, SETTLE_MS); return; }
           selChangeTimerRef.current = null;
           computeAndShow();
-        }, SETTLE_MS);
+        };
+        selChangeTimerRef.current = setTimeout(raise, SETTLE_MS);
       }
     };
 
@@ -936,12 +852,12 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     const onContextMenu = (e) => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
-      // Check both endpoints: a selection that starts/ends on a verse-number
-      // span (outside any [data-hl-key]) but reaches into reading text still
-      // has one endpoint in annotatable content — suppress the native menu.
-      const r = sel.getRangeAt(0);
-      if (!findHlContainer(r.startContainer) && !findHlContainer(r.endContainer)) return;
+      // Any reading text in it raises the toolbar, whichever ends sit on verse
+      // numbers (rs1: one end in a block was asked, so both ends on numbers,
+      // or a long-press on a number alone, raised the browser's own menu).
+      if (!readingRange(sel.getRangeAt(0))) return;
       e.preventDefault();
+      if (selChangeTimerRef.current) { clearTimeout(selChangeTimerRef.current); selChangeTimerRef.current = null; }
       computeAndShow();
     };
     // Android single-tap bridge (see onSingleTapUp in MainActivity.kt). Coords

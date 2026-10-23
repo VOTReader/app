@@ -10,7 +10,16 @@
    textContent — the domain the timing rows and the paint both use — so the
    voice begins at the clause the reader chose. Nothing here knows about
    audio; the pane decides.
+
+   rs1 (2026-10-22): the selection is read as the reading text it covers
+   (utils/reading-range.js). A start on a verse number is the start of its
+   verse (the number sits beside the verse's block, so a selection begun on
+   it offered no Listen from here, and no Repeat with it), and a start on
+   words with no voice (a heading, a block the pane does not own) listens from
+   the first block the selection covers that has one.
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { readingRange } from './reading-range.js';
 
 /** @returns {{ has: (hlKey: string) => boolean, start: (hlKey: string, offset: number | null) => boolean, repeat?: (keys: string[], label: string, times: number) => boolean } | null} */
 function pane() {
@@ -20,28 +29,38 @@ function pane() {
 
 /**
  * Where "listen from here" would start for this selection, or null when there
- * is nothing to offer (no pane with a recording, or the selection does not
- * start in one of its timed blocks).
+ * is nothing to offer (no pane with a recording, or the selection covers none
+ * of its timed blocks).
  *
- * @param {Selection | null | undefined} selection
+ * @param {Selection | Range | null | undefined} selection  the live selection, or a range of it
  * @returns {{ hlKey: string, offset: number | null } | null}
  */
 export function listenFromTarget(selection) {
   const lf = pane();
-  if (!lf || !selection || !selection.rangeCount) return null;
-  const range = selection.getRangeAt(0);
+  if (!lf || !selection) return null;
+  const raw = 'rangeCount' in selection ? (selection.rangeCount ? selection.getRangeAt(0) : null) : selection;
+  const covered = readingRange(raw);
+  if (!covered) return null;
+  const range = covered.range;
   const node = range.startContainer;
   const host = node && (node.nodeType === 3 ? node.parentElement : /** @type {Element} */ (node));
-  const block = host && typeof host.closest === 'function' ? host.closest('[data-hl-key]') : null;
+  // The block the selection starts in (its own keyed element, the rows' domain) when the pane times it, else the
+  // first covered block the pane times.
+  let block = host && typeof host.closest === 'function' ? host.closest('[data-hl-key]') : null;
+  if (!block || !lf.has(block.getAttribute('data-hl-key') || '')) {
+    block = covered.blocks.find((b) => lf.has(b.getAttribute('data-hl-key') || '')) || null;
+  }
   const hlKey = block ? block.getAttribute('data-hl-key') : null;
-  if (!block || !hlKey || !lf.has(hlKey)) return null;
-  let offset = null;
-  try {
-    const upTo = block.ownerDocument.createRange();
-    upTo.setStart(block, 0);
-    upTo.setEnd(range.startContainer, range.startOffset);
-    offset = upTo.toString().length;
-  } catch (_e) { /* a boundary outside the block: the pane falls back to the block's first clause */ }
+  if (!block || !hlKey) return null;
+  let offset = 0;
+  if (block.contains(range.startContainer)) {
+    try {
+      const upTo = /** @type {Document} */ (block.ownerDocument).createRange();
+      upTo.setStart(block, 0);
+      upTo.setEnd(range.startContainer, range.startOffset);
+      offset = upTo.toString().length;
+    } catch (_e) { /* a boundary outside the block: its first clause */ }
+  }
   return { hlKey, offset };
 }
 

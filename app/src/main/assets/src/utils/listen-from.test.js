@@ -49,6 +49,23 @@ describe('listenFromTarget / startListenFrom', () => {
     expect(startListenFrom(listenFromTarget(selectAt(body.querySelector('p').firstChild, 6)))).toBe(true);
     expect(globalThis.__votListenFrom.start).toHaveBeenCalledWith('letter:x:0', 6);
   });
+
+  // rs1 (2026-10-22): a verse number sits beside its verse's block, and a selection begun on it offered nothing.
+  it('a selection begun on a verse number listens from the start of its verse', () => {
+    body.innerHTML = '<span class="verse"><span class="verse-num">16</span><span data-hl-key="letter:x:16">For God so loved</span> </span>';
+    const r = document.createRange();
+    r.setStart(body.querySelector('.verse-num').firstChild, 0);
+    r.setEnd(body.querySelector('[data-hl-key]').firstChild, 7);
+    expect(listenFromTarget(r)).toEqual({ hlKey: 'letter:x:16', offset: 0 });
+  });
+
+  it('a selection begun on words with no voice listens from the first covered block that has one', () => {
+    globalThis.__votListenFrom.has = vi.fn((k) => k === 'letter:x:1');
+    const r = document.createRange();
+    r.setStart(body.querySelector('p').firstChild, 3);           // in block 0, which the pane does not time
+    r.setEnd(body.querySelector('em').firstChild, 2);
+    expect(listenFromTarget(r)).toEqual({ hlKey: 'letter:x:1', offset: 0 });
+  });
 });
 
 /* REPEAT THIS PASSAGE (rp1 part 3): the selected blocks the pane owns, looped three times through

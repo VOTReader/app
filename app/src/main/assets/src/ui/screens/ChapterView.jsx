@@ -211,7 +211,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
                   const vHlKey = studyHlKey(book.id + '-' + chapter.num, v.n);
                   return (
                     <span key={vi} id={`v-${v.n}`} className={`verse${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
-                      <span className="verse-num">{v.n}</span>
+                      {/* The space ends the number's word (rs1), as in BibleChapterView. */}
+                      <span className="verse-num">{v.n}{' '}</span>
                       <HighlightableText text={v.text} hlKey={vHlKey} />
                       <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />
                       <BookmarkIcon hlKey={vHlKey} />
@@ -241,7 +242,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
                 return (
                   <div key={vi} id={`v-${v.n}`} className={`verse-row${highlightedVerses.includes(v.n) ? " verse-surprise" : ""}`}>
                     <div className="verse-line">
-                      <span className="verse-num">{v.n}</span>
+                      {/* The space ends the number's word (rs1), as in BibleChapterView. */}
+                      <span className="verse-num">{v.n}{' '}</span>
                       <HighlightableText text={v.text} hlKey={vHlKey} />
                       <LinkIcon hlKey={vHlKey} onClick={onLinkOpen} />
                       <BookmarkIcon hlKey={vHlKey} />

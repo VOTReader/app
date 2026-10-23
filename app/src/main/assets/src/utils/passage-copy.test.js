@@ -4,7 +4,8 @@
    takes on every reading surface: a verse per line, its number and a space,
    footnote digits and icons left out, and the reference on the last line. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { passageCopy, passageLabel, passageReference, readingBlocksIn, isVerseKey, translationTag, sheetReference, quotedPassage } from './passage-copy.js';
+import { passageCopy, passageLabel, passageReference, isVerseKey, translationTag, sheetReference, quotedPassage } from './passage-copy.js';
+import { readingBlocksIn } from './reading-range.js';
 
 const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
 const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
@@ -222,6 +223,25 @@ describe('labels', () => {
     expect(translationTag('letter:x:1')).toBe('');
     delete g.StateStore;
     expect(translationTag('bible:john:3:16')).toBe('');
+  });
+
+  /* rs1 (S22, 2026-10-22): with the KJV recording loaded the chapter shows its
+     KJV words ("KJV text, to match the recording"), and a copy of them said
+     "John 3:14-16 (NKJV)", the reader's Settings. The words copied are the
+     ones on the page: BibleChapterView names its edition on the chapter body. */
+  it('a chapter showing another edition (to match the recording) names the edition its words are in', () => {
+    const body = document.createElement('div');
+    body.className = 'chapter-body';
+    body.setAttribute('data-translation', 'kjv');
+    document.body.appendChild(body);
+    body.appendChild(bibleChapter([[15, 'That whosoever believeth in him should not perish.'], [16, 'For God so loved the world.']], 'john:3'));
+    expect(translationTag('bible:john:3:16')).toBe(' (KJV)');
+    const num15 = /** @type {Node} */ (document.querySelector('#v-15 .verse-num')?.firstChild);
+    const end = lastText(block('bible:john:3:16'));
+    const out = /** @type {any} */ (passageCopy(range(num15, 0, end, end.length)));
+    expect(out.text.endsWith('\n\nJohn 3:15-16 (KJV)')).toBe(true);
+    // Another chapter, not on the page: the reader's own edition.
+    expect(translationTag('bible:john:4:1')).toBe(' (NKJV-R)');
   });
 
   /* cp1 follow-up: Matthew is "matthew-plain" in the Bible reader, and the old

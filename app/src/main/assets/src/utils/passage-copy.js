@@ -82,11 +82,9 @@ import { _bookmarkSourceLabel } from './bookmark-source.js';
 import { ANNOTATION_CHROME } from '../renderer/anchor-view.js';
 import { siteTarget, sourceTarget, pageTarget, siteUrl, collectionName, MATTHEW_STUDY_PAGE } from './site-link.js';
 import { passageSource, isQuotedWords } from './answers-contents.js';
+// Which blocks a range covers, and where its ends sit on a verse number (rs1): one definition with the toolbar's.
+import { OFF_PAGE, VERSE_NUMBER, readingBlocksIn, clipTo, readingRange } from './reading-range.js';
 
-/** The swipe previews: inert clones of the neighbour pages (ScreenLayout). */
-const OFF_PAGE = '[inert], .pager-peek';
-/** A verse number: the Bible reader's gutter number and a sheet's gold superscript. */
-const VERSE_NUMBER = '.verse-num, .verse-sup';
 /** The Matthew Study Bible's text is its own (corrected) edition, not a translation Settings picks. */
 const STUDY_TAG = ' (Study Bible)';
 /** Elements that start a line of their own. */
@@ -133,6 +131,13 @@ export function translationTag(key) {
   if (typeof StateStore === 'undefined' || !StateStore) return '';
   let code = null;
   try { const s = StateStore.get(); code = s && s.settings ? s.settings.translation : null; } catch (_e) { code = null; }
+  // rs1: the words copied are the ones on the page. While a recording plays, the chapter shows the recording's
+  // edition ("KJV text, to match the recording"), and BibleChapterView names it on the chapter body.
+  try {
+    const el = typeof document !== 'undefined' ? document.querySelector(`[data-hl-key="${String(key).replace(/"/g, '')}"]`) : null;
+    const shown = el && el.closest('[data-translation]');
+    if (shown) code = shown.getAttribute('data-translation') || code;
+  } catch (_e) { /* the page's edition unknown: the reader's */ }
   const opts = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) ? TRANSLATION_OPTIONS : [];
   const found = opts.find((o) => o.id === (code || 'nkjv'));
   return ' (' + (found ? found.label : 'NKJV') + ')';
@@ -327,37 +332,6 @@ function quoteLines(clips) {
   return lines;
 }
 
-/** The reading blocks ([data-hl-key]) the range reaches, in document order —
-    never an annotation icon (which carries its block's key too) and never a
-    block of a swipe preview.
-    @param {Range} range @returns {Element[]} */
-export function readingBlocksIn(range) {
-  const node = range.commonAncestorContainer;
-  const root = node.nodeType === 1 ? /** @type {Element} */ (node) : node.parentElement;
-  if (!root) return [];
-  let inside = root.closest('[data-hl-key]');
-  if (inside) {
-    let up;
-    while (inside.parentElement && (up = inside.parentElement.closest('[data-hl-key]'))) inside = up;
-    return inside.closest(OFF_PAGE) ? [] : [inside];
-  }
-  return Array.from(root.querySelectorAll('[data-hl-key]')).filter((el) =>
-    range.intersectsNode(el)
-    && !el.matches(ANNOTATION_CHROME)
-    && !(el.parentElement && el.parentElement.closest('[data-hl-key]'))
-    && !el.closest(OFF_PAGE));
-}
-
-/** The part of `range` inside `el`, or null when none of `el` is in it.
-    @param {Range} range @param {Node} el @returns {Range | null} */
-function clipTo(range, el) {
-  const r = document.createRange();
-  r.selectNodeContents(el);
-  if (range.compareBoundaryPoints(Range.START_TO_START, r) > 0) r.setStart(range.startContainer, range.startOffset);
-  if (range.compareBoundaryPoints(Range.END_TO_END, r) < 0) r.setEnd(range.endContainer, range.endOffset);
-  return r.collapsed ? null : r;
-}
-
 /** Plain text of a cloned block: whitespace collapsed as the page shows it,
     a line per <br> and per block element, chrome left out, a verse number
     followed by a space (or left out, `numbers` false).
@@ -408,12 +382,16 @@ function verseNumberOf(el) {
  * out, and a single verse never has one. The link
  * names the letter's page (a compilation entry's section) and quotes the copied
  * words only with `quote` (by default the reader's Highlight the Passage, cp3).
- * @param {Range} range
+ * The range is read as the reading text it covers (rs1, utils/reading-range.js):
+ * a selection of one verse number alone copies its verse.
+ * @param {Range} selected
  * @param {{ numbers?: boolean, quote?: boolean }} [opts]
  * @returns {{ text: string, body: string, reference: string, link: string, keys: string[], isPublic: boolean } | null}
  */
-export function passageCopy(range, { numbers = true, quote = highlightLinks() } = {}) {
-  if (!range || range.collapsed) return null;
+export function passageCopy(selected, { numbers = true, quote = highlightLinks() } = {}) {
+  if (!selected || selected.collapsed) return null;
+  const covered = readingRange(selected);
+  const range = covered ? covered.range : selected;
   /** @type {{ el: Element, key: string, body: string, clip: Range, fromTop: boolean }[]} */
   const parts = [];
   readingBlocksIn(range).forEach((el) => {
