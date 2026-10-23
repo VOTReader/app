@@ -746,6 +746,22 @@ describe("closing the docked panel at a rail's end eases both rails back inside 
     });
   }
 
+  // s26.3: a second settle ended the first, whose end then zeroed the hold the second had just set,
+  // so any clamp mid-ease (a gesture, My Web's per frame) snapped the end back at once
+  it('a second close while the first still eases holds its own bound, and lands at the view\'s edge', () => {
+    const { cam, l, ends } = atEnds('canonical');
+    const c = cam.camRef.current;
+    cam.panelInsetRef.current = { right: 0, bottom: 0 };
+    cam.settleInset(PANEL / 2);   // a narrower panel's settle, easing
+    l.frame(16); l.frame(16);
+    cam.settleInset(PANEL);       // and the wider one's, before it lands
+    expect(cam.slackFor(c), "the newer settle's hold").toBe(PANEL * DPR);
+    let frames = 0;
+    while (l.frame(16) && frames < 100) frames++;
+    expect(cam.slackFor(c), 'let go once it lands').toBe(0);
+    for (const x of ends()) expect(x).toBeCloseTo(W, 6);
+  });
+
   it('a camera already inside the new bound is left where it stands, and no motion starts', () => {
     const { cam, l } = atEnds('personal');
     const bible = cam.camRef.current, vols = cam.camVRef.current;

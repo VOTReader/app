@@ -133,6 +133,17 @@ describe('the frame loop\'s one motion (use-frame-scheduler.js animate)', () => 
     tick();
     expect(b).toHaveBeenCalledTimes(1);
   });
+  it('a step that throws ends the motion where it is, not arrived (s26.1), and the frame still draws', () => {
+    const { result } = renderHook(() => useFrameScheduler());
+    const draw = vi.fn();
+    result.current.drawRef.current = draw;
+    const onEnd = vi.fn();
+    act(() => { result.current.animate(() => { throw new Error('a bad frame'); }, onEnd); });
+    settle();
+    expect(onEnd).toHaveBeenCalledTimes(1);
+    expect(onEnd).toHaveBeenCalledWith(false);
+    expect(draw).toHaveBeenCalledTimes(1);
+  });
   it('a motion running when the screen goes ends there (its promise never hangs)', () => {
     const { result, unmount } = renderHook(() => useFrameScheduler());
     const onEnd = vi.fn();
