@@ -443,8 +443,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     const lastCh = (hist || []).find((h) => h && h.type === 'chapter' && h.bookId && h.chapterNum);
     return (
       <WebFallbackList graph={graph}
-        initialChapter={was >= 0 ? was : startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)}
-        onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse })}
+        initialChapter={was >= 0 ? was : startChapter(graph, lastCh && lastCh.bookId, lastCh && lastCh.chapterNum)} fromWeb={was >= 0}
+        // the reader's back pill names the web, as openEndpoint's does (s22.4: it came back unlabelled)
+        onOpen={(ref) => navigateToLink && navigateToLink({ type: 'bible', bookId: ref.bookId, chapter: ref.chapter, verse: ref.verse },
+          { sourceLetterTitle: 'The Scripture Web' })}
         onRetry={retryGL} onMyWeb={() => switchMode('personal')}
         onBack={onBack} verseText={(ref) => verseText(ref, translation)} />
     );

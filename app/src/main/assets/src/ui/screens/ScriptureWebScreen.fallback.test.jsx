@@ -78,6 +78,8 @@ describe('Scripture Web without WebGL2: the web read as a list (A7)', () => {
     act(() => { fireEvent.click(row); });
     expect(nav).toHaveBeenCalledTimes(1);
     expect(nav.mock.calls[0][0]).toEqual({ type: 'bible', bookId: 'romans', chapter: 5, verse: 8 });
+    // the reader's back pill is labelled with the web, as a jump from the drawn web's is (s22.4)
+    expect(nav.mock.calls[0][1]).toEqual({ sourceLetterTitle: 'The Scripture Web' });
   });
 
   it('opens on the reader’s last Bible chapter and steps through chapters', async () => {

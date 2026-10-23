@@ -8,7 +8,7 @@
  * The verse text comes from the app's free-global resolver, stubbed per test ('TEXT book c:v').
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, fireEvent, cleanup } from '@testing-library/react';
+import { render, fireEvent, cleanup, act } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import { fileURLToPath } from 'node:url';
@@ -439,6 +439,31 @@ describe('verse mode: John 3:16', () => {
     expect(panel.querySelector('.sw-group .sw-row-tag').textContent).toMatch(/^\d+ votes?$/);
     fireEvent.click(panel.querySelector('.sw-group .sw-row-main'));
     expect(props.openPanel).toHaveBeenCalledWith({ mode: 'connection', arc: expect.any(Number) });
+  });
+});
+
+/* s27.2 (idea sweep 2026-10-22): a study citation on show loads the Bible Studies for its quote; a
+   failed load (loadBibleStudies resolves false) left the quote missing for good, with no way to ask
+   again. It now says so and offers Try again, which loads them again and clears the note. */
+describe('a study citation whose Bible Studies fail to load', () => {
+  let savedStudies;
+  beforeEach(() => { savedStudies = window.BIBLE_STUDIES; delete window.BIBLE_STUDIES; });
+  afterEach(() => { window.BIBLE_STUDIES = savedStudies; delete window.loadBibleStudies; });
+
+  it('says the study text did not load, and Try again loads it again', async () => {
+    const edge = g.votEdges.find((e) => e.studyId);
+    expect(edge, 'the graph carries a study citation').toBeTruthy();
+    const load = vi.fn(async () => false);
+    window.loadBibleStudies = load;
+    const { panel } = mount({ detail: found({ kind: 'verse', verse: edge.v }) });
+    await act(async () => {});
+    expect(load).toHaveBeenCalledTimes(1);
+    const retry = [...panel.querySelectorAll('.sw-cite-failed button')];
+    expect(retry.map((b) => b.textContent)).toEqual(['Try again']);
+    load.mockImplementation(async () => { window.BIBLE_STUDIES = savedStudies; return true; });
+    await act(async () => { fireEvent.click(retry[0]); });
+    expect(load).toHaveBeenCalledTimes(2);
+    expect(panel.querySelector('.sw-cite-failed')).toBeNull();
   });
 });
 

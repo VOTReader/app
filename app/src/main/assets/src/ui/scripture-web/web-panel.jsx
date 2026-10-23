@@ -303,8 +303,9 @@ function Quote({ text, children }) {
 }
 
 /** CITED IN THE VOLUMES · n (omitted at 0): each citing passage with its letter, collection, quote and
- * "Open letter ›" at the citing paragraph (B4). `showCites` names the passage each one cites. */
-function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
+ * "Open letter ›" at the citing paragraph (B4). `showCites` names the passage each one cites;
+ * `onRetry`, when the Bible Studies failed to load, loads them again (their quotes read them). */
+function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel, onRetry = null }) {
   const [all, setAll] = React.useState(false);
   if (!cited.length) return null;
   const keys = letterKeys(g);
@@ -337,6 +338,12 @@ function CitedSection({ g, cited, showCites, startOpen, onOpen, openPanel }) {
           );
         })}
       </ul>
+      {onRetry ? (
+        <p className="sw-panel-empty sw-cite-failed">
+          The study text did not load.{' '}
+          <button type="button" className="sw-link" onClick={onRetry}>Try again</button>
+        </p>
+      ) : null}
       {cited.length > shown.length ? (
         <button type="button" className="sw-more" onClick={() => setAll(true)}>Show {cited.length - shown.length} more</button>
       ) : null}
@@ -457,6 +464,10 @@ export function WebPanel(props) {
   const votV = useCorpusVersion('__votCorpus');
   // the Bible Studies, loaded when a study citation is on show without them (its excerpt reads them)
   const [studiesV, setStudiesV] = React.useState(0);
+  // the load failed (loadBibleStudies resolves false, or threw): the cited section says so and
+  // offers Try again, as the Studies screen does (n6-09), not quotes missing for good (s27.2)
+  const [studiesFailed, setStudiesFailed] = React.useState(false);
+  const [studiesTry, setStudiesTry] = React.useState(0);
 
   // the mode's model, read at render; read again when a corpus or the Studies land (one shape per
   // mode, so typed loosely here; panel-model.js types each)
@@ -476,9 +487,15 @@ export function WebPanel(props) {
   React.useEffect(() => {
     if (!wantStudies || typeof BIBLE_STUDIES !== 'undefined' || typeof loadBibleStudies !== 'function') return undefined;
     let live = true;
-    Promise.resolve(loadBibleStudies()).then(() => { if (live) setStudiesV((n) => n + 1); });
+    Promise.resolve(loadBibleStudies()).then((ok) => {
+      if (!live) return;
+      setStudiesFailed(ok === false);
+      setStudiesV((n) => n + 1);
+    }, () => { if (live) setStudiesFailed(true); });
     return () => { live = false; };
-  }, [wantStudies]);
+  }, [wantStudies, studiesTry]);
+  const retryStudies = studiesFailed && wantStudies
+    ? () => { setStudiesFailed(false); setStudiesTry((n) => n + 1); } : null;
 
   // the lit set this mode keeps (verse mode: the threads it lists; exits mode: the lines it counts,
   // lit when it opened); a row lights its own over it
@@ -570,7 +587,8 @@ export function WebPanel(props) {
             <VerseBlock key={e.verse} block={e} onOpen={onOpen} extra={e.verse === farVerse ? follow : null} />
           ))}
         </div>
-        <CitedSection g={g} cited={cited} showCites={() => true} startOpen={!compact} onOpen={onOpen} openPanel={openPanel} />
+        <CitedSection g={g} cited={cited} showCites={() => true} startOpen={!compact} onOpen={onOpen} openPanel={openPanel}
+          onRetry={retryStudies} />
         {model.more.map((m, i) => (
           <Section key={m.verse} collapsible startOpen={i === 0} className="sw-sec-more"
             title={'More from ' + m.ref.label + ' · ' + plural(m.total, 'connection', 'connections')}>
@@ -592,7 +610,7 @@ export function WebPanel(props) {
           meta={plural(n, 'connection', 'connections') + (cited.length ? ' · cited in the Volumes ' + timesWord(cited.length) : '')} />
         <div className="sw-sec sw-verses"><VerseBlock block={model} heading={false} onOpen={onOpen} /></div>
         <CitedSection g={g} cited={cited} showCites={(c) => c.cites !== model.ref.label} startOpen={!compact}
-          onOpen={onOpen} openPanel={openPanel} />
+          onOpen={onOpen} openPanel={openPanel} onRetry={retryStudies} />
         <Section title={'Connections · ' + n.toLocaleString()} className="sw-sec-more">
           {n ? (
             <React.Fragment>
