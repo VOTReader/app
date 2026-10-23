@@ -140,6 +140,8 @@ function tick() {
 const SLOP_PX = 10;
 const SWIPE_PX = 64;
 const FLICK_PX = 24;
+/** A click this soon after a swipe ends is the swipe's own, never a tap. */
+const SWIPE_CLICK_MS = 400;
 
 /** "12 min left", or "0:42 left" under a minute. */
 function timeLeft(time, dur) {
@@ -209,7 +211,9 @@ export function AudioPlayerBar() {
   // Swipes on the bar (brief 3a), each with a button that does the same: left / right = Next / Previous (the full
   // player's), down = Close, up = open the player (the bar's tap). A swipe's own click never counts as a tap.
   const drag = React.useRef(/** @type {{ id: number, x: number, y: number, t: number, axis: string | null } | null} */ (null));
-  const swiped = React.useRef(false);
+  // When the last swipe ended: only the click that lands right after it is the swipe's own. A flag kept until the
+  // next click ate the next keyboard Enter on the bar when a swipe ended with no click at all (S22, pl-l2b).
+  const swipedAt = React.useRef(0);
   const settle = () => {
     const el = barRef.current;
     if (!el) return;
@@ -220,7 +224,7 @@ export function AudioPlayerBar() {
   const onPointerDown = (/** @type {any} */ e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY, t: Date.now(), axis: null };
-    swiped.current = false;
+    swipedAt.current = 0;
   };
   const onPointerMove = (/** @type {any} */ e) => {
     const d = drag.current;
@@ -246,7 +250,7 @@ export function AudioPlayerBar() {
     drag.current = null;
     settle();
     if (!d.axis) return;
-    swiped.current = true;
+    swipedAt.current = Date.now();
     const dist = d.axis === 'x' ? e.clientX - d.x : e.clientY - d.y;
     const far = Math.abs(dist) >= SWIPE_PX || (Math.abs(dist) >= FLICK_PX && Math.abs(dist) / Math.max(1, Date.now() - d.t) > 0.5);
     if (!far) return;
@@ -256,8 +260,8 @@ export function AudioPlayerBar() {
   };
   const onPointerCancel = () => { drag.current = null; settle(); };
   const onClickCapture = (/** @type {any} */ e) => {
-    if (!swiped.current) return;
-    swiped.current = false;
+    if (!swipedAt.current || Date.now() - swipedAt.current > SWIPE_CLICK_MS) return;
+    swipedAt.current = 0;
     e.stopPropagation();
     e.preventDefault();
   };

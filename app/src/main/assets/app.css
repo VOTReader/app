@@ -1479,7 +1479,8 @@
         position: absolute; top: -9px; right: -9px; min-width: 22px; height: 22px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
         border-radius: 11px; background: var(--gold); color: var(--bg); font-size: var(--fs-12); font-weight: 600; font-variant-numeric: tabular-nums;
       }
-      .np-tool-word { max-width: 100%; color: var(--cream-dim); font-family: var(--font-body); font-size: var(--fs-15); line-height: 1.2; overflow-wrap: anywhere; }
+      /* Capped at 20px and broken only between words: at 200 % on a 360 px phone a quarter-width column split "Spee|d" (S22, pl-l2b). */
+      .np-tool-word { max-width: 100%; color: var(--cream-dim); font-family: var(--font-body); font-size: clamp(12px, var(--fs-15), 20px); line-height: 1.2; overflow-wrap: normal; }
       .np-tool.is-on .np-tool-word { color: var(--gold); }
       .np-close:focus-visible, .np-chip:focus-visible, .np-live:focus-visible, .np-from:focus-visible, .np-flat:focus-visible, .np-tool:focus-visible,
       .audio-manager-transport button:focus-visible, .np-sheet button:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }

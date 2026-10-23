@@ -577,4 +577,16 @@ describe('AudioPlayerBar — swipes', () => {
     fireEvent.click(summary());
     expect(summary().getAttribute('aria-expanded')).toBe('true');
   });
+
+  it('a swipe that ends with no click does not eat a later tap', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      render(<AudioPlayerBar />);
+      playWholeCollection();
+      swipe(-120, 0);
+      now.mockReturnValue(3000);                      // a keyboard Enter, seconds later, with no pointer down first
+      fireEvent.click(summary());
+      expect(summary().getAttribute('aria-expanded')).toBe('true');
+    } finally { now.mockRestore(); }
+  });
 });
