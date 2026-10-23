@@ -11,6 +11,7 @@ import { splitFormatBInline } from '../../utils/format-b-inline.js';
 import { formatBOffsetMap, formatBRefScan } from '../../utils/format-b-dom-text.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
+import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '../../utils/landing-mark.js';
 import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
@@ -161,10 +162,14 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
     setLandedOff(off);
     const timer = setTimeout(() => {
       const el = wtlbMainRef.current && wtlbMainRef.current.querySelector(`[data-hl-key="${wtlbHlKey(entry.id, found)}"]`);
-      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+      if (!el) return;
+      // the landed words: a tall paragraph centres on them, and a landing that named its paragraph marks them (F1)
+      const range = landingRange(el, excerpt);
+      scrollLandingIntoView(el, range, scrollBehavior());
+      if (Number.isInteger(para)) markLanding(range);
     }, 150);
-    const fadeTimer = setTimeout(() => { setLandedPara(-1); setLandedOff(null); }, 4000);
-    return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
+    const fadeTimer = setTimeout(() => { setLandedPara(-1); setLandedOff(null); clearLanding(); }, 4000);
+    return () => { clearTimeout(timer); clearTimeout(fadeTimer); clearLanding(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- entry.paragraphs is corpus data; entry.id identifies the entry (same contract as the refAnalysis memo above)
   }, [surpriseAnchor, entry.id, ansReady]);
   React.useEffect(() => {

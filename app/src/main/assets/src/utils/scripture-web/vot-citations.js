@@ -670,17 +670,25 @@ export function endpointFor(c) {
   }
   const volKey = c.volKey || c.collection;
   const collection = c.collectionName || collectionName(volKey);
+  // The landing a search hit makes (the hub's seam walk F1, 2026-10-22): the citation's own
+  // block, pulsed, with its citing sentence placing the words in it. The key alone centred the
+  // block, and a sentence near a long paragraph's end sat under the bottom edge, unmarked.
+  const landing = (unit) => ({
+    type: 'excerpt', text: String(c.excerpt || '').replace(/^…|…$/g, ''), letterId: unit, para: p,
+  });
   if (c.entryId) {
     const type = volKey === 'blessed' ? 'blessed' : volKey === 'holydays' ? 'holy-days' : 'wtlb';
     return {
       type, key: entryHlBase(type, c.entryId) + ':' + p, entryId: c.entryId,
       screen: LETTER_SCREENS[volKey] || 'wtlb-one-entry', volKey, collection, label,
+      surpriseAnchor: landing(c.entryId),
     };
   }
   if (c.letterId) {
     return {
       type: 'letter', key: 'letter:' + c.letterId + ':' + p, letterId: c.letterId,
       screen: LETTER_SCREENS[volKey] || 'vot-letter', volKey, collection, label,
+      surpriseAnchor: landing(c.letterId),
     };
   }
   return null;

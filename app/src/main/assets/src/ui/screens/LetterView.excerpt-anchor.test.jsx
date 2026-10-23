@@ -144,6 +144,65 @@ describe('LetterView — an excerpt anchor lands on the block that holds it', ()
     }
   });
 
+  /* Scripture Web's Open letter names the citation's own block (the hub's seam walk F1, 2026-10-22): that block
+     lands though its words come earlier too, and the excerpt only places them in it. */
+  it('a landing that names its block (para) lands there, words placed within it', () => {
+    renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'and', letterId: 'the-wide-path', para: 2 } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled).toEqual(['letter:the-wide-path:2']);
+    expect(seekOffsetSeen.at(-1)).toBe('But the still small voice spoke to him in the cave, and he listened.'.indexOf('and'));
+    cleanup(); scrolled.length = 0;
+    renderLetter({ surpriseAnchor: { type: 'excerpt', text: '', letterId: 'the-wide-path', para: 3 } });
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(scrolled, 'no sentence: the block alone').toEqual(['letter:the-wide-path:3']);
+  });
+
+  it('a block taller than most of the screen centres the landed words, not the block; a named block marks them', () => {
+    globalThis.ScreenLayout = ({ children, navChildren }) => <div className="screen-scroll">{navChildren}{children}</div>;
+    const tops = [];
+    const rect = Element.prototype.getBoundingClientRect;
+    const marks = new Map();
+    const highlightsWas = globalThis.CSS && globalThis.CSS.highlights;
+    globalThis.CSS = Object.assign(globalThis.CSS || {}, { highlights: marks });
+    globalThis.Highlight = function (r) { this.range = r; };
+    Element.prototype.scrollTo = function (o) { tops.push(o && o.top); };
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, get() { return this.classList.contains('screen-scroll') ? 600 : 0; } });
+    Element.prototype.getBoundingClientRect = function () { return { top: 0, height: this.getAttribute('data-hl-key') ? 900 : 600 }; };
+    Range.prototype.getBoundingClientRect = function () { return { top: 800, height: 20 }; };
+    try {
+      renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'spoke to him in the cave', letterId: 'the-wide-path', para: 2 } });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(tops, 'the words at the middle of the 600 px screen').toEqual([810 - 300]);
+      expect(scrolled, 'not the block').toEqual([]);
+      expect(marks.get('vot-landing').range.toString()).toBe('spoke to him in the cave');
+      act(() => { vi.advanceTimersByTime(4100); });
+      expect(marks.has('vot-landing'), 'the mark fades with the landing').toBe(false);
+    } finally {
+      delete Element.prototype.scrollTo;
+      delete HTMLElement.prototype.clientHeight;
+      delete Range.prototype.getBoundingClientRect;
+      Element.prototype.getBoundingClientRect = rect;
+      delete globalThis.Highlight;
+      globalThis.CSS.highlights = highlightsWas;
+    }
+  });
+
+  it('a search landing (no block named) is not marked: its words are the find pill’s', () => {
+    const marks = new Map();
+    const highlightsWas = globalThis.CSS && globalThis.CSS.highlights;
+    globalThis.CSS = Object.assign(globalThis.CSS || {}, { highlights: marks });
+    globalThis.Highlight = function (r) { this.range = r; };
+    try {
+      renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'spoke to him in the cave' } });
+      act(() => { vi.advanceTimersByTime(200); });
+      expect(scrolled).toEqual(['letter:the-wide-path:2']);
+      expect(marks.size).toBe(0);
+    } finally {
+      delete globalThis.Highlight;
+      globalThis.CSS.highlights = highlightsWas;
+    }
+  });
+
   it('the landing fades: seekTo is withdrawn after the flash so a later Listen does not re-seek', () => {
     renderLetter({ surpriseAnchor: { type: 'excerpt', text: 'still small voice' } });
     act(() => { vi.advanceTimersByTime(200); });

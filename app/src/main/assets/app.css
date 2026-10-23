@@ -2924,6 +2924,10 @@
     body.light ::highlight(vot-reading) { background-color: rgba(122,92,16,0.16); }
     body.light ::highlight(vot-find) { background-color: rgba(122,92,16,0.18); }
     body.light ::highlight(vot-find-current) { background-color: rgba(122,92,16,0.38); text-decoration-color: #7a5c10; }
+    /* The landed sentence (utils/landing-mark.js): Scripture Web's Open letter marks the words
+       that cite the verse for the landing's 4 s, between the find wash and the current place. */
+    ::highlight(vot-landing) { background-color: rgba(214,179,95,0.34); }
+    body.light ::highlight(vot-landing) { background-color: rgba(122,92,16,0.26); }
     /* Find in the unit (FindInUnit): every place the searched words appear, and,
        stronger and underlined, the place being looked at. Gold like the result
        cards' marks, never a highlighter colour a reader's own marks could wear. */

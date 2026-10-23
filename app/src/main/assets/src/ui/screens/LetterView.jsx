@@ -10,6 +10,7 @@ import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { blockReadText } from '../../utils/segment-dom-text.js';
 import { LetterListenRow, LetterSongsCard } from '../components/LetterSongs.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
+import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '../../utils/landing-mark.js';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
@@ -219,17 +220,28 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     // open with the previous block's last words, read-along find 2026-09-22.)
     const excerpt = _squash(surpriseAnchor.text);
     const blocks = letter.blocks || [];
-    const { index: found, off } = excerptLanding(excerpt, blocks.map((b) => _squash(_blockText(b))), surpriseAnchor.find && surpriseAnchor.find.terms);
+    const terms = surpriseAnchor.find && surpriseAnchor.find.terms;
+    // A landing that names its block (Scripture Web's Open letter: the citation's own block, F1)
+    // lands there, the excerpt only placing the words within it; else the excerpt finds the block.
+    const para = surpriseAnchor.para;
+    const inPara = Number.isInteger(para) && para >= 0 && para < blocks.length
+      ? (excerpt ? excerptLanding(excerpt, [_squash(_blockText(blocks[para]))], terms) : { index: -1, off: null }) : null;
+    const { index: found, off } = inPara ? { index: para, off: inPara.index === 0 ? inPara.off : null }
+      : excerptLanding(excerpt, blocks.map((b) => _squash(_blockText(b))), terms);
     if (found < 0) return;
     const hlKey = letterHlKey(letter.id, found);
     setSurpriseBlockKey(hlKey);
     setSurpriseBlockOff(off);   // the rows' domain is the block's DOM text; the squash and any footnote numbers before the landing drift it by a few characters
     const timer = setTimeout(() => {
       const el = mainRef.current && mainRef.current.querySelector(`[data-hl-key="${hlKey}"]`);
-      if (el) el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+      if (!el) return;
+      // the landed words: a tall block centres on them (F1), and a landing that named its block marks them
+      const range = landingRange(el, excerpt);
+      scrollLandingIntoView(el, range, scrollBehavior());
+      if (inPara) markLanding(range);
     }, 150);
-    const fadeTimer = setTimeout(() => { setSurpriseBlockKey(null); setSurpriseBlockOff(null); }, 4000);
-    return () => { clearTimeout(timer); clearTimeout(fadeTimer); };
+    const fadeTimer = setTimeout(() => { setSurpriseBlockKey(null); setSurpriseBlockOff(null); clearLanding(); }, 4000);
+    return () => { clearTimeout(timer); clearTimeout(fadeTimer); clearLanding(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- identity-based cache key: letter.blocks is corpus data (read-only after boot); letter.id uniquely identifies the letter. Re-running when surpriseAnchor changes OR letter.id changes is the intent — letter.blocks changing without letter.id changing is impossible by design.
   }, [surpriseAnchor, letter.id]);
 
