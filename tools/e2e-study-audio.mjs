@@ -7,12 +7,13 @@
      2. A real tap on the pill — the request that follows is for THAT chapter's
         asset (the manifest's Drive id, answered here with a local WAV), and the
         bar reports playing with an advancing clock.
-     3. Home, then the desk's "Open the text of …" — lands back on the same study
+     3. Home, then the desk's "Open the reading — …" — lands back on the same study
         chapter with playback still running (the opener is pure navigation).
      4. Home, reload (the lazy study corpus is NOT resident in the new document —
         asserted), Listening Library › the chapter's row › "Open text for …" —
         the screen changes at once (Loading… is the route's own surface) and the
-        chapter arrives, under a "‹ Back to Listening Library" pill. This is the
+        chapter arrives, with no "Back to Listening Library" pill (Corbin 2026-10-05: the Library
+        is not a true screen; Back does the job). This is the
         no-await design of the routing arm, walked on the real corpus load.
 
    Exit 0 = every assertion held; 1 = a FAIL line above says which (also when the walk
@@ -84,8 +85,9 @@ try {
     const Orig = w.Audio;
     const Wrapped = function (...args) {
       const el = new Orig(...args);
-      for (const type of ['playing', 'pause']) el.addEventListener(type, () => { w.__e2eAudioEvents.push({ type, t: el.currentTime, at: Math.round(performance.now()) }); });
-      w.__e2eAudioEl = el;
+      // The element that last reported 'playing' is the one the clock is read from: the player also makes
+      // elements it never plays (the next track's preload), so "the last one constructed" is the wrong one.
+      for (const type of ['playing', 'pause']) el.addEventListener(type, () => { if (type === 'playing') w.__e2eAudioEl = el; w.__e2eAudioEvents.push({ type, t: el.currentTime, at: Math.round(performance.now()) }); });
       return el;
     };
     Wrapped.prototype = Orig.prototype;
@@ -182,14 +184,14 @@ try {
     await shot('2-playing');
   }
 
-  // ── 3. away, then the desk's "Open the text" — back on the chapter, still playing ──
+  // ── 3. away, then the desk's "Open the reading" — back on the chapter, still playing ──
   await goHome();
   await click('Open listening controls', { settle: 800, contains: true });
-  const opener = (await controls()).find((c) => c.startsWith('Open the text of'));
+  const opener = (await controls()).find((c) => c.startsWith('Open the reading'));
   note(`3: desk opener ${JSON.stringify(opener || null)}`);
-  if (!opener) fail('3: the desk has no "Open the text of …" control for the study recording (hasTextDestination)');
+  if (!opener) fail('3: the desk has no "Open the reading — …" control for the study recording (hasTextDestination)');
   else {
-    await click('Open the text of', { settle: 900 });
+    await click('Open the reading', { settle: 900 });
     const title3 = await heroTitle();
     const paused = await page.evaluate(() => window.__e2eAudioEl ? window.__e2eAudioEl.paused : null);
     note(`3: landed on ${JSON.stringify(title3)}; paused=${paused}`);
@@ -227,7 +229,7 @@ try {
     const back = await page.evaluate(() => { const e = document.querySelector('.back-hint-title'); return e ? e.textContent.trim() : null; });
     note(`4: chapter ${JSON.stringify(arrived)} after ${dt} ms; Loading… surface ${sawLoading ? 'seen' : 'not seen (the corpus arrived within one poll)'}; back pill ${JSON.stringify(back)}; pill ${pill4 ? 'present' : 'ABSENT'}`);
     if (arrived !== title1) fail(`4: the Library opener landed on ${JSON.stringify(arrived)}, not the chapter ${JSON.stringify(title1)}`);
-    if (back !== 'Listening Library') fail(`4: back pill reads ${JSON.stringify(back)}, expected "Listening Library"`);
+    if (back === 'Listening Library') fail('4: the "Back to Listening Library" pill is back (Corbin 2026-10-05 removed it)');
     if (!pill4) fail('4: no Listen pill on the chapter reached from the Library');
     await shot('4-from-library');
   }
