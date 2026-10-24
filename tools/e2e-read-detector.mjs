@@ -229,7 +229,7 @@ try {
     await clickText(re);
   };
 
-  // Onboarding (fresh profile) → Home → Prophetic Letters → Volume One.
+  // Onboarding (fresh profile) → Letter 1 → Home → Prophetic Letters → Volume One.
   //
   // The #root wait above proves only that SOMETHING rendered. On ubuntu-latest
   // that is not yet the About screen, so this click fired into a page with no
@@ -239,6 +239,11 @@ try {
   // below waits for the button it is about to click; this one now does too.
   await waitThenClick('the onboarding Continue button', /Continue/);
   await waitThenClick('the Begin Reading button', /Begin Reading/);
+  // First run's Begin Reading opens Volume One, Letter 1 (n114, 52553a0c7), not Home: wait for that
+  // letter's text, then take the Home button so the walk below starts where it always has.
+  await waitForScreen('the first letter', () => document.querySelectorAll('[data-hl-key]').length > 0
+    && !!document.querySelector('button[aria-label="Home"]'));
+  await page.evaluate(() => document.querySelector('button[aria-label="Home"]').click());
   await waitThenClick('Home', /Prophetic Letters/);
   await waitThenClick('the volumes screen', /Volume One(?!\d)/, () => page.evaluate(
     () => { if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus(); },
