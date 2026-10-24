@@ -32,6 +32,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 import { sourceHash, JSON_PATH, SCENES } from './check-s22-frame-time.js';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const argv = process.argv.slice(2);
@@ -96,7 +97,7 @@ try {
     await page.bringToFront();
     await page.goto(URL0 + '?t=' + Date.now(), { waitUntil: 'domcontentloaded', timeout: 60000 });
     if (!(await waitFor(page, () => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, 60000))) throw new Error('root never rendered');
-    await clickLabel(page, 'Continue'); await clickLabel(page, 'Begin Reading'); await sleep(500);
+    await throughFirstRun(page); await sleep(500);
     await clickIfPresent(page, 'Maybe later'); await sleep(200);
     await clickLabel(page, 'Personal Study'); await sleep(400);
     await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)

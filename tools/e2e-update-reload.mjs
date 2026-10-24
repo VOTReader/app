@@ -120,6 +120,7 @@ import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import puppeteer from 'puppeteer';
 import { settleRead, classifyRestoredPages, settleLine } from './e2e-walk-lib.mjs';
+import { throughFirstRun, declineTourOffer } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -334,7 +335,7 @@ try {
   // The tour offer ("Show me around / Maybe later") sits over Home on the first visit
   // after onboarding; a reader who is mid-letter never sees it, and the walk declines it.
   const declineTour = async () => {
-    const hit = await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((b) => /^Maybe later$/.test(b.textContent.trim())); if (b) b.click(); return !!b; });
+    const hit = await declineTourOffer(page);
     if (hit) await sleep(400);
     return hit;
   };
@@ -342,7 +343,7 @@ try {
   // ── boot 1: first run, the worker installs and claims ──
   await page.goto(BASE, { waitUntil: 'load' });
   await booted(); await sleep(700);
-  await click('Continue'); await click('Begin Reading');
+  await throughFirstRun(page);
   await page.waitForFunction(() => navigator.serviceWorker && navigator.serviceWorker.controller, { timeout: 90000 });
   note('worker controls the page after boot 1');
   // A fresh profile is never told it was updated. The toast stays up 4 s; both reads happen

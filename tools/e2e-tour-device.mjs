@@ -14,6 +14,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
@@ -219,7 +220,7 @@ async function setScale() {
   say(`dpr ${dpr}`);
   shot(`${tag}-00-first-screen`);
   // About → Home.
-  await tapLabel('Continue'); await tapLabel('Begin Reading');
+  await throughFirstRun(page, { press: tapLabel });
   await page.waitForFunction(() => document.querySelector('.tour-prompt') || document.querySelector('.home-nav-item'), { timeout: 30000 });
   await setScale();
   let f = await facts();

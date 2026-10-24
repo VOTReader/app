@@ -5,9 +5,9 @@
  *   node tools/e2e-tour.mjs                 # serves its own tree on an ephemeral port
  *   node tools/e2e-tour.mjs --shots DIR     # also write a screenshot per stop
  *
- * What it proves, at every stop, on a FRESH profile (About → Begin Reading → Home):
- *   - the strip offers the tour on Home and nowhere else; Maybe later hides it
- *     for the session; Don't show this again hides it for good (survives reload);
+ * What it proves, at every stop, on a FRESH profile (About → Begin Reading → Letter 1 → Home):
+ *   - the strip offers the tour on Home (and over the first letter, n114) and nowhere else; Maybe later hides it
+ *     for three days, across reloads; Don't show this again hides it for good (survives reload);
  *   - Show me around opens the welcome card as a labelled modal dialog, with
  *     Skip and Back on the card, Back disabled only on the first card;
  *   - each teaching stop finds its control on the REAL screen: the ring wraps
@@ -28,6 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { TOUR_STEPS } from '../app/src/main/assets/src/utils/tour-steps.js';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -38,7 +39,7 @@ const STRIP_ONLY = argv.includes('--strip-only');   // the strip's geometry legs
    about another worktree's build — proven on e2e:read, 2026-09-04. Nothing needs starting. */
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ASSETS = resolve(HERE, '..', 'app', 'src', 'main', 'assets');
-const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
+const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.mjs': 'application/javascript', '.css': 'text/css', '.json': 'application/json', '.woff2': 'font/woff2', '.woff': 'font/woff', '.jpg': 'image/jpeg', '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json' };
 let served = 0;   // requests this server answered: a green is evidence only if it is > 0 (the Verifier's second half)
 function startServer() {
   const server = http.createServer((req, res) => {
@@ -164,7 +165,7 @@ async function stripOnly(browser, { width, height, label, scales }) {
     await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0); b.click(); }, l);
     await sleep(400);
   };
-  await click('Continue'); await click('Begin Reading');
+  await throughFirstRun(page);
   await page.waitForFunction(() => document.querySelector('.tour-prompt'), { timeout: 15000 });
   await sleep(500);
   for (const s of scales) {
@@ -276,8 +277,8 @@ async function run(browser, { width, height, label, light }) {
   });
   const shot = async (name) => { if (shotsDir) await page.screenshot({ path: resolve(shotsDir, `${label}-${light ? 'light' : 'dark'}-${name}.png`) }); };
 
-  // About → Home; the strip appears on Home only.
-  await clickLabel('Continue'); await clickLabel('Begin Reading');
+  // About → Letter 1 → Home (first-run.mjs); the strip shows on Home (and over the first letter), nowhere else.
+  await throughFirstRun(page);
   if (SCALE !== 1) {
     // Text Size as the reader sets it: the Settings slider, so the change goes through React and
     // usePersistedState writes it. Until 2026-09-04 this wrote StateStore directly, and the next
@@ -313,9 +314,15 @@ async function run(browser, { width, height, label, light }) {
   // A reload brings it back (session-only), then Don't show this again ends it for good.
   await page.reload({ waitUntil: 'load' });
   if (SCALE !== 1) { await sleep(600); console.log(`  --font-scale after reload: ${(await facts()).fontScale} (store ${await page.evaluate(() => String((window.StateStore.get().settings || {}).fontScale))})`); }
-  await page.waitForFunction(() => document.querySelector('.tour-prompt') || document.querySelector('.about-continue'), { timeout: 30000 });
+  // Maybe later is a three-day snooze across launches since 2026-09-25 (tour-controller TOUR_LATER_MS), no longer
+  // session-only: a reload keeps the strip away; dropping the stamp brings it back for the next check.
+  await page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
+  await sleep(900);
+  if ((await facts()).prompt) fail('the strip came back on a reload inside the Maybe later snooze'); else ok('Maybe later holds across a reload');
+  await page.evaluate(() => localStorage.removeItem('vot-tour-later-at'));
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForFunction(() => document.querySelector('.tour-prompt'), { timeout: 30000 });
   await sleep(500);
-  if (!(await facts()).prompt) fail('the strip did not return after a reload following Maybe later'); else ok('Maybe later is session-only');
   await clickLabel('Don'); await sleep(300);
   if ((await facts()).prompt) fail("Don't show this again did not hide the strip");
   await page.reload({ waitUntil: 'load' });
@@ -347,7 +354,7 @@ async function run(browser, { width, height, label, light }) {
     if (f.overflowX) fail(`${id}: the page scrolls sideways`);
     cutCheck(f, id);
     const want = EXPECT_SCREEN[id];
-    if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
+    if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : want === 'reading-plans' ? 'Reading plans' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
     if (RINGED.includes(id)) {
       /* Wait for the ring to EXIST and then to STOP MOVING, and the second half is not a
          nicety. The overlay re-scrolls an off-screen target for up to RESCROLL_WINDOW_MS,

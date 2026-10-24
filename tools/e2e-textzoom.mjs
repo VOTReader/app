@@ -29,6 +29,7 @@ import { resolve, dirname, normalize, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -122,7 +123,7 @@ try {
     };
 
     await stop('about');
-    await click('Continue'); await click('Begin Reading');
+    await throughFirstRun(page);
     await stop('home');
     await click('Prophetic Letters'); await stop('volumes');
     await click('Volume One'); await stop('volume-index');

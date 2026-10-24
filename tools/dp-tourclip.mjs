@@ -50,6 +50,7 @@ import { resolve } from 'node:path';
 import { execSync } from 'node:child_process';
 import puppeteer from 'puppeteer';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : d);
@@ -100,8 +101,7 @@ try {
       await sleep(450);
     };
 
-    await clickLabel('Continue');
-    await clickLabel('Begin Reading');
+    await throughFirstRun(page);
 
     if (SCALE !== 1) {
       // Text Size the way the reader sets it: the real slider, through React's own setter, then the

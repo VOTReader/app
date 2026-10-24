@@ -25,6 +25,7 @@ import { resolve } from 'node:path';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : d);
@@ -124,7 +125,7 @@ try {
   };
 
   await stop('about');
-  await click('Continue'); await click('Begin Reading');
+  await throughFirstRun(page);
   await stop('home');
   await click('Prophetic Letters'); await stop('volumes');
   await click('Volume One'); await stop('volume-index');

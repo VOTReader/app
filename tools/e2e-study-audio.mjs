@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import puppeteer from 'puppeteer';
 import { exitAfterThrow } from './e2e-exit.mjs';
+import { throughFirstRun, declineTourOffer } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const argv = process.argv.slice(2);
 const shotsDir = argv.includes('--shots') ? argv[argv.indexOf('--shots') + 1] : null;
@@ -121,7 +122,7 @@ try {
   };
   const shot = async (name) => { if (shotsDir) await page.screenshot({ path: resolve(shotsDir, name + '.png') }); };
   const declineTour = async () => {
-    const hit = await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find((b) => /^Maybe later$/.test(b.textContent.trim())); if (b) b.click(); return !!b; });
+    const hit = await declineTourOffer(page);
     if (hit) await sleep(400);
     return hit;
   };
@@ -142,7 +143,7 @@ try {
   // ── boot: a fresh profile ──
   await page.goto(BASE, { waitUntil: 'load' });
   await booted(); await sleep(700);
-  await click('Continue'); await click('Begin Reading');
+  await throughFirstRun(page);
   await sleep(600);
   note(`boot: tour offer ${await declineTour() ? 'declined' : 'not shown'}`);
 

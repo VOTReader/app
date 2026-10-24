@@ -32,6 +32,7 @@ import puppeteer from 'puppeteer';
 import { mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { serveOwnTree } from './e2e-read-serve.mjs';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const OUT = arg('out', null);
@@ -71,8 +72,7 @@ async function clickIfPresent(page, label) {
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS });
-  await clickLabel(page, 'Continue');
-  await clickLabel(page, 'Begin Reading');
+  await throughFirstRun(page);
   await sleep(500);
   await clickIfPresent(page, 'Maybe later');
   await sleep(200);

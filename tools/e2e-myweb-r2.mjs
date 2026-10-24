@@ -99,6 +99,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { throughFirstRun } from './first-run.mjs';   // About → Begin Reading → Letter 1 → Home, in one place
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i > 0 ? process.argv[i + 1] : d; };
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -200,7 +201,7 @@ async function closeMenu(page) {
 async function boot(page, url) {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: NAV_MS });
   await page.waitForFunction(() => { const r = document.getElementById('root'); return !!r && r.children.length > 0; }, { timeout: NAV_MS });
-  await clickLabel(page, 'Continue'); await clickLabel(page, 'Begin Reading'); await sleep(500);
+  await throughFirstRun(page); await sleep(500);
   await clickIfPresent(page, 'Maybe later'); await sleep(200);
 }
 async function toMyWeb(page) {
