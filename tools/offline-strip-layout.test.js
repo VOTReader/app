@@ -37,7 +37,11 @@ describe('the offline-library strip takes layout space (b5l)', () => {
     const m = /padding:\s*([\d.]+)px \S+ ([\d.]+)px/.exec(pin || '');
     expect(m, "the chrome-pin .top-nav rule no longer states its padding in px").toBeTruthy();
     const pad = Number(m && m[1]) + Number(m && m[2]);
-    expect(strip).toBe(`calc(var(--inset-top, 0px) + 44px + ${pad}px + 1px)`);
+    // n229: the strip and the arrows read the one token, --dock-nav-bottom (:root), instead of four
+    // hand-copied calcs; the token is what must equal the nav's height.
+    expect(strip).toBe('var(--dock-nav-bottom)');
+    const token = (/--dock-nav-bottom:\s*([^;]+);/.exec(CSS) || [])[1];
+    expect(token).toBe(`calc(var(--inset-top, 0px) + 44px + ${pad}px + 1px)`);
   });
 
   it('opens its own height of room under the page nav (not under the tabs overview, which covers it)', () => {
@@ -50,7 +54,7 @@ describe('the offline-library strip takes layout space (b5l)', () => {
     const arrows = blocks('.chapter-nav-sticky').map(top).filter(Boolean);
     expect(arrows).toEqual([strip]);
     const moved = top(blocks('body.offline-strip-open .chapter-nav-sticky')[0]);
-    expect(moved).toBe(strip.replace(/\)$/, ' + var(--offline-strip-h, 0px))'));
+    expect(moved).toBe('calc(' + strip + ' + var(--offline-strip-h, 0px))');
   });
 });
 
