@@ -24,6 +24,7 @@
 import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
 import { TourPrompt } from './TourPrompt.jsx';
 import { navOriginLabel } from '../../utils/tabs.js';
+import { OPEN_YOUR_DATA_EVENT } from '../../utils/your-data-link.js';
 
 export function AppShellOverlays({
   // Tabs overview + TabActionSheet
@@ -73,6 +74,12 @@ export function AppShellOverlays({
   // [13] focus traps — Tab stays inside the open dialog (Escape already
   // routes through the registry above). Refs land on each dialog's root.
   const disableTabsTrapRef = useFocusTrap(!!disableTabsPromptOpen);
+  // id-datasafe2 171: a toast's "Open Your Data" goes to Settings; Settings opens the group.
+  React.useEffect(() => {
+    const go = () => setScreen('settings');
+    window.addEventListener(OPEN_YOUR_DATA_EVENT, go);
+    return () => window.removeEventListener(OPEN_YOUR_DATA_EVENT, go);
+  }, [setScreen]);
   const gardenTrapRef = useFocusTrap(!!gardenWarningOpen);
   const tabsTrapRef = useFocusTrap(!!(settings.tabsEnabled && tabsOverviewOpen));
   // (TabActionSheet traps itself — it mounts only while open.)

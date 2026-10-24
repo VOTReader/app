@@ -137,6 +137,13 @@
   R('.jrn-block-quote textarea { background: none; color: var(--cream); outline: none; }');
   R('body.light .jrn-block-quote textarea { color: #2a2520; }');
   R('.jrn-block-quote-cite { width: 100%; background: none; border: none; outline: none; font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); margin-top: 8px; }');
+  // id-datasafe2 161: the B / I / Scripture row under a block holding a selection.
+  R('.jrn-fmt-row { display: flex; gap: 6px; margin-top: 6px; }');
+  R('.jrn-fmt-btn { min-width: 44px; min-height: 44px; padding: 0 12px; border-radius: 8px; background: var(--bg3); border: 1px solid var(--gold-border); color: var(--gold); font-family: var(--font-body); font-size: var(--fs-14); cursor: pointer; }');
+  R('.jrn-fmt-bold { font-weight: 700; }');
+  R('.jrn-fmt-italic { font-style: italic; }');
+  R('.jrn-fmt-btn:active { background: var(--gold-faint); }');
+  R('.jrn-fmt-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }');
   R('.jrn-divider { text-align: center; padding: 16px 0; color: var(--gold); letter-spacing: 1em; font-size: var(--fs-14); user-select: none; }');
   // Media blocks get visual breathing room so they read as inline interrupts
   R('.jrn-block:has(.jrn-embed-image), .jrn-block:has(.jrn-embed-audio), .jrn-block:has(.jrn-embed-letter), .jrn-block:has(.jrn-embed-chapter), .jrn-block:has(.jrn-embed-bookmark), .jrn-block:has(.jrn-embed-note), .jrn-block:has(.jrn-embed-journal), .jrn-block:has(.jrn-embed-verse) { margin: 8px 0; }');

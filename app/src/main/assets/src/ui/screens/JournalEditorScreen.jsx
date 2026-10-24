@@ -241,6 +241,9 @@ export function JournalEditorScreen(props) {
   // because its inline waveform layout has its own compact confirm strip
   // sized for the play-button row.
   const [confirmDelIdx, setConfirmDelIdx] = useState(null);
+  // id-datasafe2 161: { idx, start, end } while a text block holds a selection;
+  // it brings the slim B / I / Scripture row under that block.
+  const [fmtSel, setFmtSel] = useState(null);
 
   // ─── Block drag-to-reorder (grip handle) ────────────────────
   // Block drag rides the SHARED pointer-events lifecycle (utils/press-drag.js
@@ -326,7 +329,8 @@ export function JournalEditorScreen(props) {
   var activeTextareaRef = useRef(null);
   var saveSeqRef = useRef(0);          // ds5 s20.3: which save the 'Saved' chip is waiting on
   var blocksContainerRef = useRef(null);
-  var pendingFocusRef = useRef(null);  // { id, caret } to focus after the next render
+  var pendingFocusRef = useRef(null);  // { id, caret, end? } to focus after the next render
+  var fmtPressRef = useRef(false);     // a finger is on the B / I / Scripture row
   var firstRunRef = useRef(true);
   // Set true right before inserting a media block so the next auto-save is
   // IMMEDIATE (not the 1.2s debounce) — see the auto-save effect below and
@@ -981,7 +985,7 @@ export function JournalEditorScreen(props) {
     pendingFocusRef.current = null;
     var el = blocksContainerRef.current && blocksContainerRef.current.querySelector('[data-block-id="' + pf.id + '"] textarea');
     if (el) {
-      try { el.focus(); el.setSelectionRange(pf.caret || 0, pf.caret || 0); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
+      try { el.focus(); el.setSelectionRange(pf.caret || 0, pf.end != null ? pf.end : (pf.caret || 0)); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
     }
   });
 
@@ -1059,6 +1063,56 @@ export function JournalEditorScreen(props) {
   function trackCaret(idx, el) {
     if (!el) return;
     activeTextareaRef.current = { idx: idx, el: el, caret: el.selectionStart };
+    // A tap on the row can collapse the selection before its click lands: hold the row meanwhile.
+    if (fmtPressRef.current) return;
+    var s = el.selectionStart, e = el.selectionEnd;
+    setFmtSel(function(prev) {
+      if (!(e > s)) return null;
+      return prev && prev.idx === idx && prev.start === s && prev.end === e ? prev : { idx: idx, start: s, end: e };
+    });
+  }
+  function blurText(idx, e) {
+    trackCaret(idx, e.target);
+    // Focus moving onto the B / I / Scripture row keeps it; anywhere else ends it.
+    var to = e.relatedTarget;
+    if (!fmtPressRef.current && !(to && to.closest && to.closest('.jrn-fmt-row'))) setFmtSel(null);
+    commitSave();
+  }
+
+  // ─── B / I / Scripture (id-datasafe2 161) ────────────────────
+  // Marks the selection in the markup the viewer renders (jrnRenderInline);
+  // the same button on marked words takes the marks off. The selection comes
+  // back over the words, so a second mark can follow.
+  function applyFormat(kind) {
+    var sel = fmtSel;
+    var cur = sel && blocks[sel.idx];
+    if (!cur) return;
+    var text = cur.text || '';
+    var out = JournalHelpers.formatSelection(text, sel.start, sel.end, kind);
+    var adding = !!out && out.text.length > text.length;
+    if (kind === 'ref' && (!out || (adding && !(typeof parseRefStr === 'function' && parseRefStr(out.text.slice(out.start, out.end)))))) {
+      showToast({ id: 'vot-toast-journal-fmt', className: 'vot-toast', text: 'Select a reference such as John 3:16 to mark it as Scripture.', ariaLive: 'polite' });
+      return;
+    }
+    if (!out) return;
+    patchBlock(sel.idx, { text: out.text });
+    pendingFocusRef.current = { id: cur.id, caret: out.start, end: out.end };
+    setFmtSel({ idx: sel.idx, start: out.start, end: out.end });
+  }
+  function blockFormatUI(idx) {
+    if (!fmtSel || fmtSel.idx !== idx) return null;
+    // Pressing a button must not take focus (and the selection) from the textarea.
+    var keep = function(e) { e.preventDefault(); };
+    var press = function() { fmtPressRef.current = true; };
+    var lift = function() { setTimeout(function() { fmtPressRef.current = false; }, 0); };
+    return (
+      <div className="jrn-fmt-row" role="toolbar" aria-label="Mark the selected words"
+        onPointerDown={press} onPointerUp={lift} onPointerCancel={lift}>
+        <button type="button" className="jrn-fmt-btn jrn-fmt-bold" onMouseDown={keep} onClick={function() { applyFormat('bold'); }} aria-label="Bold" title="Bold">B</button>
+        <button type="button" className="jrn-fmt-btn jrn-fmt-italic" onMouseDown={keep} onClick={function() { applyFormat('italic'); }} aria-label="Italic" title="Italic">I</button>
+        <button type="button" className="jrn-fmt-btn jrn-fmt-ref" onMouseDown={keep} onClick={function() { applyFormat('ref'); }} title="Mark as a Scripture reference">Scripture</button>
+      </div>
+    );
   }
   function focusTextarea(idx, el) {
     activeTextareaRef.current = { idx: idx, el: el, caret: el ? el.selectionStart : 0 };
@@ -1119,6 +1173,7 @@ export function JournalEditorScreen(props) {
     blocksRef.current = moved;               // same synchronous commit as a drag release
     setBlocks(moved);
     activeTextareaRef.current = null;        // caret index is stale after a move
+    setFmtSel(null);
     gripFocusRef.current = to;
     scheduleSave();
   }
@@ -1192,9 +1247,10 @@ export function JournalEditorScreen(props) {
               onSelect={function(e) { trackCaret(idx, e.target); }}
               onKeyUp={function(e) { trackCaret(idx, e.target); }}
               onClick={function(e) { trackCaret(idx, e.target); }}
-              onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
+              onBlur={function(e) { blurText(idx, e); }}
             />
           </div>
+          {blockFormatUI(idx)}
           {blockDeleteUI(idx)}
           {blockDragUI(idx)}
         </div>
@@ -1214,9 +1270,10 @@ export function JournalEditorScreen(props) {
                 onSelect={function(e) { trackCaret(idx, e.target); }}
                 onKeyUp={function(e) { trackCaret(idx, e.target); }}
                 onClick={function(e) { trackCaret(idx, e.target); }}
-                onBlur={function(e) { trackCaret(idx, e.target); commitSave(); }}
+                onBlur={function(e) { blurText(idx, e); }}
               />
             </div>
+            {blockFormatUI(idx)}
             <input
               type="text"
               className="jrn-block-quote-cite"

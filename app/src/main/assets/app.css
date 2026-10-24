@@ -97,8 +97,8 @@
       /* W55: the same fade trap as .vot-toast-undo above: a faded "Tap to continue
          listening." took a late tap and toggled playback. */
       .vot-toast-action:not(.show) { pointer-events:none; }
-      .vot-toast-action .vot-escape-btn { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 4px; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; vertical-align:middle; }
-      body.light .vot-toast-action .vot-escape-btn { color:var(--gold-strong,#9a7b2e); }
+      .vot-toast-action .vot-escape-btn, .vot-toast-action .vot-toast-link { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 4px; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; vertical-align:middle; }
+      body.light .vot-toast-action .vot-escape-btn, body.light .vot-toast-action .vot-toast-link { color:var(--gold-strong,#9a7b2e); }
 
       /* copy-fallback (A15) — the passage a Copy / Share could not deliver,
          kept on screen in a bottom sheet with a retry (CopyFallbackSheet.jsx;

@@ -10,6 +10,7 @@ import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
 import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
 import { openWhatsNew } from '../../utils/whats-new.js';
+import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -730,6 +731,22 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   React.useEffect(() => {
     if (_tourGroup) setOpenGroups((prev) => (prev.has(_tourGroup) ? prev : new Set([...prev, _tourGroup])));
   }, [_tourGroup]);
+  // id-datasafe2 171: "Open Your Data" (the write-failure toast) lands here with the group
+  // open and in view, whether Settings mounts for it or was already on screen.
+  React.useEffect(() => {
+    const take = () => {
+      if (!takeYourDataAsk()) return;
+      setSettingsQuery('');
+      setOpenGroups((prev) => (prev.has('data') ? prev : new Set([...prev, 'data'])));
+      setTimeout(() => {
+        const el = document.querySelector('[data-settings-group="data"]');
+        if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' });
+      }, 0);
+    };
+    take();
+    window.addEventListener(OPEN_YOUR_DATA_EVENT, take);
+    return () => window.removeEventListener(OPEN_YOUR_DATA_EVENT, take);
+  }, []);
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
   // on mount; the derived display strings below pick the right text

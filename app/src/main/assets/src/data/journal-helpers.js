@@ -554,6 +554,53 @@ export var JournalHelpers = (function() {
     return h12 + ':' + (m < 10 ? '0' + m : m) + ' ' + ap;
   }
 
+  /* id-datasafe2 161: the editor's B / I / Scripture row. Marks the selection
+     [start, end) of a text block in the markup the viewer already renders
+     (jrnRenderInline): **bold**, _italic_, {{ref:John 3:16}}. Spaces the
+     selection caught stay outside the marks (a "**word **" reads as a typo in
+     the raw text). Pressing the same button on marked words takes the marks
+     off. Italic and Scripture never cross a line (the viewer's patterns stop
+     at one), so a multi-line italic marks each line; a multi-line Scripture
+     selection is refused. Returns { text, start, end } with start/end over
+     the words (inside the marks), or null when there is nothing to mark. */
+  var FORMAT_MARKS = { bold: ['**', '**'], italic: ['_', '_'], ref: ['{{ref:', '}}'] };
+  function formatSelection(text, start, end, kind) {
+    var marks = FORMAT_MARKS[kind];
+    if (!marks || typeof text !== 'string') return null;
+    var open = marks[0], close = marks[1];
+    var s = Math.max(0, Math.min(start, end)), e = Math.min(text.length, Math.max(start, end));
+    while (s < e && /\s/.test(text[s])) s++;
+    while (e > s && /\s/.test(text[e - 1])) e--;
+    if (e <= s) return null;
+    var inner = text.slice(s, e);
+    // Marked already: the selection sits just inside the marks, or takes them in.
+    if (text.slice(s - open.length, s) === open && text.slice(e, e + close.length) === close) {
+      return {
+        text: text.slice(0, s - open.length) + inner + text.slice(e + close.length),
+        start: s - open.length, end: e - open.length
+      };
+    }
+    if (inner.length > open.length + close.length && inner.slice(0, open.length) === open && inner.slice(-close.length) === close) {
+      var bare = inner.slice(open.length, inner.length - close.length);
+      return { text: text.slice(0, s) + bare + text.slice(e), start: s, end: s + bare.length };
+    }
+    var marked;
+    if (/\n/.test(inner)) {
+      if (kind === 'ref') return null;
+      if (kind === 'italic') {
+        marked = inner.split('\n').map(function(line) {
+          var body = line.trim();
+          if (!body) return line;
+          var at = line.indexOf(body);
+          return line.slice(0, at) + open + body + close + line.slice(at + body.length);
+        }).join('\n');
+        return { text: text.slice(0, s) + marked + text.slice(e), start: s, end: s + marked.length };
+      }
+    }
+    marked = open + inner + close;
+    return { text: text.slice(0, s) + marked + text.slice(e), start: s + open.length, end: e + open.length };
+  }
+
   return {
     blockId: blockId,
     newBlock: newBlock,
@@ -580,6 +627,7 @@ export var JournalHelpers = (function() {
     getBlockFromEntry: getBlockFromEntry,
     describeBlock: describeBlock,
     isEmbeddableBlock: isEmbeddableBlock,
-    embedBlockFromJournal: embedBlockFromJournal
+    embedBlockFromJournal: embedBlockFromJournal,
+    formatSelection: formatSelection
   };
 })();

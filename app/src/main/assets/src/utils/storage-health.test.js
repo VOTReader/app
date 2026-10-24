@@ -699,6 +699,33 @@ describe('write-path integration', () => {
     expect(vi.mocked(showToast).mock.calls[0][0].ariaLive).toBe('assertive');
   });
 
+  /* id-datasafe2 171 — the toast opens Your Data in one tap. */
+  it('the write-fail toast carries an Open Your Data button that asks for Your Data', () => {
+    vi.mocked(showToast).mockImplementationOnce((opts) => {
+      const el = document.createElement('div');
+      el.id = opts.id; el.className = 'vot-toast'; el.textContent = opts.text;
+      document.body.appendChild(el);
+    });
+    const heard = vi.fn();
+    window.addEventListener('vot-open-your-data', heard);
+    try {
+      StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
+      StorageHealth.onWriteFailure(new Error('quota'));
+      const el = /** @type {HTMLElement} */ (document.getElementById('vot-toast-writefail'));
+      expect(el.classList.contains('vot-toast-action')).toBe(true);
+      const btn = /** @type {HTMLButtonElement} */ (el.querySelector('button.vot-toast-link'));
+      expect(btn.textContent).toBe('Open Your Data');
+      btn.click();
+      expect(hideToast).toHaveBeenCalledWith('vot-toast-writefail');
+      expect(heard).toHaveBeenCalledTimes(1);
+      expect(/** @type {any} */ (window).__votOpenYourData).toBe(true);
+    } finally {
+      window.removeEventListener('vot-open-your-data', heard);
+      document.getElementById('vot-toast-writefail')?.remove();
+      delete (/** @type {any} */ (window)).__votOpenYourData;
+    }
+  });
+
   it('re-shows the write-fail toast once the cooldown elapses', () => {
     StorageHealth._resetForTests({ platform: PLATFORM.CHROME, storageApi: mockStorage() });
     StorageHealth.onWriteFailure(new Error('quota'));

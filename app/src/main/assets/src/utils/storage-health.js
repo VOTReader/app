@@ -51,6 +51,7 @@
 import { DiagnosticLog } from './diagnostic-log.js';
 import { PlatformBridge } from './platform-bridge.js';
 import { showToast, hideToast } from './toast.js';
+import { openYourData } from './your-data-link.js';
 
 /* ─── Constants ─────────────────────────────────────────────────────── */
 
@@ -605,9 +606,22 @@ function _notifyWriteFailureToast() {
     id: WRITE_FAIL_TOAST_ID,
     className: 'vot-toast',
     text: WRITE_FAIL_TOAST_TEXT,
-    durationMs: 6000,
+    durationMs: 8000,
     ariaLive: 'assertive',
   });
+  // id-datasafe2 171: and one tap takes the reader there. The button is built here (the text
+  // stays textContent); showToast sets the class only on a toast's first showing, so the
+  // action class that lets a finger reach the button is added each time.
+  var el = typeof document !== 'undefined' ? document.getElementById(WRITE_FAIL_TOAST_ID) : null;
+  if (!el) return;
+  el.classList.add('vot-toast-action');
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'vot-toast-link';
+  btn.textContent = 'Open Your Data';
+  btn.addEventListener('click', function () { hideToast(WRITE_FAIL_TOAST_ID); openYourData(); }, { once: true });
+  el.appendChild(document.createTextNode(' '));
+  el.appendChild(btn);
 }
 
 /**
