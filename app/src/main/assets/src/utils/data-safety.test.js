@@ -443,20 +443,22 @@ describe('the weekly copy in Downloads/VOTReader (dl-weekly)', () => {
   });
 
   // id-datasafe 159: a failed copy was silent and retried on every pass.
+  // Asked of weeklyCopy itself: a run() pass meets the snapshot's once-a-LOCAL-day gate first,
+  // so which of these passes reach the copy depended on the machine's timezone (red in UTC CI).
   it('a failed copy is remembered with its reason, waits a day, and clears once one is written', async () => {
-    await seed({ 'vot-annotations': ANN, 'vot-notes': NOTES, 'vot-links': LINKS, 'vot-state': STATE });
-    const sink = memorySink();
     const bridge = fakeBridge();
     const save = bridge.weeklyCopySave.getMockImplementation();
     bridge.weeklyCopySave.mockImplementation(() => false);
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    await runOn(0, sink, bridge);
+    const T0 = Date.UTC(2026, 9, 1, 15);
+    const copyAt = (day) => weeklyCopy({ now: () => T0 + day * DAY, stores: { 'vot-notes': NOTES }, bridge });
+    expect(await copyAt(0)).toBe('failed');
     expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(1);
     expect(DataSafety.weeklyStatus({ bridge }).failure).toMatchObject({ reason: 'failed' });
-    await runOn(0.5, sink, bridge);                                    // the same day: no retry
+    expect(await copyAt(0.5)).toBe('recent');                          // within the day: no retry
     expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(1);
     bridge.weeklyCopySave.mockImplementation(save);
-    await runOn(1.1, sink, bridge);
+    expect(await copyAt(1.1)).toBe('written');
     expect(bridge.weeklyCopySave).toHaveBeenCalledTimes(2);
     expect(DataSafety.weeklyStatus({ bridge }).failure).toBeNull();
     expect(localStorage.getItem(WEEKLY_FAIL_KEY)).toBeNull();
