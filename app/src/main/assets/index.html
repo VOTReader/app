@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-uzE9Bnem5vMmEuiYR7PIGTzeyWj2vaYZGc6+NnmXAbc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-nnLx98+HsWi37YJk6e1qAc9vxnxE8hb3hztmPKCL6YI=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-mAlLZyzgv5j3ckXsVbEHAdVurjqzQko87dljHD/9BUY=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-uzE9Bnem5vMmEuiYR7PIGTzeyWj2vaYZGc6+NnmXAbc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-nnLx98+HsWi37YJk6e1qAc9vxnxE8hb3hztmPKCL6YI=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -761,10 +761,18 @@ root.render(/*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/R
 </script>
   <!-- Cloudflare Web Analytics (cfa1): one page view per open of the WEBSITE, spa off; nothing about it is shown.
        bc1 (Corbin via hub 2026-10-05): the website only. The phone app (appassets.androidplatform.net), the
-       review preview and a local server load no beacon, so the app sends nothing. tools/beacon-web-only.test.js. -->
+       review preview and a local server load no beacon, so the app sends nothing. tools/beacon-web-only.test.js.
+       cf-noagent (hub 2026-10-24): our own opens are not visits either. An automated browser (navigator.webdriver:
+       the headless walks, check:live) loads none, nor a device marked vot-no-stats in localStorage; opening the
+       site once with ?nostats=1 marks that browser (the S22 keeper's Chrome does). -->
   <script>
 (function (host) {
   if (host !== 'votreader.github.io') return;
+  if (navigator.webdriver) return;
+  try {
+    if (/[?&]nostats=1(&|$)/.test(location.search)) localStorage.setItem('vot-no-stats', '1');
+    if (localStorage.getItem('vot-no-stats')) return;
+  } catch (e) { /* storage blocked: count the visit */ }
   var s = document.createElement('script');
   s.defer = true;
   s.src = 'https://static.cloudflareinsights.com/beacon.min.js';
