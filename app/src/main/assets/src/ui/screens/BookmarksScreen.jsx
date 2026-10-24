@@ -292,7 +292,9 @@ export function BookmarksScreen(props) {
     var filtered = q
       ? allBookmarks.filter(function(bkm) {
           var label = (bkm.label || '').toLowerCase();
-          return label.includes(q) || sourceOf.get(bkm).lower.includes(q);
+          // n163: the reader's own thought on a bookmark is searchable too
+          var thought = (bkm.thought || '').toLowerCase();
+          return label.includes(q) || sourceOf.get(bkm).lower.includes(q) || thought.includes(q);
         })
       : allBookmarks.slice();
 

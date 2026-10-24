@@ -185,3 +185,20 @@ describe('BookmarksScreen — empty state', () => {
     expect(r.getByRole('searchbox', { name: 'Search bookmarks' })).toBeTruthy();
   });
 });
+
+/* n163 (idea sweep s19.2): the search also reads each bookmark's thought, the note the reader wrote on it. */
+describe('BookmarksScreen — search matches thoughts', () => {
+  it('finds a bookmark by a word only in its thought', () => {
+    globalThis.BookmarkStore = { ...globalThis.BookmarkStore,
+      all: () => BOOKMARKS.map((b) => (b.id === 'b2' ? { ...b, thought: 'Remember the Shepherd here' } : b)) };
+    show();
+    fireEvent.change(document.querySelector('input.notes-index-search'), { target: { value: 'shepherd' } });
+    expect(labels()).toEqual(['Zeta note']);
+  });
+
+  it('a bookmark with no thought still matches on label and source', () => {
+    show();
+    fireEvent.change(document.querySelector('input.notes-index-search'), { target: { value: 'alpha' } });
+    expect(labels().sort()).toEqual(['Alpha note', 'Mu note']);
+  });
+});
