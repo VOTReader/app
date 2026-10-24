@@ -233,23 +233,6 @@ describe('progress frontiers', () => {
     expect(ReadingStatsStore.getProgress('k')).toMatchObject({ b: 12, c: [3] });
   });
 
-  it('firstUnreadIndex finds the frontier; null when useless', () => {
-    ReadingStatsStore.recordProgress('k', 6, [0, 1, 2, 4]);
-    expect(ReadingStatsStore.firstUnreadIndex('k', 6)).toBe(3);
-    // count mismatch with the live DOM → no frontier
-    expect(ReadingStatsStore.firstUnreadIndex('k', 8)).toBeNull();
-    // nothing read → the top IS the frontier → null (no special scroll)
-    ReadingStatsStore.recordProgress('j', 6, []);
-    expect(ReadingStatsStore.firstUnreadIndex('j', 6)).toBeNull();
-    // first segment unread → resume at top → null, not 0
-    ReadingStatsStore.recordProgress('m', 6, [1, 2]);
-    expect(ReadingStatsStore.firstUnreadIndex('m', 6)).toBeNull();
-    // everything credited → no frontier
-    ReadingStatsStore.recordProgress('z', 3, [0, 1, 2]);
-    expect(ReadingStatsStore.firstUnreadIndex('z', 3)).toBeNull();
-    expect(ReadingStatsStore.firstUnreadIndex('missing', 6)).toBeNull();
-  });
-
   it('LRU-prunes to 50 in-progress items by last touch', () => {
     for (let i = 0; i < 55; i++) ReadingStatsStore.recordProgress('p' + i, 5, [0], 1000 + i);
     const map = ReadingStatsStore.get().progress;

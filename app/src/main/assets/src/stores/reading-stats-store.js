@@ -285,28 +285,6 @@ export var ReadingStatsStore = extendStore(
     },
 
     /**
-     * Index of the FIRST segment never credited — the resume frontier —
-     * or null when there is no useful frontier (no data, count mismatch
-     * with the rendered content, or nothing read yet so the top is the
-     * frontier anyway).
-     *
-     * @param {string} key
-     * @param {number} renderedBlockCount  segment count of the live DOM
-     * @returns {number | null}
-     */
-    firstUnreadIndex(key, renderedBlockCount) {
-      var p = this.getProgress(key);
-      if (!p || !p.c.length) return null;
-      if (renderedBlockCount && p.b !== renderedBlockCount) return null;
-      var credited = {};
-      for (var i = 0; i < p.c.length; i++) credited[p.c[i]] = true;
-      for (var idx = 0; idx < p.b; idx++) {
-        if (!credited[idx]) return idx === 0 ? null : idx;
-      }
-      return null; // everything credited — no frontier
-    },
-
-    /**
      * @param {string} key
      * @returns {void}
      */

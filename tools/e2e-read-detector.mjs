@@ -336,6 +336,8 @@ try {
   console.log('AFTER PARTIAL READ:', JSON.stringify({ key2, progressKeys: Object.keys(result2.progress), entry: result2.progress[key2] }));
   const partialEntry = result2.progress[key2];
   const partialCredited = new Set((partialEntry && partialEntry.c) || []);
+  // The expected resume block comes from the stored frontier (which blocks the read credited) and, below,
+  // the page's own block count; the app's helpers are not asked (they would check the app against itself).
   let expectedUnread = null;
   if (partialEntry) {
     for (let i = 0; i < partialEntry.b; i++) {
@@ -354,14 +356,12 @@ try {
     const sc = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll');
     const cands = sc ? [...sc.querySelectorAll('[data-hl-key]')].filter((el) => !el.parentElement?.closest('[data-hl-key]')) : [];
     const blocks = cands.length;
-    const firstUnread = ReadingStatsStore.firstUnreadIndex(key, blocks);
     const target = expected != null && cands[expected] && sc
       ? (cands[expected].getBoundingClientRect().top - sc.getBoundingClientRect().top) + sc.scrollTop
       : -1;
     return {
       keyNow: window.__readTrackerMeta && window.__readTrackerMeta.key,
       blocks,
-      firstUnread,
       expectedUnread: expected,
       progress: ReadingStatsStore.getProgress(key),
       scrollTop: sc ? sc.scrollTop : -1,
@@ -380,7 +380,10 @@ try {
   if (!result2.progress[key2] || !result2.progress[key2].c || result2.progress[key2].c.length < 1) fails.push('no frontier recorded for partial read of ' + key2);
   if (result2.progress[key2] && result2.progress[key2].c.length >= result2.progress[key2].b) fails.push('partial fixture credited every block; resume frontier is useless');
   if (result2.progress[key2] && !(result2.progress[key2].w < result2.progress[key2].tw)) fails.push('word-weighted partial progress missing: ' + JSON.stringify(result2.progress[key2]));
-  if (!(resume.firstUnread > 0)) fails.push('no useful first-unread index after reopen: ' + JSON.stringify(resume));
+  // The stored frontier must describe the page as rendered (same block count), and its first uncredited block
+  // must sit past the top, or there is no frontier to resume from.
+  if (!partialEntry || resume.blocks !== partialEntry.b) fails.push('stored block count does not match the reopened page: ' + JSON.stringify({ stored: partialEntry && partialEntry.b, blocks: resume.blocks }));
+  if (!(expectedUnread > 0)) fails.push('no useful first-unread block after reopen: ' + JSON.stringify(resume));
   // target === -1 means the expected block (or the scroller) could not be
   // located — that must FAIL loudly, not degrade into a vacuous pass.
   if (resume.target < 0) fails.push('frontier target block not locatable (selector/expectedUnread broke): ' + JSON.stringify(resume));

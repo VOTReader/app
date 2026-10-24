@@ -260,7 +260,6 @@ describe('useReadTracker — frontier + pace plumbing', () => {
   it('NEVER moves the viewport — the saved scroll position owns resume (frontier jump retired)', () => {
     /** @type {any} */ (globalThis).ReadingStatsStore = {
       recordProgress: vi.fn(),
-      firstUnreadIndex: vi.fn(() => 3),
     };
     root = buildContent(6, 50);
     root.scrollTop = 5000;                 // the user flicked to the bottom last visit
@@ -271,14 +270,12 @@ describe('useReadTracker — frontier + pace plumbing', () => {
     vi.advanceTimersByTime(60000);
     expect(scrollTo).not.toHaveBeenCalled();
     expect(root.scrollTop).toBe(5000);
-    expect(/** @type {any} */ (globalThis).ReadingStatsStore.firstUnreadIndex).not.toHaveBeenCalled();
   });
 
   it('does not credit the temporary scroll-memory viewport while the restore is in flight', () => {
     const recordProgress = vi.fn();
     /** @type {any} */ (globalThis).ReadingStatsStore = {
       recordProgress,
-      firstUnreadIndex: vi.fn(() => 2),
     };
     root = buildContent(4, 50);
     paras(root).forEach(hide);
