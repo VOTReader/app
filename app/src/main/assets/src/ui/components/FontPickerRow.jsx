@@ -12,15 +12,28 @@
    React, READING_FONTS, readingFontById, SelectField.
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* A09.4 (mockup B-fontsheet A, 2026-10-23): the two faces built for easy reading open the sheet under their own
+   heading (they were cards 24 and 25, about 9,500 px down), the serifs follow in registry order, and every card
+   carries a sample line set in its own face. */
+const FONT_SAMPLE = 'In the beginning was the Word';
+
 export function FontPickerRow({ value, onSelect }) {
   const current = readingFontById(value) || readingFontById('classic');
-  const options = READING_FONTS.map((def) => ({
+  /** @param {any} def @param {string} group */
+  const toOption = (def, group) => ({
     id: def.id,
     label: def.label,
     desc: def.sub,
+    group,
     // 'classic' has no family — the system serif IS its own preview.
     labelStyle: { fontFamily: def.css || 'serif', fontSize: 'var(--fs-18)', letterSpacing: 0 },
-  }));
+    sample: FONT_SAMPLE,
+    sampleStyle: { fontFamily: def.css || 'serif' },
+  });
+  const options = [
+    ...READING_FONTS.filter((def) => def.easy).map((def) => toOption(def, 'Easy to read')),
+    ...READING_FONTS.filter((def) => !def.easy).map((def) => toOption(def, 'Serif faces')),
+  ];
   return (
     <SelectField
       eyebrow="Appearance"

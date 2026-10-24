@@ -24,7 +24,9 @@
      #custom-fonts block — the pre-2026-07-31 all-system look).
    - LIST ORDER IS THE PICKER ORDER (owner call): scripture-and-classic
      book faces first, contemporary reading serifs next, display/antique
-     voices after, the two readability sans last.
+     voices after, the two readability sans last. The picker SHOWS those two
+     first, under "Easy to read" (`easy: true`; A09.4, id-myweb B 2026-10-23):
+     the registry order, and so every other surface, stays the owner's.
 
    `faces` names the local woff2 files — reading-fonts.test.js gates
    registry ↔ fonts/reading/ ↔ app.css @font-face sync.
@@ -32,7 +34,7 @@
 
 /**
  * @typedef {{ id: string, label: string, family: string | null,
- *             css: string | null, sub: string, faces: string[] }} ReadingFontDef
+ *             css: string | null, sub: string, faces: string[], easy?: boolean }} ReadingFontDef
  */
 
 /** @type {ReadingFontDef[]} */
@@ -65,8 +67,8 @@ export const READING_FONTS = [
   // Display / antique voice.
   { id: 'playfair-display', label: 'Playfair Display', family: 'Playfair Display', css: "'Playfair Display', serif", sub: 'Ornate high-contrast display', faces: ['playfair-display-latin-wght-normal.woff2', 'playfair-display-latin-wght-italic.woff2'] },
   // Readability sans.
-  { id: 'atkinson-hyperlegible', label: 'Atkinson Hyperlegible', family: 'Atkinson Hyperlegible', css: "'Atkinson Hyperlegible', sans-serif", sub: 'Sans built for low vision', faces: ['atkinson-hyperlegible-latin-400-normal.woff2', 'atkinson-hyperlegible-latin-700-normal.woff2', 'atkinson-hyperlegible-latin-400-italic.woff2', 'atkinson-hyperlegible-latin-700-italic.woff2'] },
-  { id: 'lexend', label: 'Lexend', family: 'Lexend', css: "'Lexend', sans-serif", sub: 'Sans tuned for reading ease', faces: ['lexend-latin-wght-normal.woff2'] },
+  { id: 'atkinson-hyperlegible', label: 'Atkinson Hyperlegible', family: 'Atkinson Hyperlegible', css: "'Atkinson Hyperlegible', sans-serif", sub: 'Sans built for low vision', easy: true, faces: ['atkinson-hyperlegible-latin-400-normal.woff2', 'atkinson-hyperlegible-latin-700-normal.woff2', 'atkinson-hyperlegible-latin-400-italic.woff2', 'atkinson-hyperlegible-latin-700-italic.woff2'] },
+  { id: 'lexend', label: 'Lexend', family: 'Lexend', css: "'Lexend', sans-serif", sub: 'Sans tuned for reading ease', easy: true, faces: ['lexend-latin-wght-normal.woff2'] },
 ];
 
 /** @param {string | null | undefined} id @returns {ReadingFontDef | undefined} */

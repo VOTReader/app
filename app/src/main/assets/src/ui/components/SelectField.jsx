@@ -2,11 +2,13 @@
    SelectField — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Options are { id, label, desc? } plus two optional presentation fields
+/* Options are { id, label, desc? } plus optional presentation fields
    added for the Reading Font picker (2026-07-31), ignored elsewhere:
    - labelStyle: inline style for the option's label span (the font picker
      renders each font's NAME in that font via its preview family);
    - meta: small right-aligned status text ("Built in" / "~77 KB" / …).
+   - group: a heading drawn above the first option of each run (A09.4);
+   - sample / sampleStyle: a sample line under the description, in its own style (A09.4).
    `valueStyle` does the same for the closed row's current-value span. */
 export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null, valueLabel = null }) {
   const [open, setOpen] = React.useState(false);
@@ -95,11 +97,15 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
           <div className="select-sheet-ornament-line r" />
         </div>
         <div className="select-sheet-options" role="radiogroup" aria-labelledby={titleId} onKeyDown={moveFocus}>
-          {options.map((opt) => {
+          {options.map((opt, i) => {
             const isSelected = opt.id === value;
+            // A run of options may sit under a heading of its own (`group`, the Reading Font's "Easy to read").
+            const heading = opt.group && (i === 0 || options[i - 1].group !== opt.group)
+              ? <div className="select-sheet-group">{opt.group}</div> : null;
             return (
+              <React.Fragment key={opt.id}>
+              {heading}
               <button
-                key={opt.id}
                 type="button"
                 className={`select-sheet-option${isSelected ? " selected" : ""}`}
                 role="radio"
@@ -112,7 +118,10 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
                   {isSelected ? <span className="select-sheet-option-check" aria-hidden="true">{"✓"}</span> : null}
                 </div>
                 {opt.desc ? <div className="select-sheet-option-desc">{opt.desc}</div> : null}
+                {/* a sample set in the option's own face: shown, not read out on every card */}
+                {opt.sample ? <div className="select-sheet-option-sample" style={opt.sampleStyle} aria-hidden="true">{opt.sample}</div> : null}
               </button>
+              </React.Fragment>
             );
           })}
         </div>

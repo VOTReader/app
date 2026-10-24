@@ -5,7 +5,7 @@
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 import { createPressDrag } from '../../utils/press-drag.js';
-import { translationLabel } from '../../data/translations.js';
+import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
@@ -47,6 +47,8 @@ function useSongCatalogCount() {
 const PLAN_OFFER_KEY = 'vot-plans-offer-hidden';
 
 export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+  // U09.2: the Scriptures card names the edition the Bible shows ("WEB · NKJV until it downloads").
+  useOfflineEditions(translation);
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
   // mw18 C8: with no plan running (and the plans store loaded, so a plan never flashes the offer at boot),
@@ -74,7 +76,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
 
   const ITEMS_BY_ID = {
     volumes: { id: "volumes", eyebrow: "Prophetic Letters", title: "The Volumes of Truth", detail: "Letters from The Lord, Our God and Savior" },
-    scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: `Genesis to Revelation · ${translationLabel(translation)}` },
+    scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: `Genesis to Revelation · ${editionShownLabel(translation)}` },
     answers: { id: "answers", eyebrow: "Topics & Doctrines", title: "Answers Only God Can Give", detail: "The Lord sets the record straight" },
     studies: { id: "studies", eyebrow: "Study Editions", title: "Studies", detail: "Letter Studies · Matthew Study Bible" },
     listening: { id: "listening", eyebrow: "Audio Readings", title: "Listening Library", detail: "The Letters & Scriptures, read aloud" },

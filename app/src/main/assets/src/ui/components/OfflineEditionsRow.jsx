@@ -7,24 +7,12 @@
    says 'unsupported' and the row is not drawn). State: utils/offline-editions.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { OfflineEditions, editionCodes, editionBytes, formatEditionBytes } from '../../utils/offline-editions.js';
-
-const EDITION_FILE = /\/src\/data\/bible-[a-z]+\.js(?:$|\?)/;
+import { OfflineEditions, editionCodes, editionBytes, formatEditionBytes, useOfflineEditions } from '../../utils/offline-editions.js';
 
 /** @param {{ translation?: string }} props the picked edition: a new pick re-reads the caches */
 export function OfflineEditionsRow({ translation }) {
-  React.useSyncExternalStore(OfflineEditions.subscribe, OfflineEditions.getVersion);
-  React.useEffect(() => { void OfflineEditions.check(); }, [translation]);
-  // The picked edition downloads through its <script> (useTranslationLoader): read the caches again when one lands.
-  React.useEffect(() => {
-    /** @param {Event} e */
-    const onLoad = (e) => {
-      const el = /** @type {any} */ (e.target);
-      if (el && el.tagName === 'SCRIPT' && EDITION_FILE.test(String(el.src || ''))) void OfflineEditions.check();
-    };
-    document.addEventListener('load', onLoad, true);
-    return () => document.removeEventListener('load', onLoad, true);
-  }, []);
+  // Reads the caches on a new pick and when an edition's file lands (utils/offline-editions.js).
+  useOfflineEditions(translation);
 
   const { phase, have, missing, done, total } = OfflineEditions.getState();
   if (phase === 'unknown' || phase === 'unsupported') return null;

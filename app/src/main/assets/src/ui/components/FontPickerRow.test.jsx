@@ -59,13 +59,14 @@ describe('FontPickerRow (SelectField dropdown, all fonts vendored)', () => {
     expect(document.querySelector('.settings-row-value').textContent).toBe('System Serif');
   });
 
-  it('the sheet lists every registry font IN REGISTRY ORDER, named in its own family', () => {
+  it('the sheet lists every registry font, the easy-to-read pair first, the rest IN REGISTRY ORDER, each named in its own family', () => {
     mount();
     openSheet();
     const opts = options();
     expect(opts.length).toBe(READING_FONTS.length);
+    const shown = [...READING_FONTS.filter((d) => d.easy), ...READING_FONTS.filter((d) => !d.easy)];
     opts.forEach((o, i) => {
-      const def = READING_FONTS[i];
+      const def = shown[i];
       const name = o.querySelector('.select-sheet-option-label');
       expect(name.textContent.trim()).toBe(def.label);
       expect(name.style.fontFamily).toContain(def.family || 'serif');
@@ -106,5 +107,28 @@ describe('FontPickerRow (SelectField dropdown, all fonts vendored)', () => {
     openSheet();
     fireEvent.click(option('EB Garamond'));
     expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+// A09.4: "Easy to read" opens the sheet (Atkinson Hyperlegible was card 24 of 25), and each card shows a sample in its face.
+describe('FontPickerRow — Easy to read, and a sample per font', () => {
+  it('heads the sheet with Easy to read: Atkinson Hyperlegible and Lexend, then the serif faces', () => {
+    mount();
+    openSheet();
+    const heads = [...document.querySelectorAll('.select-sheet-group')].map((h) => h.textContent);
+    expect(heads).toEqual(['Easy to read', 'Serif faces']);
+    expect(options().slice(0, 2).map((o) => o.querySelector('.select-sheet-option-label').textContent)).toEqual(['Atkinson Hyperlegible', 'Lexend']);
+    expect(options()[2].querySelector('.select-sheet-option-label').textContent).toBe('System Serif');
+  });
+
+  it('every card carries a sample line set in its own face, hidden from the screen reader', () => {
+    mount();
+    openSheet();
+    for (const o of options()) {
+      const sample = o.querySelector('.select-sheet-option-sample');
+      expect(sample.textContent).toBe('In the beginning was the Word');
+      expect(sample.getAttribute('aria-hidden')).toBe('true');
+      expect(sample.style.fontFamily).toBe(o.querySelector('.select-sheet-option-label').style.fontFamily);
+    }
   });
 });

@@ -8,6 +8,7 @@ import { OfflineAudio } from '../../utils/offline-audio.js';
 import { canTell, networkType } from '../../utils/download-gate.js';
 import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
 import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
+import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
 import { openWhatsNew } from '../../utils/whats-new.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
@@ -203,6 +204,35 @@ function NavChip({ label, checked, onToggle, disabled = false }) {
         <span className="settings-toggle-thumb" />
       </span>
     </label>
+  );
+}
+
+/* TopBarStyleRow — Top-Nav Buttons' Compact | Icons choice (A09.5): a two-option radio group over the one
+   settings.compactTopBar switch. Picking the other option flips it; arrows move between the two, as radios do. */
+function TopBarStyleRow({ compact, onToggle }) {
+  const labelId = 'settings-topbar-style';
+  const pick = (/** @type {boolean} */ wantCompact) => { if (wantCompact !== compact) onToggle(); };
+  /** @param {any} e */
+  const onKey = (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+    e.preventDefault();
+    pick(!compact);
+    const other = e.currentTarget.querySelector('[aria-checked="false"]');
+    if (other) other.focus();
+  };
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label" id={labelId}>Top Bar</span>
+      </div>
+      <div className="settings-seg" role="radiogroup" aria-labelledby={labelId} onKeyDown={onKey}>
+        <button type="button" role="radio" aria-checked={compact} tabIndex={compact ? 0 : -1} onClick={() => pick(true)}>Compact</button>
+        <button type="button" role="radio" aria-checked={!compact} tabIndex={compact ? -1 : 0} onClick={() => pick(false)}>Icons</button>
+      </div>
+      <div className="settings-row-desc settings-seg-desc">{compact
+        ? 'Settings, History and the light/dark switch move into the ⋯ menu at the end of the bar, with Text size beside them; Back, Home, Search, Bookmark and Tabs stay.'
+        : 'Every icon sits in the bar; choose which below.'}</div>
+    </div>
   );
 }
 
@@ -639,6 +669,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
     React.useCallback((cb) => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__matthewCorpus !== 'undefined') ? window.__matthewCorpus.getVersion() : 0
   );
+  // U09.2: the Bible Translation value says "· NKJV until it downloads" while that is what the Bible shows. The
+  // Editions row beside it reads the caches; this only re-renders when it does.
+  React.useSyncExternalStore(OfflineEditions.subscribe, OfflineEditions.getVersion);
   const [studiesTick, setStudiesTick] = React.useState(0);
   React.useSyncExternalStore(
     React.useCallback((cb) => (typeof ReadingStatsStore !== 'undefined') ? ReadingStatsStore.subscribe(cb) : () => {}, []),
@@ -1096,6 +1129,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
               label="Bible Translation"
               desc={<TranslationInfoDesc />}
               value={settings.translation || "nkjv"}
+              valueLabel={editionShownLabel(settings.translation || "nkjv")}
               options={TRANSLATION_OPTIONS}
               onChange={(v) => onSetting("translation", v)}
             />
@@ -1408,12 +1442,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
             {/* The compact bar (the redesign, 2026-09-25; ui/components/MoreMenu.jsx). While
                 it is on, the three icons it moves live in the ⋯ menu, so their chips unmount
                 (the dependent-rows-unmount discipline) and only Bookmark is left to choose. */}
-            <SettingsRow
-              label="Compact Top Bar"
-              desc="On (default): Settings, History and the light/dark switch move into the ⋯ menu at the end of the bar, with Text size beside them; Back, Home, Search, Bookmark and Tabs stay. Off: every icon sits in the bar, chosen below."
-              checked={settings.compactTopBar !== false}
-              onToggle={() => onToggle("compactTopBar")}
-            />
+            {/* A09.5 (mockup B-topbar A, 2026-10-23): one Compact | Icons choice in place of the switch with chips
+                nested under it; the same settings.compactTopBar key, and the chips below stay the icon picker. */}
+            <TopBarStyleRow compact={settings.compactTopBar !== false} onToggle={() => onToggle("compactTopBar")} />
             <div className="settings-chip-note">{settings.compactTopBar !== false
               ? "Which optional icon appears in the bar beside Search."
               : "Which optional icons appear in the top bar. On compact phones, History stays in Home to preserve full-size touch targets; Settings does the same below 340px."}</div>

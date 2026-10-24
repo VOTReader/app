@@ -1332,15 +1332,28 @@ describe('dependency-gated rows unmount with their dependency', () => {
 
   it('the compact top bar (the default) unmounts the chips of the icons it moves into ⋯', () => {
     renderSettings({});
-    expect(screen.getByRole('switch', { name: 'Compact Top Bar' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Compact' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only
     expect(screen.queryByRole('switch', { name: 'Settings Gear' })).toBeNull();
     expect(screen.queryByRole('switch', { name: 'Theme' })).toBeNull();
     expect(screen.getByRole('switch', { name: 'Bookmark' })).toBeTruthy();
     cleanup();
     renderSettings({ compactTopBar: false });
+    expect(screen.getByRole('radio', { name: 'Icons' }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByRole('switch', { name: 'Settings Gear' })).toBeTruthy();
     expect(screen.getByRole('switch', { name: 'Theme' })).toBeTruthy();
+  });
+
+  // A09.5: one Compact | Icons choice replaces the nested switch; it flips the same key, and only when it changes.
+  it('Top Bar is a Compact | Icons radio group over settings.compactTopBar', () => {
+    const onToggle = vi.fn();
+    renderSettings({}, { onToggle });
+    const group = screen.getByRole('radiogroup', { name: 'Top Bar' });
+    fireEvent.click(within(group).getByRole('radio', { name: 'Compact' }));
+    expect(onToggle).not.toHaveBeenCalled();
+    fireEvent.click(within(group).getByRole('radio', { name: 'Icons' }));
+    expect(onToggle).toHaveBeenCalledWith('compactTopBar');
+    expect(screen.queryByRole('switch', { name: 'Compact Top Bar' })).toBeNull();
   });
 });
 

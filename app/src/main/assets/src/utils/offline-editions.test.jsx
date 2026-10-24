@@ -7,7 +7,7 @@ import { readFileSync, statSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { OfflineEditions, EDITION_BYTES, editionCodes, editionBytes, formatEditionBytes, editionUrl } from './offline-editions.js';
+import { OfflineEditions, EDITION_BYTES, editionCodes, editionBytes, formatEditionBytes, editionUrl, editionShownLabel } from './offline-editions.js';
 import { OfflineEditionsRow } from '../ui/components/OfflineEditionsRow.jsx';
 
 const ASSETS = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -182,5 +182,35 @@ describe('OfflineEditionsRow', () => {
     await act(async () => { s.dispatchEvent(new Event('load')); });
     expect(screen.getByRole('status').textContent).toMatch(/^1 of 3 on this device\./);
     s.remove();
+  });
+});
+
+// U09.2 / s05.1: Home and Settings said "WEB" while the Bible showed NKJV (WEB picked offline, never downloaded).
+describe('the picked edition as the reader sees it', () => {
+  afterEach(() => { delete /** @type {any} */ (window).BIBLE_WEB; });
+
+  it('says "· NKJV until it downloads" while the text is in neither memory nor the device', async () => {
+    stubWorld({ held: ['kjv'] });
+    await OfflineEditions.check();
+    expect(editionShownLabel('web')).toBe('WEB · NKJV until it downloads');
+    expect(editionShownLabel('nkjv')).toBe('NKJV');
+  });
+
+  it('names the edition alone once its text is in memory, or when it is on the device', async () => {
+    stubWorld({ held: ['kjv'] });
+    await OfflineEditions.check();
+    /** @type {any} */ (window).BIBLE_WEB = {};
+    expect(editionShownLabel('web')).toBe('WEB');
+    delete /** @type {any} */ (window).BIBLE_WEB;
+    stubWorld({ held: ['web'] });
+    await OfflineEditions.check();
+    expect(editionShownLabel('web')).toBe('WEB');
+  });
+
+  it('says nothing more where the store cannot tell (the APK, a page no worker controls)', async () => {
+    stubWorld({ controller: false });
+    await OfflineEditions.check();
+    expect(OfflineEditions.getState().phase).toBe('unsupported');
+    expect(editionShownLabel('web')).toBe('WEB');
   });
 });

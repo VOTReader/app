@@ -19,6 +19,8 @@
    phase: unknown | unsupported | partial | complete | downloading | stopped
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { isTranslationLoaded, translationLabel } from '../data/translations.js';
+
 /** Bytes of each edition's file (src/data/bible-<code>.js); offline-editions.test.js checks them against the files. */
 export const EDITION_BYTES = {
   rnkjv: 181184,
@@ -149,3 +151,38 @@ export const OfflineEditions = {
   /** Tests only. */
   _reset() { _state = { phase: 'unknown', have: [], missing: [], done: 0, total: 0 }; _running = null; _version += 1; },
 };
+
+/* ── The picked edition as the reader sees it (U09.2 / s05.1, id-myweb B 2026-10-23) ──────────────────────────────
+   Offline, with WEB picked and never downloaded, the Bible shows NKJV (translateVerse answers NKJV until the
+   edition's text is in memory) while Home and Settings said "WEB". The label now says so: "WEB · NKJV until it
+   downloads", for exactly as long as the text is neither in memory nor on the device. Where the store cannot tell
+   (the APK carries every edition; a page no worker controls), it says nothing more than the edition's name. */
+
+/** @param {string} [code] settings.translation @returns {string} */
+export function editionShownLabel(code) {
+  const c = code || 'nkjv';
+  const label = translationLabel(c);
+  if (c === 'nkjv' || isTranslationLoaded(c)) return label;
+  return _state.missing.includes(c) ? label + ' · NKJV until it downloads' : label;
+}
+
+const EDITION_FILE = /\/src\/data\/bible-[a-z]+\.js(?:$|\?)/;
+
+/**
+ * Keep a view that names the picked edition current: re-render on the store, read the caches when the pick changes,
+ * and again when an edition's file lands (useTranslationLoader loads the picked one through a <script>).
+ * @param {string} [translation]
+ */
+export function useOfflineEditions(translation) {
+  React.useSyncExternalStore(OfflineEditions.subscribe, OfflineEditions.getVersion);
+  React.useEffect(() => { void OfflineEditions.check(); }, [translation]);
+  React.useEffect(() => {
+    /** @param {Event} e */
+    const onLoad = (e) => {
+      const el = /** @type {any} */ (e.target);
+      if (el && el.tagName === 'SCRIPT' && EDITION_FILE.test(String(el.src || ''))) void OfflineEditions.check();
+    };
+    document.addEventListener('load', onLoad, true);
+    return () => document.removeEventListener('load', onLoad, true);
+  }, []);
+}

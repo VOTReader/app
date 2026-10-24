@@ -4016,6 +4016,12 @@
     /* Top-Nav button chips */
     .settings-chip-note { font-size:var(--fs-12); color:var(--cream-muted); font-style:italic; padding:0.65rem 0.95rem 0; }
     .settings-chips { display:flex; flex-wrap:wrap; gap:0.45rem; padding:0.7rem 0.95rem 0.8rem; }
+    /* A09.5 (mockup B-topbar A): one two-way choice, Compact | Icons, in place of the nested switch. */
+    .settings-seg { display:flex; gap:3px; margin:0 0.95rem 0.2rem; padding:3px; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg); }
+    .settings-seg > button { flex:1; min-height:44px; border:0; border-radius:8px; background:transparent; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-15); cursor:pointer; }
+    .settings-seg > button[aria-checked="true"] { background:var(--gold); color:var(--bg); }
+    .settings-seg-desc { padding-top:0.55rem; }
+    .vot-large-text .settings-seg { margin-left:12px; margin-right:12px; }
     /* max-width + shrinkable label: 300%-cap spill fix (chip must never run
        off-screen; the mini toggle stays, the label wraps). */
     .settings-chip { display:flex; align-items:center; gap:0.5rem; border:1px solid var(--gold-border); border-radius:20px; padding:0.3rem 0.5rem 0.3rem 0.7rem; background:transparent; cursor:pointer; max-width:100%; }
@@ -4163,6 +4169,16 @@
        "Downloaded" / "~77 KB" / "Downloading…"). */
     .select-sheet-option-meta { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); flex-shrink:0; white-space:nowrap; }
     .select-sheet-option-desc { font-size:var(--fs-13); color:var(--cream-muted); font-style:italic; margin-top:0.3rem; line-height:1.45; }
+    /* A09.4: a heading over a run of options, and a sample line in the option's own face (the Reading Font sheet). */
+    .select-sheet-group { display:flex; align-items:center; gap:0.6rem; margin:0.45rem 0 0.05rem; font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); }
+    .select-sheet-group::after { content:''; flex:1; height:1px; background:var(--gold-border); }
+    .select-sheet-option-sample { font-size:var(--fs-16); color:var(--cream); margin-top:0.35rem; line-height:1.4; overflow-wrap:break-word; }
+    /* U05.7: at large text the sheet keeps px gutters and a long font name wraps inside its card ("Atkinson Hyperlegible"
+       ran past the card edge at 300%). */
+    .vot-large-text .select-sheet:not(.ans-sheet) { padding-left:12px; padding-right:12px; }
+    .vot-large-text .select-sheet-option { padding:10px 12px; }
+    .vot-large-text :is(.select-sheet-option-label, .select-sheet-group, .select-sheet-title) { overflow-wrap:anywhere; min-width:0; }
+    .vot-large-text .select-sheet-group { letter-spacing:0.04em; }
     /* ── COMPACT LIST LAYOUT ── */
     .compact-list { width:100%; max-width:32.5rem; }
     .compact-list-group { margin-bottom:1rem; }
