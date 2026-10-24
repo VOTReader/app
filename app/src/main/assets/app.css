@@ -9610,12 +9610,21 @@
          the strip's measured height below, so growing costs no tile its reach. Measured after:
          portrait 360x800 194 / 232 / 298 px at Text Size 1 / 1.8 / 3. */
       /* Message lane (cz1): over the mini player, not on it (z310 hid the whole bar, pause and close included). */
-      .tour-prompt { bottom: calc(max(14px, var(--dock-sys)) + var(--dock-player)); z-index: 310; padding: 14px 16px 10px; }
+      /* tour-dock (2026-10-23): since first run's offer also shows over Letter 1 (n114), it covered the find pill until
+         dismissed (S22). The strip stacks on the reading screen's rows (the auto-scroll pill, the Study Notes card; those sit
+         on --dock-floor, hence the extra 9px once a row is up) and steps aside while find is open, coming back when find
+         closes: the reader is busy with find, and the offer keeps. On a short screen it also steps aside for the pill or the
+         card, as there is no room left under the nav. Set on body, where the rows resolve. */
+      body { --dock-tour: calc(max(14px, var(--dock-sys)) + var(--dock-player) + var(--dock-transport) + var(--dock-context)
+        + min(calc(var(--dock-transport) + var(--dock-context)), 9px)); }
+      body:has(.find-pill) .tour-prompt { display: none; }
+      @media (max-height: 500px) { body.autoscroll-on .tour-prompt, body:has(.mode-toggle-wrap) .tour-prompt { display: none; } }
+      .tour-prompt { bottom: var(--dock-tour); z-index: 310; padding: 14px 16px 10px; }
       /* On a short screen (landscape, the player open) it scrolls inside itself rather than climb onto the nav.
          While it shows, toasts drop in under the nav (first run on Home is where the root-exit toast shows):
          the 80px it leaves free there is that lane (a two-line toast is 68px). */
-      .tour-prompt { max-height: calc(100vh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); max-height: calc(100dvh - max(14px, var(--dock-sys)) - var(--dock-player) - var(--dock-under-nav) - 80px); }
-      body.tour-prompt-open { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
+      .tour-prompt { max-height: calc(100vh - var(--dock-tour) - var(--dock-under-nav) - 80px); max-height: calc(100dvh - var(--dock-tour) - var(--dock-under-nav) - 80px); }
+      body.tour-prompt-open:not(:has(.find-pill)) { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
       /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
          later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
          second drops to its own line, right-aligned under a full-width primary, instead of the
@@ -9651,8 +9660,8 @@
       }
       /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
          scrolls clear of it, as the last paragraph does of the player bar above. */
-      body.tour-prompt-open .screen-scroll {
-        padding-bottom: calc(var(--tour-prompt-h, 200px) + 28px + var(--dock-player) + var(--dock-sys));
+      body.tour-prompt-open:not(:has(.find-pill)) .screen-scroll {
+        padding-bottom: calc(var(--tour-prompt-h, 200px) + 14px + var(--dock-tour));
       }
       /* THE CARD'S TYPE IS CAPPED, like the strip's since 2026-09-12 (the Tour Reviewer, 2026-09-13):
          uncapped, Text Size 3 on a 360x800 phone showed the Listen card's eyebrow and title with 11

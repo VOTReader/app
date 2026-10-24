@@ -66,7 +66,9 @@ const PARTS = {
   fab:        '<button class="jrn-fab jrn-fab-newentry"></button>',
 };
 // What can be on screen at once. Reading screens: hint yields to the player (AnnotationHint), autoscroll and
-// find hide it (app.css); find hides the toggle. Home: the tour prompt. Journal: the FAB.
+// find hide it (app.css); find hides the toggle. Home and first run's Letter 1: the tour prompt, which stacks on
+// the reading screen's rows and steps aside while find is open, and on a short screen for the pill or the toggle
+// (tour-dock). Journal: the FAB.
 const CASES = [];
 for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded', 'stopped']) for (const find of [0, 1])
   for (const toggle of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
@@ -78,6 +80,11 @@ for (const player of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
   CASES.push(['tour', player && 'player', msg].filter(Boolean));
   CASES.push(['fab', player && 'player', msg].filter(Boolean));
 }
+for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded']) for (const find of [0, 1])
+  for (const toggle of [0, 1]) for (const msg of ['', 'toast']) {
+    if (!as && !find && !toggle) continue;   // the plain tour cases above
+    CASES.push(['tour', player && 'player', as, find && 'find', toggle && 'toggle', msg].filter(Boolean));
+  }
 const VIEWPORTS = [[412, 915], [360, 740], [915, 412]];
 const insetsFor = (w, h) => [null, w > h ? [28, 24] : [68, 24]];
 
@@ -146,6 +153,7 @@ try {
             const el = document.querySelector(want[k]);
             const shown = vis.some((o) => o.el === el);
             const expect = !(k === 'toggle' && (c.includes('find') || (c.includes('expanded') && innerHeight <= 500)))
+              && !(k === 'tour' && (c.includes('find') || (innerHeight <= 500 && c.some((x) => ['autoscroll', 'expanded', 'toggle'].includes(x)))))
               && !(k === 'stopped' && c.includes('find'));
             if (shown !== expect) out.missing.push(`${k} ${shown ? 'shown' : 'hidden'}`);
           }

@@ -846,7 +846,10 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('.ann-hint-pill', 'bottom')).toBe('calc(max(1.2rem, var(--dock-sys)) + var(--dock-context))');
     expect(decl('.vot-toast {', 'bottom')).toBe('var(--dock-toast-bottom)');
     expect(decl('.vot-toast {', 'top')).toBe('var(--dock-toast-top)');
-    expect(decl('\n      .tour-prompt { bottom', 'bottom')).toBe('calc(max(14px, var(--dock-sys)) + var(--dock-player))');
+    // tour-dock: the strip stacks on the reading rows and steps aside while find is open.
+    expect(decl('\n      .tour-prompt { bottom', 'bottom')).toBe('var(--dock-tour)');
+    expect(decl('body { --dock-tour:', '--dock-tour')).toMatch(/var\(--dock-player\) \+ var\(--dock-transport\) \+ var\(--dock-context\)/);
+    expect(decl('body:has(.find-pill) .tour-prompt {', 'display')).toBe('none');
   });
   it('the pairwise lifts are gone, and find hides the Study Notes toggle', () => {
     expect(bare).not.toMatch(/body\.audio-bar-open \.ascroll-pill/);

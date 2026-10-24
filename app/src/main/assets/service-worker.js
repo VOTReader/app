@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-98c1102c82';
+const CACHE_VERSION = 'v1.0.2-1d40ad2f42';
 const CORPUS_VERSION = 'c74'; // c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,7 +316,7 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': 'c313c46f0c17c3437e5c34bc587a0d8539498381c0844bd56bb1b16fff6f4dd0',
-  './dist/app.min.css': 'dea66bbcb64d90a03f499b5b1da1fd1b64581e9e64844fbfcf8d83248935d92f',
+  './dist/app.min.css': '64e5b929b3ac07b6a95632474e1a8a1dd716236d33e7344a889bf191b84a44ff',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': '32c9921d45ed7765436526e6382265e64dfecf5afb5c7d153009cde2cd0a0e7c',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
