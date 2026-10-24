@@ -24,7 +24,7 @@ export function JournalChip({ refKey, onClick, label }) {
       className="nav-search-btn jrn-inbound-chip"
       onClick={function() { onClick && onClick(refKey, label); }}
       title={ids.length + ' journal ' + (ids.length === 1 ? 'entry' : 'entries')}
-      aria-label="Journal entries"
+      aria-label={ids.length + ' journal ' + (ids.length === 1 ? 'entry' : 'entries')}
     >
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--gold)' }}>
         <path d="M7 4h10a2 2 0 012 2v14l-7-3-7 3V6a2 2 0 012-2z" />

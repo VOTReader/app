@@ -87,3 +87,26 @@ describe('TabActionSheet counts only the tabs a bulk close will close (W53)', ()
     expect(screen.getByText(/No other tabs to close: pinned tabs stay open\./)).toBeTruthy();
   });
 });
+
+/* n196: a keyboard and screen-reader path to reorder tabs (drag was the only one). */
+describe('TabActionSheet Move earlier / Move later', () => {
+  it('moves the tab either way, and is off at each end', () => {
+    const onMove = vi.fn();
+    renderSheet({ onMove });
+    fireEvent.click(screen.getByRole('button', { name: 'Move earlier' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Move later' }));
+    expect(onMove.mock.calls).toEqual([[-1], [1]]);
+    cleanup();
+    renderSheet({ onMove, idx: 0 });
+    expect(/** @type {HTMLButtonElement} */ (screen.getByRole('button', { name: 'Move earlier' })).disabled).toBe(true);
+    cleanup();
+    renderSheet({ onMove, idx: 3 });
+    expect(/** @type {HTMLButtonElement} */ (screen.getByRole('button', { name: 'Move later' })).disabled).toBe(true);
+  });
+
+  it('the pin description names the real buttons (n133)', () => {
+    renderSheet();
+    expect(document.body.textContent).toContain('keeps it open through Close other tabs and Clear All');
+    expect(document.body.textContent).not.toContain('Close-others');
+  });
+});

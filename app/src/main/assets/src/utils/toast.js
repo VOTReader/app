@@ -117,10 +117,14 @@ export function showToast(opts) {
     el = document.createElement('div');
     el.id = id;
     el.className = className;
-    el.setAttribute('role', 'status');
-    el.setAttribute('aria-live', ariaLive);
     document.body.appendChild(el);
   }
+  // n198: reapplied on every call, so a later showToast on the same id gets its own ariaLive
+  // instead of keeping whatever the first call set.
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', ariaLive);
+  // n138: Cinzel suits a short line; a long message reads in the body face (.vot-toast.is-long).
+  el.classList.toggle('is-long', !!(opts && opts.text != null && String(opts.text).length > 60));
   // Update content; force reflow so the .show transition kicks in even when called on
   // an already-visible toast. SEC-2: textContent (opts.text) is the safe default for any
   // dynamic string; opts.html is for TRUSTED static markup only.

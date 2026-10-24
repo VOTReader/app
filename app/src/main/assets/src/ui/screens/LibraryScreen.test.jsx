@@ -290,3 +290,37 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     expect(tileEl('Progress')).toBe(document.querySelector('.library-tile'));
   });
 });
+
+/* n199: Home's Alt+ArrowUp/Down reorder, shared, on the Library's tiles. */
+describe('LibraryScreen keyboard reorder (n199)', () => {
+  it('Alt+ArrowDown swaps a tile with the next one, stores it and says so', () => {
+    const set = vi.fn();
+    setupGlobals({ LibraryOrderStore: { get: () => [...DEFAULT_LIBRARY_ORDER], set, subscribe: () => () => {}, getVersion: () => 0 } });
+    renderLibrary();
+    const first = document.querySelectorAll('.library-tile')[0];
+    const firstId = DEFAULT_LIBRARY_ORDER[0], secondId = DEFAULT_LIBRARY_ORDER[1];
+    fireEvent.keyDown(first, { key: 'ArrowDown', altKey: true });
+    expect(set).toHaveBeenCalledTimes(1);
+    expect(set.mock.calls[0][0].slice(0, 2)).toEqual([secondId, firstId]);
+    expect(document.querySelector('[role="status"]').textContent).toMatch(/moved later\.$/);
+    expect(first.getAttribute('aria-describedby')).toBe('library-reorder-hint');
+  });
+
+  it('a plain arrow, or Alt+ArrowUp on the first tile, moves nothing', () => {
+    const set = vi.fn();
+    setupGlobals({ LibraryOrderStore: { get: () => [...DEFAULT_LIBRARY_ORDER], set, subscribe: () => () => {}, getVersion: () => 0 } });
+    renderLibrary();
+    const first = document.querySelectorAll('.library-tile')[0];
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    fireEvent.keyDown(first, { key: 'ArrowUp', altKey: true });
+    expect(set).not.toHaveBeenCalled();
+  });
+
+  it('Back names its destination (n177)', () => {
+    setupGlobals();
+    let navOpts = null;
+    globalThis.LibraryNav = (o) => { navOpts = o; return null; };
+    renderLibrary();
+    expect(navOpts.backLabel).toBe('Home');
+  });
+});

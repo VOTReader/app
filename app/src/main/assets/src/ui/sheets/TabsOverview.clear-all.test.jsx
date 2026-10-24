@@ -72,3 +72,22 @@ describe('TabsOverview Clear All counts what it will close (sweep v081)', () => 
     expect(o.clearBtn().disabled).toBe(true);
   });
 });
+
+/* n133: "Merge duplicates" in plain words, and an off button says why on its own face. */
+describe('TabsOverview Merge duplicates', () => {
+  const show = (tabs) => render(
+    <TabsOverview tabs={tabs} activeTabIdx={0} onSelect={vi.fn()} onClose={vi.fn()} onNewTab={vi.fn()} onMenu={vi.fn()}
+      onReorder={vi.fn()} onClearAll={vi.fn()} onDedupe={vi.fn()} MAX_TABS={999} thumbnails={null} />,
+  );
+  const btn = () => /** @type {HTMLButtonElement} */ (document.querySelector('.tabs-action-btn'));
+  it('says No duplicates while it is off, and counts them when there are some', () => {
+    // tabContentKey is this file's stub: `k${__i}`, so the same __i is the same content.
+    show([{ screen: 'home', scrollPositions: {}, __i: 0 }, { screen: 'home', scrollPositions: {}, __i: 1 }]);
+    expect(btn().textContent).toBe('No duplicates');
+    expect(btn().disabled).toBe(true);
+    cleanup();
+    show([{ screen: 'home', scrollPositions: {}, __i: 0 }, { screen: 'home', scrollPositions: {}, __i: 0 }]);
+    expect(btn().textContent).toBe('Merge duplicates · 1');
+    expect(btn().disabled).toBe(false);
+  });
+});

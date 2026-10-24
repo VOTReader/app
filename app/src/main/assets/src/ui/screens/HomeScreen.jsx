@@ -6,6 +6,7 @@ import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 import { createPressDrag } from '../../utils/press-drag.js';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
+import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
 // failing device names itself (same pattern as [tabdrag]/[thumb]).
@@ -363,16 +364,12 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
               onPointerEnter={() => warmDestination(item.id)}
               onFocus={() => warmDestination(item.id)}
               onKeyDown={(e) => {
-                if (!e.altKey || !['ArrowUp', 'ArrowDown'].includes(e.key) || dragIdx >= 0) return;
-                e.preventDefault();
-                const target = orderedItems[i + (e.key === 'ArrowUp' ? -1 : 1)];
-                if (!target) return;
-                const next = [...order];
-                const from = next.indexOf(item.id), to = next.indexOf(target.id);
-                [next[from], next[to]] = [next[to], next[from]];
-                HomeOrderStore.set(next);
-                setOrder(next);
-                setHomeStatus(item.title + ' moved ' + (e.key === 'ArrowUp' ? 'up.' : 'down.'));
+                if (dragIdx >= 0) return;
+                const moved = altArrowReorder(e, order, orderedItems.map((it) => it.id), i);
+                if (!moved) return;
+                HomeOrderStore.set(moved.order);
+                setOrder(moved.order);
+                setHomeStatus(item.title + ' moved ' + (moved.up ? 'up.' : 'down.'));
               }}
               className={`home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`}
               onPointerDown={(e) => {

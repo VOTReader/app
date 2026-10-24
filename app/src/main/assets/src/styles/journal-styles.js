@@ -190,6 +190,9 @@
   // propagation so it doesn't trigger the parent card's nav click.
   R('.jrn-expand-toggle { background: none; border: none; padding: 0 0 0 6px; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap; }');
   R('.jrn-expand-toggle:hover { color: var(--gold-bright); }');
+  // n183: a 44 px touch target without moving the text: a transparent hit area around the small label.
+  R('.jrn-expand-toggle { position: relative; }');
+  R('.jrn-expand-toggle::after { content: ""; position: absolute; left: -6px; right: -8px; top: 50%; height: 44px; transform: translateY(-50%); }');
   R('.jrn-expand-toggle:active { color: var(--gold-dim); }');
   // When expanded, give the body a little breathing room from the toggle
   R('.is-expanded .jrn-expand-toggle { margin-top: 4px; }');

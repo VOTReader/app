@@ -50,10 +50,18 @@ export function ConfirmStrip({ question, yesLabel, onCancel, onConfirm, classNam
   // legibility in openIds().
   const _id = React.useId();
   useModalRegistry({ id: 'confirm-strip:' + _id, dismiss: onCancel });
+  // n185: the strip replaces the button that opened it, so focus would fall to <body>. It moves to
+  // Cancel, the safe answer; preventScroll because the strip sits where the reader just tapped.
+  const cancelRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  React.useEffect(() => {
+    const b = cancelRef.current;
+    if (b) { try { b.focus({ preventScroll: true }); } catch (_e) { b.focus(); } }
+  }, []);
   return (
     <div className={cls} style={style}>
       <span className="ann-chip-confirm-q">{question}</span>
       <button
+        ref={cancelRef}
         className="ann-chip-confirm-btn ann-chip-confirm-cancel"
         onClick={onCancel}
       >Cancel</button>

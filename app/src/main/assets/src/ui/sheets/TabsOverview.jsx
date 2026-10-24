@@ -309,7 +309,9 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
             onClick={(e) => {e.stopPropagation();onDedupe();}}
             disabled={dupeCount === 0}
             title={dupeCount === 0 ? 'No duplicate tabs' : `Merge ${dupeCount} duplicate ${dupeCount === 1 ? 'tab' : 'tabs'}`}
-          >Deduplicate{dupeCount > 0 ? ` · ${dupeCount}` : ''}</button>
+          >{/* n133: plain words, and an off button says why on its own face (a title tooltip
+              never shows on a phone). */}
+            {dupeCount === 0 ? 'No duplicates' : `Merge duplicates · ${dupeCount}`}</button>
         </div>
       </div>
       <div className="tabs-overview-grid">

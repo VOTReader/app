@@ -655,7 +655,7 @@ const SETTINGS_TOPICS = {
 /** @type {Record<string, string[]>} */
 const SETTINGS_TOPIC_WORDS = Object.fromEntries(Object.entries(SETTINGS_TOPICS).map(([id, t]) => [id, t.split(' ')]));
 
-export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null }) {
+export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null }) {
   const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
@@ -1073,7 +1073,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, onSearch
       navChildren={LibraryNav({
         // hide:['settings'] — you are already on Settings. The three icons
         // used to be hand-copied SVGs inline purely to omit the gear.
-        onBack, backTitle: 'Back', hide: ['settings'],
+        onBack, backTitle: 'Back', backLabel, hide: ['settings'],
         onHistory, onSearch, theme, onThemeChange,
       })}
     >

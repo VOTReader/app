@@ -177,3 +177,18 @@ describe('root-exit-toast — arm/disarm interaction with TIMER-CLEAR-ON-FORWARD
     expect(isArmed()).toBe(false);
   });
 });
+
+/* n197: a live region whose text never changes is not reliably announced. The text is written on each
+   show and cleared once the fade-out ends, so every arm is a text change. */
+describe('root-exit-toast — the live region announces (n197)', () => {
+  it('the text clears after the fade-out and is written again on the next arm', () => {
+    arm();
+    const el = document.getElementById('vot-root-exit-toast');
+    expect(el?.textContent).toBe('Press back again to exit');
+    disarm();
+    vi.advanceTimersByTime(400);
+    expect(el?.textContent).toBe('');
+    arm();
+    expect(el?.textContent).toBe('Press back again to exit');
+  });
+});

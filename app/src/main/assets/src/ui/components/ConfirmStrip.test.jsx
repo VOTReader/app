@@ -111,3 +111,12 @@ describe('ConfirmStrip', () => {
     expect(buttons[1].textContent).toBe('Yes, delete');
   });
 });
+
+/* n185: opening the strip moves focus to Cancel, the safe answer, so a keyboard or screen-reader user
+   lands on the question instead of on a button that has just disappeared. */
+describe('ConfirmStrip focus (n185)', () => {
+  it('focuses Cancel when it opens', () => {
+    render(<ConfirmStrip question="Delete?" onCancel={() => {}} onConfirm={() => {}} />);
+    expect(document.activeElement).toBe(screen.getByText('Cancel'));
+  });
+});

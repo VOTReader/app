@@ -7,7 +7,7 @@
    COL_BY_LETTER_SC, colLetterArr, …) are stubbed on globalThis. */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab } from './tabs.js';
+import { describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab, navOriginLabel } from './tabs.js';
 import { encodeSongsRoute } from './songs-route.js';
 
 beforeEach(() => {
@@ -246,5 +246,14 @@ describe('describeTab', () => {
         if (screen !== 'home') expect(d.title).not.toBe('Home');
       }
     });
+  });
+});
+
+/* n177: Back names where it goes. */
+describe('navOriginLabel', () => {
+  it('no origin is Home; a corpus-free screen is named as its tab would be', () => {
+    expect(navOriginLabel(null)).toBe('Home');
+    expect(navOriginLabel({ screen: 'reading-plans' })).toBe('Reading plans');
+    expect(navOriginLabel({ screen: 'volumes-home' })).toBe('Volumes');
   });
 });

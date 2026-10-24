@@ -51,6 +51,7 @@ import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSo
 import { MATTHEW_NOTE_RATIO } from '../utils/matthew-note-weight.js';
 import { AnswersHome, resetAnswersLanding } from './screens/AnswersHome.jsx';
 import { openDownloadsAt } from './screens/AudioOfflineScreen.jsx';
+import { navOriginLabel } from '../utils/tabs.js';
 import { AnswersShelf } from './screens/AnswersShelf.jsx';
 import { AnswersMedia } from './screens/AnswersMedia.jsx';
 import { AnswersSaved } from './screens/AnswersSaved.jsx';
@@ -1047,6 +1048,7 @@ export function buildScreenRoutes({
         onToggle={toggleSetting}
         onSetting={updateSetting}
         onBack={goNavOrigin}
+        backLabel={navOriginLabel(navOrigin)}
         onSearch={goSearch}
         onHistory={goHistory}
         readItems={readItems}
@@ -1131,6 +1133,7 @@ export function buildScreenRoutes({
       <HistoryScreen
         history={readHistory}
         onBack={goNavOrigin}
+        backLabel={navOriginLabel(navOrigin)}
         onHome={goHome}
         onSelect={(entry) => {
           // Wave 0 (P1-12): History was the only content entry point that set
@@ -1555,7 +1558,7 @@ export function buildScreenRoutes({
           book={MATTHEW}
           bibleAudio={bibleAudioFor(MATTHEW.id)}
           onSelect={(num) => { _pickFromIndex(); selectMatthewCh(num); }}
-          onBack={() => { if (fromSearch) { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
+          onBack={() => { if (fromSearch) { _backToResults(); } else if (fromStudies) { setFromStudies(false); goStudiesHome(); } else if (genreId) { setScreen('scripture-genre'); } else { goScripturesHome(); } }}
           // Wave 0: label names the real destination (Search / Studies /
           // the genre / Scriptures — never "Books").
           backLabel={fromSearch ? RESULTS_LABEL : fromStudies ? 'Studies' : _idxGenre ? _idxGenre.label : 'Scriptures'}
@@ -1613,7 +1616,7 @@ export function buildScreenRoutes({
           book={book}
           bibleAudio={bibleAudioFor(book.id)}
           onSelect={(num) => { _pickFromIndex(); selectBibleCh(num); }}
-          onBack={fromSearch ? () => { setFromSearch(false); setSurpriseAnchor(null); setScreen('search'); } : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
+          onBack={fromSearch ? _backToResults : genreId ? () => setScreen('scripture-genre') : goScripturesHome}
           backLabel={fromSearch ? RESULTS_LABEL : _idxGenre ? _idxGenre.label : 'Scriptures'}
           onSearch={goSearch}
           onHistory={goHistory}

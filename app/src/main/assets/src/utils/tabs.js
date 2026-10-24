@@ -265,3 +265,14 @@ export function scrollKeyForTab(tab) {
   return s || 'home';
 }
 
+
+/**
+ * The name a Back button speaks for a captured nav origin (n177): "Back to Psalms · Ch. 23" rather
+ * than a bare "Back". No origin means Back goes Home (goNavOrigin's fallback).
+ * @param {TabState | null | undefined} origin
+ * @returns {string}
+ */
+export function navOriginLabel(origin) {
+  if (!origin || !origin.screen) return 'Home';
+  try { return describeTab(origin).title || 'Home'; } catch (_e) { return 'Home'; }
+}

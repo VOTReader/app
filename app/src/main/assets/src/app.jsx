@@ -20,6 +20,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 import { buildScreenRoutes } from './ui/screen-routes.jsx';
 import { RouteSlot } from './components/RouteSlot.jsx';
+import { resolveActiveContent } from './utils/active-content.js';
 
 const { useState, useEffect } = React;
 
@@ -411,27 +412,8 @@ function App() {
   // swaps to the real screen the moment each arrives. (Folded out of App()
   // into a bundle-b hook to keep this file under its 800-line canary.)
   useLazyBundles();
-  const _MATTHEW = (typeof MATTHEW !== 'undefined') ? MATTHEW : null;
-  const ALL_BOOKS = {
-    ...(_MATTHEW ? { matthew: _MATTHEW } : {}),
-    ...(typeof BOOKS !== 'undefined' ? BOOKS : {})
-  };
-  window.__ALL_BOOKS = ALL_BOOKS; // expose for parseScriptureRef()
-  const book = bookId ? ALL_BOOKS[bookId] : null;
-  const chapter = book && chapterNum != null ? book.chapters.find((c) => c.num === chapterNum) : null;
-  function _findLetter(volKey) {
-    if (!letterId) return null;
-    var col = COL_BY_KEY.get(volKey);
-    var arr = colLetterArr(col), pref = colPreface(col);
-    return arr.find(function(l) { return l.id === letterId; }) || (pref && pref.id === letterId ? pref : null);
-  }
-  // F3: resolve only the ACTIVE letter's volume (screen -> its collection ->
-  // its array) instead of brute-scanning all 15 collections every render. NOT
-  // memoized on letterId: colLetterArr reads the lazy VOT corpus live, so a
-  // cold-opened letter would freeze at null (the documented staleness trap).
-  const _activeCol = letterId ? COL_BY_LETTER_SC.get(screen) : null;
-  const activeVolKey = _activeCol ? _activeCol.volKey : null;
-  const activeLetter = activeVolKey ? _findLetter(activeVolKey) : null;
+  // Book, chapter and letter on screen → utils/active-content.js (n227, the 800-line gate).
+  const { book, chapter, findLetter: _findLetter, activeLetter, activeVolKey } = resolveActiveContent({ screen, bookId, chapterNum, letterId });
 
   /* App-shell nav surface (20 helpers) → src/hooks/use-nav.js (P7b).
      goTabs / goNavOrigin / goSearch / goSearchOrigin stay below (P7c).

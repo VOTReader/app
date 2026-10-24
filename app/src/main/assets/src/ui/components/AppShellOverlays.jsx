@@ -23,6 +23,7 @@
 
 import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
 import { TourPrompt } from './TourPrompt.jsx';
+import { navOriginLabel } from '../../utils/tabs.js';
 
 export function AppShellOverlays({
   // Tabs overview + TabActionSheet
@@ -107,6 +108,8 @@ export function AppShellOverlays({
           <ScreenLayout trackScroll={false} landmarks={false} navChildren={LibraryNav({
             onBack: () => setTabsOverviewOpen(false),
             backTitle: 'Back',
+            // n177: Back closes the overview onto the tab underneath; it says which.
+            backLabel: tabs[activeTabIdx] ? (tabs[activeTabIdx].customTitle || navOriginLabel(tabs[activeTabIdx])) : undefined,
             onHomeBefore: () => setTabsOverviewOpen(false),
             hide: ['settings', 'history', 'search', 'theme'],
           })}>
@@ -134,6 +137,7 @@ export function AppShellOverlays({
               onCloseToRight={() => {closeTabsToTheRight(tabActionIdx);lastTabCloseStrikesRef.current = 0;}}
               onRename={(title) => renameTab(tabActionIdx, title)}
               onTogglePin={() => togglePinTab(tabActionIdx)}
+              onMove={(d) => { const to = tabActionIdx + d; if (to < 0 || to >= tabs.length) return; reorderTabs(tabActionIdx, to); setTabActionIdx(to); }}
               onDismiss={() => setTabActionIdx(null)}
             />
           )}

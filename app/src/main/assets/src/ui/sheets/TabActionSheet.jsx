@@ -2,7 +2,7 @@
    TabActionSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, onCloseToRight, onRename, onTogglePin, onDismiss }) {
+export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, onCloseToRight, onRename, onTogglePin, onMove = null, onDismiss }) {
   // Both actions here close SEVERAL tabs at once with no undo snapshot
   // (unlike the single × close, which gets an Undo toast) — so each is
   // confirm-gated in place, consistent with the app-wide ConfirmStrip
@@ -85,8 +85,20 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
             <div className="select-sheet-option-main">
               <span className="select-sheet-option-label">{tab && tab.pinned ? 'Unpin tab' : 'Pin tab'}</span>
             </div>
-            <div className="select-sheet-option-desc">{tab && tab.pinned ? 'Stops protecting this tab from bulk-close actions.' : 'Moves this tab to the front and protects it from Close-others and Clear-all.'}</div>
+            <div className="select-sheet-option-desc">{tab && tab.pinned ? 'Stops protecting this tab from Close other tabs and Clear All.' : 'Moves this tab to the front and keeps it open through Close other tabs and Clear All.'}</div>
           </button>
+          {/* n196: the keyboard and screen-reader path to reorder (drag was the only one). The sheet
+              stays open on the moved tab, so a second press moves it again. */}
+          {onMove && (
+            <div className="tab-move-row" role="group" aria-label="Move tab">
+              <button className="select-sheet-option tab-move-btn" disabled={idx <= 0} onClick={() => onMove(-1)}>
+                <span className="select-sheet-option-label">Move earlier</span>
+              </button>
+              <button className="select-sheet-option tab-move-btn" disabled={idx >= total - 1} onClick={() => onMove(1)}>
+                <span className="select-sheet-option-label">Move later</span>
+              </button>
+            </div>
+          )}
           {confirming === 'others' ? (
             <ConfirmStrip
               question={`Close ${othersCount} other ${othersCount === 1 ? 'tab' : 'tabs'}?`}

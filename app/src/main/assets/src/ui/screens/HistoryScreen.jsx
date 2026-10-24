@@ -36,7 +36,7 @@ function _entrySearchText(entry) {
   return parts.filter((p) => typeof p === 'string' && p).join(' ').toLowerCase();
 }
 
-export function HistoryScreen({ history, onBack, onHome, onSelect, onSearch, onSettings, theme, onThemeChange }) {
+export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, onSearch, onSettings, theme, onThemeChange }) {
   const now = new Date();
   const curY = now.getFullYear(),curM = now.getMonth(),curD = now.getDate();
 
@@ -261,7 +261,7 @@ export function HistoryScreen({ history, onBack, onHome, onSelect, onSearch, onS
   return (
     <ScreenLayout navChildren={LibraryNav({
       // hide:['history'] — you are already on History.
-      onBack, backTitle: 'Back', hide: ['history'],
+      onBack, backTitle: 'Back', backLabel, hide: ['history'],
       onSettings, onSearch, theme, onThemeChange,
     })}>
       <div className="vol-index history-screen">

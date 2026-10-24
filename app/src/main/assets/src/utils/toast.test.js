@@ -100,3 +100,26 @@ describe('toast — a hidden toast is no target (W55)', () => {
     }
   });
 });
+
+/* n198: the ARIA attributes are reapplied on every showToast, so a later call's ariaLive wins. */
+describe('showToast — ARIA on every call (n198)', () => {
+  it('a second call on the same id takes its own ariaLive', () => {
+    showToast({ id: 'vot-toast-aria', text: 'one', durationMs: 0 });
+    showToast({ id: 'vot-toast-aria', text: 'two', ariaLive: 'assertive', durationMs: 0 });
+    const el = document.getElementById('vot-toast-aria');
+    expect(el.getAttribute('aria-live')).toBe('assertive');
+    showToast({ id: 'vot-toast-aria', text: 'three', durationMs: 0 });
+    expect(el.getAttribute('aria-live')).toBe('polite');
+    expect(el.getAttribute('role')).toBe('status');
+    el.remove();
+  });
+
+  it('a long message is set in the body face (n138); a short one is not', () => {
+    showToast({ id: 'vot-toast-long', text: 'Saved.', durationMs: 0 });
+    const el = document.getElementById('vot-toast-long');
+    expect(el.classList.contains('is-long')).toBe(false);
+    showToast({ id: 'vot-toast-long', text: 'This message is long enough that small capitals would be hard to read at a glance.', durationMs: 0 });
+    expect(el.classList.contains('is-long')).toBe(true);
+    el.remove();
+  });
+});

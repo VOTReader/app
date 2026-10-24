@@ -23,6 +23,7 @@
 import { runName } from '../../data/plan-catalog.js';
 import { countMarks } from '../../utils/mark-kinds.js';
 import { createPressDrag } from '../../utils/press-drag.js';
+import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 
 // Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
@@ -202,6 +203,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
   const [order, setOrder] = React.useState(() => LibraryOrderStore.get());
   React.useEffect(() => { setOrder(LibraryOrderStore.get()); }, [libraryOrderVersion]);
   const [pressingIdx, setPressingIdx] = React.useState(-1);
+  const [libraryStatus, setLibraryStatus] = React.useState('');
   const [dragIdx, setDragIdx] = React.useState(-1);
 
   const cardRefs = React.useRef([]);
@@ -373,7 +375,7 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
 
   return (
     <ScreenLayout
-      navChildren={LibraryNav({ onBack: onBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}
+      navChildren={LibraryNav({ onBack: onBack, backLabel: 'Home', onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}
     >
       <div className="library-screen">
         <header className="study-head">
@@ -396,6 +398,16 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
                 startPress(i, e.clientX, e.clientY, e.pointerId);
               }}
               onDragStart={(e) => e.preventDefault()}
+              aria-describedby="library-reorder-hint"
+              onKeyDown={(e) => {
+                // n199: Home's Alt+ArrowUp/Down reorder, through the one shared handler.
+                if (dragIdx >= 0) return;
+                const moved = altArrowReorder(e, order, orderedTiles.map((t) => t.id), i);
+                if (!moved) return;
+                setOrder(moved.order);
+                LibraryOrderStore.set(moved.order);
+                setLibraryStatus(tile.title + ' moved ' + (moved.up ? 'earlier.' : 'later.'));
+              }}
             >
               <span className="library-tile-icon" aria-hidden="true">{tile.icon}</span>
               {/* main: the words and the count, which wraps under them when a large
@@ -415,6 +427,8 @@ export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmark
             </button>
           ))}
         </div>
+        <span id="library-reorder-hint" className="sr-only">Hold to rearrange, or press Alt with an arrow key.</span>
+        <p className="sr-only" role="status">{libraryStatus}</p>
       </div>
     </ScreenLayout>
   );

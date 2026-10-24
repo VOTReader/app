@@ -71,3 +71,13 @@ describe('JournalChip', () => {
     expect(clicked).toEqual({ k: 'chapter:genesis:1', l: 'Genesis 1' });
   });
 });
+
+/* n182: the chip's accessible name carries the count the badge shows. */
+describe('JournalChip accessible name (n182)', () => {
+  afterEach(() => { cleanup(); delete window.JournalIndexStore; });
+  it('announces the entry count', () => {
+    window.JournalIndexStore = { entriesReferencing: () => ['j1', 'j2', 'j3'], subscribe: () => () => {}, getVersion: () => 0 };
+    const { container } = render(<JournalChip refKey="chapter:genesis:1" />);
+    expect(container.querySelector('button').getAttribute('aria-label')).toBe('3 journal entries');
+  });
+});

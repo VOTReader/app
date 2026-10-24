@@ -54,8 +54,11 @@ let _timer = null;
 let _armed = false;
 /** @type {HTMLElement | null} */
 let _toastEl = null;
+/** @type {ReturnType<typeof setTimeout> | null} */
+let _clearTimer = null;
 
 const TOAST_ID = 'vot-root-exit-toast';
+const TOAST_TEXT = 'Press back again to exit';
 
 function _ensureToast() {
   if (_toastEl) return _toastEl;
@@ -64,7 +67,9 @@ function _ensureToast() {
   el.id = TOAST_ID;
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', 'polite');
-  el.textContent = 'Press back again to exit';
+  // n197: created EMPTY. A live region announces a text change, so the text is written on each show
+  // and cleared after each fade-out; a region created with its text already set was never announced.
+  el.textContent = '';
   el.style.cssText = [
     'position:fixed',
     // Above all overlays; lower than the Welcome modal (z 9999) which
@@ -100,12 +105,18 @@ function _showToast() {
   if (!el) return;
   // Force reflow then set opacity → smooth fade-in.
   void el.offsetHeight;
+  if (_clearTimer != null) { clearTimeout(_clearTimer); _clearTimer = null; }
+  el.textContent = TOAST_TEXT;
   el.style.opacity = '1';
 }
 
 function _hideToast() {
   if (!_toastEl) return;
-  _toastEl.style.opacity = '0';
+  const el = _toastEl;
+  el.style.opacity = '0';
+  if (_clearTimer != null) clearTimeout(_clearTimer);
+  // After the 180 ms fade, so the words do not vanish mid-fade.
+  _clearTimer = setTimeout(() => { _clearTimer = null; el.textContent = ''; }, 200);
 }
 
 /**
@@ -176,6 +187,7 @@ export function _reset() {
     _timer = null;
   }
   _armed = false;
+  if (_clearTimer != null) { clearTimeout(_clearTimer); _clearTimer = null; }
   if (_toastEl && _toastEl.parentNode) {
     _toastEl.parentNode.removeChild(_toastEl);
   }
