@@ -19,6 +19,9 @@ package com.votreader.sacredui
  *   MediaCommand          -> audio-player.__votMediaCommand(cmd, posMs)
  *   OfflineAudio          -> offline-audio.__votOfflineAudio(json)
  *   NativeAudio           -> native-audio.__votNativeAudio(json)
+ *   PlanReminderOpen      -> plan-reminder.__votPlanReminderOpen(planId)
+ *   NotificationsResult   -> plan-reminder.__votNotificationsResult(allowed)
+ *   TrimMemory            -> _entry-b.__onTrimMemory()
  */
 sealed class JsEvent(val fn: String) {
     data object ImportFile : JsEvent("__onImportFile")
@@ -77,4 +80,8 @@ sealed class JsEvent(val fn: String) {
     // rp-s1: the answer to the notification-permission ask (true = allowed). Fires for either asker
     // (the media card's or the reminder's); utils/plan-reminder.js re-reads the status on it.
     data object NotificationsResult : JsEvent("__votNotificationsResult")
+    // id-datasafe 285 (s41.7): Android asked the app to give memory back (onTrimMemory, at the
+    // levels MainActivityLogic.shouldTrimWebViewCache picks); the page drops its own regenerable
+    // caches (journal media object URLs and the like).
+    data object TrimMemory : JsEvent("__onTrimMemory")
 }

@@ -178,7 +178,11 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
   if (kind === 'legacy') {
     tail = 'Older text-format backup — contents read back correctly (this format carries no checksum).';
   } else if (integrity === 'ok') {
-    tail = 'Integrity check passed — the file looks intact.';
+    // id-datasafe 156: the CRC covers the manifest (every record); media frames are only
+    // walked to their declared lengths, so say what was checked and no more.
+    tail = s.mediaCount
+      ? 'Checksum passed: your records read back intact. Photos and voice memos were checked for size, not content.'
+      : 'Checksum passed: your records read back intact.';
   } else if (integrity === 'absent') {
     tail = 'Contents read back correctly. (No checksum — this backup predates integrity checksums; your next Export will include one.)';
   } else if (integrity === 'truncated') {
@@ -193,7 +197,8 @@ export function formatVerifyReport(s, integrity, kind, salvaged) {
       + 'Make a fresh Export.';
     level = 'warn';
   } else if (integrity === 'mismatch') {
-    tail = 'WARNING: the integrity check FAILED — this file may be corrupted. Your data here still imported-readable, but make a fresh Export as soon as possible.';
+    // id-datasafe 157: plain words for a failed checksum (the file still imports).
+    tail = 'WARNING: the checksum FAILED, so this file may be damaged. It can still be imported, but make a fresh Export as soon as possible.';
     level = 'warn';
   } else if (integrity === 'malformed' || integrity === 'trailing') {
     // Structure read fine, the trailer did not. Named explicitly rather than

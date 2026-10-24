@@ -568,7 +568,6 @@ class StorageManager(private val context: Context) {
         importBytesRead = 0L
     }
 
-    /** Best-effort delete of a SAF document we created (used on a failed/aborted export). */
     /**
      * Delete [uri] only when it is EMPTY: the document a create-document picker made
      * for a save that can no longer happen (Android killed the app while the picker
@@ -582,6 +581,7 @@ class StorageManager(private val context: Context) {
         catch (e: Exception) { Timber.w(e, "deleteIfEmpty failed for %s", uri); false }
     }
 
+    /** Best-effort delete of a SAF document we created (used on a failed/aborted export). */
     private fun deleteDocumentQuietly(uri: Uri) {
         try { DocumentsContract.deleteDocument(context.contentResolver, uri) }
         catch (e: Exception) { Timber.w(e, "deleteDocument (abort cleanup) failed for %s", uri) }

@@ -330,6 +330,8 @@ const config = defineConfig({
           // TEST-5 added the search / collectAllMediaIds / isMediaReferencedElsewhere /
           // allByCreated query-path tests, lifting this from ~51/42/62/56. Ratcheted
           // to lock the gain (never lower; per-file floors are safe to set tight).
+          // id-datasafe 266 deleted the unused search + allByCreated with their tests:
+          // the journal-store suites alone still read 76.6/65.4/79.7/78.9.
           statements: 65, branches: 54, functions: 74, lines: 70,
         },
         'app/src/main/assets/src/renderer/dom-links.js': {

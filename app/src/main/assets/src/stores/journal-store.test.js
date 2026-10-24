@@ -465,19 +465,9 @@ describe('JournalStore.pruneNotebook — cascade from journal-notebook deletion'
 });
 
 /* ──────────────────────────────────────────────────────────────
-   TEST-5 — query + scan read paths (search / media reference scans)
+   TEST-5 — scan read paths (media reference scans; the unused search went, id-datasafe 266)
    ────────────────────────────────────────────────────────────── */
-describe('JournalStore — query + scan paths (TEST-5)', () => {
-  it('search matches title, block text, and tags; empty query returns all', () => {
-    JournalStore.add({ title: 'Morning Prayer', blocks: [{ type: 'text', text: 'gratitude and peace' }], tags: ['gratitude'] });
-    JournalStore.add({ title: 'Evening', blocks: [{ type: 'text', text: 'a quiet reflection' }], tags: ['reflection'] });
-    expect(JournalStore.search('').length).toBe(2);                                  // empty → all
-    expect(JournalStore.search('morning').map((e) => e.title)).toEqual(['Morning Prayer']); // title hit
-    expect(JournalStore.search('quiet').map((e) => e.title)).toEqual(['Evening']);          // block-text hit
-    expect(JournalStore.search('reflection').map((e) => e.title)).toEqual(['Evening']);      // tag hit
-    expect(JournalStore.search('nonexistent')).toEqual([]);
-  });
-
+describe('JournalStore — scan paths (TEST-5)', () => {
   it('collectAllMediaIds gathers image + audio mediaIds across entries', () => {
     JournalStore.add({ blocks: [{ type: 'image', mediaId: 'm1' }, { type: 'text', text: 'x' }] });
     JournalStore.add({ blocks: [{ type: 'audio', mediaId: 'm2' }] });
@@ -492,14 +482,6 @@ describe('JournalStore — query + scan paths (TEST-5)', () => {
     JournalStore.remove(b.id);
     expect(JournalStore.isMediaReferencedElsewhere('shared', a.id)).toBe(false);    // only a remains
     expect(JournalStore.isMediaReferencedElsewhere(null, a.id)).toBe(false);        // falsy id short-circuits
-  });
-
-  it('allByCreated sorts newest-created first', () => {
-    const older = JournalStore.add({ title: 'older' });
-    const newer = JournalStore.add({ title: 'newer' });
-    /** @type {any} */ (JournalStore.get(older.id)).created = 1000;
-    /** @type {any} */ (JournalStore.get(newer.id)).created = 2000;
-    expect(JournalStore.allByCreated().map((e) => e.title)).toEqual(['newer', 'older']);
   });
 });
 

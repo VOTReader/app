@@ -139,7 +139,7 @@ describe('_savedBackupToast', () => {
   });
   it('warns when the backup nears the Android import limit', () => {
     const t = _savedBackupToast(undefined, true);
-    expect(t.text).toContain('nearing the Android import size limit');
+    expect(t.text).toContain('This file restores fine, but once your library grows past the limit, Export will stop');
     expect(t.sticky).toBe(true);
   });
 });

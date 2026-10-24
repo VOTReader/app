@@ -215,11 +215,6 @@ share it. (`__pendingLinkExcerpt` was removed in D2 — write-only dead code.)
 Set by the JS side BEFORE invoking a Kotlin bridge that fires a
 callback. The Kotlin side calls `webView.evaluateJavascript("window.__foo(...)")`.
 
-### `__setInsets`
-- **Setter:** `src/ui/components/FootnoteListSection.jsx:76` — set at module load (function definition)
-- **Cleanup:** none — lifetime is the page
-- **Consumer:** `MainActivity.kt`'s `injectInsets()` — called whenever window insets change (rotation, keyboard show/hide)
-
 ### `__onImportFile`
 - **Setter:** `src/ui/screens/SettingsScreen.js:270` — set BEFORE calling `AndroidBridge.openFilePicker()`
 - **Cleanup:** self-nulls inside its own body at `:271` (single-shot callback)

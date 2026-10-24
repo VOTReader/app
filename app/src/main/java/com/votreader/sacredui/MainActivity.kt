@@ -749,18 +749,6 @@ class MainActivity : AppCompatActivity(), BridgeHost {
     }
 
     /**
-     * Build and wire up the WebView used as the app's root view. Extracted
-     * from onCreate so onRenderProcessGone can rebuild a fresh WebView when
-     * the renderer process dies — every listener, client, and JS bridge is
-     * established here, so the new instance is fully equivalent to the
-     * original from the moment it leaves this method.
-     *
-     * The inset listener + requestApplyInsets are also wired here because
-     * they attach to a specific WebView; the back-press dispatcher stays in
-     * onCreate (Activity-scoped, reads the [webView] field at fire time).
-     */
-
-    /**
      * Every WebSettings choice the reader depends on, in one place so the JVM can
      * assert them — several are security decisions (file/content access off, mixed
      * content never) that were previously unreachable from a unit test, and
@@ -817,10 +805,22 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         s.useWideViewPort = false
     }
 
-    // setOnTouchListener (below) feeds a GestureDetector but returns false --
-    // it never consumes the event, so the WebView keeps its own click +
-    // accessibility handling intact, and the ClickableViewAccessibility lint
-    // check (meant for views that swallow touches) doesn't apply here.
+    /**
+     * Build and wire up the WebView used as the app's root view. Extracted
+     * from onCreate so onRenderProcessGone can rebuild a fresh WebView when
+     * the renderer process dies — every listener, client, and JS bridge is
+     * established here, so the new instance is fully equivalent to the
+     * original from the moment it leaves this method.
+     *
+     * The inset listener + requestApplyInsets are also wired here because
+     * they attach to a specific WebView; the back-press dispatcher stays in
+     * onCreate (Activity-scoped, reads the [webView] field at fire time).
+     *
+     * setOnTouchListener (below) feeds a GestureDetector but returns false --
+     * it never consumes the event, so the WebView keeps its own click +
+     * accessibility handling intact, and the ClickableViewAccessibility lint
+     * check (meant for views that swallow touches) doesn't apply here.
+     */
     @SuppressLint("ClickableViewAccessibility")
     private fun createConfiguredWebView(): WebView {
         val wv = WebView(this)
@@ -1612,7 +1612,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
             // journal media object-URL LRU) — the biggest in-heap wins live on the
             // JS side, not in this native resource cache. No-ops if the handler is
             // absent (web/PWA); routes through webView.post (bridge is thread-safe).
-            bridge.callOptional("__onTrimMemory")
+            bridge.callOptional(JsEvent.TrimMemory)
         }
     }
 

@@ -103,6 +103,7 @@ export function blobSliceToBase64(blobSlice) {
  * @param {Array<{ blob: Blob }>} args.mediaEntries        built.mediaEntries
  * @param {(slice: Blob) => Promise<string>} [args.sliceToBase64]  default blobSliceToBase64
  * @param {number} [args.chunkSize]                        default ANDROID_V3_CHUNK
+ * @param {(done: number, total: number) => void} [args.onProgress]  media bytes written so far (id-datasafe 155)
  * @returns {Promise<void>} resolves once committed; rejects (after aborting) on failure
  */
 export async function runV3AndroidExport(args) {
@@ -110,6 +111,12 @@ export async function runV3AndroidExport(args) {
   const slice = args.sliceToBase64 || blobSliceToBase64;
   const CH = args.chunkSize || ANDROID_V3_CHUNK;
   const entries = Array.isArray(args.mediaEntries) ? args.mediaEntries : [];
+  const total = entries.reduce((n, e) => n + ((e && e.blob && e.blob.size) || 0), 0);
+  let done = 0;
+  const progress = (/** @type {number} */ n) => {
+    if (typeof args.onProgress !== 'function') return;
+    try { args.onProgress(n, total); } catch (_e) { /* a progress line never stops the export */ }
+  };
   try {
     let r = bridge.v3ExportBegin(args.manifestJson);
     if (r !== 'ok') throw new Error('begin: ' + r);
@@ -121,6 +128,8 @@ export async function runV3AndroidExport(args) {
         const b64 = await slice(blob.slice(pos, Math.min(pos + CH, blob.size)));
         r = bridge.v3ExportChunk(b64);
         if (r !== 'ok') throw new Error('chunk: ' + r);
+        done += Math.min(CH, blob.size - pos);
+        progress(done);
       }
     }
     r = bridge.v3ExportFinish(true);

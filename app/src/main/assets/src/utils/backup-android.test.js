@@ -151,6 +151,23 @@ describe('round-trip export → import asserts byte-identity (multi-frame)', () 
     }
   });
 
+  // id-datasafe 155: the stream reported nothing until it ended.
+  it('reports media bytes written as it streams, ending at the total; a throwing listener stops nothing', async () => {
+    const CH = 1024;
+    const mediaEntries = [{ id: 'a', blob: new Blob([bytes(CH * 2 + 5, 1)]) }, { id: 'b', blob: new Blob([bytes(10, 2)]) }];
+    const manifest = { exportVersion: 3, media: [{ id: 'a', mime: 'x', size: CH * 2 + 5 }, { id: 'b', mime: 'x', size: 10 }] };
+    const seen = [];
+    const native = makeFakeNative();
+    await runV3AndroidExport({
+      bridge: native.bridge, manifestJson: JSON.stringify(manifest), mediaEntries, chunkSize: CH,
+      onProgress: (done, total) => { seen.push([done, total]); if (seen.length === 1) throw new Error('listener'); },
+    });
+    expect(native.state.committed).toBe(true);
+    const total = CH * 2 + 15;
+    expect(seen.map((p) => p[0])).toEqual([CH, CH * 2, CH * 2 + 5, total]);
+    expect(seen.every((p) => p[1] === total)).toBe(true);
+  });
+
   it('round-trips a manifest with NO media (zero frames)', async () => {
     const native = makeFakeNative();
     const manifest = { exportVersion: 3, media: [] };

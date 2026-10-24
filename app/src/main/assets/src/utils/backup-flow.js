@@ -48,6 +48,12 @@ const WEEKLY_OFF_KEY = 'vot-weekly-copy-off';
 const MANIFEST_WARN_BYTES = 12 * 1024 * 1024;
 const MANIFEST_MAX_BYTES = 16 * 1024 * 1024;
 
+// id-datasafe 281: the import cap, named once. A whole-file read past it (the legacy JSON
+// path, Verify on the web) is refused, as StorageManager.kt's MAX_IMPORT_SIZE is on Android ('too_large').
+const IMPORT_MAX_BYTES = 50 * 1024 * 1024;
+const IMPORT_TOO_LARGE_TEXT = 'That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?';
+const VERIFY_TOO_LARGE_TEXT = 'That file is too large to be a VOTReader backup (over 50 MB).';
+
 /**
  * The toast after a backup is written. `problems` (ok:true, from
  * buildV3Manifest) names the stores whose newest change never reached disk —
@@ -68,7 +74,8 @@ export function _savedBackupToast(problems, nearLimit) {
       + (n === 1 ? 'it' : 'them') + ' before the backup was taken'
     : '';
   const limit = nearLimit
-    ? ' Note: this backup is nearing the Android import size limit — it may soon fail to restore on a phone (desktop import is unaffected).'
+    // id-datasafe 158: this file restores; it is the NEXT export the 16 MiB gate refuses.
+    ? ' Note: your library is close to the 16 MB backup limit. This file restores fine, but once your library grows past the limit, Export will stop and say so.'
     : '';
   return { text: 'Backup saved' + stale + '.' + limit, sticky: !!(n || nearLimit) };
 }
@@ -344,40 +351,57 @@ export function createBackupFlow(ctx) {
   // payload in memory; one blob at a time). Android keeps the proven v2 path
   // until its native streaming lands (P3), so the only-backup mechanism is never
   // broken mid-port. BACKUP-STREAMING-PLAN.txt.
+  // id-datasafe 242: the start and end both export paths share (only the container write
+  // differs). Prepare shows 'Preparing export…', flushes, builds the manifest and refuses
+  // what must not be written (a read that threw, an index over the restore limit), toasting
+  // why; it answers the build, or null when the export stops here.
+  const _prepareV3Export = async () => {
+    _showToast('Preparing export…', 0);
+    // U1 + persist-debounce race closer: a vot-state union still inside
+    // usePersistedState's 250ms debounce window has NOT initiated a
+    // StateStore.set, so the whenSaved() barrier inside buildV3Manifest
+    // cannot cover it — it would be missing from the ONLY backup. Flush it
+    // synchronously FIRST (no-op when nothing is pending; bridge owned by
+    // usePersistedState, contract 5); the barrier then awaits the flushed
+    // write before the manifest reads vot-state from IDB.
+    if (typeof window.__flushPersistState === 'function') window.__flushPersistState();
+    const built = await buildV3Manifest({
+      storesMap: _exportableStores(),
+      flagMap: _flagStores(),
+      idbAdapter: IDBAdapter,
+      mediaStore: JournalMediaStore,
+      diagnosticLog: diagnosticLog,
+    });
+    if (!built.ok) {
+      hideToast(_TOAST_ID);
+      // buildV3Manifest fails LOUD (U6) only on a store or media read that
+      // THREW — those bytes really are absent, so abort rather than write a
+      // misleading, incomplete backup. A store that merely could not save its
+      // newest change still exports and comes back on built.problems below;
+      // refusing there would strand the reader in the one state the app tells
+      // them to export. (No media-limit case: v3 streams, so no size cap.)
+      _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
+      return null;
+    }
+    if (built.manifestBytes > MANIFEST_MAX_BYTES) {
+      hideToast(_TOAST_ID);
+      _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
+      return null;
+    }
+    return built;
+  };
+  /** The written file: mark the export and say what it holds (problems, the limit note). */
+  const _finishV3Export = (/** @type {any} */ built) => {
+    hideToast(_TOAST_ID);
+    _markExported();
+    const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
+    if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
+  };
+
   const _exportV3Web = async () => {
     try {
-      _showToast('Preparing export…', 0);
-      // U1 + persist-debounce race closer: a vot-state union still inside
-      // usePersistedState's 250ms debounce window has NOT initiated a
-      // StateStore.set, so the whenSaved() barrier inside buildV3Manifest
-      // cannot cover it — it would be missing from the ONLY backup. Flush it
-      // synchronously FIRST (no-op when nothing is pending; bridge owned by
-      // usePersistedState, contract 5); the barrier then awaits the flushed
-      // write before the manifest reads vot-state from IDB.
-      if (typeof window.__flushPersistState === 'function') window.__flushPersistState();
-      const built = await buildV3Manifest({
-        storesMap: _exportableStores(),
-        flagMap: _flagStores(),
-        idbAdapter: IDBAdapter,
-        mediaStore: JournalMediaStore,
-        diagnosticLog: diagnosticLog,
-      });
-      if (!built.ok) {
-        hideToast(_TOAST_ID);
-        // buildV3Manifest fails LOUD (U6) only on a store or media read that
-        // THREW — those bytes really are absent, so abort rather than write a
-        // misleading, incomplete backup. A store that merely could not save its
-        // newest change still exports and comes back on built.problems below;
-        // refusing there would strand the reader in the one state the app tells
-        // them to export. (No media-limit case: v3 streams, so no size cap.)
-        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
-        return;
-      }
-      if (built.manifestBytes > MANIFEST_MAX_BYTES) {
-        hideToast(_TOAST_ID);
-        _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
-        return;
-      }
+      const built = await _prepareV3Export();
+      if (!built) return;
       const stamp = _localStamp(new Date());
       const filename = `votreader-backup-${stamp}.votbak`;
       // The destination picker takes over the screen; drop the "Preparing…" toast.
@@ -434,10 +458,7 @@ export function createBackupFlow(ctx) {
         // any moment, so this scales to whatever the device can store.
         await writeContainer(built.manifest, built.mediaEntries, sink.write);
         await sink.close();
-        hideToast(_TOAST_ID);
-        _markExported();
-        const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
-        if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
+        _finishV3Export(built);
         return true;
       } catch (e) {
         hideToast(_TOAST_ID);
@@ -467,32 +488,8 @@ export function createBackupFlow(ctx) {
   // BACKUP-STREAMING-PLAN P3.
   const _exportV3Android = async () => {
     try {
-      _showToast('Preparing export…', 0);
-      // Same U1 + persist-debounce race closer as _exportV3Web: flush any
-      // vot-state union still inside usePersistedState's 250ms debounce
-      // window BEFORE buildV3Manifest's whenSaved() barrier + IDB read
-      // (no-op when nothing is pending; bridge owned by usePersistedState).
-      if (typeof window.__flushPersistState === 'function') window.__flushPersistState();
-      const built = await buildV3Manifest({
-        storesMap: _exportableStores(),
-        flagMap: _flagStores(),
-        idbAdapter: IDBAdapter,
-        mediaStore: JournalMediaStore,
-        diagnosticLog: diagnosticLog,
-      });
-      if (!built.ok) {
-        hideToast(_TOAST_ID);
-        // Same contract as _exportV3Web: a read that THREW aborts; a store that
-        // could not save its newest change still exports and is named on
-        // built.problems below.
-        _showToast('Export aborted — could not read: ' + built.problems.join(', ') + '. Nothing was saved. Please try again; if this repeats, your device storage may be failing.');
-        return;
-      }
-      if (built.manifestBytes > MANIFEST_MAX_BYTES) {
-        hideToast(_TOAST_ID);
-        _showToast('Export aborted — the backup index is over the 16 MiB restore limit. Nothing was saved. Clear unneeded personal data, then export again.', 0);
-        return;
-      }
+      const built = await _prepareV3Export();
+      if (!built) return;
       const stamp = _localStamp(new Date());
       const filename = `votreader-backup-${stamp}.votbak`;
       // The destination picker takes over the screen; drop the "Preparing…" toast.
@@ -509,15 +506,21 @@ export function createBackupFlow(ctx) {
       // then each media blob in <=512 KB base64 slices, then commit. On any
       // failure the driver aborts the open sink (v3ExportFinish(false)) so no
       // truncated, misleading backup survives (utils/backup-android.js — TEST-1).
+      let lastPct = -1;
       await runV3AndroidExport({
         bridge: PlatformBridge,
         manifestJson: JSON.stringify(built.manifest),
         mediaEntries: built.mediaEntries,
+        // id-datasafe 155: a long media stream said nothing until it ended. Name the share
+        // written, at most once per whole percent (each toast call repaints).
+        onProgress: (done, total) => {
+          const pct = total > 0 ? Math.floor((done / total) * 100) : 100;
+          if (pct === lastPct) return;
+          lastPct = pct;
+          _showToast('Saving backup… ' + pct + '%', 0);
+        },
       });
-      hideToast(_TOAST_ID);
-      _markExported();
-      const saved = _savedBackupToast(built.problems, built.manifestBytes > MANIFEST_WARN_BYTES);
-      if (saved.sticky) _showToast(saved.text, 0); else _showToast(saved.text);
+      _finishV3Export(built);
       return true;
     } catch (e) {
       backupWarn('android v3 export failed', e);
@@ -820,7 +823,7 @@ export function createBackupFlow(ctx) {
       if (sniff.kind === 'error') {
         try { PlatformBridge.v3ImportClose(); } catch (_e) { /* best-effort */ }
         if (sniff.reason === 'too_large') {
-          _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+          _showToast(IMPORT_TOO_LARGE_TEXT);
         } else {
           _showToast('This backup file is corrupt or incomplete and could not be read.');
         }
@@ -907,8 +910,8 @@ export function createBackupFlow(ctx) {
           // v1/v2 backup is always well under this, so a larger pick is a
           // pathological non-backup that a 300 MB .text() read would OOM on a
           // budget device.
-          if (file.size > 50 * 1024 * 1024) {
-            _showToast('That file is too large to import (over 50 MB). VOTReader backups are normally well under that — is it the right file?');
+          if (file.size > IMPORT_MAX_BYTES) {
+            _showToast(IMPORT_TOO_LARGE_TEXT);
             return;
           }
           await _doImport(await file.text());
@@ -971,7 +974,7 @@ export function createBackupFlow(ctx) {
         try {
           if (sniff.kind === 'error') {
             _verifyFail(sniff.reason === 'too_large'
-              ? 'That file is too large to be a VOTReader backup (over 50 MB).'
+              ? VERIFY_TOO_LARGE_TEXT
               : 'This backup file is corrupt or incomplete and could not be read.');
             return;
           }
@@ -1038,7 +1041,7 @@ export function createBackupFlow(ctx) {
             bytes: read.entries.reduce((n, e) => n + ((e.meta && e.meta.size) || 0), 0),
           });
         } else {
-          if (file.size > 50 * 1024 * 1024) { _verifyFail('That file is too large to be a VOTReader backup (over 50 MB).'); return; }
+          if (file.size > IMPORT_MAX_BYTES) { _verifyFail(VERIFY_TOO_LARGE_TEXT); return; }
           let parsed;
           try { parsed = JSON.parse(await file.text()); }
           catch (e) { backupWarn('verify legacy parse failed', e); _verifyFail('This backup file is corrupt or incomplete and could not be read.'); return; }

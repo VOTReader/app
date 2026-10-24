@@ -5,7 +5,7 @@
    in-test by the real writeContainer, handed to the screen through a
    mocked pickImportFile, and the flow runs the real readContainer +
    validateImportEnvelope + summarize/format pipeline. Pins:
-     - a healthy container reports its contents + "Integrity check passed"
+     - a healthy container reports its contents + "Checksum passed"
        in the Verify Result row (and the row dismisses);
      - storage-backup-1: a media frame truncated in transit STILL reports
        the manifest's contents (readContainer salvages rather than
@@ -81,13 +81,13 @@ describe('Verify a Backup (web)', () => {
     setup(await buildVotbak());
     renderSettings();
     await clickVerify();
-    const result = await screen.findByText(/Integrity check passed/);
+    const result = await screen.findByText(/Checksum passed/);
     expect(result.textContent).toContain('3 notes');
     expect(result.textContent).toContain('2 bookmarks');
     expect(result.textContent).toContain('1 media file');
     const dismiss = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Dismiss');
     await act(async () => { dismiss.click(); });
-    expect(screen.queryByText(/Integrity check passed/)).toBeNull();
+    expect(screen.queryByText(/Checksum passed/)).toBeNull();
   });
 
   it('storage-backup-1: a media frame truncated in transit still reports the (intact) manifest, with a truncation warning', async () => {

@@ -14,7 +14,7 @@
  * (412x915, ceb02901 + cz1; the size is set on an inner box, so the control's own padding and the inset
  * terms in its CSS still apply). Centred controls are drawn as wide as their CSS lets them get, so only the
  * stack can keep them apart. For every combination that can be on screen together (CASES), at 412x915,
- * 360x740 and 915x412, each without insets and with the APK's: __setInsets(68, 24) in portrait (the Pixel),
+ * 360x740 and 915x412, each without insets and with the APK's: --inset-top/--inset-bottom 68/24 in portrait (the Pixel),
  * (28, 24) in landscape, where the top inset is the status bar alone (MainActivity reserves systemBars +
  * displayCutout, and a landscape cutout sits on a side edge). 915x412 under a 68px top inset is a nav 135px
  * tall: 277px cannot hold the player, the open dwell row, find and a toast, whatever the stack does.

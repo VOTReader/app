@@ -103,9 +103,5 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef })
 /* ── Global Home button. Calls window.__goHome which App sets on mount. ── */
 /* HomeBtn → extracted to src/ui/components/HomeBtn.js */
 
-/* ── Inset bridge: MainActivity calls this after page load so CSS
-   variables reflect the real device camera cutout / status bar height ── */
-window.__setInsets = function (top, bottom) {
-  document.documentElement.style.setProperty('--inset-top', top + 'px');
-  document.documentElement.style.setProperty('--inset-bottom', bottom + 'px');
-}
+/* Insets: MainActivity's injectInsets() writes --inset-top / --inset-bottom on the root itself
+   (the old window.__setInsets bridge had no caller left; removed, id-datasafe 268). */

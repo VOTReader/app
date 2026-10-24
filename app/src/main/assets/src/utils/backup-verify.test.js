@@ -76,11 +76,15 @@ describe('formatVerifyReport', () => {
     expect(r.message).toContain('5 journal entries');
     expect(r.message).toContain('67 records across 5 data stores');
     expect(r.message).toContain('2 media files');
-    expect(r.message).toContain('Integrity check passed');
+    // id-datasafe 156: the CRC covers the records; media was only checked for size.
+    expect(r.message).toContain('Checksum passed: your records read back intact. Photos and voice memos were checked for size, not content.');
+    expect(formatVerifyReport({ ...s, mediaCount: 0 }, 'ok', 'v3').message).not.toContain('Photos');
   });
 
   it('a CRC mismatch is a warning', () => {
     const r = formatVerifyReport(s, 'mismatch', 'v3');
+    // id-datasafe 157: plain words, no 'imported-readable'.
+    expect(r.message).toContain('the checksum FAILED, so this file may be damaged. It can still be imported');
     expect(r.level).toBe('warn');
     expect(r.message).toContain('FAILED');
   });

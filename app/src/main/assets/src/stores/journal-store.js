@@ -26,7 +26,6 @@
 
    API summary:
      JournalStore.all()                 → entries (newest first by updated)
-     JournalStore.allByCreated()        → entries sorted by created desc
      JournalStore.get(id)               → entry | null
      JournalStore.add(seed?)            → newly-created entry
      JournalStore.update(id, patch, opts?) → bumps `updated` (1 ms with { keepDate: true }), rebuilds index
@@ -36,7 +35,6 @@
      JournalStore.toggleNotebook(id, nbId)
      JournalStore.pruneNotebook(nbId)   → called by JournalNotebookStore.remove
      JournalStore.count()
-     JournalStore.search(q)             → entries with q in title/preview/source label
      JournalStore.collectAllMediaIds()  → for orphan cleanup
 ═══════════════════════════════════════════════════════════════ */
 
@@ -156,18 +154,6 @@ export var JournalStore = extendStore(
       var data = this._load();
       return (data.list || []).slice().sort(function(a, b) {
         return (b.updated || b.created || 0) - (a.updated || a.created || 0);
-      });
-    },
-
-    /**
-     * All entries sorted by created date (newest first). Used by the hub
-     * when the user toggles to "by created" instead of "by updated".
-     * @returns {JournalEntry[]}
-     */
-    allByCreated() {
-      var data = this._load();
-      return (data.list || []).slice().sort(function(a, b) {
-        return (b.created || 0) - (a.created || 0);
       });
     },
 
@@ -669,28 +655,6 @@ export var JournalStore = extendStore(
         if (e.notebookIds.length !== before) { e.updated = (e.updated || e.created || 0) + 1; changed = true; }
       }
       if (changed) { this._save(); this._bump(); }
-    },
-
-    /**
-     * Case-insensitive substring search across entry title, block text,
-     * and tags. Empty query returns all() (sorted newest first).
-     * @param {string | null | undefined} q
-     * @returns {JournalEntry[]}
-     */
-    search(q) {
-      var query = (q || '').trim().toLowerCase();
-      if (!query) return this.all();
-      return this.all().filter(function(e) {
-        if ((e.title || '').toLowerCase().indexOf(query) >= 0) return true;
-        var blocks = e.blocks || [];
-        for (var i = 0; i < blocks.length; i++) {
-          var b = blocks[i];
-          var t = b.text || b.caption || b.label || b.title || '';
-          if (typeof t === 'string' && t.toLowerCase().indexOf(query) >= 0) return true;
-        }
-        if (e.tags && e.tags.join(' ').toLowerCase().indexOf(query) >= 0) return true;
-        return false;
-      });
     },
 
     /**
