@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeAll, afterAll } from 'vitest';
 import { render, fireEvent, cleanup } from '@testing-library/react';
 import { FootnoteListSection } from './FootnoteListSection.jsx';
 
@@ -112,5 +112,49 @@ describe('FootnoteListSection: no button inside a button', () => {
     fireEvent.click(card.querySelector('.footnote-list-note-text'));
     expect(scrollIntoView).toHaveBeenCalledTimes(1);
     bubble.remove();
+  });
+});
+
+/* ideas audit s14.5 (Corbin's yes, 2026-10-23): the in-body list has the sheet's Scripture Web door
+   beside Go to Scripture; its tap opens the web on the footnote's verse, not the card's jump back. */
+describe('FootnoteListSection: the Scripture Web door', () => {
+  let prevData;
+  beforeAll(async () => {
+    prevData = window.VotSearchData;
+    // @ts-ignore -- a classic script: it sets window.VotSearchData
+    await import('../../../search-data.js');
+  });
+  afterAll(() => { window.VotSearchData = prevData; });
+  afterEach(() => { delete /** @type {any} */ (window).__openScriptureWeb; });
+  const list = (footnotes) => {
+    /** @type {any} */ (globalThis).lookupVersesFromBooks = () => 'Verse text';
+    /** @type {any} */ (globalThis).ExpandableVerse = () => null;
+    /** @type {any} */ (globalThis).InAppLinkButton = () => null;
+    /** @type {any} */ (globalThis)._fnTextRedundantWithLink = () => false;
+    return render(<FootnoteListSection footnotes={footnotes} nkjv={{}} onInAppLink={() => {}} onGoToRef={() => {}} />);
+  };
+
+  it('a scripture footnote opens the web on its verse, and the card does not jump back', () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    const scrollIntoView = vi.fn();
+    const bubble = document.createElement('span');
+    bubble.className = 'fn-ref';
+    bubble.dataset.fnNum = '1';
+    bubble.scrollIntoView = scrollIntoView;
+    document.body.appendChild(bubble);
+    const { container } = list({ 1: { type: 'scripture', ref: 'Isaiah 13:11' }, 2: { type: 'note', text: 'A note' } });
+    const doors = container.querySelectorAll('[data-door="web"]');
+    expect(doors).toHaveLength(1);
+    expect(doors[0].textContent).toContain('Show in Scripture Web');
+    fireEvent.click(doors[0]);
+    expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'isaiah', chapter: 13, verse: 11 } });
+    expect(scrollIntoView).not.toHaveBeenCalled();
+    bubble.remove();
+  });
+
+  it('no door without the routes', () => {
+    const { container } = list({ 1: { type: 'scripture', ref: 'Isaiah 13:11' } });
+    expect(container.querySelector('[data-door="web"]')).toBeNull();
   });
 });

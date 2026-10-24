@@ -5,6 +5,7 @@
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { sheetReference } from '../../utils/passage-copy.js';
 import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
+import { WebDoorButton } from './footnote-web-door.jsx';
 
 export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef }) {
   const entries = Object.entries(footnotes);
@@ -64,6 +65,8 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef })
                     <GoToRefButton refStr={fn.ref} onGo={onGoToRef} />
                   </span>
                 )}
+                {/* and the sheet's other door: the web opens on this verse (ideas audit s14.5) */}
+                <WebDoorButton fn={fn} />
                 {fn.seeAlso && (
                   <div style={{ marginTop: "0.5rem" }}>
                     <span style={{ fontFamily: "'Cinzel',serif", fontSize: "var(--fs-10)", letterSpacing: "0.18em", color: "var(--gold-dim)", textTransform: "uppercase", marginRight: "0.4rem" }}>Also see:</span>
