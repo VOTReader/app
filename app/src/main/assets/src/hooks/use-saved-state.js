@@ -4,15 +4,18 @@
    Global-scope module. Bundled into dist/bundle-b.js.
    First mechanical hook extraction of P6 (App() decomposition).
 
-   Reads localStorage['vot-state'] exactly once on mount (useMemo []),
+   Reads the saved state (StateStore, IDB-backed since W2.3b; localStorage
+   ['vot-state'] before) exactly once on mount (useMemo []), after taking
+   the tab's sessionStorage leave record if one is waiting,
    coerces stale screen values back to safe defaults, and hands the
    validated object to App() — which then distributes its fields
    (saved.theme, saved.tabs, saved.settings, saved.activeReadKey …) to
    useTabs / useSettings / useReadingDwell / App-local useState.
 
    OWNS:
-     - the single-evaluation read + JSON.parse of localStorage['vot-state']
-     - the parse-error fallback ({} on JSON.parse throw)
+     - the single-evaluation read of StateStore (merged with the leave
+       record, see the JSDoc below)
+     - the error fallback ({} when the read throws or the store is empty)
 
    DOES NOT OWN:
      - _validateTabState — the screen-coercion POLICY (13 rules that
@@ -27,10 +30,11 @@
 
    PARAMS: none.
 
-   RETURNS: the validated saved-state object (or {} on JSON.parse failure).
+   RETURNS: the validated saved-state object (or {} on failure).
 
-   STORAGE: reads localStorage['vot-state']; never writes — usePersistedState
-            (P6k+1) owns the write side.
+   STORAGE: reads StateStore (key vot-state) and the sessionStorage leave
+            record (takeResumeRecord clears it); never writes StateStore —
+            usePersistedState (P6k+1) owns the write side.
 
    WINDOW: none.
 

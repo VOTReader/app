@@ -150,31 +150,6 @@ export function idbDelete(key) {
 }
 
 /**
- * Read entries from the thumbs store into a plain object. With no
- * `liveKeys` argument, reads every entry (the full-dump contract —
- * ThumbStore's own tests rely on this). Given `liveKeys` (boot-
- * performance-5: an iterable of the currently-open tabs' content keys),
- * reads ONLY those rows, so a caller that already knows its live key set
- * never materializes rows for tabs that no longer exist.
- *
- * **It DELETES NOTHING, and callers must not assume otherwise.** An earlier
- * version dropped the non-matching rows inline in the same cursor pass; that
- * cannot be right here, because every caller's key set derives from `tabs`,
- * `tabs` derives from the persisted vot-state, and that store mounts on
- * synthetic boot defaults when hydration times out (storage-backup-3) — so
- * the pass deleted the whole store on a degraded boot. Dead rows are
- * collected by useThumbnails' debounced GC, which sweeps `idbAllKeys()` and
- * runs only once StateStore reports 'loaded'. Do not "optimize" that sweep
- * away as redundant with this read; it is the only thing that deletes.
- *
- * Returns {} when IDB is unavailable or the read fails — partial
- * reads (some entries succeed, then an error) still return whatever was
- * collected up to that point.
- *
- * @param {Iterable<string>} [liveKeys]
- * @returns {Promise<Record<string, any>>}
- */
-/**
  * Every key in the thumbs store, without reading a single value. The GC needs
  * to know what is ON DISK, not what reached React state — after
  * boot-performance-5 the mount read only loads live rows, so a row whose tab
@@ -203,6 +178,31 @@ export function idbAllKeys() {
   });
 }
 
+/**
+ * Read entries from the thumbs store into a plain object. With no
+ * `liveKeys` argument, reads every entry (the full-dump contract —
+ * ThumbStore's own tests rely on this). Given `liveKeys` (boot-
+ * performance-5: an iterable of the currently-open tabs' content keys),
+ * reads ONLY those rows, so a caller that already knows its live key set
+ * never materializes rows for tabs that no longer exist.
+ *
+ * **It DELETES NOTHING, and callers must not assume otherwise.** An earlier
+ * version dropped the non-matching rows inline in the same cursor pass; that
+ * cannot be right here, because every caller's key set derives from `tabs`,
+ * `tabs` derives from the persisted vot-state, and that store mounts on
+ * synthetic boot defaults when hydration times out (storage-backup-3) — so
+ * the pass deleted the whole store on a degraded boot. Dead rows are
+ * collected by useThumbnails' debounced GC, which sweeps `idbAllKeys()` and
+ * runs only once StateStore reports 'loaded'. Do not "optimize" that sweep
+ * away as redundant with this read; it is the only thing that deletes.
+ *
+ * Returns {} when IDB is unavailable or the read fails — partial
+ * reads (some entries succeed, then an error) still return whatever was
+ * collected up to that point.
+ *
+ * @param {Iterable<string>} [liveKeys]
+ * @returns {Promise<Record<string, any>>}
+ */
 export function idbReadAll(liveKeys) {
   const keep = liveKeys ? new Set(liveKeys) : null;
   return openThumbDB().then((db) => {

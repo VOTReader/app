@@ -59,7 +59,11 @@
 }
 ```
 
-**Block types:** `para`, `poetry`, `closing`, `closing-fn`, `note`, `scripture`
+**Block types:** `para`, `poetry`, `closing`, `closing-fn`, `note`, `scripture`, `intro` (an opening paragraph
+with `segments`, set apart above the letter; 3 in Volume Two), `heading` (a `text` subheading; LetterView renders it)
+**`sectionIntro`** (optional, before `blocks`): an array of `heading` and `para` blocks shown as a framed lead-in above
+the letter body (`LetterView.jsx`, class `section-intro-quote`). It is read-tracked (`data-read-seg`) and counted by
+`countItemWords`, but not annotatable. Only Volume Seven uses it today.
 **Inline `t` types:** `text`, `italic`, `bold-italic`, `caps`, `fn`, `stanza-break`, `letter-link`
 
 ## Format B: Simple paragraph (WTLB One, WTLB Two, The Blessed)

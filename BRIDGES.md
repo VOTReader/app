@@ -181,6 +181,15 @@ setup effect.
   local on first armed sweep (cleanup ordering: the view's effect cleanup may
   null the global before the tracker's cleanup flushes the final frontier).
 
+### `__votListenFrom`
+- **Setter:** `src/ui/components/ReadAlongHighlight.jsx` (the "LISTEN FROM HERE" effect) — the live
+  (non-inert) read-along pane, while its host offers a recording (`onListen`), sets
+  `{ has(hlKey), start(hlKey, offset), repeat?(keys, label, times) }` (Listen from here 2026-09-22;
+  Repeat this passage rp1, 2026-09-25; `repeat` is absent where the player cannot loop).
+- **Cleanup:** identity-guarded: nulled on unmount only if it is still this pane's entry.
+- **Consumers:** `src/utils/listen-from.js` (`pane()`), which `src/ui/sheets/SelectionToolbar.jsx` uses
+  for the selection toolbar's "Listen from here" and "Repeat" buttons.
+
 (`__onDwellCommit` — DELETED 2026-08-03. It had no callers since the 07-19
 position-is-immediate change; use-reading-dwell.test.js carries a tombstone
 asserting it stays gone. The identity-guarded-cleanup pattern it pioneered

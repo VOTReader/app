@@ -110,14 +110,6 @@ export function getSleepRemainingSeconds() {
 }
 
 /**
- * Arm a session-only timer that pauses—never stops—audio. Pausing preserves
- * the normal resume snapshot, which is kinder than silently discarding a
- * long recording's position at bedtime.
- *
- * @param {number} minutes
- * @returns {boolean}
- */
-/**
  * The countdown's end: pause (never stop, so the queue and the resume point survive) at the bottom of the fade.
  * The timeout calls it, and so does the clock when the timeout is overdue: a hidden page's timers may run late, and
  * under the native player (m3) the page is silent, so a late timeout would leave the listener in faded silence while
@@ -138,6 +130,14 @@ export function _sleepTimerFire() {
   if (wasLive) _sleepEndedToast();
 }
 
+/**
+ * Arm a session-only timer that pauses—never stops—audio. Pausing preserves
+ * the normal resume snapshot, which is kinder than silently discarding a
+ * long recording's position at bedtime.
+ *
+ * @param {number} minutes
+ * @returns {boolean}
+ */
 export function setSleepTimer(minutes) {
   const mins = Math.max(1, Math.min(120, Math.floor(Number(minutes) || 0)));
   if (_state.status === 'idle' || !_state.queue.length) return false;

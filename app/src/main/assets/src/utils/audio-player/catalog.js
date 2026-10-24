@@ -285,16 +285,6 @@ export function renditionsFor(volKey, item, collectionLabel) {
 }
 
 /**
- * The rendition a listener asked for, or null when this letter has no reading
- * by that reader. Kept separate so every caller resolves a reader the same way.
- *
- * @param {string} volKey
- * @param {{ id?: string, title?: string } | null | undefined} item
- * @param {string | null | undefined} collectionLabel
- * @param {string | null | undefined} reader
- * @returns {Rendition | null}
- */
-/**
  * The tracks a row's own Play starts with for `item`: the listener's chosen reader where that reader read it, else
  * the manifest's primary reading (the unit a download saves, item 8). [] when the item has no recording.
  *
@@ -309,6 +299,16 @@ export function playbackTracks(volKey, item, collectionLabel) {
   return chosen ? chosen.tracks : _tracksFor(volKey, item, collectionLabel);
 }
 
+/**
+ * The rendition a listener asked for, or null when this letter has no reading
+ * by that reader. Kept separate so every caller resolves a reader the same way.
+ *
+ * @param {string} volKey
+ * @param {{ id?: string, title?: string } | null | undefined} item
+ * @param {string | null | undefined} collectionLabel
+ * @param {string | null | undefined} reader
+ * @returns {Rendition | null}
+ */
 export function _renditionByReader(volKey, item, collectionLabel, reader) {
   if (!reader) return null;
   return renditionsFor(volKey, item, collectionLabel).find((r) => r.reader === reader) || null;

@@ -325,12 +325,12 @@ export const TourController = {
     goTo(nextIndex(state.index));
   },
 
-  /** The reader tapped the ringed control themselves: move on without acting again. The next
-      stop's `enter` still runs — a tap on the Letters tile lands on the Volumes index, and the
-      tour promised to open a letter from there. */
   /** The overlay could not find this stop's control (true, after its wait) or found it again (false). */
   targetMissing(v) { targetGone = !!v; },
 
+  /** The reader tapped the ringed control themselves: move on without acting again. The next
+      stop's `enter` still runs — a tap on the Letters tile lands on the Volumes index, and the
+      tour promised to open a letter from there. */
   targetPressed() {
     if (!state.active) return;
     if (state.index >= TOUR_STEPS.length - 1) { end(); return; }

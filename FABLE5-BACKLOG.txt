@@ -19,10 +19,12 @@ HOW TO RUN A SESSION (the protocol that has worked)
      owner's phone is connected.
   5. Mark the item DONE here with a one-liner.
 
-HARD CONSTRAINTS (owner policies — never violate)
-  • NO AI features, NO API keys, NO LLM anything. NO auth/login. NO new
-    network egress (the app is self-contained + offline; only existing
-    egress: Garden images from GitHub, external links opened OUT).
+HARD CONSTRAINTS (owner policies; CLAUDE.md "User policies" is the current
+  list and wins wherever this file disagrees)
+  • AI features are allowed (Corbin 2026-09-22 retired the 2026-05-11 no-AI
+    line), but no API key ever ships in the PWA or APK, and no auth/login.
+    Network egress is what CLAUDE.md names (Garden images, audio from
+    GitHub and the relay, the Cloudflare beacon, links opened OUT).
   • Do NOT touch the welcome splash (UX6 — owner veto).
   • Hidden Manna stays out of every public index/search/home tile.
   • Data faithfulness: never author content that isn't on the live site;
@@ -296,18 +298,10 @@ PARTIAL; the rest are deferred follow-ons, each one-session-scoped.)
      whether TTS playback should count as read-tracker dwell the way real
      playback does. Cheaper than the original item now that the painter,
      the offset domain, and the player plumbing all exist.
-[23] READING MILESTONES — DONE 2026-08-04 (milestones half). Ten
-     READING_MILESTONE_DEFS (items/words/rereads) unlock inside
-     recordCompletion, which now RETURNS the newly-unlocked defs so
-     useMarkAsRead can toast via the existing jrnShowMilestoneToast;
-     My Progress gained a Milestones section (locked rows shown dim).
-     REMAINING: the full month streak calendar — the 14-day strip still
-     ships. Original spec follows.
-     READING MILESTONES + words/day streak-calendar depth — JournalStats'
-     milestone pattern applied to ReadingStatsStore (100k/500k/1M words,
-     "read Psalm 119", full-volume completions); upgrade the streak display
-     with wordsForDays() bar depth (a 14-day strip shipped 2026-08-03;
-     this is the full calendar). Toast via jrnShowMilestoneToast pattern.
+[23] READING MILESTONES — CLOSED. Built 2026-08-04, one engine 2026-08-10
+     (1edc777a8), removed 2026-10-05 (ms1, Corbin: "Gut milestones for now").
+     The month streak calendar was never built; the 14-day words strip in
+     My Progress still ships.
 [24] YEAR IN REVIEW screen — composed entirely from ReadingStatsStore +
      JournalStats + ReadingStreak data that already accrues. Seasonal;
      build near year-end.
@@ -402,20 +396,20 @@ C2-A  LISTENING TRUTH + CONTINUATION (the big one) — ALL DONE 2026-08-10
        lone recording about to become a whole collection. Plain queues switch
        on the first tap, unchanged.
 
-C2-B  TRUTH-AND-COPY PASS (one commit)
-  [B1] About page 2 claims nothing is downloaded except Garden images — false
+C2-B  TRUTH-AND-COPY PASS — ALL DONE 2026-08-10 (B1-B4 e83542e32, B5 1edc777a8)
+  [B1] DONE. About page 2 claims nothing is downloaded except Garden images — false
        since streaming shipped; also never mentions the Listening Library. S
-  [B2] "Whole-book audiobook" copy on Settings/AudioLibrary/comments — all
+  [B2] DONE. "Whole-book audiobook" copy on Settings/AudioLibrary/comments — all
        three editions are per-chapter. S
-  [B3] use-autoscroll lease block says FOUR writers; five are sanctioned and
+  [B3] DONE. use-autoscroll lease block says FOUR writers; five are sanctioned and
        CLAUDE.md points every future session at that block. S
-  [B4] CLAUDE.md drift: latest-landed re-head, 54->59 screens, per-bundle sizes
+  [B4] DONE. CLAUDE.md drift: latest-landed re-head, 54->59 screens, per-bundle sizes
        (aggregate right, parts stale), file-structure counts (or delete per CQ3). S
-  [B5] ARCHITECTURE.md: re-date; add the AUDIO SECTION — a ~4,200-line
+  [B5] DONE (§ 23). ARCHITECTURE.md: re-date; add the AUDIO SECTION — a ~4,200-line
        subsystem has zero deep reference (trust boundary, shape-branching,
        seek contract, forward-only horizon, positions store, native card). L
-Owner-gated: two Milestones engines (10-row strip vs 84-item screen) need a
-       canonical-table decision; backup "Last export" line stays retired.
+DONE 2026-08-10 (1edc777a8): the two Milestones engines became one (Milestones removed 10-05, ms1);
+       backup "Last export" line stays retired.
 
 C2-C  READING-PATH COHERENCE — ALL DONE 2026-08-10
       ([C1]-[C7] in one commit, [C8]-[C10] in a second.)

@@ -3,15 +3,15 @@
    ═══════════════════════════════════════════════════════════════════════
    SINGLE SOURCE OF TRUTH. The book-abbreviation / named-passage / synonym /
    stop-word / volume-registry / command tables are owned by the classic
-   `assets/search-data.js` (bundle-a, window.VotSearchData) and SHARED by BOTH
-   search engines. The MiniSearch engine reads them through this thin accessor
-   instead of duplicating ~590 lines of tables — duplication would be an
-   edit-both-places hazard during the Classic/MiniSearch coexistence period
-   ([[consolidate-dont-duplicate]]). This mirrors how the app shares React /
-   BOOKS / COLLECTIONS as cross-bundle globals. If Classic is ever retired, the
-   data can move into this module wholesale (and this accessor becomes the
-   owner). Read lazily (per call, not snapshotted) so load order never matters:
-   bundle-a/search-data.js is always present by the time search runs.
+   script `assets/search-data.js` (window.VotSearchData), which ships in
+   bundle-d (a side-effect import in src/ui/_entry-d.js since lz1, 2026-10-13;
+   it left bundle-a 2026-09-22, see tools/build.py). The MiniSearch engine
+   reads them through this thin accessor instead of duplicating ~590 lines of
+   tables ([[consolidate-dont-duplicate]]); the Classic engine that once
+   shared them was retired 2026-07-02, so the data could move into this module
+   wholesale one day (and this accessor would become the owner). Read lazily
+   (per call, not snapshotted) so load order never matters: bundle-d's
+   search-data.js has always run by the time search does.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**

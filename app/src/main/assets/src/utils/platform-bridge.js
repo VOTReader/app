@@ -3,39 +3,37 @@
    PlatformBridge — single source of truth for platform-conditional behavior
    ═══════════════════════════════════════════════════════════════════════
    Two shells (Android APK, desktop PWA), one JS codebase. PlatformBridge
-   is the ONLY place that branches on platform. Consumers call its methods,
-   or read `PlatformBridge.isAndroid` for the platform flag; they do NOT check
-   `window.AndroidBridge` directly. (U14, 2026-06-01: restored — the 4 sites
-   that bypassed this — storage-health, use-history-sync, use-android-back ×2 —
-   now read PlatformBridge.isAndroid. A grep for `window.AndroidBridge` outside
-   this file returns only comments + test fixtures.)
+   is the shared interface for the AppInterface calls the web also answers.
+   Consumers call its methods, or read `PlatformBridge.isAndroid` for the
+   platform flag. (U14, 2026-06-01, moved storage-health, use-history-sync
+   and use-android-back onto it.) Native-only subsystems added since own
+   their bridge reads directly, guarded at call time: native-audio.js,
+   offline-audio.js, snapshot-sink.js, plan-reminder.js and others
+   (grep `AndroidBridge` for the current list).
 
-   Mirror of the 20 @JavascriptInterface methods on AppInterface.kt (the
-   Android side). See AppInterface.kt for the authoritative contract.
+   Mirrors the AppInterface.kt methods the web shares (the Android side;
+   AppInterface.kt is the authoritative contract).
 
-   ── W1 sequence (this file evolves over W1.1 → W1.5) ────────────────────
-   W1.1 (LANDED): interface + Android passthrough + web placeholders.
-     Pure addition — no consumer migrations yet, no behavior change on
-     Android, no real web implementations. Web impls are skeletons that
-     warn (notYetImplemented) or return safe defaults.
-   W1.2 (NEXT): migrate the call sites in use-settings, use-thumbnails,
-     GardenView, JournalRecordingSheet, SettingsScreen. After this commit,
-     grep for `window.AndroidBridge` outside this file returns ZERO matches.
-   W1.3: web file I/O — openFilePicker + saveToFile via <input
-     type="file"> / Blob URL. MUST be called from a user-gesture callstack
-     (browsers block programmatic .click() outside user-initiated handlers).
-   W1.4: web audio recording — CONSOLIDATES the existing MediaRecorder
-     logic from JournalRecordingSheet.jsx:~140-160 (don't duplicate).
-     Mime negotiation: webm/opus → ogg/opus → "error:unsupported-codec".
-     No wav fallback (would balloon ~50KB/min memos to ~500KB/min).
-   W1.5: web back-nav — Escape key gated by `document.fullscreenElement`
-     + open-sheet state (don't swallow browser-native Escape behavior).
+   ── W1 sequence (from 2026-05-26, all landed) ────────────────────────────────────
+   W1.1: interface + Android passthrough + web placeholders.
+   W1.2: call sites in use-settings, use-thumbnails, GardenView,
+     JournalRecordingSheet and SettingsScreen migrated here, plus the real
+     web impls (webImpl, Category 3): Tier A screenshots (html2canvas),
+     Tier B.1 wake lock, Tier B.2 file I/O (openFilePicker + saveToFile via
+     <input type="file"> / Blob URL; call them from a user-gesture callstack,
+     since browsers block programmatic .click() outside one), Tier B.3
+     fullscreen and zoom, Tier C recording (MediaRecorder + AnalyserNode,
+     the JournalRecordingSheet code consolidated here; mime webm/opus →
+     ogg/opus → "error:unsupported-codec", no wav fallback).
+   Web back-nav (planned as W1.5) lives in use-android-back.js and the
+   modal registry's Escape dispatcher, not here. Still a placeholder:
+   haptic (Category 4).
 
    ── Detection ───────────────────────────────────────────────────────────
    The isAndroid expression appears in exactly ONE place: this file.
    Matches the existing pattern at JournalRecordingSheet.jsx:214.
-   Anywhere else is a regression — W1.2 cleans up all current duplicate
-   detection variants (`_abc`, `_ab`, `_ab2`, `AB`, raw `isAndroid` locals).
+   Anywhere else is a regression (W1.2 removed the old duplicate
+   detection variants: `_abc`, `_ab`, `_ab2`, `AB`, raw `isAndroid` locals).
    ═══════════════════════════════════════════════════════════════════════ */
 
 // W7.4: getCrashLog merges the JS-side DiagnosticLog with the native log.
@@ -200,17 +198,19 @@ const androidImpl = {
   shareImage: (b64) => /** @type {any} */ (window).AndroidBridge.shareImage(b64),
 };
 
-// ── Web impl: placeholders (W1.3 / W1.4 / W1.5 fill in actual behavior) ─
-// Three categories:
+// ── Web impl ────────────────────────────────────────────────────────────
+// Four categories (Category 3, the real web impls, is listed in webImpl):
 //   1. Genuine no-ops — Android-specific UI knobs where the browser
 //      handles the concern natively (theme via CSS, audio session via
 //      browser).
 //   2. Safe defaults — getters with sensible web answers (getZoomScale
 //      returns 1.0, getCrashLog returns "[]" matching the Android
 //      debug-build path).
-//   3. notYetImplemented warnings — surface the gap clearly when called.
+//   3. Real web impls (screenshots, wake lock, file I/O, recording).
 //      Recording methods use the "error:<reason>" string contract matching
 //      Kotlin's NativeAudioRecorder.Result.Failure → JS string shape.
+//   4. notYetImplemented warnings — surface the gap clearly when called
+//      (haptic only).
 
 const NYI_TAG = '[PlatformBridge]';
 /**
@@ -219,7 +219,7 @@ const NYI_TAG = '[PlatformBridge]';
  */
 const notYetImplemented = (name) => () => {
   if (typeof console !== 'undefined' && console.warn) {
-    console.warn(`${NYI_TAG} ${name}() web impl pending (W1.3-W1.5)`);
+    console.warn(`${NYI_TAG} ${name}() web impl pending`);
   }
 };
 

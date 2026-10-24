@@ -24,10 +24,11 @@ Suggested hour: 10 min on sections 1-2, 15 on 3, 15 on 4, 10 on 5, 10 on 6-7.
 
 One JavaScript/React codebase under `app/src/main/assets/` ships two ways: as a PWA on GitHub Pages
 (https://votreader.github.io/app/) and inside a thin Kotlin WebView shell
-(`app/src/main/java/com/votreader/sacredui/`) that is sideloaded as an APK. There is no backend and no account.
+(`app/src/main/java/com/votreader/sacredui/`) that is sideloaded as an APK. No server holds reader data and there is no account.
 The corpora (the letters, the Bibles, the studies) are static JavaScript files. Everything a reader writes
-(highlights, notes, journal, progress) stays in the device's IndexedDB and localStorage, and the only backup is
-the user-owned export file (Settings, "Your Data"). Recorded audio streams from immutable GitHub Release assets.
+(highlights, notes, journal, progress) stays in the device's IndexedDB and localStorage, and the full backup is
+the user-owned export file (Settings, "Your Data"); on Android, Google backup also keeps one copy of the newest
+local snapshot (CLAUDE.md, "Android Google backup"). Recorded audio streams from immutable GitHub Release assets.
 
 ```
              ┌──────────────────────── assets/index.html ─────────────────────────┐
@@ -105,7 +106,7 @@ fixed in the data, never in the renderer.
   degraded` state machine. Writes made before hydration finishes are queued and rebased onto the loaded data, and
   never overwrite it. Read the header of `src/stores/cached-store.js` before touching persistence (ARCHITECTURE.md
   §18.2).
-- The `votreader` schema (`DB_VERSION` in `src/stores/idb-adapter.js`, 12 today) only grows. Each bump adds object
+- The `votreader` schema (`DB_VERSION` in `src/stores/idb-adapter.js`, 14 on 2026-10-23) only grows. Each bump adds object
   stores behind an `objectStoreNames.contains()` guard and never rewrites existing data. Real readers have
   depended on it since 2026-09-26, so a migration must be additive. A database already upgraded by a newer build
   is detected with `IDBAdapter.isVersionError`.

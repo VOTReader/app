@@ -6,9 +6,10 @@
    OWNS:
      - The single useEffect that decides WHEN to call addToHistory based on
        the current nav state (screen + bookId + chapterNum + letterId +
-       studyId + studyChapterId). Fires only on nav-state changes — deps
-       are the 6 nav values; the 4 helper callbacks are intentionally
-       excluded (see the disable cite below).
+       studyId + studyChapterId). It runs on EVERY render (no deps array,
+       since 2026-08-04) so a visit whose lazy corpus lands later is still
+       recorded; recordedKeyRef keeps it to one entry per visit (see the
+       note above the effect).
 
    DOES NOT OWN:
      - addToHistory itself (lives in useHistory — this hook is the
@@ -24,21 +25,19 @@
         use-history.js's header. Pulling the policy half out of App() makes
         the architectural division explicit at the module level instead of
         implicit-by-convention.
-     2. The deps-array invariant — "fire ONLY on nav-state change, not on
-        every render" — is now expressed at a hook boundary where it's
-        testable in isolation. App()'s closure stops being the documentary
-        site for it.
-     3. The eslint disable cite that explains why _findLetter / getStudyById
-        / getStudyChapter / addToHistory are excluded from deps moves with
-        the effect to its new home — the rationale is unchanged (they
-        change identity every render but behave identically), but it now
-        names the four PARAMS, not four App-local closure captures.
+     2. The when-to-record invariant (one entry per visit) is expressed at a
+        hook boundary where it's testable in isolation. It was first the
+        6-value deps array; since 2026-08-04 it is recordedKeyRef, with no
+        deps array at all (the deps version dropped visits whose corpus
+        loaded late).
+     3. The four helper PARAMS (_findLetter / getStudyById /
+        getStudyChapter / addToHistory) change identity every render but
+        behave identically; with no deps array that no longer matters.
 
    PARAMS (single object, flat — consistent with the other P6 hooks):
      screen, bookId, chapterNum, letterId, studyId, studyChapterId
-       Current navigation position. The 6 useEffect dependencies. Any change
-       to one of these is the trigger to (re-)evaluate the screen type and
-       record an entry.
+       Current navigation position. Together they make the visit key; a new
+       key is a new visit to (re-)evaluate and record.
      addToHistory(entry)
        From useHistory. The state-mutator that this hook decides WHEN to
        call. The decision-vs-execution split is the whole point of having
@@ -46,7 +45,7 @@
      _findLetter(volKey) → letterEntry | null
        App()-local closure: looks up the current letter inside the COLLECTIONS
        array for volKey. Reads `letterId` from App()'s closure — so each
-       render rebuilds it; that's why it's intentionally not in deps.
+       render rebuilds it (harmless: the effect has no deps array).
      getStudyById(id) → study | null
        App()-local closure: STUDIES.find(...) helper. Reads BIBLE_STUDIES
        (module global) and `studies` from App()'s closure.
@@ -71,10 +70,10 @@
  */
 
 /**
- * Auto-track nav → reading-history. The effect fires on nav-state changes
- * (the 6 deps) and calls addToHistory with the entry shape for the current
- * screen type. The 4 helper callbacks are excluded from deps by design;
- * see the disable cite in the body for the full rationale.
+ * Auto-track nav → reading-history. The effect runs on every render (no deps
+ * array) and calls addToHistory once per visit, with the entry shape for the
+ * current screen type, as soon as that screen's lookups resolve; recordedKeyRef
+ * is the once-per-visit guard. See the note above the effect for why.
  *
  * @param {{
  *   screen: string,

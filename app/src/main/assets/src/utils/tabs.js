@@ -210,9 +210,9 @@ function screenContentPart(tab, screen) {
  * Build the dedup key for a tab — used by `deduplicateTabs` to fold tabs
  * whose visible content matches into a single entry, by the Tabs overview's
  * duplicate count, and as the tab's thumbnail id (use-thumbnails.js).
- * Pipe-separated field concatenation; unset numerics serialize as empty (so
- * chapter=0 and chapter=undefined would collide, but chapter is 1-indexed in
- * this app). A screen whose content lives elsewhere appends it as a last
+ * Pipe-separated field concatenation; unset numerics serialize as empty
+ * (`?? ''`), so chapter=0 ('0') and an unset chapter ('') stay distinct
+ * (chapters are 1-indexed anyway). A screen whose content lives elsewhere appends it as a last
  * segment (screenContentPart), newlines folded to spaces: use-thumbnails joins
  * the live keys with newlines.
  *

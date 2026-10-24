@@ -9,7 +9,8 @@ read-along highlighting, and the Scripture Web. One JavaScript codebase ships tw
   assets, sideloaded. The owner tests on the installed APK, so a change reaches the owner's phone only through an APK build
   (CONTRIBUTING.md, "Landing").
 
-There is no backend and no account. Whatever a reader writes stays on the device.
+No server holds reader data and there is no account. Whatever a reader writes stays on the device; on Android,
+Google backup (to the owner's own Google account) keeps one copy of the newest local snapshot (CLAUDE.md).
 
 ## Your first day
 
@@ -66,8 +67,8 @@ docs/                         subsystem docs; docs/archive/ holds finished plans
 
 ## The bundle map
 
-`npm run build` writes seven bundles and `app.min.css` to `app/src/main/assets/dist/`. Four bundles load on cold
-boot. The other three, the corpora, load the first time something needs them.
+`npm run build` writes eight bundles and `app.min.css` to `app/src/main/assets/dist/`. Four bundles load on cold
+boot. Three more, the corpora, load the first time something needs them, and the search worker runs in its own thread.
 
 | Bundle | Loads | Built from | Holds |
 |---|---|---|---|
@@ -78,6 +79,7 @@ boot. The other three, the corpora, load the first time something needs them.
 | `bundle-a-bible.js` | `__loadBibleCorpus()` | `tools/build.py` | the Bible corpora |
 | `bundle-a-matthew.js` | `__loadMatthewCorpus()` | `tools/build.py` | the Matthew Study Bible |
 | `bundle-a-vot.js` | `__loadVotCorpus()` | `tools/build.py` | the VOT collections (the volumes, the letters, WTLB, The Blessed) |
+| `bundle-w.js` | `new Worker()` in `src/search/worker-client.js` | `src/search/worker.js` | the search worker (a module worker; the work is in `worker-ops.js`) |
 
 - Code is not split; data is. The screen bundles e-h were folded into bundle-d on 2026-10-13 (lz1; the measurements
   and the reasons are in ARCHITECTURE.md, "Lazy corpora"). An old page that asks the service worker for a retired
@@ -107,7 +109,7 @@ boot. The other three, the corpora, load the first time something needs them.
 | `HISTORY.md` | the narrative of landed work | prepend a dated entry for each landing, plus a one-liner in its Closed-phases index (top of the file) |
 | `ARCHITECTURE.md` | deep reference: annotations, COLLECTIONS, navigation, read-along, audio, lazy corpora | |
 | `BRIDGES.md` | every `window.__*` bridge between bundles | change it in the same commit as the bridge |
-| `docs/` | subsystem docs: `docs/DATA-FORMATS.md` (the corpus data formats), `docs/FILE-STRUCTURE.md` (the directory tour), `docs/AUDIO-MANAGER.md`, `docs/OCR-PIPELINE.md` | a finished plan moves to `docs/archive/`, with a line in `docs/archive/README.md` |
+| `docs/` | subsystem docs: `docs/ARCHITECTURE-OVERVIEW.md` (a one-hour tour for a new developer), `docs/DATA-FORMATS.md` (the corpus data formats), `docs/FILE-STRUCTURE.md` (the directory tour), `docs/AUDIO-MANAGER.md`, `docs/OCR-PIPELINE.md`, `docs/PLAY.md` (Google Play: what is built, what is left) | a finished plan moves to `docs/archive/`, with a line in `docs/archive/README.md` |
 | `tools/SMOKE.md`, `tools/n1-smoke-walk.md` | the smoke harness; the manual device walk | |
 | `VENDORED-LIBS.md` | the vendored libraries and what the APK ships | |
 | `AGENTS.md` | a pointer to CLAUDE.md for tools that auto-load AGENTS.md | |

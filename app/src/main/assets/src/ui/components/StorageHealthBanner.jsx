@@ -14,9 +14,10 @@
 
    Priority (highest first):
      versionTooNew                        → newer-version (v04-03)
+     libraryElsewhere                     → library-elsewhere (W8, web only)
      dataMissing                          → data-missing (datasafe 10-05)
      READONLY with writeFailedThisSession → scenario 7 (write-failed)
-     CRITICAL with privateModeLikely      → scenario 8 (private mode)
+     privateModeLikely (any tier)         → scenario 8 (private mode)
      CRITICAL                             → scenario 7 (critical quota)
      WARNING                              → scenario 6 (running low)
      storesDegraded                       → storage-slow (E5)
