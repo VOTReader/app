@@ -7,6 +7,7 @@ import { AudioPlayer, AUDIO_TOAST_ID } from '../../utils/audio-player.js';
 import { showToast } from '../../utils/toast.js';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
+import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
 import { PlanRibbon } from '../components/PlanRibbon.jsx';
@@ -454,6 +455,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           <InstallCard unitKey={'bible:' + book.id + ':' + chapter.num} inert={inert} />
         </div>
       </div>
+      {/* Find in this chapter (idea 160): the ⋯ menu's field and the find pill, over the chapter's verses only.
+          Live pane only, like the read-along below. */}
+      {!inert && <FindInUnit anchor={surpriseAnchor} unitId={book.id + ':' + chapter.num} mainRef={bodyRef} noun="chapter" keyPrefix={'bible:' + book.id + ':' + chapter.num + ':'} />}
       {/* Read-along, on the same !inert contract as LetterView: the swipe peek
           renders a REAL BibleChapterView clone, and two live mounts would fight
           over the single global ::highlight(vot-reading) registration. */}

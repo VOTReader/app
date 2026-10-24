@@ -8229,6 +8229,25 @@
     .find-pill-btn:active:not(:disabled) { background: var(--gold-faint); }
     @media (hover: hover) { .find-pill-btn:not(:disabled):hover { color: var(--gold-bright); } }
     .find-pill-close { font-size: var(--fsc-20); color: var(--cream-dim); }
+    /* Find in this letter (idea 160; mockup find160/mockup-A): the same pill, its word slot a text field, the width
+       of the screen so the words typed have room, and above the soft keyboard while it is up (Chrome and the PWA
+       report it as --keyboard-height; the APK lifts --dock-floor through --inset-bottom). */
+    .find-pill-ask {
+      width: calc(100vw - 24px); max-width: 560px; padding-left: 14px;
+      bottom: max(calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport)), calc(var(--keyboard-height, 0px) + 8px));
+    }
+    .find-pill-glyph { width: 20px; height: 20px; flex-shrink: 0; color: var(--gold); }
+    .find-pill-input {
+      flex: 1 1 auto; min-width: 0; height: 44px; padding: 0 8px 0 10px; margin: 0;
+      background: none; border: none; outline: none; border-radius: 0;
+      font-family: var(--font-body); font-size: var(--fsc-16); color: var(--cream); caret-color: var(--gold);
+    }
+    .find-pill-input::placeholder { color: var(--cream-muted); opacity: 1; }
+    .find-pill:focus-within { border-color: var(--gold); }
+    .find-pill-ask .find-pill-count { border-left: 1px solid var(--gold-border); }
+    .find-pill-ask .find-pill-count:empty { display: none; }
+    /* nothing found: said calmly, in the count's own place */
+    .find-pill-none { color: var(--cream-muted); font-style: italic; }
     .ascroll-btn {
       background: none; border: none; cursor: pointer; color: var(--gold);
       display: flex; align-items: center; justify-content: center;

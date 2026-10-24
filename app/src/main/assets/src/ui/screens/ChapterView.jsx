@@ -6,6 +6,7 @@ import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
+import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { getEchoesForVerse, getNotesForVerse } from '../../utils/scripture-parse.js';
@@ -322,6 +323,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         </div>
       </div>
 
+      {/* Find in this chapter (idea 160): the ⋯ menu's field and the find pill, over the chapter's own blocks. */}
+      {!inert && <FindInUnit anchor={surpriseAnchor} unitId={book.id + '-' + chapter.num} mainRef={bodyRef} noun="chapter" keyPrefix={'study:' + book.id + '-' + chapter.num + ':'} />}
       {/* Read-along, on the same !inert contract as BibleChapterView and
           LetterView: the swipe peek renders a REAL ChapterView clone, and two
           live mounts would fight over the single global

@@ -41,9 +41,25 @@
    Live pane only (never an inert peek: one registration per highlight name),
    portaled to <body> like the autoscroll pill, so a swipe transform on
    `.pager-track` cannot carry it off.
+
+   FIND IN THIS LETTER (idea 160, Corbin yes 2026-10-23). The pill was reachable
+   only through a library search. The ⋯ menu now offers "Find in this letter"
+   (entry, topic, chapter) on every unit this mounts in (utils/page-menu.js):
+   it opens the same pill with a text field where the search words sit. What
+   the reader types is found by the same findPlaces over the same text and
+   marked with the same highlights (typedFind: the words typed, a phrase of
+   them, small words dropped among real ones); Enter steps to the next place,
+   Shift+Enter the previous one, × or Escape / Android Back (the modal
+   registry) closes it, and "No matches" says so in the count's own place.
+   The first place is the first one from where the reader is reading (the top
+   of the view as the field opened), brought into view only if it is out of
+   it. Closing it, a new unit or a new search landing ends it: nothing of it
+   outlives the unit it was typed in.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { usePageMenu } from '../../utils/page-menu.js';
+import { markStopWords } from '../screens/search-model.js';
 
 const HL_ALL = 'vot-find';
 const HL_CURRENT = 'vot-find-current';
@@ -199,6 +215,47 @@ export function placeAt(places, at) {
   return best;
 }
 
+/**
+ * What the reader typed into the find field, as the pill's find: the words, and the
+ * words as one phrase when there are several (a run of them leads its place). A small
+ * word typed among real ones ("the flood") is glue, as the search card treats it
+ * (expandSnippetTerms): only the real words count. Every word is one the reader typed,
+ * so nothing is counted apart as related. null until a word of two letters is typed.
+ * @param {string} q
+ * @param {Set<string> | null} [stop]  the words a card does not mark (markStopWords)
+ * @returns {{ terms: string[], label: string, typed: string[] } | null}
+ */
+export function typedFind(q, stop) {
+  const label = String(q || '').replace(/\s+/g, ' ').trim();
+  const words = (label.toLowerCase().match(/[\p{L}\p{N}][\p{L}\p{N}'’]*/gu) || []).filter((w) => w.length >= 2);
+  if (!words.length) return null;
+  const real = stop ? words.filter((w) => !stop.has(w)) : words;
+  const own = real.length ? real : words;
+  const terms = words.length > 1 ? [words.join(' ')].concat(own.filter((w) => w !== words.join(' '))) : own;
+  return { terms, label, typed: own };
+}
+
+/**
+ * Where the reader is reading: the flat offset of the first text that ends below the
+ * top of the view (the top 8% is under the bar's edge). 0 without a scroller or layout.
+ * @param {Element} root
+ * @param {Array<{ node: Text, start: number, end: number }>} segs
+ * @returns {number}
+ */
+function readingAt(root, segs) {
+  const sc = root.closest('.screen-scroll');
+  if (!sc) return 0;
+  const sr = sc.getBoundingClientRect();
+  const edge = sr.top + sr.height * 0.08;
+  for (const s of segs) {
+    const el = s.node.parentElement;
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.bottom > edge && (r.top !== 0 || r.bottom !== 0)) return s.start;
+  }
+  return 0;
+}
+
 /** The API is there (chrome 105+, Safari 17.2+). */
 function canMark() {
   return typeof CSS !== 'undefined' && !!(/** @type {any} */ (CSS).highlights) && typeof (/** @type {any} */ (window).Highlight) === 'function';
@@ -264,6 +321,47 @@ function rectOf(/** @type {Range} */ range) {
 }
 
 /**
+ * The part of the scroller the reader can see the unit's text in. Its top is where the
+ * page stops being covered (the sticky back row and its title band), found by asking the
+ * page what is under the column's centre; without that answer, 8% down. Its bottom is
+ * above the soft keyboard (Chrome and the PWA shrink the visual viewport for it) and
+ * above the find pill (lifted over the keyboard in the APK), so a place brought into view
+ * while the reader types is left under neither (S22 look, 2026-10-23).
+ * @param {Element} root  the unit's body
+ * @param {Element} sc  its scroller
+ * @returns {{ sr: DOMRect, top: number, bottom: number }}
+ */
+function viewOf(root, sc) {
+  const sr = sc.getBoundingClientRect();
+  let bottom = sr.bottom;
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+  if (vv && vv.height > 0) bottom = Math.min(bottom, vv.offsetTop + vv.height);
+  const pill = document.querySelector('.find-pill');
+  if (pill) {
+    const p = pill.getBoundingClientRect();
+    if (p.height > 0 && p.top > sr.top) bottom = Math.min(bottom, p.top - 8);
+  }
+  let top = sr.top + sr.height * 0.08;
+  if (typeof document.elementFromPoint === 'function' && sr.height > 0) {
+    const rr = root.getBoundingClientRect();
+    const x = rr.left + rr.width / 2;
+    // covered: under something pinned over the page (sticky or fixed), not just page content above the text
+    const pinned = (/** @type {Element} */ el) => {
+      for (let n = /** @type {Element | null} */ (el); n && n !== sc; n = n.parentElement) {
+        const pos = getComputedStyle(n).position;
+        if (pos === 'sticky' || pos === 'fixed') return true;
+      }
+      return false;
+    };
+    for (let y = sr.top + 2; y < bottom; y += 6) {
+      const el = document.elementFromPoint(x, y);
+      if (el && (root.contains(el) || !pinned(el))) { top = y; break; }
+    }
+  }
+  return { sr, top, bottom: Math.max(top, bottom) };
+}
+
+/**
  * Scroll a place 40% down the reading view (one reader-initiated write).
  * @param {Element} root
  * @param {{ ranges: Range[] }} place
@@ -273,14 +371,17 @@ function reveal(root, place) {
   if (!sc || !place || !place.ranges.length) return;
   const r = rectOf(place.ranges[0]);
   if (!r || (r.top === 0 && r.bottom === 0)) return;
-  const sr = sc.getBoundingClientRect();
-  const top = sc.scrollTop + (r.top - sr.top) - sr.height * 0.4;
+  const v = viewOf(root, sc);
+  const sr = v.sr;
+  // jsdom and a scroller with no layout keep the plain 40% of its height
+  const at = sr.height > 0 ? (v.top - sr.top) + (v.bottom - v.top) * 0.4 : sr.height * 0.4;
+  const top = sc.scrollTop + (r.top - sr.top) - at;
   sc.scrollTo({ top: Math.max(0, top), behavior: /** @type {ScrollBehavior} */ (scrollBehavior()) });
 }
 
 /**
  * Is the place in the comfortable part of the view (not under the top edge,
- * not under the pill)?
+ * not under the pill or the keyboard)?
  * @param {Element} root
  * @param {{ ranges: Range[] }} place
  */
@@ -289,8 +390,9 @@ function inView(root, place) {
   if (!sc || !place || !place.ranges.length) return true;
   const r = rectOf(place.ranges[0]);
   if (!r) return true;
-  const sr = sc.getBoundingClientRect();
-  return r.top >= sr.top + sr.height * 0.08 && r.bottom <= sr.bottom - sr.height * 0.22;
+  const v = viewOf(root, sc);
+  const sr = v.sr;
+  return r.top >= v.top && r.bottom <= Math.min(sr.bottom - sr.height * 0.22, v.bottom);
 }
 
 /**
@@ -302,21 +404,67 @@ function inView(root, place) {
  * @param {string} [props.keyPrefix]  the unit's block keys ('letter:<id>:'): only those blocks are read
  */
 export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix = '' }) {
-  const find = (anchor && anchor.type === 'excerpt' && anchor.find && Array.isArray(anchor.find.terms) && anchor.find.terms.length
+  const searchFind = (anchor && anchor.type === 'excerpt' && anchor.find && Array.isArray(anchor.find.terms) && anchor.find.terms.length
     && (!anchor.letterId || anchor.letterId === unitId)) ? anchor.find : null;
   const [closed, setClosed] = React.useState(false);
   const [count, setCount] = React.useState(0);
   const [cur, setCur] = React.useState(0);
   const [related, setRelated] = React.useState({ n: 0, only: false });
+  // Find in this letter (idea 160): the field is open (`asking`), what it holds (`q`), and the find it makes (`typed`).
+  const [asking, setAsking] = React.useState(false);
+  const [q, setQ] = React.useState('');
+  const [typed, setTyped] = React.useState(/** @type {{ terms: string[], label: string, typed: string[] } | null} */ (null));
   /** @type {{ current: Array<{ start: number, span: number, ranges: Range[], rel: Range[], near?: boolean }> }} */
   const placesRef = React.useRef([]);
   /** @type {{ current: Range[] }} the related words of the places the pill does not step through */
   const asideRef = React.useRef([]);
   const curRef = React.useRef(0);
-  const active = !!find && !closed;
+  /** where the reader was reading as the field opened (a flat offset): a typed find starts there */
+  const fromRef = React.useRef(0);
+  const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
+  const find = asking ? typed : (closed ? null : searchFind);
+  const fromSearch = !asking;
+  const active = !!find;
 
-  // A new landing (or a new unit under the same anchor) opens a fresh find.
-  React.useEffect(() => { setClosed(false); }, [anchor, unitId]);
+  // A new landing (or a new unit under the same anchor) opens a fresh find, and a new search's words replace typed ones.
+  React.useEffect(() => {
+    setClosed(false);
+    if (searchFind) { setAsking(false); setQ(''); setTyped(null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- searchFind is anchor.find: the anchor is its identity.
+  }, [anchor, unitId]);
+  // ...and a typed find belongs to the unit it was typed in.
+  React.useEffect(() => { setAsking(false); setQ(''); setTyped(null); }, [unitId]);
+
+  // The field's words, a beat after the last key, as the pill's find (the same terms object while they mean the same).
+  React.useEffect(() => {
+    if (!asking) return undefined;
+    const t = setTimeout(() => {
+      const next = typedFind(q, markStopWords(/** @type {any} */ (window).VotSearchData));
+      setTyped((o) => (o && next && o.terms.join('\u0001') === next.terms.join('\u0001') ? o : next));
+    }, 150);
+    return () => clearTimeout(t);
+  }, [q, asking]);
+
+  const openAsk = () => {
+    const root = mainRef.current;
+    fromRef.current = root ? readingAt(root, readUnitText(root, keyPrefix).segs) : 0;
+    setQ('');
+    setTyped(null);
+    setAsking(true);
+  };
+  const openAskRef = React.useRef(openAsk);
+  openAskRef.current = openAsk;
+  const closeAsk = () => { setAsking(false); setQ(''); setTyped(null); setClosed(true); };
+
+  // The ⋯ menu's "Find in this letter", while this unit is the one on screen.
+  const menuItems = React.useMemo(() => [{ key: 'find-in-unit', label: 'Find in this ' + noun, icon: /** @type {'find'} */ ('find'), onSelect: () => openAskRef.current() }], [noun]);
+  usePageMenu(menuItems);
+  // Escape and Android Back close the field through the registry (the single dispatcher), never a listener here.
+  useModalRegistry({ id: 'find-in-unit', dismiss: closeAsk, active: asking });
+  // The field takes the focus as it opens (the menu that opened it has closed).
+  React.useEffect(() => {
+    if (asking && inputRef.current) inputRef.current.focus();
+  }, [asking]);
 
   React.useEffect(() => {
     if (!active) return undefined;
@@ -343,12 +491,23 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
       placesRef.current = places;
       asideRef.current = split.aside;
       setRelated((o) => (o.n === split.related && o.only === split.relOnly ? o : { n: split.related, only: split.relOnly }));
-      // A landing at the unit's top (a title named, search200 B5) is on no place: none is current until a step.
-      if (first) { first = false; curRef.current = anchor.top ? -1 : placeAt(places, locate(flat, anchor.text)); }
-      else if (curRef.current >= places.length) curRef.current = Math.max(0, places.length - 1);
+      let show = false;
+      if (first && !fromSearch) {
+        // A typed find starts at the first place from where the reader is reading (the last one wraps to the first).
+        first = false;
+        const at = places.findIndex((p) => p.start + p.span >= fromRef.current);
+        curRef.current = places.length ? Math.max(0, at) : 0;
+        show = places.length > 0;
+      } else if (first) {
+        // A landing at the unit's top (a title named, search200 B5) is on no place: none is current until a step.
+        first = false;
+        curRef.current = anchor.top ? -1 : placeAt(places, locate(flat, anchor.text));
+      } else if (curRef.current >= places.length) curRef.current = Math.max(0, places.length - 1);
       setCount(places.length);
       setCur(curRef.current);
       mark(places, curRef.current, asideRef.current);
+      // the reader's own typing: one write, and only when the place is out of the comfortable view
+      if (show && !inView(root, places[curRef.current])) reveal(root, places[curRef.current]);
     };
     build();
 
@@ -364,9 +523,10 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     const scroller = root.closest('.screen-scroll');
     const handsOn = () => clearInterval(settle);
     const HANDS = ['pointerdown', 'touchstart', 'wheel', 'keydown'];
-    // A landing at the top has no place to bring into view: the page stays at the title.
-    if (!anchor.top) for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
-    if (!anchor.top) settle = setInterval(() => {
+    // A landing at the top has no place to bring into view: the page stays at the title. A typed find has no landing to wait for.
+    const landing = fromSearch && !anchor.top;
+    if (landing) for (const ev of HANDS) document.addEventListener(ev, handsOn, { capture: true, passive: true });
+    if (landing) settle = setInterval(() => {
       tries++;
       const busy = document.body.classList.contains('scroll-restoring') || document.body.classList.contains('autoscroll-running');
       const top = scroller ? scroller.scrollTop : 0;
@@ -393,10 +553,11 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
       for (const ev of HANDS) document.removeEventListener(ev, handsOn, { capture: true });
       clearTimeout(timer);
       if (mo) mo.disconnect();
+      placesRef.current = [];
       unmark();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `find` is anchor.find: the anchor is its identity; mainRef is a stable ref.
-  }, [active, anchor, unitId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `find` is anchor.find (the anchor is its identity) or the typed find; mainRef is a stable ref.
+  }, [find, anchor, unitId]);
 
   const go = (/** @type {number} */ delta) => {
     const places = placesRef.current;
@@ -409,7 +570,48 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     reveal(mainRef.current, places[curRef.current]);
   };
 
-  if (!active || !count || typeof document === 'undefined' || !document.body) return null;
+  if (typeof document === 'undefined' || !document.body) return null;
+  if (asking) {
+    // The same pill, the field where the search words sit: "[faith ]  2 of 7  ‹ › ×".
+    const where = 'Find in this ' + noun;
+    const status = !typed ? '' : !count ? 'No matches' : (Math.max(0, cur) + 1) + ' of ' + count;
+    const onKey = (/** @type {any} */ e) => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      // Enter before the beat has passed finds what the field holds now; after it, steps on.
+      const now = typedFind(q, markStopWords(/** @type {any} */ (window).VotSearchData));
+      if (!typed || !now || now.terms.join('\u0001') !== typed.terms.join('\u0001')) { setTyped(now); return; }
+      go(e.shiftKey ? -1 : 1);
+    };
+    return ReactDOM.createPortal(
+      <div className="find-pill find-pill-ask" role="search" aria-label={where}>
+        <svg className="find-pill-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
+        </svg>
+        <input
+          ref={inputRef}
+          className="find-pill-input"
+          type="text"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={onKey}
+          placeholder={where}
+          aria-label={where}
+          enterKeyHint="search"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
+        />
+        <span className={'find-pill-count' + (typed && !count ? ' find-pill-none' : '')} role="status" aria-live="polite">{status}</span>
+        <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={!typed || count < 2} onClick={() => go(-1)}>‹</button>
+        <button type="button" className="find-pill-btn" aria-label="Next place" disabled={!typed || count < 2} onClick={() => go(1)}>›</button>
+        <button type="button" className="find-pill-btn find-pill-close" aria-label="Close find" onClick={closeAsk}>×</button>
+      </div>,
+      document.body
+    );
+  }
+  if (!active || !count) return null;
   // At the top (no place current) the pill counts the places: "0 of 3" read as none found (search200 UX B6).
   // The related places come after ("1 of 2 · 4 related"), or are the count when no place holds a word typed.
   const counted = related.only ? (cur < 0 ? count + ' related' : (cur + 1) + ' of ' + count + ' related')

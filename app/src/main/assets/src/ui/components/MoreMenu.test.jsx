@@ -358,6 +358,20 @@ describe('MoreMenuBtn — the screen\'s own items (utils/page-menu.js)', () => {
     expect(menu()).toBeNull();
   });
 
+  it('Find in this letter (idea 160) heads the menu with its magnifier, and its tap closes the menu', () => {
+    const onFind = vi.fn();
+    globalThis.__votPageMenu = [{ key: 'find-in-unit', label: 'Find in this letter', icon: 'find', onSelect: onFind }];
+    const { open, item, menu } = setup();
+    open();
+    const first = document.querySelector('.more-menu [role="menuitem"]');
+    expect(first.textContent.trim()).toBe('Find in this letter');
+    expect(first.querySelector('svg')).not.toBeNull();
+    act(() => { fireEvent.click(item('Find in this letter')); });
+    expect(onFind).toHaveBeenCalledTimes(1);
+    expect(menu()).toBeNull();   // the field it opens takes the focus; the menu does not hand it back to ⋯
+    expect(document.activeElement).not.toBe(document.querySelector('.nav-more-btn'));
+  });
+
   it('shows none on a screen that offers none', () => {
     const { open } = setup();
     open();

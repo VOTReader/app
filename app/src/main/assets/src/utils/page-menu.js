@@ -12,7 +12,7 @@
    other bundles, and each bundle carries its own copy of this file. */
 
 /**
- * @typedef {{ key: string, label: string, danger?: boolean, onSelect: () => void }} PageMenuItem
+ * @typedef {{ key: string, label: string, icon?: 'find', danger?: boolean, onSelect: () => void }} PageMenuItem
  */
 
 /** The items the screen on view offers, or null. @returns {PageMenuItem[] | null} */

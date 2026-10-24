@@ -242,15 +242,17 @@ describe('ChapterView — the Surprise anchor flashes a verse, then lets go', ()
 
 describe('ChapterView — the scripture sheet is dismissible by every route', () => {
   it('registers with the modal registry so Escape reaches it, but only while open', () => {
+    // the sheet's own registration (the chapter's find field registers too, idea 160)
+    const sheet = () => modalCalls.filter((r) => r.id === 'scripture-sheet').pop();
     renderCh({ showStudy: true });
-    const reg = modalCalls[modalCalls.length - 1];
+    const reg = sheet();
     expect(reg.id).toBe('scripture-sheet');
     expect(reg.active).toBe(false);         // no active ref yet
     act(() => { globalThis.__panelProps.onScriptureClick('John 3:16'); });
-    const open = modalCalls[modalCalls.length - 1];
+    const open = sheet();
     expect(open.active).toBe(true);
     act(() => { open.dismiss(); });
-    expect(modalCalls[modalCalls.length - 1].active).toBe(false);
+    expect(sheet().active).toBe(false);
   });
 
   it('claims window.__closeSheet only while a ref is open, and restores the prior owner', () => {
