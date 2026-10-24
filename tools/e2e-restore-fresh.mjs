@@ -91,14 +91,15 @@ async function freshProfile(tag, { downloads } = {}) {
   }
   await page.goto(BASE, { waitUntil: 'load' });
   await booted(page);
-  // The first-run About pages, clicked through until Home shows. One click each right after
+  // The first-run About pages (then Letter 1), clicked through until Home shows. One click each right after
   // boot missed when About rendered a beat late (the answers lane: 1 run in 3 locally), and
   // the profile stayed on About page 1 - which hides the Settings gear.
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
     const home = await page.evaluate(() => /Personal Study/.test(document.body.textContent || ''));
     if (home) break;
-    if (!(await clickIf(page, 'Continue')) && !(await clickIf(page, 'Begin Reading'))) await sleep(250);
+    // First run's Begin Reading opens Volume One, Letter 1 (n114, 52553a0c7); its Home button brings the walk to Home.
+    if (!(await clickIf(page, 'Continue')) && !(await clickIf(page, 'Begin Reading')) && !(await clickIf(page, 'Home'))) await sleep(250);
   }
   need(await page.evaluate(() => /Personal Study/.test(document.body.textContent || '')), `${tag}: never reached Home past the first-run pages`);
   await hydrated(page);
