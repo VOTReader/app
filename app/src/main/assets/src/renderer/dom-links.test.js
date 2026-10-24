@@ -263,3 +263,59 @@ describe('applyDOMLinks with a malformed link (s06.9)', () => {
     expect(document.getElementById('b').querySelectorAll('.inline-link-icon').length).toBe(1);
   });
 });
+
+/* ci-cov (n231 follow-up): the placement walk moved to icon-placement.js; this file's own branches are pinned. */
+describe('applyDOMLinks — its own branches', () => {
+  const after = (icon) => (icon.previousSibling ? icon.previousSibling.textContent : '');
+
+  it('an end that recorded its words follows them when the text before it changed (W48)', () => {
+    links = [{ source: { key: 'other:1' }, target: { key: 'k:0-5', text: 'world' } }];
+    const c = setup('Hello world');
+    applyDOMLinks();
+    expect(after(c.querySelector('.inline-link-icon'))).toBe('Hello world');
+  });
+
+  it('words that are gone keep the stored offset; a second end with words reuses the view', () => {
+    links = [
+      { source: { key: 'other:1' }, target: { key: 'k:0-5', text: 'nowhere' } },
+      { source: { key: 'other:2' }, target: { key: 'k:6-11', text: 'world' } },
+    ];
+    const c = setup('Hello world');
+    applyDOMLinks();
+    const all = icons(c);
+    expect(all.length).toBe(2);
+    expect(after(all[0])).toBe('Hello');
+  });
+
+  it('a source end carried as start/end fields (no key suffix) places at its end, at full gold', () => {
+    links = [{ source: { key: 'k', start: 0, end: 5 }, target: { key: 'z:1' } }];
+    const c = setup('Hello world');
+    applyDOMLinks();
+    const icon = c.querySelector('.inline-link-icon');
+    expect(after(icon)).toBe('Hello');
+    expect(icon.classList.contains('inline-link-icon-source')).toBe(true);
+  });
+
+  it('an end field with no start still places (the start falls back to the end)', () => {
+    links = [{ source: { key: 'k', end: 5, text: 'Hello' }, target: { key: 'z:1' } }];
+    const c = setup('Hello world');
+    applyDOMLinks();
+    expect(after(c.querySelector('.inline-link-icon'))).toBe('Hello');
+  });
+
+  it('ignores endpoints with no key, an empty key, or another block\'s key; a null link is skipped', () => {
+    links = [null, { source: { key: '' }, target: { key: 'kx:0-5' } }, { source: null, target: { key: 'k:0-5' } }];
+    const c = setup('Hello world');
+    applyDOMLinks();
+    expect(icons(c).length).toBe(1);
+  });
+
+  it('a legacy link from this block draws its end-of-block icon at full gold', () => {
+    links = [{ source: { key: 'k' }, target: { key: 'z:1' } }];
+    const c = setup('Hello world');
+    applyDOMLinks();
+    const icon = c.querySelector('.inline-link-icon');
+    expect(icon.nextSibling).toBeNull();
+    expect(icon.classList.contains('inline-link-icon-source')).toBe(true);
+  });
+});

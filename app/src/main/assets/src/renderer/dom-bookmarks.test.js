@@ -272,3 +272,98 @@ describe('applyDOMBookmarks — icon placement & slide-off (T4)', () => {
     expect(icons(c).length).toBe(0);
   });
 });
+
+/* ci-cov (n231 follow-up): the placement walk moved to icon-placement.js, so this file's own branches are the
+   bookmark-specific ones: the W48 word refind, the key filter, the pulse on an end-of-block icon, and the tap's
+   fallbacks. Each is pinned here. */
+describe('applyDOMBookmarks — its own branches', () => {
+  const after = (icon) => (icon.previousSibling ? icon.previousSibling.textContent : '');
+
+  it('a bookmark that recorded its words follows them when the text before it changed (W48)', () => {
+    // stored at 0-5 ("Hello"), but the words it marked were "world", now at 6-11
+    bookmarks = [{ id: 'b1', hlKey: 'k:0-5', text: 'world', created: 1 }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    const icon = c.querySelector('.inline-bookmark-icon');
+    expect(after(icon)).toBe('Hello world');
+    expect(icon.nextSibling).toBeNull();
+  });
+
+  it('words that are gone keep the stored offset', () => {
+    bookmarks = [{ id: 'b1', hlKey: 'k:0-5', text: 'nowhere', created: 1 }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    expect(after(c.querySelector('.inline-bookmark-icon'))).toBe('Hello');
+  });
+
+  it('one view serves two bookmarks with words in the same block', () => {
+    bookmarks = [
+      { id: 'b1', hlKey: 'k:0-5', text: 'Hello', created: 1 },
+      { id: 'b2', hlKey: 'k:6-11', text: 'world', created: 1 },
+    ];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    expect(icons(c).length).toBe(2);
+  });
+
+  it('skips a bookmark keyed to another block that the prefix lookup returned', () => {
+    bookmarks = [{ id: 'b1', hlKey: 'kx:0-5', created: 1 }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    expect(icons(c).length).toBe(0);
+  });
+
+  it('a sub-key with no range lands at the end of the block, pulsing when fresh', () => {
+    bookmarks = [{ id: 'b1', hlKey: 'k:3', created: Date.now() }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    const icon = c.querySelector('.inline-bookmark-icon');
+    expect(icon.nextSibling).toBeNull();
+    expect(icon.classList.contains('just-created')).toBe(true);
+  });
+
+  it('an old end-of-block bookmark beside a placed one: both drawn, neither pulses', () => {
+    bookmarks = [
+      { id: 'b1', hlKey: 'k', created: 1 },
+      { id: 'b2', hlKey: 'k:0-5' },
+    ];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    const all = icons(c);
+    expect(all.length).toBe(2);
+    expect([...all].some((i) => i.classList.contains('just-created'))).toBe(false);
+  });
+
+  it('a single bookmark with no edit sheet wired falls back to the popover', () => {
+    delete window.__bookmarkEdit;
+    let got = null;
+    window.__openBookmarkPopover = (ids, x, y, key) => { got = { ids, key }; };
+    bookmarks = [{ id: 'b1', hlKey: 'k:0-5', created: 1 }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    c.querySelector('.inline-bookmark-icon').click();
+    expect(got).toEqual({ ids: ['b1'], key: 'k' });
+  });
+
+  it('a tap with neither the sheet nor the popover wired does nothing and throws nothing', () => {
+    delete window.__bookmarkEdit;
+    delete window.__openBookmarkPopover;
+    bookmarks = [{ id: 'b1', hlKey: 'k:0-5', created: 1 }, { id: 'b2', hlKey: 'k:0-5', created: 1 }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    expect(() => c.querySelector('.inline-bookmark-icon').click()).not.toThrow();
+  });
+
+  it('an icon whose ids were cleared opens an empty popover rather than an edit sheet', () => {
+    let got = null;
+    window.__bookmarkEdit = () => { got = 'edit'; };
+    window.__openBookmarkPopover = (ids) => { got = ids; };
+    bookmarks = [{ id: 'b1', hlKey: 'k:0-5', created: 1 }];
+    const c = setup('Hello world');
+    applyDOMBookmarks();
+    const icon = c.querySelector('.inline-bookmark-icon');
+    icon.removeAttribute('data-bkm-ids');
+    icon.click();
+    expect(got).toEqual([]);
+  });
+});
