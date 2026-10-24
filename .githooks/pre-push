@@ -78,6 +78,19 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 
   src_changed=$(echo "$files" | grep -E '^(app/src/main/assets/src/.*\.(js|jsx)|vitest\.(config|setup)\.js|package(-lock)?\.json)$' || true)
   tools_changed=$(echo "$files" | grep -E '^tools/.*\.(js|mjs)$' || true)
+  # nw-landgate (10-23): CI's vitest is test:coverage, and its per-file floors went red on main (dom-bookmarks.js branches
+  # 82 < 88) after a push the fast hook passed. A push that touches a file with a floor (a key under thresholds, or the
+  # hooks/stores/utils globs), its .test sibling, or vitest.config.js runs the coverage run instead.
+  cov_changed=""
+  if [ -n "$src_changed" ] && [ -f vitest.config.js ]; then
+    floors=$(grep -oE "'app/src/main/assets/src/[^']+\.(js|jsx)': *\{" vitest.config.js | cut -d"'" -f2)
+    cov_changed=$(echo "$src_changed" | sed -E 's/\.test\.(js|jsx)$/.\1/' | while read -r f; do
+      case $f in
+        vitest.config.js|app/src/main/assets/src/hooks/*|app/src/main/assets/src/stores/*|app/src/main/assets/src/utils/*) echo "$f" ;;
+        *) echo "$floors" | grep -qxF "$f" && echo "$f" ;;
+      esac
+    done)
+  fi
   kotlin_changed=$(echo "$files" | grep -E '^(app/src/(main|test)/.*\.kt|app/src/main/AndroidManifest\.xml|app/src/main/res/.*|app/build\.gradle\.kts|gradle/libs\.versions\.toml)$' || true)
 
   tree=$(git rev-parse "$local_sha^{tree}")
@@ -110,13 +123,18 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   if [ -z "$VOT_PREPUSH_DRY" ] && [ "$todo" != " gradle" ] && [ -f tools/check-node-modules.js ]; then
     node tools/check-node-modules.js || exit 1
   fi
+  # CI's runners are UTC: a date test that passes only in Denver time went red on main (nw-landgate, 10-23)
+  export TZ=UTC
   for g in $todo; do
     case $g in
       vitest)
         echo "[pre-push] app source in this push - running vitest (fast mode; CI enforces the coverage floors)..."
         # core.hooksPath is ABSOLUTE (the primary checkout's copy runs for every worktree): a worktree branched before
         # test:hook existed keeps its own tree's command.
-        if grep -q '"test:hook"' package.json; then
+        if [ -n "$cov_changed" ]; then
+          echo "[pre-push] the push touches a file with a coverage floor ($(echo "$cov_changed" | head -1)) - running vitest with coverage, as CI does..."
+          heavy_run vitest npm run test:coverage
+        elif grep -q '"test:hook"' package.json; then
           heavy_run vitest npm run test:hook
         else
           heavy_run vitest npm run test:coverage

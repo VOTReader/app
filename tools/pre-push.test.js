@@ -51,11 +51,23 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
   });
 
   it('runs vitest when the pushed commits change app source', () => {
-    const { sha } = commitWith(plus('app/src/main/assets/src/utils/backup.js', '\n// pre-push test\n'));
+    const { sha } = commitWith(plus('app/src/main/assets/src/ui/components/HistoryEntryCard.jsx', '\n// pre-push test\n'));
     const { out, status } = push(line(sha));
     expect(status, out).toBe(0);
     expect(out).toMatch(/\[pre-push\] would run: vitest npm run test:hook/);
     expect(out).not.toMatch(/would run: gradle/);
+  }, 60_000);
+
+  // nw-landgate (10-23): main went red on a per-file floor (dom-bookmarks.js) after a push the fast run passed
+  it.each([
+    ['a hooks/stores/utils file', 'app/src/main/assets/src/utils/backup.js'],
+    ['a file with its own floor', 'app/src/main/assets/src/renderer/dom-bookmarks.js'],
+    ['the test of a floored file', 'app/src/main/assets/src/renderer/dom-bookmarks.test.js'],
+  ])('runs vitest with coverage when the push touches %s', (_, path) => {
+    const { sha } = commitWith(plus(path, '\n// pre-push test\n'));
+    const { out, status } = push(line(sha));
+    expect(status, out).toBe(0);
+    expect(out).toMatch(/would run: vitest npm run test:coverage/);
   }, 60_000);
 
   it('runs only the tools/ suite when the push changes a gate script and no app source', () => {
@@ -133,7 +145,8 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
 
   it('vitest and gradle run through heavy_run (the machine-wide gates.lock), and the old-branch fallback stays', () => {
     const hook = readFileSync(resolve(root, HOOK), 'utf8');
-    expect(hook).toMatch(/if grep -q '"test:hook"' package\.json; then\n\s*heavy_run vitest npm run test:hook\n\s*else\n\s*heavy_run vitest npm run test:coverage\n/);
+    expect(hook).toMatch(/elif grep -q '"test:hook"' package\.json; then\n\s*heavy_run vitest npm run test:hook\n\s*else\n\s*heavy_run vitest npm run test:coverage\n/);
+    expect(hook).toMatch(/^\s*export TZ=UTC$/m);
     expect(hook).toMatch(/^\s*heavy_run vitest-tools npx vitest run tools\/$/m);
     expect(hook).toMatch(/^\s*heavy_run gradle "\$GRADLE_CMD" :app:testDebugUnitTest :app:jacocoTestCoverageVerification$/m);
     // nw-gradle (10-23): the stale-Kotlin-daemon retry runs through heavy_run too, only after an 'it is internal' failure
