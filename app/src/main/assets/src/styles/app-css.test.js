@@ -889,8 +889,10 @@ describe('bottom dock stack (cz1)', () => {
    combobox ([role="combobox"]:focus-visible) drew a second gold frame round it, a look it never had. The box
    keeps its own focus look, the border that brightens (no visible redesign in that round). */
 describe('app.css — the search box keeps its own focus look', () => {
-  it('the combobox ring does not frame the search input', () => {
-    expect(ruleBlock(CSS, '.search-input:focus-visible {')).toMatch(/outline:\s*none;\s*border-radius:\s*6px/);
+  // The box keeps its 6px corners under the app's one focus ring (search200 audit 201 replaced B3's outline:none,
+  // which left only a faint border change; app-css.focus-ring.test.js holds the ring).
+  it('the combobox ring does not frame the search input with 4px corners', () => {
+    expect(ruleBlock(CSS, '.search-input:focus-visible {')).toMatch(/outline:\s*2px solid var\(--gold\);[^}]*border-radius:\s*6px/);
     expect(CSS.indexOf('.search-input:focus-visible {'), 'after the app-wide ring, so it wins').toBeGreaterThan(CSS.indexOf('[role="combobox"]:focus-visible { outline: 2px'));
   });
 });
