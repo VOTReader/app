@@ -2052,6 +2052,9 @@
       .song-version.is-current .song-version-label { color: var(--gold); }
       .song-page-more { width: 100%; margin-top: .75rem; font-size: var(--fs-18); font-weight: 500; letter-spacing: 0; text-transform: none; }
       .song-page-lyrics p { margin: 0; color: var(--cream); font-size: var(--fs-18); font-style: italic; line-height: 1.5; }
+      /* A04.7: Hebrew lines (dir="auto" finds them) run right to left and stand upright; italic Hebrew is a slant no
+         Hebrew type has. */
+      .song-page-lyrics p:dir(rtl), .song-lyrics-line:dir(rtl) { font-style: normal; }
       .song-version-main:focus-visible, .song-page-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Keep on this phone (K1, picture r2-more-screens, third panel): a card in three states — KEEP FOR OFFLINE
          LISTENING with a filled KEEP · 64 MB, KEEPING… with a thin bar and Cancel, AVAILABLE OFFLINE with a check —
@@ -7783,6 +7786,7 @@
        Subtler than the label; truncates to a single line by default.
        Long thoughts (>80 chars) become tappable for read-more expansion;
        the expanded mode drops the ellipsis and wraps. */
+    .bkm-row-passage { display: block; margin-top: 2px; color: var(--cream-dim); font-size: var(--fs-14); font-style: italic; line-height: 1.4; }
     .bkm-row-thought {
       display: block;
       font-family: var(--font-body); font-style: italic;

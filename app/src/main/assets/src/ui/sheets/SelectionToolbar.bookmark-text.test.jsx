@@ -88,7 +88,8 @@ describe('a new bookmark labels and previews the words the reader sees (sweep v0
     window.__bookmarkCreate = vi.fn();
     bookmarkLordIsMy();
     expect(window.__bookmarkCreate).toHaveBeenCalledWith(expect.objectContaining({
-      defaultLabel: 'Lord is my',
+      // A06.9: three words widen to the sentence they sit in, still without the digit.
+      defaultLabel: 'The Lord is my shepherd',
       excerpt: 'Lord is my',
     }));
   });
@@ -96,7 +97,7 @@ describe('a new bookmark labels and previews the words the reader sees (sweep v0
   it('leaves it out of the label the direct-save fallback stores', () => {
     delete window.__bookmarkCreate;
     bookmarkLordIsMy();
-    expect(globalThis.BookmarkStore.add).toHaveBeenCalledWith(expect.objectContaining({ label: 'Lord is my' }));
+    expect(globalThis.BookmarkStore.add).toHaveBeenCalledWith(expect.objectContaining({ label: 'The Lord is my shepherd' }));
   });
 
   it('a selection across two poem lines labels with a space where the line breaks, not run together', () => {

@@ -192,7 +192,7 @@ describe('audio-track — WEB (third edition) routing', () => {
    registries that live here, so neither surface carries its own string list. */
 describe('audio-track — display registries the listening UI renders from', () => {
   it('every edition carries a short chip label led by its translation code', () => {
-    expect(BIBLE_AUDIO_EDITIONS['brm-kjv'].short).toBe('KJV · BRM');
+    expect(BIBLE_AUDIO_EDITIONS['brm-kjv'].short).toBe('KJV · Biblical Restoration');
     expect(BIBLE_AUDIO_EDITIONS['wop-nkjv'].short).toBe('NKJV · Dramatized');
     expect(BIBLE_AUDIO_EDITIONS['web-ebible'].short).toBe('WEB');
     expect(BIBLE_AUDIO_EDITIONS['tsot-matthew'].short).toBe('Matthew · TSOT');

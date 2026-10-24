@@ -142,7 +142,7 @@ describe('AudioPlayerBar — offline, what is on the phone', () => {
     clockAt(5, 240);
     expect(line2()).toMatch(/1 of 3/);
     act(() => { NetStatus.reportFailure(); });
-    expect(line2()).toBe('Volume One · 1 of 2 · Skipped 1 not on this phone');
+    expect(line2()).toBe('1 of 2 · Skipped 1 not on this phone · Volume One');
   });
 });
 
@@ -288,7 +288,7 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
       emit('ended');                                                   // the seam
       expect(title()).toBe('Volume Two · Solo Letter');                // the first track after the crossing
       emit('playing');
-      expect(line2()).toMatch(/^Volume Two\b/);   // the sub names it too
+      expect(line2()).toMatch(/ · Volume Two$/);   // the sub names it too (last, A07.12)
     } finally {
       delete globalThis.COLLECTIONS; delete globalThis.COL_BY_KEY; delete globalThis.colPreface; delete globalThis.colLetterArr;
     }
@@ -392,16 +392,16 @@ describe('AudioPlayerBar — transport', () => {
 
     playWholeCollection();                      // the preface, Letter A in two parts, Letter C: three recordings
     emit('playing');
-    expect(line2()).toBe('Volume One · 1 of 3');
+    expect(line2()).toBe('1 of 3 · Volume One');
     drive(() => AudioPlayer.next());
     emit('playing');
-    expect(line2()).toBe('Volume One · 2 of 3');
+    expect(line2()).toBe('2 of 3 · Volume One');
     drive(() => AudioPlayer.next());
     emit('playing');
-    expect(line2(), "Letter A's second part is still the second recording (31 vs 30, player brief s7)").toBe('Volume One · 2 of 3');
+    expect(line2(), "Letter A's second part is still the second recording (31 vs 30, player brief s7)").toBe('2 of 3 · Volume One');
     drive(() => AudioPlayer.next());
     emit('playing');
-    expect(line2()).toBe('Volume One · 3 of 3');
+    expect(line2()).toBe('3 of 3 · Volume One');
   });
 
   it('closes itself past the end of the queue', () => {

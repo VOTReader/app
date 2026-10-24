@@ -1032,12 +1032,12 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
 
     // Counted in the book, not the queue that starts at the chapter picked (pl-l2b).
     expect(document.querySelector('.np-kicker-at').textContent).toBe('Chapter 2 of 3');
-    expect(voiceChip().getAttribute('aria-label')).toBe('Edition: KJV · BRM. Choose another');
-    expect(voiceChip().textContent).toContain('KJV · BRM');
+    expect(voiceChip().getAttribute('aria-label')).toBe('Edition: KJV · Biblical Restoration. Choose another');
+    expect(voiceChip().textContent).toContain('KJV · Biblical Restoration');
     openVoice();
     // WEB ships no rows for this book in the fixture, so it is not offered —
     // a row that taps through to silence is worse than no row.
-    expect(voiceNames()).toEqual(['KJV · BRM', 'NKJV · Dramatized']);
+    expect(voiceNames()).toEqual(['KJV · Biblical Restoration', 'NKJV · Dramatized']);
     expect(voiceChecked()).toEqual(['true', 'false']);
     expect(subSheet('np-voice-sheet').querySelector('.np-sheet-note').textContent)
       .toBe('Starts this chapter again in the edition you pick. Your Up next stays.');
@@ -1097,7 +1097,7 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     const plays = library.recordPlayed.mock.calls.length;
 
     openVoice();
-    pickVoice(/^KJV · BRM$/);
+    pickVoice(/^KJV · Biblical Restoration$/);
 
     const after = AudioPlayer.getState();
     expect(after.queue.map((t) => t.url)).toEqual(queueBefore);   // Genesis 1 still listed as heard
@@ -1142,7 +1142,7 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     openSheet();
     openVoice();
     expect(voiceNames()).toContain('Matthew · TSOT');
-    expect(voiceNames()).toEqual(['KJV · BRM', 'NKJV · Dramatized', 'Matthew · TSOT']);
+    expect(voiceNames()).toEqual(['KJV · Biblical Restoration', 'NKJV · Dramatized', 'Matthew · TSOT']);
   });
 });
 
@@ -1486,11 +1486,11 @@ describe('AudioManagerSheet — Bible rows name their chapter (A4)', () => {
   it('a title that does NOT spell out the chapter keeps its label in the byline', () => {
     // One part is not a chapter list, so Jude keeps its plain title — and the
     // part label is then the only place the chapter appears.
-    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jude', label: 'KJV · BRM' }));
+    drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'jude', label: 'KJV · Biblical Restoration' }));
     openSheet();
 
     expect(screen.getByRole('heading', { name: 'Jude' })).toBeTruthy();
-    expect(kicker()).toBe('KJV · BRM');
+    expect(kicker()).toBe('KJV · Biblical Restoration');
     expect(byline()).toBe('Chapter 1');
   });
 });

@@ -381,7 +381,10 @@ export function AudioPlayerBar() {
   } else {
     // With a sleep or speed chip beside it, line 2 keeps the source and its place and gives up the time left
     // (picture 02, "Sleep and speed set"): the full player has the clock.
-    line2 = [track.sub, place, skippedLine || (sleepChip || speedChip ? null : left)].filter(Boolean).join(' · ');
+    // A07.12: the place first, the source last, so a short line loses the edition ("KJV · BRM"), not "1 of 19".
+    line2 = place
+      ? [place, skippedLine || (sleepChip || speedChip ? null : left), track.sub].filter(Boolean).join(' · ')
+      : [track.sub, skippedLine || (sleepChip || speedChip ? null : left)].filter(Boolean).join(' · ');
   }
 
   const segs = line2.split(' · ');

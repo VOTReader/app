@@ -61,6 +61,11 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editing
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot at edit-start: fires only when isEditing flips. bkm.label is read at that moment for the seed; tracking it in deps would clobber in-progress edits if the underlying bookmark mutated externally. setEditValue is a useState setter (identity-stable).
   }, [isEditing]);
 
+  // A06.9: the passage under the label, shown only when it says something the label does not.
+  var norm = function(t) { return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
+  var passage = typeof bkm.text === 'string' && bkm.text.trim() && norm(bkm.label).indexOf(norm(bkm.text)) < 0
+    ? '“' + (bkm.text.length > 160 ? bkm.text.slice(0, 157).trim() + '…' : bkm.text.trim()) + '”' : '';
+
   var commitEdit = function() {
     if (cancelledRef.current) return;
     var v = editValue.trim();
@@ -107,6 +112,8 @@ export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editing
           )
           : <span className="bkm-row-label">{bkm.label || '(no label)'}</span>
         }
+        {/* A06.9: the words it was made on, when the label is not already them. */}
+        {!isEditing && passage ? <span className="bkm-row-passage">{passage}</span> : null}
         {hasThought && (typeof JrnExpandable !== 'undefined'
           ? (
             <div className="bkm-row-thought" onClick={function(e) { e.stopPropagation(); }}>

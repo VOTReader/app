@@ -54,6 +54,7 @@
 
 import { modalRegistry } from './use-modal-registry.js';
 import { suppressNextHistoryPush } from './use-history-sync.js';
+import { showToast } from '../utils/toast.js';
 
 /** The listening desk's registry id (AudioManagerSheet.jsx) — the one sheet that does not hold a follow. */
 const DESK_ID = 'audio-manager-sheet';
@@ -225,6 +226,13 @@ export function useAudioFollow(p) {
       // this callback), so the prune effect sees the moved pane and the
       // carried entry together.
       if (dest && typeof pane.retargetTop === 'function') pane.retargetTop(dest);
+      // s02.7: the page moved under the reader; say where to (narration went from Letter 2 into Christmas silently).
+      if (dest) {
+        const st = player.getState();
+        const track = st && Array.isArray(st.queue) ? st.queue[st.qi] : null;
+        const name = track && (track.title || '');
+        if (name) showToast({ id: 'vot-toast-now-reading', className: 'vot-toast', durationMs: 2000, text: 'Now reading: ' + name });
+      }
     };
     const unsub = player.subscribe(() => {
       const cur = unitOf(player);

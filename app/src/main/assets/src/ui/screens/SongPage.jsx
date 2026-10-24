@@ -153,7 +153,7 @@ export function SongPage({ familyId, library, playingId, active, onPush, FamilyR
         <section className="songs-section" aria-labelledby="song-lyrics">
           <div className="songs-section-head"><h2 id="song-lyrics">Lyrics</h2></div>
           <div className="song-page-lyrics">
-            {(allLyrics ? lines : lines.slice(0, LYRIC_PREVIEW)).map((line, i) => <p key={i}>{line.t}</p>)}
+            {(allLyrics ? lines : lines.slice(0, LYRIC_PREVIEW)).map((line, i) => <p key={i} dir="auto">{line.t}</p>)}
           </div>
           {lines.length > LYRIC_PREVIEW ? (
             <button type="button" className="songs-see-all" onClick={() => setAllLyrics(!allLyrics)} aria-expanded={allLyrics}>

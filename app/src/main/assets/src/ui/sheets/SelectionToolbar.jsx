@@ -19,6 +19,7 @@ import { startSelectionDrag, selectionDragging, dockTop } from './selection-drag
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
 import { snapshotGroups, offerUndoRemoved, offerUndoAdded } from '../../utils/annotation-undo.js';
+import { sentenceAround, isShortLabel } from '../../utils/bookmark-sentence.js';
 
 /** The Undo toast's word for a new mark (U06.2). @param {string} kind */
 const markedLabel = (kind) => (kind === 'underline' ? 'Underlined' : kind === 'squiggle' ? 'Squiggled' : 'Highlighted');
@@ -1366,6 +1367,14 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     var labelText = shownText.split('\n').map(function(line) { return line.trim(); }).join(' ').trim();
     if (!labelText && selInfo.text) {
       labelText = selInfo.text.trim();
+    }
+    // A06.9: a word or two names nothing in the Bookmarks list; the sentence around it does.
+    if (labelText && container && snap.end > snap.start && isShortLabel(labelText)) {
+      var sent = sentenceAround(containerText, snap.start, snap.end);
+      var sentText = sent.end > sent.start
+        ? hlDisplayText(container, containerText, sent.start, sent.end).split('\n').map(function(line) { return line.trim(); }).join(' ').trim()
+        : '';
+      if (sentText.length > labelText.length) labelText = sentText;
     }
     // Truncate very long auto-labels to 120 chars so they read as a short tag
     if (labelText.length > 120) labelText = labelText.slice(0, 117) + '...';

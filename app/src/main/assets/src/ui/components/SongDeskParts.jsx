@@ -75,7 +75,7 @@ export function SongLyricsCard({ song, time }) {
       </div>
       <div className="song-lyrics-lines" ref={boxRef} tabIndex={0} role="region" aria-label="Lyrics">
         {lyrics.lines.map((line, i) => (
-          <p key={i} className={'song-lyrics-line' + (i === now ? ' is-now' : '')} aria-current={i === now ? 'true' : undefined}>{line.t}</p>
+          <p key={i} dir="auto" className={'song-lyrics-line' + (i === now ? ' is-now' : '')} aria-current={i === now ? 'true' : undefined}>{line.t}</p>
         ))}
       </div>
       <p className="song-lyrics-foot">{songLyricsFoot(isVerbatimSong(song), letter)}</p>

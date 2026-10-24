@@ -134,7 +134,7 @@ const BIBLE_AUDIO_DEFAULT = 'brm-kjv';
 export const BIBLE_AUDIO_EDITIONS = Object.freeze({
   'brm-kjv': Object.freeze({
     label: 'KJV · Biblical Restoration Ministries',
-    short: 'KJV · BRM',
+    short: 'KJV · Biblical Restoration',   // A08.5: 'BRM' read as a code
     translation: 'kjv',
     volKey: 'bible-brm-kjv',
     assetPrefix: 'brm',

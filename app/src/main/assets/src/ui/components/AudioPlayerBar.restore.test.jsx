@@ -113,6 +113,6 @@ describe('AudioPlayerBar — a boot-restored bar is not a queue of one (sweep v0
     expect(st.qi).toBe(2);
     expect(FakeAudio.last.src).toBe(URL_OF('idA2'));
     expect(document.querySelector('.audio-bar-title').textContent).toBe('The Wide Path · Part 2');
-    expect(line2()).toBe('Volume One · 2 of 3');   // counted in recordings: Letter A's two parts are one
+    expect(line2()).toBe('2 of 3 · Volume One');   // counted in recordings: Letter A's two parts are one
   });
 });
