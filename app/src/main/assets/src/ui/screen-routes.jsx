@@ -1669,7 +1669,7 @@ export function buildScreenRoutes({
         onLinkOpen={openLinkSidebar}
         readAlongOn={sharedViewProps.readAlongOn}
         readAlongFollow={sharedViewProps.readAlongFollow}
-        onStudyNotes={book.id === 'matthew-plain' ? () => navigateToLink({ type: 'bible', bookId: 'matthew', chapter: chapter.num }) : null}
+        onStudyNotes={book.id === 'matthew-plain' ? () => navigateToLink({ type: 'bible', bookId: 'matthew', chapter: chapter.num }, { sourceLetterTitle: book.title + ' ' + chapter.num }) : null}
       />
       );
       // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).
