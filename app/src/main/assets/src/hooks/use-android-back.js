@@ -199,6 +199,30 @@ function runBackRouter() {
   }
 }
 
+/* n230: the Back router's one-line branches, as data. Each screen names the one nav call its Back makes
+   (resolved inside the handler: origin = goNavOrigin, home = goHome, scriptures = goScripturesHome,
+   studies = goStudiesHome, searchOrigin = goSearchOrigin, answers = the Answers landing). About also marks
+   itself seen first. Screens whose Back depends on state (breadcrumbs, stacks, a live pill) stay as code.
+   - Hubs and index screens reached through _captureOrigin (UX3) back to the screen they were opened from,
+     not a hardcoded Library; the Listening Library sub-screens chain their origin to the hub
+     (screen-routes' _enterAudioSub), so one goNavOrigin pops one level.
+   - Answers: the landing is also the collection's indexScreen, so it is named here, ahead of the
+     index-screen rule that would send it to Volumes; its shelves step back to the landing (a topic unwinds
+     by the tap-through stack its opener pushed, else the letter-screen rule). */
+/** @type {Record<string, 'origin' | 'home' | 'scriptures' | 'studies' | 'searchOrigin' | 'answers'>} */
+const BACK_BY_SCREEN = {
+  'settings': 'origin', 'history': 'origin', 'about': 'origin', 'reading-plans': 'origin', 'scripture-web': 'origin',
+  'audio-library': 'origin', 'audio-library-volumes': 'origin', 'audio-library-collection': 'origin',
+  'audio-library-saved': 'origin', 'audio-library-studies': 'origin', 'audio-library-offline': 'origin',
+  'notes-index': 'origin', 'my-progress': 'origin', 'links-index': 'origin', 'bookmarks-index': 'origin',
+  'highlights-index': 'origin', 'journal-home': 'origin',
+  'library': 'home', 'scriptures-home': 'home', 'volumes-home': 'home', 'studies-home': 'home', 'answers-home': 'home',
+  'search': 'searchOrigin',
+  'scripture-genre': 'scriptures',
+  'bible-study-index': 'studies',
+  'answers-group': 'answers', 'answers-media': 'answers', 'answers-saved': 'answers', 'answers-subject': 'answers', 'answers-az': 'answers',
+};
+
 export function useAndroidBack({
   screen, bookId, genreId, fromSearch, fromStudies, fromMatthewCh, studyId, fromWtlb, fromSurprise,
   fromSearchIndex = false, setFromSearchIndex = undefined,
@@ -315,32 +339,19 @@ export function useAndroidBack({
         tapThroughBackRef.current();
         return "true";
       }
-      if (s === "settings") {goNavOrigin();return "true";} else
-      if (s === "history") {goNavOrigin();return "true";} else
-      if (s === "about") {AboutSeenFlagStore.set();goNavOrigin();return "true";} else
-      if (s === "audio-library") {goNavOrigin();return "true";} else
-      // The Listening Library sub-screens chain their origin back to the
-      // hub (screen-routes' _enterAudioSub), so one goNavOrigin pops one level.
-      if (s === "audio-library-volumes") {goNavOrigin();return "true";} else
-      if (s === "audio-library-collection") {goNavOrigin();return "true";} else
-      if (s === "audio-library-saved") {goNavOrigin();return "true";} else
-      if (s === "audio-library-studies") {goNavOrigin();return "true";} else
-      if (s === "audio-library-offline") {goNavOrigin();return "true";} else
+      // n230: the one-line branches are a table (BACK_BY_SCREEN, above the hook): screen -> the
+      // one nav call its Back makes. Every key is a plain screen name, disjoint from the branches that
+      // remain, so its place in the chain changes nothing; the branches with conditions stay as code.
+      { const simple = Object.prototype.hasOwnProperty.call(BACK_BY_SCREEN, s) ? BACK_BY_SCREEN[s] : null;
+      if (simple) {
+        if (s === "about") AboutSeenFlagStore.set();
+        ({ origin: goNavOrigin, home: goHome, scriptures: goScripturesHome, studies: goStudiesHome,
+           searchOrigin: goSearchOrigin, answers: () => setScreen("answers-home") })[simple]();
+        return "true";
+      }}
       // Songs of the Letters: Back pops the Songs stack (audioColKey) first, then leaves by the origin (screen-routes owns both).
       // W38: a popped frame keeps the screen (no nav-key change), so it clears the flag like the other in-place backs.
       if (s === "audio-library-songs") {if (typeof window.__songsBack === "function") {if (window.__songsBack()) clearSuppressNextHistoryPush();} else goNavOrigin();return "true";} else
-      if (s === "reading-plans") {goNavOrigin();return "true";} else
-      if (s === "scripture-web") {goNavOrigin();return "true";} else
-      // UX3: index/hub screens (reached via goNotesIndex/etc., which _captureOrigin)
-      // back through goNavOrigin — to the reading screen the user opened them from,
-      // not a hardcoded Library. (goNavOrigin restores the captured origin, or
-      // goHome() when none — matching settings/history/about above.)
-      if (s === "notes-index") {goNavOrigin();return "true";} else
-      if (s === "my-progress") {goNavOrigin();return "true";} else
-      if (s === "links-index") {goNavOrigin();return "true";} else
-      if (s === "bookmarks-index") {goNavOrigin();return "true";} else
-      if (s === "highlights-index") {goNavOrigin();return "true";} else
-      if (s === "journal-home") {goNavOrigin();return "true";} else
       // journal-viewer renders ONE pill with a fixed precedence (the viewer's
       // private journal→journal stack first, then the cross-screen back
       // target). Hardware back must not disagree with what's on screen, so it
@@ -357,17 +368,6 @@ export function useAndroidBack({
         setScreen("journal-home");return "true";
       } else
       if (s === "journal-editor") {goJournalViewer(journalEntryIdRef.current);return "true";} else
-      if (s === "library") {goHome();return "true";} else
-      if (s === "search") {goSearchOrigin();return "true";} else
-      if (s === "scripture-genre") {goScripturesHome();return "true";} else
-      if (s === "scriptures-home") {goHome();return "true";} else
-      if (s === "volumes-home") {goHome();return "true";} else
-      // Answers: the landing is also the collection's indexScreen, so it must be
-      // matched BEFORE the index-screen rule below sends it to Volumes. A shelf and
-      // Charts & videos, Saved answers (and the retired subject / A–Z screens) step back to the landing; a topic unwinds by the tap-through
-      // stack its opener pushed, else the letter-screen rule (indexScreen).
-      if (s === "answers-home") {goHome();return "true";} else
-      if (s === "answers-group" || s === "answers-media" || s === "answers-saved" || s === "answers-subject" || s === "answers-az") {setScreen("answers-home");return "true";} else
       // Track D: a chapter picked from the index a book-level hit opened (fromSearchIndex) backs
       // to that index, which backs to the results; one a hit opened backs to the results.
       if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current && !fromSearchIndexRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {if (fromSearchIndexRef.current && setFromSearchIndex) setFromSearchIndex(false);setChapterNum(null);setScreen("matthew-idx");}return "true";} else
@@ -379,8 +379,6 @@ export function useAndroidBack({
       // fallbacks now match bible-idx (genre → scriptures home) instead of
       // skipping the parent hub straight to Home.
       if (s === "matthew-idx") {if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else if (fromStudiesRef.current) {setFromStudies(false);goStudiesHome();} else if (genreIdRef.current) {setScreen("scripture-genre");} else {goScripturesHome();}return "true";} else
-      if (s === "studies-home") {goHome();return "true";} else
-      if (s === "bible-study-index") {goStudiesHome();return "true";} else
       if (s === "bible-study-chapter") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");return "true";}const cur = getStudyByIdRef.current(studyIdRef.current);if (cur && cur.chapters && cur.chapters.length > 1) {setStudyChapterId(null);setScreen("bible-study-index");} else {goStudiesHome();}return "true";} else
       if (s === "bible-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromWtlbRef.current) {const ret = fromWtlbRef.current;setFromWtlb(null);setScreen(ret);return "true";}if (fromSearchRef.current && fromSearchIndexRef.current) {if (setFromSearchIndex) setFromSearchIndex(false);setChapterNum(null);setScreen("bible-idx");return "true";}if (fromSearchRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {const bid = bookIdRef.current;
         /* Q8 lazy: BOOKS lives in bundle-a-bible. If the user is on bible-ch
