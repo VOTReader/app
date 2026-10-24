@@ -62,7 +62,7 @@ import {
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
 } from '../utils/garden.js';
 import { describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab } from '../utils/tabs.js';
-import { createPressDrag, pickupBuzz } from '../utils/press-drag.js';
+import { createPressDrag } from '../utils/press-drag.js';
 import {
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
   contentDocToNavItem, buildNavTree,
@@ -318,7 +318,7 @@ Object.assign(window, {
   GARDEN_TOTAL, GARDEN_TIERS, GARDEN_DEFAULT_TIER, gardenImageCache, gardenCrawled, GARDEN_CACHE_MAX,
   getGardenTier, gardenUrl, gardenCacheKey, gardenPreload, gardenIsCached, gardenTierLimits, gardenClearCache,
   describeTab, tabContentKey, tabHasProgressBar, scrollKeyForTab,
-  createPressDrag, pickupBuzz,
+  createPressDrag,
   buildNavIndex, searchNavIndex, navItemPreview, navItemToEndpoint, buildSourceEndpoint,
   contentDocToNavItem, buildNavTree,
   _bookTitle, _verseRangeLabel, noteSourceLabel, noteSourceNav, noteSourceSegments,

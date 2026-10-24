@@ -15,6 +15,8 @@
    proof: JournalStore.update changes it at once while its IDB write is still in flight or
    failing (refuter r1). Until then a draft goes only when the quota leaves no room,
    oldest first, the entry on screen last. */
+import { pickupBuzz } from '../../utils/press-drag.js';
+
 var JOURNAL_DRAFT_KEY = 'vot-journal-draft';
 /** After 'Not saved', how often and how long the chip looks for the store's own retry (its schedule ends by ~2 min). */
 var SAVED_RETRY_LOOK_MS = 2000;
