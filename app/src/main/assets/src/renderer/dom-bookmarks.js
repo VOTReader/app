@@ -27,6 +27,7 @@
 
 import { chromeAwareView, refindRange } from './anchor-view.js';
 import { makeIconButton } from './icon-button.js';
+import { insertIconAt, BOOKMARK_SKIP_RX } from './icon-placement.js';
 
 /* Window (ms) during which a freshly-created bookmark gets the .just-created
    class so its icon plays the creation-pulse animation. Re-renders of the
@@ -161,123 +162,8 @@ function _buildBookmarkIcon(hlKey, bkmIds) {
 }
 
 function _insertBookmarkIconAt(container, hlKey, endPos, bkmIds, justCreated) {
-  var WORD = /[\w’'-]/;
-  var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
-  // Elements the icon must NOT land directly before — reuses the same
-  // skip list as _insertLinkIconAt.
-  var SKIP_RX = /\b(fn-ref|tap-ref|letter-link-ref|verse-link-icon|hl-note-icon|inline-link-icon|inline-bookmark-icon)\b/;
-
-  function isSkip(el) {
-    return el && el.nodeType === 1 && el.className && SKIP_RX.test(el.className);
-  }
-  function isPhraseChar(c) { return !!c && (WORD.test(c) || CLOSE_PUNCT.test(c)); }
-
-  function nextInsertionPoint(node) {
-    var cur = node;
-    while (cur && cur !== container) {
-      var sib = cur.nextSibling;
-      if (sib === null) {
-        cur = cur.parentElement;
-        continue;
-      }
-      if (isSkip(sib)) {
-        cur = sib;
-        continue;
-      }
-      return sib;
-    }
-    return null;
-  }
-
-  // Gather all text nodes in document order.
-  var textNodes = [];
-  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-  while (w.nextNode()) textNodes.push(/** @type {Text} */ (w.currentNode));
-
-  var charPos = 0, nodeIdx = -1, localOffset = 0;
-  for (var i = 0; i < textNodes.length; i++) {
-    var nodeEnd = charPos + textNodes[i].length;
-    if (endPos > charPos && endPos <= nodeEnd) {
-      nodeIdx = i;
-      localOffset = endPos - charPos;
-      break;
-    }
-    charPos = nodeEnd;
-  }
-  if (nodeIdx < 0) {
-    var fallbackIcon = _buildBookmarkIcon(hlKey, bkmIds);
-    if (justCreated) fallbackIcon.classList.add('just-created');
-    container.appendChild(fallbackIcon);
-    return;
-  }
-
-  // If endPos is inside a skip element, slide past it.
-  var ancestor = textNodes[nodeIdx].parentElement;
-  var skipAncestor = null;
-  while (ancestor && ancestor !== container) {
-    if (isSkip(ancestor)) skipAncestor = ancestor;
-    ancestor = ancestor.parentElement;
-  }
-  if (skipAncestor) {
-    var ref = nextInsertionPoint(skipAncestor);
-    var icon = _buildBookmarkIcon(hlKey, bkmIds);
-    if (justCreated) icon.classList.add('just-created');
-    if (ref) ref.parentNode.insertBefore(icon, ref);
-    else container.appendChild(icon);
-    return;
-  }
-
-  var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
-  function hasBlockBetween(prev, next) {
-    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null);
-    bw.currentNode = prev;
-    var n;
-    while ((n = bw.nextNode())) {
-      if (n === next) return false;
-      if (n.nodeType === 1 && BLOCK_TAGS.test(/** @type {Element} */ (n).tagName)) return true;
-    }
-    return true;
-  }
-
-  // Slide forward through phrase characters, crossing inline boundaries.
-  while (true) {
-    var text = textNodes[nodeIdx].nodeValue;
-    while (localOffset < text.length && isPhraseChar(text[localOffset])) {
-      localOffset++;
-    }
-    if (localOffset < text.length) break;
-    var nextNodeIdx = nodeIdx + 1;
-    while (nextNodeIdx < textNodes.length) {
-      var na = textNodes[nextNodeIdx].parentElement;
-      var inSkip = false;
-      while (na && na !== container) {
-        if (isSkip(na)) { inSkip = true; break; }
-        na = na.parentElement;
-      }
-      if (!inSkip) break;
-      nextNodeIdx++;
-    }
-    if (nextNodeIdx >= textNodes.length) break;
-    if (hasBlockBetween(textNodes[nodeIdx], textNodes[nextNodeIdx])) break;
-    nodeIdx = nextNodeIdx;
-    localOffset = 0;
-  }
-
-  var finalNode = textNodes[nodeIdx];
-  var finalText = finalNode.nodeValue;
-  var insertBeforeNode = null;
-  if (localOffset >= finalText.length) {
-    insertBeforeNode = nextInsertionPoint(finalNode);
-  } else if (localOffset === 0) {
-    insertBeforeNode = finalNode;
-  } else {
-    insertBeforeNode = finalNode.splitText(localOffset);
-  }
-  var iconEl = _buildBookmarkIcon(hlKey, bkmIds);
-  if (justCreated) iconEl.classList.add('just-created');
-  if (insertBeforeNode) {
-    insertBeforeNode.parentNode.insertBefore(iconEl, insertBeforeNode);
-  } else {
-    container.appendChild(iconEl);
-  }
+  // renderer/icon-placement.js: the link icon's walk, also sliding past the link and bookmark icons (s06.2)
+  var icon = _buildBookmarkIcon(hlKey, bkmIds);
+  if (justCreated) icon.classList.add('just-created');
+  insertIconAt(container, endPos, BOOKMARK_SKIP_RX, icon);
 }

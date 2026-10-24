@@ -100,6 +100,10 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
             <div className="vol-index-ornament-diamond" />
             <div className="vol-index-ornament-line r" />
           </div>
+          {/* A02.11: the chip's tooltip is the only thing that said what it meant, and a phone shows no tooltips */}
+          {noteWeights && Object.values(noteWeights).some((r) => r > 0) ? (
+            <div className="idx-note-legend">{"\xD7"} notes: how long a chapter{"\u2019"}s study notes run, against its verses</div>
+          ) : null}
         </div>
         <div className="chapter-cards">
           {book.chapters.map((ch, _i) => {

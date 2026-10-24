@@ -405,6 +405,8 @@ export function useScrollMemory({
     const key = scrollKeyRef.current;
     const rec = liveScrollRecord();
     if (!key || !rec) return;
+    // s04.4: the scroll has settled; the stash takes this fresh measure (a reflow mid-scroll is caught here)
+    if (liveScrollRef.current && liveScrollRef.current.key === key) liveScrollRef.current = { key, ...rec };
     updateActiveTab((t) => ({
       scrollPositions: mergeScrollPosition(t.scrollPositions, key, rec)
     }));
@@ -423,7 +425,14 @@ export function useScrollMemory({
       if (currentEl && !tabsOverviewOpenRef.current) {
         const y = currentEl.scrollTop;
         const max = Math.max(currentEl.scrollHeight - currentEl.clientHeight, 1);
-        const a = captureAnchor(currentEl);
+        // s04.4: the anchor query (every data-hl-key, then a binary search of rects) ran on every scroll event.
+        // It runs on a screen's first scroll and each time a scroll settles; between, the anchor carried from the
+        // last measure moves with the scroll (its offset grows by what was scrolled), which is exact while the
+        // layout holds, so a nav mid-scroll still commits the exact place.
+        const prev = liveScrollRef.current;
+        const a = prev && prev.key === scrollKeyRef.current && prev.anchorKey
+          ? { anchorKey: prev.anchorKey, anchorOff: prev.anchorOff + (y - prev.y) }
+          : captureAnchor(currentEl);
         liveScrollRef.current = { key: scrollKeyRef.current, y, pct: Math.max(0, Math.min(1, y / max)), anchorKey: a.anchorKey, anchorOff: a.anchorOff };
       }
       clearTimeout(timeout);

@@ -33,7 +33,7 @@ function _prettyBookId(id) {
   return String(id).split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 
-export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, onUnmark: _onUnmark, isRead: _isRead, markAsReadEnabled, scripturesDict, indexLabel: _indexLabel, footnotesMode, backHint, onBack, navBack = null, onLinkOpen: _onLinkOpen, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null }) {
+export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, onSearch, onSettings, onHistory, onNavToChapter, prevBoundary, onPrevBoundary, nextBoundary, onNextBoundary, theme, onThemeChange, onMarkRead, readTrackKey, markAsReadEnabled, scripturesDict, footnotesMode, backHint, onBack, navBack = null, onInAppLink, onNavigateToLink, readAlongOn = true, readAlongFollow = true, showSongs = true, inert = false, restoreScroll = null, surpriseAnchor = null, fontScale = '1', answers = null }) {
   // An Answers topic (AOGCG f07-f11) draws its own page (AnswersTopic.jsx) from its sidecar, plain
   // until ANSWERS_META lands: the body waits up to 300 ms for it, then paints plain and is decorated
   // in place when it arrives.
@@ -85,9 +85,11 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
      the top bar once this hero has scrolled away (MiniTitleBand), in the hero's words. */
   const heroRef = React.useRef(null);
   // (An Answers topic names itself in its running head instead.)
+  // s23.7: the hero and the band name the entry in the same words (an entry with no number keeps no dangling " · ")
+  const eyebrow = [partLabel, entry.num].filter((x) => x != null && x !== '').join(' · ');
   const miniTitle = inert || isAns ? null : (
     <MiniTitleBand heroRef={heroRef} pageKey={entry.id} title={entry.title}
-      eyebrow={[partLabel, entry.num].filter((x) => x != null && x !== '').join(' · ')} />
+      eyebrow={eyebrow} />
   );
   const jumpTimerRef = React.useRef(/** @type {any} */ (null));
   React.useEffect(() => () => clearTimeout(jumpTimerRef.current), []);
@@ -526,8 +528,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       pager={inert ? undefined : pager}
       placeKey={(volKey || '') + ':' + (entry && entry.id)}
       stickyNav={<StickyChapterNav
-        onPrev={() => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary()}
-        onNext={() => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary()}
+        onPrev={goPrev}
+        onNext={goNext}
         prevDisabled={!prevEntry && !prevBoundary}
         nextDisabled={!nextEntry && !nextBoundary}
         prevLabel="Previous entry"
@@ -544,8 +546,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
         onBack: ansBack ? ansBack.onBack : navBack ? navBack.onBack : onHome,
         backLabel: ansBack ? ansBack.label : navBack ? navBack.label : (partLabel || 'Index'),
         arrows: {
-          onPrev: () => prevEntry ? onNavigate(prevEntry.id) : onPrevBoundary && onPrevBoundary(),
-          onNext: () => nextEntry ? onNavigate(nextEntry.id) : onNextBoundary && onNextBoundary(),
+          onPrev: goPrev, onNext: goNext,
           prevDisabled: !prevEntry && !prevBoundary,
           nextDisabled: !nextEntry && !nextBoundary,
           prevLabel: 'Previous entry', nextLabel: 'Next entry',
@@ -562,7 +563,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       <header className="hero" ref={heroRef}>
         <div className="hero-bg vol" />
         <div className="hero-content">
-          <div className="hero-eyebrow">{partLabel} {" · "} {entry.num}</div>
+          <div className="hero-eyebrow">{eyebrow}</div>
           <h1 className="hero-title">{entry.title}</h1>
           <div className="hero-ornament">
             <div className="hero-ornament-line" />

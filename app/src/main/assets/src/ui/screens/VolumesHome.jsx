@@ -2,6 +2,8 @@
    VolumesHome — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { GARDEN_TOTAL } from '../../utils/garden.js';
+
 export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   // Q8.3: VOT corpus is lazy. Subscribe + pre-fire on mount so the
   // letter-count details fill in once bundle-a-vot.js loads. Use
@@ -96,7 +98,7 @@ export function VolumesHome({ onSelect, onBack, onSearch, onHistory, onSettings,
             onClick={() => onSelect("garden")}
           >
             <div className="genre-tile-title">A Return to The Garden</div>
-            <div className="genre-tile-sub">209 Pages · A Visual Journey</div>
+            <div className="genre-tile-sub">{GARDEN_TOTAL} Pages · A Visual Journey</div>
           </button>
         </div>
       </div>

@@ -17,7 +17,7 @@ import { recordingTranslationFor, textForRecording } from '../../utils/audio-tex
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null }) {
   const bodyRef = React.useRef(null);
   // The words on screen match the voice (critique 2026-10-05 #6): while this
   // book's recording is loaded, the chapter shows the recording's translation
@@ -182,6 +182,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         markAsReadEnabled={false}
         inert={true}
         restoreScroll={savedScrollFor(bk.id + '-' + ch.num)}
+        onStudyNotes={bk.id === book.id ? onStudyNotes : null}
       />
     ),
   });
@@ -319,6 +320,11 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   pointer-events:none contract). */}
               {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
                 <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
+              )}
+              {/* A02.2: plain Matthew and the Matthew Study Bible did not know about each other. The plain chapter
+                  opens the same chapter with its study notes (a peek keeps the line, inert, as it keeps Listen). */}
+              {onStudyNotes && (
+                <button type="button" className="hero-study-link" onClick={onStudyNotes}>Read with study notes {"›"}</button>
               )}
             </div>
           </header>

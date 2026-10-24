@@ -181,6 +181,16 @@ describe('ChapterIndex — commentary-weight chip', () => {
       .toBe("Study commentary runs 2.1× the length of this chapter's verse text");
   });
 
+  /* A02.11: a phone shows no tooltip, so the page says once what the chip means */
+  it('says once under the header what the chip means, and only on an index that has chips', () => {
+    setupGlobals();
+    renderIndex({ noteWeights: { 1: 2.14 } });
+    expect(document.querySelector('.idx-note-legend').textContent).toContain('study notes run');
+    cleanup();
+    renderIndex({ noteWeights: { 1: 0 } });
+    expect(document.querySelector('.idx-note-legend')).toBeNull();
+  });
+
   it('sits alongside the minute chip without displacing it', () => {
     setupGlobals();
     globalThis.countItemWords = countItemWords;

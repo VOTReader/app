@@ -52,6 +52,8 @@
  * @returns {number}
  */
 import { COLLECTIONS, COL_BY_KEY, _studies, colLetterArr, colPreface } from '../data/scripture-resolution.js';
+import { tabActionCount } from './use-navigate-to-link.js';
+import { noteLoading, noteDone, noteGaveUp } from '../utils/wait-notice.js';
 
 function _randomIndex(max) {
   if (!Number.isInteger(max) || max <= 0) return 0;
@@ -114,9 +116,20 @@ export function useSurprise({
       for (const l of colLetterArr(col)) pool.push({ _k: 'col', volKey: col.volKey, id: l.id });
     }
     if (pool.length === 0) {
-      if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
-      if (typeof window.__loadMatthewCorpus === 'function') window.__loadMatthewCorpus();
-      if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+      // s05.3: the tap did nothing while the readings loaded, and only a second tap picked. It says it is loading,
+      // then makes the pick once they land: within 8 s, and only if no tab action ran meanwhile.
+      noteLoading('Loading the readings…');
+      const loads = [window.__loadBibleCorpus, window.__loadMatthewCorpus, window.__loadVotCorpus]
+        .filter((f) => typeof f === 'function')
+        .map((f) => { try { return Promise.resolve(f()).catch(() => null); } catch (_e) { return null; } });
+      const tabsAtTap = tabActionCount();
+      const t0 = Date.now();
+      Promise.all(loads).then(() => {
+        const ready = typeof BIBLE_BOOK_LIST !== 'undefined' && !!BIBLE_BOOK_LIST && BIBLE_BOOK_LIST.length > 0;
+        if (!ready) { noteGaveUp('Couldn’t load the readings. Check your connection, then tap again.'); return; }
+        noteDone();
+        if (tabActionCount() === tabsAtTap && Date.now() - t0 < 8000) handleSurprise();
+      });
       return;
     }
     const pick = pool[_randomIndex(pool.length)];

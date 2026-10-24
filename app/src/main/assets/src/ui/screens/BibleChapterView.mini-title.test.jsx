@@ -100,3 +100,18 @@ describe('BibleChapterView — the sticky mini title (U04.7)', () => {
     expect(band()).toBeNull();
   });
 });
+
+/* A02.2: plain Matthew opens the same chapter in the Matthew Study Bible from its hero. */
+describe('BibleChapterView — Read with study notes (A02.2)', () => {
+  it('shows the link only when the route offers it, and a tap takes it', () => {
+    let went = 0;
+    render(at(3, { onStudyNotes: () => { went++; } }));
+    const link = document.querySelector('.hero-study-link');
+    expect(link.textContent).toBe('Read with study notes \u203A');
+    link.click();
+    expect(went).toBe(1);
+    cleanup();
+    render(at(3));
+    expect(document.querySelector('.hero-study-link')).toBeNull();
+  });
+});

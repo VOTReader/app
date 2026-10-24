@@ -230,8 +230,11 @@ it('gives up after the retry budget without firing onGo (bogus book)', () => {
   const onGo = vi.fn();
   const { container } = render(<Btn refStr="Isaiah 13:11" onGo={onGo} />);
   click(container.querySelector('.sc-sheet-goto-btn'));
+  expect(document.getElementById('vot-toast-wait').textContent).toBe('Loading the Bible…');   // s14.3
   vi.advanceTimersByTime(40 * 250 + 1000); // exhaust the 40×250ms budget
   expect(onGo).not.toHaveBeenCalled();
+  // s14.3: it says so rather than giving up in silence
+  expect(document.getElementById('vot-toast-wait').textContent).toBe('Couldn’t open Isaiah 13:11. Tap again.');
 });
 
 it('clears a pending retry interval on unmount (sheet closed mid-load)', () => {

@@ -51,6 +51,7 @@ describe('applyDOMLinks', () => {
     expect(icon).not.toBeNull();
     expect(icon.classList.contains('inline-link-icon-source')).toBe(false); // target → dim
     expect(icon.title).toBe('1 link');
+    expect(icon.hasAttribute('data-count')).toBe(false);   // one link: no badge
     expect(c.textContent).toBe('Hello world');
   });
 
@@ -73,6 +74,9 @@ describe('applyDOMLinks', () => {
     const icon = c.querySelector('.inline-link-icon');
     expect(icon.title).toBe('2 links');
     expect(icon.classList.contains('inline-link-icon-source')).toBe(true); // any source → gold
+    // s06.4: the count shows on the icon (the note icon's badge), not only in the tooltip
+    expect(icon.classList.contains('inline-link-icon-badge')).toBe(true);
+    expect(icon.getAttribute('data-count')).toBe('2');
   });
 
   it('falls back to a single end-of-block icon for a legacy link (no position)', () => {

@@ -147,6 +147,7 @@
 // Volume One, or another tab's place was overwritten with it.
 import { COLLECTIONS, COL_BY_KEY, READING_CHAIN, _boundaryShort, colLetterArr, colPreface } from '../data/scripture-resolution.js';
 import { tabActionCount } from './use-navigate-to-link.js';
+import { noteLoading, noteDone, noteGaveUp } from '../utils/wait-notice.js';
 
 const JUMP_WAIT_MS = 8000;
 let _pendingJumpCancel = null;
@@ -165,13 +166,16 @@ function _whenLettersLoad(col, jump, stillHere) {
   }
   const corpus = window.__votCorpus;
   if (!corpus || typeof corpus.subscribe !== 'function') return;
+  // s04.5: the tap showed nothing while it waited, and gave up in silence.
+  noteLoading('Loading the letters…');
   let unsub = null;
   const cancel = () => {
     clearTimeout(timer);
     if (unsub) { unsub(); unsub = null; }
     if (_pendingJumpCancel === cancel) _pendingJumpCancel = null;
+    noteDone();
   };
-  const timer = setTimeout(cancel, JUMP_WAIT_MS);
+  const timer = setTimeout(() => { cancel(); noteGaveUp('Couldn’t load the letters. Tap again.'); }, JUMP_WAIT_MS);
   _pendingJumpCancel = cancel;
   unsub = corpus.subscribe(() => {
     if (colLetterArr(col).length === 0 && !colPreface(col)) return;

@@ -5,7 +5,7 @@
 import { translationName } from '../../data/translations.js';
 import { SelectSheet } from '../components/SelectField.jsx';
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, onMatthewStudy: _onMatthewStudy, layout, onCycleLayout, translation, onTranslation }) {
+export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, layout, onCycleLayout, translation, onTranslation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the
   // full ~7 MB download wait. The subscription re-renders this component
@@ -19,11 +19,8 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
     if (typeof window.__loadBibleCorpus === 'function') {
       window.__loadBibleCorpus().catch((e) => console.warn('Bible corpus pre-load failed', e));
     }
-    // Also pre-fire the Matthew Study Bible — the home screen offers a
-    // "Matthew Study" jump-button which lands directly on matthew-idx.
-    if (typeof window.__loadMatthewCorpus === 'function') {
-      window.__loadMatthewCorpus().catch((e) => console.warn('Matthew corpus pre-load failed', e));
-    }
+    // (s22.2: the Matthew Study Bible loads when it is opened, from plain Matthew's "Read with study notes" or
+    // Studies; this screen no longer offers it, so it no longer downloads it on every visit.)
   }, []);
   const bibleLoaded = typeof window.__bibleCorpus !== 'undefined' && window.__bibleCorpus.loaded;
 

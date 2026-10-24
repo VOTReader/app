@@ -35,6 +35,8 @@
    the old mount warm.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { noteLoading, noteDone, noteGaveUp } from '../../utils/wait-notice.js';
+
 const WARM_LOOKAHEAD = '800px 0px';
 
 function warmBibleCorpus() {
@@ -68,7 +70,7 @@ export function GoToRefButton({ refStr, onGo }) {
     return () => io.disconnect();
   }, [shown]);
   if (!shown) return null;
-  const go = (parsed) => {
+  const go = (parsed, label) => {
     if (retryRef.current) return; // a resolve retry is already pending
     const tryNav = () => {
       var bookKey = (typeof findBook === 'function') ? findBook(parsed.rawBook) : null;
@@ -81,9 +83,14 @@ export function GoToRefButton({ refStr, onGo }) {
     };
     if (tryNav()) return;
     if (typeof window.__loadBibleCorpus === 'function') window.__loadBibleCorpus();
+    // s14.3: the wait was silent, and after 10 s it gave up in silence too.
+    noteLoading('Loading the Bible…');
     var tries = 0;
     retryRef.current = setInterval(() => {
-      if (tryNav() || ++tries >= 40) { clearInterval(retryRef.current); retryRef.current = null; }
+      const went = tryNav();
+      if (!went && ++tries < 40) return;
+      clearInterval(retryRef.current); retryRef.current = null;
+      if (went) noteDone(); else noteGaveUp('Couldn’t open ' + (label || 'that passage') + '. Tap again.');
     }, 250);
   };
   return (
@@ -92,7 +99,7 @@ export function GoToRefButton({ refStr, onGo }) {
         // part.ref is the canonical self-contained label — "(TAG)" suffix
         // dropped, dash variants normalized, an inherited book spelled out.
         <button key={i} ref={i === 0 ? firstBtnRef : undefined} type="button" className="fn-sheet-link-btn sc-sheet-goto-btn"
-          onPointerDown={warmBibleCorpus} onFocus={warmBibleCorpus} onClick={() => go(part.parsed)}>
+          onPointerDown={warmBibleCorpus} onFocus={warmBibleCorpus} onClick={() => go(part.parsed, part.ref)}>
           <span className="fn-sheet-link-body">
             <span className="fn-sheet-link-eyebrow">Go to Scripture</span>
             <span className="fn-sheet-link-title">{part.ref}</span>

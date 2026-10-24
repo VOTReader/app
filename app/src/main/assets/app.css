@@ -618,6 +618,10 @@
       body.autoscroll-on { --dock-transport: 60px; }
       body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
       body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
+      /* A01.4: while find is open a stopped auto-scroll pill steps aside, so two transports never cover the bottom
+         third of the text and the find pill takes its row; a running one stays, so it can still be paused. */
+      body:has(.find-pill) .ascroll-pill:not(.is-running) { display: none; }
+      body.autoscroll-on:has(.find-pill):not(:has(.ascroll-pill.is-running)) { --dock-transport: 0px; }
       body:has(.mode-toggle-wrap) { --dock-context: 72px; }  /* the 59px Study Notes card + 8 + air */
       body:has(.jrn-fab) { --dock-context: 72px; }
       /* cz5 (Corbin 02:59: "Media player should be auto hidden when viewing ... the garden images"): a full-screen
@@ -2329,6 +2333,14 @@
         .hero-subtitle-tappable:hover { background: rgba(200,164,86,0.06); color: var(--cream); }
       }
       /* Ghost restore pill — tiny, tasteful, tap to bring summary back */
+      /* A02.2: plain Matthew's way into the Matthew Study Bible, under the hero (BibleChapterView) */
+      button.hero-study-link {
+        display: block; margin: 0.4rem auto 0; min-height: 44px; padding: 0 1rem;
+        background: transparent; border: none; cursor: pointer;
+        font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.16em; text-transform: uppercase;
+        color: var(--gold);
+      }
+      @media (hover: hover) { button.hero-study-link:hover { color: var(--gold-bright); } }
       button.hero-subtitle-restore {
         display: block; margin: 0.1rem auto 1.1rem;
         padding: 0.25rem 0.75rem;
@@ -4623,6 +4635,11 @@
       letter-spacing:0.06em; text-transform:uppercase;
       color:var(--gold-dim); border:1px solid var(--gold-border);
       border-radius:999px; padding:1px 7px;
+    }
+    /* A02.11: what the chip means, said once under the index header (a phone shows no tooltip) */
+    .idx-note-legend {
+      margin-top:0.7rem; font-family:var(--font-body); font-style:italic; font-size:var(--fs-13);
+      color:var(--cream-muted); text-align:center;
     }
     /* ── Part group cards (3-part study hierarchy) ── */
     /* Visual language matches .chapter-card-btn so Parts mesh with chapters. */
@@ -7905,11 +7922,12 @@
 
     /* Stacked note icon — when 2+ note groups end at the same boundary,
        a single icon renders with a count badge. */
-    .hl-note-icon-badge {
+    .hl-note-icon-badge, .inline-link-icon-badge {
       position: relative;
       display: inline-block;
     }
-    .hl-note-icon-badge::after {
+    /* s06.4: merged links wear the same count badge (dom-links.js) */
+    .hl-note-icon-badge::after, .inline-link-icon-badge::after {
       content: attr(data-count);
       position: absolute;
       top: -4px; right: -7px;
@@ -7925,7 +7943,7 @@
       box-shadow: 0 0 0 1.5px var(--bg);
       z-index: 2;   /* above the glyph (#10) */
     }
-    body.light .hl-note-icon-badge::after { box-shadow: 0 0 0 1.5px var(--bg3); }
+    body.light .hl-note-icon-badge::after, body.light .inline-link-icon-badge::after { box-shadow: 0 0 0 1.5px var(--bg3); }
 
     /* ── LIB-UX pass 2026-07-12 ── */
 

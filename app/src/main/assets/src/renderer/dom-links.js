@@ -25,6 +25,7 @@
 
 import { chromeAwareView, refindRange } from './anchor-view.js';
 import { makeIconButton } from './icon-button.js';
+import { insertIconAt, ICON_SKIP_RX } from './icon-placement.js';
 
 /* Inject inline chain icons at the end of each linked text range inside
    [data-hl-dom] containers. Re-runs on store changes. Click → onLinkOpen(blockKey)
@@ -156,7 +157,9 @@ export function applyDOMLinks() {
 function _buildLinkIcon(hlKey, count, isSource) {
   var icon = document.createElement('span');
   // Apply source/target distinction via CSS class; default is dim (target role).
-  icon.className = 'inline-link-icon' + (isSource ? ' inline-link-icon-source' : '');
+  icon.className = 'inline-link-icon' + (isSource ? ' inline-link-icon-source' : '') + (count > 1 ? ' inline-link-icon-badge' : '');
+  // s06.4: two or more links ending here are one icon; it says how many, with the note icon's badge
+  if (count > 1) icon.setAttribute('data-count', String(count));
   icon.title = count + ' link' + (count > 1 ? 's' : '');
   icon.innerHTML = '<svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
   var openSidebar = function(e) {
@@ -170,154 +173,6 @@ function _buildLinkIcon(hlKey, count, isSource) {
 }
 
 function _insertLinkIconAt(container, hlKey, endPos, count, isSource) {
-  var WORD = /[\w’'-]/;
-  var CLOSE_PUNCT = /[.,;:!?)\]}"'…—]/;
-  // Inline elements the icon must NOT land directly before — sliding
-  // past keeps their tap targets clear and matches user intent
-  // (icons should bracket the linked phrase, not interrupt
-  // reference / footnote markers).
-  var SKIP_RX = /\b(fn-ref|tap-ref|letter-link-ref|verse-link-icon|hl-note-icon)\b/;
-
-  function isSkip(el) {
-    return el && el.nodeType === 1 && el.className && SKIP_RX.test(el.className);
-  }
-  function isPhraseChar(c) { return !!c && (WORD.test(c) || CLOSE_PUNCT.test(c)); }
-
-  /* Starting from `node`, walk forward through the DOM looking for the
-     first "insertable" position that isn't directly before a skip element.
-     A skip element is jumped over as a unit. When the current node has no
-     nextSibling, walk UP to the parent and try again — this handles cases
-     like `<span>...written.</span><span class="fn-ref">1</span>` where the
-     fn-ref is a sibling of the text's wrapper, not of the text itself.
-     Returns the DOM node to insert before, or null to append to container. */
-  function nextInsertionPoint(node) {
-    var cur = node;
-    while (cur && cur !== container) {
-      var sib = cur.nextSibling;
-      if (sib === null) {
-        cur = cur.parentElement;
-        continue;
-      }
-      if (isSkip(sib)) {
-        cur = sib;
-        continue;
-      }
-      return sib;
-    }
-    return null;
-  }
-
-  // Collect all text nodes in document order. We slide across text-node
-  // boundaries (through inline emphasis wrappers like <em>/<strong>/<i>)
-  // when there's no visible whitespace between them — Android selection
-  // handles often snap to text-node boundaries, so a user dragging into
-  // an italicised phrase like "...become the <em>same?</em>..." can land
-  // the selection END at the boundary BEFORE the <em>. Without the cross-
-  // node slide the icon ends up at "...become the [icon]same?" — exactly
-  // the bug the user reported. With the slide we follow the phrase into
-  // the next text node until reaching real whitespace.
-  var textNodes = [];
-  var w = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
-  while (w.nextNode()) textNodes.push(/** @type {Text} */ (w.currentNode));
-
-  // Find the text node + local offset for endPos.
-  var charPos = 0, nodeIdx = -1, localOffset = 0;
-  for (var i = 0; i < textNodes.length; i++) {
-    var nodeEnd = charPos + textNodes[i].length;
-    if (endPos > charPos && endPos <= nodeEnd) {
-      nodeIdx = i;
-      localOffset = endPos - charPos;
-      break;
-    }
-    charPos = nodeEnd;
-  }
-  if (nodeIdx < 0) {
-    container.appendChild(_buildLinkIcon(hlKey, count, isSource));
-    return;
-  }
-
-  // If endPos landed INSIDE a skip element (fn-ref bubble's "1" text node,
-  // a letter-link's label text, etc.), slide past the whole skip element
-  // instead of placing the icon inside it.
-  var ancestor = textNodes[nodeIdx].parentElement;
-  var skipAncestor = null;
-  while (ancestor && ancestor !== container) {
-    if (isSkip(ancestor)) skipAncestor = ancestor;
-    ancestor = ancestor.parentElement;
-  }
-  if (skipAncestor) {
-    var ref = nextInsertionPoint(skipAncestor);
-    var icon = _buildLinkIcon(hlKey, count, isSource);
-    if (ref) ref.parentNode.insertBefore(icon, ref);
-    else container.appendChild(icon);
-    return;
-  }
-
-  // Block-level tags that visually break the reading flow. When sliding
-  // across text-node boundaries, we STOP if the path between two adjacent
-  // text nodes contains any of these — but we KEEP going through inline
-  // emphasis wrappers (em/strong/i/b/span/etc.) so a phrase like
-  // "...the <em>same?</em> Therefore..." reads as one continuous unit
-  // for icon-placement purposes.
-  var BLOCK_TAGS = /^(BR|P|DIV|H[1-6]|LI|BLOCKQUOTE|HR|UL|OL|TR|TD|TH|TABLE|SECTION|ARTICLE|HEADER|FOOTER|NAV|MAIN|FIGURE|FIGCAPTION|PRE|ADDRESS)$/;
-  function hasBlockBetween(prevTextNode, nextTextNode) {
-    var bw = document.createTreeWalker(container, NodeFilter.SHOW_ALL, null);
-    bw.currentNode = prevTextNode;
-    var n;
-    while ((n = bw.nextNode())) {
-      if (n === nextTextNode) return false;
-      if (n.nodeType === 1 && BLOCK_TAGS.test(/** @type {Element} */ (n).tagName)) return true;
-    }
-    return true;
-  }
-
-  // Slide forward through phrase characters (word chars + closing
-  // punctuation), crossing text-node boundaries whenever the next text
-  // node is in the SAME inline context — i.e., no block element on the
-  // DOM path between them. This is what makes the icon flow through an
-  // <em>-wrapped phrase even when Android's selection handle dropped at
-  // the text-node boundary BEFORE the <em>.
-  // Skip elements (fn-ref, etc.) are jumped over by advancing the
-  // node index past any of their child text nodes — they're part of
-  // the visible reading flow but the icon shouldn't land inside them.
-  while (true) {
-    var text = textNodes[nodeIdx].nodeValue;
-    while (localOffset < text.length && isPhraseChar(text[localOffset])) {
-      localOffset++;
-    }
-    if (localOffset < text.length) break;          // stopped at whitespace mid-node
-    var nextNodeIdx = nodeIdx + 1;
-    while (nextNodeIdx < textNodes.length) {
-      var na = textNodes[nextNodeIdx].parentElement;
-      var inSkip = false;
-      while (na && na !== container) {
-        if (isSkip(na)) { inSkip = true; break; }
-        na = na.parentElement;
-      }
-      if (!inSkip) break;
-      nextNodeIdx++;
-    }
-    if (nextNodeIdx >= textNodes.length) break;     // no more nodes
-    if (hasBlockBetween(textNodes[nodeIdx], textNodes[nextNodeIdx])) break;
-    nodeIdx = nextNodeIdx;
-    localOffset = 0;
-  }
-
-  // Final placement.
-  var finalNode = textNodes[nodeIdx];
-  var finalText = finalNode.nodeValue;
-  var insertBeforeNode = null;
-  if (localOffset >= finalText.length) {
-    insertBeforeNode = nextInsertionPoint(finalNode);
-  } else if (localOffset === 0) {
-    insertBeforeNode = finalNode;
-  } else {
-    insertBeforeNode = finalNode.splitText(localOffset);
-  }
-  var iconEl = _buildLinkIcon(hlKey, count, isSource);
-  if (insertBeforeNode) {
-    insertBeforeNode.parentNode.insertBefore(iconEl, insertBeforeNode);
-  } else {
-    container.appendChild(iconEl);
-  }
+  // renderer/icon-placement.js: slide to the end of the phrase, past footnote bubbles and references (s06.2)
+  insertIconAt(container, endPos, ICON_SKIP_RX, _buildLinkIcon(hlKey, count, isSource));
 }

@@ -2,6 +2,8 @@
    ExpandableVerse — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { cutAtWord } from '../../utils/cut-at-word.js';
+
 export const EXPAND_THRESHOLD = 130;
 export const MIN_HIDDEN_WORDS = 20; // only collapse if hiding at least this many whole words
 
@@ -31,7 +33,7 @@ export function ExpandableVerse({ text, refStr }) {
   const isLong = text.length > EXPAND_THRESHOLD && hiddenWords >= MIN_HIDDEN_WORDS;
 
   const fullContent = <ScriptureVerseText text={text} cite={refStr} />;
-  const truncatedContent = <VerseWithNumbers text={previewText.slice(0, EXPAND_THRESHOLD).trimEnd() + "…"} refStr={previewRef} />;
+  const truncatedContent = <VerseWithNumbers text={cutAtWord(previewText, EXPAND_THRESHOLD).trimEnd() + "…"} refStr={previewRef} />;
 
   return (
     <span className="footnote-list-verse">

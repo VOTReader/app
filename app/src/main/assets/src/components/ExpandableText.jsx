@@ -12,6 +12,8 @@
    either way. The toggle shows only when the clamp actually hides something.
    Without either prop the component cuts the plain string, as before. */
 
+import { cutAtWord } from '../utils/cut-at-word.js';
+
 export function ExpandableText(props) {
   var useState = React.useState;
   var text = props.text || '';
@@ -77,11 +79,8 @@ export function ExpandableText(props) {
       </div>
     );
   }
-  // Never cut between the two halves of an emoji (a lone half draws as a replacement glyph).
-  var end = threshold;
-  var last = text.charCodeAt(end - 1);
-  if (last >= 0xD800 && last <= 0xDBFF) end--;
-  var head = text.slice(0, end).trim();
+  // Cut between words, never inside one or between the two halves of an emoji (s01.9; utils/cut-at-word.js).
+  var head = cutAtWord(text, threshold).trim();
   return (
     <div {...divProps}>
       {expanded ? text : head + '…'}

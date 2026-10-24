@@ -134,8 +134,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       pager={inert ? undefined : pager}
       placeKey={(book && book.id) + '-' + (chapter && chapter.num)}
       stickyNav={<StickyChapterNav
-        onPrev={() => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary()}
-        onNext={() => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary()}
+        onPrev={goPrevCh}
+        onNext={goNextCh}
         prevDisabled={!prevCh && !prevBoundary}
         nextDisabled={!nextCh && !nextBoundary}
         prevLabel="Previous chapter"
@@ -146,8 +146,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
         // navBack (search200 UX B1): from a search hit the ‹ returns to the results.
         onBack: navBack ? navBack.onBack : onIndex, backLabel: navBack ? navBack.label : book.title,
         arrows: {
-          onPrev: () => prevCh ? onNavigate(prevCh.num) : onPrevBoundary && onPrevBoundary(),
-          onNext: () => nextCh ? onNavigate(nextCh.num) : onNextBoundary && onNextBoundary(),
+          onPrev: goPrevCh, onNext: goNextCh,
           prevDisabled: !prevCh && !prevBoundary,
           nextDisabled: !nextCh && !nextBoundary,
           prevLabel: 'Previous chapter', nextLabel: 'Next chapter',
@@ -163,26 +162,29 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       <header className="hero">
         <div className="hero-bg" />
         <div className="hero-content">
-          <div className="hero-eyebrow">{bookLabel ? <>{bookLabel} {"\xA0\xB7\xA0"} </> : null}Chapter {chapter.num}</div>
-          <h1 className="hero-title">Chapter {chapter.num}</h1>
-          {chapter.title && showChapterTitle && (
-            !titleFocusHidden ? (
+          {/* A02.12: the heading said "Chapter N" under an eyebrow that already said it. It is the chapter's title,
+              as the Bible hero's is (tap it to hide it; the book's subtitle stands in), and the eyebrow names the
+              study edition (A02.2), so it never reads as the plain Matthew. */}
+          <div className="hero-eyebrow">{bookLabel ? <>{bookLabel} Study Bible {"\xA0\xB7\xA0"} </> : null}Chapter {chapter.num}</div>
+          <h1 className="hero-title">
+            {chapter.title && showChapterTitle && !titleFocusHidden ? (
               <button
                 type="button"
-                className="hero-subtitle hero-subtitle-tappable"
+                className="hero-title-action"
                 onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))}
                 title="Tap to hide summary"
               >
                 {chapter.title}
               </button>
-            ) : (
-              <button
-                className="hero-subtitle-restore"
-                onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(false))}
-                title="Show summary"
-                aria-label="Show chapter summary"
-              >+ Show summary</button>
-            )
+            ) : (book.subtitle || `Chapter ${chapter.num}`)}
+          </h1>
+          {chapter.title && showChapterTitle && titleFocusHidden && (
+            <button
+              className="hero-subtitle-restore"
+              onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(false))}
+              title="Show summary"
+              aria-label="Show chapter summary"
+            >+ Show summary</button>
           )}
           <div className="hero-ornament">
             <div className="hero-ornament-line" />

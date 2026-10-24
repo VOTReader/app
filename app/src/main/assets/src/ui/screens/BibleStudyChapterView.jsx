@@ -91,6 +91,8 @@ export function BibleStudyChapterView({
       num: c.num,
       date: null, from: null, spoken: null, forLine: null,
       preamble: c.part ? `Part ${c.part}` : null,
+      // A02.10: the Studies list counts a study's units as Parts, or, when it is grouped in parts, as chapters
+      unitWord: study.parts ? 'Chapter' : 'Part',
       blocks: c.blocks || [],
       sectionIntro: c.sectionIntro || null,
       footnotes: c.footnotes || {},

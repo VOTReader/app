@@ -19,6 +19,7 @@ import { PlanRibbon } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
+import { prophecyCardsOf } from '../components/ProphecyGroup.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -29,8 +30,8 @@ const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
 const _blockText = blockReadText;
 
 /**
- * W44: the saved-state key of every prophecy card a letter renders, under the
- * same rules ProphecyGroup uses to render a card (a part with content).
+ * W44: the saved-state key of every prophecy card a letter renders: ProphecyGroup's
+ * own list of cards (prophecyCardsOf, s15.6).
  * @param {{ id: string, blocks: any[] }} letter
  * @returns {string[]}
  */
@@ -40,10 +41,7 @@ export function prophecyCardKeysOf(letter) {
   letter.blocks.forEach((b, bi) => {
     if (!b || b.type !== "prophecy-group") return;
     const g = letter.id + ":" + bi;
-    if (b.intro && b.intro.length > 0) keys.push(g + ":intro");
-    if (b.ot && b.ot.blocks && b.ot.blocks.length > 0) keys.push(g + ":ot");
-    if (b.nt && b.nt.blocks && b.nt.blocks.length > 0) keys.push(g + ":nt");
-    if (b.vot && b.vot.blocks && b.vot.blocks.length > 0) keys.push(g + ":vot");
+    prophecyCardsOf(b).forEach((c) => keys.push(g + ":" + c.type));
   });
   return keys;
 }
@@ -86,7 +84,10 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
      the top bar once this hero has scrolled away (MiniTitleBand). Its eyebrow is the
      hero's own; an inert peek draws none. */
   const heroRef = React.useRef(null);
-  const position = (studyMode ? (letter.num === 0 ? "Preface" : `Chapter ${letter.num}`) : (letter.num === 0 ? "Preface" : `Letter ${letter.num}`));
+  /* A02.10: a study names its units as the Studies list does ("6 Parts · Bible Study"; a study grouped in parts
+     calls its units chapters): the shim's unitWord. The footers, the hero and the band all say it. */
+  const unit = studyMode ? (letter.unitWord || 'Chapter') : 'Letter';
+  const position = letter.num === 0 ? "Preface" : `${unit} ${letter.num}`;
   const miniTitle = inert ? null : (
     <MiniTitleBand heroRef={heroRef} eyebrow={(volumeLabel ? volumeLabel + ' · ' : '') + position} title={letter.title} pageKey={letter.id} />
   );
@@ -384,7 +385,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is
               OMITTED (and its separator with it) rather than asserting
               "Volume Two". The position label alone is honest. */}
-          <div className="hero-eyebrow">{volumeLabel ? <>{volumeLabel} {"\xA0\xB7\xA0"} </> : null}{studyMode ? letter.num === 0 ? "Preface" : `Chapter ${letter.num}` : letter.num === 0 ? "Preface" : `Letter ${letter.num}`}</div>
+          <div className="hero-eyebrow">{volumeLabel ? <>{volumeLabel} {"\xA0\xB7\xA0"} </> : null}{position}</div>
           <h1 className="hero-title">{letter.title}</h1>
           {letter.subtitle && <div className="hero-subtitle">{letter.subtitle}</div>}
           <div className="hero-ornament">
@@ -677,7 +678,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             <div className="bottom-nav">
               {letter.prevLetter ? (
                 <button className="bottom-nav-card" onClick={() => onNavigate(letter.prevLetter.id)}>
-                  <div className="bottom-nav-label">‹ Previous Letter</div>
+                  <div className="bottom-nav-label">‹ Previous {unit}</div>
                   <div className="bottom-nav-title">{letter.prevLetter.title}</div>
                 </button>
               ) : prevBoundary ? (
@@ -687,14 +688,14 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 </button>
               ) : (
                 <div className="bottom-nav-card placeholder">
-                  <div className="bottom-nav-label">‹ Previous Letter</div>
+                  <div className="bottom-nav-label">‹ Previous {unit}</div>
                   <div className="bottom-nav-title">—</div>
                 </div>
               )}
 
               {letter.nextLetter ? (
                 <button className="bottom-nav-card next" onClick={() => onNavigate(letter.nextLetter.id)}>
-                  <div className="bottom-nav-label">Next Letter ›</div>
+                  <div className="bottom-nav-label">Next {unit} ›</div>
                   <div className="bottom-nav-title">{letter.nextLetter.title}</div>
                 </button>
               ) : nextBoundary ? (
@@ -704,12 +705,12 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 </button>
               ) : letter.nextLetterExternal ? (
                 <a className="bottom-nav-card next" href={letter.nextLetterExternal.url} target="_blank" rel="noopener noreferrer">
-                  <div className="bottom-nav-label">Next Letter ›</div>
+                  <div className="bottom-nav-label">Next {unit} ›</div>
                   <div className="bottom-nav-title">{letter.nextLetterExternal.title}</div>
                 </a>
               ) : (
                 <div className="bottom-nav-card next placeholder">
-                  <div className="bottom-nav-label">Next Letter ›</div>
+                  <div className="bottom-nav-label">Next {unit} ›</div>
                   <div className="bottom-nav-title">—</div>
                 </div>
               )}
@@ -726,7 +727,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
           Settings → Reading. */}
       {/* Opened from search: every place the words appear, marked, and the pill
           that steps between them. Live pane only, like the read-along. */}
-      {!inert && <FindInUnit anchor={surpriseAnchor} unitId={letter.id} mainRef={mainRef} noun={studyMode ? 'chapter' : 'letter'} keyPrefix={letterHlPrefix(letter.id)} />}
+      {!inert && <FindInUnit anchor={surpriseAnchor} unitId={letter.id} mainRef={mainRef} noun={unit.toLowerCase()} keyPrefix={letterHlPrefix(letter.id)} />}
       {!inert && <ReadAlongHighlight volKey={volKey} letterId={letter.id} mainRef={mainRef} onListen={AudioPlayer.hasAudio(volKey, letter.id) ? () => AudioPlayer.playLetter({ volKey, letter, collectionLabel: volumeLabel || null }) : null} hlKeyFn={letterHlKey} readAlongOn={readAlongOn} readAlongFollow={readAlongFollow} seekTo={surpriseBlockKey} seekOffset={surpriseBlockOff} />}
 
       {/* Interactive chrome (bottom sheets + the prophecy expand FAB) portals

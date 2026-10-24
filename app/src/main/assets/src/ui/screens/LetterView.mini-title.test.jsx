@@ -130,3 +130,21 @@ describe('LetterView — the sticky mini title (B10 item 1)', () => {
     expect(band().querySelector('.mini-title-name').textContent).toBe('The Next One');
   });
 });
+
+/* A02.10: a study chapter says the study's own word for its units, as the Studies list counts them ("6 Parts"):
+   the hero, the band and both footers. */
+describe('LetterView — a study names its parts (A02.10)', () => {
+  it('a study in Parts says Part in the eyebrow, the band and the footers', () => {
+    renderLetter({ studyMode: true, volumeLabel: 'Purity' }, { ...LETTER, num: 1, unitWord: 'Part' });
+    expect(document.querySelector('.hero-eyebrow').textContent).toBe('Purity \xA0\xB7\xA0 Part 1');
+    expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('Purity \xB7 Part 1');
+    const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['\u2039 Previous Part', 'Next Part \u203A']);
+  });
+
+  it('a letter still says Letter', () => {
+    renderLetter();
+    const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);
+    expect(labels).toEqual(['\u2039 Previous Letter', 'Next Letter \u203A']);
+  });
+});

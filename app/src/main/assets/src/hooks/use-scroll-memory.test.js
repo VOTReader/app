@@ -334,6 +334,29 @@ describe('useScrollMemory — content anchor (reflow-proof restore)', () => {
     expect(saved.anchorOff).toBe(-30);      // v2 starts 30px below the viewport top
   });
 
+  /* s04.4: the anchor query ran on every scroll event. It runs on a screen's first scroll and when a scroll settles;
+     between, the carried anchor moves with the scroll, so a nav mid-scroll still commits the exact place. */
+  it('measures the anchor once per scroll, not per event, and a nav mid-scroll still commits the exact place', () => {
+    stubContainerRect(0);
+    addAnchor('v1', 0);
+    addAnchor('v2', 1000);
+    addAnchor('v3', 2000);
+    const { rerender } = renderHook((p) => useScrollMemory(p), { initialProps: baseProps() });
+    settleRestoreRaf();
+    const real = el.querySelectorAll.bind(el);
+    let queries = 0;
+    el.querySelectorAll = (sel) => { if (sel === '[data-hl-key]') queries++; return real(sel); };
+    act(() => { for (let y = 900; y <= 990; y += 10) scrollTo(y); });
+    expect(queries).toBe(1);                       // the first event measures; nine more carry it
+    act(() => { vi.advanceTimersByTime(150); });   // settles: measured afresh, saved
+    expect(queries).toBe(2);
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 990, anchorKey: 'v2', anchorOff: -10 });
+    act(() => { scrollTo(995); scrollTo(1000); });  // a new scroll, then the nav before it settles
+    expect(queries).toBe(2);
+    rerender(baseProps({ letterId: 'beta' }));
+    expect(tab.scrollPositions['letter-alpha']).toMatchObject({ y: 1000, anchorKey: 'v2', anchorOff: 0 });
+  });
+
   /* restore-anchor-top-of-letter-1 (2026-09-11). A record captured at the TOP of a letter
      still carries an anchor: the FIRST paragraph, with a large NEGATIVE offset that bakes
      in everything above it (hero, meta). The header's height at boot is not its height

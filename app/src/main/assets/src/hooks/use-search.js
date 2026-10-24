@@ -193,6 +193,10 @@ import { readingPlaceKey } from '../utils/search-visit.js';
 import { formsToMark } from '../utils/marked-forms.js';
 import { kjvVisitEdition } from '../utils/kjv-visit.js';
 import { warmSearchAtLaunch } from '../search/warm-at-launch.js';
+import { noteGaveUp } from '../utils/wait-notice.js';
+
+/* s04.6: a result whose letter, volume or kind the app cannot find no longer does nothing. */
+const cannotOpen = () => noteGaveUp('Couldn’t open that result.');
 
 /**
  * The "In {Book}" scope chip's label for a Bible book. BOOKS ships in the lazy
@@ -519,9 +523,9 @@ export function useSearch({
       }
       if (r.kind === 'ref-letter') {
         const vm = SRCH_VOL_MAP[r.volumeId];
-        if (!vm) return;
+        if (!vm) { cannotOpen(); return; }
         const lid = srchResolveLetterId(r.volumeId, r.letterNum, r.letterId);
-        if (!lid) return;
+        if (!lid) { cannotOpen(); return; }
         setLetterId(lid);
         setSurpriseAnchor(null);   // a reference names the letter, not a place in it
         land({ screen: vm.screen, letterId: lid });   // no cursor move: the arm skips the landing
@@ -539,6 +543,7 @@ export function useSearch({
         setScreen(effectiveBookId === 'matthew' ? 'matthew-idx' : 'bible-idx');
         return;
       }
+      cannotOpen();
       return;
     }
     // Result doc from Orama
@@ -564,7 +569,7 @@ export function useSearch({
     }
     if (k === 'letter' || k === 'letter-title' || k === 'footnote' || k === 'wtlb' || k === 'wtlb-title' || k === 'blessed' || k === 'blessed-title' || k === 'holy-day' || k === 'holy-day-title' || k === 'answers' || k === 'answers-title') {
       const vm = SRCH_VOL_MAP[doc.volumeId];
-      if (!vm || !doc.letterId) return;
+      if (!vm || !doc.letterId) { cannotOpen(); return; }
       setLetterId(doc.letterId);
       setSurpriseAnchor(excerptAnchor(doc, terms, entry, doc.letterId, query, stopTyped));
       land({ screen: vm.screen, letterId: doc.letterId });   // no cursor move: the arm skips the landing

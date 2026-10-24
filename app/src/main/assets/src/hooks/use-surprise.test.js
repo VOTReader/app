@@ -252,6 +252,27 @@ describe('useSurprise — pool filtering', () => {
     delete window.__loadMatthewCorpus;
     delete window.__loadVotCorpus;
   });
+
+  /* s05.3: the cold-start tap said nothing and picked nothing; a second tap worked. */
+  it('a cold-start tap says it is loading, then makes the pick once the readings land', async () => {
+    window.MATTHEW = undefined;
+    window.BIBLE_BOOK_LIST = undefined;
+    window._studies = () => [];
+    window.COLLECTIONS = [];
+    window.__loadBibleCorpus = vi.fn(async () => {
+      window.BIBLE_BOOK_LIST = [{ id: 'genesis', chapters: [{ num: 1 }] }];
+    });
+    const props = baseProps();
+    const { result } = renderHook(() => useSurprise(props));
+    act(() => { result.current.handleSurprise(); });
+    expect(document.getElementById('vot-toast-wait').textContent).toBe('Loading the readings…');
+    expect(props.setScreen).not.toHaveBeenCalled();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); });
+    expect(props.setBookId).toHaveBeenCalledWith('genesis');
+    expect(props.setScreen).toHaveBeenCalledWith('bible-ch');
+    expect(document.getElementById('vot-toast-wait').classList.contains('show')).toBe(false);
+    delete window.__loadBibleCorpus;
+  });
 });
 
 describe('useSurprise — randomness', () => {

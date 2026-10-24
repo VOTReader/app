@@ -75,7 +75,7 @@ afterEach(() => {
 
 const props = {
   onSelect: () => {}, onGenre: () => {}, onBack: () => {}, onSearch: () => {},
-  onHistory: () => {}, onSettings: () => {}, onMatthewStudy: () => {},
+  onHistory: () => {}, onSettings: () => {},
   theme: 'dark', onThemeChange: () => {}, onCycleLayout: () => {},
   translation: 'nkjv',
 };

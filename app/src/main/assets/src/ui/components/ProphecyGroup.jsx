@@ -2,24 +2,33 @@
    ProphecyGroup — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* The card rules below (a part renders a card when it has content) are mirrored
-   by LetterView's prophecyCardKeysOf (W44: expand/collapse-all saves every card). */
+const CARD_TAGS = { intro: 'Introduction', ot: 'Old Testament Prophecy', nt: 'Fulfilled in the New Testament', vot: 'Fulfillment in the Volumes of Truth' };
+
+/**
+ * The cards a prophecy group renders, in order: a part makes a card when it has content (s15.6: the one rule, read
+ * here and by LetterView's prophecyCardKeysOf, W44's expand/collapse-all, which saves every card).
+ * @param {any} block a "prophecy-group" block
+ * @returns {{ type: 'intro' | 'ot' | 'nt' | 'vot', tag: string, label?: string, blocks: any[] }[]}
+ */
+export function prophecyCardsOf(block) {
+  /** @type {{ type: 'intro' | 'ot' | 'nt' | 'vot', tag: string, label?: string, blocks: any[] }[]} */
+  const cards = [];
+  if (!block) return cards;
+  if (block.intro && block.intro.length > 0) cards.push({ type: 'intro', tag: CARD_TAGS.intro, blocks: block.intro });
+  for (const type of /** @type {const} */ (['ot', 'nt', 'vot'])) {
+    const part = block[type];
+    if (part && part.blocks && part.blocks.length > 0) cards.push({ type, tag: CARD_TAGS[type], label: part.label, blocks: part.blocks });
+  }
+  return cards;
+}
+
 export function ProphecyGroup({ block, fnProps, expandSignal, groupKey, statesRef, onSaveStates }) {
   return (
     <div className="prophecy-group">
       {block.label && <div className="prophecy-group-label">{block.label}</div>}
-      {block.intro && block.intro.length > 0 && (
-        <ProphecyCard key={groupKey + ":intro"} type="intro" tag="Introduction" blocks={block.intro} fnProps={fnProps} expandSignal={expandSignal} stateKey={groupKey + ":intro"} statesRef={statesRef} onSaveStates={onSaveStates} />
-      )}
-      {block.ot && block.ot.blocks && block.ot.blocks.length > 0 && (
-        <ProphecyCard key={groupKey + ":ot"} type="ot" tag="Old Testament Prophecy" label={block.ot.label} blocks={block.ot.blocks} fnProps={fnProps} expandSignal={expandSignal} stateKey={groupKey + ":ot"} statesRef={statesRef} onSaveStates={onSaveStates} />
-      )}
-      {block.nt && block.nt.blocks && block.nt.blocks.length > 0 && (
-        <ProphecyCard key={groupKey + ":nt"} type="nt" tag="Fulfilled in the New Testament" label={block.nt.label} blocks={block.nt.blocks} fnProps={fnProps} expandSignal={expandSignal} stateKey={groupKey + ":nt"} statesRef={statesRef} onSaveStates={onSaveStates} />
-      )}
-      {block.vot && block.vot.blocks && block.vot.blocks.length > 0 && (
-        <ProphecyCard key={groupKey + ":vot"} type="vot" tag="Fulfillment in the Volumes of Truth" label={block.vot.label} blocks={block.vot.blocks} fnProps={fnProps} expandSignal={expandSignal} stateKey={groupKey + ":vot"} statesRef={statesRef} onSaveStates={onSaveStates} />
-      )}
+      {prophecyCardsOf(block).map((c) => (
+        <ProphecyCard key={groupKey + ":" + c.type} type={c.type} tag={c.tag} label={c.label} blocks={c.blocks} fnProps={fnProps} expandSignal={expandSignal} stateKey={groupKey + ":" + c.type} statesRef={statesRef} onSaveStates={onSaveStates} />
+      ))}
     </div>
   );
 }

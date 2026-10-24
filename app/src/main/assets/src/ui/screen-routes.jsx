@@ -1380,7 +1380,6 @@ export function buildScreenRoutes({
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}
-        onMatthewStudy={() => { _startNewTrail(); setBookId('matthew'); setChapterNum(null); setScreen('matthew-idx'); }}
         theme={theme} onThemeChange={setTheme}
         layout={settings.scriptureLayout}
         onCycleLayout={(nextId) => updateSetting('scriptureLayout', nextId)}
@@ -1670,6 +1669,7 @@ export function buildScreenRoutes({
         onLinkOpen={openLinkSidebar}
         readAlongOn={sharedViewProps.readAlongOn}
         readAlongFollow={sharedViewProps.readAlongFollow}
+        onStudyNotes={book.id === 'matthew-plain' ? () => navigateToLink({ type: 'bible', bookId: 'matthew', chapter: chapter.num }) : null}
       />
       );
       // Q8: BOOKS not loaded yet — show loading (or a retry on failure, E1).

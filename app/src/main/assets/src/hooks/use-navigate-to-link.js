@@ -80,6 +80,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { showToast } from '../utils/toast.js';
+import { noteLoading, noteDone, noteGaveUp } from '../utils/wait-notice.js';
+import { findEntryContext } from '../data/scripture-resolution.js';
 
 /* sweep v059: what a Bible jump says when its corpus cannot load. */
 const BIBLE_LOAD_FAILED_MSG = 'Couldn’t load the Bible. Check your connection.';
@@ -184,10 +186,26 @@ export function useNavigateToLink({
     // until the VOT corpus has loaded. Such an endpoint used to run the WHOLE
     // prologue (pendingScrollHlKey, destSnapshot, pushFromLetter) and then
     // match nothing: a silent dead tap that ALSO left a junk back-stack entry.
-    // Bail before any of that and kick the corpus; a re-tap works once it lands
-    // (note rows re-tap fine — no retry loop needed).
+    // Bail before any of that and kick the corpus. s03.2: the tap then waited in
+    // silence for a re-tap. It says it is loading, and once the letters land it
+    // finds the entry's screen and finishes the jump, as a Bible jump does: only if
+    // the reader has not moved and no tab action ran meanwhile (W39).
     if (endpoint && _NEEDS_SCREEN[endpoint.type] && !endpoint.screen) {
-      if (typeof window.__loadVotCorpus === 'function') window.__loadVotCorpus();
+      const id = endpoint.letterId || endpoint.entryId;
+      const load = typeof window.__loadVotCorpus === 'function' ? window.__loadVotCorpus : null;
+      if (!load || !id) { noteGaveUp('Couldn’t open that link.'); return; }
+      noteLoading('Loading the letters…');
+      const movesAtTap = _movesRef.current.count;
+      const tabActionsAtTap = _navLinkTabActions;
+      Promise.resolve(load()).then(function () {
+        if (_movesRef.current.count !== movesAtTap || _navLinkTabActions !== tabActionsAtTap) { noteDone(); return; }
+        const ctx = findEntryContext(id, endpoint.type);
+        if (!ctx || !ctx.screen) { noteGaveUp('Couldn’t open that link.'); return; }
+        noteDone();
+        navigateToLink(Object.assign({}, endpoint, { screen: ctx.screen }), meta);
+      }).catch(function () {
+        noteGaveUp('Couldn’t load the letters. Check your connection, then tap again.');
+      });
       return;
     }
     closeLinkSidebar();

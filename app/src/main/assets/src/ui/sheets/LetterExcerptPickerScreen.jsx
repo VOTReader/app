@@ -270,7 +270,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         <div className="picker-letter-title">{titleText}</div>
         {subtitleText && <div className="picker-letter-subtitle">{subtitleText}</div>}
         {hasSelection && <div className="picker-selection-hint">{'"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'}</div>}
-        {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt — or use the button below to {returnTargetInsteadOfLink ? 'insert' : 'link'} the whole {entryNoun}.</div>}
+        {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt from one paragraph — or use the button below to {returnTargetInsteadOfLink ? 'insert' : 'link'} the whole {entryNoun}.</div>}
         {blocks.map(b => (
           <p
             key={b.key}

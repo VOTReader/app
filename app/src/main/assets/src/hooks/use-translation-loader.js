@@ -27,6 +27,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { hideToast, showToast } from '../utils/toast.js';
+import { noteGaveUp } from '../utils/wait-notice.js';
 
 export const TRANSLATION_MISSING_TOAST_ID = 'vot-toast-translation-missing';
 
@@ -42,11 +43,17 @@ function translationLabel(code) {
   return (opt && opt.label) || code.toUpperCase();
 }
 
-/** @param {string} code */
-function showMissingNotice(code) {
+/** @param {string} code @param {() => void} [retry] */
+function showMissingNotice(code, retry) {
   if (typeof showToast !== 'function') return;
   const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
   const label = translationLabel(code);
+  // s05.1: online, the download failed for a reason the reader cannot see; a button tries again now rather than
+  // at the next launch (offline, the connection coming back already does).
+  if (!offline && retry) {
+    noteGaveUp(label + ' didn’t load, so the Bible shows NKJV for now.', { id: TRANSLATION_MISSING_TOAST_ID, retry, durationMs: 8000 });
+    return;
+  }
   showToast({
     id: TRANSLATION_MISSING_TOAST_ID, className: 'vot-toast', durationMs: 8000, ariaLive: 'assertive',
     text: offline
@@ -105,7 +112,7 @@ export function useTranslationLoader(translation, setTranslationTick) {
         setTranslationTick((v) => v + 1);
         if (!translationMissing(code)) { hideMissingNotice(); stopListening(); return; }
         if (failed) { load(); return; }       // the connection came back mid-load: try once more now
-        showMissingNotice(code);
+        showMissingNotice(code, () => { if (live) load(); });
       });
     };
     if (typeof window !== 'undefined') window.addEventListener('online', onOnline);
