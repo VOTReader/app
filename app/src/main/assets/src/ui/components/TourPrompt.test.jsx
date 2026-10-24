@@ -6,7 +6,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { TourPrompt } from './TourPrompt.jsx';
 import { TourController } from '../../utils/tour-controller.js';
-import { TOUR_STOPS_WORD } from '../../utils/tour-steps.js';
 import * as steps from '../../utils/tour-steps.js';   // TOUR_MINUTES_WORD read off the module so this file loads on the base tree
 import { AboutSeenFlagStore, TourDoneFlagStore } from '../../stores/app-flag-stores.js';
 
@@ -51,13 +50,35 @@ describe('TourPrompt — the strip declares the room it takes', () => {
     expect(document.body.classList.contains('tour-prompt-open')).toBe(false);
   });
 
-  /* RED 2026-09-10: the strip said "six short stops" after the highlight stop made the tour
-     seven. The count was hand-written here, a bundle away from the array it counts. It now
-     reads the word the steps module publishes (through the controller, the only thing this
-     bundle-d component can reach); tour-steps.test pins that word against the array itself. */
-  it('counts the stops the tour actually has', () => {
+  /* RED 2026-09-10: the strip said "six short stops" after the highlight stop made the tour seven, the
+     count hand-written a bundle away from the array it counts. The one-row strip (n115) names only the
+     minutes, and reads them from the steps module through the controller, never typed here. */
+  it('names the minutes the tour actually takes', () => {
     render(<TourPrompt screen="home" />);
     const text = document.querySelector('.tour-prompt-text').textContent;
-    expect(text).toContain(`${TOUR_STOPS_WORD} short stops, about ${steps.TOUR_MINUTES_WORD} minutes`);
+    expect(text).toBe(`New here? Take the ${steps.TOUR_MINUTES_WORD}-minute tour.`);
+  });
+
+  /* n115/n351 (A07.6): the 215 px card is one slim row: words, Show me around, Later, and ×, which
+     still means "Don't show this again" by name. */
+  it('is one row: Show me around starts the tour, Later snoozes, × never again', () => {
+    const { container, getByRole } = render(<TourPrompt screen="home" />);
+    const strip = container.querySelector('.tour-prompt');
+    expect(strip.querySelector('h2')).toBeNull();
+    expect([...strip.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') || b.textContent))
+      .toEqual(['Show me around', 'Maybe later', 'Don’t show this again']);
+    expect(getByRole('button', { name: 'Maybe later' }).textContent).toBe('Later');
+    act(() => { getByRole('button', { name: 'Don’t show this again' }).click(); });
+    expect(TourDoneFlagStore.is()).toBe(true);
+    expect(document.querySelector('.tour-prompt')).toBeNull();
+  });
+
+  it('shows over the first letter (where Begin Reading lands, n114) and over no other letter', () => {
+    const first = TourController.firstLetter();
+    const { unmount } = render(<TourPrompt screen={first.screen} letterId={first.id} />);
+    expect(document.querySelector('.tour-prompt')).toBeTruthy();
+    unmount();
+    render(<TourPrompt screen={first.screen} letterId="the-wide-path" />);
+    expect(document.querySelector('.tour-prompt')).toBeNull();
   });
 });

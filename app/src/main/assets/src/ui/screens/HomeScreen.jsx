@@ -47,7 +47,42 @@ function useSongCatalogCount() {
 /** localStorage: the reader said "Not now" to Today's reading-plan offer (C8). */
 const PLAN_OFFER_KEY = 'vot-plans-offer-hidden';
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history: _history, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+/** Home's Continue row: what the newest History row names, as a title and its place. @param {any} entry */
+export function continueLabel(entry) {
+  if (!entry) return null;
+  if (entry.type === 'letter') {
+    const col = entry.volumeScreen && typeof COL_BY_INDEX_SC !== 'undefined' ? COL_BY_INDEX_SC.get(entry.volumeScreen) : null;
+    const place = col ? col.label + (entry.letterNum ? ', Letter ' + entry.letterNum : '') : '';
+    return entry.letterTitle ? { title: entry.letterTitle, place } : null;
+  }
+  if (entry.type === 'study-chapter') return entry.studyTitle ? { title: entry.studyTitle, place: entry.chapterTitle || (entry.chapterNum ? 'Part ' + entry.chapterNum : '') } : null;
+  return entry.bookTitle ? { title: entry.bookTitle + (entry.chapterNum ? ' ' + entry.chapterNum : ''), place: '' } : null;
+}
+
+/** @param {{ entry: any, onContinue?: (entry: any) => void, onStartHere?: () => void }} props */
+function ContinueRow({ entry, onContinue, onStartHere }) {
+  const lab = continueLabel(entry);
+  if (lab && onContinue) {
+    return (
+      <button type="button" className="home-continue" onClick={() => onContinue(entry)}
+        aria-label={'Continue: ' + lab.title + (lab.place ? ', ' + lab.place : '')}>
+        <span className="home-continue-eyebrow" aria-hidden="true">Continue</span>
+        <span className="home-continue-title" aria-hidden="true">{lab.title}{lab.place ? <span className="home-continue-place">{' · ' + lab.place}</span> : null}</span>
+        <span className="home-continue-chev" aria-hidden="true">›</span>
+      </button>
+    );
+  }
+  if (entry || !onStartHere) return null;
+  return (
+    <button type="button" className="home-continue" onClick={onStartHere} aria-label="Start here: Volume One, Letter 1, Chosen by God">
+      <span className="home-continue-eyebrow" aria-hidden="true">Start here</span>
+      <span className="home-continue-title" aria-hidden="true">Volume One, Letter 1<span className="home-continue-place"> · Chosen by God</span></span>
+      <span className="home-continue-chev" aria-hidden="true">›</span>
+    </button>
+  );
+}
+
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
   // U09.2: the Scriptures card names the edition the Bible shows ("WEB · NKJV until it downloads").
   useOfflineEditions(translation);
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
@@ -344,7 +379,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
             Search library
           </button>}
-          {historyEnabled !== false && <button type="button" onClick={onHistory}>Recent reading</button>}
+          {/* n131/n352 (A07.2, L1.1, U02.1): "Recent reading" opened a list. The newest place is now one
+              tap (Continue), and before any reading the row says where to start; the list is "History".
+              Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png (A and C). */}
+          {historyEnabled !== false && <ContinueRow entry={Array.isArray(history) ? history[0] : null} onContinue={onContinue} onStartHere={onStartHere} />}
+          {historyEnabled !== false && <button type="button" onClick={onHistory}>History</button>}
           {onNotes && <button type="button" onClick={onNotes}>Notes</button>}
           {/* U08.1: Highlights were four taps from a letter; now one from Home. */}
           {onHighlights && <button type="button" onClick={onHighlights}>Highlights</button>}

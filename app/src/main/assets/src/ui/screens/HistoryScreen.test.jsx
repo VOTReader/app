@@ -150,6 +150,15 @@ describe('HistoryScreen — search', () => {
     expect(document.body.textContent).toContain('The scroll is blank');
   });
 
+  // n131 (L1.1): the blank scroll's one way on.
+  it('the blank scroll offers one button that starts reading', () => {
+    setupGlobals();
+    const onStartReading = vi.fn();
+    const { getByRole } = renderScreen([], { onStartReading });
+    fireEvent.click(getByRole('button', { name: 'Start with Volume One, Letter 1' }));
+    expect(onStartReading).toHaveBeenCalledTimes(1);
+  });
+
   it('filters rows by title, and reports how many matched', () => {
     setupGlobals();
     renderScreen(HISTORY);

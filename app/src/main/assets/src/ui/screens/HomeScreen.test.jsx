@@ -10,7 +10,7 @@
 import 'fake-indexeddb/auto';   // mw18: the rp1 test saves runs in ReadingPlanStore (IDB); a failed save's toast would leak
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
-import { HomeScreen } from './HomeScreen.jsx';
+import { HomeScreen, continueLabel } from './HomeScreen.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
 
@@ -120,7 +120,8 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     setupGlobals();
     renderHome({ searchEnabled: false, historyEnabled: false });
     expect(screen.queryByRole('button', { name: 'Search library' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Recent reading' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
+    expect(document.querySelector('.home-continue')).toBeNull();
   });
 
   /* Corbin, 2026-09-11: "add the scripture web button back to the home screen like it was
@@ -138,7 +139,7 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     const shortcuts = document.querySelector('.home-shortcuts');
     expect(shortcuts).toBeTruthy();
     const labels = [...shortcuts.querySelectorAll('button')].map((x) => x.textContent.trim());
-    expect(labels).toEqual(['Search library', 'Recent reading', 'Notes', 'Bookmarks', 'Scripture Web']);
+    expect(labels).toEqual(['Search library', 'History', 'Notes', 'Bookmarks', 'Scripture Web']);
 
     fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
     expect(onScriptureWeb).toHaveBeenCalledTimes(1);
@@ -415,8 +416,46 @@ describe('Home shortcut to Highlights', () => {
     const onHighlights = vi.fn();
     renderHome({ onNotes: () => {}, onHighlights, onBookmarks: () => {} });
     const buttons = [...document.querySelectorAll('.home-shortcuts button')];
-    expect(buttons.map((x) => x.textContent.trim())).toEqual(['Search library', 'Recent reading', 'Notes', 'Highlights', 'Bookmarks']);
+    expect(buttons.map((x) => x.textContent.trim())).toEqual(['Search library', 'History', 'Notes', 'Highlights', 'Bookmarks']);
     buttons[3].click();
     expect(onHighlights).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* n131/n352 (A07.2, L1.1, U02.1): "Recent reading" opened a History list. The newest place is one tap now
+   (Continue: title, place), and before any reading the row says where to start. */
+describe('HomeScreen — the Continue row', () => {
+  const LETTER = { type: 'letter', letterId: 'chosen-by-god', letterTitle: 'Chosen by God', letterNum: 1, volumeScreen: 'vot-one-index', ts: 2 };
+  afterEach(() => { delete globalThis.COL_BY_INDEX_SC; });
+
+  it('continues the newest place in one tap, named by its title and place', () => {
+    setupGlobals();
+    globalThis.COL_BY_INDEX_SC = new Map([['vot-one-index', { label: 'Volume One' }]]);
+    const onContinue = vi.fn();
+    renderHome({ history: [LETTER, { ...LETTER, letterTitle: 'Older', ts: 1 }], onContinue, onStartHere: vi.fn() });
+    const row = screen.getByRole('button', { name: 'Continue: Chosen by God, Volume One, Letter 1' });
+    expect(row.textContent).toBe('ContinueChosen by God · Volume One, Letter 1›');
+    fireEvent.click(row);
+    expect(onContinue).toHaveBeenCalledWith(LETTER);
+    expect(screen.queryByRole('button', { name: /^Start here/ })).toBeNull();
+  });
+
+  it('before any reading it offers Start here, which opens the first letter', () => {
+    setupGlobals();
+    const onStartHere = vi.fn();
+    renderHome({ history: [], onContinue: vi.fn(), onStartHere });
+    fireEvent.click(screen.getByRole('button', { name: 'Start here: Volume One, Letter 1, Chosen by God' }));
+    expect(onStartHere).toHaveBeenCalledTimes(1);
+  });
+
+  it('a Bible chapter continues as book and chapter', () => {
+    expect(continueLabel({ type: 'bible', bookId: 'john', bookTitle: 'John', chapterNum: 3 })).toEqual({ title: 'John 3', place: '' });
+    expect(continueLabel(null)).toBeNull();
+  });
+
+  it('with History switched off there is no row', () => {
+    setupGlobals();
+    renderHome({ historyEnabled: false, history: [LETTER], onContinue: vi.fn(), onStartHere: vi.fn() });
+    expect(document.querySelector('.home-continue')).toBeNull();
   });
 });

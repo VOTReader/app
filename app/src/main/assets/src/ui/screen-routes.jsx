@@ -847,6 +847,42 @@ export function buildScreenRoutes({
     _listOpen({ screen: hc.letterScreen, letterId: entry.letterId }, { sourceLetterTitle: 'History', silent: true });
   };
 
+  /** A History row, or Home's Continue (n131/n352: the newest row, one tap): open it with History's own wiring. */
+  const _openHistoryEntry = (/** @type {any} */ entry) => {
+    // Wave 0 (P1-12): History was the only content entry point that set
+    // nav state directly with NO origin capture, so Back from the entry
+    // never returned to History. Route through navigateToLink — the same
+    // fromLetter-stack origin capture the Library index screens use —
+    // with the 'History' back-pill title; Back (step 3 / 3b in
+    // use-android-back) then unwinds to the history screen. The
+    // setActiveReadKey dwell-gate / last-read bookkeeping stays here:
+    // navigateToLink deliberately doesn't do it.
+    // Wave 0 (sticky genreId): entering content from History is a
+    // non-genre entry — clear genreId so a later index-level Back
+    // can't misroute into a genre visited in an earlier session leg.
+    // `silent: true` — History is the ONE pill-less link surface (agent
+    // design: you already know where you came from). The back-stack
+    // entry is still pushed, so Back from the destination returns to
+    // History; only the visible pill is suppressed.
+    if (entry.type === 'study-chapter') {
+      const study = getStudyById(entry.studyId);
+      // Do not make a saved History row depend on the lazy study corpus
+      // already being resident. navigateToLink can set the destination
+      // state immediately; App's bible-study-chapter route then owns the
+      // idempotent corpus kick + loading surface.
+      const slug = (study && study.slug) || entry.studySlug || entry.studyId;
+      setGenreId(null);
+      setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: entry.studyChapterId })));
+      _listOpen({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
+    } else if (entry.type === 'letter') {
+      _openHistoryLetter(entry);
+    } else {
+      setGenreId(null);
+      setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
+      _listOpen({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History', silent: true });
+    }
+  };
+
   /**
    * @param {any} jsx     the route's element, or falsy when the letter did not resolve
    * @param {string} [volKey] the collection, for the dead-letter fallback. Pass it
@@ -1090,6 +1126,8 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         onSearch={goSearch}
         onHistory={goHistory}
+        onContinue={_openHistoryEntry}
+        onStartHere={() => _openFirstLetter('Home')}
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onOpenSongs={() => _openSongs([{ k: 'hub' }], { screen: 'home' })}
         onNotes={goNotesIndex}
@@ -1142,40 +1180,8 @@ export function buildScreenRoutes({
         onBack={goNavOrigin}
         backLabel={navOriginLabel(navOrigin)}
         onHome={goHome}
-        onSelect={(entry) => {
-          // Wave 0 (P1-12): History was the only content entry point that set
-          // nav state directly with NO origin capture, so Back from the entry
-          // never returned to History. Route through navigateToLink — the same
-          // fromLetter-stack origin capture the Library index screens use —
-          // with the 'History' back-pill title; Back (step 3 / 3b in
-          // use-android-back) then unwinds to the history screen. The
-          // setActiveReadKey dwell-gate / last-read bookkeeping stays here:
-          // navigateToLink deliberately doesn't do it.
-          // Wave 0 (sticky genreId): entering content from History is a
-          // non-genre entry — clear genreId so a later index-level Back
-          // can't misroute into a genre visited in an earlier session leg.
-          // `silent: true` — History is the ONE pill-less link surface (agent
-          // design: you already know where you came from). The back-stack
-          // entry is still pushed, so Back from the destination returns to
-          // History; only the visible pill is suppressed.
-          if (entry.type === 'study-chapter') {
-            const study = getStudyById(entry.studyId);
-            // Do not make a saved History row depend on the lazy study corpus
-            // already being resident. navigateToLink can set the destination
-            // state immediately; App's bible-study-chapter route then owns the
-            // idempotent corpus kick + loading surface.
-            const slug = (study && study.slug) || entry.studySlug || entry.studyId;
-            setGenreId(null);
-            setActiveReadKey(studyReadKey(slug), () => setLastReadChapters((prev) => ({ ...prev, [studyReadKey(slug)]: entry.studyChapterId })));
-            _listOpen({ type: 'study-letter', studyId: entry.studyId, studyChapterId: entry.studyChapterId }, { sourceLetterTitle: 'History', silent: true });
-          } else if (entry.type === 'letter') {
-            _openHistoryLetter(entry);
-          } else {
-            setGenreId(null);
-            setActiveReadKey(entry.bookId, () => setLastReadChapters((prev) => ({ ...prev, [entry.bookId]: entry.chapterNum })));
-            _listOpen({ type: 'bible', bookId: entry.bookId, chapter: entry.chapterNum }, { sourceLetterTitle: 'History', silent: true });
-          }
-        }}
+        onSelect={_openHistoryEntry}
+        onStartReading={() => _openFirstLetter('History')}
         onSearch={goSearch}
         onSettings={goSettings}
         onHistory={goHistory}

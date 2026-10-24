@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
    TourPrompt — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   The quiet strip at the foot of Home that offers "Show me around" once,
-   after About: Show me around · Maybe later · Don't show this again. A few
+   The quiet slim strip that offers "Show me around" once, after About,
+   over Home or the first letter (where first run's Begin Reading lands):
+   Show me around · Later · × (don't show this again). A few
    hundred bytes on the boot path; the tour itself (TourOverlay) ships in
    bundle-d too (it rode lazy bundle-e until lz1, 2026-10-13).
 
@@ -49,16 +50,18 @@ export function TourPrompt({ screen, letterId }) {
   }, [show]);
   if (!show) return null;
   return (
-    <div className="tour-prompt" role="region" aria-labelledby="tour-prompt-title" ref={ref}>
-      <h2 className="tour-prompt-title" id="tour-prompt-title">New here?</h2>
-      {/* The count comes from the tour itself: this line said "six" for a day after the tour grew to
-          seven, because it was typed here, a bundle away from the array it counts (2026-09-10). */}
-      <p className="tour-prompt-text">Let me show you around: {ctl.stopsWord()} short stops, about {ctl.minutesWord()} minutes.</p>
-      <div className="tour-row">
-        <button type="button" className="tour-btn primary" onClick={() => ctl.start('prompt')}>Show me around</button>
-        <button type="button" className="tour-btn" onClick={() => ctl.dismissPrompt('later')}>Maybe later</button>
-      </div>
-      <button type="button" className="tour-never" onClick={() => ctl.dismissPrompt('never')}>Don&rsquo;t show this again</button>
+    <div className="tour-prompt tour-strip" role="region" aria-labelledby="tour-prompt-title" ref={ref}>
+      {/* n115/n351 (A07.6): slim strip (Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png, variant C);
+          the card it replaces was 215 px over Home's cards. The minutes come from the tour itself. */}
+      <p className="tour-prompt-text" id="tour-prompt-title">
+        <span className="tour-prompt-title">New here?</span> Take the {ctl.minutesWord()}-minute tour.
+      </p>
+      <button type="button" className="tour-btn primary" onClick={() => ctl.start('prompt')}>Show me around</button>
+      {/* "Later" on screen; the name keeps the whole phrase (the visible word is inside it). */}
+      <button type="button" className="tour-btn quiet" aria-label="Maybe later" onClick={() => ctl.dismissPrompt('later')}>Later</button>
+      <button type="button" className="tour-never" aria-label="Don’t show this again" title="Don’t show this again" onClick={() => ctl.dismissPrompt('never')}>
+        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
     </div>
   );
 }
