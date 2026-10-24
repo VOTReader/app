@@ -117,12 +117,11 @@ describe('a book or a study opened from the Scriptures, genre or Studies screens
     expect(props.handleScriptureSelect).toHaveBeenCalledWith('jude', true);
   });
 
-  it('Scriptures: the Matthew Study Bible tile clears both flags, then opens its index', () => {
-    const { routes, props } = makeRoutes({ setBookId: vi.fn(), setChapterNum: vi.fn() });
-    find(routes['scriptures-home'](), G.ScripturesHome).props.onMatthewStudy();
-    expect(props.setFromSearch).toHaveBeenCalledWith(false);
-    expect(props.setFromSurprise).toHaveBeenCalledWith(false);
-    expect(props.setScreen).toHaveBeenCalledWith('matthew-idx');
+  // s22.2 / A02.2: the Scriptures screen has no Matthew Study tile (its prop was never drawn); the Study Bible opens
+  // from plain Matthew's "Read with study notes" (BibleChapterView) or from Studies.
+  it('Scriptures: no dead Matthew Study handler is handed to the screen', () => {
+    const { routes } = makeRoutes({ setBookId: vi.fn(), setChapterNum: vi.fn() });
+    expect(find(routes['scriptures-home'](), G.ScripturesHome).props.onMatthewStudy).toBeUndefined();
   });
 
   it('a genre screen: a book clears both flags, then opens', () => {
