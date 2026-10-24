@@ -17,7 +17,7 @@
  * offsets), and a window counts as done once the site has published since it began (LAST_PUBLISH_AT, the newest
  * successful github-pages deployment): the :37 run publishes only when the :07 one did not. A run in the hour after
  * a window (the other DST offset's crons) catches up a window that passed with nothing published, and so does a
- * dispatch with catchup=true, which the PC's catch-up row sends (D:/Swarm/tools/release-catchup.py). A window with
+ * dispatch with catchup=true, which the PC sends at +10 min when no run came (D:/Swarm/tools/main-ci-watch.py). A window with
  * nothing new still publishes nothing (deploy-target.mjs, the build-sha floor), so a catch-up is harmless.
  *
  * Usage (the deploy's gate job): EVENT_NAME=<github.event_name> SCHEDULE=<github.event.schedule>

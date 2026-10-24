@@ -65,7 +65,9 @@ on:
   # sheds). Each window hour now has two runs off the hour, and the gate publishes once per
   # window: a run after the site already published since the window began skips. The
   # other offset's hour catches up a window that passed with nothing published, and so
-  # does a dispatch with catchup=true (the PC's catch-up row, D:/Swarm/tools/release-catchup.py).
+  # does a dispatch with catchup=true. GitHub dropped both 21:xx crons on 10-23 as well, so
+  # the PC sends that dispatch first (D:/Swarm/tools/main-ci-watch.py): at +10 min when no
+  # run came, and again at +55 min when nothing published; the crons are the backup.
   schedule:
     - cron: '7 12 * * *'    # 06:07 MDT (07:07 MST: catch-up hour after nothing published)
     - cron: '37 12 * * *'   # 06:37 MDT
