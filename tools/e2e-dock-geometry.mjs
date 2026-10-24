@@ -52,8 +52,11 @@ const PARTS = {
   // The mini bar of the player brief (pl-l0 L1): 48 px controls in 8 px padding, no pull tab; the real one also writes its
   // measured height to --audio-bar-h, which the mount below mirrors.
   player:     '<div class="audio-bar"><div style="height:48px;flex:1"></div></div>',
-  autoscroll: '<div class="ascroll-pill"><div style="height:44px;width:100vw"></div></div>',
-  expanded:   '<div class="ascroll-pill is-expanded"><div style="height:44px;width:100vw"></div><div class="ascroll-row ascroll-dwell-row" style="height:44px"></div></div>',
+  // A01.4 (0606ef9c4): while find is open a STOPPED pill steps aside and a running one stays to be paused, so the
+  // running pill is the one that shares the dock with find; 'stopped' checks that it does step aside.
+  autoscroll: '<div class="ascroll-pill is-running"><div style="height:44px;width:100vw"></div></div>',
+  stopped:    '<div class="ascroll-pill"><div style="height:44px;width:100vw"></div></div>',
+  expanded:   '<div class="ascroll-pill is-running is-expanded"><div style="height:44px;width:100vw"></div><div class="ascroll-row ascroll-dwell-row" style="height:44px"></div></div>',
   find:       '<div class="find-pill"><div style="height:44px;width:100vw"></div></div>',
   toggle:     '<div class="mode-toggle-wrap"><div class="mode-toggle-label">Study Notes</div><div class="mode-toggle"><div style="height:33px;width:229px"></div></div></div>',
   hint:       '<div class="ann-hint-pill"><div style="height:57px;width:100vw"></div></div>',            // 79px with its padding
@@ -65,7 +68,7 @@ const PARTS = {
 // What can be on screen at once. Reading screens: hint yields to the player (AnnotationHint), autoscroll and
 // find hide it (app.css); find hides the toggle. Home: the tour prompt. Journal: the FAB.
 const CASES = [];
-for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded']) for (const find of [0, 1])
+for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded', 'stopped']) for (const find of [0, 1])
   for (const toggle of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
     const c = [player && 'player', as, find && 'find', toggle && 'toggle', msg].filter(Boolean);
     CASES.push(c);
@@ -100,7 +103,7 @@ try {
           document.body.innerHTML = '<div class="screen-scroll" style="position:fixed;inset:0"><div style="height:3000px"></div><p id="dock-last" style="margin:0;height:28px">the last line</p></div>'
             + c.map((k) => parts[k]).join('');
           document.body.classList.toggle('audio-bar-open', c.includes('player'));
-          document.body.classList.toggle('autoscroll-on', c.includes('autoscroll') || c.includes('expanded'));
+          document.body.classList.toggle('autoscroll-on', c.includes('autoscroll') || c.includes('expanded') || c.includes('stopped'));
           document.body.classList.toggle('tour-prompt-open', c.includes('tour'));
           const tour = document.querySelector('.tour-prompt');
           if (tour) document.documentElement.style.setProperty('--tour-prompt-h', Math.round(tour.getBoundingClientRect().height) + 'px');
@@ -137,12 +140,13 @@ try {
             if (o.q.left < -0.5 || o.q.top < navBottom - 0.5 || o.q.right > innerWidth + 0.5 || o.q.bottom > floor + 0.5)
               out.off.push(`${o.k} [${[o.q.left, o.q.top, o.q.right, o.q.bottom].map(Math.round)}]`);
           }
-          const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', find: '.find-pill', toggle: '.mode-toggle-wrap',
+          const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', stopped: '.ascroll-pill', find: '.find-pill', toggle: '.mode-toggle-wrap',
             hint: '.ann-hint-pill', toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab' };
           for (const k of c) {
             const el = document.querySelector(want[k]);
             const shown = vis.some((o) => o.el === el);
-            const expect = !(k === 'toggle' && (c.includes('find') || (c.includes('expanded') && innerHeight <= 500)));
+            const expect = !(k === 'toggle' && (c.includes('find') || (c.includes('expanded') && innerHeight <= 500)))
+              && !(k === 'stopped' && c.includes('find'));
             if (shown !== expect) out.missing.push(`${k} ${shown ? 'shown' : 'hidden'}`);
           }
           return out;
