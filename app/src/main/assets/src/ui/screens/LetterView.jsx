@@ -20,6 +20,7 @@ import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 import { prophecyCardsOf } from '../components/ProphecyGroup.jsx';
+import { EditionCompare } from '../components/EditionCompare.jsx';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -769,6 +770,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               {typeof GoToRefButton !== 'undefined' && goToScriptureRef && (
                 <GoToRefButton refStr={scripRef} onGo={goToScriptureRef} />
               )}
+              <EditionCompare key={scripRef} cite={scripRef} />
             </>
           )}
         </div>

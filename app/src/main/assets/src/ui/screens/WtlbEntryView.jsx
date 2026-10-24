@@ -24,6 +24,7 @@ import { answersAnchorPara, answersMetaFor } from '../../utils/answers-sections.
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
+import { EditionCompare } from '../components/EditionCompare.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -715,6 +716,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               {typeof GoToRefButton !== 'undefined' && goToScriptureRef && (
                 <GoToRefButton refStr={scriptureRef} onGo={goToScriptureRef} />
               )}
+              <EditionCompare key={scriptureRef} cite={scriptureRef} />
             </>
           )}
         </div>

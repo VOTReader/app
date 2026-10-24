@@ -308,6 +308,48 @@ export function translateVerse(bookId, chNum, verse, translation) {
   return verse.text; // not loaded / verse absent or blank → NKJV fallback
 }
 
+/* Sparse overlays whose base is the NKJV itself (no registry `base`): a verse
+   they do not carry reads as the NKJV verse. */
+const _NKJV_OVERLAYS = new Set(['rnkjv']);
+
+/**
+ * One verse as one edition prints it, or null when that edition does not carry
+ * it (n166, Compare editions). translateVerse answers NKJV for every miss, which
+ * is right for a chapter page and wrong beside an edition's name. Reads the
+ * edition from `dataOf` when given (an edition file read for the comparison and
+ * let go, never put on window), else from its window global; no cache, so a
+ * borrowed edition object is never kept.
+ * @param {string} bookId
+ * @param {number|string} chNum
+ * @param {number} n
+ * @param {string} code  an edition id other than nkjv
+ * @param {Record<string, any>} [dataOf]
+ * @param {string|null} [nkjvText]  the NKJV verse, for an overlay on the NKJV
+ * @returns {string|null}
+ */
+export function editionVerse(bookId, chNum, n, code, dataOf, nkjvText) {
+  const get = (/** @type {string} */ c) => (dataOf && dataOf[c]) || /** @type {any} */ (window)['BIBLE_' + c.toUpperCase()] || null;
+  const at = (/** @type {any} */ data, /** @type {any} */ ch, /** @type {number} */ v) => {
+    const list = data && data[bookId] && data[bookId][ch];
+    if (!Array.isArray(list)) return null;
+    for (let i = 0; i < list.length; i++) if (list[i] && list[i].n === v) return _blank(list[i].text) ? null : list[i].text;
+    return null;
+  };
+  const data = get(code);
+  if (!data) return null;
+  const t = at(data, chNum, n);
+  if (t) return t;
+  const alias = _VERSIFICATION_ALIAS[code + '|' + bookId + '|' + chNum];
+  const to = alias && alias[n];
+  if (to) {
+    const a = at(data, to[0], to[1]);
+    if (a) return a;
+  }
+  const base = _baseOf(code);
+  if (base && base !== 'nkjv') return at(get(base), chNum, n);
+  return _NKJV_OVERLAYS.has(code) && !_blank(nkjvText) ? /** @type {string} */ (nkjvText) : null;
+}
+
 // ── Translation display labels ──────────────────────────────────────────
 // The chrome that names the active Bible version (the home "Scriptures of
 // Truth" card, the Scriptures hero eyebrow) must reflect settings.translation,

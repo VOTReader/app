@@ -4,6 +4,7 @@
 
 import { inertAttr } from '../../utils/inert-attr.js';
 import { sheetReference } from '../../utils/passage-copy.js';
+import { EditionCompare } from './EditionCompare.jsx';
 
 export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   const isOpen = activeRef != null;
@@ -35,6 +36,7 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
             {typeof GoToRefButton !== 'undefined' && onGoToRef && (
               <GoToRefButton refStr={activeRef.cite} onGo={onGoToRef} />
             )}
+            <EditionCompare key={activeRef.cite} cite={activeRef.cite} />
           </>
         )}
       </div>

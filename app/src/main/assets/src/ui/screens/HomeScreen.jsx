@@ -4,6 +4,7 @@
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
+import { DailyPassage, useDailyPassage } from '../components/DailyPassage.jsx';
 import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
@@ -82,7 +83,7 @@ function ContinueRow({ entry, onContinue, onStartHere }) {
   );
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead, onOpenAnswer }) {
   // U09.2: the Scriptures card names the edition the Bible shows ("WEB · NKJV until it downloads").
   useOfflineEditions(translation);
   // rp1: the reader's plans for today, above Search (TodayCard.jsx)
@@ -95,6 +96,11 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     && !!planStore && (typeof planStore.getState !== 'function' || planStore.getState() === 'loaded');
   const hideOffer = () => { setOfferHidden(true); try { localStorage.setItem(PLAN_OFFER_KEY, '1'); } catch (_e) { /* private window: hidden for this visit */ } };
   useSongCatalogCount();
+  // n173: the passage for the day, once the Answers corpus is on the page. It shows only on a Home that
+  // had it when it opened, so a corpus landing mid-visit never pushes the cards under the reader's finger.
+  const daily = useDailyPassage();
+  const dailyAtOpen = React.useRef(/** @type {boolean | null} */ (null));
+  if (dailyAtOpen.current === null) dailyAtOpen.current = !!daily;
   /* ──────────────────────────────────────────────────────────────
      Drag-and-drop home tiles (1s long-press → lift → drag → snap)
        Architecture note: we use IMPERATIVE DOM manipulation for all
@@ -370,6 +376,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           <div className="home-ornament-diamond" />
           <div className="home-ornament-line r" />
         </div>
+        {dailyAtOpen.current ? <DailyPassage pick={daily} onOpen={onOpenAnswer} /> : null}
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled} tracksOf={planTracks}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
           onEnableMarkAsRead={onEnableMarkAsRead} onOpenPlans={() => onOpenPlans && onOpenPlans()}

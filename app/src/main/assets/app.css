@@ -3229,6 +3229,22 @@
     .sc-sheet-tag { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.35rem; display:block; }
     .sc-sheet-cite { font-family:'Cinzel',serif; font-size:var(--fs-18); color:var(--gold-bright); margin-bottom:0.85rem; display:block; }
     .sc-sheet-verse { font-size:var(--fs-16); line-height:1.85; color:var(--cream-dim); font-style:italic; }
+    /* n166 Compare editions (EditionCompare.jsx; Codex mockup lanes/myweb/out/id1/F/mockup/board-r1.png, A): a small-caps
+       toggle on a hairline under the verse, then one row per edition, its short name beside the whole text. */
+    .sc-compare { margin-top:1rem; border-top:1px solid var(--gold-border); }
+    .sc-compare-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:44px; padding:0; background:none; border:none; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; cursor:pointer; }
+    .sc-compare-toggle:focus-visible { outline:2px solid var(--gold); outline-offset:2px; border-radius:4px; }
+    .sc-compare-chev { flex-shrink:0; transition:transform 0.2s ease; }
+    .sc-compare-toggle[aria-expanded="true"] .sc-compare-chev { transform:rotate(180deg); }
+    .sc-compare-row { display:grid; grid-template-columns:3.6rem 1fr; column-gap:0.75rem; padding:0.7rem 0; border-top:1px solid var(--gold-border); }
+    .sc-compare-ed { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.1em; color:var(--gold); padding-top:0.2rem; overflow-wrap:anywhere; }
+    .sc-compare-row > .sc-compare-text, .sc-compare-body { grid-column:2; min-width:0; }
+    .sc-compare-text { margin:0; font-size:var(--fs-15); line-height:1.6; color:var(--cream); }
+    .sc-compare-text + .sc-compare-text { margin-top:0.4rem; }
+    .sc-compare-part { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.1em; color:var(--gold-dim); }
+    .sc-compare-vn { font-size:0.7em; color:var(--gold-dim); margin-right:0.15em; }
+    .sc-compare-wait, .sc-compare-none, .sc-compare-note { color:var(--cream-dim); font-style:italic; }
+    .sc-compare-note { margin:0; padding:0.7rem 0 0; border-top:1px solid var(--gold-border); font-size:var(--fs-14); text-align:center; }
     .sc-sheet-compound { display:flex; flex-direction:column; gap:1.1rem; }
     .sc-sheet-compound-part { display:flex; flex-direction:column; gap:0.35rem; }
     .sc-sheet-compound-label { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.14em; color:var(--gold); text-transform:uppercase; margin-bottom:0.1rem; display:block; }
@@ -3487,6 +3503,13 @@
     .home-screen-app .home-ornament {
       margin-bottom: 0.75rem;
     }
+    /* n173: the passage for the day (DailyPassage.jsx; Codex mockup lanes/myweb/out/id1/F/mockup/board-r1.png, D) */
+    .home-daily { display:block; width:100%; max-width:30rem; margin:0 0 1rem; padding:0.25rem 0.5rem; border:0; border-radius:8px; background:none; color:inherit; font:inherit; text-align:center; cursor:pointer; }
+    .home-daily:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+    .home-daily-quote { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:6; line-clamp:6; overflow:hidden; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; line-height:1.55; }
+    .home-daily-quote strong { font-weight:600; }
+    .home-daily-src { display:block; margin-top:0.45rem; color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
+    @media (hover:hover) { .home-daily:hover .home-daily-src { color:var(--gold); } }
     .home-shortcuts { display:flex; flex-wrap:wrap; gap:0.5rem; width:100%; max-width:30rem; margin-bottom:1rem; }
     .home-shortcuts button { flex:1 1 auto; min-height:44px; padding:0.45rem 0.7rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font-family:var(--font-body); font-size:var(--fs-14); cursor:pointer; overflow-wrap:anywhere; }
     .home-shortcuts .home-search-action { display:flex; align-items:center; gap:0.6rem; flex-basis:100%; text-align:left; background:var(--gold-faint); }

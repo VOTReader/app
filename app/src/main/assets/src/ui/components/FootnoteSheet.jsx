@@ -6,6 +6,7 @@ import { inertAttr } from '../../utils/inert-attr.js';
 import { sheetReference } from '../../utils/passage-copy.js';
 import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
 import { WebDoorButton } from './footnote-web-door.jsx';
+import { EditionCompare } from './EditionCompare.jsx';
 
 export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, onNavigate, onGoToRef }) {
   const isOpen = num != null;
@@ -85,6 +86,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                 {typeof GoToRefButton !== 'undefined' && onGoToRef && (
                   <GoToRefButton refStr={fn.ref} onGo={onGoToRef} />
                 )}
+                <EditionCompare key={fn.ref} cite={fn.ref} />
                 <WebDoorButton fn={fn} onBefore={onClose} />
                 {fn.seeAlso && (
                   <div className="fn-sheet-see-also">
