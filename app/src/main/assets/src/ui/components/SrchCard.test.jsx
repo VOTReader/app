@@ -376,3 +376,20 @@ describe('a direct reference card says where it opens (audit 6)', () => {
     expect(head({ __direct: true, __label: 'Volume Two · Letter 5', __sub: 'Open letter', ref: { kind: 'ref-letter' } })).toBe('Volume Two · Letter 5');
   });
 });
+
+/* search200 audit 252: the heading badge was cut at 28 characters mid-word ("The Parable of the Mustard S…"). */
+describe('SrchCard — a long heading badge is cut at a word', () => {
+  it('cuts at the last space at or before 28 characters, then the ellipsis; a short heading stays whole', () => {
+    const v = (heading) => ({ score: 1, doc: { kind: 'verse', ref: 'Matthew 13:31', text: 'Another parable He put forth to them.', heading } });
+    const badge = (heading) => {
+      const { container, unmount } = render(<SrchCard entry={v(heading)} terms={['parable']} onSelect={() => {}} isDirect={false} />);
+      const t = container.querySelector('.badge-heading').textContent;
+      unmount();
+      return t;
+    };
+    expect(badge('The Parable of the Mustard Seed and the Leaven')).toBe('The Parable of the Mustard…');
+    expect(badge('The Beatitudes')).toBe('The Beatitudes');
+    expect(badge('Exactly twenty-eight chars!!')).toBe('Exactly twenty-eight chars!!');
+    expect(badge('Supercalifragilisticexpialidocious heading'), 'one word longer than the cut is cut in it').toBe('Supercalifragilisticexpialid…');
+  });
+});

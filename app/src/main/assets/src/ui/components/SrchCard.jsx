@@ -20,6 +20,14 @@ const PLACE_UNIT = {
   'bible-study': 'chapter',
 };
 
+/* A heading badge longer than `max` is cut at the last space at or before it, not mid-word (search200 audit 252);
+   one word longer than `max` is cut in it. Pure. */
+export function cutAtWord(/** @type {string} */ s, /** @type {number} */ max) {
+  if (s.length <= max) return s;
+  const sp = s.lastIndexOf(' ', max);
+  return s.slice(0, sp > 0 ? sp : max).replace(/[\s,;:·-]+$/u, '') + '…';
+}
+
 /* The collection a reprint is filed in ("Answers Only God Can Give"), from the screen's grouping globals; the kind's
    badge label when they are absent. */
 function collectionOf(/** @type {any} */ doc) {
@@ -207,7 +215,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
             translationLabel falls back to the NKJV default for unknown ids. */}
         {kjv ? <span className="srch-card-badge">{translationLabel(kjv.edition)}</span>
           : doc.translation && doc.translation !== 'nkjv' && <span className="srch-card-badge">{translationLabel(doc.translation)}</span>}
-        {doc.heading && doc.kind === 'verse' && <span className="srch-card-badge badge-heading">{doc.heading.length > 28 ? doc.heading.slice(0, 28) + '…' : doc.heading}</span>}
+        {doc.heading && doc.kind === 'verse' && <span className="srch-card-badge badge-heading">{cutAtWord(doc.heading, 28)}</span>}
       </div>
       {locLine && <div className="srch-card-loc">{locLine}</div>}
       <div className="srch-card-snippet">
