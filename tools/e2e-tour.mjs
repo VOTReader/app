@@ -160,11 +160,6 @@ async function stripOnly(browser, { width, height, label, scales }) {
   await page.goto(BASE, { waitUntil: 'load' });
   await page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
   await sleep(600);
-  const click = async (l) => {
-    await page.waitForFunction((l) => [...document.querySelectorAll('button,[role=button]')].some((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0), { timeout: 30000 }, l);
-    await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim()).startsWith(l) && b.getBoundingClientRect().width > 0); b.click(); }, l);
-    await sleep(400);
-  };
   await throughFirstRun(page);
   await page.waitForFunction(() => document.querySelector('.tour-prompt'), { timeout: 15000 });
   await sleep(500);
