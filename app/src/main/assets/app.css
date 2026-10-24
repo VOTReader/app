@@ -3615,6 +3615,8 @@
     @media (hover:hover) { .plans-row:not(:disabled):hover { background:var(--gold-faint); } .plans-item:hover { color:var(--cream); } }
     .plans-pick { display:flex; flex-wrap:wrap; gap:0.4rem; padding:0 0 0.7rem 2.6rem; }
     .plans-chip { min-height:44px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+    /* n354b: Start where I am names a letter, which can run to two lines */
+    .plans-chip-resume { padding:0.45rem 0.9rem; border-radius:1.1rem; text-align:left; line-height:1.3; color:var(--gold); }
     .plans-note:empty { display:none; }
     /* mw18: Build your own plan (PlanBuilder.jsx; mockups r1-build-pick.png, r1-build-goal.png) */
     .plans-build-row { margin-top:0.2rem; border-top:1px solid var(--gold-border); }
@@ -3667,6 +3669,7 @@
     .build-each-main { margin:0.2rem 0 0.1rem; color:var(--gold); font-size:var(--fs-20); }
     .build-each p { margin:0.1rem 0; }
     .build-each .today-btn-wide { margin-top:0.8rem; }
+    .build-each .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
     /* mw18 C9/C11: the month pages and its days open their reading; finished plans (mockup r1-complete.png) */
     .plans-month-head { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.4rem; }
     .plans-month-head .plans-month-name { margin:0; min-width:9rem; }

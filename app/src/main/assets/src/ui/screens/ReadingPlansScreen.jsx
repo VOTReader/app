@@ -23,7 +23,7 @@ import { OfflineCollectionAction, useOfflineAudio } from '../components/OfflineA
 import { canTell } from '../../utils/download-gate.js';
 import { usePlanRuns, runRow, saveRun, stopRun, letterSource, itemRef, shortDate, takePlanOpen, onPlanOpenAsk } from '../../utils/plan-runs-view.js';
 import { supported as reminderSupported, reminderStatus, askForReminders, openReminderSettings, lastActive, isReminderTime } from '../../utils/plan-reminder.js';
-import { startCatalogPlan, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
+import { startCatalogPlan, catalogResume, planDef, runName, PLAN_CATALOG, LETTER_CHAIN } from '../../data/plan-catalog.js';
 import { monthCells, dayItems, newRun, dayNum, weeksOnPlan, markOn, catchUp, spreadOut, spreadPreview, changePace, changeWeekdays, pauseRun, resumeRun, markDay, totalDays, todayKey } from '../../data/plan-engine.js';
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -229,14 +229,33 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
   const [monthShift, setMonthShift] = React.useState(0);
   const [repairing, setRepairing] = React.useState(/** @type {string | null} */ (null));
   const [status, setStatus] = React.useState('');
+  // n354b: the plan whose two starts show (From the beginning / Start where I am)
+  const [choosing, setChoosing] = React.useState(/** @type {{ id: string, opt: any, at: { k: string, t: string } } | null} */ (null));
   const rows = plans.map((r) => runRow(r, now));
   const running = new Set(plans.map((p) => p.plan));
   const lettersIn = seq.length > 0;
   /** @param {string} id @param {any} [opt] */
   const start = (id, opt) => {
     const r = startCatalogPlan(id, letterSource(), new Date(), opt);
+    setChoosing(null);
     if (r) { saveRun(r); setStatus(''); setPicking(false); if (remindable) setOffer(r.id); } else setStatus('Loading the Volumes… try again in a moment.');
   };
+  // n354b: a letters plan the reader is partway through offers to start at the first letter of it not yet read,
+  // beside the normal start; with nothing of it read the tap starts it as before.
+  /** @param {string} id @param {any} [opt] */
+  const begin = (id, opt) => {
+    const at = catalogResume(id, letterSource(), isRead, opt);
+    if (at) { setChoosing({ id, opt, at }); setStatus(''); } else start(id, opt);
+  };
+  /** The two starts, under the plan's row. @param {string} name */
+  const startChoice = (name) => choosing ? (
+    <div className="plans-pick" role="group" aria-label={'Start ' + name}>
+      <button type="button" className="plans-chip" onClick={() => start(choosing.id, choosing.opt)}>From the beginning</button>
+      <button type="button" className="plans-chip plans-chip-resume" onClick={() => start(choosing.id, { ...(choosing.opt || {}), from: choosing.at.k })}>
+        {'Start where I am: ' + choosing.at.t}
+      </button>
+    </div>
+  ) : null;
   // rp-s1: a tapped reminder opens its plan's details, also while this screen shows.
   React.useEffect(() => onPlanOpenAsk((id) => { takePlanOpen(); setOpen(id); setMonthShift(0); }), []);
   // rp-s1: the daily reminder (the Android app only), offered once as a plan starts; its time is kept per plan in the
@@ -318,7 +337,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
     return (
       <ScreenLayout navChildren={LibraryNav({ onBack: () => setBuilding(building === 2 ? 1 : 0), backLabel: 'Reading plans', showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}>
         <div className="plans-screen">
-          <PlanBuilder step={building} onStep={setBuilding} lettersReady={lettersIn}
+          <PlanBuilder step={building} onStep={setBuilding} lettersReady={lettersIn} isRead={isRead}
             onStarted={(r) => { if (remindable) setOffer(r.id); }} />
         </div>
       </ScreenLayout>
@@ -575,11 +594,12 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
             <ul className="plans-list">
               {PLAN_CATALOG.filter((p) => p.group === g).map((p) => {
                 const on = running.has(p.id) && p.id !== 'collection';
+                const asking = !!choosing && choosing.id === p.id;
                 return (
                   <li key={p.id}>
                     <button type="button" className="plans-row" disabled={on} aria-label={on ? p.name + ', following' : 'Start ' + p.name}
-                      aria-expanded={p.id === 'collection' ? picking : undefined}
-                      onClick={() => (p.id === 'collection' ? setPicking(!picking) : start(p.id))}>
+                      aria-expanded={p.id === 'collection' ? picking || asking : asking || undefined}
+                      onClick={() => (p.id === 'collection' ? (setPicking(!(picking || asking)), setChoosing(null)) : asking ? setChoosing(null) : begin(p.id))}>
                       <GroupIcon group={g} />
                       <span className="plans-row-text">
                         <span className="plans-row-name">{p.name}</span>
@@ -587,10 +607,10 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                       </span>
                       <svg className="plans-row-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
                     </button>
-                    {p.id === 'collection' && picking ? (
+                    {asking ? startChoice(p.name) : p.id === 'collection' && picking ? (
                       <div className="plans-pick" role="group" aria-label="Pick a collection">
                         {collections.length ? collections.map((c) => (
-                          <button key={c.volKey} type="button" className="plans-chip" onClick={() => start('collection', { volKey: c.volKey })}>{c.label}</button>
+                          <button key={c.volKey} type="button" className="plans-chip" onClick={() => begin('collection', { volKey: c.volKey })}>{c.label}</button>
                         )) : <span className="plans-note">Loading the Volumes…</span>}
                       </div>
                     ) : null}

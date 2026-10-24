@@ -18,7 +18,7 @@
 
 import { BIBLE_BOOKS } from './reading-plans.js';
 import { BIBLE_CHAPTER_WORDS } from './plan-bible-words.js';
-import { newRun, runStatus, todayKey } from './plan-engine.js';
+import { newRun, runStatus, todayKey, resumeAt, startFrom } from './plan-engine.js';
 
 /** @typedef {import('./plan-engine.js').PlanItem} PlanItem */
 /** @typedef {import('./plan-engine.js').PlanTrack} PlanTrack */
@@ -173,13 +173,14 @@ export function runName(run, src) {
 /**
  * Start a catalog plan. Null when it needs the Volumes and they are not loaded.
  * @param {string} id @param {LetterSource | null} src @param {Date} now
- * @param {{ pace?: PlanPace, weekdays?: boolean[], volKey?: string, name?: string }} [opt]
+ * @param {{ pace?: PlanPace, weekdays?: boolean[], volKey?: string, name?: string, from?: string }} [opt]
+ *   from: start at this letter (n354b's Start where I am), the plan's letters before it left out
  * @returns {PlanRun | null}
  */
 export function startCatalogPlan(id, src, now, opt = {}) {
   const def = planDef(id);
   if (!def) return null;
-  const tracks = def.tracks(src, opt);
+  const tracks = opt.from ? startFrom(def.tracks(src, opt), opt.from) : def.tracks(src, opt);
   if (!tracks.some((t) => t.items.length)) return null;
   const run = newRun({ plan: id, tracks, pace: opt.pace || def.pace, weekdays: opt.weekdays || def.weekdays || ALL_WEEK }, now);
   if (id === 'collection') {
@@ -187,6 +188,16 @@ export function startCatalogPlan(id, src, now, opt = {}) {
     run.name = (col && (col.label || col.short)) || 'One collection';
   } else if (opt.name) run.name = opt.name;
   return run;
+}
+
+/**
+ * n354b: where a catalog plan could start for this reader (its first unread letter, in its own order), or null.
+ * @param {string} id @param {LetterSource | null} src @param {(bid: string, cid: string) => boolean} isRead
+ * @param {{ volKey?: string }} [opt]
+ */
+export function catalogResume(id, src, isRead, opt = {}) {
+  const def = planDef(id);
+  return def && def.letters && src ? resumeAt(def.tracks(src, opt), isRead) : null;
 }
 
 /**

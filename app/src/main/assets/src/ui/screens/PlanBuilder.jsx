@@ -18,7 +18,7 @@ import { useModalRegistry } from '../../hooks/use-modal-registry.js';
 import { BIBLE_BOOKS } from '../../data/reading-plans.js';
 import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
 import { LETTER_CHAIN } from '../../data/plan-catalog.js';
-import { newRun, todayKey } from '../../data/plan-engine.js';
+import { newRun, todayKey, resumeAt, startFrom } from '../../data/plan-engine.js';
 import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
 
 /** @typedef {import('../../data/plan-builder.js').Pick} Pick */
@@ -47,10 +47,12 @@ function Stepper({ label, value, min, step, unit, onChange }) {
 }
 
 /**
- * @param {{ step: 1 | 2, onStep: (s: 0 | 1 | 2) => void, lettersReady: boolean, onStarted?: (run: any) => void }} props
- *   step 0 closes the builder (back on the Plans screen); onStarted hears the run it began
+ * @param {{ step: 1 | 2, onStep: (s: 0 | 1 | 2) => void, lettersReady: boolean, onStarted?: (run: any) => void,
+ *   isRead?: (bid: string, cid: any) => boolean }} props
+ *   step 0 closes the builder (back on the Plans screen); onStarted hears the run it began; isRead (the read record)
+ *   lets a plan with letters start where the reader is (n354b)
  */
-export function PlanBuilder({ step, onStep, lettersReady, onStarted }) {
+export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
   const [tab, setTab] = React.useState(/** @type {'bible' | 'letters'} */ ('bible'));
   const [picks, setPicks] = React.useState(/** @type {Pick[]} */ ([]));
   const [open, setOpen] = React.useState(/** @type {string | null} */ (null));
@@ -119,9 +121,12 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted }) {
     put('l:' + col.volKey, !have.size ? null : { t: 'l', volKey: col.volKey, ids: have.size >= all.length ? null : all.filter((x) => have.has(x)) });
   };
 
-  const start = () => {
+  // n354b: the first letter of the plan, in its own order, the reader has not read (null when none of it is read)
+  const resume = step === 2 && preview && isRead ? resumeAt(spec.tracks, isRead) : null;
+  /** @param {string} [from] start at this letter, the plan's letters before it left out */
+  const start = (from) => {
     if (!preview) return;
-    const run = newRun(spec, new Date());
+    const run = newRun(from ? { ...spec, tracks: startFrom(spec.tracks, from) } : spec, new Date());
     saveRun(run);
     if (onStarted) onStarted(run);
     onStep(0);
@@ -321,7 +326,10 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted }) {
             <p className="build-row-sub">{'Finishes ' + shortDate(preview.finish) + ' · ' + preview.days + (preview.days === 1 ? ' reading day' : ' reading days')}</p>
           </>
         ) : null}
-        <button type="button" className="today-btn today-btn-wide" disabled={!preview || (mode === 'by' && !by)} onClick={start}>Start plan</button>
+        <button type="button" className="today-btn today-btn-wide" disabled={!preview || (mode === 'by' && !by)} onClick={() => start()}>Start plan</button>
+        {resume ? (
+          <button type="button" className="today-link build-resume" disabled={mode === 'by' && !by} onClick={() => start(resume.k)}>{'Start where I am: ' + resume.t}</button>
+        ) : null}
       </section>
     </div>
   );

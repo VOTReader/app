@@ -110,3 +110,30 @@ describe('PlanBuilder', () => {
     expect(screen.getByText('Nothing picked yet')).toBeTruthy();
   });
 });
+
+/* n354b: a built plan with letters the reader is partway through offers Start where I am beside Start plan. */
+describe('PlanBuilder — Start where I am (n354b)', () => {
+  const openReading = (isRead) => {
+    render(<ReadingPlansScreen {...base()} isRead={isRead} />);
+    fireEvent.click(screen.getByRole('button', { name: /Build your own plan/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Ruth/ }));
+    fireEvent.click(screen.getByRole('tab', { name: 'The Letters' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /^Volume Seven/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+  };
+
+  it('starts the letters at the first unread; the Bible picks stay whole', () => {
+    openReading((bid, cid) => (bid === 'volume-seven' && cid === 'seven-1') || bid === 'ruth');
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start where I am: Letter 2' })); });
+    const [run] = ReadingPlanStore.active();
+    const keys = run.tracks.flatMap((t) => t.items.map((it) => it.k));
+    expect(keys.filter((k) => k.startsWith('volume-seven:'))).toEqual(['volume-seven:seven-2', 'volume-seven:seven-3', 'volume-seven:seven-4']);
+    expect(keys.filter((k) => k.startsWith('ruth:'))).toHaveLength(4);
+  });
+
+  it('no offer with none of its letters read', () => {
+    openReading((bid) => bid === 'ruth');
+    expect(screen.queryByRole('button', { name: /^Start where I am/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Start plan' })).toBeTruthy();
+  });
+});

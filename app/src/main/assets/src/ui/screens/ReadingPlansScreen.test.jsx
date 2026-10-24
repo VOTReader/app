@@ -381,3 +381,59 @@ describe('the daily reminder (rp-s1)', () => {
     expect(openPlans).toHaveBeenCalledTimes(2);
   });
 });
+
+/* n354b (hub call 2026-10-23 19:30): a letters plan the reader is partway through offers "Start where I am: <title>"
+   beside the normal start; with nothing of it read the tap starts it as before. */
+describe('ReadingPlansScreen — Start where I am (n354b)', () => {
+  const KEYS = ['COL_BY_KEY', 'colLetterArr', 'colPreface', 'READING_CHAIN'];
+  let saved;
+  beforeEach(() => {
+    saved = KEYS.map((k) => [k, Object.getOwnPropertyDescriptor(globalThis, k)]);
+    const col = { volKey: 'blessed', readKey: 'the-blessed', label: 'The Blessed', short: 'Blessed', letterScreen: 'blessed-letter' };
+    const letters = [{ id: 'b1', title: 'First' }, { id: 'b2', title: 'Second' }, { id: 'b3', title: 'Third' }];
+    globalThis.COL_BY_KEY = new Map([['blessed', col]]);
+    globalThis.colLetterArr = (c) => (c === col ? letters : []);
+    globalThis.colPreface = () => null;
+    globalThis.READING_CHAIN = ['blessed'];
+  });
+  afterEach(() => {
+    for (const [k, d] of saved) { if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }
+  });
+  const readOf = (ids) => (bid, cid) => bid === 'the-blessed' && ids.includes(cid);
+
+  it('with a letter read, the tap offers both starts; Start where I am begins at the first unread', () => {
+    render(<ReadingPlansScreen {...base({ isRead: readOf(['b1']) })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start The Blessed' }));
+    expect(runs()).toHaveLength(0);
+    const group = screen.getByRole('group', { name: 'Start The Blessed' });
+    expect(within(group).getByRole('button', { name: 'From the beginning' })).toBeTruthy();
+    fireEvent.click(within(group).getByRole('button', { name: 'Start where I am: Second' }));
+    expect(runs()).toHaveLength(1);
+    expect(runs()[0].tracks[0].items.map((it) => it.k)).toEqual(['the-blessed:b2', 'the-blessed:b3']);
+  });
+
+  it('From the beginning starts the whole plan', () => {
+    render(<ReadingPlansScreen {...base({ isRead: readOf(['b1']) })} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start The Blessed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'From the beginning' }));
+    expect(runs()[0].tracks[0].items).toHaveLength(3);
+  });
+
+  it('with nothing read the tap starts the plan at once, no offer', () => {
+    render(<ReadingPlansScreen {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Start The Blessed' }));
+    expect(screen.queryByRole('group', { name: 'Start The Blessed' })).toBeNull();
+    expect(runs()).toHaveLength(1);
+    expect(runs()[0].tracks[0].items).toHaveLength(3);
+  });
+
+  it('a second tap on the row puts the offer away', () => {
+    render(<ReadingPlansScreen {...base({ isRead: readOf(['b1']) })} />);
+    const row = screen.getByRole('button', { name: 'Start The Blessed' });
+    fireEvent.click(row);
+    expect(row.getAttribute('aria-expanded')).toBe('true');
+    fireEvent.click(row);
+    expect(screen.queryByRole('group', { name: 'Start The Blessed' })).toBeNull();
+    expect(runs()).toHaveLength(0);
+  });
+});

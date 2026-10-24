@@ -509,3 +509,31 @@ function finishIfDone(run, dateKey) {
   for (let d = 0; d < totalDays(run); d++) if (!dayDone(run, d)) return run;
   return { ...run, status: 'finished', finished: dateKey };
 }
+
+// ── start where I am (n354b, hub call 2026-10-23) ────────────────────────
+
+/**
+ * The letter a plan could start at instead of its first: the first letter, in the plan's own order (its tracks in
+ * order, each in its own order), the reader has not marked read. Null when no letter of it is read yet, when that
+ * letter is the plan's first anyway, or when every letter is read. Bible chapters (items with no title) never count.
+ * @param {PlanTrack[]} tracks @param {(bid: string, cid: string) => boolean} isRead
+ * @returns {{ k: string, t: string } | null}
+ */
+export function resumeAt(tracks, isRead) {
+  const letters = tracks.flatMap((tr) => (tr && Array.isArray(tr.items) ? tr.items : [])).filter((it) => it.t);
+  const read = (/** @type {PlanItem} */ it) => { const i = it.k.lastIndexOf(':'); return !!isRead(it.k.slice(0, i), it.k.slice(i + 1)); };
+  const at = letters.findIndex((it) => !read(it));
+  if (at <= 0) return null;
+  return { k: letters[at].k, t: String(letters[at].t) };
+}
+
+/**
+ * The tracks with the letters before `k` left out of the track that holds it (the others as they are).
+ * @param {PlanTrack[]} tracks @param {string} k @returns {PlanTrack[]}
+ */
+export function startFrom(tracks, k) {
+  return tracks.map((tr) => {
+    const i = tr.items.findIndex((it) => it.k === k);
+    return i > 0 ? { ...tr, items: tr.items.slice(i) } : tr;
+  });
+}

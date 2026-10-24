@@ -1,7 +1,7 @@
 /* plan-catalog (mw18): the call-1A plans, frozen items, and rp1's plans moved into runs. */
 
 import { describe, it, expect } from 'vitest';
-import { PLAN_CATALOG, bibleItems, collectionItems, startCatalogPlan, migrateRp1, bookTitle, runName, chronoItems } from './plan-catalog.js';
+import { PLAN_CATALOG, bibleItems, collectionItems, startCatalogPlan, migrateRp1, bookTitle, runName, chronoItems, catalogResume } from './plan-catalog.js';
 import { runStatus, dayItems, itemsLabel, totalDays, monthCells } from './plan-engine.js';
 import { biblePortion, BIBLE_CHAPTER_COUNT } from './reading-plans.js';
 
@@ -124,5 +124,24 @@ describe('Letters by date (S3)', () => {
     };
     expect(chronoItems(s).map((it) => it.k.split(':')[1])).toEqual(['fl1', 'f-pre', 'f1', 's2', 'f2', 's1', 'w1', 'b1']);
     expect(PLAN_CATALOG.find((p) => p.id === 'letters-chrono').name).toBe('Letters by date');
+  });
+});
+
+/* n354b: Start where I am, for the catalog's letter plans. */
+describe('start where I am (n354b)', () => {
+  const readOf = (ids) => (bid, cid) => bid === 'volume-one' && ids.includes(cid);
+  it('a Volumes plan offers its first unread letter in volume order, and starts there', () => {
+    const isRead = readOf(['one-preface', 'one-1', 'one-2']);
+    expect(catalogResume('seven-volumes', src, isRead)).toEqual({ k: 'volume-one:one-3', t: 'Letter 3' });
+    const run = /** @type {any} */ (startCatalogPlan('seven-volumes', src, at('2026-10-23'), { from: 'volume-one:one-3' }));
+    expect(dayItems(run, 0)[0].k).toBe('volume-one:one-3');
+    expect(run.tracks[0].items.some((it) => it.k === 'volume-one:one-1')).toBe(false);
+  });
+  it('One collection reads its own collection; nothing read, a Bible plan, or no Volumes: no offer', () => {
+    expect(catalogResume('collection', src, readOf(['one-preface']), { volKey: 'one' })).toEqual({ k: 'volume-one:one-1', t: 'Letter 1' });
+    expect(catalogResume('collection', src, readOf(['one-preface']), { volKey: 'two' })).toBeNull();
+    expect(catalogResume('seven-volumes', src, readOf([]))).toBeNull();
+    expect(catalogResume('bible-year', src, () => true)).toBeNull();
+    expect(catalogResume('seven-volumes', null, readOf(['one-preface']))).toBeNull();
   });
 });

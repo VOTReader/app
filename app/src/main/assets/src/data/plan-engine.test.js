@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   dayNum, dateOf, todayKey, cutPoints, planDays, dayItems, itemsLabel, itemsCount, newRun, runStatus, tickItem,
   markDay, catchUp, spreadOut, spreadPreview, changePace, pauseRun, resumeRun, monthCells, isReadingDay, weeksOnPlan, markOn,
+  resumeAt, startFrom,
 } from './plan-engine.js';
 import { BIBLE_BOOKS, biblePortion, BIBLE_YEAR_DAYS } from './reading-plans.js';
 
@@ -202,5 +203,46 @@ describe('weeks on plan (S4)', () => {
     const run = markOn(bibleYear(at('2026-10-04')), '2026-10-05', at('2026-10-06'));
     expect(dayItems(run, 0).every((it) => run.ticks[it.k] === '2026-10-05')).toBe(true);
     expect(runStatus(run, at('2026-10-06')).day).toBe(1);
+  });
+});
+
+/* n354b (hub call 2026-10-23 19:30): a plan with letters can start where the reader is. The next unread is the
+   first letter, in the plan's own order, the reader has not marked read; no offer when nothing is read yet, or
+   when that letter is already the plan's first. */
+describe('start where I am (n354b)', () => {
+  const L = (id, t) => ({ k: 'one:' + id, w: 100, t: t || 'Letter ' + id, s: 'V1' });
+  const letters = { kind: 'letters', by: 'words', items: [L('a'), L('b'), L('c'), L('d')] };
+  const bible = { kind: 'bible', by: 'count', items: [{ k: 'genesis:1', w: 600 }, { k: 'genesis:2', w: 600 }] };
+  const readOf = (ids) => (bid, cid) => bid === 'one' && ids.includes(cid);
+
+  it('names the first unread letter in plan order once something is read', () => {
+    expect(resumeAt([letters], readOf(['a', 'b']))).toEqual({ k: 'one:c', t: 'Letter c' });
+    expect(resumeAt([letters], readOf(['a', 'c']))).toEqual({ k: 'one:b', t: 'Letter b' });
+  });
+
+  it('offers nothing when nothing is read, when the first letter is still unread, or when every letter is read', () => {
+    expect(resumeAt([letters], readOf([]))).toBeNull();
+    expect(resumeAt([letters], readOf(['c']))).toBeNull();
+    expect(resumeAt([letters], readOf(['a', 'b', 'c', 'd']))).toBeNull();
+  });
+
+  it('looks at the letters only: Bible chapters read or not change nothing', () => {
+    const isRead = (bid, cid) => bid === 'genesis' || (bid === 'one' && cid === 'a');
+    expect(resumeAt([bible, letters], isRead)).toEqual({ k: 'one:b', t: 'Letter b' });
+    expect(resumeAt([bible], () => true)).toBeNull();
+  });
+
+  it('startFrom drops the letters before it from their track and leaves the rest alone', () => {
+    const out = startFrom([bible, letters], 'one:c');
+    expect(out[0]).toBe(bible);
+    expect(out[1].items.map((it) => it.k)).toEqual(['one:c', 'one:d']);
+    expect(letters.items).toHaveLength(4);                      // not mutated
+    expect(startFrom([letters], 'one:zz')[0]).toBe(letters);    // a key it does not hold changes nothing
+  });
+
+  it('a run started from there opens on that letter', () => {
+    const run = newRun({ plan: 'volumes', tracks: startFrom([letters], 'one:c'), pace: { mode: 'items', n: 1 } }, at('2026-10-23'));
+    expect(dayItems(run, 0).map((it) => it.k)).toEqual(['one:c']);
+    expect(planDays(run)).toHaveLength(2);
   });
 });
