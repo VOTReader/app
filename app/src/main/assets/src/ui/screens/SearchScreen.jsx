@@ -9,7 +9,7 @@ import { SrchTopicCard } from '../components/SrchTopicCard.jsx';
 import { fewerWords, nearestShown, NEAREST_SHOWN } from '../components/srch-empty.js';
 import {
   refQuote, expandSnippetTerms, isStopTerm, typedStopWords, markStopWords, scopeConflict, letterRefCards,
-  searchMemo, matchCountLabel, groupInSiteOrder, correctedQuery,
+  searchMemo, matchCountLabel, groupInSiteOrder, correctedQuery, isPlansQuery,
 } from './search-model.js';
 
 export { expandSnippetTerms, typedStopWords, scopeConflict, letterRefCards, searchMemo, matchCountLabel, groupInSiteOrder, correctedQuery };
@@ -132,7 +132,7 @@ export function useImeHideBlur(inputRef) {
   }, []);
 }
 
-export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null }) {
+export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null, onOpenPlans = null }) {
   // Songs of the Letters (L8): ONE shortcut row at the top when the LOADED song catalog matches the query — a
   // pure in-memory filter (findSongFamilies, bundle-d). Songs never join the MiniSearch index, so a daily catalog
   // change never forces the index rebuild; a catalog not yet loaded shows nothing and is not fetched from here.
@@ -1096,6 +1096,18 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
             </div>
           </div>
         )}
+
+        {/* "plan" or "reading plan" names the Reading plans screen (rp-c8s, mw18 C8): a row like the songs row, for a
+            query that is only that; a longer phrase ("the plan of salvation") gets none. */}
+        {typeof onOpenPlans === 'function' && isPlansQuery(query) ? (
+          <button type="button" className="srch-songs-row" onClick={() => onOpenPlans()}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+              <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
+            </svg>
+            <span className="srch-songs-row-text">Reading plans</span>
+            <span aria-hidden="true">›</span>
+          </button>
+        ) : null}
 
         {songsFound > 0 && typeof onOpenSongs === 'function' ? (
           <button type="button" className="srch-songs-row" onClick={() => onOpenSongs(songQuery)}>

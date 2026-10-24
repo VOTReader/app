@@ -304,3 +304,16 @@ describe('a letter opened from a volume index or the Library drops an old search
     expect(props.setScreen).toHaveBeenCalledWith('vot-letter');
   });
 });
+
+/* Search's Reading plans row (rp-c8s, mw18 C8): the row the search screen shows for "reading plan" opens the
+   Reading plans screen, through the same goReadingPlans as More > Reading plans (so Back returns to the search). */
+describe('search route: Reading plans row', () => {
+  beforeEach(() => { G.SearchScreen = () => null; });
+  afterEach(() => { delete G.SearchScreen; });
+  it('hands SearchScreen goReadingPlans as onOpenPlans', () => {
+    const goReadingPlans = vi.fn();
+    const { routes } = makeRoutes({ screen: 'search', goReadingPlans, searchQuery: 'reading plan', setSearchQuery: vi.fn(), handleSearchSelect: vi.fn(), handleSearchCommand: vi.fn(), goSearchOrigin: vi.fn(), setSearchScope: vi.fn(), updateSetting: vi.fn() });
+    const el = routes.search();
+    expect(el.props.onOpenPlans).toBe(goReadingPlans);
+  });
+});

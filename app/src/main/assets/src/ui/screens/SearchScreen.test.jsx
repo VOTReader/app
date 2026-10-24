@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url';
 import {
   expandSnippetTerms, relatedWordsFor, relatedWordsFound, matchCountLabel, useImeHideBlur, SearchScreen, SEARCH_LIMIT, groupInSiteOrder, correctedQuery, letterRefCards,
 } from './SearchScreen.jsx';
+import { isPlansQuery } from './search-model.js';
 import {
   srchSortCanonical as realSrchSortCanonical,
   SRCH_CANONICAL_BOOK_INDEX as realCanonIndex,
@@ -2210,5 +2211,49 @@ describe('SearchScreen (search200 UX, track D)', () => {
     r.rerender(<SearchScreen {...props} query="faith with" />);
     act(() => { vi.advanceTimersByTime(200); });
     expect(document.querySelectorAll('.srch-suggest-item'), 'a name still to finish is offered').toHaveLength(1);
+  });
+});
+
+/* "plan" or "reading plan" finds Reading plans (rp-c8s, mw18 C8): a row like the songs row, for a query that names the
+   plans and nothing more; "the plan of salvation" is a search of words and gets no row. */
+describe('SearchScreen: Reading plans row', () => {
+  const noop = () => {};
+  beforeEach(() => {
+    /** @type {any} */ (globalThis).ScreenLayout = ({ children }) => <div>{children}</div>;
+    /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
+    /** @type {any} */ (globalThis).SRCH_QUICK_PICKS = [];
+    setScreenGlobals();
+    /** @type {any} */ (window).VotSearchData = { BOOK_DISPLAY: {}, SYNONYM_MAP: {} };
+    /** @type {any} */ (window).getRecentSearches = () => [];
+    /** @type {any} */ (window).VotSearchMini = {
+      getState: () => ({ ready: false }), init: vi.fn(() => new Promise(() => {})), suggest: () => [], fuzzyBookSuggest: () => null,
+      search: vi.fn(() => Promise.resolve({ parsed: null, results: [], parsedTerms: [] })),
+    };
+  });
+  afterEach(() => { cleanup(); delete /** @type {any} */ (window).VotSearchMini; });
+  const renderAt = (query, onOpenPlans) => render(<SearchScreen query={query} onQueryChange={noop} settings={{}} onSettingsChange={noop}
+    onSelect={noop} onBack={noop} searchScope={null} searchContext={null} onToggleScope={noop} onCommand={noop} onOpenPlans={onOpenPlans} />);
+
+  it('"reading plan" shows the row, which opens Reading plans', () => {
+    const onOpenPlans = vi.fn();
+    renderAt('reading plan', onOpenPlans);
+    fireEvent.click(screen.getByRole('button', { name: /Reading plans/ }));
+    expect(onOpenPlans).toHaveBeenCalledTimes(1);
+  });
+
+  it('"the plan of salvation" gets no row', () => {
+    renderAt('the plan of salvation', vi.fn());
+    expect(screen.queryByRole('button', { name: /Reading plans/ })).toBeNull();
+  });
+});
+
+describe('isPlansQuery', () => {
+  it('reads the plans asked for by name', () => {
+    for (const q of ['plan', 'Plans', 'reading plan', 'Reading Plans', 'bible reading plan', 'my reading plans', '  reading   plan ', 'reading plan?', 'start a reading plan', 'daily bible reading plan'])
+      expect(isPlansQuery(q), q).toBe(true);
+  });
+  it('leaves a search of words alone', () => {
+    for (const q of ['', 'pla', 'the plan of salvation', 'plan of god', "god's plan", 'planted', 'reading', 'plan for my life', 'his plan'])
+      expect(isPlansQuery(q), q).toBe(false);
   });
 });

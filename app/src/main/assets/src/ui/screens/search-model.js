@@ -231,3 +231,18 @@ export function groupInSiteOrder(results, groupKey, meta) {
 export function correctedQuery(query, corrections) {
   return applyCorrections(query, corrections);
 }
+
+/* "plan" or "reading plan" asks for the Reading plans screen (rp-c8s, mw18 C8). Only a query that names the plans and
+   nothing more: a few lead words ("my", "bible", "start a", "daily") then "plan(s)" or "reading plan(s)". A longer
+   phrase ("the plan of salvation", "god's plan") is a search of words and gets no row. */
+const PLANS_QUERY = /^(?:(?:start|begin|open|my|a|the|bible|daily|scripture|scriptures|volumes)\s+)*(?:reading\s+)?plans?$/;
+
+/**
+ * Whether a query asks for the Reading plans screen by name. Case, extra spaces and end punctuation are ignored. Pure.
+ * @param {string} query
+ * @returns {boolean}
+ */
+export function isPlansQuery(query) {
+  const q = String(query || '').toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+  return PLANS_QUERY.test(q);
+}
