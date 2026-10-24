@@ -221,9 +221,14 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
     // Tap a verse number to quick-select the whole verse. Sets a synthetic
     // selInfo and visually selects the verse in the DOM so the user gets a
     // single-tap path that doesn't require drag-selection on mobile.
+    // n172: with one whole verse already picked by its number (the anchor), a
+    // tap on another number extends the pick to the range between them, either
+    // way; a tap once a range is picked starts over on that verse alone. A range
+    // that would take in verses the filter hides starts over too (s29.3 would
+    // drop it at once). A drag selection is never an anchor.
     const v = verses.find(x => x.n === vn);
     if (!v) return;
-    setSelInfo({
+    const single = () => ({
       verseStart: vn,
       verseEnd: vn,
       charStart: 0,
@@ -234,12 +239,31 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
       // replaces selInfo without this flag, so its own highlight is the mark.
       whole: true
     });
+    setSelInfo((prev) => {
+      const anchored = prev && prev.whole && prev.verseStart === prev.verseEnd;
+      if (!anchored) return single();
+      if (prev.verseStart === vn) return prev;
+      const lo = Math.min(prev.verseStart, vn);
+      const hi = Math.max(prev.verseStart, vn);
+      const span = verses.filter(x => x.n >= lo && x.n <= hi);
+      const shown = new Set(shownVerses.map(x => x.n));
+      if (span.some(x => !shown.has(x.n))) return single();
+      const last = span[span.length - 1];
+      return {
+        verseStart: lo,
+        verseEnd: hi,
+        charStart: 0,
+        charEnd: (last.text || '').length,
+        text: span.map(x => x.text || '').join(' '),
+        whole: true
+      };
+    });
     // Clear any native selection so the visual is purely the .is-selected ring.
     try {
       const sel = window.getSelection();
       sel && sel.removeAllRanges && sel.removeAllRanges();
     } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
-  }, [verses]);
+  }, [verses, shownVerses]);
 
   const confirmLink = React.useCallback(() => {
     const refinedTarget = { ...target };
@@ -350,7 +374,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
           className={"picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")}
         >{hasSelection
           ? previewText
-          : "Highlight any portion, or tap a verse number to grab the whole verse."
+          : "Highlight any portion, or tap a verse number to grab the whole verse (tap a second number for a range)."
         }</div>
         <div ref={bodyRef} className="picker-verses">
           {filterQ && shownVerses.length === 0 && (

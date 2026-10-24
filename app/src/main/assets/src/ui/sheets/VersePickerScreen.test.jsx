@@ -155,6 +155,9 @@ describe('VersePickerScreen marks a whole verse taken by its number', () => {
     expect(rows().some((r) => r.classList.contains('is-selected'))).toBe(false);
     fireEvent.click(container.querySelectorAll('.picker-verse-num')[1]);
     expect(rows().map((r) => r.classList.contains('is-selected'))).toEqual([false, true]);
+    // n172: a second number extends to a range; a third starts over on that verse alone
+    fireEvent.click(container.querySelectorAll('.picker-verse-num')[0]);
+    expect(rows().map((r) => r.classList.contains('is-selected'))).toEqual([true, true]);
     fireEvent.click(container.querySelectorAll('.picker-verse-num')[0]);
     expect(rows().map((r) => r.classList.contains('is-selected'))).toEqual([true, false]);
   });
@@ -444,5 +447,82 @@ describe('VersePickerScreen selection hidden by the filter (s29.3)', () => {
     fireEvent.change(container.querySelector('.picker-find-input'), { target: { value: 'without form' } });
     const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
     expect(btn.disabled).toBe(false);
+  });
+});
+
+/* n172 (idea sweep s29.8): a second verse-number tap extends the pick to a range from the first
+   (the anchor), either direction; a third tap starts over on that verse alone. */
+describe('VersePickerScreen: a second verse number makes a range (n172)', () => {
+  const FIVE = [1, 2, 3, 4, 5].map((n) => ({ n, text: 'Verse ' + n + ' text.' }));
+  const stubFive = () => {
+    stubGlobals();
+    window._allBooks = () => ({ genesis: { chapters: [{ num: 1, verses: FIVE }] } });
+  };
+  const nums = (c) => [...c.querySelectorAll('.picker-verse-num')];
+  const ringed = (c) => [...c.querySelectorAll('.picker-verse-selectable')]
+    .filter((r) => r.classList.contains('is-selected')).map((r) => Number(r.getAttribute('data-verse')));
+
+  it('taps on 2 then 4 pick 2-4 and link it whole as "Genesis 1:2-4"', () => {
+    stubFive();
+    const onClose = vi.fn();
+    const { container } = render(<VersePickerScreen {...baseProps} returnTargetInsteadOfLink={true} onClose={onClose} />);
+    fireEvent.click(nums(container)[1]);
+    expect(ringed(container)).toEqual([2]);
+    fireEvent.click(nums(container)[3]);
+    expect(ringed(container)).toEqual([2, 3, 4]);
+    expect(container.querySelector('.picker-selection-hint').textContent).toBe('Verse 2 text. Verse 3 text. Verse 4 text.');
+    fireEvent.click(container.querySelector('.picker-footer-btn'));
+    const t = onClose.mock.calls[0][0];
+    expect(t).toMatchObject({ verse: 2, verseEnd: 4, label: 'Genesis 1:2-4', key: 'bible:genesis:1:2-4' });
+    expect(t.partial).toBeUndefined();
+  });
+
+  it('works backwards too: 4 then 2 is 2-4', () => {
+    stubFive();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.click(nums(container)[3]);
+    fireEvent.click(nums(container)[1]);
+    expect(ringed(container)).toEqual([2, 3, 4]);
+  });
+
+  it('a third tap starts over on that verse alone; tapping the one verse again keeps it', () => {
+    stubFive();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.click(nums(container)[0]);
+    fireEvent.click(nums(container)[2]);
+    expect(ringed(container)).toEqual([1, 2, 3]);
+    fireEvent.click(nums(container)[4]);
+    expect(ringed(container)).toEqual([5]);
+    fireEvent.click(nums(container)[4]);
+    expect(ringed(container)).toEqual([5]);
+  });
+
+  it('with the list filtered, a range that would take in hidden verses starts over instead', () => {
+    stubGlobals();
+    window._allBooks = () => ({ genesis: { chapters: [{ num: 1, verses: FIVE.map((v) => ({ ...v, text: (v.n % 2 ? 'odd ' : 'even ') + v.n })) }] } });
+    const r = render(<VersePickerScreen {...baseProps} />);
+    fireEvent.change(r.container.querySelector('.picker-find-input'), { target: { value: 'odd' } });   // 1, 3, 5 shown
+    fireEvent.click(nums(r.container)[0]);   // verse 1
+    fireEvent.click(nums(r.container)[1]);   // verse 3: 1-3 would take hidden verse 2
+    expect(ringed(r.container)).toEqual([3]);
+    expect(/** @type {HTMLButtonElement} */ (r.container.querySelector('.picker-footer-btn')).disabled).toBe(false);
+  });
+
+  it('a drag selection is not an anchor: the next number tap picks that verse alone', () => {
+    stubFive();
+    const { container } = render(<VersePickerScreen {...baseProps} />);
+    const texts = container.querySelectorAll('.picker-verse-text');
+    const range = document.createRange();
+    range.setStart(texts[0].firstChild, 0);
+    range.setEnd(texts[1].firstChild, 5);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    vi.useFakeTimers();
+    try {
+      fireEvent.mouseUp(container.querySelector('.picker-body'));
+      act(() => { vi.advanceTimersByTime(200); });
+    } finally { vi.useRealTimers(); }
+    fireEvent.click(nums(container)[3]);
+    expect(ringed(container)).toEqual([4]);
   });
 });
