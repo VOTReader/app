@@ -690,3 +690,94 @@ describe('useTabActions — closing the tab on screen cancels its reading dwell 
     });
   });
 });
+
+/* n170 (idea sweep s05.2): closed tabs keep an undo stack about 5 deep. Each Undo reopens the
+   most recent close still held, at its old index; while more are held the toast offers the next. */
+describe('useTabActions — n170 closed-tab undo stack', () => {
+  beforeEach(() => { vi.clearAllMocks(); vi.useFakeTimers(); });
+  afterEach(() => { vi.useRealTimers(); document.body.innerHTML = ''; });
+
+  // Close tabs one by one through the real updaters, the strip shrinking as React would apply it.
+  const closeInTurn = (ts, result, strip, idxs) => {
+    let cur = strip;
+    for (const i of idxs) {
+      const n = ts.setTabs.mock.calls.length;
+      act(() => { result.current.closeTab(i); });
+      cur = ts.setTabs.mock.calls[n][0](cur);
+      act(() => { vi.advanceTimersByTime(0); });
+    }
+    return cur;
+  };
+  const undo = (ts, result, cur) => {
+    const n = ts.setTabs.mock.calls.length;
+    act(() => { result.current.restoreClosedTab(); });
+    return ts.setTabs.mock.calls[n] ? ts.setTabs.mock.calls[n][0](cur) : cur;
+  };
+
+  it('three closes come back in reverse order, each at its old index', () => {
+    const ts = makeTabState([]);
+    const { result } = mount(ts);
+    let cur = closeInTurn(ts, result, ['a', 'b', 'c', 'd', 'e'].map(tab), [1, 2, 0]); // b, then d, then a
+    expect(cur.map((t) => t.id)).toEqual(['c', 'e']);
+    cur = undo(ts, result, cur);
+    expect(cur.map((t) => t.id)).toEqual(['a', 'c', 'e']);
+    cur = undo(ts, result, cur);
+    expect(cur.map((t) => t.id)).toEqual(['a', 'c', 'd', 'e']);
+    cur = undo(ts, result, cur);
+    expect(cur.map((t) => t.id)).toEqual(['a', 'b', 'c', 'd', 'e']);
+    const n = ts.setTabs.mock.calls.length;
+    act(() => { result.current.restoreClosedTab(); });     // nothing left
+    expect(ts.setTabs.mock.calls.length).toBe(n);
+  });
+
+  it('holds only the five most recent closes', () => {
+    const ts = makeTabState([]);
+    const { result } = mount(ts);
+    const ids = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+    let cur = closeInTurn(ts, result, ids.map(tab), [0, 0, 0, 0, 0, 0, 0]);  // a..g closed, h left
+    for (let i = 0; i < 6; i++) cur = undo(ts, result, cur);
+    expect(cur.map((t) => t.id)).toEqual(['c', 'd', 'e', 'f', 'g', 'h']);  // a and b fell off the stack
+  });
+
+  it('after an Undo with more held, the toast offers the next one; its button reopens it', () => {
+    /** @type {any} */ (showToast).mockImplementation(({ id, html }) => {
+      const old = document.getElementById(id); if (old) old.remove();
+      const el = document.createElement('div');
+      el.id = id; el.innerHTML = html;
+      document.body.appendChild(el);
+    });
+    const ts = makeTabState([]);
+    const { result } = mount(ts);
+    let cur = closeInTurn(ts, result, ['a', 'b', 'c'].map(tab), [0, 0]);
+    expect(cur.map((t) => t.id)).toEqual(['c']);
+    let btn = /** @type {HTMLElement} */ (document.querySelector('#vot-toast-undo .vot-undo-btn'));
+    let n = ts.setTabs.mock.calls.length;
+    act(() => { btn.click(); });
+    cur = ts.setTabs.mock.calls[n][0](cur);
+    expect(cur.map((t) => t.id)).toEqual(['b', 'c']);
+    act(() => { vi.advanceTimersByTime(0); });
+    btn = /** @type {HTMLElement} */ (document.querySelector('#vot-toast-undo .vot-undo-btn'));
+    expect(btn && btn.textContent).toBe('Reopen another');
+    n = ts.setTabs.mock.calls.length;
+    act(() => { btn.click(); });
+    cur = ts.setTabs.mock.calls[n][0](cur);
+    expect(cur.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    /** @type {any} */ (showToast).mockClear();
+    act(() => { vi.advanceTimersByTime(0); });
+    expect(showToast).not.toHaveBeenCalled();             // nothing left to offer
+  });
+
+  it('an updater React runs twice records the close once', () => {
+    const ts = makeTabState([]);
+    const { result } = mount(ts);
+    const strip = ['a', 'b', 'c'].map(tab);
+    act(() => { result.current.closeTab(0); });
+    const upd = ts.setTabs.mock.calls[0][0];
+    upd(strip); const cur = upd(strip);                   // StrictMode-style double invoke
+    let after = undo(ts, result, cur);
+    expect(after.map((t) => t.id)).toEqual(['a', 'b', 'c']);
+    const n = ts.setTabs.mock.calls.length;
+    act(() => { result.current.restoreClosedTab(); });
+    expect(ts.setTabs.mock.calls.length).toBe(n);
+  });
+});

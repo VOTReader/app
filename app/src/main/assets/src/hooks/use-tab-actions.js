@@ -70,6 +70,8 @@ import { noteTabAction } from './use-navigate-to-link.js';
 // Tabs overview is a card grid; past ~20 it's already unwieldy) while still
 // generous. Both silent-fail sites (openNewTab, restoreClosedTab) toast.
 const MAX_TABS = 50;
+// n170: how many closed tabs the Undo toast can bring back, newest first.
+const CLOSED_UNDO_DEPTH = 5;
 
 // Cap-hit feedback via the standard toast primitive (utils/toast.js); the
 // plain 'vot-toast' class is the existing neutral-toast styling (same class
@@ -121,15 +123,27 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
   const [tabActionIdx, setTabActionIdx] = React.useState(null); // long-press target
   const [disableTabsPromptOpen, setDisableTabsPromptOpen] = React.useState(false);
   const lastTabCloseStrikes = React.useRef(0); // 3-strike counter for last-tab close
-  const closedTabRef = React.useRef(null);     // UX7: { tab, idx } snapshot for the undo toast
+  // UX7 + n170: the closed tabs, newest last ({ tab, idx } each), at most CLOSED_UNDO_DEPTH.
+  const closedTabsRef = React.useRef(/** @type {{ tab: any, idx: number }[]} */ ([]));
+  const offerUndoRef = React.useRef(false);     // the last close was a real one (not the last-tab reset)
+
+  // The undo toast; its button calls restoreClosedTab (through a ref: the two refer to each other).
+  const restoreRef = React.useRef(/** @type {() => void} */ (() => {}));
+  const showUndoToast = (/** @type {string} */ html) => {
+    showToast({ id: 'vot-toast-undo', className: 'vot-toast vot-toast-undo', html, durationMs: 6000 });
+    const el = (typeof document !== 'undefined') && document.getElementById('vot-toast-undo');
+    const btn = el && el.querySelector('.vot-undo-btn');
+    if (btn) btn.addEventListener('click', () => restoreRef.current(), { once: true });
+  };
 
   // UX7: re-insert the most-recently closed tab at its original index. Tab close
   // was the one INSTANT, irreversible delete in the app (every other delete
   // confirms); this gives it a brief, non-blocking undo (an "Undo" affordance in
   // a toast) so a misfire is recoverable without adding friction to the common case.
+  // n170: the closes stack up (about 5 deep). Each undo reopens the newest still held, and
+  // while more are held the toast comes back offering the next.
   const restoreClosedTab = React.useCallback(() => {
-    const snap = closedTabRef.current;
-    closedTabRef.current = null;
+    const snap = closedTabsRef.current.pop();
     hideToast('vot-toast-undo');
     if (!snap) return;
     setTabs((prev) => {
@@ -140,8 +154,14 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       setActiveTabIdx(at);
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); see header above.
+    if (closedTabsRef.current.length) {
+      setTimeout(() => {
+        if (closedTabsRef.current.length) showUndoToast('Tab reopened. <button type="button" class="vot-undo-btn">Reopen another</button>');
+      }, 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); showUndoToast reads refs only; see header above.
   }, []);
+  restoreRef.current = restoreClosedTab;
 
   // All 7 useCallbacks below intentionally omit setters from their deps. Rationale
   // (one disable per site so the rule still catches new non-setter deps):
@@ -193,8 +213,8 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
           lastTabCloseStrikes.current = 0;
         }
         // Reset the last tab to home rather than actually closing it. This is NOT
-        // a real close (a tab always remains), so no undo snapshot.
-        closedTabRef.current = null;
+        // a real close (a tab always remains), so no undo snapshot and no toast.
+        offerUndoRef.current = false;
         const reset = { ...DEFAULT_TAB };
         cancelDwell(); // the only tab is the one on screen; it goes back to Home
         setActiveTabIdx(0);
@@ -202,7 +222,14 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       }
       // Closing a non-last tab — reset the strike counter (user is using tabs normally)
       lastTabCloseStrikes.current = 0;
-      closedTabRef.current = { tab: prev[idx], idx }; // UX7: snapshot for undo
+      // UX7 + n170: push the close for undo (once: React may run this updater twice)
+      const stack = closedTabsRef.current;
+      const top = stack[stack.length - 1];
+      if (!top || top.tab !== prev[idx]) {
+        stack.push({ tab: prev[idx], idx });
+        if (stack.length > CLOSED_UNDO_DEPTH) stack.shift();
+      }
+      offerUndoRef.current = true;
       const next = prev.filter((_, i) => i !== idx);
       // Keep activeTabIdx pointing at a valid tab
       setActiveTabIdx((prevIdx) => {
@@ -216,24 +243,16 @@ export function useTabActions({ tabState, cancelDwell, setTabThumbnails }) {
       return next;
     });
     // UX7: after the close commits, offer a brief recoverable Undo. The macrotask
-    // runs once React has flushed the updater above, so closedTabRef is populated;
-    // it's null on the last-tab reset path (no toast there). 6 s window. The toast
+    // runs once React has flushed the updater above, so the close is on the stack;
+    // offerUndoRef is false on the last-tab reset path (no toast there). 6 s window. The toast
     // sits at z-index 9998 (above the tabs overview) and is pointer-events:auto via
     // the .vot-toast-undo class, so the button is tappable over the overview.
     setTimeout(() => {
-      if (!closedTabRef.current) return;
-      showToast({
-        id: 'vot-toast-undo',
-        className: 'vot-toast vot-toast-undo',
-        html: 'Tab closed. <button type="button" class="vot-undo-btn">Undo</button>',
-        durationMs: 6000,
-      });
-      const el = (typeof document !== 'undefined') && document.getElementById('vot-toast-undo');
-      const btn = el && el.querySelector('.vot-undo-btn');
-      if (btn) btn.addEventListener('click', restoreClosedTab, { once: true });
+      if (!offerUndoRef.current || !closedTabsRef.current.length) return;
+      showUndoToast('Tab closed. <button type="button" class="vot-undo-btn">Undo</button>');
     }, 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin) + restoreClosedTab is a stable useCallback; cancelDwell is a ref-only function (stale-safe); see header above.
-  }, [restoreClosedTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setters from tabState (useState origin); showUndoToast reads refs only (the button goes through restoreRef); cancelDwell is a ref-only function (stale-safe); see header above.
+  }, []);
   // [7] PINNED TABS survive every BULK close (Close-others / Close-to-the-
   //-right / Clear-all). The single per-tab × still closes a pinned tab —
   // that's an explicit, targeted act with its own Undo toast.
