@@ -38,6 +38,7 @@ import {
 } from '../../utils/answers-topic.js';
 import { answersFragmentStart } from '../../utils/answers-links.js';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
+import { endsOnClosing } from '../../utils/closing-breaks.js';
 
 /** The pictures' own sizes, so a figure holds its place before it decodes. */
 const IMG_WH = { 'answers-chart-chronology.jpg': [2000, 1545], 'answers-holidays-vs-holy-days.jpg': [1472, 960], 'answers-banner.jpg': [1200, 304] };
@@ -263,9 +264,11 @@ const Para = React.memo(/**
     default: {
       const al = p.align === 'center' ? ' is-center' + (raw.indexOf('\n') >= 0 ? ' letter-poetry' : '') : p.align === 'justify' ? ' is-justify' : p.align === 'right' ? ' is-right' : '';
       const ind = pm && pm.marks && pm.marks.indent ? { paddingLeft: pm.marks.indent * (ts2 ? 12 : 24) + 'px' } : undefined;
+      // A closing with more of the passage after it (not its "~ [From ...]" line): clear space (mw-close).
+      const mid = i + 1 < entry.paragraphs.length && endsOnClosing(raw) && answersParaPlan(entry, meta, i + 1).kind === 'p' ? ' letter-closing-mid' : '';
       return (
         <>
-          <p className={'letter-para' + al + pulse} style={ind} {...hl}>{S(nodes({}))}</p>
+          <p className={'letter-para' + al + mid + pulse} style={ind} {...hl}>{S(nodes({}))}</p>
           <Figures meta={meta} i={i} />
         </>
       );

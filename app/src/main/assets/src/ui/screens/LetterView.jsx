@@ -21,6 +21,8 @@ import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 import { prophecyCardsOf } from '../components/ProphecyGroup.jsx';
 import { EditionCompare } from '../components/EditionCompare.jsx';
+import { AddendumHeadLines } from '../components/AddendumHead.jsx';
+import { addendumHeadLines, closingMid } from '../../utils/closing-breaks.js';
 
 /** Whitespace-squashed — the search index's text domain (index-builder letterText). */
 const _squash = (s) => String(s || '').replace(/\s+/g, ' ').trim();
@@ -470,6 +472,19 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 <h2 key={bi} className={`study-heading study-heading-l${block.level || 2}`}>{block.text}</h2>
               );
 
+              if (block.type === "para") {
+                // A dated addendum header after a closing (V1 Christmas, V4 Obey God): the letter
+                // header's lines, same characters (mw-close).
+                const prevType = bi > 0 && letter.blocks[bi - 1].type;
+                const headLines = (prevType === "closing" || prevType === "closing-fn") ? addendumHeadLines(block.segments) : null;
+                if (headLines) return (
+                  <p key={letter.id + ":" + bi} className="letter-para letter-addendum-head" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
+                    <StaticSubtree>
+                      <AddendumHeadLines lines={headLines} onScripClick={fnProps.onScripClick} highlightText={fnProps.highlightText} />
+                    </StaticSubtree>
+                  </p>
+                );
+              }
               if (block.type === "para") return (
                 <p key={letter.id + ":" + bi} className="letter-para" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
                   <StaticSubtree>
@@ -506,13 +521,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 );
               }
               if (block.type === "closing") return (
-                <div key={letter.id + ":" + bi} className="letter-closing" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
+                <div key={letter.id + ":" + bi} className={"letter-closing" + (closingMid(letter.blocks, bi) ? " letter-closing-mid" : "")} data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
                   <StaticSubtree>{block.text}</StaticSubtree>
                 </div>
               );
 
               if (block.type === "closing-fn") return (
-                <div key={letter.id + ":" + bi} className="letter-closing-fn" data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
+                <div key={letter.id + ":" + bi} className={"letter-closing-fn" + (closingMid(letter.blocks, bi) ? " letter-closing-mid" : "")} data-hl-key={letterHlKey(letter.id, bi)} data-hl-dom={true}>
                   <StaticSubtree>
                     <Segments segments={block.segments} {...fnProps} />
                   </StaticSubtree>

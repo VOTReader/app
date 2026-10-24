@@ -2916,6 +2916,17 @@
     .stanza-break { height:0.9rem; display:block; }
     .letter-closing { text-align:center; font-family:var(--font-body); font-size:var(--fs-18); font-style:italic; color:var(--cream-dim); margin-top:2rem; padding-top:2rem; border-top:1px solid var(--gold-border); }
     .letter-closing-fn { text-align:center; margin-top:0.5rem; }
+    /* A closing with more of the letter after it (an addendum, the next word of the same letter):
+       clear space, so what follows reads as a new section (mw-close, Corbin 2026-10-24). */
+    .letter-closing-mid { margin-bottom:2.6rem; }
+    /* A dated addendum header after a closing, set line by line as the letter's own header is
+       (.letter-meta's classes on each line; AddendumHead.jsx). */
+    .letter-addendum-head { line-height:1.5; margin-bottom:2.2rem; }
+    .letter-addendum-head .addendum-head-line { display:block; }
+    /* The header's own type, not the import's all-italic run: upright date / spoken / for lines, a plain italic From. */
+    .letter-addendum-head .italic-text, .letter-addendum-head .bold-italic { color:inherit; font-weight:inherit; }
+    .letter-addendum-head .meta-date .italic-text, .letter-addendum-head .meta-spoken .italic-text,
+    .letter-addendum-head .meta-for .italic-text { font-style:normal; }
     .bold-italic { font-weight:600; font-style:italic; }
     .italic-text { font-style:italic; color:var(--cream-dim); }
     /* ── FOOTNOTE BUBBLE ── */
@@ -9882,6 +9893,8 @@
 
 /* Reading */
 .ans-reading .letter-para{line-height:1.6;margin-bottom:1.1em}
+/* a closing ("Says The Lord.") with more of the passage after it: clear space, as in letters (mw-close) */
+.ans-reading .letter-closing-mid{margin-bottom:2.4em}
 .ans-reading .is-justify{text-align:left}
 .ans-reading .ans-sh{margin:44px 0 16px;padding-top:20px;border-top:1px solid var(--border);font-weight:400;font-size:max(min(var(--fs-24),8vw),min(var(--fs-18),10vw));line-height:1.25;text-align:left;color:var(--cream)}
 /* r2 (§2.1 changed): a head never reads smaller than its text through Text Size 2, then holds at 10vw (36 at 360, 41.2 at 412),
