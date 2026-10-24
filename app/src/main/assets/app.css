@@ -4126,7 +4126,7 @@
     .about-credits { margin:1.2rem 0 0; }
     .about-credits > summary { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; color:var(--gold-dim); cursor:pointer; min-height:44px; display:flex; align-items:center; justify-content:center; gap:0.4rem; list-style:none; }
     .about-credits > summary::-webkit-details-marker { display:none; }
-    .about-credits > summary::after { content:'A'; font-family:var(--font-body); font-size:var(--fs-16); transition:transform 0.18s ease; }
+    .about-credits > summary::after { content:'\203A'; font-family:var(--font-body); font-size:var(--fs-16); transition:transform 0.18s ease; }
     .about-credits[open] > summary::after { transform:rotate(90deg); }
     .about-credits > .about-body { margin-top:0.6rem; }
     .about-credits .about-credit { font-size:var(--fs-14); }
