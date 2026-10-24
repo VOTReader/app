@@ -4672,6 +4672,10 @@
     }
     /* n130: a history row is label, full-width title (wraps at word boundaries, never clamped
        to a stub), then one meta line: progress · time · visits. */
+    .history-entry-eyebrow { display:flex; align-items:baseline; min-width:0; margin-bottom:0.18rem; }
+    .history-entry-eyebrow .chapter-card-label { margin-bottom:0; flex:0 1 auto; min-width:0; }
+    .history-entry-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-dim); white-space:nowrap; flex-shrink:0; }
+    .history-entry-eyebrow .chapter-card-label + .history-entry-num::before { content:'·'; margin:0 0.45rem; }
     .history-entry-card .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; word-break:normal; overflow-wrap:break-word; }
     .history-entry-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:0.1rem 0.5rem; margin-top:0.3rem; }
     .history-entry-meta > * + *::before { content:'·'; margin-right:0.5rem; color:var(--gold-dim); }

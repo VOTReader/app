@@ -119,3 +119,15 @@ describe('HistoryEntryCard — row mechanics', () => {
     expect(picked).toEqual([entry]);
   });
 });
+
+/* n130: the number is named beside the collection (it used to stand alone, reading like a rank). */
+describe('HistoryEntryCard — the number is named (n130)', () => {
+  it('a titled row names its number beside the collection; an untitled one does not repeat it', () => {
+    show({ ...LETTER, volumeScreen: 'vot-five-index' });
+    expect(document.querySelector('.history-entry-num').textContent).toBe('Letter 4');
+    expect(document.querySelector('.chapter-card-num')).toBeNull();
+    cleanup();
+    show({ ...LETTER, letterTitle: null, volumeScreen: 'vot-five-index' });
+    expect(document.querySelector('.history-entry-num')).toBeNull();
+  });
+});

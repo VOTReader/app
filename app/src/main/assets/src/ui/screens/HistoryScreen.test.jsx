@@ -452,7 +452,7 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     setupGlobals();
     renderScreen(REPEATS);
     expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1', 'Chapter 1']);
-    expect(cardLabels()).toEqual(['Psalms · Chapter 23', 'Psalms', 'Genesis']);
+    expect(cardLabels()).toEqual(['Psalms', 'Psalms', 'Genesis']);
     expect(rowVisits()).toEqual(['', '3 visits', '']);
     // The day header counts ROWS, not visits — "Today · 3", never "· 5".
     expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 3');

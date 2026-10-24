@@ -28,15 +28,21 @@ export function HistoryEntryCard({ entry, onSelect, chip = null }) {
   /* n130 (A01.2/A07.10): the row used to be num | title | chip | time, four columns
      fighting for 375 px, so a long title clamped to a stub and the bare number read like a
      rank. Now the title has the full width and wraps at word boundaries, the number is named
-     on the label line ("Psalms · Chapter 23"), and progress, time and visits share one meta
-     line under the title. Untitled rows already say "Chapter 1" as their title. */
-  const label = title ? (cardLabel ? `${cardLabel} · ${fallback}` : fallback) : cardLabel;
+     on the eyebrow beside the collection ("PSALMS · CHAPTER 23"), and progress, time and visits
+     share one meta line under the title. An untitled row already says "Chapter 1" as its title,
+     so it names no number twice. */
+  const numLabel = title ? fallback : null;
   return (
     <button className="chapter-card-btn history-entry-card" onClick={() => onSelect(entry)}>
       <div className="chapter-card-info">
         {/* Absent, not empty: an unresolvable row drops the line instead of
             printing '' (or, for a chapter row with no bookTitle, 'undefined'). */}
-        {label ? <div className="chapter-card-label">{label}</div> : null}
+        {cardLabel || numLabel ? (
+          <div className="history-entry-eyebrow">
+            {cardLabel ? <span className="chapter-card-label">{cardLabel}</span> : null}
+            {numLabel ? <span className="history-entry-num">{numLabel}</span> : null}
+          </div>
+        ) : null}
         <div className="chapter-card-title">{title || fallback}</div>
         <div className="history-entry-meta">
           {chip}
