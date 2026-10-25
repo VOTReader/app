@@ -8,6 +8,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react';
 import { editionVerse } from '../data/translations.js';
+import { editionBookId } from '../data/scripture-resolution.js';
 import { compareParts, parseEditionFile, _resetCompareForTests } from './edition-compare.js';
 import { OfflineEditions, editionUrl } from './offline-editions.js';
 import { EditionCompare } from '../ui/components/EditionCompare.jsx';
@@ -24,9 +25,10 @@ const OPTIONS = [
 const BOOKS_STUB = {
   daniel: { id: 'daniel', title: 'Daniel', chapters: [{ num: 7, sections: [{ verses: [{ n: 13, text: 'NKJV 7:13' }, { n: 14, text: 'NKJV 7:14' }] }] }] },
   romans: { id: 'romans', title: 'Romans', chapters: [{ num: 16, sections: [{ verses: [{ n: 25, text: 'NKJV 16:25' }] }] }] },
+  matthew: { id: 'matthew', title: 'Matthew', chapters: [{ num: 19, sections: [{ verses: [{ n: 14, text: 'NKJV Matthew 19:14' }] }] }] },
 };
 const FILES = {
-  web: 'var BIBLE_WEB = {"daniel":{"7":[{"n":13,"text":"WEB 7:13"},{"n":14,"text":"WEB 7:14"}]}};',
+  web: 'var BIBLE_WEB = {"daniel":{"7":[{"n":13,"text":"WEB 7:13"},{"n":14,"text":"WEB 7:14"}]},"matthew-plain":{"19":[{"n":14,"text":"WEB Matthew 19:14"}]}};',
   rkjv: '/* overlay */\nvar BIBLE_RKJV = {\n"mark":{"1":[{"n":1,"text":"RKJV Mark 1:1"}]}\n};\n',
   rnkjv: '/* overlay */\nvar BIBLE_RNKJV = {\n"mark":{"1":[{"n":1,"text":"RNKJV Mark 1:1"}]}\n};\n',
 };
@@ -115,6 +117,13 @@ describe('EditionCompare', () => {
     expect(window.BIBLE_WEB).toBeUndefined(); // read and let go, never put on window
   });
 
+  it("reads Matthew from each edition's plain Matthew, not the study book id (Corbin 10-24: every edition 'Not in this edition' on Matthew 19:14)", async () => {
+    render(<EditionCompare cite="Matthew 19:14" />);
+    fireEvent.click(screen.getByRole('button', { name: 'Compare editions' }));
+    await waitFor(() => expect(screen.getByText('WEB Matthew 19:14')).toBeTruthy());
+    expect(screen.getByText('NKJV Matthew 19:14')).toBeTruthy(); // NKJV-R, silent here, reads the NKJV
+  });
+
   it('numbers the verses of a range', async () => {
     render(<EditionCompare cite="Daniel 7:13-14" />);
     fireEvent.click(screen.getByRole('button', { name: 'Compare editions' }));
@@ -135,6 +144,16 @@ describe('parseEditionFile', () => {
       const first = data.genesis || data['matthew-plain'];
       expect(first, id).toBeTruthy();
       expect(typeof Object.values(first)[0][0].text, id).toBe('string');
+    }
+  });
+
+  it('every book a cite can name is a book of every shipped full edition', () => {
+    const books = readFileSync(resolve(ASSETS, 'src/data/books.js'), 'utf8');
+    const ids = ['matthew', ...[...books.matchAll(/^ {2}"?([a-z0-9]+)"?: \{$/gm)].map((m) => m[1])];
+    expect(ids.length).toBe(66);
+    for (const code of ['web', 'bsb', 'hnv', 'kjv', 'asv', 'lsv', 'ylt', 'rvr']) {
+      const data = parseEditionFile(readFileSync(resolve(ASSETS, 'src/data/bible-' + code + '.js'), 'utf8'));
+      expect(ids.filter((b) => !data[editionBookId(b)]), code).toEqual([]);
     }
   });
 });

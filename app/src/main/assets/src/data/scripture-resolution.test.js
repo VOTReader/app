@@ -417,6 +417,11 @@ describe('lookupVersesFromBooks', () => {
     window.BIBLE_KJV = { john: { 3: [{ n: 16, text: 'For God so loued the world' }] } };
     expect(lookupVersesFromBooks('John 3:16 (KJV)')).toBe('For God so loued the world');
   });
+  it('reads a tagged Matthew ref from the edition\'s plain Matthew ("Matthew 13:15 (KJV)" ships 6 times)', () => {
+    window.__ALL_BOOKS = { matthew: { id: 'matthew', title: 'Matthew', chapters: [{ num: 13, sections: [{ verses: [{ n: 15, text: 'NKJV 13:15' }] }] }] }, ...BOOKS };
+    window.BIBLE_KJV = { 'matthew-plain': { 13: [{ n: 15, text: 'KJV 13:15' }] } };
+    expect(lookupVersesFromBooks('Matthew 13:15 (KJV)')).toBe('KJV 13:15');
+  });
   it('falls back to NKJV when the tagged translation is not loaded', () => {
     expect(lookupVersesFromBooks('John 3:16 (KJV)')).toBe('For God so loved the world');
   });

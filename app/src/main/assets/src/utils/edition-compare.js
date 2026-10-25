@@ -14,7 +14,7 @@
 
 import { editionVerse } from '../data/translations.js';
 import { OfflineEditions, editionCodes, editionUrl } from './offline-editions.js';
-import { findBook, splitCompoundRef } from '../data/scripture-resolution.js';
+import { editionBookId, findBook, splitCompoundRef } from '../data/scripture-resolution.js';
 
 /** The most verses one comparison reads per part (a whole-chapter cite is not compared). */
 const MAX_VERSES = 12;
@@ -75,7 +75,7 @@ export function compareText(parts, code, dataOf) {
   return parts.map((p) => {
     const verses = [];
     for (let n = p.from; n <= p.to; n++) {
-      verses.push({ n, text: editionVerse(p.bookId, p.chapter, n, code, dataOf, _nkjvVerse(p.bookId, p.chapter, n)) });
+      verses.push({ n, text: editionVerse(editionBookId(p.bookId), p.chapter, n, code, dataOf, _nkjvVerse(p.bookId, p.chapter, n)) });
     }
     return { label: p.label, verses };
   });

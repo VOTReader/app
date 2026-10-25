@@ -299,6 +299,14 @@ const BOOK_ALIASES = {
 };
 
 /**
+ * The book id an edition file keys a book under. A cite's "Matthew" finds the VOT study book (`matthew`, first in
+ * __ALL_BOOKS); every edition file holds the plain Gospel as `matthew-plain`, as the reader's own Matthew does.
+ * @param {string} bookId
+ * @returns {string}
+ */
+export function editionBookId(bookId) { return bookId === 'matthew' ? 'matthew-plain' : bookId; }
+
+/**
  * Resolve a raw book name (or alias / abbreviation) to a canonical book key.
  * @param {string} rawName
  * @returns {string | null}
@@ -524,8 +532,9 @@ export function lookupVersesFromBooks(ref) {
     const code = String(p.tag).toLowerCase();
     if (code !== 'nkjv') {
       const data = (typeof window !== 'undefined') ? window['BIBLE_' + code.toUpperCase()] : null;
-      if (data && data[bookKey] && data[bookKey][p.chapter]) {
-        const altList = data[bookKey][p.chapter].filter(v => v.n >= vStart && v.n <= vEnd);
+      const edKey = editionBookId(bookKey);
+      if (data && data[edKey] && data[edKey][p.chapter]) {
+        const altList = data[edKey][p.chapter].filter(v => v.n >= vStart && v.n <= vEnd);
         if (altList.length) {
           return altList.length === 1 ? altList[0].text : altList.map(v => `${v.n}. ${v.text}`).join(' ');
         }

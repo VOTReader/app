@@ -313,6 +313,14 @@ export function translateVerse(bookId, chNum, verse, translation) {
 const _NKJV_OVERLAYS = new Set(['rnkjv']);
 
 /**
+ * The book id an edition file keys a book under. A cite's "Matthew" finds the VOT study book (`matthew`, first in
+ * __ALL_BOOKS); every edition file holds the plain Gospel as `matthew-plain`, as the reader's own Matthew does.
+ * @param {string} bookId
+ * @returns {string}
+ */
+export function editionBookId(bookId) { return bookId === 'matthew' ? 'matthew-plain' : bookId; }
+
+/**
  * One verse as one edition prints it, or null when that edition does not carry
  * it (n166, Compare editions). translateVerse answers NKJV for every miss, which
  * is right for a chapter page and wrong beside an edition's name. Reads the
