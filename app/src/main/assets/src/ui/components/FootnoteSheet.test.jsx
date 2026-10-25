@@ -201,6 +201,28 @@ describe('the Scripture Web door', () => {
     expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'john', chapter: 14, verse: 6 } });
   });
 
+  // Corbin, 2026-10-24: "Romans 6:23, Ezekiel 18:4, Ezekiel 18:20" opened only the first
+  it('a footnote citing several passages: one door, a button for each passage', () => {
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    /** @type {any} */ (globalThis).splitCompoundRef = (s) => s.split(/,\s*/).map((ref, index) => ({ ref, index }));
+    try {
+      const many = { type: 'scripture', ref: 'Romans 6:23, Ezekiel 18:4, Ezekiel 18:20' };
+      const onClose = vi.fn();
+      render(<Sheet num={1} fn={many} nkjv={{}} footnotes={{ '1': many }} onClose={onClose} />);
+      expect(document.querySelectorAll('.fn-sheet [data-door="web"]'), 'one door').toHaveLength(1);
+      const refs = [...document.querySelectorAll('.fn-sheet .fn-web-ref')];
+      expect(refs.map((b) => b.getAttribute('aria-label'))).toEqual([
+        'Show Romans 6:23 in Scripture Web', 'Show Ezekiel 18:4 in Scripture Web', 'Show Ezekiel 18:20 in Scripture Web',
+      ]);
+      refs[2].dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      expect(onClose).toHaveBeenCalled();
+      expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'ezekiel', chapter: 18, verse: 20 } });
+    } finally {
+      delete /** @type {any} */ (globalThis).splitCompoundRef;
+    }
+  });
+
   it('no door without the routes, and none on a note that is not scripture', () => {
     render(<Sheet num={1} fn={fn} nkjv={{}} footnotes={{ '1': fn }} onClose={() => {}} />);
     expect(webBtn()).toBeNull();

@@ -3056,6 +3056,15 @@
     @media (hover: hover) { .fn-sheet-link-btn:hover { background:rgba(200,164,86,0.14); border-color:var(--gold-dim); } }
     .fn-sheet-link-btn .fn-sheet-link-eyebrow { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.2em; color:var(--gold-dim); text-transform:uppercase; display:block; margin-bottom:0.1rem; }
     .fn-sheet-link-btn .fn-sheet-link-title { display:block; color:var(--gold-bright); font-size:var(--fs-15); line-height:1.3; }
+    /* a footnote citing several passages: one door, a button for each (2026-10-24) */
+    .fn-sheet-link-btn.fn-web-doors { cursor:default; }
+    .fn-sheet-link-btn.fn-web-doors:active { background:rgba(200,164,86,0.08); transform:none; }
+    @media (hover: hover) { .fn-sheet-link-btn.fn-web-doors:hover { background:rgba(200,164,86,0.08); border-color:var(--gold-border); } }
+    .fn-web-refs { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.35rem; }
+    .fn-web-ref { min-height:44px; padding:0 0.8rem; background:transparent; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold-bright); font-family:inherit; font-size:var(--fs-15); cursor:pointer; }
+    .fn-web-ref:active { background:rgba(200,164,86,0.18); }
+    @media (hover: hover) { .fn-web-ref:hover { background:rgba(200,164,86,0.14); border-color:var(--gold-dim); } }
+    .fn-web-ref:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
     .fn-sheet-link-btn .fn-sheet-link-chevron { margin-left:auto; color:var(--gold-dim); font-size:var(--fs-18); flex-shrink:0; align-self:center; }
     .fn-sheet-link-body { flex:1; min-width:0; }
     .fn-sheet-see-also { margin-top:1.1rem; padding-top:0.9rem; border-top:1px solid var(--gold-border); }
