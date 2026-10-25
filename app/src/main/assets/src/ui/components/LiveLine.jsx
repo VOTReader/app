@@ -23,6 +23,45 @@ import { fragmentAt, liveBibleFragments, liveFragments } from './ReadAlongHighli
 
 /** How many clauses before the one being read may share the card. */
 const LEAD_CLAUSES = 2;
+/** The most lines of words the card shows, and the fewest it gives way to when the player is short of room. */
+const MOST_LINES = 5;
+const FEWEST_LINES = 2;
+/** About how many characters a voice reads a second: where the last row ends when no row follows it. */
+const CHARS_PER_SECOND = 14;
+
+/**
+ * How far the voice is through row `i` at `time`, 0..1: from its onset to the next row's (a verse or a whole
+ * paragraph is one row, so a long one is read for a while under the same words).
+ * @param {any[]} rows @param {number} i @param {number} time @param {number} chars the row's length in characters
+ */
+function through(rows, i, time, chars) {
+  const start = rows[i][0];
+  const next = rows[i + 1] ? rows[i + 1][0] : 0;
+  const end = next > start ? next : start + Math.max(2, chars / CHARS_PER_SECOND);
+  return Math.max(0, Math.min(1, (time - start) / (end - start)));
+}
+
+/**
+ * Where the voice is through the card's words, 0..1, counting the lead before the clause being read.
+ * @param {{ lead: string, now: string, at: number }} line
+ */
+function readPoint(line) {
+  const before = line.lead ? line.lead.length + 1 : 0;
+  return (before + line.at * line.now.length) / (before + line.now.length);
+}
+
+/**
+ * How far the card's words roll up, in whole lines, so the place being read stays in its window: about two fifths
+ * down, never past the last line; 0 when the words fit (Corbin 10-24: a long verse or paragraph ran off the bottom).
+ * @param {number} full the words' height @param {number} room the window's height @param {number} line one line's height
+ * @param {number} at where the voice is through the words, 0..1
+ */
+export function rollOffset(full, room, line, at) {
+  if (!(full > room + 1) || !(line > 0)) return 0;
+  const most = full - room;
+  const want = Math.max(0, Math.min(most, at * full - room * 0.4));
+  return Math.min(most, Math.round(want / line) * line);
+}
 
 /**
  * The letter or entry a "volKey:id" key names, from the corpus registry; null until the corpus lands.
@@ -103,7 +142,7 @@ export function rowWords(unit, row) {
  * The card's words at `time`: the clause being read (`now`) and up to two clauses before it in the same block and
  * sentence (`lead`). Null before the first timed clause, or with no rows or no text.
  * @param {any} track @param {number} time
- * @returns {{ lead: string, now: string, key: string } | null}
+ * @returns {{ lead: string, now: string, key: string, at: number } | null} at: how far the voice is through `now`, 0..1
  */
 export function liveLineAt(track, time) {
   if (!track) return null;
@@ -125,7 +164,7 @@ export function liveLineAt(track, time) {
     if (!words || /[.!?]["”’)]?$/.test(words)) break;   // the sentence before this one
     lead.unshift(words);
   }
-  return { lead: lead.join(' '), now, key };
+  return { lead: lead.join(' '), now, key, at: through(frags, i, time, now.length) };
 }
 
 /**
@@ -158,7 +197,7 @@ function verseWords(bookId, chapter, verse, translation) {
 /**
  * A Bible chapter's card at `time`: the verse under the clock, whole (`now`), its number as the dim `lead`.
  * @param {any} track @param {number} time
- * @returns {{ lead: string, now: string, key: string } | null}
+ * @returns {{ lead: string, now: string, key: string, at: number } | null}
  */
 export function bibleLineAt(track, time) {
   const rows = liveBibleFragments(track);
@@ -167,7 +206,22 @@ export function bibleLineAt(track, time) {
   if (i < 0) return null;
   const verse = rows[i][1];
   const now = verseWords(track.key.slice(track.key.indexOf(':') + 1), AudioPlayer.bibleChapterOfTrack(track), verse, bibleTextEdition(track));
-  return now ? { lead: String(verse), now, key: track.key } : null;
+  return now ? { lead: String(verse), now, key: track.key, at: through(rows, i, time, now.length) } : null;
+}
+
+/**
+ * The height the card's words could take without the player's body overflowing: the body's height less everything
+ * else in it (its padding, gaps and other children, and the card around the words). Infinite outside the player.
+ * @param {HTMLElement} box @returns {number}
+ */
+function spareFor(box) {
+  const body = box.closest('.np-body');
+  if (!(body instanceof HTMLElement)) return Infinity;
+  const cs = getComputedStyle(body);
+  const kids = Array.from(body.children);
+  let used = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.rowGap) || 0) * (kids.length - 1);
+  for (const k of kids) used += /** @type {HTMLElement} */ (k).offsetHeight;
+  return body.clientHeight - (used - box.clientHeight) - 8;   // 8: the children's margins, rounded up
 }
 
 /** The lazy Bible corpus as a store (index.html's __bibleCorpus), inert before it exists. @param {() => void} cb */
@@ -210,15 +264,46 @@ export function LiveLine({ track, time, title, onOpen }) {
     return letGo;
   }, [textEdition]);
   const line = liveLineAt(track, Number(time) || 0);
+  // The words show in a window of five lines (no line clamp: a clamped box hid the words being read, and drew lines
+  // over each other on the phone); when they run longer it rolls up with the voice, a whole line at a time. The window
+  // gives up lines (to two) when the player's body has no room for five, so the card never runs under the dock.
+  const boxRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const rollRef = React.useRef(/** @type {HTMLElement | null} */ (null));
+  const shownRef = React.useRef('');
+  const words = line ? line.lead + '|' + line.now : '';
+  const point = line ? readPoint(line) : 0;
+  React.useLayoutEffect(() => {
+    const box = boxRef.current;
+    const roll = rollRef.current;
+    if (!box || !roll) return;
+    const fresh = shownRef.current !== words;
+    shownRef.current = words;
+    const full = roll.offsetHeight;
+    const lineH = parseFloat(getComputedStyle(roll).lineHeight) || 0;
+    let room = box.clientHeight;
+    if (lineH > 0) {
+      const lines = Math.max(FEWEST_LINES, Math.min(MOST_LINES, Math.floor(spareFor(box) / lineH)));
+      const most = lines * lineH + 'px';
+      if (box.style.maxHeight !== most) box.style.maxHeight = most;
+      room = Math.min(full, lines * lineH);
+    }
+    const y = rollOffset(full, room, lineH, point);
+    roll.style.transition = fresh ? 'none' : '';   // new words start at their top; the same words glide
+    roll.style.transform = y ? 'translateY(' + -y + 'px)' : '';
+    const more = (y > 0 ? 'above ' : '') + (y + room < full - 1 ? 'below' : '');
+    if (more.trim()) box.setAttribute('data-more', more.trim()); else box.removeAttribute('data-more');
+  });
   if (!line && !onOpen) return null;
   const body = (
     <>
       {line ? (
         <>
           <span className="np-live-kicker">Now reading</span>
-          <span className="np-live-text">
-            {line.lead ? <span className="np-live-lead">{line.lead} </span> : null}
-            <span className="np-live-now">{line.now}</span>
+          <span className="np-live-text" ref={boxRef}>
+            <span className="np-live-roll" ref={rollRef}>
+              {line.lead ? <span className="np-live-lead">{line.lead} </span> : null}
+              <span className="np-live-now">{line.now}</span>
+            </span>
           </span>
         </>
       ) : null}
