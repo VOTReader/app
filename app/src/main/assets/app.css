@@ -1459,6 +1459,11 @@
       .np-lyrics-head .np-title { font-size: var(--fs-24); }
       .np-body .song-lyrics-card { width: 100%; max-width: 560px; margin: 0; text-align: left; }
       .np-body .song-lyrics-lines { max-height: none; }
+      /* so-lyrbox (Corbin 10-24): with the lyrics open the card fills the body and its lines scroll themselves, so a
+         finger scrolls them and Follow along keeps the sung line in view (with the body as the scroller the lines
+         never moved and the sung one sat under the dock). */
+      .np-body-lyrics > .song-lyrics-card { flex: 1 1 0; min-height: 12em; display: flex; flex-direction: column; }
+      .np-body-lyrics .song-lyrics-lines { flex: 1 1 auto; min-height: 0; }
 
       .np-dock { flex: 0 0 auto; width: 100%; max-width: 620px; margin: 0 auto; }
       .audio-manager-progress { position: relative; padding: 14px 0 6px; }

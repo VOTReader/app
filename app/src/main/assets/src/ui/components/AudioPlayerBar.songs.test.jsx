@@ -304,6 +304,47 @@ describe('the full player in song mode (pictures 08-09, pl-l2)', () => {
     expect(desk.querySelector('.song-lyrics-foot').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
   });
 
+  /* so-lyrbox (Corbin 10-24, 'Right Every Wrong'): in the full player the lyrics never moved and a finger could not
+     scroll them. The lines box had no height of its own, so the player's body was the scroller and Follow along's
+     scrollTo on the box did nothing; the sung line sat below the dock. */
+  it('(so-lyrbox) with the lyrics open, the lines box is the scroller and follows the sung line', async () => {
+    const calls = [];
+    const prev = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = function (o) { calls.push([this.className, o && o.top]); };
+    try {
+      playFamilyA();
+      const desk = openLyrics(openDesk());
+      await within(desk).findByText('Come, love awaits you');
+      expect(desk.querySelector('.np-body').classList.contains('np-body-lyrics')).toBe(true);
+      at(11);
+      expect(calls.filter((c) => c[0] === 'song-lyrics-lines').length).toBe(1);
+    } finally { HTMLElement.prototype.scrollTo = prev; }
+  });
+
+  it('(so-lyrbox) a finger in the lyrics holds Follow along off them for a few seconds', async () => {
+    const calls = [];
+    const prev = HTMLElement.prototype.scrollTo;
+    HTMLElement.prototype.scrollTo = function (o) { calls.push(o && o.top); };
+    const now = vi.spyOn(Date, 'now');
+    let clock = 1000000;
+    now.mockImplementation(() => clock);
+    try {
+      playFamilyA();
+      const desk = openLyrics(openDesk());
+      await within(desk).findByText('Come, love awaits you');
+      at(11);
+      expect(calls.length).toBe(1);
+      fireEvent.touchStart(desk.querySelector('.song-lyrics-lines'));
+      clock += 1000;
+      at(16);
+      expect(calls.length).toBe(1);                       // the hand has it
+      expect(desk.querySelector('.song-lyrics-line.is-now').textContent).toBe('The door is open wide');   // still lit
+      clock += 6000;
+      at(11);
+      expect(calls.length).toBe(2);                       // let go: the box follows again
+    } finally { HTMLElement.prototype.scrollTo = prev; now.mockRestore(); }
+  });
+
   /* n3-10 (sweep 2): the player tells the page the time once a second, and the
      wash moved only then, up to a second late on a line. While a song plays, the
      card now reads the element's own clock each frame (getPreciseTime, as the

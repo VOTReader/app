@@ -13,6 +13,9 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { isVerbatimSong } from '../../utils/song-catalog.js';
 import { useSongLyrics, lyricLineAt, songLyricsFoot, songLetterOf } from './SongParts.jsx';
 
+/** How long a hand in the lyrics box keeps Follow along from scrolling it, in ms. */
+const HAND_HOLD_MS = 5000;
+
 /**
  * The words of the song playing. Synced: the current line takes the
  * read-along wash and the card follows it (inside its own box — never the
@@ -23,6 +26,10 @@ export function SongLyricsCard({ song, time }) {
   const lyrics = useSongLyrics(song);
   const [follow, setFollow] = React.useState(true);
   const boxRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  // A finger or wheel in the box holds Follow along off it for a few seconds, so the lines can be scrolled by hand
+  // (so-lyrbox, Corbin 10-24); the next line after that brings the sung one back into view.
+  const handRef = React.useRef(0);
+  const hand = () => { handRef.current = Date.now(); };
   const synced = !!(lyrics && lyrics.synced);
   // n3-10: the player tells the page the time once a second, so the wash moved
   // up to a second late. While the song plays, read the element's own clock each
@@ -46,7 +53,7 @@ export function SongLyricsCard({ song, time }) {
   const now = synced ? (playing && liveLine !== null ? liveLine : lyricLineAt(lyrics.lines, time)) : -1;
   React.useEffect(() => {
     const box = boxRef.current;
-    if (!box || !follow || now < 0) return;
+    if (!box || !follow || now < 0 || Date.now() - handRef.current < HAND_HOLD_MS) return;
     const line = /** @type {HTMLElement | null} */ (box.children[now] || null);
     if (!line) return;
     // The box is position:relative, so a line's offsetTop is measured from the box itself.
@@ -73,7 +80,8 @@ export function SongLyricsCard({ song, time }) {
           <button type="button" className={'song-lyrics-follow' + (follow ? ' is-on' : '')} aria-pressed={follow} onClick={() => setFollow(!follow)}>Follow along</button>
         ) : null}
       </div>
-      <div className="song-lyrics-lines" ref={boxRef} tabIndex={0} role="region" aria-label="Lyrics">
+      <div className="song-lyrics-lines" ref={boxRef} tabIndex={0} role="region" aria-label="Lyrics"
+        onTouchStart={hand} onTouchMove={hand} onWheel={hand}>
         {lyrics.lines.map((line, i) => (
           <p key={i} dir="auto" className={'song-lyrics-line' + (i === now ? ' is-now' : '')} aria-current={i === now ? 'true' : undefined}>{line.t}</p>
         ))}

@@ -411,7 +411,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
           <RowMenu label={'More for ' + (heading || 'this recording')} items={menu} />
         </header>
 
-        <div className="np-body">
+        <div className={'np-body' + (songId && lyrics ? ' np-body-lyrics' : '')}>
           {songId ? (
             <>
               {lyrics ? (
