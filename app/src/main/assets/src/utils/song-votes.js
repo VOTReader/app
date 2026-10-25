@@ -274,6 +274,13 @@ export function downVotedIds() {
   return out;
 }
 
+/** Songs this device liked, the newest like first (the Songs hub's Liked Songs, so-liked 10-24). @returns {string[]} */
+export function likedSongIds() {
+  const out = [];
+  for (const [id, e] of _votes) if (e.v === 1) out.push([id, e.at]);
+  return out.sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+}
+
 /** Has the one-time "Only you see this" note been shown on this install? */
 export function downNoteSeen() { return _downNoteSeen; }
 
@@ -487,6 +494,7 @@ export const SongVotes = {
   setVote: setSongVote,
   tap: tapSongVote,
   downVotedIds,
+  likedIds: likedSongIds,
   downNoteSeen,
   markDownNoteSeen,
   flush: flushSongVotes,

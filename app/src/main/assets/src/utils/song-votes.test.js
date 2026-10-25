@@ -7,7 +7,7 @@ import {
   SONG_VOTE_URL, SONG_TALLY_URL, SONG_VOTE_KEYS,
   loadSongVotes, voteOf, setSongVote, tapSongVote, voteToSend, downVotedIds, downNoteSeen, markDownNoteSeen,
   flushSongVotes, pendingSongVotes, postSongVote, normalizeSongTally, loadSongTally, popularSongIds, lovedSongIds,
-  voteTraits, SongVotes, _resetSongVotesForTests,
+  voteTraits, likedSongIds, SongVotes, _resetSongVotesForTests,
 } from './song-votes.js';
 
 const A = 'aaaaaaaaaaaa';
@@ -68,6 +68,20 @@ describe('what a change of vote sends (👎 never leaves the device)', () => {
     expect(pendingSongVotes()).toEqual([]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(downVotedIds()).toEqual([A]);
+  });
+});
+
+describe('Liked Songs (so-liked): the likes of this device', () => {
+  it('lists the 👍 songs, newest like first; a 👎 or a cleared like leaves', async () => {
+    await loadSongVotes();
+    setSongVote(A, 1, 1000);
+    setSongVote(B, 1, 3000);
+    setSongVote(C, 1, 2000);
+    expect(likedSongIds()).toEqual([B, C, A]);
+    expect(SongVotes.likedIds()).toEqual([B, C, A]);
+    setSongVote(C, -1, 4000);
+    setSongVote(A, 0, 5000);
+    expect(likedSongIds()).toEqual([B]);
   });
 });
 

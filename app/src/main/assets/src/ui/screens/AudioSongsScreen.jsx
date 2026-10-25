@@ -154,6 +154,12 @@ function topSongs(v, n) {
   return n ? list.slice(0, n) : list;
 }
 
+/** so-liked (Corbin 10-24 "scroll through Liked Songs"): this listener's 👍 songs, newest like first. */
+function likedSongs() {
+  const store = votes();
+  return store && typeof store.likedIds === 'function' ? songsOfIds(store.likedIds()) : [];
+}
+
 /** Kept ids as songs, hidden ones included (a kept song must stay removable). @param {string[]} ids */
 function keptSongs(ids) {
   const cat = catalog();
@@ -180,6 +186,12 @@ function listContent(v, library) {
       eyebrow: 'Your songs', title: v === 'saved' ? 'Saved songs' : 'Recently played songs',
       families: null, songs: songsOfIds(ids),
       empty: v === 'saved' ? 'Tap Save on any song and it will wait here.' : 'Songs you play will appear here.',
+    };
+  }
+  if (v === 'liked') {
+    return {
+      eyebrow: 'Your songs', title: 'Liked Songs', families: null, songs: likedSongs(),
+      empty: 'Tap the thumbs-up on any song and it will wait here.',
     };
   }
   if (v === 'kept') {
@@ -546,6 +558,8 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const playShelf = useLatestFn((s, list, label) => AudioPlayer.playSongs({ ids: list.map((x) => x.id), startId: s.id, label }));
   const playPopular = useLatestFn((s) => playShelf(s, popular, 'Popular songs'));
   const playLoved = useLatestFn((s) => playShelf(s, loved, 'All-time loved'));
+  const liked = likedSongs();
+  const playLiked = useLatestFn((s) => playShelf(s, liked, 'Liked Songs'));
   const seeAll = (v, label) => (
     <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'top:' + v })} aria-label={'See all ' + label}>See all<ChevronRightIcon /></button>
   );
@@ -616,6 +630,14 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
             <section className="songs-section songs-top-shelf" aria-labelledby="songs-new">
               <SectionHead id="songs-new" title="New from the flock" action={newest.length > SHELF_TILES ? seeAll('new', 'new songs') : null} />
               <SongTiles songs={newest.slice(0, SHELF_TILES)} onPlay={playNewRow} />
+            </section>
+          ) : null}
+          {liked.length ? (
+            <section className="songs-section songs-top-shelf" aria-labelledby="songs-liked">
+              <SectionHead id="songs-liked" title="Liked Songs" action={
+                <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'liked' })} aria-label="See all liked songs">See all<ChevronRightIcon /></button>
+              } />
+              <SongTiles songs={liked.slice(0, SHELF_TILES)} onPlay={playLiked} />
             </section>
           ) : null}
 
