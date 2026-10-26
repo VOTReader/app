@@ -64,7 +64,7 @@ function rememberQuery(q) {
 
 /* The day's pool costs tens of ms on a phone; the corpus and its sidecars are fixed arrays once
    loaded, so it is built once per array, not on every landing mount (the search index likewise:
-   answersIndexOf). Home's daily passage (DailyPassage.jsx) reads the same pool, so both show one pick. */
+   answersIndexOf). */
 let _pool = { of: /** @type {any} */ (null), meta: /** @type {any} */ (null), v: /** @type {any} */ (null) };
 /** @param {any[]} entries @param {Record<string, any>} meta */
 export function dailyPoolOf(entries, meta) {

@@ -23,12 +23,6 @@ vi.mock('../../utils/press-drag.js', async (importOriginal) => {
 });
 import { ThemeBtn } from '../components/ThemeBtn.jsx';
 
-// n173: the day's passage, its source stubbed (DailyPassage.test.jsx covers the pick itself).
-const daily = vi.hoisted(() => ({ pick: null }));
-vi.mock('../components/DailyPassage.jsx', async (importOriginal) => {
-  const real = await importOriginal();
-  return { ...real, useDailyPassage: () => daily.pick };
-});
 
 const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'createPressDrag', 'translationLabel', 'LibraryNav', 'NavButtons'];
 
@@ -467,35 +461,15 @@ describe('HomeScreen — the Continue row', () => {
   });
 });
 
-/* n173: the passage for the day sits under the title, above Today, and opens where it sits. A corpus that
-   lands while Home is open never inserts it (the cards would jump under the reader's finger). */
-describe('HomeScreen — the passage for the day', () => {
-  const PICK = { id: 'the-coming-of-the-lord', anchor: 'Behold, the judgments', quote: ['Behold, the judgments of God'], title: 'God Eternal', collection: 'Volume 1' };
-  afterEach(() => { daily.pick = null; });
-
-  it('shows above Today once the source is on the page, and opens the passage', () => {
+/* home-quote (Corbin 2026-10-26: "Can you remove the card text at the top feature"): no excerpt and no source
+   line under the title; Today sits under the ornament. */
+describe('HomeScreen — the top feature', () => {
+  it('is the title alone: no passage or source line under it', () => {
     setupGlobals();
-    daily.pick = PICK;
-    const onOpenAnswer = vi.fn();
-    const { container } = renderHome({ onOpenAnswer });
-    const btn = screen.getByRole('button', { name: /^Answer of the day/ });
-    expect(btn.textContent).toBe('Answer of the day: Behold, the judgments of GodFrom “God Eternal” · Volume One ›');
-    const search = screen.getByRole('button', { name: 'Search library' });
-    expect(btn.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(container.querySelector('.home-main-title').compareDocumentPosition(btn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    fireEvent.click(btn);
-    expect(onOpenAnswer).toHaveBeenCalledWith(PICK.id, PICK.anchor);
-  });
-
-  it('stays out of a Home that opened without it', () => {
-    setupGlobals();
-    const view = renderHome({ onOpenAnswer: vi.fn() });
-    daily.pick = PICK;
-    view.rerender(
-      <HomeScreen onSelect={() => {}} onSurprise={() => {}} showSurprise={true} onSettings={() => {}} onSearch={() => {}}
-        onHistory={() => {}} historyEnabled={true} onAbout={() => {}} history={[]} theme="dark" onThemeChange={() => {}}
-        translation="nkjv" onOpenAnswer={vi.fn()} />
-    );
+    const { container } = renderHome({});
+    expect(container.querySelector('.home-main-title')).not.toBeNull();
+    expect(container.querySelector('.home-daily, .home-daily-quote, .home-daily-src')).toBeNull();
     expect(screen.queryByRole('button', { name: /^Answer of the day/ })).toBeNull();
+    expect(container.textContent).not.toMatch(/From “/);
   });
 });

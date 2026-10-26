@@ -3547,13 +3547,6 @@
     .home-screen-app .home-ornament {
       margin-bottom: 0.75rem;
     }
-    /* n173: the passage for the day (DailyPassage.jsx; Codex mockup lanes/myweb/out/id1/F/mockup/board-r1.png, D) */
-    .home-daily { display:block; width:100%; max-width:30rem; margin:0 0 1rem; padding:0.25rem 0.5rem; border:0; border-radius:8px; background:none; color:inherit; font:inherit; text-align:center; cursor:pointer; }
-    .home-daily:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-    .home-daily-quote { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:6; line-clamp:6; overflow:hidden; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-16); font-style:italic; line-height:1.55; }
-    .home-daily-quote strong { font-weight:600; }
-    .home-daily-src { display:block; margin-top:0.45rem; color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
-    @media (hover:hover) { .home-daily:hover .home-daily-src { color:var(--gold); } }
     .home-shortcuts { display:flex; flex-wrap:wrap; gap:0.5rem; width:100%; max-width:30rem; margin-bottom:1rem; }
     .home-shortcuts button { flex:1 1 auto; min-height:44px; padding:0.45rem 0.7rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font-family:var(--font-body); font-size:var(--fs-14); cursor:pointer; overflow-wrap:anywhere; }
     .home-shortcuts .home-search-action { display:flex; align-items:center; gap:0.6rem; flex-basis:100%; text-align:left; background:var(--gold-faint); }
