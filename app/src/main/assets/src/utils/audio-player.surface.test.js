@@ -12,7 +12,7 @@ const METHODS = [
   'playLetter', 'playCollection', 'playSection', 'playBibleBook', 'playPortion', 'portionTracks', 'playSongs',
   'setShuffle', 'switchSongVersion', 'setRepeat', 'setLoop', 'clearLoop', 'canLoop', 'isNative',
   'bibleChapterStart', 'bibleChapterOfTrack', 'sectionLetterKeyAt', 'sectionOpeningKey', 'liveLetter', 'sectionMarks',
-  'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'setPlaybackRate',
+  'playTrack', 'toggle', 'next', 'prev', 'seek', 'skip', 'skipSeconds', 'setSkipSeconds', 'clampSkipSeconds', 'setPlaybackRate',
   'getSleepRemainingSeconds', 'setSleepTimer', 'setSleepAtTrackEnd', 'setSleepAtQueueEnd', 'clearSleepTimer',
   'playAt', 'removeUpcoming', 'insertUpcoming', 'moveUpcoming', 'clearUpcoming', 'clearUpcomingWithUndo', 'undoClearUpcoming', 'playNext', 'addToQueue', 'switchVoiceInPlace', 'stop', 'stopWithUndo', 'undoStop', 'pauseIfPlaying', 'syncKeepAlive',
 ];

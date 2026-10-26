@@ -2848,7 +2848,7 @@ describe('audio-player — Media Session', () => {
   /* Desktop-PWA only in practice: the web MediaSession is inert inside the
      Android WebView (the phone reads the native card instead), so these
      handlers exist for Chrome's own media hub and hardware keys. */
-  it('registers ∓15s and stop, and offers prev/next only when the queue has somewhere to go', () => {
+  it('registers ∓ the skip step and stop, and offers prev/next only when the queue has somewhere to go', () => {
     const session = {
       metadata: null, handlers: {}, position: null, playbackState: 'none',
       setActionHandler(a, h) { this.handlers[a] = h; },
@@ -2868,11 +2868,14 @@ describe('audio-player — Media Session', () => {
       expect(typeof session.handlers.seekforward).toBe('function');
       expect(typeof session.handlers.stop).toBe('function');
 
+      // No offset named: the player's own skip step (10 s unless Settings says, player-1025).
       session.handlers.seekforward();
-      expect(AudioPlayer.getState().time).toBe(15);
+      expect(AudioPlayer.getState().time).toBe(10);
       session.handlers.seekforward();
-      expect(AudioPlayer.getState().time).toBe(30);
+      expect(AudioPlayer.getState().time).toBe(20);
       session.handlers.seekbackward();
+      expect(AudioPlayer.getState().time).toBe(10);
+      session.handlers.seekforward({ seekOffset: 5 });   // a host that names its own offset keeps it
       expect(AudioPlayer.getState().time).toBe(15);
 
       // A real queue re-registers them…
