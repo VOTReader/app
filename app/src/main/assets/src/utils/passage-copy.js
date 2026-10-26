@@ -140,7 +140,17 @@ export function translationTag(key) {
   } catch (_e) { /* the page's edition unknown: the reader's */ }
   const opts = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) ? TRANSLATION_OPTIONS : [];
   const found = opts.find((o) => o.id === (code || 'nkjv'));
-  return ' (' + (found ? found.label : 'NKJV') + ')';
+  return ' (' + (found ? citedLabel(found.label) : 'NKJV') + ')';
+}
+
+/** cite-r (Corbin 2026-10-26): "When copy pasting, nkjv r and KJV R should drop
+    the R. I know it's accurate but I feel a little sheepish making my own named
+    translation". A copy or share out of a restored-name edition cites the
+    edition it restores ("NKJV-R" -> "NKJV"); the words stay as shown, and the
+    app's own labels (picker, headers, compare) keep the R to tell them apart.
+    @param {string} label */
+export function citedLabel(label) {
+  return String(label).replace(/[-\s]R$/, '');
 }
 
 /** cp3 (Corbin 2026-09-27): "the attached link actually HIGHLIGHTS the shared

@@ -4,7 +4,7 @@
    takes on every reading surface: a verse per line, its number and a space,
    footnote digits and icons left out, and the reference on the last line. */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { passageCopy, passageLabel, passageReference, isVerseKey, translationTag, sheetReference, quotedPassage } from './passage-copy.js';
+import { passageCopy, passageLabel, passageReference, isVerseKey, translationTag, sheetReference, quotedPassage, citedLabel } from './passage-copy.js';
 import { readingBlocksIn } from './reading-range.js';
 
 const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
@@ -56,7 +56,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const num37 = /** @type {Node} */ (document.querySelector('#v-37 .verse-num')?.firstChild);
     const end = lastText(block('bible:john:7:39'));
     const out = /** @type {any} */ (passageCopy(range(num37, 0, end, end.length)));
-    expect(out.text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)`);
+    expect(out.text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV)`);
     expect(out.keys).toEqual(['bible:john:7:37', 'bible:john:7:38', 'bible:john:7:39']);
     expect(out.isPublic).toBe(true);
   });
@@ -66,7 +66,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const start = /** @type {Node} */ (block('bible:john:7:37').firstChild);
     const end = lastText(block('bible:john:7:39'));
     expect(/** @type {any} */ (passageCopy(range(start, 0, end, end.length))).text)
-      .toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)`);
+      .toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV)`);
   });
 
   it('started mid-verse: that part-verse has no number, the rest do, and the reference still names it', () => {
@@ -74,15 +74,15 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const start = /** @type {Node} */ (block('bible:john:7:37').firstChild);
     const end = lastText(block('bible:john:7:38'));
     const out = /** @type {any} */ (passageCopy(range(start, V37.indexOf('YahuShua'), end, end.length)));
-    expect(out.text).toBe(`"${V37.slice(V37.indexOf('YahuShua'))}\n38 ${V38}"\n\nJohn 7:37-38 (NKJV-R)`);
+    expect(out.text).toBe(`"${V37.slice(V37.indexOf('YahuShua'))}\n38 ${V38}"\n\nJohn 7:37-38 (NKJV)`);
   });
 
   it('one verse (cp4): the words quoted, a blank line, the reference; no number even when the number was selected', () => {
     bibleChapter([[37, V37], [38, V38]]);
     const t = /** @type {Node} */ (block('bible:john:7:38').firstChild);
-    expect(/** @type {any} */ (passageCopy(range(t, 0, t, 15))).text).toBe('"He who believes"\n\nJohn 7:38 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(range(t, 0, t, 15))).text).toBe('"He who believes"\n\nJohn 7:38 (NKJV)');
     const num = /** @type {Node} */ (document.querySelector('#v-38 .verse-num')?.firstChild);
-    expect(/** @type {any} */ (passageCopy(range(num, 0, t, 15))).text).toBe('"He who believes"\n\nJohn 7:38 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(range(num, 0, t, 15))).text).toBe('"He who believes"\n\nJohn 7:38 (NKJV)');
   });
 
   it('a start dropped between the digits of a number still copies the whole number', () => {
@@ -98,7 +98,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const end = lastText(block('bible:john:7:38'));
     const out = /** @type {any} */ (passageCopy(range(num37, 0, end, end.length), { numbers: false }));
     expect(out.body).toBe(`${V37}\n${V38}`);
-    expect(out.reference).toBe('John 7:37-38 (NKJV-R)');
+    expect(out.reference).toBe('John 7:37-38 (NKJV)');
     expect(out.keys[0]).toBe('bible:john:7:37');
   });
 
@@ -106,14 +106,14 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     bibleChapter([[37, V37], [38, V38]]);
     const start = /** @type {Node} */ (block('bible:john:7:37').firstChild);
     const num38 = /** @type {Node} */ (document.querySelector('#v-38 .verse-num')?.firstChild);
-    expect(/** @type {any} */ (passageCopy(range(start, 0, num38, 2))).text).toBe(`"${V37}"\n\nJohn 7:37 (NKJV-R)`);
+    expect(/** @type {any} */ (passageCopy(range(start, 0, num38, 2))).text).toBe(`"${V37}"\n\nJohn 7:37 (NKJV)`);
   });
 
   it('a range across chapters is named as one: "John 7:53-8:1"', () => {
     const a = bibleChapter([[53, 'And everyone went to his own house.']], 'john:7');
     const b = bibleChapter([[1, 'But Jesus went to the Mount of Olives.']], 'john:8');
     const out = /** @type {any} */ (passageCopy(range(a, 0, b, b.childNodes.length)));
-    expect(out.text).toBe('"53 And everyone went to his own house.\n1 But Jesus went to the Mount of Olives."\n\nJohn 7:53-8:1 (NKJV-R)');
+    expect(out.text).toBe('"53 And everyone went to his own house.\n1 But Jesus went to the Mount of Olives."\n\nJohn 7:53-8:1 (NKJV)');
   });
 
   it('footnote digits, note icons and link icons never reach the clipboard', () => {
@@ -121,7 +121,7 @@ describe('passageCopy — a Bible passage (the reader\'s John 7:37-39)', () => {
     const b1 = block('bible:john:7:1');
     b1.innerHTML = 'In the <mark class="hl-mark">beginning</mark><span class="fn-ref">3</span> was<span class="hl-note-icon" data-hl-key="bible:john:7:1"><svg></svg></span> the Word';
     const out = /** @type {any} */ (passageCopy(range(b1, 0, b1, b1.childNodes.length)));
-    expect(out.text).toBe('"In the beginning was the Word"\n\nJohn 7:1 (NKJV-R)');
+    expect(out.text).toBe('"In the beginning was the Word"\n\nJohn 7:1 (NKJV)');
     expect(out.keys).toEqual(['bible:john:7:1']);
   });
 });
@@ -218,7 +218,7 @@ describe('readingBlocksIn — only the page the reader is on', () => {
     bibleChapter([[1, 'After these things']]);
     const all = range(document.body, 0, document.body, document.body.childNodes.length);
     expect(readingBlocksIn(all).map((e) => e.getAttribute('data-hl-key'))).toEqual(['bible:john:7:1']);
-    expect(/** @type {any} */ (passageCopy(all)).text).toBe('"After these things"\n\nJohn 7:1 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(all)).text).toBe('"After these things"\n\nJohn 7:1 (NKJV)');
   });
 });
 
@@ -237,12 +237,27 @@ describe('labels', () => {
   });
 
   it('the translation is the reader\'s, read from Settings at the copy; unknown settings claim nothing', () => {
-    expect(translationTag('bible:john:3:16')).toBe(' (NKJV-R)');
+    expect(translationTag('bible:john:3:16')).toBe(' (NKJV)');
     g.StateStore = { get: () => ({ settings: { translation: 'kjv' } }) };
     expect(translationTag('bible:john:3:16')).toBe(' (KJV)');
     expect(translationTag('letter:x:1')).toBe('');
     delete g.StateStore;
     expect(translationTag('bible:john:3:16')).toBe('');
+  });
+
+  /* cite-r (Corbin 2026-10-26): "When copy pasting, nkjv r and KJV R should drop the R". A copy or share
+     out of a restored-name edition cites the edition it restores; the app's own labels keep the R. */
+  it('a restored-name edition is cited by the edition it restores: NKJV-R as NKJV, KJV-R as KJV', () => {
+    g.TRANSLATION_OPTIONS = [...g.TRANSLATION_OPTIONS, { id: 'rkjv', label: 'KJV-R' }, { id: 'rvr', label: 'RVR' }];
+    expect(translationTag('bible:john:3:16')).toBe(' (NKJV)');
+    g.StateStore = { get: () => ({ settings: { translation: 'rkjv' } }) };
+    expect(translationTag('bible:john:3:16')).toBe(' (KJV)');
+    expect(passageReference(['bible:john:7'])).toBe('John 7 (KJV)');
+    g.StateStore = { get: () => ({ settings: { translation: 'rvr' } }) };
+    expect(translationTag('bible:john:3:16')).toBe(' (RVR)');
+    expect(['NKJV-R', 'KJV-R', 'KJV R', 'RVR', 'HNV', 'NKJV'].map(citedLabel)).toEqual(['NKJV', 'KJV', 'KJV', 'RVR', 'HNV', 'NKJV']);
+    // the registry the picker, headers and compare read is untouched: they still say NKJV-R
+    expect(g.TRANSLATION_OPTIONS.find((/** @type {any} */ o) => o.id === 'rnkjv').label).toBe('NKJV-R');
   });
 
   /* rs1 (S22, 2026-10-22): with the KJV recording loaded the chapter shows its
@@ -261,7 +276,7 @@ describe('labels', () => {
     const out = /** @type {any} */ (passageCopy(range(num15, 0, end, end.length)));
     expect(out.text.endsWith('\n\nJohn 3:15-16 (KJV)')).toBe(true);
     // Another chapter, not on the page: the reader's own edition.
-    expect(translationTag('bible:john:4:1')).toBe(' (NKJV-R)');
+    expect(translationTag('bible:john:4:1')).toBe(' (NKJV)');
   });
 
   /* cp1 follow-up: Matthew is "matthew-plain" in the Bible reader, and the old
@@ -269,9 +284,9 @@ describe('labels', () => {
   it('Matthew in the Bible reader names the translation too; a book the reader does not translate does not', () => {
     g.BIBLE_BOOK_LIST = [{ id: 'john', title: 'John' }, { id: 'matthew-plain', title: 'Matthew' }];
     try {
-      expect(translationTag('bible:matthew-plain:5:16')).toBe(' (NKJV-R)');
+      expect(translationTag('bible:matthew-plain:5:16')).toBe(' (NKJV)');
       expect(translationTag('bible:matthew-tsot:5:16')).toBe('');
-      expect(passageReference(['bible:matthew-plain:5:3', 'bible:matthew-plain:5:5'])).toBe('Matthew 5:3-5 (NKJV-R)');
+      expect(passageReference(['bible:matthew-plain:5:3', 'bible:matthew-plain:5:5'])).toBe('Matthew 5:3-5 (NKJV)');
     } finally { delete g.BIBLE_BOOK_LIST; }
   });
 
@@ -281,7 +296,7 @@ describe('labels', () => {
   });
 
   it('a whole chapter (a page\'s own key) is named with its translation', () => {
-    expect(passageReference(['bible:john:7'])).toBe('John 7 (NKJV-R)');
+    expect(passageReference(['bible:john:7'])).toBe('John 7 (NKJV)');
   });
 
   it('cp4: copied words are quoted once; words already one quotation are not quoted twice', () => {
@@ -309,7 +324,7 @@ describe('passageCopy — always ends with where the words are from', () => {
     body.innerHTML = '<div class="section-heading">Rivers of Living Water</div>';
     document.body.appendChild(body);
     const h = /** @type {Element} */ (body.firstElementChild);
-    expect(/** @type {any} */ (passageCopy(range(h, 0, h, 1))).text).toBe('"Rivers of Living Water"\n\nJohn 7 (NKJV-R)');
+    expect(/** @type {any} */ (passageCopy(range(h, 0, h, 1))).text).toBe('"Rivers of Living Water"\n\nJohn 7 (NKJV)');
   });
 
   it('a footnote sheet\'s verses keep their numbers apart ("19 For", not "19For") and name themselves', () => {
@@ -421,7 +436,7 @@ describe('passageCopy — the link to the passage on thevolumesoftruth.com', () 
     const w = bibleChapter([[16, 'For God so loved the world']], 'john:3');
     const out = /** @type {any} */ (passageCopy(range(w, 0, w, w.childNodes.length)));
     expect(out.link).toBe('');
-    expect(out.text).toBe('"For God so loved the world"\n\nJohn 3:16 (NKJV-R)');
+    expect(out.text).toBe('"For God so loved the world"\n\nJohn 3:16 (NKJV)');
   });
 
   it('a Holy Days entry taken from Words To Live By links to its section there', () => {

@@ -1258,7 +1258,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
   const V37 = 'On the last day, that great day of the feast, YahuShua stood and cried out, saying, “If anyone thirsts, let him come to Me and drink.';
   const V38 = 'He who believes in Me, as the Scripture has said, out of his heart will flow rivers of living water.”';
   const V39 = 'But this He spoke concerning the Spirit, whom those believing in Him would receive; for the Holy Spirit was not yet given, because YahuShua was not yet glorified.';
-  const WANT = `"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)`;
+  const WANT = `"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV)`;
   const g = /** @type {any} */ (globalThis);
   /** @type {PropertyDescriptor | undefined} */ let origClipboard;
 
@@ -1351,7 +1351,7 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
         .find((sp) => sp.textContent === 'Share')?.closest('.sel-action-btn'));
       act(() => { fire(shareBtn, 'click'); });
       await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
-      expect(sent[0].text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV-R)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
+      expect(sent[0].text).toBe(`"37 ${V37}\n38 ${V38}\n39 ${V39}"\n\nJohn 7:37-39 (NKJV)\nhttps://votreader.github.io/app/?p=bible%3Ajohn%3A7%3A37`);
     } finally {
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
