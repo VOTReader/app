@@ -321,6 +321,8 @@ export function useAndroidBack({
         if (fl.sourceStudyId !== undefined) setStudyId(fl.sourceStudyId);
         if (fl.sourceStudyChapterId !== undefined) setStudyChapterId(fl.sourceStudyChapterId);
         if (fl.sourceJournalEntryId !== undefined) setJournalEntryId(fl.sourceJournalEntryId);
+        // share-fn: left from inside a footnote, Back lands on that footnote, open again.
+        if (fl.sourceFootnote != null && fl.sourceLetterId) window.navHandoff.set('reopenFootnote', { letterId: fl.sourceLetterId, num: fl.sourceFootnote });
         setScreen(fl.sourceScreen);
         return "true";
       }

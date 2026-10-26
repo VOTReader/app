@@ -240,6 +240,14 @@ describe('useTapThrough — openInAppLetter', () => {
     expect(pushed.sourceVolumeLabel).toBeNull();
   });
 
+  // share-fn: a link tapped inside a footnote names it, so Back can open it again.
+  it('carries the footnote the link was tapped in (null when none)', () => {
+    const { result, props } = setup({ screen: 'vot-seven-letter', letterId: 'proclaim' });
+    act(() => { result.current.openInAppLetter({ collection: 'two', letterTitle: 'The Wide Path' }, { sourceLetterTitle: 'P', sourceFootnote: '2' }); });
+    act(() => { result.current.openInAppLetter({ collection: 'two', letterTitle: 'The Wide Path' }); });
+    expect(props.pushFromLetter.mock.calls.map((c) => c[0].sourceFootnote)).toEqual(['2', null]);
+  });
+
   it('null target → no-op', () => {
     const { result, props } = setup();
     act(() => { result.current.openInAppLetter(null); });

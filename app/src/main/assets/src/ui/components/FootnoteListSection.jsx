@@ -6,8 +6,11 @@ import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { sheetReference } from '../../utils/passage-copy.js';
 import { _fnTextRedundantWithLink } from './VerseWithNumbers.jsx';
 import { WebDoorButton } from './footnote-web-door.jsx';
+import { FootnoteNoteText } from './FootnoteNoteText.jsx';
+import { inAppLinkForTitle, openInAppPage } from './FootnoteSheet.jsx';
+import { inAppTitleForUrl } from '../../utils/footnote-note.js';
 
-export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef }) {
+export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, onRef = null }) {
   const entries = Object.entries(footnotes);
   if (entries.length === 0) return null;
   const scrollToBubble = (num) => {
@@ -77,8 +80,25 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef })
               </>
             ) : (
               <>
-                {fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && <span className="footnote-list-note-text">{fn.text}{fn.link && " "}</span>}
+                {fn.text && !(fn.link && _fnTextRedundantWithLink(fn.text, fn.link)) && (
+                  <span className="footnote-list-note-text">
+                    {/* share-fn: its markers, references and source letter are followable, as in the sheet */}
+                    <FootnoteNoteText
+                      text={fn.text}
+                      onRef={onRef}
+                      onLetter={onInAppLink ? (title, excerpt) => { const l = inAppLinkForTitle(title); if (l) onInAppLink(excerpt ? { ...l, excerpt } : l); } : null}
+                      canOpenLetter={(title) => !!inAppLinkForTitle(title)}
+                    />
+                    {fn.link && " "}
+                  </span>
+                )}
                 {fn.link && <InAppLinkButton compact={true} link={fn.link} onActivate={onInAppLink} />}
+                {(() => {
+                  // share-fn: a web link to a page the app has (an Answers topic, a letter) opens it here.
+                  const page = !fn.link && fn.url && onInAppLink ? inAppTitleForUrl(fn.url) : null;
+                  const link = page ? (inAppLinkForTitle(page.title, page.answers) || (page.answers ? { letterTitle: page.title } : null)) : null;
+                  return page && link ? <InAppLinkButton compact={true} link={link} onActivate={() => openInAppPage(page, fn.url, onInAppLink)} /> : null;
+                })()}
                 {fn.url && <span className={(fn.link || fn.text) ? "footnote-list-url-extra" : "footnote-list-note-text"}><a href={fn.url} target="_blank" rel="noopener noreferrer" className="fn-link" onClick={(e) => e.stopPropagation()}>{(fn.link || fn.text) ? "Open external link" : fn.url}</a></span>}
                 {!fn.text && !fn.link && !fn.url && <span className="footnote-list-missing">(no content attached)</span>}
               </>

@@ -177,6 +177,8 @@ export function useTapThrough({
       sourceStudyId: studyId, sourceStudyChapterId: studyChapterId,
       sourceLetterTitle: meta && meta.sourceLetterTitle ? meta.sourceLetterTitle : null,
       sourceVolumeLabel: meta && meta.sourceVolumeLabel ? meta.sourceVolumeLabel : null,
+      // share-fn: the footnote the link was tapped in, reopened on Back (navHandoff 'reopenFootnote').
+      sourceFootnote: meta && meta.sourceFootnote != null ? meta.sourceFootnote : null,
       destSnapshot: destSnapshot,
     });
     // NAV2: see goToLetterFromMatthew — only a letter/wtlb destination consumes

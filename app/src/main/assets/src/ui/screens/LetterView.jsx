@@ -210,6 +210,14 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     } else {
       setHighlightExcerpt(null);
     }
+    // share-fn: Back from a letter opened inside one of this letter's footnotes
+    // opens that footnote again. A swipe peek never takes it.
+    const reopen = inert ? null : window.navHandoff.peek('reopenFootnote');
+    if (reopen && reopen.letterId === letter.id) {
+      window.navHandoff.clear('reopenFootnote');
+      if (letter.footnotes && letter.footnotes[reopen.num]) setSheetFn(reopen.num);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once per letter: letter.id is the identity (footnotes are corpus data), inert is fixed per mount site
   }, [letter.id]);
 
   React.useEffect(() => {
@@ -587,7 +595,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               </div>
             )}
 
-            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} />}
+            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} onRef={handleScripClick} />}
 
             {!closingEndsBody && (
               <div className="ornament-divider">
@@ -758,7 +766,12 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
         footnotes={letter.footnotes}
         onNavigate={(newKey) => setSheetFn(newKey)}
         onClose={() => setSheetFn(null)}
-        onInAppLink={(link) => { setSheetFn(null); wrappedInAppLink && wrappedInAppLink(link); }}
+        onInAppLink={(link) => {
+          const from = sheetFn;
+          setSheetFn(null);
+          // share-fn: the push names this footnote, so Back opens it again.
+          if (onInAppLink) onInAppLink(link, { sourceLetterTitle: letter.title, sourceVolumeLabel: volumeLabel, sourceFootnote: from });
+        }}
         onGoToRef={goToScriptureRef}
       />
 

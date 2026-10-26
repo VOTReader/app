@@ -175,6 +175,19 @@ describe('useFromLetterStack — tapThroughBack', () => {
     act(() => { result.current.tapThroughBack(); });
     expect(setters.setScreen).not.toHaveBeenCalled();
   });
+
+  // share-fn (Corbin 2026-10-25, "back returns to the footnote"): a page opened from inside a
+  // footnote hands the letter its footnote back, for LetterView to open again.
+  it('hands back the footnote the tap-through left from; an entry with none hands back nothing', () => {
+    const { result } = setup();
+    act(() => { result.current.pushFromLetter({ sourceScreen: 'vot-seven-letter', sourceLetterId: 'proclaim', sourceFootnote: '2' }); });
+    act(() => { result.current.tapThroughBack(); });
+    expect(navHandoff.peek('reopenFootnote')).toEqual({ letterId: 'proclaim', num: '2' });
+    navHandoff.clear('reopenFootnote');
+    act(() => { result.current.pushFromLetter({ sourceScreen: 'vot-seven-letter', sourceLetterId: 'proclaim', sourceFootnote: null }); });
+    act(() => { result.current.tapThroughBack(); });
+    expect(navHandoff.peek('reopenFootnote')).toBeNull();
+  });
 });
 
 // ── C) the prune effect ─────────────────────────────────────────────────

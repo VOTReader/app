@@ -158,6 +158,8 @@ export function useFromLetterStack({
     if (popped.sourceStudyId !== undefined) setStudyId(popped.sourceStudyId);
     if (popped.sourceStudyChapterId !== undefined) setStudyChapterId(popped.sourceStudyChapterId);
     if (popped.sourceJournalEntryId !== undefined) setJournalEntryId(popped.sourceJournalEntryId);
+    // share-fn: left from inside a footnote, Back lands on that footnote, open again.
+    if (popped.sourceFootnote != null && popped.sourceLetterId) window.navHandoff.set('reopenFootnote', { letterId: popped.sourceLetterId, num: popped.sourceFootnote });
     if (popped.sourceScreen) setScreen(popped.sourceScreen);
   };
 

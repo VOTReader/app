@@ -8,9 +8,10 @@
    message; this guards the portal relocation. */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
-import { render, cleanup, screen } from '@testing-library/react';
+import { render, cleanup, screen, fireEvent, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
 import { FootnoteSheet } from './FootnoteSheet.jsx';
+import { InAppLinkButton } from './InAppLinkButton.jsx';
 
 beforeEach(() => {
   /** @type {any} */ (globalThis).ReactDOM = ReactDOM;
@@ -231,5 +232,81 @@ describe('the Scripture Web door', () => {
     const note = { type: 'note', text: 'A note' };
     render(<Sheet num={1} fn={note} nkjv={{}} footnotes={{ '1': note }} onClose={() => {}} />);
     expect(webBtn()).toBeNull();
+  });
+});
+
+/* share-fn (Corbin 2026-10-25, Volume Seven "Proclaim The Name of The Lord", footnote 2:
+   "we need to make these followable with good UX, links/refs inside footnotes"). The note
+   quotes "Death and Deliverance" with its own [A] [B] and, at its end, the lines they name. */
+describe('a note footnote: markers, references and the source letter are followable (share-fn)', () => {
+  const g = /** @type {any} */ (globalThis);
+  const DD = '\u201CYet now I command all people everywhere to repent in sincerity and in truth.[A] Yet now I command all who have ears to hear, to call upon His name.[B] Says The Lord.\u201D (From \u201CDeath and Deliverance\u201D)\n\nA. Acts 17:30 \u2014 \u201CTruly, these times of ignorance God overlooked,\u201D\nB. Zephaniah 3:9 \u2014 \u201CFor then I will restore to the peoples a pure language,\u201D';
+  const note = { type: 'note', text: DD };
+  const fns = { '1': { type: 'scripture', ref: 'Matthew 10:8' }, '2': note };
+  beforeEach(() => {
+    g.InAppLinkButton = InAppLinkButton;
+    g.VOT_LETTER_REGISTRY = new Map([['Volume Three::Death and Deliverance', {}], ['Answers Only God Can Give::Regarding True Repentance', {}]]);
+    g.lookupVersesFromBooks = (ref) => (ref === 'Acts 17:30' ? 'Truly, these times of ignorance God overlooked' : null);
+  });
+  afterEach(() => { delete g.VOT_LETTER_REGISTRY; delete g.__loadAnswersCorpus; delete g.InAppLinkButton; });
+  const click = (el) => fireEvent.click(el);
+  const byText = (sel, t) => [...document.querySelectorAll(sel)].find((el) => el.textContent === t);
+
+  it('keeps every word, and sets each lettered note on its own line', () => {
+    render(<Sheet num="2" fn={note} nkjv={{}} footnotes={fns} onClose={() => {}} />);
+    const body = document.querySelector('.fn-sheet .fn-note');
+    expect(body.textContent).toBe(DD.replace(/\n/g, ''));
+    expect([...body.querySelectorAll('.fn-note-line')].map((l) => l.textContent.slice(0, 13))).toEqual(['A. Acts 17:30', 'B. Zephaniah ']);
+  });
+
+  it('[A] lights its line; the line\'s label lights the marker again', () => {
+    render(<Sheet num="2" fn={note} nkjv={{}} footnotes={fns} onClose={() => {}} />);
+    click(byText('.fn-note-mark', '[A]'));
+    const line = document.querySelector('[data-fn-line="A"]');
+    expect(line.classList.contains('fn-note-lit')).toBe(true);
+    expect(document.activeElement).toBe(line);
+    click(byText('.fn-note-label', 'A.'));
+    expect(document.querySelector('[data-fn-mark="A"]').classList.contains('fn-note-lit')).toBe(true);
+  });
+
+  it('a reference opens its verse in the sheet, and Back returns to the footnote', () => {
+    render(<Sheet num="2" fn={note} nkjv={{}} footnotes={fns} onClose={() => {}} />);
+    click(byText('.fn-note-ref', 'Acts 17:30'));
+    expect(document.querySelector('.fn-sheet .fn-note')).toBeNull();
+    expect(document.querySelector('.fn-sheet .fn-sheet-ref').textContent).toBe('Acts 17:30');
+    expect(document.querySelector('.fn-sheet .fn-sheet-verse').textContent).toContain('Truly, these times');
+    click(document.querySelector('.fn-sheet-back'));
+    expect(document.querySelector('.fn-sheet .fn-note')).not.toBeNull();
+  });
+
+  it('the source letter opens that letter in the app, on the passage the note quotes', () => {
+    const onInAppLink = vi.fn();
+    render(<Sheet num="2" fn={note} nkjv={{}} footnotes={fns} onClose={() => {}} onInAppLink={onInAppLink} />);
+    click(byText('.fn-note-letter', '\u201CDeath and Deliverance\u201D'));
+    expect(onInAppLink).toHaveBeenCalledWith({ collection: 'Volume Three', letterTitle: 'Death and Deliverance',
+      excerpt: 'Yet now I command all people everywhere to repent in sincerity and in truth. Yet now I command all who have ears to hear, to call upon His name. Says The Lord.' });
+  });
+
+  it('a source letter the app does not have stays plain text', () => {
+    g.VOT_LETTER_REGISTRY = new Map();
+    render(<Sheet num="2" fn={note} nkjv={{}} footnotes={fns} onClose={() => {}} onInAppLink={vi.fn()} />);
+    expect(document.querySelector('.fn-note-letter')).toBeNull();
+    expect(document.querySelector('.fn-sheet .fn-note').textContent).toContain('(From \u201CDeath and Deliverance\u201D)');
+  });
+
+  it('a web link to an Answers topic opens it in the app, fetching Answers first when it is not loaded', async () => {
+    const onInAppLink = vi.fn();
+    const web = { type: 'note', text: 'See: "Regarding True Repentance"', url: 'https://answersonlygodcangive.com/Regarding_True_Repentance' };
+    render(<Sheet num="1" fn={web} nkjv={{}} footnotes={{ '1': web }} onClose={() => {}} onInAppLink={onInAppLink} />);
+    click(document.querySelector('.fn-sheet-link-btn'));
+    expect(onInAppLink).toHaveBeenCalledWith({ collection: 'Answers Only God Can Give', letterTitle: 'Regarding True Repentance' });
+    expect(document.querySelector('.fn-sheet a.fn-link').textContent).toBe('Open external link');
+    cleanup(); onInAppLink.mockClear();
+    g.VOT_LETTER_REGISTRY = new Map();
+    g.__loadAnswersCorpus = () => { g.VOT_LETTER_REGISTRY = new Map([['Answers Only God Can Give::Regarding True Repentance', {}]]); return Promise.resolve(); };
+    render(<Sheet num="1" fn={web} nkjv={{}} footnotes={{ '1': web }} onClose={() => {}} onInAppLink={onInAppLink} />);
+    click(document.querySelector('.fn-sheet-link-btn'));
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(onInAppLink).toHaveBeenCalledWith({ collection: 'Answers Only God Can Give', letterTitle: 'Regarding True Repentance' });
   });
 });

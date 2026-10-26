@@ -50,6 +50,10 @@
      pendingScrollFlash string (the pendingScrollHlKey to flash) | null
         writer: use-shared-passage-link (a shared letter passage, U07.6)
         reader: use-dom-annotation-sync (take when the scroll finds the block: one pulse)
+     reopenFootnote     {letterId, num} | null
+        writer: use-from-letter-stack / use-android-back (Back from a page opened
+                inside a footnote: its push carried sourceFootnote, share-fn)
+        reader: LetterView (peek on mount; opens that footnote's sheet again, then clears)
      journalNewEntry    string (the entry's id) | null
         writer: use-journal-mutations (New entry, U03.6)
         reader: screen-routes' journal-editor route (take on Back: the list it was made from, not its read-only view)

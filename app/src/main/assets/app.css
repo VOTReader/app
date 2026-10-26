@@ -3051,6 +3051,18 @@
     .whats-new-none { color:var(--cream-dim); font-style:italic; margin:0.6rem 0 0; }
     .fn-sheet-verse { font-size:var(--fs-16); line-height:1.75; color:var(--cream-dim); font-style:italic; }
     .fn-sheet-note { font-size:var(--fs-16); color:var(--cream-dim); line-height:1.6; font-style:italic; }
+    /* share-fn (Corbin 2026-10-25): a note's own markers [A], the lines they point at, its
+       references and its source letter, followable (FootnoteNoteText.jsx). */
+    .fn-note-body { display:block; }
+    .fn-note-mark { font:inherit; font-family:'Cinzel',serif; font-style:normal; font-size:0.72em; line-height:0; vertical-align:super; color:var(--gold); background:none; border:0; border-radius:3px; padding:0.7em 0.2em; margin:-0.7em -0.2em -0.7em -0.1em; cursor:pointer; }
+    .fn-note-lines { display:block; margin-top:0.85rem; padding-top:0.55rem; border-top:1px solid var(--gold-border); }
+    .fn-note-line { display:block; margin-top:0.35rem; padding:0.2rem 0.45rem; margin-left:-0.45rem; margin-right:-0.45rem; border-radius:4px; transition:background 0.3s ease; }
+    .fn-note-line:focus { outline:none; }
+    .fn-note-label { font:inherit; font-family:'Cinzel',serif; font-style:normal; color:var(--gold); background:none; border:0; border-radius:3px; padding:0.45em 0.35em 0.45em 0; margin:-0.45em 0.1em -0.45em 0; cursor:pointer; }
+    .fn-note-mark:focus-visible, .fn-note-label:focus-visible { outline:2px solid var(--gold); outline-offset:1px; }
+    .fn-note-lit { background:var(--gold-faint); box-shadow:0 0 0 1px var(--gold-border); }
+    .fn-sheet-back { display:inline-flex; align-items:center; gap:0.4em; min-height:44px; padding:0 0.25rem 0 0; margin:-0.35rem 0 0.2rem; background:none; border:0; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
+    .fn-sheet-back:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
     .fn-sheet-verse-missing { font-size:var(--fs-15); color:var(--cream-muted); line-height:1.55; font-style:italic; padding:0.6rem 0.9rem; border-left:2px solid var(--gold-border); background:rgba(200,164,86,0.04); border-radius:0 4px 4px 0; }
     .fn-sheet-verse-missing strong { color:var(--gold-dim); font-weight:600; font-style:normal; }
     .fn-sheet-url-extra { font-size:var(--fs-14); color:var(--cream-muted); margin-top:0.4rem; font-style:italic; }
