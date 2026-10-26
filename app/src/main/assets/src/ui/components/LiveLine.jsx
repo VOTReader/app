@@ -86,16 +86,29 @@ function readRaw(s) {
 
 /**
  * A run of segments as its DOM text, and where its footnote markers sit in it (the card leaves them out: a "1"
- * after "Abraham," reads as a word).
- * @param {any[]} segments @param {string} text @param {Array<[number, number]>} notes @returns {string}
+ * after "Abraham," reads as a word) and where a stanza break ends a line in it.
+ * @param {any[]} segments @param {string} text @param {Array<[number, number]>} notes @param {Set<number>} seams
+ * @returns {string}
  */
-function addRun(segments, text, notes) {
+function addRun(segments, text, notes, seams) {
   let out = text;
   for (const piece of segmentsDomPieces(segments)) {
+    if (piece.seam) seams.add(out.length);
     if (piece.fn && piece.text) notes.push([out.length, out.length + piece.text.length]);
     out += piece.text;
   }
   return out;
+}
+
+/**
+ * A poem's lines as the page draws them (tools/audio-fragments-lib.mjs blockDomainText): one <div> a line, so their
+ * text abuts with no separator ("heal;" + "And though"); a poem kept as bare segments draws each one as a line, its
+ * leading newline away.
+ * @param {any} b @returns {any[][]}
+ */
+function poemLines(b) {
+  if (Array.isArray(b.lines)) return b.lines.map((ln) => (Array.isArray(ln) ? ln : []));
+  return (b.segments || []).map((seg) => [{ ...seg, v: String((seg && seg.v) || '').replace(/^\n/, '') }]);
 }
 
 /**
@@ -110,11 +123,19 @@ export function rowWords(unit, row) {
   let text = '';
   /** @type {Array<[number, number]>} */
   const notes = [];
+  // Where one drawn line ends and the next begins: the card reads it as a space, and a widening never crosses it
+  // (a row ending on "heal;" would take the next line's "And", and the row after would take "heal;" back).
+  /** @type {Set<number>} */
+  const seams = new Set();
   if (unit && Array.isArray(unit.blocks)) {
     const b = unit.blocks[bi];
     if (!b) return '';
-    if (b.segments) text = addRun(b.segments, '', notes);
-    else if (Array.isArray(b.lines)) for (const ln of b.lines) text = Array.isArray(ln) ? addRun(ln, text, notes) : text;
+    if (b.type === 'poetry' || (!b.segments && Array.isArray(b.lines))) {
+      for (const ln of poemLines(b)) {
+        if (text) seams.add(text.length);
+        text = addRun(ln, text, notes, seams);
+      }
+    } else if (b.segments) text = addRun(b.segments, '', notes, seams);
     else if (typeof b.text === 'string') text = b.text;
   } else if (unit && Array.isArray(unit.paragraphs)) {
     const p = unit.paragraphs[bi];
@@ -128,14 +149,19 @@ export function rowWords(unit, row) {
     for (const [x, y] of notes) for (let k = x; k < y; k++) chars[k] = '';
     text = chars.join('');
   }
-  const words = (/** @type {string} */ s) => s.replace(//g, '').replace(/\s+/g, ' ').trim();
-  if (cs < 0) return words(text);
+  /** text[a, z) with a space at each line seam inside it, as words. @param {number} a @param {number} z */
+  const words = (a, z) => {
+    let s = '';
+    for (let k = a; k < z; k++) s += (k > a && seams.has(k) ? ' ' : '') + text[k];
+    return s.replace(//g, '').replace(/\s+/g, ' ').trim();
+  };
+  if (cs < 0) return words(0, text.length);
   let a = Math.max(0, Math.min(text.length, cs));
   let z = Math.max(a, Math.min(text.length, ce));
   // A row a character off its word (an older alignment) still shows whole words.
-  while (a > 0 && a < text.length && /\S/.test(text[a]) && /\S/.test(text[a - 1])) a--;
-  while (z > a && z < text.length && /\S/.test(text[z - 1]) && /\S/.test(text[z])) z++;
-  return words(text.slice(a, z));
+  while (a > 0 && a < text.length && !seams.has(a) && /\S/.test(text[a]) && /\S/.test(text[a - 1])) a--;
+  while (z > a && z < text.length && !seams.has(z) && /\S/.test(text[z - 1]) && /\S/.test(text[z])) z++;
+  return words(a, z);
 }
 
 /**

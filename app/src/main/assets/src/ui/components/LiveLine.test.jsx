@@ -129,6 +129,24 @@ describe('rowWords', () => {
   it('widens a row a character off its word to whole words', () => {
     expect(rowWords(LETTER, [0, 1, at('Many') + 1, at('many things will I show') - 2, 0])).toBe('Many things you must overcome in the years ahead;');
   });
+
+  /* Corbin 10-25 (Volume Seven, "I Am Calling You Out! (Part 1)"): the card read "heal;And heal;And though I", the
+     poem's lines run together and the word at the seam twice. Its rows end exactly where a drawn line does. */
+  it('reads a poem line break as a space, and never widens a row across one', () => {
+    const lines = ['And though I afflict, I will also heal;', 'And though I strike the people in My wrath,', 'I will also bind up their wounds...'];
+    const unit = { blocks: [{ type: 'poetry', lines: lines.map((v) => [{ t: 'italic', v }]) }] };
+    const [l0, l1] = [lines[0].length, lines[0].length + lines[1].length];
+    expect(rowWords(unit, [0, 0, 0, l0, 0])).toBe(lines[0]);
+    expect(rowWords(unit, [0, 0, l0, l1, 0])).toBe(lines[1]);
+    expect(rowWords(unit, [0, 0, 0, l1, 0])).toBe(lines[0] + ' ' + lines[1]);
+    expect(rowWords(unit, [0, 0, -1, -1, 0])).toBe(lines.join(' '));
+    // A poem kept as bare segments, one a line with its leading newline away on the page.
+    const bare = { blocks: [{ type: 'poetry', segments: lines.map((v, i) => ({ t: 'text', v: (i ? '\n' : '') + v })) }] };
+    expect(rowWords(bare, [0, 0, l0, l1, 0])).toBe(lines[1]);
+    // A stanza break inside a run ends its line too.
+    const stanza = { blocks: [{ type: 'para', segments: [{ t: 'text', v: 'heal;' }, { t: 'stanza-break', v: '' }, { t: 'text', v: 'And so' }] }] };
+    expect(rowWords(stanza, [0, 0, -1, -1, 0])).toBe('heal; And so');
+  });
 });
 
 /* Corbin 10-24: on a long verse or paragraph the words being read ran off the bottom of the card (a five-line clamp
