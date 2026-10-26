@@ -77,9 +77,13 @@ import { readingFontById, readingFontCss } from '../utils/reading-fonts.js';
    switches off again in one tap and that choice is recorded. Round 1: Corbin, 2026-09-10,
    "make surprise me dice button and reading dot on by default"; Auto-Continue with them
    (only reachable once Auto-Scroll is on, i.e. once the reader asked for hands-free).
+   Round 2: Corbin, 2026-10-25, "Make the share settings in VOTReader share the website link the
+   default one": Share Includes moves from the app's link to the website's, for every reader who
+   never picked one (a reader who chose App Link in Settings is touched and keeps it).
    @type {ReadonlyArray<Readonly<Record<string, any[]>>>}  key → [old default, new default] */
 const DEFAULT_FLIPS = Object.freeze([
   Object.freeze({ showSurpriseButton: [false, true], showReadingDot: [false, true], autoScrollNext: [false, true] }),
+  Object.freeze({ shareLink: ['app', 'site'] }),
 ]);
 
 /** The text scale from which the app lays out for large text (the root class vot-large-text). */
@@ -193,9 +197,9 @@ export function useSettings({ savedSettings, theme }) {
       compactTopBar: true,
       // Copy & Share (cp3, Corbin 2026-09-27): the link a tap on Share attaches ('app' | 'site';
       // holding Share still offers both), and whether a website link also quotes the copied words
-      // so the site opens on them highlighted (off: the link names the letter alone). New keys,
-      // so every profile starts at these defaults.
-      shareLink: "app",
+      // so the site opens on them highlighted (off: the link names the letter alone). The website's
+      // link is the default since 2026-10-25 (DEFAULT_FLIPS round 2 carries it to older profiles).
+      shareLink: "site",
       linkHighlight: false,
       showScrollNotch: true,
       // Settings › Reading › Answers Reading Path (AOGCG, 2026-10-22): the Answers landing's ticks,

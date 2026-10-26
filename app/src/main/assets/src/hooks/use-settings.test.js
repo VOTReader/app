@@ -239,20 +239,23 @@ describe('useSettings — PlatformBridge mirror', () => {
    default that the reader never set (`touched`) takes the new one, once; an explicit choice is
    never overwritten. Nothing recorded `touched` before tonight, so for older profiles "switched
    off" and "never touched" are the same bytes and both flip — stated, not hidden. */
+/** How many default-flip rounds have shipped: a booted profile is stamped with it. */
+const ROUNDS = 2;
+
 describe('useSettings — the 2026-09-10 default flips reach every profile that never chose', () => {
   const FLIPPED = { showSurpriseButton: true, showReadingDot: true, autoScrollNext: true };
 
   it('a fresh profile reads the dice, the reading marker and Auto-Continue ON, stamped with the round', () => {
     const s = mount().result.current.settings;
     for (const [k, v] of Object.entries(FLIPPED)) expect(s[k], k).toBe(v);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(ROUNDS);
     expect(s.touched).toEqual({});
   });
 
   it('a profile saved before tonight, still carrying the OLD defaults, is flipped once and stamped; nothing else moves', () => {
     const s = mount({ savedSettings: { showSurpriseButton: false, showReadingDot: false, autoScrollNext: false, translation: 'kjv', autoScroll: false } }).result.current.settings;
     for (const [k, v] of Object.entries(FLIPPED)) expect(s[k], k).toBe(v);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(ROUNDS);
     expect(s.translation).toBe('kjv');
     expect(s.autoScroll).toBe(false);
   });
@@ -276,7 +279,7 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
   it('the round runs once: a stamped profile is never re-flipped, touched record or not', () => {
     const s = mount({ savedSettings: { defaultsRev: 1, showSurpriseButton: false } }).result.current.settings;
     expect(s.showSurpriseButton).toBe(false);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(ROUNDS);
   });
 
   it('a profile already at the NEW value is left exactly as it is', () => {
@@ -316,6 +319,28 @@ describe('useSettings — the 2026-09-10 default flips reach every profile that 
     const s = mount({ savedSettings: saved }).result.current.settings;
     expect(s.showSurpriseButton).toBe(false);
     expect(s.showReadingDot).toBe(true);
-    expect(s.defaultsRev).toBe(1);
+    expect(s.defaultsRev).toBe(ROUNDS);
+  });
+});
+
+/* Round 2 (share-fn, Corbin 2026-10-25: "Make the share settings in VOTReader share the website
+   link the default one"). Share Includes was 'app' for everyone since cp3 (09-27) and every
+   profile saved it; it moves to 'site' unless the reader picked App Link (touched). */
+describe('useSettings — the 2026-10-25 flip makes the website link the default for Share', () => {
+  it('a fresh profile shares the website link', () => {
+    expect(mount().result.current.settings.shareLink).toBe('site');
+  });
+  it('a saved profile still at the old default (app, never chosen) moves to the website link, once', () => {
+    const s = mount({ savedSettings: { shareLink: 'app', defaultsRev: 1, translation: 'kjv' } }).result.current.settings;
+    expect(s.shareLink).toBe('site');
+    expect(s.defaultsRev).toBe(2);
+    expect(s.translation).toBe('kjv');
+  });
+  it('a reader who chose App Link keeps it', () => {
+    const s = mount({ savedSettings: { shareLink: 'app', defaultsRev: 1, touched: { shareLink: true } } }).result.current.settings;
+    expect(s.shareLink).toBe('app');
+  });
+  it('a profile through round 2 that is set back to App Link is not flipped again', () => {
+    expect(mount({ savedSettings: { shareLink: 'app', defaultsRev: 2 } }).result.current.settings.shareLink).toBe('app');
   });
 });

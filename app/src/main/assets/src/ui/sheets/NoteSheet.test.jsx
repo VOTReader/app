@@ -294,6 +294,31 @@ describe('NoteSheet Share outcome (A15)', () => {
     expect(sent[1].text).toBe('anchor\n\nSaved note');
   });
 
+  /* share-fn (Corbin 2026-10-25, "share the website link the default one"): a note on a letter
+     sends the letter's page on the website, as the selection's Share does; Share Includes App
+     Link sends the app's. */
+  it('a note on a letter shares the website link by default, the app link under App Link', async () => {
+    const g = /** @type {any} */ (globalThis);
+    const sent = /** @type {any[]} */ ([]);
+    setNav('share', (d) => { sent.push(d); return Promise.resolve(); });
+    g.findEntryContext = () => ({ kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' });
+    try {
+      for (const settings of [{}, { shareLink: 'app' }]) {
+        g.StateStore = { get: () => ({ settings }) };
+        setupStores({ body: 'Saved note' });
+        window.AnnotationStore.getByGroup = () => [{ key: 'letter:the-wide-path:1', ann: { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'anchor' } }];
+        const { container, unmount } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+        fireEvent.click(/** @type {Element} */ (container.querySelector('.note-sheet-menu-btn')));
+        fireEvent.click(screen.getByText('Share'));
+        await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
+        unmount();
+      }
+    } finally { delete g.findEntryContext; delete g.StateStore; }
+    expect(sent.length).toBe(2);
+    expect(sent[0].text.endsWith('\n\nhttps://www.thevolumesoftruth.com/The_Wide_Path')).toBe(true);
+    expect(sent[1].text.endsWith('\n\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1')).toBe(true);
+  });
+
   it('a share the reader cancels stays quiet', async () => {
     setNav('share', () => Promise.reject(Object.assign(new Error('Share canceled'), { name: 'AbortError' })));
     await shareFromMenu();

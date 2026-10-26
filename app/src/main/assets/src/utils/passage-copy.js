@@ -280,6 +280,15 @@ function declaredOrigin(range) {
   return origin && origin.reference ? origin : null;
 }
 
+/** One block's page on the site, or null where the site has none (the Bible,
+    the reader's journal): what a note's Share sends under the website setting.
+    @param {string} key  the block's hlKey
+    @returns {string | null} */
+export function siteLinkForKey(key) {
+  const origin = key ? passageOrigin([key]) : null;
+  return origin && origin.target ? siteUrl(origin.target) || null : null;
+}
+
 /** The reading page on screen as a link to its place on the site (a letter's
     page, a compilation entry's section, an Answers topic's own page), with its
     name: what the ⋯ menu's "Copy website link" copies (cp2). The page is the

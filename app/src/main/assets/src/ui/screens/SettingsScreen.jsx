@@ -1528,8 +1528,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
         </SettingsGroup>
 
         {/* Copy & Share (cp3, Corbin 2026-09-27). A copy of a letter ends with its
-            link on thevolumesoftruth.com (utils/site-link.js); Share ends with
-            the app's. Two choices live here so no one needs a long press to reach
+            link on thevolumesoftruth.com (utils/site-link.js); so does Share,
+            unless the reader picks the app's (the default since 2026-10-25). Two choices live here so no one needs a long press to reach
             them: which link a tap on Share sends (holding or right-clicking Share
             still picks either for one share), and whether a website link opens
             on the copied words highlighted (off: the letter itself). */}
@@ -1540,7 +1540,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               title="Share Includes"
               label="Share Includes"
               desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy adds the website link wherever the passage has a page there."
-              value={settings.shareLink === 'site' ? 'site' : 'app'}
+              value={settings.shareLink === 'app' ? 'app' : 'site'}
               options={SHARE_LINK_OPTIONS}
               onChange={(v) => onSetting("shareLink", v)}
             />

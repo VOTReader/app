@@ -261,13 +261,13 @@ describe('read-along settings disclosure', () => {
    without a long press ("on PC and others"), and a website link that highlights the
    copied words is "an option, not the default". */
 describe('Copy & Share group', () => {
-  it('holds Share Includes (the app link by default) and Highlight the Passage (off by default)', () => {
+  it('holds Share Includes (the website link by default, share-fn 2026-10-25) and Highlight the Passage (off by default)', () => {
     renderSettings();
     const labels = groupRowLabels('Copy & Share');
     expect(labels).toContain('Share Includes');
     expect(labels).toContain('Highlight the Passage');
     expect(within(row('Highlight the Passage')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
-    expect(groupHead('Copy & Share').textContent).toContain('Share: app link · Highlight off');
+    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight off');
   });
 
   it('writes through the keys Copy and Share read', () => {

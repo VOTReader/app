@@ -4,7 +4,7 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
-import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
+import { copyText as copyToClipboard, shareText, shareLinkSetting } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from './CopyFallbackSheet.jsx';
 import { AnswersCardSheet } from './AnswersCardSheet.jsx';
 import { answersIsTopicKey, answersCardFor, answersCardWords } from '../../utils/answers-extras.js';
@@ -207,17 +207,6 @@ const STILL_WAITS = 15;
 /** Holding Share this long offers the website link too (cp2), a little
     sooner than Android's own long-press (about 500 ms). */
 const SHARE_HOLD_MS = 450;
-
-/** The link a tap on Share attaches: Settings › Copy & Share › Share Includes
-    (cp3, Corbin 2026-09-27: the choice had to be reachable without a long
-    press, on a PC and everywhere else). 'app' unless the reader chose 'site'.
-    @returns {'app' | 'site'} */
-function shareLinkSetting() {
-  try {
-    const s = typeof StateStore !== 'undefined' && StateStore ? StateStore.get() : null;
-    return s && s.settings && s.settings.shareLink === 'site' ? 'site' : 'app';
-  } catch (_e) { return 'app'; }
-}
 
 /** Share's second link (cp2): shown above the actions once the reader holds
     Share, for a passage the website has. A tap on Share sends the app's link

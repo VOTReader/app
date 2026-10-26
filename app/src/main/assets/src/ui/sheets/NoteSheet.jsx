@@ -5,9 +5,9 @@
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
-import { shareText } from '../../utils/copy-share.js';
+import { shareText, shareLinkSetting } from '../../utils/copy-share.js';
 import { passageLinkFor } from '../../utils/passage-link.js';
-import { passageLabel, translationTag } from '../../utils/passage-copy.js';
+import { passageLabel, translationTag, siteLinkForKey } from '../../utils/passage-copy.js';
 import { relativeDate } from '../../utils/dates.js';
 
 /**
@@ -165,9 +165,11 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // note, and the reader's own journal sends the words alone.
     // U07.2: the passage goes in quotes with its reference (Copy's: "John 3:16 (NKJV)") and the reader's words as
     // "My note:", so the note can't read as part of the verse.
+    // share-fn (Corbin 2026-10-25): the link is the website's where the passage has a
+    // page there, as the selection's Share sends, unless Share Includes says App Link.
     const key = segs[0] && segs[0].key;
     const lastKey = segs.length > 1 ? segs[segs.length - 1].key : null;
-    const link = key ? passageLinkFor(key) : null;
+    const link = key ? (shareLinkSetting() === 'site' && siteLinkForKey(key)) || passageLinkFor(key) : null;
     const text = link
       ? '\u201C' + anchor + '\u201D \u2014 ' + passageLabel(key, lastKey) + translationTag(key)
         + (note.body ? '\n\nMy note: ' + note.body : '') + '\n\n' + link

@@ -78,6 +78,18 @@ function appShareSheet(text) {
   }
 }
 
+/** The link Share attaches: Settings › Copy & Share › Share Includes (cp3,
+    Corbin 2026-09-27). 'site' (the passage's page on thevolumesoftruth.com, where
+    it has one) unless the reader chose 'app' (Corbin 2026-10-25: "share the
+    website link the default one"). Read by the selection's Share and a note's.
+    @returns {'app' | 'site'} */
+export function shareLinkSetting() {
+  try {
+    const s = typeof StateStore !== 'undefined' && StateStore ? StateStore.get() : null;
+    return s && s.settings && s.settings.shareLink === 'app' ? 'app' : 'site';
+  } catch (_e) { return 'site'; }
+}
+
 /**
  * Share `text` through the native share sheet; without one, or when the
  * share fails for any reason other than the reader cancelling, copy it.

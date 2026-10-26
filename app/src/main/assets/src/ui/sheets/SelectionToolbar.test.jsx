@@ -1384,9 +1384,10 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
   });
 
   /* cp2 (Corbin 2026-09-27): a letter's Copy ends with its name and its link on
-     thevolumesoftruth.com; its Share sends the same words and name, and "share
-     just links to the app". */
-  it('a letter: Copy links the website (its page and the words), Share the app', async () => {
+     thevolumesoftruth.com; its Share sends the same words and name. share-fn (Corbin
+     2026-10-25, "share the website link the default one"): Share's link is the
+     website's too, unless Share Includes says App Link. */
+  it('a letter: Copy and Share both link the website; Share Includes App Link sends the app', async () => {
     g.findEntryContext = () => ({ kind: 'letter', screen: 'vot-letter', collection: 'Volume Two', title: 'The Wide Path' });
     const p = readingContainer('letter:the-wide-path:1', 'Yet in your arrogance, you continue to forsake your Maker.');
     const written = /** @type {string[]} */ ([]);
@@ -1412,9 +1413,14 @@ describe('SelectionToolbar — a copied passage names itself (cp1)', () => {
       raise();
       press('Share');
       await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
-      expect(sent[0].text).toBe('"' + words + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
+      expect(sent[0].text).toBe('"' + words + '"\n\nThe Wide Path (Volume Two)\nhttps://www.thevolumesoftruth.com/The_Wide_Path');
+      g.StateStore = { get: () => ({ settings: { shareLink: 'app' } }) };
+      raise();
+      press('Share');
+      await act(async () => { for (let i = 0; i < 5; i++) await vi.advanceTimersByTimeAsync(0); });
+      expect(sent[1].text).toBe('"' + words + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1');
     } finally {
-      delete g.findEntryContext;
+      delete g.findEntryContext; delete g.StateStore;
       if (origShare) Object.defineProperty(navigator, 'share', origShare);
       else delete /** @type {any} */ (navigator).share;
     }
@@ -1576,8 +1582,9 @@ describe('SelectionToolbar — steps aside while the selection or the page is mo
   });
 });
 
-/* cp2 (Corbin 2026-09-27, "do both suggestions"): Share sends the app's link on
-   a tap; holding it offers the website's too, for someone without the app. */
+/* cp2 (Corbin 2026-09-27, "do both suggestions"): Share sends one link on a tap
+   (the website's since share-fn, 2026-10-25; the app's under Share Includes App
+   Link); holding it offers both. */
 describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
   const g = /** @type {any} */ (globalThis);
   const WORDS = 'Yet in your arrogance, you continue to forsake your Maker.';
@@ -1612,7 +1619,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(500); });
   };
 
-  it('a tap shares with the app link; a hold offers both, and the click that ends the hold shares nothing', async () => {
+  it('a hold offers both links, and the click that ends the hold shares nothing', async () => {
     raise('letter:the-wide-path:1', WORDS);
     expect(document.querySelector('.sel-link-choice')).toBeNull();
     await hold();
@@ -1650,7 +1657,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
       + SITE + '#:~:text=Yet%20in%20your%20arrogance%2C,to%20forsake%20your%20Maker%2E']);
   });
 
-  it('"App link" shares as a tap does; a right-click opens the choice without raising the toolbar anew', async () => {
+  it('"App link" shares the app link; a right-click opens the choice without raising the toolbar anew', async () => {
     raise('letter:the-wide-path:1', WORDS);
     act(() => { fire(shareBtn(), 'contextmenu', { button: 2 }); });
     expect(choice('App link')).toBeTruthy();
@@ -1665,7 +1672,7 @@ describe('SelectionToolbar — hold Share for the website link (cp2)', () => {
     act(() => { fire(choice('Cancel'), 'click'); });
     act(() => { fire(shareBtn(), 'click'); });
     await settle();
-    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\nhttps://votreader.github.io/app/?p=letter%3Athe-wide-path%3A1']);
+    expect(sent.map((d) => d.text)).toEqual(['"' + WORDS + '"\n\nThe Wide Path (Volume Two)\n' + SITE]);
   });
 
   it('✕ closes the choice; a passage the website does not have (the Bible) offers none', async () => {
