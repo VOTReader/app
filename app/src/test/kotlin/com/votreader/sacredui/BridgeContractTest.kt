@@ -163,6 +163,8 @@ class BridgeContractTest {
         "audioSeek" to 1,
         "audioRate" to 1,
         "audioVolume" to 1,
+        // player-1025: the skip step, from audio-player/transport.js setSkipSeconds (guarded window.AndroidBridge).
+        "audioSkip" to 1,
         "audioUpcoming" to 1,
         "audioLoop" to 1,
         "audioRelease" to 0,

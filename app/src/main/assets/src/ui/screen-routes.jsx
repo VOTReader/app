@@ -374,6 +374,8 @@ export function buildScreenRoutes({
   AudioPlayer.setPreferredReader(settings.letterReader);
   // Download only on Wi-Fi (ra6): pushed the same way, to the download stores and the phone app's.
   setWifiOnly(settings.downloadWifiOnly === true);
+  // Skip Buttons (player-1025): the step every skip control takes, the phone's lock screen included.
+  AudioPlayer.setSkipSeconds(settings.skipSeconds);
   // dl-d5: each running plan's next 7 days, and (opt-in) the next 3 after the one playing, download on Wi-Fi.
   setAutoDownloads(planTracks, settings.keepNextReady === true);
   /* ─────────────────────────────────────────────────────────────────────

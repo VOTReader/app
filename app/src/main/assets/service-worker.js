@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-d8e041d805';
+const CACHE_VERSION = 'v1.0.2-aa0a4d8e82';
 const CORPUS_VERSION = 'c74'; // c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,11 +316,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': 'e9e7c6f7c25eddb1d2c0e9901847bff5dde05fa727ca5e9bdbb896b88998bae9',
-  './dist/app.min.css': '7d39cc705d0d4d5629ca8e3e6ca76c4e146b438c4369430d4e4f146a647a2d57',
+  './dist/app.min.css': '306600ca20373e7e508e87f829ce91151ba57ffea7f9617305298767d403dc38',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': 'b38c4660b2927748a833d1bedad548c9c46dd7e17cafb9b9cf868625755a755f',
+  './dist/bundle-b.js': 'b30dc27b16ca6c4b41a248d240e5de941c7f0ba77de2d02f7b2f66350ced2fc5',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': 'd629b65691dab408a1879b7611ac1887e99142001122b0537114f55c77b5e99a',
+  './dist/bundle-d.js': '5fbf8b914bc0a855dad6f0561d67cbabb07b1b92691be789152fd8f62118fc85',
   './dist/bundle-w.js': '8f8fa44e8acc4db6755462ed4b29a25f21647c0898618f7be41b48d7aab546f6',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'e9e7c6f7c25eddb1d2c0e9901847bff5dde05fa727ca5e9bdbb896b88998bae9',

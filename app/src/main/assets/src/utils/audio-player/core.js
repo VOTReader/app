@@ -72,6 +72,14 @@ export const _state = { status: 'idle', queue: [], qi: 0, time: 0, duration: 0, 
 export let _readingRate = 1;
 /** Write from another module of the player (the binding is read-only outside this one). @param {typeof _readingRate} v */
 export function _setReadingRate(v) { _readingRate = v; }
+/** The skip buttons' step, whole seconds (Corbin 10-25: "10s by default, adjustable in settings"). Settings ›
+ *  Listening › Skip Buttons sets it through transport's setSkipSeconds; every skip control reads it. */
+export const SKIP_DEFAULT_SEC = 10;
+export const SKIP_MIN_SEC = 5;
+export const SKIP_MAX_SEC = 60;
+export let _skipSec = SKIP_DEFAULT_SEC;
+/** @param {number} v */
+export function _setSkipSec(v) { _skipSec = v; }
 export const _g = () => /** @type {any} */ (globalThis);
 /** AudioLibraryStore lives in bundle-b; resolve it at call time to avoid a second bundled singleton. */
 export const _library = () => _g().AudioLibraryStore || null;

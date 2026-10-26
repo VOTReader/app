@@ -3,6 +3,8 @@ package com.votreader.sacredui
 import android.app.PendingIntent
 import android.content.Intent
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -70,9 +72,10 @@ class PlaybackService : MediaSessionService() {
             )
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_NETWORK)
-            // The lock screen's, notification's and headset's skip back and forward: 15 s, as the app's own buttons.
-            .setSeekBackIncrementMs(SKIP_MS)
-            .setSeekForwardIncrementMs(SKIP_MS)
+            // The lock screen's, notification's and headset's skip back and forward: the app's own step (Settings ›
+            // Skip Buttons, 10 s by default), which PageOwnsTheQueue reads live; these are only its starting value.
+            .setSeekBackIncrementMs(skipMs)
+            .setSeekForwardIncrementMs(skipMs)
             .build()
         val open = PendingIntent.getActivity(
             this, 0,
@@ -91,6 +94,9 @@ class PlaybackService : MediaSessionService() {
             override fun onMediaMetadataChanged(mediaMetadata: MediaMetadata) = layoutFor(mediaMetadata)
         })
         layoutFor(player.mediaMetadata)
+        // A new skip step redraws the buttons with its number (the page may set it from any thread).
+        val main = Handler(Looper.getMainLooper())
+        onSkip = { main.post { spoken?.let { session?.setMediaButtonPreferences(buttons(it)) } } }
     }
 
     /** Which buttons are showing: spoken word or a song (null before the first). */
@@ -112,6 +118,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        onSkip = null
         session?.let { it.player.release(); it.release() }
         session = null
         super.onDestroy()
@@ -127,6 +134,16 @@ class PlaybackService : MediaSessionService() {
             .build()
 
         override fun isCommandAvailable(command: Int): Boolean = availableCommands.contains(command)
+
+        /** Skip back and forward by the page's step ([skipMs]), not the one ExoPlayer was built with. */
+        override fun getSeekBackIncrement(): Long = skipMs
+        override fun getSeekForwardIncrement(): Long = skipMs
+        override fun seekBack() = seekTo((currentPosition - skipMs).coerceAtLeast(0L))
+        override fun seekForward() {
+            val end = duration
+            val to = currentPosition + skipMs
+            seekTo(if (end != C.TIME_UNSET && to > end) end else to)
+        }
 
         /** What plays is the page's to choose: a jump to another item, a repeat or shuffle mode would change it
          *  without a seam the page hears (a car's queue tap, AVRCP repeat; refutation S3). The app never asks. */
@@ -180,18 +197,33 @@ class PlaybackService : MediaSessionService() {
     }
 
     companion object {
-        const val SKIP_MS = 15_000L
+        /** The skip step (Settings › Skip Buttons; Corbin 10-25: 10 s by default), set by the page through [setSkipSeconds]. */
+        @Volatile
+        var skipMs: Long = 10_000L
+            private set
+
+        /** The live service's redraw of its buttons for a new step (null while no service runs). */
+        @Volatile
+        private var onSkip: (() -> Unit)? = null
+
+        /** The page's skip step, seconds (AppInterface.audioSkip): the system surfaces skip by it and show its number. */
+        fun setSkipSeconds(seconds: Double) {
+            val ms = NativeAudioLogic.clampSkipMs(seconds)
+            if (ms == skipMs) return
+            skipMs = ms
+            onSkip?.invoke()
+        }
 
         /**
-         * The system surfaces' buttons (pl-l5, player brief 3h). Spoken word: -15 in the back slot and +15 in the
-         * forward slot, so the lock screen's compact row reads -15, play, +15; previous and next follow in the
-         * expanded notification. A song: none, so Media3 draws its own prev, play, next.
+         * The system surfaces' buttons (pl-l5, player brief 3h). Spoken word: back by the skip step in the back slot and
+         * forward in the forward slot, so the lock screen's compact row reads -10, play, +10; previous and next follow
+         * in the expanded notification. A song: none, so Media3 draws its own prev, play, next.
          */
         fun buttons(spoken: Boolean): List<CommandButton> = if (!spoken) emptyList() else listOf(
-            CommandButton.Builder(CommandButton.ICON_SKIP_BACK_15).setPlayerCommand(Player.COMMAND_SEEK_BACK)
-                .setDisplayName("Back 15 seconds").setSlots(CommandButton.SLOT_BACK).build(),
-            CommandButton.Builder(CommandButton.ICON_SKIP_FORWARD_15).setPlayerCommand(Player.COMMAND_SEEK_FORWARD)
-                .setDisplayName("Forward 15 seconds").setSlots(CommandButton.SLOT_FORWARD).build(),
+            CommandButton.Builder(NativeAudioLogic.skipIcons(skipMs).first).setPlayerCommand(Player.COMMAND_SEEK_BACK)
+                .setDisplayName("Back ${skipMs / 1000} seconds").setSlots(CommandButton.SLOT_BACK).build(),
+            CommandButton.Builder(NativeAudioLogic.skipIcons(skipMs).second).setPlayerCommand(Player.COMMAND_SEEK_FORWARD)
+                .setDisplayName("Forward ${skipMs / 1000} seconds").setSlots(CommandButton.SLOT_FORWARD).build(),
             CommandButton.Builder(CommandButton.ICON_PREVIOUS).setPlayerCommand(Player.COMMAND_SEEK_TO_PREVIOUS)
                 .setDisplayName("Previous").setSlots(CommandButton.SLOT_OVERFLOW).build(),
             CommandButton.Builder(CommandButton.ICON_NEXT).setPlayerCommand(Player.COMMAND_SEEK_TO_NEXT)

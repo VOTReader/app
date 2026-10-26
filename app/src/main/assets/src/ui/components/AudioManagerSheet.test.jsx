@@ -389,21 +389,36 @@ describe('AudioManagerSheet — transport', () => {
     expect(timeSpans()).toEqual(['3:20', '−1:40']);
   });
 
-  it('jumps ∓15 seconds through the store, clamped to the recording', () => {
+  it('jumps ∓10 seconds through the store, clamped to the recording', () => {
     startCollection();
     openSheet();
     setDuration(300);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Forward 15 seconds' }));
-    expect(el().currentTime).toBe(15);
-    expect(timeSpans()).toEqual(['0:15', '−4:45']);
+    fireEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds' }));
+    expect(el().currentTime).toBe(10);
+    expect(timeSpans()).toEqual(['0:10', '−4:50']);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Back 15 seconds' }));
-    expect(el().currentTime).toBe(0);                   // clamped at the head, not -15
+    fireEvent.click(screen.getByRole('button', { name: 'Back 10 seconds' }));
+    expect(el().currentTime).toBe(0);                   // clamped at the head, not -10
 
     drive(() => AudioPlayer.seek(295));
-    fireEvent.click(screen.getByRole('button', { name: 'Forward 15 seconds' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Forward 10 seconds' }));
     expect(el().currentTime).toBe(300);                 // …and at the tail
+  });
+
+  /* Corbin 10-25: "Make the 15s forward/backward button 10s by default, adjustable in settings". */
+  it('takes the step Settings sets, its number on both buttons', async () => {
+    startCollection();
+    openSheet();
+    setDuration(300);
+    await act(async () => { AudioPlayer.setSkipSeconds(30); await Promise.resolve(); });
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Forward 30 seconds' }));
+      expect(el().currentTime).toBe(30);
+      expect(screen.getByRole('button', { name: 'Back 30 seconds' }).textContent).toBe('30');
+    } finally {
+      await act(async () => { AudioPlayer.setSkipSeconds(10); await Promise.resolve(); });
+    }
   });
 });
 

@@ -4108,6 +4108,12 @@
     .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; min-height:44px; background:var(--gold-faint); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; padding:0.35rem 0.55rem; font-family:inherit; max-width:60%; }
     .settings-select-chev { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
     @media (hover:hover){ .settings-select-trigger:hover .settings-row-value{ color:var(--gold-bright); } }
+    /* Skip Buttons (player-1025): − [10] s + */
+    .settings-step { display:inline-flex; align-items:center; gap:0.4rem; }
+    .settings-step-btn { width:44px; height:44px; border-radius:50%; border:1px solid var(--gold-border); background:var(--gold-faint); color:var(--gold); font-size:var(--fs-18); line-height:1; cursor:pointer; font-family:inherit; }
+    .settings-step-btn:disabled { opacity:0.4; cursor:default; }
+    .settings-step-input { width:3.4em; min-height:44px; text-align:center; font-family:inherit; font-size:var(--fs-15); color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0 0.2rem; }
+    .settings-step-unit { font-size:var(--fs-13); color:var(--gold); font-style:italic; margin-left:-0.15rem; }
     /* Top-Nav button chips */
     .settings-chip-note { font-size:var(--fs-12); color:var(--cream-muted); font-style:italic; padding:0.65rem 0.95rem 0; }
     .settings-chips { display:flex; flex-wrap:wrap; gap:0.45rem; padding:0.7rem 0.95rem 0.8rem; }

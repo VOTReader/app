@@ -1,5 +1,6 @@
 package com.votreader.sacredui
 
+import androidx.media3.session.CommandButton
 import com.votreader.sacredui.NativeAudioLogic.RawJson
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -23,6 +24,22 @@ class NativeAudioLogicTest {
         assertEquals(1f, NativeAudioLogic.clampRate(Double.POSITIVE_INFINITY))
         assertEquals(0.25f, NativeAudioLogic.clampRate(0.01))
         assertEquals(4f, NativeAudioLogic.clampRate(9.0))
+    }
+
+    @Test
+    fun `the skip step is 5 to 60 whole seconds, a bad one the 10 s default`() {
+        assertEquals(10_000L, NativeAudioLogic.clampSkipMs(10.0))
+        assertEquals(12_000L, NativeAudioLogic.clampSkipMs(12.4))
+        assertEquals(5_000L, NativeAudioLogic.clampSkipMs(1.0))
+        assertEquals(60_000L, NativeAudioLogic.clampSkipMs(600.0))
+        assertEquals(10_000L, NativeAudioLogic.clampSkipMs(Double.NaN))
+    }
+
+    @Test
+    fun `the lock screen draws the step's own icon where Media3 has one, else the plain arrow`() {
+        assertEquals(CommandButton.ICON_SKIP_BACK_10 to CommandButton.ICON_SKIP_FORWARD_10, NativeAudioLogic.skipIcons(10_000L))
+        assertEquals(CommandButton.ICON_SKIP_BACK_30 to CommandButton.ICON_SKIP_FORWARD_30, NativeAudioLogic.skipIcons(30_000L))
+        assertEquals(CommandButton.ICON_SKIP_BACK to CommandButton.ICON_SKIP_FORWARD, NativeAudioLogic.skipIcons(20_000L))
     }
 
     @Test

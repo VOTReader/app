@@ -112,7 +112,7 @@ describe('the mini-player song skin (final-08, player brief picture 03)', () => 
     expect(bar.querySelector('.audio-bar-seek')).toBeNull();
     expect(bar.querySelector('.audio-bar-line')).not.toBeNull();
     expect(bar.querySelector('.audio-bar-pull')).toBeNull();                     // the pull tab is gone (brief 3a)
-    expect(within(bar).queryByRole('button', { name: 'Back 15 seconds' })).toBeNull();   // songs: Play / Next / Close
+    expect(within(bar).queryByRole('button', { name: 'Back 10 seconds' })).toBeNull();   // songs: Play / Next / Close
     fireEvent.click(within(bar).getByRole('button', { name: 'Next song' }));
     expect(AudioPlayer.getState().qi).toBe(1);
     fireEvent.click(within(bar).getByRole('button', { name: 'Close player' }));
@@ -169,7 +169,7 @@ describe('the mini-player song skin (final-08, player brief picture 03)', () => 
     expect(bar.querySelector('.audio-bar-cover')).toBeNull();
     expect(bar.querySelector('.audio-bar-seek')).toBeNull();
     expect(bar.querySelector('.audio-bar-play')).not.toBeNull();
-    expect(within(bar).getByRole('button', { name: 'Back 15 seconds' })).toBeTruthy();
+    expect(within(bar).getByRole('button', { name: 'Back 10 seconds' })).toBeTruthy();
     expect(within(bar).queryByRole('button', { name: 'Next song' })).toBeNull();
   });
 

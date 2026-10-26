@@ -175,18 +175,18 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
       render(<AudioPlayerBar />);
       playSingleLetter();
       expect(line2()).toBe('Loading…');
-      expect(screen.getByRole('button', { name: 'Back 15 seconds' }).disabled).toBe(true);   // nothing to step back in
+      expect(screen.getByRole('button', { name: 'Back 10 seconds' }).disabled).toBe(true);   // nothing to step back in
       act(() => { vi.advanceTimersByTime(7900); });
       expect(line2()).toBe('Loading…');
       expect(screen.queryByRole('button', { name: 'Cancel loading' })).toBeNull();
       act(() => { vi.advanceTimersByTime(200); });
       expect(line2()).toBe('Still loading');
       expect(screen.getByRole('button', { name: 'Cancel loading' }).textContent).toBe('Cancel');
-      expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Back 10 seconds' })).toBeNull();
       act(() => { el().duration = 240; el().dispatchEvent(new Event('durationchange')); });
       emit('playing');
       expect(line2()).toBe('Volume One · 4 min left');
-      expect(screen.getByRole('button', { name: 'Back 15 seconds' }).disabled).toBe(false);
+      expect(screen.getByRole('button', { name: 'Back 10 seconds' }).disabled).toBe(false);
       // A stall mid-recording keeps the place: the time left is what the reader needs then.
       clockAt(65);
       emit('waiting');
@@ -221,14 +221,14 @@ describe('AudioPlayerBar — visibility + the reading-surface body class', () =>
     expect(line2()).toBe('Couldn’t load');
     expect(document.querySelector('.audio-bar-line2').classList.contains('is-failed')).toBe(true);
     expect(document.querySelector('.audio-bar-summary').getAttribute('aria-label')).toContain('Couldn’t load');
-    expect(screen.queryByRole('button', { name: 'Back 15 seconds' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Back 10 seconds' })).toBeNull();
     el().played = false;
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
     expect(el().played).toBe(true);
     el().error = null;
     emit('playing');
     expect(line2()).toBe('Volume One');
-    expect(screen.getByRole('button', { name: 'Back 15 seconds' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Back 10 seconds' })).toBeTruthy();
   });
 
   it('shows the sleep and speed chips beside line 2 only while they are set (brief 3a)', () => {
@@ -367,20 +367,20 @@ describe('AudioPlayerBar — transport', () => {
     playWholeCollection();
     emit('playing');
     const names = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
-    expect(names.slice(1)).toEqual(['Back 15 seconds', 'Pause', 'Close player']);
+    expect(names.slice(1)).toEqual(['Back 10 seconds', 'Pause', 'Close player']);
     expect(screen.queryByRole('slider')).toBeNull();
     expect(document.querySelector('.audio-bar-pull')).toBeNull();
   });
 
-  it('Back 15 steps back fifteen seconds in the same recording', () => {
+  it('Back steps back ten seconds (the skip step) in the same recording', () => {
     render(<AudioPlayerBar />);
     playSingleLetter();
     emit('playing');
     clockAt(45, 240);
     const srcAssignments = el().srcHistory.length;
-    fireEvent.click(screen.getByRole('button', { name: 'Back 15 seconds' }));
-    expect(el().currentTime).toBe(30);
-    expect(AudioPlayer.getState().time).toBe(30);
+    fireEvent.click(screen.getByRole('button', { name: 'Back 10 seconds' }));
+    expect(el().currentTime).toBe(35);
+    expect(AudioPlayer.getState().time).toBe(35);
     expect(el().srcHistory).toHaveLength(srcAssignments);   // a seek, not a re-fetch
   });
 

@@ -17,7 +17,12 @@ import {
   PREV_OFFLINE_MSG,
   _setPendingRestore,
   _setReadingRate,
+  _setSkipSec,
   _setSource,
+  _skipSec,
+  SKIP_DEFAULT_SEC,
+  SKIP_MAX_SEC,
+  SKIP_MIN_SEC,
   _source,
   _state,
   _toast,
@@ -296,6 +301,40 @@ export function seek(seconds) {
  */
 export function skip(seconds) {
   seek((_state.time || 0) + (Number(seconds) || 0));
+}
+
+/**
+ * A skip step as whole seconds within SKIP_MIN_SEC..SKIP_MAX_SEC; anything that is not a number is the default.
+ * @param {unknown} v @returns {number}
+ */
+export function clampSkipSeconds(v) {
+  const n = typeof v === 'number' || (typeof v === 'string' && v.trim() !== '') ? Math.round(Number(v)) : NaN;
+  return Number.isFinite(n) ? Math.min(SKIP_MAX_SEC, Math.max(SKIP_MIN_SEC, n)) : SKIP_DEFAULT_SEC;
+}
+
+/** The skip buttons' step, seconds. @returns {number} */
+export function skipSeconds() { return _skipSec; }
+
+/** The step the phone app's media service was last told; 0 = not yet (it outlives a page reload, so tell it once). */
+let _nativeSkipSec = 0;
+
+/**
+ * Set the skip buttons' step (Settings › Listening › Skip Buttons). The player's buttons redraw with the new number,
+ * and in the phone app the lock screen's, notification's and headset's skips take it too. Idempotent: the settings
+ * render pushes it every time.
+ * @param {unknown} v @returns {number} the step now in force
+ */
+export function setSkipSeconds(v) {
+  const n = clampSkipSeconds(v);
+  const bridge = typeof window !== 'undefined' ? /** @type {any} */ (window).AndroidBridge : null;
+  if (n !== _nativeSkipSec && bridge && typeof bridge.audioSkip === 'function') {
+    try { bridge.audioSkip(n); _nativeSkipSec = n; } catch (_e) { /* an older app: its own 15 stays */ }
+  }
+  if (n === _skipSec) return n;
+  _setSkipSec(n);
+  // Settings pushes it from a render: tell the player's subscribers after it, not during it.
+  queueMicrotask(_notify);
+  return n;
 }
 
 /**

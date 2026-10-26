@@ -1,5 +1,8 @@
 package com.votreader.sacredui
 
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.session.CommandButton
 import kotlin.math.ceil
 
 /**
@@ -48,6 +51,20 @@ object NativeAudioLogic {
         if (volume.isFinite()) volume.coerceIn(0.0, 1.0).toFloat() else 1f
 
     fun clampStartMs(ms: Long): Long = if (ms > 0L) ms else 0L
+
+    /** The skip step the page sets (Settings › Skip Buttons), 5 to 60 whole seconds, in ms; a bad number is the 10 s default. */
+    fun clampSkipMs(seconds: Double): Long =
+        if (seconds.isFinite()) Math.round(seconds).coerceIn(5L, 60L) * 1000L else 10_000L
+
+    /** The lock screen's back and forward icons for a skip step: the numbered ones Media3 draws (5, 10, 15, 30), else the plain arrows. */
+    @OptIn(UnstableApi::class)
+    fun skipIcons(skipMs: Long): Pair<Int, Int> = when (skipMs) {
+        5_000L -> CommandButton.ICON_SKIP_BACK_5 to CommandButton.ICON_SKIP_FORWARD_5
+        10_000L -> CommandButton.ICON_SKIP_BACK_10 to CommandButton.ICON_SKIP_FORWARD_10
+        15_000L -> CommandButton.ICON_SKIP_BACK_15 to CommandButton.ICON_SKIP_FORWARD_15
+        30_000L -> CommandButton.ICON_SKIP_BACK_30 to CommandButton.ICON_SKIP_FORWARD_30
+        else -> CommandButton.ICON_SKIP_BACK to CommandButton.ICON_SKIP_FORWARD
+    }
 
     /**
      * GitHub release assets answer `application/octet-stream`, which an <audio> ignores and ExoPlayer would have to

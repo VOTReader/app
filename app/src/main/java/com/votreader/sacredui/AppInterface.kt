@@ -840,6 +840,10 @@ class AppInterface(
     @JavascriptInterface
     fun audioVolume(volume: Double) { native { it.volume(volume) } }
 
+    /** The skip buttons' step, seconds (Settings › Skip Buttons): the lock screen's, notification's and headset's skips take it. */
+    @JavascriptInterface
+    fun audioSkip(seconds: Double) { PlaybackService.setSkipSeconds(seconds) }
+
     /** What plays after this recording without the page: [{url, title, artist, album, rate}]. */
     @JavascriptInterface
     fun audioUpcoming(json: String?) { native { it.upcoming(json) } }

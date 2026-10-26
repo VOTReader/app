@@ -11,6 +11,7 @@ import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
 import { openWhatsNew } from '../../utils/whats-new.js';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
+import { AudioPlayer } from '../../utils/audio-player.js';
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -339,6 +340,54 @@ function AudioRateRow() {
   );
 }
 
+/* SkipStepRow — Listening → Skip Buttons (player-1025, Corbin 10-25: "Make the 15s forward/backward button 10s by
+   default, adjustable in settings (typed number, or incremented)"). One step for back and forward: the full player's
+   two, the mini player's back, and in the phone app the lock screen's, notification's and headset's. − and + move it
+   by 5 (to the next multiple of 5); the box takes any whole number, kept to 5-60. Module scope for a stable identity. */
+const SKIP_STEP_BY = 5;
+/** @param {{ value: unknown, onChange: (sec: number) => void }} props */
+function SkipStepRow({ value, onChange }) {
+  const clamp = (/** @type {unknown} */ v) => AudioPlayer.clampSkipSeconds(v);
+  const sec = clamp(value);
+  /** Text in the box while it is being typed in; null = showing the setting. */
+  const [typed, setTyped] = React.useState(/** @type {string | null} */ (null));
+  const set = (/** @type {number} */ n) => {
+    const next = clamp(n);
+    AudioPlayer.setSkipSeconds(next);
+    if (next !== sec) onChange(next);
+  };
+  const commit = () => {
+    if (typed !== null && typed.trim() !== '' && Number.isFinite(Number(typed))) set(Number(typed));
+    setTyped(null);
+  };
+  const lo = clamp(0);
+  const hi = clamp(1e9);
+  return (
+    <div className="settings-row">
+      <div className="settings-row-head">
+        <span className="settings-row-label" id="settings-skip-label">Skip Buttons</span>
+        <span className="settings-row-grow" />
+        <span className="settings-step" role="group" aria-labelledby="settings-skip-label">
+          <button type="button" className="settings-step-btn" aria-label="Shorter skip" disabled={sec <= lo}
+            onClick={() => set(Math.ceil(sec / SKIP_STEP_BY) * SKIP_STEP_BY - SKIP_STEP_BY)}>{'−'}</button>
+          <input type="number" inputMode="numeric" className="settings-step-input" aria-label="Skip seconds"
+            min={lo} max={hi} step={1} value={typed === null ? String(sec) : typed}
+            onFocus={() => setTyped('')} placeholder={String(sec)}
+            onChange={(e) => setTyped(e.target.value)} onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(); /** @type {HTMLInputElement} */ (e.target).blur(); }
+              else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); setTyped(null); }
+            }} />
+          <span className="settings-step-unit" aria-hidden="true">s</span>
+          <button type="button" className="settings-step-btn" aria-label="Longer skip" disabled={sec >= hi}
+            onClick={() => set(Math.floor(sec / SKIP_STEP_BY) * SKIP_STEP_BY + SKIP_STEP_BY)}>{'+'}</button>
+        </span>
+      </div>
+      <div className="settings-row-desc">{'How far back and forward the player’s skip buttons jump: ' + sec + ' seconds. The lock screen and headphones skip the same.'}</div>
+    </div>
+  );
+}
+
 /**
  * Songs of the Letters kept on this phone (K1): how many and how big (catalog bytes), and Manage › to the Kept
  * list. SongKeep and the Songs screens live in bundle-d/h, read here as globals; no keep store, no row.
@@ -642,7 +691,7 @@ const SHARE_LINK_OPTIONS = [
 const SETTINGS_TOPICS = {
   appearance: 'appearance theme light dark text size font typeface',
   reading: 'reading bible translation offline editions download all chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
-  listening: 'listening bible letter audio voice speed rate read along highlight playback follow',
+  listening: 'listening bible letter audio voice speed rate skip seconds read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
   topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
   features: 'search synonyms synonym filter stop words tabs history',
@@ -1361,6 +1410,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
                 the store write, plus it retimes whatever is playing right now —
                 and falls back to the store when the player module is absent. */}
             <AudioRateRow />
+            <SkipStepRow value={settings.skipSeconds} onChange={(sec) => onSetting("skipSeconds", sec)} />
             <SettingsRow
               label="Read-Along Highlight"
               desc="While a recorded letter is playing, softly wash the sentence being read so your eye can follow the voice. It uses the timings that ship with the app; letters that don't have them simply play as before."

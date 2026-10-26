@@ -389,6 +389,33 @@ describe('Listening group', () => {
     expect(groupRowLabels('Listening')).not.toContain('Keep the next 3 ready');
   });
 
+  // player-1025 (Corbin 10-25): "Make the 15s forward/backward button 10s by default, adjustable in settings (typed
+  // number, or incremented)". Under Default Speed; − and + move by 5, a typed number is kept to 5-60.
+  it('Skip Buttons: 10 s by default, a stepper and a typed number, writing its own key', () => {
+    const onSetting = vi.fn();
+    renderSettings({}, { onSetting });
+    const labels = groupRowLabels('Listening');
+    expect(labels.indexOf('Skip Buttons')).toBe(labels.indexOf('Default Speed') + 1);
+    const r = row('Skip Buttons');
+    const box = within(r).getByRole('spinbutton', { name: 'Skip seconds' });
+    expect(box.value).toBe('10');
+    fireEvent.click(within(r).getByRole('button', { name: 'Longer skip' }));
+    expect(onSetting).toHaveBeenLastCalledWith('skipSeconds', 15);
+    fireEvent.click(within(r).getByRole('button', { name: 'Shorter skip' }));
+    expect(onSetting).toHaveBeenLastCalledWith('skipSeconds', 5);
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: '12' } });
+    fireEvent.blur(box);
+    expect(onSetting).toHaveBeenLastCalledWith('skipSeconds', 12);
+    fireEvent.focus(box);
+    fireEvent.change(box, { target: { value: '500' } });
+    fireEvent.keyDown(box, { key: 'Enter' });
+    expect(onSetting).toHaveBeenLastCalledWith('skipSeconds', 60);
+    cleanup();
+    renderSettings({ skipSeconds: 60 });
+    expect(within(row('Skip Buttons')).getByRole('button', { name: 'Longer skip' }).disabled).toBe(true);
+  });
+
   // Downloads brief section 7 item 10: where the browser cannot tell Wi-Fi from mobile data the switch did nothing.
   it('Download only on Wi-Fi: not offered where Wi-Fi cannot be told from mobile data, nor where nothing downloads', () => {
     window.AndroidBridge = { offlineAudioState: () => '{}' };   // a store, but no way to tell (as a desktop browser)

@@ -12,7 +12,7 @@
                  it comes from, "Do you like this song?"
      dock        pinned to the thumb zone, never scrolled away (fixes 27a, U04.3):
                  the scrubber (a compilation's letters as ticks), the transport
-                 (reading: prev · −15 · play · +15 · next; song: shuffle · prev ·
+                 (reading: prev · −10 · play · +10 · next, the step Settings sets; song: shuffle · prev ·
                  play · next · repeat) and the bottom row (Speed · Sleep · Up next
                  · Read along; a song: Lyrics · Sleep · Up next · On this phone),
                  each of which opens a small sheet (PlayerSheets.jsx).
@@ -176,14 +176,14 @@ const ICON = { viewBox: '0 0 24 24', 'aria-hidden': true, fill: 'none', stroke: 
 function DownIcon() { return <svg {...ICON} strokeWidth={2}><path d="M5 9l7 7 7-7" /></svg>; }
 function PrevItemIcon() { return <svg {...ICON}><path d="M17 5L9 12l8 7z" /><path d="M6.5 5v14" /></svg>; }
 function NextItemIcon() { return <svg {...ICON}><path d="M7 5l8 7-8 7z" /><path d="M17.5 5v14" /></svg>; }
-/** A curved arrow round "15": back (dir -1) or forward (dir 1). @param {{ dir: number }} props */
-function SkipIcon({ dir }) {
+/** A curved arrow round the skip step ("10"): back (dir -1) or forward (dir 1). @param {{ dir: number, sec: number }} props */
+function SkipIcon({ dir, sec }) {
   return (
     <svg {...ICON} strokeWidth={1.6}>
       {dir < 0
         ? <><path d="M9 4.5L6 7.5l3 3" /><path d="M6.5 7.5H13a6.5 6.5 0 1 1-6.4 7.6" /></>
         : <><path d="M15 4.5l3 3-3 3" /><path d="M17.5 7.5H11a6.5 6.5 0 1 0 6.4 7.6" /></>}
-      <text x="12" y="17.4" textAnchor="middle" fontSize="7.6" fontWeight="600" fill="currentColor" stroke="none" fontFamily="inherit">15</text>
+      <text x="12" y="17.4" textAnchor="middle" fontSize="7.6" fontWeight="600" fill="currentColor" stroke="none" fontFamily="inherit">{sec}</text>
     </svg>
   );
 }
@@ -318,6 +318,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const restoring = !!state.restoring;
   // A queue of one turns prev into a Restart rather than a dead control.
   const single = !restoring && queue.length < 2;
+  const skipSec = AudioPlayer.skipSeconds();
   // A WTLB compilation: the letter under the clock is the title, its place among the file's letters under it.
   const live = AudioPlayer.liveLetter();
   const liveTitle = live && live.title ? live.title : null;
@@ -480,9 +481,9 @@ export function AudioManagerSheet({ open, state, onClose }) {
           ) : (
             <div className="audio-manager-transport np-transport" aria-label="Playback controls">
               <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.prev()} aria-label={single ? 'Restart' : 'Previous track'}><PrevItemIcon /></button>
-              <button type="button" className="audio-manager-round np-skip" onClick={() => AudioPlayer.skip(-15)} aria-label="Back 15 seconds"><SkipIcon dir={-1} /></button>
+              <button type="button" className="audio-manager-round np-skip" onClick={() => AudioPlayer.skip(-skipSec)} aria-label={'Back ' + skipSec + ' seconds'}><SkipIcon dir={-1} sec={skipSec} /></button>
               {play}
-              <button type="button" className="audio-manager-round np-skip" onClick={() => AudioPlayer.skip(15)} aria-label="Forward 15 seconds"><SkipIcon dir={1} /></button>
+              <button type="button" className="audio-manager-round np-skip" onClick={() => AudioPlayer.skip(skipSec)} aria-label={'Forward ' + skipSec + ' seconds'}><SkipIcon dir={1} sec={skipSec} /></button>
               {/* Live while restoring: the placeholder's length says nothing about the queue the tap rebuilds (sweep v021). */}
               <button type="button" className="audio-manager-round" onClick={() => AudioPlayer.next()} disabled={!restoring && upcoming < 1} aria-label="Next track"><NextItemIcon /></button>
             </div>

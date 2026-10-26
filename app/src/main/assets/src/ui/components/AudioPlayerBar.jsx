@@ -17,7 +17,7 @@
    The shape is the player brief's (2026-10-22, 3a and 3g; pictures
    D:/Swarm/calls/player-mockups/01-04): 64 px at 100% text, a 3 px progress
    line for a top edge, a type mark (the cover for a song, a book for the
-   rest), the title and one line under it, then Back 15 / Play / Close for
+   rest), the title and one line under it, then Back 10 (the skip step) / Play / Close for
    spoken word and Play / Next / Close for a song. No seek, previous or pull
    tab on the bar: seeking lives in the listening controls the bar opens.
    ═══════════════════════════════════════════════════════════════════════ */
@@ -149,12 +149,13 @@ function BookMark() {
   );
 }
 
-function Back15Icon() {
+/** @param {{ sec: number }} props */
+function BackIcon({ sec }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M11.5 4.1A8.4 8.4 0 1 1 4.3 9" />
       <path d="M13.9 1.7L11.4 4.1l2.5 2.4" />
-      <text x="12.4" y="16" textAnchor="middle" fontSize="7.6" fill="currentColor" stroke="none">15</text>
+      <text x="12.4" y="16" textAnchor="middle" fontSize="7.6" fill="currentColor" stroke="none">{sec}</text>
     </svg>
   );
 }
@@ -399,9 +400,10 @@ export function AudioPlayerBar() {
     speedChip ? 'speed ' + speedChip : null,
   ].filter(Boolean).join(', ') + '. Open listening controls.';
 
-  // Spoken word: Back 15 sits left of Play. While it cannot work (nothing loaded yet, or the load failed) its slot
+  // Spoken word: Back (the skip step, 10 s unless Settings says) sits left of Play. While it cannot work (nothing loaded yet, or the load failed) its slot
   // holds what can: Cancel past 8 s of loading, Retry after a failure. A link inside line 2, as the picture draws
   // it, would be a button inside the summary button, which no screen reader reaches.
+  const skipSec = AudioPlayer.skipSeconds();
   let slot = null;
   if (!songId) {
     if (failed) {
@@ -410,8 +412,8 @@ export function AudioPlayerBar() {
       slot = <button type="button" className="audio-bar-act" onClick={() => AudioPlayer.toggle()} aria-label="Cancel loading">Cancel</button>;
     } else {
       slot = (
-        <button type="button" className="audio-bar-back" onClick={() => AudioPlayer.skip(-15)} disabled={starting} aria-label="Back 15 seconds">
-          <Back15Icon />
+        <button type="button" className="audio-bar-back" onClick={() => AudioPlayer.skip(-skipSec)} disabled={starting} aria-label={'Back ' + skipSec + ' seconds'}>
+          <BackIcon sec={skipSec} />
         </button>
       );
     }

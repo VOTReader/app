@@ -14,6 +14,7 @@ import {
   _isSong,
   late,
   _native,
+  _skipSec,
   _state,
   _toast,
 } from './core.js';
@@ -21,9 +22,6 @@ import { _letterTitleOf, _secKey } from './sections.js';
 
 /** @typedef {import('../audio-player.js').Track} Track */
 
-/** Default short-jump, seconds — the same step the listening desk's ∓15 buttons
- *  take, so a host media card that omits `seekOffset` agrees with the app. */
-const SEEK_STEP_SEC = 15;
 
 /**
  * Raise the held keep-alive edge if playback is running once the tour is over: the tour stops
@@ -163,10 +161,10 @@ export function _mediaSession(track) {
     // Desktop-PWA reach: Chrome's own media hub and hardware media keys
     // offer these three; the phone reads the NATIVE card instead (the web
     // MediaSession is inert inside the WebView), so this is desktop-only value
-    // for three lines. `offset` is optional in the spec — default to the same
-    // 15s the listening desk's ∓15 buttons use.
-    _setAction(ms, 'seekbackward', (/** @type {any} */ d) => late.skip(-((d && d.seekOffset) || SEEK_STEP_SEC)));
-    _setAction(ms, 'seekforward', (/** @type {any} */ d) => late.skip((d && d.seekOffset) || SEEK_STEP_SEC));
+    // for three lines. `offset` is optional in the spec — default to the
+    // step the player's own skip buttons take (Settings › Skip Buttons).
+    _setAction(ms, 'seekbackward', (/** @type {any} */ d) => late.skip(-((d && d.seekOffset) || _skipSec)));
+    _setAction(ms, 'seekforward', (/** @type {any} */ d) => late.skip((d && d.seekOffset) || _skipSec));
     _setAction(ms, 'stop', () => late.stop());
     _syncMediaSessionActions();
     _syncMediaSessionState(_state.status);
