@@ -281,6 +281,32 @@ describe('liveLineAt — a Bible chapter', () => {
     }
   });
 
+  /* Corbin 10-27: "minify the title and leave most of the screen for the text. Same size and behavior, just more room
+     for it." The card's words take every line the player's body has room for, past five. */
+  it('takes every line the player has room for, counting the card by its parts', () => {
+    const LONG = 'word '.repeat(120).trim();
+    globalThis.resolveVerseText = () => LONG;
+    // The body is 600 px; the card is 560 of it (2 px border), its kicker 20 and cue 28: 544 px to spare, 17 lines.
+    const heights = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
+      const c = this.classList;
+      return c.contains('np-live-roll') ? 960 : c.contains('np-live') ? 560 : c.contains('np-live-kicker') ? 20 : c.contains('np-live-cue') ? 28 : 0;
+    });
+    const rooms = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function () {
+      const c = this.classList;
+      return c.contains('np-live-text') ? 160 : c.contains('np-live') ? 558 : c.contains('np-body') ? 600 : 0;
+    });
+    const real = window.getComputedStyle;
+    const styles = vi.spyOn(window, 'getComputedStyle').mockImplementation((el) => (el.classList && el.classList.contains('np-live-roll') ? { lineHeight: '32px' } : real(el)));
+    try {
+      playJohn(1);
+      act(() => tick(5));
+      render(<div className="np-body"><LiveLine track={current()} time={5} title="John 1" onOpen={() => {}} /></div>);
+      expect(document.querySelector('.np-live-text').style.maxHeight).toBe('544px');
+    } finally {
+      heights.mockRestore(); rooms.mockRestore(); styles.mockRestore();
+    }
+  });
+
   it('shows the verse on the card', () => {
     playJohn(1);
     act(() => tick(13));

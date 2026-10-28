@@ -23,7 +23,7 @@ import { fragmentAt, liveBibleFragments, liveFragments } from './ReadAlongHighli
 
 /** How many clauses before the one being read may share the card. */
 const LEAD_CLAUSES = 2;
-/** The most lines of words the card shows, and the fewest it gives way to when the player is short of room. */
+/** The lines of words the card shows outside the player, and the fewest it gives way to when the player is short of room. */
 const MOST_LINES = 5;
 const FEWEST_LINES = 2;
 /** About how many characters a voice reads a second: where the last row ends when no row follows it. */
@@ -235,19 +235,33 @@ export function bibleLineAt(track, time) {
   return now ? { lead: String(verse), now, key: track.key, at: through(rows, i, time, now.length) } : null;
 }
 
+/** An element's margins, top and bottom. @param {Element} el */
+function marginsOf(el) {
+  const cs = getComputedStyle(el);
+  return (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+}
+
 /**
  * The height the card's words could take without the player's body overflowing: the body's height less everything
- * else in it (its padding, gaps and other children, and the card around the words). Infinite outside the player.
+ * else in it (its padding, gaps and other children, and the card's own border, padding, kicker and cue, counted by
+ * its parts so the card's height never feeds back into its own room). Infinite outside the player.
  * @param {HTMLElement} box @returns {number}
  */
 function spareFor(box) {
   const body = box.closest('.np-body');
   if (!(body instanceof HTMLElement)) return Infinity;
+  const card = box.parentElement;
   const cs = getComputedStyle(body);
   const kids = Array.from(body.children);
   let used = (parseFloat(cs.paddingTop) || 0) + (parseFloat(cs.paddingBottom) || 0) + (parseFloat(cs.rowGap) || 0) * (kids.length - 1);
-  for (const k of kids) used += /** @type {HTMLElement} */ (k).offsetHeight;
-  return body.clientHeight - (used - box.clientHeight) - 8;   // 8: the children's margins, rounded up
+  for (const k of kids) {
+    // The body's children are spaced by its gap; their margins are auto (centring), which read back as the free room.
+    if (k !== card) { used += /** @type {HTMLElement} */ (k).offsetHeight; continue; }
+    const ccs = getComputedStyle(card);
+    used += card.offsetHeight - card.clientHeight + (parseFloat(ccs.paddingTop) || 0) + (parseFloat(ccs.paddingBottom) || 0);
+    for (const part of Array.from(card.children)) used += (part === box ? 0 : /** @type {HTMLElement} */ (part).offsetHeight) + marginsOf(part);
+  }
+  return body.clientHeight - used - 6;   // 6: the card's own 4 px top margin and sub-pixel rounding
 }
 
 /** The lazy Bible corpus as a store (index.html's __bibleCorpus), inert before it exists. @param {() => void} cb */
@@ -290,9 +304,10 @@ export function LiveLine({ track, time, title, onOpen }) {
     return letGo;
   }, [textEdition]);
   const line = liveLineAt(track, Number(time) || 0);
-  // The words show in a window of five lines (no line clamp: a clamped box hid the words being read, and drew lines
-  // over each other on the phone); when they run longer it rolls up with the voice, a whole line at a time. The window
-  // gives up lines (to two) when the player's body has no room for five, so the card never runs under the dock.
+  // The words show in a window of whole lines (no line clamp: a clamped box hid the words being read, and drew lines
+  // over each other on the phone); when they run longer it rolls up with the voice, a whole line at a time. In the
+  // player the window takes every line the body has room for (Corbin 10-27: the small title leaves "most of the screen
+  // for the text"), never fewer than two, so the card never runs under the dock; elsewhere it is five lines.
   const boxRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const rollRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const shownRef = React.useRef('');
@@ -308,7 +323,8 @@ export function LiveLine({ track, time, title, onOpen }) {
     const lineH = parseFloat(getComputedStyle(roll).lineHeight) || 0;
     let room = box.clientHeight;
     if (lineH > 0) {
-      const lines = Math.max(FEWEST_LINES, Math.min(MOST_LINES, Math.floor(spareFor(box) / lineH)));
+      const spare = spareFor(box);
+      const lines = spare === Infinity ? MOST_LINES : Math.max(FEWEST_LINES, Math.floor(spare / lineH));
       const most = lines * lineH + 'px';
       if (box.style.maxHeight !== most) box.style.maxHeight = most;
       room = Math.min(full, lines * lineH);
