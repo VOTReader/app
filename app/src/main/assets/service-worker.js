@@ -48,8 +48,8 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-7ac8a1b935';
-const CORPUS_VERSION = 'c74'; // c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
+const CACHE_VERSION = 'v1.0.2-d0d9233721';
+const CORPUS_VERSION = 'c75'; // c74->c75 (2026-10-28): audio re-upload watch -- TB2_001_Introduction (new, read by AI with music): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-10-28-054506.json). // PREVIOUS c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -320,7 +320,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': 'b30dc27b16ca6c4b41a248d240e5de941c7f0ba77de2d02f7b2f66350ced2fc5',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': 'b3ad170f381fe9481fb2a4331f99a6bba3e2132970734566c301375fb1381faf',
+  './dist/bundle-d.js': '64baae54e6a422e9bc6c5f16313cde4c89cf35f09f5e55ce7ae490f6123797e8',
   './dist/bundle-w.js': '8f8fa44e8acc4db6755462ed4b29a25f21647c0898618f7be41b48d7aab546f6',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'e9e7c6f7c25eddb1d2c0e9901847bff5dde05fa727ca5e9bdbb896b88998bae9',
@@ -343,7 +343,7 @@ const ASSET_REVISIONS = {
   './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
   './dist/bundle-a-matthew.js': 'b2ed5c2818a82748ca0a0a897d66fa83823fe574ac6ec4a694fe72687dbe665b',
-  './dist/bundle-a-vot.js': '84e1bb585c54051f3c8aeb2c915ece90b1221f735f265d98bbcb4639f925a0bf',
+  './dist/bundle-a-vot.js': 'ee4ab496128f061f1b51be6e7a7b50b0fb756ff6f4c4b499665ace041a1cd7a3',
   './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
   './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
   './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
@@ -420,7 +420,7 @@ const ASSET_REVISIONS = {
   './src/data/answers.js': 'a291d3608d84d6d2bcf5dfd2c6d0524e2103d5c7bc3b657cd113d2ac518ba6eb',
   './src/data/audio-lengths.js': 'c0476aeafb8e2e5a892d63b072943ad1b6dd4648b8f9b1d5cefb29ccb510055a',
   './src/data/audio-sync-sections.js': 'a48bd0c2f2352ca5ef21b903fe0f5dc9a6048f0b0492b6cf15d845edd54547ac',
-  './src/data/audio-sync.js': '46671f942b2a13ec672369f0384960ac9166f194e034d61bd889995331cbc5f9',
+  './src/data/audio-sync.js': '0945ff2d311be5e6c3acea296da7ed132f38416bea367385afb823fb3a743e97',
   './src/data/bible-asv.js': '552b7ae92a206f103f53f51f33cc8b90365156244aab6b7c47f8da5d16d6a34b',
   './src/data/bible-bsb.js': 'c6298eeaaba6bf491a0cbfe6f22ba3d19357ad29c6c88acd6f5bf4791347a6bd',
   './src/data/bible-hnv.js': '582c866ccba90aa63170c958bda79d554f32dc5749a6949bb289aa51f96eeead',

@@ -775,6 +775,7 @@ var AUDIO_ALTERNATES = {
 "blessed:blessed-are-those-who-serve-me-as-i-have-loved-them":[["M",[["1Z3mX6wWwOnziNxhHM_LKmYXDMwnBQ2i-"]]]],
 "blessed:blessed-are-those-who-walk-in-my-ways":[["M",[["1eA6ED-r83m8XGT68pXdaS9p23rL1tlnM","Part 1"],["1iwf6dXZ_WcsWAlpzjJWfwv2eGFhyXWaB","Part 2"]]]],
 "blessed:blessed-are-those-who-worship-me":[["M",[["1qDLB_99VDWGkk3t_Fs89r8hZOHM9nveO"]]]],
+"blessed:introduction":[["M",[["1AGxEMRFj7p3hxggKBXKUHs5mwg4eK-d_"]]]],
 "one:a-word-of-warning":[["V",[["1uTqPKjQH3x04tFbAuhHI_tox5Gmtj6GG"]]]],
 "one:and-he-shall-be-called-i-am":[["V",[["190_ELZ_MDHpuctdxtgrWxBk9OqLlWI8K"]]]],
 "one:be-baptized-in-the-living-waters-of-spirit-and-truth":[["V",[["1WMMeodw68BHhHe-eJAd64QMG29eYNIvH"]]]],
