@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-4b031d6d04';
+const CACHE_VERSION = 'v1.0.2-ea69a36651';
 const CORPUS_VERSION = 'c75'; // c74->c75 (2026-10-28): audio re-upload watch -- TB2_001_Introduction (new, read by AI with music): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-10-28-054506.json). // PREVIOUS c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,11 +316,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': 'e9e7c6f7c25eddb1d2c0e9901847bff5dde05fa727ca5e9bdbb896b88998bae9',
-  './dist/app.min.css': '0cf2afd9b6c206ec9fd026585ecdbae9536ee6062ab58dc777d6ba8794dd003d',
+  './dist/app.min.css': '85c60c3e68e4cf57747d7c0f92c62b47d37903011cc6ec1471e32cbc59556549',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': 'b30dc27b16ca6c4b41a248d240e5de941c7f0ba77de2d02f7b2f66350ced2fc5',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': '64baae54e6a422e9bc6c5f16313cde4c89cf35f09f5e55ce7ae490f6123797e8',
+  './dist/bundle-d.js': '5ce9be9ce9c528562e20e359e367b342289bb8210e3adf1722878a4471edf706',
   './dist/bundle-w.js': '8f8fa44e8acc4db6755462ed4b29a25f21647c0898618f7be41b48d7aab546f6',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'e9e7c6f7c25eddb1d2c0e9901847bff5dde05fa727ca5e9bdbb896b88998bae9',

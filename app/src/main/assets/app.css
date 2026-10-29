@@ -8999,7 +8999,7 @@
        2.4.11; w4 review round 2) */
     .sw-panel-body {
       flex: 1 1 auto; min-height: 0; overflow-y: auto;
-      padding: 24px calc(24px + var(--sw-safe-right)) 0 24px; scroll-padding-top: 60px;
+      padding: 24px calc(24px + var(--sw-safe-right)) calc(24px + var(--sw-safe-bottom)) 24px; scroll-padding-top: 60px;
       scrollbar-width: thin; scrollbar-color: var(--sw-panel-edge) transparent;
       touch-action: pan-y; overscroll-behavior: contain;
     }
@@ -9165,16 +9165,8 @@
       background: none; border: 0; color: var(--sw-text-meta); cursor: pointer;
     }
     .sw-crumbs-back:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
-    /* the CC-BY line: a 48 px band pinned at the foot on PC; last in the scroll on a phone */
-    .sw-panel-credit {
-      flex: none; display: flex; align-items: center; min-height: 48px; box-sizing: border-box;
-      padding: 0 calc(24px + var(--sw-safe-right)) var(--sw-safe-bottom) 24px;
-      background: var(--sw-panel); border-top: 1px solid var(--sw-hairline);
-      font-size: calc(var(--fsc-13) * var(--sw-ts)); color: var(--sw-text-muted);
-    }
-    .sw-panel-body > .sw-panel-credit { min-height: 0; padding: 16px 0 calc(16px + var(--sw-safe-bottom)); }
     /* compact (root height <= 500: every phone value of the spec) */
-    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + var(--sw-safe-right)) 0 20px; scroll-padding-top: 54px; }
+    .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + var(--sw-safe-right)) calc(16px + var(--sw-safe-bottom)) 20px; scroll-padding-top: 54px; }
     .sw-root.sw-compact :is(.sw-sheet-eyebrow, .sw-panel-over, .sw-sec-title) { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
     .sw-root.sw-compact .sw-panel-title { font-size: calc(var(--fsc-24) * var(--sw-ts)); }
     .sw-root.sw-compact :is(.sw-sheet-meta, .sw-panel-meta, .sw-link, .sw-cite-quote, .sw-zoom-row) { font-size: calc(var(--fsc-15) * var(--sw-ts)); }
@@ -9184,16 +9176,6 @@
     .sw-root.sw-compact :is(.sw-cite-title, .sw-row-ref) { font-size: calc(var(--fsc-16) * var(--sw-ts)); }
     .sw-root.sw-compact :is(.sw-cite-source, .sw-sort-note) { font-size: calc(var(--fsc-13) * var(--sw-ts)); }
     .sw-root.sw-compact .sw-row-text { font-size: calc(var(--fsc-14) * var(--sw-ts)); }
-    .sw-root.sw-compact .sw-panel-credit { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
-    /* A compact SHEET (under 560 px wide and 500 tall) hides the legend, and its credit sat only at
-       the end of the scroll (w5 minor). The CC-BY line is a licence obligation, so there it sticks to
-       the sheet's foot while the rest scrolls; still last in the flow, so nothing moves under it. */
-    .sw-root.sw-compact[data-panel="sheet"] .sw-panel-body > .sw-panel-credit {
-      position: sticky; bottom: 0; z-index: 1;
-      margin: 0 calc(-20px - var(--sw-safe-right)) 0 -20px;
-      padding: 8px calc(20px + var(--sw-safe-right)) calc(8px + var(--sw-safe-bottom)) 20px;
-      background: var(--sw-panel); border-top: 1px solid var(--sw-hairline);
-    }
     .sw-root.sw-compact .sw-sec { margin-top: 10px; padding-top: 2px; }
     .sw-root.sw-compact :is(.sw-sec.sw-verses, .sw-links.sw-sec) { padding-top: 0; }
     .sw-root.sw-compact :is(.sw-row, .sw-row-main) { min-height: 60px; }
@@ -9481,11 +9463,6 @@
     .sw-guide-body { margin: 0 0 10px; padding-left: 18px; font-size: var(--fs-15); line-height: 1.45; }
     .sw-guide-body li + li { margin-top: 4px; }
     .sw-guide-body strong { color: var(--sw-gold); font-weight: 600; }
-    /* the footer: the OpenBible.info credit (Q5), under a hairline */
-    .sw-guide-foot {
-      margin: 0 0 12px; padding-top: 8px; border-top: 1px solid var(--sw-hairline);
-      font-size: var(--fs-13); color: var(--sw-text-muted);
-    }
     /* Got it is the web's own control (the panel is dark in both themes, so the light theme's
        grey-blob problem it once had cannot arise), right-aligned. */
     .sw-guide-close { display: flex; margin: 0 0 0 auto; }

@@ -316,14 +316,15 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(props.lightThreads.mock.calls.at(-1)[0].length).toBe(panel.querySelector('.sw-group .sw-rows').children.length);
   });
 
-  it('credits the cross-reference data, pinned at the foot on PC and last in the scroll compact', () => {
-    const pc = mount({ detail: detail() });
-    const credit = pc.panel.querySelector('.sw-panel-credit');
-    expect(credit.textContent).toBe(g.attribution);
-    expect(credit.parentElement).toBe(pc.panel);
-    cleanup();
-    const phone = mount({ detail: detail(), compact: true });
-    expect(phone.panel.querySelector('.sw-panel-credit').parentElement.classList.contains('sw-panel-body')).toBe(true);
+  // Corbin, 2026-10-29: "We don't need huge credit lines about OpenBible really anywhere except for
+  // a small spot in sweb": the legend's tail is that spot, so the panel carries none
+  it('carries no credit line: the legend\'s small one is the web\'s', () => {
+    for (const compact of [false, true]) {
+      const { panel } = mount({ detail: detail(), compact });
+      expect(panel.querySelector('.sw-panel-credit')).toBeNull();
+      expect(panel.textContent).not.toContain(g.attribution);
+      cleanup();
+    }
   });
 
   /* w4 review (s04b phone): scrolled, the pinned close X sat over the Cited head's chevron and left
@@ -593,17 +594,12 @@ describe('the chooser at overview', () => {
     expect(panel.querySelector('.sw-zoom-row')).toBeNull();
   });
 
-  /* w4 integration: through w3 My Web's panel had no credit, on the reading that My Web drew none
-     of the OpenBible data; the My Web stream's w4 legend ends on the credit (its Bible rail is the
-     graph asset's own), and the hub's call keeps it on screen wherever the web is. While a panel
-     is open the legend hides, so on PC the panel's pinned foot is where it shows. The w3 pin
-     (no credit on My Web) is rewritten to that intent. */
-  it('My Web\'s panel carries the CC-BY credit too, pinned at its foot on PC', () => {
+  /* My Web's legend ends on the credit as the canon's does (w4); its panel, like the canon's,
+     carries none since 2026-10-29 (one small spot, the legend's). */
+  it('My Web\'s panel carries no credit line either', () => {
     const choices = [arcOf(ARC), arcOf(ARC + 1)];
     const { panel } = mount({ choices, mode: 'personal' });
-    const credit = panel.querySelector('.sw-panel-credit');
-    expect(credit && credit.textContent).toBe(g.attribution);
-    expect(credit.parentElement).toBe(panel);
+    expect(panel.querySelector('.sw-panel-credit')).toBeNull();
   });
 });
 

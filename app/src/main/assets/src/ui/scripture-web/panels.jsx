@@ -92,11 +92,11 @@ export function TipChip({ info, viewport, inset }) {
  * the held name and My Web added 2026-10-23, ideas audit A10.1). The "+" button, the ruler on the left and the bar that
  * jumped are gone, so the card no longer names them; the legend says what the colours are, and the
  * first line what an arch's height is (C22, w3 review).
- * The footer carries the OpenBible.info credit (Q5). `canSearch`: the go-to's button is there.
+ * The credit is the legend's alone (Corbin, 2026-10-29: one small spot). `canSearch`: the go-to's button is there.
  * `mode` 'personal' (w4): My Web's own four lines, its two rails, the reader's links and
  * Timothy's notes as the legend names them, a tap, and the rails' Reset buttons; the canon's
  * card told of votes and gold ticks My Web does not draw. */
-export function HowToReadGuide({ onClose, canSearch, credit, mode, home }) {
+export function HowToReadGuide({ onClose, canSearch, mode, home }) {
   // where focus was as it opened: on a first visit it opens itself with focus nowhere (<body>), and
   // closing it handed the keyboard back there, where the web's keys do not reach (w4 focus hunt);
   // then home (the web's root) takes it
@@ -134,7 +134,6 @@ export function HowToReadGuide({ onClose, canSearch, credit, mode, home }) {
             <li><strong>Reset</strong> brings the whole web back; <strong>My Web</strong>, in More, draws your own links.</li>
           </ul>
         )}
-        <p className="sw-guide-foot">{credit || WEB_CREDIT}</p>
       </div>
       <button type="button" className="sw-btn sw-guide-close" onClick={onClose}>Got it</button>
     </div>

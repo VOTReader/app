@@ -196,9 +196,10 @@ describe('the docked panel (spec section 3)', () => {
     expect(open).toMatch(/background:\s*var\(--sw-panel\)/);
   });
 
-  it('the pinned credit is a 48 px band on PC and last in the scroll on a phone', () => {
-    expect(rule('.sw-panel-credit')).toMatch(/min-height:\s*48px/);
-    expect(rule('.sw-panel-body > .sw-panel-credit')).toMatch(/min-height:\s*0/);
+  // Corbin, 2026-10-29: one small credit, the legend's; the panel's band is gone
+  it('has no credit band of its own', () => {
+    expect(rule('.sw-panel-credit')).toBeNull();
+    expect(BARE).not.toMatch(/\.sw-panel-credit\b/);
   });
 });
 

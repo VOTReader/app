@@ -641,7 +641,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         </svg>
         <span className="sw-hide-label">{chromeHidden ? 'Show controls' : 'Hide controls'}</span>
       </button>
-      {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} credit={graph && graph.attribution} mode={mode}
+      {guideShown && <HowToReadGuide onClose={closeGuide} canSearch={!!goTo.button} mode={mode}
         home={() => wrapRef.current} />}
       {goTo.box}
       {/* the way back to the verse a choice zoomed out of (use-web-selection.js returnTo) */}

@@ -7,7 +7,7 @@
  * thread (its votes, said once in plain words), the gold ticks of the Volumes' citations,
  * the Go to that jumps to a verse (only when the go-to is there), and Reset. It never names a
  * control the screen does not have: the "+" button and the ruler-and-bar it described were
- * retired (item 23). Its footer carries the OpenBible.info credit (Q5). The card is the web's
+ * retired (item 23). The credit is the legend's alone (Corbin, 2026-10-29). The card is the web's
  * own dark panel in both themes (Q4: panels pinned dark).
  */
 import React from 'react';
@@ -103,13 +103,12 @@ describe('How to read this web: seven or eight short lines about controls that e
     expect(card.getAttribute('aria-modal')).toBe('true');
   });
 
-  it('the footer carries the OpenBible.info credit, the data\'s own line when it has one (Q5)', () => {
-    let foot = guide().querySelector('.sw-guide-foot');
-    expect(foot && foot.textContent).toBe(WEB_CREDIT);
-    expect(WEB_CREDIT).toBe('Cross-reference data © OpenBible.info (CC-BY)');
-    cleanup();
-    foot = guide({ credit: 'Cross-reference data from OpenBible.info' }).querySelector('.sw-guide-foot');
-    expect(foot.textContent).toBe('Cross-reference data from OpenBible.info');
+  // Corbin, 2026-10-29: "We don't need huge credit lines about OpenBible really anywhere except for
+  // a small spot in sweb": the credit is the legend's tail alone, not the card's footer
+  it('carries no credit line of its own: the legend\'s small one is the web\'s', () => {
+    const card = guide();
+    expect(card.querySelector('.sw-guide-foot')).toBeNull();
+    expect(card.textContent).not.toContain(WEB_CREDIT);
   });
 });
 
@@ -137,22 +136,22 @@ describe('the guide in My Web speaks of My Web', () => {
     const all = mine().join(' ');
     expect(all).not.toMatch(/votes?|tick|Go to|search|arch/i);
   });
-  it('keeps the credit and the browse-mode document', () => {
+  it('keeps the browse-mode document, and no credit line of its own', () => {
     const card = guide({ mode: 'personal' });
-    expect(card.querySelector('[role="document"] .sw-guide-foot').textContent).toBe(WEB_CREDIT);
+    expect(card.querySelector('[role="document"] .sw-guide-title')).not.toBeNull();
+    expect(card.textContent).not.toContain(WEB_CREDIT);
   });
 });
 
 describe('the guide reads in browse mode (w4 quality hunt)', () => {
   // the screen's root is role="application": the card's words sit in a document inside the
   // dialog, so NVDA and JAWS read them with the virtual cursor
-  it('its title, lines and credit sit in a role="document" region; Got it stays outside it', () => {
+  it('its title and lines sit in a role="document" region; Got it stays outside it', () => {
     const card = guide({ canSearch: true });
     const doc = card.querySelector('[role="document"]');
     expect(doc).not.toBeNull();
     expect(doc.querySelector('.sw-guide-title')).not.toBeNull();
     expect(doc.querySelectorAll('li').length).toBe(8);
-    expect(doc.querySelector('.sw-guide-foot').textContent).toBe(WEB_CREDIT);
     expect(doc.contains(card.querySelector('.sw-guide-close'))).toBe(false);
   });
 });
@@ -167,11 +166,10 @@ describe('the guide card is the web\'s dark panel in both themes (Q4)', () => {
     expect(card).not.toMatch(/var\(--(bg\d?|cream|gold)[-)]/);
     expect(rule('.sw-guide-title')).toMatch(/color:\s*var\(--sw-title\)/);
     expect(rule('.sw-guide-body strong')).toMatch(/color:\s*var\(--sw-gold\)/);
-    expect(rule('.sw-guide-foot')).toMatch(/color:\s*var\(--sw-text-muted\)/);
   });
 
   it('reads at 13 px or more', () => {
-    for (const sel of ['.sw-guide-title', '.sw-guide-body', '.sw-guide-foot']) {
+    for (const sel of ['.sw-guide-title', '.sw-guide-body']) {
       const m = /font-size:\s*var\(--fsc?-(\d+)\)/.exec(rule(sel));
       expect(m, sel).toBeTruthy();
       expect(Number(m[1]), sel).toBeGreaterThanOrEqual(13);

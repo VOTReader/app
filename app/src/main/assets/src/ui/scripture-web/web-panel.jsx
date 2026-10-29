@@ -761,9 +761,6 @@ export function WebPanel(props) {
   const back = () => { if (journey && typeof journey.back === 'function') journey.back(); };
   /** A crumb back along the trail: one Back a step, as many as it is from the top. @param {number} i */
   const backTo = (i) => { if (crumbs) for (let k = crumbs.length - 1; k > i; k--) back(); };
-  // the CC-BY credit, in My Web too (w4 integration): its legend ends on it, and while a panel is
-  // open the legend hides, so this is where it stays on screen on PC (the hub's licence call)
-  const credit = g.attribution ? <div className="sw-panel-credit">{g.attribution}</div> : null;
 
   return (
     <div className={containerClass} ref={ref} tabIndex={-1} role="dialog" aria-modal="false" aria-label={label}
@@ -800,9 +797,7 @@ export function WebPanel(props) {
           </button>
         ) : null}
         <div className="sw-panel-content" key={key}>{body}</div>
-        {compact ? credit : null}
       </div>
-      {compact ? null : credit}
     </div>
   );
 }
