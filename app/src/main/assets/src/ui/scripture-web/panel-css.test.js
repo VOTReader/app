@@ -144,6 +144,13 @@ describe('the docked panel (spec section 3)', () => {
     expect(r, 'the panel scrolls by touch (scripture-web-2/8)').toMatch(/touch-action:\s*pan-y/);
   });
 
+  // dead-control hunt (2026-10-22): turned, the reader's up and down is the glass's width
+  it('turned (.sw-rotated), the panel lets a finger pan either way, so it scrolls along the reader\'s up and down', () => {
+    const r = rule('.sw-root.sw-rotated .sw-panel, .sw-root.sw-rotated .sw-panel-body');
+    expect(r).not.toBeNull();
+    expect(r).toMatch(/touch-action:\s*pan-x pan-y/);
+  });
+
   it('does not move under reduced motion', () => {
     expect(BARE).toMatch(/@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.sw-panel, \.sw-sheet, \.sw-choice, \.sw-list\s*\{\s*animation:\s*none;/);
   });

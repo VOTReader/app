@@ -9003,6 +9003,11 @@
       scrollbar-width: thin; scrollbar-color: var(--sw-panel-edge) transparent;
       touch-action: pan-y; overscroll-behavior: contain;
     }
+    /* TURNED (a portrait phone, .sw-rotated): pan-y names the glass's up and down, and the reader,
+       holding the phone sideways, scrolls the panel along the glass's width. Both ways are let
+       through, so the panel follows the finger however the engine reads the turn (dead-control
+       hunt 2026-10-22: the panel body would not scroll by touch in the rotated fallback). */
+    .sw-root.sw-rotated .sw-panel, .sw-root.sw-rotated .sw-panel-body { touch-action: pan-x pan-y; }
     .sw-panel-body::-webkit-scrollbar { width: 3px; }
     .sw-panel-body::-webkit-scrollbar-thumb { background: var(--sw-panel-edge); border-radius: 2px; }
     .sw-panel-content { padding-bottom: 24px; }
