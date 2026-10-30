@@ -52,7 +52,7 @@ import { lemma, bestWindow } from './passage.js';
 import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey } from './semantic.js';
 import { kjvTwin, twinView, kjvReading, twinTokens, twinSentences, twinOnly, twinHolders, loadKjvTwin, kjvTwinReady, kjvTwinStatus, onKjvTwin, setKjvTwin, setKjvTwinSource } from './kjv-twin.js';
 import { searchWorker } from './worker-client.js';
-import { indexAssembler } from './index-transfer.js';
+import { indexAssembler, indexJSONParts } from './index-transfer.js';
 import { buildTitles, scoreTitles, admitTitles, swapTitles, stripCollections, titleWords, titleShare, nearWords } from './titles.js';
 import { alignClasses, alignWeights, alignScore, alignMet } from './align.js';
 import { parseLexicon } from './lexicon.js';
@@ -2353,12 +2353,13 @@ const IDLE_TURN_MS = 1000;
 let paceIdle = false;
 /** @type {null | (() => void)} ends the idle turn a background build is waiting on */
 let hurryTurn = null;
-/** The wait between two chunks of a build: the next task, or the next idle turn for a background build. */
+/** The wait between two chunks of a build: the next task, or the next idle turn for a background build.
+    @returns {Promise<any>} the idle turn's deadline when one came (requestIdleCallback's), else null */
 function buildTurn() {
-  if (!paceIdle) return new Promise((r) => setTimeout(r, 0));
+  if (!paceIdle) return new Promise((r) => setTimeout(() => r(null), 0));
   return new Promise((r) => {
     let over = false;
-    const end = () => { if (over) return; over = true; hurryTurn = null; r(undefined); };
+    const end = (deadline = /** @type {any} */ (null)) => { if (over) return; over = true; hurryTurn = null; r(deadline || null); };
     const cancel = onIdle(end, { timeout: IDLE_TURN_MS, fallbackDelay: 16 });
     hurryTurn = () => { cancel(); end(); };
   });
@@ -2416,11 +2417,21 @@ async function build(options) {
   const ms = new MiniSearch(buildMiniSearchOptions());
   // 500 at a time: a chunk of 2,000 held the main thread for about a second on a
   // slow phone (UI audit 2026-09-27), and the box stalled under the reader's typing.
+  // A background build adds what its idle turn has room for (SLICE_MS when the turn timed out on a busy page):
+  // 500 at once held the S22 for 130-350 ms a chunk under the Scripture Web's pan (measure:s22, 2026-10-29).
   const CHUNK = 500;
-  for (let i = 0; i < docs.length; i += CHUNK) {
-    ms.addAll(docs.slice(i, i + CHUNK));
-    if (options.onProgress) options.onProgress(Math.min(i + CHUNK, docs.length), docs.length);
-    await buildTurn();
+  /** @type {any} */ let turn = null;
+  for (let i = 0; i < docs.length;) {
+    if (paceIdle) {
+      const room = turn && !turn.didTimeout && typeof turn.timeRemaining === 'function' ? turn.timeRemaining() - 1 : 0;
+      const end = now() + Math.max(SLICE_MS, room);
+      do ms.add(docs[i++]); while (i < docs.length && now() < end);
+    } else {
+      ms.addAll(docs.slice(i, i + CHUNK));
+      i = Math.min(i + CHUNK, docs.length);
+    }
+    if (options.onProgress) options.onProgress(i, docs.length);
+    turn = await buildTurn();
   }
   if (options.onProgress) options.onProgress(docs.length, docs.length);
   const t2 = now();
@@ -2437,8 +2448,9 @@ async function build(options) {
   // Persist for next session (fire-and-forget) once the reader is not waiting on it:
   // serializing the index is one long task (1.7 s on a slow phone), and it ran the
   // moment the build finished, so the first search froze behind it (UI audit
-  // 2026-09-27).
-  onIdle(() => { saveCached(builtSig, JSON.stringify(ms)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
+  // 2026-09-27). It is written a slice at a time now (indexJSONParts, measure:s22 2026-10-29).
+  const live = () => msIndex === ms;
+  onIdle(() => { indexJSONParts(ms, { live, sliceMs: SLICE_MS, turn: yieldToPage }).then((parts) => (parts ? saveCached(builtSig, parts) : false)).catch(() => {}); }, { timeout: 15000, fallbackDelay: 3000 });
 }
 
 /* EVERY TEXT, FOR THE READER'S EDITION, BEFORE THE INDEX IS BUILT (sweep W2, 2026-10-13). buildDocs

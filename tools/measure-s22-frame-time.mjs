@@ -117,6 +117,7 @@ try {
       await sleep(600);
       if ((await attr(page, 'data-density')) !== 'famous') throw new Error('density not famous');
     }
+    await sleep(600);   // the settle the menu's select step gave every measurement before 10-23
     const renderer = await page.evaluate(() => { const gl = document.querySelector('canvas.sw-canvas-gl')?.getContext('webgl2') || document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : 'none'; });
     const viewport = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio }));
     note(`renderer "${renderer}" viewport ${JSON.stringify(viewport)}`);

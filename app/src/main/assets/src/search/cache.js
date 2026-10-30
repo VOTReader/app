@@ -171,10 +171,24 @@ export async function loadCached(sig) {
   }
 }
 
+/** Parts as a body the cache reads a part a turn (one 21 MB Response held the S22 152 ms, measure:s22 2026-10-29). */
+function streamOf(/** @type {string[]} */ parts) {
+  if (typeof ReadableStream !== 'function' || typeof TextEncoder !== 'function') return null;
+  const enc = new TextEncoder();
+  let k = 0;
+  return new ReadableStream({
+    async pull(c) {
+      if (k >= parts.length) { c.close(); return; }
+      if (k) await new Promise((r) => setTimeout(r, 0));
+      c.enqueue(enc.encode(parts[k++]));
+    },
+  });
+}
+
 /**
  * Persist the serialized index under the current signature (single entry).
  * @param {string} sig
- * @param {string} json
+ * @param {string|string[]} json  the JSON, or its parts in order (engine.js indexJSONParts), streamed in
  * @returns {Promise<boolean>}
  */
 export async function saveCached(sig, json) {
@@ -182,7 +196,19 @@ export async function saveCached(sig, json) {
   try {
     const cache = await openCache();
     if (!cache) return false;
-    await cache.put(ENTRY_URL, new Response(json, { headers: { 'content-type': 'application/json', [SIG_HEADER]: sig } }));
+    const headers = { 'content-type': 'application/json', [SIG_HEADER]: sig };
+    if (typeof json === 'string') {
+      await cache.put(ENTRY_URL, new Response(json, { headers }));
+      return true;
+    }
+    const stream = streamOf(json);
+    try {
+      if (!stream) throw new Error('no streams');
+      await cache.put(ENTRY_URL, new Response(stream, { headers }));
+    } catch {
+      // an engine that will not store a streamed body stores the same JSON at once, as before
+      await cache.put(ENTRY_URL, new Response(json.join(''), { headers }));
+    }
     return true;
   } catch {
     return false; // quota / unavailable — search still works, just rebuilds next time

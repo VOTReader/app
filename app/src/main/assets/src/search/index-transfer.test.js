@@ -1,8 +1,8 @@
 /* The warm index handed over in parts (sr9, 2026-10-14): what the page assembles from the worker's parts
    is the index MiniSearch.loadJSON makes from the same JSON, and no part is large. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import MiniSearch from './vendor/minisearch.js';
-import { postIndexParts, indexAssembler } from './index-transfer.js';
+import { postIndexParts, indexAssembler, indexJSONParts } from './index-transfer.js';
 
 const OPTIONS = { fields: ['title', 'text'], storeFields: ['title', 'text', 'kind'], idField: 'id' };
 const WORDS = ['grace', 'mercy', 'shepherd', 'still', 'waters', 'righteous', 'flourish', 'cedar', 'lebanon', 'love'];
@@ -46,5 +46,38 @@ describe('index-transfer', () => {
     expect(msgs[0].head).toBeTruthy();
     expect(msgs.length).toBeGreaterThan(10);
     for (const m of msgs.slice(1)) expect(JSON.stringify(m).length, m.part).toBeLessThan(600000);
+  });
+});
+
+/* The warm index written a slice at a time (measure:s22, 2026-10-29): JSON.stringify(ms) was one ~580 ms task on
+   the S22 after a cold build. The parts, joined, are the JSON it writes, and a write another index overtook stops. */
+describe('indexJSONParts', () => {
+  const built = new MiniSearch(OPTIONS);
+  built.addAll(docs);
+  built.discard('d7');
+
+  it('writes, a slice at a time, the JSON JSON.stringify writes', async () => {
+    let t = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (t += 1));   // 1 ms a reading
+    let turns = 0;
+    try {
+      const parts = /** @type {string[]} */ (await indexJSONParts(built, { sliceMs: 8, turn: async () => { turns++; } }));
+      expect(parts.length).toBeGreaterThan(10);
+      expect(turns).toBe(parts.length - 1);
+      const json = parts.join('');
+      expect(JSON.parse(json)).toEqual(JSON.parse(JSON.stringify(built)));
+      const loaded = MiniSearch.loadJSON(json, OPTIONS);
+      for (const q of ['shepherd waters', 'cedar', 'letter 450', 'w8999']) {
+        expect(loaded.search(q).map((r) => r.id)).toEqual(built.search(q).map((r) => r.id));
+      }
+    } finally { clock.mockRestore(); }
+  });
+
+  it('is dropped when another index comes in', async () => {
+    let t = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (t += 1));
+    try {
+      expect(await indexJSONParts(built, { sliceMs: 8, turn: async () => {}, live: () => false })).toBeNull();
+    } finally { clock.mockRestore(); }
   });
 });

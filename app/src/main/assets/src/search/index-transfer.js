@@ -88,3 +88,68 @@ export function indexAssembler(MiniSearch, head, options) {
     },
   };
 }
+
+/* THE WARM INDEX IS WRITTEN A SLICE AT A TIME (measure:s22, 2026-10-29). JSON.stringify(ms) after a cold build was
+   one task of ~580 ms on the S22 (toJSON 127 ms, the stringify 305, the 21 MB Response 152), and its idle turn
+   fell between two frames of a Scripture Web pan. indexJSONParts writes what toJSON gives, member by member, a
+   slice at a time; cache.js saveCached streams the parts in. Joined, they are the JSON JSON.stringify(ms) writes
+   (index-transfer.test.js parses both). */
+
+/**
+ * The JSON of a MiniSearch index in parts, written `sliceMs` at a time with a `turn` between.
+ * @param {any} ms
+ * @param {{ live?: () => boolean, sliceMs?: number, turn?: () => Promise<any> }} [opts]
+ *   `live` false drops the write (another index came in), checked at each turn
+ * @returns {Promise<string[]|null>} the parts in order, or null when dropped
+ */
+export async function indexJSONParts(ms, opts = {}) {
+  const live = opts.live || (() => true);
+  const sliceMs = opts.sliceMs || 8;
+  const turn = opts.turn || (() => new Promise((r) => setTimeout(r, 0)));
+  const clock = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  /** @type {string[]} */ const parts = [];
+  /** @type {string[]} */ let run = [];
+  let end = clock() + sliceMs;
+  let n = 0;
+  /** Past the slice: close a part and give the page a turn. false when the write is dropped. */
+  const next = async () => {
+    if ((++n & 63) !== 0 || clock() < end) return true;
+    parts.push(run.join('')); run = [];
+    await turn();
+    end = clock() + sliceMs;
+    return live();
+  };
+  const str = (/** @type {any} */ v) => JSON.stringify(v);
+  /** A Map as the object Object.fromEntries makes of it; a member JSON leaves out (undefined) is left out. */
+  const object = async (/** @type {Iterable<[any, any]>} */ entries) => {
+    run.push('{');
+    let first = true;
+    for (const [k, v] of entries) {
+      const s = str(v);
+      if (s === undefined) continue;
+      run.push((first ? '' : ',') + str(String(k)) + ':' + s);
+      first = false;
+      if (!(await next())) return false;
+    }
+    run.push('}');
+    return true;
+  };
+  run.push('{"documentCount":' + str(ms._documentCount) + ',"nextId":' + str(ms._nextId) + ',"documentIds":');
+  if (!(await object(ms._documentIds))) return null;
+  run.push(',"fieldIds":' + str(ms._fieldIds) + ',"fieldLength":');
+  if (!(await object(ms._fieldLength))) return null;
+  run.push(',"averageFieldLength":' + str(ms._avgFieldLength) + ',"storedFields":');
+  if (!(await object(ms._storedFields))) return null;
+  run.push(',"dirtCount":' + str(ms._dirtCount) + ',"index":[');
+  let first = true;
+  for (const [term, fieldIndex] of ms._index) {
+    /** @type {Record<string, any>} */ const data = {};
+    for (const [fieldId, freqs] of fieldIndex) data[fieldId] = Object.fromEntries(freqs);
+    run.push((first ? '' : ',') + str([term, data]));
+    first = false;
+    if (!(await next())) return null;
+  }
+  run.push('],"serializationVersion":2}');
+  parts.push(run.join(''));
+  return parts;
+}

@@ -59,6 +59,30 @@ describe('a background build runs in idle time', () => {
     expect((await E.search('shepherd')).results.length).toBeGreaterThan(0);
   });
 
+  // measure:s22 (2026-10-29): 500 documents at once held the S22's main thread 130-350 ms a chunk, under the
+  // Scripture Web's pan. A background chunk is what its idle turn has room for, SLICE_MS when the turn timed out.
+  it('a background chunk is sized by its idle turn, not 500 at once', async () => {
+    let t = 0;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => (t += 1));   // 1 ms a reading
+    try {
+      /** @type {number[]} */ const seen = [];
+      let done = false;
+      E.init({ background: true, onProgress: (n) => seen.push(n) }).then(() => { done = true; });
+      await settle();
+      const busy = () => { const q = idle; idle = []; for (const c of q) if (c.fn) c.fn({ didTimeout: true, timeRemaining: () => 0 }); };
+      for (let i = 0; i < 3; i++) { busy(); await settle(); }
+      const paced = seen.map((n, i) => n - (i ? seen[i - 1] : 0));
+      expect(paced.length).toBeGreaterThanOrEqual(3);
+      expect(paced.every((d) => d >= 1 && d <= 8)).toBe(true);   // SLICE_MS of a 1 ms clock
+      E.init();   // the Search screen opens: full speed, 500 a chunk
+      for (let i = 0; i < 20 && !done; i++) await settle();
+      expect(done).toBe(true);
+      const steps = seen.map((n, i) => n - (i ? seen[i - 1] : 0));
+      expect(steps.slice(paced.length)).toContain(500);
+      expect(seen[seen.length - 1]).toBe(1500);
+    } finally { clock.mockRestore(); }
+  });
+
   it('a foreground init takes a background build to full speed', async () => {
     let done = false;
     E.init({ background: true });

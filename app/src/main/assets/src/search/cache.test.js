@@ -125,6 +125,22 @@ describe('the warm index in the Cache API', () => {
     expect([...GC.caches.stores.keys()]).toEqual([SEARCH_CACHE_NAME]);
   });
 
+  // measure:s22 (2026-10-29): the engine hands over the JSON in parts (indexJSONParts), streamed in
+  it('stores parts as the one JSON they make, streamed, or at once where a stream is refused', async () => {
+    expect(await saveCached('sig-p', ['{"index":', '[1,2]', ',"é":"✦"}'])).toBe(true);
+    expect(await loadCached('sig-p')).toBe('{"index":[1,2],"é":"✦"}');
+    // an engine that will not store a streamed body
+    const open = GC.caches.open;
+    let puts = 0;
+    GC.caches.open = async (/** @type {string} */ name) => {
+      const c = await open(name);
+      return { ...c, put: async (/** @type {any} */ req, /** @type {any} */ res) => { if (++puts === 1) throw new TypeError('streamed body'); return c.put(req, res); } };
+    };
+    expect(await saveCached('sig-q', ['{"a":', '1}'])).toBe(true);
+    expect(puts).toBe(2);
+    expect(await loadCached('sig-q')).toBe('{"a":1}');
+  });
+
   it('returns null for a stale (non-matching) signature', async () => {
     await saveCached('old', '{"x":1}');
     expect(await loadCached('new')).toBeNull();
