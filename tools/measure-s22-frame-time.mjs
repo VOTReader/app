@@ -105,7 +105,18 @@ try {
     if (await page.$('.sw-fallback')) throw new Error('sw-fallback: ' + await page.evaluate(() => (document.querySelector('.sw-fallback-body') || {}).textContent || ''));
     if (!(await waitFor(page, () => !document.querySelector('.sw-loading'), 60000))) throw new Error('still loading');
     await sleep(800); await clickIfPresent(page, 'Dismiss'); await sleep(300);
-    await page.select('select.sw-select', 'famous'); await sleep(600);
+    // the measured density is Famous: since 2026-10-23 it is the Filters sheet's Strength row ("All"),
+    // the menu's select gone; a fresh profile is already there, so the sheet opens only when it is not
+    if ((await attr(page, 'data-density')) !== 'famous') {
+      await clickLabel(page, 'Filters'); await sleep(400);
+      await page.evaluate(() => {
+        const b = [...document.querySelectorAll('.sw-filter-sheet .sw-seg-btn')].find((x) => x.textContent === 'All');
+        if (b) b.click();
+        const c = document.querySelector('.sw-filter-close'); if (c) c.click();
+      });
+      await sleep(600);
+      if ((await attr(page, 'data-density')) !== 'famous') throw new Error('density not famous');
+    }
     const renderer = await page.evaluate(() => { const gl = document.querySelector('canvas.sw-canvas-gl')?.getContext('webgl2') || document.createElement('canvas').getContext('webgl2'); const d = gl && gl.getExtension('WEBGL_debug_renderer_info'); return d ? String(gl.getParameter(d.UNMASKED_RENDERER_WEBGL)) : 'none'; });
     const viewport = await page.evaluate(() => ({ w: innerWidth, h: innerHeight, dpr: devicePixelRatio }));
     note(`renderer "${renderer}" viewport ${JSON.stringify(viewport)}`);
