@@ -995,16 +995,20 @@ describe('routeOverlayHit (CONTRACTS.md section 4): what a tap on a drawn name d
     expect(handled).toBe(true);
     expect(get().sel.choices.map((c) => c.index)).toEqual([1, 2]);
   });
-  it("a pill with a cell opens today's group all the same; a fan's chip opens its lines in exits mode, the camera still", async () => {
+  it("a pill with a cell opens its column, \"Where its lines go\"; a fan's chip opens its lines in exits mode, the camera still", async () => {
     const { get } = mountWeb({ cam: { x: 9000, ppv: 8 } });
     const spy = vi.fn(() => true);
     expect(routeOverlayHit({ kind: 'pill', ids: [1, 2], label: 'Genesis 1', cell: { lo: 200, hi: 210 } }, { graph: graph(), flyTo: vi.fn(), openPanel: spy, journey: null })).toBe(true);
-    expect(spy).toHaveBeenCalledWith({ mode: 'group', ids: [1, 2], label: 'Genesis 1' });
+    expect(spy).toHaveBeenCalledWith({ mode: 'exits', ids: [1, 2], label: 'Genesis 1', key: 'cell:200-210',
+      cell: { lo: 200, hi: 210 }, side: null, books: null, area: { label: 'Genesis 1', lo: 200, hi: 210 } });
+    spy.mockClear();
+    expect(routeOverlayHit({ kind: 'pill', ids: [1, 2], label: 'Genesis 1' }, { graph: graph(), flyTo: vi.fn(), openPanel: spy, journey: null })).toBe(true);
+    expect(spy, 'no cell: its group, as before').toHaveBeenCalledWith({ mode: 'group', ids: [1, 2], label: 'Genesis 1' });
     const nav = () => ({ graph: graph(), flyTo: get().cam.flyTo, openPanel: get().sel.openPanel, journey: get().journey });
     let handled;
     act(() => { handled = routeOverlayHit({ kind: 'pill', ids: [1, 2], label: 'Genesis 1', cell: { lo: 200, hi: 210 } }, nav()); });
     expect(handled).toBe(true);
-    expect(get().sel.choices.map((c) => c.index)).toEqual([1, 2]);
+    expect(get().sel.detail).toMatchObject({ kind: 'exits', cell: { lo: 200, hi: 210 }, books: null });
     settle(); await flush();
     const cam = { ...get().cam.camRef.current };
     const chip = { kind: 'exit', ids: [1, 2], label: 'Genesis', key: 'c200-210:r:0-0', side: 'right', lo: 0, hi: 0, count: 2,

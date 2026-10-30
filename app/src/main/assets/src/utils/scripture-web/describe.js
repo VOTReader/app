@@ -301,6 +301,10 @@ export function exitsWords(info) {
   const n = info.ids ? info.ids.length : 0;
   const lines = plural(n, 'connection', 'connections');
   const label = info.label || '';
+  // a "+n" pill's column: every line standing there, by where it goes
+  if (!info.books) {
+    return { over: 'Where its lines go', title: label, meta: lines, summary: label + ', ' + lines + ', by where they go.' };
+  }
   const title = info.side === 'left' ? '‹ ' + label : info.side === 'right' ? label + ' ›' : label;
   const from = info.area && info.area.label ? ' from ' + info.area.label : '';
   return { over: 'Leaving the view', title, meta: lines + from,

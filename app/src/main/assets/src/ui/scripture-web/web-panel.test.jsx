@@ -716,4 +716,19 @@ describe("exits mode: a fan chip's lines, by the book they go to", () => {
     expect(props.followRow.mock.calls[0][0].hereVerse).toBeGreaterThanOrEqual(cell.lo);
     expect(props.followRow.mock.calls[0][0].hereVerse).toBeLessThanOrEqual(cell.hi);
   });
+
+  // the curtain round's held pill tap (built 2026-10-29): a column's pill is "Where its lines go"
+  it("a pill's column: 'Where its lines go', its label, its count; every line in the cell by far book", () => {
+    const all = Int32Array.from(fan.right.concat(fan.left).flatMap((x) => Array.from(exitIds(g, set, V.W, x.side, x.lo, x.hi, cell))));
+    const col = { kind: 'exits', key: 'cell:' + cell.lo + '-' + cell.hi, label: 'Isaiah 54:1-12', side: null, books: null,
+      cell, area: { label: 'Isaiah 54:1-12', ...cell }, ids: all };
+    const w = ds.exitsWords(col);
+    expect(w).toEqual({ over: 'Where its lines go', title: 'Isaiah 54:1-12', meta: all.length + ' connections',
+      summary: 'Isaiah 54:1-12, ' + all.length + ' connections, by where they go.' });
+    const { panel } = mount({ detail: col });
+    expect(panel.querySelector('.sw-panel-over').textContent).toBe('Where its lines go');
+    expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · ' + pm.exitsModel(g, col).threads.total.toLocaleString());
+    const books = pm.exitsModel(g, col).threads.groups.map((x) => x.book);
+    expect(books.length, 'its lines go to more than one book').toBeGreaterThan(1);
+  });
 });

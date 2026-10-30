@@ -159,14 +159,16 @@ describe("the fan's hover (PC): a pill raises it, a chip lights its lines, nothi
 });
 
 describe('the taps: a pill opens its group as today, with the fan up; a chip opens its lines', () => {
-  it("a pill tap opens today's group panel and keeps the fan up while that card is open", () => {
+  // the curtain round's held pill tap (built 2026-10-29): a column's pill opens "Where its lines go"
+  it('a pill tap opens its column, every line it counts lit, and keeps the fan up while that card is open', () => {
     const w = mount();
     w.tap(AT.pill);
-    expect(w.get().sel.choices.map((c) => c.index)).toEqual([0, 1, 2, 3]);
-    expect(w.get().sel.detail).toBe(null);
+    expect(w.get().sel.choices || null).toBe(null);
+    expect(w.get().sel.detail).toMatchObject({ kind: 'exits', cell: CELL, side: null, books: null });
+    expect(Array.from(w.get().sel.detail.ids)).toEqual([0, 1, 2, 3]);
     expect(w.focus().ask).toMatchObject({ cell: CELL, side: null, books: null });
     expect(w.focus().ask.hover).toBeFalsy();
-    expect(w.focus().lit, 'the group lights nothing on its own').toBe(null);
+    expect(Array.from(w.focus().lit), 'its lines are lit').toEqual([0, 1, 2, 3]);
     // the panel closes: the fan goes
     act(() => { w.get().sel.closeCards(); });
     expect(w.focus().ask || null).toBe(null);

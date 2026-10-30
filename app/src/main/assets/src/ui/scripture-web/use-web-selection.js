@@ -463,8 +463,11 @@ export function useWebSelection({
       bringIn((found.far === 'to' ? found.from : found.to) + 0.5);
       return;
     }
+    // a column's card (a "+n" pill's) brings its column out from under the panel; a fan chip's
+    // lines are the frame's own, and the camera stays where the reader is
     const range = found.kind === 'verse' ? [found.verse, endOf(found)]
-      : found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi] : null;
+      : found.kind === 'chapter' || found.kind === 'bundle' ? [found.lo, found.hi]
+      : found.kind === 'exits' && found.cell && !found.books ? [found.cell.lo, found.cell.hi] : null;
     if (!range || mode === 'personal') return;
     bringIn((range[0] + range[1] + 1) / 2);
   }, [camRef, viewRef, flyTo, coverNow, bringIn, graph, mode]);

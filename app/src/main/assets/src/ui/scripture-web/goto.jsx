@@ -691,8 +691,10 @@ export function useGoTo(web) {
 /**
  * Route a tap on an overlay target (CONTRACTS.md section 4): a book name frames the book, a
  * chapter numeral frames the chapter (about 70 % of the canvas area) and opens its group, a pill
- * opens its group, and a chip of a pill's fan opens the lines it counts in the panel's exits mode,
- * moving no camera (exits.js). A camera move is a journey arrival, pushed before the camera moves (the trail
+ * with a column opens "Where its lines go" (the panel's exits mode: every line it counts, by the
+ * book it goes to; the camera brings the column out from under the panel), a pill with none its
+ * group, and a chip of a pill's fan opens the lines it counts in exits mode, moving no camera
+ * (exits.js). A camera move is a journey arrival, pushed before the camera moves (the trail
  * asks the go-to where it set out from).
  * @param {import('./overlay-renderer.js').OverlayHit | null} hit
  * @param {{ graph: any, flyTo: Function, openPanel: Function, journey: any, insetFor?: Function, closePanel?: Function }} nav
@@ -722,7 +724,16 @@ export function routeOverlayHit(hit, nav) {
     return true;
   }
   if (hit.kind === 'pill') {
-    return typeof nav.openPanel === 'function' && !!nav.openPanel({ mode: 'group', ids: hit.ids, label: hit.label });
+    if (typeof nav.openPanel !== 'function') return false;
+    // a pill that names no cell has no column: its group, as before
+    if (!hit.cell) return !!nav.openPanel({ mode: 'group', ids: hit.ids, label: hit.label });
+    // its column (the curtain round's held pill tap, built 2026-10-29): every line it counts, by
+    // where it goes; its fan stays up while the card is open (the ask's key is the cell's)
+    return !!nav.openPanel({
+      mode: 'exits', ids: hit.ids, label: hit.label, key: 'cell:' + hit.cell.lo + '-' + hit.cell.hi,
+      cell: { lo: hit.cell.lo, hi: hit.cell.hi }, side: null, books: null,
+      area: { label: hit.label, lo: hit.cell.lo, hi: hit.cell.hi },
+    });
   }
   if (hit.kind === 'exit') {
     return typeof nav.openPanel === 'function' && !!nav.openPanel({
