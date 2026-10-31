@@ -155,38 +155,13 @@ describe('See all: one page, three tabs', () => {
   });
 });
 
-describe('Liked Songs (so-liked, Corbin 10-24)', () => {
-  it('hidden while nothing is liked', async () => {
+describe('no Liked Songs shelf (Corbin 10-30: removed)', () => {
+  it('likes leave the hub without a Liked Songs shelf', async () => {
     await tally(null);
     await act(async () => { await SongVotes.load(); });
+    act(() => { SongVotes.setVote(ids[2], 1, 1000); SongVotes.setVote(ids[5], 1, 3000); });
     renderScreen([{ k: 'hub' }]);
     expect(screen.queryByRole('heading', { name: 'Liked Songs' })).toBeNull();
-  });
-
-  it('a shelf of the likes of this listener, newest like first, that plays from the tapped song; See all opens the list', async () => {
-    await tally(null);
-    await act(async () => { await SongVotes.load(); });
-    act(() => { SongVotes.setVote(ids[2], 1, 1000); SongVotes.setVote(ids[5], 1, 3000); SongVotes.setVote(ids[7], 1, 2000); SongVotes.setVote(ids[8], 1, 500); });
-    const props = renderScreen([{ k: 'hub' }]);
-    const shelf = section('Liked Songs');
-    const tiles = shelf.querySelectorAll('.songs-top-tile');
-    expect(tiles.length).toBe(3);
-    expect(tiles[0].textContent).toContain(BIG.songs[5].t);
-    expect(tiles[1].textContent).toContain(BIG.songs[7].t);
-    fireEvent.click(tiles[1]);
-    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ ids: [ids[5], ids[7], ids[2], ids[8]], startId: ids[7], label: 'Liked Songs' }));
-    fireEvent.click(within(shelf).getByRole('button', { name: 'See all liked songs' }));
-    expect(props.onPush).toHaveBeenCalledWith({ k: 'list', v: 'liked' });
-  });
-
-  it('the full list scrolls every like and has Play all', async () => {
-    await tally(null);
-    await act(async () => { await SongVotes.load(); });
-    act(() => { for (let i = 0; i < 6; i++) SongVotes.setVote(ids[i + 1], 1, 1000 + i); });
-    renderScreen([{ k: 'hub' }, { k: 'list', v: 'liked' }]);
-    expect(screen.getByRole('heading', { name: 'Liked Songs' })).toBeTruthy();
-    expect(document.querySelectorAll('.songs-list .songs-row').length).toBe(6);
-    fireEvent.click(screen.getByRole('button', { name: 'Play all' }));
-    expect(player.playSongs).toHaveBeenCalledWith(expect.objectContaining({ ids: [6, 5, 4, 3, 2, 1].map((i) => ids[i]), label: 'Liked Songs' }));
+    expect(SongVotes.likedIds).toBeUndefined();
   });
 });
