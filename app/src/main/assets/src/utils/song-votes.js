@@ -27,8 +27,8 @@
    daily publish (D:/FlockSync/songs_publish.py): {v: 1, min, songs: {id:
    [liked, liked_last_30d]}, popular: [ids], loved: [ids]}. A 404 (before the
    first publish) is "no votes yet". The app shows no numbers from it, ever
-   (no like or play counts): only the order of the Popular and All-time loved
-   shelves.
+   (no like or play counts): only the order of the All-time loved shelf (its
+   popular list is published but unread since Corbin 10-30 removed Popular).
 
    Bundle-d beside song-catalog.js; bundle-h screens read the `SongVotes`
    global (ui/_entry-d.js), never by import.
@@ -274,6 +274,13 @@ export function downVotedIds() {
   return out;
 }
 
+/** Songs this device liked, the newest like first (the Songs hub's Liked Songs, so-liked 10-24). @returns {string[]} */
+export function likedSongIds() {
+  const out = [];
+  for (const [id, e] of _votes) if (e.v === 1) out.push([id, e.at]);
+  return out.sort((a, b) => b[1] - a[1]).map((x) => x[0]);
+}
+
 /** Has the one-time "Only you see this" note been shown on this install? */
 export function downNoteSeen() { return _downNoteSeen; }
 
@@ -416,7 +423,7 @@ async function _fetchTally() {
 
 /**
  * Load the tallies: network first, the last good copy when it fails. A 404
- * (nothing published yet) is an empty tally: Popular shows its empty card.
+ * (nothing published yet) is an empty tally: All-time loved stays hidden.
  * Asked again at most every TALLY_RECHECK_MS.
  * @returns {Promise<void>}
  */
@@ -451,8 +458,6 @@ export function loadSongTally() {
   return _tallyLoading;
 }
 
-/** Popular (liked lately, real agreement), ranked, one version per family. @returns {string[]} */
-export function popularSongIds() { return _tally ? _tally.popular : []; }
 /** All-time loved, ranked, one version per family. @returns {string[]} */
 export function lovedSongIds() { return _tally ? _tally.loved : []; }
 
@@ -487,10 +492,10 @@ export const SongVotes = {
   setVote: setSongVote,
   tap: tapSongVote,
   downVotedIds,
+  likedIds: likedSongIds,
   downNoteSeen,
   markDownNoteSeen,
   flush: flushSongVotes,
   pending: pendingSongVotes,
-  popularIds: popularSongIds,
   lovedIds: lovedSongIds,
 };

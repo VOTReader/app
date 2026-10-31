@@ -2152,10 +2152,8 @@
       .song-vote-ask { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 .35rem; margin: .35rem 0 .25rem; }
       .song-vote-ask-q { color: var(--vote-taupe); font-size: var(--fs-16); font-style: italic; text-align: center; }
       .song-vote-pair.is-large .song-vote-svg { width: clamp(30px, 1.6rem, 36px); height: clamp(30px, 1.6rem, 36px); }
-      /* sy4-3 shelves (pictures song-voting 01-04): Popular / All-time loved / New as three tiles each, See all = one
-         page with three tabs. Tiles carry no vote UI and no numbers; a family with versions says "3 versions". */
-      .songs-section-titles { display: inline-flex; align-items: baseline; flex-wrap: wrap; gap: 0 .6rem; min-width: 0; }
-      .songs-section-sub { color: var(--vote-taupe); font-size: var(--fs-14); font-style: italic; }
+      /* sy4-3 shelves (pictures song-voting 01-04): All-time loved / New as three tiles each, See all = one
+         page with two tabs (Popular removed, Corbin 10-30). Tiles carry no vote UI and no numbers; a family with versions says "3 versions". */
       .songs-top-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; }
       .songs-top-tile { display: flex; flex-direction: column; gap: .3rem; min-width: 0; padding: 0; border: 0; background: none; color: var(--cream); font: inherit; text-align: left; cursor: pointer; }
       .songs-top-tile .songs-top-cover { width: 100%; height: auto; aspect-ratio: 1; border-radius: 6px; }

@@ -6,8 +6,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import {
   SONG_VOTE_URL, SONG_TALLY_URL, SONG_VOTE_KEYS,
   loadSongVotes, voteOf, setSongVote, tapSongVote, voteToSend, downVotedIds, downNoteSeen, markDownNoteSeen,
-  flushSongVotes, pendingSongVotes, postSongVote, normalizeSongTally, loadSongTally, popularSongIds, lovedSongIds,
-  voteTraits, SongVotes, _resetSongVotesForTests,
+  flushSongVotes, pendingSongVotes, postSongVote, normalizeSongTally, loadSongTally, lovedSongIds,
+  voteTraits, likedSongIds, SongVotes, _resetSongVotesForTests,
 } from './song-votes.js';
 
 const A = 'aaaaaaaaaaaa';
@@ -68,6 +68,20 @@ describe('what a change of vote sends (👎 never leaves the device)', () => {
     expect(pendingSongVotes()).toEqual([]);
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(downVotedIds()).toEqual([A]);
+  });
+});
+
+describe('Liked Songs (so-liked): the likes of this device', () => {
+  it('lists the 👍 songs, newest like first; a 👎 or a cleared like leaves', async () => {
+    await loadSongVotes();
+    setSongVote(A, 1, 1000);
+    setSongVote(B, 1, 3000);
+    setSongVote(C, 1, 2000);
+    expect(likedSongIds()).toEqual([B, C, A]);
+    expect(SongVotes.likedIds()).toEqual([B, C, A]);
+    setSongVote(C, -1, 4000);
+    setSongVote(A, 0, 5000);
+    expect(likedSongIds()).toEqual([B]);
   });
 });
 
@@ -311,12 +325,12 @@ describe('the tallies (votes.json)', () => {
   const tally = { v: 1, min: 3, songs: { [A]: [5, 3], [B]: [9, 0] }, popular: [A], loved: [B, A] };
   const answer = (status, body) => vi.fn(async (url) => ({ status, ok: status === 200, url, text: async () => JSON.stringify(body) }));
 
-  it('reads popular and loved in their published order', async () => {
+  it('reads loved in its published order', async () => {
     globalThis.fetch = answer(200, tally);
     await loadSongTally();
     expect(globalThis.fetch.mock.calls[0][0]).toBe(SONG_TALLY_URL);
-    expect(popularSongIds()).toEqual([A]);
     expect(lovedSongIds()).toEqual([B, A]);
+    expect(SongVotes.popularIds).toBeUndefined();
     expect(SongVotes.tallyLoaded).toBe(true);
     expect(idb.data.get(SONG_VOTE_KEYS.tally)).toEqual(tally);
   });
@@ -325,7 +339,6 @@ describe('the tallies (votes.json)', () => {
     globalThis.fetch = answer(404, {});
     await loadSongTally();
     expect(SongVotes.tallyLoaded).toBe(true);
-    expect(popularSongIds()).toEqual([]);
     expect(lovedSongIds()).toEqual([]);
   });
 
@@ -333,7 +346,7 @@ describe('the tallies (votes.json)', () => {
     idb.data.set(SONG_VOTE_KEYS.tally, tally);
     globalThis.fetch = fakeFetch('net');
     await loadSongTally();
-    expect(popularSongIds()).toEqual([A]);
+    expect(lovedSongIds()).toEqual([B, A]);
   });
 
   it('refuses a file of another version and drops ids that are not songs', () => {

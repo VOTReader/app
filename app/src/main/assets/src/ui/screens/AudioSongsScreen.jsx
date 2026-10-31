@@ -25,10 +25,10 @@ import { OfflineNote } from '../components/OfflineAudioControls.jsx';
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
 const NEW_TOTAL = 10;
-/* sy4-3 (Corbin 2026-10-22, pictures calls/song-voting-mockups 01-04): Popular, All-time loved and New as shelves of
-   tiles on the hub, each with See all: one page, three tabs. Popular = liked lately with real agreement and
-   All-time loved = liked most, both ranked by the daily votes.json (best version per family); New = newest by
-   first-seen date. A family shows once. No numbers. */
+/* sy4-3 (Corbin 2026-10-22, pictures calls/song-voting-mockups 01-04): All-time loved and New as shelves of
+   tiles on the hub, each with See all: one page, two tabs. All-time loved = liked most, ranked by the daily
+   votes.json (best version per family); New = newest by first-seen date. A family shows once. No numbers.
+   Popular (liked lately) is gone (Corbin 10-30: "get rid of the popular among users surface"). */
 /** Tiles on a hub shelf; See all opens the rest. */
 const SHELF_TILES = 3;
 /** Rows on the See all page's New tab. */
@@ -36,7 +36,6 @@ const NEW_PAGE = 50;
 /** All-time loved stays hidden while it has fewer songs than this (sv-mock README: "too thin"). */
 const LOVED_MIN = 3;
 const TOP_TABS = [
-  { v: 'popular', label: 'Popular', line: 'Songs listeners have loved lately', play: 'Popular songs' },
   { v: 'loved', label: 'All-time loved', line: 'Songs listeners have loved most', play: 'All-time loved' },
   { v: 'new', label: 'New', line: 'Newest songs first', play: 'New from the flock' },
 ];
@@ -146,12 +145,18 @@ function rankedSongs(ids) {
   return out;
 }
 
-/** A shelf's songs: Popular, All-time loved or New. `n` 0 = all. @param {string} v @param {number} n @returns {any[]} */
+/** A shelf's songs: All-time loved or New. `n` 0 = all. @param {string} v @param {number} n @returns {any[]} */
 function topSongs(v, n) {
   if (v === 'new') return newestSongs(n || NEW_PAGE);
   const store = votes();
-  const list = store ? rankedSongs(v === 'popular' ? store.popularIds() : store.lovedIds()) : [];
+  const list = store ? rankedSongs(store.lovedIds()) : [];
   return n ? list.slice(0, n) : list;
+}
+
+/** so-liked (Corbin 10-24 "scroll through Liked Songs"): this listener's 👍 songs, newest like first. */
+function likedSongs() {
+  const store = votes();
+  return store && typeof store.likedIds === 'function' ? songsOfIds(store.likedIds()) : [];
 }
 
 /** Kept ids as songs, hidden ones included (a kept song must stay removable). @param {string[]} ids */
@@ -180,6 +185,12 @@ function listContent(v, library) {
       eyebrow: 'Your songs', title: v === 'saved' ? 'Saved songs' : 'Recently played songs',
       families: null, songs: songsOfIds(ids),
       empty: v === 'saved' ? 'Tap Save on any song and it will wait here.' : 'Songs you play will appear here.',
+    };
+  }
+  if (v === 'liked') {
+    return {
+      eyebrow: 'Your songs', title: 'Liked Songs', families: null, songs: likedSongs(),
+      empty: 'Tap the thumbs-up on any song and it will wait here.',
     };
   }
   if (v === 'kept') {
@@ -310,11 +321,11 @@ function SongRowPlain({ song, playingId, active, onPlay, onOpen, onRemove }) {
 }
 const SongRow = React.memo(SongRowPlain, sameRowFor((p) => (p.playingId === p.song.id ? (p.active ? 2 : 1) : 0)));
 
-/** @param {{ title: string, id?: string, action?: any, sub?: string }} props */
-function SectionHead({ title, id, action, sub = '' }) {
+/** @param {{ title: string, id?: string, action?: any }} props */
+function SectionHead({ title, id, action }) {
   return (
     <div className="songs-section-head">
-      {sub ? <span className="songs-section-titles"><h2 id={id}>{title}</h2><span className="songs-section-sub">{sub}</span></span> : <h2 id={id}>{title}</h2>}
+      <h2 id={id}>{title}</h2>
       {action || null}
     </div>
   );
@@ -345,11 +356,11 @@ function SongTiles({ songs, onPlay }) {
   );
 }
 
-/** Empty Popular (02): what the shelf says instead of a list, and the way to New. @param {{ onNew: () => void }} props */
-function PopularEmpty({ onNew }) {
+/** Empty All-time loved: what the tab says instead of a list, and the way to New. @param {{ onNew: () => void }} props */
+function LovedEmpty({ onNew }) {
   return (
     <div className="songs-card songs-top-empty">
-      <p>Popular fills in as listeners like songs.</p>
+      <p>All-time loved fills in as listeners like songs.</p>
       <button type="button" className="songs-see-all" onClick={onNew}>Start with New<ChevronRightIcon /></button>
     </div>
   );
@@ -383,7 +394,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
   React.useSyncExternalStore(AudioPlayer.subscribe, playerMark);
-  // sy4-3: the Popular and All-time loved shelves read the daily tallies.
+  // sy4-3: the All-time loved shelf reads the daily tallies.
   const vstore = votes();
   React.useSyncExternalStore(
     React.useCallback((cb) => (vstore ? vstore.subscribe(cb) : () => {}), [vstore]),
@@ -541,11 +552,11 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const playNewRow = useLatestFn((s) => AudioPlayer.playSongs({ ids: newest.map((x) => x.id), startId: s.id, label: 'New from the flock' }));
   const vstore = votes();
   const tallyReady = !!(vstore && vstore.tallyLoaded);
-  const popular = tallyReady ? topSongs('popular', 0) : [];
   const loved = tallyReady ? topSongs('loved', 0) : [];
   const playShelf = useLatestFn((s, list, label) => AudioPlayer.playSongs({ ids: list.map((x) => x.id), startId: s.id, label }));
-  const playPopular = useLatestFn((s) => playShelf(s, popular, 'Popular songs'));
   const playLoved = useLatestFn((s) => playShelf(s, loved, 'All-time loved'));
+  const liked = likedSongs();
+  const playLiked = useLatestFn((s) => playShelf(s, liked, 'Liked Songs'));
   const seeAll = (v, label) => (
     <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'top:' + v })} aria-label={'See all ' + label}>See all<ChevronRightIcon /></button>
   );
@@ -600,13 +611,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
         </section>
       ) : (
         <>
-          {tallyReady ? (
-            <section className="songs-section songs-top-shelf" aria-labelledby="songs-popular">
-              <SectionHead id="songs-popular" title="Popular" sub="Loved lately" action={popular.length ? seeAll('popular', 'popular songs') : null} />
-              {popular.length ? <SongTiles songs={popular.slice(0, SHELF_TILES)} onPlay={playPopular} /> : <PopularEmpty onNew={() => open({ k: 'list', v: 'top:new' })} />}
-            </section>
-          ) : null}
-          {tallyReady && popular.length && loved.length >= LOVED_MIN ? (
+          {tallyReady && loved.length >= LOVED_MIN ? (
             <section className="songs-section songs-top-shelf" aria-labelledby="songs-loved">
               <SectionHead id="songs-loved" title="All-time loved" action={seeAll('loved', 'all-time loved songs')} />
               <SongTiles songs={loved.slice(0, SHELF_TILES)} onPlay={playLoved} />
@@ -616,6 +621,14 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
             <section className="songs-section songs-top-shelf" aria-labelledby="songs-new">
               <SectionHead id="songs-new" title="New from the flock" action={newest.length > SHELF_TILES ? seeAll('new', 'new songs') : null} />
               <SongTiles songs={newest.slice(0, SHELF_TILES)} onPlay={playNewRow} />
+            </section>
+          ) : null}
+          {liked.length ? (
+            <section className="songs-section songs-top-shelf" aria-labelledby="songs-liked">
+              <SectionHead id="songs-liked" title="Liked Songs" action={
+                <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'liked' })} aria-label="See all liked songs">See all<ChevronRightIcon /></button>
+              } />
+              <SongTiles songs={liked.slice(0, SHELF_TILES)} onPlay={playLiked} />
             </section>
           ) : null}
 
@@ -690,7 +703,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
 }
 
 /**
- * See all (03, 04): one page, three tabs (Popular / All-time loved / New); a shelf's See all opens it on its tab. A
+ * See all (03, 04): one page, two tabs (All-time loved / New); a shelf's See all opens it on its tab. A
  * family shows once ("Come Home · 3 versions ›"). A tap on a row plays the tab's list from there.
  * @param {{ frame: any, playingId: string, active: boolean, onPush: (f: any) => void, onReplaceTop: (f: any) => void }} props
  */
@@ -730,7 +743,7 @@ function SongsTopPage({ frame, playingId, active, onPush, onReplaceTop }) {
         ) : waiting ? null : tab.v === 'new' ? (
           <p className="songs-empty">No songs yet.</p>
         ) : (
-          <PopularEmpty onNew={() => onReplaceTop({ k: 'list', v: 'top:new' })} />
+          <LovedEmpty onNew={() => onReplaceTop({ k: 'list', v: 'top:new' })} />
         )}
       </section>
     </>
