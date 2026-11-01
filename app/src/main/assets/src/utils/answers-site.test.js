@@ -14,6 +14,7 @@ import {
 } from './answers-site.js';
 import { ANSWERS_COMMANDMENTS, ANSWERS_SUBJECTS, ANSWERS_MAIN_PAGE_ID } from './answers-shelves.js';
 import { answersIdForUrl } from './answers-links.js';
+import { answersEyebrow } from './answers-topic.js';
 
 const DATA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'data');
 const ctx = {};
@@ -496,5 +497,26 @@ describe('the shared words', () => {
 
   it('keeps the nine subjects the app files topics under today', () => {
     expect(ANSWERS_SUBJECTS.length).toBe(9);
+  });
+});
+
+/* nightly 11-01 U5: AnswersTopic's "Next in …" row reads answersEyebrow(entries, next).text unguarded. Every page the
+   chain or a page outside the menu names next has an eyebrow with words: no guard is needed. */
+describe('answers-site — every next page has an eyebrow', () => {
+  it('names a heading for each next page, in the chain and outside the menu', () => {
+    const byId = new Map(A.map((e) => [e.id, e]));
+    let seen = 0;
+    for (const e of A) {
+      const sn = answersSiteNav(A, e.id);
+      if (!sn || !sn.next) continue;
+      const nx = byId.get(sn.next);
+      expect(nx, e.id + ' -> ' + sn.next).toBeTruthy();
+      const eb = answersEyebrow(A, nx);
+      expect(typeof eb.text, sn.next).toBe('string');
+      expect(eb.text.length, sn.next).toBeGreaterThan(0);
+      expect(eb.text, sn.next).not.toContain('undefined');
+      seen++;
+    }
+    expect(seen).toBeGreaterThan(100);
   });
 });
