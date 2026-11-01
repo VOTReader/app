@@ -129,10 +129,28 @@ class PlanReminderTest {
         assertEquals(1, nm.size())
         // Recorded as Saturday's: the next alarm is Sunday 23:45, not Monday's.
         assertEquals(at(sun, 23, 45).toInstant().toEpochMilli(), am.scheduledAlarms.single().triggerAtMs)
+        // Yesterday's reminder at 00:30 posts silently: nothing sounds in the night.
+        assertTrue(isSilent(nm.getNotification(PlanReminder.NOTIFICATION_ID)))
         app.getSystemService(NotificationManager::class.java).cancelAll()
         PlanReminder.onAlarm(app, at(sun, 23, 45))
         assertEquals(1, nm.size())
+        // Today's own reminder sounds as before.
+        assertFalse(isSilent(nm.getNotification(PlanReminder.NOTIFICATION_ID)))
     }
+
+    @Test
+    fun `a same-day reminder is never silent`() {
+        PlanReminder.set(app, list(p()), at(fri, 6))
+        PlanReminder.onAlarm(app, at(fri, 7, 31))
+        assertFalse(isSilent(nm.getNotification(PlanReminder.NOTIFICATION_ID)))
+    }
+
+    /**
+     * What NotificationCompat.setSilent(true) builds on API 26+ (androidx core): the "silent" group with
+     * GROUP_ALERT_SUMMARY, which keeps a non-summary notification from sounding or vibrating.
+     */
+    private fun isSilent(n: android.app.Notification): Boolean =
+        n.group == NotificationCompat.GROUP_KEY_SILENT && n.groupAlertBehavior == android.app.Notification.GROUP_ALERT_SUMMARY
 
     @Test
     fun `finishing today takes a reminder still showing down, and a done day posts nothing`() {
