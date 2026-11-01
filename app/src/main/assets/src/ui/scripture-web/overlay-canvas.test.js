@@ -15,7 +15,7 @@ import { footBundles, lensRange, labelFeed } from '../../utils/scripture-web/pic
 import { webFrame, webViewArgs, centreOf } from '../../utils/scripture-web/web-frame.js';
 import { citationsForVerse } from '../../utils/scripture-web/vot-citations.js';
 import { css, TAP_CONTEXT } from '../../utils/scripture-web/sw-ink.js';
-import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE, FAN_MOST, FAN_MOST_COMPACT, fanAt, TAP_MIN } from './overlay-renderer.js';
+import { paintCanonOverlay, paintMyWebOverlay, hitOverlay, stackRows, citedVerses, chipKeepers, DEEP_FULL, LABEL_RECEDE, FAN_MOST, FAN_MOST_COMPACT, fanAt, TAP_MIN, COMB_FROM, COMB_FULL, COMB_LEAD } from './overlay-renderer.js';
 import { exitCensus } from '../../utils/scripture-web/exits.js';
 
 // the fan's census, spied on (its own law: it runs only while a fan is up)
@@ -1541,4 +1541,37 @@ describe("the top scrim holds under a phone's header", () => {
     expect(g0.stops[1][0]).toBe(0.55);
     expect(alphaOf(g0.stops[1][1])).toBeCloseTo(0.65 * 0.6, 3);
   });
+});
+
+/* night review 11-01 #2: the comb placed before the chips and the leg labels and took their room
+   (and a 44 px tap) at full strength from 72 px a verse, though it drew at quiet * combT, a sixtieth
+   of its ink at 75 px. The labels at full ink went and near-invisible tags stood in for them: a dip,
+   not a cross-fade. Now the stronger side places first and the fainter names only what is left. */
+describe('the comb hands over from the chips as a cross-fade, not a dip', () => {
+  const JOHN3_16 = verseOf('john', 3, 16) + 0.5;
+  const at = (name, ppvCss) => {
+    const zoom = (ppvCss * FRAMES[name].DPR) / geo.fitPPV({ total: g.total }, FRAMES[name].W);
+    const fs = frameAt(name, zoom, JOHN3_16);
+    const rec = recorder(); rec.ctx.translate = () => {}; rec.ctx.rotate = () => {}; rec.ctx.clip = () => {};
+    const out = paintCanonOverlay(rec.ctx, fs);
+    return {
+      inked: rec.texts().filter((c) => c.alpha > 0.3).length,
+      threads: out.hits.filter((h) => h.hit && h.hit.kind === 'thread').length,
+    };
+  };
+  for (const name of ['pc', 'phone']) {
+    it(`${name}: labels at ink hold through the hand-over, and a faint tag takes no tap`, () => {
+      const before = at(name, COMB_FROM - 2);
+      expect(before.inked, 'labels at ink before the comb').toBeGreaterThan(10);
+      // combT (smoothstep COMB_FROM..COMB_FULL) is under COMB_LEAD below the band's midpoint
+      const mid = (COMB_FROM + COMB_FULL) / 2;
+      for (let ppv = COMB_FROM + 2; ppv < COMB_FULL; ppv += 4) {
+        const now = at(name, ppv);
+        expect(now.inked, `${ppv} px a verse: labels at ink`).toBeGreaterThanOrEqual(0.8 * before.inked);
+        if (ppv < mid - 1) expect(now.threads, `${ppv} px a verse: a faint tag is not a tap target`).toBe(0);
+        if (ppv > mid + 1) expect(now.threads, `${ppv} px a verse: the comb's tags are its threads' taps`).toBeGreaterThan(3);
+      }
+      expect(COMB_LEAD).toBe(0.5);
+    });
+  }
 });
