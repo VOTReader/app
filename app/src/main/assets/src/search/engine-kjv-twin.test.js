@@ -4,8 +4,23 @@
    typed word exactly (no prefix reach). With no wording (none set, or a file that does not load) the search is the
    reader's edition alone. Fixture texts only (no bench query); every case puts the engine's wording back. */
 import { describe, it, expect, beforeAll, afterAll, afterEach, vi } from 'vitest';
-import { VotSearchMini as E } from './engine.js';
+import { VotSearchMini as E, wordsHeld } from './engine.js';
 import { encodeKjvTwin, parseKjvTwin } from './kjv-twin.js';
+
+/* The model's read, as a search awaits it: a test may run something there (a KJV wording loading late). */
+const midMeaning = vi.hoisted(() => ({ /** @type {null | (() => Promise<void>)} */ run: null }));
+vi.mock('./semantic.js', async (orig) => {
+  const real = /** @type {any} */ (await orig());
+  return {
+    ...real,
+    semanticDocs: async (/** @type {any[]} */ ...a) => {
+      const run = midMeaning.run;
+      midMeaning.run = null;
+      if (run) await run();
+      return real.semanticDocs(...a);
+    },
+  };
+});
 
 const STOP = new Set(['the', 'a', 'an', 'of', 'and', 'is', 'my', 'to', 'in', 'he', 'that', 'his', 'for', 'i', 'you', 'it', 'not', 'are', 'be', 'with', 'all', 'on', 'who', 'by', 'was', 'at', 'so', 'your', 'has', 'they', 'their', 'them', 'do', 'nor', 'upon', 'unto']);
 const VOT_DATA = {
@@ -153,6 +168,63 @@ describe('every verse in its KJV wording too, in the engine', () => {
     expect(of(await E.search('steward door'), 'Proverbs 2:3')).not.toHaveProperty('kjvWording');
     // never on a text that is not a verse
     for (const x of (await E.search(q)).results) if (x.doc.kind !== 'verse') expect(x).not.toHaveProperty('kjvWording');
+  });
+
+  /* nightly 11-01 #3: a -word drops only a text whose card shows it. "love -charity" dropped 1 Cor 13:4-8, their
+     "charity" in the KJV wording alone (never on the card, no kjvWording flag), once the token store was read. */
+  it('a -word reads the words a verse shows, not its KJV wording; + and a phrase read both', async () => {
+    E.setKjvTwin(TWIN);
+    // Proverbs 2:2 says "doorman"; its KJV wording "porter"
+    expect(refs(await E.search('steward -porter'))).toContain('Proverbs 2:2');
+    expect(refs(await E.search('steward -doorman'))).not.toContain('Proverbs 2:2');
+    expect(refs(await E.search('steward +porter'))).toContain('Proverbs 2:2');
+    expect(refs(await E.search('"spake unto the porter"'))).toContain('Proverbs 2:2');
+  });
+
+  it('read before the store, the words test agrees with the store: - on the shown words, + and phrase on both', () => {
+    const own = ['the', 'steward', 'spoke', 'to', 'the', 'doorman'];
+    const kjv = ['|', '|', 'the', 'steward', 'spake', 'unto', 'the', 'porter'];
+    expect(wordsHeld(own, kjv, null, [], [['porter']])).toBe(true);
+    expect(wordsHeld(own, kjv, null, [], [['doorman']])).toBe(false);
+    expect(wordsHeld(own, kjv, null, [['porter']], [])).toBe(true);
+    expect(wordsHeld(own, kjv, ['spake', 'unto'], [], [])).toBe(true);
+    expect(wordsHeld(own, [], ['spake', 'unto'], [], [])).toBe(false);
+    // no run reaches across the gap
+    expect(wordsHeld(own, kjv, ['doorman', 'the'], [], [])).toBe(false);
+  });
+
+  /* nightly 11-01 U1: the file loading while a search awaits the model (adoptTwin at the next idle) dropped the
+     originals that search read with; originalsFirst then read them all anew in one block, in the new wording, under
+     a search ranked in the old one. The search starts over on the new wording instead. */
+  it('a KJV wording taken up while a search awaits the model starts that search over on it', async () => {
+    // no quote (a quote found asks no meaning): words strewn, one of them the KJV wording's alone
+    const q = 'sentinel dayspring steward watcheth porter';
+    await E.search(q);
+    const clock = vi.spyOn(performance, 'now');
+    let reads = 0;
+    midMeaning.run = async () => {
+      reads++;
+      const t0 = performance.now() - 1e6;
+      let t = t0;
+      clock.mockImplementation(() => (t += 1000));
+      E.setKjvTwin(TWIN);
+      // the idle warm the new wording asks for (onKjvTwin -> onIdle -> warmOriginals -> adoptTwin): with every slice
+      // spent at once, the originals are read a text a slice, and the search goes on while they are
+      for (let i = 0; i < 200 && E.getState().originals !== 'building'; i++) await new Promise((r) => setTimeout(r, 10));
+      expect(E.getState().originals).toBe('building');
+      // the clock stands from here, behind the search's slice: it reaches its next page turn with the slice not spent
+      clock.mockImplementation(() => t0);
+    };
+    try {
+      const r = await E.search(q);
+      // ranked again on the new wording, not left half in each: "dayspring" (the KJV's alone) found, and said so
+      expect(reads).toBe(1);
+      expect(midMeaning.run).toBe(null);
+      expect(refs(r)).toContain('Proverbs 2:2');
+      expect(/** @type {any} */ (r.results.find((/** @type {any} */ x) => x.doc.ref === 'Proverbs 2:2')).kjvWording).toBe(true);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('the app names a file: read beside the index, and the verse leads once it is in', async () => {
