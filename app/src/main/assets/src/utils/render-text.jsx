@@ -47,6 +47,7 @@ export function renderTextWithScripRefs(text, baseClassName, onScripClick, highl
           key={i}
           className="inline-scrip-ref"
           href="#"
+          aria-haspopup="dialog"
           onClick={(e) => { e.preventDefault(); onScripClick && onScripClick(ref); }}
           title={ref}
         >

@@ -540,7 +540,8 @@ describe('mark-as-read section disclosure', () => {
     const onClearBook = vi.fn();
     renderSettings({ markAsRead: true }, { onClearBook });
     fireEvent.click(screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ }));
-    const clears = screen.getAllByRole('button', { name: 'Clear' });
+    // Each Clear is named for what it clears (a11y pass 2026-11-01): the section's, then the book's.
+    const clears = [screen.getByRole('button', { name: 'Clear Scriptures' }), screen.getByRole('button', { name: 'Clear Genesis' })];
     expect(clears.every((button) => !button.disabled)).toBe(true);
     fireEvent.click(clears[1]);
     expect(screen.getByText('Clear read marks and saved positions for “Genesis”?')).toBeTruthy();

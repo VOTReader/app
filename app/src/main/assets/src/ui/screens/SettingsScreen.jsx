@@ -594,6 +594,7 @@ function SectionClearBtn({ label, disabled, onClear }) {
   return (
     <button
       className="settings-clear-btn"
+      aria-label={'Clear ' + label}
       disabled={disabled}
       onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
     >Clear</button>

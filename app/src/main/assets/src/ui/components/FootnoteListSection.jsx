@@ -23,7 +23,7 @@ export function FootnoteListSection({ footnotes, nkjv, onInAppLink, onGoToRef, o
   };
   return (
     <div className="footnote-list">
-      <div className="footnote-list-header">Footnotes</div>
+      <div className="footnote-list-header" role="heading" aria-level={2}>Footnotes</div>
       {entries.map(([num, fn]) => (
         // The card takes a pointer tap anywhere; the keyboard and screen-reader
         // control is the number. The card is not role=button itself: its Go to

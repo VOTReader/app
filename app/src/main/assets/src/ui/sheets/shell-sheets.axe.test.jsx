@@ -310,10 +310,10 @@ describe('axe — VersePickerScreen', () => {
     expect(await seriousViolations(document)).toEqual([]);
   });
 
-  it('a chapter that is not there is still a named, focused dialog', async () => {
+  it('a chapter that is not there is keeps focus inside its screen', async () => {
     globals([]);
     render(<VersePickerScreen refineRequest={req} {...pickerProps} />);
-    expectModal('Select Verse');
+    expect(document.querySelector('.picker-screen').contains(document.activeElement)).toBe(true);
     expect(await seriousViolations(document)).toEqual([]);
   });
 });
@@ -339,10 +339,10 @@ describe('axe — LetterExcerptPickerScreen', () => {
     expect(await seriousViolations(document)).toEqual([]);
   });
 
-  it('a letter that is not there is still a named, focused dialog', async () => {
+  it('a letter that is not there is keeps focus inside its screen', async () => {
     globals(null);
     render(<LetterExcerptPickerScreen refineRequest={req} {...pickerProps} />);
-    expectModal('Select Text to Link');
+    expect(document.querySelector('.picker-screen').contains(document.activeElement)).toBe(true);
     expect(await seriousViolations(document)).toEqual([]);
   });
 });

@@ -317,7 +317,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
 
   if (!chapter) {
     return (
-      <div className="picker-screen" ref={trapRef} role="dialog" aria-modal="true" aria-label="Select Verse">
+      <div className="picker-screen" ref={trapRef}>
         <div className="picker-header">
           <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
           <span className="picker-title">Select Verse</span>

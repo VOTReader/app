@@ -609,7 +609,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
             {footnotesMode && refAnalysis.orderedRefs.length > 0 && (
               <div className="footnote-list wtlb-footnote-list">
-                <div className="footnote-list-header">Footnotes</div>
+                <div className="footnote-list-header" role="heading" aria-level={2}>Footnotes</div>
                 {refAnalysis.orderedRefs.map((ref) => {
                   const num = refAnalysis.refNumMap[ref];
                   const verseText = lookupVerse(ref);
