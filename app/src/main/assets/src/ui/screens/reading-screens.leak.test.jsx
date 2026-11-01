@@ -74,6 +74,7 @@ const GLOBALS = ['ReactDOM', 'ScreenLayout', 'StickyChapterNav', 'HomeBtn', 'Nav
   'OT_BOOK_IDS', 'TRANSLATION_OPTIONS', 'LetterView', 'ChapterView', 'studyShortTitle', 'ANSWERS_META', 'AnnotationStore', 'NoteStore'];
 let saved;
 let harness;
+let priorFetch;
 /** A store's subscribe with real add/remove semantics, so the harness can count what stays subscribed. */
 const subs = () => { const l = new Set(); return { subscribe: (cb) => { l.add(cb); return () => { l.delete(cb); }; } }; };
 let realAudio;
@@ -120,6 +121,12 @@ beforeEach(() => {
     AnnotationStore: { all: () => ({}), get: () => [], ...subs(), getVersion: () => 1 },
     NoteStore: { get: () => null, ...subs(), getVersion: () => 1 },
   });
+  // No live network in a unit test. LetterView's LetterSongs loads the song catalog on mount, and
+  // jsdom sent that to https://votreader.github.io for real: when the reply landed, undici's 4 s
+  // keep-alive timer started mid-cycle, which is the CI flake of run 41342597788 (found by the
+  // harness naming the site, 28 of 30 soak runs). Answered here, offline and at once: no catalog.
+  priorFetch = globalThis.fetch;
+  globalThis.fetch = () => Promise.resolve(new Response('', { status: 404 }));
   harness = installLeakHarness();
   resetAnswersLanding();
   try { localStorage.clear(); } catch (_e) { /* */ }
@@ -133,6 +140,7 @@ beforeEach(() => {
 
 afterEach(() => {
   harness.restore();
+  globalThis.fetch = priorFetch;
   cleanup();
   modalRegistry._reset();
   Object.assign(AudioPlayer, realAudio);
