@@ -80,15 +80,17 @@ function _writeJournalDraft(eid, title, blocks, mood) {
  *  r2). A write that started meanwhile (the next entry's save, the fence coming down and
  *  re-saving) writes the whole store, these words included: wait for that one instead
  *  (refuter r3: giving up there left confirmed drafts behind for good). */
-function _journalStoreSettled() {
-  var store = /** @type {any} */ (JournalStore);
+/** @param {any} [store] the store a wait captured: a wait that lands late asks THAT object, not the
+ *  global, which a test file's teardown may have removed by then (an unhandled rejection otherwise). */
+function _journalStoreSettled(store) {
+  if (store === undefined) store = /** @type {any} */ (JournalStore);
   return !(typeof store.isReady === 'function' && !store.isReady())
     && !(typeof isStoreWriteFenced === 'function' && isStoreWriteFenced());
 }
 function _markJournalDraftDurableWhenSaved(eid, n) {
   var store = /** @type {any} */ (JournalStore);
   if (!eid || typeof store.whenSaved !== 'function') return;
-  var settled = _journalStoreSettled;
+  var settled = function() { return _journalStoreSettled(store); };
   if (!settled()) return;
   if (n == null) { var cur = _readJournalDrafts()[eid]; if (!cur || !cur.n) return; n = cur.n; }
   var wait = function() {

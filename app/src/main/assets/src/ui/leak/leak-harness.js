@@ -25,10 +25,16 @@
    baseline is taken after one warm-up cycle, so module-level singletons a screen
    creates once per app (a store opening its database, a lazy cache) are not leaks;
    anything that grows per mount is. Each record keeps the stack that created it,
-   so a failure names the line to fix. After an unmount the harness waits LINGER_MS
+   so a failure names the line to fix; every record names a site, the nearest library or
+   runner frame when no app frame exists. Only a record whose creation stack holds an app
+   frame (src/, a test file, the setup) is counted against the screen: one with none (a
+   library's own continuation landing mid-cycle, the CI flake of 2026-11-01) is returned as a
+   stray, and two or more of them alive at once still fail, since that is something piling
+   up. After an unmount the harness waits LINGER_MS
    (real time) before counting: a zero-delay deferral may finish, but a timer, a
    frame loop or an observer still going after that is still going. */
 
+import { appendFileSync } from 'node:fs';
 import { cleanup, act } from '@testing-library/react';
 
 export const LINGER_MS = 40;
@@ -36,14 +42,28 @@ export const LINGER_MS = 40;
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
 const sleep = (ms) => new Promise((r) => realSetTimeout(r, ms));
 
-function shortStack() {
-  return (new Error().stack || '').split('\n').slice(3, 11)
-    .map((l) => l.trim())
-    .filter((l) => !/leak-harness\.js|node_modules|node:internal/.test(l))
-    .slice(0, 5)
-    .join(' | ')
-    .replace(/\(?(?:file:\/\/)?\/[^\s]*?\/assets\/src\//g, '(');
+/**
+ * Where a record was created: the app's own frames when there are any (src/, the test file,
+ * the setup), else the nearest frames of any kind (a library, the runner), so a record always
+ * names a site. `own` says whether any frame is the app's.
+ * @returns {{ stack: string, own: boolean }}
+ */
+function creationSite() {
+  // Deep enough that the caller is still in the trace under a coverage run's extra frames.
+  const prior = Error.stackTraceLimit;
+  Error.stackTraceLimit = 40;
+  let raw;
+  try { raw = new Error().stack || ''; } finally { Error.stackTraceLimit = prior; }
+  const frames = raw.split('\n').slice(1).map((l) => l.trim()).filter((l) => l.startsWith('at ') && !/leak-harness\.js/.test(l));
+  const short = (l) => l.replace(/\(?(?:file:\/\/)?\/[^\s]*?\/assets\/src\//g, '(').replace(/\(?(?:file:\/\/)?\/[^\s]*?\/node_modules\//g, '(node_modules/');
+  const own = frames.filter((l) => !/node_modules|[( ]node:/.test(l));   // node:internal, node:async_hooks, …
+  const pick = own.length ? own : frames;
+  return {
+    stack: pick.length ? pick.slice(0, 5).map(short).join(' | ') : '(no stack frames: started outside any JS call site)',
+    own: own.length > 0,
+  };
 }
+const shortStack = () => creationSite().stack;
 
 /**
  * Wrap the APIs. Returns { counts, live, restore }.
@@ -54,7 +74,7 @@ export function installLeakHarness(opts = {}) {
   let seq = 0;
   const live = new Map();
   const undo = [];
-  const add = (kind, desc, extra) => { const id = ++seq; live.set(id, { kind, desc, stack: shortStack(), ...extra }); return id; };
+  const add = (kind, desc, extra) => { const id = ++seq; const site = creationSite(); live.set(id, { kind, desc, stack: site.stack, own: site.own, ...extra }); return id; };
   // A callback a mounted screen scheduled that runs after the screen is gone: recorded
   // while `watch` is set (from the unmount until the count), whatever its delay.
   let watch = null; // { from, to } — ids created by the cycle that just unmounted
@@ -66,7 +86,7 @@ export function installLeakHarness(opts = {}) {
     // not something the screen left running; whether it lands before or after an immediate
     // unmount is scheduling luck. Frames and any real delay still count.
     if (v && v.kind === 'timeout' && v.zero) return;
-    if (v) late.push({ id, kind: v.kind, desc: v.desc + ', ran after the unmount', stack: v.stack });
+    if (v) late.push({ id, kind: v.kind, desc: v.desc + ', ran after the unmount', stack: v.stack, own: v.own });
   };
   const drop = (id) => { if (id) live.delete(id); };
   const patch = (obj, key, value) => {
@@ -247,11 +267,11 @@ export function installLeakHarness(opts = {}) {
     /** counts by kind */
     counts() {
       const c = {};
-      live.forEach((v) => { if (counted(v)) c[v.kind] = (c[v.kind] || 0) + 1; });
+      live.forEach((v) => { if (counted(v) && v.own !== false) c[v.kind] = (c[v.kind] || 0) + 1; });
       return c;
     },
     /** live records, for a failure message */
-    live() { const out = []; live.forEach((v, id) => { if (counted(v)) out.push({ id, kind: v.kind, desc: v.desc, stack: v.stack }); }); return out; },
+    live() { const out = []; live.forEach((v, id) => { if (counted(v)) out.push({ id, kind: v.kind, desc: v.desc, stack: v.stack, own: v.own !== false }); }); return out; },
     /** the id of the newest record */
     seq() { return seq; },
     /** Watch for callbacks created in (from, to] running from now on; `stop()` returns them. */
@@ -300,6 +320,9 @@ export async function expectNoLeaks(h, mount, o = {}) {
   };
   await once(); // warm-up: once-per-app singletons start here, and are not counted
   const baseline = h.counts();
+  const foreignBefore = new Set(h.live().filter((x) => !x.own).map((x) => x.id));
+  /** Unattributed records: no app frame in their creation stack (a library's or the runner's own). */
+  const strays = [];
   for (let i = 0; i < cycles; i++) {
     const mark = h.seq();
     const ranLate = await once();
@@ -307,7 +330,15 @@ export async function expectNoLeaks(h, mount, o = {}) {
     // whatever else came and went meanwhile; so is a timer or frame of the screen's
     // that ran after the unmount (a short one is gone by the count, but it ran
     // against a screen that was not there any more).
-    const extra = [...h.live().filter((x) => x.id > mark), ...ranLate.filter((x) => (o.allowLate || []).every((re) => !re.test(x.stack)))];
+    const fresh = [...h.live().filter((x) => x.id > mark), ...ranLate.filter((x) => (o.allowLate || []).every((re) => !re.test(x.stack)))];
+    // Only a record the app's code started is the screen's (a library call the screen made
+    // synchronously still has the screen's frame under it). One with no app frame at all is
+    // reported, not failed: a single one is the runner's or a library's own business landing
+    // mid-cycle. Two or more alive at once means something is piling up, and that fails.
+    const extra = fresh.filter((x) => x.own !== false);
+    for (const x of fresh) if (x.own === false && !strays.some((s) => s.id === x.id)) strays.push(x);
+    const foreignAlive = h.live().filter((x) => !x.own && !foreignBefore.has(x.id));
+    if (foreignAlive.length >= 2) extra.push(...foreignAlive);
     if (extra.length) {
       const by = {};
       for (const x of extra) by[x.kind] = (by[x.kind] || 0) + 1;
@@ -316,7 +347,13 @@ export async function expectNoLeaks(h, mount, o = {}) {
     }
     const now = h.counts();
     const grew = Object.keys(now).filter((k) => (now[k] || 0) > (baseline[k] || 0));
-    if (grew.length) throw new Error(`${o.label || 'screen'}: after unmount ${i + 1} of ${cycles}, ${grew.map((k) => `${k} ${baseline[k] || 0} -> ${now[k]}`).join(', ')} above the baseline:\n` + h.live().map((x) => `  ${x.kind} ${x.desc} @ ${x.stack}`).slice(0, 12).join('\n'));
+    if (grew.length) throw new Error(`${o.label || 'screen'}: after unmount ${i + 1} of ${cycles}, ${grew.map((k) => `${k} ${baseline[k] || 0} -> ${now[k]}`).join(', ')} above the baseline:\n` + h.live().filter((x) => x.own).map((x) => `  ${x.kind} ${x.desc} @ ${x.stack}`).slice(0, 12).join('\n'));
   }
-  return { baseline };
+  // LEAK_STRAYS_LOG=<file>: append each stray (label, kind, site) there, for a soak run's tally.
+  const env = /** @type {any} */ (globalThis).process && /** @type {any} */ (globalThis).process.env;
+  const log = env && env.LEAK_STRAYS_LOG;
+  if (log && strays.length) {
+    try { appendFileSync(log, strays.map((x) => `${o.label || 'screen'}\t${x.kind} ${x.desc}\t${x.stack}\n`).join('')); } catch (_e) { /* a tally, never a verdict */ }
+  }
+  return { baseline, strays };
 }

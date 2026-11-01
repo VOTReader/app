@@ -901,3 +901,34 @@ describe("JournalEditorScreen — the 'Saved' chip waits for the write (ds5 s20.
     expect(chip()).toBe('Saving…');
   });
 });
+
+// A save the unmount flush started can land after the file's globals are gone (with fake-indexeddb the
+// write really lands, later on a loaded run). Its durability wait asked the GLOBAL JournalStore whether
+// the store had settled, so it threw "JournalStore is not defined" from a .then: an unhandled rejection,
+// which fails the whole vitest job (cleanup session, PR #63). The wait now asks the store it captured.
+describe('JournalEditorScreen — a durability wait that lands after the globals are gone', () => {
+  it('throws nothing when the save lands after JournalStore left the global scope', async () => {
+    const entry = JournalStore.add({ title: 'orig', blocks: [JournalHelpers.newBlock('p', { text: 'x' })] });
+    /** @type {(ok: boolean) => void} */
+    let land = () => {};
+    const realWhenSaved = JournalStore.whenSaved;
+    JournalStore.whenSaved = () => new Promise((r) => { land = r; });
+    const unhandled = [];
+    const onUnhandled = (/** @type {any} */ e) => { unhandled.push(e); };
+    const proc = /** @type {any} */ (globalThis).process;
+    proc.on('unhandledRejection', onUnhandled);
+    try {
+      const { unmount, getByRole } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+      fireEvent.change(getByRole('textbox', { name: 'Entry title' }), { target: { value: 'edited' } });
+      act(() => { window.dispatchEvent(new Event('pagehide')); });   // the hide writes a draft and arms its durability wait
+      unmount();                       // the flush saves and arms another
+      delete globalThis.JournalStore;  // the file's teardown, before the write lands
+      await act(async () => { land(true); await new Promise((r) => setTimeout(r, 20)); });
+      expect(unhandled.map(String)).toEqual([]);
+    } finally {
+      proc.off('unhandledRejection', onUnhandled);
+      JournalStore.whenSaved = realWhenSaved;
+      globalThis.JournalStore = JournalStore;
+    }
+  });
+});
