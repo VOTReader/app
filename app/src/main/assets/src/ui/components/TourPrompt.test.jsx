@@ -2,6 +2,7 @@
    RED first (review-tutorial, 2026-09-04): on a 699 px phone the strip covered the last Home tile
    (Settings) and nothing could scroll it clear. Like the player bar, the strip marks the body while
    it is up and publishes its measured height, and app.css pads .screen-scroll by that much. */
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { TourPrompt } from './TourPrompt.jsx';

@@ -25,6 +25,7 @@
      - Idempotency / null-input guards
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { JournalIndexStore } from './journal-index-store.js';
 import { IDBAdapter } from './idb-adapter.js';

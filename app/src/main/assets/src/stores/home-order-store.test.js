@@ -26,6 +26,7 @@
      - An import payload with foreign ids (W2.6 import path).
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { HomeOrderStore, DEFAULT_HOME_ORDER } from './home-order-store.js';
 

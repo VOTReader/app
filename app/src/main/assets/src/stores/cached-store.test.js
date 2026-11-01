@@ -2039,7 +2039,9 @@ describe('CachedStore W70 — a burst of edits is one write; the cold start stil
     return extendStore(
       CachedStore(name, { list: /** @type {string[]} */ ([]) }, { idb: true, legacyLsKey: null, crossTabMerge: (_b, ours) => ours }),
       {
-        add(/** @type {string} */ id) { if (this._shouldDefer('add', id)) return; this._load().list.push(id); this._save(); this._bump(); },
+        // `list || (list = [])`, as the real list stores read it: the pending overlay starts as a bare {} (copyDefault),
+        // so a bare .list.push threw in the replay test ('pending-overlay apply failed', console-clean).
+        add(/** @type {string} */ id) { if (this._shouldDefer('add', id)) return; const d = /** @type {any} */ (this._load()); (d.list || (d.list = [])).push(id); this._save(); this._bump(); },
         replaceAll(/** @type {any} */ data) { if (this._shouldDefer('replaceAll', data)) return; this._cache = data; this._save(); this._bump(); },
       }
     );

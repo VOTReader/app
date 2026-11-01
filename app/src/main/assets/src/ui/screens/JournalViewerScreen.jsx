@@ -968,7 +968,7 @@ export function JournalViewerScreen(props) {
           {(entry.blocks || []).map(function(b, i) {
             return (
               <JournalBlockView
-                key={b.id}
+                key={b.id || 'pos-' + i /* an old block without an id (pre-id data) keys by position, as its marks do */}
                 block={b}
                 callbacks={callbacks}
                 entryId={entry.id}

@@ -22,6 +22,7 @@
        false-match `wtlb-one-extra:1` (which starts with `wtlb-one-`).
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BookmarkStore } from './bookmark-store.js';
 

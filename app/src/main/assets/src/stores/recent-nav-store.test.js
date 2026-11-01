@@ -6,6 +6,7 @@
    destination bumps it to the head instead of creating a duplicate.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RecentNavStore } from './recent-nav-store.js';
 

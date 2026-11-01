@@ -26,7 +26,9 @@ afterEach(cleanup);
 /** The text a reader's DOM actually contains for this run of segments. */
 function renderedText(segments) {
   const { container } = render(
-    React.createElement('p', null,
+    // A div, as the poetry line a stanza break lives in (LetterView's .poetry-line): a stanza break is a <div>,
+    // which a <p> may not hold (React's validateDOMNesting warned on the 'stanza break' case).
+    React.createElement('div', null,
       React.createElement(/** @type {any} */ (Segments), { segments, onFnClick() {}, onScripClick() {} })),
   );
   return container.textContent;
@@ -115,7 +117,9 @@ describe('segmentsDomText is the domain Segments renders', () => {
 const squash = (s) => String(s).replace(/\s+/g, ' ').trim();
 function renderedTextWithoutFootnotes(segments) {
   const { container } = render(
-    React.createElement('p', null,
+    // A div, as the poetry line a stanza break lives in (LetterView's .poetry-line): a stanza break is a <div>,
+    // which a <p> may not hold (React's validateDOMNesting warned on the 'stanza break' case).
+    React.createElement('div', null,
       React.createElement(/** @type {any} */ (Segments), { segments, onFnClick() {}, onScripClick() {} })),
   );
   container.querySelectorAll('.fn-ref').forEach((el) => el.remove());

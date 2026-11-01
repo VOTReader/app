@@ -1016,7 +1016,9 @@ describe('PlatformBridge — Web takeScreenshot (html2canvas integration)', () =
     /** @type {any} */ (globalThis).html2canvas = h2c;
     bridge = await importBridge();
 
-    await bridge.takeThemedScreenshot('light', 0, 1024, 80);
+    // (theme, maxDim, quality), as use-thumbnails calls it. A stray 0 here once made maxDim 0, so the capture
+    // failed after onclone ran ('degenerate' downscale) and the test still passed on the onclone half alone.
+    expect(await bridge.takeThemedScreenshot('light', 1024, 80)).toBe(FULLSIZE_URL);
     const opts = h2c.mock.calls[0][1];
     expect(typeof opts.onclone).toBe('function');
 

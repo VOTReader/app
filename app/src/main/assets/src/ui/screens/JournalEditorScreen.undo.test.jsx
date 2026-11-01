@@ -16,6 +16,7 @@
        no-op, while hideToast made the tap look like it had worked and the
        durable entry (written by the unmount flush) stayed block-less. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, cleanup } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';
@@ -43,7 +44,7 @@ beforeEach(() => {
     if (opts.text) el.textContent = opts.text;
   });
   globalThis.hideToast = vi.fn((id) => { const el = document.getElementById(id); if (el) el.remove(); });
-  globalThis.StorageHealth = { onWriteFailure: () => {} };
+  globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
   globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = ({ onConfirm }) =>

@@ -26,6 +26,10 @@ vi.mock('./journal-index-store.js', async (importOriginal) => { const real = /**
 vi.mock('./journal-stats-store.js', async (importOriginal) => { const real = /** @type {any} */ (await importOriginal()); return { ...real, get JournalStatsStore() { return 'JournalStatsStore' in globalThis ? /** @type {any} */ (globalThis).JournalStatsStore : real.JournalStatsStore; } }; });
 
 beforeEach(() => {
+  // jsdom has no IndexedDB: an empty disk that takes every write, so the stores' saves land instead of logging
+  // 'IndexedDB is not available' (console-clean). A per-test disk, unlike fake-indexeddb's, which carries over.
+  vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+  vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
   localStorage.clear();
   JournalStore._resetForTests({ forceLoaded: true });
   AnnotationStore._resetForTests({ forceLoaded: true });
@@ -41,6 +45,7 @@ beforeEach(() => {
   globalThis.JournalIndexStore = JournalIndexStore;
   globalThis.JournalStatsStore = JournalStatsStore;
 });
+afterEach(() => { vi.restoreAllMocks(); });
 
 describe('JournalStore.rekeyMarks()', () => {
   it('moves a highlight, a note, a bookmark and a link end onto block ids, and a second call changes nothing', () => {

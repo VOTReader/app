@@ -3,6 +3,7 @@
    Tests Safari7DayModal + IosPwaWelcomeCard components.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, cleanup, act } from '@testing-library/react';
 import { Safari7DayModal, IosPwaWelcomeCard } from './SafariFlows.jsx';
