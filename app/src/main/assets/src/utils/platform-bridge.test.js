@@ -437,6 +437,37 @@ describe('PlatformBridge — Web setImmersiveMode (Fullscreen API)', () => {
     expect(warnSpy.mock.calls[0][0]).toMatch(/setImmersiveMode\(true\)/);
   });
 
+  /* #59's console-clean found it in the Scripture Web (use-forced-landscape.js), and platform-bridge already noted
+     it for Garden: immersive mode asks from a mount effect, and with no tap behind it (a restored history entry, a
+     reload, a driven walk) Chromium refuses and logs "requestFullscreen blocked: Permissions check failed" plus its
+     own user-gesture error. Where the browser reports activation, a request it would refuse is not made. */
+  describe('only asks when a tap is behind it', () => {
+    const setActivation = (v) => Object.defineProperty(navigator, 'userActivation', { configurable: true, value: v });
+    afterEach(() => { delete (/** @type {any} */ (navigator)).userActivation; });
+
+    it('no activation: no request, so nothing is refused or logged', async () => {
+      setActivation({ isActive: false, hasBeenActive: true });
+      mockRequestFullscreen.mockImplementation(() => Promise.reject(new Error('Permissions check failed')));
+      bridge.setImmersiveMode(true);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(mockRequestFullscreen).not.toHaveBeenCalled();
+      expect(warnSpy).not.toHaveBeenCalled();
+    });
+
+    it('a tap just behind it: fullscreen is asked for, as before', () => {
+      setActivation({ isActive: true, hasBeenActive: true });
+      bridge.setImmersiveMode(true);
+      expect(mockRequestFullscreen).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaving still exits fullscreen whatever the activation', () => {
+      setActivation({ isActive: false, hasBeenActive: true });
+      /** @type {any} */ (document).fullscreenElement = document.documentElement;
+      bridge.setImmersiveMode(false);
+      expect(mockExitFullscreen).toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('silently no-ops when Fullscreen API is absent', () => {
     delete (/** @type {any} */ (document.documentElement)).requestFullscreen;
     delete (/** @type {any} */ (document)).exitFullscreen;

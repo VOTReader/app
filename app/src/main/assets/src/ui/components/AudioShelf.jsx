@@ -17,6 +17,7 @@ import { songById } from '../../utils/song-catalog.js';
 import { formatClock } from './AudioSeekSlider.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { TrackOnPhone } from './OfflineAudioControls.jsx';
+import { calendarDaysAgo } from '../../utils/dates.js';
 
 /** AudioLibraryStore lives in bundle-b; resolved at call time, never imported. */
 export function audioLibraryStore() { return /** @type {any} */ (globalThis).AudioLibraryStore || null; }
@@ -123,7 +124,9 @@ export function relativePlayedAt(stamp) {
   if (minutes < 60) return minutes + ' min ago';
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
-  const days = Math.floor(hours / 24);
+  // A day or more: counted in calendar days, as History's day headers and utils/dates.js's labels are (#61): a
+  // play on Monday at 23:00 read "1 day ago" under Monday's header on Wednesday morning.
+  const days = Math.max(1, calendarDaysAgo(stamp, Date.now()));
   return days + (days === 1 ? ' day ago' : ' days ago');
 }
 

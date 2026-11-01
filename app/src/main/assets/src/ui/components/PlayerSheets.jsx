@@ -117,9 +117,9 @@ export function SleepSheet({ state, noun, onClose }) {
     : state.sleepAtQueueEnd ? 'Stops at the end of the queue'
       : left > 0 ? 'Stops in ' + countdown(left) : '';
   const off = !state.sleepEndsAt && !state.sleepAtTrackEnd && !state.sleepAtQueueEnd;
-  /** @param {string} label @param {boolean} on @param {() => void} act @param {string} [cls] */
-  const chip = (label, on, act, cls = '') => (
-    <button type="button" className={(on ? 'is-active ' : '') + cls} aria-pressed={on} onClick={act}>{label}</button>
+  /** @param {string} key a stable key (the presets render from a list) @param {string} label @param {boolean} on @param {() => void} act */
+  const chip = (key, label, on, act) => (
+    <button key={key} type="button" className={on ? 'is-active ' : ''} aria-pressed={on} onClick={act}>{label}</button>
   );
   return (
     <PlayerSheet
@@ -127,12 +127,12 @@ export function SleepSheet({ state, noun, onClose }) {
       aside={status ? <span className="np-sheet-status" role="status">{status}</span> : <span className="np-sheet-status" role="status" />}
     >
       <div className="np-grid" role="group" aria-label="Sleep timer">
-        {preset.map((m) => chip(m + ' min', !customArmed && state.sleepMinutes === m, () => { setCustom(null); AudioPlayer.setSleepTimer(m); }))}
-        {chip('End of this ' + noun, !!state.sleepAtTrackEnd, () => { setCustom(null); AudioPlayer.setSleepAtTrackEnd(); })}
-        {chip('End of the queue', !!state.sleepAtQueueEnd, () => { setCustom(null); AudioPlayer.setSleepAtQueueEnd(); })}
-        {chip(customArmed ? 'Custom · ' + state.sleepMinutes + ' min' : 'Custom…', customArmed || custom != null,
+        {preset.map((m) => chip('min-' + m, m + ' min', !customArmed && state.sleepMinutes === m, () => { setCustom(null); AudioPlayer.setSleepTimer(m); }))}
+        {chip('track-end', 'End of this ' + noun, !!state.sleepAtTrackEnd, () => { setCustom(null); AudioPlayer.setSleepAtTrackEnd(); })}
+        {chip('queue-end', 'End of the queue', !!state.sleepAtQueueEnd, () => { setCustom(null); AudioPlayer.setSleepAtQueueEnd(); })}
+        {chip('custom', customArmed ? 'Custom · ' + state.sleepMinutes + ' min' : 'Custom…', customArmed || custom != null,
           () => setCustom(customArmed ? state.sleepMinutes : 20))}
-        {chip('Off', off, () => { setCustom(null); AudioPlayer.clearSleepTimer(); })}
+        {chip('off', 'Off', off, () => { setCustom(null); AudioPlayer.clearSleepTimer(); })}
       </div>
       {custom != null ? (
         <div className="np-custom">

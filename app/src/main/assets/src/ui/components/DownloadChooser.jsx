@@ -73,9 +73,22 @@ function _item(/** @type {any} */ t, /** @type {string} */ name) {
 
 /**
  * A plan held for Wi-Fi ("Wait for Wi-Fi", brief 3e): in a browser that reports its connection, it starts once the
- * connection is no longer mobile data. One at a time; a newer plan replaces it.
+ * connection is no longer mobile data. One at a time; a newer plan replaces it. The plan outlives the chooser (it
+ * starts with the chooser closed), but no chooser's callback is kept with it: whichever chooser is open subscribes
+ * (subscribeHeld) and is told when it changes. Keeping the Apply's own callback held the closed chooser and told it,
+ * not the one open, so a reopened chooser said "Waiting for Wi-Fi" after the downloads had started (#60, item 4).
  */
-let _held = /** @type {null | { off: any, items: any[], onChange: () => void }} */ (null);
+let _held = /** @type {null | { off: any, items: any[] }} */ (null);
+/** @type {Set<() => void>} */
+const _heldSubs = new Set();
+function _heldChanged() {
+  for (const cb of [..._heldSubs]) { try { cb(); } catch (_e) { /* one listener never stops the rest */ } }
+}
+/** @param {() => void} cb @returns {() => void} unsubscribe */
+function subscribeHeld(cb) {
+  _heldSubs.add(cb);
+  return () => { _heldSubs.delete(cb); };
+}
 function _connection() {
   const n = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator) : null;
   return n ? n.connection || n.mozConnection || n.webkitConnection || null : null;
@@ -87,13 +100,14 @@ function _onConnection() {
   const c = _connection();
   if (c && typeof c.removeEventListener === 'function') c.removeEventListener('change', _onConnection);
   h.off.download(h.items);
-  h.onChange();
+  _heldChanged();
 }
-/** @param {any} off @param {any[]} items @param {() => void} onChange */
-function holdForWifi(off, items, onChange) {
+/** @param {any} off @param {any[]} items */
+function holdForWifi(off, items) {
   const c = _connection();
-  _held = { off, items, onChange };
+  _held = { off, items };
   if (c && typeof c.addEventListener === 'function') c.addEventListener('change', _onConnection);
+  _heldChanged();
 }
 /** @returns {number} recordings held for Wi-Fi now */
 export function heldForWifi() {
@@ -471,7 +485,6 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
   const plan = planOf(off, allUnits, wanted, _secondsOf);
   const free = off.freeBytes();
   const [asking, setAsking] = React.useState(/** @type {'' | 'apply' | 'mobile'} */ (''));
-  const [, setHeldTick] = React.useState(0);
 
   const run = (/** @type {boolean} */ now) => {
     const removeUrls = [];
@@ -489,7 +502,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
     }
     if (items.length) {
       if (now) off.download(items);
-      else holdForWifi(off, items, () => setHeldTick((n) => n + 1));
+      else holdForWifi(off, items);
     }
     if (!now) setEdits(new Map());
     setAsking('');
@@ -505,7 +518,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
   const studiesHere = statsOf(off, studies.units).here;
   const readerNames = /** @type {any} */ (globalThis).AUDIO_READERS;
   const readers = readerNames ? Object.entries(readerNames) : [];
-  const held = heldForWifi();
+  const held = React.useSyncExternalStore(subscribeHeld, heldForWifi);
 
   return (
     <div className="dl-choose" ref={focusRef}>

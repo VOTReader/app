@@ -329,18 +329,29 @@ function webSetKeepScreenOn(enabled) {
   }
 }
 
-// Web immersive mode — Fullscreen API (W1.2 Tier B.3). GardenView calls
-// setImmersiveMode(true) from a mount-time useEffect, which is OUTSIDE
-// the user-gesture chain that triggered navigation. Most browsers block
-// requestFullscreen() in that context with a "Permissions check failed"
-// TypeError — we swallow it (best-effort; on Android this works natively;
-// on web Garden remains in-page with browser chrome visible).
+// Web immersive mode — Fullscreen API (W1.2 Tier B.3). GardenView and the
+// Scripture Web (use-forced-landscape.js) call setImmersiveMode(true) from a
+// mount-time useEffect, outside the tap's own handler. What a browser checks
+// is transient user activation (Chromium: a few seconds after a tap), so a
+// screen a tap just opened still goes fullscreen; one opened with no tap
+// behind it (a restored history entry, a reload, a driven walk) is refused
+// ("Permissions check failed", plus Chromium's own "user gesture" error).
+// Where the browser reports activation (navigator.userActivation), a request
+// it would refuse is not made at all (#59/#60's finds, 2026-11-01); without
+// that API it is asked as before and a refusal is swallowed with a warn
+// (best-effort; on Android this works natively). Either way a refused screen
+// stays in-page with the browser chrome visible, as it always did.
+/** @returns {boolean} false only when the browser says no tap is behind this call */
+function _mayRequestFullscreen() {
+  const ua = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator).userActivation : null;
+  return !ua || typeof ua.isActive !== 'boolean' || ua.isActive;
+}
 /** @param {boolean} immersive */
 function webSetImmersiveMode(immersive) {
   try {
     if (immersive) {
       const elem = /** @type {any} */ (document).documentElement;
-      if (elem && typeof elem.requestFullscreen === 'function') {
+      if (elem && typeof elem.requestFullscreen === 'function' && _mayRequestFullscreen()) {
         const result = elem.requestFullscreen();
         if (result && typeof result.catch === 'function') {
           result.catch((/** @type {any} */ e) => {

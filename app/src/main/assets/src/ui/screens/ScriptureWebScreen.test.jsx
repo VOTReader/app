@@ -1000,6 +1000,24 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(container.querySelector('.sw-hint')).toBeNull();
     });
 
+    /* #60's leak hunt, item 1: the density hint's 3.6 s timer was never cleared at unmount, so a
+       reader who chose a strength and left at once had setHint('') run on a screen that was gone. */
+    it('the density hint\'s timer does not outlive the screen', async () => {
+      const { unmount } = await mount({ settings: seen }, threaded);
+      const realST = window.setTimeout, realCT = window.clearTimeout;
+      const hints = [], cleared = new Set();
+      window.setTimeout = (fn, ms, ...a) => { const t = realST(fn, ms, ...a); if (ms === 3600) hints.push(t); return t; };
+      window.clearTimeout = (t) => { cleared.add(t); return realCT(t); };
+      try {
+        chooseStrength('Essential');
+        expect(hints.length, 'PRECONDITION: the switch armed the hint timer').toBe(1);
+        unmount();
+        expect(cleared.has(hints[0]), 'the unmount cleared it').toBe(true);
+      } finally {
+        window.setTimeout = realST; window.clearTimeout = realCT;
+      }
+    });
+
     /* item 29 (w3, the My Web stream): the list was the first 36 links in store order wherever
        the camera stood, so "Nearby" was not near and link 37 on could be reached only by finding
        it on the canvas. Now every link is listed, the one passing nearest the middle first. */

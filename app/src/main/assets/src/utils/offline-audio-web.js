@@ -378,6 +378,11 @@ function _hookGate() {
   if (!_visHooked && typeof document !== 'undefined') { _visHooked = true; document.addEventListener('visibilitychange', _wakeCheck); }
 }
 
+/** Cancel a response's unread body, which ends its fetch. Never throws. @param {Response} res */
+function _drop(res) {
+  try { if (res.body && !res.bodyUsed) res.body.cancel().catch(() => {}); } catch (_e) { /* already closed */ }
+}
+
 async function _next() {
   if (_active || !_queue.length) return;
   // Paused (Pause all, or found at open): the queue holds where it is; Resume goes on.
@@ -417,14 +422,17 @@ async function _next() {
     // Paused, cancelled or reloaded while it looked for room: it never fetches.
     if (ctl.signal.aborted || gen !== _gen) throw new Error('stopped');
     const res = await fetch(from, { signal: ctl.signal, credentials: 'omit' });
-    if (res.status !== 200 || !res.body) throw new Error('relay ' + res.status);
+    // A response this job will not read is cancelled before it is left: its body stream (and the fetch under it,
+    // which a cancel ends) otherwise stayed open until GC (#60, item 5). Not ctl.abort(): the catch reads that as
+    // the reader's cancel.
+    if (res.status !== 200 || !res.body) { _drop(res); throw new Error('relay ' + res.status); }
     const total = Number(res.headers.get('Content-Length')) || 0;
-    if (!(total > 0)) { reason = 'size'; throw new Error('no size'); }
+    if (!(total > 0)) { reason = 'size'; _drop(res); throw new Error('no size'); }
     job.total = total;
     await _estimate();
     if (_free >= 0 && total > _free) {
       reason = 'space';
-      try { res.body.cancel(); } catch (_e) { /* already closed */ }
+      _drop(res);
       throw new Error('no room');
     }
     let last = 0;
