@@ -199,8 +199,8 @@ export function AppShellOverlays({
                 <br /><br />For the best experience, connect to <strong>Wi-Fi</strong> before proceeding. Mobile data charges may apply otherwise.
                 <br /><br />Please also ensure your device has sufficient <strong>free storage</strong> available to cache the full collection.
               </div>
-              <div className="garden-tier-selector">
-                <div className="garden-tier-label">Image Quality</div>
+              <div className="garden-tier-selector" role="group" aria-labelledby="garden-tier-label">
+                <div className="garden-tier-label" id="garden-tier-label">Image Quality</div>
                 <div className="garden-tier-hint">You can change this anytime from the Settings menu.</div>
                 {GARDEN_TIERS.map((t) => (
                   <button

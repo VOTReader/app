@@ -80,7 +80,7 @@ function Behind({ plan, row, now }) {
   const spread = spreadPreview(plan, now);
   return (
     <div className="plans-behind">
-      <h4 className="plans-behind-title">{row.behind + (row.behind === 1 ? ' day' : ' days') + ' behind'}</h4>
+      <h4 className="plans-behind-title" aria-level={3}>{row.behind + (row.behind === 1 ? ' day' : ' days') + ' behind'}</h4>
       <p className="plans-plan-sub">{'At this pace you finish ' + shortDate(row.projected) + ' (planned ' + shortDate(row.target) + ')'}</p>
       <button type="button" className="plans-option" onClick={() => saveRun(catchUp(plan, new Date()))}>
         <span className="plans-option-name">Catch me up</span>
@@ -134,7 +134,7 @@ function PaceChoices({ plan, now, onDone }) {
       </div>
       <label className="plans-by">
         <span>Finish by</span>
-        <input type="date" value={by} min={todayKey(now)} onChange={(e) => setBy(e.target.value)} />
+        <input type="date" aria-label="Finish by" value={by} min={todayKey(now)} onChange={(e) => setBy(e.target.value)} />
         <button type="button" className="today-link" disabled={!by} onClick={() => set({ mode: 'by', date: by })}>Set</button>
       </label>
       <label className="plans-by">
@@ -376,10 +376,10 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
             <section key={plan.id} className="plans-plan" aria-label={row.name}>
               <span className="today-eyebrow">{plans.length > 1 ? row.name : 'Today'}</span>
               {row.finished ? (
-                <h3 className="plans-plan-title">Plan complete</h3>
+                <h3 className="plans-plan-title" aria-level={2}>Plan complete</h3>
               ) : row.done ? (
                 <>
-                  <div className="plans-done"><Check done /><h3 className="plans-plan-title">Done today</h3></div>
+                  <div className="plans-done"><Check done /><h3 className="plans-plan-title" aria-level={2}>Done today</h3></div>
                   <p className="plans-plan-sub">{'Tomorrow: ' + row.tomorrow}</p>
                   <div className="plans-links">
                     {row.next ? <button type="button" className="today-link" onClick={() => onRead(row.next)}>Read ahead</button> : null}
@@ -389,7 +389,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                 </>
               ) : (
                 <>
-                  <h3 className="plans-plan-title">{row.label}</h3>
+                  <h3 className="plans-plan-title" aria-level={2}>{row.label}</h3>
                   <p className="plans-plan-sub">{'Day ' + (row.day + 1) + ' of ' + row.totalDays + (row.minutes ? ' · about ' + row.minutes + ' min' : '')}</p>
                   <div className="today-actions plans-actions">
                     <button type="button" className="today-btn" aria-label={'Read today: ' + row.label} disabled={!row.next}
@@ -497,7 +497,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
                           <button key={d.date} type="button" className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined}
                             aria-label={'Open ' + label} onClick={() => onRead(ref)}>{inner}</button>
                         ) : (
-                          <span key={d.date} className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined} aria-label={label}>{inner}</span>
+                          <span key={d.date} className="plans-day" data-state={dayState(d.state)} data-read={d.read ? '1' : undefined} role="img" aria-label={label}>{inner}</span>
                         );
                       })}
                     </div>
@@ -565,7 +565,7 @@ export function ReadingPlansScreen({ readingPlans, isRead, markAsReadEnabled: _m
             {recent ? (
               <section className="plans-plan plans-complete" aria-label={'You finished ' + runName(recent, null)}>
                 <span className="plans-complete-check" aria-hidden="true"><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.6"><path d="M5 12.5l4.2 4.2L19 7" /></svg></span>
-                <h3 className="plans-complete-title">You finished<span>{runName(recent, null)}</span></h3>
+                <h3 className="plans-complete-title" aria-level={2}>You finished<span>{runName(recent, null)}</span></h3>
                 <p className="plans-plan-sub">{finishedLine(recent)}</p>
                 <div className="today-actions plans-actions">
                   <button type="button" className="today-btn" onClick={() => runAgain(recent)}>Run it again</button>

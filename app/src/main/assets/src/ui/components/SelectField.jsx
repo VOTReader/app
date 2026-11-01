@@ -91,7 +91,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
         <SheetHandle onClose={onClose} />
         {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
         <div className="select-sheet-title" id={titleId}>{title}</div>
-        <div className="select-sheet-ornament">
+        <div className="select-sheet-ornament" aria-hidden="true">
           <div className="select-sheet-ornament-line" />
           <div className="select-sheet-ornament-diamond">{"✦"}</div>
           <div className="select-sheet-ornament-line r" />

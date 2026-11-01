@@ -156,7 +156,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
     );
   }
   if (b.type === 'divider') {
-    return <div className="jrn-divider">❖  ❖  ❖</div>;
+    return <div className="jrn-divider" role="separator">❖  ❖  ❖</div>;
   }
   if (b.type === 'letter-card') {
     var lc = JournalHelpers.resolveLetterCard(b.volKey, b.letterId, b.excerpt);
@@ -262,7 +262,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
         className="jrn-embed-notebook"
         {...jrnInteractiveProps(function() { callbacks.onNotebookCard && callbacks.onNotebookCard(b.notebookId); })}
       >
-        <div className="jrn-emb-notebook-icon">
+        <div className="jrn-emb-notebook-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
             <polyline points="15 4 15 9 20 9" />
@@ -273,7 +273,7 @@ export function JournalBlockView({ block, callbacks, entryId, blockIndex }) {
           <div className="jrn-emb-eyebrow">{nbc ? nbc.eyebrow : 'Notebook'}</div>
           <h4 className="jrn-emb-title">{nbc ? nbc.title : 'Notebook'}</h4>
         </div>
-        <span className="jrn-emb-notebook-arrow">›</span>
+        <span className="jrn-emb-notebook-arrow" aria-hidden="true">›</span>
       </div>
     );
   }

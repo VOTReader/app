@@ -28,7 +28,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                 <button key={i} className="scripture-ref" onClick={() => onScriptureClick && onScriptureClick(s)}>
                   <span className="scripture-ref-tag">{s.ref}</span>
                   <span className="scripture-ref-text">{s.cite}</span>
-                  <span className="scripture-ref-chevron">{"›"}</span>
+                  <span className="scripture-ref-chevron" aria-hidden="true">{"›"}</span>
                 </button>
               ) : (
                 <div key={hlKeyBase ? hlKeyBase + '-s' + i : i} className="scripture-ref scripture-ref-note" {...ann('s' + i)}>

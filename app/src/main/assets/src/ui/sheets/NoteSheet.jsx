@@ -214,8 +214,9 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
               className="note-sheet-menu-btn"
               onClick={() => { setMenuOpen(v => !v); setShowColors(false); setConfirmDelete(false); }}
               aria-label="Options"
+              aria-expanded={menuOpen}
             >
-              <svg viewBox="0 0 24 24" fill="currentColor">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <circle cx="12" cy="5" r="1.7" />
                 <circle cx="12" cy="12" r="1.7" />
                 <circle cx="12" cy="19" r="1.7" />
@@ -308,7 +309,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                   if (!nb) return null;
                   return (
                     <span key={id} className="note-sheet-nb-chip">
-                      <svg viewBox="0 0 24 24">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
                         <polyline points="15 4 15 9 20 9" />
                       </svg>
@@ -324,7 +325,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                 ? <div className="note-sheet-body">{note.body}</div>
                 : (
                   <button className="note-sheet-empty-btn" onClick={() => setMode('edit')}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                       <path d="M12 20h9" />
                       <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
                     </svg>
@@ -338,6 +339,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                 value={body}
                 onChange={e => setBody(e.target.value)}
                 placeholder="Write your note…"
+                aria-label="Note text"
                 onFocus={() => {
                   setTimeout(() => {
                     try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
@@ -352,7 +354,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                 className="note-edit-nb-row"
                 onClick={() => { onOpenNotebookPicker && onOpenNotebookPicker(groupId); }}
               >
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
                   <polyline points="15 4 15 9 20 9" />
                 </svg>

@@ -1265,6 +1265,7 @@ export function JournalEditorScreen(props) {
                 rows={1}
                 value={b.text || ''}
                 placeholder="Quoted text…"
+                aria-label="Quoted text"
                 onChange={function(e) { patchBlock(idx, { text: e.target.value }); trackCaret(idx, e.target); }}
                 onFocus={function(e) { focusTextarea(idx, e.target); }}
                 onSelect={function(e) { trackCaret(idx, e.target); }}
@@ -1279,6 +1280,7 @@ export function JournalEditorScreen(props) {
               className="jrn-block-quote-cite"
               value={b.cite || ''}
               placeholder="Citation (optional)"
+              aria-label="Quote citation"
               onChange={function(e) { patchBlock(idx, { cite: e.target.value }); }}
               onBlur={function() { commitSave(); }}
             />
@@ -1291,7 +1293,7 @@ export function JournalEditorScreen(props) {
     if (b.type === 'divider') {
       return (
         <div {...common}>
-          <div className="jrn-divider">❖  ❖  ❖</div>
+          <div className="jrn-divider" role="separator">❖  ❖  ❖</div>
           {blockDeleteUI(idx)}
           {blockDragUI(idx)}
         </div>
@@ -1308,6 +1310,7 @@ export function JournalEditorScreen(props) {
               type="text"
               className="jrn-img-caption"
               placeholder="Caption (optional)"
+              aria-label="Photo caption"
               value={b.caption || ''}
               onChange={function(e) { patchBlock(idx, { caption: e.target.value }); }}
               onBlur={function() { commitSave(); }}
@@ -1410,6 +1413,7 @@ export function JournalEditorScreen(props) {
             type="text"
             value={title}
             placeholder="Title"
+            aria-label="Entry title"
             onChange={function(e) { setTitle(e.target.value); scheduleSave(); }}
             onBlur={function() { commitSave(); }}
           />

@@ -280,7 +280,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
       <div className="tabs-overview-header">
         <div className="tabs-overview-eyebrow">Reading Places</div>
         <h1 className="tabs-overview-title" id="tabs-overview-title">Tabs</h1>
-        <div className="tabs-overview-ornament">
+        <div className="tabs-overview-ornament" aria-hidden="true">
           <div className="tabs-overview-ornament-line" />
           <div className="tabs-overview-ornament-diamond">{"✦"}</div>
           <div className="tabs-overview-ornament-line r" />
@@ -379,14 +379,15 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                 onClick={(e) => {e.stopPropagation();onMenu && onMenu(i);}}
                 onPointerDown={(e) => e.stopPropagation()}
                 title="Tab actions"
-                aria-label="Tab actions"
+                aria-label={'Tab actions: ' + title}
+                aria-haspopup="dialog"
               >{"⋮"}</button>
               <button
                 className="tab-card-close"
                 onClick={(e) => {e.stopPropagation();onClose(i);}}
                 onPointerDown={(e) => e.stopPropagation()}
                 title="Close tab"
-                aria-label="Close tab"
+                aria-label={'Close tab: ' + title}
               >{"\xD7"}</button>
               <div className="tab-card-thumb-wrap">
                 {/* draggable=false: a long-press/drag landing on the thumbnail
@@ -400,7 +401,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                       ref={_fitThumb} onLoad={(e) => _fitThumb(e.target)}
                     />
                   : <div className="tab-card-thumb-placeholder">
-                      <div className="tab-card-thumb-sigil">{"✦"}</div>
+                      <div className="tab-card-thumb-sigil" aria-hidden="true">{"✦"}</div>
                     </div>
                 }
                 <div className="tab-card-thumb-scrim" />
@@ -409,7 +410,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                 <div className="tab-card-eyebrow">
                   {t.pinned && (
                     /* [7] pin badge — bulk-close-immune tab. */
-                    <svg className="tab-card-pin" viewBox="0 0 24 24" fill="currentColor" aria-label="Pinned">
+                    <svg className="tab-card-pin" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Pinned">
                       <path d="M16 3a1 1 0 0 1 1 1v1l-1 6 3 3v2h-6v5l-1 2-1-2v-5H5v-2l3-3-1-6V4a1 1 0 0 1 1-1h8z" />
                     </svg>
                   )}

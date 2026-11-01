@@ -418,7 +418,7 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     <div className="garden-fullscreen">
       <div className="garden-top-bar">
         <button className="garden-back-btn" onClick={onBack} title="Back" aria-label="Back">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
@@ -464,7 +464,7 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
               // human copy + a pill "Try again" — never a dead-end.
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center", color: "rgba(255,255,255,0.6)", fontSize: "var(--fs-14)" }}>
                 {/* U09.6: offline, say why (a page not seen before is not on the phone), not just "failed". */}
-                <div>{typeof navigator !== "undefined" && navigator.onLine === false
+                <div role="alert">{typeof navigator !== "undefined" && navigator.onLine === false
                   ? "No connection. This page isn\u2019t on your phone yet: the pictures you have seen stay here."
                   : "Failed to load — check your connection"}</div>
                 <button type="button" onClick={retryImage} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
@@ -490,12 +490,12 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
 
       <div className="garden-bottom-bar">
         <button className="garden-arrow-btn" onClick={goPrev} disabled={page <= 1} title="Previous page" aria-label="Previous page">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
         <button className="garden-arrow-btn" onClick={goNext} disabled={page >= GARDEN_TOTAL} title="Next page" aria-label="Next page">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <polyline points="9 6 15 12 9 18" />
           </svg>
         </button>
