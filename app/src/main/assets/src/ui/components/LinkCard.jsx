@@ -29,7 +29,7 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const rawText = otherText || thisSide.text || '';
   const isLong = rawText.length > 150;
   const chainSvg = (
-    <svg className="link-card-chain" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg className="link-card-chain" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
       <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
@@ -89,6 +89,7 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
             <button
               type="button"
               className="link-card-show-more"
+              aria-expanded={expanded}
               onClick={(e) => { e.stopPropagation(); setExpanded(x => !x); }}
             >
               {expanded ? "Show less" : "Show more"}

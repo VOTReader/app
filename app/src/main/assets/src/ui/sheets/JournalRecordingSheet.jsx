@@ -909,7 +909,7 @@ export function JournalRecordingSheet({ onSave, onClose }) {
     if (stage === 'requesting') {
       return (
         <div className="jrn-rec-content">
-          <div className="jrn-rec-requesting">Requesting microphone access…</div>
+          <div className="jrn-rec-requesting" role="status">Requesting microphone access…</div>
           <div className="jrn-rec-actions">
             <button className="jrn-rec-cancel" onClick={discard}>Cancel</button>
           </div>

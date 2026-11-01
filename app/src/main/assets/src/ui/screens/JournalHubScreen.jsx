@@ -404,8 +404,8 @@ export function JournalHubScreen(props) {
           <span className="study-head-count" aria-live="polite">{countText}</span>
         </header>
         <div className="jrn-tabs">
-          <button className={'jrn-tab' + (tab === 'all' ? ' active' : '')} onClick={function() { setTab('all'); }}>All Entries</button>
-          <button className={'jrn-tab' + (tab === 'pinned' ? ' active' : '')} onClick={function() { setTab('pinned'); }}>Pinned</button>
+          <button className={'jrn-tab' + (tab === 'all' ? ' active' : '')} aria-pressed={tab === 'all'} onClick={function() { setTab('all'); }}>All Entries</button>
+          <button className={'jrn-tab' + (tab === 'pinned' ? ' active' : '')} aria-pressed={tab === 'pinned'} onClick={function() { setTab('pinned'); }}>Pinned</button>
         </div>
         {renderUnclaimed()}
         {tab === 'all' && renderEntries(allEntries, false)}
