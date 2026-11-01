@@ -623,6 +623,10 @@ export function useThumbnails({
 
   // The boot window's floor counts from the first render.
   React.useEffect(() => { noteCaptureBootStart(performance.now()); }, []);
+  // False once the hook has unmounted: a capture still awaiting its render then arms
+  // nothing more (no other-theme timer, no retry, no re-run), since the unmount
+  // cleanup below has already run (leak hunt 2026-11-01).
+  const aliveRef = React.useRef(true);
 
   // ── Capture callback ───────────────────────────────────────────────────
   // HARD INVARIANT: must be React.useCallback with dep array [tabsEnabled].
@@ -630,7 +634,7 @@ export function useThumbnails({
   // tabs, true-pixel shot (takeScreenshot) for Garden — see the primary-
   // capture comment below.
   const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean, force?: boolean, idle?: boolean }} [opts] */ async (opts) => {
-    if (!tabsEnabled) return;
+    if (!tabsEnabled || !aliveRef.current) return;
     const urgent = !!(opts && opts.urgent);
     const force = !!(opts && opts.force);
     // HIDDEN PAGE: nothing to look at and nothing to gain — a capture then only
@@ -784,7 +788,7 @@ export function useThumbnails({
         && !(document.body && document.body.classList.contains('autoscroll-running'));
     };
     const scheduleOtherTheme = (delayMs) => {
-      if (isGarden) return;
+      if (isGarden || !aliveRef.current) return;
       variantTimerRef.current = setTimeout(async () => {
         variantTimerRef.current = null;
         if (captureSeqRef.current !== seq) return;        // superseded
@@ -874,6 +878,7 @@ export function useThumbnails({
     } finally {
       captureInFlightRef.current = false;
     }
+    if (!aliveRef.current) return;   // unmounted while the render ran: arm nothing more
     // BOUNDED RETRY: a failed capture used to wait for the next nav —
     // on a tab the user just opens the overview from, that's never,
     // and the card stays a blank ✦ forever (owner's PC). Retry up to 3
@@ -911,20 +916,31 @@ export function useThumbnails({
   }, [tabsEnabled]);
 
   // ── Pending other-theme capture + failed-capture retry — clear on unmount ─
-  React.useEffect(() => () => {
-    if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
-    if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
-    if (calmDeferTimerRef.current) clearTimeout(calmDeferTimerRef.current);
-    if (variantIdleRef.current) variantIdleRef.current();
+  React.useEffect(() => {
+    aliveRef.current = true;
+    return () => {
+      aliveRef.current = false;
+      if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
+      if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
+      if (calmDeferTimerRef.current) clearTimeout(calmDeferTimerRef.current);
+      if (variantIdleRef.current) variantIdleRef.current();
+    };
   }, []);
 
   // ── Pending boot-window wait — drop on unmount or a tabsEnabled flip ────
   // The wait holds THIS callback identity; when it changes (tabs toggled) or
   // the hook unmounts, the stale wait must not capture. The after-nav effect
   // re-requests under the new identity.
+  // The calm re-check, the other-theme render and the failed-capture retry also call
+  // the old identity (tabsEnabled baked in): a flip to tabs-off drops them too, or
+  // they capture for tabs that are gone (leak hunt 2026-11-01).
   React.useEffect(() => () => {
     if (bootWaitCancelRef.current) { bootWaitCancelRef.current(); bootWaitCancelRef.current = null; }
     if (idleCancelRef.current) { idleCancelRef.current(); idleCancelRef.current = null; }
+    if (calmDeferTimerRef.current) { clearTimeout(calmDeferTimerRef.current); calmDeferTimerRef.current = null; }
+    if (variantTimerRef.current) { clearTimeout(variantTimerRef.current); variantTimerRef.current = null; }
+    if (variantIdleRef.current) { variantIdleRef.current(); variantIdleRef.current = null; }
+    if (captureRetryTimerRef.current) { clearTimeout(captureRetryTimerRef.current); captureRetryTimerRef.current = null; }
   }, [captureActiveTabThumbnail]);
 
   // ── Restore: page back from hidden / bfcache, vot-state hydrated ───────
