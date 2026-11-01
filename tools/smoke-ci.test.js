@@ -210,3 +210,40 @@ describe('smoke-ci: a shared passage link opens there (A8)', () => {
     expect(bad.summary).toContain('verseOnPage":false');
   });
 });
+
+/* console-clean (2026-11-01): every browser console.error line, boot to close, fails the walk. smoke.js's own
+   wrapper sees only what the app logs while votSmoke() runs; the CDP 'console' view also sees the browser's lines
+   (a 404, a CSP refusal) and the audits after the walk. The one carve-out is a failed load from another origin
+   (GitHub-hosted audio and images): the runner's network, not the app. */
+import { foldConsoleErrors, isAppConsoleError } from './smoke-ci.js';
+
+describe('smoke-ci: the walked screens log no console errors', () => {
+  const APP = 'http://127.0.0.1:4100';
+
+  it('a clean console keeps a passing walk passing and says so', () => {
+    const report = foldConsoleErrors(passingReport(), []);
+    expect(report.ok).toBe(true);
+    expect(report.summary).toMatch(/browser console\.error 0$/);
+  });
+
+  it('any console error fails the walk and names the first one', () => {
+    const report = foldConsoleErrors(passingReport(), [
+      { type: 'error', text: 'Warning: Each child in a list should have a unique "key" prop.\n\nCheck the render method', url: APP + '/dist/bundle-d.js' },
+      { type: 'error', text: 'second', url: '' },
+    ]);
+    expect(report.ok).toBe(false);
+    expect(report.summary).toContain('2 BROWSER CONSOLE ERRORS — first: Warning: Each child in a list should have a unique "key" prop.');
+    expect(report.summary).not.toContain('Check the render method');
+    expect(report.consoleErrors).toHaveLength(2);
+  });
+
+  it('counts errors only, and a failed load only when it is the app\'s own', () => {
+    expect(isAppConsoleError({ type: 'warning', text: 'deprecated', url: APP + '/index.html' }, APP)).toBe(false);
+    expect(isAppConsoleError({ type: 'log', text: 'x', url: '' }, APP)).toBe(false);
+    expect(isAppConsoleError({ type: 'error', text: 'TypeError: x is not a function', url: APP + '/dist/bundle-d.js' }, APP)).toBe(true);
+    expect(isAppConsoleError({ type: 'error', text: 'Refused to execute inline script because it violates the CSP', url: '' }, APP)).toBe(true);
+    expect(isAppConsoleError({ type: 'error', text: 'Failed to load resource: the server responded with a status of 404 (Not Found)', url: APP + '/src/data/answers.js' }, APP)).toBe(true);
+    expect(isAppConsoleError({ type: 'error', text: 'Failed to load resource: net::ERR_CONNECTION_RESET', url: 'https://release-assets.githubusercontent.com/a.mp3' }, APP)).toBe(false);
+    expect(isAppConsoleError({ type: 'error', text: 'Failed to load resource: net::ERR_FAILED', url: '' }, APP)).toBe(true);
+  });
+});
