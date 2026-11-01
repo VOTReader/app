@@ -48,10 +48,12 @@
                                    where it is missing)
      - hidden-page skip           (no capture while document.visibilityState
                                    is 'hidden'; one is re-requested on return)
-     - cache reuse                (a non-urgent capture whose content key
-                                   already holds both theme variants is not
-                                   redrawn; resize, theme flips and the
-                                   overview heal still redraw)
+     - one-shot cache reuse       (only the FIRST capture after a startup
+                                   or restore reuses a content key that
+                                   already holds both theme variants; every
+                                   later capture redraws, so no card goes
+                                   stale; resize, theme flips and the
+                                   overview heal always redraw)
      - overview-open heal effect  (opening the overview captures the active
                                    content tab URGENTLY — safe: clone renders
                                    exclude the overlay; heals blank/stale
@@ -239,12 +241,23 @@ function noteCaptureBootStart(now) {
  * moment. Extends a window still open from boot; never shortens one.
  * @param {number} now  performance.now()-domain
  */
+/* CACHE REUSE IS ONE-SHOT. A stored card is reused (not redrawn) only by
+   the FIRST capture after a startup or a restore: that is the capture that
+   froze the reopen, and the card it reuses is the one the reader saw when
+   they left. Every later capture redraws, so a page whose content changes
+   under the same content key (a highlight, a note, an edited entry) never
+   keeps a stale card. Module state like the boot window: page load arms it,
+   noteCaptureRestore re-arms it, and the first capture to reach the cache
+   check consumes it, whatever it then does. */
+let _reuseArmed = true;
+
 export function noteCaptureRestore(now) {
   const until = now + RESTORE_CAPTURE_FLOOR_MS;
   // A settled window's floor is spent: the restore sets its own. An open one
   // (boot still running) only ever grows.
   if (_bootSettled || _bootFloorAt == null || until > _bootFloorAt) _bootFloorAt = until;
   _bootSettled = false;
+  _reuseArmed = true;
   // A wait already armed re-checks the floor when its timer or idle callback
   // fires (pumpCaptureBootWindow), so nothing else to do here.
 }
@@ -298,6 +311,7 @@ export function _resetCaptureBootGateForTests(settled) {
   _bootSettled = settled;
   _renderQueue = [];
   _renderBusy = false;
+  _reuseArmed = true;
 }
 
 /* ── The render queue ───────────────────────────────────────────────────
@@ -819,13 +833,17 @@ export function useThumbnails({
     let skipped = false;
     let rerun = false;
     try {
-      // CACHE REUSE. A non-urgent capture of a content key that already holds
-      // both theme variants (Garden: one shot fills both) is not redrawn —
-      // the reopen and every revisit of a page reuse the stored JPEGs. Resize
-      // and theme flips pass `force` (the stored pixels are wrong for them);
-      // the overview heal is urgent. The live-tabs IDB read is awaited first,
+      // CACHE REUSE (one-shot, see _reuseArmed). The FIRST capture after a
+      // startup or restore does not redraw a content key that already holds
+      // both theme variants (Garden: one shot fills both) — the reopen reuses
+      // the stored JPEGs. Every later capture redraws, so no card goes stale.
+      // Any first capture consumes the arm; resize and theme flips (`force`:
+      // the stored pixels are wrong for them) and the urgent overview heal
+      // consume it without reusing. The live-tabs IDB read is awaited first,
       // so a row that is in IndexedDB but not yet in state still counts.
-      if (!urgent && !force) {
+      const reuse = _reuseArmed;
+      _reuseArmed = false;
+      if (reuse && !urgent && !force) {
         if (thumbsLoadRef.current) { try { await thumbsLoadRef.current; } catch (_e) { /* read failed: nothing cached */ } }
         const cached = thumbnailsRef.current[key];
         if (cached && cached[curTheme] && cached[otherTheme]) skipped = true;
@@ -1048,8 +1066,8 @@ export function useThumbnails({
   // Capture shortly after any screen/tab change — and after a THEME change
   // (the active tab re-renders in the new theme; recapturing swaps its
   // filtered overview card for true pixels).
-  // A THEME change forces the redraw (cache reuse would keep the old pixels);
-  // a plain navigation reuses a cached card.
+  // A THEME change forces the redraw (even the one-shot cache reuse would
+  // keep the old pixels).
   const lastNavThemeRef = React.useRef(theme);
   React.useEffect(() => {
     if (!tabsEnabled) return;

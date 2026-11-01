@@ -127,6 +127,60 @@ describe('useThumbnails — no capture at startup', () => {
   });
 });
 
+describe('useThumbnails — cache reuse is one-shot (first capture after a startup or restore)', () => {
+  // Both tabs already have a full card in IndexedDB.
+  // Step in slices: a render's promise continuations (which arm the
+  // other-theme timer) run between advances, not inside one.
+  const settle = async (ms) => { for (let t = 0; t < ms; t += 500) await advance(500); };
+  const bothCached = () => vi.fn(async () => ({
+    'key-a': { dark: DARK, light: LIGHT },
+    'key-b': { dark: DARK, light: LIGHT },
+  }));
+
+  it('after the startup reuse, a later capture of a cached page redraws it — no card goes stale', async () => {
+    g.idbReadAll = bothCached();
+    const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: props() });
+    await settle(4000);
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();     // the startup capture reused A's card
+    rerender(onB());                                          // B is cached too, but the reuse is spent
+    await settle(4000);
+    expect(takeThemedScreenshot.mock.calls.map((c) => c[0])).toEqual(['dark', 'light']);
+    takeThemedScreenshot.mockClear();
+    rerender(props());                                        // back to A: its content may have changed since
+    await settle(4000);
+    expect(takeThemedScreenshot.mock.calls.map((c) => c[0])).toEqual(['dark', 'light']);
+  });
+
+  it('a restore re-arms the reuse for its first capture only', async () => {
+    g.idbReadAll = bothCached();
+    const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: props() });
+    await settle(4000);                                      // startup capture: reused
+    rerender(onB());
+    await settle(4000);                                      // B redrawn
+    takeThemedScreenshot.mockClear();
+    await setVisibility('hidden');
+    await setVisibility('visible');                           // a restore
+    rerender(props());
+    await settle(RESTORE_CAPTURE_FLOOR_MS + 2000);
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();     // first capture after the restore: reused
+    rerender(onB());
+    await settle(4000);
+    expect(takeThemedScreenshot.mock.calls.map((c) => c[0])).toEqual(['dark', 'light']); // the next one redraws
+  });
+
+  it('a first capture that cannot reuse (urgent overview heal) still spends the reuse', async () => {
+    g.idbReadAll = bothCached();
+    const { result, rerender } = renderHook((p) => useThumbnails(p), { initialProps: props() });
+    await flush();
+    await act(async () => { await result.current.captureActiveTabThumbnail({ urgent: true }); });
+    expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);   // urgent: always drawn
+    takeThemedScreenshot.mockClear();
+    rerender(onB());
+    await settle(4000);
+    expect(takeThemedScreenshot).toHaveBeenCalledWith('dark', 1440, 90); // no reuse left for B
+  });
+});
+
 describe('useThumbnails — no capture right after a restore', () => {
   it('back from hidden: a navigation in the first seconds waits out RESTORE_CAPTURE_FLOOR_MS', async () => {
     const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: props() });
