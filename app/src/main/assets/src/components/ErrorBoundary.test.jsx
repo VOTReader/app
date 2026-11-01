@@ -10,6 +10,13 @@ import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from 'vites
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 
+// React re-throws a caught render error to window in development (invokeGuardedCallback), and jsdom prints any
+// window error left unhandled as an uncaught stack. The boundary catching it is what this file asserts, so its
+// own deliberate throws are marked handled; any other error still prints (console-clean).
+const DELIBERATE_THROWS = ['bad callback', 'kaboom'];
+window.addEventListener('error', (e) => { if (e.error && DELIBERATE_THROWS.includes(e.error.message)) e.preventDefault(); });
+
+
 /** @returns {import('react').ReactElement} */
 function Boom() { throw new Error('kaboom'); }
 

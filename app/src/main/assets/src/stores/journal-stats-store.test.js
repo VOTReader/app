@@ -20,6 +20,7 @@
    conventions established in note-store.test.js / link-store.test.js.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   JournalStatsStore,

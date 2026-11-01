@@ -10,6 +10,13 @@ import { render, screen, cleanup } from '@testing-library/react';
 import { AppShellOverlays } from './AppShellOverlays.jsx';
 import { ErrorBoundary } from '../../components/ErrorBoundary.jsx';
 
+// React re-throws a caught render error to window in development (invokeGuardedCallback), and jsdom prints any
+// window error left unhandled as an uncaught stack. The boundary catching it is what this file asserts, so its
+// own deliberate throws are marked handled; any other error still prints (console-clean).
+const DELIBERATE_THROWS = ['tabs overview broke'];
+window.addEventListener('error', (e) => { if (e.error && DELIBERATE_THROWS.includes(e.error.message)) e.preventDefault(); });
+
+
 const G = /** @type {any} */ (globalThis);
 G.ErrorBoundary = ErrorBoundary;
 G.StorageHealthBanner = () => <div data-testid="storage-banner" />;

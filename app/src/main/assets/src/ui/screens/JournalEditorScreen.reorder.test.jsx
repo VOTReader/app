@@ -13,6 +13,7 @@
    geometry comes from per-element getBoundingClientRect stubs — jsdom
    rects are all zeros otherwise. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';

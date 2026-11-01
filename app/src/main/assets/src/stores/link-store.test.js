@@ -11,6 +11,7 @@
    No mocks (per [[dont-over-mock]]) — real LinkStore + jsdom localStorage.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LinkStore, persistLink, lnkId, hlId } from './link-store.js';
 import { mergeArrayStore } from './store-merge.js';

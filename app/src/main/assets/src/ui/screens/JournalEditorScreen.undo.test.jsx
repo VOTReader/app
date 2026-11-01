@@ -16,6 +16,7 @@
        no-op, while hideToast made the tap look like it had worked and the
        durable entry (written by the unmount flush) stayed block-less. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, cleanup } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';

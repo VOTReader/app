@@ -1,5 +1,6 @@
 /* ReadingPlanStore (mw18): plan runs in their own store, ticked by the read record, merged per run. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { ReadingPlanStore } from './reading-plan-store.js';
 import { mergePlanStore } from './store-merge.js';
