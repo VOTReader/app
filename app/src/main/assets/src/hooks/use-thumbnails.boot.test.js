@@ -66,7 +66,10 @@ const hookProps = (over) => ({
 });
 
 const flush = async () => act(async () => { await Promise.resolve(); });
-const advance = async (ms) => { await act(async () => { vi.advanceTimersByTime(ms); }); await flush(); };
+// +1 ms: every non-urgent render now starts from onIdle, and jsdom has no
+// requestIdleCallback — its 0 ms timer fallback, scheduled inside a fake-timer
+// tick, lands one tick (1 ms) later.
+const advance = async (ms) => { await act(async () => { vi.advanceTimersByTime(ms + 1); }); await flush(); };
 
 describe('useThumbnails — boot quiet window', () => {
   it('web: no capture during page load — the first after-nav capture waits past the floor', async () => {

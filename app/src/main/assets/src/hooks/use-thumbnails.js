@@ -35,6 +35,23 @@
                                    until BOOT_CAPTURE_FLOOR_MS after the first
                                    render AND an idle moment — keeps
                                    html2canvas out of page load)
+     - the restore quiet window   (re-armed when the page comes back from
+                                   hidden / the bfcache, and when vot-state
+                                   finishes hydrating: no non-urgent capture
+                                   for RESTORE_CAPTURE_FLOOR_MS + an idle
+                                   moment — the S22 reopen freeze, 10-18)
+     - the render queue           (module-wide: ONE html2canvas/PixelCopy
+                                   render at a time, primary and other-theme
+                                   alike, across every hook instance)
+     - idle placement             (every non-urgent render starts from
+                                   onIdle — requestIdleCallback, or a timer
+                                   where it is missing)
+     - hidden-page skip           (no capture while document.visibilityState
+                                   is 'hidden'; one is re-requested on return)
+     - cache reuse                (a non-urgent capture whose content key
+                                   already holds both theme variants is not
+                                   redrawn; resize, theme flips and the
+                                   overview heal still redraw)
      - overview-open heal effect  (opening the overview captures the active
                                    content tab URGENTLY — safe: clone renders
                                    exclude the overlay; heals blank/stale
@@ -193,6 +210,16 @@ export function captureIsCalm(now) {
    and held the search index back to 4-9 s; from Home there was no freeze
    over 70 ms and the index was ready in 0.65 s. */
 export const BOOT_CAPTURE_FLOOR_MS = 10000;
+/* RESTORE re-arms the same window, shorter: the page coming back from hidden
+   (the APK reopened from recents, a PWA tab refocused), a bfcache pageshow,
+   and vot-state's late hydration (the restored tabs replace the boot
+   defaults, which re-fires the after-nav capture) are all moments the app is
+   busy repainting a restored route — exactly where the 10-18 S22 reopen
+   freeze sat. Re-arming only ever EXTENDS the window, never shortens it. */
+export const RESTORE_CAPTURE_FLOOR_MS = 5000;
+/* Bound on every idle wait (a permanently busy thread must not starve the
+   capture forever). */
+export const CAPTURE_IDLE_TIMEOUT_MS = 2000;
 const WEB_BOOT_IDLE_TIMEOUT_MS = 5000;
 let _bootFloorAt = /** @type {number | null} */ (null);
 let _bootSettled = false;
@@ -207,6 +234,40 @@ function noteCaptureBootStart(now) {
 }
 
 /**
+ * A restore happened (page back from hidden / bfcache, state hydrated):
+ * close the window again until `now + RESTORE_CAPTURE_FLOOR_MS` and an idle
+ * moment. Extends a window still open from boot; never shortens one.
+ * @param {number} now  performance.now()-domain
+ */
+export function noteCaptureRestore(now) {
+  const until = now + RESTORE_CAPTURE_FLOOR_MS;
+  // A settled window's floor is spent: the restore sets its own. An open one
+  // (boot still running) only ever grows.
+  if (_bootSettled || _bootFloorAt == null || until > _bootFloorAt) _bootFloorAt = until;
+  _bootSettled = false;
+  // A wait already armed re-checks the floor when its timer or idle callback
+  // fires (pumpCaptureBootWindow), so nothing else to do here.
+}
+
+function pumpCaptureBootWindow() {
+  const now = performance.now();
+  const wait = Math.max(0, /** @type {number} */ (_bootFloorAt) - now);
+  _bootTimer = setTimeout(() => {
+    _bootTimer = null;
+    // Re-armed by a restore while this timer slept: sleep the remainder.
+    if (performance.now() < /** @type {number} */ (_bootFloorAt)) { pumpCaptureBootWindow(); return; }
+    _bootIdleCancel = onIdle(() => {
+      _bootIdleCancel = null;
+      if (performance.now() < /** @type {number} */ (_bootFloorAt)) { pumpCaptureBootWindow(); return; }
+      _bootSettled = true;
+      const waiters = _bootWaiters;
+      _bootWaiters = [];
+      waiters.forEach((w) => w());
+    }, { timeout: WEB_BOOT_IDLE_TIMEOUT_MS });
+  }, wait);
+}
+
+/**
  * Run `fn` once the boot window has lifted (floor passed + an idle moment);
  * runs it synchronously when it already has.
  * @param {() => void} fn
@@ -216,19 +277,8 @@ function whenCaptureBootSettled(fn) {
   if (_bootSettled) { fn(); return () => {}; }
   _bootWaiters.push(fn);
   if (!_bootTimer && !_bootIdleCancel) {
-    const now = performance.now();
-    noteCaptureBootStart(now);
-    const wait = Math.max(0, /** @type {number} */ (_bootFloorAt) - now);
-    _bootTimer = setTimeout(() => {
-      _bootTimer = null;
-      _bootIdleCancel = onIdle(() => {
-        _bootIdleCancel = null;
-        _bootSettled = true;
-        const waiters = _bootWaiters;
-        _bootWaiters = [];
-        waiters.forEach((w) => w());
-      }, { timeout: WEB_BOOT_IDLE_TIMEOUT_MS });
-    }, wait);
+    noteCaptureBootStart(performance.now());
+    pumpCaptureBootWindow();
   }
   return () => { _bootWaiters = _bootWaiters.filter((w) => w !== fn); };
 }
@@ -246,7 +296,53 @@ export function _resetCaptureBootGateForTests(settled) {
   _bootWaiters = [];
   _bootFloorAt = null;
   _bootSettled = settled;
+  _renderQueue = [];
+  _renderBusy = false;
 }
+
+/* ── The render queue ───────────────────────────────────────────────────
+   Every html2canvas clone render (and Garden's native shot) goes through
+   here, so at most ONE runs at a time in the whole page: the primary, the
+   other-theme render ~900ms later, a retry, and a second hook instance can
+   otherwise overlap (the per-hook in-flight flag covered only the primary),
+   and two overlapping clone renders on a phone are one multi-second freeze.
+   A task starts synchronously when the queue is empty. Each task re-checks
+   its own preconditions when it actually starts (hidden page, superseded
+   capture, page changed) — the wait in the queue can outlive them. */
+/** @type {Array<{ task: () => any, resolve: (v: any) => void, reject: (e: any) => void }>} */
+let _renderQueue = [];
+let _renderBusy = false;
+
+/**
+ * @template T
+ * @param {() => T | Promise<T>} task
+ * @returns {Promise<T>}
+ */
+export function runCaptureRender(task) {
+  return new Promise((resolve, reject) => {
+    _renderQueue.push({ task, resolve, reject });
+    if (!_renderBusy) drainCaptureRenders();
+  });
+}
+
+async function drainCaptureRenders() {
+  _renderBusy = true;
+  while (_renderQueue.length) {
+    const job = /** @type {any} */ (_renderQueue.shift());
+    try { job.resolve(await job.task()); } catch (e) { job.reject(e); }
+  }
+  _renderBusy = false;
+}
+
+/** True while the page is hidden — nobody can see a card, and a capture
+ *  then only steals the CPU the reopen will need. */
+function pageHidden() {
+  return typeof document !== 'undefined' && document.visibilityState === 'hidden';
+}
+
+/** Sentinels a queued render returns instead of a data URL. */
+const SKIP_HIDDEN = 'skip:hidden';
+const SKIP_STALE = 'skip:stale';
 
 /**
  * Classify which theme a legacy (pre-metadata) thumbnail was captured under
@@ -301,7 +397,7 @@ function classifyThumbTheme(dataUrl) {
  * @returns {{
  *   tabThumbnails: Record<string, { dark?: string, light?: string, unknown?: string }>,
  *   setTabThumbnails: (val: any) => void,
- *   captureActiveTabThumbnail: (opts?: { urgent?: boolean }) => void
+ *   captureActiveTabThumbnail: (opts?: { urgent?: boolean, force?: boolean }) => void
  * }}
  */
 export function useThumbnails({
@@ -317,6 +413,10 @@ export function useThumbnails({
   // Call-time mirror of tabThumbnails — mergeVariant and the probe upgrades
   // read it to build entries without stale-closure state.
   const thumbnailsRef = React.useRef({});
+  // The live-tabs IDB read while it is in flight (null once it settles): the
+  // cache-reuse check waits for it, so a reopen never redraws a card that is
+  // sitting in IndexedDB merely because the read had not landed yet.
+  const thumbsLoadRef = React.useRef(/** @type {null | Promise<void>} */ (null));
 
   // ── Load previously-saved thumbnails on mount ──────────────────────────
   // Entries are DUAL-THEME variant maps: { dark?: url, light?: url,
@@ -354,7 +454,7 @@ export function useThumbnails({
     // Dead rows are the debounced GC effect's job below: it depends on
     // [tabs, tabThumbnails], so it re-runs once the real tabs hydrate.
     const liveKeys = liveKeySig ? liveKeySig.split('\n') : [];
-    idbReadAll(liveKeys).then((thumbs) => {
+    const load = idbReadAll(liveKeys).then((thumbs) => {
       if (cancelled) return;
       const norm = {};
       /** @type {Array<[string, string]>} */
@@ -404,6 +504,10 @@ export function useThumbnails({
           idbPut(k, entry);
         });
       });
+    });
+    thumbsLoadRef.current = load;
+    load.then(() => { if (thumbsLoadRef.current === load) thumbsLoadRef.current = null; }, () => {
+      if (thumbsLoadRef.current === load) thumbsLoadRef.current = null;
     });
     return () => { cancelled = true; };
     // tabsEnabled gates AND re-triggers this read; liveKeySig re-triggers it
@@ -482,12 +586,14 @@ export function useThumbnails({
   // A capture asked for while one is in flight ({ urgent }), run once that one
   // ends if the reader has moved to another page or theme meanwhile (sweep mw13:
   // the bare in-flight return lost a quickly picked tab's capture).
-  const pendingCaptureRef = React.useRef(/** @type {null | { urgent: boolean }} */ (null));
+  const pendingCaptureRef = React.useRef(/** @type {null | { urgent: boolean, force: boolean }} */ (null));
   // Capture sequence + the pending other-theme capture timer. Each primary
   // capture bumps the sequence; the deferred themed capture aborts if a newer
   // primary superseded it (fresh scroll position or content).
   const captureSeqRef = React.useRef(0);
   const variantTimerRef = React.useRef(/** @type {any} */ (null));
+  // The other-theme render's idle wait (its cancel), once its timer fired.
+  const variantIdleRef = React.useRef(/** @type {null | (() => void)} */ (null));
   // Bounded failed-capture retry (see the tail of captureActiveTabThumbnail).
   const captureRetryCountRef = React.useRef(0);
   const captureRetryTimerRef = React.useRef(/** @type {any} */ (null));
@@ -496,6 +602,10 @@ export function useThumbnails({
   const calmDeferTimerRef = React.useRef(/** @type {any} */ (null));
   // Pending web boot-window wait (its cancel), at most one per hook.
   const bootWaitCancelRef = React.useRef(/** @type {null | (() => void)} */ (null));
+  // Pending idle wait before a non-urgent render (its cancel), at most one.
+  const idleCancelRef = React.useRef(/** @type {null | (() => void)} */ (null));
+  // A capture dropped because the page was hidden — re-requested on return.
+  const hiddenSkippedRef = React.useRef(false);
 
   // The boot window's floor counts from the first render.
   React.useEffect(() => { noteCaptureBootStart(performance.now()); }, []);
@@ -505,11 +615,20 @@ export function useThumbnails({
   // Single async-await path: clone render (takeThemedScreenshot) for content
   // tabs, true-pixel shot (takeScreenshot) for Garden — see the primary-
   // capture comment below.
-  const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean }} [opts] */ async (opts) => {
+  const captureActiveTabThumbnail = React.useCallback(/** @param {{ urgent?: boolean, force?: boolean, idle?: boolean }} [opts] */ async (opts) => {
     if (!tabsEnabled) return;
+    const urgent = !!(opts && opts.urgent);
+    const force = !!(opts && opts.force);
+    // HIDDEN PAGE: nothing to look at and nothing to gain — a capture then only
+    // competes with the reopen. Remember it; the visibility listener asks again
+    // (through the restore window) when the page comes back.
+    if (pageHidden()) { hiddenSkippedRef.current = true; return; }
     if (captureInFlightRef.current) {
       const was = pendingCaptureRef.current;
-      pendingCaptureRef.current = { urgent: !!((opts && opts.urgent) || (was && was.urgent)) };
+      pendingCaptureRef.current = {
+        urgent: !!(urgent || (was && was.urgent)),
+        force: !!(force || (was && was.force)),
+      };
       return;
     }
     // AUTO-SCROLL SUPPRESSION. A capture is an html2canvas clone render plus a
@@ -523,11 +642,18 @@ export function useThumbnails({
     // BOOT QUIET WINDOW (see the module header). Non-urgent captures wait
     // for it on both platforms; one pending wait per hook, so boot-time
     // navigations collapse into one capture.
-    if (!(opts && opts.urgent) && !_bootSettled) {
+    if (!urgent && !_bootSettled) {
       if (!bootWaitCancelRef.current) {
         bootWaitCancelRef.current = whenCaptureBootSettled(() => {
           bootWaitCancelRef.current = null;
-          captureActiveTabThumbnail();
+          captureActiveTabThumbnail(force ? { force: true } : undefined);
+        });
+      } else if (force) {
+        // A forced request (resize, theme flip) folds into the pending wait.
+        bootWaitCancelRef.current();
+        bootWaitCancelRef.current = whenCaptureBootSettled(() => {
+          bootWaitCancelRef.current = null;
+          captureActiveTabThumbnail({ force: true });
         });
       }
       return;
@@ -539,11 +665,26 @@ export function useThumbnails({
     // when the user actually rests). Urgent captures — the overview open/heal,
     // where the user is about to look at the card — run regardless.
     if (calmDeferTimerRef.current) { clearTimeout(calmDeferTimerRef.current); calmDeferTimerRef.current = null; }
-    if (!(opts && opts.urgent) && !captureIsCalm(performance.now())) {
+    if (!urgent && !captureIsCalm(performance.now())) {
       calmDeferTimerRef.current = setTimeout(() => {
         calmDeferTimerRef.current = null;
-        captureActiveTabThumbnail();
+        captureActiveTabThumbnail(force ? { force: true } : undefined);
       }, CALM_RECHECK_MS);
+      return;
+    }
+    // IDLE PLACEMENT. A calm user is not an idle main thread: a non-urgent
+    // render starts from an idle callback (requestIdleCallback, a timer where
+    // it is missing), bounded by CAPTURE_IDLE_TIMEOUT_MS. Requests collapse
+    // into the one pending idle wait; the capture then reads the live tab.
+    if (!urgent && !(opts && opts.idle)) {
+      if (idleCancelRef.current) {
+        if (!force) return;
+        idleCancelRef.current();
+      }
+      idleCancelRef.current = onIdle(() => {
+        idleCancelRef.current = null;
+        captureActiveTabThumbnail({ idle: true, force });
+      }, { timeout: CAPTURE_IDLE_TIMEOUT_MS });
       return;
     }
     const tab = tabsRef.current[activeTabIdxRef.current];
@@ -580,6 +721,7 @@ export function useThumbnails({
     const otherTheme = curTheme === 'light' ? 'dark' : 'light';
     const seq = ++captureSeqRef.current;
     if (variantTimerRef.current) { clearTimeout(variantTimerRef.current); variantTimerRef.current = null; }
+    if (variantIdleRef.current) { variantIdleRef.current(); variantIdleRef.current = null; }
 
     // Merge one theme's pixels into the tab's variant entry ({ dark?, light?,
     // unknown? }). Any real capture supersedes a legacy `unknown` snapshot.
@@ -639,12 +781,23 @@ export function useThumbnails({
         // carry over — the overview only ever shows the CURRENT theme's
         // variant right away; the other-theme render can always wait.
         if (!captureIsCalm(performance.now())) { scheduleOtherTheme(CALM_RECHECK_MS); return; }
-        try {
-          const dataUrl = await PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
-          if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
-        } catch (_e) {
-          // best-effort — the overview falls back to the flip filter
-        }
+        // Hidden: drop it; the return asks for a capture again.
+        if (pageHidden()) { hiddenSkippedRef.current = true; return; }
+        // Same idle placement and the same one-at-a-time queue as the primary.
+        variantIdleRef.current = onIdle(async () => {
+          variantIdleRef.current = null;
+          try {
+            const dataUrl = await runCaptureRender(() => {
+              if (pageHidden()) { hiddenSkippedRef.current = true; return SKIP_HIDDEN; }
+              if (captureSeqRef.current !== seq || !onOwnPage()) return SKIP_STALE;
+              return PlatformBridge.takeThemedScreenshot(otherTheme, 1440, 90);
+            });
+            if (dataUrl === SKIP_HIDDEN || dataUrl === SKIP_STALE) return;
+            if (captureSeqRef.current === seq) mergeVariant(otherTheme, dataUrl);
+          } catch (_e) {
+            // best-effort — the overview falls back to the flip filter
+          }
+        }, { timeout: CAPTURE_IDLE_TIMEOUT_MS });
       }, delayMs == null ? 900 : delayMs);
     };
 
@@ -661,13 +814,38 @@ export function useThumbnails({
     // the native path is both cheaper and blink-free there).
     captureInFlightRef.current = true;
     let gotUrl = false;
+    // Set when the capture did not render on purpose (cached, hidden, stale):
+    // no retry, and a stale one asks again for the page now on screen.
+    let skipped = false;
+    let rerun = false;
     try {
-      const dataUrl = isGarden
-        ? await PlatformBridge.takeScreenshot(navHeightDp, 1440, 90)
-        : await PlatformBridge.takeThemedScreenshot(curTheme, 1440, 90);
-      gotUrl = !!dataUrl;
-      applyThumb(dataUrl);
-      if (dataUrl) scheduleOtherTheme();
+      // CACHE REUSE. A non-urgent capture of a content key that already holds
+      // both theme variants (Garden: one shot fills both) is not redrawn —
+      // the reopen and every revisit of a page reuse the stored JPEGs. Resize
+      // and theme flips pass `force` (the stored pixels are wrong for them);
+      // the overview heal is urgent. The live-tabs IDB read is awaited first,
+      // so a row that is in IndexedDB but not yet in state still counts.
+      if (!urgent && !force) {
+        if (thumbsLoadRef.current) { try { await thumbsLoadRef.current; } catch (_e) { /* read failed: nothing cached */ } }
+        const cached = thumbnailsRef.current[key];
+        if (cached && cached[curTheme] && cached[otherTheme]) skipped = true;
+      }
+      if (!skipped) {
+        const dataUrl = await runCaptureRender(() => {
+          if (pageHidden()) return SKIP_HIDDEN;
+          if (!onOwnPage() || (themeRef.current === 'light' ? 'light' : 'dark') !== curTheme) return SKIP_STALE;
+          return isGarden
+            ? PlatformBridge.takeScreenshot(navHeightDp, 1440, 90)
+            : PlatformBridge.takeThemedScreenshot(curTheme, 1440, 90);
+        });
+        if (dataUrl === SKIP_HIDDEN) { skipped = true; hiddenSkippedRef.current = true; }
+        else if (dataUrl === SKIP_STALE) { skipped = true; rerun = true; }
+        else {
+          gotUrl = !!dataUrl;
+          applyThumb(dataUrl);
+          if (dataUrl) scheduleOtherTheme();
+        }
+      }
     } catch (_e) {
       // Best-effort capture — failures are silent (thumbnails are visual
       // sugar; missing one isn't an error worth surfacing to the user).
@@ -682,6 +860,8 @@ export function useThumbnails({
     // budget; a permanently-broken environment stops after 3 traces.
     if (gotUrl) {
       captureRetryCountRef.current = 0;
+    } else if (skipped) {
+      // nothing failed — no retry
     } else if (captureRetryCountRef.current < 3) {
       captureRetryCountRef.current += 1;
       if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
@@ -699,7 +879,11 @@ export function useThumbnails({
     if (pending) {
       const live = tabsRef.current[activeTabIdxRef.current];
       const liveTheme = themeRef.current === 'light' ? 'light' : 'dark';
-      if (live && (tabContentKey(live) !== key || liveTheme !== curTheme)) captureActiveTabThumbnail(pending);
+      if (live && (rerun || skipped || tabContentKey(live) !== key || liveTheme !== curTheme)) {
+        captureActiveTabThumbnail({ urgent: pending.urgent, force: pending.force });
+      }
+    } else if (rerun) {
+      captureActiveTabThumbnail(force ? { force: true } : undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- activeTabIdxRef/tabsOverviewOpenRef/tabsRef are useRef refs read via .current inside the callback — call-time fresh, never stale. The ref objects themselves are stable; inclusion would add noise without changing behavior.
   }, [tabsEnabled]);
@@ -709,6 +893,7 @@ export function useThumbnails({
     if (variantTimerRef.current) clearTimeout(variantTimerRef.current);
     if (captureRetryTimerRef.current) clearTimeout(captureRetryTimerRef.current);
     if (calmDeferTimerRef.current) clearTimeout(calmDeferTimerRef.current);
+    if (variantIdleRef.current) variantIdleRef.current();
   }, []);
 
   // ── Pending boot-window wait — drop on unmount or a tabsEnabled flip ────
@@ -717,7 +902,46 @@ export function useThumbnails({
   // re-requests under the new identity.
   React.useEffect(() => () => {
     if (bootWaitCancelRef.current) { bootWaitCancelRef.current(); bootWaitCancelRef.current = null; }
+    if (idleCancelRef.current) { idleCancelRef.current(); idleCancelRef.current = null; }
   }, [captureActiveTabThumbnail]);
+
+  // ── Restore: page back from hidden / bfcache, vot-state hydrated ───────
+  // Each re-arms the quiet window (noteCaptureRestore), so the reopen's
+  // repaint, scroll restore and search-index warm-up get the main thread to
+  // themselves. A capture skipped while hidden is asked for again — it waits
+  // out that window like any non-urgent capture.
+  React.useEffect(() => {
+    if (!tabsEnabled) return undefined;
+    const onRestore = () => {
+      noteCaptureRestore(performance.now());
+      if (hiddenSkippedRef.current) {
+        hiddenSkippedRef.current = false;
+        captureActiveTabThumbnail();
+      }
+    };
+    const onVis = () => { if (!pageHidden()) onRestore(); };
+    const onPageShow = (e) => { if (e && e.persisted) onRestore(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('pageshow', onPageShow);
+    // vot-state hydrating late swaps the boot-default tabs for the restored
+    // ones (after-nav re-fires): that is a restore too. Only the TRANSITION
+    // into 'loaded' counts; typeof-guarded like the GC's StateStore read.
+    let unsub = /** @type {null | (() => void)} */ (null);
+    if (typeof StateStore !== 'undefined' && StateStore
+      && typeof StateStore.subscribe === 'function' && typeof StateStore.getState === 'function') {
+      let last = StateStore.getState();
+      unsub = StateStore.subscribe(() => {
+        const now = StateStore.getState();
+        if (now === 'loaded' && last !== 'loaded') noteCaptureRestore(performance.now());
+        last = now;
+      });
+    }
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('pageshow', onPageShow);
+      if (unsub) unsub();
+    };
+  }, [tabsEnabled, captureActiveTabThumbnail]);
 
   // ── Calm-tracker listeners ─────────────────────────────────────────────
   // Feed the module-level interaction tracker the calm gate reads. Document
@@ -806,7 +1030,8 @@ export function useThumbnails({
       // visited (and render letterboxed meanwhile — TabsOverview's aspect
       // guard).
       clearTimeout(recaptureTimer);
-      recaptureTimer = setTimeout(captureActiveTabThumbnail, 600);
+      // force: the stored thumbs are the wrong aspect now — no cache reuse.
+      recaptureTimer = setTimeout(() => captureActiveTabThumbnail({ force: true }), 600);
     };
     window.addEventListener('resize', onResize);
     return () => {
@@ -819,10 +1044,15 @@ export function useThumbnails({
   // Capture shortly after any screen/tab change — and after a THEME change
   // (the active tab re-renders in the new theme; recapturing swaps its
   // filtered overview card for true pixels).
+  // A THEME change forces the redraw (cache reuse would keep the old pixels);
+  // a plain navigation reuses a cached card.
+  const lastNavThemeRef = React.useRef(theme);
   React.useEffect(() => {
     if (!tabsEnabled) return;
     if (tabsOverviewOpen) return;
-    const timer = setTimeout(captureActiveTabThumbnail, 350);
+    const force = lastNavThemeRef.current !== theme;
+    lastNavThemeRef.current = theme;
+    const timer = setTimeout(() => captureActiveTabThumbnail(force ? { force: true } : undefined), 350);
     return () => clearTimeout(timer);
   }, [activeTab.screen, activeTab.bookId, activeTab.chapterNum, activeTab.letterId,
   activeTab.studyId, activeTab.studyChapterId, activeTab.genreId,
