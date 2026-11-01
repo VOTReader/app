@@ -5,6 +5,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebFilters, validFilters } from './web-filters.jsx';
 import { readSavedSpot, saveSpot, _resetWebPlace } from '../screens/ScriptureWebScreen.jsx';
+import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { NO_FILTERS } from '../../utils/scripture-web/filters.js';
 
 afterEach(() => _resetWebPlace());
@@ -33,6 +34,10 @@ describe('the saved spot', () => {
     expect(validFilters(back.filters)).toEqual(filters);
     const { result } = hook(back.filters);
     expect(result.current.filters).toEqual(filters);
+    // night review 11-01: the spot chooses no thread; its focus is the empty one in full
+    // (focus: {} had no arc, safe only while every reader normalises it)
+    expect(back.focus).toEqual(focusState());
+    expect(back.focus.arc).toBe(-1);
   });
 
   it('a spot for another canon, a broken one or none opens the whole web, with no filters', () => {

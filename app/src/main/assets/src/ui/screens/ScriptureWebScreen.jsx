@@ -110,7 +110,7 @@ export function readSavedSpot(total) {
     if (!s || !s.cam || !(s.cam.ppv > 0) || !Number.isFinite(s.cam.x)) return null;
     if (total && s.cam.total !== total) return null;
     return { mode: 'canonical', cam: { x: s.cam.x, ppv: s.cam.ppv, y: s.cam.y > 0 ? s.cam.y : 0, total: s.cam.total },
-      focus: {}, detail: null, filters: s.filters || null };
+      focus: focusState(), detail: null, filters: s.filters || null };
   } catch (_e) { return null; }
 }
 /** Keep the canon's camera and filters for the next visit. @param {any} cam @param {any} filters */

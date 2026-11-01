@@ -226,7 +226,10 @@ function sentences(text) {
 export function cleanExcerpt(s) {
   return String(s)
     .replace(/\(\s*\)/g, '')
-    .replace(/\s+[-–—·]\s*(?=[\s,.;:!?)\]]|$)/g, '')
+    // only the dash a removed reference left: one with nothing after it but punctuation or the
+    // line's end ("\s*" before a lookahead that took "\s" let it back off to nothing, so every
+    // spaced dash between two words went too: "the Lord — He is good" lost its dash)
+    .replace(/\s+[-–—·][ \t]*(?=[,.;:!?)\]]|\n|$)/g, '')
     .replace(/\s*\n[\s\n]*/g, (m, off, all) => (/[.!?:;…,”’"]$/.test(all.slice(0, off)) ? ' ' : ' / '))
     .replace(/[ \t\u00a0]+/g, ' ')
     .replace(/\s+([,.;:!?])/g, '$1')

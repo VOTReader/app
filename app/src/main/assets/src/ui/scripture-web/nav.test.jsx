@@ -356,6 +356,40 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     await act(async () => { first(false); await Promise.resolve(); await Promise.resolve(); });
     expect(result.current.stack, 'a second Back went on: the first fly gives nothing back').toEqual([]);
   });
+
+  // night review 11-01 (web-panel.jsx backTo): a crumb is one Back a step, called in a loop in one
+  // event. The trail is popped from its ref, so each Back sees the last; each fly stops the one
+  // before (flyTo's flyStopRef), and only the crumb's own panel opens on landing
+  it("a crumb's Backs in one event: the trail ends at the crumb, and the crumb's panel is what opens", async () => {
+    const trail = (j) => {
+      j.push({ verse: 200, label: 'b', open: { mode: 'verse', verse: 200 } }, { verse: 100, label: 'a', open: { mode: 'verse', verse: 100 } });
+      j.push({ verse: 300, label: 'c', open: { mode: 'verse', verse: 300 } });
+      j.push({ verse: 400, label: 'd', open: { mode: 'verse', verse: 400 } });
+    };
+    // animated: a new fly stops the running one, which resolves false
+    let stop = null;
+    const flying = vi.fn(() => new Promise((r) => { if (stop) stop(false); stop = r; }));
+    const one = renderHook(() => useJourney({ flyTo: flying }));
+    const openA = vi.fn(() => true);
+    one.result.current.connect({ openPanel: openA });
+    act(() => { trail(one.result.current); });
+    expect(verses(one.result.current.stack)).toEqual([100, 200, 300, 400]);
+    act(() => { for (let k = 3; k > 1; k--) one.result.current.back(); });   // the crumb at 200
+    expect(verses(one.result.current.stack)).toEqual([100, 200]);
+    await act(async () => { stop(true); await Promise.resolve(); await Promise.resolve(); });
+    expect(verses(one.result.current.stack), 'the stopped fly gave nothing back: the trail moved on').toEqual([100, 200]);
+    expect(openA).toHaveBeenCalledTimes(1);
+    expect(openA).toHaveBeenLastCalledWith({ mode: 'verse', verse: 200 });
+    // instant (reduced motion): every fly lands, in the order asked, so the crumb's own opens last
+    const two = renderHook(() => useJourney({ flyTo: vi.fn(() => Promise.resolve(true)) }));
+    const openB = vi.fn(() => true);
+    two.result.current.connect({ openPanel: openB });
+    act(() => { trail(two.result.current); });
+    act(() => { for (let k = 3; k > 0; k--) two.result.current.back(); });   // home, at 100
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(two.result.current.stack).toEqual([]);
+    expect(openB).toHaveBeenLastCalledWith({ mode: 'verse', verse: 100 });
+  });
 });
 
 /* Corbin, 2026-10-22: "tapping a line then having it fully zoom all the way out sucks, takes me away

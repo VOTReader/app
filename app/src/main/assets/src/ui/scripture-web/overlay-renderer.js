@@ -655,13 +655,18 @@ export function paintCanonOverlay(ctx, fs) {
   if (g.count > 0 && L.deepT >= 0.5) {
     const memo = memoOf(g);
     const quiet = chosen ? LABEL_RECEDE : 1;
-    // the verse zoom: the comb names every leg along itself first; the chips and the leg columns
-    // hand over to it (they name what it has not placed, fading out as it comes in)
-    if (L.combT > 0.01) memo.comb = drawComb(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.comb, labelled, hits, quiet * L.combT);
+    // the verse zoom: the chips and the leg columns hand over to the comb, a cross-fade. Whichever
+    // side has the stronger ink places first and owns its room (the grid, the labelled threads, the
+    // taps); the fainter side names only what the stronger left. Below COMB_LEAD the comb is the
+    // faint one: a tag at a sixtieth of its ink took the room, and the tap, of a chip at full ink.
+    const lead = L.combT >= COMB_LEAD;
+    const comb = () => drawComb(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.comb, labelled, hits, quiet * L.combT, lead);
+    if (lead) memo.comb = comb();
     if (L.combT < 0.99) {
       memo.chips = drawChips(ctx, g, cam, L, fs, grid, memo, labelled, quiet * (1 - L.combT));
       if (cam.ppv / L.s >= LEG_PPV_CSS) memo.legs = drawLegs(ctx, g, L, fs, legFeed(g, cam, L, fs, memo), grid, memo.legs, labelled, quiet * (1 - L.combT));
     }
+    if (!lead && L.combT > 0.01) memo.comb = comb();
   }
   return {
     marks, altitudeSpan: altitude.span, elevator, labels: labelled.size, badges, hits,
@@ -1365,6 +1370,8 @@ export const PLATE_FULL = 144;
 /** CSS px a verse over which the comb eases in (and the chips and leg columns out). */
 export const COMB_FROM = 72;
 export const COMB_FULL = 112;
+/** The comb's share of the cross-fade at which its tags take the room (and the taps) first. */
+export const COMB_LEAD = 0.5;
 /** The plate's type, CSS px: the largest that holds the verse, down to the floor (then cut with "…"). */
 const PLATE_TYPE = { pc: { min: 13, max: 26, head: 13 }, compact: { min: 12, max: 17, head: 12 } };
 /** The plate's padding inside a verse's cell, CSS px, and its line height, em. */
@@ -1554,7 +1561,7 @@ function combSlots(f, side, w, thick, L) {
  * end written along its leg. Ranked as the chips are (the centre chapter's threads, then votes),
  * remembered frame to frame; a tag is a tap target for its thread. Returns the memory.
  */
-function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha) {
+function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha, lead = true) {
   const { s, Wc, base, camY, sz } = L;
   const yb = base + camY;
   const font = canvasFont(sz.leg, s), fpx = fontPx(sz.leg, s);
@@ -1583,9 +1590,12 @@ function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha) {
       cands.push(c);
     }
   }
+  // leading, a tag owns its room; faint (under COMB_LEAD), it keeps off the chips and legs drawn
+  // before it and off its own tags, reserves nothing and takes no tap
+  const own = lead ? grid : createGrid();
   const res = placeRanked(cands, memo,
-    (b) => !grid.hits(b, 1.5 * s),
-    (b, c) => { grid.add(b); labelled.add(c.i); });
+    (b, c) => (lead || !labelled.has(c.i)) && !grid.hits(b, 1.5 * s) && (lead || !own.hits(b, 1.5 * s)),
+    (b, c) => { own.add(b); if (lead) labelled.add(c.i); });
   setFont(ctx, font, 0);
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -1598,6 +1608,7 @@ function drawComb(ctx, g, L, fs, feed, grid, memo, labelled, hits, alpha) {
     ctx.rotate(b.ang);
     haloText(ctx, p.cand.text, 0, -fpx * 0.08, fill, L);
     ctx.restore();
+    if (!lead) continue;
     // TAP_MIN each way about the tag's centre (s25.2: a line of type plus 4 px a side was some 20 px
     // tall); the core still wins where two targets overlap (hitOverlay)
     const cx = (b.x0 + b.x1) / 2, half = Math.max((b.x1 - b.x0) / 2, (TAP_MIN * s) / 2);

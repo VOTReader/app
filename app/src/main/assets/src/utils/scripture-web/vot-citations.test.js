@@ -101,6 +101,36 @@ describe('cleanExcerpt / excerptAround / excerptSpan', () => {
     expect(vc.cleanExcerpt('  spaced   out , words  ')).toBe('spaced out, words');
   });
 
+  // night review 11-01 #1: `\s*` backed off to nothing before a lookahead that took `\s`, so every
+  // dash with a space each side went, and the card misquoted the letter
+  it('cleanExcerpt keeps a spaced dash between words, dropping only the one a removed reference left', () => {
+    expect(vc.cleanExcerpt('the Lord — He is good')).toBe('the Lord — He is good');
+    expect(vc.cleanExcerpt('I AM COME - I have come')).toBe('I AM COME - I have come');
+    expect(vc.cleanExcerpt('first – then · last')).toBe('first – then · last');
+    // a dash before punctuation, at the end of the text, or at a line's end is the removed reference's
+    expect(vc.cleanExcerpt('Kiss The Son - , and live')).toBe('Kiss The Son, and live');
+    expect(vc.cleanExcerpt('Kiss The Son — .')).toBe('Kiss The Son.');
+    expect(vc.cleanExcerpt('Kiss The Son —')).toBe('Kiss The Son');
+    expect(vc.cleanExcerpt('Kiss The Son ·\nThat you may live')).toBe('Kiss The Son / That you may live');
+    // unspaced dashes and hyphenated words were never touched
+    expect(vc.cleanExcerpt('well-known words—and more')).toBe('well-known words—and more');
+  });
+
+  it('an excerpt with a spaced dash is found, and marked, in the paragraph it quotes', async () => {
+    const { landingRange } = await import('../landing-mark.js');
+    const { excerptLanding } = await import('../excerpt-landing.js');
+    const text = 'Hear Me. I AM COME - I have come to you, for the Lord — He is good. And then more words follow.';
+    const at = text.indexOf(' And then');
+    const ex = vc.excerptAround(text, at);
+    expect(ex).toContain('I AM COME - I have come');
+    expect(ex).toContain('the Lord — He is good.');
+    expect(excerptLanding(ex, [text]).index).toBe(0);
+    const el = document.createElement('p');
+    el.textContent = text;
+    const r = landingRange(el, ex);
+    expect(r && r.toString(), 'the whole sentence is marked, not only its head').toBe(ex);
+  });
+
   it('excerptAround quotes the sentence a cite closes, borrowing a short one before it', () => {
     const t = 'An earlier sentence that sets the scene. The cited sentence. A later one.';
     const at = t.indexOf(' A later');
