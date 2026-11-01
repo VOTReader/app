@@ -113,7 +113,9 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
   }, [drawn, curY, curM]);
 
   // Most-recent year/month/week of each container default-open; everything else default-closed.
-  // Current-month days at top: today + yesterday default-open, others default-closed.
+  // Current-month days at top: today + yesterday default-open, others default-closed. On the 1st,
+  // yesterday is last month's (on January 1, last year's) and lives in the tree as a `ymd:` day,
+  // so it is default-open there too; its year/month/week are the tree's newest, so already open.
   const [overrides, setOverrides] = React.useState({});
   // A search's expansion state is kept SEPARATE from the browsing one, and
   // reset whenever the query changes. Reusing one map would mean a year the
@@ -147,6 +149,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
   const defaultOpen = (id) => {
     if (id === `cd:${curY}-${curM}-${curD}`) return true;                    // Today
     if (id === `cd:${yestY}-${yestM}-${yestD}`) return true;                  // Yesterday
+    if (id === `ymd:${yestY}-${yestM}-${yestD}`) return true;                 // Yesterday, on the 1st
     if (id === recentYearId) return true;                                      // Most recent previous year
     if (recentMonthIds.has(id)) return true;                                   // Most recent month of each year
     if (recentWeekIds.has(id)) return true;                                    // Most recent week of each month
