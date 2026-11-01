@@ -289,6 +289,8 @@ export function JournalEditorScreen(props) {
   // W16: how many block-delete Undo windows are still open, and what the exit
   // prune removed while one was. Undo past Done re-adds the entry from it.
   var undoOpenRef = useRef(0);
+  // The Saved chip's pending re-look (awaitRetry / awaitSettled), stopped on unmount.
+  var savedLookRef = useRef(/** @type {any} */ (null));
   var prunedRef = useRef(/** @type {{ entry: any, newEntry: boolean, counted: boolean } | null} */ (null));
 
   // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
@@ -300,6 +302,7 @@ export function JournalEditorScreen(props) {
     if (!_journalStoreSettled()) showSavedWhenDurable();
     return function() {
       mountedRef.current = false;
+      if (savedLookRef.current) { clearTimeout(savedLookRef.current); savedLookRef.current = null; }
       if (dragCtl.current) dragCtl.current.destroy();
       if (dragScrollRafRef.current) { clearTimeout(dragScrollRafRef.current); dragScrollRafRef.current = 0; }
       commitSave();
@@ -519,13 +522,15 @@ export function JournalEditorScreen(props) {
     }
     function awaitRetry(failed, n) {
       if (n >= SAVED_RETRY_LOOKS) return;   // the store's retries are over by then
-      setTimeout(function() {
+      if (!mountedRef.current) return;      // the chip is gone: nothing to look for (leak hunt 2026-11-01)
+      savedLookRef.current = setTimeout(function() {
         if (!mountedRef.current || seq !== saveSeqRef.current) return;
         if (JournalStore._lastWrite !== failed) ask(); else awaitRetry(failed, n + 1);
       }, SAVED_RETRY_LOOK_MS);
     }
     function awaitSettled() {
-      setTimeout(function() {
+      if (!mountedRef.current) return;
+      savedLookRef.current = setTimeout(function() {
         if (!mountedRef.current || seq !== saveSeqRef.current) return;
         if (_journalStoreSettled()) ask(); else awaitSettled();
       }, SAVED_RETRY_LOOK_MS);

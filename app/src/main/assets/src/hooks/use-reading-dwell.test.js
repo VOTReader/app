@@ -84,6 +84,19 @@ describe('useReadingDwell → ReadingStreakStore (the dwell-gated half)', () => 
     expect(recordReadingDay).toHaveBeenCalledTimes(1);
   });
 
+  // Leak hunt 2026-11-01: an unmount left the armed dwell (up to dwellMs) running, so it recorded a
+  // reading day for a mount that was gone.
+  it('an unmount stops the armed dwell: nothing pending, nothing recorded after', () => {
+    const recordReadingDay = vi.fn();
+    window.ReadingStreakStore = { recordReadingDay };
+    const { result, unmount } = mount();
+    act(() => { result.current.setActiveReadKey('bible:psalms:23'); });
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(recordReadingDay).not.toHaveBeenCalled();
+  });
+
   it('TOMBSTONE: the __onDwellCommit bridge is gone (deleted 2026-08-03 — no callers)', () => {
     // The bridge let ScreenLayout force a dwell commit; nothing had called
     // it since position-is-immediate (2026-07-19), and the read tracker

@@ -40,6 +40,12 @@ function onKeyActivate(e, go) {
 export function FootnoteNoteText({ text, onRef = null, onLetter = null, canOpenLetter = null }) {
   const rootRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const note = React.useMemo(() => parseFootnoteNote(text), [text]);
+  // The flashes' un-light timers: the sheet closing stops them (leak hunt 2026-11-01).
+  const flashesRef = React.useRef(/** @type {Set<ReturnType<typeof setTimeout>>} */ (new Set()));
+  React.useEffect(() => {
+    const flashes = flashesRef.current;   // one Set for the note's life
+    return () => { flashes.forEach((t) => clearTimeout(t)); flashes.clear(); };
+  }, []);
   if (!hasFollowable(note)) return <>{text}</>;
 
   /** Bring `sel` into view inside this note, lit for a moment, and focus it. @param {string} sel */
@@ -50,7 +56,8 @@ export function FootnoteNoteText({ text, onRef = null, onLetter = null, canOpenL
     el.classList.remove('fn-note-lit');
     void el.offsetWidth;   // restart the flash on a second tap
     el.classList.add('fn-note-lit');
-    setTimeout(() => el.classList.remove('fn-note-lit'), FLASH_MS);
+    const t = setTimeout(() => { flashesRef.current.delete(t); el.classList.remove('fn-note-lit'); }, FLASH_MS);
+    flashesRef.current.add(t);
     try { el.focus({ preventScroll: true }); } catch (_e) { /* focus is a nicety */ }
   };
   const stop = (/** @type {any} */ e) => e.stopPropagation();
