@@ -29,6 +29,7 @@
    If both show fresh data, the suppress is unnecessary.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { AnnotationStore } from './annotation-store.js';

@@ -13,6 +13,7 @@
    window.getSelection (as in SelectionToolbar.recolor-note.test.jsx). Each test raises the toolbar on
    the selection, then the "tap" collapses it before the button's click. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { SelectionToolbar } from './SelectionToolbar.jsx';

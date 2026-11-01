@@ -12,6 +12,7 @@
    cannot see in jsdom (a toggle's pressed state, a radio group's checked
    swatch, an unnamed field) are pinned by name at the end of each block. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act, screen, within } from '@testing-library/react';
 import { seriousViolations } from '../a11y/axe-run.js';

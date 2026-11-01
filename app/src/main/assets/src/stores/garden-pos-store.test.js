@@ -3,6 +3,7 @@
    Same harness as the sibling stores: _resetForTests({ forceLoaded })
    bypasses the IDB state machine. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { GardenPosStore } from './garden-pos-store.js';
 

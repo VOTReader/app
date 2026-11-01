@@ -1,4 +1,5 @@
 /* NoteDefaultStore — last-used note style+color default. */
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NoteDefaultStore } from './note-default-store.js';
 

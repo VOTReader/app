@@ -1,6 +1,7 @@
 /* AudioPositionsStore — durable per-recording resume points, and the LRU +
    import hardening that keep the map small and trustworthy. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AudioPositionsStore,

@@ -5,6 +5,7 @@
    takes the marks off a second press, and asks for a reference when the
    selected words are not one. No selection, no row. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, act, cleanup } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';
@@ -29,7 +30,7 @@ beforeEach(() => {
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   globalThis.showToast = vi.fn();
   globalThis.hideToast = vi.fn();
-  globalThis.StorageHealth = { onWriteFailure: () => {} };
+  globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
   globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = () => null;

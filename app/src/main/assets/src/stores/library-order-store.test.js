@@ -11,6 +11,7 @@
    removal direction and the foreign ids an import payload can carry.
    Only a value that isn't an array of strings falls back wholesale. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LibraryOrderStore, DEFAULT_LIBRARY_ORDER } from './library-order-store.js';
 

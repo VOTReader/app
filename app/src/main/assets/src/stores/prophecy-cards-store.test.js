@@ -6,6 +6,7 @@
    defensive copy.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ProphecyCardsStore } from './prophecy-cards-store.js';
 

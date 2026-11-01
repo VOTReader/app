@@ -9,6 +9,7 @@
    only buildProgressGroups is stubbed so the reading rows don't need a
    full 66-book corpus fixture. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { MyProgressScreen, _fmtWords } from './MyProgressScreen.jsx';

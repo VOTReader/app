@@ -12,6 +12,13 @@ import { fileURLToPath } from 'node:url';
 import { ErrorBoundary } from './ErrorBoundary.jsx';
 import { RouteSlot } from './RouteSlot.jsx';
 
+// React re-throws a caught render error to window in development (invokeGuardedCallback), and jsdom prints any
+// window error left unhandled as an uncaught stack. The boundary catching it is what this file asserts, so its
+// own deliberate throws are marked handled; any other error still prints (console-clean).
+const DELIBERATE_THROWS = ['route body threw while building props'];
+window.addEventListener('error', (e) => { if (e.error && DELIBERATE_THROWS.includes(e.error.message)) e.preventDefault(); });
+
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 let errSpy;
 beforeEach(() => { sessionStorage.clear(); errSpy = vi.spyOn(console, 'error').mockImplementation(() => {}); });

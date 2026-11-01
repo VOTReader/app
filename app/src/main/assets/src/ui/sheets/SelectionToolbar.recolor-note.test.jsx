@@ -18,11 +18,12 @@
    Real AnnotationStore + NoteStore over jsdom localStorage (no store mocks), a
    real Range stubbed into window.getSelection as in SelectionToolbar.test.jsx. */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { SelectionToolbar } from './SelectionToolbar.jsx';
 import { AnnotationStore } from '../../stores/annotation-store.js';
 import { NoteStore } from '../../stores/note-store.js';
+import { IDBAdapter } from '../../stores/idb-adapter.js';
 
 const V15 = 'That whosoever believeth in him should not perish, but have eternal life.';
 const V16 = 'For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.';
@@ -94,6 +95,10 @@ const groupsOn = (key) => [...new Set(AnnotationStore.get(key).map((h) => h.grou
 let _n = 0;
 beforeEach(() => {
   _origGetSelection = window.getSelection;
+  // jsdom has no IndexedDB: an empty disk per test that takes every write, so the stores' merged saves land
+  // instead of logging 'IndexedDB is not available' (console-clean).
+  vi.spyOn(IDBAdapter, 'get').mockResolvedValue(undefined);
+  vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
   localStorage.clear();
   AnnotationStore._resetForTests({ forceLoaded: true });
   NoteStore._resetForTests({ forceLoaded: true });
@@ -110,6 +115,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   window.getSelection = _origGetSelection;
   document.body.innerHTML = '';
   ['HL_COLORS', 'AnnotationStore', 'HighlightStore', 'NoteStore', 'snapRangeToWords', 'snapSelectionRange', 'hlId']
