@@ -211,22 +211,27 @@ describe('ReadingPlansScreen', () => {
   });
 
   it('the month pages back and forth, and a planned day opens its reading (C9)', () => {
-    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-    const p = base();
-    render(<ReadingPlansScreen {...p} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    const now = new Date();
-    const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
-    const month = screen.getByRole('group', { name: new RegExp('^' + MONTHS[next.getMonth()]) });
-    // The first of next month is a planned day: it opens that day's first chapter.
-    fireEvent.click(within(month).getByRole('button', { name: new RegExp('^Open ' + MONTHS[next.getMonth()] + ' 1, ahead') }));
-    const [call] = p.onRead.mock.calls;
-    expect(call[0].bid).toBe('genesis');
-    expect(call[0].cid).toBeGreaterThan(3);
-    fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
-    expect(screen.getByRole('group', { name: MONTHS[now.getMonth()] })).toBeTruthy();
+    // On a pinned day late in a month: next month's 1st must still fall inside Genesis, which a real clock early in a
+    // month breaks (from November 1, December 1 is day 31, in Leviticus).
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 20, 12) });
+    try {
+      ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+      const p = base();
+      render(<ReadingPlansScreen {...p} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+      const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
+      const month = screen.getByRole('group', { name: new RegExp('^' + MONTHS[next.getMonth()]) });
+      // The first of next month is a planned day: it opens that day's first chapter.
+      fireEvent.click(within(month).getByRole('button', { name: new RegExp('^Open ' + MONTHS[next.getMonth()] + ' 1, ahead') }));
+      const [call] = p.onRead.mock.calls;
+      expect(call[0].bid).toBe('genesis');
+      expect(call[0].cid).toBeGreaterThan(3);
+      fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
+      expect(screen.getByRole('group', { name: MONTHS[now.getMonth()] })).toBeTruthy();
+    } finally { vi.useRealTimers(); }
   });
 
   it('a finished plan is celebrated quietly, listed with its dates, and can run again (C11)', () => {
@@ -244,15 +249,19 @@ describe('ReadingPlansScreen', () => {
   });
 
   it('a missed day can be marked read, and whole weeks read show as weeks on plan (S4)', () => {
-    ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(1)));
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    act(() => { fireEvent.click(screen.getByRole('button', { name: /: mark it read$/ })); });
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark it read' })); });
-    const run = ReadingPlanStore.active()[0];
-    expect(['genesis:1', 'genesis:2', 'genesis:3'].every((k) => run.ticks[k] === todayKey(daysAgo(1)))).toBe(true);
-    expect(screen.queryByRole('button', { name: /: mark it read$/ })).toBeNull();
-    expect(screen.getByText(/^\d+ weeks? on plan$/)).toBeTruthy();
+    // On a pinned mid-month day, so yesterday is in this month's calendar (on a real 1st it is last month's).
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 15, 12) });
+    try {
+      ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(1)));
+      render(<ReadingPlansScreen {...base()} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+      act(() => { fireEvent.click(screen.getByRole('button', { name: /: mark it read$/ })); });
+      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark it read' })); });
+      const run = ReadingPlanStore.active()[0];
+      expect(['genesis:1', 'genesis:2', 'genesis:3'].every((k) => run.ticks[k] === todayKey(daysAgo(1)))).toBe(true);
+      expect(screen.queryByRole('button', { name: /: mark it read$/ })).toBeNull();
+      expect(screen.getByText(/^\d+ weeks? on plan$/)).toBeTruthy();
+    } finally { vi.useRealTimers(); }
   });
 
   it('writes the day\u2019s note in the Journal, and opens the same note again from the day (S5)', () => {

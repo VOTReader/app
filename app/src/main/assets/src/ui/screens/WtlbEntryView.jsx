@@ -561,8 +561,8 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
       {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
+      {/* Plain black, no banner (Corbin 2026-11-01), like every reading page. */}
       <header className="hero" ref={heroRef}>
-        <div className="hero-bg vol" />
         <div className="hero-content">
           <div className="hero-eyebrow">{eyebrow}</div>
           <h1 className="hero-title">{entry.title}</h1>

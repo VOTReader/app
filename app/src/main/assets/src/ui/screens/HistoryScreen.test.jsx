@@ -498,14 +498,20 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
   });
 
   it('CONTROL (green on the base tree by design): the same reading on ANOTHER day is its own row — collapse is per calendar day', () => {
-    setupGlobals();
-    const twoDays = [
-      chapter('psalms', 'Psalms', 1, now - 1000),
-      chapter('psalms', 'Psalms', 1, now - 1000 - 86400000),        // yesterday: default-open, like today
-    ];
-    renderScreen(twoDays);
-    expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
-    expect(document.querySelectorAll('.history-entry-visits')).toHaveLength(0);
+    // On a pinned mid-month noon: on a real 1st of the month (or just after midnight) "yesterday" falls in last
+    // month's group, which opens shut, and the second row is not shown.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 15, 12) });
+    try {
+      setupGlobals();
+      const at = Date.now();
+      const twoDays = [
+        chapter('psalms', 'Psalms', 1, at - 1000),
+        chapter('psalms', 'Psalms', 1, at - 1000 - 86400000),        // yesterday: default-open, like today
+      ];
+      renderScreen(twoDays);
+      expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
+      expect(document.querySelectorAll('.history-entry-visits')).toHaveLength(0);
+    } finally { vi.useRealTimers(); }
   });
 
   it('a filtering query collapses the same way (the rule is the view\'s, not the button\'s)', () => {

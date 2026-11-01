@@ -278,9 +278,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         const hasCuratedTitle = !!displayChapterTitle;
         const titleText = heroTitle; // the band above says the same
         const titleIsTappable = titleEffective && hasCuratedTitle;
+        // Plain black, no amber banner (Corbin 2026-11-01), like every reading page.
         return (
           <header className="hero" ref={heroRef}>
-            <div className={`hero-bg${OT_BOOK_IDS.has(book.id) ? " ot" : ""}`} />
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
               {recordingTextShown && (

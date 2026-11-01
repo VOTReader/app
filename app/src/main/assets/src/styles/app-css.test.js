@@ -221,6 +221,26 @@ describe('app.css — the personal-study header starts at one height', () => {
   });
 });
 
+/* EVERY READING PAGE OPENS ON PLAIN BLACK (Corbin 2026-11-01: "get rid of blue banner on each
+   letter", then the amber ones on studies and Bible chapters, "one consistent page top"). The
+   navy band over letters and Words To Live By entries and the amber band over Bible, Matthew and
+   study chapters are gone: the same centred title, ornament and Listen on plain black, with the
+   band's padding taken back (measured at 412 px: a letter's first words 76 px higher). */
+describe('app.css — no reading page draws a banner', () => {
+  it('has no banner rule left, and the hero keeps only the plain padding', () => {
+    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(bare).not.toMatch(/\.hero-bg\b/);
+    expect(ruleBlock(CSS, '.hero {')).toMatch(/padding:\s*min\(2\.5rem, 52px\)/);
+  });
+  it('none of the four reading views draws one', () => {
+    for (const f of ['LetterView.jsx', 'WtlbEntryView.jsx', 'BibleChapterView.jsx', 'ChapterView.jsx']) {
+      const src = readFileSync(resolve(here, '..', 'ui', 'screens', f), 'utf8');
+      expect(src, f).not.toMatch(/hero-bg/);
+      expect(src, f).toMatch(/className="hero"/);
+    }
+  });
+});
+
 /* THE REDESIGN WALK'S LARGE-TYPE FIXES (2026-09-25). An Opus walk of the night's screens at 180 %
    on 360 px found: Progress's "12 of 89 reached" running 66 px off the screen (the page scrolled
    sideways), its chart heading doing the same, header counts dropping under a title's start, a
@@ -463,7 +483,8 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     const hero = ruleBlock(CSS, '.hero {');
     // Sides too (2026-09-22): 1.8rem, capped at the phone size (29 px, or 7vw
     // where that is wider) — 86 px a side at Text Size 3 left a 187 px title.
-    expect(hero).toMatch(/padding:\s*min\(5\.5rem,\s*\d+px\)\s+min\(1\.8rem,\s*max\(\d+px,\s*\d+vw\)\)\s+min\(4rem,\s*\d+px\)/);
+    // Top and bottom are the banner-less 2.5rem / 2.25rem since 2026-11-01 (was 5.5rem / 4rem).
+    expect(hero).toMatch(/padding:\s*min\(2\.5rem,\s*\d+px\)\s+min\(1\.8rem,\s*max\(\d+px,\s*\d+vw\)\)\s+min\(2\.25rem,\s*\d+px\)/);
   });
   it('the reading column pads in rem up to the phone size, never past it', () => {
     const wrap = ruleBlock(CSS, '.page-wrapper {');
