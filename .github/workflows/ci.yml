@@ -641,6 +641,9 @@ jobs:
     # later). So the copy that skips takes another name (`name:` above uses the
     # same condition as `if:` below), and `build + syntax-check` comes only from
     # a run that does the work: the push run, or a fork PR's pull_request run.
+    # GitHub does not evaluate the name of a job its `if:` skips, so that copy is
+    # listed under the expression's own text (seen on #62); either way it is not
+    # the required name, and the PR stays BLOCKED until the push run reports.
     #
     # always(): a job whose needs failed is SKIPPED by default, and a skipped
     # required check counts as passing. This one runs anyway and fails unless
