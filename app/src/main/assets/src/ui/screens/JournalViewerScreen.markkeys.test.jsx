@@ -21,7 +21,7 @@ const DIV = { id: 'b_d', type: 'divider' };
 /** Each markable block's words -> the key its marks are stored under. */
 function keysFor(blocks) {
   const { container, unmount } = render(
-    <div>{blocks.map((b, i) => <JournalBlockView key={b.id} block={b} callbacks={{}} entryId="j_1" blockIndex={i} />)}</div>
+    <div>{blocks.map((b, i) => <JournalBlockView key={b.id || 'pos-' + i} block={b} callbacks={{}} entryId="j_1" blockIndex={i} />)}</div>
   );
   const out = {};
   container.querySelectorAll('[data-hl-key]').forEach((el) => { out[el.textContent] = el.getAttribute('data-hl-key'); });
