@@ -141,7 +141,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
             aria-label={saveTitle}
             title={canSave ? saveTitle : (isEditMode ? 'No changes to save' : 'Add a label')}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="20 6 9 17 4 12" />
             </svg>
           </button>
@@ -151,7 +151,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
           {pending.sourceLabel && <div className="bkm-create-source">{pending.sourceLabel}</div>}
           {pending.excerpt && <div className="bkm-create-excerpt">“{normalizeExcerptDisplay(pending.excerpt)}”</div>}
 
-          <div className="bkm-create-field-label">Label</div>
+          <div className="bkm-create-field-label" id="bookmark-create-label">Label</div>
           <input
             ref={labelRef}
             className="bkm-create-label-input"
@@ -163,6 +163,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
               else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
             }}
             placeholder="A short name for this bookmark…"
+            aria-labelledby="bookmark-create-label"
             maxLength={200}
           />
 
@@ -183,7 +184,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
                   onClick={handleOpen}
                   title="Open this passage"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                     <polyline points="15 3 21 3 21 9" />
                     <line x1="10" y1="14" x2="21" y2="3" />
@@ -197,7 +198,7 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
                   onClick={handleDelete}
                   title="Delete this bookmark"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <polyline points="3 6 5 6 21 6" />
                     <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
                     <path d="M10 11v6" />

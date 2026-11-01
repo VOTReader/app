@@ -207,7 +207,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
 
   if (!entry) {
     return (
-      <div className="picker-screen">
+      <div className="picker-screen" ref={trapRef} role="dialog" aria-modal="true" aria-label="Select Text to Link">
         <div className="picker-header">
           <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
           <span className="picker-title">Select Text to Link</span>
