@@ -88,8 +88,12 @@ object PlanReminder {
         val msg = PlanReminderLogic.message(plans, now, last, setOn)
         if (msg != null) {
             // Marked sent before the post: a post that throws must not turn into a second try every alarm today.
-            p.edit().putString(K_LAST, now.toLocalDate().toString()).apply()
-            post(context, msg)
+            // The day the reminder is for: yesterday for a late-evening one Doze delivered after midnight, so
+            // tonight's own reminder still comes.
+            p.edit().putString(K_LAST, msg.day.toString()).apply()
+            // Yesterday's reminder, posted after midnight (Doze held it, or a reboot caught it up): silent, so a
+            // missed 23:45 never sounds in the night. Today's sound as the reader's settings say.
+            post(context, msg, silent = msg.day.isBefore(now.toLocalDate()))
         }
         schedule(context, now, catchUp = false)
     }
@@ -184,7 +188,7 @@ object PlanReminder {
         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
 
-    private fun post(context: Context, msg: PlanReminderLogic.Message) {
+    private fun post(context: Context, msg: PlanReminderLogic.Message, silent: Boolean = false) {
         if (!allowed(context)) return
         ensureChannel(context)
         val open = Intent(context, MainActivity::class.java)
@@ -202,6 +206,7 @@ object PlanReminder {
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setContentIntent(content)
             .setAutoCancel(true)
+            .setSilent(silent)
             .build()
         try {
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, n)

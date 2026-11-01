@@ -172,4 +172,93 @@ class PlanReminderLogicTest {
         assertEquals(gapDay, gap.toLocalDate())
         assertTrue(gap.isAfter(ZonedDateTime.of(gapDay.atTime(1, 59), zone)))
     }
+
+    // ── day boundaries (the 2026-11-01 date-boundary hunt) ───────────────────────────────────────────────────────────
+
+    @Test
+    fun `a late-evening reminder Doze delivers after midnight still shows, for yesterday, and tonight's still comes`() {
+        // 23:45 on Saturday 2026-10-31; Doze holds the alarm to 00:30 on Sunday 2026-11-01, the day US clocks go back.
+        val sat = LocalDate.of(2026, 10, 31)
+        val sun = LocalDate.of(2026, 11, 1)
+        val p = listOf(plan(time = "23:45", active = sat))
+        val msg = PlanReminderLogic.message(p, at(sun, 0, 30), null, sat)
+        assertNotNull(msg, "the day boundary swallowed a reminder 45 minutes late")
+        assertEquals(sat, msg.day)
+        assertEquals(PlanReminderLogic.lineFor(sat), msg.text)
+        // Recorded as Saturday's: Sunday's own 23:45 is the next alarm, not Monday's.
+        assertEquals(at(sun, 23, 45), PlanReminderLogic.nextFire(p, at(sun, 0, 30), sat, sat, catchUp = false))
+        assertNotNull(PlanReminderLogic.message(p, at(sun, 23, 45), sat, sat))
+        // Saturday already notified, or read through on Saturday: nothing after midnight.
+        assertNull(PlanReminderLogic.message(p, at(sun, 0, 30), sat, sat))
+        assertNull(PlanReminderLogic.message(listOf(plan(time = "23:45", active = sat, done = sat)), at(sun, 0, 30), null, sat))
+        // Past the grace (23:45 + 4 h is 02:45 on the wall clock, which repeats 01:00-02:00 that night): skipped.
+        assertNotNull(PlanReminderLogic.message(p, at(sun, 2, 30), null, sat))
+        assertNull(PlanReminderLogic.message(p, at(sun, 2, 50), null, sat))
+        // A today notified already (an earlier plan just after midnight) is the one notification: yesterday's waits.
+        assertNull(PlanReminderLogic.message(p, at(sun, 0, 30), sun, sat))
+    }
+
+    @Test
+    fun `a late-evening reminder across New Year is kept, and a reboot just after midnight catches it up`() {
+        val eve = LocalDate.of(2026, 12, 31)
+        val ny = LocalDate.of(2027, 1, 1)
+        val p = listOf(plan(time = "23:30", active = eve))
+        assertEquals(at(eve, 23, 30), PlanReminderLogic.nextFire(p, at(eve, 22), null, eve, catchUp = false))
+        val msg = PlanReminderLogic.message(p, at(ny, 0, 30), null, eve)
+        assertEquals(eve, msg!!.day)
+        // The phone restarted at 00:30 and lost the 23:30 alarm: fire now (it is within the grace), as at 9:00 for 7:30.
+        assertEquals(at(ny, 0, 30), PlanReminderLogic.nextFire(p, at(ny, 0, 30), null, eve, catchUp = true))
+        // Already shown on New Year's Eve: the next one is New Year's Day at 23:30.
+        assertEquals(at(ny, 23, 30), PlanReminderLogic.nextFire(p, at(ny, 0, 30), eve, eve, catchUp = true))
+        // Without catch-up (a plain alarm reschedule) nothing fires early.
+        assertEquals(at(ny, 23, 30), PlanReminderLogic.nextFire(p, at(ny, 0, 30), null, eve, catchUp = false))
+    }
+
+    @Test
+    fun `the 1st of a month just after midnight reminds about the 1st, not the month before`() {
+        val dec1 = LocalDate.of(2026, 12, 1)
+        val p = listOf(plan(time = "00:05", active = dec1))
+        val msg = PlanReminderLogic.message(p, at(dec1, 0, 5), null, dec1)
+        assertEquals(dec1, msg!!.day)
+        assertEquals(at(dec1.plusDays(1), 0, 5), PlanReminderLogic.nextFire(p, at(dec1, 0, 5), dec1, dec1, catchUp = false))
+    }
+
+    @Test
+    fun `the repeated hour on the day clocks go back reminds once`() {
+        val sun = LocalDate.of(2026, 11, 1)
+        val p = listOf(plan(time = "01:30", active = sun))
+        val first = PlanReminderLogic.nextFire(p, at(sun, 0, 30), null, sun, catchUp = false)!!
+        assertEquals(LocalTime.of(1, 30), first.toLocalTime())
+        assertNotNull(PlanReminderLogic.message(p, first, null, sun))
+        // An hour later the wall clock reads 01:30 again: notified today, so the next is Monday's.
+        val second = first.withLaterOffsetAtOverlap()
+        assertEquals(first.toLocalTime(), second.toLocalTime())
+        assertNull(PlanReminderLogic.message(p, second, sun, sun))
+        assertEquals(at(sun.plusDays(1), 1, 30), PlanReminderLogic.nextFire(p, second, sun, sun, catchUp = false))
+    }
+
+    @Test
+    fun `a reminder in the spring gap comes once the clock has jumped, not before`() {
+        val gapDay = LocalDate.of(2027, 3, 14)
+        val p = listOf(plan(time = "02:30", active = gapDay))
+        val next = PlanReminderLogic.nextFire(p, at(gapDay, 1, 59), null, gapDay, catchUp = false)!!
+        assertEquals(gapDay, next.toLocalDate())
+        assertEquals(LocalTime.of(3, 30), next.toLocalTime())
+        // 03:00 is the first instant after the jump: 02:30 "is" 03:30 today, still ahead.
+        assertNull(PlanReminderLogic.message(p, at(gapDay, 3, 0), null, gapDay))
+        assertEquals(gapDay, PlanReminderLogic.message(p, next, null, gapDay)!!.day)
+    }
+
+    @Test
+    fun `a leap day is a reading day like any other`() {
+        val leap = LocalDate.of(2028, 2, 29)   // a Tuesday
+        val p = listOf(plan(active = leap.minusDays(1)))
+        assertEquals(at(leap, 7, 30), PlanReminderLogic.nextFire(p, at(leap.minusDays(1), 8), null, leap.minusDays(1), false))
+        assertEquals(at(LocalDate.of(2028, 3, 1), 7, 30), PlanReminderLogic.nextFire(p, at(leap, 8), leap, leap, false))
+        val tueOnly = listOf(false, false, true, false, false, false, false)
+        assertTrue(PlanReminderLogic.readsOn(plan(weekdays = tueOnly), leap))
+        // "Quiet after 7 days" counts the leap day.
+        assertFalse(PlanReminderLogic.isQuiet(plan(active = LocalDate.of(2028, 2, 23)), LocalDate.of(2028, 3, 1), null))
+        assertTrue(PlanReminderLogic.isQuiet(plan(active = LocalDate.of(2028, 2, 22)), LocalDate.of(2028, 3, 1), null))
+    }
 }

@@ -50,8 +50,12 @@ object PlanReminderLogic {
         val paused: Boolean = false,
     )
 
-    /** What one notification says. [planId] is the plan a tap opens (the earliest due one). */
-    data class Message(val planId: String, val title: String, val text: String)
+    /**
+     * What one notification says. [planId] is the plan a tap opens (the earliest due one). [day] is the reading day
+     * it reminds about, the one recorded as notified: today, or yesterday for a late-evening reminder that Doze held
+     * past midnight.
+     */
+    data class Message(val planId: String, val title: String, val text: String, val day: LocalDate)
 
     // Calm and short, no guilt, no exclamation marks (the research in the reading-plan brief: one respectful reminder
     // helps, nagging hurts; rotating copy helped retention).
@@ -119,6 +123,9 @@ object PlanReminderLogic {
         catchUp: Boolean,
     ): ZonedDateTime? {
         val today = now.toLocalDate()
+        // A late-evening time (23:45) that a reboot or a clock change lost just before midnight is still within the
+        // grace after it: catch up on yesterday's reminder now, as one at 7:30 lost at 9:00 is caught up on.
+        if (catchUp && dueSlots(plans, today.minusDays(1), now, lastNotified, setOn).isNotEmpty()) return now
         for (offset in 0L..8L) {
             val day = today.plusDays(offset)
             if (day == lastNotified) continue
@@ -144,12 +151,14 @@ object PlanReminderLogic {
      */
     fun message(plans: List<Plan>, now: ZonedDateTime, lastNotified: LocalDate?, setOn: LocalDate?): Message? {
         val today = now.toLocalDate()
-        if (today == lastNotified) return null
-        val due = plans.filter { p ->
-            if (!dueOn(p, today, setOn)) return@filter false
-            val at = today.atTime(p.time).atZone(now.zone)
-            !at.isAfter(now) && Duration.between(at, now) < GRACE
-        }.sortedWith(compareBy({ it.time }, { it.id }))
+        // Today first; then yesterday, for an alarm set for a late-evening time that Doze delivered after midnight
+        // (it is still within the grace after its time, and the day boundary must not swallow it).
+        var day = today
+        var due = if (today == lastNotified) emptyList() else dueSlots(plans, today, now, lastNotified, setOn)
+        if (due.isEmpty()) {
+            day = today.minusDays(1)
+            due = dueSlots(plans, day, now, lastNotified, setOn)
+        }
         if (due.isEmpty()) return null
         val first = due[0]
         val title = when (due.size) {
@@ -157,7 +166,22 @@ object PlanReminderLogic {
             2 -> "${first.name} and ${due[1].name}"
             else -> "${first.name} and ${due.size - 1} more"
         }
-        return Message(first.id, title, lineFor(today))
+        return Message(first.id, title, lineFor(day), day)
+    }
+
+    /**
+     * The plans whose reminder for [day] is due at [now]: wanted that day, not yet notified, and its time on [day]
+     * reached less than [GRACE] ago. Sorted by time, then id. [day] is today, or yesterday only when [lastNotified]
+     * is before it (a yesterday already notified, or a today notified after it, never fires again).
+     */
+    private fun dueSlots(plans: List<Plan>, day: LocalDate, now: ZonedDateTime, lastNotified: LocalDate?, setOn: LocalDate?): List<Plan> {
+        if (day == lastNotified) return emptyList()
+        if (day.isBefore(now.toLocalDate()) && lastNotified != null && !day.isAfter(lastNotified)) return emptyList()
+        return plans.filter { p ->
+            if (!dueOn(p, day, setOn)) return@filter false
+            val at = day.atTime(p.time).atZone(now.zone)
+            !at.isAfter(now) && Duration.between(at, now) < GRACE
+        }.sortedWith(compareBy({ it.time }, { it.id }))
     }
 
     /** Whether any plan still wants a reminder today (when none does, a notification still showing is taken down). */

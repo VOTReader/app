@@ -9,7 +9,7 @@
    deterministic. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { relativeDate, timeAgo } from './dates.js';
+import { relativeDate, timeAgo, calendarDaysAgo } from './dates.js';
 
 const NOW = 1_700_000_000_000;  // fixed reference epoch (ms)
 const MIN = 60_000;
@@ -107,5 +107,66 @@ describe('timeAgo', () => {
 
   it('"N months ago" at >= 5 weeks', () => {
     expect(timeAgo(NOW - 60 * DAY)).toBe('2 months ago');
+  });
+});
+
+/* The date-boundary hunt (2026-11-01). Instants are local wall-clock times (new Date(y, m, d, h, min)), so each case
+   means the same in every zone; run under TZ=America/Denver they sit on the DST, month and year boundaries themselves.
+   Elapsed hours / 24 called a visit at 23:00 the day before yesterday "1 day ago" at 08:00, under History's header
+   naming that day; a day or more is now counted in calendar days. Under a day stays in hours. */
+describe('a day or more ago counts calendar days, not 24-hour blocks', () => {
+  const at = (/** @type {number} */ y, /** @type {number} */ mo, /** @type {number} */ d, h = 0, mi = 0) => new Date(y, mo, d, h, mi).getTime();
+  const both = (/** @type {number} */ ts, /** @type {string} */ want) => {
+    expect(timeAgo(ts)).toBe(want);
+    expect(relativeDate(ts)).toBe(want);
+  };
+
+  it('23:00 the day before yesterday is "2 days ago" at 08:00; yesterday is "1 day ago"; under a day is hours', () => {
+    vi.setSystemTime(at(2026, 10, 4, 8, 0));          // Wednesday 08:00
+    both(at(2026, 10, 2, 23, 0), '2 days ago');         // Monday 23:00, 33 hours
+    both(at(2026, 10, 3, 7, 0), '1 day ago');           // Tuesday 07:00, 25 hours
+    both(at(2026, 10, 3, 23, 0), '9 hr ago');
+  });
+
+  it('the day DST ended, 2026-11-01: 00:30, 01:30 and 23:30', () => {
+    vi.setSystemTime(at(2026, 10, 1, 0, 30));
+    both(at(2026, 9, 30, 23, 30), '2 days ago');        // Friday 23:30: 25 hours, two midnights
+    vi.setSystemTime(at(2026, 10, 1, 1, 30));
+    both(at(2026, 9, 31, 1, 0), '1 day ago');
+    // 23:30: Saturday 00:15 is 48 h 15 min back (the repeated hour), which 24-hour blocks called "2 days ago".
+    vi.setSystemTime(at(2026, 10, 1, 23, 30));
+    both(at(2026, 9, 31, 0, 15), '1 day ago');
+    expect(calendarDaysAgo(at(2026, 9, 31, 0, 15), Date.now())).toBe(1);
+  });
+
+  it('the spring gap, 2027-03-14: 01:59 and 03:00', () => {
+    vi.setSystemTime(at(2027, 2, 14, 1, 59));
+    both(at(2027, 2, 13, 1, 0), '1 day ago');
+    vi.setSystemTime(at(2027, 2, 14, 3, 0));
+    both(at(2027, 2, 12, 3, 30), '2 days ago');         // 46 h 30 min in Denver (the lost hour): still two days
+    expect(calendarDaysAgo(at(2027, 2, 13, 0, 0), Date.now())).toBe(1);
+  });
+
+  it('New Year: 2026-12-31 23:30 and 2027-01-01 00:30', () => {
+    vi.setSystemTime(at(2026, 11, 31, 23, 30));
+    both(at(2026, 11, 30, 22, 0), '1 day ago');
+    vi.setSystemTime(at(2027, 0, 1, 0, 30));
+    both(at(2026, 11, 30, 23, 30), '2 days ago');
+    both(at(2026, 11, 25, 12, 0), '1 week ago');        // 7 calendar days, last year: still relative
+  });
+
+  it('a leap day counts: 2028-02-29 and the day after', () => {
+    vi.setSystemTime(at(2028, 1, 29, 12, 0));
+    both(at(2028, 1, 28, 9, 0), '1 day ago');
+    vi.setSystemTime(at(2028, 2, 1, 8, 0));
+    both(at(2028, 1, 28, 20, 0), '2 days ago');         // 36 hours, Feb 29 between
+  });
+
+  it('00:05 on the 1st and an evening (18:00-23:59, the UTC date already tomorrow in the Americas)', () => {
+    vi.setSystemTime(at(2026, 11, 1, 0, 5));
+    both(at(2026, 10, 29, 23, 0), '2 days ago');
+    vi.setSystemTime(at(2026, 10, 4, 18, 30));
+    both(at(2026, 10, 2, 19, 0), '2 days ago');         // 47 h 30 min
+    both(at(2026, 10, 3, 23, 50), '18 hr ago');
   });
 });
