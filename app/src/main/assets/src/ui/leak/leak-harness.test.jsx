@@ -92,4 +92,14 @@ describe('the leak harness', () => {
     const Defer = make(() => () => { setTimeout(() => {}, 0); }, true);
     await expectNoLeaks(h, () => render(<Defer />), { cycles: 2 });
   });
+
+  it('a zero-delay deferral queued just before an immediate unmount is not counted', async () => {
+    function Deferring() {
+      return <button type="button" onClick={() => { setTimeout(() => {}, 0); }}>x</button>;
+    }
+    const { fireEvent } = await import('@testing-library/react');
+    await expectNoLeaks(h, () => render(<Deferring />), {
+      cycles: 3, unmountAt: 'interact', interact: () => fireEvent.click(document.querySelector('button')),
+    });
+  });
 });

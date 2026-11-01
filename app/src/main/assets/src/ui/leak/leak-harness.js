@@ -62,6 +62,10 @@ export function installLeakHarness(opts = {}) {
   const ran = (id) => {
     if (!watch || !id || id <= watch.from || id > watch.to) return;
     const v = live.get(id);
+    // A zero-delay timeout is a deferral (the same turn's follow-up, e.g. a focus handler's),
+    // not something the screen left running; whether it lands before or after an immediate
+    // unmount is scheduling luck. Frames and any real delay still count.
+    if (v && v.kind === 'timeout' && v.zero) return;
     if (v) late.push({ id, kind: v.kind, desc: v.desc + ', ran after the unmount', stack: v.stack });
   };
   const drop = (id) => { if (id) live.delete(id); };
@@ -121,7 +125,7 @@ export function installLeakHarness(opts = {}) {
       ? function () { const k = rel(h); const id = timerIds.get(k); ran(id); drop(id); timerIds.delete(k); return fn.apply(this, args); }
       : fn;
     h = realST.call(w, run, ms);
-    timerIds.set(rel(h), add('timeout', 'after ' + (ms | 0) + ' ms'));
+    timerIds.set(rel(h), add('timeout', 'after ' + (ms | 0) + ' ms', { zero: (ms | 0) <= 0 }));
     return h;
   });
   patch(w, 'clearTimeout', function (h) { const k = rel(h); drop(timerIds.get(k)); timerIds.delete(k); return realCT.call(w, h); });
