@@ -804,14 +804,17 @@ function storeRunAt(/** @type {TokenStore} */ S, /** @type {number} */ sid, /** 
  * Where a run of words as kjvEncode reads them (a possessive's "s" a word of its own) first starts in a text's
  * tokens, the store's joined words read as their two ("god's" as god, s); -1 when it does not. The quoted
  * phrase's and the +/- words' test, as holdsWords read them on kjvEncode's own tokens.
+ * `own`: in the words the text shows alone, a verse's KJV wording (after TWIN_GAP) not read (a -word's test).
  * @param {TokenStore} S @param {number} sid @param {number[]} r  the run's numbers (-1: a word in no text)
+ * @param {boolean} [own]
  */
-function storeWordsAt(S, sid, r) {
+function storeWordsAt(S, sid, r, own = false) {
   const n = r.length;
   if (!n) return 0;
   const T = S.toks;
   const B = S.base;
-  const b = S.to[sid];
+  let b = S.to[sid];
+  if (own) b = ownEnd(S, sid);
   for (let i = S.from[sid]; i < b; i++) {
     // a run may start on a joined word's "s" (o = 1) as well as on its word
     for (let o = 0; o < (B[T[i]] >= 0 ? 2 : 1); o++) {
@@ -830,6 +833,27 @@ function storeWordsAt(S, sid, r) {
     }
   }
   return -1;
+}
+/** Where a text's own wording ends in its store span: at TWIN_GAP, before its KJV wording; the span's end else. */
+function ownEnd(/** @type {TokenStore} */ S, /** @type {number} */ sid) {
+  const b = S.to[sid];
+  const sep = S.ids.get(TWIN_SEP);
+  if (sep === undefined) return b;
+  for (let i = S.from[sid]; i < b; i++) if (S.toks[i] === sep) return i;
+  return b;
+}
+/**
+ * The quoted phrase's and the +/- words' test on a text's tokens read anew (no store yet, or a text it does not
+ * hold): the phrase and the + words in either wording, as the store reads them; a - word in the words the text shows
+ * alone (its KJV wording is not on its card). `own` holds the text's own tokens (with its heading and ref), `kjv`
+ * its KJV wording's (TWIN_GAP first), empty for a text of one wording.
+ * @param {string[]} own @param {string[]} kjv @param {string[]|null} phrase @param {string[][]} must @param {string[][]} mustNot
+ */
+export function wordsHeld(own, kjv, phrase, must, mustNot) {
+  const all = kjv.length ? own.concat(kjv) : own;
+  if (phrase && !hasTokenRun(all, phrase)) return false;
+  if (must.length && !must.every((run) => hasTokenRun(all, run))) return false;
+  return !mustNot.some((run) => hasTokenRun(own, run));
 }
 /** How many texts the index finds the run's anchor in at most, for the store to read the run in all of them. */
 const RUN_HOLDERS = 5000;
@@ -3510,17 +3534,20 @@ async function searchWords(query, options) {
     if (!phraseToks && !hasMust && !hasMustNot) return true;
     const sid = S ? storeSpan(S, d.id) : null;
     if (!S || sid === null) {
-      const toks = kjvEncode((d.text || '') + ' ' + (d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || ''));
-      if (phraseToks && !hasTokenRun(toks, phraseToks)) return false;
-      if (hasMust && !mustToks.every((run) => hasTokenRun(toks, run))) return false;
-      return !mustNotToks.some((run) => hasTokenRun(toks, run));
+      /* read as the store reads it (nightly 11-01 #3): the phrase and + words in the KJV wording too, so a search
+         before the store is read finds the texts it finds after */
+      const own = kjvEncode((d.text || '') + ' ' + (d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || ''));
+      const twin = phraseToks || hasMust ? withKjv(msIndex, msIndex && msIndex._idToShortId.get(d.id), kjvEncode((d.text || '') + ' ' + (d.title || ''))) : [];
+      const gap = twin.indexOf(TWIN_SEP);
+      return wordsHeld(own, gap < 0 ? [] : twin.slice(gap), phraseToks, hasMust ? mustToks : [], mustNotToks);
     }
     /** @type {string[]|null} */ let side = null;
     const sideToks = () => side || (side = d.heading || d.ref ? kjvEncode((d.title || '') + ' ' + (d.heading || '') + ' ' + (d.ref || '')) : []);
-    const holds = (/** @type {string[]} */ run, /** @type {number[]} */ ids) => storeWordsAt(S, sid, ids) >= 0 || hasTokenRun(sideToks(), run);
+    const holds = (/** @type {string[]} */ run, /** @type {number[]} */ ids, own = false) => storeWordsAt(S, sid, ids, own) >= 0 || hasTokenRun(sideToks(), run);
     if (phraseToks && !holds(phraseToks, /** @type {number[]} */ (phraseIds))) return false;
     if (hasMust && !mustToks.every((run, i) => holds(run, mustIds[i]))) return false;
-    return !mustNotToks.some((run, i) => holds(run, mustNotIds[i]));
+    // a -word in the words the card shows alone: a verse's KJV wording is not on it (nightly 11-01 #3)
+    return !mustNotToks.some((run, i) => holds(run, mustNotIds[i], true));
   };
   const allowed = (/** @type {any} */ d) => inScope(d) && holdsWords(d);
   /** A text not shown yet, marked shown (the dedup). */
@@ -3847,6 +3874,10 @@ async function searchWords(query, options) {
     // Kept to a collection or scope, the model's best of everything may hold few of its texts: it reads further.
     sem = await semanticDocs(meant, unitId, corpusFilter || scopeBookId || scopeVolumeId ? MEANING_FILTERED : undefined);
     meaningLater = !sem && semanticStatus().status !== 'ready';
+    /* A KJV wording taken up while the model ran (adoptTwin: the file loaded late) dropped the originals and the
+       store this search read with, and originalsFirst below would read the originals anew in one block, under the
+       reader's typing, in the new wording. It starts over on the new wording, as at a page's turn (pause). */
+    if (msIndex === inUse && TWIN_READ !== twinInUse) return searchWords(query, options);
     if (msIndex !== inUse) sem = null;
     if (sem) sem = sem.filter((s) => { const f = msIndex.getStoredFields(s.id); return !!f && allowed({ ...f, id: s.id }); });
     const wordsFirst = out[0];
@@ -4328,12 +4359,19 @@ function suggest(query, opts) {
 /** Drop the in-memory index and the warm cache, and build again for the active (or given) translation. */
 function rebuild(options) {
   options = options || {};
-  const code = options.translation || stats.translation || 'nkjv';
-  ready = false;
-  msIndex = null;
-  coldNext = true;
-  clearCached().catch(() => {});
-  return init({ translation: code });
+  const go = () => {
+    const code = options.translation || stats.translation || 'nkjv';
+    ready = false;
+    msIndex = null;
+    coldNext = true;
+    clearCached().catch(() => {});
+    return init({ translation: code });
+  };
+  /* A BUILD UNDER WAY IS WAITED FOR FIRST (nightly 11-01 U4). Asked mid-build (the launch's background build, often a
+     warm restore), init() joined that build, found its index current and built nothing: the cache the reader asked to
+     drop was what they got, and coldNext stayed set for the next build, whichever it was (another edition's skipped
+     its warm cache). The build ends, then the index is dropped and built cold. */
+  return building ? building.then(go, go) : go();
 }
 
 function getState() {
