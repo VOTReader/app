@@ -206,6 +206,11 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (hintTimer.current) clearTimeout(hintTimer.current);
     hintTimer.current = setTimeout(() => setHint(''), 3600);
   }, [setAnnounce]);
+  // the hint's timer goes with the screen: a reader who leaves inside its 3.6 s never had
+  // setHint('') run against a screen that is gone (leak hunt #60, item 1)
+  React.useEffect(() => () => {
+    if (hintTimer.current) { clearTimeout(hintTimer.current); hintTimer.current = 0; }
+  }, []);
   /** The density, chosen in the Filters sheet's Strength row: kept as the setting, its line said. @param {Density} next */
   const chooseDensity = React.useCallback((next) => {
     setDensity(next);
