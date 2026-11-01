@@ -378,6 +378,18 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   const dragRef = React.useRef(false);
   // Debounce timer for selectionchange → show (handle-drag scenario)
   const selChangeTimerRef = React.useRef(null);
+  // The toolbar press's end listeners (W54), held so an unmount mid-press takes them off the document.
+  const pressEndsRef = React.useRef(/** @type {Set<() => void>} */ (new Set()));
+  React.useEffect(() => {
+    const ends = pressEndsRef.current;   // one Set for the toolbar's life
+    return () => {
+      for (const end of ends) {
+        document.removeEventListener('pointerup', end, true);
+        document.removeEventListener('pointercancel', end, true);
+      }
+      ends.clear();
+    };
+  }, []);
   // Track tap target and position for tap-on-mark detection
   const tapTargetRef = React.useRef(null);
   const tapPosRef = React.useRef({ x: 0, y: 0 });
@@ -929,6 +941,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
       document.removeEventListener('copy', onCopy);
       document.removeEventListener('scroll', onAnyScroll, true);
       if (stillTimer) clearTimeout(stillTimer);
+      // The settle debounce (and the drag's re-arm of it) outlives the toolbar otherwise (leak hunt 2026-11-01).
+      if (selChangeTimerRef.current) { clearTimeout(selChangeTimerRef.current); selChangeTimerRef.current = null; }
       window.__nativeTapAnnotation = null;
     };
   }, [computeOffset, findHlContainer]);
@@ -1471,8 +1485,10 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         const end = () => {
           document.removeEventListener('pointerup', end, true);
           document.removeEventListener('pointercancel', end, true);
+          pressEndsRef.current.delete(end);
           setTimeout(() => { suppressRef.current = false; }, 300);
         };
+        pressEndsRef.current.add(end);
         document.addEventListener('pointerup', end, true);
         document.addEventListener('pointercancel', end, true);
       }}
