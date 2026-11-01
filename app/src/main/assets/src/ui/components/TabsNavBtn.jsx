@@ -34,6 +34,7 @@ export function TabsNavBtn() {
         onClick={() => { dismissHint(); onOpen(); }}
         title={`${count} tab${count === 1 ? '' : 's'} open`}
         aria-label={`Open tabs (${count} open)`}
+        aria-haspopup="dialog"
       >
         <span className="tabs-nav-btn-glyph">{"▢"}</span>
         <span className="tabs-nav-btn-count">{label}</span>

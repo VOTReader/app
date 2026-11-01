@@ -452,6 +452,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               data-fn-num={n}
               role="button"
               tabIndex={0}
+              aria-haspopup="dialog"
               aria-label={`Footnote ${n}`}
               onClick={() => handleBubbleClick(ref, n)}
               onKeyDown={(e) => {
@@ -467,7 +468,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
           );
         }
         return (
-          <a key={si} className="wtlb-cite" href="#" onClick={(e) => { e.preventDefault(); openSheetForRef(ref); }}>
+          <a key={si} className="wtlb-cite" href="#" aria-haspopup="dialog" onClick={(e) => { e.preventDefault(); openSheetForRef(ref); }}>
             ({ref})
           </a>
         );
@@ -608,7 +609,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
 
             {footnotesMode && refAnalysis.orderedRefs.length > 0 && (
               <div className="footnote-list wtlb-footnote-list">
-                <div className="footnote-list-header">Footnotes</div>
+                <div className="footnote-list-header" role="heading" aria-level={2}>Footnotes</div>
                 {refAnalysis.orderedRefs.map((ref) => {
                   const num = refAnalysis.refNumMap[ref];
                   const verseText = lookupVerse(ref);
@@ -625,7 +626,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               </div>
             )}
 
-            <div className="ornament-divider">
+            <div className="ornament-divider" aria-hidden="true">
               <div className="ornament-divider-line" />
               <div className="ornament-divider-symbol">✦</div>
               <div className="ornament-divider-line" />

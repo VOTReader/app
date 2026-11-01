@@ -5,6 +5,7 @@
 app/src/main/assets/lazy-css-loader.test.js
 app/src/main/assets/service-worker-1.contract.test.js
 app/src/main/assets/src/components/ErrorBoundary.test.jsx
+app/src/main/assets/src/search/cache.test.js
 app/src/main/assets/src/search/semantic.test.js
 app/src/main/assets/src/ui/components/AudioPlayerBar.songs.test.jsx
 app/src/main/assets/src/ui/components/LetterSongs.test.jsx

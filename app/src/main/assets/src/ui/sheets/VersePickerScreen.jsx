@@ -317,7 +317,7 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
 
   if (!chapter) {
     return (
-      <div className="picker-screen">
+      <div className="picker-screen" ref={trapRef}>
         <div className="picker-header">
           <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
           <span className="picker-title">Select Verse</span>
@@ -367,11 +367,12 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
             aria-label="Filter verses by text"
           />
           {filterQ && (
-            <span className="picker-find-count">{shownVerses.length} of {verses.length}</span>
+            <span className="picker-find-count" role="status" aria-live="polite">{shownVerses.length} of {verses.length}</span>
           )}
         </div>
         <div
           className={"picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")}
+          aria-live="polite"
         >{hasSelection
           ? previewText
           : "Highlight any portion, or tap a verse number to grab the whole verse (tap a second number for a range)."

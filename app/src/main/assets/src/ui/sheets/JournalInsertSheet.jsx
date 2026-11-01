@@ -248,7 +248,7 @@ export function JournalInsertSheet(props) {
   function insertItem(icon, label, desc, onClick, drill) {
     return (
       <button type="button" className={'jrn-insert-item' + (drill ? ' has-drill' : '')} onClick={onClick}>
-        <span className="jrn-insert-icon">{icon}</span>
+        <span className="jrn-insert-icon" aria-hidden="true">{icon}</span>
         <span className="jrn-insert-text">
           <span className="jrn-insert-label">{label}</span>
           <span className="jrn-insert-desc">{desc}</span>
@@ -307,6 +307,10 @@ export function JournalInsertSheet(props) {
             : mode === 'pick-bookmark' ? 'Search bookmarks…'
             : mode === 'pick-notebook' ? 'Search notebooks…'
             : 'Search notes…'}
+          aria-label={mode === 'pick-journal' ? 'Search journal entries'
+            : mode === 'pick-bookmark' ? 'Search bookmarks'
+            : mode === 'pick-notebook' ? 'Search notebooks'
+            : 'Search notes'}
           value={query}
           onChange={function(e) { setQuery(e.target.value); }}
         />
@@ -340,7 +344,7 @@ export function JournalInsertSheet(props) {
             : filtered.map(function(b) {
                 return (
                   <button key={b.id} type="button" className="jrn-picker-item" onClick={function() { chooseBookmark(b); }}>
-                    <span className="jrn-picker-spine">BK</span>
+                    <span className="jrn-picker-spine" aria-hidden="true">BK</span>
                     <span className="jrn-picker-text">
                       <span className="jrn-picker-label">{b.label || 'Bookmark'}</span>
                       <span className="jrn-picker-cat">{sourceLabel(b.hlKey)}</span>
@@ -383,7 +387,7 @@ export function JournalInsertSheet(props) {
                 try { src = noteLabel(n); } catch (_e) { /* helper may throw on malformed data; treat as missing */ }
                 return (
                   <button key={n.groupId} type="button" className="jrn-picker-item" onClick={function() { chooseNote(n); }}>
-                    <span className="jrn-picker-spine">NT</span>
+                    <span className="jrn-picker-spine" aria-hidden="true">NT</span>
                     <span className="jrn-picker-text">
                       <span className="jrn-picker-label" style={{ fontStyle: 'italic', textTransform: 'none', fontFamily: 'var(--font-body)' }}>{label}</span>
                       <span className="jrn-picker-cat">{src}</span>
@@ -430,7 +434,7 @@ export function JournalInsertSheet(props) {
                 try { dateStr = JournalHelpers.shortDate(e.created); } catch (_err) { /* helper may throw on malformed data; treat as missing */ }
                 return (
                   <button key={e.id} type="button" className="jrn-picker-item" onClick={function() { chooseJournal(e); }}>
-                    <span className="jrn-picker-spine">JR</span>
+                    <span className="jrn-picker-spine" aria-hidden="true">JR</span>
                     <span className="jrn-picker-text">
                       <span className="jrn-picker-label">{title}</span>
                       <span className="jrn-picker-cat">{dateStr + (preview ? ' · ' + preview : '')}</span>
@@ -465,7 +469,7 @@ export function JournalInsertSheet(props) {
             className="jrn-picker-item jrn-blockpick-whole"
             onClick={function() { chooseWholeEntry(fresh); }}
           >
-            <span className="jrn-picker-spine">JR</span>
+            <span className="jrn-picker-spine" aria-hidden="true">JR</span>
             <span className="jrn-picker-text">
               <span className="jrn-picker-label">Link the Whole Entry</span>
               <span className="jrn-picker-cat">Inserts a card that opens this entry</span>
@@ -536,7 +540,7 @@ export function JournalInsertSheet(props) {
                 var cnt = noteCount(nb.id);
                 return (
                   <button key={nb.id} type="button" className="jrn-picker-item" onClick={function() { chooseNotebook(nb.id); }}>
-                    <span className="jrn-picker-spine">NB</span>
+                    <span className="jrn-picker-spine" aria-hidden="true">NB</span>
                     <span className="jrn-picker-text">
                       <span className="jrn-picker-label">{nb.name}</span>
                       <span className="jrn-picker-cat">{cnt + (cnt === 1 ? ' note' : ' notes')}</span>

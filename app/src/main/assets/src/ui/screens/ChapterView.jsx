@@ -280,7 +280,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             </div>
           )}
 
-          <div className="ornament-divider">
+          <div className="ornament-divider" aria-hidden="true">
             <div className="ornament-divider-line" />
             <div className="ornament-divider-symbol">✦</div>
             <div className="ornament-divider-line" />

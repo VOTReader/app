@@ -40,7 +40,7 @@ function Stepper({ label, value, min, step, unit, onChange }) {
   return (
     <span className="build-stepper">
       <button type="button" aria-label={'Less: ' + label} disabled={value - step < min} onClick={() => onChange(Math.max(min, value - step))}>−</button>
-      <span className="build-stepper-value">{value + unit}</span>
+      <span className="build-stepper-value" aria-live="polite">{value + unit}</span>
       <button type="button" aria-label={'More: ' + label} onClick={() => onChange(value + step)}>+</button>
     </span>
   );

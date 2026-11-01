@@ -507,6 +507,8 @@ function StorageTrendValue({ samples }) {
 /* DataActionRow — label + ⓘ-revealed description + action button. */
 function DataActionRow({ label, desc = null, children = null, className = '' }) {
   const [showDesc, setShowDesc] = React.useState(false);
+  const descId = `settings-desc-${React.useId()}`;
+  const descShown = !!(showDesc && desc);
   return (
     <div className={'settings-row' + (className ? ' ' + className : '')}>
       <div className="settings-row-head">
@@ -517,13 +519,14 @@ function DataActionRow({ label, desc = null, children = null, className = '' }) 
             className="settings-info-btn"
             aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
             aria-expanded={showDesc}
+            aria-controls={descShown ? descId : undefined}
             onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
           >i</button>
         )}
         <span className="settings-row-grow" />
         {children}
       </div>
-      {showDesc && desc && <div className="settings-row-desc">{desc}</div>}
+      {descShown && <div className="settings-row-desc" id={descId}>{desc}</div>}
     </div>
   );
 }
@@ -591,6 +594,7 @@ function SectionClearBtn({ label, disabled, onClear }) {
   return (
     <button
       className="settings-clear-btn"
+      aria-label={'Clear ' + label}
       disabled={disabled}
       onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
     >Clear</button>
@@ -1632,7 +1636,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             </DataInfoRow>
             {/* up1: the changes behind recent updates, in plain words (WhatsNewSheet) */}
             <DataInfoRow label="What's new">
-              <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); void openWhatsNew(); }}>Show</button>
+              <button className="settings-clear-btn" aria-label="Show what's new" onClick={(e) => { e.stopPropagation(); void openWhatsNew(); }}>Show</button>
             </DataInfoRow>
             <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
             <DataInfoRow label="Total app data" value={appDataDisplayText} />

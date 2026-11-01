@@ -38,7 +38,7 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
         </div>
         <div className="chapter-cards">
           {list.length === 0 && studiesLoading && (
-            <div className="sc-sheet-loading" style={{ textAlign: "center", padding: "1.5rem 0" }}>Loading studies…</div>
+            <div className="sc-sheet-loading" role="status" style={{ textAlign: "center", padding: "1.5rem 0" }}>Loading studies…</div>
           )}
           {list.length === 0 && !studiesLoading && !studiesError && (
             <div className="studies-empty">Letter Studies coming soon.</div>
@@ -79,7 +79,7 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
           })}
           {studiesError && !studiesLoading && (
             <div className="studies-empty" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", textAlign: "center" }}>
-              <div>{list.length === 0 ? "Couldn’t load studies." : "Some studies couldn’t load."}</div>
+              <div role="alert">{list.length === 0 ? "Couldn’t load studies." : "Some studies couldn’t load."}</div>
               <button type="button" onClick={onRetry} style={{ padding: "8px 20px", borderRadius: "999px", border: "1px solid currentColor", background: "transparent", color: "inherit", font: "inherit", cursor: "pointer", opacity: 0.85 }}>Try again</button>
             </div>
           )}
