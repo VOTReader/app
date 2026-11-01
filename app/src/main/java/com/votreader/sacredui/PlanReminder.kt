@@ -88,7 +88,9 @@ object PlanReminder {
         val msg = PlanReminderLogic.message(plans, now, last, setOn)
         if (msg != null) {
             // Marked sent before the post: a post that throws must not turn into a second try every alarm today.
-            p.edit().putString(K_LAST, now.toLocalDate().toString()).apply()
+            // The day the reminder is for: yesterday for a late-evening one Doze delivered after midnight, so
+            // tonight's own reminder still comes.
+            p.edit().putString(K_LAST, msg.day.toString()).apply()
             post(context, msg)
         }
         schedule(context, now, catchUp = false)
