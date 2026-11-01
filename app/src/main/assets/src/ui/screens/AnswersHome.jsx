@@ -441,6 +441,8 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const [recent, setRecent] = React.useState(readRecent);
   React.useEffect(() => { _landing.query = query; _landing.tab = tab; _landing.sheet = sheet; }, [query, tab, sheet]);
   const inputRef = React.useRef(/** @type {HTMLInputElement | null} */ (null));
+  const tabCRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
+  const tabAzRef = React.useRef(/** @type {HTMLButtonElement | null} */ (null));
   const placeholder = usePlaceholder(inputRef);
   const ts2 = answersLayoutClass(fontScale, false).includes('ans-ts2');
 
@@ -497,7 +499,14 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   // A saved A–Z tab waits for the corpus: until then Contents shows, so it is the selected tab.
   const az = tab === 'az' && loaded;
   const onTabKey = (e) => {
-    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setTab(az ? 'contents' : 'az'); }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      const next = az ? 'contents' : 'az';
+      setTab(next);
+      // focus follows the selection (nightly 11-01 #4): a screen reader then reads the tab now selected
+      const el = (next === 'az' ? tabAzRef : tabCRef).current;
+      if (el) el.focus();
+    }
   };
 
   return (
@@ -561,9 +570,9 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
         </div>
         <div className="ans-landing-b">
           <div className="ans-tabs" role="tablist" aria-label="Browse Answers">
-            <button type="button" className="ans-tab" role="tab" id="ans-tab-c" aria-controls="ans-panel-c" aria-selected={!az}
+            <button ref={tabCRef} type="button" className="ans-tab" role="tab" id="ans-tab-c" aria-controls="ans-panel-c" aria-selected={!az}
               tabIndex={az ? -1 : 0} onClick={() => setTab('contents')} onKeyDown={onTabKey}>Contents</button>
-            <button type="button" className="ans-tab" role="tab" id="ans-tab-az" aria-controls="ans-panel-az" aria-selected={az}
+            <button ref={tabAzRef} type="button" className="ans-tab" role="tab" id="ans-tab-az" aria-controls="ans-panel-az" aria-selected={az}
               tabIndex={az ? 0 : -1} onClick={() => setTab('az')} onKeyDown={onTabKey}>A–Z</button>
           </div>
           {az ? (
