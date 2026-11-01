@@ -503,8 +503,9 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
       e.preventDefault();
       const next = az ? 'contents' : 'az';
       setTab(next);
-      // focus follows the selection (nightly 11-01 #4): a screen reader then reads the tab now selected
-      const el = (next === 'az' ? tabAzRef : tabCRef).current;
+      // focus follows the selection (nightly 11-01 #4): a screen reader then reads the tab now selected. A–Z is
+      // selected only once the corpus is in (az above): before that, Contents stays selected and keeps the focus.
+      const el = (next === 'az' && loaded ? tabAzRef : tabCRef).current;
       if (el) el.focus();
     }
   };
