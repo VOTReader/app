@@ -612,7 +612,7 @@ jobs:
         run: node tools/build-kjv-twin.mjs --check
 
   build:
-    name: build + syntax-check
+    name: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository) && 'build + syntax-check' || 'build + syntax-check (skipped PR copy)' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     needs: [gates, vitest, browser, search-bench]
@@ -633,6 +633,14 @@ jobs:
     # `build + syntax-check` is a REQUIRED status check on main, and the check
     # run this job publishes is keyed to the head SHA — the push run publishes it
     # for the same SHA, so the requirement is still satisfied on an in-repo PR.
+    #
+    # The skipped copy publishes a check run too, and while it carried the
+    # required name GitHub counted it as passing: about 15 s after every push to
+    # an in-repo PR branch the PR read green, before the push run's jobs had even
+    # queued (#61 merged on it 2026-11-01 19:41:37; its real CI started 13 s
+    # later). So the copy that skips takes another name (`name:` above uses the
+    # same condition as `if:` below), and `build + syntax-check` comes only from
+    # a run that does the work: the push run, or a fork PR's pull_request run.
     #
     # always(): a job whose needs failed is SKIPPED by default, and a skipped
     # required check counts as passing. This one runs anyway and fails unless

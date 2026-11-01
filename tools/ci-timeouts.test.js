@@ -45,8 +45,16 @@ describe('the restore walk is a CI gate (n7-06)', () => {
    skipped required check counts as passing. */
 describe('the required check covers every CI job (ln1)', () => {
   const build = jobs(wf('ci.yml')).build;
-  it('keeps the exact required name', () => {
-    expect(build).toMatch(/^ {4}name: build \+ syntax-check\n/);
+  // The same condition decides the job's `if:` and its name. The copy an in-repo PR skips still publishes a check run,
+  // and under the required name it read as passing before the real run had queued (#61 merged on it, 2026-11-01).
+  const WORKS = "github.event_name != 'pull_request' ||\n      github.event.pull_request.head.repo.full_name != github.repository";
+  it('keeps the exact required name on every run that does the work', () => {
+    expect(build).toMatch(/^ {4}name: \$\{\{ \(github\.event_name != 'pull_request' \|\| github\.event\.pull_request\.head\.repo\.full_name != github\.repository\) && 'build \+ syntax-check' \|\| '([^']+)' \}\}\n/);
+    expect(build).toContain(`always() &&\n      (${WORKS})`);
+  });
+  it('gives the skipped in-repo pull_request copy a name branch protection does not count', () => {
+    const other = /&& 'build \+ syntax-check' \|\| '([^']+)' \}\}/.exec(build)[1];
+    expect(other).not.toBe('build + syntax-check');
   });
   // search-bench (2026-10-05) joined them: the benchmark's floor gates main like the rest.
   it('needs gates, vitest, browser and search-bench, and runs when one of them fails', () => {
