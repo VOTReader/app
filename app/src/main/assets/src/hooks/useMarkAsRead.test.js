@@ -6,6 +6,7 @@
    readKey via COL_BY_KEY, respects the markAsRead gate, and records a streak
    day (a full listen proves presence as well as a full read does). */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useReadProgress } from './useMarkAsRead.js';

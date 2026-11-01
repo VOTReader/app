@@ -34,6 +34,7 @@
         Matthew chapter clicks to bible-ch (wrong renderer).
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act, fireEvent } from '@testing-library/react';
 import { useReadingPositionNav } from './use-reading-position-nav.js';

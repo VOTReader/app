@@ -16,6 +16,7 @@
      - replaceAll (import path) not defaulting missing fields.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import { ReadingStreakStore } from './reading-streak-store.js';
 

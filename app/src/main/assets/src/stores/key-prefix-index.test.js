@@ -6,6 +6,7 @@
    filters answered (same records, same order, each once), follow every
    write, and read each record once per store version, not once per call. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { LinkStore } from './link-store.js';
 import { BookmarkStore } from './bookmark-store.js';

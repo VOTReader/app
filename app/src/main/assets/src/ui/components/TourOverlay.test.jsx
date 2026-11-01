@@ -14,6 +14,7 @@
      E) It renders nothing while the tour is inactive, and the card at once
         when it starts (the overlay rode lazy bundle-e and waited for it until lz1).
 */
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
 import { TourOverlay } from './TourOverlay.jsx';

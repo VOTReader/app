@@ -26,6 +26,8 @@
  * only after the walk had already failed for another reason — so they passed
  * green. RED-proved: a `setTimeout(() => { throw ... }, 4000)` appended to
  * dist/bundle-b.js exited 0 with a PASS line on the old verdict.
+ * Every browser console.error line is part of it too (foldConsoleErrors,
+ * 2026-11-01), boot to close, except a failed load from another origin.
  *
  * Local: `npm run smoke:ci`. CI: a step after `npm run build`.
  */
@@ -327,6 +329,37 @@ export function foldPageErrors(report, pageErrors) {
   return report;
 }
 
+// Console errors are part of the verdict too (console-clean, 2026-11-01). smoke.js counts console.error only while
+// votSmoke() runs, and only the calls the app makes itself; the browser's own error lines (a 404, a CSP refusal, a
+// React error logged before the walk, anything during the compact-nav / tap-target / shared-link audits after it)
+// never pass through that wrapper. This is the CDP view of the whole page lifetime, boot to close.
+// One carve-out: a resource that failed to load from ANOTHER origin (the GitHub-hosted audio and images) is the
+// network's weather on the runner, not a defect in the app, and failing the walk on it would be a flake. A failed
+// load from the app's own origin still counts, as does every other error line.
+// msg: { type, text, url } — url is the message's source location (for a resource error, the resource itself).
+export function isAppConsoleError(msg, appOrigin) {
+  if (!msg || msg.type !== 'error') return false;
+  if (/^Failed to load resource\b/.test(String(msg.text || ''))) {
+    let origin = '';
+    try { origin = new URL(String(msg.url || '')).origin; } catch { /* no URL: count it */ }
+    if (origin && appOrigin && origin !== appOrigin) return false;
+  }
+  return true;
+}
+// Pure, exported for tools/smoke-ci.test.js, like foldPageErrors.
+export function foldConsoleErrors(report, consoleErrors) {
+  if (!consoleErrors || consoleErrors.length === 0) {
+    report.summary += ' | browser console.error 0';
+    return report;
+  }
+  const n = consoleErrors.length;
+  const first = String(consoleErrors[0].text || consoleErrors[0]).split('\n')[0];
+  report.ok = false;
+  report.consoleErrors = consoleErrors.slice();
+  report.summary += ` | ${n} BROWSER CONSOLE ERROR${n === 1 ? '' : 'S'} — first: ${first}`;
+  return report;
+}
+
 // One full smoke attempt against a FRESH browser: load → wait for mount →
 // pre-load corpora → inject smoke.js → run votSmoke → return { report, pageErrors }.
 // THROWS on a HARNESS error (CDP timeout / launch failure / wedged runner) — those
@@ -359,6 +392,13 @@ async function runAttempt(url) {
     page.setDefaultTimeout(30000);
     const pageErrors = [];
     page.on('pageerror', (e) => pageErrors.push(String(e)));
+    const consoleErrors = [];
+    const appOrigin = new URL(url).origin;
+    page.on('console', (m) => {
+      const loc = m.location() || {};
+      const msg = { type: m.type(), text: m.text(), url: loc.url || '' };
+      if (isAppConsoleError(msg, appOrigin)) consoleErrors.push(msg);
+    });
 
     await page.goto(url, { waitUntil: 'domcontentloaded' });
     // Wait for React to mount the app shell.
@@ -418,7 +458,7 @@ async function runAttempt(url) {
       sharedLink = { ok: false, error: (error && error.message) || String(error) };
     }
     foldSharedLink(report, sharedLink);
-    return { report, pageErrors };
+    return { report, pageErrors, consoleErrors };
   } finally {
     if (browser) { try { await browser.close(); } catch { /* wedged browser — ignore */ } }
   }
@@ -450,10 +490,11 @@ async function main() {
       }
       // A real report is AUTHORITATIVE: a genuine render failure (ok === false)
       // must NOT be retried (that would mask a real regression). Done either way.
-      const { report, pageErrors } = result;
+      const { report, pageErrors, consoleErrors } = result;
       // A pageerror is a genuine failure, not a wedged runner: fold it into the
       // verdict here, on the authoritative (never retried) report.
       foldPageErrors(report, pageErrors);
+      foldConsoleErrors(report, consoleErrors);
       console.log('[smoke-ci] ' + report.summary);
       if (report.ok) {
         exitCode = 0;
@@ -461,6 +502,7 @@ async function main() {
         console.error('[smoke-ci] FAIL — full report:');
         console.error(JSON.stringify(report, null, 2));
         if (pageErrors.length) console.error('[smoke-ci] pageerrors:', pageErrors);
+        if (consoleErrors.length) console.error('[smoke-ci] browser console errors:', consoleErrors);
       }
       break;
     }

@@ -82,7 +82,9 @@ describe('useReadProgress — markRead', () => {
 
   it('a detector completion feeds ReadingStatsStore; a manual mark does not', () => {
     const recordCompletion = vi.fn();
-    /** @type {any} */ (globalThis).ReadingStatsStore = { recordCompletion };
+    // clearProgress too: the manual mark below clears the partial-read marker through it (a missing one logged
+    // 'reading-stats frontier clear failed: clearProgress is not a function').
+    /** @type {any} */ (globalThis).ReadingStatsStore = { recordCompletion, clearProgress: vi.fn() };
     try {
       const { result } = setup();
       act(() => { result.current.markRead('matthew', 5); });          // manual — a claim

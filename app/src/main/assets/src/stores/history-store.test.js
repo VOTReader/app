@@ -28,6 +28,7 @@
    identical at 'loaded' state.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { HistoryStore } from './history-store.js';
 

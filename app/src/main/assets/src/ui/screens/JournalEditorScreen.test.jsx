@@ -19,6 +19,7 @@
    are advanced, so any persisted data MUST have come from the synchronous flush
    / immediate-save paths, not the debounce. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act, fireEvent } from '@testing-library/react';
 import { JournalEditorScreen } from './JournalEditorScreen.jsx';
@@ -44,7 +45,7 @@ beforeEach(() => {
 
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   globalThis.showToast = () => {};
-  globalThis.StorageHealth = { onWriteFailure: () => {} };
+  globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
   globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = () => null;

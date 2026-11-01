@@ -16,6 +16,7 @@
      E) subscribe/getVersion notify on every state change (React reads it
         with useSyncExternalStore like every other store).
 */
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TourController, TOUR_LATER_MS } from './tour-controller.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';

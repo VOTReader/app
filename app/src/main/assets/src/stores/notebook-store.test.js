@@ -22,6 +22,7 @@
         The cross-store wiring is the load-bearing part.
 */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NotebookStore } from './notebook-store.js';
 import { NoteStore } from './note-store.js';

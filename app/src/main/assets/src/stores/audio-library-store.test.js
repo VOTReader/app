@@ -1,5 +1,6 @@
 /* AudioLibraryStore — Listening Library metadata and import hardening. */
 
+import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   AudioLibraryStore,
