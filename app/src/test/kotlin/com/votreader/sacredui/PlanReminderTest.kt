@@ -120,6 +120,21 @@ class PlanReminderTest {
     }
 
     @Test
+    fun `a late-evening alarm Doze delivers after midnight posts yesterday's reminder and keeps tonight's`() {
+        // 23:45 on Saturday 2026-10-31, delivered at 00:30 on Sunday 2026-11-01 (the day US clocks go back).
+        val sat = fri.plusDays(1)
+        val sun = fri.plusDays(2)
+        PlanReminder.set(app, list(p(time = "23:45", active = sat)), at(sat, 22))
+        PlanReminder.onAlarm(app, at(sun, 0, 30))
+        assertEquals(1, nm.size())
+        // Recorded as Saturday's: the next alarm is Sunday 23:45, not Monday's.
+        assertEquals(at(sun, 23, 45).toInstant().toEpochMilli(), am.scheduledAlarms.single().triggerAtMs)
+        app.getSystemService(NotificationManager::class.java).cancelAll()
+        PlanReminder.onAlarm(app, at(sun, 23, 45))
+        assertEquals(1, nm.size())
+    }
+
+    @Test
     fun `finishing today takes a reminder still showing down, and a done day posts nothing`() {
         PlanReminder.set(app, list(p()), at(fri, 6))
         PlanReminder.onAlarm(app, at(fri, 7, 31))
