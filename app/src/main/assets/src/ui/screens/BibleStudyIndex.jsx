@@ -36,6 +36,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
         key={ch.id}
         ref={isCurrent ? currentRef : null}
         className={`chapter-card-btn${isCurrent ? " is-current" : ""}`}
+        aria-current={isCurrent ? 'true' : undefined}
         onClick={() => onSelect(ch.id)}
       >
         <span className="chapter-card-num">{ch.num}</span>
@@ -99,6 +100,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
                       key={part.num}
                       ref={isCurrent ? currentRef : null}
                       className={`part-group-card${isCurrent ? " is-expanded" : ""}`}
+                      aria-current={isCurrent ? 'true' : undefined}
                       onClick={() => ch && onSelect(ch.id)}
                     >
                       <div className="part-group-info">
@@ -124,7 +126,7 @@ export function BibleStudyIndex({ study, onSelect, onBack, onSearch, onHistory, 
                         <div className="part-group-title">{part.title}</div>
                         {part.subtitle && <div className="part-group-subtitle">{part.subtitle}</div>}
                       </div>
-                      <span className={`part-chevron${isOpen ? " is-open" : ""}`}>{"›"}</span>
+                      <span className={`part-chevron${isOpen ? " is-open" : ""}`} aria-hidden="true">{"›"}</span>
                     </button>
                     {isOpen && (
                       <div className="part-chapters">

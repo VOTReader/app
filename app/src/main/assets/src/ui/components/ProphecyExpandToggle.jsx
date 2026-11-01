@@ -18,7 +18,7 @@ export function ProphecyExpandToggle({ allExpanded, onToggle }) {
           onClick={() => onToggle(!allExpanded)}
           title={allExpanded ? "Collapse all cards" : "Expand all cards"}
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             {allExpanded ? (
               <polyline points="6 15 12 9 18 15" />
             ) : (

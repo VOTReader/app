@@ -588,7 +588,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 inline mid-paragraph, or no closing at all) keeps the divider in
                 its old spot between footnotes and the prev/next cards. */}
             {closingEndsBody && (
-              <div className="ornament-divider">
+              <div className="ornament-divider" aria-hidden="true">
                 <div className="ornament-divider-line" />
                 <div className="ornament-divider-symbol">✦</div>
                 <div className="ornament-divider-line" />
@@ -598,7 +598,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} onRef={handleScripClick} />}
 
             {!closingEndsBody && (
-              <div className="ornament-divider">
+              <div className="ornament-divider" aria-hidden="true">
                 <div className="ornament-divider-line" />
                 <div className="ornament-divider-symbol">✦</div>
                 <div className="ornament-divider-line" />
@@ -691,7 +691,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   <a className="related-link" href={letter.videoMusicUrl} target="_blank" rel="noopener noreferrer">▶ Video (excerpts set to music)</a>
                 )}
                 <a className="related-link" href="https://www.youtube.com/user/trumpetcallofgod" target="_blank" rel="noopener noreferrer">
-                  <span style={{ color: '#cc4444' }}>▶</span> Official YouTube Channel
+                  <span style={{ color: '#cc4444' }} aria-hidden="true">▶</span> Official YouTube Channel
                 </a>
               </div>
               )}

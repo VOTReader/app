@@ -83,8 +83,8 @@ function renderNodes(nodes, pi, kb) {
     // A cite's and a link's words sit in span.ans-tb, drawn above every target's 14px band (app.css): where two
     // bands overlap (links on adjacent lines, the names of an "Also see:" line) a tap on a link's own words is
     // still that link's. The span wraps the words only: the paragraph's text is unchanged (D3).
-    if (n.t === 'cite') return <a key={key} className="wtlb-cite" href="#" data-ans="cite" data-p={pi} data-n={d.n} data-ref={d.ref}><span className="ans-tb">{kids}</span></a>;
-    if (n.t === 'sup') return <sup key={key} className="ans-note-ref" role="button" tabIndex={0} data-ans="note" data-p={pi} data-at={d.N.at}>{kids}</sup>;
+    if (n.t === 'cite') return <a key={key} className="wtlb-cite" href="#" aria-haspopup="dialog" data-ans="cite" data-p={pi} data-n={d.n} data-ref={d.ref}><span className="ans-tb">{kids}</span></a>;
+    if (n.t === 'sup') return <sup key={key} className="ans-note-ref" role="button" tabIndex={0} aria-haspopup="dialog" data-ans="note" data-p={pi} data-at={d.N.at}>{kids}</sup>;
     const bare = n.t === 'bare';
     const X = (bare ? d.B : d.L) || {};
     const go = X.kind === 'external' && X.url
