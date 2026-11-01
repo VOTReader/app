@@ -29,6 +29,7 @@ export function Segments({ segments, activeFn, onFnClick, onScripClick, onLetter
           onKeyDown={(e) => activateOnKey(e, () => onFnClick(seg.v))}
           role="button"
           tabIndex={0}
+          aria-haspopup="dialog"
           aria-label={`Footnote ${seg.v}`}
           title={`Footnote ${seg.v}`}
         >{seg.v}</span>

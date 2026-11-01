@@ -278,9 +278,9 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         const hasCuratedTitle = !!displayChapterTitle;
         const titleText = heroTitle; // the band above says the same
         const titleIsTappable = titleEffective && hasCuratedTitle;
+        // Plain black, no amber banner (Corbin 2026-11-01), like every reading page.
         return (
           <header className="hero" ref={heroRef}>
-            <div className={`hero-bg${OT_BOOK_IDS.has(book.id) ? " ot" : ""}`} />
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
               {recordingTextShown && (
@@ -410,7 +410,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           })()}
           {/* Reading-end sentinel: end of verses, before ornament and nav. */}
           <div className="reading-end" />
-          <div className="ornament-divider">
+          <div className="ornament-divider" aria-hidden="true">
             <div className="ornament-divider-line" />
             <div className="ornament-divider-symbol">✦</div>
             <div className="ornament-divider-line" />

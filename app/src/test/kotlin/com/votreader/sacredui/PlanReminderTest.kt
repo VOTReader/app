@@ -39,8 +39,8 @@ class PlanReminderTest {
     private val nm get() = shadowOf(app.getSystemService(NotificationManager::class.java))
 
     private fun list(vararg plans: String) = """{"plans":[${plans.joinToString(",")}]}"""
-    private fun p(id: String = "run-1", time: String = "07:30", extra: String = "") =
-        """{"id":"$id","name":"Bible in a Year","time":"$time","active":"2026-10-23"$extra}"""
+    private fun p(id: String = "run-1", time: String = "07:30", extra: String = "", active: LocalDate = fri) =
+        """{"id":"$id","name":"Bible in a Year","time":"$time","active":"$active"$extra}"""
 
     @Before
     fun allow() {
@@ -158,9 +158,12 @@ class PlanReminderTest {
         assertEquals(0, am.scheduledAlarms.size)
         PlanReminder.reschedule(app, at(fri, 8))
         assertEquals(at(fri, 8).toInstant().toEpochMilli(), am.scheduledAlarms.single().triggerAtMs)
-        // The receiver routes the system broadcasts to it (with the real clock: an alarm is set either way).
+        // The receiver routes the system broadcasts to it (with the real clock: an alarm is set either way). The receiver
+        // reads the real clock, so this half's plan is active today on that clock: a fixed date goes quiet as time passes.
         am.scheduledAlarms.toList().forEach { app.getSystemService(AlarmManager::class.java).cancel(it.operation!!) }
-        PlanReminder.set(app, list(p(extra = ""","weekdays":[true,true,true,true,true,true,true]""")), ZonedDateTime.now())
+        val now = ZonedDateTime.now()
+        val everyDay = ""","weekdays":[true,true,true,true,true,true,true]"""
+        PlanReminder.set(app, list(p(extra = everyDay, active = now.toLocalDate())), now)
         am.scheduledAlarms.toList().forEach { app.getSystemService(AlarmManager::class.java).cancel(it.operation!!) }
         PlanReminderReceiver().onReceive(app, Intent(Intent.ACTION_BOOT_COMPLETED))
         assertEquals(1, am.scheduledAlarms.size)

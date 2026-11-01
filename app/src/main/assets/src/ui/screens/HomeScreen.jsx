@@ -352,7 +352,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
       hideBack: true, showHome: false, hide: ['settings', 'history'],
       leftExtras: (
         <button className="nav-search-btn" onClick={onAbout} title="About VOTReader" aria-label="About VOTReader" style={{ marginRight: 'auto', color: 'var(--gold)' }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
             <circle cx="12" cy="12" r="9.5" />
             <line x1="12" y1="11" x2="12" y2="17" strokeLinecap="round" />
             <circle cx="12" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
@@ -427,7 +427,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
                 <span className="hni-title">{item.title}</span>
                 <span className="hni-detail">{item.detail}</span>
               </span>
-              <span className="hni-arrow">{"›"}</span>
+              <span className="hni-arrow" aria-hidden="true">{"›"}</span>
             </button>
           ))}
         </div>
@@ -447,7 +447,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
              so label-in-name (2.5.3) holds, which a bare swap to the
              descriptive title would have broken. */
           <button className="surprise-fab" onClick={openSurprise} disabled={surpriseBusy} aria-busy={surpriseBusy} title="Surprise Me — open a random chapter or letter" aria-label="Surprise Me — open a random chapter or letter">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <rect x="3" y="3" width="18" height="18" rx="3.5" />
               <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />
               <circle cx="16" cy="8" r="1.15" fill="currentColor" stroke="none" />

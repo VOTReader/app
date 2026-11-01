@@ -47,6 +47,7 @@ export function ExpandableVerse({ text, refStr }) {
           // .footnote-verse-toggle (app.css): the look it had inline, plus a
           // 44 px-tall invisible halo — the label alone is 12 px tall.
           className="footnote-verse-toggle"
+          aria-expanded={expanded}
         >
           {expanded ? "Show less ▲" : "Read more ▼"}
         </button>

@@ -255,10 +255,12 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
           <div className="notes-tabs">
             <button
               className={"notes-tab" + (tab === 'notebooks' ? ' active' : '')}
+              aria-pressed={tab === 'notebooks'}
               onClick={() => setTab('notebooks')}
             >Notebooks</button>
             <button
               className={"notes-tab" + (tab === 'all-notes' ? ' active' : '')}
+              aria-pressed={tab === 'all-notes'}
               onClick={() => setTab('all-notes')}
             >All Notes</button>
           </div>
@@ -277,6 +279,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   ? <input
                       className="nb-drilled-rename"
                       autoFocus type="text" value={renameValue}
+                      aria-label="Notebook name"
                       onChange={e => { setRenameValue(e.target.value); setRenameTaken(''); }}
                       // No onBlur commit — explicit Save/Cancel buttons own the
                       // commit so tapping a button doesn't race the blur handler
@@ -308,7 +311,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                       )}
                       {drilledNb && <>
                         <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
-                        <button className="nb-drilled-action" onClick={() => setColorPicking(v => !v)} title="Color tag">Color</button>
+                        <button className="nb-drilled-action" onClick={() => setColorPicking(v => !v)} title="Color tag" aria-expanded={colorPicking}>Color</button>
                         <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
                       </>}
                     </>
@@ -321,6 +324,8 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
               <div className="nb-color-row" role="radiogroup" aria-label="Notebook color">
                 <button
                   className={'nb-color-swatch default' + (!drilledNb.color ? ' selected' : '')}
+                  role="radio"
+                  aria-checked={!drilledNb.color}
                   style={{ background: 'var(--gold)' }}
                   aria-label="Default gold"
                   onClick={() => { NotebookStore.setColor(drilledNb.id, null); setColorPicking(false); }}
@@ -329,6 +334,8 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   <button
                     key={c}
                     className={'nb-color-swatch' + (drilledNb.color === c ? ' selected' : '')}
+                    role="radio"
+                    aria-checked={drilledNb.color === c}
                     style={{ background: 'var(--hl-' + c + ')' }}
                     aria-label={c}
                     onClick={() => { NotebookStore.setColor(drilledNb.id, c); setColorPicking(false); }}
@@ -409,7 +416,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
               {/* A hollow dot: no colour, and every name starts at one edge. */}
               <span className="nb-card-name"><span className="nb-card-dot is-none" aria-hidden="true" />Uncategorized</span>
               <span className="nb-card-count">{counts.__uncategorized}{counts.__uncategorized === 1 ? " note" : " notes"}</span>
-              <span className="nb-card-arrow">›</span>
+              <span className="nb-card-arrow" aria-hidden="true">›</span>
             </button>
             {notebooks.map(nb => (
               <button
@@ -423,7 +430,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                   {nb.name}
                 </span>
                 <span className="nb-card-count">{(counts[nb.id] || 0)}{(counts[nb.id] || 0) === 1 ? " note" : " notes"}</span>
-                <span className="nb-card-arrow">›</span>
+                <span className="nb-card-arrow" aria-hidden="true">›</span>
               </button>
             ))}
             {newNbInline
@@ -434,6 +441,7 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
                         className="nb-card-create-input"
                         autoFocus type="text"
                         placeholder="Notebook name…"
+                        aria-label="Notebook name"
                         value={newNbName}
                         onChange={e => setNewNbName(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createNotebook(); } else if (e.key === 'Escape') { setNewNbInline(false); setNewNbName(''); } }}

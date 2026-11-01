@@ -96,4 +96,25 @@ describe('engine warm-cache restore', () => {
     expect(VotSearchMini.getStats().cached).toBe(false);
     expect((await VotSearchMini.search('shepherd')).results[0].doc.ref).toBe('Psalms 23:1');
   });
+
+  /* nightly 11-01 U4: asked while a build was under way (the launch's warm restore), rebuild() joined it, found the
+     restored index current and built nothing; its coldNext stayed set for whatever build came next. */
+  it('rebuild() asked during a build builds again once that build ends, and leaves no cold build pending', async () => {
+    const warm = VotSearchMini.init();
+    // the build under way (it starts once the corpora are read)
+    for (let i = 0; i < 100 && !VotSearchMini.getState().building; i++) await Promise.resolve();
+    expect(VotSearchMini.getState().building).toBe(true);
+    const rebuilt = VotSearchMini.rebuild();
+    await warm;
+    await rebuilt;
+    expect(VotSearchMini.getStats().cached).toBe(false);
+    expect((await VotSearchMini.search('shepherd')).results[0].doc.ref).toBe('Psalms 23:1');
+    // the next build (another edition, its index in the warm cache) restores it: no cold build was left pending
+    const kjv = new MiniSearch(buildMiniSearchOptions());
+    kjv.addAll(buildDocs({ translation: 'kjv' }));
+    await saveCached(dataSignature('kjv'), JSON.stringify(kjv));
+    await VotSearchMini.init({ translation: 'kjv' });
+    expect(VotSearchMini.getStats().translation).toBe('kjv');
+    expect(VotSearchMini.getStats().cached).toBe(true);
+  });
 });

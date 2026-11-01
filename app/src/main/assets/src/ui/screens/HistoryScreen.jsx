@@ -113,7 +113,9 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
   }, [drawn, curY, curM]);
 
   // Most-recent year/month/week of each container default-open; everything else default-closed.
-  // Current-month days at top: today + yesterday default-open, others default-closed.
+  // Current-month days at top: today + yesterday default-open, others default-closed. On the 1st,
+  // yesterday is last month's (on January 1, last year's) and lives in the tree as a `ymd:` day,
+  // so it is default-open there too; its year/month/week are the tree's newest, so already open.
   const [overrides, setOverrides] = React.useState({});
   // A search's expansion state is kept SEPARATE from the browsing one, and
   // reset whenever the query changes. Reusing one map would mean a year the
@@ -147,6 +149,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
   const defaultOpen = (id) => {
     if (id === `cd:${curY}-${curM}-${curD}`) return true;                    // Today
     if (id === `cd:${yestY}-${yestM}-${yestD}`) return true;                  // Yesterday
+    if (id === `ymd:${yestY}-${yestM}-${yestD}`) return true;                 // Yesterday, on the 1st
     if (id === recentYearId) return true;                                      // Most recent previous year
     if (recentMonthIds.has(id)) return true;                                   // Most recent month of each year
     if (recentWeekIds.has(id)) return true;                                    // Most recent week of each month
@@ -245,7 +248,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
           <span className="history-day-label">{dayLabel(year, month, dg.day)}</span>
           {dg.entries.length > 1 && <span className="history-day-count">{"\xB7 "}{dg.entries.length}</span>}
           <span className="history-day-spacer" />
-          <span className={`history-chevron${dOpen ? ' is-open' : ''}`}>{"›"}</span>
+          <span className={`history-chevron${dOpen ? ' is-open' : ''}`} aria-hidden="true">{"›"}</span>
         </button>
         {dOpen && (
           <div className="chapter-cards">
@@ -295,7 +298,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
         )}
         {history.length === 0 ? (
           <div className="history-empty">
-            <div className="history-empty-sigil">✦</div>
+            <div className="history-empty-sigil" aria-hidden="true">✦</div>
             <div className="history-empty-title">The scroll is blank.</div>
             <div className="history-empty-body">Every chapter, letter, and study you visit will land here — a trail of what the Spirit has led you through. Begin reading and this will populate.</div>
             {/* n118: one primary button, the same one every empty list screen carries; n131 (L1.1): it opens the
@@ -319,7 +322,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
                     <span className="history-year-rule" />
                     <span className="history-year-label">{yg.year}</span>
                     <span className="history-year-rule r" />
-                    <span className={`history-chevron${yOpen ? ' is-open' : ''}`}>{"›"}</span>
+                    <span className={`history-chevron${yOpen ? ' is-open' : ''}`} aria-hidden="true">{"›"}</span>
                   </button>
                   {yOpen && yg.months.map((mg) => {
                     const mId = `ym:${yg.year}-${mg.month}`;
@@ -330,7 +333,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
                         <button className="history-month-header" aria-expanded={mOpen} onClick={() => toggle(mId)}>
                           <span className="history-month-label">{MONTH_NAMES[mg.month]}</span>
                           <span className="history-month-count">{monthTotal}</span>
-                          <span className={`history-chevron${mOpen ? ' is-open' : ''}`}>{"›"}</span>
+                          <span className={`history-chevron${mOpen ? ' is-open' : ''}`} aria-hidden="true">{"›"}</span>
                         </button>
                         {mOpen && mg.weeks.map((wg) => {
                           const wId = `ymw:${yg.year}-${mg.month}-${wg.key}`;
@@ -342,7 +345,7 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
                               <button className="history-week-header" aria-expanded={wOpen} onClick={() => toggle(wId)}>
                                 <span className="history-week-label">{wsLabel}</span>
                                 <span className="history-week-count">{weekTotal}</span>
-                                <span className={`history-chevron${wOpen ? ' is-open' : ''}`}>{"›"}</span>
+                                <span className={`history-chevron${wOpen ? ' is-open' : ''}`} aria-hidden="true">{"›"}</span>
                               </button>
                               {wOpen && wg.days.map((dg) => renderDaySection(yg.year, mg.month, dg, false))}
                             </div>

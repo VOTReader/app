@@ -309,7 +309,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
         <div className="navpick-row-label">{label}</div>
         <div className="navpick-row-cat">{count}</div>
       </div>
-      <span className="navpick-row-chevron">{"›"}</span>
+      <span className="navpick-row-chevron" aria-hidden="true">{"›"}</span>
     </button>
   );
 
@@ -458,7 +458,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
             user can re-pick if they linked the wrong target. */}
         {lastCreatedLink && (
           <div className="navpick-success" role="status">
-            <svg className="navpick-success-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg className="navpick-success-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <polyline points="20 6 9 17 4 12" />
             </svg>
             <span className="navpick-success-text">
@@ -488,6 +488,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
                 ref={inputRef}
                 className="navpick-search-input"
                 placeholder={searchScope === 'text' ? "Search any phrase in the text…" : "Search titles & references…"}
+                aria-label={searchScope === 'text' ? "Search any phrase in the text" : "Search titles and references"}
                 value={input}
                 onChange={e => setInput(e.target.value)}
                 enterKeyHint="search"

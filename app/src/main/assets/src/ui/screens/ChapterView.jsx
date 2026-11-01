@@ -160,8 +160,8 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
       })}
     >
       <BackHintPill backHint={backHint} onClick={onTapThroughBack} />
+      {/* Plain black, no amber banner (Corbin 2026-11-01), like every reading page. */}
       <header className="hero">
-        <div className="hero-bg" />
         <div className="hero-content">
           {/* A02.12: the heading said "Chapter N" under an eyebrow that already said it. It is the chapter's title,
               as the Bible hero's is (tap it to hide it; the book's subtitle stands in), and the eyebrow names the
@@ -280,7 +280,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             </div>
           )}
 
-          <div className="ornament-divider">
+          <div className="ornament-divider" aria-hidden="true">
             <div className="ornament-divider-line" />
             <div className="ornament-divider-symbol">✦</div>
             <div className="ornament-divider-line" />

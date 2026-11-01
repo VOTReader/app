@@ -128,6 +128,32 @@ describe('AnswersHome — the landing (f01, f02)', () => {
   });
 });
 
+describe('AnswersHome — the tabs (nightly 11-01 #4)', () => {
+  it('an arrow key moves focus with the selection, so the focused tab is the selected one', () => {
+    render(<AnswersHome {...base} />);
+    const c = document.getElementById('ans-tab-c');
+    const az = document.getElementById('ans-tab-az');
+    c.focus();
+    fireEvent.keyDown(c, { key: 'ArrowRight' });
+    expect(az.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(az);
+    fireEvent.keyDown(az, { key: 'ArrowLeft' });
+    expect(c.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(c);
+  });
+
+  it('before the corpus is in, Contents stays the selected tab and keeps the focus', () => {
+    render(<AnswersHome {...base} entries={[]} />);
+    const c = document.getElementById('ans-tab-c');
+    const az = document.getElementById('ans-tab-az');
+    c.focus();
+    fireEvent.keyDown(c, { key: 'ArrowRight' });
+    expect(az.getAttribute('aria-selected')).toBe('false');
+    expect(c.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(c);
+  });
+});
+
 describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
   it('a tablet opens its commandment: the site\'s heading, the verse, its topics in the site\'s order', () => {
     const onOpenTopic = vi.fn();

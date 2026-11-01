@@ -498,14 +498,20 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
   });
 
   it('CONTROL (green on the base tree by design): the same reading on ANOTHER day is its own row — collapse is per calendar day', () => {
-    setupGlobals();
-    const twoDays = [
-      chapter('psalms', 'Psalms', 1, now - 1000),
-      chapter('psalms', 'Psalms', 1, now - 1000 - 86400000),        // yesterday: default-open, like today
-    ];
-    renderScreen(twoDays);
-    expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
-    expect(document.querySelectorAll('.history-entry-visits')).toHaveLength(0);
+    // On a pinned mid-month noon: on a real 1st of the month (or just after midnight) "yesterday" falls in last
+    // month's group, which opens shut, and the second row is not shown.
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 15, 12) });
+    try {
+      setupGlobals();
+      const at = Date.now();
+      const twoDays = [
+        chapter('psalms', 'Psalms', 1, at - 1000),
+        chapter('psalms', 'Psalms', 1, at - 1000 - 86400000),        // yesterday: default-open, like today
+      ];
+      renderScreen(twoDays);
+      expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
+      expect(document.querySelectorAll('.history-entry-visits')).toHaveLength(0);
+    } finally { vi.useRealTimers(); }
   });
 
   it('a filtering query collapses the same way (the rule is the view\'s, not the button\'s)', () => {
@@ -515,6 +521,38 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
     expect(cardLabels()).toEqual(['Psalms', 'Genesis']);
     expect(rowVisits()).toEqual(['3 visits', '']);
+  });
+});
+
+/* Yesterday on the 1st (2026-11-01). On the 1st, yesterday belongs to last month (on January 1, to
+   last year), so it renders inside the year/month/week tree as a `ymd:` day, and only the
+   current-month `cd:` id was default-open: the year, month and week opened, and the day under them
+   read "Yesterday" but sat shut. Found the morning the CONTROL row above went red. The clock is
+   pinned because on any other date this file never builds the case. */
+describe('HistoryScreen — yesterday stays open on the 1st, when it is last month\'s', () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  const dayHeader = (label) => [...document.querySelectorAll('.history-day-header')]
+    .find((h) => h.querySelector('.history-day-label').textContent === label);
+
+  it.each([
+    ['on the 1st of a month, yesterday in last month', new Date(2026, 10, 1, 12), 'Fri · Oct 30'],
+    ['on January 1, yesterday inside last year\'s tree', new Date(2027, 0, 1, 12), 'Wed · Dec 30'],
+  ])('%s', (_case, pinned, dayBeforeLabel) => {
+    vi.setSystemTime(pinned);
+    setupGlobals();
+    const t = pinned.getTime();
+    renderScreen([
+      chapter('psalms', 'Psalms', 1, t - 3600000),   // today, 11:00
+      chapter('psalms', 'Psalms', 2, t - DAY),       // yesterday, noon
+      chapter('psalms', 'Psalms', 3, t - 2 * DAY),   // the day before, same week
+    ]);
+    const yest = dayHeader('Yesterday');
+    expect(yest, 'yesterday keeps its label').toBeTruthy();
+    expect(yest.getAttribute('aria-expanded')).toBe('true');
+    expect(cardTitles(), 'today\'s row, then yesterday\'s').toEqual(['Chapter 1', 'Chapter 2']);
+    // CONTROL: only yesterday opens; an older day in the same open week stays shut.
+    expect(dayHeader(dayBeforeLabel).getAttribute('aria-expanded')).toBe('false');
   });
 });
 

@@ -240,7 +240,15 @@ describe('the outbox', () => {
     await flushSongVotes();
     const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
     expect(body.v).toBe(0);
-    expect(JSON.stringify(globalThis.fetch.mock.calls)).not.toContain('-1');
+    // Everything sent but the install id, which is random base64url and holds "-1" in about 1 run in 200
+    // (shuffle seed 777, 2026-11-01: "__UBMOmufe7nP_-1mAWcaA"), so it cannot stand in for the 👎.
+    const sent = globalThis.fetch.mock.calls.map(([url, init]) => {
+      const b = JSON.parse(init.body);
+      delete b.install;
+      return [url, { ...init, body: b }];
+    });
+    expect(sent.map(([, init]) => init.body.v)).toEqual([0]);
+    expect(JSON.stringify(sent)).not.toContain('-1');
   });
 
   it('a newer vote cast while one is in flight is not lost', async () => {

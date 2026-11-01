@@ -113,6 +113,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
                 key={ch.num}
                 ref={isCurrent ? currentRef : null}
                 className={`chapter-card-btn${isCurrent ? " is-current" : ""}`}
+                aria-current={isCurrent ? 'true' : undefined}
                 onClick={() => onSelect(ch.num)}
               >
                 <span className="chapter-card-num">{ch.num}</span>

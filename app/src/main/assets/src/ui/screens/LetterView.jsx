@@ -390,8 +390,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
       {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
+      {/* Plain black, no banner (Corbin 2026-11-01: blue on letters, amber on studies). */}
       <header className="hero" ref={heroRef}>
-        <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />
         <div className="hero-content">
           {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is
               OMITTED (and its separator with it) rather than asserting
@@ -588,7 +588,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 inline mid-paragraph, or no closing at all) keeps the divider in
                 its old spot between footnotes and the prev/next cards. */}
             {closingEndsBody && (
-              <div className="ornament-divider">
+              <div className="ornament-divider" aria-hidden="true">
                 <div className="ornament-divider-line" />
                 <div className="ornament-divider-symbol">✦</div>
                 <div className="ornament-divider-line" />
@@ -598,7 +598,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} onRef={handleScripClick} />}
 
             {!closingEndsBody && (
-              <div className="ornament-divider">
+              <div className="ornament-divider" aria-hidden="true">
                 <div className="ornament-divider-line" />
                 <div className="ornament-divider-symbol">✦</div>
                 <div className="ornament-divider-line" />
@@ -615,7 +615,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             <div className="related-section">
               {letter.addendum && (
                 <div className="related-card">
-                  <div className="related-card-title">Also Read</div>
+                  <div className="related-card-title" role="heading" aria-level={2}>Also Read</div>
                   {letter.addendumLink && wrappedInAppLink ? (
                     <a className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(letter.addendumLink); }}>{letter.addendum}</a>
                   ) : letter.addendumInternal ? (
@@ -628,7 +628,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
               {letter.relatedTopics?.length > 0 && (
                 <div className="related-card">
-                  <div className="related-card-title">Related Topics</div>
+                  <div className="related-card-title" role="heading" aria-level={2}>Related Topics</div>
                   {letter.relatedTopics.map((t, i) => {
                     // An answersonlygodcangive.com row opens the vendored topic
                     // in-app at once — the answers-entry route shows Loading…
@@ -654,7 +654,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
 
               {letter.bibleStudies?.length > 0 && (
                 <div className="related-card">
-                  <div className="related-card-title">Bible Study</div>
+                  <div className="related-card-title" role="heading" aria-level={2}>Bible Study</div>
                   {letter.bibleStudies.map((s, i) =>
                     s.link && wrappedInAppLink ? (
                       <a key={i} className="related-link" href="#" onClick={(e) => { e.preventDefault(); wrappedInAppLink(s.link); }}>{s.label}</a>
@@ -680,7 +680,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   voice-over URL, or the set-to-music URL. */}
               {(letter.videos?.length > 0 || letter.videoVoiceUrl || letter.videoMusicUrl) && (
               <div className="related-card">
-                <div className="related-card-title">Videos</div>
+                <div className="related-card-title" role="heading" aria-level={2}>Videos</div>
                 {letter.videos?.map((v, i) => (
                   <a key={i} className="related-link" href={v.url} target="_blank" rel="noopener noreferrer">▶ {v.label}</a>
                 ))}
@@ -691,7 +691,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                   <a className="related-link" href={letter.videoMusicUrl} target="_blank" rel="noopener noreferrer">▶ Video (excerpts set to music)</a>
                 )}
                 <a className="related-link" href="https://www.youtube.com/user/trumpetcallofgod" target="_blank" rel="noopener noreferrer">
-                  <span style={{ color: '#cc4444' }}>▶</span> Official YouTube Channel
+                  <span style={{ color: '#cc4444' }} aria-hidden="true">▶</span> Official YouTube Channel
                 </a>
               </div>
               )}
