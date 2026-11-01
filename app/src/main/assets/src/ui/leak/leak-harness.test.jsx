@@ -102,4 +102,30 @@ describe('the leak harness', () => {
       cycles: 3, unmountAt: 'interact', interact: () => fireEvent.click(document.querySelector('button')),
     });
   });
+
+  // A stand-in for a library: its frames read as node_modules, as a real dependency's do. It keeps
+  // the ids it arms so a test can stop them.
+  const libIds = [];
+  const lib = new Function('ids', 'ms', 'ids.push(setTimeout(function () {}, ms));\n//# sourceURL=/repo/node_modules/fake-lib/index.js');
+  /** The library's own continuation: a microtask calls it straight, with no app frame under it. */
+  const libLater = () => queueMicrotask(lib.bind(null, libIds, 4000));
+  afterEach(() => { while (libIds.length) clearTimeout(libIds.pop()); });
+
+  it('a library timer the screen arms itself is the screen\'s: its effect is under it in the stack', async () => {
+    const Leaky = make(() => { lib(libIds, 4000); return () => {}; }, false);
+    await expect(expectNoLeaks(h, () => render(<Leaky />), { cycles: 2 })).rejects.toThrow(/still running: timeout \+1[\s\S]*leak-harness\.test\.jsx/);
+  });
+
+  it('one unattributed stray (no app frame: a library continuation landing mid-cycle) is reported, not failed, and named', async () => {
+    let n = 0;
+    const Once = make(() => { if (++n === 2) libLater(); return () => {}; }, true);   // the first counted mount only
+    const r = await expectNoLeaks(h, () => render(<Once />), { cycles: 3 });
+    expect(r.strays.map((x) => x.desc)).toEqual(['after 4000 ms']);
+    expect(r.strays[0].stack).toMatch(/node_modules\/fake-lib\/index\.js/);
+  });
+
+  it('unattributed strays that pile up, one per mount, still fail', async () => {
+    const Pile = make(() => { libLater(); return () => {}; }, true);
+    await expect(expectNoLeaks(h, () => render(<Pile />), { cycles: 4 })).rejects.toThrow(/still running: timeout \+2[\s\S]*fake-lib/);
+  });
 });
