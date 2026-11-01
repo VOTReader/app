@@ -39,6 +39,12 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   //   'close'  — backdrop / Escape / Android back (sheet closes entirely)
   const [confirmingDiscard, setConfirmingDiscard] = React.useState(/** @type {null | 'cancel' | 'close'} */ (null));
   const textareaRef = React.useRef(null);
+  // The textarea's focus → scroll-into-view delays, stopped when the sheet closes (leak hunt 2026-11-01).
+  const focusScrollsRef = React.useRef(/** @type {Set<ReturnType<typeof setTimeout>>} */ (new Set()));
+  React.useEffect(() => {
+    const pending = focusScrollsRef.current;   // one Set for the sheet's life
+    return () => { pending.forEach((t) => clearTimeout(t)); pending.clear(); };
+  }, []);
 
   React.useEffect(() => {
     if (mode === 'edit' && textareaRef.current) {
@@ -341,9 +347,11 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
                 placeholder="Write your note…"
                 aria-label="Note text"
                 onFocus={() => {
-                  setTimeout(() => {
+                  const t = setTimeout(() => {
+                    focusScrollsRef.current.delete(t);
                     try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
                   }, 220);
+                  focusScrollsRef.current.add(t);
                 }}
               />
             )}

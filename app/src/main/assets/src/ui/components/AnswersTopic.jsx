@@ -350,6 +350,10 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   const barRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const railBarRef = React.useRef(/** @type {HTMLElement | null} */ (null));
   const pinRef = React.useRef(0);
+  // The two-frame wait landAfterClose takes: cancelled if the topic unmounts first, so no
+  // jump or state update lands after it (leak hunt 2026-11-01).
+  const landFrameRef = React.useRef(0);
+  React.useEffect(() => () => { if (landFrameRef.current) cancelAnimationFrame(landFrameRef.current); }, []);
   const sheetRef = React.useRef(sheet);
   sheetRef.current = sheet;
   const [layoutEl, setLayoutEl] = React.useState(/** @type {Element | null} */ (null));
@@ -448,7 +452,10 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   /** After the sheet has closed (and given focus back without scrolling): land under the head. */
   const landAfterClose = (/** @type {() => void} */ go) => {
     setSheet(null);
-    requestAnimationFrame(() => requestAnimationFrame(() => { pinRef.current = Date.now() + 900; setShown(true); go(); }));
+    if (landFrameRef.current) cancelAnimationFrame(landFrameRef.current);
+    landFrameRef.current = requestAnimationFrame(() => {
+      landFrameRef.current = requestAnimationFrame(() => { landFrameRef.current = 0; pinRef.current = Date.now() + 900; setShown(true); go(); });
+    });
   };
   const jumpRow = (/** @type {number} */ k) => {
     const r = rows[k];

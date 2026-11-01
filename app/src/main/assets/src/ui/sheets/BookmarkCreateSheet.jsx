@@ -57,12 +57,14 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
     setConfirmingDelete(false);
     // Focus the label input on mount so users can immediately refine it
     // in CREATE mode or jump straight to editing in EDIT mode.
-    setTimeout(function() {
+    var focusTimer = setTimeout(function() {
       if (labelRef.current) {
         labelRef.current.focus();
         labelRef.current.select();
       }
     }, 60);
+    // A sheet closed (or re-targeted) within the 60 ms takes its focus call along (leak hunt 2026-11-01).
+    return function() { clearTimeout(focusTimer); };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect intent is re-sync ONLY when pending switches identity (editId/hlKey are the mode + instance keys). pending itself reads other fields at fire-time but tracking it would re-fire on every parent re-render. setLabel/setConfirmingDelete are tuple-unpacked useState setters (identity-stable).
   }, [pendingEditId, pendingHlKey]);
 

@@ -109,6 +109,24 @@ describe('useDomAnnotationSync — apply pass', () => {
     expect(props.setNoteSheetTarget).toHaveBeenCalledWith({ groupId: 'g1', startInEditMode: false });
   });
 
+  // Leak hunt 2026-11-01: the pass's two follow-ups (the note open, the mark jump) were untracked, so a
+  // screen change within their 60 / 70 ms ran them after the unmount; the jump could then start a
+  // window wheel/touchmove watch that nothing would ever stop.
+  it('an unmount before the pass\'s follow-ups fire stops them: no note opens, no jump runs', () => {
+    navHandoff.set('pendingOpenNote', 'g1');
+    navHandoff.set('pendingScrollHlKey', 'nowhere');
+    const props = baseProps();
+    const addSpy = vi.spyOn(window, 'addEventListener');
+    const { unmount } = renderHook(() => useDomAnnotationSync(props));
+    act(() => { vi.advanceTimersByTime(0); });   // the pass: both follow-ups armed
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+    act(() => { vi.advanceTimersByTime(200); });
+    expect(props.setNoteSheetTarget).not.toHaveBeenCalled();
+    expect(addSpy.mock.calls.filter(([type]) => type === 'wheel' || type === 'touchmove')).toEqual([]);
+    addSpy.mockRestore();
+  });
+
   it('does not open a NoteSheet when the stashed group no longer exists', () => {
     window.NoteStore.get = vi.fn(() => null);
     navHandoff.set('pendingOpenNote', 'gone');

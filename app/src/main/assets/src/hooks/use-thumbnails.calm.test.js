@@ -157,3 +157,32 @@ describe('useThumbnails — interaction calm gate', () => {
     expect(takeThemedScreenshot).toHaveBeenLastCalledWith('light', 1440, 90);
   });
 });
+
+// Leak hunt 2026-11-01: what a capture arms must stop with the hook (or with tabs).
+describe('useThumbnails — nothing outlives the hook or tabs-off', () => {
+  it('tabs turned off while a capture waits for calm: the waiting re-check is dropped, nothing renders', async () => {
+    stampRecentTouch();
+    const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350);                       // after-nav attempt → the calm gate defers it
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();
+    rerender(hookProps({ tabsEnabled: false }));
+    stampCalm();
+    await advance(CALM_RECHECK_MS * 3);       // the old re-check would have captured for tabs that are gone
+    expect(takeThemedScreenshot).not.toHaveBeenCalled();
+  });
+
+  it('an unmount while a render is in flight arms nothing after it lands (no other-theme render, no retry)', async () => {
+    /** @type {(v: string) => void} */
+    let land = () => {};
+    takeThemedScreenshot.mockImplementation(() => new Promise((r) => { land = r; }));
+    const { unmount } = renderHook((p) => useThumbnails(p), { initialProps: hookProps() });
+    await advance(350);                       // the primary render starts
+    expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
+    unmount();
+    await act(async () => { land(RENDER_DARK); });
+    await flush();
+    expect(vi.getTimerCount()).toBe(0);
+    await advance(5000);                      // the old code's other-theme render came 900 ms on
+    expect(takeThemedScreenshot).toHaveBeenCalledTimes(1);
+  });
+});

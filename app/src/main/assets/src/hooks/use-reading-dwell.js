@@ -164,7 +164,12 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   React.useEffect(() => {
     const onVis = () => {if (document.visibilityState === 'hidden') pauseDwell();else scheduleDwell();};
     document.addEventListener('visibilitychange', onVis);
-    return () => document.removeEventListener('visibilitychange', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      // The armed dwell (up to DWELL_MS) belongs to this mount: an unmount stops it rather than
+      // letting it record a reading day afterwards (leak hunt 2026-11-01).
+      if (dwellTimerRef.current) {clearTimeout(dwellTimerRef.current);dwellTimerRef.current = null;}
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only listener attach. pauseDwell + scheduleDwell are local plain functions (per the file's "Do NOT useCallback" invariant) whose bodies operate only on dwellTimerRef/dwellAccRef/dwellStartRef/dwellKeyRef/dwellMsRef via .current — stable behavior regardless of identity. Stale-safe.
   }, []);
 

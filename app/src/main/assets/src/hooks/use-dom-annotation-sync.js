@@ -233,7 +233,22 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
   // effect clears an older pass's timer before it fires.
   const loadSig = [bibleCorpusV, matthewCorpusV, votCorpusV, answersCorpusV, studiesLoading, hlDomV].join('|');
   const passLoadSigRef = React.useRef(/** @type {string | null} */ (null));
-  React.useEffect(() => () => { const w = scrollMissRef.current; scrollMissRef.current = null; if (w) w.stop(); }, []);
+  // The pass's follow-up timers (the note open, the mark jump): not cancelled by a newer pass, which
+  // relies on them, but an unmount stops them so none runs, or starts a scroll watch, after it (leak hunt 2026-11-01).
+  const followUpsRef = React.useRef(/** @type {Set<ReturnType<typeof setTimeout>>} */ (new Set()));
+  React.useEffect(() => {
+    const followUps = followUpsRef.current;   // one Set for the hook's life
+    return () => {
+      followUps.forEach((t) => clearTimeout(t));
+      followUps.clear();
+      const w = scrollMissRef.current; scrollMissRef.current = null; if (w) w.stop();
+    };
+  }, []);
+  /** @param {() => void} fn @param {number} ms */
+  const followUp = (fn, ms) => {
+    const t = setTimeout(() => { followUpsRef.current.delete(t); fn(); }, ms);
+    followUpsRef.current.add(t);
+  };
 
   React.useEffect(() => {
     placeRef.current = placeKey;
@@ -260,7 +275,7 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
       const gid = window.navHandoff.take('pendingOpenNote');
       if (gid) {
         // Defer one more tick so DOM marks are in place for the active-state
-        setTimeout(() => {
+        followUp(() => {
           if (NoteStore.get(gid)) setNoteSheetTarget({ groupId: gid, startInEditMode: false });
         }, 60);
       }
@@ -271,7 +286,7 @@ export function useDomAnnotationSync({ screen, letterId, placeKey, studiesLoadin
       // (see scrollToPendingMark), so a pass over a "Loading…" placeholder
       // leaves it for the re-run the corpus load triggers (sweep v010).
       const sk = window.navHandoff.peek('pendingScrollHlKey');
-      if (sk) setTimeout(() => scrollToPendingMark(sk, placeRef, scrollMissRef, loaded), 70);
+      if (sk) followUp(() => scrollToPendingMark(sk, placeRef, scrollMissRef, loaded), 70);
       else { // slot empty (scrolled, goHome, or a jump with no mark): forget any wait
         const w = scrollMissRef.current;
         scrollMissRef.current = null;
