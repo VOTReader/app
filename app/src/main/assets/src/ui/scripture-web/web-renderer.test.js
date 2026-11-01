@@ -7,10 +7,10 @@
  * law into the shader instead of inlining the shared one, arcs stop being
  * tappable where they look tappable — and nothing on screen looks wrong.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   SHADER_SOURCE, TOP_SHADER_SOURCE, DENSITY_STEPS, createRenderer, topLook,
-  ARC_TEX_W, GESTURE_DPR, backingScale, backingSize,
+  ARC_TEX_W, GESTURE_DPR, backingScale, backingSize, loseContext,
 } from './web-renderer.js';
 import {
   arcShapeGLSL, arcFrameGLSL, flyOverWidth, flyOverGLSL, glslFloat, squashFactor, TOP_SEGMENT_MIN,
@@ -981,5 +981,21 @@ describe('graceful degradation', () => {
     const canvas = /** @type {any} */ (
       { getContext: () => null, addEventListener() {}, removeEventListener() {} });
     expect(createRenderer(canvas, /** @type {any} */ ({ count: 0 }))).toBeNull();
+  });
+});
+
+describe('loseContext (#60 leak hunt, item 3)', () => {
+  it('asks WEBGL_lose_context to let a live context go', () => {
+    const ext = { loseContext: vi.fn() };
+    loseContext({ getExtension: (n) => (n === 'WEBGL_lose_context' ? ext : null), isContextLost: () => false });
+    expect(ext.loseContext).toHaveBeenCalledTimes(1);
+  });
+  it('leaves a context already lost alone, and never throws without the extension', () => {
+    const ext = { loseContext: vi.fn() };
+    loseContext({ getExtension: () => ext, isContextLost: () => true });
+    expect(ext.loseContext).not.toHaveBeenCalled();
+    expect(() => loseContext({ getExtension: () => null })).not.toThrow();
+    expect(() => loseContext({ getExtension: () => { throw new Error('gone'); } })).not.toThrow();
+    expect(() => loseContext(null)).not.toThrow();
   });
 });

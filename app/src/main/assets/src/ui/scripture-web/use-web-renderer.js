@@ -34,7 +34,7 @@ import { maxZoomOf, centreOf, centreRange, tapFadeStep, TAP_FADE_MS } from '../.
 import { focusState } from '../../utils/scripture-web/focus-state.js';
 import { readChromeTokens } from '../../utils/scripture-web/palette.js';
 import { ensureScriptureWebData } from '../../utils/scripture-web/web-data.js';
-import { createRenderer, backingScale, backingSize } from './web-renderer.js';
+import { createRenderer, backingScale, backingSize, loseContext } from './web-renderer.js';
 import { paintCanonOverlay, paintMyWebOverlay, publishRails } from './overlay-renderer.js';
 import { railFrame } from './rail-renderer.js';
 import { onWebFontReady } from '../../utils/scripture-web/label-engine.js';
@@ -540,6 +540,9 @@ export function useWebRenderer({
     // same and its frame draws without a renderer (w3 item 31).
     if (!renderer) setNoWebGL(true);
     rendererRef.current = renderer;
+    // the canvas's one WebGL2 context (a restore rebuilds on this same object): released below
+    // when the canvas leaves for good, rather than held until GC (leak hunt #60, item 3)
+    const ctx = renderer && renderer.gl;
     if (!camRef.current) {
       const back = resumeRef.current;
       if (back && back.cam && back.cam.total === graph.total) {
@@ -606,6 +609,11 @@ export function useWebRenderer({
       if (renderer) renderer.dispose();
       renderer = null;
       rendererRef.current = null;
+      // The canvas left the document (the screen closed, or the list took its place): its context
+      // goes now. Each visit made a new one that only GC freed, and Chrome keeps ~16 live before
+      // it force-loses the oldest. A rebuild on the same canvas (a dep changed; it is still
+      // connected) keeps its context, which the replacement renderer is about to draw on.
+      if (ctx && !glc.isConnected) loseContext(ctx);
     };
   }, [graph, listShown, schedule, glRetry, yFrameFor, camRef, camVRef, viewRef, focusRef, glRef, resumeRef, setLoadError, uiRef,
     wrapRef, drawRef]);
