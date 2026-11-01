@@ -3,7 +3,7 @@
    after Apply", the footer totals Apply, Apply asks once, a chapter grid takes ranges, and a big Apply on mobile data
    asks about Wi-Fi first. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
 import { DownloadChooser } from './DownloadChooser.jsx';
 
 const U = (id) => 'https://example.test/' + id + '.mp3';
@@ -213,5 +213,26 @@ describe('Choose: mobile data', () => {
     conn.type = 'wifi';
     conn.listeners.forEach((f) => f());
     expect(off.download).toHaveBeenCalledWith([{ url: U('v2-one'), key: 'v2:one', title: 'Letter One' }]);
+  });
+
+  /* #60's leak hunt, item 4: the held plan kept the Apply's own callback, the CLOSED chooser's setState, so Wi-Fi
+     arriving told the chooser that was gone and not the one open: a reopened chooser kept saying "Waiting for Wi-Fi"
+     after the downloads had started. */
+  it('a plan held from a chooser since closed: Wi-Fi arriving clears the line in the chooser open now', () => {
+    const conn = { type: 'cellular', listeners: [], addEventListener: (_e, f) => conn.listeners.push(f), removeEventListener: vi.fn() };
+    Object.defineProperty(window.navigator, 'connection', { configurable: true, value: conn });
+    off.st.sizes.set(U('v2-one'), 150e6);
+    const first = render(<DownloadChooser off={off} />);
+    fireEvent.click(box(first.container, 'Volume Two'));
+    fireEvent.click(within(footer(first.container)).getByRole('button'));
+    fireEvent.click(within(first.getByRole('dialog')).getByRole('button', { name: 'Apply' }));
+    fireEvent.click(within(first.getByRole('dialog')).getByRole('button', { name: 'Wait for Wi-Fi' }));
+    first.unmount();
+    const { container } = render(<DownloadChooser off={off} />);
+    expect(container.textContent, 'PRECONDITION: the reopened chooser shows the hold').toMatch(/Waiting for Wi-Fi · 1 recording/);
+    conn.type = 'wifi';
+    act(() => { conn.listeners.forEach((f) => f()); });
+    expect(off.download).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toMatch(/Waiting for Wi-Fi/);
   });
 });

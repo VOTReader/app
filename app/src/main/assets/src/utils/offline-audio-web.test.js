@@ -192,6 +192,30 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.batch()).toEqual({ done: 0, total: 1, failed: 1 });
   });
 
+  /* #60's leak hunt, item 5: a relay refusal (a body with it) or a 200 with no Content-Length gave up on the job
+     with the body unread, so its stream and the fetch under it stayed open until GC. Each is cancelled now. */
+  it('a refusal or a size-less answer cancels the body it will not read', async () => {
+    await ready();
+    WebOfflineAudio._setTiming({ retry: [] });
+    const bodies = [];
+    const answer = (status, headers) => {
+      const cancel = vi.fn();
+      bodies.push(cancel);
+      return new Response(new ReadableStream({ pull(c) { c.enqueue(new Uint8Array(10)); }, cancel }), { status, headers });
+    };
+    fetchMock.mockImplementationOnce(async () => answer(503, {}));
+    OfflineAudio.download([{ url: URL_OF('r1'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r1'))).toBe('network'));
+    fetchMock.mockImplementationOnce(async () => answer(200, {}));
+    OfflineAudio.download([{ url: URL_OF('r2'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r2'))).toBe('size'));
+    expect(bodies.length, 'PRECONDITION: both answers were fetched').toBe(2);
+    await vi.waitFor(() => {
+      expect(bodies[0], 'the refusal\'s body').toHaveBeenCalledTimes(1);
+      expect(bodies[1], 'the size-less body').toHaveBeenCalledTimes(1);
+    });
+  });
+
   it('a fetch that fails once waits as retrying, then saves on the next try', async () => {
     await ready();
     WebOfflineAudio._setTiming({ retry: [60, 60, 60] });

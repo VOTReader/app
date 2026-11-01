@@ -195,3 +195,56 @@ describe('My Web paints its ground with one clear (bug #10)', () => {
     expect(typeof bg).toBe('string');
   });
 });
+
+/* #60's leak hunt, item 3: dispose() skips loseContext() (rightly: a rebuild after a restore
+   draws on the same canvas), and nothing else let the context go, so each visit to the web left
+   a WebGL2 context for GC to free, and Chrome force-loses the oldest past ~16 live. The context
+   now goes when its canvas leaves the document, and never on a rebuild. */
+describe('the WebGL context goes with its canvas, not on a rebuild', () => {
+  const withLose = () => {
+    const ext = { loseContext: vi.fn() };
+    const r = fakeRenderer();
+    r.gl = { getExtension: vi.fn((n) => (n === 'WEBGL_lose_context' ? ext : null)), isContextLost: () => false };
+    return { r, ext };
+  };
+
+  it('closing the screen loses the context once', async () => {
+    const { r, ext } = withLose();
+    nextBuild = () => r;
+    const { unmount } = await mount();
+    expect(BUILDS[0].r, 'PRECONDITION: the case\'s renderer was built').toBe(r);
+    expect(ext.loseContext).not.toHaveBeenCalled();
+    unmount();
+    expect(ext.loseContext).toHaveBeenCalledTimes(1);
+    expect(r.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it('a restore that rebuilds on the same canvas keeps the context, and closing after it loses it once', async () => {
+    const { r, ext } = withLose();
+    nextBuild = () => r;
+    const { unmount } = await mount();
+    const second = withLose();
+    second.r.gl = r.gl; // the same canvas hands back the same context
+    act(() => { BUILDS[0].opts.onContextLost(); });
+    nextBuild = () => second.r;
+    act(() => { BUILDS[0].opts.onContextRestored(); });
+    await flush(40);
+    expect(BUILDS.length, 'PRECONDITION: rebuilt').toBe(2);
+    expect(ext.loseContext, 'the restored context is the replacement\'s').not.toHaveBeenCalled();
+    unmount();
+    expect(ext.loseContext).toHaveBeenCalledTimes(1);
+  });
+
+  it('a loss nothing restores: the list takes the canvas\'s place, and its context goes with it', async () => {
+    const { r, ext } = withLose();
+    nextBuild = () => r;
+    const { container } = await mount();
+    vi.useFakeTimers();
+    act(() => { BUILDS[0].opts.onContextLost(); });
+    act(() => { vi.advanceTimersByTime(3000); });
+    vi.useRealTimers();
+    await flush();
+    expect(list(container), 'PRECONDITION: on the list').toBeTruthy();
+    expect(ext.loseContext).toHaveBeenCalledTimes(1);
+  });
+});

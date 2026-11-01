@@ -51,8 +51,12 @@ export function useFrameScheduler() {
   // what runs after each draw (onFrame, below)
   const afterRef = React.useRef(/** @type {Set<() => void>} */ (new Set()));
 
+  // false once the screen has gone: a frame asked for after that (a gesture listener's last event,
+  // a fade's next step) is never requested (leak hunt #60, item 2)
+  const aliveRef = React.useRef(true);
+
   const schedule = React.useCallback(() => {
-    if (rafRef.current) return;
+    if (rafRef.current || !aliveRef.current) return;
     rafRef.current = requestAnimationFrame(() => {
       rafRef.current = 0;
       const m = motionRef.current;
@@ -90,11 +94,21 @@ export function useFrameScheduler() {
       if (m.onEnd) m.onEnd(false);
     };
   }, [schedule]);
-  // a motion running when the screen goes ends there, so a fly's promise never hangs
-  React.useEffect(() => () => {
-    const m = motionRef.current;
-    motionRef.current = null;
-    if (m && m.onEnd) m.onEnd(false);
+  // a motion running when the screen goes ends there, so a fly's promise never hangs; and the
+  // frame still pending is cancelled with the after-frame callbacks, so the last draw and the
+  // DOM that rides the camera never run against a screen that is gone, and My Web's fade
+  // (capFractionNow) cannot ask for another
+  React.useEffect(() => {
+    aliveRef.current = true;
+    const after = afterRef.current; // one Set for the hook's life
+    return () => {
+      aliveRef.current = false;
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
+      after.clear();
+      const m = motionRef.current;
+      motionRef.current = null;
+      if (m && m.onEnd) m.onEnd(false);
+    };
   }, []);
 
   // r2 (Orchestrator's ruling, 2026-09-11): while a gesture is live the

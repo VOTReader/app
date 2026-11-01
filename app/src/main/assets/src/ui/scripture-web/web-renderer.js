@@ -878,6 +878,20 @@ export function createRenderer(canvas, graph, opts = {}) {
       // NOTE: no loseContext() here. A rebuild after a real context loss
       // reuses this same canvas, and force-losing the freshly restored
       // context would kill the replacement renderer as it is being born.
+      // The context is let go once its canvas leaves the document
+      // (use-web-renderer.js, loseContext below).
     },
   };
+}
+
+/**
+ * Let a canvas's WebGL context go now rather than at GC (WEBGL_lose_context). Only for a canvas
+ * that is gone for good: a lost context is not drawn on again. Never throws.
+ * @param {any} gl
+ */
+export function loseContext(gl) {
+  try {
+    const ext = gl && typeof gl.getExtension === 'function' ? gl.getExtension('WEBGL_lose_context') : null;
+    if (ext && !(typeof gl.isContextLost === 'function' && gl.isContextLost())) ext.loseContext();
+  } catch (_e) { /* already gone */ }
 }
