@@ -410,7 +410,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           })()}
           {/* Reading-end sentinel: end of verses, before ornament and nav. */}
           <div className="reading-end" />
-          <div className="ornament-divider">
+          <div className="ornament-divider" aria-hidden="true">
             <div className="ornament-divider-line" />
             <div className="ornament-divider-symbol">✦</div>
             <div className="ornament-divider-line" />

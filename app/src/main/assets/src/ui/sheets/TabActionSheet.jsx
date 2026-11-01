@@ -47,7 +47,7 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
         <SheetHandle onClose={onDismiss} />
         <div className="select-sheet-eyebrow">Tab {tabNum}</div>
         <div className="select-sheet-title" id="tab-actions-title">Tab actions</div>
-        <div className="select-sheet-ornament">
+        <div className="select-sheet-ornament" aria-hidden="true">
           <div className="select-sheet-ornament-line" />
           <div className="select-sheet-ornament-diamond">{"✦"}</div>
           <div className="select-sheet-ornament-line r" />
@@ -63,6 +63,7 @@ export function TabActionSheet({ idx, total, tabs = null, tab, onCloseOthers, on
                 value={renaming}
                 maxLength={60}
                 placeholder="Tab name"
+                aria-label="Tab name"
                 autoFocus
                 onChange={(e) => setRenaming(e.target.value)}
                 onKeyDown={(e) => {

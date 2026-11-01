@@ -114,6 +114,7 @@ export function NotebookPickerSheet({ groupId, onClose }) {
             className="nb-picker-new-input"
             type="text"
             placeholder="New notebook name…"
+            aria-label="New notebook name"
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createNotebook(); } }}

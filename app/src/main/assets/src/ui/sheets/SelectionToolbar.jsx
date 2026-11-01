@@ -1594,7 +1594,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
             the range, so a whole chapter or letter can become a single note.
             (Previously gated behind !mv, which made Note vanish the moment a
             selection crossed a paragraph break or verse boundary.) */}
-        <button className="sel-action-btn" onClick={handleNote} title="Note">
+        <button className="sel-action-btn" onClick={handleNote} title="Note" aria-haspopup="dialog">
           <svg viewBox="0 0 24 24">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
             <polyline points="14 2 14 8 20 8" />
@@ -1604,7 +1604,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           <span>Note</span>
         </button>
         {showColors && (
-          <button className="sel-action-btn" onClick={handleLink} title="Link">
+          <button className="sel-action-btn" onClick={handleLink} title="Link" aria-haspopup="dialog">
             <svg viewBox="0 0 24 24">
               <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
               <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
@@ -1645,7 +1645,7 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           </svg>
           <span>Search</span>
         </button>
-        <button className="sel-action-btn" onClick={handleBookmark} title="Bookmark">
+        <button className="sel-action-btn" onClick={handleBookmark} title="Bookmark" aria-haspopup="dialog">
           <svg viewBox="0 0 24 24">
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>

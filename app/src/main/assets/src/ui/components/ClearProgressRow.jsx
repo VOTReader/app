@@ -24,7 +24,7 @@ export function ClearProgressRow({ label, total, count, hasPartial, onClear }) {
     <div className="progress-row">
       <span className="progress-row-label">{label}</span>
       <span className="progress-row-tally">{"0 / "}{total}</span>
-      <button className="settings-clear-btn" disabled>Clear</button>
+      <button className="settings-clear-btn" disabled aria-label={'Clear ' + label}>Clear</button>
     </div>
   );
 
@@ -41,7 +41,7 @@ export function ClearProgressRow({ label, total, count, hasPartial, onClear }) {
     <div className="progress-row">
       <span className="progress-row-label">{label}</span>
       <span className="progress-row-tally">{count}{" / "}{total}</span>
-      <button className="settings-clear-btn" onClick={() => setConfirming(true)}>Clear</button>
+      <button className="settings-clear-btn" onClick={() => setConfirming(true)} aria-label={'Clear ' + label}>Clear</button>
     </div>
   );
 }
