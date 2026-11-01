@@ -733,7 +733,6 @@
       /* Theme switcher: hidden in the top nav when "Theme Button in Top Nav" is
          off. Theme stays changeable via the Light Theme setting (Text & Translation). */
       body.no-theme-nav .nav-theme-btn { display: none; }
-      body.light .hero-bg { display: none; }
 
       .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
       @media (hover: hover) { .nav-theme-btn:hover { color: var(--gold-bright); } }
@@ -2277,50 +2276,14 @@
         position: relative; overflow: hidden;
         /* rem up to a px ceiling: at Text Size 1.8 the old 5.5rem/4rem grew to 158/115 px and the
            hero filled 77 % of a 360x800 screen with the first words below the fold (2026-09-05). */
-        padding: min(5.5rem, 110px) min(1.8rem, max(29px, 7vw)) min(4rem, 80px); text-align: center;
+        padding: min(2.5rem, 52px) min(1.8rem, max(29px, 7vw)) min(2.25rem, 44px); text-align: center;
         border-bottom: 1px solid var(--gold-border);
       }
-      .hero-bg {
-        position: absolute; inset: 0; z-index: 1;
-        background: linear-gradient(
-          to bottom,
-          #1f1500 0%,
-          #2a1d00 35%,
-          #1a1200 70%,
-          var(--bg) 100%
-        );
-        pointer-events: none;
-      }
-      .hero-bg.vol {
-        background: linear-gradient(
-          to bottom,
-          #03060f 0%,
-          #070e24 30%,
-          #09122e 55%,
-          #060c1e 75%,
-          var(--bg) 100%
-        );
-      }
-      /* Bible Study hero: warmer, deeper amber signals "Study" vs Volumes. */
-      .hero-bg.study {
-        background: linear-gradient(
-          to bottom,
-          #120802 0%,
-          #1e0f00 30%,
-          #2b1a02 55%,
-          #1a0f00 75%,
-          var(--bg) 100%
-        );
-      }
-      .hero-bg.ot {
-        background: linear-gradient(
-          to bottom,
-          #1a0f00 0%,
-          #211400 35%,
-          #1a0e00 70%,
-          var(--bg) 100%
-        );
-      }
+      /* No banner on any reading page (Corbin 2026-11-01: "get rid of blue banner on each
+         letter", then the amber ones on studies and Bible chapters, "one consistent page
+         top"; the redesign's round 2 take 1). The centred eyebrow, title, ornament and
+         Listen sit on plain black, and the padding the band needed is taken back so the
+         text starts sooner. */
       .hero-content { position: relative; z-index: 3; }
       .hero-eyebrow {
         font-family: 'Cinzel', serif;

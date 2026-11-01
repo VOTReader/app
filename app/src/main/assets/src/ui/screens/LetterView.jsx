@@ -390,8 +390,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
       {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
+      {/* Plain black, no banner (Corbin 2026-11-01: blue on letters, amber on studies). */}
       <header className="hero" ref={heroRef}>
-        <div className={`hero-bg ${studyMode ? "study" : "vol"}`} />
         <div className="hero-content">
           {/* C2-C [C2]: no volumeLabel → the collection half of the eyebrow is
               OMITTED (and its separator with it) rather than asserting
