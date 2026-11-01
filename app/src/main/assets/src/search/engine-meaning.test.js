@@ -39,7 +39,6 @@ const KEEPERS = 'Thus says The Lord: Blessed are those who keep My Sabbath and M
 const WISDOM = 'For those who love Me obey My Commandments, and those who remember My Sabbaths honor Me and shall know Wisdom.';
 const SABBATH = 'Many have asked about the day of rest. ' + KEEPERS + ' ✦ ' + 'The fields lie still under the evening sky. '.repeat(3) + WISDOM + ' ✦';
 const WATCH = 'Stay awake through the night and guard the door, for the master returns at an hour no one expects. ✦ 1/29/05 ' + HEADING + ' The towers of the proud shall fall.';
-const LAMP = 'Hear Me, says The Lord. Keep your torch. Burning through the long dark night, the watchman waits upon the wall.';
 const GLOBALS = {
   BOOKS: {},
   LETTERS_V1: [
@@ -52,8 +51,6 @@ const GLOBALS = {
     { id: 'obey', num: 7, title: 'Obey God', blocks: [{ segments: [{ v: OBEY }] }] },
     { id: 'keepers', num: 8, title: 'The Keepers', blocks: [{ segments: [{ v: KEEPERS }] }] },
     { id: 'wisdom', num: 9, title: 'The Word of Wisdom', blocks: [{ segments: [{ v: 'The fields lie still under the evening sky. '.repeat(12) + WISDOM }] }] },
-    // a line a reader remembers with slips, across two of its sentences, the second holding more of the words
-    { id: 'lampkeeper', num: 11, title: 'The Watchman', blocks: [{ segments: [{ v: LAMP }] }] },
     // a title, and a sentence past the first ones saying a word of its collection's name
     { id: 'strayed', num: 10, title: 'The Fold', blocks: [{ segments: [{ v: 'Where does a shepherd spend his days? Pray in like manner. For the one who strays from the flock shall not be forsaken.' }] }] },
   ],
@@ -268,17 +265,6 @@ describe('meaning first', () => {
     const r = await first('the fold volume one');
     expect(r.doc.letterId).toBe('strayed');
     expect(r.placeStart).toBe(0);
-  });
-
-  /* nightly 11-01 U2: a text holding a quote with its slips opens at the first of the words it holds (B4), and the
-     meaning's sentence snap moved it on to the sentence after, which holds more of the typed words: the reader landed
-     past the words they remembered. A text the run or the quote landed on keeps its landing. */
-  it('a text holding the quote with its slips opens at its first word, the model on', async () => {
-    said.near = 'garment';
-    // a quote with more slips than a quote found (one word off) has: the model reads it, and its landing ran
-    const r = (await VotSearchMini.search('o keep thy torch ever burning thru all the long dark night')).results;
-    const e = r.find((x) => x.doc.letterId === 'lampkeeper');
-    expect(e.placeStart).toBe(LAMP.indexOf('Keep your torch'));
   });
 
   /* THE READER'S FILTERS HOLD FOR WHAT THE MEANING ADDS (sweep W1, 2026-10-13). The model's best

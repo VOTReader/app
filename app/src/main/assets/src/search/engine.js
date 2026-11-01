@@ -1108,8 +1108,7 @@ function sentenceAt(text, start, words) {
  * @param {Map<any, string>} idOf
  * @param {Array<{id:string, start:number, passages: () => Array<[number, number]>}>} sem
  * @param {string[]} terms
- * @param {Set<any>} [byTitle]  the entries opened where they say (a title named, the typed run, the quote held with
- *   its slips): their landing stands
+ * @param {Set<any>} [byTitle]  the entries a title named opens where it says: their landing stands
  */
 function meaningLanding(out, idOf, sem, terms, byTitle) {
   const byId = new Map(sem.map((s) => [s.id, s]));
@@ -4006,10 +4005,6 @@ async function searchWords(query, options) {
      greeting, or the clause before the one typed, and missed the words. */
   const landRun = p.phrase ? joinApostropheS(/** @type {string[]} */ (phraseToks)) : typedTokens;
   const landAcc = S && landRun.length >= RUN_MIN ? runIds(S, landRun) : null;
-  /* ...and neither the run's landing nor the quote's (below) is snapped back by the meaning's (meaningLanding): its
-     sentence snap moved a quote that crosses into a sentence holding more of the typed words on to that sentence,
-     past the words remembered (nightly 11-01 U2). */
-  const landedOn = new Set(landedByTitle);
   if (S && landAcc) {
     for (let r = 0; r < Math.min(out.length, RUN_LAND_REACH); r++) {
       const e = out[r];
@@ -4019,7 +4014,7 @@ async function searchWords(query, options) {
       if (sid === null) continue;
       const at = !p.phrase && id !== undefined && id in runAt ? runAt[id] : storeRunAt(S, sid, landAcc);
       const c = at >= 0 ? tokenPlace(e.doc.text, at) : -1;
-      if (c >= 0) { /** @type {any} */ (e).placeStart = c; landedOn.add(e); }
+      if (c >= 0) /** @type {any} */ (e).placeStart = c;
     }
   }
   // A text holding the quote with its slips (B4) opens on the words it holds, at the first of them.
@@ -4028,9 +4023,9 @@ async function searchWords(query, options) {
     const a = alignHeld.get(/** @type {string} */ (idOf.get(e)));
     if (!a || a.start < 0 || e.doc.kind === 'verse' || !e.doc.text || typeof (/** @type {any} */ (e).placeStart) === 'number') continue;
     const c = tokenPlace(e.doc.text, a.start);
-    if (c >= 0) { /** @type {any} */ (e).placeStart = c; landedOn.add(e); }
+    if (c >= 0) /** @type {any} */ (e).placeStart = c;
   }
-  if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), landedOn);
+  if (sem && sem.length) meaningLanding(out, idOf, sem, (p.phrase ? [p.phrase] : []).concat(filtered.filter((t) => !isStopTerm(t))), landedByTitle);
   /* THE SAME WORDS IN ANOTHER VERSE, SHOWN SECOND (search200 fix2, the hunt bench). A verse leading on the typed run
      is often one of two that word it alike (a saying a gospel repeats, a proverb said twice), and the letters quoting
      the first filled Best Matches: the other verse sat below them, unseen. One or two other verses holding the typed
