@@ -44,7 +44,7 @@ beforeEach(() => {
     if (opts.text) el.textContent = opts.text;
   });
   globalThis.hideToast = vi.fn((id) => { const el = document.getElementById(id); if (el) el.remove(); });
-  globalThis.StorageHealth = { onWriteFailure: () => {} };
+  globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
   globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = ({ onConfirm }) =>

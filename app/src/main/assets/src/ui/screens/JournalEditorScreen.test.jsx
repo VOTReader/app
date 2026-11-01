@@ -45,7 +45,7 @@ beforeEach(() => {
 
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   globalThis.showToast = () => {};
-  globalThis.StorageHealth = { onWriteFailure: () => {} };
+  globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
   globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = () => null;
