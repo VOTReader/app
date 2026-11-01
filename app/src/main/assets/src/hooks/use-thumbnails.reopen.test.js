@@ -251,6 +251,36 @@ describe('useThumbnails — one capture at a time', () => {
     expect(maxInFlight).toBe(1);
   });
 
+  it('a Garden shot queued behind a render does not run once the overview opened meanwhile', async () => {
+    // Garden's native shot photographs the real screen, overlay included: the
+    // overview check has to hold when the queued render STARTS, not only when
+    // it was asked for.
+    const takeScreenshot = /** @type {import('vitest').Mock} */ (PlatformBridge.takeScreenshot);
+    takeScreenshot.mockReset();
+    takeScreenshot.mockImplementation(async () => DARK);
+    /** @type {Array<() => void>} */
+    const finishers = [];
+    takeThemedScreenshot.mockImplementation((theme) => new Promise((res) => finishers.push(() => res(theme === 'light' ? LIGHT : DARK))));
+    const garden = { id: 'g', screen: 'garden-view', gardenPage: 2 };
+    const onGarden = (over) => props({ tabs: [tabA, garden], activeTabIdx: 1, activeTab: garden, ...over });
+    const { rerender } = renderHook((p) => useThumbnails(p), { initialProps: props({ tabs: [tabA, garden] }) });
+    await advance(350);                               // A dark starts
+    await act(async () => { finishers.shift()(); });
+    await flush();
+    await advance(900);                               // A light starts — held
+    rerender(onGarden());
+    await advance(2000);                              // the Garden shot is queued behind it
+    expect(takeScreenshot).not.toHaveBeenCalled();
+    rerender(onGarden({ tabsOverviewOpen: true }));   // the reader opens the overview
+    await flush();
+    await act(async () => { finishers.shift()(); });  // A light ends
+    await flush();
+    expect(takeScreenshot).not.toHaveBeenCalled();
+    rerender(onGarden({ tabsOverviewOpen: false }));  // closed again: the shot is taken then
+    await advance(2000);
+    expect(takeScreenshot).toHaveBeenCalledTimes(1);
+  });
+
   it('runCaptureRender runs tasks strictly in order and survives a throwing task', async () => {
     const order = [];
     const a = runCaptureRender(async () => { order.push('a'); throw new Error('boom'); });

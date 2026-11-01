@@ -834,6 +834,10 @@ export function useThumbnails({
         const dataUrl = await runCaptureRender(() => {
           if (pageHidden()) return SKIP_HIDDEN;
           if (!onOwnPage() || (themeRef.current === 'light' ? 'light' : 'dark') !== curTheme) return SKIP_STALE;
+          // The overview opened while this waited: Garden's native shot would
+          // photograph the overlay. The rerun stops at the overview check, and
+          // closing the overview re-fires the after-nav capture.
+          if (isGarden && tabsOverviewOpenRef.current) return SKIP_STALE;
           return isGarden
             ? PlatformBridge.takeScreenshot(navHeightDp, 1440, 90)
             : PlatformBridge.takeThemedScreenshot(curTheme, 1440, 90);
