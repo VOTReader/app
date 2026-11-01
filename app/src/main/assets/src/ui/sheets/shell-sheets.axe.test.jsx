@@ -310,7 +310,7 @@ describe('axe — VersePickerScreen', () => {
     expect(await seriousViolations(document)).toEqual([]);
   });
 
-  it('a chapter that is not there is keeps focus inside its screen', async () => {
+  it('a chapter that is not there keeps focus inside its screen', async () => {
     globals([]);
     render(<VersePickerScreen refineRequest={req} {...pickerProps} />);
     expect(document.querySelector('.picker-screen').contains(document.activeElement)).toBe(true);
@@ -339,7 +339,7 @@ describe('axe — LetterExcerptPickerScreen', () => {
     expect(await seriousViolations(document)).toEqual([]);
   });
 
-  it('a letter that is not there is keeps focus inside its screen', async () => {
+  it('a letter that is not there keeps focus inside its screen', async () => {
     globals(null);
     render(<LetterExcerptPickerScreen refineRequest={req} {...pickerProps} />);
     expect(document.querySelector('.picker-screen').contains(document.activeElement)).toBe(true);
