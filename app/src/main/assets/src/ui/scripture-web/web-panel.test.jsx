@@ -16,7 +16,8 @@ import { resolve, dirname } from 'node:path';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import * as ds from '../../utils/scripture-web/describe.js';
 import * as pm from '../../utils/scripture-web/panel-model.js';
-import { WebPanel, modeOfDetail, subjectKey, strongestFirst, CITED_SHOWN } from './web-panel.jsx';
+import { WebPanel, modeOfDetail, subjectKey, strongestFirst, CITED_SHOWN, GO_ON_SHOWN } from './web-panel.jsx';
+import { arrive, moveTo, stopOf, chainTo, pathOf, EMPTY_TRAIL } from './use-journey.js';
 import * as geo from '../../utils/scripture-web/geometry.js';
 import { frameSetAt } from '../../utils/scripture-web/frame-set.js';
 import { webFrame } from '../../utils/scripture-web/web-frame.js';
@@ -62,6 +63,21 @@ afterEach(() => {
   globalThis.resolveVerseText = saved.r;
   globalThis.translateVerse = saved.t;
 });
+
+/** A journey as the panel reads it (use-journey.js): a real trail, every move a spy. */
+function journeyOf(t) {
+  return {
+    trail: t, path: pathOf(t), here: stopOf(t, t.at), stack: chainTo(t, t.at),
+    push() {}, clear: vi.fn(), back: vi.fn(() => null), forward: vi.fn(() => null), go: vi.fn(() => null), connect() {},
+  };
+}
+/** A trail walked along threads: [verse, label, arc] steps, each from the one before. */
+function walked(...steps) {
+  const at = ([verse, label, arc]) => ({ verse, label, open: { mode: 'verse', verse }, via: arc >= 0 ? { arc } : undefined });
+  let t = arrive(EMPTY_TRAIL, at(steps[1]), at(steps[0]));
+  for (let k = 2; k < steps.length; k++) t = arrive(t, at(steps[k]), at(steps[k - 1]));
+  return t;
+}
 
 function mount(over = {}) {
   const props = {
@@ -235,7 +251,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(props.onOpen.mock.calls[0][0]).toBeTruthy();
   });
 
-  it('MORE FROM each end: the first open, grouped by book, rows with Open and Follow, the sort said', () => {
+  it('MORE FROM each end: the first open, grouped by book, each row a way on, the sort said', () => {
     const { panel, props } = mount({ detail: detail() });
     const more = [...panel.querySelectorAll('.sw-sec-more')];
     expect(more).toHaveLength(2);
@@ -251,11 +267,12 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     // the first book is open; its rows never list the chosen thread
     const rows = more[0].querySelectorAll('.sw-group .sw-row');
     expect(rows.length).toBeGreaterThan(0);
-    // a row's Follow says what the open connection's says: Follow to the other end (A10.4)
-    const follows = [...more[0].querySelectorAll('.sw-group .sw-row-follow')];
-    expect(follows.length).toBe(rows.length);
-    for (const f of follows) expect(f.getAttribute('aria-label')).toMatch(/^Follow to /);
-    fireEvent.click(follows[0]);
+    // each row is a way on (2026-11-03): the whole row is one control, and it goes there
+    const ways = [...more[0].querySelectorAll('.sw-group .sw-row-go .sw-row-main')];
+    expect(ways.length).toBe(rows.length);
+    for (const w of ways) expect(w.getAttribute('aria-label')).toMatch(/^Go to .+, \d+ votes?$/);
+    expect(more[0].querySelectorAll('.sw-row-follow, .sw-row-open').length, 'no second and third button on a row').toBe(0);
+    fireEvent.click(ways[0]);
     expect(props.followRow).toHaveBeenCalledWith(expect.objectContaining({ hereVerse: ISA_7_14 }));
     expect(props.followRow.mock.calls[0][0].index).not.toBe(ARC);
     // a closed book opens on its header; the second end opens on its own
@@ -386,58 +403,138 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
   it('a crumb names the place it holds: the whole web, a book, a chapter, a verse', () => {
     // one name for the whole web, the go-to's and the trail's (w4 review: two literals had to agree)
     expect(hereLabel(g, [0, g.total], 15551, true)).toBe(ds.WHOLE_WEB);
-    const journey = { stack: [
-      { verse: vid('psalms', 103, 2), label: ds.WHOLE_WEB },
-      { verse: vid('romans', 1, 1), label: 'Romans' },
-      { verse: vid('john', 3, 1), label: 'John 3' },
-      { verse: vid('1corinthians', 13, 1), label: '1 Corinthians 13' },
-      { verse: ISA_7_14, label: 'Isaiah 7:14' },
-      { verse: g.to[ARC], label: 'Matthew 1:23' },
-    ], push() {}, clear() {}, back() { return null; } };
-    const { panel } = mount({ detail: detail(), journey });
-    expect([...panel.querySelectorAll('.sw-crumbs li')].map((c) => c.textContent))
+    const places = [
+      [vid('psalms', 103, 2), ds.WHOLE_WEB], [vid('romans', 1, 1), 'Romans'], [vid('john', 3, 1), 'John 3'],
+      [vid('1corinthians', 13, 1), '1 Corinthians 13'], [ISA_7_14, 'Isaiah 7:14'], [g.to[ARC], 'Matthew 1:23'],
+    ];
+    let t = arrive(EMPTY_TRAIL, { verse: places[1][0], label: places[1][1] }, { verse: places[0][0], label: places[0][1] });
+    for (const [verse, label] of places.slice(2)) t = arrive(t, { verse, label });
+    const { panel } = mount({ detail: detail(), journey: journeyOf(t) });
+    expect([...panel.querySelectorAll('.sw-trail-stops li')].map((c) => c.textContent))
       .toEqual(['Whole web', 'Romans', 'John 3', '1Cor 13', 'Isa 7:14', 'Matt 1:23']);
+    // a crumb that shortens its stop's name is named in full for a screen reader
+    const romans = [...panel.querySelectorAll('.sw-trail-stops .sw-crumb')].find((b) => b.textContent === '1Cor 13');
+    expect(romans.getAttribute('aria-label')).toBe('1 Corinthians 13');
   });
 
-  it('the trail shows once a Follow has steps, the current crumb marked, and Back walks it', () => {
-    const back = vi.fn(() => ({ verse: ISA_7_14, label: 'Isaiah 7:14' }));
-    const journey = { stack: [{ verse: ISA_7_14, label: 'Isaiah 7:14' }, { verse: g.to[ARC], label: 'Matthew 1:23' }], push() {}, clear() {}, back };
-    const { panel, byLabel, props } = mount({ detail: detail(), journey });
-    const crumbs = [...panel.querySelectorAll('.sw-crumbs li')];
-    expect(crumbs.map((c) => c.textContent)).toEqual(['Isa 7:14', 'Matt 1:23']);
+  /* THE TRAIL BAR (2026-11-03): pinned over the scroll, so the way back never scrolls away. */
+  it('the trail bar: pinned over the scroll, where the reader is marked, the way ahead dimmer', () => {
+    const MATT = g.to[ARC];
+    let t = walked([ISA_7_14, 'Isaiah 7:14'], [MATT, 'Matthew 1:23', ARC], [JOHN_3_16, 'John 3:16', 7]);
+    t = moveTo(t, chainTo(t, t.at)[1].id);   // back one: at Matthew 1:23, John 3:16 ahead
+    const journey = journeyOf(t);
+    const { panel, byLabel, props } = mount({ detail: found({ kind: 'verse', verse: MATT }), journey });
+    const bar = panel.querySelector('.sw-trail');
+    expect(bar.parentElement, 'outside the scroll: pinned').toBe(panel);
+    expect(bar.getAttribute('aria-label')).toBe('Your path');
+    expect(panel.getAttribute('data-trail')).toBe('1');
+    const crumbs = [...bar.querySelectorAll('.sw-trail-stops li')];
+    expect(crumbs.map((c) => c.textContent)).toEqual(['Isa 7:14', 'Matt 1:23', 'John 3:16']);
     expect(crumbs[1].classList.contains('is-here')).toBe(true);
-    expect(crumbs[1].getAttribute('aria-current')).toBe('location');
-    fireEvent.click(byLabel(/^Back along the trail$/)[0]);
-    expect(back).toHaveBeenCalledTimes(1);
-    // the journey flies home and reopens the line itself (use-journey.js): a fly of the panel's own
-    // would take that one over (integration, w3)
+    expect(crumbs[1].querySelector('[aria-current="location"]')).toBeTruthy();
+    expect(crumbs[1].querySelector('.sw-crumb'), 'where the reader stands is no button').toBeNull();
+    expect(crumbs[2].classList.contains('is-ahead')).toBe(true);
+    // Back and Forward name where they go, and hand the move to the trail: it flies (never the panel)
+    fireEvent.click(byLabel(/^Back to Isaiah 7:14$/)[0]);
+    expect(journey.back).toHaveBeenCalledTimes(1);
+    fireEvent.click(byLabel(/^Forward to John 3:16$/)[0]);
+    expect(journey.forward).toHaveBeenCalledTimes(1);
+    fireEvent.click(crumbs[0].querySelector('.sw-crumb'));
+    expect(journey.go).toHaveBeenCalledWith(chainTo(t, t.at)[0].id);
+    fireEvent.click(crumbs[2].querySelector('.sw-crumb'));
+    expect(journey.go).toHaveBeenLastCalledWith(t.stops.find((x) => x.verse === JOHN_3_16).id);
     expect(props.flyTo).not.toHaveBeenCalled();
+    // at the start of the trail there is no Back, and with nothing gone on to no Forward
+    const home = journeyOf(moveTo(t, chainTo(t, t.at)[0].id));
+    cleanup();
+    const first = mount({ detail: found({ kind: 'verse', verse: ISA_7_14 }), journey: home });
+    expect(first.panel.querySelectorAll('.sw-trail-btn')[0].disabled).toBe(true);
+    expect(first.panel.querySelectorAll('.sw-trail-btn')[1].disabled).toBe(false);
   });
 
-  // the dead-control hunt, 2026-10-22: "Whole web" looked tappable and did nothing
-  it('a step back along the trail is a button: it goes back as many steps as it is from the top', () => {
-    const back = vi.fn(() => null);
-    const journey = { stack: [{ verse: 1, label: 'Genesis 1:2' }, { verse: ISA_7_14, label: 'Isaiah 7:14' }, { verse: g.to[ARC], label: 'Matthew 1:23' }], push() {}, clear() {}, back };
-    const { panel } = mount({ detail: detail(), journey });
-    const steps = [...panel.querySelectorAll('.sw-crumbs .sw-crumb')];
-    expect(steps.map((b) => b.textContent)).toEqual(['Gen 1:2', 'Isa 7:14']);
-    expect(panel.querySelector('.sw-crumbs li.is-here .sw-crumb'), 'where the reader is is no button').toBeNull();
-    fireEvent.click(steps[0]);
-    expect(back).toHaveBeenCalledTimes(2);
+  it('no trail bar on a lone stop, nor on My Web', () => {
+    const one = journeyOf(arrive(EMPTY_TRAIL, { verse: ISA_7_14, label: 'Isaiah 7:14' }));
+    expect(mount({ detail: detail(), journey: one }).panel.querySelector('.sw-trail')).toBeNull();
+    cleanup();
+    const two = journeyOf(walked([ISA_7_14, 'Isaiah 7:14'], [g.to[ARC], 'Matthew 1:23', ARC]));
+    expect(mount({ detail: detail(), journey: two, mode: 'personal' }).panel.querySelector('.sw-trail')).toBeNull();
   });
 
-  it('a card opened from another card shows its Back link, not the trail', () => {
-    const journey = { stack: [{ verse: ISA_7_14, label: 'Isaiah 7:14' }, { verse: g.to[ARC], label: 'Matthew 1:23' }], push() {}, clear() {}, back() { return null; } };
-    const { panel } = mount({ detail: Object.assign(detail(), { parent: found({ kind: 'verse', verse: ISA_7_14 }) }), journey });
-    expect(panel.querySelector('.sw-crumbs')).toBeNull();
+  it('away from the stop (a line tapped on the way), Back names the stop and its crumb goes back there', () => {
+    const MATT = g.to[ARC];
+    const journey = journeyOf(walked([ISA_7_14, 'Isaiah 7:14'], [MATT, 'Matthew 1:23', ARC]));
+    // the stop is Matthew 1:23's verse; the panel shows the line instead
+    const { panel, byLabel } = mount({ detail: detail(), journey });
+    expect(byLabel(/^Back to Matthew 1:23$/)).toHaveLength(1);
+    const here = panel.querySelector('.sw-trail-stops li.is-here .sw-crumb');
+    expect(here, "the stop's crumb is a button while the panel is elsewhere").toBeTruthy();
+    fireEvent.click(here);
+    expect(journey.go).toHaveBeenCalledWith(journey.here.id);
+  });
+
+  it('each end of a line is a way on: Follow to it, on both ends; the end the reader stands on has none', () => {
+    const d = detail();
+    const { panel, props } = mount({ detail: d });
+    const follows = [...panel.querySelectorAll('.sw-verses .sw-follow')];
+    expect(follows.map((f) => f.getAttribute('aria-label'))).toEqual(['Follow to Isaiah 7:14', 'Follow to Matthew 1:23']);
+    fireEvent.click(follows[0]);
+    const asked = props.followThread.mock.calls[0][0];
+    expect(asked.far === 'to' ? asked.to : asked.from, 'the end the button names').toBe(ISA_7_14);
+    cleanup();
+    const atIsaiah = journeyOf(walked([g.to[ARC], 'Matthew 1:23'], [ISA_7_14, 'Isaiah 7:14', ARC]));
+    const two = mount({ detail: d, journey: atIsaiah });
+    expect([...two.panel.querySelectorAll('.sw-verses .sw-follow')].map((f) => f.getAttribute('aria-label')))
+      .toEqual(['Follow to Matthew 1:23']);
+  });
+
+  it('a card opened from another card shows its Back link', () => {
+    const { panel } = mount({ detail: Object.assign(detail(), { parent: found({ kind: 'verse', verse: ISA_7_14 }) }) });
     expect(panel.querySelector('.sw-back-link').textContent).toMatch(/Back to Isaiah 7:14/);
+  });
+
+  /* YOUR PATHS (2026-11-03): back a couple and another way is a path of its own; every one stays. */
+  it('your paths: the button counts them; the view lists each from its fork, says where the reader is, goes to a stop, and clears on a second tap', () => {
+    const MATT = g.to[ARC];
+    const J = JOHN_3_16;
+    let t = walked([ISA_7_14, 'Isaiah 7:14'], [MATT, 'Matthew 1:23', ARC], [J, 'John 3:16', 7]);
+    t = moveTo(t, chainTo(t, t.at)[0].id);
+    t = arrive(t, { verse: vid('luke', 1, 31), label: 'Luke 1:31', open: { mode: 'verse', verse: vid('luke', 1, 31) }, via: { arc: 9 } },
+      { verse: ISA_7_14, label: 'Isaiah 7:14' });
+    const journey = journeyOf(t);
+    const { panel, byLabel } = mount({ detail: found({ kind: 'verse', verse: vid('luke', 1, 31) }), journey });
+    const btn = byLabel(/^Your paths, 2$/)[0];
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(btn);
+    expect(panel.getAttribute('aria-label')).toBe('Your paths');
+    expect(panel.querySelector('.sw-panel-meta').textContent).toBe('2 paths · 4 stops');
+    const paths = [...panel.querySelectorAll('.sw-path')];
+    expect(paths).toHaveLength(2);
+    expect([...paths[0].querySelectorAll('.sw-path-ref')].map((x) => x.textContent)).toEqual(['Isaiah 7:14', 'Matthew 1:23', 'John 3:16']);
+    expect(paths[1].querySelector('.sw-path-stop.is-from .sw-path-ref').textContent, 'the path begins at its fork').toBe('From Isaiah 7:14');
+    expect(paths[1].classList.contains('is-current')).toBe(true);
+    const here = paths[1].querySelector('.sw-path-stop.is-here');
+    expect(here.querySelector('.sw-path-here').textContent).toBe('You are here');
+    expect(here.querySelector('.sw-path-go').getAttribute('aria-current')).toBe('location');
+    expect(paths[0].querySelector('.sw-path-text').textContent, 'a stop in its own words').toBe('TEXT isaiah 7:14');
+    // a stop goes there, and the view gives way to the panel
+    fireEvent.click(paths[0].querySelectorAll('.sw-path-go')[2]);
+    expect(journey.go).toHaveBeenCalledWith(t.stops.find((x) => x.verse === J).id);
+    expect(panel.querySelector('.sw-paths')).toBeNull();
+    // Clear asks a second tap
+    fireEvent.click(byLabel(/^Your paths, 2$/)[0]);
+    const clear = panel.querySelector('.sw-paths-clear');
+    fireEvent.click(clear);
+    expect(journey.clear).not.toHaveBeenCalled();
+    expect(clear.textContent).toBe('Tap again to clear your paths');
+    fireEvent.click(clear);
+    expect(journey.clear).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('verse mode: John 3:16', () => {
   const detail = () => found({ kind: 'verse', verse: JOHN_3_16 });
 
-  it('its text, its citations, its threads by book, and the base lit set back when a row lets go', () => {
+  it('its text, its citations, its ways on strongest first, every thread by book under them, and the base lit set back when a row lets go', () => {
     const { panel, props } = mount({ detail: detail() });
     expect(panel.getAttribute('data-mode')).toBe('verse');
     expect(panel.querySelector('.sw-panel-title').textContent).toBe('John 3:16');
@@ -452,13 +549,29 @@ describe('verse mode: John 3:16', () => {
     expect(items.map((s) => !!s.querySelector(':scope > .sw-dot-sep'))).toEqual([false, true]);
     expect(meta.querySelector('.sw-dot-sep').textContent).toBe(' · ');
     expect(panel.querySelector('.sw-verse-text').textContent).toBe('TEXT john 3:16');
-    expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · 48');
+    expect(panel.querySelector('.sw-sec-go .sw-sec-title').textContent).toBe('Go on from here · 48');
     // every line with a " · " in it (the section titles, the cite sources) wraps the same way
     for (const line of panel.querySelectorAll('.sw-sec-title, .sw-cite-source')) {
       if (line.textContent.includes(' · ')) expect(line.querySelector('.sw-dots'), line.textContent).toBeTruthy();
     }
-    const row = panel.querySelector('.sw-group .sw-row');
+    // the strongest ways on first, across the books
+    const want = pm.waysOn(pm.threadsFrom(g, JOHN_3_16, JOHN_3_16, 'famous')).slice(0, GO_ON_SHOWN).map((r) => r.other.label);
+    const rows = [...panel.querySelectorAll('.sw-go-list .sw-row')];
+    expect(rows.map((r) => r.querySelector('.sw-row-ref').textContent)).toEqual(want);
+    for (let k = 1; k < rows.length; k++) {
+      const v = (r) => Number(/(\d+) votes?/.exec(r.querySelector('.sw-row-tag').textContent)[1]);
+      expect(v(rows[k])).toBeLessThanOrEqual(v(rows[k - 1]));
+    }
+    // every thread, by book, a tap away under them
+    const all = panel.querySelector('.sw-sec-all .sw-sec-toggle');
+    expect(all.getAttribute('aria-label')).toBe('All 48 by book');
+    expect(all.getAttribute('aria-expanded')).toBe('false');
+    expect(panel.querySelector('.sw-sec-all .sw-group')).toBeNull();
+    fireEvent.click(all);
+    expect(panel.querySelectorAll('.sw-sec-all .sw-group').length).toBeGreaterThan(1);
+    const row = rows[0];
     fireEvent.mouseEnter(row);
+    expect(props.lightThreads.mock.calls.at(-1)[0]).toHaveLength(1);
     fireEvent.mouseLeave(row);
     const base = props.lightThreads.mock.calls.at(-1)[0];
     expect(base.length).toBe(48);
@@ -467,7 +580,7 @@ describe('verse mode: John 3:16', () => {
   it('a change of density lights the threads it now lists, never the stale set (w3 review)', () => {
     const { panel, props, rerender } = mount({ detail: detail() });
     rerender(<WebPanel {...props} density="essential" />);
-    const n = Number(/· (\d+)$/.exec(panel.querySelector('.sw-sec-more .sw-sec-title').textContent)[1]);
+    const n = Number(/· (\d+)$/.exec(panel.querySelector('.sw-sec-go .sw-sec-title').textContent)[1]);
     expect(n).toBeGreaterThan(0);
     expect(n).toBeLessThan(48);
     const lit = props.lightThreads.mock.calls.at(-1)[0];
@@ -481,12 +594,52 @@ describe('verse mode: John 3:16', () => {
     expect(props.lightThreads).not.toHaveBeenCalled();
   });
 
-  it('a row shows that connection; its tag is its votes', () => {
+  it('a way on is one tap: it follows its thread there; its tag is its votes; a verse stood at is marked visited', () => {
     const { panel, props } = mount({ detail: detail() });
-    expect(panel.querySelector('.sw-group .sw-row-tag').textContent).toMatch(/^\d+ votes?$/);
-    fireEvent.click(panel.querySelector('.sw-group .sw-row-main'));
-    // the row's card keeps the way back to this one (the dead-control hunt, 2026-10-22)
-    expect(props.openPanel).toHaveBeenCalledWith({ mode: 'connection', arc: expect.any(Number) }, { back: true });
+    expect(panel.querySelector('.sw-go-list .sw-row-tag').textContent).toMatch(/^\d+ votes?$/);
+    const first = panel.querySelector('.sw-go-list .sw-row-main');
+    fireEvent.click(first);
+    expect(props.followRow).toHaveBeenCalledWith(expect.objectContaining({ hereVerse: JOHN_3_16 }));
+    expect(props.openPanel).not.toHaveBeenCalled();
+    expect(panel.querySelector('.sw-row-visited'), 'nothing stood at yet').toBeNull();
+    cleanup();
+    // a trail that has stood at the first way's verse
+    const way = pm.waysOn(pm.threadsFrom(g, JOHN_3_16, JOHN_3_16, 'famous'))[0];
+    const t = walked([way.otherVerse, way.other.label], [vid('genesis', 1, 1), 'Genesis 1:1', 3]);
+    const again = mount({ detail: detail(), journey: journeyOf(t) });
+    const seen = again.panel.querySelector('.sw-go-list .sw-row');
+    expect(seen.querySelector('.sw-row-visited')).toBeTruthy();
+    expect(seen.querySelector('.sw-row-main').getAttribute('aria-label')).toMatch(/, visited$/);
+  });
+
+  it('a stop the reader came to along a thread: where they came from, its thread no way on, only the first ways lit', () => {
+    const ways = pm.waysOn(pm.threadsFrom(g, JOHN_3_16, JOHN_3_16, 'famous'));
+    const via = ways[0];
+    const t = walked([via.otherVerse, via.other.label], [JOHN_3_16, 'John 3:16', via.index]);
+    const journey = journeyOf(t);
+    const { panel, props } = mount({ detail: detail(), journey });
+    const came = panel.querySelector('.sw-came');
+    expect(came.querySelector('.sw-came-ref').textContent).toBe('From ' + via.other.label);
+    expect(came.querySelector('.sw-came-votes').textContent).toBe(via.votes + ' votes');
+    expect(came.querySelector('.sw-came-text').textContent).toBe('TEXT ' + via.other.bookId + ' ' + via.other.chapter + ':' + via.other.verse);
+    expect(came.getAttribute('aria-label')).toBe('Back to ' + via.other.label);
+    fireEvent.click(came);
+    expect(journey.back).toHaveBeenCalledTimes(1);
+    // the verse still counts its thread in; the ways on leave it out
+    expect(panel.querySelector('.sw-panel-meta').textContent).toMatch(/^48 connections/);
+    expect(panel.querySelector('.sw-sec-go .sw-sec-title').textContent).toBe('Go on from here · 47');
+    const listed = [...panel.querySelectorAll('.sw-go-list .sw-row-ref')].map((x) => x.textContent);
+    expect(listed).toEqual(ways.slice(1, 1 + GO_ON_SHOWN).map((r) => r.other.label));
+    // the web lights only the ways the panel offers first, not the verse's every thread over the path
+    const lit = props.lightThreads.mock.calls.at(-1)[0];
+    expect([...lit]).toEqual(ways.slice(1, 1 + GO_ON_SHOWN).map((r) => r.index));
+    cleanup();
+    // on the phone the way in is one quiet link beside Open in reader
+    const phone = mount({ detail: detail(), journey, compact: true });
+    expect(phone.panel.querySelector('.sw-came')).toBeNull();
+    const link = phone.panel.querySelector('.sw-verses .sw-came-link');
+    expect(link.textContent).toMatch(/^From \S.* · \d+ votes$/);
+    expect(phone.panel.querySelectorAll('.sw-go-list .sw-row')).toHaveLength(4);
   });
 });
 
@@ -697,7 +850,7 @@ describe("exits mode: a fan chip's lines, by the book they go to", () => {
     }
   });
 
-  it('the panel: its head, "Connections · n" the chip\'s count, rows with Open and Follow, the lines lit as it opened', () => {
+  it('the panel: its head, "Connections · n" the chip\'s count, each row a way on, the lines lit as it opened', () => {
     const { panel, props } = mount({ detail });
     expect(modeOfDetail(detail)).toBe('exits');
     expect(subjectKey('exits', detail, null)).toBe('x:' + detail.key);
@@ -707,10 +860,9 @@ describe("exits mode: a fan chip's lines, by the book they go to", () => {
     expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · ' + grp.count);
     const rows = panel.querySelectorAll('.sw-group .sw-row');
     expect(rows.length).toBeGreaterThan(0);
-    const follows = [...panel.querySelectorAll('.sw-group .sw-row-follow')];
+    const follows = [...panel.querySelectorAll('.sw-group .sw-row-go .sw-row-main')];
     expect(follows.length).toBe(rows.length);
-    for (const f of follows) expect(f.getAttribute('aria-label')).toMatch(/^Follow to /);
-    expect(panel.querySelectorAll('.sw-group .sw-row-open').length, 'each row has its Open').toBe(rows.length);
+    for (const f of follows) expect(f.getAttribute('aria-label')).toMatch(/^Go to /);
     fireEvent.click(follows[0]);
     expect(props.followRow).toHaveBeenCalledWith(expect.objectContaining({ hereVerse: expect.any(Number) }));
     expect(props.followRow.mock.calls[0][0].hereVerse).toBeGreaterThanOrEqual(cell.lo);

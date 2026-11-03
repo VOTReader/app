@@ -144,6 +144,36 @@ export function panelOf(detail, choices, choiceChapter = -1) {
   return null;
 }
 
+/**
+ * Whether what is open is a trail stop's own panel (use-journey.js: isAt), so the trail knows where
+ * the reader stands: a verse stop's verse card, a chapter's card, a line's, a letter's, a fan chip's;
+ * a stop that opens nothing (a book) while nothing is open. A stop recorded with no panel at all
+ * (open undefined) is wherever the reader is. Pure, for its tests.
+ * @param {any} stop  a trail stop ({ open })
+ * @param {any} detail  the open card, or null
+ * @param {any[] | null} [choices]  the chooser's rows
+ * @param {boolean} [listOpen]  Nearby
+ */
+export function showsStop(stop, detail, choices, listOpen) {
+  if (!stop) return false;
+  const o = stop.open;
+  if (o === undefined) return true;
+  if (listOpen || (choices && choices.length)) return false;
+  if (o === null) return !detail;
+  if (!detail) return false;
+  if (o.mode === 'verse') {
+    const end = o.verseEnd > o.verse ? o.verseEnd : o.verse;
+    return detail.kind === 'verse' && detail.verse === o.verse && endOf(detail) === end;
+  }
+  if (o.mode === 'group') return detail.kind === 'chapter' && detail.chapterIndex === o.chapter;
+  if (o.mode === 'connection') {
+    return detail.kind === 'arc' && (o.prophecy ? detail.index < 0 && detail.prophecyIndex === o.arc : detail.index === o.arc);
+  }
+  if (o.mode === 'letter') return detail.kind === 'letter' && detail.letterKey === o.letterKey;
+  if (o.mode === 'exits') return detail.kind === 'exits' && detail.key === o.key;
+  return true;
+}
+
 /** The camera's ease when the panel frames what it opened (spec section 3: 450 ms). */
 export const FRAME_MS = 450;
 
@@ -215,6 +245,22 @@ export function useWebSelection({
   // whether the docked panel is open (read by the hover: the panel covers the web under it)
   const panelOpenRef = React.useRef(false);
   panelOpenRef.current = !!(detail || (choices && choices.length) || listOpen);
+  // what is open, for the trail's question (use-journey.js isAt): does the panel show this stop? Away
+  // from it (a line tapped on the way, the panel closed), Back goes back to it first
+  const openNowRef = React.useRef({ detail, choices, listOpen });
+  openNowRef.current = { detail, choices, listOpen };
+  const connectTrail = journey && typeof journey.connect === 'function' ? journey.connect : null;
+  React.useEffect(() => {
+    if (!connectTrail) return;
+    connectTrail({
+      isAt: (stop) => {
+        const o = openNowRef.current;
+        return showsStop(stop, o.detail, o.choices, o.listOpen);
+      },
+      // a step along the trail takes the camera: the way back to a zoom a choice left goes with it
+      onTravel: () => { if (returnRef.current) setReturnTo(null); },
+    });
+  }, [connectTrail]);
 
   // The pointer handlers are reached through a ref for the reason draw is
   // (use-frame-scheduler.js): the gesture listeners bind once and call the
@@ -481,7 +527,10 @@ export function useWebSelection({
    */
   const commitFound = React.useCallback((found, opts = {}) => {
     if (!found) return;
-    const o = /** @type {{ frame?: boolean, parent?: any }} */ (opts && typeof opts === 'object' && !('nativeEvent' in opts) ? opts : {});
+    const o = /** @type {{ frame?: boolean, parent?: any, via?: any }} */ (opts && typeof opts === 'object' && !('nativeEvent' in opts) ? opts : {});
+    // a trail stop's verse (use-journey.js): the thread the reader came along stays chosen, gold
+    // over its keyline, while the verse's own threads light round it (its ways on)
+    const via = found.kind === 'verse' && o.via && o.via.arc >= 0 ? (o.via.prophecy ? { arc: o.via.arc, prophecy: true } : { arc: o.via.arc }) : null;
     // the far foot is the one further from the middle of what the reader sees (the canvas area's
     // centre, the panel left out): what Follow goes to, read BEFORE the framing moves the camera.
     // The near one is what a thread too wide to frame keeps in view (frameFound)
@@ -499,8 +548,8 @@ export function useWebSelection({
     focusRef.current = focusState(found.kind === 'arc'
       ? (found.index >= 0 ? { arc: found.index } : { arc: found.prophecyIndex, prophecy: true })
       : found.kind === 'link' || found.kind === 'underlay' ? { arc: found.index, underlay: found.kind === 'underlay' }
-      : found.kind === 'verse' ? { range: [found.verse, endOf(found)],
-        lit: g ? arcsTouching(g, found.verse, endOf(found), density, 0) : null }
+      : found.kind === 'verse' ? Object.assign({ range: /** @type {[number, number]} */ ([found.verse, endOf(found)]),
+        lit: g ? arcsTouching(g, found.verse, endOf(found), density, 0) : null }, via)
       // a fan chip's card lights its lines and keeps its column's fan up; no range, so nothing
       // recedes (C3: the lit ink only, every other line as it was)
       : found.kind === 'exits' ? { lit: found.ids,
@@ -593,10 +642,12 @@ export function useWebSelection({
   const openPanel = React.useCallback((spec, opts = {}) => {
     const g = graph;
     if (!g || !spec) return false;
-    /** @type {{ parent?: any, frame?: boolean }} */
+    /** @type {{ parent?: any, frame?: boolean, via?: any }} */
     const via = {};
     if (opts && opts.back) via.parent = detailRef.current;
     if (opts && opts.frame === false) via.frame = false;
+    // a trail stop's verse names the thread the reader came along (use-journey.js travel)
+    if (spec.mode === 'verse' && spec.via) via.via = spec.via;
     const arcHit = (i) => ({ kind: 'arc', hit: { index: i, from: g.from[i], to: g.to[i], votes: g.votes[i] } });
     if (spec.mode === 'connection') {
       if (spec.prophecy) {
@@ -797,56 +848,55 @@ export function useWebSelection({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the switch is the trigger: what is open is read as it flips
   }, [showUnderlay]);
 
-  /** Follow the chosen line to its far foot: the camera centres that verse in the canvas area at
-   * the same zoom (bringIn; at the canon's end it stands right of centre, still in the area), the line
-   * stays spotlit, and the control turns to the other end so the reader can walk it back (Corbin's
-   * brief, 2026-09-11: "every line followable end to end"). */
+  /**
+   * Arrive at a verse along a thread (2026-11-03, Corbin: "going from link to link to link"): the
+   * verse becomes a stop of the trail, set out from the thread's other end (use-journey.js push:
+   * that end is a stop of its own first when the reader stood somewhere else), and its panel opens
+   * there in verse mode: where they came from, the ways on. The camera centres the verse in the
+   * canvas area at the same zoom (bringIn; at the canon's end it stands right of centre, still in
+   * the area); the thread stays chosen, gold, and the verse's threads light round it.
+   * @param {number} verse  where the thread goes
+   * @param {number} fromVerse  where it sets out (its other end)
+   * @param {{ arc: number, prophecy?: boolean }} via  the thread
+   */
+  const arriveAt = React.useCallback((verse, fromVerse, via) => {
+    const g = graph;
+    const found = g && camRef.current ? describe({ kind: 'verse', verse }) : null;
+    if (!found) return;
+    const there = refOfVerse(g, verse), from = refOfVerse(g, fromVerse);
+    if (journey) {
+      journey.push({ verse, label: there.label, open: { mode: 'verse', verse }, via },
+        { verse: fromVerse, label: from.label, open: { mode: 'verse', verse: fromVerse } });
+    }
+    // where the camera goes is the arrival's own: the foot, at the verse's middle, at the zoom it has;
+    // the way back to a zoom a choice left is the trail's now (its Back), so that offer goes
+    dropReturn();
+    commitFound(found, { frame: false, via });
+    bringIn(verse + 0.5, { always: true });
+    setAnnounce(followAnnouncement(there.label));
+  }, [graph, camRef, describe, journey, commitFound, bringIn, setAnnounce, dropReturn]);
+
+  /** Follow the chosen line to one of its ends (`info.far`: the end away from the reader, or the
+   * one the connection card's "Follow to <that end>" names): an arrival there (arriveAt). Corbin's
+   * brief, 2026-09-11: "every line followable end to end". */
   const followThread = React.useCallback((info) => {
     if (!camRef.current || !info || info.kind !== 'arc') return;
     const toFar = info.far === 'to';
-    const verse = toFar ? info.to : info.from;
-    const end = toFar ? info.b : info.a;
-    // the journey records the arrival, and where it set out from (the near foot), so Back comes
-    // home with this line open again (use-journey.js)
-    // (a prophecy pair the OpenBible data does not hold is reopened as the pair)
-    const open = info.index >= 0 ? { mode: 'connection', arc: info.index }
-      : { mode: 'connection', arc: info.prophecyIndex, prophecy: true };
-    if (journey) journey.push({ verse, label: end.label, open }, { verse: toFar ? info.from : info.to, label: (toFar ? info.a : info.b).label, open });
-    // the camera goes there through flyTo (bringIn: out from under the panel, clamped): to the
-    // foot, which stands at the verse's middle
-    bringIn(verse + 0.5, { always: true });
-    setDetail(Object.assign({}, info, { far: toFar ? 'from' : 'to' }));
-    setAnnounce(followAnnouncement(end.label));
-    schedule();
-  }, [camRef, bringIn, journey, schedule, setAnnounce]);
+    // a prophecy pair the OpenBible data does not hold is the thread by its pair
+    const via = info.index >= 0 ? { arc: info.index } : { arc: info.prophecyIndex, prophecy: true };
+    arriveAt(toFar ? info.to : info.from, toFar ? info.from : info.to, via);
+  }, [camRef, arriveAt]);
 
   /**
-   * Follow a listed thread (a MORE FROM or a verse-mode row) to its far end: the panel swaps to that
-   * connection, the camera goes to the end the row names at the zoom it has, and the connection's
-   * own Follow then names the end the reader came from (spec 4.6 "Follow").
+   * Follow a listed thread (a way on, a row by book, a group's or a fan's row) to the end the row
+   * names: an arrival there (arriveAt), set out from the row's near end.
    * @param {{ index: number, hereVerse: number, otherVerse: number }} row
    */
   const followRow = React.useCallback((row) => {
     const g = graph;
     if (!g || !row || !(row.index >= 0 && row.index < g.count)) return;
-    const info = describe({ kind: 'arc', hit: { index: row.index, from: g.from[row.index], to: g.to[row.index], votes: g.votes[row.index] } });
-    if (!info) return;
-    const far = info.to === row.otherVerse ? 'from' : 'to';
-    const here = far === 'from' ? info.a : info.b, there = far === 'from' ? info.b : info.a;
-    if (journey) {
-      // the arrival carries the row's own line (w4): left without one, the trail filled it from
-      // what was open at the push, the previous connection (setDetail has not rendered), so Back
-      // reopened the wrong line. The trail's start keeps what was open there, as it should.
-      if (!journey.stack.length) journey.push({ verse: row.hereVerse, label: here.label });
-      journey.push({ verse: row.otherVerse, label: there.label, open: { mode: 'connection', arc: row.index } });
-    }
-    focusRef.current = focusState({ arc: row.index });
-    setTip(null); setChoices(null); setListOpen(false);
-    setDetail(Object.assign({}, info, { far }));
-    bringIn(row.otherVerse + 0.5, { always: true });
-    setAnnounce(followAnnouncement(there.label));
-    schedule();
-  }, [graph, describe, journey, focusRef, bringIn, schedule, setAnnounce]);
+    arriveAt(row.otherVerse, row.hereVerse, { arc: row.index });
+  }, [graph, arriveAt]);
 
   /** "Zoom to <chapter>" (the chooser's last row, Q7): the panel closes and the chapter fills about
    * 70 % of the canvas (panel-model chapterFrame). @param {number} chapterIndex */

@@ -86,15 +86,15 @@ describe('prophecySet: the prophecy pairs as threads, on their arc\'s feet when 
 /* The prophecy class (GL item 4) joined the top set in the commit that draws it: every pair, always,
    first. The cases below were written for the set without it; rewritten to the same intent with the
    class leading (three pairs in the fixture). */
-describe('topSet: the prophecy class, then the lit, the hovered and the chosen, chosen last', () => {
+describe('topSet: the prophecy class, then the lit, the path, the hovered and the chosen, chosen last', () => {
   it('lays the kinds out in TOP_ORDER, each thread on the main pass\'s feet', () => {
     const g = graph();
     const fans = fansOf(g);
-    expect(TOP_ORDER).toEqual(['prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
+    expect(TOP_ORDER).toEqual(['prophecy', 'prophecyInRange', 'lit', 'path', 'hover', 'chosen']);
     const s = topSet(g, { lit: Int32Array.from([1, 2]), litKey: 'k', hoverArc: 3, focusArc: 0, focusProphecy: -1 });
     expect(s.ranges).toEqual([
       { kind: 'prophecy', first: 0, count: 3 }, { kind: 'prophecyInRange', first: 3, count: 0 }, { kind: 'lit', first: 3, count: 2 },
-      { kind: 'hover', first: 5, count: 1 }, { kind: 'chosen', first: 6, count: 1 },
+      { kind: 'path', first: 5, count: 0 }, { kind: 'hover', first: 5, count: 1 }, { kind: 'chosen', first: 6, count: 1 },
     ]);
     expect([...s.from]).toEqual([60, 120, 5, 10, 40, 60, 10]);
     expect([...s.to]).toEqual([70, 190, 180, 30, 90, 70, 150]);
@@ -114,7 +114,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
 
   it('a hover on the chosen line is not drawn twice; ids outside the graph are dropped', () => {
     const s = topSet(graph(), { lit: Int32Array.from([-1, 2, 99]), litKey: 'x', hoverArc: 0, focusArc: 0, focusProphecy: -1 });
-    expect(s.ranges.map((r) => r.count)).toEqual([3, 0, 1, 0, 1]);
+    expect(s.ranges.map((r) => r.count)).toEqual([3, 0, 1, 0, 0, 1]);
   });
 
   /* GL review 2026-10-18 (finding 2): 107 of the asset's pairs are no OpenBible arc, so hoverArc
@@ -126,7 +126,7 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect([s.from[3], s.to[3], s.fanA[3], s.fanB[3]]).toEqual([5, 180, 0, 0]);
     // the chosen pair under the pointer is drawn once, as the chosen
     const chosen = topSet(g, { lit: null, litKey: '', hoverArc: -1, hoverProphecy: 2, focusArc: -1, focusProphecy: 2 });
-    expect(chosen.ranges.map((r) => r.count)).toEqual([3, 0, 0, 0, 1]);
+    expect(chosen.ranges.map((r) => r.count)).toEqual([3, 0, 0, 0, 0, 1]);
     // an arc under the pointer is the hover; the pair beside it is not a second one
     const both = topSet(g, { lit: null, litKey: '', hoverArc: 2, hoverProphecy: 2, focusArc: -1, focusProphecy: -1 });
     expect(both.ranges.find((r) => r.kind === 'hover').count).toBe(1);
@@ -164,10 +164,27 @@ describe('topSet: the prophecy class, then the lit, the hovered and the chosen, 
     expect(a).not.toBe(none);
     expect(topSet(g, Object.assign({}, v), a)).toBe(a);
     expect(topSet(g, Object.assign({}, v, { hoverArc: 1 }), a)).not.toBe(a);
-    expect(topSetKey(v), 'lit | hover | chosen | chosen pair | hovered pair | range (no second range since w5)').toBe('|2|-1|-1|-1|');
+    expect(topSetKey(v), 'lit | hover | chosen | chosen pair | hovered pair | range (no second range since w5) | path').toBe('|2|-1|-1|-1||');
     // a graph with no prophecy and nothing asked about: no top pass at all
     const bare = Object.assign(graph(), { prophecy: [] });
     expect(topSet(bare, { lit: null, litKey: '', hoverArc: -1, focusArc: -1, focusProphecy: -1 }).count).toBe(0);
+  });
+
+  /* 2026-11-03: the reader's path (use-journey.js pathArcsOf) is its own kind, over the lit fan and
+     under the hover and the chosen line: each thread once, the chosen one drawn as the chosen, a
+     filtered thread not at all, and a new path a new set. */
+  it("the reader's path: its threads once each, the chosen one left to the chosen kind", () => {
+    const g = graph();
+    const v = { lit: null, litKey: '', path: Int32Array.from([1, 2, 1, 0, 99]), pathKey: 'p1', hoverArc: -1, focusArc: 0, focusProphecy: -1 };
+    const s = topSet(g, v);
+    const path = s.ranges.find((r) => r.kind === 'path');
+    expect(path.count, 'arcs 1 and 2; 0 is the chosen, 99 is no arc, the second 1 a repeat').toBe(2);
+    expect([s.from[path.first], s.to[path.first]]).toEqual([10, 30]);
+    expect(s.ranges.find((r) => r.kind === 'chosen').count).toBe(1);
+    // the same path is the same set; a new path (its key) is a new one
+    expect(topSet(g, Object.assign({}, v), s)).toBe(s);
+    expect(topSet(g, Object.assign({}, v, { path: Int32Array.from([3]), pathKey: 'p2' }), s)).not.toBe(s);
+    expect(topSetKey(v)).not.toBe(topSetKey(Object.assign({}, v, { pathKey: 'p2' })));
   });
 
   /* GL review 2026-10-18 (finding 3): the class receded all or nothing. The main pass keeps the

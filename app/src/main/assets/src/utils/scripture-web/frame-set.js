@@ -84,8 +84,9 @@ import {
   arcFrameTau, frameSegments, frameHeights, topSegmentsFor, CLIP_MARGIN, FLYOVER_MARGIN, TOP_SEGMENT_MIN,
 } from './geometry.js';
 
-/** The top pass's kinds, in drawing order: the chosen line last, on top. */
-export const TOP_ORDER = Object.freeze(['prophecy', 'prophecyInRange', 'lit', 'hover', 'chosen']);
+/** The top pass's kinds, in drawing order: the chosen line last, on top. The reader's path (the
+ * threads their trail came along, use-journey.js) over the lit fan, under the hover and the chosen. */
+export const TOP_ORDER = Object.freeze(['prophecy', 'prophecyInRange', 'lit', 'path', 'hover', 'chosen']);
 
 /** Compact mode (the build spec, mockups README.md "Compact mode"): the root at most this tall, CSS px. */
 export const COMPACT_HEIGHT_CSS = 500;
@@ -170,7 +171,7 @@ export function prophecySet(g) {
  * @typedef {{ kind: string, first: number, count: number }} TopRange
  * @typedef {{ key: string, count: number, from: Uint16Array, to: Uint16Array,
  *   fanA: Float32Array, fanB: Float32Array, ranges: TopRange[], pairs: ProphecySet,
- *   masks: ({ threads: Uint8Array, pairs: Uint8Array } | null), litKey: string,
+ *   masks: ({ threads: Uint8Array, pairs: Uint8Array } | null), litKey: string, pathKey: string,
  *   hoverArc: number, hoverProphecy: number, focusArc: number, focusProphecy: number,
  *   range: ReadonlyArray<number> }} TopSet
  *   pairs: the prophecySet it was built over (one per graph); masks: the filters it was built
@@ -180,15 +181,15 @@ export function prophecySet(g) {
  */
 
 /**
- * The key of the frame's top set: what is lit, hovered and chosen (the
+ * The key of the frame's top set: what is lit, on the reader's path, hovered and chosen (the
  * prophecy class is the graph's own, split only by the chosen range).
- * @param {{ litKey?: string, hoverArc?: number, hoverProphecy?: number, focusArc?: number, focusProphecy?: number,
- *   focusRange?: ArrayLike<number> | null }} v
+ * @param {{ litKey?: string, pathKey?: string, hoverArc?: number, hoverProphecy?: number, focusArc?: number,
+ *   focusProphecy?: number, focusRange?: ArrayLike<number> | null }} v
  */
 export function topSetKey(v) {
   const r = spanOf(v.focusRange);
   return (v.litKey || '') + '|' + askOf(v.hoverArc) + '|' + askOf(v.focusArc) + '|' + askOf(v.focusProphecy)
-    + '|' + askOf(v.hoverProphecy) + '|' + (r[0] <= r[1] ? r[0] + '-' + r[1] : '');
+    + '|' + askOf(v.hoverProphecy) + '|' + (r[0] <= r[1] ? r[0] + '-' + r[1] : '') + '|' + (v.pathKey || '');
 }
 
 /** One asked-about index as the key reads it: -1 for none. @param {number | null | undefined} x */
@@ -209,17 +210,18 @@ function spanOf(r) {
 /**
  * The top pass's threads for one frame, as instance data in TOP_ORDER: every
  * prophecy pair (those the chosen range keeps lit apart, as prophecyInRange),
- * the lit arcs, the hovered thread (an arc, or a prophecy pair that is none;
- * never the chosen one), the chosen thread. `prev` comes back as it is when
+ * the lit arcs, the reader's path (its threads but the chosen one), the hovered
+ * thread (an arc, or a prophecy pair that is none; never the chosen one), the
+ * chosen thread. `prev` comes back as it is when
  * nothing changed (the ask, field by field) and it was built over the same graph.
  *
  * The range law is the main pass's (web-renderer.js: inRange): a pair with a
  * foot in the chosen range keeps its ink; the rest of the class recedes with
  * a tap (GL review 2026-10-18).
  * @param {any} g  the decoded graph
- * @param {{ lit?: ArrayLike<number> | null, litKey?: string, hoverArc?: number, hoverProphecy?: number,
- *   focusArc?: number, focusProphecy?: number, focusRange?: ArrayLike<number> | null }} v  the frame's
- *   view args (webViewArgs)
+ * @param {{ lit?: ArrayLike<number> | null, litKey?: string, path?: ArrayLike<number> | null, pathKey?: string,
+ *   hoverArc?: number, hoverProphecy?: number, focusArc?: number, focusProphecy?: number,
+ *   focusRange?: ArrayLike<number> | null }} v  the frame's view args (webViewArgs)
  * @param {TopSet | null} [prev]
  * @returns {TopSet}
  */
@@ -231,15 +233,24 @@ export function topSet(g, v, prev) {
   const masks = filterMasksOf(g);
   // the same ask, field by field: a frame that changes nothing builds no key (E3)
   if (prev && prev.pairs === ps && prev.masks === masks && prev.litKey === (v.litKey || '')
-    && prev.hoverArc === askOf(v.hoverArc) && prev.focusArc === askOf(v.focusArc)
+    && prev.pathKey === (v.pathKey || '') && prev.hoverArc === askOf(v.hoverArc) && prev.focusArc === askOf(v.focusArc)
     && prev.focusProphecy === askOf(v.focusProphecy) && prev.hoverProphecy === askOf(v.hoverProphecy)
     && prev.range[0] === range[0] && prev.range[1] === range[1]) return prev;
   const key = topSetKey(v);
   const count = g && g.count > 0 ? g.count : 0;
   const isArc = (i) => i != null && i >= 0 && i < count && Number.isInteger(i);
-  const arcs = { lit: /** @type {number[]} */ ([]), hover: /** @type {number[]} */ ([]), chosen: /** @type {number[]} */ ([]) };
+  const arcs = { lit: /** @type {number[]} */ ([]), path: /** @type {number[]} */ ([]),
+    hover: /** @type {number[]} */ ([]), chosen: /** @type {number[]} */ ([]) };
   if (v.lit) {
     for (let k = 0; k < v.lit.length; k++) if (isArc(v.lit[k]) && (!masks || masks.threads[v.lit[k]])) arcs.lit.push(v.lit[k]);
+  }
+  // the reader's path: each thread once, the chosen one (the thread in) drawn as the chosen
+  if (v.path) {
+    const seen = new Set();
+    for (let k = 0; k < v.path.length; k++) {
+      const i = v.path[k];
+      if (isArc(i) && i !== v.focusArc && !seen.has(i) && (!masks || masks.threads[i])) { seen.add(i); arcs.path.push(i); }
+    }
   }
   if (isArc(v.hoverArc) && v.hoverArc !== v.focusArc) arcs.hover.push(/** @type {number} */ (v.hoverArc));
   if (isArc(v.focusArc)) arcs.chosen.push(/** @type {number} */ (v.focusArc));
@@ -261,7 +272,7 @@ export function topSet(g, v, prev) {
     pairsKept = 0;
     for (let k = 0; k < ps.count; k++) if (ps.twin[k] === k && masks.pairs[k]) pairsKept++;
   }
-  const total = pairsKept + arcs.lit.length + arcs.hover.length + arcs.chosen.length
+  const total = pairsKept + arcs.lit.length + arcs.path.length + arcs.hover.length + arcs.chosen.length
     + (hoverPair >= 0 ? 1 : 0) + (chosenPair >= 0 ? 1 : 0);
   const from = new Uint16Array(total), to = new Uint16Array(total);
   const fanA = new Float32Array(total), fanB = new Float32Array(total);
@@ -301,7 +312,7 @@ export function topSet(g, v, prev) {
     ranges.push({ kind, first, count: at - first });
   }
   return {
-    key, count: total, from, to, fanA, fanB, ranges, pairs: ps, masks, litKey: v.litKey || '',
+    key, count: total, from, to, fanA, fanB, ranges, pairs: ps, masks, litKey: v.litKey || '', pathKey: v.pathKey || '',
     hoverArc: askOf(v.hoverArc), hoverProphecy: askOf(v.hoverProphecy),
     focusArc: askOf(v.focusArc), focusProphecy: askOf(v.focusProphecy),
     range,

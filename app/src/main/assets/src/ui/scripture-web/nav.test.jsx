@@ -5,7 +5,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebCamera } from './use-web-camera.js';
 import { useWebSelection } from './use-web-selection.js';
-import { useJourney, pushed, JOURNEY_CAP } from './use-journey.js';
+import {
+  useJourney, arrive, moveTo, stopOf, chainTo, pathOf, branchesOf, visitedOf, pathArcsOf, trailForStorage, restoreTrail,
+  EMPTY_TRAIL, TRAIL_CAP,
+} from './use-journey.js';
 import { useFrameScheduler } from './use-frame-scheduler.js';
 import { fitPPV } from '../../utils/scripture-web/geometry.js';
 
@@ -256,34 +259,151 @@ describe('flyTo eases (A3): through the one frame loop, to exactly where the ins
   });
 });
 
-describe('the journey (A3): a breadcrumb trail whose top is where the reader is', () => {
-  const at = (verse) => ({ verse, label: 'v' + verse });
+/* THE TRAIL (2026-11-03, Corbin: "going from link to link to link, to back a couple to a different
+   link, and follow any number of paths through the bible"): a tree of stops. The pure rules first,
+   then the trail as the screen wires it. */
+describe('the trail: a tree of stops, where the reader is on it, and every way they have gone', () => {
+  const at = (verse, extra) => Object.assign({ verse, label: 'v' + verse }, extra);
   const verses = (s) => s.map((e) => e.verse);
+  const hereOf = (t) => stopOf(t, t.at);
+  const stopAt = (t, verse) => t.stops.find((s) => s.verse === verse);
+  /** A walk: each verse an arrival along a thread from the one before (arc ids from 1). */
+  const walk = (...vs) => {
+    let t = arrive(EMPTY_TRAIL, at(vs[1], { via: { arc: 1 } }), at(vs[0]));
+    for (let k = 2; k < vs.length; k++) t = arrive(t, at(vs[k], { via: { arc: k } }), at(vs[k - 1]));
+    return t;
+  };
 
-  it('the first arrival seeds where the reader set out from; the same place twice is one crumb', () => {
-    expect(verses(pushed([], at(100), at(5)))).toEqual([5, 100]);
-    expect(verses(pushed([], at(100)))).toEqual([100]);
-    expect(verses(pushed([], at(100), at(100))), 'set out from where it arrives: no crumb').toEqual([100]);
-    expect(verses(pushed([at(5), at(100)], at(100)))).toEqual([5, 100]);
-    expect(verses(pushed([at(5), at(100)], at(300), at(100)))).toEqual([5, 100, 300]);
+  it('the first arrival seeds where the reader set out from; the same place twice is one stop', () => {
+    expect(verses(chainTo(arrive(EMPTY_TRAIL, at(100), at(5)), 1))).toEqual([5, 100]);
+    const one = arrive(EMPTY_TRAIL, at(100));
+    expect(verses(one.stops)).toEqual([100]);
+    expect(verses(arrive(EMPTY_TRAIL, at(100), at(100)).stops), 'set out from where it arrives: no second stop').toEqual([100]);
+    const t = walk(5, 100);
+    const again = arrive(t, at(100, { open: { mode: 'verse', verse: 100 } }));
+    expect(verses(again.stops)).toEqual([5, 100]);
+    expect(hereOf(again).open, 'the stop keeps the panel the arrival names').toEqual({ mode: 'verse', verse: 100 });
   });
-  it('walking back the way it came steps back; home again empties the trail', () => {
-    expect(verses(pushed([at(5), at(100), at(300)], at(100)))).toEqual([5, 100]);
-    expect(verses(pushed([at(5), at(100)], at(5)))).toEqual([]);
+
+  it('walking back the way it came steps back, and the way ahead stays', () => {
+    let t = walk(5, 100, 300);
+    t = arrive(t, at(100));
+    expect(hereOf(t).verse).toBe(100);
+    expect(verses(pathOf(t).stops), 'the bar still holds the way ahead').toEqual([5, 100, 300]);
+    expect(pathOf(t).here).toBe(1);
+    t = arrive(t, at(5));
+    expect(hereOf(t).verse, 'home: where the trail set out').toBe(5);
+    expect(t.stops, 'nothing is lost by going home').toHaveLength(3);
   });
-  it('keeps the last 24', () => {
-    let s = [];
-    for (let i = 0; i < 40; i++) s = pushed(s, at(i * 10));
-    expect(s).toHaveLength(JOURNEY_CAP);
-    expect(s[s.length - 1].verse).toBe(390);
+
+  it('back a couple, then another way: a branch beside the old path, and every path stays', () => {
+    let t = walk(5, 100, 300, 400);
+    t = moveTo(t, stopAt(t, 100).id);
+    expect(verses(pathOf(t).stops), 'after going back, the way ahead is the way gone').toEqual([5, 100, 300, 400]);
+    t = arrive(t, at(700, { via: { arc: 9 } }), at(100));
+    expect(verses(chainTo(t, t.at))).toEqual([5, 100, 700]);
+    expect(verses(pathOf(t).stops), 'the bar follows the new way').toEqual([5, 100, 700]);
+    const b = branchesOf(t);
+    expect(b.map((x) => verses(x.stops))).toEqual([[5, 100, 300, 400], [700]]);
+    expect(b[1].from.verse, 'the new path leaves from 100').toBe(100);
+    expect(b.map((x) => x.current)).toEqual([false, true]);
+    // the old path's end, gone to again: the way on from 100 points at it once more
+    t = moveTo(t, stopAt(t, 400).id);
+    expect(verses(pathOf(t).stops)).toEqual([5, 100, 300, 400]);
+    expect(stopAt(t, 100).last).toBe(stopAt(t, 300).id);
+    expect(branchesOf(t).map((x) => x.current)).toEqual([true, false]);
+    // a third way from where the trail set out
+    t = moveTo(t, stopAt(t, 5).id);
+    t = arrive(t, at(900, { via: { arc: 11 } }), at(5));
+    expect(branchesOf(t).map((x) => verses(x.stops))).toEqual([[5, 100, 300, 400], [700], [900]]);
+    expect(branchesOf(t)[2].from.verse).toBe(5);
+    expect([...visitedOf(t)].sort((x, y) => x - y)).toEqual([5, 100, 300, 400, 700, 900]);
   });
+
+  it('moving to where the reader already is, on the way they already face, is the same trail', () => {
+    const t = walk(5, 100, 300);
+    expect(moveTo(t, t.at)).toBe(t);
+    expect(moveTo(t, 999), 'no such stop').toBe(t);
+  });
+
+  it('arriving where the reader went on to before is that stop again, not a second one', () => {
+    let t = walk(5, 100, 300);
+    t = moveTo(t, stopAt(t, 100).id);
+    t = arrive(t, at(300, { via: { arc: 2 } }), at(100));
+    expect(t.stops).toHaveLength(3);
+    expect(hereOf(t).verse).toBe(300);
+  });
+
+  it('a thread from somewhere else sets out from its own near end, a stop of its own first', () => {
+    const t = walk(5, 100);
+    const far = arrive(t, at(900, { via: { arc: 7 } }), at(800));
+    expect(verses(chainTo(far, far.at))).toEqual([5, 100, 800, 900]);
+    expect(stopAt(far, 800).via, 'the near end is a jump').toBeUndefined();
+    expect(hereOf(far).via).toEqual({ arc: 7 });
+    // a jump (no thread: the go-to, a book's name) never puts its origin in a trail it joins
+    expect(verses(chainTo(arrive(t, at(900), at(800)), 2))).toEqual([5, 100, 900]);
+  });
+
+  it(`keeps at most ${TRAIL_CAP} stops: the oldest branch ends go first, never the way to where the reader is`, () => {
+    let t = arrive(EMPTY_TRAIL, at(2, { via: { arc: 1 } }), at(1));
+    for (let v = 3; v <= 100; v++) t = arrive(t, at(v, { via: { arc: v } }), at(v - 1));
+    t = moveTo(t, stopAt(t, 50).id);
+    for (let v = 1001; v <= 1080; v++) t = arrive(t, at(v, { via: { arc: v } }), at(v === 1001 ? 50 : v - 1));
+    expect(t.stops).toHaveLength(TRAIL_CAP);
+    const path = verses(pathOf(t).stops);
+    expect(path.slice(0, 50)).toEqual(Array.from({ length: 50 }, (_, k) => k + 1));
+    expect(path.slice(50)).toEqual(Array.from({ length: 80 }, (_, k) => k + 1001));
+    expect(Math.max(...verses(t.stops).filter((v) => v < 1000)), 'the old branch lost its far end first').toBe(80);
+  });
+
   it('ignores what is not a place', () => {
-    const s = [at(5), at(100)];
-    expect(pushed(s, /** @type {any} */ (null))).toBe(s);
-    expect(pushed(s, /** @type {any} */ ({ verse: NaN, label: '' }))).toBe(s);
+    const t = walk(5, 100);
+    expect(arrive(t, /** @type {any} */ (null))).toBe(t);
+    expect(arrive(t, /** @type {any} */ ({ verse: NaN, label: '' }))).toBe(t);
   });
 
-  it('Follow leaves a trail home: Back flies there, eased, and the line opens again from that end', async () => {
+  it("the web's path: the threads the bar's path came along, a prophecy pair left to its own class", () => {
+    let t = walk(5, 100, 300);
+    expect(pathArcsOf(t)).toEqual([1, 2]);
+    t = moveTo(t, stopAt(t, 100).id);
+    expect(pathArcsOf(t), 'the way ahead is still on the path').toEqual([1, 2]);
+    t = arrive(t, at(700, { via: { arc: 5, prophecy: true } }), at(100));
+    expect(pathArcsOf(t)).toEqual([1]);
+  });
+
+  it('kept and back (the resume point): every stop, its thread, its panel and Forward\'s way; a broken one is nothing', () => {
+    let t = walk(5, 100, 300);
+    t = moveTo(t, stopAt(t, 100).id);
+    t = arrive(t, at(700, { via: { arc: 9 }, open: { mode: 'verse', verse: 700, lit: Int32Array.from([1, 2]) } }), at(100));
+    const kept = JSON.parse(JSON.stringify(trailForStorage(t)));
+    expect(kept.stops.find((s) => s.verse === 700).open, 'the lit list is not kept').toEqual({ mode: 'verse', verse: 700 });
+    const back = /** @type {any} */ (restoreTrail(kept, TOTAL));
+    expect(verses(back.stops)).toEqual(verses(t.stops));
+    expect(back.at).toBe(t.at);
+    expect(branchesOf(back).map((x) => verses(x.stops))).toEqual([[5, 100, 300], [700]]);
+    expect(stopAt(back, 100).last, "Forward's way from 100 is the newest").toBe(stopAt(back, 700).id);
+    expect(hereOf(back).via).toEqual({ arc: 9 });
+    // a new stop after a restore takes a new id
+    const on = arrive(back, at(800, { via: { arc: 4 } }), at(700));
+    expect(new Set(on.stops.map((s) => s.id)).size).toBe(on.stops.length);
+    expect(restoreTrail(null)).toBeNull();
+    expect(restoreTrail({ v: 2, stops: kept.stops })).toBeNull();
+    expect(restoreTrail({ v: 1, at: 0, stops: [{ id: 0, verse: 5, label: 'a', parent: 3 }] }), 'a parent it never held').toBeNull();
+    expect(restoreTrail(kept, 200), 'a verse past the canon').toBeNull();
+    expect(trailForStorage(EMPTY_TRAIL)).toBeNull();
+  });
+
+  it('a door in sets out a new path beside the kept ones (fresh): the reader stands on none of them', () => {
+    const kept = trailForStorage(walk(5, 100, 300));
+    const { result } = renderHook(() => useJourney({ initial: kept, fresh: true }));
+    expect(result.current.here).toBeNull();
+    expect(result.current.trail.stops).toHaveLength(3);
+    act(() => { result.current.push(at(2000, { via: { arc: 6 } }), at(1990)); });
+    expect(verses(result.current.stack)).toEqual([1990, 2000]);
+    expect(branchesOf(result.current.trail).map((x) => verses(x.stops))).toEqual([[5, 100, 300], [1990, 2000]]);
+  });
+
+  it('Follow arrives at the far end as a stop: its verse opens with its thread chosen; Back flies home to the verse it came from', async () => {
     const { get } = mount({ loop: true });
     get().journey.connect({ openPanel: get().sel.openPanel, closePanel: get().sel.closePanel }); // as useGoTo does
     act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
@@ -293,34 +413,44 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     // centred on the foot, at its verse's middle (the panel stream's Follow)
     expect(get().cam.camRef.current.x).toBeCloseTo(100.5, 6);
     expect(verses(get().journey.stack), 'the near foot, then the far').toEqual([20100, 100]);
-    expect(get().sel.detail.far).toBe('to');
+    expect(get().sel.detail, 'the arrival is the verse, in verse mode').toMatchObject({ kind: 'verse', verse: 100 });
+    expect(get().cam.focusRef.current.arc, 'the thread in stays chosen').toBe(0);
+    expect(get().journey.here.via).toEqual({ arc: 0 });
     let to = null;
     act(() => { to = get().journey.back(); });
     expect(to).toMatchObject({ verse: 20100 });
-    expect(get().journey.stack, 'home: nothing further back').toEqual([]);
+    expect(verses(get().journey.stack)).toEqual([20100]);
+    expect(verses(get().journey.path.stops), 'the way ahead stays in the bar').toEqual([20100, 100]);
     tick();
     expect(get().cam.camRef.current.x, 'on its way, not jumped').not.toBeCloseTo(20100.5, 0);
     await act(async () => { settle(); await Promise.resolve(); await Promise.resolve(); });
     // home to the foot, at its verse's middle, as Follow lands
     expect(get().cam.camRef.current.x).toBeCloseTo(20100.5, 6);
-    expect(get().sel.detail, 'the line is open again').toMatchObject({ kind: 'arc', index: 0 });
-    expect(get().sel.detail.far, 'and its Follow names the end it now faces away from').toBe('from');
-    expect(get().journey.back()).toBeNull();
+    expect(get().sel.detail, 'the verse it set out from is open again').toMatchObject({ kind: 'verse', verse: 20100 });
+    expect(get().journey.back(), 'home: nothing further back').toBeNull();
+    // Forward walks on the way it went
+    let on = null;
+    act(() => { on = get().journey.forward(); });
+    expect(on).toMatchObject({ verse: 100 });
+    await act(async () => { settle(); await Promise.resolve(); await Promise.resolve(); });
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 100 });
+    expect(get().cam.focusRef.current.arc, 'and its thread in is chosen again').toBe(0);
   });
 
   it('Follow back along the same line is a step back, not a longer trail', () => {
     const { get } = mount();
     act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
-    // opening the line framed all 20,000 verses of it (the panel stream's frameFound), a zoom at
-    // which the camera's clamp holds it off both feet; the reader zooms back in to walk it
     get().cam.camRef.current = { x: 15551, ppv: 8, total: TOTAL, y: 0 };
     act(() => { get().sel.followThread(get().sel.detail); });
-    act(() => { get().sel.followThread(get().sel.detail); });
-    expect(get().cam.camRef.current.x).toBeCloseTo(20100.5, 6);
-    expect(get().journey.stack).toEqual([]);
+    expect(verses(get().journey.stack)).toEqual([20100, 100]);
+    // the same line again, from the end the reader now stands on, followed back
+    act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
+    act(() => { get().sel.followThread(Object.assign({}, get().sel.detail, { far: 'to' })); });
+    expect(verses(get().journey.stack)).toEqual([20100]);
+    expect(get().journey.trail.stops).toHaveLength(2);
   });
 
-  it('three hops: Back walks them one by one, each a fly; an entry with open null closes the panel', async () => {
+  it('three hops: Back walks them one by one, each a fly; a stop with open null closes the panel', async () => {
     const { get } = mount();
     const closed = vi.fn();
     get().journey.connect({ openPanel: get().sel.openPanel, closePanel: closed });
@@ -331,16 +461,16 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     expect(verses(get().journey.stack)).toEqual([15551, 9000, 300]);
     act(() => { get().journey.back(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    // each crumb's verse at its middle, where a foot stands
+    // each stop's verse at its middle, where a foot stands
     expect(get().cam.camRef.current.x).toBe(9000.5);
     expect(closed).toHaveBeenCalledTimes(1);
     act(() => { get().journey.back(); });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(get().cam.camRef.current.x).toBe(15551.5);
-    expect(get().journey.stack).toEqual([]);
+    expect(verses(get().journey.stack)).toEqual([15551]);
   });
 
-  it('a Back whose fly is cut short gives the crumb back; one the trail moved on from does not', async () => {
+  it('a Back whose fly is cut short puts the reader back; one the trail moved on from does not', async () => {
     let land = null;
     const flyTo = vi.fn(() => new Promise((r) => { land = r; }));
     const { result } = renderHook(() => useJourney({ flyTo }));
@@ -354,41 +484,48 @@ describe('the journey (A3): a breadcrumb trail whose top is where the reader is'
     const first = land;
     act(() => { result.current.back(); });
     await act(async () => { first(false); await Promise.resolve(); await Promise.resolve(); });
-    expect(result.current.stack, 'a second Back went on: the first fly gives nothing back').toEqual([]);
+    expect(verses(result.current.stack), 'a second Back went on: the first fly gives nothing back').toEqual([5]);
   });
 
-  // night review 11-01 (web-panel.jsx backTo): a crumb is one Back a step, called in a loop in one
-  // event. The trail is popped from its ref, so each Back sees the last; each fly stops the one
-  // before (flyTo's flyStopRef), and only the crumb's own panel opens on landing
-  it("a crumb's Backs in one event: the trail ends at the crumb, and the crumb's panel is what opens", async () => {
+  it("a crumb is one flight to its stop, and the stop's own panel is what opens", async () => {
     const trail = (j) => {
       j.push({ verse: 200, label: 'b', open: { mode: 'verse', verse: 200 } }, { verse: 100, label: 'a', open: { mode: 'verse', verse: 100 } });
       j.push({ verse: 300, label: 'c', open: { mode: 'verse', verse: 300 } });
       j.push({ verse: 400, label: 'd', open: { mode: 'verse', verse: 400 } });
     };
-    // animated: a new fly stops the running one, which resolves false
-    let stop = null;
-    const flying = vi.fn(() => new Promise((r) => { if (stop) stop(false); stop = r; }));
+    const flying = vi.fn(() => Promise.resolve(true));
     const one = renderHook(() => useJourney({ flyTo: flying }));
-    const openA = vi.fn(() => true);
-    one.result.current.connect({ openPanel: openA });
+    const open = vi.fn(() => true);
+    one.result.current.connect({ openPanel: open });
     act(() => { trail(one.result.current); });
     expect(verses(one.result.current.stack)).toEqual([100, 200, 300, 400]);
-    act(() => { for (let k = 3; k > 1; k--) one.result.current.back(); });   // the crumb at 200
-    expect(verses(one.result.current.stack)).toEqual([100, 200]);
-    await act(async () => { stop(true); await Promise.resolve(); await Promise.resolve(); });
-    expect(verses(one.result.current.stack), 'the stopped fly gave nothing back: the trail moved on').toEqual([100, 200]);
-    expect(openA).toHaveBeenCalledTimes(1);
-    expect(openA).toHaveBeenLastCalledWith({ mode: 'verse', verse: 200 });
-    // instant (reduced motion): every fly lands, in the order asked, so the crumb's own opens last
-    const two = renderHook(() => useJourney({ flyTo: vi.fn(() => Promise.resolve(true)) }));
-    const openB = vi.fn(() => true);
-    two.result.current.connect({ openPanel: openB });
-    act(() => { trail(two.result.current); });
-    act(() => { for (let k = 3; k > 0; k--) two.result.current.back(); });   // home, at 100
+    const two = one.result.current.trail.stops.find((s) => s.verse === 200);
+    act(() => { one.result.current.go(two.id); });
+    expect(flying, 'one flight, straight there').toHaveBeenCalledTimes(1);
+    expect(flying).toHaveBeenLastCalledWith({ x: 200.5 });
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
-    expect(two.result.current.stack).toEqual([]);
-    expect(openB).toHaveBeenLastCalledWith({ mode: 'verse', verse: 100 });
+    expect(verses(one.result.current.stack)).toEqual([100, 200]);
+    expect(verses(one.result.current.path.stops), 'the way on stays ahead in the bar').toEqual([100, 200, 300, 400]);
+    expect(open).toHaveBeenLastCalledWith({ mode: 'verse', verse: 200 });
+  });
+
+  it('away from the stop (a line tapped on the way, the panel closed), Back goes back to it first', async () => {
+    const flying = vi.fn(() => Promise.resolve(true));
+    const { result } = renderHook(() => useJourney({ flyTo: flying }));
+    const open = vi.fn(() => true);
+    let showing = true;
+    result.current.connect({ openPanel: open, isAt: () => showing });
+    act(() => { result.current.push({ verse: 300, label: 'b', open: { mode: 'verse', verse: 300 }, via: { arc: 4 } }, { verse: 5, label: 'a', open: { mode: 'verse', verse: 5 } }); });
+    showing = false;
+    let to = null;
+    act(() => { to = result.current.back(); });
+    expect(to, 'the stop the reader is at').toMatchObject({ verse: 300 });
+    expect(verses(result.current.stack), 'the trail does not move').toEqual([5, 300]);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(open, 'its panel opens again, its thread in named').toHaveBeenLastCalledWith({ mode: 'verse', verse: 300, via: { arc: 4 } });
+    showing = true;
+    act(() => { to = result.current.back(); });
+    expect(to).toMatchObject({ verse: 5 });
   });
 });
 

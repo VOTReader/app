@@ -29,7 +29,7 @@ import { railPosition } from '../../utils/scripture-web/personal-graph.js';
 export const WEB_KEYS_HELP = 'Drag to move through scripture; pinch or scroll to zoom. '
   + 'The arrow keys move, the plus and minus keys zoom, and 0 resets the view. '
   + 'Enter or Space selects the line nearest the centre; [ and ] step through the lines at the chosen verse. '
-  + 'Slash or Control+K opens Go to, for a book, chapter or verse; Backspace goes back to where you were before. '
+  + 'Slash or Control+K opens Go to, for a book, chapter or verse; Backspace goes back to where you were before, and Shift+Backspace forward again. '
   + 'Escape closes what is on top, then leaves the web. Nearby opens a keyboard-friendly list.';
 
 /** My Web's #sw-a11y-help (w4 quality hunt: it was the canon's, which promised Enter, [ ] and Go
@@ -57,14 +57,18 @@ export function useWebKeys({
   graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
   camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
   resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor, filtersOpen, closeFilters,
-  returnShown, returnBack,
+  returnShown, returnBack, trailBack,
 }) {
   const goToOpen = !!(goTo && goTo.isOpen);
   /** Close whatever is on top of the web, one layer a call: the guide, then
    * the empty-web notice, then the panels and the hover chip together.
-   * Escape and Android Back both come here (v08-03), so they agree.
+   * Escape and Android Back both come here (v08-03), so they agree; but on a
+   * trail stop with a stop before it, the system Back (`how` 'back': Android's,
+   * the browser's) steps back along the trail as a browser goes back a page
+   * (2026-11-03: "back a couple to a different link"), where Escape closes.
+   * @param {string} [how]  'back' | 'escape' (use-modal-registry.js)
    * @returns {boolean} whether there was anything to close */
-  const closeTopOverlay = React.useCallback(() => {
+  const closeTopOverlay = React.useCallback((how = '') => {
     // the go-to box is the newest layer, over the panel it may have opened
     if (goToOpen) { goTo.close(); return true; }
     // the Filters sheet (web-filters.jsx), over the web and its panel
@@ -73,9 +77,10 @@ export function useWebKeys({
     if (returnShown) { returnBack(); return true; }
     if (guideOpen) { closeGuide(); return true; }
     if (emptyShown) { dismissEmpty(); return true; }
+    if (how === 'back' && typeof trailBack === 'function' && trailBack()) return true;
     if (listOpen || choices || detail || tip) { closeCards(); return true; }
     return false;
-  }, [goToOpen, goTo, filtersOpen, closeFilters, returnShown, returnBack, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards]);
+  }, [goToOpen, goTo, filtersOpen, closeFilters, returnShown, returnBack, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards, trailBack]);
   // Android Back and the app's Escape dispatcher close the top overlay first
   // instead of leaving the web (the hover chip alone is not worth a Back).
   useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
@@ -118,7 +123,12 @@ export function useWebKeys({
     if (goTo && !e.ctrlKey && !e.metaKey && !e.altKey) {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); goTo.selectCentre(); return; }
       if (e.key === '[' || e.key === ']') { e.preventDefault(); goTo.step(e.key === ']' ? 1 : -1); return; }
-      if (e.key === 'Backspace' && goTo.back) { e.preventDefault(); goTo.back(); return; }
+      if (e.key === 'Backspace' && goTo.back) {
+        e.preventDefault();
+        // Shift+Backspace: on along the trail, the way the reader came back (goTo.forward)
+        if (e.shiftKey) { if (goTo.forward) goTo.forward(); } else goTo.back();
+        return;
+      }
     }
     // a key held with Ctrl, Cmd or Alt is the browser's: Ctrl+= / Ctrl+- / Ctrl+0 zoom the page and
     // Alt+Left goes back (s26.2: the web took them as its own zoom, reset and pan)

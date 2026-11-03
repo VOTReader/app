@@ -78,6 +78,13 @@ const TABLE = {
   // near glow (NEAR_GLOW_CSS): at 1.5 the go-to's gold lost its lead over the glowing local arcs
   // round it (gold lead 1.44 -> 0.92 on PC); 2 on the phone, where 2.5 read heavy
   lit: { hex: '#E8BE6E', alpha: 0.85, width: 2.5, widthCompact: 2 },
+  // the reader's path (2026-11-03, mockup r1-phone): the threads their trail came along, a gold chain
+  // the way to where they are and on. The chosen line's gold on a keyline of its own, a step thinner:
+  // drawn over the lit fan (the ways on from the verse), under the hover and the chosen line (the
+  // thread in), so the chain reads through the gold of the verse's own threads
+  path: { hex: '#F2D38A', alpha: 0.95, width: 2, widthCompact: 1.75 },
+  pathHalo: { hex: '#E0A84E', alpha: 0.16, width: 8 },           // a softer glow than the chosen's: the chain reads lit
+  pathKey: { hex: '#000000', alpha: 0.50, width: 4, widthCompact: 3 },
 
   // ── deep zoom wayfinding (§4.3) ─────────────────────────────────────────
   chapterNumeral: { hex: '#B7BFC1', alpha: 1 },                  // 28 / 20 px

@@ -56,13 +56,13 @@ import { useWebGraph, useChromeTokens, useWebRenderer, walkOn } from '../scriptu
 import { placeOfRef } from '../../utils/scripture-web/ref-parse.js';
 import { parseReference } from '../../search/ref-parser.js';
 import { usePersonalWeb } from '../scripture-web/use-personal-web.js';
-import { useWebSelection } from '../scripture-web/use-web-selection.js';
+import { useWebSelection, showsStop } from '../scripture-web/use-web-selection.js';
 import { usePanelLayout, usePanelInset, collapsedFor, stackedFor } from '../scripture-web/use-panel-layout.js';
 import { WebPanel } from '../scripture-web/web-panel.jsx';
 import { useWebKeys, WEB_KEYS_HELP, MY_WEB_KEYS_HELP } from '../scripture-web/use-web-keys.js';
-import { useJourney } from '../scripture-web/use-journey.js';
+import { useJourney, pathArcsOf } from '../scripture-web/use-journey.js';
 import { useGoTo } from '../scripture-web/goto.jsx';
-import { focusState } from '../../utils/scripture-web/focus-state.js';
+import { focusState, litKeyOf } from '../../utils/scripture-web/focus-state.js';
 /** @typedef {import('../../utils/scripture-web/decode.js').Density} Density */
 import { attachWebGestures } from '../scripture-web/gestures.js';
 import { WebFallbackList } from '../scripture-web/WebFallbackList.jsx';
@@ -110,14 +110,24 @@ export function readSavedSpot(total) {
     if (!s || !s.cam || !(s.cam.ppv > 0) || !Number.isFinite(s.cam.x)) return null;
     if (total && s.cam.total !== total) return null;
     return { mode: 'canonical', cam: { x: s.cam.x, ppv: s.cam.ppv, y: s.cam.y > 0 ? s.cam.y : 0, total: s.cam.total },
-      focus: focusState(), detail: null, filters: s.filters || null };
+      focus: focusState(), detail: null, filters: s.filters || null, trail: s.trail || null };
   } catch (_e) { return null; }
 }
-/** Keep the canon's camera and filters for the next visit. @param {any} cam @param {any} filters */
-export function saveSpot(cam, filters) {
+/** The saved spot's trail alone (a door in keeps the reader's paths, use-journey.js fresh). */
+function readSavedTrail() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SPOT_KEY) || 'null');
+    return (s && s.trail) || null;
+  } catch (_e) { return null; }
+}
+/** Keep the canon's camera and filters for the next visit, and the reader's paths through the web
+ * (use-journey.js trailForStorage, 2026-11-03), this device's alone like the rest of the spot.
+ * @param {any} cam @param {any} filters @param {any} [trail] */
+export function saveSpot(cam, filters, trail) {
   if (!cam || !(cam.ppv > 0)) return;
   try {
-    localStorage.setItem(SPOT_KEY, JSON.stringify({ cam: { x: cam.x, ppv: cam.ppv, y: cam.y > 0 ? cam.y : 0, total: cam.total }, filters }));
+    localStorage.setItem(SPOT_KEY, JSON.stringify({ cam: { x: cam.x, ppv: cam.ppv, y: cam.y > 0 ? cam.y : 0, total: cam.total }, filters,
+      trail: trail || null }));
   } catch (_e) { /* private mode: nothing kept, the web opens whole */ }
 }
 function readChromeHidden() {
@@ -231,7 +241,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // hover) is a LIGHT touch: it brightens the thread under the pointer and
   // names it, but never dims the rest of the web. Only a tap focuses.
   const {
-    camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
+    camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef, pathRef,
     frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt, slackFor, settleInset,
   } = useWebCamera({ graph, density, modeRef, schedule, topbarRef, animate, onFrame });
   // the walks' camera door (a driven browser only, walkOn): a reference's first verse, the camera,
@@ -306,9 +316,21 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // and stays up (w3 item 31)
   const listShown = noWebGL && mode !== 'personal';
 
-  // where the reader has been (use-journey.js): the navigation stream pushes,
-  // the panel shows it and its Back
-  const journey = useJourney({ flyTo });
+  // where the reader has been (use-journey.js): the navigation stream records each arrival, the
+  // panel shows the trail and its paths; a resume point (back from the reader) brings it with it
+  const keptTrail = React.useRef(/** @type {any} */ (undefined));
+  if (keptTrail.current === undefined) keptTrail.current = start ? readSavedTrail() : (resumeRef.current && resumeRef.current.trail) || null;
+  const journey = useJourney({ flyTo, initial: keptTrail.current, fresh: !!start });
+  // the reader's path on the web: the threads the trail came along, drawn in the path's ink over the
+  // field (the canon's only: My Web's rails draw no OpenBible thread)
+  const pathIds = React.useMemo(() => Int32Array.from(pathArcsOf(journey.trail)), [journey.trail]);
+  React.useEffect(() => {
+    const ids = mode === 'personal' || !pathIds.length ? null : pathIds;
+    const key = ids ? litKeyOf(ids) : '';
+    if (pathRef.current.key === key) return;
+    pathRef.current = { ids, key };
+    schedule();
+  }, [pathIds, mode, pathRef, schedule]);
 
   // where the docked panel sits (use-panel-layout.js): the root's own size as a layout, and what
   // the panel will cover once open (insetFor), so a choice is framed before the panel renders
@@ -336,8 +358,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // is put away, which on a phone may be the last the page hears)
   const spotRef = React.useRef(/** @type {any} */ (null));
   spotRef.current = web.filters;
+  const snapRef = React.useRef(journey.snapshot);
+  snapRef.current = journey.snapshot;
   React.useEffect(() => {
-    const keep = () => { if (modeRef.current !== 'personal' && graph && camRef.current) saveSpot(camRef.current, spotRef.current); };
+    const keep = () => {
+      if (modeRef.current !== 'personal' && graph && camRef.current) saveSpot(camRef.current, spotRef.current, snapRef.current());
+    };
     const hidden = () => { if (document.visibilityState === 'hidden') keep(); };
     document.addEventListener('visibilitychange', hidden);
     return () => { document.removeEventListener('visibilitychange', hidden); keep(); };
@@ -347,6 +373,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // records what it covers and the controls right-align to its edge; under 1000 px of canvas
   // area they collapse to the go-to and a "more" menu (spec section 3)
   const panelOpen = listOpen || !!choices || !!detail;
+  // the trail pill: a path to come back to, the panel closed, nothing else asking the corner
+  const trailPill = mode !== 'personal' && graph && !panelOpen && !returnTo && journey.here && journey.trail.stops.length >= 2
+    ? journey.here : null;
   usePanelInset({ layout, open: panelOpen, panelInsetRef, wrapRef, schedule, onShrink: settleInset });
   // the first visit's how-to-read card gives way to the first card the reader opens (the dead-control
   // hunt, 2026-10-22: it lay over a verse card opened from Go to, and the tap meant for "Open in
@@ -430,9 +459,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (camVRef.current) resetRail('top');
     flyTo({ x0: 0, x1: cam.total, y: 0 }, { insetRight: 0 });
     focusRef.current = focusState();
-    journey.clear();
+    // the reader's paths stay (2026-11-03): Reset is the view's; the trail pill is the way back to
+    // where they were, and the paths view's Clear the way to forget them
     setDetail(null); setChoices(null); setListOpen(false); setTip(null); schedule();
-  }, [camRef, flyTo, camVRef, resetRail, focusRef, journey, schedule, setChoices, setDetail, setListOpen, setTip]);
+  }, [camRef, flyTo, camVRef, resetRail, focusRef, schedule, setChoices, setDetail, setListOpen, setTip]);
 
   const toggleChrome = React.useCallback(() => {
     const next = !chromeHidden;
@@ -472,10 +502,10 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     }
     if (hintTimer.current) { clearTimeout(hintTimer.current); hintTimer.current = 0; }
     setHint('');
+    // the trail is the canon's: it waits, unseen, while My Web is up
     closeCards();
-    journey.clear();
     setMode(next);
-  }, [closeCards, journey, cancelFly, camRef, modeRef, viewRef, zoomCapFor, schedule]);
+  }, [closeCards, cancelFly, camRef, modeRef, viewRef, zoomCapFor, schedule]);
 
   const { setSheetOpen } = web;
   const closeFilters = React.useCallback(() => setSheetOpen(false), [setSheetOpen]);
@@ -484,8 +514,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // closes a press, then the keys pan, climb, zoom and reset
   // a key that moves the camera takes it, as a gesture does: the way back goes with it
   const takeCamera = React.useCallback(() => { cancelFly(); dropReturn(); }, [cancelFly, dropReturn]);
+  // the system Back on a trail stop with a stop before it: a step back along the trail
+  const trailBack = React.useCallback(() => {
+    const h = journey.here;
+    if (mode === 'personal' || !h || !(h.parent >= 0) || !showsStop(h, detail, choices, listOpen)) return false;
+    return !!journey.back();
+  }, [journey, mode, detail, choices, listOpen]);
   const { onKeyDown } = useWebKeys({
-    filtersOpen: web.canon && web.sheetOpen, closeFilters, returnShown: !!returnTo, returnBack,
+    filtersOpen: web.canon && web.sheetOpen, closeFilters, returnShown: !!returnTo, returnBack, trailBack,
     graph, guideOpen: guideShown, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
     resetView, onBack, dropHover, setAnnounce, schedule, cancelFly: takeCamera, goTo, slackFor,
@@ -498,9 +534,9 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     // jump from here comes back HERE.
     const cam = camRef.current;
     resumeWeb = cam ? { mode: modeRef.current, cam: Object.assign({}, cam), focus: Object.assign({}, focusRef.current), detail,
-      filters: web.filters } : null;
+      filters: web.filters, trail: journey.snapshot() } : null;
     navigateToLink(endpoint, { sourceLetterTitle: 'The Scripture Web' });
-  }, [navigateToLink, camRef, focusRef, modeRef, detail, web.filters]);
+  }, [navigateToLink, camRef, focusRef, modeRef, detail, web.filters, journey]);
 
   // ── render ──────────────────────────────────────────────────────────────
   if (loadError) return loadErrorPanel(loadError, retryLoad, onBack, !!(layout && layout.compact));
@@ -655,6 +691,17 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           aria-label={'Back to ' + returnTo.label + ', zoomed in where you were'}>
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
           Back to {returnTo.label}
+        </button>
+      ) : null}
+      {/* THE TRAIL PILL (2026-11-03): with the panel closed (a tap on the sky, Reset, the X), the
+          way back to the stop the reader was at on their path; it opens there again */}
+      {trailPill ? (
+        <button type="button" className="sw-btn sw-trail-pill" onClick={() => journey.go(trailPill.id)}
+          aria-label={'Back to your path at ' + trailPill.label}>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
+            <circle cx="5" cy="17" r="2" /><circle cx="19" cy="17" r="2" /><path d="M7 17c1-7 9-7 10 0" />
+          </svg>
+          <span>Your path</span><span className="sw-trail-pill-at">{trailPill.label}</span>
         </button>
       ) : null}
       {/* the pill names what is on; with the sheet open the sheet's own count does */}

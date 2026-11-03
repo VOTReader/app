@@ -378,14 +378,35 @@ describe('panel density (w4)', () => {
     expect(rule('.sw-title-end')).toMatch(/display:\s*inline-block/);
   });
 
-  it('compact, the trail is a 32 px row (its Back 44 to hit) and stands where the overline was', () => {
-    const crumbs = rule('.sw-root.sw-compact .sw-crumbs');
-    expect(crumbs).toMatch(/min-height:\s*32px/);
-    const back = rule('.sw-root.sw-compact .sw-crumbs-back');
-    expect(back).toMatch(/min-height:\s*32px/);
-    expect(back).toMatch(/position:\s*relative/);
-    expect(rule('.sw-root.sw-compact .sw-crumbs-back::after')).toMatch(/top:\s*-6px/);
-    // the trail names where the reader is; the title under it names the connection
-    expect(rule('.sw-root.sw-compact .sw-crumbs ~ .sw-panel-content .sw-panel-over')).toMatch(/display:\s*none/);
+  /* the trail bar (2026-11-03): pinned over the scroll, so the way back never scrolls away */
+  it('the trail bar is pinned over the scroll, under a gold rule, its buttons and stops 44 px to hit', () => {
+    const bar = rule('.sw-trail');
+    expect(bar).toMatch(/flex:\s*none/);
+    expect(bar).toMatch(/border-bottom:\s*1px solid var\(--sw-cite-rule\)/);
+    expect(bar).toMatch(/background:\s*var\(--sw-panel\)/);
+    expect(rule('.sw-trail-btn')).toMatch(/min-height:\s*44px/);
+    expect(rule('.sw-crumb')).toMatch(/min-height:\s*44px/);
+    expect(rule('.sw-trail-paths')).toMatch(/min-height:\s*44px/);
+    // the stops scroll sideways, and one scrolled off the left fades at the rule, never cut
+    const stops = rule('.sw-trail-stops');
+    expect(stops).toMatch(/overflow-x:\s*auto/);
+    expect(BARE).toMatch(/\.sw-trail-stops \{[^}]*mask-image:\s*linear-gradient/);
+    // with the bar the X sits in its row: nothing scrolls up under it, the head needs no room for it
+    expect(rule('.sw-panel[data-trail]::before')).toMatch(/content:\s*none/);
+    expect(rule('.sw-panel[data-trail] .sw-panel-head')).toMatch(/padding-right:\s*0/);
+  });
+
+  it('compact, the trail bar is 52 px and stands where the overline was', () => {
+    expect(rule('.sw-root.sw-compact .sw-trail')).toMatch(/min-height:\s*52px/);
+    // the bar names where the reader is; a verse stop's overline goes
+    expect(rule('.sw-root.sw-compact .sw-panel[data-trail][data-mode="verse"] .sw-panel-over')).toMatch(/display:\s*none/);
+    // a stop's way in reads in one line on the phone, and so does a way on's preview
+    expect(rule('.sw-root.sw-compact .sw-row-text-go')).toMatch(/-webkit-line-clamp:\s*1/);
+  });
+
+  it('a way on is one control: its body, a visited ring in gold, a chevron', () => {
+    expect(rule('.sw-row-go .sw-row-main')).toMatch(/flex-direction:\s*row/);
+    expect(rule('.sw-row-visited')).toMatch(/border:\s*1\.5px solid var\(--sw-gold\)/);
+    expect(rule('.sw-sec-go > .sw-sec-head .sw-sec-title')).toMatch(/color:\s*var\(--sw-gold\)/);
   });
 });

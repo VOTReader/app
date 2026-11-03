@@ -72,8 +72,17 @@ describe('webViewArgs', () => {
       localize: localizeFactor(3 / (1920 / 360)),
       camY: 12, dpr: desktop.DPR, density: 'famous', rulerDepth: f.ruler,
       focusArc: 7, focusRange: [1, 5],
-      focusProphecy: -1, hoverArc: 4, hoverProphecy: 6, lit: null, litKey: '',
+      focusProphecy: -1, hoverArc: 4, hoverProphecy: 6, lit: null, litKey: '', path: null, pathKey: '',
     });
+  });
+
+  it("hands the reader's path through with its key, and none when the path is empty (2026-11-03)", () => {
+    const ids = Int32Array.from([3, 9]);
+    const a = webViewArgs(desktop, cam, f, 'famous', focusState(), { ids, key: '2:k' });
+    expect(a.path).toBe(ids);
+    expect(a.pathKey).toBe('2:k');
+    expect(webViewArgs(desktop, cam, f, 'famous', focusState(), { ids: new Int32Array(0), key: '' })).toMatchObject({ path: null, pathKey: '' });
+    expect(webViewArgs(desktop, cam, f, 'famous', focusState())).toMatchObject({ path: null, pathKey: '' });
   });
 
   it('a camera below the baseline draws at height 0, and there is no second range (retired in w5)', () => {

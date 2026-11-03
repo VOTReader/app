@@ -115,6 +115,53 @@ export function followAnnouncement(label) {
   return 'Following the line to ' + label;
 }
 
+/* THE TRAIL'S WORDS (2026-11-03: link to link, back a couple, any number of paths). The trail
+   bar (web-panel.jsx TrailBar), a stop's way in and ways on, and the paths view say these. */
+
+/** A stop's ways on: its heading. @param {number} n */
+export function goOnTitle(n) {
+  return 'Go on from here · ' + Number(n).toLocaleString();
+}
+
+/** A way on's name: where it goes, how strong, and what tapping it does; "visited" when the reader
+ * has stood there on one of their paths. @param {string} label @param {number} votes @param {boolean} visited */
+export function goOnRowLabel(label, votes, visited) {
+  return 'Go to ' + label + ', ' + plural(votes, 'vote', 'votes') + (visited ? ', visited' : '');
+}
+
+/** The full list under the strongest ways on. @param {number} n */
+export function allByBookLabel(n) {
+  return 'All ' + Number(n).toLocaleString() + ' by book';
+}
+
+/** A stop's way in: "From Isaiah 7:14" (its button goes back there). @param {string} label */
+export function cameFromLabel(label) {
+  return 'From ' + label;
+}
+
+/** The trail bar's Back and Forward, named for where they go. @param {string} label */
+export function backToLabel(label) {
+  return 'Back to ' + label;
+}
+/** @param {string} label */
+export function forwardToLabel(label) {
+  return 'Forward to ' + label;
+}
+
+/** The paths button and the paths view's meta. @param {number} paths */
+export function pathsLabel(paths) {
+  return 'Your paths, ' + Number(paths).toLocaleString();
+}
+/** @param {number} paths @param {number} stops */
+export function pathsMeta(paths, stops) {
+  return plural(paths, 'path', 'paths') + ' · ' + plural(stops, 'stop', 'stops');
+}
+
+/** A path's fork, where it left another path: "From Isaiah 7:14". @param {string} label */
+export function forkLabel(label) {
+  return 'From ' + label;
+}
+
 /** How many threads the canon web draws at this density (the topbar's count). */
 export function graphStats(graph, density) {
   let shown = 0;

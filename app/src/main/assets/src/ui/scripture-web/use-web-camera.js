@@ -92,6 +92,9 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   // whole through focusState()/withLit(), except hover, hoverProphecy and
   // hoverUnderlay, which the hover rAF writes in place.
   const focusRef = React.useRef(/** @type {import('../../utils/scripture-web/focus-state.js').Focus} */ (focusState()));
+  // the reader's path on the web (use-journey.js pathArcsOf): the threads their trail came along and
+  // their key, written by the screen as the trail changes, drawn in the path's ink (frame-set topSet)
+  const pathRef = React.useRef(/** @type {{ ids: Int32Array | null, key: string }} */ ({ ids: null, key: '' }));
   // CSS px the open panel covers (right: docked; bottom: the sheet under 560 px).
   // The panel stream writes it; nothing else does. Zero while no panel is open.
   const panelInsetRef = React.useRef({ right: 0, bottom: 0 });
@@ -106,7 +109,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
 
   /** What the web renderer is told for this frame. */
   const viewFor = React.useCallback(
-    () => webViewArgs(viewRef.current, camRef.current, frame(), density, focusRef.current),
+    () => webViewArgs(viewRef.current, camRef.current, frame(), density, focusRef.current, pathRef.current),
     [density, frame],
   );
 
@@ -376,7 +379,7 @@ export function useWebCamera({ graph, density, modeRef, schedule, topbarRef, ani
   }, [onFrame, graph]);
 
   return {
-    camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef,
+    camRef, camVRef, lastRailRef, viewRef, focusRef, panelInsetRef, pathRef,
     frame, viewFor, zoomCapFor, yFrameFor, camFor, flyTo, cancelFly, settledAt, slackFor, settleInset,
   };
 }

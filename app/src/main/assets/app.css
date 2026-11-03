@@ -9109,23 +9109,148 @@
       color: var(--sw-text-meta); cursor: pointer;
     }
     .sw-back-link:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
-    .sw-crumbs { display: flex; align-items: center; gap: 2px; margin: -12px 40px 6px -12px; font-size: calc(var(--fsc-14) * var(--sw-ts)); color: var(--sw-text-muted); }
-    .sw-crumbs ol { display: flex; flex-wrap: wrap; gap: 0 6px; list-style: none; margin: 0; padding: 0; }
-    .sw-crumbs li + li::before { content: '\203A'; margin-right: 6px; color: var(--sw-text-muted); }
-    .sw-crumbs li.is-here { color: var(--sw-text); }
-    /* a step back along the trail: the words, tappable, with a 44 px hit like the trail's Back */
+    /* THE TRAIL BAR (2026-11-03, mockup r1-phone; web-panel.jsx TrailBar): pinned over the panel's
+       scroll, so the way back never scrolls away, a gold hairline under it. Back and Forward in gold
+       (dim when there is nowhere to go), the path's crumbs scrolling sideways (where the reader is in
+       gold, the way ahead dimmer), the paths button; the close X keeps its corner at the bar's end. */
+    .sw-trail {
+      flex: none; position: relative; z-index: 1; display: flex; align-items: center;
+      min-height: 64px; padding: 10px calc(64px + var(--sw-safe-right)) 10px 14px; box-sizing: border-box;
+      background: var(--sw-panel); border-bottom: 1px solid var(--sw-cite-rule);
+      font-size: calc(var(--fsc-16) * var(--sw-ts)); color: var(--sw-text-meta);
+    }
+    .sw-trail-btn {
+      flex: none; min-width: 40px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
+      padding: 0; background: none; border: 0; border-radius: 6px; color: var(--sw-gold); cursor: pointer;
+    }
+    .sw-trail-btn:disabled { color: var(--sw-text-muted); opacity: 0.4; cursor: default; }
+    .sw-trail-btn:not(:disabled):hover { background: var(--sw-active-fill); }
+    .sw-trail-btn:focus-visible, .sw-trail-paths:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
+    .sw-trail-stops {
+      flex: 1 1 auto; min-width: 0; display: flex; align-items: center; margin: 0 0 0 8px; padding: 0 20px 0 14px;
+      border-left: 1px solid var(--sw-hairline); list-style: none; white-space: nowrap;
+      overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
+    }
+    .sw-trail-stops::-webkit-scrollbar { display: none; }
+    /* a crumb half scrolled off either end fades out rather than show a cut word (the rule on the
+       left stays drawn) */
+    .sw-trail-stops {
+      -webkit-mask-image: linear-gradient(to right, black 1px, transparent 1px, black 15px, black calc(100% - 18px), transparent);
+      mask-image: linear-gradient(to right, black 1px, transparent 1px, black 15px, black calc(100% - 18px), transparent);
+    }
+    .sw-trail-stops li { flex: none; display: flex; align-items: center; }
+    .sw-trail-stops li + li::before { content: '\203A'; margin: 0 8px; color: var(--sw-text-muted); }
+    .sw-trail-stops li.is-ahead { opacity: 0.6; }
+    .sw-trail-at, .sw-trail-stops li.is-here .sw-crumb { color: var(--sw-gold); }
+    /* a stop on the path: its words, a 44 px hit */
     .sw-crumb {
-      position: relative; padding: 0; background: transparent; border: 0; color: inherit; font: inherit; cursor: pointer;
-      text-decoration: underline; text-decoration-color: var(--sw-hairline); text-underline-offset: 3px;
+      position: relative; min-height: 44px; padding: 0; background: transparent; border: 0;
+      color: inherit; font: inherit; cursor: pointer;
     }
-    .sw-crumb::after { content: ''; position: absolute; left: -3px; right: -3px; top: -12px; bottom: -12px; }
-    .sw-crumb:hover { color: var(--sw-text); text-decoration-color: currentColor; }
-    .sw-crumb:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; border-radius: 3px; }
-    .sw-crumbs-back {
-      flex: none; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
-      background: none; border: 0; color: var(--sw-text-meta); cursor: pointer;
+    .sw-crumb:hover { color: var(--sw-text); }
+    .sw-crumb:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; border-radius: 3px; }
+    .sw-trail-paths {
+      flex: none; display: inline-flex; align-items: center; gap: 5px; min-width: 44px; min-height: 44px; margin-left: 6px;
+      padding: 0 4px 0 12px; background: none; border: 0; border-left: 1px solid var(--sw-hairline);
+      color: var(--sw-text-meta); font: inherit; cursor: pointer;
     }
-    .sw-crumbs-back:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
+    .sw-trail-paths:hover, .sw-trail-paths.is-on { color: var(--sw-gold); }
+    /* with the bar, the close X sits in its row: the panel head needs no room for it, and nothing
+       scrolls up under it (the band below the X stays away) */
+    .sw-panel[data-trail] .sw-panel-head { padding-right: 0; }
+    .sw-panel[data-trail]::before { content: none; }
+    .sw-panel[data-trail] .sw-panel-body { padding-top: 18px; scroll-padding-top: 12px; }
+    .sw-panel[data-trail] .sw-sheet-close { top: 10px; }
+    /* A STOP'S WAY IN: the verse its thread came from, quiet, under a gold rule; the line goes back there */
+    .sw-came {
+      display: flex; flex-direction: column; gap: 2px; width: 100%; margin: 12px 0 0; padding: 8px 12px;
+      box-sizing: border-box; background: none; border: 0; border-left: 2px solid var(--sw-cite-rule);
+      border-radius: 0 6px 6px 0; text-align: left; font-family: var(--sw-font); color: var(--sw-text-meta); cursor: pointer;
+    }
+    .sw-came:hover { background: var(--sw-active-fill); }
+    .sw-came:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
+    .sw-came-top { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 10px; font-size: calc(var(--fsc-16) * var(--sw-ts)); }
+    .sw-came-icon { flex: none; color: var(--sw-gold); }
+    .sw-came-ref { color: var(--sw-text-body); }
+    .sw-came-votes { color: var(--sw-text-muted); font-size: calc(var(--fsc-14) * var(--sw-ts)); }
+    .sw-came-text {
+      font-size: calc(var(--fsc-15) * var(--sw-ts)); font-style: italic; line-height: 1.4; color: var(--sw-text-muted);
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    /* GO ON FROM HERE: its head in gold (the way on is what the stop is for), the ways as rows that
+       are each one control: reference and votes, the verse's words, a visited ring, a chevron */
+    .sw-sec-go > .sw-sec-head .sw-sec-title { color: var(--sw-gold); }
+    .sw-go-list { display: grid; gap: 2px; }
+    .sw-row-go .sw-row-main { flex-direction: row; align-items: center; gap: 10px; padding: 8px 6px 8px 8px; }
+    .sw-row-go-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+    .sw-row-text-go {
+      font-style: italic; white-space: normal;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .sw-row-visited { flex: none; width: 9px; height: 9px; border: 1.5px solid var(--sw-gold); border-radius: 50%; }
+    .sw-row-chev { flex: none; color: var(--sw-text-muted); }
+    .sw-row-go:hover .sw-row-chev, .sw-row-go:focus-within .sw-row-chev { color: var(--sw-gold); }
+    /* the phone's way in: a quiet link beside "Open in reader" */
+    .sw-came-link { gap: 6px; }
+    .sw-came-link .sw-came-icon { color: var(--sw-gold); }
+    /* ALL n BY BOOK: the rows by book under the strongest ways on */
+    .sw-sec-all { margin-top: 6px; }
+    /* YOUR PATHS (mockup r1-paths): a transit map. A path's stops hang on a line, each a dot; a path
+       that leaves another starts under its fork's words, an elbow off the line before it; the path the
+       reader is on is in gold, the others dimmer; where the reader is, is ringed */
+    .sw-paths { list-style: none; margin: 12px 0 0; padding: 0; }
+    .sw-path + .sw-path { margin-top: 10px; }
+    .sw-path-stops { list-style: none; margin: 0; padding: 0; }
+    .sw-path.is-fork { margin-left: 18px; }
+    .sw-path-stop { position: relative; padding-left: 26px; }
+    .sw-path-stop::before {
+      content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 2px; background: var(--sw-hairline);
+    }
+    .sw-path-stop:first-child::before { top: 22px; }
+    .sw-path-stop:last-child::before { bottom: auto; height: 22px; }
+    .sw-path-stop:first-child:last-child::before { content: none; }
+    .sw-path-stop::after {
+      content: ''; position: absolute; left: 3px; top: 17px; width: 10px; height: 10px; border-radius: 50%;
+      background: var(--sw-text-muted);
+    }
+    .sw-path.is-current > .sw-path-stops > .sw-path-stop::before { background: var(--sw-cite-rule); }
+    .sw-path.is-current > .sw-path-stops > .sw-path-stop::after { background: var(--sw-gold); }
+    /* where a fork leaves from: its stop small and hollow, its words quiet */
+    .sw-path-stop.is-from::after { left: 4px; top: 12px; width: 6px; height: 6px; background: var(--sw-panel); border: 2px solid var(--sw-text-muted); }
+    .sw-path-stop.is-from:first-child::before { top: 16px; }
+    .sw-path-stop.is-from .sw-path-go { min-height: 32px; padding-top: 4px; padding-bottom: 4px; }
+    .sw-path-stop.is-from .sw-path-ref { font-size: calc(var(--fsc-14) * var(--sw-ts)); font-style: italic; color: var(--sw-text-muted); }
+    .sw-path.is-current > .sw-path-stops > .sw-path-stop.is-from::after { background: var(--sw-panel); border-color: var(--sw-gold); }
+    .sw-path-stop.is-here::after {
+      left: 1px; top: 15px; width: 10px; height: 10px; background: var(--sw-panel);
+      border: 2px solid var(--sw-gold); box-shadow: 0 0 0 3px var(--sw-cite-rule);
+    }
+    .sw-path-go {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-height: 44px; padding: 7px 8px;
+      box-sizing: border-box; background: none; border: 0; border-radius: 6px; text-align: left;
+      font-family: var(--sw-font); color: inherit; cursor: pointer;
+    }
+    .sw-path-go:hover { background: var(--sw-active-fill); }
+    .sw-path-go:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
+    .sw-path-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+    .sw-path-ref { font-size: calc(var(--fsc-18) * var(--sw-ts)); color: var(--sw-text-body); }
+    .sw-path-stop.is-here .sw-path-ref { color: var(--sw-gold); }
+    .sw-path-here {
+      padding: 1px 7px; border-radius: 4px; background: var(--sw-gold); color: var(--sw-panel);
+      font-size: calc(var(--fsc-13) * var(--sw-ts));
+    }
+    .sw-path-text {
+      max-width: 100%; font-size: calc(var(--fsc-14) * var(--sw-ts)); font-style: italic; color: var(--sw-text-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .sw-paths-clear {
+      display: block; width: 100%; min-height: 44px; margin-top: 18px; padding: 0 14px; border-radius: 6px;
+      background: none; border: 1px solid var(--sw-control-border); font-family: var(--sw-font);
+      font-size: calc(var(--fsc-15) * var(--sw-ts)); color: var(--sw-text-meta); cursor: pointer;
+    }
+    .sw-paths-clear:hover { border-color: var(--sw-control-border-hover); }
+    .sw-paths-clear.is-arming { color: var(--sw-gold); border-color: var(--sw-active-border); }
+    .sw-paths-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     /* compact (root height <= 500: every phone value of the spec) */
     .sw-root.sw-compact .sw-panel-body { padding: 12px calc(20px + var(--sw-safe-right)) calc(16px + var(--sw-safe-bottom)) 20px; scroll-padding-top: 54px; }
     .sw-root.sw-compact :is(.sw-sheet-eyebrow, .sw-panel-over, .sw-sec-title) { font-size: calc(var(--fsc-12) * var(--sw-ts)); }
@@ -9147,14 +9272,20 @@
     .sw-root.sw-compact .sw-panel-title { margin-top: 2px; }
     .sw-root.sw-compact .sw-panel-meta { margin-top: 2px; }
     .sw-root.sw-compact .sw-verse + .sw-verse { margin-top: 8px; }
-    /* the trail, compact: a 32 px row (its Back 44 to hit), and it stands where the overline was:
-       the trail names where the reader is, the title under it the connection (w4: the 44 px row
-       over the overline kept "Cited in the Volumes" under the fold, r2-06 has neither) */
-    .sw-root.sw-compact .sw-crumbs { min-height: 32px; margin: -8px 40px 2px -10px; }
-    .sw-root.sw-compact .sw-crumbs-back { position: relative; min-width: 36px; min-height: 32px; }
-    .sw-root.sw-compact .sw-crumbs-back::after { content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px; }
-    .sw-root.sw-compact .sw-crumbs ~ .sw-panel-content .sw-panel-over { display: none; }
-    .sw-root.sw-compact .sw-crumbs ~ .sw-panel-content .sw-panel-title { margin-top: 0; }
+    /* the trail, compact: a 52 px bar, its words a step smaller, the X in its row; the overline
+       under it goes (the bar says where the reader is), and a stop's way in reads in one line */
+    .sw-root.sw-compact .sw-trail { min-height: 52px; padding: 4px calc(56px + var(--sw-safe-right)) 4px 8px; font-size: calc(var(--fsc-15) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-trail-btn { min-width: 38px; }
+    .sw-root.sw-compact .sw-trail-stops { margin-left: 4px; padding-left: 10px; }
+    .sw-root.sw-compact .sw-panel[data-trail] .sw-sheet-close { top: 4px; }
+    .sw-root.sw-compact .sw-panel[data-trail] .sw-panel-body { padding-top: 10px; }
+    .sw-root.sw-compact .sw-panel[data-trail][data-mode="verse"] .sw-panel-over { display: none; }
+    .sw-root.sw-compact .sw-came { margin-top: 8px; padding: 6px 10px; }
+    .sw-root.sw-compact .sw-came-top { font-size: calc(var(--fsc-15) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-came-text { -webkit-line-clamp: 1; font-size: calc(var(--fsc-14) * var(--sw-ts)); }
+    .sw-root.sw-compact .sw-row-go .sw-row-main { padding: 6px 4px 6px 6px; }
+    .sw-root.sw-compact .sw-row-text-go { -webkit-line-clamp: 1; }
+    .sw-root.sw-compact .sw-path-ref { font-size: calc(var(--fsc-16) * var(--sw-ts)); }
 
     /* WHILE THE PANEL IS OPEN (spec section 3): the key hides; the controls right-align to the
        panel's left edge less the gutter (24 / 16 compact; the strip's own 7 px padding is inside
@@ -9336,6 +9467,17 @@
     }
     .sw-root.sw-compact .sw-return-pill { left: 16px; top: calc(var(--sw-chrome-top, 10px) + 64px); }
     .sw-root.sw-chrome-hidden .sw-return-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+    /* the trail pill (2026-11-03): the return pill's corner, while the panel is closed and a path waits */
+    .sw-trail-pill {
+      position: absolute; z-index: 5; left: 24px; top: calc(var(--sw-chrome-top, 10px) + 76px);
+      gap: 8px; padding: 0 16px 0 12px; border-radius: 22px; border-color: var(--sw-active-border); color: var(--sw-gold);
+      animation: sw-panel-fade 200ms ease-out;
+    }
+    .sw-trail-pill-at { color: var(--sw-text); }
+    .sw-root.sw-compact .sw-trail-pill { left: 16px; top: calc(var(--sw-chrome-top, 10px) + 64px); }
+    .sw-root.sw-chrome-hidden .sw-trail-pill { top: calc(var(--sw-chrome-top, 10px) + 4px); }
+    @keyframes sw-panel-fade { from { opacity: 0; } to { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .sw-trail-pill { animation: none; } }
     /* a docked panel takes the right: the pill centres on the web left of it */
     .sw-root.sw-panel-open[data-panel="dock"] .sw-filter-pill {
       left: calc((100% - var(--sw-panel-w, 42%)) / 2); max-width: calc(100% - var(--sw-panel-w, 42%) - 32px);

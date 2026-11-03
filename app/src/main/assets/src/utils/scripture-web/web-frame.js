@@ -108,6 +108,9 @@ export function webFrame(v, personal) {
  *   lit, litKey    the lit arc ids (Int32Array or null) and their key; a
  *                  renderer uploads the set when litKey differs from the
  *                  key it last uploaded
+ *   path, pathKey  the reader's path (use-journey.js pathArcsOf): the arc
+ *                  ids their trail came along (or null) and their key, as
+ *                  lit and litKey
  *   dpr            v.DPR, so the picker and the overlay find the renderer's
  *                  visible set (frame-set.frameSet)
  * The canon overlay reads the same object (paintCanonOverlay's fs.view).
@@ -116,8 +119,9 @@ export function webFrame(v, personal) {
  * @param {Frame} f  webFrame(v, …)
  * @param {import('./decode.js').Density} density
  * @param {Partial<import('./focus-state.js').Focus>} focus  focusRef.current
+ * @param {{ ids: ArrayLike<number> | null, key: string } | null} [path]  the camera hook's pathRef.current
  */
-export function webViewArgs(v, cam, f, density, focus) {
+export function webViewArgs(v, cam, f, density, focus, path) {
   const prophecy = !!focus.prophecy && focus.arc >= 0;
   return {
     width: v.W, height: v.H, base: f.base, ceil: f.ceil,
@@ -135,6 +139,7 @@ export function webViewArgs(v, cam, f, density, focus) {
     hoverArc: focus.hover == null ? -1 : focus.hover,
     hoverProphecy: focus.hoverProphecy == null ? -1 : focus.hoverProphecy,
     lit: focus.lit || null, litKey: focus.lit ? focus.litKey || '' : '',
+    path: path && path.ids && path.ids.length ? path.ids : null, pathKey: path && path.ids && path.ids.length ? path.key : '',
   };
 }
 

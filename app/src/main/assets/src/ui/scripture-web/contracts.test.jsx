@@ -5,7 +5,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useWebCamera } from './use-web-camera.js';
-import { useWebSelection, panelOf, PANEL_MODES, CHOOSER_MOST, isTie } from './use-web-selection.js';
+import { useWebSelection, panelOf, showsStop, PANEL_MODES, CHOOSER_MOST, isTie } from './use-web-selection.js';
 import { pickThreads } from '../../utils/scripture-web/pick.js';
 import { useJourney } from './use-journey.js';
 import { useGoTo, routeOverlayHit } from './goto.jsx';
@@ -239,6 +239,32 @@ describe('the panel API (CONTRACTS.md section 6): each mode opens today\'s card'
   });
 });
 
+/* 2026-11-03: the trail asks whether the panel shows the stop the reader is at (use-journey.js isAt):
+   away from it, Back goes back to it first. */
+describe('showsStop: is the open card the stop\'s own?', () => {
+  const verse = (v, end) => ({ kind: 'verse', verse: v, verseEnd: end });
+  it('a verse stop: its verse card, its range whole; a chapter, a line, a letter, a fan chip by their keys', () => {
+    expect(showsStop({ open: { mode: 'verse', verse: 12 } }, verse(12))).toBe(true);
+    expect(showsStop({ open: { mode: 'verse', verse: 12 } }, verse(13))).toBe(false);
+    expect(showsStop({ open: { mode: 'verse', verse: 12, verseEnd: 14 } }, verse(12, 14))).toBe(true);
+    expect(showsStop({ open: { mode: 'verse', verse: 12, verseEnd: 14 } }, verse(12)), 'a range is not its first verse').toBe(false);
+    expect(showsStop({ open: { mode: 'group', chapter: 5 } }, { kind: 'chapter', chapterIndex: 5 })).toBe(true);
+    expect(showsStop({ open: { mode: 'connection', arc: 3 } }, { kind: 'arc', index: 3 })).toBe(true);
+    expect(showsStop({ open: { mode: 'connection', arc: 2, prophecy: true } }, { kind: 'arc', index: -1, prophecyIndex: 2 })).toBe(true);
+    expect(showsStop({ open: { mode: 'letter', letterKey: 'v1/a' } }, { kind: 'letter', letterKey: 'v1/a' })).toBe(true);
+    expect(showsStop({ open: { mode: 'exits', key: 'x' } }, { kind: 'exits', key: 'x' })).toBe(true);
+  });
+  it('a stop that opens nothing is shown while nothing is; one with no panel recorded is wherever the reader is', () => {
+    expect(showsStop({ open: null }, null)).toBe(true);
+    expect(showsStop({ open: null }, verse(3))).toBe(false);
+    expect(showsStop({}, verse(3))).toBe(true);
+    // the chooser or Nearby over it: the panel is elsewhere
+    expect(showsStop({ open: { mode: 'verse', verse: 12 } }, verse(12), [{ index: 1 }])).toBe(false);
+    expect(showsStop({ open: { mode: 'verse', verse: 12 } }, verse(12), null, true)).toBe(false);
+    expect(showsStop(null, verse(12))).toBe(false);
+  });
+});
+
 describe('panelOf: today\'s open card in the panel\'s terms', () => {
   it('maps every card kind, the chooser, and nothing open', () => {
     expect(panelOf({ kind: 'arc', index: 3 }, null).spec).toEqual({ mode: 'connection', arc: 3 });
@@ -395,7 +421,11 @@ describe('the journey (CONTRACTS.md section 7): a real trail since the navigatio
     // the camera centres the far foot, which stands at the verse's middle (w3 review, round 2)
     expect(get().cam.camRef.current.x).toBeCloseTo(200.5, 6);
     expect(get().cam.camRef.current.ppv).toBe(ppv);
-    expect(get().sel.detail.far).toBe('to');
+    // the arrival is a stop (2026-11-03): the verse, its thread in chosen, the way back a step of the trail
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 200 });
+    expect(get().cam.focusRef.current.arc).toBe(1);
+    expect(get().journey.stack.map((e) => e.verse)).toEqual([300, 200]);
+    expect(get().journey.here.via).toEqual({ arc: 1 });
   });
 });
 
@@ -545,9 +575,9 @@ describe("the panel brings what it opens out from under itself, even at the cano
     act(() => { m.get().sel.followRow({ index: 2, hereVerse: 5000, otherVerse: 9000 }); });
     expect(m.get().cam.camRef.current.ppv).toBe(60);
     expect(across(m, 9000)).toBeCloseTo(0.5, 2);
-    // the connection's own Follow walks it back, as deep
-    const info = m.get().sel.detail;
-    expect(info.far).toBe('from');
+    // the line's own Follow walks it back, as deep: the arrival is the verse, so the line opens again
+    act(() => { m.get().sel.openPanel({ mode: 'connection', arc: 2 }, { frame: false }); });
+    const info = Object.assign({}, m.get().sel.detail, { far: 'from' });
     act(() => { m.get().sel.followThread(info); });
     expect(m.get().cam.camRef.current.ppv).toBe(60);
     expect(across(m, 5000)).toBeCloseTo(0.5, 2);
@@ -829,16 +859,18 @@ describe('the mouse leaving the web, or resting on the chrome, hovers nothing (g
 });
 
 describe('a row\'s Follow and the zoom row (the panel stream)', () => {
-  it('followRow swaps to that connection and goes to the end the row names', () => {
+  it('followRow arrives at the end the row names: its verse opens there, the row\'s thread chosen', () => {
     const { get } = mount();
     act(() => { get().sel.openPanel({ mode: 'verse', verse: 200 }); });
     act(() => { get().sel.followRow({ index: 1, hereVerse: 200, otherVerse: 300 }); });
-    expect(get().sel.detail).toMatchObject({ kind: 'arc', index: 1, far: 'from' });
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 300 });
     expect(get().cam.camRef.current.x).toBeCloseTo(300.5, 6); // the foot, at the verse's middle
-    expect(get().cam.focusRef.current).toMatchObject({ arc: 1, lit: null });
+    // its thread in stays chosen; the verse's own threads light round it, as verse mode's do
+    expect(get().cam.focusRef.current).toMatchObject({ arc: 1, range: [300, 300] });
+    expect(get().journey.stack.map((e) => e.verse)).toEqual([200, 300]);
     // a row that names no thread does nothing
     act(() => { get().sel.followRow({ index: 99, hereVerse: 0, otherVerse: 1 }); });
-    expect(get().sel.detail).toMatchObject({ index: 1 });
+    expect(get().sel.detail).toMatchObject({ kind: 'verse', verse: 300 });
   });
 
   it('zoomTo closes the panel and fits the chapter across the canvas, ignoring the inset', () => {

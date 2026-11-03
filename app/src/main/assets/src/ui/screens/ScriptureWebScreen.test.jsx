@@ -62,7 +62,7 @@ vi.mock('../scripture-web/web-renderer.js', async (importOriginal) => {
         DRAWN.push({ ppv: opts && opts.ppv, dpr: (opts && opts.dpr) || 1, density: opts && opts.density, camY: opts && opts.camY, camX: opts && opts.camX, lens: opts && opts.lens,
           focusArc: opts && opts.focusArc, focusRange: opts && opts.focusRange, lensDim: opts && opts.lensDim,
           centre: opts && opts.centre, tapFade: opts && opts.tapFade, focusProphecy: opts && opts.focusProphecy,
-          hoverProphecy: opts && opts.hoverProphecy });
+          hoverProphecy: opts && opts.hoverProphecy, path: opts && opts.path });
         return { instances: 0, draws: 0 };
       },
       // My Web's ground (refactor.md #10): one clear, recorded so a case can
@@ -498,7 +498,7 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
     });
     afterEach(() => { HTMLCanvasElement.prototype.getContext = realGetContext; });
 
-    it('the sheet offers Follow to the far foot; pressing it centres the camera there and the control turns to the other end', async () => {
+    it('the line offers Follow to each end; Follow arrives at that verse, and its way in goes back', async () => {
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       expect(zoomText(container)).toBe('24882x');
@@ -506,7 +506,8 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       await pickNearby();
       const sheet = container.querySelector('.sw-sheet');
       expect(sheet, 'the connection sheet opened').toBeTruthy();
-      // the camera sits at 15551 = the from foot, so the far foot is `to`: Genesis 2:5101
+      // a line is a fork in the road (2026-11-03): either end is a way on
+      expect(screen.getByRole('button', { name: /^follow to genesis 2:552$/i })).toBeTruthy();
       const follow = screen.getByRole('button', { name: /^follow to genesis 2:5101$/i });
       /* A3 (w3 navigation): Follow FLIES there, eased over 600-900 ms through the frame loop, so
          the camera is read once the fly has landed (it once jumped, and one frame was enough). */
@@ -519,18 +520,23 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       fireEvent.click(follow);
       // centred on the foot, at the verse's middle
       await landsAt(20100.5);
-      // and back: the control now names the from foot
-      fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:552$/i }));
+      // the arrival is a stop: that verse, its thread in still chosen
+      expect(container.querySelector('.sw-panel').getAttribute('data-mode')).toBe('verse');
+      expect(DRAWN[DRAWN.length - 1].focusArc, 'the thread in stays chosen').toBe(0);
+      // and back: where it came from is the way there
+      const cameFrom = container.querySelector('.sw-came, .sw-came-link');
+      expect(cameFrom.getAttribute('aria-label')).toBe('Back to Genesis 2:552');
+      fireEvent.click(cameFrom);
       await landsAt(15551.5);
-      // the line stays chosen throughout: the sheet is still up
+      // the panel stays up throughout
       expect(container.querySelector('.sw-sheet')).toBeTruthy();
     });
 
     /* Integration (w3): the panel's trail Back called journey.back(), which flies home and reopens
-       the line on landing (use-journey.js), and then flew on its own to the crumb's verse: the second
-       fly took over the first, so the line was never reopened from home and the camera stopped at
+       what was open there on landing (use-journey.js), and then flew on its own to the crumb's verse:
+       the second fly took over the first, so nothing reopened from home and the camera stopped at
        the verse's edge, not its foot. Back is the journey's alone. */
-    it("the trail's Back flies home to the foot and opens the line again from there", async () => {
+    it("the trail bar's Back flies home to the foot and opens the verse the trail set out from", async () => {
       const { container } = await mount({}, threaded);
       for (let i = 0; i < 40; i++) await pressFrame('+');
       await pickNearby();
@@ -542,16 +548,73 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       };
       fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
       await landsAt(20100.5);
-      expect(container.querySelectorAll('.sw-crumbs li'), 'home, then here').toHaveLength(2);
-      fireEvent.click(screen.getByRole('button', { name: 'Back along the trail' }));
+      expect(container.querySelectorAll('.sw-trail-stops li'), 'home, then here').toHaveLength(2);
+      fireEvent.click(container.querySelector('.sw-trail .sw-trail-btn'));
       await landsAt(15551.5);
-      // reopened from home on landing (the fly's last frame): its Follow names the far foot again
-      const again = /^follow to genesis 2:5101$/i;
-      for (let i = 0; i < 50 && !screen.queryByRole('button', { name: again }); i++) {
+      // reopened from home on landing (the fly's last frame): the verse the trail set out from
+      const title = () => container.querySelector('.sw-panel-title');
+      for (let i = 0; i < 50 && !(title() && title().textContent === 'Genesis 2:552'); i++) {
         await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
       }
-      expect(screen.getByRole('button', { name: again })).toBeTruthy();
-      expect(container.querySelector('.sw-crumbs'), 'home: the trail is done').toBeNull();
+      expect(title().textContent).toBe('Genesis 2:552');
+      // home: the way ahead stays in the bar, where the reader is marked
+      expect(container.querySelectorAll('.sw-trail-stops li')).toHaveLength(2);
+      expect(container.querySelector('.sw-trail-stops li.is-here').textContent).toBe('Gen 2:552');
+    });
+
+    /* 2026-11-03: the trail outlives the panel. With it closed (the X, a tap on the sky, Reset) a pill
+       is the way back to the stop; the path still draws on the web; and the saved spot keeps the trail
+       for the next visit, where the pill offers it again. */
+    describe('the trail outlives the panel', () => {
+      const landsAt = async (x) => {
+        for (let i = 0; i < 80 && Math.abs(lastCamX() - x) > 0.05; i++) {
+          await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+        }
+        expect(lastCamX()).toBeCloseTo(x, 1);
+      };
+      const followed = async () => {
+        const view = await mount({}, threaded);
+        for (let i = 0; i < 40; i++) await pressFrame('+');
+        await pickNearby();
+        fireEvent.click(screen.getByRole('button', { name: /^follow to genesis 2:5101$/i }));
+        await landsAt(20100.5);
+        return view;
+      };
+      afterEach(() => { try { localStorage.removeItem('vot-sw-spot'); } catch (_e) { /* none */ } });
+
+      it('closed, a pill is the way back to the stop, and the path still draws', async () => {
+        const { container } = await followed();
+        expect(container.querySelector('.sw-trail-pill'), 'no pill while the panel is up').toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+        await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+        const pill = screen.getByRole('button', { name: 'Back to your path at Genesis 2:5101' });
+        expect(pill.textContent).toBe('Your pathGenesis 2:5101');
+        expect(DRAWN[DRAWN.length - 1].path && [...DRAWN[DRAWN.length - 1].path], 'the path still on the web').toEqual([0]);
+        fireEvent.click(pill);
+        for (let i = 0; i < 50 && !container.querySelector('.sw-panel'); i++) {
+          await act(async () => { await new Promise((r) => setTimeout(r, 20)); });
+        }
+        expect(container.querySelector('.sw-panel-title').textContent).toBe('Genesis 2:5101');
+        expect(container.querySelector('.sw-trail-pill')).toBeNull();
+      });
+
+      it('Reset brings the whole web back and keeps the paths: the pill offers the way back', async () => {
+        const { container } = await followed();
+        fireEvent.click(screen.getByRole('button', { name: 'Reset the view' }));
+        await act(async () => { await new Promise((r) => setTimeout(r, 40)); });
+        expect(container.querySelector('.sw-panel')).toBeNull();
+        expect(screen.getByRole('button', { name: 'Back to your path at Genesis 2:5101' })).toBeTruthy();
+      });
+
+      it('the saved spot keeps the trail: the next visit offers the way back to it', async () => {
+        await followed();
+        cleanup();
+        const kept = JSON.parse(localStorage.getItem('vot-sw-spot'));
+        expect(kept.trail.stops.map((x) => x.verse)).toEqual([15551, 20100]);
+        expect(kept.trail.stops[1].via).toEqual({ arc: 0 });
+        await mount({}, threaded);
+        expect(screen.getByRole('button', { name: 'Back to your path at Genesis 2:5101' })).toBeTruthy();
+      });
     });
 
     /* sw1 B1 (audit-web 10-05): the card's x closed the card but left the line focused, so the shader kept
