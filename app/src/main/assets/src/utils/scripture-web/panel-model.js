@@ -270,17 +270,56 @@ export function connectionModel(g, info, { density, translation, corpus }) {
  * Verse mode: the verse in full, its citations, and every thread it carries grouped by book. The
  * ids are its lit set (verse mode lights its threads, CONTRACTS section 6).
  * @param {any} g @param {number} verse
- * @param {{ density: any, translation?: string, corpus?: any, verseEnd?: number }} opts  verseEnd: a
- *   range's last verse (the go-to's range)
+ * @param {{ density: any, translation?: string, corpus?: any, verseEnd?: number, skip?: number }} opts
+ *   verseEnd: a range's last verse (the go-to's range); skip: the thread the reader came along
+ *   (a stop's way in, which the panel shows as where they came from, not as a way on)
  */
-export function verseModel(g, verse, { density, translation, corpus, verseEnd }) {
+export function verseModel(g, verse, { density, translation, corpus, verseEnd, skip = -1 }) {
   const block = verseBlock(g, verse, translation);
   // a range (the go-to's "John 3:16-18"): its first verse's text, the range's citations and threads
   const end = verseEnd > verse && verseEnd < g.total ? verseEnd : verse;
   const verses = [];
   for (let v = verse; v <= end; v++) verses.push(v);
-  const threads = threadsFrom(g, verse, end, density);
+  const threads = threadsFrom(g, verse, end, density, skip);
   return Object.assign(block, { cited: citedRows(g, verses, corpus), threads });
+}
+
+/**
+ * The ways on from a verse (a stop's "Go on from here"): every thread of `threads`, strongest
+ * first across the books (readers' votes; then the nearer, then canon order), so the strongest
+ * ways on lead and one tap takes each.
+ * @param {{ groups: ThreadGroup[] }} threads  threadsFrom's
+ * @returns {ThreadRow[]}
+ */
+export function waysOn(threads) {
+  const rows = [];
+  for (const grp of threads.groups) for (const r of grp.rows) rows.push(r);
+  const span = (/** @type {ThreadRow} */ r) => Math.abs(r.otherVerse - r.hereVerse);
+  return rows.sort((x, y) => y.votes - x.votes || span(x) - span(y) || x.otherVerse - y.otherVerse);
+}
+
+/**
+ * Where a stop's thread came from (a stop's "From ..." line): the thread's other end in full, and
+ * its votes (null for a prophecy pair the OpenBible data does not hold). Null when the stop has no
+ * thread, or its thread does not touch the stop's verse.
+ * @param {any} g @param {number} verse  the stop's verse
+ * @param {{ arc: number, prophecy?: boolean } | null | undefined} via
+ * @param {string} [translation]
+ */
+export function cameFrom(g, verse, via, translation) {
+  if (!g || !via || !(via.arc >= 0)) return null;
+  let a, b, votes = null;
+  if (via.prophecy) {
+    const p = g.prophecy && g.prophecy[via.arc];
+    if (!p) return null;
+    a = p.a; b = p.b;
+  } else {
+    if (!(via.arc < g.count)) return null;
+    a = g.from[via.arc]; b = g.to[via.arc]; votes = g.votes[via.arc];
+  }
+  if (a !== verse && b !== verse) return null;
+  const other = a === verse ? b : a;
+  return Object.assign(verseBlock(g, other, translation), { votes });
 }
 
 /**

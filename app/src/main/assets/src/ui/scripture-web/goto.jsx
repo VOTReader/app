@@ -49,11 +49,11 @@ import { WHOLE_WEB } from '../../utils/scripture-web/describe.js';
 
 /**
  * @typedef {{ button: any, box: any, isOpen: boolean, open: (query?: string) => void, close: () => void,
- *   selectCentre: () => boolean, step: (dir: number) => boolean, back: () => boolean }} GoTo
+ *   selectCentre: () => boolean, step: (dir: number) => boolean, back: () => boolean, forward: () => boolean }} GoTo
  *   button  the header slot's node (null: nothing in the header)
  *   box     what the go-to puts over the canvas (null: nothing)
  *   open    opens the box, optionally with a query typed in; close closes it
- *   selectCentre, step, back (additive, for use-web-keys.js): Enter / Space, [ ] and Backspace
+ *   selectCentre, step, back, forward (additive, for use-web-keys.js): Enter / Space, [ ], Backspace and Shift+Backspace
  */
 
 /** The hint under the rows (spec 4.5). */
@@ -147,7 +147,7 @@ export function connectionsText(n) {
 
 const NO_GOTO = Object.freeze({
   button: null, box: null, isOpen: false,
-  open() {}, close() {}, selectCentre() { return false; }, step() { return false; }, back() { return false; },
+  open() {}, close() {}, selectCentre() { return false; }, step() { return false; }, back() { return false; }, forward() { return false; },
 });
 
 /**
@@ -496,25 +496,38 @@ export function useGoTo(web) {
   const follow = React.useCallback((side) => {
     const e = edges[side];
     if (!e || !graph || !live) return;
-    const open = { mode: 'connection', arc: e.arc };
-    if (journey) journey.push({ verse: e.verse, label: e.label, open }, here());
+    // an arrival at that end (2026-11-03): a verse stop of the trail, set out from the thread's
+    // near end, its panel the verse's (where the reader came from, the ways on)
+    const via = { arc: e.arc };
+    const near = graph.from[e.arc] === e.verse ? graph.to[e.arc] : graph.from[e.arc];
+    const open = { mode: 'verse', verse: e.verse };
+    if (journey) {
+      journey.push({ verse: e.verse, label: e.label, open, via },
+        { verse: near, label: refOfVerse(graph, near).label, open: { mode: 'verse', verse: near } });
+    }
     // the chip goes once that end is in view, and the keyboard with it to the body (review
     // 2026-10-18): it goes home to the web first, which does not scroll the page
     const root = rootRef && rootRef.current;
     if (root && typeof root.focus === 'function') root.focus({ preventScroll: true });
-    // and the line opens where it lands, not framed again (w4: framing both feet zoomed far out)
-    Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(open, { frame: false }); }, () => {});
-  }, [edges, graph, live, journey, here, flyTo, openPanel, rootRef]);
+    // and the verse opens where it lands, not framed again (w4: framing both feet zoomed far out)
+    Promise.resolve(flyTo({ x: e.verse + 0.5 })).then((ok) => { if (ok) openPanel(Object.assign({}, open, { via }), { frame: false }); }, () => {});
+  }, [edges, graph, live, journey, flyTo, openPanel, rootRef]);
 
-  /** Backspace on the web: one step back along the trail (journey.back, which reopens what was
-   * open there), named for the screen reader. Nothing called journey.back before (the review of
-   * 2026-10-18); the panel's own Back control is the panel stream's (CONTRACTS.md ledger). */
+  /** Backspace on the web: one step back along the trail (journey.back: the stop before, or the
+   * stop the reader is at when the panel has moved on from it, its panel opened again there),
+   * named for the screen reader. */
   const back = React.useCallback(() => {
     if (!journey || !live || mode === 'personal') return false;
-    const s = journey.stack;
-    if (!s || s.length < 2) { say('Nothing to go back to'); return false; }
     const to = journey.back();
-    if (to) say('Back to ' + to.label);
+    say(to ? 'Back to ' + to.label : 'Nothing to go back to');
+    return !!to;
+  }, [journey, live, mode, say]);
+
+  /** Shift+Backspace: on along the trail again, the way the reader went last from here. */
+  const forward = React.useCallback(() => {
+    if (!journey || !live || mode === 'personal' || typeof journey.forward !== 'function') return false;
+    const to = journey.forward();
+    say(to ? 'Forward to ' + to.label : 'Nothing ahead');
     return !!to;
   }, [journey, live, mode, say]);
 
@@ -685,7 +698,7 @@ export function useGoTo(web) {
   const box = theBox || theChip || edges.left || edges.right
     ? <>{theBox}{theChip}{edgeChip('left')}{edgeChip('right')}</> : null;
 
-  return { button, box, isOpen, open, close, selectCentre, step, back };
+  return { button, box, isOpen, open, close, selectCentre, step, back, forward };
 }
 
 /**

@@ -17,6 +17,12 @@
    open that verse); hover and keyboard focus anywhere on the row call
    `onLight` (the panel lights the row's thread on the canvas, A5) and
    leaving it calls `onLight(null)`.
+
+   A WAY ON (`go`, 2026-11-03): the whole row is the one control, and it
+   follows the thread to the verse it names: the reference, its votes, its
+   words, and a chevron that says the row goes somewhere. `visited` marks a
+   verse the reader has stood at on any of their paths (a small gold ring,
+   named for a screen reader in the button's own name).
    ═══════════════════════════════════════════════════════════════════════ */
 
 /**
@@ -26,10 +32,11 @@
  *   onOpen?: () => void, openLabel?: string,
  *   onFollow?: () => void, followLabel?: string,
  *   onLight?: (on: boolean) => void, active?: boolean, mainClass?: string,
+ *   go?: boolean, visited?: boolean,
  * }} props
  */
 export function ConnectionRow({ title, tag, text, quote, skin = 'panel', onMain, mainLabel, onOpen, openLabel,
-  onFollow, followLabel, onLight, active, mainClass }) {
+  onFollow, followLabel, onLight, active, mainClass, go = false, visited = false }) {
   const fallback = skin === 'fallback';
   // a named row keeps its verse: the name replaces the button's words, so the preview is its
   // description (ideas audit s24.1)
@@ -37,7 +44,7 @@ export function ConnectionRow({ title, tag, text, quote, skin = 'panel', onMain,
   const described = mainLabel && text ? textId : undefined;
   const c = fallback
     ? { li: undefined, main: 'swf-row', top: 'swf-row-top', ref: 'swf-ref', tag: 'swf-tier', text: 'swf-snip' }
-    : { li: 'sw-row' + (active ? ' is-on' : ''), main: 'sw-row-main', top: 'sw-row-top', ref: 'sw-row-ref', tag: 'sw-row-tag', text: 'sw-row-text' };
+    : { li: 'sw-row' + (active ? ' is-on' : '') + (go ? ' sw-row-go' : ''), main: 'sw-row-main', top: 'sw-row-top', ref: 'sw-row-ref', tag: 'sw-row-tag', text: 'sw-row-text' };
   // the chooser and the Nearby list keep their rows' old hooks (.sw-choice-row, .sw-choice-chapter)
   if (mainClass) c.main += ' ' + mainClass;
   const light = onLight ? {
@@ -45,6 +52,24 @@ export function ConnectionRow({ title, tag, text, quote, skin = 'panel', onMain,
     onFocus: () => onLight(true),
     onBlur: (/** @type {any} */ e) => { if (!e.currentTarget.contains(e.relatedTarget)) onLight(false); },
   } : {};
+  if (go && !fallback) {
+    return (
+      <li className={c.li} {...light}>
+        <button type="button" className={c.main} onClick={onMain} aria-label={mainLabel} aria-describedby={described}>
+          <span className="sw-row-go-body">
+            <span className={c.top}>
+              <span className={c.ref}>{title}</span>
+              {tag ? <span className={c.tag}>{tag}</span> : null}
+            </span>
+            {text != null ? <span className={c.text + ' sw-row-text-go'} id={described}>{text}</span> : null}
+          </span>
+          {visited ? <i className="sw-row-visited" aria-hidden="true" /> : null}
+          <svg className="sw-row-chev" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+        </button>
+      </li>
+    );
+  }
   return (
     <li className={c.li} {...light}>
       <button type="button" className={c.main} onClick={onMain} aria-label={mainLabel} aria-describedby={described}>

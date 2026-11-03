@@ -592,8 +592,10 @@ describe('Back puts the panel back as it was', () => {
     settle();
     fireEvent.click(container.querySelector('.sw-goto-edge-right'));
     settle(); await flush();
-    // the view holds verses 70-170: 2 (100-300) and 0 (100-20100) leave on the right; 2 is the stronger
-    expect(get().sel.panel.spec).toEqual({ mode: 'connection', arc: 2 });
+    // the view holds verses 70-170: 2 (100-300) and 0 (100-20100) leave on the right; 2 is the stronger.
+    // The arrival is a stop (2026-11-03): the verse at the far end, its thread in chosen
+    expect(get().sel.panel.spec).toEqual({ mode: 'verse', verse: 300 });
+    expect(get().cam.focusRef.current.arc).toBe(2);
     await back(get);
     expect(get().sel.panel.spec).toEqual({ mode: 'verse', verse: 100 });
     expect(litOf(get).sort(), 'its threads lit again').toEqual([0, 2]);
@@ -620,10 +622,10 @@ describe('Back puts the panel back as it was', () => {
   });
 
   /* w4 interaction hunt: a row's Follow pushed its arrival with no `open`, so the trail filled it
-     from what was open at the push: the PREVIOUS connection (setDetail had not rendered). Two row
-     Follows, then Back, reopened the line before the first row's. Each arrival now carries the
-     row's own connection, as followThread's do; the trail's start keeps what was open there. */
-  it('two row Follows, then Back: the first row\'s line opens again, and Back home the line set out from', async () => {
+     from what was open at the push: the PREVIOUS connection (setDetail had not rendered). Each
+     arrival carries its own panel: since 2026-11-03 a stop is its verse (where the reader came
+     from, the ways on), and the trail sets out from the verse the first row left. */
+  it('two row Follows, then Back: each stop\'s verse opens again, its thread in chosen, home the verse the trail set out from', async () => {
     const { get } = mountWeb({ cam: { x: 150, ppv: 8 } });
     act(() => { get().sel.openPanel({ mode: 'connection', arc: 0 }); });
     settle();
@@ -631,11 +633,14 @@ describe('Back puts the panel back as it was', () => {
     settle(); await flush();
     act(() => { get().sel.followRow({ index: 1, hereVerse: 300, otherVerse: 200 }); });
     settle(); await flush();
-    expect(get().sel.panel.spec).toMatchObject({ mode: 'connection', arc: 1 });
+    expect(get().sel.panel.spec).toMatchObject({ mode: 'verse', verse: 200 });
+    expect(get().journey.stack.map((e) => e.verse)).toEqual([100, 300, 200]);
     await back(get);
-    expect(get().sel.panel.spec, 'the first row\'s line').toMatchObject({ mode: 'connection', arc: 2 });
+    expect(get().sel.panel.spec, 'the first row\'s verse').toMatchObject({ mode: 'verse', verse: 300 });
+    expect(get().cam.focusRef.current.arc, 'its thread in chosen again').toBe(2);
     await back(get);
-    expect(get().sel.panel.spec, 'where the trail set out: the line that was open there').toMatchObject({ mode: 'connection', arc: 0 });
+    expect(get().sel.panel.spec, 'where the trail set out').toMatchObject({ mode: 'verse', verse: 100 });
+    expect(get().journey.path.stops.map((e) => e.verse), 'the way ahead stays in the bar').toEqual([100, 300, 200]);
   });
 
   it('a book name\'s crumb keeps what was open when it was tapped, not the go-to\'s panel after it', async () => {
@@ -690,8 +695,10 @@ describe('the edge chips (spec 4.5): where lit threads leave the frame, and Foll
     expect(document.activeElement, 'focus goes home to the root').toBe(container.querySelector('.sw-root'));
     expect(get().cam.camRef.current.x).toBeCloseTo(20100.5, 6);
     expect(get().cam.camRef.current.ppv, 'the same zoom').toBeCloseTo(8, 9);
-    expect(get().sel.detail, 'the line opens where it landed').toMatchObject({ kind: 'arc', index: 0, far: 'from' });
-    expect(get().journey.stack.map((e) => e.verse)).toEqual([120, 20100]);
+    // the arrival is a stop (2026-11-03): the verse it landed on, set out from the thread's near end
+    expect(get().sel.detail, 'the verse opens where it landed').toMatchObject({ kind: 'verse', verse: 20100 });
+    expect(get().cam.focusRef.current.arc, 'its thread in chosen').toBe(0);
+    expect(get().journey.stack.map((e) => e.verse)).toEqual([100, 20100]);
   });
 
   /* w4 interaction hunt: the chip flew to the far end at the same zoom, then the line's opening
@@ -706,7 +713,7 @@ describe('the edge chips (spec 4.5): where lit threads leave the frame, and Foll
     fireEvent.click(right);
     settle(); await flush();
     settle(); await flush();
-    expect(get().sel.detail, 'the line opens where it landed').toMatchObject({ kind: 'arc', index: 2 });
+    expect(get().sel.detail, 'the verse opens where it landed').toMatchObject({ kind: 'verse', verse: 300 });
     expect(get().cam.camRef.current.x).toBeCloseTo(300.5, 6);
     expect(get().cam.camRef.current.ppv, 'the same zoom').toBeCloseTo(8, 9);
   });
@@ -921,7 +928,7 @@ describe("through the web's own keys (use-web-keys.js)", () => {
     fireEvent.keyDown(root, { key: 'Backspace' });
     settle(); await flush(); settle();
     expect(setAnnounce).toHaveBeenLastCalledWith('Back to Genesis 1:15552');
-    expect(get().journey.stack, 'home: the trail is done').toEqual([]);
+    expect(get().journey.stack.map((e) => e.label), 'home: where the trail set out, the trail kept').toEqual(['Genesis 1:15552']);
     expect(get().cam.camRef.current.x, 'where it set out').toBeCloseTo(15551, 6);
     expect(get().sel.panel, 'the overview had nothing open').toBeNull();
     fireEvent.keyDown(root, { key: 'Backspace' });

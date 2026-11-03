@@ -294,7 +294,7 @@ export function useAndroidBack({
       // "true, but nav-key-inert" too.
       if (modalRegistry.isAnyOpen()) {
         const top = modalRegistry.peek();
-        if (top && typeof top.dismiss === 'function') { top.dismiss(); clearSuppressNextHistoryPush(); return "true"; }
+        if (top && typeof top.dismiss === 'function') { top.dismiss('back'); clearSuppressNextHistoryPush(); return "true"; }
       }
       if (window.__closeSheet) {window.__closeSheet();window.__closeSheet = null;clearSuppressNextHistoryPush();return "true";}
       if (tabsOverviewOpenRef.current) {
@@ -490,7 +490,7 @@ export function useAndroidBack({
           // unregister. We do NOT also call handleAndroidBack — that
           // would dismiss-AND-navigate on a single press.
           e.preventDefault();
-          top.dismiss();
+          top.dismiss('escape');
         }
         return;
       }

@@ -648,6 +648,8 @@ export function paintCanonOverlay(ctx, fs) {
   for (const b of fs.keepOut || []) grid.add({ x0: b.x0 * dpr, x1: b.x1 * dpr, y0: b.y0 * dpr, y1: b.y1 * dpr });
   /** threads labelled this frame: OpenBible ids, and 'p<n>' for a prophecy pair */
   const labelled = new Set();
+  // the reader's path (use-journey.js): a bead at each stop it stands on, under the chosen feet
+  drawPathFeet(ctx, g, cam, L, view);
   const chosen = drawChosen(ctx, g, cam, L, fs, grid, labelled, ch);
   // a column's fan, asked for: placed before the feet's chips and the far ends, which keep off it
   const fan = drawFan(ctx, g, cam, L, fs, grid, hits);
@@ -1712,6 +1714,38 @@ function chosenOf(ctx, g, cam, L, fs) {
 
 /** The ground a chosen foot's reference keeps clear: its box and the halo round it. */
 const footHoles = (ch, s) => (ch ? ch.feet.map((f) => ({ x0: f.box.x0 - 4 * s, x1: f.box.x1 + 4 * s, y0: f.box.y0 - 3 * s, y1: f.box.y1 + 3 * s })) : []);
+
+/**
+ * The reader's path on the baseline (2026-11-03, mockup r1-phone): a small gold bead in a black ring
+ * at each foot of the threads their trail came along (view.path, the GL's path kind), so the stops
+ * read as a chain along the canon; the chosen line's own feet are drawn over them, bigger. A foot
+ * under the open panel is off the frame the reader sees (Q12).
+ * @param {CanvasRenderingContext2D} ctx @param {any} g @param {any} cam @param {any} L
+ * @param {{ path?: ArrayLike<number> | null, focusArc?: number }} view
+ */
+function drawPathFeet(ctx, g, cam, L, view) {
+  const ids = view && view.path;
+  if (!ids || !ids.length) return;
+  const { s, W, Wc, base, camY } = L;
+  const yb = base + camY;
+  const fan = fansOf(g);
+  const seen = new Set();
+  const r = 3 * s, ring = r + inkWidth('chosenFootRing') * s * 0.75;
+  for (let k = 0; k < ids.length; k++) {
+    const i = ids[k];
+    if (!(i >= 0 && i < g.count)) continue;
+    for (const [verse, f] of [[g.from[i], fan.fanA[i]], [g.to[i], fan.fanB[i]]]) {
+      if (seen.has(verse)) continue;
+      seen.add(verse);
+      const x = footX(cam, W, verse, f);
+      if (!(x >= 0 && x <= Wc)) continue;
+      ctx.fillStyle = css('chosenFootRing');
+      ctx.beginPath(); ctx.arc(x, yb, ring, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = css('path');
+      ctx.beginPath(); ctx.arc(x, yb, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+}
 
 /**
  * The chosen line (OpenBible or prophecy): its feet marked on the baseline it

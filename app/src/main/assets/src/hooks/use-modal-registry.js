@@ -69,7 +69,7 @@
 
 import { useRefMirror } from './use-ref-mirror.js';
 
-/** @type {Map<string, () => void>} */
+/** @type {Map<string, (how?: string) => void>} */
 const _registry = new Map();
 /** @type {Set<() => void>} */
 const _watchers = new Set();
@@ -93,7 +93,7 @@ export const modalRegistry = {
    * ignores invalid input rather than throwing — registration failure
    * should NOT prevent a modal from rendering.
    *
-   * @param {{ id: string, dismiss: () => void }} entry
+   * @param {{ id: string, dismiss: (how?: string) => void }} entry
    * @returns {void}
    */
   register(entry) {
@@ -134,7 +134,7 @@ export const modalRegistry = {
   },
 
   /**
-   * @returns {{ id: string, dismiss: () => void } | null}
+   * @returns {{ id: string, dismiss: (how?: string) => void } | null}
    *   The most-recently-registered entry (= topmost modal), or null if
    *   the registry is empty. Returns a fresh object each call.
    */
@@ -142,7 +142,7 @@ export const modalRegistry = {
     if (_registry.size === 0) return null;
     /** @type {string} */
     let lastId = '';
-    /** @type {(() => void) | null} */
+    /** @type {((how?: string) => void) | null} */
     let lastDismiss = null;
     for (const [id, dismiss] of _registry) {
       lastId = id;
@@ -191,7 +191,7 @@ export const modalRegistry = {
  *
  * @param {{
  *   id: string,
- *   dismiss: () => void,
+ *   dismiss: (how?: string) => void,
  *   active?: boolean
  * }} args
  *   id      — globally-unique registry key. Components with multiple
@@ -218,9 +218,11 @@ export function useModalRegistry({ id, dismiss, active = true }) {
     if (!id) return undefined;
     modalRegistry.register({
       id,
-      dismiss: () => {
+      // `how` (additive, 2026-11-03): 'back' from the system Back (Android's, the browser's),
+      // 'escape' from the Escape key; a modal that only closes ignores it
+      dismiss: (/** @type {string | undefined} */ how) => {
         const fn = dismissRef.current;
-        if (typeof fn === 'function') fn();
+        if (typeof fn === 'function') fn(how);
       },
     });
     return () => modalRegistry.unregister(id);

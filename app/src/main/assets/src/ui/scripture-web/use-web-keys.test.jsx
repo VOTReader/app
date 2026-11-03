@@ -12,7 +12,8 @@ afterEach(() => { cleanup(); document.body.innerHTML = ''; });
 
 const goToStub = (over = {}) => ({
   button: {}, box: null, isOpen: false,
-  open: vi.fn(), close: vi.fn(), selectCentre: vi.fn(() => true), step: vi.fn(() => true), back: vi.fn(() => true), ...over,
+  open: vi.fn(), close: vi.fn(), selectCentre: vi.fn(() => true), step: vi.fn(() => true), back: vi.fn(() => true),
+  forward: vi.fn(() => true), ...over,
 });
 
 function mountKeys(over = {}) {
@@ -31,7 +32,7 @@ function mountKeys(over = {}) {
 /**
  * A keydown as React hands the root one: on the root itself, or bubbled up from a child.
  * @param {string} key
- * @param {{ onChild?: boolean, ctrlKey?: boolean }} [opts]
+ * @param {{ onChild?: boolean, ctrlKey?: boolean, shiftKey?: boolean }} [opts]
  */
 function rootKey(key, { onChild = false, ...mods } = {}) {
   const root = document.createElement('div');
@@ -121,6 +122,15 @@ describe('Enter, Space, [ and ] on the web', () => {
     expect(p.goTo.back, 'a field or a button keeps its own Backspace').toHaveBeenCalledTimes(1);
   });
 
+  it('Shift+Backspace goes on along the trail again, the way the reader came back (2026-11-03)', () => {
+    const { p, keys } = mountKeys();
+    const e = rootKey('Backspace', { shiftKey: true });
+    keys().onKeyDown(e);
+    expect(p.goTo.forward).toHaveBeenCalledTimes(1);
+    expect(p.goTo.back).not.toHaveBeenCalled();
+    expect(e.preventDefault).toHaveBeenCalled();
+  });
+
   it('they are the web\'s only while the web has the keyboard: a button keeps its own Enter', () => {
     const { p, keys } = mountKeys();
     const e = rootKey('Enter', { onChild: true });
@@ -155,11 +165,29 @@ describe('Escape and Back close the go-to first', () => {
     top.dismiss();
     expect(p.goTo.close).toHaveBeenCalledTimes(1);
   });
+
+  /* 2026-11-03 ("back a couple to a different link"): on a trail stop with a stop before it, the
+     system Back steps back along the trail, as a browser goes back a page; Escape still closes. */
+  it('on a trail stop, the system Back steps back along the trail; Escape closes the panel', () => {
+    const trailBack = vi.fn(() => true);
+    const { p } = mountKeys({ detail: { kind: 'verse', verse: 300 }, trailBack });
+    const top = modalRegistry.peek();
+    top.dismiss('back');
+    expect(trailBack).toHaveBeenCalledTimes(1);
+    expect(p.closeCards, 'the panel stays: it shows the stop before').not.toHaveBeenCalled();
+    top.dismiss('escape');
+    expect(trailBack, 'Escape is no step back').toHaveBeenCalledTimes(1);
+    expect(p.closeCards).toHaveBeenCalledTimes(1);
+    // nowhere to step back to: the system Back closes, as it always has
+    const none = mountKeys({ detail: { kind: 'verse', verse: 300 }, trailBack: vi.fn(() => false) });
+    modalRegistry.peek().dismiss('back');
+    expect(none.p.closeCards).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('the help text (G2)', () => {
   it('names the keys', () => {
-    for (const w of [/arrow keys/i, /plus and minus/i, /\b0\b/, /Enter or Space/, /\[ and \]/, /slash|\//i, /Control\+K/, /Backspace/, /Escape/]) {
+    for (const w of [/arrow keys/i, /plus and minus/i, /\b0\b/, /Enter or Space/, /\[ and \]/, /slash|\//i, /Control\+K/, /Backspace/, /Shift\+Backspace/, /Escape/]) {
       expect(WEB_KEYS_HELP).toMatch(w);
     }
   });

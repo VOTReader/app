@@ -41,19 +41,28 @@
 import { ConnectionRow } from './connection-row.jsx';
 import {
   connectionTitle, connectionMeta, sheetEyebrow, sheetMeta, listEyebrow, listMeta, arcLine, plural, timesWord, followLabel, openInReaderLabel,
-  verseEndpoint, verseTextFor, WHOLE_WEB, exitsWords, endsOf,
+  verseTextFor, WHOLE_WEB, exitsWords, endsOf,
+  goOnTitle, goOnRowLabel, allByBookLabel, cameFromLabel, backToLabel, forwardToLabel, pathsLabel, pathsMeta, forkLabel,
 } from '../../utils/scripture-web/describe.js';
 import {
   GROUP_ROWS, verseText, shortRef, connectionModel, verseModel, rangeModel, letterRows, zoomChapterOf, chapterName,
-  exitsModel,
+  exitsModel, waysOn, cameFrom,
 } from '../../utils/scripture-web/panel-model.js';
 import { refOfVerse } from '../../utils/scripture-web/pick.js';
 import { windowCorpus, letterKeyOf } from '../../utils/scripture-web/vot-citations.js';
 import { litKeyOf } from '../../utils/scripture-web/focus-state.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
+import { stopOf, branchesOf, visitedOf } from './use-journey.js';
+import { showsStop } from './use-web-selection.js';
 
 /** Citations shown before "Show n more". */
 export const CITED_SHOWN = 2;
+/** A stop's strongest ways on, before "All n by book": the phone's panel holds fewer above the fold. */
+export const GO_ON_SHOWN = 6;
+export const GO_ON_SHOWN_COMPACT = 4;
+/** The trail bar's right-hand fade, CSS px (app.css .sw-trail-stops' mask): the stop where the reader
+ * is is scrolled clear of it. */
+const TRAIL_FADE = 18;
 /** Where nothing is laid out to measure (jsdom, a first render), a quote longer than this many
  * characters stands in for one the two-line clamp cuts, and is offered "more" (Quote measures the
  * clamp itself wherever there is layout). */
@@ -264,6 +273,172 @@ function VerseBlock({ block, heading = true, onOpen, extra = null }) {
   );
 }
 
+/** A crumb's name for a screen reader: the stop's own label where the crumb abbreviates it. */
+function crumbName(g, s) {
+  const text = crumbText(g, s);
+  return s.label && s.label !== text && s.label !== WHOLE_WEB ? s.label : undefined;
+}
+
+/** A stop's verse in its own words, for the paths view: '' for a place (a book, a chapter, the
+ * whole web) or a range, which the label names alone. */
+function stopText(g, s, translation) {
+  if (!(s.verse >= 0 && s.verse < g.total)) return '';
+  const r = refOfVerse(g, s.verse);
+  return s.label === r.label ? verseText(r, translation) : '';
+}
+
+const ICON = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6,
+  strokeLinecap: /** @type {'round'} */ ('round'), strokeLinejoin: /** @type {'round'} */ ('round'), 'aria-hidden': true };
+
+/**
+ * THE TRAIL BAR (2026-11-03; mockup r1-phone): pinned over the panel's scroll, so the way back is
+ * always in reach. Back and Forward; then the path as crumbs, from where the trail set out, through
+ * where the reader is (gold), on along the way they went last (dimmer, ahead), each a stop to go to
+ * in one flight; then the paths button once the reader has gone more than one way. Where the panel
+ * shows something else than the stop the reader is at (a line tapped on the way), Back is the way
+ * back to that stop, and its crumb a button.
+ * @param {{ g: any, journey: any, atHere: boolean, branches: number, pathsOpen: boolean,
+ *   onPaths: () => void, onMove: () => void }} p
+ */
+function TrailBar({ g, journey, atHere, branches, pathsOpen, onPaths, onMove }) {
+  const { path, here, trail } = journey;
+  const stopsRef = React.useRef(/** @type {HTMLOListElement | null} */ (null));
+  // the crumb where the reader is stays in view as the trail grows: the row scrolls sideways to
+  // show it whole with as many stops before it as fit, starting at a stop's own edge, never mid-word
+  const hereId = here ? here.id : -1;
+  React.useLayoutEffect(() => {
+    const ol = stopsRef.current;
+    const el = ol && ol.querySelector('.is-here');
+    if (!el) return;
+    const lis = Array.from(ol.children);
+    const at = lis.indexOf(el);
+    const left = ol.getBoundingClientRect().left - ol.scrollLeft;
+    // a stop's words (its "›" before them is the li's own): where they start and end in the row
+    const words = (/** @type {Element} */ li) => (li.firstElementChild || li).getBoundingClientRect();
+    const pos = (/** @type {Element} */ li) => words(li).left - left;
+    const pad = parseFloat(getComputedStyle(ol).paddingLeft) || 0;
+    // the room between the left padding and the right edge's fade (app.css: 18 px)
+    const room = ol.clientWidth - pad - TRAIL_FADE;
+    const end = pos(el) + words(el).width;
+    let first = at;
+    while (first > 0 && end - pos(lis[first - 1]) <= room) first--;
+    // and never short of what the stop where the reader is needs to clear the fade
+    const want = Math.max(first > 0 ? pos(lis[first]) - pad : 0, end - (ol.clientWidth - TRAIL_FADE));
+    ol.scrollLeft = Math.max(0, Math.min(ol.scrollWidth - ol.clientWidth, want));
+  }, [hereId, path.stops.length]);
+  if (!here) return null;
+  const back = !atHere ? here : stopOf(trail, here.parent);
+  const ahead = here.last >= 0 ? stopOf(trail, here.last) : null;
+  const act = (/** @type {() => any} */ f) => () => { onMove(); f(); };
+  return (
+    <nav className="sw-trail" aria-label="Your path">
+      <button type="button" className="sw-trail-btn" onClick={act(() => journey.back())} disabled={!back}
+        aria-label={back ? backToLabel(back.label || crumbText(g, back)) : 'Back'}>
+        <svg {...ICON}><path d="M15 18l-6-6 6-6" /></svg>
+      </button>
+      <button type="button" className="sw-trail-btn" onClick={act(() => journey.forward())} disabled={!(atHere && ahead)}
+        aria-label={atHere && ahead ? forwardToLabel(ahead.label || crumbText(g, ahead)) : 'Forward'}>
+        <svg {...ICON}><path d="M9 6l6 6-6 6" /></svg>
+      </button>
+      <ol className="sw-trail-stops" ref={stopsRef}>
+        {path.stops.map((s, i) => {
+          const isHere = i === path.here;
+          return (
+            <li key={s.id} className={isHere ? 'is-here' : i > path.here ? 'is-ahead' : undefined}>
+              {isHere && atHere ? <span className="sw-trail-at" aria-current="location" aria-label={crumbName(g, s)}>{crumbText(g, s)}</span> : (
+                <button type="button" className="sw-crumb" onClick={act(() => journey.go(s.id))}
+                  aria-current={isHere ? 'location' : undefined} aria-label={crumbName(g, s)}>{crumbText(g, s)}</button>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {branches > 1 ? (
+        <button type="button" className={'sw-trail-paths' + (pathsOpen ? ' is-on' : '')} onClick={onPaths}
+          aria-pressed={pathsOpen} aria-label={pathsLabel(branches)}>
+          <svg {...ICON} width={18} height={18}><circle cx="6" cy="5" r="2" /><circle cx="6" cy="19" r="2" /><circle cx="18" cy="9" r="2" /><path d="M6 7v10M18 11c0 4-6 3-11.2 6.5" /></svg>
+          <span aria-hidden="true">{branches}</span>
+        </button>
+      ) : null}
+    </nav>
+  );
+}
+
+/** A stop's way in (2026-11-03): the verse its thread came from, quiet, with the thread's votes; the
+ * whole line is the way back there. */
+function CameFrom({ from, onBack }) {
+  return (
+    <button type="button" className="sw-came" onClick={onBack} aria-label={backToLabel(from.ref.label)}>
+      <span className="sw-came-top">
+        <svg className="sw-came-icon" {...ICON} width={16} height={16}><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+        <span className="sw-came-ref">{cameFromLabel(from.ref.label)}</span>
+        {from.votes != null ? <span className="sw-came-votes">{plural(from.votes, 'vote', 'votes')}</span> : null}
+      </span>
+      {from.text ? <span className="sw-came-text">{from.text}</span> : null}
+    </button>
+  );
+}
+
+/**
+ * YOUR PATHS (2026-11-03; mockup r1-paths): every way the reader has gone, as a transit map. The
+ * first path runs down from where the trail set out; each other way on is a path of its own, under
+ * a fork naming the stop it left. Each stop goes there in one flight, with its verse's words; where
+ * the reader is, is said. Clear asks a second tap (nothing to undo it with).
+ * @param {{ g: any, journey: any, translation?: string, onDone: () => void }} p
+ */
+function PathsView({ g, journey, translation, onDone }) {
+  const branches = branchesOf(journey.trail);
+  const [arming, setArming] = React.useState(false);
+  React.useEffect(() => {
+    if (!arming) return undefined;
+    const t = setTimeout(() => setArming(false), 4000);
+    return () => clearTimeout(t);
+  }, [arming]);
+  const hereId = journey.here ? journey.here.id : -1;
+  return (
+    <React.Fragment>
+      <PanelHead over="Your paths" title={null} meta={pathsMeta(branches.length, journey.trail.stops.length)} />
+      <ol className="sw-paths">
+        {branches.map((b) => (
+          <li key={b.stops[0].id} className={'sw-path' + (b.from ? ' is-fork' : '') + (b.current ? ' is-current' : '')}>
+            <ol className="sw-path-stops">
+              {/* a path that leaves another begins at the stop it leaves from, small and hollow */}
+              {b.from ? (
+                <li className="sw-path-stop is-from">
+                  <button type="button" className="sw-path-go" onClick={() => { onDone(); journey.go(/** @type {any} */ (b.from).id); }}
+                    aria-label={forkLabel(b.from.label || crumbText(g, b.from))}>
+                    <span className="sw-path-top"><span className="sw-path-ref">{forkLabel(b.from.label === WHOLE_WEB ? 'the whole web' : b.from.label || crumbText(g, b.from))}</span></span>
+                  </button>
+                </li>
+              ) : null}
+              {b.stops.map((s) => {
+                const isHere = s.id === hereId;
+                const text = stopText(g, s, translation);
+                return (
+                  <li key={s.id} className={'sw-path-stop' + (isHere ? ' is-here' : '')}>
+                    <button type="button" className="sw-path-go" aria-current={isHere ? 'location' : undefined}
+                      onClick={() => { onDone(); journey.go(s.id); }}>
+                      <span className="sw-path-top">
+                        <span className="sw-path-ref">{s.label === WHOLE_WEB ? 'Whole web' : s.label || crumbText(g, s)}</span>
+                        {isHere ? <span className="sw-path-here">You are here</span> : null}
+                      </span>
+                      {text ? <span className="sw-path-text">{text}</span> : null}
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </li>
+        ))}
+      </ol>
+      <button type="button" className={'sw-paths-clear' + (arming ? ' is-arming' : '')}
+        onClick={() => { if (arming) { onDone(); journey.clear(); } else setArming(true); }}>
+        {arming ? 'Tap again to clear your paths' : 'Clear paths'}
+      </button>
+    </React.Fragment>
+  );
+}
+
 /**
  * A citing passage's quote: two lines (r2-02), then "more" when the clamp cuts it. w4: "more" asked
  * the text's length (QUOTE_LONG) and not the clamp, so on a phone, where two lines hold about 100
@@ -446,6 +621,21 @@ export function WebPanel(props) {
   } = props;
   const mode = listOpen ? 'list' : choices && choices.length ? 'chooser' : modeOfDetail(detail);
   const key = subjectKey(mode, detail, choices);
+  // the trail (use-journey.js): where the reader is on it, and whether this panel shows that stop
+  const trail = journey && journey.trail ? journey.trail : null;
+  const here = journey && journey.here ? journey.here : null;
+  const atHere = !!here && showsStop(here, detail, choices, listOpen);
+  // a verse panel at the stop the reader is at: its thread in is where they came from, not a way on
+  const via = atHere && mode === 'verse' && here.via && !here.via.prophecy ? here.via.arc : -1;
+  const stopCount = trail ? trail.stops.length : 0;
+  // the trail bar (use-journey.js: the navigation stream keeps the trail) once the reader has gone
+  // somewhere from where they set out: pinned over the scroll, in every mode but My Web's
+  const trailShown = webMode !== 'personal' && !!here && stopCount >= 2;
+  // the paths view, over whatever the panel shows; a new subject puts it away
+  const [pathsOpen, setPathsOpen] = React.useState(false);
+  React.useEffect(() => { setPathsOpen(false); }, [key]);
+  const showPaths = pathsOpen && trailShown;
+  const contentKey = showPaths ? 'paths' : key;
 
   // no trap (digest #46): useFocusTrap's modal:false only hands focus back on close. It is called
   // BEFORE the panel's own focus below, so it remembers where the reader was, not the panel.
@@ -475,7 +665,7 @@ export function WebPanel(props) {
       try { el.focus({ preventScroll: true }); } catch (_e) { /* best-effort */ }
     }
     firstRef.current = false;
-  }, [key, ref]);
+  }, [contentKey, ref]);
 
   const bibleV = useCorpusVersion('__bibleCorpus');
   const votV = useCorpusVersion('__votCorpus');
@@ -492,13 +682,13 @@ export function WebPanel(props) {
     if (!g || !detail || mode === 'list' || mode === 'chooser') return null;
     const opts = { density, translation, corpus: corpusNow() };
     if (mode === 'connection') return connectionModel(g, detail, opts);
-    if (mode === 'verse') return verseModel(g, detail.verse, Object.assign(opts, { verseEnd: detail.verseEnd }));
+    if (mode === 'verse') return verseModel(g, detail.verse, Object.assign(opts, { verseEnd: detail.verseEnd, skip: via }));
     if (mode === 'group') return rangeModel(g, detail.lo, detail.hi, density);
     if (mode === 'letter') return { rows: letterRows(g, detail.letterKey, translation) };
     if (mode === 'exits') return exitsModel(g, detail);
     return null;
     // eslint-disable-next-line react-hooks/exhaustive-deps -- the versions are the trigger: the model reads globals they fill
-  }, [g, detail, mode, density, translation, bibleV, votV, studiesV]));
+  }, [g, detail, mode, density, translation, via, bibleV, votV, studiesV]));
   const cited = model && model.cited ? model.cited : [];
   const wantStudies = cited.some((c) => c.collection === 'studies' && !c.excerpt);
   React.useEffect(() => {
@@ -515,8 +705,13 @@ export function WebPanel(props) {
     ? () => { setStudiesFailed(false); setStudiesTry((n) => n + 1); } : null;
 
   // the lit set this mode keeps (verse mode: the threads it lists; exits mode: the lines it counts,
-  // lit when it opened); a row lights its own over it
-  const base = mode === 'verse' && model && model.threads ? model.threads.ids
+  // lit when it opened); a row lights its own over it. A stop the reader came to along a thread
+  // lights only the ways on it lists first (2026-11-03): the web then shows the path in, the path
+  // behind, and the few ways the panel offers, not every thread of the verse over the chain
+  const goShown = compact ? GO_ON_SHOWN_COMPACT : GO_ON_SHOWN;
+  const ways = React.useMemo(() => (mode === 'verse' && model && model.threads ? waysOn(model.threads) : null), [mode, model]);
+  const firstWays = React.useMemo(() => (via >= 0 && ways ? ways.slice(0, goShown).map((r) => r.index) : null), [via, ways, goShown]);
+  const base = mode === 'verse' && model && model.threads ? (firstWays || model.threads.ids)
     : mode === 'exits' && detail && detail.ids ? detail.ids : null;
   const light = React.useCallback((/** @type {ArrayLike<number> | null} */ ids) => {
     if (webMode === 'personal' || typeof lightThreads !== 'function') return;
@@ -538,16 +733,19 @@ export function WebPanel(props) {
     : sheetEyebrow(detail) + ' details';
   const closeLabel = mode === 'list' ? 'Close nearby connections' : mode === 'chooser' ? 'Close connection choices' : 'Close';
 
-  /** A thread row's actions (spec 4.6: [Open] [Follow]; the row itself shows that connection). */
-  const rowProps = (/** @type {any} */ r) => ({
-    // a row's card keeps the way back to this one ("Back to ..."): it is no step of the trail
-    onMain: () => openPanel({ mode: 'connection', arc: r.index }, { back: true }),
-    mainLabel: r.other.label + ', ' + plural(r.votes, 'vote', 'votes') + ': show this connection',
-    // one wording with the open connection's own Open in reader and Follow to (ideas audit A10.4)
-    onOpen: () => onOpen(verseEndpoint(r.other)), openLabel: openInReaderLabel(r.other.label),
-    onFollow: () => followRow(r), followLabel: followLabel(r.other.label),
-    onLight: (/** @type {boolean} */ on) => light(on ? [r.index] : null),
-  });
+  /** A thread row (2026-11-03): a way on. The whole row follows the thread to the verse it names
+   * (followRow: that verse becomes a stop of the trail, its panel opens there), and says whether
+   * the reader has stood there on one of their paths. Open in reader is the stop's own. */
+  const visited = trail ? visitedOf(trail) : null;
+  const rowProps = (/** @type {any} */ r) => {
+    const seen = !!visited && visited.has(r.otherVerse);
+    return {
+      go: true, visited: seen,
+      onMain: () => followRow(r),
+      mainLabel: goOnRowLabel(r.other.label, r.votes, seen),
+      onLight: (/** @type {boolean} */ on) => light(on ? [r.index] : null),
+    };
+  };
   const votesTag = (/** @type {any} */ r) => plural(r.votes, 'vote', 'votes');
   const fromTag = (/** @type {any} */ r) => 'from ' + shortRef(g, r.hereVerse);
   const sortNote = <p className="sw-sort-note">Strongest first in each book.</p>;
@@ -599,20 +797,24 @@ export function WebPanel(props) {
       </React.Fragment>
     );
   } else if (mode === 'connection' && model) {
-    const farVerse = detail.far === 'to' ? detail.to : detail.from;
-    const farEnd = detail.far === 'to' ? detail.b : detail.a;
-    // "Follow to <the far end>", so Follow shares "Open in reader"'s row (w4; describe.js)
-    const followWords = followLabel(farEnd.label);
-    const follow = (
-      <button type="button" className="sw-link sw-follow" onClick={() => followThread(detail)}
-        aria-label={followWords}><span className="sw-follow-label">{metaItems(followWords)}</span> <span aria-hidden="true">›</span></button>
-    );
+    // "Follow to <that end>" on each end (2026-11-03): a line is a fork in the road, and either end
+    // is a way on; it shares "Open in reader"'s row (w4; describe.js). The end where the reader
+    // stands has none: they are there
+    const followTo = (/** @type {any} */ e) => {
+      if (here && atHereVerse(here, e.verse)) return null;
+      const words = followLabel(e.ref.label);
+      const far = e.verse === detail.to ? 'to' : 'from';
+      return (
+        <button type="button" className="sw-link sw-follow" onClick={() => followThread(Object.assign({}, detail, { far }))}
+          aria-label={words}><span className="sw-follow-label">{metaItems(words)}</span> <span aria-hidden="true">›</span></button>
+      );
+    };
     body = (
       <React.Fragment>
         <PanelHead over="Connection" title={connectionTitle(detail)} meta={arcLine(detail)} />
         <div className="sw-sec sw-verses">
           {model.ends.map((e) => (
-            <VerseBlock key={e.verse} block={e} onOpen={onOpen} extra={e.verse === farVerse ? follow : null} />
+            <VerseBlock key={e.verse} block={e} onOpen={onOpen} extra={followTo(e)} />
           ))}
         </div>
         <CitedSection g={g} cited={cited} showCites={() => true} startOpen={!compact} onOpen={onOpen} openPanel={openPanel}
@@ -631,22 +833,47 @@ export function WebPanel(props) {
       </React.Fragment>
     );
   } else if (mode === 'verse' && model) {
+    // A STOP (2026-11-03; mockup r1-phone): where the reader stands, in full; the verse they came
+    // from, quiet, as the way back; then the ways on, strongest first, one tap each; every thread by
+    // book under them; then the Volumes' citations
     const n = model.threads.total;
+    const shown = (ways || []).slice(0, goShown);
+    const from = atHere && here.via ? cameFrom(g, detail.verse, here.via, translation) : null;
+    const total = n + (via >= 0 ? 1 : 0);
+    // on the phone the way in is one quiet link beside "Open in reader", so the ways on stay above
+    // the fold; with room, a block with the verse it came from in its own words
+    const fromLink = from && compact ? (
+      <button type="button" className="sw-link sw-link-quiet sw-came-link" onClick={() => journey.back()}
+        aria-label={backToLabel(from.ref.label)}>
+        <svg className="sw-came-icon" {...ICON} width={16} height={16}><path d="M9 14L4 9l5-5" /><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" /></svg>
+        {cameFromLabel(shortRef(g, from.verse))}{from.votes != null ? ' · ' + plural(from.votes, 'vote', 'votes') : ''}
+      </button>
+    ) : null;
     body = (
       <React.Fragment>
         <PanelHead over={detail.verseEnd > detail.verse ? 'Verses' : 'Verse'} title={detail.label || model.ref.label}
-          meta={plural(n, 'connection', 'connections') + (cited.length ? ' · cited in the Volumes ' + timesWord(cited.length) : '')} />
-        <div className="sw-sec sw-verses"><VerseBlock block={model} heading={false} onOpen={onOpen} /></div>
-        <CitedSection g={g} cited={cited} showCites={(c) => c.cites !== model.ref.label} startOpen={!compact}
-          onOpen={onOpen} openPanel={openPanel} onRetry={retryStudies} />
-        <Section title={'Connections · ' + n.toLocaleString()} className="sw-sec-more">
+          meta={plural(total, 'connection', 'connections') + (cited.length ? ' · cited in the Volumes ' + timesWord(cited.length) : '')} />
+        <div className="sw-sec sw-verses"><VerseBlock block={model} heading={false} onOpen={onOpen} extra={fromLink} /></div>
+        {from && !compact ? <CameFrom from={from} onBack={() => journey.back()} /> : null}
+        <Section title={goOnTitle(n)} className="sw-sec-go">
           {n ? (
             <React.Fragment>
-              {sortNote}
-              <ThreadGroups groups={model.threads.groups} tagOf={votesTag} translation={translation} rowProps={rowProps} light={light} />
+              <ul className="sw-rows sw-go-list">
+                {shown.map((r) => (
+                  <ConnectionRow key={r.index} title={r.other.label} tag={votesTag(r)} text={verseText(r.other, translation)} {...rowProps(r)} />
+                ))}
+              </ul>
+              {n > shown.length ? (
+                <Section key={'all:' + key} title={allByBookLabel(n)} collapsible startOpen={false} className="sw-sec-all">
+                  {sortNote}
+                  <ThreadGroups groups={model.threads.groups} tagOf={votesTag} translation={translation} rowProps={rowProps} light={light} />
+                </Section>
+              ) : null}
             </React.Fragment>
-          ) : <p className="sw-panel-empty">No threads at this density.</p>}
+          ) : <p className="sw-panel-empty">{from ? 'No other threads at this density.' : 'No threads at this density.'}</p>}
         </Section>
+        <CitedSection g={g} cited={cited} showCites={(c) => c.cites !== model.ref.label} startOpen={!compact}
+          onOpen={onOpen} openPanel={openPanel} onRetry={retryStudies} />
       </React.Fragment>
     );
   } else if (mode === 'group' && model) {
@@ -751,53 +978,41 @@ export function WebPanel(props) {
   const parent = mode !== 'list' && mode !== 'chooser' && detail && detail.parent ? detail.parent : null;
   const parentName = parent ? (parent.kind === 'letter' ? parent.title : parent.kind === 'verse' ? parent.ref.label
     : parent.kind === 'arc' ? connectionTitle(parent) : sheetEyebrow(parent)) : '';
-  // the Follow trail (use-journey.js: the navigation stream keeps it): "Gen 3:15 › Isa 7:14 › Matt 1:23"
-  const stack = journey && Array.isArray(journey.stack) ? journey.stack : [];
-  // shown while the card is the trail's own: a card opened from a row has its Back link instead (the
-  // dead-control hunt, 2026-10-22: the trail named the card before it "here" and its Back skipped it)
-  const crumbs = mode === 'connection' && stack.length >= 2 && !parent ? stack : null;
-  // Back is the journey's alone: back() flies home and reopens what was open there on landing
-  // (use-journey.js); a fly of the panel's own after it took that fly over, so nothing reopened
-  const back = () => { if (journey && typeof journey.back === 'function') journey.back(); };
-  /** A crumb back along the trail: one Back a step, as many as it is from the top. @param {number} i */
-  const backTo = (i) => { if (crumbs) for (let k = crumbs.length - 1; k > i; k--) back(); };
+  const branches = trailShown ? branchesOf(/** @type {any} */ (trail)).length : 0;
 
   return (
-    <div className={containerClass} ref={ref} tabIndex={-1} role="dialog" aria-modal="false" aria-label={label}
+    <div className={containerClass} ref={ref} tabIndex={-1} role="dialog" aria-modal="false"
+      aria-label={showPaths ? 'Your paths' : label}
       data-mode={mode} data-lens-on={mode === 'list' ? (lensOn ? '1' : '0') : undefined}
-      data-scrolled={scrolled ? '1' : undefined}>
+      data-scrolled={scrolled ? '1' : undefined} data-trail={trailShown ? '1' : undefined}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label={closeLabel}>
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <path d="M18 6L6 18M6 6l12 12" />
         </svg>
       </button>
+      {trailShown ? (
+        <TrailBar g={g} journey={journey} atHere={atHere && !showPaths} branches={branches} pathsOpen={showPaths}
+          onPaths={() => setPathsOpen(!showPaths)} onMove={() => setPathsOpen(false)} />
+      ) : null}
       {/* a document inside the dialog (w4 quality hunt): the screen's root is role="application"
           for the web's keys, and there NVDA and JAWS stop the virtual cursor, so the verses the
           panel exists to show read only in browse mode, which a document turns back on */}
       <div className="sw-panel-body" ref={bodyRef} onScroll={onBodyScroll} role="document">
-        {crumbs ? (
-          <nav className="sw-crumbs" aria-label="Your trail">
-            <button type="button" className="sw-crumbs-back" onClick={back} aria-label="Back along the trail">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M15 18l-6-6 6-6" /></svg>
-            </button>
-            <ol>
-              {crumbs.map((c, i) => (
-                <li key={i} className={i === crumbs.length - 1 ? 'is-here' : undefined} aria-current={i === crumbs.length - 1 ? 'location' : undefined}>
-                  {i === crumbs.length - 1 ? crumbText(g, c) : (
-                    <button type="button" className="sw-crumb" onClick={() => backTo(i)}>{crumbText(g, c)}</button>
-                  )}
-                </li>
-              ))}
-            </ol>
-          </nav>
-        ) : null}
-        {parent ? (
+        {parent && !showPaths ? (
           <button type="button" className="sw-back-link" onClick={() => onChoose(parent, { frame: false })}>
             <span aria-hidden="true">‹ </span>Back to {parentName}
           </button>
         ) : null}
-        <div className="sw-panel-content" key={key}>{body}</div>
+        <div className="sw-panel-content" key={contentKey}>
+          {showPaths ? <PathsView g={g} journey={journey} translation={translation} onDone={() => setPathsOpen(false)} /> : body}
+        </div>
       </div>
     </div>
   );
+}
+
+/** Whether stop `s` is the reader standing at this verse: a verse's stop (a book's or a chapter's
+ * stands at its first verse, but is no verse of its own). @param {any} s @param {number} verse */
+function atHereVerse(s, verse) {
+  return s.verse === verse && (!!s.via || !!(s.open && s.open.mode === 'verse'));
 }

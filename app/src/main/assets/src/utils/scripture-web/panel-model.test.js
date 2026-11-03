@@ -190,6 +190,59 @@ describe('verse mode: John 3:16', () => {
   });
 });
 
+/* A STOP (2026-11-03): where the reader came from, and the ways on from there, strongest first. */
+describe('a stop: its ways on and its way in', () => {
+  it('waysOn: every thread of the verse, strongest first across the books, then the nearer', () => {
+    const t = pm.threadsFrom(g, JOHN_3_16, JOHN_3_16, 'famous');
+    const ways = pm.waysOn(t);
+    expect(ways).toHaveLength(48);
+    for (let k = 1; k < ways.length; k++) {
+      const a = ways[k - 1], b = ways[k];
+      expect(a.votes > b.votes || (a.votes === b.votes && Math.abs(a.otherVerse - a.hereVerse) <= Math.abs(b.otherVerse - b.hereVerse)),
+        a.other.label + ' before ' + b.other.label).toBe(true);
+    }
+    expect(new Set(ways.map((r) => r.index)).size, 'each thread once').toBe(48);
+  });
+
+  it('verseModel skips the thread the reader came along: a way in is no way on', () => {
+    const in1 = pm.waysOn(pm.threadsFrom(g, JOHN_3_16, JOHN_3_16, 'famous'))[0];
+    const m = pm.verseModel(g, JOHN_3_16, { density: 'famous', corpus, skip: in1.index });
+    expect(m.threads.total).toBe(47);
+    expect(m.threads.ids).not.toContain(in1.index);
+  });
+
+  it('cameFrom: the other end in full and the thread\'s votes; nothing for a thread that does not touch the verse', () => {
+    const from = pm.cameFrom(g, MATT_1_23, { arc: ARC });
+    expect(from.verse).toBe(ISA_7_14);
+    expect(from.ref.label).toBe('Isaiah 7:14');
+    expect(from.text).toBe('TEXT isaiah 7:14');
+    expect(from.votes).toBe(g.votes[ARC]);
+    expect(pm.cameFrom(g, JOHN_3_16, { arc: ARC }), 'the thread is not this verse\'s').toBeNull();
+    expect(pm.cameFrom(g, MATT_1_23, null)).toBeNull();
+    expect(pm.cameFrom(g, MATT_1_23, { arc: g.count })).toBeNull();
+    // a prophecy pair has no votes of its own
+    const k = g.prophecy.findIndex((p) => p.a !== p.b);
+    const pair = g.prophecy[k];
+    const viaPair = pm.cameFrom(g, pair.b, { arc: k, prophecy: true });
+    expect(viaPair.verse).toBe(pair.a);
+    expect(viaPair.votes).toBeNull();
+  });
+
+  it('the words: the ways on, the way in, Back and Forward, the paths', () => {
+    expect(ds.goOnTitle(1234)).toBe('Go on from here · 1,234');
+    expect(ds.goOnRowLabel('Luke 1:31', 1, false)).toBe('Go to Luke 1:31, 1 vote');
+    expect(ds.goOnRowLabel('Luke 1:31', 12, true)).toBe('Go to Luke 1:31, 12 votes, visited');
+    expect(ds.allByBookLabel(48)).toBe('All 48 by book');
+    expect(ds.cameFromLabel('Isaiah 7:14')).toBe('From Isaiah 7:14');
+    expect(ds.backToLabel('Isaiah 7:14')).toBe('Back to Isaiah 7:14');
+    expect(ds.forwardToLabel('Luke 2:11')).toBe('Forward to Luke 2:11');
+    expect(ds.pathsLabel(3)).toBe('Your paths, 3');
+    expect(ds.pathsMeta(1, 1)).toBe('1 path · 1 stop');
+    expect(ds.pathsMeta(3, 9)).toBe('3 paths · 9 stops');
+    expect(ds.forkLabel('Genesis 3:15')).toBe('From Genesis 3:15');
+  });
+});
+
 describe('group mode', () => {
   it('a chapter lists its threads by the book they go to and zooms to itself', () => {
     const ci = g.chapterOfVerse[ISA_7_14];
