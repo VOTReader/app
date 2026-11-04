@@ -1393,6 +1393,40 @@ describe('service-worker — this build\'s code and timings only (W27)', () => {
     expect(await (await sw.caches.open(CURRENT_CORE)).match(H2C)).toBeTruthy();
   });
 
+  /* h1104-19: a picture, icon or UI font the install's best-effort pass missed (the signal dropped) was fetched from
+     the network every time it showed and never kept, because only ASSET_INTEGRITY files were kept on use: the reader
+     saw it online and lost it offline, and the offline library stayed incomplete until someone tapped Retry. */
+  /** A response whose clone is a whole response too (status and all), as a real one's is. */
+  const clonable = (bytes) => ({ ...bytesResp(bytes), clone: () => clonable(bytes) });
+  it('a picture or UI font the install missed is kept the first time it loads online, so it shows offline too', async () => {
+    const GLYPHS = './fonts/vot-glyphs.woff2';
+    const GLYPHS_URL = 'https://app.test/fonts/vot-glyphs.woff2';
+    let online = true;
+    const sw = bootSW({ fail: [GLYPHS], resolveKeys: true, fetchImpl: async (r, inst) => {
+      if (!online) throw new TypeError('Failed to fetch');
+      return r.url === GLYPHS_URL ? clonable(realBytes(GLYPHS)) : inst(r);
+    } });
+    await install(sw);
+    await activate(sw);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(GLYPHS), 'the install missed it').toBeFalsy();
+    expect((await fetchEvent(sw, getReq(GLYPHS_URL))).status).toBe(200);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(GLYPHS), 'kept on use').toBeTruthy();
+    online = false;
+    const res = await fetchEvent(sw, getReq(GLYPHS_URL));
+    expect(res.status).toBe(200);
+    expect(await startsWith(res, realBytes(GLYPHS))).toBe(true);
+  });
+
+  it('a picture whose bytes are another build\'s is shown but never kept under this build\'s name', async () => {
+    const PIC = './study-cover-lamb.jpg';
+    const PIC_URL = 'https://app.test/study-cover-lamb.jpg';
+    const sw = bootSW({ fail: [PIC], resolveKeys: true, fetchImpl: async (r, inst) => (r.url === PIC_URL ? bytesResp(otherBuildBytes(PIC)) : inst(r)) });
+    await install(sw);
+    const res = await fetchEvent(sw, getReq(PIC_URL));
+    expect(res.status).toBe(200);
+    expect(await (await sw.caches.open(CURRENT_CORE)).match(PIC)).toBeFalsy();
+  });
+
   it('online, a share link with a query (?p=) boots the cached shell, not the network\'s (another build after a deploy)', async () => {
     const net = [];
     const sw = bootSW({ resolveKeys: true, fetchImpl: async (r, inst) => { if (/^https:/.test(r.url)) net.push(r.url); return inst(r); } });

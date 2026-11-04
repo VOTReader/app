@@ -1212,8 +1212,13 @@ async function coreFirst(request) {
     // answered is reloaded onto its own worker when that worker claims it (sw-register).
     const key = navigate ? null : scopeKey(request.url);
     const want = key && ASSET_INTEGRITY[key];
-    if (want && response.ok && !response.redirected) {
-      if (!(await isThisBuilds(response, want))) {
+    // h1104-19: a picture, icon or UI font the install's best-effort pass missed is kept here too, when its bytes are
+    // this build's (ASSET_REVISIONS), or it showed online and never offline. Another build's is shown, never kept:
+    // a picture is not code, so it is no reason for a 503.
+    const revision = !want && key && ASSET_REVISIONS[key];
+    if ((want || revision) && response.ok && !response.redirected) {
+      if (!(await isThisBuilds(response, want || revision))) {
+        if (revision) return response;
         askForUpdate(true);
         return new Response('Another build', { status: 503, statusText: 'Service Unavailable' });
       }
