@@ -3901,7 +3901,9 @@
     .garden-page-counter:focus-visible, .garden-jump-go:focus-visible { outline:2px solid var(--white); outline-offset:2px; }
     .garden-page-chevron { flex:none; opacity:0.75; }
     .garden-jump-go { min-height:44px; min-width:44px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:999px; color:var(--white); font-family:var(--font-cinzel); font-size:var(--fs-13); letter-spacing:0.05em; cursor:pointer; padding:0 0.8rem; }
-    .garden-jump-form { display:flex; align-items:center; gap:0.3rem; }
+    .garden-jump-form { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem; flex:1 1 auto; min-width:0; }
+    /* the scrubber: its own line under the number and Go, the bar's whole width, a 44 px track to hold */
+    .garden-jump-scrub { flex:1 0 100%; min-height:44px; margin:0; accent-color:var(--white); cursor:pointer; }
     .garden-jump-input { width:3rem; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:4px; color:var(--white); font-family:var(--font-cinzel); font-size:var(--fs-13); text-align:center; padding:0.2rem 0.3rem; outline:none; -moz-appearance:textfield; }
     .garden-jump-input::-webkit-inner-spin-button, .garden-jump-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
     .garden-jump-hint { font-family:var(--font-cinzel); font-size:var(--fs-13); color:rgba(255,255,255,0.5); }
@@ -9093,6 +9095,14 @@
     .sw-row-btn:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 2px; }
     /* Nearby's chapter row and the chooser's rows keep their hooks (.sw-choice-row) */
     .sw-choice-chapter .sw-row-ref { color: var(--sw-gold); }
+    /* a chooser row and a Nearby row open a card: a chevron says so (10-22 sweep, Discovery views 5), the
+       way a way-on row's does (.sw-row-chev); drawn here so the row's words and name stay as they are */
+    .sw-choice-row { position: relative; padding-right: 30px; }
+    .sw-choice-row::after {
+      content: '\203A' / ''; position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      font-size: calc(var(--fsc-20) * var(--sw-ts)); line-height: 1; color: var(--sw-text-muted);
+    }
+    .sw-row:hover .sw-choice-row::after, .sw-choice-row:focus-visible::after { color: var(--sw-gold); }
     /* "Zoom to <chapter>" (Q7): the panel closes and the chapter fills the web */
     .sw-zoom-row {
       display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; margin-top: 16px;

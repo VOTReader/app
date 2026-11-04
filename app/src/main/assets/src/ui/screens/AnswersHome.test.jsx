@@ -76,6 +76,19 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     expect(document.body.textContent).not.toMatch(/\b0 passages/);
   });
 
+  // 10-22 sweep, Discovery views 6: before the sidecar lands every row keeps a sub line, so the list does not
+  // reflow when it arrives; the index's row says the same sentence less its count (it grew a line at 360 px).
+  it('before the sidecar: every row keeps its sub line, and the index says its sentence without the count', () => {
+    delete window.ANSWERS_META;
+    render(<AnswersHome {...base} />);
+    const rows = [...document.querySelectorAll('.ans-row')];
+    expect(rows.length).toBeGreaterThan(20);
+    const fd = rows.find((r) => r.querySelector('.ans-row-title').textContent === 'False Doctrines Within the Churches (Index)');
+    expect(NB(fd.querySelector('.ans-row-sub').textContent)).toBe('Categories, each answered by The Truth');
+    // every topic row (Charts & videos is a tool row: its one-line sub fits inside the row's 76 px floor, measured)
+    for (const r of rows.filter((x) => !x.textContent.startsWith('Charts'))) expect(r.querySelector('.ans-row-sub'), r.textContent).toBeTruthy();
+  });
+
   it('the reading path: Continue in the site\'s order, the start, or nothing read when it is off', () => {
     const first = render(<AnswersHome {...base} />);
     const path = () => document.querySelector('.ans-path .ans-row');
