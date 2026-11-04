@@ -2222,10 +2222,12 @@ function runCli() {
   const xrefRegistry = new Set();
   /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
   const xrefs = [];
-  // Format-D (Bible Studies) letter-link cross-refs. Checked as WARNINGS, not
-  // errors: the study renderer navigates by letterId+screen (Segments path b),
-  // so seg.link here is currently UNUSED — a casing variant is latent, not a live
-  // dead link. Surfaced so it can't silently rot if the renderer ever switches.
+  // Format-D (Bible Studies) letter-link cross-refs. Checked as WARNINGS here.
+  // The study renderer DOES follow seg.link (LetterView hands every study
+  // chapter onInAppLink, so Segments takes path a; letterId+screen is only the
+  // fallback for a segment with no link), so a variant label is a live dead
+  // link: tools/corpus-links.test.js resolves every study link's title too,
+  // and holds the ones broken today in its known-breaks list.
   /** @type {Array<{ collection: string, letterTitle: string, where: string }>} */
   const studyXrefs = [];
   // Blank-footnote gate: every content owner (letter / entry / study chapter)
@@ -2531,13 +2533,13 @@ function runCli() {
   totals.items += xrefVotChecked;
   console.log(`  ${xrefVotChecked} VOT-letter cross-refs checked (of ${xrefs.length} link objects) — ${xrefErrors === 0 ? 'OK' : 'FAIL'} (${xrefErrors} unresolved)`);
   // Format-D study links — WARN (not error) on a casing/display variant of a real
-  // registryLabel (the seg.link is currently unused, so it's latent not live).
+  // registryLabel; tools/corpus-links.test.js is the gate for study links.
   let studyWarns = 0;
   for (const x of studyXrefs) {
     if (VOT_REGISTRY_LABELS.has(x.collection)) continue;          // exact registryLabel → fine
     const variant = NORM_TO_REGISTRY.get(_normLabel(x.collection));
     if (variant || VOT_DISPLAY_LABELS.has(x.collection)) {
-      console.warn(`  WARN:  [${x.where}] collection "${x.collection}" should be the exact registryLabel${variant ? ` "${variant}"` : ''} — harmless today (study links nav by letterId+screen) but a latent dead-link if the renderer ever uses seg.link.`);
+      console.warn(`  WARN:  [${x.where}] collection "${x.collection}" should be the exact registryLabel${variant ? ` "${variant}"` : ''} — a study chapter follows seg.link, so this tap does nothing (tools/corpus-links.test.js).`);
       studyWarns++;
     }
     // else: collection isn't a VOT collection at all (Bible-Study self-ref) → skip.
