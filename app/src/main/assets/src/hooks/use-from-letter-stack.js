@@ -93,6 +93,23 @@
 import { useRefMirror } from './use-ref-mirror.js';
 
 /**
+ * share-fn: the footnote a tap-through left from, handed back to the page it lives on
+ * (navHandoff 'reopenFootnote', which LetterView matches against its letter.id), or null.
+ * A Bible study's chapter is a LetterView page whose letter.id is the CHAPTER's id
+ * (BibleStudyChapterView's shim); the entry's sourceLetterId there is only the letter the
+ * app had open before, so naming it missed the chapter's own footnote and left the hand-off
+ * for that earlier letter, whose footnote of the same number opened the next time it was
+ * read (reading-flow hunt, 2026-11-04). Both Back paths (the pill, hardware Back) use this.
+ * @param {any} entry  a fromLetterStack entry
+ * @returns {{ letterId: string, num: string } | null}
+ */
+export function reopenFootnoteOf(entry) {
+  if (!entry || entry.sourceFootnote == null) return null;
+  const page = entry.sourceScreen === 'bible-study-chapter' ? entry.sourceStudyChapterId : entry.sourceLetterId;
+  return page ? { letterId: page, num: entry.sourceFootnote } : null;
+}
+
+/**
  * Multi-level tap-through back-stack + "Back to …" pill handler. Pushes
  * source contexts onto a per-tab stack (via tabField); the pill on the
  * destination screen pops the top and restores its captured nav state.
@@ -159,7 +176,8 @@ export function useFromLetterStack({
     if (popped.sourceStudyChapterId !== undefined) setStudyChapterId(popped.sourceStudyChapterId);
     if (popped.sourceJournalEntryId !== undefined) setJournalEntryId(popped.sourceJournalEntryId);
     // share-fn: left from inside a footnote, Back lands on that footnote, open again.
-    if (popped.sourceFootnote != null && popped.sourceLetterId) window.navHandoff.set('reopenFootnote', { letterId: popped.sourceLetterId, num: popped.sourceFootnote });
+    const reopen = reopenFootnoteOf(popped);
+    if (reopen) window.navHandoff.set('reopenFootnote', reopen);
     if (popped.sourceScreen) setScreen(popped.sourceScreen);
   };
 

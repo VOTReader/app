@@ -338,6 +338,19 @@ describe('useAndroidBack — P1-12 History tap-through return path', () => {
     expect(props.setScreen).toHaveBeenCalledWith('journal-viewer');
   });
 
+  // share-fn on a Bible study (reading-flow hunt 2026-11-04): the footnote lives on the study
+  // chapter's page, so Back hands IT the footnote, not the letter the app last had open.
+  it('step 3 hands a Bible study chapter back its own footnote', () => {
+    /** @type {any} */ (window).navHandoff = { clear: vi.fn(), set: vi.fn() };
+    const stack = [{ sourceScreen: 'bible-study-chapter', sourceLetterId: 'keep-the-passover', sourceStudyId: 'grace-and-the-law', sourceStudyChapterId: 'grace-and-the-law-ch7', sourceFootnote: '8' }];
+    const props = baseProps({ screen: 'vot-one-letter', fromLetterRef: { current: stack }, backActive: true });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(window.navHandoff.set).toHaveBeenCalledWith('reopenFootnote', { letterId: 'grace-and-the-law-ch7', num: '8' });
+    expect(props.setStudyChapterId).toHaveBeenCalledWith('grace-and-the-law-ch7');
+    expect(props.setScreen).toHaveBeenCalledWith('bible-study-chapter');
+  });
+
   // Phase 3: History entries are now `silent` (no pill), so backHint is null
   // for them — backActive is what keeps this return path alive.
   it('back from a chapter entered via History defers to the back-pill handler (tapThroughBack)', () => {
