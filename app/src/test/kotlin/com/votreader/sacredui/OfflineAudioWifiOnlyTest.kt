@@ -179,6 +179,22 @@ class OfflineAudioWifiOnlyTest {
         waitFor("the automatic one on Wi-Fi") { s.isSaved(url1) }
     }
 
+    /* h1104-19: the job's network asked only after the switch, so a queue holding only Wi-Fi-only items (a plan's
+       automatic days, a "Wait for Wi-Fi" plan) ran its user-initiated job on mobile data, an ongoing "Waiting for
+       Wi-Fi" notification keeping the app up until Wi-Fi. Such a queue now asks Android for an unmetered network. */
+    @Test
+    fun `a queue of only Wi-Fi-only downloads asks for an unmetered network, one of the listener's own does not (h1104-19)`() {
+        val s = recording()
+        s.enqueue(listOf(OfflineAudioStore.Item(url1, "a", "auto", wifi = true)))
+        Thread.sleep(100)
+        assertTrue(s.summary().onlyWifi)
+        assertEquals(android.app.job.JobInfo.NETWORK_TYPE_UNMETERED, DownloadJob.networkFor(s.summary()))
+        s.enqueue(listOf(OfflineAudioStore.Item(url2, "b", "own")))
+        assertFalse(s.summary().onlyWifi)
+        assertEquals(android.app.job.JobInfo.NETWORK_TYPE_ANY, DownloadJob.networkFor(OfflineAudioStore.Summary(true, false, null, 0, 2, 0, 0, -1, 0, false)))
+        assertEquals(android.app.job.JobInfo.NETWORK_TYPE_UNMETERED, DownloadJob.networkFor(OfflineAudioStore.Summary(true, false, null, 0, 2, 0, 0, -1, 0, true)))
+    }
+
     @Test
     fun `the listener's own Download of one waiting for Wi-Fi starts it on mobile data (dl-d5)`() {
         val s = recording()

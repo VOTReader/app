@@ -46,7 +46,7 @@ object DownloadJob {
             if (!s.busy || s.paused) return
             val info = JobInfo.Builder(JOB_ID, ComponentName(app, DownloadJobService::class.java))
                 .setUserInitiated(true)
-                .setRequiredNetworkType(if (s.wifiOnly) JobInfo.NETWORK_TYPE_UNMETERED else JobInfo.NETWORK_TYPE_ANY)
+                .setRequiredNetworkType(networkFor(s))
                 .setEstimatedNetworkBytes(s.leftBytes.coerceAtLeast(0L), 0L)
                 .build()
             js.schedule(info)
@@ -55,6 +55,10 @@ object DownloadJob {
             Timber.w(e, "downloads: the user-initiated job could not be scheduled")
         }
     }
+
+    /** The network the job waits for: unmetered with the switch on, or when all that is queued is Wi-Fi-only (h1104-19). */
+    fun networkFor(s: OfflineAudioStore.Summary): Int =
+        if (s.wifiOnly || s.onlyWifi) JobInfo.NETWORK_TYPE_UNMETERED else JobInfo.NETWORK_TYPE_ANY
 
     /** The notification's words for [s]: (title, text, progress 0..1000 or -1 for none). */
     fun words(s: OfflineAudioStore.Summary): Triple<String, String, Int> {
