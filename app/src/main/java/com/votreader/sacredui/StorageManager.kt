@@ -199,6 +199,8 @@ class StorageManager(private val context: Context) {
 
     // ── export session ──
     private var exportOut: DataOutputStream? = null
+    // The document the open session writes, so abandonV3Export aborts only the session it was asked about.
+    private var exportUri: Uri? = null
     // Bytes still expected in the current blob frame (0 = no frame in flight /
     // frame complete). Cross-checked so a short/over write fails loudly rather
     // than producing a silently-corrupt only-backup.
@@ -245,6 +247,7 @@ class StorageManager(private val context: Context) {
             out.writeLong(manifestBytes.size.toLong())
             out.write(manifestBytes)
             exportOut = out
+            exportUri = uri
             exportFrameRemaining = 0L
             exportManifestCrc = CRC32().apply { update(manifestBytes) }.value
             Result.Success(Unit)
@@ -316,6 +319,7 @@ class StorageManager(private val context: Context) {
     fun finishV3Export(commit: Boolean, uri: Uri?): Result<Unit> = synchronized(v3Lock) {
         val out = exportOut ?: return Result.Failure("no_session")
         exportOut = null
+        exportUri = null
         val incomplete = exportFrameRemaining != 0L
         exportFrameRemaining = 0L
         return try {
@@ -341,7 +345,12 @@ class StorageManager(private val context: Context) {
             Timber.w(e, "finishV3Export failed")
             // A failed flush/close means the destination may hold a truncated
             // container — same cleanup contract as the abort / incomplete-frame
-            // paths: never leave a partial backup behind.
+            // paths: never leave a partial backup behind. Close it first, as
+            // they do: a flush that threw (a full disk) skipped the close above,
+            // and exportOut is already cleared, so nothing later would release
+            // it. Left open, the descriptor kept the deleted partial's blocks,
+            // the whole partial backup, allocated until a GC finalized it.
+            try { out.close() } catch (_: Exception) { /* already failing */ }
             uri?.let { deleteDocumentQuietly(it) }
             Result.Failure(e.message ?: "finish_failed")
         }
@@ -552,9 +561,27 @@ class StorageManager(private val context: Context) {
         closeImportQuietly()
     }
 
+    /**
+     * The page streaming a v3 export died with its renderer (MainActivity.onRenderProcessGone), so nothing will
+     * ever finish or abort the export it began. Fail it clean in the page's place: the session open on [uri] is
+     * closed and its partial document deleted, exactly as the page's own abort (finishV3Export(false)) does. A
+     * destination the page never began writing is deleted only while still empty ([deleteIfEmpty]: a file the
+     * reader chose to overwrite, untouched so far, stays). A session on another document is left alone.
+     */
+    fun abandonV3Export(uri: Uri) {
+        synchronized(v3Lock) {
+            if (exportOut == null) {
+                deleteIfEmpty(uri)
+            } else if (exportUri == uri) {
+                finishV3Export(commit = false, uri = uri)
+            }
+        }
+    }
+
     private fun closeExportQuietly() {
         try { exportOut?.close() } catch (_: Exception) { /* best-effort */ }
         exportOut = null
+        exportUri = null
         exportFrameRemaining = 0L
         exportManifestCrc = 0L
     }

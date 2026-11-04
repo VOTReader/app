@@ -13,6 +13,7 @@ import io.mockk.clearAllMocks
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -944,6 +945,48 @@ class StorageManagerTest {
         verify(exactly = 1) {
             cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
         }
+    }
+
+    @Test
+    fun `v3 export closes the provider stream before deleting the partial when the final flush throws`() {
+        // A full disk at commit time: the trailer's flush throws and the catch deleted the
+        // partial .votbak, but never closed the stream (exportOut was already cleared, so no
+        // later release reaches it). The open descriptor kept the deleted file's blocks, the
+        // whole partial backup, allocated on a phone that had just run out of space, until a
+        // GC happened to finalize the stream. Same close-then-delete contract as the abort
+        // path and as beginV3Export's failure (sweep v090).
+        val uri = Uri.parse("content://test/v3-flush-fail-close")
+        val stream = mockk<OutputStream>(relaxUnitFun = true)
+        every { stream.write(any<Int>()) } throws IOException("disk full")
+        every { stream.write(any<ByteArray>(), any(), any()) } throws IOException("disk full")
+        every { cr.openOutputStream(uri, "wt") } returns stream
+        every { cr.call(any<String>(), any(), any(), any()) } returns Bundle()
+
+        assertIs<StorageManager.Result.Success<Unit>>(
+            storage.beginV3Export(uri, "{}".toByteArray(Charsets.UTF_8))
+        )
+        val r = storage.finishV3Export(commit = true, uri = uri)
+        assertIs<StorageManager.Result.Failure>(r)
+        assertEquals("disk full", r.reason)
+        verifyOrder {
+            stream.close()
+            cr.call(eq("test"), eq("android:deleteDocument"), isNull(), any())
+        }
+    }
+
+    @Test
+    fun `abandonV3Export aborts only the session on the document it names`() {
+        // MainActivity abandons the export of a page whose renderer died. A session open on any
+        // other document belongs to someone else and must be left to finish.
+        val mine = Uri.parse("content://test/v3-open")
+        val other = Uri.parse("content://test/v3-dead-page")
+        every { cr.openOutputStream(mine, "wt") } returns ByteArrayOutputStream()
+        assertIs<StorageManager.Result.Success<Unit>>(
+            storage.beginV3Export(mine, "{}".toByteArray(Charsets.UTF_8))
+        )
+        storage.abandonV3Export(other)
+        assertIs<StorageManager.Result.Success<Unit>>(storage.finishV3Export(commit = true, uri = mine))
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
     }
 
     @Test

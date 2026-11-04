@@ -89,12 +89,15 @@
         android:theme="@style/Theme.VotReader.Splash">
 
         <!-- configChanges: the page holds the reader's live state (a memo recording, the player). A font size, display
-             size or language change recreated the activity, and its teardown deleted the memo (sweep W14). -->
+             size or language change recreated the activity, and its teardown deleted the memo (sweep W14). Bold text
+             (fontWeightAdjustment, the switch beside Font size), a color mode, grammatical gender or touchscreen change
+             did the same until they were listed too. mcc/mnc need no entry: since Android 8 they never recreate.
+             MainActivityConfigChangeTest pins every one. -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTask"
-            android:configChanges="screenSize|orientation|keyboardHidden|smallestScreenSize|uiMode|screenLayout|fontScale|density|locale|layoutDirection|keyboard|navigation"
+            android:configChanges="screenSize|orientation|keyboardHidden|smallestScreenSize|uiMode|screenLayout|fontScale|density|locale|layoutDirection|keyboard|navigation|fontWeightAdjustment|colorMode|grammaticalGender|touchscreen"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -102,8 +105,11 @@
             </intent-filter>
             <!-- n6-15: a shared passage link (https://votreader.github.io/app/?p=<key>) opens the app, not the
                  browser. autoVerify: Android checks https://votreader.github.io/.well-known/assetlinks.json (repo
-                 VOTReader/VOTReader.github.io) for this package and signing key. /app only: the songs' pages and
-                 files stay the browser's. MainActivity + SharedLink.kt read the key. ManifestAppLinksTest pins it. -->
+                 VOTReader/VOTReader.github.io) for this package and signing key. The app's own page only (/app,
+                 /app/, and the PWA's start_url /app/index.html): the songs' pages and files, and the site's other
+                 pages under /app/ (privacy.html), stay the browser's. A /app/ prefix claim opened VOTReader for a
+                 Privacy policy link tapped in any other app, and it showed nothing (W57's twin from outside).
+                 MainActivity + SharedLink.kt read the key. ManifestAppLinksTest pins it. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -111,7 +117,8 @@
                 <data android:scheme="https" />
                 <data android:host="votreader.github.io" />
                 <data android:path="/app" />
-                <data android:pathPrefix="/app/" />
+                <data android:path="/app/" />
+                <data android:path="/app/index.html" />
             </intent-filter>
         </activity>
 
