@@ -29,6 +29,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { _jrnDateStr, _jrnDaysBetween, _count } from './journal-stats-store.js';
+import { mergeReadingStreakStore } from './store-merge.js';
 
 /**
  * On-disk shape.
@@ -47,7 +48,9 @@ export var ReadingStreakStore = extendStore(
     longestStreak: 0,
     lastReadDate: null,
     totalDays: 0
-  }), { idb: true }),
+  // dl2: merged across tabs (store-merge.js mergeReadingStreakStore). Saved blind, a tab
+  // left open overnight restarted the streak the other tab had kept up.
+  }), { idb: true, crossTabMerge: mergeReadingStreakStore }),
   {
     /**
      * Read the full streak object.

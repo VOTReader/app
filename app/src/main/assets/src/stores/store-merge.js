@@ -24,7 +24,20 @@
      - add / add (id in only one side)      → keep it
      - delete vs untouched                  → honor the delete (drop)
      - delete vs edit                       → keep the edit (never lose content)
+     - edit vs untouched (same id both sides) → keep the edit, whatever the
+                                              clocks say (dl1, below)
      - edit vs edit (same id both sides)    → newer `updated` wins
+
+   dl1 (2026-11-04): "edit vs untouched" used to be decided by the stamps
+   alone, newer wins and a tie to theirs. In ONE tab `theirs` is this tab's
+   own last save, so an edit stamped no later than that save lost to it and
+   the edit was gone from memory as well as disk: a device clock that steps
+   back (a manual time change, a network-time correction) reverted every edit
+   to a record last saved under the faster clock, and two saves of one record
+   in one millisecond reverted the second. A side that is still the base copy
+   now gives way to the side that changed. A record's stamp moves on every
+   change its writers make, so the same stamp as the base copy means
+   unchanged; a record with no stamp at all is compared whole.
 
    NOTE on delete-vs-edit: "keep the edit" means a record one tab DELETES while
    another tab concurrently EDITS is RESURRECTED (with the edit's content). This
@@ -88,9 +101,12 @@ function _newer(ours, theirs) {
 }
 
 /**
- * Did `cur` change since `base`? Drives the delete-vs-edit decision.
+ * Did `cur` change since `base`? Drives the delete-vs-edit decision and the
+ * edit-vs-untouched one (`_resolve`).
  *   - present↔absent transitions count as changed
- *   - both timestamped → changed iff `cur` is strictly newer
+ *   - either timestamped → changed iff the stamp moved. dl1: it was "strictly
+ *     newer", so an edit stamped under a clock set back read as untouched and a
+ *     sibling's delete took it.
  *   - neither timestamped (booleans, immutable records) → structural compare
  * @param {any} base
  * @param {any} cur
@@ -100,20 +116,40 @@ function _changed(base, cur) {
   if (base === undefined || base === null) return !(cur === undefined || cur === null);
   if (cur === undefined || cur === null) return true;
   const bt = _stamp(base), ct = _stamp(cur);
-  if (bt || ct) return ct > bt;
+  if (bt || ct) return ct !== bt;
   try { return JSON.stringify(base) !== JSON.stringify(cur); }
   catch (_e) { return true; }
 }
 
 /**
- * Default per-key value resolver for `mergeMapByKey`: newer of ours/theirs.
- * @param {any} _baseVal
+ * Both sides hold the record: the copy to keep (dl1, file header). A side that
+ * did not change it since `base` gives way to the side that did, so this tab's
+ * own edit survives its own last save whatever the clock did. Changed on both
+ * sides (two tabs edited it), or no ancestor to tell by: the newer stamp, a
+ * tie to theirs, as always.
+ * @param {any} baseRec
+ * @param {any} ours
+ * @param {any} theirs
+ * @returns {any}
+ */
+function _resolve(baseRec, ours, theirs) {
+  if (baseRec !== undefined && baseRec !== null) {
+    if (!_changed(baseRec, theirs)) return ours;
+    if (!_changed(baseRec, ours)) return theirs;
+  }
+  return _newer(ours, theirs);
+}
+
+/**
+ * Default per-key value resolver for `mergeMapByKey`: the changed side, else
+ * the newer of ours/theirs (`_resolve`).
+ * @param {any} baseVal
  * @param {any} ourVal
  * @param {any} theirVal
  * @returns {any}
  */
-function _defaultValueMerge(_baseVal, ourVal, theirVal) {
-  return _newer(ourVal, theirVal);
+function _defaultValueMerge(baseVal, ourVal, theirVal) {
+  return _resolve(baseVal, ourVal, theirVal);
 }
 
 /**
@@ -130,12 +166,12 @@ export function mergeRecordsById(base, ours, theirs) {
   const B = _byId(base), T = _byId(theirs);
   /** @type {any[]} */ const out = [];
   const seen = new Set();
-  // 1. Walk ours in order — keep / replace-with-newer / drop-on-honored-delete.
+  // 1. Walk ours in order — keep / resolve / drop-on-honored-delete.
   for (const rec of _arr(ours)) {
     const id = rec && rec.id;
     if (id == null || seen.has(id)) continue;
     seen.add(id);
-    if (T.has(id)) out.push(_newer(rec, T.get(id)));                 // both → newer wins
+    if (T.has(id)) out.push(_resolve(B.get(id), rec, T.get(id)));    // both → the changed side, else newer
     else if (B.has(id) && !_changed(B.get(id), rec)) { /* their delete, unedited → drop */ }
     else out.push(rec);                                              // our add, or our edit beats their delete
   }
@@ -282,6 +318,246 @@ export function mergeAnnotationsStore(base, ours, theirs) {
 /** Journal index: `{ refKey: entryId[] }` — union the id lists per key. */
 export function mergeJournalIndexStore(base, ours, theirs) {
   return mergeMapByKey(base, ours, theirs, function (_b, o, t) { return unionStrings(o, t); });
+}
+
+/* ─── The reading history and the tallies (dl2, 2026-11-04) ─────────────
+   vot-history, vot-reading-stats, vot-reading-streak and vot-journal-stats
+   saved their whole value blind. Each tab loads it once, at boot, so a second
+   tab's save wrote the copy it had loaded over everything the first had saved
+   since: the visits it recorded, the words it credited, the reading days and
+   the journal count. Each merges here the way its writers change it: the
+   history as a log (a visit either tab added stays; one either tab removed, a
+   clear or the cap, goes), a total as the stored total plus what this tab
+   added to it since the base, a streak from both tabs' latest days.
+   With no base there is no telling what this tab added, so each keeps this
+   tab's copy, the old blind write (a total merged without its ancestor would
+   count the stored copy twice). A store saves only once it has loaded, and
+   loading sets the base, so that is a test store forced 'loaded'. In one tab
+   the stored copy is the base, and every merge here returns this tab's copy. */
+
+/** The most visits the history keeps (history-store.js add). */
+const HISTORY_CAP = 2000;
+/** The day buckets and in-progress places the words-read ledger keeps (reading-stats-store.js). */
+const STATS_MAX_DAYS = 400;
+const STATS_MAX_SAMPLES = 50;
+const STATS_MAX_PROGRESS = 50;
+
+/** A finite, non-negative number, else 0 (reading-stats-store.js _count). @param {any} x @returns {number} */
+function _tally(x) {
+  const n = (typeof x === 'number' || typeof x === 'string') ? Number(x) : NaN;
+  return isFinite(n) && n > 0 ? n : 0;
+}
+
+/** The stored total plus what this tab added since the base. @param {any} b @param {any} o @param {any} t */
+function _addedTo(b, o, t) {
+  return Math.max(0, _tally(t) + (_tally(o) - _tally(b)));
+}
+
+/** @param {any} x @returns {boolean} */
+function _isObj(x) { return !!x && typeof x === 'object' && !Array.isArray(x); }
+
+/** @param {any} v @returns {string} */
+function _json(v) {
+  try { return JSON.stringify(v); } catch (_e) { return String(v); }
+}
+
+/** A visit's identity: what was read, and when. @param {any} e @returns {string} */
+function _visitId(e) {
+  if (e && typeof e === 'object') return 'v\u0000' + String(e.type) + '\u0000' + String(e.key) + '\u0000' + String(e.ts);
+  return 'j\u0000' + _json(e);
+}
+
+/** @param {any} e @returns {number} */
+function _visitTs(e) {
+  return (e && typeof e === 'object' && typeof e.ts === 'number' && isFinite(e.ts)) ? e.ts : 0;
+}
+
+/**
+ * vot-history (newest first, capped). A visit either tab added is kept; one the
+ * other tab no longer holds (its clear, or the cap) goes. This tab's list keeps
+ * its order and the other tab's visits are woven in by time, so one tab alone
+ * gets back exactly what it wrote.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any[]}
+ */
+export function mergeHistoryStore(base, ours, theirs) {
+  if (!Array.isArray(base) || !Array.isArray(theirs)) return _arr(ours);   // nothing stored yet: this tab's copy
+  const inBase = new Set(base.map(_visitId));
+  const inOurs = new Set(_arr(ours).map(_visitId));
+  const inTheirs = new Set(_arr(theirs).map(_visitId));
+  /** @type {any[]} */ const mine = [];
+  for (const e of _arr(ours)) {
+    const id = _visitId(e);
+    if (!inBase.has(id) || inTheirs.has(id)) mine.push(e);                        // else: the other tab removed it
+  }
+  /** @type {any[]} */ const added = [];
+  for (const e of _arr(theirs)) {
+    const id = _visitId(e);
+    if (!inOurs.has(id) && !inBase.has(id)) added.push(e);                        // the other tab's visit
+  }
+  if (!added.length) return mine.slice(0, HISTORY_CAP);
+  /** @type {any[]} */ const out = [];
+  let i = 0, j = 0;
+  while ((i < mine.length || j < added.length) && out.length < HISTORY_CAP) {
+    if (j >= added.length || (i < mine.length && _visitTs(mine[i]) >= _visitTs(added[j]))) out.push(mine[i++]);
+    else out.push(added[j++]);
+  }
+  return out;
+}
+
+/** How many times each item occurs, by its JSON. @param {any} x @returns {Map<string, number>} */
+function _counted(x) {
+  /** @type {Map<string, number>} */ const m = new Map();
+  for (const s of _arr(x)) { const k = _json(s); m.set(k, (m.get(k) || 0) + 1); }
+  return m;
+}
+
+/**
+ * A rolling window of samples, merged as a multiset: the stored ones less those
+ * this tab dropped since the base (trimmed off the front, or a reset), then the
+ * ones this tab added. In one tab that is this tab's own list.
+ * @param {any} b @param {any} o @param {any} t
+ * @returns {any[]}
+ */
+function _mergeSamples(b, o, t) {
+  const B = _counted(b), O = _counted(o);
+  /** @type {Map<string, number>} */ const dropped = new Map();
+  for (const [k, n] of B) { const d = n - (O.get(k) || 0); if (d > 0) dropped.set(k, d); }
+  /** @type {any[]} */ const out = [];
+  for (const s of _arr(t)) {
+    const k = _json(s), d = dropped.get(k) || 0;
+    if (d > 0) dropped.set(k, d - 1); else out.push(s);
+  }
+  for (const s of _arr(o)) {
+    const k = _json(s), n = B.get(k) || 0;
+    if (n > 0) B.set(k, n - 1); else out.push(s);   // this tab's own new sample
+  }
+  return out;
+}
+
+/**
+ * A set of strings three ways: kept when either side has it, unless the base
+ * had it and either side has let it go (mergePlanStore's ticks, the same rule).
+ * @param {any} b @param {any} o @param {any} t
+ * @returns {string[]}
+ */
+function _mergeStringSet(b, o, t) {
+  const B = new Set(_arr(b)), O = new Set(_arr(o)), T = new Set(_arr(t));
+  return unionStrings(o, t).filter((x) => !(B.has(x) && (!O.has(x) || !T.has(x))));
+}
+
+/** One in-progress place: the side that touched it since the base, else the later touch. @param {any} b @param {any} o @param {any} t */
+function _progressMerge(b, o, t) {
+  if (b !== undefined && b !== null) {
+    if (!_changed(b, t)) return o;
+    if (!_changed(b, o)) return t;
+  }
+  return _tally(o && o.t) >= _tally(t && t.t) ? o : t;
+}
+
+/**
+ * vot-reading-stats. Totals and each day's words: the stored figure plus what
+ * this tab credited since the base. Pace samples: the stored ones and this tab's
+ * new ones, the last 50. In-progress places merge by item, the latest 50 kept.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any}
+ */
+export function mergeReadingStatsStore(base, ours, theirs) {
+  if (!_isObj(base) || !_isObj(theirs)) return ours;   // nothing stored yet: this tab's copy
+  const B = _obj(base), O = _obj(ours), T = _obj(theirs);
+  /** @type {Record<string, any>} */ const out = Object.assign({}, T, O);
+  for (const f of ['totalWordsRead', 'totalActiveMs', 'totalCompletions', 'rereads']) out[f] = _addedTo(B[f], O[f], T[f]);
+  const bd = _obj(B.wordsByDay), od = _obj(O.wordsByDay), td = _obj(T.wordsByDay);
+  /** @type {Record<string, number>} */ const days = {};
+  for (const d of new Set([...Object.keys(od), ...Object.keys(td)])) {
+    const n = _addedTo(bd[d], od[d], td[d]);
+    if (n > 0) days[d] = n;
+  }
+  const dayKeys = Object.keys(days).sort();   // YYYY-MM-DD sorts by date
+  for (let i = 0; i < dayKeys.length - STATS_MAX_DAYS; i++) delete days[dayKeys[i]];
+  out.wordsByDay = days;
+  out.wpmSamples = _mergeSamples(B.wpmSamples, O.wpmSamples, T.wpmSamples).slice(-STATS_MAX_SAMPLES);
+  const progress = mergeMapByKey(B.progress, O.progress, T.progress, _progressMerge);
+  const items = Object.keys(progress);
+  if (items.length > STATS_MAX_PROGRESS) {
+    items.sort((a, z) => _tally(progress[a] && progress[a].t) - _tally(progress[z] && progress[z].t));
+    for (let k = 0; k < items.length - STATS_MAX_PROGRESS; k++) delete progress[items[k]];
+  }
+  out.progress = progress;
+  if (Array.isArray(O.milestonesUnlocked) || Array.isArray(T.milestonesUnlocked)) out.milestonesUnlocked = _mergeStringSet(B.milestonesUnlocked, O.milestonesUnlocked, T.milestonesUnlocked);
+  return out;
+}
+
+/** A stored YYYY-MM-DD day, or '' for none. @param {any} d @returns {string} */
+function _day(d) { return typeof d === 'string' ? d : ''; }
+
+/** Whole local days from d1 to d2 (journal-stats-store.js _jrnDaysBetween). @param {string} d1 @param {string} d2 */
+function _daysApart(d1, d2) {
+  return Math.round((new Date(d2 + 'T00:00:00').getTime() - new Date(d1 + 'T00:00:00').getTime()) / 86400000);
+}
+
+/**
+ * Both tabs moved a streak on: the run ending on the later day, joined to the
+ * earlier tab's run when that ended the day before (the tab with the later day
+ * may never have seen it: a tab left open overnight restarts at 1).
+ * @param {Record<string, any>} O @param {Record<string, any>} T @param {string} field the last-day field
+ * @returns {{ last: any, current: number }}
+ */
+function _latestRun(O, T, field) {
+  const oDay = _day(O[field]), tDay = _day(T[field]);
+  if (oDay === tDay) return { last: O[field] || T[field] || null, current: Math.max(_tally(O.currentStreak), _tally(T.currentStreak)) };
+  const late = oDay > tDay ? O : T, early = oDay > tDay ? T : O;
+  const lateDay = _day(late[field]), earlyDay = _day(early[field]);
+  let current = _tally(late.currentStreak);
+  if (earlyDay && _daysApart(earlyDay, lateDay) === 1) current = Math.max(current, _tally(early.currentStreak) + 1);
+  return { last: late[field], current };
+}
+
+/**
+ * vot-reading-streak. Total reading days: the stored total plus the days this
+ * tab counted since the base, the shared latest day once.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any}
+ */
+export function mergeReadingStreakStore(base, ours, theirs) {
+  if (!_isObj(base) || !_isObj(theirs)) return ours;   // nothing stored yet: this tab's copy
+  const B = _obj(base), O = _obj(ours), T = _obj(theirs);
+  if (!_changed(B, T)) return ours;
+  if (!_changed(B, O)) return theirs;
+  const bTotal = _tally(B.totalDays);
+  const oNew = Math.max(0, _tally(O.totalDays) - bTotal), tNew = Math.max(0, _tally(T.totalDays) - bTotal);
+  const run = _latestRun(O, T, 'lastReadDate');
+  const shared = _day(O.lastReadDate) === _day(T.lastReadDate) && oNew > 0 && tNew > 0 ? 1 : 0;
+  return Object.assign({}, T, O, {
+    currentStreak: run.current,
+    lastReadDate: run.last,
+    totalDays: bTotal + oNew + tNew - shared,
+    longestStreak: Math.max(_tally(O.longestStreak), _tally(T.longestStreak), run.current),
+  });
+}
+
+/**
+ * vot-journal-stats. Entries: the stored count plus this tab's new entries less
+ * its deletes since the base. No entries left: no live streak (J5).
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any}
+ */
+export function mergeJournalStatsStore(base, ours, theirs) {
+  if (!_isObj(base) || !_isObj(theirs)) return ours;   // nothing stored yet: this tab's copy
+  const B = _obj(base), O = _obj(ours), T = _obj(theirs);
+  if (!_changed(B, T)) return ours;
+  if (!_changed(B, O)) return theirs;
+  const totalEntries = Math.max(0, _tally(T.totalEntries) + (_tally(O.totalEntries) - _tally(B.totalEntries)));
+  const run = _latestRun(O, T, 'lastEntryDate');
+  const currentStreak = totalEntries === 0 ? 0 : run.current;
+  /** @type {Record<string, any>} */ const out = Object.assign({}, T, O, {
+    totalEntries,
+    currentStreak,
+    lastEntryDate: run.last,
+    longestStreak: Math.max(_tally(O.longestStreak), _tally(T.longestStreak), currentStreak),
+  });
+  if (Array.isArray(O.milestonesUnlocked) || Array.isArray(T.milestonesUnlocked)) out.milestonesUnlocked = _mergeStringSet(B.milestonesUnlocked, O.milestonesUnlocked, T.milestonesUnlocked);
+  return out;
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   mergeRecordsById, mergeMapByKey, unionStrings,
   mergeArrayStore, mergeListStore, mergeMapStore,
   mergeAnnotationsStore, mergeJournalIndexStore,
+  mergeHistoryStore, mergeReadingStatsStore, mergeReadingStreakStore, mergeJournalStatsStore,
 } from './store-merge.js';
 
 const rec = (id, updated, extra) => ({ id, updated, created: updated, ...(extra || {}) });
@@ -87,6 +88,67 @@ describe('mergeRecordsById — conflict matrix', () => {
     const ours = [rec('a', 1), rec('b', 1), rec('c', 2)];
     const theirs = [rec('a', 1), rec('b', 1), rec('z', 2)];
     expect(ids(mergeRecordsById(base, ours, theirs))).toEqual(['a', 'b', 'c', 'z']);
+  });
+});
+
+/* dl1 (2026-11-04): in one tab `theirs` is this tab's own last save. An edit stamped no
+   later than it (a clock set back, two saves in one millisecond) lost to it, and the merge
+   result replaced the cache, so the edit was gone from memory too. A side still equal to
+   the base gives way to the side that changed, whatever the stamps say. */
+describe('dl1 — edit vs untouched: the changed side wins whatever the clocks say', () => {
+  it('our edit stamped EARLIER than the stored copy (clock set back) is kept', () => {
+    const base = [rec('x', 100, { body: 'v1' })];
+    const ours = [rec('x', 40, { body: 'v2' })];     // edited after the clock went back a minute
+    const theirs = [rec('x', 100, { body: 'v1' })];  // our own last save, untouched since
+    expect(mergeRecordsById(base, ours, theirs)).toEqual([rec('x', 40, { body: 'v2' })]);
+  });
+
+  it('our edit in the same millisecond as the stored copy is kept', () => {
+    const base = [rec('x', 100, { body: 'v1' })];
+    const ours = [rec('x', 100, { body: 'v2' })];
+    expect(mergeRecordsById(base, ours, [rec('x', 100, { body: 'v1' })])[0].body).toBe('v2');
+  });
+
+  it("a sibling's edit stamped earlier than our untouched copy is kept too", () => {
+    const base = [rec('x', 100, { body: 'v1' })];
+    const out = mergeRecordsById(base, [rec('x', 100, { body: 'v1' })], [rec('x', 40, { body: 'theirs' })]);
+    expect(out[0].body).toBe('theirs');
+  });
+
+  it('edit vs delete: an edit stamped under a clock set back still beats the delete', () => {
+    const base = [rec('x', 100, { body: 'v1' })];
+    expect(mergeRecordsById(base, [rec('x', 40, { body: 'v2' })], [])).toEqual([rec('x', 40, { body: 'v2' })]);
+    expect(mergeRecordsById(base, [], [rec('x', 40, { body: 'v2' })])).toEqual([rec('x', 40, { body: 'v2' })]);
+  });
+
+  it('keyed maps (notes) follow the same rule', () => {
+    const base = { g: rec('g', 100, { body: 'v1' }) };
+    expect(mergeMapByKey(base, { g: rec('g', 40, { body: 'v2' }) }, { g: rec('g', 100, { body: 'v1' }) }).g.body).toBe('v2');
+    expect(mergeMapStore(base, { g: rec('g', 100, { body: 'v1' }) }, { g: rec('g', 40, { body: 't' }) }).g.body).toBe('t');
+  });
+
+  it('annotation buckets follow it segment by segment', () => {
+    const seg = (id, updated, color) => ({ id, groupId: id, kind: 'highlight', color, start: 0, end: 4, updated, created: 1 });
+    const base = { k: [seg('s1', 100, 'yellow')] };
+    const out = mergeAnnotationsStore(base, { k: [seg('s1', 40, 'blue')] }, { k: [seg('s1', 100, 'yellow')] });
+    expect(out.k[0].color).toBe('blue');
+  });
+
+  it('both sides changed: still the newer stamp, a tie to theirs', () => {
+    const base = [rec('x', 100, { body: 'b' })];
+    expect(mergeRecordsById(base, [rec('x', 300, { body: 'o' })], [rec('x', 200, { body: 't' })])[0].body).toBe('o');
+    expect(mergeRecordsById(base, [rec('x', 200, { body: 'o' })], [rec('x', 300, { body: 't' })])[0].body).toBe('t');
+    expect(mergeRecordsById(base, [rec('x', 200, { body: 'o' })], [rec('x', 200, { body: 't' })])[0].body).toBe('t');
+  });
+
+  it('no ancestor for the record (no base yet): the newer stamp, as before', () => {
+    expect(mergeRecordsById(null, [rec('x', 40, { body: 'o' })], [rec('x', 100, { body: 't' })])[0].body).toBe('t');
+  });
+
+  it('records with no stamp at all are compared whole', () => {
+    const base = [{ id: 'l', v: 1 }];
+    expect(mergeRecordsById(base, [{ id: 'l', v: 2 }], [{ id: 'l', v: 1 }])[0].v).toBe(2);
+    expect(mergeRecordsById(base, [{ id: 'l', v: 1 }], [{ id: 'l', v: 3 }])[0].v).toBe(3);
   });
 });
 
@@ -259,5 +321,96 @@ describe('import semantics — merge(base, imported, idb) reduces to imported wh
     const siblingNow = [rec('a', 1), rec('s', 2)];  // a sibling tab added s during import
     const out = mergeRecordsById(oldData, imported, siblingNow);
     expect(ids(out).sort()).toEqual(['a', 's']);    // sibling's s is NOT lost
+  });
+});
+
+/* dl2 (2026-11-04): the reading history and the tallies merge across tabs. Each strategy
+   returns this tab's own copy when the stored copy is still the base (one tab), keeps
+   this tab's copy with no base, and otherwise adds the two tabs' changes together. */
+describe('dl2 — history and tally merges', () => {
+  const visit = (key, ts) => ({ type: 'chapter', key, ts });
+
+  it('one tab: every strategy hands back exactly this tab\'s copy', () => {
+    const hBase = [visit('ch:a:1', 3), visit('ch:a:2', 2)];
+    const hOurs = [visit('ch:a:3', 5), ...hBase];
+    expect(mergeHistoryStore(hBase, hOurs, hBase)).toEqual(hOurs);
+    const sBase = { totalWordsRead: 100, totalActiveMs: 9, totalCompletions: 1, rereads: 0,
+      wordsByDay: { '2026-11-01': 100 }, wpmSamples: [{ w: 1, ms: 2 }, { w: 3, ms: 4 }],
+      progress: { a: { b: 3, c: [0], t: 1 } }, milestonesUnlocked: ['x'] };
+    const sOurs = { ...sBase, totalWordsRead: 160, totalCompletions: 2, wordsByDay: { '2026-11-01': 100, '2026-11-02': 60 },
+      wpmSamples: [{ w: 3, ms: 4 }, { w: 5, ms: 6 }], progress: { b: { b: 2, c: [1], t: 2 } } };
+    expect(mergeReadingStatsStore(sBase, sOurs, sBase)).toEqual(sOurs);
+    const kBase = { currentStreak: 2, longestStreak: 4, lastReadDate: '2026-11-01', totalDays: 9 };
+    const kOurs = { currentStreak: 3, longestStreak: 4, lastReadDate: '2026-11-02', totalDays: 10 };
+    expect(mergeReadingStreakStore(kBase, kOurs, kBase)).toEqual(kOurs);
+    const jBase = { totalEntries: 4, currentStreak: 1, longestStreak: 2, lastEntryDate: '2026-11-01', milestonesUnlocked: [] };
+    const jOurs = { ...jBase, totalEntries: 5, currentStreak: 2, lastEntryDate: '2026-11-02' };
+    expect(mergeJournalStatsStore(jBase, jOurs, jBase)).toEqual(jOurs);
+  });
+
+  it('no base, or nothing stored yet: this tab\'s copy (never the stored copy counted twice)', () => {
+    const ours = { totalWordsRead: 5 };
+    expect(mergeReadingStatsStore(null, ours, { totalWordsRead: 7 })).toBe(ours);
+    expect(mergeReadingStatsStore({}, ours, null)).toBe(ours);
+    expect(mergeHistoryStore(null, [visit('k', 1)], [visit('j', 2)])).toEqual([visit('k', 1)]);
+    expect(mergeReadingStreakStore({}, { totalDays: 1 }, undefined)).toEqual({ totalDays: 1 });
+    expect(mergeJournalStatsStore(undefined, { totalEntries: 1 }, { totalEntries: 3 })).toEqual({ totalEntries: 1 });
+  });
+
+  it('history: the other tab\'s visits are woven in by time, the cap holds, a clear is kept', () => {
+    const base = [visit('ch:a:1', 10)];
+    const ours = [visit('ch:a:3', 30), visit('ch:a:1', 10)];
+    const theirs = [visit('ch:a:2', 20), visit('ch:a:1', 10)];
+    expect(mergeHistoryStore(base, ours, theirs).map((e) => e.ts)).toEqual([30, 20, 10]);
+    expect(mergeHistoryStore(base, [], theirs).map((e) => e.ts)).toEqual([20]);   // our clear, their new visit
+    const many = Array.from({ length: 2000 }, (_, i) => visit('ch:p:' + i, 5000 - i));
+    expect(mergeHistoryStore([], many, [visit('ch:z:1', 9999)]).length).toBe(2000);
+    expect(mergeHistoryStore([], many, [visit('ch:z:1', 9999)])[0].ts).toBe(9999);
+  });
+
+  it('reading stats: both tabs\' words add up; a reset in this tab is kept', () => {
+    const base = { totalWordsRead: 100, wordsByDay: { d1: 100 }, wpmSamples: [{ w: 1, ms: 1 }], milestonesUnlocked: ['m'] };
+    const ours = { totalWordsRead: 130, wordsByDay: { d1: 130 }, wpmSamples: [{ w: 1, ms: 1 }, { w: 2, ms: 2 }], milestonesUnlocked: ['m'] };
+    const theirs = { totalWordsRead: 150, wordsByDay: { d1: 150 }, wpmSamples: [{ w: 1, ms: 1 }, { w: 3, ms: 3 }], milestonesUnlocked: ['m'] };
+    const out = mergeReadingStatsStore(base, ours, theirs);
+    expect(out.totalWordsRead).toBe(180);
+    expect(out.wordsByDay).toEqual({ d1: 180 });
+    expect(out.wpmSamples).toEqual([{ w: 1, ms: 1 }, { w: 3, ms: 3 }, { w: 2, ms: 2 }]);
+    const reset = mergeReadingStatsStore(base, { totalWordsRead: 0, wordsByDay: {}, wpmSamples: [], milestonesUnlocked: [] }, base);
+    expect(reset).toMatchObject({ totalWordsRead: 0, wordsByDay: {}, wpmSamples: [], milestonesUnlocked: [] });
+  });
+
+  it('reading stats: 400 day buckets and 50 in-progress places at most', () => {
+    const days = {};
+    for (let i = 0; i < 400; i++) days['2025-' + String(1 + Math.floor(i / 28)).padStart(2, '0') + '-' + String(1 + (i % 28)).padStart(2, '0')] = 1;
+    const out = mergeReadingStatsStore({ wordsByDay: {} }, { wordsByDay: days }, { wordsByDay: { '2026-11-04': 5 } });
+    expect(Object.keys(out.wordsByDay).length).toBe(400);
+    expect(out.wordsByDay['2026-11-04']).toBe(5);
+    const progress = {};
+    for (let i = 0; i < 50; i++) progress['k' + i] = { b: 2, c: [0], t: i + 1 };
+    const p = mergeReadingStatsStore({ progress: {} }, { progress }, { progress: { fresh: { b: 2, c: [1], t: 999 } } }).progress;
+    expect(Object.keys(p).length).toBe(50);
+    expect(p.fresh).toBeTruthy();
+    expect(p.k0).toBeUndefined();
+  });
+
+  it('reading streak: a day both tabs read counts once; a later tab\'s restart joins the run it never saw', () => {
+    const base = { currentStreak: 2, longestStreak: 2, lastReadDate: '2026-11-01', totalDays: 2 };
+    const day2 = { currentStreak: 3, longestStreak: 3, lastReadDate: '2026-11-02', totalDays: 3 };
+    expect(mergeReadingStreakStore(base, day2, day2)).toEqual(day2);
+    const stale = { currentStreak: 1, longestStreak: 2, lastReadDate: '2026-11-03', totalDays: 3 };   // never saw 11-02
+    expect(mergeReadingStreakStore(base, stale, day2)).toEqual({ currentStreak: 4, longestStreak: 4, lastReadDate: '2026-11-03', totalDays: 4 });
+    const broken = { ...base, currentStreak: 0 };                                                       // this tab's load-time break
+    const fresh = { currentStreak: 1, longestStreak: 2, lastReadDate: '2026-11-05', totalDays: 3 };
+    expect(mergeReadingStreakStore(base, broken, fresh)).toEqual(fresh);
+  });
+
+  it('journal counts: new entries and deletes from both tabs; none left, no live streak', () => {
+    const base = { totalEntries: 2, currentStreak: 1, longestStreak: 3, lastEntryDate: '2026-11-01', milestonesUnlocked: [] };
+    const ours = { ...base, totalEntries: 0, currentStreak: 0 };                                        // deleted both
+    const theirs = { ...base, totalEntries: 3, lastEntryDate: '2026-11-01' };                           // added one
+    expect(mergeJournalStatsStore(base, ours, theirs)).toMatchObject({ totalEntries: 1, currentStreak: 1 });
+    const gone = { ...base, totalEntries: 1 };
+    expect(mergeJournalStatsStore(base, ours, gone)).toMatchObject({ totalEntries: 0, currentStreak: 0 });
   });
 });

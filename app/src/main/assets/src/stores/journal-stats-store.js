@@ -24,6 +24,7 @@
 ═══════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeJournalStatsStore } from './store-merge.js';
 
 /**
  * On-disk shape.
@@ -91,7 +92,9 @@ export var JournalStatsStore = extendStore(
     longestStreak: 0,
     lastEntryDate: null,
     milestonesUnlocked: []
-  }), { idb: true }),
+  // dl2: merged across tabs (store-merge.js mergeJournalStatsStore). Saved blind, a
+  // second tab's save took back the entries the first had counted since it loaded.
+  }), { idb: true, crossTabMerge: mergeJournalStatsStore }),
   {
     /**
      * Read the full stats object.
