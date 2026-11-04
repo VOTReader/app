@@ -88,8 +88,13 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     if (bodyRef.current !== (cur.body || '') || readNoteDraft(groupId)) writeNoteDraft(groupId, bodyRef.current);
   }, [groupId]);
   React.useEffect(() => {
-    // A draft that is no longer worth offering (saved since, or the same words) goes now.
-    if (!recovered && note && readNoteDraft(groupId)) clearNoteDraft(groupId);
+    // A draft no longer worth offering (saved since, or the same words) goes once the note
+    // store's latest write is on disk. A Save whose write failed (a full device) left those
+    // words in memory only, so the draft is then the one copy that outlives the app closing.
+    if (!recovered && note) {
+      const stale = readNoteDraft(groupId);
+      if (stale) clearNoteDraftWhenSaved(NoteStore, groupId, stale.body);
+    }
     const onVisibility = () => { if (document.visibilityState === 'hidden') keepDraft(); };
     window.addEventListener('pagehide', keepDraft);
     document.addEventListener('visibilitychange', onVisibility);

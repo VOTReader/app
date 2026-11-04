@@ -145,13 +145,28 @@ describe('dl4 — a note being typed outlives a kill', () => {
     expect(readNoteDraft('g1')).toBeNull();
   });
 
-  it('a draft older than the saved note (saved since, here or in another tab) is not offered, and goes', () => {
+  it('a draft older than the saved note (saved since, here or in another tab) is not offered, and goes once the save is on disk', async () => {
     setupStores({ body: 'saved later', updated: 5000 });
     localStorage.setItem(NOTE_DRAFT_KEY, JSON.stringify({ v: 1, drafts: { g1: { body: 'older words', ts: 4000 } } }));
     render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
     expect(textarea()).toBeNull();
     expect(screen.getByText('saved later')).toBeTruthy();
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(readNoteDraft('g1')).toBeNull();
+  });
+
+  it('a note whose Save failed (a full device), reopened in the same session, keeps its draft: the words are in memory only', async () => {
+    setupStores({ body: 'before' });
+    const first = render(<NoteSheet groupId="g1" startInEditMode={true} onClose={() => {}} />);
+    fireEvent.change(textarea(), { target: { value: 'the words that did not fit' } });
+    fireEvent.click(screen.getByText('Save'));
+    await act(async () => { landWrite(false); await Promise.resolve(); await Promise.resolve(); });
+    first.unmount();
+    // Reopened: the store's memory holds the words, so the draft is not offered back,
+    // but the store's last write failed, so it must not be cleared either.
+    render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+    await act(async () => { await Promise.resolve(); await Promise.resolve(); });
+    expect(readNoteDraft('g1').body).toBe('the words that did not fit');
   });
 });
 
