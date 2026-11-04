@@ -48,10 +48,12 @@ function setupStores({ body = '' } = {}) {
 
 beforeEach(() => {
   modalRegistry._reset();
+  localStorage.clear();   // dl4: a sheet unmounted mid-edit leaves a note draft (utils/note-draft.js)
 });
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   modalRegistry._reset();
   delete window.HL_COLORS;
   delete window.NoteStore;

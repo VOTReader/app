@@ -1425,6 +1425,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-audio-recent-open',
   'vot-recent-searches',          // search/recent-searches.js
   'vot-journal-draft',            // JournalEditorScreen
+  'vot-note-draft',               // utils/note-draft.js — a note's words typed before a kill (dl4)
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
