@@ -29,8 +29,6 @@ export const NO_SIGNAL_MSG = 'No signal. This recording isn’t on your phone.';
 /** Offline, a Next or Previous with nothing that way on the phone: refused, so the one playing plays on (RC.1). */
 export const NEXT_OFFLINE_MSG = 'No connection. The next recording isn’t on this phone.';
 export const PREV_OFFLINE_MSG = 'No connection. The previous recording isn’t on this phone.';
-/** The end of a reading plan's portion (player brief 2026-10-22, 3g). Any other queue's end names its collection. */
-export const PORTION_DONE_MSG = 'Today’s listening is done.';
 
 /**
  * Stream URL for a track. The manifest stores Google Drive file ids, but the

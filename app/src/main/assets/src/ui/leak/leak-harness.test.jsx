@@ -84,8 +84,16 @@ describe('the leak harness', () => {
   });
 
   it('a short timer that runs after the unmount is caught, though it is gone by the count', async () => {
-    const Late = make(() => { setTimeout(() => {}, 60); return () => {}; }, false);   // past the 40 ms settle: it runs once the probe is gone
-    await expect(expectNoLeaks(h, () => render(<Late />), { cycles: 2 })).rejects.toThrow(/timeout after 60 ms, ran after the unmount/);
+    // Armed by a tap and unmounted in the same task, so it runs inside the 40 ms settle after the unmount whatever the
+    // load: it fires before the settle's own (later, longer) sleep. A 60 ms timer armed at mount raced the mount's
+    // settle instead and ran while the probe was still there on a busy machine (land 11-04).
+    function Late() {
+      return <button type="button" onClick={() => { setTimeout(() => {}, 5); }}>x</button>;
+    }
+    const { fireEvent } = await import('@testing-library/react');
+    await expect(expectNoLeaks(h, () => render(<Late />), {
+      cycles: 2, unmountAt: 'interact', interact: () => fireEvent.click(document.querySelector('button')),
+    })).rejects.toThrow(/timeout after 5 ms, ran after the unmount/);
   });
 
   it('a timer an unmount itself schedules (a cleanup deferral) is not', async () => {

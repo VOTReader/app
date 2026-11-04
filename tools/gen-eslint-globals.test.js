@@ -7,11 +7,14 @@
    Object.assign(window, {...}) blocks ("// Stores", "// Late stores + data")
    were read as exports, and src/data/*.test.js constants (HERE, DIST, BUNDLES,
    DATA, DOORWAYS) were read as corpus globals. */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { spawnSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+
+// Each case spawns python: ~150 ms alone, past the 20 s default once under a loaded land (11-04).
+vi.setConfig({ testTimeout: 120_000 });
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GENERATED = readFileSync(join(HERE, 'eslint-globals.generated.js'), 'utf8');

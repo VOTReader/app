@@ -398,19 +398,51 @@ describe('audio-player — next / prev / seek / stop', () => {
     expect(el().loadCalls).toBe(1);  // …and load() drops the Drive connection
   });
 
-  it('the end of the order says so, by the collection the bar named (player brief s7: it vanished silently)', () => {
-    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
-    el().dispatchEvent(new Event('ended'));
-    expect(AudioPlayer.getState().status).toBe('idle');
-    const toast = document.getElementById(AUDIO_TOAST_ID);
-    expect(toast.textContent).toBe('Finished · Volume One.');
-    expect(toast.getAttribute('aria-live')).toBe('polite');
+  it('the end of the order is Finished for 10 s, by the collection the bar named (player brief 3g: it vanished silently)', () => {
+    vi.useFakeTimers();
+    try {
+      AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+      el().dispatchEvent(new Event('ended'));
+      expect(AudioPlayer.getState().status).toBe('idle');
+      const fin = AudioPlayer.finished();
+      expect(fin && fin.label).toBe('Volume One');
+      expect(fin.portion).toBe(false);
+      expect(fin.queue.map((t) => t.url)).toEqual([URL_OF('idC')]);
+      expect(document.getElementById(AUDIO_TOAST_ID), 'the bar says it now, not a toast').toBeNull();
+      vi.advanceTimersByTime(9900);
+      expect(AudioPlayer.finished()).not.toBeNull();
+      vi.advanceTimersByTime(200);
+      expect(AudioPlayer.finished()).toBeNull();
+    } finally { vi.useRealTimers(); }
   });
 
-  it('Close is not an ending: no Finished line', () => {
+  it('Replay plays the finished queue again from its top at 0:00', () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' }, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('ended'));
+    el().currentTime = 50;
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.getState().status).toBe('idle');
+    expect(AudioPlayer.replayFinished()).toBe(true);
+    const s = AudioPlayer.getState();
+    expect(s.queue.map((t) => t.url)).toEqual([URL_OF('idA1'), URL_OF('idA2')]);
+    expect(s.qi).toBe(0);
+    expect(el().src).toBe(URL_OF('idA1'));
+    expect(s.status).not.toBe('idle');
+    expect(AudioPlayer.finished()).toBeNull();
+    expect(AudioPlayer.replayFinished(), 'spent').toBe(false);
+  });
+
+  it('Close is not an ending, and anything that starts ends Finished', () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
     AudioPlayer.stop();
-    expect(document.getElementById(AUDIO_TOAST_ID)).toBeNull();
+    expect(AudioPlayer.finished()).toBeNull();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' }, collectionLabel: 'Volume One' });
+    el().dispatchEvent(new Event('ended'));
+    expect(AudioPlayer.finished()).not.toBeNull();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.finished()).toBeNull();
+    AudioPlayer.stop();
+    expect(AudioPlayer.finished(), 'a later stop never brings it back').toBeNull();
   });
 
   it('prev restarts the current track when more than 3s in', () => {

@@ -12,8 +12,8 @@ import {
   _native,
   NEXT_OFFLINE_MSG,
   _notify,
+  OFFLINE_MSG,
   _pendingRestore,
-  PORTION_DONE_MSG,
   PREV_OFFLINE_MSG,
   _setPendingRestore,
   _setReadingRate,
@@ -27,7 +27,7 @@ import {
   _state,
   _toast,
 } from './core.js';
-import { _setSongRecordPending } from './credit.js';
+import { _countPlay, _setSongRecordPending } from './credit.js';
 import {
   _clearOfflineSkip,
   _clearStallWatchdog,
@@ -161,13 +161,13 @@ export function next(atSeam) {
   // …unless a songs queue repeats: 'all' wraps to its top instead of ending.
   if (_state.qi + 1 >= _state.queue.length) {
     if (_repeatMode() !== 'all') {
-      // The end says so (player brief 2026-10-22, section 7: the bar just vanished): a plan's portion in its own
-      // words, anything else by the collection the bar named. The new bar's Finished state replaces this (L4).
+      // The end says so (player brief 2026-10-22, 3g "Ended" and section 7: the bar just vanished): the bar stays
+      // FINISHED_MS as "Finished · Volume One" with Replay, a plan's portion as "Today's listening is done" (L4).
       const last = _state.queue[_state.qi];
       const named = (last && last.sub) || (_source && _source.label) || '';
-      const done = _source && _source.portion ? PORTION_DONE_MSG : 'Finished' + (named ? ' · ' + named : '') + '.';
+      const fin = { queue: _state.queue.slice(), source: _source, label: named, portion: !!(_source && _source.portion), title: (last && last.title) || '' };
       stop();
-      _toast(done);
+      _setFinished(fin);
       return;
     }
     _state.qi = 0;
@@ -403,6 +403,7 @@ export function playAt(index, at) {
  */
 export function stop() {
   const wasActive = _state.status !== 'idle';
+  _clearFinished();
   // The ✕ means "I'm done with THIS SESSION", not "forget where I was": the
   // per-recording map survives, so closing the bar no longer erases the place
   // in a 90-minute reading. Written before the live state is cleared.
@@ -437,6 +438,63 @@ export function stop() {
   _resetSectionFollow();
   _clearMediaSession();
   if (wasActive) _setAudioActive(false);
+  _notify();
+}
+
+/** How long the bar stays as Finished after the end of the order (player brief 3g "Ended": 10 s). */
+export const FINISHED_MS = 10000;
+/** @type {{ queue: any[], source: any, label: string, portion: boolean, title: string } | null} */
+let _finished = null;
+let _finishedTimer = /** @type {any} */ (0);
+
+/** @param {NonNullable<typeof _finished>} fin */
+function _setFinished(fin) {
+  _clearFinished();
+  _finished = fin;
+  _finishedTimer = setTimeout(() => { _finishedTimer = 0; _finished = null; _notify(); }, FINISHED_MS);
+  _notify();
+}
+
+function _clearFinished() {
+  if (_finishedTimer) clearTimeout(_finishedTimer);
+  _finishedTimer = 0;
+  _finished = null;
+}
+
+/**
+ * What the bar shows for FINISHED_MS after the queue ran out (player brief 3g "Ended"): the collection it named, the
+ * queue it played (for "All 30 recordings played" and Replay), and whether it was a plan's portion. Null once anything
+ * else is on the bar.
+ * @returns {{ queue: any[], label: string, portion: boolean, title: string } | null}
+ */
+export function finished() {
+  if (_finished && _state.status !== 'idle') _clearFinished();
+  return _finished;
+}
+
+/**
+ * The Finished bar's Replay: the same queue again from its top, at 0:00.
+ * @returns {boolean} whether it started
+ */
+export function replayFinished() {
+  finished();   // drops a record that something since started over
+  const f = _finished;
+  if (!f || !f.queue.length) return false;
+  if (_offlineRefuses(f.queue)) { _toast(OFFLINE_MSG); return false; }
+  _clearFinished();
+  _setPendingRestore(null);
+  _setSource(f.source);
+  _state.queue = f.queue.slice();
+  _state.qi = 0;
+  _countPlay();
+  _startAt(() => 0);
+  return true;
+}
+
+/** The Finished bar's ✕: it goes now rather than at the end of its 10 s. */
+export function dismissFinished() {
+  if (!_finished) return;
+  _clearFinished();
   _notify();
 }
 

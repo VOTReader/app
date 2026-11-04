@@ -184,6 +184,47 @@ function CloseGlyph() {
   );
 }
 
+/**
+ * The bar after the queue ran out (player brief 3g "Ended", picture 02 "Finished"): "Finished · Volume One" and "All 30
+ * recordings played", or "Today's listening is done" for a plan's portion, with Replay and ✕, for 10 s. Nothing on it
+ * opens the player: there is nothing playing to control.
+ * @param {{ fin: { queue: any[], label: string, portion: boolean, title: string }, barRef: any }} props
+ */
+function FinishedBar({ fin, barRef }) {
+  const queue = fin.queue;
+  const last = queue[queue.length - 1] || {};
+  const songId = songIdOfKey(last.key);
+  const n = queuePlace(queue, queue.length - 1).of;
+  // A run that crossed into other collections (the site order continues by itself) is named by none of them.
+  const crossed = !!queue[0] && queue[0].sub !== last.sub;
+  const name = fin.portion || crossed ? '' : fin.label || (n < 2 ? fin.title : '');
+  const head = fin.portion ? 'Today’s listening is done' : 'Finished';
+  const line = n >= 2 ? 'All ' + n + (songId ? ' songs' : ' recordings') + ' played' : name === fin.title ? '' : fin.title;
+  return (
+    <div ref={barRef} className={'audio-bar is-finished' + (songId ? ' is-song' : '')} role="region" aria-label="Audio player">
+      <span className="audio-bar-line" aria-hidden="true"><span style={{ width: '100%' }} /></span>
+      <div className="audio-bar-summary" role="status">
+        <span className="audio-bar-mark" aria-hidden="true">
+          {songId ? <SongCover song={songById(songId) || { id: songId }} className="audio-bar-cover" /> : <BookMark />}
+        </span>
+        <span className="audio-bar-summary-text">
+          <span className="audio-bar-title">
+            {head}
+            {name ? <span className="audio-bar-part">{' · '}<em className="audio-bar-fin-name">{name}</em></span> : null}
+          </span>
+          {line ? <span className="audio-bar-sub"><span className="audio-bar-line2">{line}</span></span> : null}
+        </span>
+      </div>
+      <div className="audio-bar-controls">
+        <button type="button" className="audio-bar-act audio-bar-replay" onClick={() => AudioPlayer.replayFinished()} aria-label={'Replay ' + (fin.portion ? 'today’s listening' : name || 'from the start')}>Replay</button>
+        <button type="button" className="audio-bar-close" onClick={() => AudioPlayer.dismissFinished()} aria-label="Close player">
+          <CloseGlyph />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function AudioPlayerBar() {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   // The song skin says "Not on this phone" the moment the signal goes (and stops when it returns): the player only
@@ -193,6 +234,10 @@ export function AudioPlayerBar() {
   React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
   const st = AudioPlayer.getState();
   const open = st.status !== 'idle';
+  // The end of the order (player brief 3g "Ended"): the bar stays 10 s as Finished, with Replay. It never vanishes silently.
+  const fin = open ? null : AudioPlayer.finished();
+  const finShown = !!fin;
+  const shown = open || finShown;
   const [managerOpen, setManagerOpen] = React.useState(false);
   const barRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   // Swipes on the bar (brief 3a), each with a button that does the same: left / right = Next / Previous (the full
@@ -259,9 +304,9 @@ export function AudioPlayerBar() {
   // bar that isn't there.
   React.useEffect(() => {
     if (typeof document === 'undefined' || !document.body) return undefined;
-    document.body.classList.toggle('audio-bar-open', open);
+    document.body.classList.toggle('audio-bar-open', shown);
     return () => document.body.classList.remove('audio-bar-open');
-  }, [open]);
+  }, [shown]);
 
   // The bar grows with Text size (brief 3a), so the dock reads its real height rather than a constant: the rows
   // above it (pills, toasts, the reading text's end) stand on it. The system inset under it is the dock floor's,
@@ -269,7 +314,7 @@ export function AudioPlayerBar() {
   React.useLayoutEffect(() => {
     const el = barRef.current;
     const root = typeof document !== 'undefined' ? document.documentElement : null;
-    if (!open || !el || !root) return undefined;
+    if (!shown || !el || !root) return undefined;
     const measure = () => {
       const cs = getComputedStyle(el);
       const sys = Math.max(0, (parseFloat(cs.paddingBottom) || 0) - (parseFloat(cs.paddingTop) || 0));
@@ -280,7 +325,7 @@ export function AudioPlayerBar() {
     const ro = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
     if (ro) ro.observe(el);
     return () => { if (ro) ro.disconnect(); root.style.removeProperty('--audio-bar-h'); };
-  }, [open]);
+  }, [shown, finShown]);
 
   // Closing playback also closes its controller. It avoids leaving a modal
   // mounted around an intentionally discarded queue when stop() is invoked
@@ -297,7 +342,7 @@ export function AudioPlayerBar() {
   const starting = st.status === 'loading' && !(st.duration > 0) && !((Number(st.time) || 0) >= 1);
   const lateStart = useStillLoading(starting, (head && head.url) || '');
 
-  if (!open) return null;
+  if (!open) return fin ? <FinishedBar fin={fin} barRef={barRef} /> : null;
 
   const queue = st.queue || [];
   /** @type {Partial<import('../../utils/audio-player.js').Track>} */

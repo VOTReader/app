@@ -102,6 +102,11 @@ function windowsFor(bucket) {
   return w;
 }
 
+// The two equivalence walks below compare thousands of windows against the oracles: a few seconds
+// alone, over the 20 s default under a loaded machine (land rc 4, 11-04). Pure compute, so a longer
+// ceiling hides nothing.
+const WALK_TIMEOUT_MS = 120000;
+
 describe('walkDrawnRuns is the four loops it replaced', () => {
   it('the asset has chunked buckets to walk (the control)', () => {
     expect(graph.buckets.length).toBeGreaterThan(2);
@@ -119,7 +124,7 @@ describe('walkDrawnRuns is the four loops it replaced', () => {
         }
       }
       expect(checked).toBeGreaterThan(1000);
-    });
+    }, WALK_TIMEOUT_MS);
 
     it(density + ': the renderer makes the same draws', () => {
       for (const bucket of graph.buckets) {
@@ -128,7 +133,7 @@ describe('walkDrawnRuns is the four loops it replaced', () => {
           expect(runsOf(bucket, count, CHUNK, lo, hi)).toEqual(rendererOracle(bucket, count, CHUNK, lo, hi));
         }
       }
-    });
+    }, WALK_TIMEOUT_MS);
   }
 
   it('a bucket without chunks is one run; missing extents are visible; an empty prefix walks nothing', () => {

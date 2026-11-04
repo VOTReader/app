@@ -72,7 +72,7 @@ describe('playPortion — today’s portion as one queue that stops (mw18 C5)', 
     expect(AudioPlayer.getState().queue.some((t) => !/jonah_00[23]|idA[12]/.test(t.url))).toBe(false);
   });
 
-  it("the portion's end says today's listening is done, and the saved place remembers it is a portion", () => {
+  it("the portion's end is a finished portion (the bar: today's listening is done), and the saved place remembers it is a portion", () => {
     AudioPlayer.playPortion({ label: 'Bible in a Year', items: [
       { volKey: 'bible-brm-kjv', item: { id: 'jonah' }, collectionLabel: 'KJV', chapterNum: 2 },
     ] });
@@ -82,7 +82,7 @@ describe('playPortion — today’s portion as one queue that stops (mw18 C5)', 
     expect(JSON.parse(localStorage.getItem('vot-audio-pos')).portion).toBe(true);
     el().dispatchEvent(new Event('ended'));
     expect(AudioPlayer.getState().status).toBe('idle');
-    expect(document.getElementById('vot-toast-audio').textContent).toBe('Today’s listening is done.');
+    expect(AudioPlayer.finished().portion).toBe(true);
   });
 
   it('passes over items with no recording, and starts nothing when none has one', () => {
