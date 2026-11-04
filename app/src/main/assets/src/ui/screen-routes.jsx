@@ -1887,7 +1887,10 @@ export function buildScreenRoutes({
           goHome();
         }
       };
-      return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} onNavigate={(id) => { setLetterId(id); }} />;
+      // The ‹ names where it goes: Hidden Manna has no index (its letter is reached from a Matthew card), so
+      // "Back to Hidden Manna", the label every letter's ‹ takes from its collection, named nowhere (2026-11-04).
+      const hmBack = { onBack: goHomeFromHM, label: fromMatthewChRef.current ? 'Matthew ' + fromMatthewChRef.current.chapterNum : 'Home' };
+      return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} navBack={hmBack} onNavigate={(id) => { setLetterId(id); }} />;
     },
 
     'garden-view': () => (
