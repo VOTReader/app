@@ -1501,13 +1501,13 @@ var LETTERS_V6 = [
       },
       "4": {
         "type": "scripture",
-        "ref": "(which means “God with us”) - Matthew 1:23"
+        "ref": "Matthew 1:23"
       }
     },
     "nkjv": {
       "John 1:1-5": "1. In the beginning was the Word, and the Word was with God, and the Word was God. 2. He was in the beginning with God. 3. All things were made through Him, and without Him nothing was made that was made. 4. In Him was life, and the life was the light of men. 5. And the light shines in the darkness, and the darkness did not comprehend it.",
       "John 1:14": "And the Word became flesh and dwelt among us, and we beheld His glory, the glory as of the only begotten of the Father, full of grace and truth.",
-      "(which means “God with us”) - Matthew 1:23": "“Behold, the virgin shall be with child, and bear a Son, and they shall call His name Immanuel,” which is translated, “God with us.” (Matthew 1:23)"
+      "Matthew 1:23": "“Behold, the virgin shall be with child, and bear a Son, and they shall call His name Immanuel,” which is translated, “God with us.” (Matthew 1:23)"
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/the-one-worthy-of-all-praise",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=3cBRmRcC2Lw&list=PLE8FlkxQPQkPq8VQsKdAQxdkiIuP0i4Fb&index=12",

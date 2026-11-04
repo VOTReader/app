@@ -51,35 +51,8 @@ const read = (rel) => readFileSync(resolve(SRC, rel), 'utf8');
 // Matched on kind + where + target (as a multiset: two identical links are two
 // entries). `should` is the walk's advice that day, for the person fixing it.
 const KNOWN_BREAKS = [
-  // ── letter-link (20): a study letter-link the registry cannot resolve; the
-  //    study follows seg.link (see the premise below), so the tap does nothing.
-  //    Mostly a straight apostrophe, a "…", or a capital the title does not have.
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Two::Salvation Is Given and Must Be Received; Once Received, Forever Shall It Belong to the Redeemed', should: 'Volume Seven::Salvation Is Given and Must Be Received; Once Received, Forever Shall It Belong to the Redeemed' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Seven::As I Am, So Shall It Be with Those I Am Sending… The Mystery of God Revealed to the Chosen', should: 'Volume Seven::As I Am, So Shall It Be with Those I Am Sending... The Mystery of God Revealed to the Chosen' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Two::One Truth, One Church, One Body… No Walls', should: 'Volume Two::One Truth, One Church, One Body... No Walls' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Two::I Am The Passover and The Lamb, the New Covenant With Men', should: 'Volume Two::I Am The Passover and The Lamb, The New Covenant with Men' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Two::I Am The Passover and The Lamb, the New Covenant With Men', should: 'Volume Two::I Am The Passover and The Lamb, The New Covenant with Men' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Seven::The Prophets Are Sent Out, True and False: the High-Minded Abased, the Lowly Uplifted... The Great and Terrible Day of The Lord Is Near, and Who Shall Stand', should: 'Volume Seven::The Prophets Are Sent Out, True and False; the High-Minded Abased, the Lowly Uplifted... The Great and Terrible Day of The Lord Is Near, and Who Shall Stand' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Volume Two::All Have Been Purchased; Yet Few Have Accepted, Few Are Chosen', should: 'Volume Two::All Have Been Purchased... Yet Few Have Accepted, Few Are Chosen' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch7 letter-link', target: 'Volume Two::I Am The Passover and The Lamb, the New Covenant With Men', should: 'Volume Two::I Am The Passover and The Lamb, The New Covenant with Men' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch8 letter-link', target: 'Volume Three::Blessed Are Those Who Overcome for My Name\'s Sake', should: 'Volume Three::Blessed Are Those Who Overcome for My Name’s Sake' },
-  { kind: 'letter-link', where: 'bible-studies.js more-than-a-man-ch8 letter-link', target: 'Volume Three::Blessed Are Those Who Overcome for My Name\'s Sake', should: 'Volume Three::Blessed Are Those Who Overcome for My Name’s Sake' },
-  { kind: 'letter-link', where: 'bible-studies.js lamb-of-god-ch1 letter-link', target: 'Volume Two::I Am The Passover and The Lamb, the New Covenant With Men', should: 'Volume Two::I Am The Passover and The Lamb, The New Covenant with Men' },
-  { kind: 'letter-link', where: 'bible-studies.js lamb-of-god-ch7 letter-link', target: 'Volume Two::I Am The Passover and The Lamb, the New Covenant With Men', should: 'Volume Two::I Am The Passover and The Lamb, The New Covenant with Men' },
-  { kind: 'letter-link', where: 'bible-studies.js lamb-of-god-ch14 letter-link', target: 'Volume Four::Walking in the Footsteps of The Messiah\'s Passion', should: 'Volume Four::Walking in the Footsteps of The Messiah’s Passion' },
-  { kind: 'letter-link', where: 'bible-studies.js grace-and-the-law-ch2 letter-link', target: 'Volume Three::Blessed Are Those Who Overcome for My Name\'s Sake', should: 'Volume Three::Blessed Are Those Who Overcome for My Name’s Sake' },
-  { kind: 'letter-link', where: 'bible-studies.js grace-and-the-law-ch4 letter-link', target: 'Volume Three::The Dust Has Been Shaken Off the Feet of God\'s Messengers as a Testament Against You, O Churches of Men', should: 'Volume Three::The Dust Has Been Shaken Off the Feet of God’s Messengers as a Testament Against You, O Churches of Men' },
-  { kind: 'letter-link', where: 'bible-studies.js purity-ch1 letter-link', target: 'Volume Three::Blessed Are Those Who Overcome for My Name\'s Sake', should: 'Volume Three::Blessed Are Those Who Overcome for My Name’s Sake' },
-  { kind: 'letter-link', where: 'bible-studies.js purity-ch1 letter-link', target: 'Words To Live By: Part One::Walking Together in The Father\'s Joy', should: 'Words To Live By: Part One::Walking Together in The Father’s Joy' },
-  { kind: 'letter-link', where: 'bible-studies.js purity-ch2 letter-link', target: 'Volume Three::Blessed Are Those Who Overcome for My Name\'s Sake', should: 'Volume Three::Blessed Are Those Who Overcome for My Name’s Sake' },
-  { kind: 'letter-link', where: 'bible-studies.js purity-ch3 letter-link', target: 'Volume Three::Blessed Are Those Who Overcome for My Name\'s Sake', should: 'Volume Three::Blessed Are Those Who Overcome for My Name’s Sake' },
-  // latent: the Matthew preface is not rendered anywhere today
-  { kind: 'letter-link', where: 'matthew.js preface letter-link', target: 'Volume Four::Mistranslation and Misinterpretation Leading to Great Obscurity Among Many Faces', should: 'Volume Four::Mistranslation and Misinterpretation Leading to Great Obscurity among Many Faces' },
-  // ── letter-id (3): latent (each segment has a link, which the tap follows), but
-  //    the letterId names no letter or another letter than the link does.
-  { kind: 'letter-id', where: 'bible-studies.js more-than-a-man-ch5 letter-link', target: 'rebuke-letter/enemies-of-the-lord-come-forth', should: 'vot-rebuke-letter/enemies-of-the-lord-come-forth' },
-  { kind: 'letter-id', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'vot-flock-letter/given-to-teach', should: 'vot-flock-letter/even-to-children-is-the-spirit-given' },
-  { kind: 'letter-id', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'vot-seven-letter/to-the-nation-once-called-of-itself-under-god', should: 'vot-seven-letter/thus-declares-the-lord-against-the-nation-once-called-of-itself-under-god' },
+  // (letter-link 20, letter-id 3, verse-range 4 and matthew-cite "1 John 3:2" were
+  //  fixed in the data the same day, CORPUS_VERSION c76; 39 -> 11.)
   // ── excerpt (7): the study quotes words its link's letter does not hold, and
   //    another original letter does (a misattribution: the tap lands elsewhere).
   { kind: 'excerpt', where: 'bible-studies.js more-than-a-man-ch6 letter-link', target: 'Words To Live By: Part Two::Bear Fruit', should: 'Volume Two::Bear Much Fruit, the Harvest Is Near' },
@@ -95,18 +68,11 @@ const KNOWN_BREAKS = [
   { kind: 'matthew-note', where: 'matthew.js chapter 10 note 10:9', target: 'I Have Purged; Behold, I Shall Wipe Away and Restore::I Have Purged; Behold, I Shall Wipe Away and Restore' },
   { kind: 'matthew-note', where: 'matthew.js chapter 10 note 10:19', target: 'I Have Purged; Behold, I Shall Wipe Away and Restore::I Have Purged; Behold, I Shall Wipe Away and Restore' },
   { kind: 'matthew-note', where: 'matthew.js chapter 26 note 26:28', target: 'The Promise::The Promise' },
-  // ── matthew-cite (2): a reference missing from MATTHEW_NKJV renders as untappable commentary.
+  // ── matthew-cite (1): a reference missing from MATTHEW_NKJV renders as untappable commentary.
   { kind: 'matthew-cite', where: 'matthew.js chapter 11 scripture 11:13-14', target: 'Malachi 4:4-6' },
-  { kind: 'matthew-cite', where: 'matthew.js chapter 22 scripture 22:30', target: '1 John 3:2' },
-  // ── verse-range (4): the dict text shows, but the ref does not parse, so the
-  //    sheet has no Go to Scripture (and the edition compare cannot find it).
-  { kind: 'verse-range', where: 'volume-one.js duty footnote 5', target: 'Amos 3:7 CJB', should: 'Amos 3:7 (CJB)' },
-  { kind: 'verse-range', where: 'volume-six.js the-one-worthy-of-all-praise footnote 4', target: '(which means “God with us”) - Matthew 1:23', should: 'Matthew 1:23' },
-  { kind: 'verse-range', where: 'volume-seven.js as-i-am-so-shall-it-be-with-those-i-am-sending-the-mystery-of-god-revealed-to-the-chosen footnote 4', target: '(which means “God with us”) - Matthew 1:23', should: 'Matthew 1:23' },
-  { kind: 'verse-range', where: 'matthew-nkjv.js key', target: 'Wedding Garment: Colossians 3:9-10', should: 'Colossians 3:9-10' },
 ];
 // The count the list started at. Lower it as entries go; never raise it.
-const KNOWN_CEILING = 39;
+const KNOWN_CEILING = 11;
 
 const keyOf = (b) => `${b.kind} | ${b.where} | ${b.target}`;
 /** a − b, as multisets of keys. */
@@ -372,7 +338,7 @@ describe('every cross-reference in the corpus resolves', () => {
 
   it('the known list only shrinks', () => {
     expect(KNOWN_BREAKS.length).toBeLessThanOrEqual(KNOWN_CEILING);
-    expect(KNOWN_CEILING).toBeLessThanOrEqual(39);
+    expect(KNOWN_CEILING).toBeLessThanOrEqual(11);
     for (const b of KNOWN_BREAKS) expect(KINDS).toContain(b.kind);
   });
 });

@@ -48,8 +48,8 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-85c5c6d7aa';
-const CORPUS_VERSION = 'c75'; // c74->c75 (2026-10-28): audio re-upload watch -- TB2_001_Introduction (new, read by AI with music): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-10-28-054506.json). // PREVIOUS c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
+const CACHE_VERSION = 'v1.0.2-a5eb99afa2';
+const CORPUS_VERSION = 'c76'; // c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -320,7 +320,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': '0fbfd1210dc903d52cd8d39256b0e87f6ee5567403682dcbd562064f32a29f63',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': '7c0c6772d01beedab07c40e45e019da8e43eb10e59796109c2be6499de41571e',
+  './dist/bundle-d.js': '6874d9614483b65d09dd09e9542a990b12e7faf418dbd4990316be9bff9bf4c5',
   './dist/bundle-w.js': '25e14db10d8ac2d483f3c40feb9a4e1aa45ae9846c4ea61b3ae6499ff440d9b9',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',
@@ -342,8 +342,8 @@ const ASSET_REVISIONS = {
   './answers-chart-chronology.jpg': 'b526c71f82d2b2b4e906d90a300de41200afdc849c9e8ad25804ae7887f5ee52',
   './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
-  './dist/bundle-a-matthew.js': 'b2ed5c2818a82748ca0a0a897d66fa83823fe574ac6ec4a694fe72687dbe665b',
-  './dist/bundle-a-vot.js': 'ee4ab496128f061f1b51be6e7a7b50b0fb756ff6f4c4b499665ace041a1cd7a3',
+  './dist/bundle-a-matthew.js': 'e88268c42ae19fca4c02ac78177a47602936a0313ca59f3e6cc25a9c7976e58c',
+  './dist/bundle-a-vot.js': 'f5a0c5aa25c89a6474149450b56f2be3f7961537b5a04d6f6f81020349e7376a',
   './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
   './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
   './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
@@ -429,14 +429,14 @@ const ASSET_REVISIONS = {
   './src/data/bible-rkjv.js': '8aff1bbb50beaee6f9e6e215ca1de0dcaef61ce75fb637522c43aa6c3f94ed57',
   './src/data/bible-rnkjv.js': 'fba44c03cc99eb2532009df85f41bddb8a587972090915bd2776c7734fa61c5e',
   './src/data/bible-rvr.js': '6c7451ca2517f4b5ea69bb37daf10f88d19bd68b600793f99b4f1ff650e3bca8',
-  './src/data/bible-studies.js': 'c0b4f7e3281aa9a33899d9e9830e1f044a8bd0a5e7d87d5e73601e0081282cc1',
+  './src/data/bible-studies.js': '853d7ad0fb9be9295de0fa6b4d9a845952c857fd937e61fefd3484cf937b63be',
   './src/data/bible-sync-brm-kjv.js': '0d107fa0e256a67b46112a5d2a47e4d6abcd7e239bda3263c04528e6351db3fa',
   './src/data/bible-sync-tsot-matthew.js': 'cb5f612b25cdca8c1d2cc4bc713377fe754fca989d00ed8e53220b3ac5309444',
   './src/data/bible-sync-web-ebible.js': 'accb68464a6f17e4e9c581daa3a5f6056f788114e955bbaee35d343d99733e7f',
   './src/data/bible-sync-wop-nkjv.js': 'e3540f79031a09c45eb7d39c23c9a83892df100846af47c615a85d45f961989a',
   './src/data/bible-web.js': '22b119d895aa329b2f62e6ba7b1b5978f1fbcf13fc474d1de5d9b72c9a3558c2',
   './src/data/bible-ylt.js': 'b6069acf40f8a8cc847390d7e8ee1af7c5b5d83d7e77c40c4bf612715c1acdf8',
-  './src/data/scripture-web-data.js': '028a061c958c56fb80725e7fab64d312361b25935c114ee1312a271ab373f065',
+  './src/data/scripture-web-data.js': '033ec47bbbbae873d457463f0ec9f5f7696b66f8e3ff24e35d15c22c02e81022',
   './study-chart-chronology.jpg': 'd8991646f54d4b9861ce85bb7ff59517623307b9c7c851a592bd48b7b5b854a8',
   './study-cover-lamb.jpg': 'dcb877b4ac506318d971b1d3f772862ad84cb5efb701dbf6387b42d3c1f31b58',
   './study-cover-mtam.jpg': 'b0775896d907f7f8302b02d6f2ecdb6db9bfa0ed09715bda954f96b71c0d65ce',
