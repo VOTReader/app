@@ -1189,6 +1189,11 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 // attaching + loading until the user taps.
                 webView = createConfiguredWebView()
                 vm.currentScale = 1f
+                // The fresh page boots believing the system bars are showing (its fullscreen
+                // state lived in the dead renderer's memory, and GardenView / Scripture Web clear
+                // immersive mode only from an unmount that never ran). Show them, so the window
+                // matches the page; a screen that wants fullscreen asks for it again on mount.
+                applyImmersiveMode(false)
 
                 if (decision.showRetryView) {
                     Timber.w("Renderer crashed %d times in 60s. Showing retry view; webView is live but detached until user taps.", vm.renderRecoveryCount)
