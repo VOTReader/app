@@ -124,3 +124,39 @@ describe('OfflineLibrary.dismiss / start', () => {
     }
   });
 });
+
+/* h1104-19: a library left incomplete by a dropped signal stayed incomplete when the signal came back: the banner
+   (and the "still" banner's "Connect to the internet, then retry") waited for a tap. Now the page repairs it on its
+   own when the browser says it is back online, quietly for a reader who dismissed the banner. */
+describe('OfflineLibrary repairs itself when the network returns', () => {
+  const settle = () => new Promise((r) => setTimeout(r, 0));
+  it('incomplete, then online: the missing files are fetched without a tap', async () => {
+    const w = fakeWorker({ CHECK_OFFLINE: status(['a', 'b']), REPAIR_OFFLINE: status([]) });
+    await OfflineLibrary.check(() => w, 1000);
+    expect(OfflineLibrary.getState().phase).toBe('incomplete');
+    window.dispatchEvent(new Event('online'));
+    await settle();
+    expect(w.asked).toEqual(['CHECK_OFFLINE', 'REPAIR_OFFLINE']);
+    expect(OfflineLibrary.getState().phase).toBe('fixed');
+  });
+  it('a reader who closed the banner is not shown it again while the repair runs', async () => {
+    let answer;
+    const w = { asked: [], postMessage(msg, ports) { this.asked.push(msg.type); if (msg.type === 'CHECK_OFFLINE') ports[0].postMessage(status(['a'])); else answer = () => ports[0].postMessage(status([])); } };
+    await OfflineLibrary.check(() => w, 1000);
+    OfflineLibrary.dismiss();
+    window.dispatchEvent(new Event('online'));
+    await settle();
+    expect(w.asked).toContain('REPAIR_OFFLINE');
+    expect(OfflineLibrary.getState().phase).toBe('dismissed');
+    answer();
+    await settle();
+    expect(OfflineLibrary.getState().phase).toBe('fixed');
+  });
+  it('a whole library, or a repair already running, asks nothing more', async () => {
+    const w = fakeWorker({ CHECK_OFFLINE: status([]) });
+    await OfflineLibrary.check(() => w, 1000);
+    window.dispatchEvent(new Event('online'));
+    await settle();
+    expect(w.asked).toEqual(['CHECK_OFFLINE']);
+  });
+});

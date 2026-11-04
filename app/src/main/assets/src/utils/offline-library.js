@@ -38,6 +38,18 @@ let _version = 0;
 const _listeners = new Set();
 /** @type {() => any} */
 let _getWorker = () => null;
+/** @type {(() => void) | null} */
+let _onOnline = null;
+
+/* h1104-19: the network returning repairs an incomplete library on its own (no tap): the files a dropped signal
+   left out are the ones a reader most needs next time it drops. Quiet for a reader who closed the banner. */
+function _listenForOnline() {
+  if (_onOnline || typeof window === 'undefined' || typeof window.addEventListener !== 'function') return;
+  _onOnline = () => {
+    if (_state.phase === 'incomplete' || _state.phase === 'still') OfflineLibrary.retry(undefined, { quiet: true });
+  };
+  window.addEventListener('online', _onOnline);
+}
 
 /** @param {OfflineState} next */
 function _set(next) {
@@ -100,6 +112,7 @@ export const OfflineLibrary = {
    */
   check(getWorker, timeoutMs) {
     _getWorker = getWorker;
+    _listenForOnline();
     return askWorker(getWorker(), 'CHECK_OFFLINE', timeoutMs || CHECK_TIMEOUT_MS).then((status) => {
       if (!status) _set({ phase: 'unknown', missing: 0 });
       else if (status.complete) _set({ phase: 'complete', missing: 0 });
@@ -108,10 +121,11 @@ export const OfflineLibrary = {
     });
   },
 
-  /** Fetch only the missing files; "fixed" only on a worker's fresh read of a complete library. */
-  retry(timeoutMs) {
+  /** Fetch only the missing files; "fixed" only on a worker's fresh read of a complete library.
+      @param {number} [timeoutMs] @param {{ quiet?: boolean }} [opts] quiet: a closed banner stays closed */
+  retry(timeoutMs, opts) {
     const before = _state.missing;
-    _dismissed = false;
+    if (!(opts && opts.quiet)) _dismissed = false;
     _set({ phase: 'retrying', missing: before });
     return askWorker(_getWorker(), 'REPAIR_OFFLINE', timeoutMs || REPAIR_TIMEOUT_MS).then((status) => {
       if (status && status.complete) {
@@ -147,6 +161,8 @@ export const OfflineLibrary = {
     _dismissed = false;
     _started = false;
     _getWorker = () => null;
+    if (_onOnline && typeof window !== 'undefined') window.removeEventListener('online', _onOnline);
+    _onOnline = null;
     _version += 1;
     _listeners.clear();
   },
