@@ -33,6 +33,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeHistoryStore } from './store-merge.js';
 
 /**
  * @typedef {{
@@ -82,7 +83,9 @@ function _normalizeEntries(entries) {
 }
 
 export const HistoryStore = extendStore(
-  CachedStore('vot-history', /** @type {HistoryEntry[]} */ ([]), { idb: true }),
+  // dl2: merged across tabs (store-merge.js mergeHistoryStore). Saved blind, a second
+  // tab's save dropped every visit the first had recorded since it loaded.
+  CachedStore('vot-history', /** @type {HistoryEntry[]} */ ([]), { idb: true, crossTabMerge: mergeHistoryStore }),
   {
     /**
      * The full history array, newest first. Live cache reference —

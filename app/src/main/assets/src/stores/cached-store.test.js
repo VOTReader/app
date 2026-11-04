@@ -1360,6 +1360,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-audio-recent-open');    // AudioLibraryScreen RECENT_OPEN_KEY
     expect(LS_SKIP_LIST).toContain('vot-recent-searches');      // search/recent-searches.js
     expect(LS_SKIP_LIST).toContain('vot-journal-draft');        // JournalEditorScreen
+    expect(LS_SKIP_LIST).toContain('vot-note-draft');           // utils/note-draft.js (dl4)
     expect(LS_SKIP_LIST).toContain('vot-journal-new-entry-stats');
     expect(LS_SKIP_LIST).toContain('vot-restore-inflight');     // use-restore-guard
     expect(LS_SKIP_LIST).toContain('vot-last-seen-build');      // utils/update-toast.js
@@ -1380,7 +1381,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-notes-tab');
     expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
     expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
-    expect(LS_SKIP_LIST.length).toBe(33);
+    expect(LS_SKIP_LIST.length).toBe(34);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
