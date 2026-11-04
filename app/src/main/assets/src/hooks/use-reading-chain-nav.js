@@ -403,8 +403,17 @@ export function useReadingChainNav({
   const bcvOnNextBook = chIsLast && bookId === 'revelation' ?
     _goFirst.one :
     goNextBibleBook;
+  // The page that jump opens, in its own hero's words: Volume One opens on its
+  // Preface ("A Word of Warning", _first), and the card said "Letter 1" over it
+  // (reading-flow hunt, 2026-11-04). Before the letters land the jump waits for
+  // them, so only the volume is known.
+  const _v1OpensOn = () => {
+    const v1 = COL_BY_KEY.get('one');
+    if (colPreface(v1)) return 'Volume One · Preface';
+    return colLetterArr(v1).length > 0 ? 'Volume One · Letter 1' : 'Volume One';
+  };
   const bcvNextBoundaryTitle = chIsLast && bookId === 'revelation' ?
-    'Volume One · Letter 1' :
+    _v1OpensOn() :
     null;
 
   // The full surface — including the helpers that App() doesn't
