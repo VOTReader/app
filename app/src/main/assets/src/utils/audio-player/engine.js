@@ -361,7 +361,9 @@ function _onError() {
   // A streamed recording that could not be reached: MediaError 2 (the network failed mid-load), or 4, which is what a
   // fetch that fails outright reports before any metadata (the HTML spec's "cannot be fetched at all"; the S22 measured
   // it for a DNS miss, 2026-09-13). The assets are known-good MP3s, so a 4 there is the network as well (U04.2).
-  const lostSignal = !!(err && (err.code === 2 || err.code === 4) && _streamed(failed));
+  // Native says when the server answered with an error or the file is not there (native-audio.js `missing`): that is
+  // the recording, not the signal.
+  const lostSignal = !!(err && (err.code === 2 || err.code === 4) && !err.missing && _streamed(failed));
   // U04.2: a step that died at the network before it ever sounded goes back to what was playing, paused where it
   // was; the element still holds the failed recording, so toggle() re-loads the restored one and seeks to its place.
   const back = _lastGood;

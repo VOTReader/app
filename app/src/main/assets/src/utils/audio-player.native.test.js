@@ -252,6 +252,19 @@ describe('audio-player on the native player (m3)', () => {
     expect(last.startMs).toBe(300000);
   });
 
+  it('online, a recording gone from the release (HTTP 404, native 2004) is a load failure, not No signal, and is not stepped back from', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 100000, dur: 900000, playing: true, want: true });
+    await flush();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'error', url: URL_OF('idA1'), pos: 0, dur: 0, playing: false, want: true, code: 2004, name: 'ERROR_CODE_IO_BAD_HTTP_STATUS' });
+    await flush();
+    const s = AudioPlayer.getState();
+    expect(s.failed).toBe('load');
+    expect(s.queue[s.qi].title).toBe('Letter A');
+    expect((document.getElementById('vot-toast-audio') || {}).textContent || '').not.toContain('No signal');
+  });
+
   it('a place moved on the bar after a load error is where Retry starts, not the place it died', async () => {
     AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
     send({ type: 'state', url: URL_OF('idC'), pos: 100000, dur: 900000, playing: true, want: true });

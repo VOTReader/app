@@ -105,7 +105,7 @@ class NativeAudio extends EventTarget {
     /** @type {NativeHooks} */
     this.hooks = hooks || {};
     this.preload = 'none';
-    /** @type {{ code: number } | null} */
+    /** @type {{ code: number, missing?: boolean } | null} */
     this.error = null;
     this._src = '';
     /** The url native plays or last reported (after a seam, before the player adopts it). */
@@ -523,7 +523,11 @@ class NativeAudio extends EventTarget {
     this._playing = false;
     this._paused = true;
     this._syncTicker();
-    this.error = { code: mediaErrorOf(e) };
+    // `missing`: native KNOWS the server answered (bad HTTP status: a recording gone from the release, 2004) or the
+    // file is not there (2005). <audio> cannot tell that from a DNS miss (both MediaError 4), so the player reads a 4
+    // as the network; under native it is a load failure, not a dead zone (no "No signal", no step back).
+    const n = Number(e && e.code) || 0;
+    this.error = { code: mediaErrorOf(e), missing: n === 2004 || n === 2005 };
     this._loaded = false;
     this._expect = null;   // play() loads it afresh (the player's retry)
     this._fire('error');
