@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-uzE9Bnem5vMmEuiYR7PIGTzeyWj2vaYZGc6+NnmXAbc=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-nnLx98+HsWi37YJk6e1qAc9vxnxE8hb3hztmPKCL6YI=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-CELpBvV+P+s/PNlXoCQIwDKZoyT/5cQtafQo/uAX/8E=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-nnLx98+HsWi37YJk6e1qAc9vxnxE8hb3hztmPKCL6YI=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -237,7 +237,14 @@
       _notify: function() { this.loaded = true; this.error = false; this._bump(); },
       _setError: function() { this.error = true; this._bump(); }
     };
-    var load = function() {
+    // h1104-19: a load that failed is not tried again by an ask within RETRY_GAP_MS of the failure. Screens ask from
+    // render (screen-routes' _kickVot, audio-lengths' lengthOf), and the failure's own bump re-renders them: offline,
+    // fail -> bump -> render -> retry -> fail never ended. Try again passes force; the network coming back retries.
+    var RETRY_GAP_MS = 1500;
+    var failed = null;
+    var failedAt = 0;
+    var markFailed = function(p) { failed = p; failedAt = Date.now(); };
+    var load = function(force) {
       // KEEP THIS FIRST — the takeover guard below depends on it (Verifier,
       // service-worker-1, 2026-09-04). Returning the cached promise before the
       // guard is what makes the guard cost a reader nothing: a corpus already
@@ -261,6 +268,7 @@
         window.location.reload();
         return corpus._promise;
       }
+      if (corpus.error && failed && force !== true && Date.now() - failedAt < RETRY_GAP_MS) return failed;
       // Retry: clear a prior error so subscribers flip back to the loading state.
       if (corpus.error) { corpus.error = false; corpus._bump(); }
       corpus._promise = new Promise(function(resolve, reject) {
@@ -277,6 +285,7 @@
           if (corpus.loaded || corpus._promise !== mine) return;
           stalled = true;
           corpus._promise = null;
+          markFailed(mine);
           corpus._setError();
           if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
             try { window.DiagnosticLog.error('corpus', 'load stalled for ' + bundlePath); } catch (_e) {}
@@ -311,6 +320,7 @@
             // Script loaded but did not run, or its finishInit threw — same recovery path.
             if (stalled) return;   // the watchdog already failed this attempt
             if (corpus._promise === mine) corpus._promise = null;
+            markFailed(mine);
             corpus._setError();
             if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
               try { window.DiagnosticLog.error('corpus', 'init failed for ' + name + ': ' + ((e && e.message) || e)); } catch (_e2) {}
@@ -326,6 +336,7 @@
           clearTimeout(watchdog);
           if (stalled) return;   // the watchdog already failed this attempt
           if (corpus._promise === mine) corpus._promise = null;
+          markFailed(mine);
           corpus._setError();
           if (window.DiagnosticLog && typeof window.DiagnosticLog.error === 'function') {
             try { window.DiagnosticLog.error('corpus', 'failed to load ' + bundlePath); } catch (_e) {}
@@ -337,6 +348,12 @@
       var mine = corpus._promise;
       return corpus._promise;
     };
+    // h1104-19: the network back, a load that failed tries again on its own (a screen that failed offline recovers).
+    if (typeof window.addEventListener === 'function') {
+      window.addEventListener('online', function() {
+        if (corpus.error && !corpus._promise) load(true).catch(function() { /* failed again: the screen says so */ });
+      });
+    }
     return { corpus: corpus, load: load };
   };
   (function() {

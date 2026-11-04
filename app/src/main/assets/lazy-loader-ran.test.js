@@ -114,7 +114,7 @@ describe.each(CORPORA)('$path: `load` is not proof the bundle ran', (c) => {
     expect(await loadAndFire(c), 'the load promise resolved over a bundle that defined nothing').toBe('rejected');
     expect(window[c.corpus].loaded, 'the corpus is marked loaded but none of its globals exist').toBe(false);
     expect(window[c.corpus].error, 'no E1 error, so the route never offers "Try again"').toBe(true);
-    window[c.load]().catch(() => {});
+    window[c.load](true).catch(() => {});
     expect(injected(c.path), 'the retry reused the cached promise instead of fetching the bundle again').toHaveLength(2);
   });
 
@@ -178,7 +178,7 @@ describe('a stalled corpus load (s01.6)', () => {
     vi.advanceTimersByTime(2000);
     expect(await settled).toBe('rejected');
     expect(window[c.corpus].error, 'no E1 error, so the route spins forever').toBe(true);
-    window[c.load]().catch(() => {});
+    window[c.load](true).catch(() => {});
     expect(injected(c.path)).toHaveLength(2);
   });
 

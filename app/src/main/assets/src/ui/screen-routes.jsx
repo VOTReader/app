@@ -722,7 +722,7 @@ export function buildScreenRoutes({
     if (corpus && corpus.error) {
       return _fallbackView({
         say: 'Couldn’t load this section.', label: 'Try again', role: 'alert', nav,
-        onGo: () => { if (typeof loadFn === 'function') loadFn(); },
+        onGo: () => { if (typeof loadFn === 'function') loadFn(true); },   // an explicit retry (h1104-19: a render's ask waits out a fresh failure)
       });
     }
     // SHELL-3: this kicks the lazy-corpus load from inside a route's RENDER
