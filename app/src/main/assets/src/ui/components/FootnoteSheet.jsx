@@ -96,6 +96,11 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
   const nextKey = curIdx >= 0 && curIdx < orderedKeys.length - 1 ? orderedKeys[curIdx + 1] : null;
   const total = orderedKeys.length;
   const showNav = total > 1 && onNavigate && curIdx !== -1;
+  // "of M" counts this page's footnotes. Eight Bible-study chapters number theirs
+  // on from the chapter before, as the study's pages do (Grace and the Law, Part 7:
+  // 8-14), and "Footnote 8 of 7" put the number over the count. When the numbers
+  // are not the page's own 1..M the counter gives the place: "Footnote 8 · 1 of 7".
+  const numberIsPlace = orderedKeys.every((k, i) => k === String(i + 1));
   // position:fixed sheet — portal to <body> so it anchors to the viewport, not to
   // the reading screen's `.pager-track` (whose transient page-swipe transform
   // would otherwise become its containing block and drop it off-screen — see
@@ -110,7 +115,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
             <div className="fn-sheet-num-row">
               <div className="fn-sheet-num">
                 Footnote {num}
-                {showNav && <span className="fn-sheet-num-of"> of {total}</span>}
+                {showNav && <span className="fn-sheet-num-of">{numberIsPlace ? ` of ${total}` : ` \xB7 ${curIdx + 1} of ${total}`}</span>}
               </div>
               {showNav && (
                 <div className="fn-sheet-nav">
