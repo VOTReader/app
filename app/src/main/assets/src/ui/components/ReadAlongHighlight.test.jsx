@@ -724,6 +724,42 @@ describe('ReadAlongHighlight — Back to the voice', () => {
     act(() => { AudioPlayer.toggle(); });
     expect(pill()).toBeNull();
   });
+
+  it('a pause keeps the hold: Play again leaves the page where the reader put it, and the pill comes back', () => {
+    const t0 = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    handScroll(BELOW);
+    expect(pill()).toBeTruthy();
+    act(() => { AudioPlayer.toggle(); });   // pause to think
+    expect(pill()).toBeNull();
+    act(() => { AudioPlayer.toggle(); });   // and play on
+    nowSpy.mockReturnValue(t0 + 9000);     // past the 4 s grace
+    clockTo(6);
+    runGlide();
+    expect(scroller.scrollTop, 'the page stays where the reader put it').toBe(0);
+    expect(pill() && pill().getAttribute('aria-label')).toMatch(/below$/);
+  });
+
+  it('the voice brought onto the screen by a tap lets go at once, not after the hand window', () => {
+    const t0 = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    handScroll(BELOW);
+    expect(pill()).toBeTruthy();
+    nowSpy.mockReturnValue(t0 + 9000);
+    // a tap on a clause in view (or Listen from here): the finger marks the hand, the lit line is now on screen
+    fireEvent(scroller, new Event('pointerdown', { bubbles: true }));
+    rectIs(ON);
+    clockTo(6);
+    expect(pill()).toBeNull();
+  });
 });
 
 /* ═══════════════════════════════════════════════════════════════════════

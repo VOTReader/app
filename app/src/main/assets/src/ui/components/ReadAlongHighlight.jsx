@@ -570,17 +570,19 @@ function _glideTo(el, to, glideRef) {
 function _follow(range, mainRef, userScrollAt, glideRef, hold) {
   if (_leaseHeld()) return true;
   if (_readerSelecting()) return false;
-  if (Date.now() - userScrollAt.current < USER_SCROLL_MS) return false;
   const scroller = _scrollerOf(mainRef);
   if (!scroller) return false;
   // BACK TO THE VOICE (player brief 3d, picture 17): a reader who scrolled the lit line off screen is reading
   // elsewhere on purpose. The page stays where they put it, with the pill, until they tap it or the voice
-  // comes onto the screen they are looking at; then the follow goes on as before.
+  // comes onto the screen they are looking at; then the follow goes on as before. Checked BEFORE the hand's window:
+  // a tap on a clause in view (or Listen from here) brings the voice to the reader AND marks the hand, and the pill
+  // pointed away from a lit line under their finger until the window ran out.
   if (hold && hold.held) {
     const side = _sideOf(range, scroller);
     if (side) { _holdShow(hold, side); return false; }
     _holdRelease(hold);
   }
+  if (Date.now() - userScrollAt.current < USER_SCROLL_MS) return false;
   const box = scroller.getBoundingClientRect();
   if (!box.height) return false;   // not laid out (hidden tab, jsdom) — nothing to aim at
   // The band is a share of the room the reader can SEE. Whatever sits over the bottom of the
@@ -627,6 +629,10 @@ function _sideOf(range, scroller) {
 function _holdShow(h, dir) {
   h.held = true;
   if (h.dir !== dir) { h.dir = dir; if (h.set) h.set(dir); }
+}
+/** Paused: the pill goes, the hold stands (Play again keeps the page where the reader put it). @param {VoiceHold} h */
+function _holdHide(h) {
+  if (h.dir) { h.dir = 0; if (h.set) h.set(0); }
 }
 /** @param {VoiceHold} h */
 function _holdRelease(h) {
@@ -1044,10 +1050,17 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   // lit line off screen holds the follow and raises the pill; one that brings it back lets go. Only while this pane
   // plays and follows, and never under auto-scroll, whose pill owns the spot and whose scrolling is the reader's choice.
   const holding = active && readAlongOn && readAlongFollow;
+  // Paused on this pane's recording: the pill hides and the hold stands, so reading ahead, pausing to think and
+  // playing on does not pull the page back (the next frame's _follow shows the pill again, or lets go if the voice
+  // is on screen). Anything else that ends the holding (another recording, follow or read-along off) lets go.
+  const pausedHere = React.useRef(false);
+  const _holdKey = React.useRef(key);   // the cleanup runs after the next render: a letter change lets go
+  _holdKey.current = key;
+  pausedHere.current = loaded && st.status === 'paused' && readAlongOn && readAlongFollow;
   React.useEffect(() => {
     const el = _scrollerOf(mainRef);
     const h = hold.current;
-    if (!el || !holding) { _holdRelease(h); return undefined; }
+    if (!el || !holding) { if (pausedHere.current) _holdHide(h); else _holdRelease(h); return undefined; }
     let raf = /** @type {number | null} */ (null);
     const check = () => {
       raf = null;
@@ -1064,9 +1077,11 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     return () => {
       el.removeEventListener('scroll', onScroll);
       if (raf != null) { try { cancelAnimationFrame(raf); } catch (_e) { /* frame source gone */ } }
-      _holdRelease(h);
+      if (pausedHere.current && _holdKey.current === key) _holdHide(h); else _holdRelease(h);
     };
   }, [mainRef, key, holding]);
+  // A hold kept through a pause ends when this page's recording leaves the bar (closed, another one started).
+  React.useEffect(() => { if (!loaded) _holdRelease(hold.current); }, [loaded]);
   // The pill's tap: let go, and the next frame repaints the lit line and glides to it.
   const backToVoice = React.useCallback(() => {
     _holdRelease(hold.current);
