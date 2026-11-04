@@ -48,7 +48,7 @@ function App() {
         3. useSheetOrchestration  ← nav state via tabField (2)
         4. useFromLetterStack     ← tabField (2)
         5. useSettings            ← saved
-        6. useFullscreenGesture   ← settings (5); disabled on GardenView
+        6. useFullscreenGesture   ← settings (5); paused on GardenView
         7. useHistory             ← settings.historyEnabled (5)
         8. useThumbnails          ← tabs/activeTab (2), settings (5)
         9. useScrollMemory        ← activeTab + updateActiveTab (2)
@@ -228,7 +228,7 @@ function App() {
   // Fullscreen is a user-gesture-only browser API. GardenView owns its own
   // always-on immersive view, so this shortcut never competes with it.
   useFullscreenGesture({
-    enabled: settings.doubleTapFullscreen !== false && screen !== 'garden-view',
+    enabled: settings.doubleTapFullscreen !== false, paused: screen === 'garden-view',
     hintCount: settings.fullscreenHintCount,
     onHintShown: (count) => updateSetting('fullscreenHintCount', count),
   });

@@ -5,6 +5,11 @@
    One pointer-up listener covers mouse, touch, and pen on the shared web UI.
    PlatformBridge supplies the platform split: the browser Fullscreen API for
    desktop/PWA, and Android system-bar immersive mode for the APK.
+
+   `enabled` is Settings › Double-Tap / Click Fullscreen: switched off while
+   the gesture holds fullscreen, it returns to regular view. `paused` is a
+   screen that owns immersive mode itself (GardenView): the gesture stands
+   down and leaves the bars to it.
 */
 
 import { PlatformBridge } from '../utils/platform-bridge.js';
@@ -69,9 +74,11 @@ export function isFullscreenGestureTarget(target) {
 }
 
 /**
- * @param {{ enabled: boolean, hintCount: unknown, onHintShown: (count: number) => void }} args
+ * `enabled` is the reader's setting; `paused` is a screen that owns immersive mode itself (GardenView).
+ * @param {{ enabled: boolean, paused?: boolean, hintCount: unknown, onHintShown: (count: number) => void }} args
  */
-export function useFullscreenGesture({ enabled, hintCount, onHintShown }) {
+export function useFullscreenGesture({ enabled, paused = false, hintCount, onHintShown }) {
+  const active = !!enabled && !paused;
   const previousTapRef = React.useRef(null);
   const pointerDownRef = React.useRef(null);
   // Android's bridge has no readback API. This ref stays correct because this
@@ -88,11 +95,25 @@ export function useFullscreenGesture({ enabled, hintCount, onHintShown }) {
   const hintCountRef = useRefMirror(safeHintCount);
   const onHintShownRef = useRefMirror(onHintShown);
 
+  // The setting switched OFF while the gesture holds fullscreen hands the screen back (settings hunt,
+  // 2026-11-04): the double tap was the only way out, and on Android the bars stayed hidden for the
+  // life of the activity. A reader who turns it off because fullscreen keeps happening by accident is
+  // in fullscreen at that moment. Only the setting: a pause leaves immersive mode to GardenView, which
+  // shows the bars again itself when it closes. With the setting off nothing else holds fullscreen
+  // here, since the setting changes on Settings, where the Garden and Scripture Web are closed.
   React.useEffect(() => {
-    if (!enabled) {
+    if (enabled) return;
+    const held = PlatformBridge.isAndroid ? androidFullscreenRef.current : !!document.fullscreenElement;
+    androidFullscreenRef.current = false;
+    if (held) PlatformBridge.setImmersiveMode(false);
+  }, [enabled]);
+
+  React.useEffect(() => {
+    if (!active) {
       previousTapRef.current = null;
       pointerDownRef.current = null;
-      androidFullscreenRef.current = false;
+      // A pause (GardenView) takes immersive mode over and hands back regular view when it closes.
+      if (enabled) androidFullscreenRef.current = false;
       return undefined;
     }
 
@@ -166,5 +187,5 @@ export function useFullscreenGesture({ enabled, hintCount, onHintShown }) {
       document.removeEventListener('pointerdown', onPointerDown, true);
       document.removeEventListener('pointerup', onPointerUp, true);
     };
-  }, [enabled, hintCountRef, onHintShownRef]);
+  }, [active, enabled, hintCountRef, onHintShownRef]);
 }
