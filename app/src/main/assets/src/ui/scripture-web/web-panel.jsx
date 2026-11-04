@@ -279,12 +279,41 @@ function crumbName(g, s) {
   return s.label && s.label !== text && s.label !== WHOLE_WEB ? s.label : undefined;
 }
 
+/** The words of the crumb where the reader is: a plain span, where an aria-label goes unread (h1104-7),
+ * so a short crumb ("Matt 1:23") is hidden from a screen reader and its full name said instead. */
+function hereName(g, s) {
+  const text = crumbText(g, s);
+  const name = crumbName(g, s);
+  return name ? <React.Fragment><span aria-hidden="true">{text}</span><span className="sw-sr-only">{name}</span></React.Fragment> : text;
+}
+
 /** A stop's verse in its own words, for the paths view: '' for a place (a book, a chapter, the
  * whole web) or a range, which the label names alone. */
 function stopText(g, s, translation) {
   if (!(s.verse >= 0 && s.verse < g.total)) return '';
   const r = refOfVerse(g, s.verse);
   return s.label === r.label ? verseText(r, translation) : '';
+}
+
+/**
+ * Where the trail bar's row scrolls (2026-11-03): the stop where the reader is whole and clear of
+ * the right edge's fade, with as many stops before it as fit, the first of them from its own edge.
+ * h1104-7: with that stop the last, the row's end clamped the scroll short, so the row began inside
+ * the stop before ("7:14 › Matt 1:23 › Isa 9:6", once the paths button narrowed it); `endRoom` is
+ * the room the row's end needs for the scroll to reach a stop's edge.
+ * @param {{ starts: number[], hereAt: number, hereWidth: number, pad: number, width: number,
+ *   scrollWidth: number, fade?: number }} m  where each stop's words start in the row's content
+ * @returns {{ scrollLeft: number, endRoom: number }}
+ */
+export function trailScroll({ starts, hereAt, hereWidth, pad, width, scrollWidth, fade = TRAIL_FADE }) {
+  const room = width - pad - fade;
+  const end = starts[hereAt] + hereWidth;
+  let first = hereAt;
+  while (first > 0 && end - starts[first - 1] <= room) first--;
+  // and never short of what the stop where the reader is needs to clear the fade
+  const want = Math.max(0, first > 0 ? starts[first] - pad : 0, end - (width - fade));
+  const max = Math.max(0, scrollWidth - width);
+  return { scrollLeft: want, endRoom: Math.max(0, Math.ceil(want - max)) };
 }
 
 const ICON = { width: 20, height: 20, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6,
@@ -306,26 +335,25 @@ function TrailBar({ g, journey, atHere, branches, pathsOpen, onPaths, onMove }) 
   // the crumb where the reader is stays in view as the trail grows: the row scrolls sideways to
   // show it whole with as many stops before it as fit, starting at a stop's own edge, never mid-word
   const hereId = here ? here.id : -1;
+  // the paths button, once there, narrows the row
+  const forked = branches > 1;
   React.useLayoutEffect(() => {
     const ol = stopsRef.current;
     const el = ol && ol.querySelector('.is-here');
     if (!el) return;
+    ol.style.paddingRight = '';
     const lis = Array.from(ol.children);
-    const at = lis.indexOf(el);
     const left = ol.getBoundingClientRect().left - ol.scrollLeft;
     // a stop's words (its "›" before them is the li's own): where they start and end in the row
     const words = (/** @type {Element} */ li) => (li.firstElementChild || li).getBoundingClientRect();
-    const pos = (/** @type {Element} */ li) => words(li).left - left;
-    const pad = parseFloat(getComputedStyle(ol).paddingLeft) || 0;
-    // the room between the left padding and the right edge's fade (app.css: 18 px)
-    const room = ol.clientWidth - pad - TRAIL_FADE;
-    const end = pos(el) + words(el).width;
-    let first = at;
-    while (first > 0 && end - pos(lis[first - 1]) <= room) first--;
-    // and never short of what the stop where the reader is needs to clear the fade
-    const want = Math.max(first > 0 ? pos(lis[first]) - pad : 0, end - (ol.clientWidth - TRAIL_FADE));
-    ol.scrollLeft = Math.max(0, Math.min(ol.scrollWidth - ol.clientWidth, want));
-  }, [hereId, path.stops.length]);
+    const cs = getComputedStyle(ol);
+    const { scrollLeft, endRoom } = trailScroll({
+      starts: lis.map((li) => words(li).left - left), hereAt: lis.indexOf(el), hereWidth: words(el).width,
+      pad: parseFloat(cs.paddingLeft) || 0, width: ol.clientWidth, scrollWidth: ol.scrollWidth,
+    });
+    if (endRoom > 0) ol.style.paddingRight = (parseFloat(cs.paddingRight) || 0) + endRoom + 'px';
+    ol.scrollLeft = scrollLeft;
+  }, [hereId, path.stops.length, forked]);
   if (!here) return null;
   const back = !atHere ? here : stopOf(trail, here.parent);
   const ahead = here.last >= 0 ? stopOf(trail, here.last) : null;
@@ -345,7 +373,7 @@ function TrailBar({ g, journey, atHere, branches, pathsOpen, onPaths, onMove }) 
           const isHere = i === path.here;
           return (
             <li key={s.id} className={isHere ? 'is-here' : i > path.here ? 'is-ahead' : undefined}>
-              {isHere && atHere ? <span className="sw-trail-at" aria-current="location" aria-label={crumbName(g, s)}>{crumbText(g, s)}</span> : (
+              {isHere && atHere ? <span className="sw-trail-at" aria-current="location">{hereName(g, s)}</span> : (
                 <button type="button" className="sw-crumb" onClick={act(() => journey.go(s.id))}
                   aria-current={isHere ? 'location' : undefined} aria-label={crumbName(g, s)}>{crumbText(g, s)}</button>
               )}
@@ -611,6 +639,7 @@ function ThreadGroups({ groups, tagOf, translation, rowProps, light }) {
  *   openPanel: (spec: any, opts?: any) => boolean, followThread: (info: any) => void,
  *   followRow: (row: any) => void, zoomTo: (chapterIndex: number) => void,
  *   onOpen: (endpoint: any) => void, lightThreads: (ids: ArrayLike<number> | null) => void,
+ *   pathsOpen?: boolean, setPathsOpen?: (open: boolean) => void,
  * }} props
  */
 export function WebPanel(props) {
@@ -619,6 +648,10 @@ export function WebPanel(props) {
     choiceCut = false, detail,
     journey, onClose, onChoose, openPanel, followThread, followRow, zoomTo, onOpen, lightThreads,
   } = props;
+  // the paths view's switch: the screen's when it passes one (so Escape and Back see it), else its own
+  const [ownPaths, setOwnPaths] = React.useState(false);
+  const pathsOpen = props.setPathsOpen ? !!props.pathsOpen : ownPaths;
+  const setPathsOpen = props.setPathsOpen || setOwnPaths;
   const mode = listOpen ? 'list' : choices && choices.length ? 'chooser' : modeOfDetail(detail);
   const key = subjectKey(mode, detail, choices);
   // the trail (use-journey.js): where the reader is on it, and whether this panel shows that stop
@@ -632,8 +665,9 @@ export function WebPanel(props) {
   // somewhere from where they set out: pinned over the scroll, in every mode but My Web's
   const trailShown = webMode !== 'personal' && !!here && stopCount >= 2;
   // the paths view, over whatever the panel shows; a new subject puts it away
-  const [pathsOpen, setPathsOpen] = React.useState(false);
-  React.useEffect(() => { setPathsOpen(false); }, [key]);
+  React.useEffect(() => { setPathsOpen(false); }, [key, setPathsOpen]);
+  // and a closed panel leaves it put away for the next time it opens
+  React.useEffect(() => () => setPathsOpen(false), [setPathsOpen]);
   const showPaths = pathsOpen && trailShown;
   const contentKey = showPaths ? 'paths' : key;
 
@@ -665,6 +699,9 @@ export function WebPanel(props) {
       try { el.focus({ preventScroll: true }); } catch (_e) { /* best-effort */ }
     }
     firstRef.current = false;
+    // Your paths opens on where the reader is (h1104-7): on a phone a later path's foot is below the fold
+    const at = contentKey === 'paths' && bodyRef.current ? bodyRef.current.querySelector('.sw-path-stop.is-here') : null;
+    if (at && typeof at.scrollIntoView === 'function') at.scrollIntoView({ block: 'nearest' });
   }, [contentKey, ref]);
 
   const bibleV = useCorpusVersion('__bibleCorpus');
@@ -983,7 +1020,7 @@ export function WebPanel(props) {
   return (
     <div className={containerClass} ref={ref} tabIndex={-1} role="dialog" aria-modal="false"
       aria-label={showPaths ? 'Your paths' : label}
-      data-mode={mode} data-lens-on={mode === 'list' ? (lensOn ? '1' : '0') : undefined}
+      data-mode={showPaths ? 'paths' : mode} data-lens-on={mode === 'list' ? (lensOn ? '1' : '0') : undefined}
       data-scrolled={scrolled ? '1' : undefined} data-trail={trailShown ? '1' : undefined}>
       <button type="button" className="sw-sheet-close" onClick={onClose} aria-label={closeLabel}>
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">

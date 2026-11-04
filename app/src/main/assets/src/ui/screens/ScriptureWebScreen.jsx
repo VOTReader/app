@@ -520,8 +520,12 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
     if (mode === 'personal' || !h || !(h.parent >= 0) || !showsStop(h, detail, choices, listOpen)) return false;
     return !!journey.back();
   }, [journey, mode, detail, choices, listOpen]);
+  // Your paths, open over the panel (web-panel.jsx): kept here so Escape and Back put it away first
+  const [pathsOpen, setPathsOpen] = React.useState(false);
+  const closePaths = React.useCallback(() => setPathsOpen(false), []);
   const { onKeyDown } = useWebKeys({
     filtersOpen: web.canon && web.sheetOpen, closeFilters, returnShown: !!returnTo, returnBack, trailBack,
+    pathsShown: pathsOpen && !!(detail || choices || listOpen), closePaths,
     graph, guideOpen: guideShown, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
     camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
     resetView, onBack, dropHover, setAnnounce, schedule, cancelFly: takeCamera, goTo, slackFor,
@@ -717,7 +721,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
         <WebPanel graph={graph} mode={mode} density={density} translation={translation}
           compact={!!(layout && layout.compact)}
           listOpen={listOpen} listItems={listItems} choices={choices} choiceChapter={choiceChapter} choiceCut={choiceCut}
-          detail={detail} journey={journey}
+          detail={detail} journey={journey} pathsOpen={pathsOpen} setPathsOpen={setPathsOpen}
           lensOn={listOpen && mode !== 'personal' && !!(camRef.current && viewRef.current.W && lensRange(graph, camRef.current, viewRef.current.W))}
           onClose={closeCards} onChoose={commitFound} openPanel={openPanel} followThread={followThread}
           followRow={followRow} zoomTo={zoomTo} onOpen={openEndpoint} lightThreads={lightThreads} />
