@@ -17,6 +17,7 @@ import {
   mergeArrayStore, mergeListStore, mergeMapStore,
   mergeAnnotationsStore, mergeJournalIndexStore,
   mergeHistoryStore, mergeReadingStatsStore, mergeReadingStreakStore, mergeJournalStatsStore,
+  mergeAudioLibraryStore, mergeAudioPositionsStore,
 } from './store-merge.js';
 
 const rec = (id, updated, extra) => ({ id, updated, created: updated, ...(extra || {}) });
@@ -412,5 +413,79 @@ describe('dl2 — history and tally merges', () => {
     expect(mergeJournalStatsStore(base, ours, theirs)).toMatchObject({ totalEntries: 1, currentStreak: 1 });
     const gone = { ...base, totalEntries: 1 };
     expect(mergeJournalStatsStore(base, ours, gone)).toMatchObject({ totalEntries: 0, currentStreak: 0 });
+  });
+});
+
+describe('h1104-16 — the listening library and the places in recordings', () => {
+  const U = (n) => 'https://github.com/VOTReader/votreader-assets/releases/download/audio-v1/track_' + n + '.mp3';
+  const saved = (n, at) => ({ key: null, title: 'T' + n, sub: null, url: U(n), readerCode: 'wmb', partLabel: null, savedAt: at });
+  const played = (n, at) => ({ ...saved(n, 0), playedAt: at });
+  const lib = (o) => ({ v: 1, saved: [], recent: [], rate: 1, plays: 0, completions: 0, songSaved: [], songRecent: [], songKept: [], ...o });
+
+  it("library: no base, or nothing stored, keeps this tab's copy; in one tab, this tab's copy exactly", () => {
+    const ours = lib({ saved: [saved(1, 5)], plays: 3 });
+    expect(mergeAudioLibraryStore(null, ours, lib({ saved: [saved(2, 6)] }))).toBe(ours);
+    expect(mergeAudioLibraryStore(lib({}), ours, null)).toBe(ours);
+    const base = lib({ saved: [saved(2, 1)], plays: 1 });
+    expect(mergeAudioLibraryStore(base, ours, JSON.parse(JSON.stringify(base)))).toBe(ours);
+  });
+
+  it('library: a recording saved, a song kept and plays counted in each tab all stay; a removal is honoured', () => {
+    const base = lib({ saved: [saved(1, 1), saved(2, 2)], recent: [played(1, 10)], plays: 4, completions: 1, songSaved: ['s1'], songKept: ['k1'] });
+    const ours = lib({ saved: [saved(3, 30), saved(1, 1)], recent: [played(3, 31), played(1, 10)], plays: 5, completions: 2, rate: 1.25, songSaved: ['s1', 's2'], songKept: ['k1'] });   // saved 3, removed 2, played 3
+    const theirs = lib({ saved: [saved(4, 40), saved(2, 2), saved(1, 1)], recent: [played(4, 41), played(1, 10)], plays: 6, completions: 1, songSaved: [], songKept: ['k2', 'k1'] });   // saved 4, played 4 twice, unsaved song s1
+    const out = mergeAudioLibraryStore(base, ours, theirs);
+    expect(out.saved.map((r) => r.url)).toEqual([U(4), U(3), U(1)]);
+    expect(out.recent.map((r) => r.url)).toEqual([U(4), U(3), U(1)]);
+    expect(out.plays).toBe(7);
+    expect(out.completions).toBe(2);
+    expect(out.rate).toBe(1.25);
+    expect(out.songSaved).toEqual(['s2']);
+    expect(out.songKept.sort()).toEqual(['k1', 'k2']);
+  });
+
+  it("library: the rate the other tab changed wins over this tab's untouched one; a pre-counter base counts its recent shelf", () => {
+    const base = { v: 1, saved: [], recent: [played(1, 1), played(2, 2)], rate: 1 };       // no plays field: 2 by the store's lower bound
+    const ours = lib({ recent: [played(3, 3), played(1, 1), played(2, 2)], plays: 3 });
+    const theirs = lib({ recent: [played(1, 1), played(2, 2)], plays: 2, rate: 1.5 });
+    const out = mergeAudioLibraryStore(base, ours, theirs);
+    expect(out.rate).toBe(1.5);
+    expect(out.plays).toBe(3);
+  });
+
+  it('library: a recording replayed in the other tab keeps its later play; the shelves stay capped', () => {
+    const base = lib({ recent: [played(1, 10)] });
+    const ours = lib({ recent: [played(2, 20), played(1, 10)] });
+    const theirs = lib({ recent: [played(1, 30)] });
+    expect(mergeAudioLibraryStore(base, ours, theirs).recent.map((r) => [r.url, r.playedAt])).toEqual([[U(1), 30], [U(2), 20]]);
+    const many = (from) => Array.from({ length: 30 }, (_, i) => played(from + i, from + i));
+    expect(mergeAudioLibraryStore(lib({}), lib({ recent: many(100) }), lib({ recent: many(200) })).recent.length).toBe(30);
+  });
+
+  const P = (o) => ({ v: 1, positions: o });
+  it("positions: no base keeps this tab's copy; in one tab, this tab's copy exactly", () => {
+    const ours = P({ [U(1)]: { t: 10, d: 100, at: 5 } });
+    expect(mergeAudioPositionsStore(undefined, ours, P({}))).toBe(ours);
+    const base = P({ [U(2)]: { t: 1, d: 9, at: 1 } });
+    expect(mergeAudioPositionsStore(base, ours, P({ [U(2)]: { t: 1, d: 9, at: 1 } }))).toBe(ours);
+  });
+
+  it("positions: each tab's places stay, the moved side wins, a cleared place stays cleared, oldest touch first", () => {
+    const base = P({ [U(1)]: { t: 10, d: 100, at: 1 }, [U(2)]: { t: 20, d: 100, at: 2 }, [U(3)]: { t: 30, d: 100, at: 3 } });
+    const ours = P({ [U(2)]: { t: 20, d: 100, at: 2 }, [U(3)]: { t: 30, d: 100, at: 3 }, [U(1)]: { t: 50, d: 100, at: 9 }, [U(5)]: { t: 5, d: 50, at: 10 } });  // moved 1, cleared nothing, new 5
+    const theirs = P({ [U(1)]: { t: 10, d: 100, at: 1 }, [U(3)]: { t: 30, d: 100, at: 3 }, [U(4)]: { t: 4, d: 40, at: 8 } });                                    // cleared 2, new 4
+    const out = mergeAudioPositionsStore(base, ours, theirs);
+    expect(Object.keys(out.positions)).toEqual([U(3), U(4), U(1), U(5)]);
+    expect(out.positions[U(1)].t).toBe(50);
+    const both = mergeAudioPositionsStore(base, P({ ...base.positions, [U(1)]: { t: 60, d: 100, at: 7 } }), P({ ...base.positions, [U(1)]: { t: 70, d: 100, at: 8 } }));
+    expect(both.positions[U(1)].t).toBe(70);                                                                                                              // both moved it: the later touch
+  });
+
+  it('positions: the 200 freshest are kept', () => {
+    const map = (from) => Object.fromEntries(Array.from({ length: 200 }, (_, i) => [U(from + i), { t: 1, d: 2, at: from + i }]));
+    const out = mergeAudioPositionsStore(P({}), P(map(1000)), P(map(2000)));
+    expect(Object.keys(out.positions).length).toBe(200);
+    expect(out.positions[U(2199)]).toBeTruthy();
+    expect(out.positions[U(1199)]).toBeUndefined();
   });
 });

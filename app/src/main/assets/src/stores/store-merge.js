@@ -560,6 +560,121 @@ export function mergeJournalStatsStore(base, ours, theirs) {
   return out;
 }
 
+/* ─── The listening library and the places in recordings (h1104-16) ─────
+   vot-audio-library and vot-audio-positions saved their whole value blind, so a
+   second PWA tab's save wrote the copy it loaded over what the first had saved
+   since: a recording saved, a song kept, a place inside a recording. The same
+   rules as dl2: no base, or nothing stored yet, keeps this tab's copy; in one
+   tab the stored copy is the base and this tab's copy comes back as it is. */
+
+/** The caps the two stores keep (audio-library-store.js, audio-positions-store.js). */
+const AUDIO_SAVED_CAP = 100;
+const AUDIO_RECENT_CAP = 30;
+const SONG_SAVED_CAP = 500;
+const SONG_RECENT_CAP = 30;
+const SONG_KEPT_CAP = 5000;
+const AUDIO_POSITIONS_CAP = 200;
+
+/** A recording's identity in the library: its release URL. @param {any} r @returns {string} */
+function _trackUrl(r) { return (r && typeof r === 'object' && typeof r.url === 'string') ? r.url : ''; }
+
+/** First copy of each URL. @param {any} x @returns {Map<string, any>} */
+function _byUrl(x) {
+  /** @type {Map<string, any>} */ const m = new Map();
+  for (const r of _arr(x)) { const u = _trackUrl(r); if (u && !m.has(u)) m.set(u, r); }
+  return m;
+}
+
+/** A field three ways: the side that changed it since the base, else ours (the tab writing now). @param {any} b @param {any} o @param {any} t */
+function _field3(b, o, t) {
+  if (_json(b) === _json(o) && _json(b) !== _json(t)) return t;
+  return o;
+}
+
+/**
+ * A shelf of recordings (saved: savedAt; recent: playedAt), by URL. One either
+ * tab added stays; one either tab removed since the base goes unless the other
+ * tab changed it; one both hold is the side that changed it, else the later
+ * stamp. Newest first, capped (the store sorts the same way on every read).
+ * @param {any} b @param {any} o @param {any} t @param {string} stampKey @param {number} cap
+ * @returns {any[]}
+ */
+function _mergeTracks(b, o, t, stampKey, cap) {
+  const B = _byUrl(b), O = _byUrl(o), T = _byUrl(t);
+  /** @type {any[]} */ const out = [];
+  for (const [u, r] of O) {
+    if (T.has(u)) {
+      const base = B.get(u), theirs = T.get(u);
+      if (base && _json(base) === _json(theirs)) out.push(r);
+      else if (base && _json(base) === _json(r)) out.push(theirs);
+      else out.push(_tally(r[stampKey]) >= _tally(theirs[stampKey]) ? r : theirs);
+    } else if (!(B.has(u) && _json(B.get(u)) === _json(r))) out.push(r);   // else: the other tab removed it
+  }
+  for (const [u, r] of T) {
+    if (O.has(u)) continue;
+    if (!(B.has(u) && _json(B.get(u)) === _json(r))) out.push(r);          // else: this tab removed it
+  }
+  out.sort((x, z) => _tally(z[stampKey]) - _tally(x[stampKey]));
+  return out.slice(0, cap);
+}
+
+/** The recordings-started count, with the store's lower bound for a pre-counter record. @param {Record<string, any>} x */
+function _plays(x) {
+  return Object.prototype.hasOwnProperty.call(x, 'plays') ? _tally(x.plays) : _arr(x.recent).length;
+}
+
+/**
+ * vot-audio-library. The two recording shelves by URL; the three song shelves
+ * as three-way sets; plays and completions as the stored count plus this tab's
+ * new ones; the playback rate from the tab that changed it.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any}
+ */
+export function mergeAudioLibraryStore(base, ours, theirs) {
+  if (!_isObj(base) || !_isObj(theirs)) return ours;   // nothing stored yet: this tab's copy
+  if (!_changed(base, theirs)) return ours;             // one tab, or the other tab saved nothing since
+  const B = _obj(base), O = _obj(ours), T = _obj(theirs);
+  if (!_changed(B, O)) return theirs;
+  return Object.assign({}, T, O, {
+    saved: _mergeTracks(B.saved, O.saved, T.saved, 'savedAt', AUDIO_SAVED_CAP),
+    recent: _mergeTracks(B.recent, O.recent, T.recent, 'playedAt', AUDIO_RECENT_CAP),
+    rate: _field3(B.rate, O.rate, T.rate),
+    plays: _addedTo(_plays(B), _plays(O), _plays(T)),
+    completions: _addedTo(B.completions, O.completions, T.completions),
+    songSaved: _mergeStringSet(B.songSaved, O.songSaved, T.songSaved).slice(0, SONG_SAVED_CAP),
+    songRecent: _mergeStringSet(B.songRecent, O.songRecent, T.songRecent).slice(0, SONG_RECENT_CAP),
+    songKept: _mergeStringSet(B.songKept, O.songKept, T.songKept).slice(0, SONG_KEPT_CAP),
+  });
+}
+
+/** One place in a recording: the side that moved it since the base, else the later touch. @param {any} b @param {any} o @param {any} t */
+function _positionMerge(b, o, t) {
+  if (b !== undefined && b !== null) {
+    if (!_changed(b, t)) return o;
+    if (!_changed(b, o)) return t;
+  }
+  return _tally(o && o.at) >= _tally(t && t.at) ? o : t;
+}
+
+/**
+ * vot-audio-positions ({ v, positions: { url: { t, d, at } } }, oldest touch
+ * first). Per URL the side that moved it, else the later `at`; a place either
+ * tab cleared since the base stays cleared; the 200 freshest kept.
+ * @param {any} base @param {any} ours @param {any} theirs
+ * @returns {any}
+ */
+export function mergeAudioPositionsStore(base, ours, theirs) {
+  if (!_isObj(base) || !_isObj(theirs)) return ours;   // nothing stored yet: this tab's copy
+  if (!_changed(base, theirs)) return ours;
+  const B = _obj(base), O = _obj(ours), T = _obj(theirs);
+  if (!_changed(B, O)) return theirs;
+  const map = mergeMapByKey(B.positions, O.positions, T.positions, _positionMerge);
+  const urls = Object.keys(map).sort((x, z) => _tally(map[x] && map[x].at) - _tally(map[z] && map[z].at));
+  /** @type {Record<string, any>} */ const positions = {};
+  for (const u of urls.slice(Math.max(0, urls.length - AUDIO_POSITIONS_CAP))) positions[u] = map[u];
+  return Object.assign({}, T, O, { positions });
+}
+
 /**
  * A read count, normalized. `readItems` values are counts, but pre-2026-08-03
  * data holds `true` — one read.

@@ -12,6 +12,7 @@
 */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeAudioLibraryStore } from './store-merge.js';
 import { isSongId, normalizeAudioRate, normalizeAudioTrack, songIdOfKey } from '../utils/audio-track.js';
 
 export const MAX_SAVED_AUDIO_TRACKS = 100;
@@ -215,7 +216,9 @@ function _readView(store) {
 }
 
 export const AudioLibraryStore = extendStore(
-  CachedStore('vot-audio-library', /** @type {AudioLibraryData} */ (_empty()), { idb: true }),
+  // h1104-16: merged across tabs (store-merge.js mergeAudioLibraryStore). Saved blind, a second
+  // PWA tab's save wrote the copy it loaded over what the first had saved since.
+  CachedStore('vot-audio-library', /** @type {AudioLibraryData} */ (_empty()), { idb: true, crossTabMerge: mergeAudioLibraryStore }),
   {
     /** _readView's memo: the record it normalized, at which _version, and the result.
      *  @type {{ source: unknown, version: number, data: AudioLibraryData } | null} */

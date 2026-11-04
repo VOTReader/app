@@ -33,7 +33,10 @@ beforeEach(() => {
   vi.setSystemTime(new Date('2026-08-08T12:00:00Z'));
 });
 
-afterEach(() => vi.useRealTimers());
+// h1104-16: the store merges across tabs, so each save re-reads IndexedDB under the store's lock, and
+// fake-indexeddb answers on the faked timers. Let a case's saves finish before the real clock returns,
+// or the next case's save waits forever behind a lock nothing will release.
+afterEach(async () => { if (vi.isFakeTimers()) await vi.advanceTimersByTimeAsync(100); vi.useRealTimers(); });
 
 describe('AudioLibraryStore — normalized metadata', () => {
   it('starts with a conservative empty library and normal playback speed', () => {
@@ -323,15 +326,26 @@ describe('AudioLibraryStore — a star tapped before the library has loaded (swe
    *  @returns {Promise<(data: any) => Promise<void>>} lands the given record */
   async function degradedBoot() {
     /** @type {(v: any) => void} */ let answer = () => {};
-    vi.spyOn(IDBAdapter, 'get').mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
+    const getSpy = vi.spyOn(IDBAdapter, 'get').mockImplementationOnce(() => new Promise((resolve) => { answer = resolve; }));
     putSpy = vi.spyOn(IDBAdapter, 'put').mockResolvedValue(undefined);
     AudioLibraryStore._resetForTests();
     const hydrated = AudioLibraryStore._hydrate();
     await vi.advanceTimersByTimeAsync(3000);
     await hydrated;
     expect(AudioLibraryStore.getState()).toBe('degraded');
-    return async (data) => { answer(data); await vi.advanceTimersByTimeAsync(0); };
+    return async (data) => {
+      // h1104-16: the store merges across tabs, so its save re-reads the stored copy first: that is this record
+      getSpy.mockResolvedValue(data);
+      answer(data);
+      await vi.advanceTimersByTimeAsync(0);
+    };
   }
+
+  /** h1104-16: a merged save re-reads the stored copy under the store's lock before it
+   *  writes, and fake-indexeddb answers on the (faked) timers: step them until it has. */
+  const written = async () => {
+    for (let i = 0; i < 50 && !putSpy.mock.calls.some((c) => c[0] === 'vot-audio-library'); i++) await vi.advanceTimersByTimeAsync(10);
+  };
 
   /** The record the rebase wrote to IndexedDB. */
   const persisted = () => putSpy.mock.calls.filter((c) => c[0] === 'vot-audio-library').pop()[2];
@@ -346,6 +360,7 @@ describe('AudioLibraryStore — a star tapped before the library has loaded (swe
     expect(AudioLibraryStore.getState()).toBe('loaded');
     expect(AudioLibraryStore.isSaved(track(1))).toBe(true);
     expect(AudioLibraryStore.saved().map((t) => [t.url, t.savedAt])).toEqual([[track(1).url, 111]]);
+    await written();
     expect(persisted().saved.map((t) => t.url)).toEqual([track(1).url]);
   });
 
@@ -357,6 +372,7 @@ describe('AudioLibraryStore — a star tapped before the library has loaded (swe
     expect(AudioLibraryStore.toggleSaved(song(6))).toBe(true);
     await land({ v: 1, saved: [], recent: [], songSaved: [sid(6), sid(5)] });
     expect(AudioLibraryStore.songSaved()).toEqual([sid(6), sid(5)]);
+    await written();
     expect(persisted().songSaved).toEqual([sid(6), sid(5)]);
   });
 

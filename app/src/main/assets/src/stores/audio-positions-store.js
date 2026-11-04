@@ -15,6 +15,7 @@
 */
 
 import { CachedStore, extendStore } from './cached-store.js';
+import { mergeAudioPositionsStore } from './store-merge.js';
 import { isVotAudioUrl } from '../utils/audio-track.js';
 
 /** Recordings remembered at once. The LRU drops the least recently touched. */
@@ -142,7 +143,9 @@ function _writeableData(store) {
 }
 
 export const AudioPositionsStore = extendStore(
-  CachedStore('vot-audio-positions', /** @type {AudioPositionsData} */ (_empty()), { idb: true }),
+  // h1104-16: merged across tabs (store-merge.js mergeAudioPositionsStore). Saved blind, a second
+  // PWA tab's save wrote the copy it loaded over what the first had saved since.
+  CachedStore('vot-audio-positions', /** @type {AudioPositionsData} */ (_empty()), { idb: true, crossTabMerge: mergeAudioPositionsStore }),
   {
     /** @returns {AudioPositionsData} */
     get() {

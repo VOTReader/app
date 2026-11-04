@@ -15,7 +15,7 @@
      2 tabs  two PWA tabs, each holding the copy it loaded, write the same store. A store the
              reader adds to keeps both tabs' additions (the merge stores, dl2 included). A store
              that holds one choice (a position, an arrangement, a preference) keeps the last
-             tab's choice whole, by design; the audio stores are listed in the PR (not this area).
+             tab's choice whole, by design. The audio library and positions merge too (h1104-16).
 
    Each "tab" or "launch" is a fresh copy of the store modules (vi.resetModules) with its own
    IndexedDB connection, over one shared database: the topology of real browser tabs. */
@@ -74,9 +74,10 @@ const ROWS = [
     write: (s, t) => s.set(t === 'a' ? ['notes', 'journal'] : ['journal', 'notes']), has: (s, t) => s.get()[0] === (t === 'a' ? 'notes' : 'journal') },
   { name: 'vot-note-default', mod: './note-default-store.js', exp: 'NoteDefaultStore', merge: false,
     write: (s, t) => s.set('underline', t === 'a' ? 'green' : 'blue'), has: (s, t) => s.get().color === (t === 'a' ? 'green' : 'blue') },
-  { name: 'vot-audio-library', mod: './audio-library-store.js', exp: 'AudioLibraryStore', merge: false,
-    write: (s, t) => s.setPlaybackRate(t === 'a' ? 1.25 : 1.5), has: (s, t) => s.getPlaybackRate() === (t === 'a' ? 1.25 : 1.5) },
-  { name: 'vot-audio-positions', mod: './audio-positions-store.js', exp: 'AudioPositionsStore', merge: false,
+  { name: 'vot-audio-library', mod: './audio-library-store.js', exp: 'AudioLibraryStore', merge: true,
+    write: (s, t) => s.setSaved({ url: AUDIO + 'saved_' + t + '.mp3', title: 'Recording ' + t, readerCode: 'wmb' }, true),
+    has: (s, t) => s.saved().some((r) => r.url === AUDIO + 'saved_' + t + '.mp3') },
+  { name: 'vot-audio-positions', mod: './audio-positions-store.js', exp: 'AudioPositionsStore', merge: true,
     write: (s, t) => s.setPosition({ url: AUDIO + 'track_' + t + '.mp3' }, 60, 600), has: (s, t) => !!s.get().positions[AUDIO + 'track_' + t + '.mp3'] },
   ...['vot-welcomed', 'vot-about-seen', 'vot-garden-warning-acked', 'vot-ann-hint-dismissed', 'vot-tour-done'].map((name) => ({
     name, mod: './app-flag-stores.js', flag: true,
