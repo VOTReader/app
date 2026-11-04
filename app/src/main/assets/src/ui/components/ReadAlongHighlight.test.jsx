@@ -633,6 +633,99 @@ describe('ReadAlongHighlight — a hand on the page suspends follow-scroll', () 
   });
 });
 
+/* Back to the voice (player brief 3d, picture 17): a hand that scrolls the lit line off screen keeps the page where
+   it put it, with a pill that brings the reader back. */
+describe('ReadAlongHighlight — Back to the voice', () => {
+  const ON = { ...RANGE_RECT, top: 300, bottom: 324, y: 300 };
+  const BELOW = { ...RANGE_RECT, top: 1200, bottom: 1224, y: 1200 };
+  const ABOVE = { ...RANGE_RECT, top: -400, bottom: -376, y: -400 };
+  const rectIs = (r) => { Range.prototype.getBoundingClientRect = () => r; };
+  const pill = () => document.querySelector('.voice-pill');
+  /** The reader's thumb: a touchmove, then the scroll it makes, then the frame the scroll check waits for. */
+  const handScroll = (r) => {
+    fireEvent(scroller, new Event('touchmove', { bubbles: true }));
+    rectIs(r);
+    fireEvent(scroller, new Event('scroll'));
+    frame(0);
+  };
+
+  it('a hand that leaves the lit line off screen raises the pill and holds the follow past the 4 s grace', () => {
+    const t0 = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    expect(pill()).toBeNull();
+    handScroll(BELOW);
+    expect(pill().getAttribute('aria-label')).toBe('Back to the voice: the line being read is below');
+    nowSpy.mockReturnValue(t0 + 9000);
+    clockTo(6);
+    runGlide();
+    expect(scroller.scrollTop, 'the page stays where the reader put it').toBe(0);
+    expect(pill()).toBeTruthy();
+  });
+
+  it('the pill glides back to the lit line and lets the follow go on', () => {
+    const t0 = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    handScroll(ABOVE);
+    expect(pill().getAttribute('aria-label')).toMatch(/above$/);
+    handScroll(BELOW);
+    expect(pill().getAttribute('aria-label')).toMatch(/below$/);
+    nowSpy.mockReturnValue(t0 + 1000);
+    fireEvent.click(pill());
+    expect(pill()).toBeNull();
+    frame(0);      // the next frame repaints the lit line and starts the glide
+    runGlide();
+    expect(scroller.scrollTop).toBeCloseTo(1200 - 280, 5);
+  });
+
+  it('scrolling the lit line back into view lets go by itself', () => {
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    handScroll(BELOW);
+    expect(pill()).toBeTruthy();
+    handScroll(ON);
+    expect(pill()).toBeNull();
+  });
+
+  it('never under auto-scroll, and never for the follow’s own scrolling', () => {
+    const t0 = 1_700_000_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0);
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    document.body.classList.add('autoscroll-on');
+    handScroll(BELOW);
+    expect(pill()).toBeNull();
+    document.body.classList.remove('autoscroll-on');
+    nowSpy.mockReturnValue(t0 + 9000);   // long after the hand: a scroll now is not the reader's
+    rectIs(BELOW);
+    fireEvent(scroller, new Event('scroll'));
+    frame(0);
+    expect(pill()).toBeNull();
+  });
+
+  it('goes when the audio pauses', () => {
+    rectIs(ON);
+    mount();
+    play();
+    clockTo(2);
+    handScroll(BELOW);
+    expect(pill()).toBeTruthy();
+    act(() => { AudioPlayer.toggle(); });
+    expect(pill()).toBeNull();
+  });
+});
+
 /* ═══════════════════════════════════════════════════════════════════════
    The pure helpers
    ═══════════════════════════════════════════════════════════════════════ */

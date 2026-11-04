@@ -567,12 +567,20 @@ function _glideTo(el, to, glideRef) {
  *   the first paint, which left the lit verse off screen for that whole verse
  *   (ed1, emulator 2026-10-05). The reader's own hand never makes it owed.
  */
-function _follow(range, mainRef, userScrollAt, glideRef) {
+function _follow(range, mainRef, userScrollAt, glideRef, hold) {
   if (_leaseHeld()) return true;
   if (_readerSelecting()) return false;
   if (Date.now() - userScrollAt.current < USER_SCROLL_MS) return false;
   const scroller = _scrollerOf(mainRef);
   if (!scroller) return false;
+  // BACK TO THE VOICE (player brief 3d, picture 17): a reader who scrolled the lit line off screen is reading
+  // elsewhere on purpose. The page stays where they put it, with the pill, until they tap it or the voice
+  // comes onto the screen they are looking at; then the follow goes on as before.
+  if (hold && hold.held) {
+    const side = _sideOf(range, scroller);
+    if (side) { _holdShow(hold, side); return false; }
+    _holdRelease(hold);
+  }
   const box = scroller.getBoundingClientRect();
   if (!box.height) return false;   // not laid out (hidden tab, jsdom) — nothing to aim at
   // The band is a share of the room the reader can SEE. Whatever sits over the bottom of the
@@ -590,6 +598,73 @@ function _follow(range, mainRef, userScrollAt, glideRef) {
   // out-of-range target can never accumulate into drift.
   _glideTo(scroller, (scroller.scrollTop || 0) + (rect.top - (box.top + vis * 0.35)), glideRef);
   return false;
+}
+
+/**
+ * Where a range sits against the part of the scroller the reader can see: -1 above it, 1 below it, 0 on it (or
+ * not measurable: a hidden tab, a range whose text is gone).
+ * @param {any} range @param {any} scroller @returns {-1 | 0 | 1}
+ */
+function _sideOf(range, scroller) {
+  if (!range || !scroller) return 0;
+  const box = scroller.getBoundingClientRect();
+  if (!box.height) return 0;
+  const vis = box.height - _bottomPad(scroller);
+  const rect = range.getBoundingClientRect();
+  if (!rect || (!rect.height && !rect.width)) return 0;
+  if (rect.bottom <= box.top) return -1;
+  if (rect.top >= box.top + vis) return 1;
+  return 0;
+}
+
+/**
+ * One reading pane's hold on its follow: `held` while the reader's hand has the lit line off screen, `dir` the side
+ * the pill points to, `range` the line last lit, `set` the pill's own setter (only the pill re-renders, never the
+ * reading screen: header rule 2).
+ * @typedef {{ held: boolean, dir: number, range: any, set: ((d: number) => void) | null }} VoiceHold
+ */
+/** @param {VoiceHold} h @param {number} dir */
+function _holdShow(h, dir) {
+  h.held = true;
+  if (h.dir !== dir) { h.dir = dir; if (h.set) h.set(dir); }
+}
+/** @param {VoiceHold} h */
+function _holdRelease(h) {
+  h.held = false;
+  if (h.dir) { h.dir = 0; if (h.set) h.set(0); }
+}
+
+/** @param {{ up: boolean }} props */
+function ArrowGlyph({ up }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {up ? <path d="M12 19V5M6 11l6-6 6 6" /> : <path d="M12 5v14M6 13l6 6 6-6" />}
+    </svg>
+  );
+}
+
+/**
+ * The "Back to the voice" pill (player brief 3d, picture 17): above the player, centred, while the reader has the
+ * lit line scrolled off screen. Steps aside for the auto-scroll pill, which owns that spot (audit-listen Z3).
+ * @param {{ hold: { current: VoiceHold }, onBack: () => void }} props
+ */
+function VoicePill({ hold, onBack }) {
+  const [dir, setDir] = React.useState(0);
+  React.useEffect(() => {
+    const h = hold.current;
+    h.set = setDir;
+    setDir(h.dir);
+    return () => { if (h.set === setDir) h.set = null; };
+  }, [hold]);
+  if (!dir || typeof document === 'undefined' || !document.body) return null;
+  const RD = /** @type {any} */ (globalThis).ReactDOM;
+  const pill = (
+    <button type="button" className="voice-pill" onClick={onBack} aria-label={'Back to the voice: the line being read is ' + (dir < 0 ? 'above' : 'below')}>
+      <ArrowGlyph up={dir < 0} />
+      <span>Back to the voice</span>
+    </button>
+  );
+  return RD && typeof RD.createPortal === 'function' ? RD.createPortal(pill, document.body) : pill;
 }
 
 /** The scroller's scroll-padding-bottom in px: the part of it something else is drawn over. */
@@ -621,7 +696,7 @@ function _bottomPad(scroller) {
  * @param {{ current: number }} lastFrag
  * @returns {boolean} the follow is owed (see _follow)
  */
-function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag, offsetMapFn) {
+function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glideRef, lastFrag, offsetMapFn, hold) {
   lastFrag.current = i;
   const clear = () => { /** @type {any} */ (CSS).highlights.delete(HL_NAME); };
   if (i < 0) { clear(); return false; }
@@ -653,7 +728,8 @@ function _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScr
   const H = /** @type {any} */ (globalThis).Highlight;
   if (typeof H !== 'function') { clear(); return false; }
   /** @type {any} */ (CSS).highlights.set(HL_NAME, new H(range));
-  return readAlongFollow ? _follow(range, mainRef, userScrollAt, glideRef) : false;
+  if (hold) hold.range = range;
+  return readAlongFollow ? _follow(range, mainRef, userScrollAt, glideRef, hold) : false;
 }
 
 /**
@@ -834,6 +910,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
   const time = st.time;
   const lastFrag = React.useRef(-1);
   const userScrollAt = React.useRef(0);
+  const hold = React.useRef(/** @type {VoiceHold} */ ({ held: false, dir: 0, range: null, set: null }));
   const owed = React.useRef(false);
   // NEW WORDS UNDER THE SAME CLOCK. When the host swaps the text in place (a
   // Bible chapter moving to its recording's translation once that edition's
@@ -963,6 +1040,39 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       el.removeEventListener('pointerdown', mark, true);
     };
   }, [mainRef, key]);
+  // BACK TO THE VOICE: a scroll by the reader's hand (one inside the hand's window, or any while held) that leaves the
+  // lit line off screen holds the follow and raises the pill; one that brings it back lets go. Only while this pane
+  // plays and follows, and never under auto-scroll, whose pill owns the spot and whose scrolling is the reader's choice.
+  const holding = active && readAlongOn && readAlongFollow;
+  React.useEffect(() => {
+    const el = _scrollerOf(mainRef);
+    const h = hold.current;
+    if (!el || !holding) { _holdRelease(h); return undefined; }
+    let raf = /** @type {number | null} */ (null);
+    const check = () => {
+      raf = null;
+      if (!h.held && Date.now() - userScrollAt.current >= USER_SCROLL_MS) return;   // not the reader's scroll
+      if (typeof document !== 'undefined' && document.body && document.body.classList.contains('autoscroll-on')) { _holdRelease(h); return; }
+      const side = _sideOf(h.range, el);
+      if (side) _holdShow(h, side); else _holdRelease(h);
+    };
+    const onScroll = () => {
+      if (raf != null) return;
+      if (typeof requestAnimationFrame === 'function') raf = requestAnimationFrame(check); else check();
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      if (raf != null) { try { cancelAnimationFrame(raf); } catch (_e) { /* frame source gone */ } }
+      _holdRelease(h);
+    };
+  }, [mainRef, key, holding]);
+  // The pill's tap: let go, and the next frame repaints the lit line and glides to it.
+  const backToVoice = React.useCallback(() => {
+    _holdRelease(hold.current);
+    userScrollAt.current = 0;
+    lastFrag.current = -1;
+  }, []);
 
   // THE FRAME LOOP (header: THE CLOCK). Refs only — no state is written here,
   // so a frame costs one binary search and, on a sentence boundary, one paint.
@@ -980,7 +1090,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
       // An owed follow (a lease stood it down) is paid by repainting the same
       // fragment the moment the lease is gone.
       if (owed.current && !_leaseHeld()) { owed.current = false; lastFrag.current = -1; }
-      if (i !== lastFrag.current) owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
+      if (i !== lastFrag.current) owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn, hold.current);
       if (!stopped) id = requestAnimationFrame(tick);
     };
     id = requestAnimationFrame(tick);
@@ -1004,7 +1114,7 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     const i = fragmentAt(frags, time + LEAD_S);
     if (owed.current && !_leaseHeld()) { owed.current = false; lastFrag.current = -1; }
     if (i === lastFrag.current) return undefined;
-    owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn);
+    owed.current = _paintAt(frags, i, mainRef, letterId, hlKeyFn, readAlongFollow, userScrollAt, glide, lastFrag, offsetMapFn, hold.current);
     return undefined;
   }, [frags, time, letterId, hlKeyFn, mainRef, readAlongFollow, offsetMapFn, textKey]);
 
@@ -1287,5 +1397,5 @@ export function ReadAlongHighlight({ volKey, letterId, mainRef, hlKeyFn, readAlo
     }
   }, [key]);
 
-  return null;
+  return <VoicePill hold={hold} onBack={backToVoice} />;
 }

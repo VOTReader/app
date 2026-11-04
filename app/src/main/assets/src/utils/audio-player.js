@@ -47,7 +47,7 @@
      songs         songs queues, shuffle, repeat, version switch
      queue         the play* entry points, the site order, queue edits
      restore       rebuild a restored bar, resume across the update reload and a close
-     transport     toggle, next/prev, playAt, seek, skip, speed, stop, stopWithUndo/undoStop, pauseIfPlaying
+     transport     toggle, next/prev, playAt, seek, skip, speed, stop, stopWithUndo/undoStop, finished/replayFinished, pauseIfPlaying
    ═══════════════════════════════════════════════════════════════════════ */
 
 import {
@@ -94,10 +94,13 @@ import { liveLetter, sectionLetterKeyAt, sectionMarks, sectionOpeningKey } from 
 import { clearSleepTimer, getSleepRemainingSeconds, setSleepAtQueueEnd, setSleepAtTrackEnd, setSleepTimer } from './audio-player/sleep.js';
 import { playSongs, setRepeat, setShuffle, switchSongVersion } from './audio-player/songs.js';
 import {
+  dismissFinished,
+  finished,
   next,
   pauseIfPlaying,
   playAt,
   prev,
+  replayFinished,
   seek,
   setPlaybackRate,
   clampSkipSeconds,
@@ -259,6 +262,9 @@ export const AudioPlayer = {
   stop,
   stopWithUndo,
   undoStop,
+  finished,
+  replayFinished,
+  dismissFinished,
   pauseIfPlaying,
   syncKeepAlive,
 };
