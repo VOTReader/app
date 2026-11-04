@@ -341,7 +341,12 @@ class StorageManager(private val context: Context) {
             Timber.w(e, "finishV3Export failed")
             // A failed flush/close means the destination may hold a truncated
             // container — same cleanup contract as the abort / incomplete-frame
-            // paths: never leave a partial backup behind.
+            // paths: never leave a partial backup behind. Close it first, as
+            // they do: a flush that threw (a full disk) skipped the close above,
+            // and exportOut is already cleared, so nothing later would release
+            // it. Left open, the descriptor kept the deleted partial's blocks,
+            // the whole partial backup, allocated until a GC finalized it.
+            try { out.close() } catch (_: Exception) { /* already failing */ }
             uri?.let { deleteDocumentQuietly(it) }
             Result.Failure(e.message ?: "finish_failed")
         }
