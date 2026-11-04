@@ -72,13 +72,14 @@ function _item(/** @type {any} */ t, /** @type {string} */ name) {
 }
 
 /**
- * A plan held for Wi-Fi ("Wait for Wi-Fi", brief 3e): in a browser that reports its connection, it starts once the
- * connection is no longer mobile data. One at a time; a newer plan replaces it. The plan outlives the chooser (it
- * starts with the chooser closed), but no chooser's callback is kept with it: whichever chooser is open subscribes
- * (subscribeHeld) and is told when it changes. Keeping the Apply's own callback held the closed chooser and told it,
- * not the one open, so a reopened chooser said "Waiting for Wi-Fi" after the downloads had started (#60, item 4).
+ * A plan held for Wi-Fi ("Wait for Wi-Fi", brief 3e). h1104-19: it goes to the store at once as Wi-Fi-only items
+ * (wifi: true), the same saved queue the plan's automatic downloads use: it outlives a close (on the phone it starts
+ * with the app closed), and a second plan adds to it. It used to wait in this variable, so a close or a second Wait
+ * lost it and nothing ever downloaded. What stays here is only what the chooser says: how many of the plan's
+ * recordings still wait while the connection is mobile data. Whichever chooser is open subscribes (subscribeHeld),
+ * never the Apply's own callback (#60, item 4: a reopened chooser said "Waiting for Wi-Fi" after they had started).
  */
-let _held = /** @type {null | { off: any, items: any[] }} */ (null);
+let _held = /** @type {null | { off: any, urls: Set<string> }} */ (null);
 /** @type {Set<() => void>} */
 const _heldSubs = new Set();
 function _heldChanged() {
@@ -93,25 +94,27 @@ function _connection() {
   const n = typeof navigator !== 'undefined' ? /** @type {any} */ (navigator) : null;
   return n ? n.connection || n.mozConnection || n.webkitConnection || null : null;
 }
-function _onConnection() {
-  if (!_held || networkType() === 'cellular') return;
-  const h = _held;
-  _held = null;
-  const c = _connection();
-  if (c && typeof c.removeEventListener === 'function') c.removeEventListener('change', _onConnection);
-  h.off.download(h.items);
-  _heldChanged();
-}
+/** The connection changed: the store starts the plan on Wi-Fi itself; the line re-reads. */
+function _onConnection() { _heldChanged(); }
 /** @param {any} off @param {any[]} items */
 function holdForWifi(off, items) {
+  off.download(items.map((i) => ({ ...i, wifi: true })));
+  const urls = new Set(_held && _held.off === off ? _held.urls : []);
+  for (const i of items) urls.add(i.url);
+  _held = { off, urls };
   const c = _connection();
-  _held = { off, items };
-  if (c && typeof c.addEventListener === 'function') c.addEventListener('change', _onConnection);
+  if (c && typeof c.addEventListener === 'function') {
+    if (typeof c.removeEventListener === 'function') c.removeEventListener('change', _onConnection);
+    c.addEventListener('change', _onConnection);
+  }
   _heldChanged();
 }
-/** @returns {number} recordings held for Wi-Fi now */
+/** @returns {number} the held plan's recordings still waiting for Wi-Fi now */
 export function heldForWifi() {
-  return _held ? _held.items.length : 0;
+  if (!_held || networkType() !== 'cellular') return 0;
+  let n = 0;
+  for (const u of _held.urls) if (_held.off.statusOf(u) === 'queued') n += 1;
+  return n;
 }
 
 function CheckGlyph() { return <path d="M6.5 12.5l3.8 3.8 7.2-8.3" />; }

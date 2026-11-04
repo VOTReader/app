@@ -199,20 +199,25 @@ describe('Choose: mobile data', () => {
     expect(off.download).toHaveBeenCalledTimes(1);
   });
 
-  it('Wait for Wi-Fi holds it until the connection is no longer mobile data', () => {
+  /* h1104-19: the plan used to wait in a variable of this page, so closing the app (or a second Wait for Wi-Fi) lost
+     it and nothing ever downloaded. It goes to the store's own saved queue as Wi-Fi-only items, which outlive a close
+     (and, on the phone, start with the app closed); the chooser still says what waits. */
+  it('Wait for Wi-Fi queues it as Wi-Fi-only at once (the store keeps it across a close) and says so until Wi-Fi', () => {
     const conn = { type: 'cellular', listeners: [], addEventListener: (_e, f) => conn.listeners.push(f), removeEventListener: vi.fn() };
     Object.defineProperty(window.navigator, 'connection', { configurable: true, value: conn });
     off.st.sizes.set(U('v2-one'), 150e6);
+    off.download.mockImplementation((items) => { for (const i of items) off.st.status.set(i.url, 'queued'); return true; });
     const { container, getByRole } = render(<DownloadChooser off={off} />);
     fireEvent.click(box(container, 'Volume Two'));
     fireEvent.click(within(footer(container)).getByRole('button'));
     fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
     fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Wait for Wi-Fi' }));
-    expect(off.download).not.toHaveBeenCalled();
+    expect(off.download).toHaveBeenCalledWith([{ url: U('v2-one'), key: 'v2:one', title: 'Letter One', wifi: true }]);
     expect(container.textContent).toMatch(/Waiting for Wi-Fi · 1 recording/);
     conn.type = 'wifi';
-    conn.listeners.forEach((f) => f());
-    expect(off.download).toHaveBeenCalledWith([{ url: U('v2-one'), key: 'v2:one', title: 'Letter One' }]);
+    act(() => { conn.listeners.forEach((f) => f()); });
+    expect(off.download, 'the store starts it on Wi-Fi itself').toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toMatch(/Waiting for Wi-Fi/);
   });
 
   /* #60's leak hunt, item 4: the held plan kept the Apply's own callback, the CLOSED chooser's setState, so Wi-Fi
@@ -222,6 +227,7 @@ describe('Choose: mobile data', () => {
     const conn = { type: 'cellular', listeners: [], addEventListener: (_e, f) => conn.listeners.push(f), removeEventListener: vi.fn() };
     Object.defineProperty(window.navigator, 'connection', { configurable: true, value: conn });
     off.st.sizes.set(U('v2-one'), 150e6);
+    off.download.mockImplementation((items) => { for (const i of items) off.st.status.set(i.url, 'queued'); return true; });
     const first = render(<DownloadChooser off={off} />);
     fireEvent.click(box(first.container, 'Volume Two'));
     fireEvent.click(within(footer(first.container)).getByRole('button'));
