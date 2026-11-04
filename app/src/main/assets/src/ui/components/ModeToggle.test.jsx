@@ -104,3 +104,28 @@ describe('renderCommentaryCite still ships from this file', () => {
     expect(renderCommentaryCite('')).toBe('');
   });
 });
+
+/* reading-flow hunt 2026-11-04: a Matthew note's references were gold (this class is the app's
+   tappable reference) and did nothing when tapped. They open the chapter's scripture sheet now, so
+   each must be the reference it names: the old greedy tail took the "1" of "1 Corinthians"
+   ("Ephesians 1:22, 1" + "Corinthians 12:13") and left ":17" off "Revelation 21:9, 22:17". */
+describe('renderCommentaryCite: the references a commentary note names', () => {
+  // Matthew 16:18's note, verbatim from matthew.js.
+  const NOTE = 'In the Bible, the word "church" refers to The Lord\'s body or body of believers, the Messianic community (Ephesians 1:22, 1 Corinthians 12:13); and also the Bride (John 3:29; Revelation 21:9, 22:17).';
+
+  it('reads each reference whole, and leaves a following book its own number', () => {
+    render(<span>{renderCommentaryCite(NOTE)}</span>);
+    expect([...document.querySelectorAll('.inline-scrip-ref')].map((e) => e.textContent))
+      .toEqual(['Ephesians 1:22', '1 Corinthians 12:13', 'John 3:29', 'Revelation 21:9, 22:17']);
+    expect(document.body.textContent).toBe(NOTE);
+  });
+
+  it('opens a reference when handed a way to, as every other gold reference does', () => {
+    const onRef = vi.fn();
+    render(<span>{renderCommentaryCite('First through John the Baptist (Matthew 11:14); then', onRef)}</span>);
+    const ref = document.querySelector('.inline-scrip-ref');
+    expect(ref.getAttribute('aria-haspopup')).toBe('dialog');
+    fireEvent.click(ref);
+    expect(onRef).toHaveBeenCalledWith('Matthew 11:14');
+  });
+});

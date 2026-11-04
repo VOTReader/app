@@ -137,3 +137,22 @@ describe('InlineEcho — pill label', () => {
     expect(container.textContent).not.toContain('The Promise');
   });
 });
+
+/* reading-flow hunt 2026-11-04: a commentary row's references (Matthew 11:13-14's "(Matthew 11:14)",
+   the cross-references "Malachi 4:4-6" and "1 John 3:2" that have no Matthew verse entry) were gold
+   and opened nothing. They open the chapter's scripture sheet, named for the row's verse. */
+describe('a commentary row\'s references open the scripture sheet', () => {
+  beforeEach(() => { g.MATTHEW_NKJV = {}; });
+  afterEach(() => { delete g.MATTHEW_NKJV; });
+  const ROW = { ref: '11:13-14', cite: 'Malachi 4:4-6' };
+  for (const [name, Comp] of [['StudyPanels', Panels], ['InlineNotes', Inline]]) {
+    it(name + ': a tap on the reference opens it', () => {
+      const opened = [];
+      render(<Comp scriptures={[ROW]} votNotes={[]} onScriptureClick={(s) => opened.push(s)} hlKeyBase="study:matthew-11:13" />);
+      const ref = /** @type {HTMLElement} */ (document.querySelector('.inline-scrip-ref'));
+      expect(ref && ref.textContent).toBe('Malachi 4:4-6');
+      ref.click();
+      expect(opened).toEqual([{ ref: '11:13-14', cite: 'Malachi 4:4-6' }]);
+    });
+  }
+});

@@ -34,7 +34,7 @@ export function StudyPanels({ scriptures, votNotes, onScriptureClick, onVotLette
                 <div key={hlKeyBase ? hlKeyBase + '-s' + i : i} className="scripture-ref scripture-ref-note" {...ann('s' + i)}>
                   <StaticSubtree>
                     <span className="scripture-ref-tag">{s.ref}</span>
-                    <span className="scripture-ref-text">{renderCommentaryCite(s.cite)}</span>
+                    <span className="scripture-ref-text">{renderCommentaryCite(s.cite, onScriptureClick ? (cite) => onScriptureClick({ ref: s.ref, cite }) : null)}</span>
                   </StaticSubtree>
                 </div>
               );
