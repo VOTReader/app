@@ -9,6 +9,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import android.os.Build
 import java.io.File
+import java.io.IOException
 import java.nio.file.Files
 import java.util.Calendar
 import kotlin.test.assertEquals
@@ -188,6 +189,32 @@ class SnapshotStoreTest {
         // The snapshot, then its cloud copy (ds-backup): each synced before it has its name.
         assertEquals(listOf(false to false, true to false), seen)
         assertEquals(j("a"), store.read(named.name))
+    }
+
+    // A full disk: the write (or its fsync) fails partway. The half-written temp file used to
+    // stay behind, up to 24 MB of the phone's last free space, until some later save succeeded,
+    // while the WebView needed that space for the reader's own notes and highlights.
+    private fun leftoverTmps(): List<String> =
+        listOf(File(dir, "snapshots"), File(dir, "snapshot-cloud"))
+            .flatMap { d -> d.list()?.filter { it.endsWith(".tmp") } ?: emptyList() }
+
+    @Test fun `a save the disk cannot hold leaves no half-written temp file and keeps the snapshots before it`() {
+        assertTrue(store.save(j("good"), at(2026, 10, 1)))
+        store.sync = { throw IOException("No space left on device") }
+        assertFalse(store.save(j("next"), at(2026, 10, 2)))
+        assertEquals(emptyList(), leftoverTmps())
+        assertEquals(listOf("snap-20261001-120000.json"), names())
+        assertEquals(j("good"), store.read("snap-20261001-120000.json"))
+    }
+
+    @Test fun `a cloud copy the disk cannot hold leaves no half-written temp file`() {
+        var syncs = 0
+        // The snapshot itself syncs first and is whole; its cloud copy is the second sync, and fails.
+        store.sync = { out -> if (++syncs == 2) throw IOException("No space left on device"); out.fd.sync() }
+        assertTrue(store.save(j("a"), at(2026, 10, 1)))
+        assertEquals(2, syncs)
+        assertEquals(emptyList(), leftoverTmps())
+        assertEquals(listOf("snap-20261001-120000.json"), names())
     }
 
     // ds-backup: Google's cloud backup takes only snapshot-cloud/ (one copy of the newest

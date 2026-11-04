@@ -75,7 +75,7 @@ class SnapshotStore(private val dir: File, private val cloud: File = File(dir.pa
                 name = "snap-" + stampFormat().format(Date(t)) + ".json"
             }
             val tmp = File(dir, "$name.tmp")
-            FileOutputStream(tmp).use { out -> out.write(bytes); out.flush(); sync(out) }
+            writeSynced(tmp) { out -> out.write(bytes) }
             if (!tmp.renameTo(File(dir, name))) { tmp.delete(); return false }
             prune()
             cloudCopy()
@@ -149,10 +149,25 @@ class SnapshotStore(private val dir: File, private val cloud: File = File(dir.pa
      */
     private fun place(src: File, to: File, via: File = to): Boolean {
         val tmp = File(via, src.name + ".tmp")
-        FileOutputStream(tmp).use { out -> src.inputStream().use { it.copyTo(out) }; out.flush(); sync(out) }
+        writeSynced(tmp) { out -> src.inputStream().use { it.copyTo(out) } }
         if (tmp.renameTo(File(to, src.name))) return true
         tmp.delete()
         return false
+    }
+
+    /**
+     * Write [tmp] with [fill], its bytes forced to the disk before the caller renames it (W9). A
+     * write that fails takes its part-written file with it, then rethrows: on a full disk the
+     * half-written .tmp (up to [MAX_BYTES]) used to stay until a later save succeeded, holding the
+     * last free space the WebView needed for the reader's own notes and highlights.
+     */
+    private fun writeSynced(tmp: File, fill: (FileOutputStream) -> Unit) {
+        try {
+            FileOutputStream(tmp).use { out -> fill(out); out.flush(); sync(out) }
+        } catch (t: Throwable) {
+            tmp.delete()
+            throw t
+        }
     }
 
     /** Snapshot files, newest first. */
