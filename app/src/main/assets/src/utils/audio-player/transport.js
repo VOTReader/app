@@ -256,11 +256,13 @@ export function seek(seconds) {
        it was, so Play resumed at the old place (sweep v83). Every play path
        clears _pendingRestore first, so while it is set this branch is the bar. */
     if (!_pendingRestore) return;          // idle: no element and nothing to restore
-    const at = Math.max(0, Math.floor(seconds || 0));
+    // The EXACT time, as the element branch keeps it: timing rows start anywhere in a second, and a floored clock
+    // lit the clause before the tapped one and resumed inside it. The tick and persist marks are whole seconds.
+    const at = Math.max(0, Number(seconds) || 0);
     _pendingRestore.time = at;
     _state.time = at;
-    _setLastTick(at);
-    _setLastPersistSec(at);
+    _setLastTick(Math.floor(at));
+    _setLastPersistSec(Math.floor(at));
     _notify();
     _persist();
     return;

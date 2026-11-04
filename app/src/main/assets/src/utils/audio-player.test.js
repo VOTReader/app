@@ -2557,6 +2557,28 @@ describe('audio-player — a seek on the boot-restored bar (read-along-4)', () =
       delete globalThis.colLetterArr;
     }
   });
+
+  it('keeps the exact onset of the tapped clause: a clause at 150.7 s is not floored back into the one before it', async () => {
+    /* Timing rows start anywhere in a second, and read-along paints fragmentAt(time + 0.15): a floored 150 lights the
+       PREVIOUS clause and Play starts inside it. The live element's seek keeps the exact time; so must the bar's. */
+    await restored();
+    AudioPlayer.seek(150.7);
+    expect(AudioPlayer.getState().time).toBe(150.7);
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBeCloseTo(150.7, 1);
+    globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);
+    globalThis.colPreface = () => ITEMS[0];
+    globalThis.colLetterArr = () => ITEMS.slice(1);
+    try {
+      AudioPlayer.toggle();
+      await new Promise((r) => setTimeout(r, 0));
+      el().dispatchEvent(new Event('loadedmetadata'));
+      expect(el().currentTime).toBeCloseTo(150.7, 3);
+    } finally {
+      delete globalThis.COL_BY_KEY;
+      delete globalThis.colPreface;
+      delete globalThis.colLetterArr;
+    }
+  });
 });
 
 describe('audio-player — a seek on a restored bar whose element holds a prewarm (sweep v83)', () => {
