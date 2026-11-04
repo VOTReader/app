@@ -89,6 +89,50 @@ describe('useFullscreenGesture', () => {
     expect(PlatformBridge.setImmersiveMode).not.toHaveBeenCalled();
   });
 
+  /* Settings hunt (2026-11-04): Settings › Double-Tap / Click Fullscreen turned OFF while the gesture held
+     fullscreen forgot the Android state and left the system bars hidden, with the one way out (the double
+     tap) gone. A reader who switches it off because fullscreen keeps happening by accident is in fullscreen
+     at that moment. Off now hands the screen back; a pause for GardenView (which owns immersive mode
+     itself) still does not. */
+  it('Android: switching the setting off while fullscreen returns to regular view', () => {
+    PlatformBridge.isAndroid = true;
+    const { rerender } = mount();
+    const prose = document.body.appendChild(document.createElement('p'));
+    doubleTap(prose);
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenLastCalledWith(true);
+    rerender({ enabled: false, hintCount: 1, onHintShown: vi.fn() });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenLastCalledWith(false);
+  });
+
+  it('web: switching the setting off while fullscreen leaves fullscreen', () => {
+    const { rerender } = mount();
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: document.documentElement });
+    rerender({ enabled: false, hintCount: 1, onHintShown: vi.fn() });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledWith(false);
+  });
+
+  it('switching it off in regular view, or starting off, changes nothing', () => {
+    PlatformBridge.isAndroid = true;
+    const { rerender } = mount({ enabled: false });
+    rerender({ enabled: true, hintCount: 0, onHintShown: vi.fn() });
+    rerender({ enabled: false, hintCount: 0, onHintShown: vi.fn() });
+    expect(PlatformBridge.setImmersiveMode).not.toHaveBeenCalled();
+  });
+
+  it('a pause for GardenView leaves immersive mode to the Garden, and the gesture resumes after it', () => {
+    PlatformBridge.isAndroid = true;
+    const { rerender } = mount();
+    const prose = document.body.appendChild(document.createElement('p'));
+    doubleTap(prose);
+    rerender({ enabled: true, paused: true, hintCount: 1, onHintShown: vi.fn() });
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(1);   // only the double tap's (true)
+    doubleTap(prose);
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenCalledTimes(1);   // paused: no gesture
+    rerender({ enabled: true, paused: false, hintCount: 1, onHintShown: vi.fn() });
+    doubleTap(prose);                                                   // the Garden handed back regular view
+    expect(PlatformBridge.setImmersiveMode).toHaveBeenLastCalledWith(true);
+  });
+
   /* App() passes onHintShown as an inline arrow, so a dep on it re-ran this
      effect on EVERY App render — tearing down and re-adding both capture-phase
      document listeners each time. Listener churn on the app root is the shape

@@ -20,10 +20,12 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -188,6 +190,75 @@ class MainActivityPickerTest {
         val (activity, rq) = relaunchedAfterProcessDeath { it.launchV3ExportPicker("votreader-backup-2026-10-14.votbak") }
         assertTrue(activity.activityResultRegistry.dispatchResult(rq, Activity.RESULT_OK, Intent().setData(existing)))
         assertFalse(awaitDeleted(existing, 500L), "a file with bytes is the reader's own: never deleted")
+    }
+
+    // ── a renderer death mid-backup (W12's process-death path, for the renderer) ──
+    // The renderer is likeliest to run out of memory exactly when the page streams a media-heavy
+    // backup. The fresh page it reboots into asks for nothing, so the dead page's backup must end
+    // the way its own abort would have ended it.
+
+    private fun rendererDies(activity: MainActivity) {
+        val wv = activity.activeWebView
+        wv.webViewClient.onRenderProcessGone(wv, null)
+        idle()
+    }
+
+    /** A provider stream the test can see closed (Robolectric hands it out for its uri). */
+    private class SeenStream : ByteArrayOutputStream() {
+        @Volatile var closed = false
+        override fun close() { closed = true; super.close() }
+    }
+
+    /** Pick [dest] in the v3 save picker; the answer lands while the page that asked is alive. */
+    private fun pickedForBackup(activity: MainActivity, dest: Uri, sink: SeenStream) {
+        shadowOf(activity.contentResolver).registerOutputStream(dest, sink)
+        activity.launchV3ExportPicker("votreader-backup-2026-11-04.votbak")
+        val request = shadowOf(activity).nextStartedActivityForResult
+        shadowOf(activity).receiveResult(request.intent, Activity.RESULT_OK, Intent().setData(dest))
+        assertEquals(dest, vmOf(activity).pendingV3ExportUri)
+    }
+
+    @Test
+    fun `a v3 backup export answered after the page's renderer died deletes the empty votbak and stashes nothing`() {
+        val activity = started().get()
+        activity.launchV3ExportPicker("votreader-backup-2026-11-04.votbak")
+        val request = shadowOf(activity).nextStartedActivityForResult
+        rendererDies(activity)
+        shadowOf(activity).receiveResult(request.intent, Activity.RESULT_OK, Intent().setData(orphan))
+        assertTrue(awaitDeleted(orphan), "the page that asked died with its renderer: nobody will stream into this .votbak")
+        assertNull(vmOf(activity).pendingV3ExportUri)
+    }
+
+    @Test
+    fun `an export the page was streaming when its renderer died is closed and its partial deleted`() {
+        val activity = started().get()
+        val dest = Uri.parse("content://${RecordingDocsProvider.AUTHORITY}/document/streaming")
+        RecordingDocsProvider.sizes[dest] = 4096L   // half-written: an empty-only delete would keep it
+        val sink = SeenStream()
+        pickedForBackup(activity, dest, sink)
+        val storage = vmOf(activity).storage
+        // What the page's AndroidBridge.v3ExportBegin / v3ExportWriteBlob / v3ExportChunk do, cut mid-frame.
+        assertIs<StorageManager.Result.Success<Unit>>(storage.beginV3Export(dest, "{}".toByteArray(Charsets.UTF_8)))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.v3ExportWriteBlobHeader(10L))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.v3ExportWriteChunk(ByteArray(4)))
+        rendererDies(activity)
+        assertTrue(awaitDeleted(dest), "a half-written .votbak nothing will finish reads as a corrupt backup: it must go")
+        assertTrue(sink.closed, "the dead page's export stream must be closed, not left open")
+        assertNull(vmOf(activity).pendingV3ExportUri)
+    }
+
+    @Test
+    fun `control - a backup the page finished before its renderer died is never deleted`() {
+        val activity = started().get()
+        val dest = Uri.parse("content://${RecordingDocsProvider.AUTHORITY}/document/finished")
+        RecordingDocsProvider.sizes[dest] = 4096L
+        pickedForBackup(activity, dest, SeenStream())
+        val storage = vmOf(activity).storage
+        assertIs<StorageManager.Result.Success<Unit>>(storage.beginV3Export(dest, "{}".toByteArray(Charsets.UTF_8)))
+        assertIs<StorageManager.Result.Success<Unit>>(storage.finishV3Export(commit = true, uri = dest))
+        // The renderer died after the commit, before AndroidBridge.v3ExportFinish cleared the stashed uri.
+        rendererDies(activity)
+        assertFalse(awaitDeleted(dest, 500L), "a finished backup holds the reader's data: never deleted")
     }
 
     @Test

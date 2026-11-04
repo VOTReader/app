@@ -11,7 +11,7 @@
    the DOM side (body classes, #custom-fonts, CSS vars) is real jsdom. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, render, act } from '@testing-library/react';
 
 vi.mock('../utils/platform-bridge.js', () => ({
   PlatformBridge: {
@@ -24,7 +24,7 @@ import { PlatformBridge } from '../utils/platform-bridge.js';
 // The hook reads GARDEN_DEFAULT_TIER as a bare window global (bundle-d).
 /** @type {any} */ (globalThis).GARDEN_DEFAULT_TIER = 2;
 
-import { useSettings, defaultFlipsFor } from './use-settings.js';
+import { useSettings, defaultFlipsFor, legacyChromeFor, RETIRED_SETTINGS } from './use-settings.js';
 
 /** Render the hook with props, defaulting to a fresh first launch. */
 function mount({ savedSettings = null, theme = 'dark' } = {}) {
@@ -68,9 +68,9 @@ describe('useSettings — defaults + migration', () => {
   });
 
   it('saved settings override defaults', () => {
-    const { result } = mount({ savedSettings: { translation: 'kjv', haptic: false } });
+    const { result } = mount({ savedSettings: { translation: 'kjv', keepScreenOn: false } });
     expect(result.current.settings.translation).toBe('kjv');
-    expect(result.current.settings.haptic).toBe(false);
+    expect(result.current.settings.keepScreenOn).toBe(false);
     // untouched defaults survive
     expect(result.current.settings.markAsRead).toBe(true);
   });
@@ -87,20 +87,93 @@ describe('useSettings — defaults + migration', () => {
     expect(result.current.settings.showSectionHeadings).toBe(true);
   });
 
-  it('migrates old showChapterSummary:false and the migration WINS over a stale saved value', () => {
+  it('migrates old showChapterSummary:false into showChapterTitle (a profile that never chose it)', () => {
     const { result } = mount({
       savedSettings: { showChapterSummary: false, showChapterTitle: true },
     });
-    // ...migrated spread comes after ...savedS
     expect(result.current.settings.showChapterTitle).toBe(false);
+  });
+});
+
+/* Settings hunt (2026-11-04): the two legacy chrome keys were translated on EVERY boot and never removed.
+   The first boot persists the whole merged settings object, legacy key included, so `...migrated` put
+   Chapter Titles and Section Headings back off at each reload: a reader whose old profile had
+   showChrome:false could turn them on and see them gone again after the next launch. */
+describe('useSettings — the legacy chrome keys translate once', () => {
+  /** One launch: mount on what the last launch saved, let the reader act, return what this one saves. */
+  function launch(saved, act_ = null) {
+    const { result, unmount } = mount({ savedSettings: saved });
+    if (act_) act(() => act_(result.current));
+    const persisted = JSON.parse(JSON.stringify(result.current.settings));
+    unmount();
+    return persisted;
+  }
+
+  it('Chapter Titles and Section Headings turned back on stay on across a reload (showChrome:false profile)', () => {
+    const first = launch({ showChrome: false });
+    expect(first.showChapterTitle).toBe(false);
+    expect(first.showSectionHeadings).toBe(false);
+    const second = launch(first, (r) => { r.toggleSetting('showChapterTitle'); r.toggleSetting('showSectionHeadings'); });
+    expect(second.showChapterTitle).toBe(true);
+    const third = launch(second);
+    expect(third.showChapterTitle).toBe(true);
+    expect(third.showSectionHeadings).toBe(true);
+  });
+
+  it('Chapter Titles turned back on stays on across a reload (showChapterSummary:false profile)', () => {
+    const first = launch({ showChapterSummary: false });
+    expect(first.showChapterTitle).toBe(false);
+    const second = launch(first, (r) => r.toggleSetting('showChapterTitle'));
+    expect(launch(second).showChapterTitle).toBe(true);
+  });
+
+  it('a key the reader set themselves is never overwritten by a legacy key still in the profile', () => {
+    const s = launch({ showChrome: false, showChapterTitle: true, showSectionHeadings: true,
+      touched: { showChapterTitle: true, showSectionHeadings: true } });
+    expect(s.showChapterTitle).toBe(true);
+    expect(s.showSectionHeadings).toBe(true);
+  });
+
+  it('the legacy keys leave the profile once translated', () => {
+    const s = launch({ showChrome: false, showChapterSummary: false });
+    expect('showChrome' in s).toBe(false);
+    expect('showChapterSummary' in s).toBe(false);
+  });
+
+  it('legacyChromeFor: only the false case carries intent, and touched keys are the reader\'s', () => {
+    expect(legacyChromeFor({})).toEqual({});
+    expect(legacyChromeFor({ showChrome: true, showChapterSummary: true })).toEqual({});
+    expect(legacyChromeFor({ showChrome: false })).toEqual({ showChapterTitle: false, showSectionHeadings: false });
+    expect(legacyChromeFor({ showChapterSummary: false })).toEqual({ showChapterTitle: false });
+    expect(legacyChromeFor({ showChrome: false, touched: { showSectionHeadings: true } })).toEqual({ showChapterTitle: false });
+  });
+});
+
+/* Settings hunt (2026-11-04): keys no code reads any more used to ride in every profile forever. */
+describe('useSettings — retired keys leave the profile', () => {
+  it.each(RETIRED_SETTINGS.map((k) => [k]))('%s is dropped as the settings load', (key) => {
+    const { result } = mount({ savedSettings: { [key]: true, translation: 'kjv' } });
+    expect(key in result.current.settings).toBe(false);
+    expect(result.current.settings.translation).toBe('kjv');
+  });
+
+  it('a first launch saves no retired key (haptic was a default nothing read)', () => {
+    const { result } = mount();
+    for (const key of RETIRED_SETTINGS) expect(key in result.current.settings).toBe(false);
+  });
+
+  it('no retired key is a live default or the name of a settings row', () => {
+    const { result } = mount();
+    const live = new Set(Object.keys(result.current.settings));
+    expect(RETIRED_SETTINGS.filter((k) => live.has(k))).toEqual([]);
   });
 });
 
 describe('useSettings — mutators', () => {
   it('toggleSetting flips a boolean; updateSetting sets a value', () => {
     const { result } = mount();
-    act(() => result.current.toggleSetting('haptic'));
-    expect(result.current.settings.haptic).toBe(false);
+    act(() => result.current.toggleSetting('keepScreenOn'));
+    expect(result.current.settings.keepScreenOn).toBe(false);
     act(() => result.current.updateSetting('arrowLayout', 'split'));
     expect(result.current.settings.arrowLayout).toBe('split');
   });
@@ -147,6 +220,30 @@ describe('useSettings — body-class mirror', () => {
     document.body.className = '';
     mount({ savedSettings: { compactTopBar: false } });
     expect(cls().contains('compact-topbar')).toBe(false);
+  });
+
+  /* Settings hunt (2026-11-04): the mirror ran as a PASSIVE effect, i.e. after the App's first paint.
+     The body classes decide what that paint shows: the compact bar hides three icons only through
+     body.compact-topbar, `body:not(.arrows-nav):not(.arrows-off) .letter-body` adds 4rem of padding,
+     vot-large-text re-lays the large sizes. So each launch painted the default bar and arrows first,
+     and the scroll restore (a layout effect later in App) measured that wrong page. Probe: a layout
+     effect after useSettings in the same component, which runs before any passive effect. */
+  it('the classes are on before the first paint (a later layout effect already sees them)', () => {
+    /** @type {Record<string, boolean>} */ const seen = {};
+    function Probe() {
+      useSettings({ savedSettings: { arrowLayout: 'off', fontScale: '2', showScrollNotch: true }, theme: 'light' });
+      React.useLayoutEffect(() => {
+        seen.compact = cls().contains('compact-topbar');
+        seen.arrowsOff = cls().contains('arrows-off');
+        seen.notch = cls().contains('scroll-notch');
+        seen.light = cls().contains('light');
+        seen.large = document.documentElement.classList.contains('vot-large-text');
+        seen.scale = document.documentElement.style.getPropertyValue('--font-scale') === '2';
+      }, []);
+      return null;
+    }
+    render(React.createElement(Probe));
+    expect(seen).toEqual({ compact: true, arrowsOff: true, notch: true, light: true, large: true, scale: true });
   });
 
   it('arrowLayout maps to exactly one arrows-* class', () => {

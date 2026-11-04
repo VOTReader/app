@@ -1377,7 +1377,11 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).not.toContain('vot-ann-migrated');     // W7.1 retired this exception
     expect(LS_SKIP_LIST).toContain('vot-answers-path');         // AOGCG: the Answers reading path (device-local)
     expect(LS_SKIP_LIST).toContain('vot-answers-recent');       // AOGCG: the Answers recent searches (device-local)
-    expect(LS_SKIP_LIST.length).toBe(20);
+    // Settings hunt (2026-11-04): the live keys the list had missed (ls-skip-list.gate.test.js finds them).
+    expect(LS_SKIP_LIST).toContain('vot-notes-tab');
+    expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
+    expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
+    expect(LS_SKIP_LIST.length).toBe(34);
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 
@@ -1533,7 +1537,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     consoleSpy.mockRestore();
   });
 
-  it('meta-write failure: LS still cleared (partial OK; next boot retries)', async () => {
+  it('meta-write failure: LS still cleared, and localStorage records the sweep as done', async () => {
     /** @type {Record<string, any>} */
     const idbMeta = {};
     vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
@@ -1543,8 +1547,26 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     localStorage.setItem('vot-bookmarks', '[]');
     await clearLegacyLs();
     expect(localStorage.getItem('vot-bookmarks')).toBeNull();  // cleared
-    expect(idbMeta['migrated-v1']).toBeUndefined();             // flag NOT set
+    expect(idbMeta['migrated-v1']).toBeUndefined();             // the meta flag could not be written
+    expect(localStorage.getItem('vot-ls-cleanup-done')).toBe('1');
     consoleSpy.mockRestore();
+  });
+
+  /* Settings hunt (2026-11-04): a sweep that had finished but could not write its meta flag (a full
+     disk) ran again at the next boot, and the only vot-* keys left by then were live ones written in
+     between: the retry could only delete preferences. The sweep is done once it has swept. */
+  it('a failed flag write does not make the next boot sweep the keys written since', async () => {
+    /** @type {Record<string, any>} */
+    const idbMeta = {};
+    vi.spyOn(IDBAdapter, 'get').mockImplementation(async (_s, k) => idbMeta[String(k)]);
+    vi.spyOn(IDBAdapter, 'put').mockRejectedValue(new Error('quota'));
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    localStorage.setItem('vot-bookmarks', '[]');
+    await clearLegacyLs();                                        // boot 1: swept; the meta put fails
+    localStorage.setItem('vot-a-later-preference', 'chosen');     // the reader's session writes a live key
+    await clearLegacyLs();                                        // boot 2
+    expect(localStorage.getItem('vot-a-later-preference')).toBe('chosen');
   });
 
   it('_resetLegacyLsFlag clears the flag so clearLegacyLs runs again', async () => {

@@ -28,10 +28,11 @@ object SharedLink {
     private val RANGE = Regex(":\\d+-\\d+$")
 
     /**
-     * W57 (sweep 2026-10-13): an address this app claims itself, the manifest's verified App Link (https, [HOST],
-     * /app or /app/...). Android hands any VIEW of one straight back to this package, so the page's own links of
-     * this shape (About's Privacy policy, /app/privacy.html) must open in the page or in a browser, never by a plain
-     * ACTION_VIEW: that looped back to onNewIntent, which found no key and showed nothing.
+     * W57 (sweep 2026-10-13): an address on this app's own path (https, [HOST], /app or /app/...). The manifest's
+     * verified App Link claims its page (/app, /app/, /app/index.html), and Android hands any VIEW of one straight
+     * back to this package, so the page's own links of this shape must open in the page or in a browser, never by a
+     * plain ACTION_VIEW: that looped back to onNewIntent, which found no key and showed nothing. Kept as wide as the
+     * old /app/ prefix claim was (About's Privacy policy, /app/privacy.html, takes the browser route too).
      */
     fun isAppLink(url: String?): Boolean = appLinkUri(url) != null
 
