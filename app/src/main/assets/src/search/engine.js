@@ -37,13 +37,14 @@ import { edgeReading, readReference, restWords } from './ref-edge.js';
 import { scopeWord, collectionNamed } from './scope-word.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { searchUnits } from './stage-units.js';
+import { matchWords, accumulate } from './stage-match.js';
 import { wordForms } from './word-forms.js';
 import { numberReading } from './numbers.js';
 import { kjvEncode, kjvEncodeAt, negationOf, PRONOUN_BARE, PRONOUN_PIECE } from './tokenize.js';
 import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
 import {
   KIND_BOOST, coverageMultiplier, popcount, PHRASE_BOOST, SYNONYM_DEMOTION,
-  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, SYNONYM_WEIGHT, FORM_WEIGHT, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch, TITLE_EXACT_BOOST,
+  BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, NEAR_PHRASE_MIN, ORIGINAL_BOOST, REPRINT_KINDS, nearPhrase, titleMatch, TITLE_EXACT_BOOST,
   titleLevel, TITLE_LEVEL_LEAD, TITLE_LEAD,
 } from './ranking.js';
 import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
@@ -2576,6 +2577,9 @@ const ENGINE = {
   termExists,
   restoredNameOf,
   NAME_FORMS,
+  searchUnit,
+  prefixable,
+  isStopTerm,
 };
 
 /**
@@ -2717,26 +2721,10 @@ async function searchWords(query, options) {
   if (!filtered.length && !p.phrase) return { parsed, results: [], parsedTerms: filtered, textQuery: p };
 
   // Build search units (literal + synonyms): search/stage-units.js. `ctx` is the run's state, read and written by each stage.
-  /** @type {any} */ const ctx = { options, p, filtered, D, eng: ENGINE };
+  /** @type {any} */ const ctx = { options, p, filtered, D, spent, pause, eng: ENGINE };
   searchUnits(ctx);
   const { units, didExpand } = ctx;
 
-  // One BM25 search per unit; accumulate score + coverage bitmask.
-  const scoreMap = Object.create(null);
-  const termMask = Object.create(null);
-  const literalHit = Object.create(null);
-  const matchedTerms = Object.create(null);
-  /** @type {Record<string, Array<[number, string[]]>>} an Answers topic's matched words, each with the query words it counts for */
-  const answersHits = Object.create(null);
-  /** @type {Record<string, number>} a verse's score in its KJV wording, unit by unit (kjv-twin.js) */
-  const kjvScore = Object.create(null);
-  /** @type {Record<string, number>} the typed words its KJV wording holds, as termMask */
-  const kjvMask = Object.create(null);
-  const docLookup = Object.create(null);
-  const unitOpts = (unit) => ({ prefix: unit.literal ? prefixable : false, fuzzy: false, combineWith: 'AND', boost: MS_SEARCH_DEFAULTS.boost });
-  // A stop word the reader typed among real words ranks, but is not a word to mark:
-  // its matches do not ride on the result for the snippet and the find bar.
-  const contentTyped = units.some((u) => u.literal && !isStopTerm(u.term));
   /* What the reader wants found: a -word is ruled out, not typed, and a +word is its word (sweep 2026-10-14 v002).
      Read as typed, "Q -x" asked the texts to hold the run "Q x", so the passage quoted lost its phrase and
      original boosts to a word the reader excluded; and the -word counted toward the words that make a keyword
@@ -2750,54 +2738,10 @@ async function searchWords(query, options) {
     ? kjvEncode(p.phrase).filter((t) => !(STOP_TRIMMED && STOP_TRIMMED.has(t))).length
     : units.filter((u) => u.literal && !isStopTerm(u.term)).length;
   const keyword = contentWords <= KEYWORD_CONTENT_WORDS && kjvEncode(p.phrase || wanted).length <= KEYWORD_WORDS;
-  /** @param {any} unit @param {any[]} res */
-  const accumulate = (unit, res) => {
-    const weight = unit.literal || unit.joined ? 1 : unit.form ? FORM_WEIGHT : SYNONYM_WEIGHT;
-    for (let r = 0; r < res.length; r++) {
-      const hit = res[r];
-      const id = hit.id;
-      scoreMap[id] = (scoreMap[id] || 0) + hit.score * weight;
-      if (!docLookup[id]) docLookup[id] = hit;
-      if (unit.literal || unit.joined) literalHit[id] = true;   // a text found only through a form or a synonym is demoted below: the typed form first
-      if ((unit.literal || unit.form || unit.joined) && !(contentTyped && isStopTerm(unit.term))) {
-        // hit.terms is the DOC-side vocabulary that matched (MiniSearch derives
-        // it from the match map), so for a fuzzy/prefix hit it's the corrected
-        // word — query "sheperd" carries "shepherd" here. The snippet
-        // highlighter only knows the literal typed terms, so these ride along
-        // on the result for the UI to merge in (v1.1 gap: corrected words
-        // rendered unmarked). A word-form unit's hit ("flood" for a typed
-        // "flooding") rides the same way, or its snippet would show no mark.
-        // Not synonym units: they match exactly, and SRCH4's
-        // expandSnippetTerms already covers those.
-        if (hit.terms) {
-          const mt = matchedTerms[id] || (matchedTerms[id] = []);
-          for (let t = 0; t < hit.terms.length && mt.length < 12; t++) {
-            if (mt.indexOf(hit.terms[t]) < 0) mt.push(hit.terms[t]);
-          }
-        }
-      }
-      if (unit.origin < 31) {
-        if (!hit.kjvOnly) termMask[id] = (termMask[id] || 0) | (unit.cover || (1 << unit.origin));
-        if (hit.kind === 'answers' && hit.terms) (answersHits[id] || (answersHits[id] = [])).push([unit.cover || (1 << unit.origin), hit.terms]);
-      }
-      // the verse's KJV reading, added up on its own (kjvReading)
-      if (hit.kjv !== undefined) {
-        kjvScore[id] = (kjvScore[id] || 0) + hit.kjv * weight * (hit.kjvOnly ? FORM_WEIGHT : 1);
-        if (unit.origin < 31) kjvMask[id] = (kjvMask[id] || 0) | (unit.cover || (1 << unit.origin));
-      }
-    }
-  };
-  const heard = Object.create(null);   // origin -> some unit of that word found something
-  const heardOwn = Object.create(null); // origin -> a unit other than its word forms found something
-  const unheard = [];                  // literal units that found nothing as typed
-  for (let u = 0; u < units.length; u++) {
-    if (spent()) { const r = await pause(); if (r) return r; }
-    const unit = units[u];
-    let res;
-    try { res = searchUnit(unit.term, unitOpts(unit), keyword); } catch { continue; }
-    if (res && res.length) { heard[unit.origin] = true; if (!unit.form) heardOwn[unit.origin] = true; accumulate(unit, res); continue; }
-    if (unit.literal) unheard.push(unit);
-  }
+  // One BM25 search per unit; accumulate score + coverage bitmask: search/stage-match.js
+  Object.assign(ctx, { keyword });
+  { const r = await matchWords(ctx); if (r) return r; }
+  const { scoreMap, termMask, literalHit, matchedTerms, answersHits, kjvScore, kjvMask, docLookup, unitOpts, heard, heardOwn, unheard } = ctx;
   /* THE TYPO FALLBACK WAITS FOR THE WHOLE FAMILY (2026-09-26). A typed word that
      finds nothing as typed but whose forms or synonyms do is a real word this
      corpus happens to inflect differently ("prays", where the text says pray and
@@ -2823,7 +2767,7 @@ async function searchWords(query, options) {
     let fixed;
     try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword, heard[unit.origin] ? (w) => formMisspelt(typed, w) : undefined); } catch { continue; }
     if (!fixed.res.length) continue;
-    accumulate(unit, fixed.res);
+    accumulate(ctx, unit, fixed.res);
     if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
   }
   /* A CORRECTED QUERY IS SEARCHED AS THAT QUERY (2026-09-27). "Showing results for
