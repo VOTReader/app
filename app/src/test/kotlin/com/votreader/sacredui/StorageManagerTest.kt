@@ -975,6 +975,21 @@ class StorageManagerTest {
     }
 
     @Test
+    fun `abandonV3Export aborts only the session on the document it names`() {
+        // MainActivity abandons the export of a page whose renderer died. A session open on any
+        // other document belongs to someone else and must be left to finish.
+        val mine = Uri.parse("content://test/v3-open")
+        val other = Uri.parse("content://test/v3-dead-page")
+        every { cr.openOutputStream(mine, "wt") } returns ByteArrayOutputStream()
+        assertIs<StorageManager.Result.Success<Unit>>(
+            storage.beginV3Export(mine, "{}".toByteArray(Charsets.UTF_8))
+        )
+        storage.abandonV3Export(other)
+        assertIs<StorageManager.Result.Success<Unit>>(storage.finishV3Export(commit = true, uri = mine))
+        verify(exactly = 0) { cr.call(any<String>(), any(), any(), any()) }
+    }
+
+    @Test
     fun `v3 export refuses to overflow a frame`() {
         val uri = Uri.parse("content://test/overflow")
         every { cr.openOutputStream(uri, "wt") } returns ByteArrayOutputStream()

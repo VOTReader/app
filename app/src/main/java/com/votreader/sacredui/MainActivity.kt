@@ -1171,6 +1171,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
                 pendingMicPermission = null
                 fileChooserCallback?.let { try { it.onReceiveValue(null) } catch (_: Exception) {} }
                 fileChooserCallback = null
+                abandonBackupOfDeadPage()
 
                 // The renderer owned the HTML <audio> element, so it is
                 // already silent. Stop its native keep-alive before replacing
@@ -1303,6 +1304,23 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         }
 
         return wv
+    }
+
+    /**
+     * W12 for a renderer death: the page that asked for a v3 backup died with its renderer, and the fresh page
+     * asks for nothing. Process death already lands the picker's answer on a false [MainViewModel.v3ExportRequested]
+     * (its empty .votbak deleted, nothing stashed); a renderer death kept the flag set, so the answer was stashed
+     * for a page that never asked and the empty file stayed, reading as a corrupt backup in Verify and Import. And
+     * an export the dead page was streaming (a media-heavy one is when the renderer is likeliest to run out of
+     * memory) kept its stream open on a half-written .votbak that nothing would ever finish or delete. Clear the
+     * request, and abandon the export the way the page's own abort would: closed, its partial deleted. Off the
+     * main thread, since closing a SAF stream can wait on its provider.
+     */
+    private fun abandonBackupOfDeadPage() {
+        vm.v3ExportRequested = false
+        val uri = vm.pendingV3ExportUri ?: return
+        vm.pendingV3ExportUri = null
+        lifecycleScope.launch(Dispatchers.IO) { vm.storage.abandonV3Export(uri) }
     }
 
     /**
