@@ -490,6 +490,64 @@ describe('JournalEditorScreen — an image insert keeps edits made while it save
   });
 });
 
+/* h1104-16: a photo picked just before leaving. Done or Back while the photo compressed
+   and saved unmounted the editor, setBlocks was a no-op, and the stored photo, named by no
+   entry, was swept as an orphan at the next launch. It now goes into the stored entry. */
+describe('JournalEditorScreen — a photo picked just before leaving is kept (h1104-16)', () => {
+  /** Pick a photo whose store write is held until the returned function lands it (or fails it). */
+  function pickPhotoHeld() {
+    let finish, fail;
+    globalThis.JournalMediaStore.compressImage.mockImplementation(() => Promise.resolve({ blob: new Blob(['y'], { type: 'image/jpeg' }), width: 10, height: 10 }));
+    globalThis.JournalMediaStore.put.mockImplementation(() => new Promise((res, rej) => { finish = res; fail = rej; }));
+    fireEvent.change(document.querySelector('input[type="file"]'), { target: { files: [new File(['x'], 'photo.jpg', { type: 'image/jpeg' })] } });
+    const flush = async () => { for (let i = 0; i < 5; i++) await Promise.resolve(); };
+    return {
+      land: async (mid) => { await flush(); finish(mid); await flush(); },
+      failIt: async () => { await flush(); fail(new Error('decode failed')); await flush(); },
+    };
+  }
+
+  it('Done while the photo saved: the stored entry holds it, above the trailing paragraph', async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'words' }), JournalHelpers.newBlock('p', { text: '' })] });
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const photo = pickPhotoHeld();
+    unmount();
+    await photo.land('m_late');
+    const saved = JournalStore.get(entry.id);
+    expect(saved.blocks.map((b) => b.type === 'p' ? b.text : b.type)).toEqual(['words', 'image', '']);
+    expect(saved.blocks[1].mediaId).toBe('m_late');
+  });
+
+  it('a new entry whose only content is that photo is not pruned on exit, and holds the photo', async () => {
+    const entry = JournalStore.add();
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const photo = pickPhotoHeld();
+    unmount();
+    expect(JournalStore.get(entry.id)).not.toBeNull();
+    await photo.land('m_first');
+    expect(JournalStore.get(entry.id).blocks.some((b) => b.type === 'image' && b.mediaId === 'm_first')).toBe(true);
+  });
+
+  it('the photo failing after the exit prunes the entry it kept blank', async () => {
+    const entry = JournalStore.add();
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const photo = pickPhotoHeld();
+    unmount();
+    await photo.failIt();
+    expect(JournalStore.get(entry.id)).toBeNull();
+  });
+
+  it('the entry deleted meanwhile: nothing is written back', async () => {
+    const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'words' })] });
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const photo = pickPhotoHeld();
+    unmount();
+    JournalStore.remove(entry.id);
+    await photo.land('m_gone');
+    expect(JournalStore.get(entry.id)).toBeNull();
+  });
+});
+
 /* ────────────────────────────────────────────────────────────────────────
    Wave 0 journal UX fixes (P1-5 / P1-6 / P1-7).
 

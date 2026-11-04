@@ -294,6 +294,9 @@ export function JournalEditorScreen(props) {
   // The Saved chip's pending re-look (awaitRetry / awaitSettled), stopped on unmount.
   var savedLookRef = useRef(/** @type {any} */ (null));
   var prunedRef = useRef(/** @type {{ entry: any, newEntry: boolean, counted: boolean } | null} */ (null));
+  // h1104-16: photos picked and still compressing or saving. One on its way is
+  // content to the exit prune: it lands in the stored entry (onFileChosen).
+  var photosInFlightRef = useRef(0);
 
   // Unmount mid-gesture: one call tears down listeners, timers, ghost, and
   // landing. The reorder itself commits SYNCHRONOUSLY at release now, so
@@ -405,7 +408,8 @@ export function JournalEditorScreen(props) {
       // this entry die with it. Deliberately NOT done in the pagehide flush:
       // backgrounding keeps the editor mounted, and removing the entry under
       // it would orphan the user's next keystroke.
-      if (!(t || '').trim() && !_blocksHaveContent(bs)) {
+      var photoComing = photosInFlightRef.current > 0;
+      if (!(t || '').trim() && !_blocksHaveContent(bs) && !photoComing) {
         // W16: blank because a block delete's Undo is still on screen? Keep what
         // that Undo needs to re-add the entry (deleteBlock's restore), and leave
         // its marks until the window closes.
@@ -1030,11 +1034,47 @@ export function JournalEditorScreen(props) {
   }
 
   // ─── File picker (image) ────────────────────────────────────
+  // h1104-16: the reader tapped Done or Back while the photo compressed and saved
+  // (a second or two on a budget phone). setBlocks went with the editor, and a
+  // stored photo no entry names is swept as an orphan 4 s into the next launch,
+  // so the photo was gone. It goes into the stored entry instead, the route
+  // deleteBlock's Undo takes past Done: the CURRENT entry, so nothing written
+  // since is clobbered. Above a trailing empty paragraph, where the editor would
+  // have put it. The entry gone (deleted from the hub): nothing to put it in.
+  function addPhotoAfterExit(mid) {
+    var eid = entryIdRef.current;
+    var cur = eid ? JournalStore.get(eid) : null;
+    if (!cur) return;
+    var next = Array.isArray(cur.blocks) ? cur.blocks.slice() : [];
+    var block = JournalHelpers.newBlock('image', { mediaId: mid, caption: '' });
+    var last = next[next.length - 1];
+    if (last && last.type === 'p' && !(last.text || '').trim()) next.splice(next.length - 1, 0, block);
+    else next.push(block);
+    JournalStore.update(eid, { blocks: next });
+    _maybeRecordNewEntryStats(eid, cur.title, next);   // a new entry whose first content is this photo counts now
+  }
+
+  // The photo failed after the reader left, and the entry it kept from the exit
+  // prune is still blank: prune it now, as the exit would have (P1-7).
+  function dropIfLeftBlank() {
+    var eid = entryIdRef.current;
+    var cur = eid ? JournalStore.get(eid) : null;
+    if (!cur || (cur.title || '').trim() || _blocksHaveContent(cur.blocks)) return;
+    var newEntry = false;
+    try { newEntry = localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY) === eid; } catch (_e) { /* best-effort */ }
+    JournalStore.remove(eid, { skipStats: !(countedRef.current && !newEntry) });
+    try { if (newEntry) localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY); } catch (_e) { /* best-effort */ }
+    _clearJournalDraft(eid);
+  }
+
   function onFileChosen(e) {
     var file = e.target.files && e.target.files[0];
     if (!file) return;
     e.target.value = '';  // reset so same file can be re-picked later
 
+    photosInFlightRef.current += 1;
+    var landed = false;
+    var settle = function() { if (!landed) { landed = true; photosInFlightRef.current -= 1; } };
     JournalMediaStore.compressImage(file, { maxDim: 1600, quality: 0.8 }).then(function(out) {
       return JournalMediaStore.put({
         type: 'image',
@@ -1044,9 +1084,13 @@ export function JournalEditorScreen(props) {
         height: out.height
       });
     }).then(function(mid) {
+      settle();
+      if (!mountedRef.current) { addPhotoAfterExit(mid); return; }
       immediateSaveRef.current = true;  // persist the new image block at once (skip the 1.2s debounce)
       insertBlockBelow(JournalHelpers.newBlock('image', { mediaId: mid, caption: '' }));
     }).catch(function(err) {
+      settle();
+      if (!mountedRef.current) dropIfLeftBlank();
       // Wave-0: only QUOTA-shaped failures belong to StorageHealth — this
       // catch also covers decode/resize failures, and reporting those flipped
       // the app to READONLY with the misleading "storage may be full" toast.
