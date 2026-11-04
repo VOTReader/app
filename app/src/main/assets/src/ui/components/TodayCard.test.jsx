@@ -3,7 +3,8 @@
    mockups (lanes/myweb/out/mockups/rp1/r2-home-one.png, r2-home-two.png). */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
-import { TodayCard, useNow } from './TodayCard.jsx';
+import { TodayCard, useNow, useQuestionOfDay } from './TodayCard.jsx';
+import { answersQuestionOfDay, shippedQuestionPool } from '../../utils/answers-question-day.js';
 
 afterEach(cleanup);
 
@@ -112,6 +113,70 @@ describe('useNow', () => {
       expect(screen.getByTestId('now').textContent).toBe('15');
       unmount();
       expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+// The Answers question of the day (docs/mockups/question-of-the-day/a-foot-row.html).
+describe('the question of the day', () => {
+  const Q = { id: 'regarding-the-days-of-noah', subject: 'the Days of Noah', text: 'What does The Lord say about the Days of Noah?' };
+  const NAME = 'Question of the day: What does The Lord say about the Days of Noah?';
+
+  /** Home's wiring: the hook's question into the card. */
+  function Home({ titles, rows = [row()], onOpen }) {
+    const question = useQuestionOfDay(titles);
+    return <TodayCard rows={rows} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled question={question} onOpenQuestion={onOpen} />;
+  }
+
+  it('sits under the plan, below Read and Listen, and tapping it opens that Answers entry', () => {
+    const onOpen = vi.fn();
+    render(<TodayCard rows={[row()]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled question={Q} onOpenQuestion={onOpen} />);
+    const buttons = screen.getAllByRole('button').map((b) => b.getAttribute('aria-label') || b.textContent);
+    expect(buttons.indexOf(NAME)).toBeGreaterThan(buttons.indexOf('Read Genesis 47-50'));
+    expect(screen.getByText('Question of the day')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: NAME }));
+    expect(onOpen).toHaveBeenCalledWith('regarding-the-days-of-noah');
+  });
+
+  it('rides every state of the card: two plans, done today, the offer, and alone when there is no plan and no offer', () => {
+    const two = [row(), row({ id: 'volumes', name: 'The Volumes in Order' })];
+    for (const props of [{ rows: two }, { rows: [row({ done: true, next: { bid: 'exodus', cid: 1 } })] }, { rows: [], offerStart: true }, { rows: [] }]) {
+      render(<TodayCard onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} question={Q} onOpenQuestion={vi.fn()} {...props} />);
+      expect(screen.getByRole('button', { name: NAME })).toBeTruthy();
+      cleanup();
+    }
+    render(<TodayCard rows={[]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} question={Q} onOpenQuestion={vi.fn()} />);
+    expect(screen.getByRole('region', { name: 'Question of the day' })).toBeTruthy();
+  });
+
+  it('absent while the data is missing: no row, no spinner, no error, and the plan card as before', () => {
+    const { container } = render(<Home titles={null} onOpen={vi.fn()} />);
+    expect(screen.queryByRole('button', { name: /Question of the day/ })).toBeNull();
+    expect(container.querySelector('.today-q')).toBeNull();
+    expect(container.textContent).not.toMatch(/Question|Loading|error/i);
+    cleanup();
+    const empty = render(<Home titles={{}} rows={[]} onOpen={vi.fn()} />);
+    expect(empty.container.firstChild).toBeNull();   // no plan, no offer, no question: no card at all
+  });
+
+  it('the same question all day, and the next one after local midnight', () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 4, 0, 0, 5), toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const pool = shippedQuestionPool();
+      const today = answersQuestionOfDay(pool, new Date(2026, 10, 4));
+      const tomorrow = answersQuestionOfDay(pool, new Date(2026, 10, 5));
+      expect(tomorrow.id).not.toBe(today.id);
+      const onOpen = vi.fn();
+      render(<Home onOpen={onOpen} />);
+      const name = 'Question of the day: ' + today.text;
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+      act(() => { vi.advanceTimersByTime(23 * 3600_000 + 59 * 60_000); });   // 23:59:05, the same day
+      expect(screen.getByRole('button', { name })).toBeTruthy();
+      act(() => { vi.advanceTimersByTime(60_000); });                          // past midnight
+      fireEvent.click(screen.getByRole('button', { name: 'Question of the day: ' + tomorrow.text }));
+      expect(onOpen).toHaveBeenCalledWith(tomorrow.id);
     } finally {
       vi.useRealTimers();
     }
