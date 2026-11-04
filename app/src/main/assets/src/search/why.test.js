@@ -42,6 +42,10 @@ describe('whyMatched: why a card is there', () => {
       .toEqual({ kind: 'name', from: 'jesus', to: 'YahuShua' });
     // even when the card's terms lack the name: His names for the typed word are looked for in the text
     expect(whyMatched(t, ['jesus', 'wept'], ['jesus', 'wept'], { names })).toEqual({ kind: 'name', from: 'jesus', to: 'YahuShua' });
+    // a heading in capitals before the sentences: the name as the sentences write it; capitals when that is all
+    const study = 'YAHUSHUA MORE THAN A MAN\nThey said to Him, "Lord, come and see." YahuShua wept.';
+    expect(whyMatched(study, ['jesus', 'wept', 'yahushua'], ['jesus', 'wept'], { names })).toEqual({ kind: 'name', from: 'jesus', to: 'YahuShua' });
+    expect(whyMatched('YAHUSHUA WEPT', ['jesus', 'wept', 'yahushua'], ['jesus', 'wept'], { names })).toEqual({ kind: 'name', from: 'jesus', to: 'YAHUSHUA' });
     // a name the text holds whose own names hold the typed one ("Jesus" for a typed yeshua is NAMES.yeshua's too)
     expect(whyMatched('Jesus wept.', ['yeshua', 'wept', 'jesus'], ['yeshua', 'wept'], { names })).toEqual({ kind: 'name', from: 'yeshua', to: 'Jesus' });
   });

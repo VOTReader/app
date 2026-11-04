@@ -884,15 +884,21 @@ export function whyMatched(text, terms, typed, how) {
   const missing = own.filter((_, i) => !held[i]);
   const exactAny = (/** @type {string} */ x) => exacts.some((ex) => ex(x));
   const namesOf = (/** @type {string} */ w) => (o.names ? o.names(w) : []);
-  // one of His names: a form the typed name is also searched as, or a name the text holds that is one of the typed word's
+  // one of His names: a form the typed name is also searched as, or a name the text holds that is one of the typed
+  // word's. Written as the text writes it in its sentences ("YahuShua"), over a heading in capitals ("YAHUSHUA MORE
+  // THAN A MAN"); capitals only when the text has nothing else ("YAHUWAH").
   for (const w of missing) {
     const forms = namesOf(w);
     const pool = forms.length ? hits.concat(occurrences(body, forms, true)) : hits;
+    let caps = '';
     for (const h of pool) {
       const x = word(h);
       const b = bare(x);
-      if (b !== w && !exactAny(x) && (forms.indexOf(b) >= 0 || namesOf(b).indexOf(w) >= 0)) return { kind: 'name', from: w, to: x };
+      if (b === w || exactAny(x) || (forms.indexOf(b) < 0 && namesOf(b).indexOf(w) < 0)) continue;
+      if (x !== x.toUpperCase()) return { kind: 'name', from: w, to: x };
+      if (!caps) caps = x;
     }
+    if (caps) return { kind: 'name', from: w, to: caps };
   }
   // a word swapped: a synonym or a word form of the first typed word the text does not hold
   const fams = familiesOf(list);
