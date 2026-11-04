@@ -1,0 +1,18 @@
+{
+ "_comment": [
+  "The Answers landing's search floor (npm run bench:answers; search200 h8, 2026-11-04, main 8d0656284): what answersRankedSearch (utils/answers-ranked.js, the main engine kept to Answers, meaning model on) puts in the first 1 and 3 topics, per shape of tools/answers-questions/cases.json and the hunt bench's sw-answers rows. A change that drops a shape under its line explains why in its commit, or does not land.",
+  "Measured the same day on the same set, the box's own matcher (answersSearch, the screen until then and its fallback while the index builds) scored top-1 / top-3: title/words 118/120, title/question 61/65, title/short 115/119, section/words 94/145, section/question 40/68, section/short 49/81, hunt/sw-answers 13/17, ALL set 477/598. With the meaning model off the engine scored ALL set 793/877 (sw-answers 35/41).",
+  "A combination (the box's title matches first, then the engine) gained 2 title cases and lost 11 heading cases: not taken."
+ ],
+ "engine": "engine",
+ "shapes": {
+  "title/words": { "top1": 121, "top3": 121 },
+  "title/question": { "top1": 113, "top3": 118 },
+  "title/short": { "top1": 117, "top3": 119 },
+  "section/words": { "top1": 233, "top3": 251 },
+  "section/question": { "top1": 140, "top3": 164 },
+  "section/short": { "top1": 146, "top3": 159 },
+  "hunt/sw-answers": { "top1": 38, "top3": 42 },
+  "ALL set": { "top1": 870, "top3": 932 }
+ }
+}
