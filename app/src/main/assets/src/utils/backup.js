@@ -509,6 +509,32 @@ function _restoreStore(store, method, data) {
 }
 
 /**
+ * dl5 (2026-11-04): the device's own localStorage copies of words in a store the
+ * import has just replaced. They belong to the old library, and they outlived the
+ * restore: the journal editor takes a draft back when it is newer than the entry
+ * it names (JRNL-1), and a restored entry carries the backup's older stamp, so the
+ * first open of it showed the device's words and its exit save wrote them over the
+ * restore; a note draft (utils/note-draft.js) was offered over the restored note the
+ * same way; the New-Entry marker counted a restored entry a second time on its next
+ * save. Dropped only for a store this backup restored: a store it does not carry is
+ * left as it is, its drafts with it. Keys: JournalEditorScreen.jsx JOURNAL_DRAFT_KEY
+ * and JRN_NEW_ENTRY_STATS_KEY, note-draft.js NOTE_DRAFT_KEY
+ * (ui/screens/JournalEditorScreen.restore.test.jsx pins the spellings together).
+ * @type {Record<string, string[]>}
+ */
+const DRAFTS_OF_STORE = {
+  'vot-journal': ['vot-journal-draft', 'vot-journal-new-entry-stats'],
+  'vot-notes': ['vot-note-draft'],
+};
+
+/** @param {string} name a store the import just restored */
+function _dropDraftsOf(name) {
+  for (const k of DRAFTS_OF_STORE[name] || []) {
+    try { localStorage.removeItem(k); } catch (_e) { /* non-fatal */ }
+  }
+}
+
+/**
  * Apply a v2-shape `stores` object to the IDB-backed stores + flags: SKIP any
  * section that fails shape validation (so a corrupt section can't overwrite good
  * data), call the store's import method otherwise, set/clear each flag. Returns
@@ -533,7 +559,7 @@ function _applyStoresAndFlags(storesObj, storesMap, flagMap, validateStorePayloa
       continue;
     }
     const { store, method } = storesMap[name];
-    try { _restoreStore(store, method, storesObj[name]); }
+    try { _restoreStore(store, method, storesObj[name]); _dropDraftsOf(name); }
     catch (e) { importFailures += 1; backupWarn('store import failed for', name, e); }
   }
   for (const name of Object.keys(flagMap)) {
@@ -688,6 +714,7 @@ async function _applyImportPayloadUnlocked(parsed, ctx) {
         }
         const { store, method } = storesMap[name];
         _restoreStore(store, method, obj);
+        _dropDraftsOf(name);
       } catch (e) { importFailures += 1; backupWarn('V1 import parse failed for', name, e); }
     }
     for (const name of Object.keys(flagMap)) {

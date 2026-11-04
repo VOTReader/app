@@ -16,10 +16,14 @@
      - updateSetting   (plain arrow fn: sets settings[key] = val, records touched[key])
      - DEFAULT_FLIPS   (the rounds of default changes applied to profiles that never chose;
                         `defaultsRev` and `touched` ride inside settings — see the block above it)
-     - body-class + platform-bridge effect (deps [theme, settings])
+     - body-class + platform-bridge LAYOUT effect (deps [theme, settings])
                         Mirrors theme + every settings flag that has a CSS
                         body-class or a platform-bridge call onto
-                        document.body.classList and PlatformBridge.
+                        document.body.classList and PlatformBridge, before
+                        the paint (2026-11-04: it was passive, after it).
+     - RETIRED_SETTINGS + legacyChromeFor — the keys no code reads any more,
+                        dropped as the settings load (the two legacy chrome
+                        keys translated first, once).
 
    DOES NOT OWN:
      - The vot-state PERSIST effect — it is usePersistedState (P6k+1). That
@@ -47,7 +51,7 @@
      usePersistedState (P6k+1) via the returned settings value.
 
    WINDOW: none — wires no window.__* handler bridges. The body-class
-     effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn —
+     layout effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn —
      setLightStatusBar is a no-op on web; setKeepScreenOn uses
      navigator.wakeLock fire-and-forget per [[explicit-async-decision]].
    ═══════════════════════════════════════════════════════════════════════ */
@@ -89,6 +93,52 @@ const DEFAULT_FLIPS = Object.freeze([
 /** The text scale from which the app lays out for large text (the root class vot-large-text). */
 export const LARGE_TEXT_SCALE = 1.8;
 
+/* SETTINGS NO CODE READS ANY MORE (settings hunt, 2026-11-04). `...savedS` carries every key a profile
+   ever saved into every later write and every backup, so a retired key used to live on as a value that
+   looks like a choice: trueBlack, the backup-reminder trio, showProgressBar, and `haptic`, a default
+   declared here that nothing ever read. They are dropped as the settings load; the mount write then
+   saves the profile without them. showChrome / showChapterSummary are translated first
+   (legacyChromeFor), then dropped the same way, which is what makes that translation run once.
+   The search-named orphans (searchEngine, the 2026-05-11 searchInclude* flags) belong to the search
+   lane and are left as they are. A key re-used for a new setting must leave this list first.
+   @type {ReadonlyArray<string>} */
+export const RETIRED_SETTINGS = Object.freeze([
+  'showChrome', 'showChapterSummary',                       // translated by legacyChromeFor, then dropped
+  'haptic',                                                  // a default nothing read (2026-11-04)
+  'trueBlack',                                               // True Black is the dark theme (2026-08-03)
+  'showProgressBar',                                         // retired 2026-08-03
+  'backupReminder', 'lastExportAt', 'lastBackupRemindedAt',  // the boot backup toast, retired 2026-08-04
+]);
+
+/**
+ * `s` without the RETIRED_SETTINGS keys. Mutates and returns it (the useState initializer's fresh object).
+ * @param {Record<string, any>} s
+ * @returns {Record<string, any>}
+ */
+export function withoutRetired(s) {
+  for (const key of RETIRED_SETTINGS) delete s[key];
+  return s;
+}
+
+/**
+ * The two legacy chrome keys as the settings they became: showChrome:false → Chapter Titles and Section
+ * Headings off; showChapterSummary:false (the Matthew hero, unified into the universal title) → Chapter
+ * Titles off. Only the false case carries intent, and a key the reader set themselves (`touched`) is
+ * theirs, never overwritten. Pure; RETIRED_SETTINGS then drops the legacy keys, so a profile goes
+ * through this once.
+ * @param {Record<string, any>} savedS
+ * @returns {Record<string, any>}
+ */
+export function legacyChromeFor(savedS) {
+  const touched = (savedS.touched && typeof savedS.touched === 'object') ? savedS.touched : {};
+  /** @type {Record<string, any>} */
+  const out = {};
+  const off = (/** @type {string} */ key) => { if (!touched[key]) out[key] = false; };
+  if (savedS.showChrome === false) { off('showChapterTitle'); off('showSectionHeadings'); }
+  if (savedS.showChapterSummary === false) off('showChapterTitle');
+  return out;
+}
+
 /**
  * What a saved profile still owes from the rounds it has not been through: `{ key: newDefault }`
  * for every key still at its OLD default that the reader never set, plus the stamp. Pure, so the
@@ -128,19 +178,15 @@ export function useSettings({ savedSettings, theme }) {
     const savedS = savedSettings || {};
     // Migration: old `showChrome` → both new masters. Old `showChapterSummary`
     // → showChapterTitle (Matthew hero is unified into the universal setting).
-    const migrated = {};
-    if ('showChrome' in savedS) {
-      if (savedS.showChrome === false) {
-        migrated.showChapterTitle = false;
-        migrated.showSectionHeadings = false;
-      }
-    }
-    if ('showChapterSummary' in savedS && savedS.showChapterSummary === false) {
-      migrated.showChapterTitle = false;
-    }
+    // ONCE (settings hunt, 2026-11-04): never over a key the reader set (`touched`), and the
+    // legacy keys leave the profile below (RETIRED_SETTINGS), so the next boot has nothing left
+    // to translate. Before, a legacy key stayed in every profile that had it (the first boot
+    // persists the whole merged object) and `...migrated` won at each launch: Chapter Titles and
+    // Section Headings went back off at every reload for a reader who had turned them on again.
+    const migrated = legacyChromeFor(savedS);
     // Default flips (DEFAULT_FLIPS above): every round this profile has not been through.
     Object.assign(migrated, defaultFlipsFor(savedS));
-    return {
+    return withoutRetired({
       showReadingDot: true, showSurpriseButton: true, markAsRead: true,
       // The keys the reader set through the two mutators — a flip never overwrites one of these.
       touched: {},
@@ -159,11 +205,12 @@ export function useSettings({ savedSettings, theme }) {
       // (searchEngine removed 2026-07-02 — the Classic/FlexSearch engine is
       //  RETIRED after the owner's A/B; MiniSearch is the only engine. A stale
       //  persisted 'searchEngine' key in old vot-state blobs is simply unread.)
-      haptic: true,
+      // (haptic removed 2026-11-04: a default nothing read and no row offered; the
+      //  buzzes go straight to PlatformBridge.haptic. RETIRED_SETTINGS drops it.)
       keepScreenOn: true,
       // (backupReminder + its lastExportAt/lastBackupRemindedAt stamps removed
-      //  2026-08-04 — the boot backup-freshness toast is retired. Stale keys in
-      //  old vot-state blobs are simply unread.)
+      //  2026-08-04 — the boot backup-freshness toast is retired. RETIRED_SETTINGS
+      //  drops the stale keys from old vot-state blobs, since 2026-11-04.)
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
       showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
       // Recorded Bible edition for the whole-book Listen pill ('off' hides it).
@@ -244,7 +291,7 @@ export function useSettings({ savedSettings, theme }) {
       skipSeconds: 10,
       ...savedS,
       ...migrated // migration wins over stale saved values
-    };
+    });
   });
 
   // ── Plain arrow functions ──────────────────────────────────────────────
@@ -259,6 +306,15 @@ export function useSettings({ savedSettings, theme }) {
   // native Android bridge call. Split out of the old App() save-state
   // effect (P6g) which had a combined dep array of 8 values.
   //
+  // A LAYOUT effect (settings hunt, 2026-11-04), so the classes are on for the
+  // App's FIRST paint. As a passive effect it ran after that paint: every launch
+  // drew the default bar (body.compact-topbar hides three icons), the split
+  // arrows and their 4rem letter padding (no arrows-off yet), the small-text
+  // layout at 180%+ — and useScrollMemory's restore, a layout effect further down
+  // App, measured that page. The boot script still owns what it can set before
+  // React (theme, font block, --font-scale); this is everything else, and it
+  // runs before the restore because App calls useSettings first.
+  //
   // SAFE TO NARROW THE DEPS to [theme, settings]: the old effect listed
   // all 8 save-state deps, so JOB A (this) re-ran whenever tabs /
   // activeTabIdx / lastRead* / activeReadKey / readItems changed too.
@@ -268,7 +324,7 @@ export function useSettings({ savedSettings, theme }) {
   // value it already has is a no-op). Those runs were pure redundant
   // work; dropping them by narrowing the deps to [theme, settings] is
   // invisible. Do NOT add the other 6 deps back.
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     document.body.classList.toggle("light", theme === "light");
     // [10] True Black — an OLED modifier on the DARK theme only (surfaces
     // --bg2/--bg3 drop to pure/near black; everything else untouched).

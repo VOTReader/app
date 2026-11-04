@@ -84,6 +84,30 @@ describe('useReadingDwell → ReadingStreakStore (the dwell-gated half)', () => 
     expect(recordReadingDay).toHaveBeenCalledTimes(1);
   });
 
+  /* Settings hunt (2026-11-04): Settings reads a dwellMs that is not a positive number as the default
+     ("A day counts ... after 20 seconds", SettingsScreen _dwellWords), but this timer turned it into
+     NaN and fired at once, so the day counted the moment a page opened. Settings are restorable from a
+     backup file, so any value can arrive here. Both readers now agree: 20 s. */
+  it.each([['abc'], [-5], ['0'], [Infinity]])('a dwellMs of %j counts the day after the default 20 s, as Settings says', (bad) => {
+    const recordReadingDay = vi.fn();
+    window.ReadingStreakStore = { recordReadingDay };
+    const { result } = renderHook(() => useReadingDwell({ dwellMs: /** @type {any} */ (bad), initialActiveReadKey: null }));
+    act(() => { result.current.setActiveReadKey('bible:psalms:23'); });
+    act(() => { vi.advanceTimersByTime(19000); });
+    expect(recordReadingDay).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(1100); });
+    expect(recordReadingDay).toHaveBeenCalledTimes(1);
+  });
+
+  it('a stored string choice from Settings ("3000") still times 3 s', () => {
+    const recordReadingDay = vi.fn();
+    window.ReadingStreakStore = { recordReadingDay };
+    const { result } = renderHook(() => useReadingDwell({ dwellMs: /** @type {any} */ ('3000'), initialActiveReadKey: null }));
+    act(() => { result.current.setActiveReadKey('bible:psalms:23'); });
+    act(() => { vi.advanceTimersByTime(3100); });
+    expect(recordReadingDay).toHaveBeenCalledTimes(1);
+  });
+
   // Leak hunt 2026-11-01: an unmount left the armed dwell (up to dwellMs) running, so it recorded a
   // reading day for a mount that was gone.
   it('an unmount stops the armed dwell: nothing pending, nothing recorded after', () => {

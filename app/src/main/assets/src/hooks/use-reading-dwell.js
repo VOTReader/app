@@ -107,7 +107,13 @@ export function useReadingDwell({ dwellMs, initialActiveReadKey }) {
   // setting changed mid-session (sweep mw13: it kept the mount-time value).
   const dwellMsRef = React.useRef(dwellMs);
   dwellMsRef.current = dwellMs;
-  const DWELL_MS = () => dwellMsRef.current ? Number(dwellMsRef.current) : 20000;
+  // A value that is not a positive finite number is the 20 s default, the way Settings describes it
+  // (SettingsScreen _dwellWords). It used to become NaN here, and a NaN timeout fires at once
+  // (settings hunt, 2026-11-04: settings arrive from backup files too).
+  const DWELL_MS = () => {
+    const n = Number(dwellMsRef.current);
+    return Number.isFinite(n) && n > 0 ? n : 20000;
+  };
 
   // ── Plain arrow functions ──────────────────────────────────────────────
   // Local plain functions operating only on the dwell refs via .current —

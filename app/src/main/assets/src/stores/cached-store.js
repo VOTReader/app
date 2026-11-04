@@ -692,8 +692,20 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // (the n4-05 refuter's R2-1: sibling keys leaked into the ancestor).
           const ownCopy = baseIsOurs && !exact;
           if (!ownCopy) self._cache = /** @type {any} */ (merged);
+          // dl3: the disk gets THIS merge, taken now, never the live cache. The put waits
+          // its turn in the adapter's write queue (a busy boot queues every store's), and
+          // the stores edit `_cache` in place meanwhile, so the disk got edits the
+          // ancestor below lacked: harmless for records (both sides then hold the same
+          // copy), but a total merged as "the stored figure plus what this tab added"
+          // counted such an edit twice. The ancestor is exactly what was written, and never
+          // the cache itself: an exact save's data has just become `_cache` above, so taking
+          // it uncloned made `_base === _cache`, and the first in-place edit after an Import
+          // & Overwrite went into the ancestor too and was dropped as unchanged (review,
+          // 2026-11-04). An own-copy store's ancestor is not the merge at all, so its write
+          // keeps the merge as it is.
+          const written = ownCopy ? merged : _cloneSnapshot(merged);
           // the next merge's ancestor: what this tab wrote (ownCopy), else the merge
-          const nextBase = /** @type {any} */ (_cloneSnapshot(ownCopy ? ours : merged));
+          const nextBase = /** @type {any} */ (ownCopy ? _cloneSnapshot(ours) : written);
           // ── end synchronous section
           // No subscriber re-render here: STORE-1 is LOSS-PREVENTION, not live
           // cross-tab sync. A sibling's pulled-in records are now in `_cache`
@@ -709,7 +721,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // sibling deleted next sat in ours but in neither base nor theirs, and came
           // back as 'our add'); an own-copy store keeps its ancestor (`theirs` would
           // hand it sibling keys it never had, R2-1).
-          return IDBAdapter.put(name, 'v', merged).then(function (r) { self._base = nextBase; return r; }, function (err) {
+          return IDBAdapter.put(name, 'v', written).then(function (r) { self._base = nextBase; return r; }, function (err) {
             if (!ownCopy) self._base = /** @type {any} */ (_cloneSnapshot(theirs));
             throw err;
           });
@@ -1398,11 +1410,13 @@ export function _resetStoreRegistry() {
                                disclosure state (ui/screens/AudioLibraryScreen.jsx
                                RECENT_OPEN_KEY).
    Both audio keys post-date W2.4 and are deliberately LS (sync reads on the
-   player's hot path). The flag makes cleanup one-shot, but it is only set
-   AFTER a successful meta write — a quota failure leaves the flag unset and
-   the next boot retries, by which time a prior session's playback has
-   written 'vot-audio-pos'. Without the skip, that retry silently eats the
-   reader's place in a 90-minute recording.
+   player's hot path). A sweep can still meet them: one deferred past a
+   session (a store not loaded at the first boot), or the boot after Clear
+   All. Without the skip it would eat the reader's place in a 90-minute
+   recording. (A failed meta write no longer means a second sweep: the
+   localStorage flag records the sweep once it has swept, 2026-11-04.)
+   Every live vot-* key belongs on the list; ls-skip-list.gate.test.js finds
+   them in the source and fails on one that is missing.
    (W7.1 retired an earlier exception, 'vot-ann-migrated' — its only reader,
    the pre-W2 annotation bootstrap migration, was deleted, so W2.4 now
    clears the orphaned flag like any other legacy vot-* key.)
@@ -1416,6 +1430,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-audio-recent-open',
   'vot-recent-searches',          // search/recent-searches.js
   'vot-journal-draft',            // JournalEditorScreen
+  'vot-note-draft',               // utils/note-draft.js — a note's words typed before a kill (dl4)
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw
@@ -1436,6 +1451,23 @@ export const LS_SKIP_LIST = Object.freeze([
   // recent searches, both kept on this device only (ui/components/AnswersParts.jsx, AnswersHome.jsx).
   'vot-answers-path',
   'vot-answers-recent',
+  // Settings hunt (2026-11-04): every live key this list did not name. A sweep that runs late (a
+  // fresh profile whose first boot had a store not loaded, the boot after Clear All) met them and
+  // deleted them; ls-skip-list.gate.test.js now finds each live key in the source and fails here.
+  'vot-notes-tab',                // NotesIndexScreen: the Notes tab the reader last chose
+  'vot-answers-fold',             // AnswersTopic: the sections the reader folded
+  'vot-plan-ribbon-hidden',       // PlanRibbon: the plan line hidden for today
+  'vot-plans-offer-hidden',       // HomeScreen: the reading-plan offer dismissed
+  'vot-plan-quiet-asked',         // ReadingPlansScreen: the plans already asked about going quiet
+  'vot-install-offer',            // InstallCard: the reader's answer to the install offer
+  'vot-ios-pwa-welcomed',         // SafariFlows: the Home Screen app's welcome, shown once
+  'vot-tabs-hint-seen',           // TabsNavBtn: the tabs hint, shown once
+  'vot-tour-later-at',            // utils/tour-controller.js: "Later" on the tour, and when
+  'vot-weekly-copy-fail',         // utils/data-safety.js WEEKLY_FAIL_KEY: the weekly copy's last failure
+  'vot-scrollheal-1',             // use-saved-state: the one-time scroll heal ran (again = every saved place cleared)
+  'vot-sw-spot',                  // ScriptureWebScreen: where the web was left (the Scripture Web lane's key)
+  'vot-auto-downloads',           // utils/auto-download.js (the offline downloads lane's keys)
+  'vot-auto-gone',
 ]);
 
 /** Meta-store key holding the W2.4 cleanup-complete flag. */
@@ -1459,9 +1491,10 @@ function _markLsCleanupDone() {
  * legacy-LS-fallback path has read the LS keys it needs.
  *
  * Best-effort: any individual error (meta read, LS iteration, LS
- * removeItem, meta write) is logged but does not throw. A partial
- * cleanup is acceptable — the next boot retries because the flag
- * isn't set yet.
+ * removeItem, meta write) is logged but does not throw. A cleanup
+ * that never swept (a deferral, a meta read or LS iteration that
+ * failed) runs at the next boot; one that swept is done, and says so
+ * in localStorage even when the meta write fails.
  *
  * @returns {Promise<void>}
  */
@@ -1509,12 +1542,15 @@ export async function clearLegacyLs() {
     try { localStorage.removeItem(k); }
     catch (_e) { /* per-key non-fatal */ }
   }
+  // Swept: that is done whatever the meta write below does (settings hunt, 2026-11-04). The retry a
+  // failed meta write used to leave found only the keys written since, all of them live, and deleted
+  // every one this list did not name. Without localStorage the meta flag still decides.
+  _markLsCleanupDone();
 
   try {
     await IDBAdapter.put('meta', LS_MIGRATION_FLAG_KEY, true);
-    _markLsCleanupDone();
   } catch (e) {
-    console.warn('clearLegacyLs: meta write failed; will retry next boot', e);
+    console.warn('clearLegacyLs: meta write failed; the localStorage flag still records the sweep', e);
   }
 }
 

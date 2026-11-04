@@ -43,6 +43,7 @@
 
 import { CachedStore, extendStore } from './cached-store.js';
 import { _jrnDateStr, _count } from './journal-stats-store.js';
+import { mergeReadingStatsStore } from './store-merge.js';
 
 /**
  * @typedef {{
@@ -182,7 +183,9 @@ export var ReadingStatsStore = extendStore(
     wpmSamples: [],
     progress: {},
     milestonesUnlocked: []
-  }), { idb: true }),
+  // dl2: merged across tabs (store-merge.js mergeReadingStatsStore). Saved blind, a
+  // second tab's save took back every word the first had credited since it loaded.
+  }), { idb: true, crossTabMerge: mergeReadingStatsStore }),
   {
     /** @returns {ReadingStatsData} */
     get() { return this._load(); },
