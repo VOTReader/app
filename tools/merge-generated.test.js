@@ -112,7 +112,7 @@ describe('the driver in a real rebase', () => {
     expect(merged).toContain('// fetch (main)');
     expect(merged).not.toContain('<<<<<<<');
     expect(readFileSync(DIST, 'utf8')).toBe('main();');   // ours during a rebase = the branch being rebuilt onto
-  }, 30_000);
+  }, 180_000); // ~2.6 s alone; 75 s once under a loaded land (11-04): each git call is a Git Bash spawn
 
   it('a tree without the driver script gets a plain text merge with conflict markers, never a silent ours', () => {
     const dir = init('votgen-old-');
@@ -133,5 +133,5 @@ describe('the driver in a real rebase', () => {
     expect(r.status).not.toBe(0);
     expect(readFileSync(join(dir, 'sw.js'), 'utf8')).toMatch(/<<<<<<< ours[\s\S]*v1-main[\s\S]*v1-lane[\s\S]*>>>>>>> theirs/);
     run(dir, 'git', ['rebase', '--abort']);
-  }, 30_000);
+  }, 180_000); // ~2.6 s alone; 75 s once under a loaded land (11-04): each git call is a Git Bash spawn
 });
