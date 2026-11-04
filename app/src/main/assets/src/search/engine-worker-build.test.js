@@ -84,6 +84,31 @@ describe('a cold build on the search worker', () => {
     expect(viaWorker[0].length).toBeGreaterThan(0);
   });
 
+  /* round 2: the originals' keys and the token store the first search waits for are read on that worker too */
+  it('reads the originals on the worker that built the index, and a search answers as with the page read', async () => {
+    const E = await freshEngine(true);
+    await E.init();
+    const viaWorker = [ids(await E.search('shepherd waters')), ids(await E.search('the lord is my cedar and mercy verse'))];
+    expect(asked).toContain('warm');
+    expect(E.getStats().warmIn).toBe('worker');
+    expect(E.getState().originals).toBe('ready');
+
+    const P = await freshEngine(false);
+    await P.init();
+    expect([ids(await P.search('shepherd waters')), ids(await P.search('the lord is my cedar and mercy verse'))]).toEqual(viaWorker);
+    expect(P.getStats().warmIn).toBeUndefined();
+  });
+
+  it('a worker that cannot do the warm read leaves it to the page', async () => {
+    failOn = 'warm';
+    const E = await freshEngine(true);
+    await E.init();
+    expect((await E.search('shepherd')).results.length).toBeGreaterThan(0);
+    expect(asked).toContain('warm');
+    expect(E.getStats().warmIn).toBeUndefined();
+    expect(E.getState().originals).toBe('ready');
+  });
+
   it('a worker that fails part way leaves the build to the page', async () => {
     failOn = 'build-end';
     const E = await freshEngine(true);

@@ -12,6 +12,10 @@
      a time (build-add), then build-end posts the index in parts of its own maps
      (postIndexMaps) and writes it to the warm cache here, where the 21 MB of
      JSON holds no page.
+   - warm (search200 h8 round 2): the originals' keys and the token store the
+     first search waits for (warm-read.js), read here from the index this
+     worker just built or restored, which it keeps until then (`key`, the
+     page's name for it), with the KJV wording read from the page's own file.
    Every request is answered by one message with `done: true` (and `error` when
    it failed); a restore posts its parts before that, a meaning-start `alive`
    every ALIVE_MS (the page gives up a worker that goes quiet, worker-client.js).
@@ -22,6 +26,30 @@ import { buildMiniSearchOptions } from './search-config.js';
 import { loadCached, saveCached } from './cache.js';
 import { postIndexParts, postIndexMaps } from './index-transfer.js';
 import { configureSemantic, startSemantic, semanticStatus, semanticKeys } from './semantic.js';
+import { readWarm } from './warm-read.js';
+import { parseKjvTwin, twinView } from './kjv-twin.js';
+
+/** The index last built or restored here, kept for its warm read: what of it warm-read.js reads, under the page's key. */
+/** @type {{key: string, ms: any}|null} */ let kept = null;
+/** The KJV wording, by the file it was read from: a page reads one file a session. */
+/** @type {{url: string, twin: any}|null} */ let twinRead = null;
+/** Entries per part of the originals' and the runs' maps. */
+const WARM_PART = 8000;
+/** An object keyed by numbers as a Map, in its keys' order (MiniSearch's objectToNumericMap, as the page's index has it). */
+function numericMap(/** @type {Record<string, any>} */ obj) {
+  const m = new Map();
+  for (const k of Object.keys(obj)) m.set(parseInt(k, 10), obj[k]);
+  return m;
+}
+/** The KJV wording read from `url` (absolute), parsed as kjv-twin.js parses it on the page. */
+async function twinFrom(/** @type {string} */ url) {
+  if (twinRead && twinRead.url === url) return twinRead.twin;
+  const r = await fetch(url);
+  if (!r.ok || r.redirected) throw new Error('kjv twin: ' + url + ' ' + (r.redirected ? 'redirected' : r.status));
+  const twin = parseKjvTwin(await r.json());
+  twinRead = { url, twin };
+  return twin;
+}
 
 /** The build under way, by the page's key: one at a time (a build-add marked `first` drops any other). */
 /** @type {Map<string, {ms: any, addMs: number}>} */ const builds = new Map();
@@ -42,7 +70,9 @@ export async function handleWorkerMessage(data, post) {
     if (op === 'restore') {
       const json = await loadCached(data.sig);
       if (!json) return reply({ done: true, miss: true });
-      postIndexParts(JSON.parse(json), reply);
+      const js = JSON.parse(json);
+      postIndexParts(js, reply);
+      if (data.key) kept = { key: data.key, ms: { _storedFields: numericMap(js.storedFields), _documentIds: numericMap(js.documentIds), _nextId: js.nextId, _fieldIds: js.fieldIds } };
       return reply({ done: true });
     }
     if (op === 'build-add') {
@@ -60,10 +90,27 @@ export async function handleWorkerMessage(data, post) {
       if (!b) return reply({ done: true, error: 'search worker: no build ' + data.key });
       // the index's own maps (index-transfer.js postIndexMaps): the page builds none from an object
       postIndexMaps(b.ms, reply);
+      kept = { key: data.key, ms: b.ms };
       reply({ done: true, insertMs: Math.round(b.addMs), docCount: b.ms.documentCount });
       // the warm cache for the next session, from here: the page never holds the JSON (`save` is its signature)
       if (data.save) await saveCached(data.save, JSON.stringify(b.ms));
       return undefined;
+    }
+    if (op === 'warm') {
+      const k = kept;
+      if (!k || k.key !== data.key) return reply({ done: true, error: 'search worker: no index ' + data.key });
+      kept = null;
+      const twin = data.twin ? await twinFrom(data.twin) : null;
+      const t = clock();
+      const { O, S, store } = readWarm(k.ms, twin ? twinView(twin, k.ms) : null);
+      for (const [part, m] of /** @type {Array<[string, Map<any, any>]>} */ ([['originals', O], ['shingles', S]])) {
+        let entries = [];
+        for (const e of m) { entries.push(e); if (entries.length >= WARM_PART) { reply({ part, entries }); entries = []; } }
+        if (entries.length) reply({ part, entries });
+      }
+      const { ms: _ms, ...rest } = store;
+      reply({ part: 'store', store: rest });
+      return reply({ done: true, readMs: Math.round(clock() - t) });
     }
     if (op === 'meaning-start') {
       // the files resolve against the page's base; this worker never starts another

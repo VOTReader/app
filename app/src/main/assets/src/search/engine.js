@@ -63,7 +63,8 @@ import { loadCached, saveCached, clearCached, dataSignature } from './cache.js';
 import { onIdle } from '../utils/on-idle.js';
 import { lemma, bestWindow } from './passage.js';
 import { startSemantic, semanticDocs, semanticStatus, semanticReady, docUnitKey } from './semantic.js';
-import { kjvTwin, twinView, kjvReading, twinTokens, twinSentences, twinOnly, twinHolders, loadKjvTwin, kjvTwinReady, kjvTwinStatus, onKjvTwin, setKjvTwin, setKjvTwinSource } from './kjv-twin.js';
+import { TWIN_SEP, ORIGINAL_KINDS, sentenceSpans, nameAsPrinted, sentenceKey, eachShingle, addTo, HEADING, addOriginal, withKjvView, storeBuilder as storeBuilderFor } from './warm-read.js';
+import { kjvTwin, kjvTwinUrl, twinView, kjvReading, twinOnly, twinHolders, loadKjvTwin, kjvTwinReady, kjvTwinStatus, onKjvTwin, setKjvTwin, setKjvTwinSource } from './kjv-twin.js';
 import { searchWorker } from './worker-client.js';
 import { indexAssembler, indexJSONParts } from './index-transfer.js';
 import { buildTitles, titleWords, nearWords } from './titles.js';
@@ -355,28 +356,15 @@ function searchUnit(term, opts, keyword) {
    own words is not capped by that verse found in its KJV words (A TITLE THAT IS A VERSE IN THE READER'S EDITION). */
 /** @type {import('./kjv-twin.js').KjvTwin|null} the KJV wording the caches were read with (adoptTwin) */ let TWIN_READ = null;
 /** @type {{ms: any, data: any, view: import('./kjv-twin.js').KjvView|null}|null} */ let TWIN_VIEW = null;
-/** A token no query holds, between a verse's two wordings. */
-const TWIN_SEP = '|';
-/** Between a verse's two wordings: no typed run reaches across it, and a window or an alignment reads each alone
-    (eachWording, wordingsOf). */
-const TWIN_GAP = new Array(12).fill(TWIN_SEP);
+/** A text's tokens with its KJV wording after them (warm-read.js withKjvView), with the wording in use. */
+function withKjv(/** @type {any} */ ms, /** @type {number|undefined} */ sid, /** @type {string[]} */ own) {
+  return withKjvView(sid === undefined ? null : twinNow(), ms, sid, own);
+}
 /** The index's verses with their KJV wording; null with none (no file, a KJV reader's index). */
 function twinNow() {
   if (!msIndex || !TWIN_READ) return null;
   if (!TWIN_VIEW || TWIN_VIEW.ms !== msIndex || TWIN_VIEW.data !== TWIN_READ) TWIN_VIEW = { ms: msIndex, data: TWIN_READ, view: twinView(TWIN_READ, msIndex) };
   return TWIN_VIEW.view;
-}
-/** A text's tokens with its KJV wording after them (a verse worded otherwise in the KJV); `own` as it is else. */
-function withKjv(/** @type {any} */ ms, /** @type {number|undefined} */ sid, /** @type {string[]} */ own) {
-  const V = sid === undefined ? null : twinNow();
-  const kjv = V && V.ms === ms ? twinTokens(V, sid) : null;
-  if (!kjv) return own;
-  if (kjv.length === own.length) {
-    let i = 0;
-    while (i < own.length && own[i] === kjv[i]) i++;
-    if (i === own.length) return own;
-  }
-  return own.concat(TWIN_GAP, kjv);
 }
 /** The best of `read` over a text's wordings, each read alone: a verse's tokens or lemmas hold its KJV wording after
     its own, TWIN_GAP between, and a window wider than the gap (a long quote's) would read the two as one text. */
@@ -695,57 +683,8 @@ function skeleton(/** @type {string} */ w) {
  * @typedef {{ms: any, words: string[], ids: Map<string, number>, base: Int32Array, toks: Uint32Array, from: Uint32Array, to: Uint32Array, sId: number}} TokenStore
  */
 /** @type {TokenStore|null} */ let STORE = null;
-/** A store being filled: `add` one stored doc, `done` the store. */
-function storeBuilder(/** @type {any} */ ms) {
-  /** @type {Map<string, number>} */ const ids = new Map();
-  /** @type {string[]} */ const words = [];
-  /** @type {string[]} */ const keys = [];
-  /** @type {number[]} */ const base = [];
-  /** @type {number[]} */ const from = [];
-  /** @type {number[]} */ const to = [];
-  let toks = new Uint32Array(1 << 20);
-  let n = 0;
-  const idOf = (/** @type {string} */ key, /** @type {string} */ word, /** @type {number} */ b) => {
-    let id = ids.get(key);
-    if (id === undefined) { id = words.length; ids.set(key, id); words.push(word); keys.push(key); base.push(b); }
-    return id;
-  };
-  const sId = idOf('s', 's', -1);
-  return {
-    add(/** @type {number} */ shortId, /** @type {any} */ f) {
-      if (!f) return;
-      const raw = withKjv(ms, shortId, kjvEncode((f.text || '') + ' ' + (f.title || '')));
-      if (n + raw.length > toks.length) {
-        const t = new Uint32Array(Math.max(Math.ceil(toks.length * 1.5), n + raw.length));
-        t.set(toks.subarray(0, n));
-        toks = t;
-      }
-      const a = n;
-      for (let i = 0; i < raw.length; i++) {
-        const w = raw[i];
-        if (w === 's' && n > a) {
-          // joinApostropheS: the "s" joins the word before it
-          const prev = toks[n - 1];
-          toks[n - 1] = idOf(keys[prev] + "'s", words[prev] + 's', prev);
-        } else {
-          toks[n++] = idOf(w, w, -1);
-        }
-      }
-      from[shortId] = a;
-      to[shortId] = n;
-    },
-    /** @returns {TokenStore} */
-    done() {
-      return {
-        ms, words, ids, sId,
-        base: Int32Array.from(base),
-        toks: n < toks.length * 0.9 ? toks.slice(0, n) : toks,
-        from: Uint32Array.from(from, (x) => x || 0),
-        to: Uint32Array.from(to, (x) => x || 0),
-      };
-    },
-  };
-}
+/** A store being filled for `ms`, its verses with the KJV wording read in use (warm-read.js storeBuilder). */
+const storeBuilder = (/** @type {any} */ ms) => storeBuilderFor(ms, twinNow());
 /** The store of the index in use, when it is read; null while it is being read (a search reads the old way then). */
 function storeNow() {
   return STORE && STORE.ms === msIndex ? STORE : null;
@@ -1262,22 +1201,8 @@ function alignLexiconReady() {
 const SMALL_RUN_MIN = 4;
 /** Who reprints whom: a text yields only to an original of a LOWER tier (Words To Live By excerpts the letters). */
 const ORIGINAL_TIER = { verse: 0, letter: 0, wtlb: 1, blessed: 1, 'holy-day': 2, 'bible-study': 3, answers: 4 };
-const ORIGINAL_KINDS = new Set(['verse', 'letter', 'wtlb', 'blessed']);
 /** @type {Map<string, string[]>|null} sentence key -> original doc ids */ let ORIGINALS = null;
 /** @type {Map<string, any>|null} original doc id -> its stored fields */ let ORIGINAL_DOCS = null;
-/** The sentences of a text, as character spans (a sentence ends at . ! ? ; or a line's end). */
-function sentenceSpans(text) {
-  const out = [];
-  const re = /[^.!?;\n]+[.!?;]*/g;
-  let m;
-  while ((m = re.exec(text))) out.push({ start: m.index, end: m.index + m[0].length, text: m[0] });
-  return out;
-}
-/* HIS NAME AS THE EDITIONS PRINT IT (sr11, 2026-10-15). The studies and the Matthew Study Bible restore His name
-   in the verses they quote ("When YahuShua heard these things, He marveled at him"), and the edition the index
-   holds prints "Jesus" (Luke 7:9): the study's sentence never met its verse's key, and the study led the verse. */
-const RESTORED_NAME = /^(?:yahushua|yeshua|yahshua|yahusha|yeshu)$/;
-const nameAsPrinted = (/** @type {string} */ t) => (RESTORED_NAME.test(t) ? 'jesus' : t);
 /* ...and the Father's, in a verse (search200 fix1): the editions print "The LORD is my shepherd", so a reader's
    "yahuwah is my shepherd" held no verse's run, and the phrase pass reads a verse with the typed names printed. */
 const RESTORED_FATHER = /^(?:yahuwah|yahweh|yhwh|jehovah|yahuah)$/;
@@ -1322,60 +1247,7 @@ function restoredNameOf(/** @type {string} */ t) {
   }
   return t;
 }
-/** A sentence's key: its words as the index reads them, His name as printed; null under five words (too common to mean one text). */
-function sentenceKey(s) {
-  return tokensKey(kjvEncode(s));
-}
-/** The key of a sentence read as tokens (a verse's KJV wording, kjv-twin.js). */
-function tokensKey(/** @type {string[]} */ toks) {
-  return toks.length >= 5 ? toks.map(nameAsPrinted).join(' ') : null;
-}
-/* Words To Live By cuts its excerpts mid-sentence and the Answers reprints re-punctuate, so a
-   whole-sentence key misses them: a letter, Words To Live By or Blessed text is also keyed by
-   runs of SHINGLE words, a content-chosen quarter of them (hash % 4 === 0), which both sides
-   pick alike wherever the run falls. Verses are short: their sentence keys suffice. */
-const SHINGLE = 8;
 /** @type {Map<number, string[]>|null} shingle hash -> original doc ids */ let SHINGLES = null;
-/** FNV-1a over a run of tokens. */
-function runHash(toks, from) {
-  let h = 0x811c9dc5;
-  for (let i = from; i < from + SHINGLE; i++) {
-    const t = toks[i];
-    for (let c = 0; c < t.length; c++) h = Math.imul(h ^ t.charCodeAt(c), 16777619);
-    h = Math.imul(h ^ 32, 16777619);
-  }
-  return h >>> 0;
-}
-/** @param {string[]} toks @param {(h:number) => void} each */
-function eachShingle(toks, each) {
-  for (let i = 0; i + SHINGLE <= toks.length; i++) { const h = runHash(toks, i); if (h % 4 === 0) each(h); }
-}
-const addTo = (/** @type {Map<any, string[]>} */ m, /** @type {any} */ k, /** @type {string} */ id) => {
-  const list = m.get(k);
-  if (!list) m.set(k, [id]);
-  else if (list[list.length - 1] !== id) list.push(id);
-};
-/* A LETTER'S HEADING IS NO ONE'S WORDS (sr11, 2026-10-15). Every Answers excerpt opens with the heading of the letter
-   it comes from ("1/29/05 From The Lord, Our God and Savior The Word of The Lord Spoken to Timothy For The Lord's
-   Little Flock, and For All Those Who Have Ears to Hear"), and a letter with an addendum or a second word holds one in
-   its text (Volume One's "Christmas", Volume Four's "Obey God"). Keyed, that heading's runs named "Obey God" the
-   original of any Answers passage the model matched next to a heading, and it led searches about other things
-   (benchmark t320 "keep watch", t401 "come out of the churches"). A heading is never keyed. */
-const HEADING = /(?:\d{1,2}\/\d{1,2}\/\d{2,4}\s+)?(?:From [^.!?\n]{0,80}?Savior\s+)?[^.!?\n]{0,40}?(?:to|from) Timothy\s+For [^.!?\n]{0,120}?Ears to Hear/gi;
-/** Key one stored doc if it is an original: its sentences (a verse's in its KJV wording too, `V`) and, past a verse,
-    its runs of words. */
-function addOriginal(/** @type {Map<string, string[]>} */ O, /** @type {Map<number, string[]>} */ S, /** @type {Map<string, any>} */ D, /** @type {string} */ id, /** @type {any} */ f,
-  /** @type {import('./kjv-twin.js').KjvView|null} */ V, /** @type {number} */ sid) {
-  if (!f || !ORIGINAL_KINDS.has(f.kind) || !f.text) return;
-  D.set(id, f);
-  const text = f.kind !== 'verse' && /ears to hear/i.test(f.text) ? f.text.replace(HEADING, '\n') : f.text;
-  for (const sp of sentenceSpans(text)) {
-    const k = sentenceKey(sp.text);
-    if (k) addTo(O, k, id);
-  }
-  if (f.kind !== 'verse') eachShingle(kjvEncode(text), (h) => addTo(S, h, id));
-  else if (V) for (const toks of twinSentences(V, sid)) { const k = tokensKey(toks); if (k) addTo(O, k, id); }
-}
 /** The originals, read in one pass if they are not read yet (node; a search that raced a swap). */
 function originals() {
   if (ORIGINALS) return ORIGINALS;
@@ -1474,6 +1346,50 @@ async function warmExcerpts(/** @type {any} */ ms) {
 function warmOriginals() {
   return kjvTwinReady().then(() => { adoptTwin(); return warmRead(); });
 }
+/* THE WARM READ RUNS ON THE SEARCH WORKER TOO (search200 h8 round 2, 2026-11-04). The originals' keys and the token
+   store (warm-read.js) are ~1.1 s of tokenizing on a desktop, read on the page in SLICE_MS slices after every swap, a
+   cold build's or a warm restore's, and a first search waited for them: 12.7 s at 4x CPU under load after a cold start.
+   The worker that built or restored the index keeps what it read of it (worker-ops.js 'warm') and reads them there,
+   with the KJV wording from the page's own file; the page takes the maps and the store as they come and makes the
+   docs map of its own stored fields. Anything else (no worker, a wording set directly, a worker that fails or has let
+   the index go) reads them on the page as before. */
+/** @type {{ms: any, key: string}|null} the index in use, kept by the worker that built or restored it */ let WORKER_INDEX = null;
+/** Read the originals and the store of `ms` on the worker; false: the page reads them. */
+async function readWarmOnWorker(/** @type {any} */ ms) {
+  const k = WORKER_INDEX;
+  WORKER_INDEX = null;   // the worker lets an index go once it is asked for it
+  if (!k || k.ms !== ms || msIndex !== ms || typeof document === 'undefined') return false;
+  const twin = TWIN_READ;
+  const url = twin ? kjvTwinUrl() : null;
+  if (twin && (!url || kjvTwin() !== twin)) return false;   // a wording set directly: the worker cannot read the same one
+  const w = searchWorker();
+  if (!w) return false;
+  const O = new Map();
+  const S = new Map();
+  /** @type {any} */ let store = null;
+  try {
+    await w.request('warm', { key: k.key, twin: url ? String(new URL(url, document.baseURI)) : null }, (/** @type {any} */ m) => {
+      if (m.part === 'originals') for (const [key, ids] of m.entries) O.set(key, ids);
+      else if (m.part === 'shingles') for (const [h, ids] of m.entries) S.set(h, ids);
+      else if (m.part === 'store') store = m.store;
+    }, RESTORE_QUIET_MS);
+  } catch {
+    return false;
+  }
+  if (msIndex !== ms || TWIN_READ !== twin) return true;   // another index or wording came in: its own read follows
+  if (!store) return false;
+  if (!ORIGINALS) {
+    const D = new Map();
+    const ids = ms._documentIds;
+    for (const [sid, f] of ms._storedFields) if (f && ORIGINAL_KINDS.has(f.kind) && f.text) D.set(ids.get(sid), f);
+    ORIGINAL_DOCS = D;
+    SHINGLES = S;
+    ORIGINALS = O;
+  }
+  if (!(STORE && STORE.ms === ms)) STORE = { ms, ...store };
+  stats.warmIn = 'worker';
+  return true;
+}
 function warmRead() {
   if (!msIndex || (ORIGINALS && storeNow() && TITLES && TITLES.ms === msIndex)) return Promise.resolve();
   if (typeof document === 'undefined') {
@@ -1485,7 +1401,7 @@ function warmRead() {
   if (ORIGINALS_BUILD && ORIGINALS_BUILD.ms === msIndex) return ORIGINALS_BUILD.done;
   const ms = msIndex;
   // the titles last, in one task of their own (a search that comes first builds them itself)
-  const done = readOriginals(ms).then(() => readStore(ms)).then(() => yieldToPage()).then(() => { if (msIndex === ms) titlesNow(); })
+  const done = readWarmOnWorker(ms).then((onWorker) => (onWorker ? undefined : readOriginals(ms).then(() => readStore(ms)))).then(() => yieldToPage()).then(() => { if (msIndex === ms) titlesNow(); })
     .catch(() => { if (ORIGINALS_BUILD && ORIGINALS_BUILD.done === done) ORIGINALS_BUILD = null; });
   ORIGINALS_BUILD = { ms, done };
   return done;
@@ -2141,8 +2057,8 @@ let ready = false;
 /** @type {Error|null} */ let buildError = null;
 /** `sig`: what the index was built from (cache.js dataSignature), for the check that it still is. */
 /** `restoredIn`: where a warm index was read, the search worker or the page (sr9). */
-/** `builtIn`: 'worker' when a cold build ran on the search worker (h8). */
-/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string, restoredIn?:string, builtIn?:string}} */ let stats = {};
+/** `builtIn`: 'worker' when a cold build ran on the search worker (h8); `warmIn`: 'worker' when its warm read did. */
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string, restoredIn?:string, builtIn?:string, warmIn?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -2163,6 +2079,7 @@ function reshapeDoc(r) {
     outlive the index it was read from. Cleared here, at the swap, not when the build starts: a search on
     the old index while the new one builds would fill them again with the old texts. */
 function swapIn(/** @type {any} */ ms, /** @type {typeof stats} */ st) {
+  WORKER_INDEX = null;
   STORE = null;
   TITLES = null;
   TITLE_TOKS.clear();
@@ -2216,19 +2133,21 @@ function buildTurn() {
     hurryTurn = () => { cancel(); end(); };
   });
 }
-/** The cached index for `sig`, or null when there is none. @returns {Promise<{ms: any, where: string}|null>} */
+/** The cached index for `sig`, or null when there is none; `key` names it on the worker that read it (its warm read).
+    @returns {Promise<{ms: any, where: string, key?: string}|null>} */
 async function restoreIndex(/** @type {string} */ sig) {
   const w = searchWorker();
   if (w) {
     try {
       /** @type {ReturnType<typeof indexAssembler>|null} */ let asm = null;
-      const r = await w.request('restore', { sig }, (/** @type {any} */ m) => {
+      const key = 'r' + (++buildSeq);
+      const r = await w.request('restore', { sig, key }, (/** @type {any} */ m) => {
         if (m.head) asm = indexAssembler(MiniSearch, m.head, buildMiniSearchOptions());
         else if (asm) asm.add(m.part, m.entries);
         else throw new Error('search worker: a part before the head');
       }, RESTORE_QUIET_MS);
       // a miss is checked here too: a worker with no Cache API sees none where the page has one
-      if (!r.miss && asm) return { ms: /** @type {any} */ (asm).ms, where: 'worker' };
+      if (!r.miss && asm) return { ms: /** @type {any} */ (asm).ms, where: 'worker', key };
     } catch { /* the page reads it */ }
   }
   const json = await loadCached(sig);
@@ -2243,12 +2162,13 @@ async function restoreIndex(/** @type {string} */ sig) {
    warm cache itself, so the page never serializes the 21 MB either. Where there is no worker, or it fails part way,
    the page builds as before. */
 const BUILD_PART_DOCS = 1000;
+/** Names an index built or restored on the worker (buildOnWorker, restoreIndex). */
 let buildSeq = 0;
 /**
  * @param {any[]} docs
  * @param {string|null} save  the signature to keep the index under in the warm cache, null to keep it out
  * @param {((done:number, total:number) => void)|undefined} onProgress
- * @returns {Promise<{ms: any, insertMs: number}|null>} null: build it on the page
+ * @returns {Promise<{ms: any, insertMs: number, key: string}|null>} null: build it on the page
  */
 async function buildOnWorker(docs, save, onProgress) {
   const w = searchWorker();
@@ -2266,7 +2186,7 @@ async function buildOnWorker(docs, save, onProgress) {
       else throw new Error('search worker: a part before the head');
     }, RESTORE_QUIET_MS);
     const ms = asm && /** @type {any} */ (asm).ms;
-    return ms && ms.documentCount === docs.length ? { ms, insertMs: r.insertMs || 0 } : null;
+    return ms && ms.documentCount === docs.length ? { ms, insertMs: r.insertMs || 0, key } : null;
   } catch {
     return null;
   }
@@ -2289,6 +2209,7 @@ async function build(options) {
       if (restored) {
         const ms = restored.ms;
         swapIn(ms, { docCount: ms.documentCount, buildMs: Math.round(now() - tc), cached: true, translation: code, sig, restoredIn: restored.where });
+        if (restored.key) WORKER_INDEX = { ms, key: restored.key };
         if (options.onProgress) options.onProgress(ms.documentCount, ms.documentCount);
         return;
       }
@@ -2308,6 +2229,7 @@ async function build(options) {
   if (onWorker) {
     const t2w = now();
     swapIn(onWorker.ms, { docCount: docs.length, buildMs: Math.round(t2w - t0), collectMs: Math.round(t1 - t0), insertMs: onWorker.insertMs, cached: false, translation: code, sig: builtSig, builtIn: 'worker' });
+    WORKER_INDEX = { ms: onWorker.ms, key: onWorker.key };
     if (options.onProgress) options.onProgress(docs.length, docs.length);
     return;
   }

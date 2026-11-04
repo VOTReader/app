@@ -409,6 +409,8 @@ export function twinSentences(/** @type {KjvView} */ V, /** @type {number} */ si
    the next build tries again. */
 /** @type {KjvTwin|null} */ let TWIN = null;
 /** @type {string|null} */ let SOURCE = null;
+/** @type {string|null} the file the wording in use was read from; null when it was set directly (setKjvTwin) or is none */
+let FROM = null;
 /** @type {{url: string, done: Promise<void>, settled: boolean, failed: boolean, wait?: Promise<void>, waited?: boolean}|null} */
 let LOAD = null;
 /** @type {Array<() => void>} told when the wording in use changes */ const LISTENERS = [];
@@ -417,6 +419,9 @@ export const KJV_TWIN_WAIT_MS = 2000;
 
 /** The KJV wording in use; null, none. */
 export function kjvTwin() { return TWIN; }
+/** The file the wording in use was read from (as named), for a reader that reads the same file (the search worker's
+    warm read, search200 h8); null when there is none or it was set directly. */
+export function kjvTwinUrl() { return TWIN ? FROM : null; }
 /** Tell `fn` whenever the wording in use changes (engine.js reads its texts again). */
 export function onKjvTwin(/** @type {() => void} */ fn) { LISTENERS.push(fn); }
 function putInUse(/** @type {KjvTwin|null} */ t) {
@@ -428,12 +433,14 @@ function putInUse(/** @type {KjvTwin|null} */ t) {
 export function setKjvTwin(/** @type {KjvTwin|null} */ t) {
   SOURCE = null;
   LOAD = null;
+  FROM = null;
   putInUse(t || null);
 }
 /** Name the file (relative to the page), fetched on the next build or text search; null: none. */
 export function setKjvTwinSource(/** @type {string|null} */ url) {
   SOURCE = url || null;
   LOAD = null;
+  FROM = null;
   putInUse(null);
 }
 /**
@@ -453,7 +460,7 @@ export function loadKjvTwin(again) {
       if (!r.ok || r.redirected) throw new Error('kjv twin: ' + url + ' ' + (r.redirected ? 'redirected' : r.status));
       return r.json();
     })
-    .then((j) => { const t = parseKjvTwin(j); if (LOAD === load) putInUse(t); })
+    .then((j) => { const t = parseKjvTwin(j); if (LOAD === load) { FROM = url; putInUse(t); } })
     .catch(() => { load.failed = true; })
     .finally(() => { load.settled = true; });
   return load;
