@@ -2137,7 +2137,8 @@ let ready = false;
 /** @type {Error|null} */ let buildError = null;
 /** `sig`: what the index was built from (cache.js dataSignature), for the check that it still is. */
 /** `restoredIn`: where a warm index was read, the search worker or the page (sr9). */
-/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string, restoredIn?:string}} */ let stats = {};
+/** `builtIn`: 'worker' when a cold build ran on the search worker (h8). */
+/** @type {{docCount?:number, buildMs?:number, collectMs?:number, insertMs?:number, cached?:boolean, translation?:string, sig?:string, restoredIn?:string, builtIn?:string}} */ let stats = {};
 
 function now() {
   return (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
@@ -2230,6 +2231,43 @@ async function restoreIndex(/** @type {string} */ sig) {
   return json ? { ms: MiniSearch.loadJSON(json, buildMiniSearchOptions()), where: 'page' } : null;
 }
 
+/* A COLD BUILD RUNS ON THE SEARCH WORKER (search200 h8, 2026-11-04). On the page a cold build was the reader's
+   index ready ~11.7 s after a cold start at 4x CPU (headless Chrome): MiniSearch's inserts, ~1M tokens, paced to the
+   page's idle turns so a page turn is never behind them. The worker does them at its own full speed, beside the page:
+   the page collects the docs (buildDocs, it holds the corpora), sends them a part at a time, and assembles the index
+   from the parts the worker posts back as a restore's (index-transfer.js), each a short task. The worker writes the
+   warm cache itself, so the page never serializes the 21 MB either. Where there is no worker, or it fails part way,
+   the page builds as before. */
+const BUILD_PART_DOCS = 1000;
+let buildSeq = 0;
+/**
+ * @param {any[]} docs
+ * @param {string|null} save  the signature to keep the index under in the warm cache, null to keep it out
+ * @param {((done:number, total:number) => void)|undefined} onProgress
+ * @returns {Promise<{ms: any, insertMs: number}|null>} null: build it on the page
+ */
+async function buildOnWorker(docs, save, onProgress) {
+  const w = searchWorker();
+  if (!w) return null;
+  const key = 'b' + (++buildSeq);
+  try {
+    for (let i = 0; i < docs.length; i += BUILD_PART_DOCS) {
+      await w.request('build-add', { key, first: i === 0, docs: docs.slice(i, i + BUILD_PART_DOCS) }, undefined, RESTORE_QUIET_MS);
+      if (onProgress) onProgress(Math.min(i + BUILD_PART_DOCS, docs.length), docs.length);
+    }
+    /** @type {ReturnType<typeof indexAssembler>|null} */ let asm = null;
+    const r = await w.request('build-end', { key, save }, (/** @type {any} */ m) => {
+      if (m.head) asm = indexAssembler(MiniSearch, m.head, buildMiniSearchOptions());
+      else if (asm) asm.add(m.part, m.entries);
+      else throw new Error('search worker: a part before the head');
+    }, RESTORE_QUIET_MS);
+    const ms = asm && /** @type {any} */ (asm).ms;
+    return ms && ms.documentCount === docs.length ? { ms, insertMs: r.insertMs || 0 } : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Build the in-memory index for one translation (chunked for onProgress). `persist: false` keeps it
     out of the warm cache (a corpus failed to load: that index must not replace a whole one there). */
 async function build(options) {
@@ -2261,6 +2299,14 @@ async function build(options) {
   const builtSig = dataSignature(code);
   const docs = buildDocs({ translation: shownEdition(code) });
   const t1 = now();
+  const persist = options.persist !== false;
+  const onWorker = await buildOnWorker(docs, persist ? builtSig : null, options.onProgress);
+  if (onWorker) {
+    const t2w = now();
+    swapIn(onWorker.ms, { docCount: docs.length, buildMs: Math.round(t2w - t0), collectMs: Math.round(t1 - t0), insertMs: onWorker.insertMs, cached: false, translation: code, sig: builtSig, builtIn: 'worker' });
+    if (options.onProgress) options.onProgress(docs.length, docs.length);
+    return;
+  }
   const ms = new MiniSearch(buildMiniSearchOptions());
   // 500 at a time: a chunk of 2,000 held the main thread for about a second on a
   // slow phone (UI audit 2026-09-27), and the box stalled under the reader's typing.
@@ -2291,7 +2337,7 @@ async function build(options) {
     translation: code,
     sig: builtSig,
   });
-  if (options.persist === false) return;
+  if (!persist) return;
   // Persist for next session (fire-and-forget) once the reader is not waiting on it:
   // serializing the index is one long task (1.7 s on a slow phone), and it ran the
   // moment the build finished, so the first search froze behind it (UI audit

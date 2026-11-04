@@ -2,7 +2,7 @@
    is the index MiniSearch.loadJSON makes from the same JSON, and no part is large. */
 import { describe, it, expect, vi } from 'vitest';
 import MiniSearch from './vendor/minisearch.js';
-import { postIndexParts, indexAssembler, indexJSONParts } from './index-transfer.js';
+import { postIndexParts, postIndexMaps, indexAssembler, indexJSONParts } from './index-transfer.js';
 
 const OPTIONS = { fields: ['title', 'text'], storeFields: ['title', 'text', 'kind'], idField: 'id' };
 const WORDS = ['grace', 'mercy', 'shepherd', 'still', 'waters', 'righteous', 'flourish', 'cedar', 'lebanon', 'love'];
@@ -46,6 +46,30 @@ describe('index-transfer', () => {
     expect(msgs[0].head).toBeTruthy();
     expect(msgs.length).toBeGreaterThan(10);
     for (const m of msgs.slice(1)) expect(JSON.stringify(m).length, m.part).toBeLessThan(600000);
+  });
+});
+
+/* A built index handed over as its own maps (search200 h8, 2026-11-04): what the page assembles from them, cloned as
+   postMessage clones them, is the index a restore of its JSON makes, and no part is large. */
+describe('postIndexMaps', () => {
+  const built = new MiniSearch(OPTIONS);
+  built.addAll(docs);
+  built.discard('d7');
+
+  it('assembles the index loadJSON makes of its JSON, in parts of the same sizes', () => {
+    const msgs = /** @type {any[]} */ ([]);
+    postIndexMaps(built, (m) => msgs.push(structuredClone(m)));
+    expect(msgs[0].head.maps).toBe(true);
+    let asm = /** @type {any} */ (null);
+    for (const m of msgs) {
+      if (m.head) asm = indexAssembler(MiniSearch, m.head, OPTIONS);
+      else asm.add(m.part, m.entries);
+    }
+    const loaded = MiniSearch.loadJSON(JSON.stringify(built), OPTIONS);
+    expect(JSON.stringify(asm.ms)).toBe(JSON.stringify(loaded));
+    for (const q of ['shepherd waters', 'cedar', 'letter 450', 'w8999']) expect(asm.ms.search(q).map((/** @type {any} */ r) => r.id)).toEqual(loaded.search(q).map((r) => r.id));
+    expect(msgs.length).toBeGreaterThan(10);
+    for (const m of msgs.slice(1)) expect(JSON.stringify(m.part === 'index' ? m.entries.map((/** @type {any} */ [t, f]) => [t, [...f].map(([k, v]) => [k, [...v]])]) : m.entries).length, m.part).toBeLessThan(600000);
   });
 });
 

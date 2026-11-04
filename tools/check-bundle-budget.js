@@ -114,7 +114,9 @@ const BUDGETS = [
   { file: 'bundle-d.js', measured: 1680140, max: 1932200 },   // every screen/sheet/util (bundles e-h folded in by lz1)
   // 2026-10-14, sr9: the search worker (src/search/worker.js): the warm-index read and the meaning model, off the
   // page's thread. 7,967 B measured x 1.15. onnxruntime-web is not in it: the worker imports the vendored copy.
-  { file: 'bundle-w.js', measured: 7967, max: 9200 },
+  // 2026-11-04, search200 h8: a cold build runs on the worker too (MiniSearch and the tokenizer, ~24 KB): 7,967 ->
+  // 33,040 B measured, x 1.15 = 37,996 -> the hundred above. The worker is fetched on first use, never in the cold boot.
+  { file: 'bundle-w.js', measured: 33040, max: 38000 },
   // Re-baselined 2026-09-22 (292,190 B): the Answers landing's rules (~8 KB) and the
   // month's large-text / tap-target fixes, on top of 253,510 B measured 09-01.
   // 2026-09-25 (n7-08): the tree had grown to 335,980 B, 20 under this ceiling. Measured first: 91.5 KB

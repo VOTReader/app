@@ -907,6 +907,20 @@ describe('SearchScreen (W0 micro-gaps)', () => {
     vi.useRealTimers();
   });
 
+  /* h8 (search200, 2026-11-04): the suggestions need no index (named passages, books, commands: bundle data), and a
+     query typed while a cold index builds had none of them, only "Building search index…". */
+  it('the suggestions open while the index is still building', async () => {
+    vi.useFakeTimers();
+    const E = /** @type {any} */ (window).VotSearchMini;
+    E.getState = () => ({ ready: false, building: true });
+    E.init = () => new Promise(() => {});   // the build never ends here
+    E.suggest = () => [{ query: 'psalm 23', label: 'Psalm 23', kind: 'passage' }];
+    await typeAndWait(baseProps(), 'psa');
+    expect(screen.getByText(/Building search index/)).toBeTruthy();
+    expect(document.querySelector('.srch-suggest-item'), 'the list, open over the build').toBeTruthy();
+    vi.useRealTimers();
+  });
+
   it('the clear button keeps the focus in the box', async () => {
     vi.useFakeTimers();
     await typeAndWait(baseProps(), 'mercy');

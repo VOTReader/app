@@ -271,8 +271,9 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
     const own = q.toLowerCase().replace(/\s+/g, ' ');
     const s = E.suggest(q, { max: 9 }).filter((x) => String(x.query || '').trim().toLowerCase().replace(/\s+/g, ' ') !== own).slice(0, 8);
     setSuggestions(s);
-    setShowSuggest(s.length > 0 && !buildInfo.building && dismissedFor !== query);
-  }, [query, buildInfo.building, dismissedFor]);
+    // open while a cold index builds too: they read the bundle's tables, no index (h8, search200 2026-11-04)
+    setShowSuggest(s.length > 0 && dismissedFor !== query);
+  }, [query, dismissedFor]);
   const suggestOpen = showSuggest && suggestions.length > 0;
   /** Close the list; `dismiss`: and keep it closed for this query (Enter, Escape), where a blur or a scroll
    *  lets the box open it again. */

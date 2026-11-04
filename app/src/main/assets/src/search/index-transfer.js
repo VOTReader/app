@@ -50,6 +50,41 @@ export function postIndexParts(js, post) {
   if (entries.length) post({ part: 'index', entries });
 }
 
+/* A BUILT INDEX IS HANDED OVER AS ITS OWN MAPS (search200 h8, 2026-11-04). An index the worker has just built is no
+   JSON: its maps go to the page as they are (postMessage clones a Map), in parts of the same sizes, so the page
+   sets each term's field map as it arrives and builds no Map from an object (the JSON parts cost the page ~2.3 s
+   at 4x CPU, most of it numericMap). The head says so (`maps: true`); indexAssembler takes either. */
+
+/**
+ * Post a live MiniSearch index in parts of its own maps: one `head`, then `part` messages.
+ * @param {any} ms
+ * @param {(m: any) => void} post
+ */
+export function postIndexMaps(ms, post) {
+  post({ head: { documentCount: ms._documentCount, nextId: ms._nextId, fieldIds: ms._fieldIds, averageFieldLength: ms._avgFieldLength, dirtCount: ms._dirtCount, serializationVersion: 2, maps: true } });
+  for (const [name, m] of /** @type {Array<[string, Map<any, any>]>} */ ([['documentIds', ms._documentIds], ['fieldLength', ms._fieldLength]])) {
+    let entries = [];
+    for (const e of m) { entries.push(e); if (entries.length >= KEYS_PER_PART) { post({ part: name, entries }); entries = []; } }
+    if (entries.length) post({ part: name, entries });
+  }
+  let entries = [];
+  let n = 0;
+  for (const e of ms._storedFields) {
+    entries.push(e);
+    n += 64 + (e[1] && typeof e[1].text === 'string' ? e[1].text.length : 0);
+    if (n >= STORED_CHARS_PER_PART) { post({ part: 'storedFields', entries }); entries = []; n = 0; }
+  }
+  if (entries.length) post({ part: 'storedFields', entries });
+  entries = [];
+  n = 0;
+  for (const e of ms._index) {
+    entries.push(e);
+    for (const freqs of e[1].values()) n += freqs.size;
+    if (n >= POSTINGS_PER_PART) { post({ part: 'index', entries }); entries = []; n = 0; }
+  }
+  if (entries.length) post({ part: 'index', entries });
+}
+
 /** An object keyed by numbers, as a Map with number keys (MiniSearch's objectToNumericMap). */
 function numericMap(/** @type {Record<string, any>} */ obj) {
   const m = new Map();
@@ -66,10 +101,19 @@ function numericMap(/** @type {Record<string, any>} */ obj) {
 export function indexAssembler(MiniSearch, head, options) {
   const ms = MiniSearch.instantiateMiniSearch(head, options);
   const v1 = head.serializationVersion === 1;
+  const maps = !!head.maps;
   return {
     ms,
     /** @param {string} part @param {Array<[any, any]>} entries */
     add(part, entries) {
+      if (maps) {
+        // postIndexMaps: the keys are numbers already and each term's field map is a Map
+        if (part === 'index') { for (const [term, fields] of entries) ms._index.set(term, fields); return; }
+        const m = part === 'documentIds' ? ms._documentIds : part === 'fieldLength' ? ms._fieldLength : part === 'storedFields' ? ms._storedFields : null;
+        if (!m) throw new Error('index-transfer: unknown part ' + part);
+        for (const [k, v] of entries) { m.set(k, v); if (m === ms._documentIds) ms._idToShortId.set(v, k); }
+        return;
+      }
       if (part === 'index') {
         for (const [term, data] of entries) {
           const fields = new Map();
