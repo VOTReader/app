@@ -37,7 +37,8 @@ import { edgeReading, readReference, restWords } from './ref-edge.js';
 import { scopeWord, collectionNamed } from './scope-word.js';
 import { parseTextQuery, applyCorrections } from './query-parse.js';
 import { searchUnits } from './stage-units.js';
-import { matchWords, accumulate } from './stage-match.js';
+import { matchWords } from './stage-match.js';
+import { typoFallback } from './stage-typo.js';
 import { wordForms } from './word-forms.js';
 import { numberReading } from './numbers.js';
 import { kjvEncode, kjvEncodeAt, negationOf, PRONOUN_BARE, PRONOUN_PIECE } from './tokenize.js';
@@ -2580,6 +2581,8 @@ const ENGINE = {
   searchUnit,
   prefixable,
   isStopTerm,
+  searchCorrected,
+  formMisspelt,
 };
 
 /**
@@ -2721,7 +2724,7 @@ async function searchWords(query, options) {
   if (!filtered.length && !p.phrase) return { parsed, results: [], parsedTerms: filtered, textQuery: p };
 
   // Build search units (literal + synonyms): search/stage-units.js. `ctx` is the run's state, read and written by each stage.
-  /** @type {any} */ const ctx = { options, p, filtered, D, spent, pause, eng: ENGINE };
+  /** @type {any} */ const ctx = { options, p, filtered, D, navAlso, spent, pause, eng: ENGINE };
   searchUnits(ctx);
   const { units, didExpand } = ctx;
 
@@ -2741,35 +2744,10 @@ async function searchWords(query, options) {
   // One BM25 search per unit; accumulate score + coverage bitmask: search/stage-match.js
   Object.assign(ctx, { keyword });
   { const r = await matchWords(ctx); if (r) return r; }
-  const { scoreMap, termMask, literalHit, matchedTerms, answersHits, kjvScore, kjvMask, docLookup, unitOpts, heard, heardOwn, unheard } = ctx;
-  /* THE TYPO FALLBACK WAITS FOR THE WHOLE FAMILY (2026-09-26). A typed word that
-     finds nothing as typed but whose forms or synonyms do is a real word this
-     corpus happens to inflect differently ("prays", where the text says pray and
-     prayed); correcting it to the nearest spelling instead could land on any
-     one-edit neighbour with more documents ("rays"). Only a word nothing of its
-     own reached is a typo, and the correction is reported so the screen can say
-     "Showing results for shepherd" rather than change the reader's words
-     silently. */
-  const corrections = [];
-  // Under a card (a book name, a named passage) the card answers the query: no typo
-  // guess ("Beatitudes", the quick pick, showed "Showing results for platitudes").
-  /* ...AND A WORD ONLY ITS FORMS FOUND IS STILL A TYPO WHEN THE TEXT'S OWN SPELLING OF IT IS ONE SLIP AWAY (search200
-     wave 3, U08.6, 2026-10-23). "in the begining god creatd" corrected creatd and kept "begining": stripped of -ing it
-     is begin, which the text holds. Its near spelling "beginning" is of the same family (its forms meet the typed
-     word's) and is no form the engine searched, so the typed word is that word misspelt. "prays" stays as typed: its
-     near spelling, pray, is one of the forms already searched. */
-  for (let u = 0; u < (navAlso ? 0 : unheard.length); u++) {
-    const unit = unheard[u];
-    if (heardOwn[unit.origin]) continue;
-    if (spent()) { const r = await pause(); if (r) return r; }
-    if (/\d/.test(unit.term)) continue;   // a number is not a typo: "316" is not "16"
-    const typed = kjvEncode(unit.term);
-    let fixed;
-    try { fixed = searchCorrected(unit.term, unitOpts(unit), keyword, heard[unit.origin] ? (w) => formMisspelt(typed, w) : undefined); } catch { continue; }
-    if (!fixed.res.length) continue;
-    accumulate(ctx, unit, fixed.res);
-    if (fixed.to && typed.length === 1 && typed[0] !== fixed.to) corrections.push({ from: typed[0], to: fixed.to });
-  }
+  const { scoreMap, termMask, literalHit, matchedTerms, answersHits, kjvScore, kjvMask, docLookup } = ctx;
+  // THE TYPO FALLBACK: search/stage-typo.js
+  { const r = await typoFallback(ctx); if (r) return r; }
+  /** @type {Array<{from: string, to: string}>} */ const corrections = ctx.corrections;
   /* A CORRECTED QUERY IS SEARCHED AS THAT QUERY (2026-09-27). "Showing results for
      shepherd" showed 152 results where "shepherd" shows 171 (the UI walk): the
      corrected word was searched bare, without the synonyms, forms and phrase ranking
