@@ -61,6 +61,7 @@ import { answersSectionAnchor } from '../utils/answers-sections.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
+import { holyDaysLetter } from './components/pager-preview.jsx';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -1828,8 +1829,7 @@ export function buildScreenRoutes({
       if (hdEntry.type === 'wtlb') {
         return <WtlbEntryView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} entry={hdEntry} partLabel="Regarding The Holy Days" onNavToChapter={_navToChapter} footnotesMode={true} />;
       }
-      const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
-      return <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={letterShim} volumeLabel="Regarding The Holy Days" />;
+      return <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={holyDaysLetter(hdEntry)} volumeLabel="Regarding The Holy Days" />;
     },
 
     // ── Answers Only God Can Give ──

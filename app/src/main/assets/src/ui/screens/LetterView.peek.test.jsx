@@ -198,6 +198,35 @@ describe('LetterView pager.peek format gate (mixed Holy Days collection)', () =>
     });
     const desc = capturedPager.peek('next');
     expect(desc.kind).toBe('screen');
-    expect(desc.el.props.letter).toBe(formatA);
+    // The entry as its route draws it (holyDaysLetter: its neighbours read as prevLetter/nextLetter).
+    expect(desc.el.props.letter).toEqual({ ...formatA, prevLetter: null, nextLetter: null });
+  });
+});
+
+/* reading-flow hunt 2026-11-04: Holy Days is mixed-format, so its letter-type ghosts keep their
+   neighbours as prevEntry/nextEntry; the route reads them as prevLetter/nextLetter
+   (screen-routes 'holy-days-entry'). The swipe peek rendered the raw entry, so the page that slid
+   in drew "—" for both bottom cards and disabled arrows where the page it became has them. */
+describe('LetterView pager.peek inside Holy Days', () => {
+  const KEEP = { id: 'keep-the-passover', type: 'letter', title: 'Keep The Passover', num: 8, blocks: [], footnotes: {}, nkjv: {},
+    prevEntry: { id: 'i-am-the-passover', title: 'I Am The Passover' }, nextEntry: { id: 'unleavened', title: 'Unleavened' } };
+  const UNLEAVENED = { id: 'unleavened', type: 'letter', title: 'Unleavened', num: 9, blocks: [], footnotes: {}, nkjv: {},
+    prevEntry: { id: 'keep-the-passover', title: 'Keep The Passover' }, nextEntry: { id: 'devotion', title: 'Devotion' } };
+  beforeEach(() => {
+    globalThis.COL_BY_KEY = new Map([['holydays', { volKey: 'holydays', kind: 'holy-days', label: 'Regarding The Holy Days', letterScreen: 'holy-days-entry' }]]);
+    globalThis.colLetterArr = (col) => (col.volKey === 'holydays' ? [KEEP, UNLEAVENED] : []);
+    globalThis.colPreface = () => null;
+  });
+  afterEach(() => {
+    for (const k of ['COL_BY_KEY', 'colLetterArr', 'colPreface']) delete globalThis[k];
+  });
+
+  it('peeks the neighbour with the neighbours its own page will show', () => {
+    renderLetter({ letter: { ...KEEP, prevLetter: KEEP.prevEntry, nextLetter: KEEP.nextEntry }, volKey: 'holydays', studyMode: false, volumeLabel: 'Regarding The Holy Days' });
+    const desc = capturedPager.peek('next');
+    expect(desc.kind).toBe('screen');
+    expect(desc.el.props.letter.id).toBe('unleavened');
+    expect(desc.el.props.letter.prevLetter).toEqual({ id: 'keep-the-passover', title: 'Keep The Passover' });
+    expect(desc.el.props.letter.nextLetter).toEqual({ id: 'devotion', title: 'Devotion' });
   });
 });
