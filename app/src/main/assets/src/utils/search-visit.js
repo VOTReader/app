@@ -90,8 +90,8 @@ export function isSearchLook({ fromSearch, searchLanding, ...place }) {
  */
 export function searchBackActive({ screen, fromSearch, fromSurprise, fromWtlb, fromMatthewCh, stackLength, backActive, fromSearchIndex }) {
   if (!fromSearch || fromSurprise || !screen) return false;
-  // The tap-through stack pops first on every letter-shaped screen (study chapters too).
-  if (isLetterShaped(screen) && (stackLength || 0) > 0) return false;
+  // A live tap-through top pops first on every letter-shaped screen (study chapters too).
+  if (isLetterShaped(screen) && (stackLength || 0) > 0 && backActive) return false;
   if (screen === 'bible-ch' || screen === 'matthew-ch') {
     if (backActive) return false;                       // a live tap-through pill wins
     if (fromSearchIndex) return false;                  // picked from the hit's index: back to that index

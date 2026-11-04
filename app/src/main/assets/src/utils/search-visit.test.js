@@ -69,7 +69,9 @@ describe('searchBackActive — when the reader backs to the results', () => {
   it('is off without a search, or when a later breadcrumb owns the back', () => {
     expect(searchBackActive({ ...base, screen: 'vot-letter', fromSearch: false })).toBe(false);
     expect(searchBackActive({ ...base, screen: 'vot-letter', fromSurprise: true })).toBe(false);
-    expect(searchBackActive({ ...base, screen: 'vot-letter', stackLength: 1 })).toBe(false);
+    expect(searchBackActive({ ...base, screen: 'vot-letter', stackLength: 1, backActive: true })).toBe(false);
+    // a kept entry that is not live (PR #70 review, found 1) is not Back's to pop: the results are
+    expect(searchBackActive({ ...base, screen: 'vot-letter', stackLength: 1, backActive: false })).toBe(true);
     expect(searchBackActive({ ...base, screen: 'vot-letter', fromMatthewCh: { chapterNum: 5 } })).toBe(false);
     expect(searchBackActive({ ...base, screen: 'bible-ch', backActive: true })).toBe(false);
     expect(searchBackActive({ ...base, screen: 'bible-ch', fromWtlb: 'wtlb-one-entry' })).toBe(false);

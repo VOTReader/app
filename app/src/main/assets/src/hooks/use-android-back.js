@@ -312,7 +312,9 @@ export function useAndroidBack({
       // so it's a window slot — same pattern as window.__closeSheet above.
       if (typeof window.__screenBack === 'function' && window.__screenBack()) { clearSuppressNextHistoryPush(); return "true"; }
       const stack = fromLetterRef.current;
-      if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0) {
+      // Only a live top is Back's to pop (backActive): an entry the F5 detour rule keeps while the reader is away
+      // stays for when they return (PR #70 review, found 1: Continue reading > Search > a hit > Back went Home).
+      if (LETTER_SCREEN_SET.has(s) && stack && stack.length > 0 && backActiveRef.current) {
         const fl = stack[stack.length - 1];
         setFromLetterStack((prev) => prev.slice(0, -1));
         window.navHandoff.clear('pendingHighlight');

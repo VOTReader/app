@@ -318,7 +318,7 @@ describe('useAndroidBack — P1-12 History tap-through return path', () => {
   // screens already use (step 3 for letters, step 3b for chapters).
   it('back from a letter entered via History pops the stack and returns to history', () => {
     const stack = [{ sourceScreen: 'history', sourceLetterTitle: 'History', sourceBookId: 'john', sourceChapterNum: 3 }];
-    const props = baseProps({ screen: 'vot-one-letter', fromLetterRef: { current: stack } });
+    const props = baseProps({ backActive: true, screen: 'vot-one-letter', fromLetterRef: { current: stack } });
     renderHook(() => useAndroidBack(props));
     const res = window.handleAndroidBack();
     expect(res).toBe('true');
@@ -331,11 +331,23 @@ describe('useAndroidBack — P1-12 History tap-through return path', () => {
   // viewer with the wrong entry loaded.
   it('step 3 restores a captured sourceJournalEntryId', () => {
     const stack = [{ sourceScreen: 'journal-viewer', sourceJournalEntryId: 'e7' }];
-    const props = baseProps({ screen: 'vot-one-letter', fromLetterRef: { current: stack } });
+    const props = baseProps({ backActive: true, screen: 'vot-one-letter', fromLetterRef: { current: stack } });
     renderHook(() => useAndroidBack(props));
     window.handleAndroidBack();
     expect(props.setJournalEntryId).toHaveBeenCalledWith('e7');
     expect(props.setScreen).toHaveBeenCalledWith('journal-viewer');
+  });
+
+  // PR #70 review, found 1: Home > Continue reading (a silent entry the F5 detour rule keeps while the reader is
+  // away) > Search > a hit > Back went to Home. An entry that is not live (backActive false) is not Back's to pop.
+  it('step 3 leaves a kept, not-live entry alone: Back from a search hit goes to the results', () => {
+    const stack = [{ sourceScreen: 'home', silent: true, destSnapshot: { screen: 'vot-one-letter', letterId: 'other' } }];
+    const props = baseProps({ screen: 'vot-one-letter', fromSearch: true, fromLetterRef: { current: stack }, backActive: false });
+    renderHook(() => useAndroidBack(props));
+    window.handleAndroidBack();
+    expect(props.setFromLetterStack).not.toHaveBeenCalled();
+    expect(props.setScreen).not.toHaveBeenCalledWith('home');
+    expect(props.setScreen).toHaveBeenCalledWith('search');
   });
 
   // share-fn on a Bible study (reading-flow hunt 2026-11-04): the footnote lives on the study
@@ -533,7 +545,7 @@ describe('useAndroidBack — Answers Only God Can Give', () => {
 
   it('a topic opened from a list unwinds to that list by the tap-through stack', () => {
     /** @type {any} */ (globalThis).LETTER_SCREEN_SET = new Set(['answers-entry']);
-    const props = baseProps({
+    const props = baseProps({ backActive: true, // its top is live in the app (PR #70 review: step 3 pops only a live top)
       screen: 'answers-entry',
       fromLetterRef: { current: [{ sourceScreen: 'answers-group', sourceLetterId: '10' }] },
     });
@@ -565,7 +577,7 @@ describe('useAndroidBack — the dismiss-first gates', () => {
   });
 
   it('the tap-through pop restores every captured source field', () => {
-    const props = baseProps({
+    const props = baseProps({ backActive: true, // its top is live in the app (PR #70 review: step 3 pops only a live top)
       screen: 'vot-letter',
       fromLetterRef: { current: [
         { sourceScreen: 'old', sourceLetterId: 'nope' },
