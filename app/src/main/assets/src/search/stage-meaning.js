@@ -127,6 +127,8 @@ export function meaningFirst(eng, out, idOf, sem, named, held, admit, rare) {
     top.push(e);
     inTop.add(s.id);
     added.add(e);
+    // its card says "by meaning" when the typed words do not find it as typed (search200 ideas E, snippet.js whyMatched)
+    /** @type {any} */ (e).byMeaning = true;
   }
   const key = (/** @type {any} */ e, /** @type {number} */ i) => (named(e.doc) ? 1 : 0) + 1 / (MEANING_K + Math.min(i, MEANING_REACH)) +
     w / (MEANING_K + (semRank.get(idOf.get(e)) ?? 1e6)) + (idOf.get(e) === sure ? MEANING_SURE_LEAD : 0);

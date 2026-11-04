@@ -140,6 +140,8 @@ describe('meaning first', () => {
     const r = await first('honour the one who made you while still a child');
     expect(r.doc.letterId).toBe('creator');
     expect(r.placeStart).toBe(STARTS.creator);
+    // the meaning brought it in, so its card can say "by meaning" (search200 ideas E, snippet.js whyMatched)
+    expect(r.byMeaning).toBe(true);
   });
 
   /* THE MODEL CAN ARRIVE AFTER THE FIRST SEARCH (sr11 S22 look, 2026-10-15). The model starts once the page is idle,

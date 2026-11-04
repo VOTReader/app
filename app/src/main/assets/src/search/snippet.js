@@ -847,3 +847,64 @@ function joinsRun(gap, twoWords) {
   const words = gap.trim().split(/\s+/);
   return words.length <= 3 && words.every((w) => /^[\p{L}'’]+$/u.test(w) && isGlue(w));
 }
+
+/* WHY THIS MATCHED (search200 ideas E, PICKS.md E; h8 2026-11-04). A result found through one of His names, a
+   synonym, a word form, the verse's KJV wording or the meaning model looked like any other card. Its one quiet line
+   under the snippet says why it is there. It is read when the card renders, from the card's own text and the words it
+   marks (the engine's matched terms for that result), never inside the search: the first build kept it in the ranking
+   loop and cost +2.05 ms a search. Nothing scores by it. */
+/**
+ * The one reason a card gives, or null. Priority (PICKS.md E): a typed word the text holds as another of His names
+ * ("YahuShua" for jesus), then a word swapped for it (a synonym or a word form: "pastor" for shepherd), then the
+ * verse's KJV wording, then the meaning model. A text holding every typed content word as typed (or as a longer
+ * word one starts, its archaic twin, the word a slip meant: exactOf) gives none, and so does one holding only some
+ * of them that nothing else explains. Pure but for the synonym table (familiesOf).
+ * @param {string} text  the card's own text: its title, heading and body (not a KJV wording it quotes instead)
+ * @param {string[]} terms  the words the card marks: the typed words first, then their synonyms and the engine's matched forms
+ * @param {string[]} typed  the screen's typed list (typedOwn reads the typed words out of it)
+ * @param {{ kjv?: boolean, meaning?: boolean, names?: (w: string) => string[] }} [how]  the verse's KJV wording found it
+ *   (entry.kjvWording); the meaning model brought it in (entry.byMeaning); His other names for a typed word (engine.js)
+ * @returns {null | { kind: 'name' | 'swap' | 'kjv' | 'meaning', from?: string, to?: string }}
+ */
+export function whyMatched(text, terms, typed, how) {
+  const o = how || {};
+  const list = (terms || []).map((t) => String(t || '').toLowerCase()).filter(Boolean);
+  const own = [...typedOwn(typed && typed.length ? typed : list)].filter((w) => !/\s/.test(w) && hasRealWord(w));
+  if (!own.length) return null;
+  const body = String(text || '');
+  const hits = body && list.length ? occurrences(body, list, true) : [];
+  const word = (/** @type {{ idx: number, len: number }} */ h) => body.slice(h.idx, h.idx + h.len);
+  const exacts = own.map((w) => exactOf(new Set([w])));
+  const held = own.map(() => false);
+  for (const h of hits) {
+    const x = word(h);
+    for (let i = 0; i < own.length; i++) if (!held[i] && exacts[i](x)) held[i] = true;
+    if (held.every(Boolean)) return null;
+  }
+  const missing = own.filter((_, i) => !held[i]);
+  const exactAny = (/** @type {string} */ x) => exacts.some((ex) => ex(x));
+  const namesOf = (/** @type {string} */ w) => (o.names ? o.names(w) : []);
+  // one of His names: a form the typed name is also searched as, or a name the text holds that is one of the typed word's
+  for (const w of missing) {
+    const forms = namesOf(w);
+    const pool = forms.length ? hits.concat(occurrences(body, forms, true)) : hits;
+    for (const h of pool) {
+      const x = word(h);
+      const b = bare(x);
+      if (b !== w && !exactAny(x) && (forms.indexOf(b) >= 0 || namesOf(b).indexOf(w) >= 0)) return { kind: 'name', from: w, to: x };
+    }
+  }
+  // a word swapped: a synonym or a word form of the first typed word the text does not hold
+  const fams = familiesOf(list);
+  for (const w of missing) {
+    const f = fams.get(w);
+    const fam = f ? f.fam : w;
+    for (const h of hits) {
+      if (h.term !== fam) continue;
+      const x = word(h);
+      if (!exactAny(x)) return { kind: 'swap', from: w, to: bare(x) };
+    }
+  }
+  if (o.kjv) return { kind: 'kjv' };
+  return o.meaning ? { kind: 'meaning' } : null;
+}

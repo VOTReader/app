@@ -54,7 +54,7 @@ import { rankWords } from './stage-rank.js';
 import { titlesStage } from './stage-titles.js';
 import { wordForms } from './word-forms.js';
 import { kjvEncode, kjvEncodeAt, negationOf, PRONOUN_BARE, PRONOUN_PIECE } from './tokenize.js';
-import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces } from './snippet.js';
+import { snippet, snippetAt, highlightSpans, matchExcerpt, morePlaces, findPlaces, whyMatched } from './snippet.js';
 import {
   coverageMultiplier, popcount,
   BM25_PARAMS, KEYWORD_BM25, KEYWORD_CONTENT_WORDS, KEYWORD_WORDS, joinApostropheS, NEAR_PHRASE_MIN,
@@ -1309,6 +1309,10 @@ function oneName(/** @type {string} */ t) {
   const f = NAME_FORMS[n];
   if (!f) return t;
   return RESTORED_FATHER.test(n) ? 'yahuwah' : n === 'christ' || RESTORED_ANOINTED.test(n) ? 'hamashiach' : 'yahushua';
+}
+/** His other names a typed name is also searched as (NAME_FORMS), for a card's why line (snippet.js whyMatched). */
+function hisNames(/** @type {string} */ t) {
+  return NAME_FORMS[restoredNameOf(String(t || '').toLowerCase())] || [];
 }
 /** A restored name typed as a possessive without its apostrophe ("yahuwahs", "yahushuas") → the name; else the word. */
 function restoredNameOf(/** @type {string} */ t) {
@@ -3099,6 +3103,9 @@ export const VotSearchMini = {
   morePlaces,
   findPlaces,
   highlightSpans,
+  // why a card the typed words did not find as typed is there (search200 ideas E): read when the card renders, never in the search
+  whyMatched: (/** @type {string} */ text, /** @type {string[]} */ terms, /** @type {string[]} */ typed, /** @type {{kjv?: boolean, meaning?: boolean}} */ how) =>
+    whyMatched(text, terms, typed, { ...how, names: hisNames }),
   levenshtein,
   fuzzyBookSuggest,
   getState,

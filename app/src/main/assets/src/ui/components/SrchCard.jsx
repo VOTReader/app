@@ -119,6 +119,34 @@ export function cardPassage(entry, terms, stopTyped) {
 }
 
 /**
+ * WHY THIS MATCHED (search200 ideas E, PICKS.md E): the card's one quiet line under its snippet, from the reason
+ * snippet.js whyMatched reads off the card's own text when it renders. His name as the text writes it, then the
+ * typed one ("YahuShua = Jesus"); the typed word, then the word that matched ("shepherd → pastor"); "KJV wording";
+ * "by meaning". '' for no reason (an exact card). Pure.
+ * @param {any} why  whyMatched's reason
+ * @returns {string}
+ */
+export function whyLine(why) {
+  if (!why || typeof why !== 'object') return '';
+  if (why.kind === 'kjv') return 'KJV wording';
+  if (why.kind === 'meaning') return 'by meaning';
+  const from = String(why.from || '');
+  const to = String(why.to || '');
+  if (!from || !to) return '';
+  if (why.kind === 'swap') return from.toLowerCase() + ' → ' + to.toLowerCase();
+  if (why.kind === 'name') return to + ' = ' + from.charAt(0).toUpperCase() + from.slice(1).toLowerCase();
+  return '';
+}
+
+/** What a card's why line reads: its title, its heading and its own text (never a KJV wording it quotes instead). @param {any} doc */
+function whyText(doc) {
+  /** @type {string[]} */
+  const parts = [];
+  for (const t of [doc.title, doc.heading, doc.text]) if (t && parts.indexOf(String(t)) < 0) parts.push(String(t));
+  return parts.join('\n');
+}
+
+/**
  * A verse its KJV wording found (the engine's kjvWording, search200 idea A) quotes the KJV words it matched: the
  * edition is fetched and held while the card shows (data/translations.js), and the card reads its own words until
  * the text is in memory. Null for any other card.
@@ -154,6 +182,17 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   const unit = doc ? PLACE_UNIT[doc.kind] : undefined;
   const placeText = unit ? doc.text || '' : '';
   const termsKey = (hlTerms || []).join('\u0001');
+  // Why a card the typed words did not find as typed is there (search200 ideas E): read here, for the cards on
+  // screen, never in the search. A row that says it of every card (the near-meaning row) passes `why` itself.
+  const typedKey = (terms || []).join('\n');
+  const kjvFound = !!(doc && entry.kjvWording);
+  const byMeaning = !!(doc && entry.byMeaning);
+  const reason = React.useMemo(() => {
+    const sm = /** @type {any} */ (window).VotSearchMini;
+    if (why || !doc || !sm || typeof sm.whyMatched !== 'function') return '';
+    return whyLine(sm.whyMatched(whyText(doc), hlTerms || [], terms || [], { kjv: kjvFound, meaning: byMeaning }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- termsKey and typedKey are the term lists by value.
+  }, [why, doc, termsKey, typedKey, kjvFound, byMeaning]);
   // A text only the meaning search found (engine.js meaningFirst) names the passage the model
   // matched: the snippet quotes the window that opens there, where the reader will land, and
   // not the typed words' densest window further on (sweep W33), which the places list offers.
@@ -221,7 +260,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
       <div className="srch-card-snippet">
         <SrchSnippet text={body || ''} terms={hlTerms} typed={terms} start={titled ? undefined : placeStart} />
       </div>
-      {why ? <div className="srch-card-why">{why}</div> : null}
+      {why || reason ? <div className="srch-card-why">{why || reason}</div> : null}
     </button>
   );
   const reprints = (also || []).filter((r) => r && r.doc);
