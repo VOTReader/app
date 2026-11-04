@@ -257,6 +257,35 @@ describe('AnswersHome — search (f06)', () => {
     expect(find.terms).toContain('sabbath');
   });
 
+  it('once the main engine\'s index is ready, its order kept to Answers; the box\'s groups before (search200 h8)', async () => {
+    const doc = (id) => { const e = ANSWERS.find((x) => x.id === id); return { kind: 'answers', volumeId: 'answers', letterId: id, title: e.title, text: e.paragraphs.map((p) => p.text).join(' ') }; };
+    let current = false;
+    let answer;
+    const search = vi.fn(() => new Promise((res) => { answer = res; }));
+    window.VotSearchMini = { isCurrent: () => current, search, matchExcerpt: () => '' };
+    try {
+      const view = render(<AnswersHome {...base} />);
+      // the index is building: the box answers on its own, title matches first
+      fireEvent.change(field(), { target: { value: 'sabbath' } });
+      expect(search).not.toHaveBeenCalled();
+      expect(texts('.ans-results .ans-row-title')[0]).toBe('God Speaks About The Sabbath');
+      // ready: the title matches while the engine answers, then the engine's order
+      current = true;
+      view.rerender(<AnswersHome {...base} />);
+      expect(search).toHaveBeenCalledTimes(1);
+      fireEvent.change(field(), { target: { value: 'is sunday the sabbath' } });
+      expect(search).toHaveBeenCalledTimes(2);
+      expect(search.mock.calls[1][0]).toBe('is sunday the sabbath');
+      expect(search.mock.calls[1][1].scope).toEqual({ volumeId: 'answers' });
+      // the search called off for the query typed over
+      expect(search.mock.calls[0][1].signal.aborted).toBe(true);
+      expect(document.querySelector('.ans-results-sum .ans-meta').textContent).toBe('Searching…');
+      await act(async () => { answer({ results: [doc('regarding-the-holidays-of-men'), doc('god-speaks-about-the-sabbath')].map((d) => ({ doc: d, terms: [] })) }); });
+      expect(texts('.ans-results .ans-row-title').slice(0, 2)).toEqual(['Regarding the Holidays of Men', 'God Speaks About The Sabbath']);
+      expect(NB(document.querySelector('.ans-results-sum .ans-meta').textContent)).toMatch(/^In Answers · /);
+    } finally { delete window.VotSearchMini; }
+  });
+
   it('Back with a question typed clears it before leaving the screen', () => {
     const onBack = vi.fn();
     render(<AnswersHome {...base} onBack={onBack} />);

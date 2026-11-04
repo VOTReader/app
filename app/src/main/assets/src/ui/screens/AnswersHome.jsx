@@ -16,8 +16,11 @@
    numbered "Thus Says The Lord..." groups with our short names, the False
    Doctrines index, then Charts & videos and the credit. A query of two or
    more characters replaces everything under the field with the results,
-   grouped by topic: title matches first, then the site's order (U2: no
-   list anywhere is sorted by how much a topic says).
+   grouped by topic, in the main search engine's order once its index is
+   ready (search200 h8: it put the right topic first twice as often as the
+   box's own matcher, utils/answers-ranked.js); before that, title matches
+   first, then the site's order (U2: no list is sorted by how much a topic
+   says).
 
    The landing keeps its query, its tab and its open sheet in module memory,
    so Back from a topic returns to the same results, list or sheet (U5);
@@ -36,6 +39,7 @@ import {
   answersSearchSum, answersSearchSub, answersHitSource, answersClosest, answersDomain, ANSWERS_TSTL_HEAD,
 } from '../../utils/answers-browse.js';
 import { answersIndexOf, answersSearch, answersTitleMatches, answersSnippet, answersPlainText, answersPlainLines } from '../../utils/answers-search.js';
+import { answersEngineReady, answersRankedSearch } from '../../utils/answers-ranked.js';
 import { passageTextBefore } from '../../utils/answers-contents.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { AnsIcon, AnsRow, Chev, LeadTitle, ReadMark, useAnswersMeta, useAnswersSaved, answersLayoutClass } from '../components/AnswersParts.jsx';
@@ -457,8 +461,24 @@ export function AnswersHome({ entries, site, isRead: isReadRaw, pathOn = true, p
   const deferred = React.useDeferredValue(query);
   const q = query.trim();
   const isQuery = q.length >= 2;
-  const results = React.useMemo(() => (loaded && deferred.trim().length >= 2 ? answersSearch(index, deferred, opts) : null), [loaded, index, deferred, opts]);
-  const pending = isQuery && deferred.trim() !== q;
+  const boxResults = React.useMemo(() => (loaded && deferred.trim().length >= 2 ? answersSearch(index, deferred, opts) : null), [loaded, index, deferred, opts]);
+  /* RANKED BY THE MAIN ENGINE (search200 h8): once its index is ready, the engine kept to Answers orders the
+     topics (utils/answers-ranked.js); the box's own groups stand in while it builds, or when a search fails.
+     While the engine answers, the title matches show as they do while typing ("Searching…"). */
+  const dq = deferred.trim();
+  const engineOn = loaded && dq.length >= 2 && answersEngineReady(/** @type {any} */ (window).VotSearchMini);
+  const [ranked, setRanked] = React.useState(/** @type {{ q: string, r: any } | null} */ (null));
+  React.useEffect(() => {
+    if (!engineOn) return undefined;
+    let live = true;
+    const ctl = typeof AbortController === 'function' ? new AbortController() : null;
+    answersRankedSearch(/** @type {any} */ (window).VotSearchMini, index, dq, { ...opts, signal: ctl ? ctl.signal : undefined })
+      .then((r) => { if (live) setRanked({ q: dq, r }); }, () => { if (live) setRanked({ q: dq, r: null }); });
+    return () => { live = false; if (ctl) ctl.abort(); };
+  }, [engineOn, index, dq, opts]);
+  const rankedNow = engineOn && ranked && ranked.q === dq ? ranked : null;
+  const results = rankedNow && rankedNow.r ? rankedNow.r : boxResults;
+  const pending = isQuery && (dq !== q || (engineOn && !rankedNow));
   const titleOnly = React.useMemo(() => (pending && loaded ? answersTitleMatches(index, query, opts) : null), [pending, loaded, index, query, opts]);
   const recentMode = focused && !q && recent.length > 0;
   const media = React.useMemo(() => (loaded && meta ? answersMediaIndex(list, meta) : null), [loaded, list, meta]);
