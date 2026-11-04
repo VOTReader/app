@@ -35,9 +35,19 @@
    frame loop or an observer still going after that is still going. */
 
 import { appendFileSync } from 'node:fs';
+import { vi } from 'vitest';
 import { cleanup, act } from '@testing-library/react';
 
 export const LINGER_MS = 40;
+
+/* A leak check counts what a screen leaves running; it is not a latency test. Its 20 cycles wait in real time
+   (LINGER_MS twice a cycle, plus the renders), so on a loaded machine (the full suite beside other lanes' runs at
+   ~95 % CPU, 2026-11-04) one test ran past vitest's 20 s default and failed while every count was clean; and a
+   timed-out test's loop goes on in the background, calling cleanup() under the next tests in its file (their
+   "Unable to fire a change event" and missing-button failures that night). Every file that uses the harness
+   imports this module, so the ceiling is set here, once, for those files only. A real hang still fails. */
+export const LEAK_TEST_TIMEOUT_MS = 180000;
+vi.setConfig({ testTimeout: LEAK_TEST_TIMEOUT_MS });
 
 const realSetTimeout = globalThis.setTimeout.bind(globalThis);
 const sleep = (ms) => new Promise((r) => realSetTimeout(r, ms));
