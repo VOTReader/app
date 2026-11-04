@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-30f5dc1039';
+const CACHE_VERSION = 'v1.0.2-917cb97b6c';
 const CORPUS_VERSION = 'c76'; // c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -320,8 +320,8 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': '0fbfd1210dc903d52cd8d39256b0e87f6ee5567403682dcbd562064f32a29f63',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': '01c8bca56a5aa9e67b51c6662f7a81c9971865ab2290056a153f61f0e78ddea1',
-  './dist/bundle-w.js': '25e14db10d8ac2d483f3c40feb9a4e1aa45ae9846c4ea61b3ae6499ff440d9b9',
+  './dist/bundle-d.js': 'ff8977ee598ae31203e7e8b3a6cf8ee9be869d1273632a23e1fd5a03752dfe31',
+  './dist/bundle-w.js': 'e9be59da2cb9374885f5d90418b5e6936e36966bc1de4ce2e13b2fa9dd869d8f',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',
   './manifest.json': 'e1c7daf263bec90aeffc1236ebffe6374859459cb2674259053a4fbc12525d31',
