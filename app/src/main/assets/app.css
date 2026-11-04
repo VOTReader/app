@@ -8207,6 +8207,22 @@
       box-shadow: 0 6px 20px rgba(0,0,0,0.45);
       transition: opacity 260ms ease;
     }
+    /* BACK TO THE VOICE (player brief 3d, picture 17): the reader scrolled the lit line away; one tap glides back.
+       The auto-scroll pill owns this spot (audit-listen Z3), so this one steps aside for it. */
+    .voice-pill {
+      position: fixed; left: 50%; transform: translateX(-50%);
+      bottom: calc(var(--dock-floor) + var(--dock-player) + 12px);
+      z-index: 195;
+      display: inline-flex; align-items: center; gap: 8px;
+      min-height: 44px; max-width: calc(100vw - 32px); padding: 0 20px;
+      background: var(--bg3); color: var(--gold); border: 1px solid var(--gold); border-radius: 999px;
+      font: inherit; font-size: var(--fs-15); white-space: nowrap; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.45);
+    }
+    .voice-pill svg { width: 18px; height: 18px; flex-shrink: 0; }
+    body.light .voice-pill { box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
+    body.autoscroll-on .voice-pill { display: none; }
+    .voice-pill:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     body.light .ascroll-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
     /* IDLE FADE — reading text is the product; chrome that stays bright
        competes with it. Any touch restores full opacity (the component
