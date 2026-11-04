@@ -41,6 +41,19 @@
 // in-memory corpus. COL_BY_KEY / colLetterArr / colPreface are cross-bundle
 // globals (scripture-resolution.js). Returns null if not found (caller falls
 // back to a boundary card).
+/**
+ * A Holy Days entry as LetterView reads it. The collection is mixed-format, so
+ * its letter-type ghosts keep their neighbours as prevEntry/nextEntry, and
+ * LetterView reads prevLetter/nextLetter. The 'holy-days-entry' route and the
+ * swipe peek (LetterView's _letterPeek) both draw it through this, so the page
+ * that slides in is the page it becomes (the peek drew "—" cards, 2026-11-04).
+ * @param {any} entry
+ * @returns {any}
+ */
+export function holyDaysLetter(entry) {
+  return entry ? { ...entry, prevLetter: entry.prevEntry || null, nextLetter: entry.nextEntry || null } : entry;
+}
+
 export function resolveNeighborLetter(volKey, neighborId) {
   if (!volKey || !neighborId || typeof COL_BY_KEY === 'undefined') return null;
   const col = COL_BY_KEY.get(volKey);

@@ -401,6 +401,24 @@ describe('useReadingChainNav — bcv* boundary props', () => {
     expect(props.setActiveReadKey).toHaveBeenCalledWith('vol:one', expect.any(Function));
   });
 
+  // reading-flow hunt 2026-11-04: Volume One opens on its Preface ("A Word of Warning"), and
+  // Revelation 22's Next Book card said "Volume One · Letter 1" over a tap that opened it.
+  it('REVELATION last chapter names the page Volume One opens on: its Preface, when it has one', () => {
+    const pref = window.colPreface;
+    window.colPreface = (col) => col?.volKey === 'one' ? { id: 'a-word-of-warning', title: 'A Word of Warning' } : pref(col);
+    const { result, props } = setup({ book: stubBibleBookList[2], chapter: { num: 22 }, bookId: 'revelation' });
+    expect(result.current.bcvNextBoundaryTitle).toBe('Volume One · Preface');
+    result.current.bcvOnNextBook();
+    expect(props.setLetterId).toHaveBeenCalledWith('a-word-of-warning');
+  });
+
+  it('REVELATION last chapter, before the letters have landed: "Volume One", no page it cannot know yet', () => {
+    const arr = window.colLetterArr;
+    window.colLetterArr = (col) => col?.volKey === 'one' ? [] : arr(col);
+    const { result } = setup({ book: stubBibleBookList[2], chapter: { num: 22 }, bookId: 'revelation' });
+    expect(result.current.bcvNextBoundaryTitle).toBe('Volume One');
+  });
+
   // (No "REVELATION mid-chapter" test: the stub gives Revelation just
   // chapters [{num:1}, {num:22}] which makes chIsLast=true for BOTH
   // — the gap between 1 and 22 means the `chapter.num + 1` neighbor

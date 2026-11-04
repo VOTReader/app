@@ -61,6 +61,7 @@ import { answersSectionAnchor } from '../utils/answers-sections.js';
 import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
+import { holyDaysLetter } from './components/pager-preview.jsx';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -1829,8 +1830,7 @@ export function buildScreenRoutes({
       if (hdEntry.type === 'wtlb') {
         return <WtlbEntryView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} entry={hdEntry} partLabel="Regarding The Holy Days" onNavToChapter={_navToChapter} footnotesMode={true} />;
       }
-      const letterShim = { ...hdEntry, prevLetter: hdEntry.prevEntry || null, nextLetter: hdEntry.nextEntry || null };
-      return <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={letterShim} volumeLabel="Regarding The Holy Days" />;
+      return <LetterView {...sharedViewProps} {...colReadNavProps('holydays')} {...bc} letter={holyDaysLetter(hdEntry)} volumeLabel="Regarding The Holy Days" />;
     },
 
     // ── Answers Only God Can Give ──
@@ -1888,7 +1888,10 @@ export function buildScreenRoutes({
           goHome();
         }
       };
-      return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} onNavigate={(id) => { setLetterId(id); }} />;
+      // The ‹ names where it goes: Hidden Manna has no index (its letter is reached from a Matthew card), so
+      // "Back to Hidden Manna", the label every letter's ‹ takes from its collection, named nowhere (2026-11-04).
+      const hmBack = { onBack: goHomeFromHM, label: fromMatthewChRef.current ? 'Matthew ' + fromMatthewChRef.current.chapterNum : 'Home' };
+      return <LetterView {...sharedViewProps} {...colReadNavProps('hm')} letter={letterShim} volumeLabel="Hidden Manna" onHome={goHomeFromHM} navBack={hmBack} onNavigate={(id) => { setLetterId(id); }} />;
     },
 
     'garden-view': () => (

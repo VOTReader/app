@@ -3,7 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { inertAttr } from '../../utils/inert-attr.js';
-import { resolveNeighborLetter, savedScrollFor, letterScrollKey } from '../components/pager-preview.jsx';
+import { resolveNeighborLetter, savedScrollFor, letterScrollKey, holyDaysLetter } from '../components/pager-preview.jsx';
 import { answersEndpointForUrl, answersLinkForUrl, openAnswersLink } from '../../utils/answers-links.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
@@ -116,7 +116,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     // default resolver only knows the COL_BY_KEY collections, so without the
     // override a same-study neighbor degraded to a generic boundary card.
     const custom = resolvePeek ? resolvePeek(nb) : null;
-    const full = custom ? custom.letter : resolveNeighborLetter(volKey, nb.id);
+    const found = custom ? custom.letter : resolveNeighborLetter(volKey, nb.id);
+    // A Holy Days ghost's neighbours, read as its own route reads them (holyDaysLetter).
+    const full = !custom && volKey === 'holydays' && found && found.blocks ? holyDaysLetter(found) : found;
     // FORMAT GATE. Holy Days is a MIXED collection: its ghost entries carry
     // type 'letter' (Format A, `blocks`) or 'wtlb' (Format B, `paragraphs`),
     // and the route branches on that. A neighbor of the OTHER format resolves

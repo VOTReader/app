@@ -93,7 +93,10 @@ describe('useTapThrough — goToLetterFromMatthew', () => {
     const { result, props } = setup({ chapterNum: 5 });
     act(() => { result.current.goToLetterFromMatthew('two', 'The Wide Path', 'wide path excerpt'); });
 
-    // pushFromLetter source-context entry: source is matthew chapter 5
+    // pushFromLetter source-context entry: source is matthew chapter 5. The destSnapshot makes its
+    // "‹ Back to Matthew 5" pill single-shot (reading-flow hunt 2026-11-04): without one the
+    // entry was never pruned, so the pill followed the reader to every later letter, and after
+    // Hidden Manna's ‹ it stood on Matthew 5 itself.
     expect(props.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'matthew-ch',
       sourceBookId: 'matthew',
@@ -103,6 +106,7 @@ describe('useTapThrough — goToLetterFromMatthew', () => {
       sourceStudyChapterId: null,
       sourceLetterTitle: 'Matthew 5',
       sourceVolumeLabel: null,
+      destSnapshot: { screen: 'vot-letter', bookId: null, chapterNum: null, letterId: 'wide-path', studyId: null, studyChapterId: null },
     });
     expect(props.setFromMatthewCh).toHaveBeenCalledWith({ chapterNum: 5 });
     expect(props.setLetterId).toHaveBeenCalledWith('wide-path');
@@ -123,6 +127,27 @@ describe('useTapThrough — goToLetterFromMatthew', () => {
     expect(props.setActiveReadKey).toHaveBeenCalledWith('bible-study-lamb-of-god');
     // Critical: must NOT touch setLetterId on the study branch
     expect(props.setLetterId).not.toHaveBeenCalled();
+    expect(props.pushFromLetter.mock.calls[0][0].destSnapshot).toEqual({ screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: 'lamb-of-god', studyChapterId: 'lamb-1' });
+  });
+
+  // reading-flow hunt 2026-11-04: Back from a card's letter returned to Matthew and left the
+  // breadcrumb set; it outranks every later Back from a letter, so Studies > a study chapter >
+  // a letter link > Next > Back landed on Matthew instead of the study chapter.
+  it('spends the Matthew breadcrumb once the reader is on Matthew again', () => {
+    const props = { ...baseProps(), screen: 'vot-letter', fromMatthewCh: { chapterNum: 5 } };
+    const { rerender } = renderHook((p) => useTapThrough(p), { initialProps: props });
+    expect(props.setFromMatthewCh).not.toHaveBeenCalled();
+    rerender({ ...props, screen: 'matthew-ch' });
+    expect(props.setFromMatthewCh).toHaveBeenCalledWith(null);
+  });
+
+  it('leaves the breadcrumb alone while the reader is away from Matthew, and writes nothing when there is none', () => {
+    const props = { ...baseProps(), screen: 'vot-letter', fromMatthewCh: { chapterNum: 5 } };
+    const { rerender } = renderHook((p) => useTapThrough(p), { initialProps: props });
+    rerender({ ...props, screen: 'vot-three-letter' });
+    rerender({ ...props, screen: 'bible-ch', fromMatthewCh: null });
+    rerender({ ...props, screen: 'matthew-ch', fromMatthewCh: null });
+    expect(props.setFromMatthewCh).not.toHaveBeenCalled();
   });
 
   it('excerpt set → navHandoff pendingHighlight gets { excerpt, letterId }', () => {

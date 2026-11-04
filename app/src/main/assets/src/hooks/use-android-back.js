@@ -151,6 +151,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { useRefMirror } from './use-ref-mirror.js';
+import { reopenFootnoteOf } from './use-from-letter-stack.js';
 import { PlatformBridge } from '../utils/platform-bridge.js';
 import {
   arm as _rootExitArm,
@@ -322,7 +323,8 @@ export function useAndroidBack({
         if (fl.sourceStudyChapterId !== undefined) setStudyChapterId(fl.sourceStudyChapterId);
         if (fl.sourceJournalEntryId !== undefined) setJournalEntryId(fl.sourceJournalEntryId);
         // share-fn: left from inside a footnote, Back lands on that footnote, open again.
-        if (fl.sourceFootnote != null && fl.sourceLetterId) window.navHandoff.set('reopenFootnote', { letterId: fl.sourceLetterId, num: fl.sourceFootnote });
+        const reopen = reopenFootnoteOf(fl);
+        if (reopen) window.navHandoff.set('reopenFootnote', reopen);
         setScreen(fl.sourceScreen);
         return "true";
       }

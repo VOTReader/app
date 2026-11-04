@@ -125,3 +125,16 @@ it('omits the Go-to-Scripture action when no onGoToRef handler is provided', () 
   expect(document.querySelector('[data-testid="goto"]')).toBeNull();
   delete (/** @type {any} */ (globalThis)).GoToRefButton;
 });
+
+/* reading-flow hunt 2026-11-04: a reference opened from a Matthew note's commentary is not always in
+   MATTHEW_NKJV (the dictionary of the cross-references the notes list): its text comes from the
+   bundled Bible, as the footnote and inline-cite sheets already read it. */
+it('reads a reference MATTHEW_NKJV does not hold from the bundled Bible', () => {
+  /** @type {any} */ (globalThis).lookupVersesFromBooks = (ref) => (ref === 'Malachi 4:4-6' ? '4. Remember the Law of Moses…' : null);
+  try {
+    render(<Sheet activeRef={{ ref: '11:13-14', cite: 'Malachi 4:4-6' }} onClose={() => {}} />);
+    expect(document.querySelector('[data-testid="verse"]').textContent).toContain('Remember the Law of Moses');
+  } finally {
+    delete (/** @type {any} */ (globalThis)).lookupVersesFromBooks;
+  }
+});

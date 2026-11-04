@@ -41,7 +41,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { useFromLetterStack } from './use-from-letter-stack.js';
+import { useFromLetterStack, reopenFootnoteOf } from './use-from-letter-stack.js';
 import { navHandoff } from '../utils/nav-handoff.js';
 
 let _prevHandoff;
@@ -187,6 +187,29 @@ describe('useFromLetterStack — tapThroughBack', () => {
     act(() => { result.current.pushFromLetter({ sourceScreen: 'vot-seven-letter', sourceLetterId: 'proclaim', sourceFootnote: null }); });
     act(() => { result.current.tapThroughBack(); });
     expect(navHandoff.peek('reopenFootnote')).toBeNull();
+  });
+
+  // reading-flow hunt 2026-11-04: a Bible study's chapter is a LetterView page whose id is the
+  // CHAPTER's (studyChapterId); the app's letterId is whatever letter was open before. Grace and
+  // the Law, Part 7, footnote 8 opens a Volume Seven letter: Back did not reopen the footnote, and
+  // the hand-off named the earlier letter, whose footnote 8 then opened the next time it was read.
+  it('hands a Bible study chapter its own footnote back, never the letter read before it', () => {
+    const { result } = setup();
+    act(() => { result.current.pushFromLetter({ sourceScreen: 'bible-study-chapter', sourceLetterId: 'keep-the-passover', sourceStudyId: 'grace-and-the-law', sourceStudyChapterId: 'grace-and-the-law-ch7', sourceFootnote: '8' }); });
+    act(() => { result.current.tapThroughBack(); });
+    expect(navHandoff.peek('reopenFootnote')).toEqual({ letterId: 'grace-and-the-law-ch7', num: '8' });
+    navHandoff.clear('reopenFootnote');
+  });
+});
+
+describe('reopenFootnoteOf', () => {
+  it('names the page the footnote lives on, or nothing', () => {
+    expect(reopenFootnoteOf({ sourceScreen: 'vot-seven-letter', sourceLetterId: 'proclaim', sourceFootnote: '2' })).toEqual({ letterId: 'proclaim', num: '2' });
+    expect(reopenFootnoteOf({ sourceScreen: 'bible-study-chapter', sourceLetterId: 'x', sourceStudyChapterId: 'purity-ch1', sourceFootnote: '3' })).toEqual({ letterId: 'purity-ch1', num: '3' });
+    expect(reopenFootnoteOf({ sourceScreen: 'bible-study-chapter', sourceLetterId: 'x', sourceStudyChapterId: null, sourceFootnote: '3' })).toBeNull();
+    expect(reopenFootnoteOf({ sourceScreen: 'vot-seven-letter', sourceLetterId: null, sourceFootnote: '2' })).toBeNull();
+    expect(reopenFootnoteOf({ sourceScreen: 'vot-seven-letter', sourceLetterId: 'proclaim', sourceFootnote: null })).toBeNull();
+    expect(reopenFootnoteOf(null)).toBeNull();
   });
 });
 

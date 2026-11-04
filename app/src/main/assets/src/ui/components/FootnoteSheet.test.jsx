@@ -310,3 +310,27 @@ describe('a note footnote: markers, references and the source letter are followa
     expect(onInAppLink).toHaveBeenCalledWith({ collection: 'Answers Only God Can Give', letterTitle: 'Regarding True Repentance' });
   });
 });
+
+/* reading-flow hunt 2026-11-04: eight Bible-study chapters number their footnotes on from the
+   chapter before, as the study's own pages do (Grace and the Law, Part 7 holds 8-14), and the
+   sheet's counter put the footnote's NUMBER over the page's COUNT: "Footnote 8 of 7". */
+describe('the footnote counter', () => {
+  const num = () => document.querySelector('.fn-sheet-num').textContent;
+  it('counts by place when a page numbers its footnotes on from an earlier page', () => {
+    const fns = { '8': fn, '9': fn, '10': fn, '11': fn, '12': fn, '13': fn, '14': fn };
+    render(<Sheet num="8" fn={fn} nkjv={{}} footnotes={fns} onClose={() => {}} onNavigate={() => {}} />);
+    expect(num()).toBe('Footnote 8 · 1 of 7');
+  });
+
+  it('counts by place over a gap in the numbers too', () => {
+    const fns = { '1': fn, '2': fn, '4': fn };
+    render(<Sheet num="4" fn={fn} nkjv={{}} footnotes={fns} onClose={() => {}} onNavigate={() => {}} />);
+    expect(num()).toBe('Footnote 4 · 3 of 3');
+  });
+
+  it('reads "Footnote N of M" as before when the page numbers its own 1..M', () => {
+    const fns = { '1': fn, '2': fn, '3': fn };
+    render(<Sheet num="2" fn={fn} nkjv={{}} footnotes={fns} onClose={() => {}} onNavigate={() => {}} />);
+    expect(num()).toBe('Footnote 2 of 3');
+  });
+});

@@ -10,7 +10,13 @@ export function ScriptureSheet({ activeRef, onClose, onGoToRef }) {
   const isOpen = activeRef != null;
   const rail = useRailMode();   // companion-rail fork — see FootnoteSheet
   const trapRef = useFocusTrap(isOpen, { modal: !rail });   // rail: no trap, but focus returns on close
-  const verseText = activeRef ? MATTHEW_NKJV[activeRef.cite] : null;
+  // A reference opened from a note's commentary ("(Matthew 11:14)", "Malachi 4:4-6") need not be in
+  // MATTHEW_NKJV, the dictionary of the cross-references the notes list: the bundled Bible reads it,
+  // as the footnote and inline-cite sheets do (2026-11-04). Looked up each render, so a Bible corpus
+  // that lands while the sheet is open fills it in.
+  const verseText = activeRef
+    ? (MATTHEW_NKJV[activeRef.cite] || (typeof lookupVersesFromBooks === 'function' ? lookupVersesFromBooks(activeRef.cite) : null))
+    : null;
   // position:fixed sheet — portal to <body> so it anchors to the viewport, NOT to
   // the reading screen's `.pager-track`. During a page-swipe settle the track
   // carries a transient transform / will-change:transform (use-pager-gesture); a

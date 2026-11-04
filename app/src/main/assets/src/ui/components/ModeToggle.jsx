@@ -65,15 +65,24 @@ export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
 ═══════════════════════════════════════════════════════════════ */
 // Commentary cites (non-lookup scripture notes) may embed inline refs like
 // "(Matthew 11:14)". Detect Book-Ch:Vs patterns and style them gold.
-export function renderCommentaryCite(text) {
+// `onRef`: they are gold in the class every tappable reference has, and did
+// nothing when tapped; handed a way to open one, each is a tap target, as in
+// render-text.jsx (reading-flow hunt, 2026-11-04).
+export function renderCommentaryCite(text, onRef = null) {
   if (!text) return text;
-  // Matches "Matthew 11:14", "1 John 2:15-17", "Psalm 22:1", etc.
-  const rx = /\b((?:[123]\s)?[A-Z][a-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:[-,\s\d]+)?)\b/g;
+  // Matches "Matthew 11:14", "1 John 2:15-17", "Psalm 22:1", "Revelation 21:9, 22:17", etc.
+  // The tail takes a range or a comma's verse (or chapter:verse), never the number a
+  // following book starts with: the old [-,\s\d]+ read "Ephesians 1:22, 1" and left
+  // "Corinthians 12:13" (and dropped ":17" from "21:9, 22:17").
+  const rx = /\b((?:[123]\s)?[A-Z][a-z]+(?:\s+[A-Za-z]+)*\s+\d+:\d+(?:\s*[-–]\s*\d+(?::\d+)?|\s*,\s*\d+(?::\d+)?(?!\s*[A-Za-z\d]))*)/g;
   const parts = [];
   let last = 0,m;
   while ((m = rx.exec(text)) !== null) {
     if (m.index > last) parts.push(text.slice(last, m.index));
-    parts.push(<span key={m.index} className="inline-scrip-ref">{m[0]}</span>);
+    const ref = m[0];
+    parts.push(onRef
+      ? <a key={m.index} className="inline-scrip-ref" href="#" aria-haspopup="dialog" title={ref} onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRef(ref); }}>{ref}</a>
+      : <span key={m.index} className="inline-scrip-ref">{ref}</span>);
     last = m.index + m[0].length;
   }
   if (last < text.length) parts.push(text.slice(last));

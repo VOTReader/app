@@ -382,7 +382,7 @@ function App() {
     screen, bookId, chapterNum, letterId, studyId, studyChapterId,
     pushFromLetter,
     setScreen, setLetterId, setStudyId, setStudyChapterId,
-    setFromMatthewCh, setActiveReadKey, setLastReadForVol,
+    setFromMatthewCh, setActiveReadKey, setLastReadForVol, fromMatthewCh,
   });
 
   /* useTabActions — tab open/close/switch operations (P6k Commit B).

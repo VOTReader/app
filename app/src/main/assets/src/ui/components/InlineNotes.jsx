@@ -26,7 +26,7 @@ export function InlineNotes({ scriptures, votNotes, onScriptureClick, onVotLette
           <div key={hlKeyBase ? hlKeyBase + '-s' + i : `s${i}`} className="inline-note-scripture inline-note-plain" {...ann('s' + i)}>
             <StaticSubtree>
               <span className="inline-note-tag">{s.ref}</span>
-              <span className="inline-note-cite">{renderCommentaryCite(s.cite)}</span>
+              <span className="inline-note-cite">{renderCommentaryCite(s.cite, onScriptureClick ? (cite) => onScriptureClick({ ref: s.ref, cite }) : null)}</span>
             </StaticSubtree>
           </div>
         );
