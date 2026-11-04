@@ -52,9 +52,11 @@
                        back-stack pusher.
      setScreen, setLetterId, setStudyId, setStudyChapterId
                        Nav setters for the destination.
-     setFromMatthewCh  From useTabs tabField. Only goToLetterFromMatthew
+     setFromMatthewCh  From useTabs tabField. goToLetterFromMatthew
                        calls it (marks the Matthew chapter the user
-                       came from).
+                       came from); the hook clears it once the reader
+                       is on matthew-ch again.
+     fromMatthewCh     That breadcrumb's value (read to know it is set).
      setActiveReadKey  From useReadingDwell. Sets the dwell-timer's
                        active key for the destination + a last-read
                        commit callback (for non-study destinations).
@@ -98,7 +100,8 @@
  *   setStudyChapterId: (v: any) => void,
  *   setFromMatthewCh: (v: any) => void,
  *   setActiveReadKey: (key: string, commitFn?: (() => void) | null) => void,
- *   setLastReadForVol: (volKey: string, letterId: string) => void
+ *   setLastReadForVol: (volKey: string, letterId: string) => void,
+ *   fromMatthewCh?: { chapterNum: number | null } | null
  * }} args
  * @returns {{
  *   goToLetterFromMatthew: (vol: string, letter: string, excerpt?: string) => void,
@@ -107,15 +110,38 @@
  */
 import { resolveVotLetter } from '../data/letter-linking.js';
 
+/** Where a tap-through lands, as the prune effect and _destMatches compare it. @param {any} dest */
+function destSnapshotOf(dest) {
+  return dest.isStudy
+    ? { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: dest.studyId, studyChapterId: dest.studyChapterId }
+    : { screen: dest.screen, bookId: null, chapterNum: null, letterId: dest.id, studyId: null, studyChapterId: null };
+}
+
 export function useTapThrough({
   screen, bookId, chapterNum, letterId, studyId, studyChapterId,
   pushFromLetter,
   setScreen, setLetterId, setStudyId, setStudyChapterId,
   setFromMatthewCh, setActiveReadKey, setLastReadForVol,
+  fromMatthewCh = null,
 }) {
+  // The breadcrumb a Matthew card leaves (fromMatthewCh) says "this letter was
+  // opened from Matthew N", and Back from a letter honours it before Studies,
+  // Search and the index. Once the reader is on Matthew again it is spent: Back
+  // from the card's letter (the pill or hardware Back) returned there and left it
+  // set, so a later Back from an unrelated letter went to Matthew (reading-flow
+  // hunt, 2026-11-04). The jumps that set it leave Matthew in the same tick.
+  React.useEffect(() => {
+    if (screen === 'matthew-ch' && fromMatthewCh) setFromMatthewCh(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- setFromMatthewCh is a tabField setter (identity-stable)
+  }, [screen, fromMatthewCh]);
+
   const goToLetterFromMatthew = (vol, letter, excerpt) => {
     const dest = resolveVotLetter(vol, letter);
     if (!dest) return; // defensive: unknown letter → no-op (no blackscreen)
+    // destSnapshot: the "‹ Back to Matthew N" pill is single-shot like every other
+    // (openInAppLetter below). Without one the entry was never pruned: the pill
+    // followed the reader onto every later letter, and after Hidden Manna's ‹
+    // (which returns to Matthew without popping) it stood on Matthew N itself.
     pushFromLetter({
       sourceScreen: 'matthew-ch',
       sourceBookId: 'matthew',
@@ -125,6 +151,7 @@ export function useTapThrough({
       sourceStudyChapterId: null,
       sourceLetterTitle: `Matthew ${chapterNum}`,
       sourceVolumeLabel: null,
+      destSnapshot: destSnapshotOf(dest),
     });
     // NAV2: only a LetterView / WtlbEntryView destination consumes pendingHighlight.
     // A study chapter (bible-study-chapter) has no reader, so setting the slot there
@@ -165,12 +192,7 @@ export function useTapThrough({
     // ALL back pills in the app are now single-shot per user direction:
     // the pill is a contextual breadcrumb for THIS landing, not a
     // permanent fixture that survives onward navigation.
-    let destSnapshot = null;
-    if (dest.isStudy) {
-      destSnapshot = { screen: 'bible-study-chapter', bookId: null, chapterNum: null, letterId: null, studyId: dest.studyId, studyChapterId: dest.studyChapterId };
-    } else {
-      destSnapshot = { screen: dest.screen, bookId: null, chapterNum: null, letterId: dest.id, studyId: null, studyChapterId: null };
-    }
+    const destSnapshot = destSnapshotOf(dest);
     pushFromLetter({
       sourceScreen: screen, sourceLetterId: letterId,
       sourceBookId: bookId, sourceChapterNum: chapterNum,
