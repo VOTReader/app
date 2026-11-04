@@ -13,18 +13,19 @@ class FakeAudio extends EventTarget {
     super();
     FakeAudio.last = this;
     this._src = ''; this.currentTime = 0; this.duration = 0; this.paused = true; this.readyState = 0;
-    this.preload = ''; this.error = null; this.defaultPlaybackRate = 1; this.playbackRate = 1; this.volume = 1;
+    this.preload = ''; this.error = null; this.defaultPlaybackRate = 1; this.playbackRate = 1; this.volume = 1; this.ended = false;
   }
   get src() { return this._src; }
-  set src(v) { this._src = v; this.currentTime = 0; this.readyState = 0; this.playbackRate = this.defaultPlaybackRate; }
-  play() { this.paused = false; this.readyState = 4; this.dispatchEvent(new Event('playing')); return Promise.resolve(); }
+  set src(v) { this._src = v; this.currentTime = 0; this.readyState = 0; this.ended = false; this.playbackRate = this.defaultPlaybackRate; }
+  // A real element (and native's ENDED, NativeAudioController) seeks an ended recording to 0 on play().
+  play() { if (this.ended) { this.ended = false; this.currentTime = 0; } this.paused = false; this.readyState = 4; this.dispatchEvent(new Event('playing')); return Promise.resolve(); }
   pause() { if (!this.paused) { this.paused = true; this.dispatchEvent(new Event('pause')); } }
   load() {}
   removeAttribute(name) { if (name === 'src') this._src = ''; }
 }
 
 const el = () => FakeAudio.last;
-const end = () => { el().duration = 300; el().currentTime = 300; el().dispatchEvent(new Event('ended')); };
+const end = () => { el().duration = 300; el().currentTime = 300; el().ended = true; el().paused = true; el().dispatchEvent(new Event('ended')); };
 const ITEMS = { one: [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }], two: [{ id: 'c', title: 'C' }] };
 const playRun = () => AudioPlayer.playCollection({ volKey: 'one', items: ITEMS.one, collectionLabel: 'Volume One' });
 const toastText = () => (document.getElementById('vot-toast-audio') || {}).textContent || '';
@@ -94,6 +95,37 @@ describe('sleep at the end of the queue', () => {
     expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
   });
 
+  it('a countdown chosen on the held last recording lets the run go on into the next collection', () => {
+    playRun();
+    AudioPlayer.setSleepAtQueueEnd();
+    end();   // A ends: the queue is held at [A, B]
+    AudioPlayer.setSleepTimer(30);
+    expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual(['one:a', 'one:b', 'two:c']);
+    end();   // B ends inside the 30 minutes: Volume Two plays, the session does not end
+    expect(AudioPlayer.getState().status).not.toBe('idle');
+    expect(AudioPlayer.getState().qi).toBe(2);
+  });
+
+  it('End of this recording chosen on the held last recording lets the run go on after it', () => {
+    playRun();
+    AudioPlayer.setSleepAtQueueEnd();
+    end();
+    AudioPlayer.setSleepAtTrackEnd();
+    expect(AudioPlayer.getState().queue.map((t) => t.key)).toEqual(['one:a', 'one:b', 'two:c']);
+  });
+
+  it('Play after the queue-end sleep goes on into the next collection, not back to the top of the last recording', () => {
+    playRun();
+    AudioPlayer.setSleepAtQueueEnd();
+    end();
+    end();   // B ends: paused at its end
+    AudioPlayer.toggle();
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(2);
+    expect(s.queue[s.qi].key).toBe('two:c');
+    expect(el().src).toContain('idC');
+  });
+
   it('refuses with nothing playing', () => {
     expect(AudioPlayer.setSleepAtQueueEnd()).toBe(false);
   });
@@ -114,4 +146,38 @@ describe('Keep listening +15 min', () => {
     expect(AudioPlayer.getSleepRemainingSeconds()).toBeGreaterThan(14 * 60);
   });
 
+  it('tapped after the listener already pressed Play, it keeps playing and adds the 15 minutes', () => {
+    playRun();
+    AudioPlayer.setSleepTimer(30);
+    vi.advanceTimersByTime(30 * 60000);
+    AudioPlayer.toggle();   // Play from the bar (or the headset) while the toast is still up
+    expect(AudioPlayer.getState().status).not.toBe('paused');
+    document.querySelector('#vot-toast-audio button').click();
+    expect(AudioPlayer.getState().status).not.toBe('paused');
+    expect(AudioPlayer.getState().sleepMinutes).toBe(15);
+  });
+});
+
+describe('Play after a sleep that ended with the recording', () => {
+  it('moves on to the next recording instead of replaying the one just heard', () => {
+    playRun();
+    AudioPlayer.setSleepAtTrackEnd();
+    end();   // A ends: paused at its end
+    expect(AudioPlayer.getState().status).toBe('paused');
+    expect(AudioPlayer.getState().qi).toBe(0);
+    AudioPlayer.toggle();
+    const s = AudioPlayer.getState();
+    expect(s.qi).toBe(1);
+    expect(el().src).toContain('idB');
+    expect(s.status).not.toBe('paused');
+  });
+
+  it('the toast Keep listening also moves on', () => {
+    playRun();
+    AudioPlayer.setSleepAtTrackEnd();
+    end();
+    document.querySelector('#vot-toast-audio button').click();
+    expect(AudioPlayer.getState().qi).toBe(1);
+    expect(AudioPlayer.getState().sleepMinutes).toBe(15);
+  });
 });

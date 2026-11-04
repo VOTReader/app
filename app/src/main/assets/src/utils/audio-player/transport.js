@@ -90,6 +90,12 @@ export function toggle() {
     return;
   }
 
+  // Paused at the END of a recording (a sleep that ended with it, a passage repeat's last pass at the end): Play moves
+  // on. play() on an ended element starts it again from 0:00 (the media spec; native's STATE_ENDED seeks to 0 too), so
+  // the chapter just heard played twice and counted finished twice. A seam's step (atSeam): nothing is left playing to
+  // keep, so it is not refused offline; it pauses on what cannot load, with the notice. At the end of the order
+  // there is nowhere to go, and Play starts it over as before.
+  if (_el.ended && !_el.error && (_state.qi + 1 < _state.queue.length || _repeatMode() === 'all')) { next(true); return; }
   const track = _state.queue[_state.qi];
   if (!track) return;
   // A failed element stays failed until src is re-assigned; an element still

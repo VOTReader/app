@@ -23,11 +23,22 @@ export function _clearSleepTimer(notify = true) {
     _state.sleepMinutes = 0;
     _state.sleepAtTrackEnd = false;
     _state.sleepAtQueueEnd = false;
-    // "End of the queue" held the run back from the site order; let go on its last recording, it joins it again.
-    if (heldRun && _state.qi + 1 >= _state.queue.length) late._extendQueue();
+    _letGoOfHeldRun(heldRun);
     if (notify) _notify();
   }
   _syncSleepVolume();   // a fade in progress ends with the timer: full voice again
+}
+
+/**
+ * "End of the queue" held the run back from the site order (queue.js _extendQueue asks). Whatever disarms it on the
+ * last recording lets go, so the run joins the order again: Clear, another sleep mode (a countdown chosen there used
+ * to end the whole session when that recording ended, its minutes unused), and the queue-end sleep's own firing (the
+ * next Play goes on into the next collection). Call it AFTER the flag is cleared.
+ * @param {boolean} wasHeld sleepAtQueueEnd before it was cleared
+ * @returns {void}
+ */
+function _letGoOfHeldRun(wasHeld) {
+  if (wasHeld && !_state.sleepAtQueueEnd && _state.qi + 1 >= _state.queue.length) late._extendQueue();
 }
 
 /* ── THE SLEEP FADE (2026-09-22) ──────────────────────────────────────────
@@ -79,8 +90,10 @@ export function _syncSleepVolume() {
  * @returns {void}
  */
 export function _sleepAtTrackEndFire() {
+  const heldRun = _state.sleepAtQueueEnd;
   _state.sleepAtTrackEnd = false;
   _state.sleepAtQueueEnd = false;
+  _letGoOfHeldRun(heldRun);
   const wasLive = _state.status === 'playing' || _state.status === 'loading';
   if (wasLive && _el) { try { _el.pause(); } catch (_e) { /* already detached */ } }
   late._markPaused();
@@ -92,7 +105,9 @@ export function _sleepAtTrackEndFire() {
 /** Every sleep end says so, with one tap to play on for another quarter hour (brief 3b, pl-l2). */
 function _sleepEndedToast() {
   _toastAction('Sleep timer ended. Playback paused.', 'Keep listening +15 min', () => {
-    late.toggle();
+    // Play only if still paused: the toast stays up 8 s, and a listener who already pressed Play (the bar, a headset)
+    // must not be paused by a tap that says "keep listening".
+    if (_state.status === 'paused') late.toggle();
     setSleepTimer(15);
   });
 }
@@ -142,8 +157,10 @@ export function setSleepTimer(minutes) {
   const mins = Math.max(1, Math.min(120, Math.floor(Number(minutes) || 0)));
   if (_state.status === 'idle' || !_state.queue.length) return false;
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
+  const heldRun = _state.sleepAtQueueEnd;
   _state.sleepAtTrackEnd = false;   // one sleep arming at a time
   _state.sleepAtQueueEnd = false;
+  _letGoOfHeldRun(heldRun);
   _state.sleepEndsAt = Date.now() + mins * 60000;
   // The PRESET, kept beside the deadline: the desk shows which chip is armed,
   // and the remaining seconds cannot answer that (a 30-minute timer with 15
@@ -169,8 +186,10 @@ export function setSleepAtTrackEnd() {
   if (_sleepTimer) { clearTimeout(_sleepTimer); _sleepTimer = null; }
   _state.sleepEndsAt = 0;
   _state.sleepMinutes = 0;
+  const heldRun = _state.sleepAtQueueEnd;
   _state.sleepAtTrackEnd = true;
   _state.sleepAtQueueEnd = false;
+  _letGoOfHeldRun(heldRun);
   _syncSleepVolume();
   _notify();
   return true;
