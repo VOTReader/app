@@ -49,6 +49,9 @@ const VOT_CONST = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*['"`](vot-[A-Za-
  * @returns {Map<string, Set<string>>}   key → the files that use it
  */
 export function lsKeysIn(sources) {
+  // Only a module that names localStorage or declares a vot-* constant can matter (the corpora, 56 MB
+  // of src/data, are neither), so the patterns below never walk them.
+  const relevant = new Map([...sources].filter(([, src]) => src.includes('localStorage') || /['"`]vot-/.test(src)));
   /** @type {Map<string, Set<string>>} */
   const found = new Map();
   const add = (key, file) => {
@@ -61,13 +64,13 @@ export function lsKeysIn(sources) {
     return m ? m[1] : null;
   };
   const exported = (name) => {
-    for (const src of sources.values()) {
+    for (const src of relevant.values()) {
       const m = new RegExp('export\\s+(?:const|let|var)\\s+' + name + '\\s*=\\s*[\'"`]([^\'"`]+)[\'"`]').exec(src);
       if (m) return m[1];
     }
     return null;
   };
-  for (const [file, src] of sources) {
+  for (const [file, src] of relevant) {
     let paramKeyed = false;
     for (const m of src.matchAll(CALL)) {
       const arg = m[1];
