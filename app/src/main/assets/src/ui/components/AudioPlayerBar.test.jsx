@@ -404,15 +404,50 @@ describe('AudioPlayerBar — transport', () => {
     expect(line2()).toBe('3 of 3 · Volume One');
   });
 
-  it('closes itself past the end of the queue', () => {
+  it('past the end of the queue it says Finished for 10 s with Replay, then closes itself (brief 3g, picture 02)', () => {
+    vi.useFakeTimers();
+    try {
+      render(<AudioPlayerBar />);
+      playWholeCollection();
+      for (let i = 0; i < 3; i++) drive(() => AudioPlayer.next());
+      expect(title()).toBe('The Seventh Day');                 // last track in the queue
+      emit('ended');
+      expect(AudioPlayer.getState().status).toBe('idle');       // past the end = done
+      expect(bar()).toBeTruthy();
+      expect(barOpenClass()).toBe(true);
+      expect(title()).toBe('Finished · Volume One');
+      expect(line2()).toBe('All 3 recordings played');
+      expect(screen.getByRole('status').textContent).toBe('Finished · Volume OneAll 3 recordings played');
+      expect(screen.queryByRole('button', { name: /Open listening controls/ })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Replay Volume One' })).toBeTruthy();
+      act(() => { vi.advanceTimersByTime(10000); });
+      expect(bar()).toBeNull();
+      expect(barOpenClass()).toBe(false);
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('Replay starts the queue again from its top; ✕ closes the Finished bar at once', () => {
     render(<AudioPlayerBar />);
     playWholeCollection();
     for (let i = 0; i < 3; i++) drive(() => AudioPlayer.next());
-    expect(title()).toBe('The Seventh Day');                 // last track in the queue
-    drive(() => AudioPlayer.next());
-    expect(AudioPlayer.getState().status).toBe('idle');       // past the end = done
+    emit('ended');
+    fireEvent.click(screen.getByRole('button', { name: 'Replay Volume One' }));
+    expect(AudioPlayer.getState().qi).toBe(0);
+    expect(AudioPlayer.getState().queue).toHaveLength(4);
+    expect(title()).toBe('A Word of Warning');
+    for (let i = 0; i < 3; i++) drive(() => AudioPlayer.next());
+    emit('ended');
+    fireEvent.click(screen.getByRole('button', { name: 'Close player' }));
     expect(bar()).toBeNull();
     expect(barOpenClass()).toBe(false);
+  });
+
+  it('a lone letter finishes by its collection, its title under it', () => {
+    render(<AudioPlayerBar />);
+    playSingleLetter();
+    emit('ended');
+    expect(title()).toBe('Finished · Volume One');
+    expect(line2()).toBe('The Seventh Day');
   });
 
   it('✕ stops playback, hides the bar, and discards the resume snapshot', () => {
