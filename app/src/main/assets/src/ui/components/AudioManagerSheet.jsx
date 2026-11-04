@@ -263,6 +263,14 @@ function Scrubber({ state, marks }) {
 /**
  * @param {{ open: boolean, state: import('../../utils/audio-player.js').AudioPlayerState, onClose: () => void }} props
  */
+/** Why the recording did not start, as the bar under it says it (h1104-19: a lost signal is not "not on this phone").
+    @param {string} failed  the engine's state.failed: load | signal | offline */
+export function sheetFailLine(failed) {
+  if (failed === 'load') return 'Couldn’t load this recording.';
+  if (failed === 'signal') return 'No signal. Your place is kept.';
+  return 'This recording isn’t on this phone.';
+}
+
 export function AudioManagerSheet({ open, state, onClose }) {
   // A screen that will render nothing (no current track) must not claim the modal registry or the close-sheet
   // bridge: an invisible topmost modal would swallow Escape/back. Hooks stay unconditional; only `active` and the
@@ -458,7 +466,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
               <LiveLine track={current} time={state.time} title={heading || ''} onOpen={canRead ? openReading : null} />
               {state.failed ? (
                 <p className="np-status" role="status">
-                  {state.failed === 'load' ? 'Couldn’t load this recording.' : 'This recording isn’t on this phone.'}
+                  {sheetFailLine(state.failed)}
                   {' '}<button type="button" className="np-sheet-link" onClick={() => AudioPlayer.toggle()}>Retry</button>
                 </p>
               ) : null}

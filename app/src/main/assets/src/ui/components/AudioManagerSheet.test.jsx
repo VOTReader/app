@@ -1509,3 +1509,15 @@ describe('AudioManagerSheet — Bible rows name their chapter (A4)', () => {
     expect(byline()).toBe('Chapter 1');
   });
 });
+
+/* h1104-19: a stream that lost its signal (the engine's 'signal': the phone still says it is online) made the full
+   player say "This recording isn't on this phone.", pointing the reader at a download, while the bar under it said
+   "No signal. Your place is kept." The sheet says what the bar says. */
+describe('the full player says why a recording did not start (h1104-19)', () => {
+  it('lost signal is not "not on this phone"', async () => {
+    const { sheetFailLine } = await import('./AudioManagerSheet.jsx');
+    expect(sheetFailLine('signal')).toBe('No signal. Your place is kept.');
+    expect(sheetFailLine('offline')).toBe('This recording isn’t on this phone.');
+    expect(sheetFailLine('load')).toBe('Couldn’t load this recording.');
+  });
+});
