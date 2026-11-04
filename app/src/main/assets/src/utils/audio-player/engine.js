@@ -372,10 +372,18 @@ function _onError() {
     _setSource(back.source);
     _state.time = back.time;
     _state.duration = back.duration;
+    // The speed is the restored recording's, as _start sets it: a song at 1x, a reading at the reading speed (the
+    // failed step's speed stayed on it: a song came back at 1.5x, a reading at 1x).
+    _state.rate = _isSong(back.queue[back.qi]) ? 1 : _readingRate;
     _errorTime = back.time;
     _lastTick = Math.floor(back.time);
     _state.failed = 'signal';
     _setStatus('paused');
+    // Let go of the recording that failed. The element (and native, under the APK) still held it, and a headset, car
+    // or lock-screen Play made native prepare and play IT, which the page then followed as native's own Play (W61):
+    // the failed recording under the restored one's name, its clock written over that one's place, and the restored
+    // letter credited at its end. Released, toggle() loads the restored recording at its place.
+    _releaseEl();
     _mediaSession(back.queue[back.qi]);
     _persist();
     _toast(NO_SIGNAL_MSG);

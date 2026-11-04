@@ -223,6 +223,47 @@ describe('audio-player on the native player (m3)', () => {
     expect(bridge.audioLoad).toHaveBeenCalledTimes(2);
   });
 
+  // U04.2's step back after a dead-zone step: the bar goes back to what was playing, so native must let go of the
+  // recording that failed, or a headset, car or lock-screen Play plays IT under the old one's name (W61's pickup),
+  // writes its clock over the old one's place and credits the old letter at its end.
+  it('(U04.2) a step undone in a dead zone lets native go of the failed recording; an outside Play cannot run it', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 300000, dur: 900000, playing: true, want: true });
+    await flush();
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    send({ type: 'error', url: URL_OF('idA1'), pos: 0, dur: 0, playing: false, want: true, code: 2001, name: 'ERROR_CODE_IO_NETWORK_CONNECTION_FAILED' });
+    await flush();
+    let s = AudioPlayer.getState();
+    expect(s.queue[s.qi].title).toBe('Letter C');
+    expect(s.status).toBe('paused');
+    expect(bridge.audioRelease).toHaveBeenCalled();
+    // the car's Play: native would prepare what it still held
+    send({ type: 'state', url: URL_OF('idA1'), pos: 0, dur: 400000, playing: false, want: true, buffering: true });
+    send({ type: 'state', url: URL_OF('idA1'), pos: 20000, dur: 400000, playing: true, want: true });
+    await flush();
+    s = AudioPlayer.getState();
+    expect(s.status).toBe('paused');
+    expect(s.time).toBeCloseTo(300, 1);
+    expect(JSON.parse(localStorage.getItem('vot-audio-pos')).time).toBeCloseTo(300, 1);
+    // the bar's own Play resumes Letter C at its place
+    AudioPlayer.toggle();
+    const last = loads().at(-1);
+    expect(last.url).toBe(URL_OF('idC'));
+    expect(last.startMs).toBe(300000);
+  });
+
+  it('a place moved on the bar after a load error is where Retry starts, not the place it died', async () => {
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-c', title: 'Letter C' } });
+    send({ type: 'state', url: URL_OF('idC'), pos: 100000, dur: 900000, playing: true, want: true });
+    send({ type: 'error', url: URL_OF('idC'), pos: 100000, dur: 900000, playing: false, want: true, code: 3001, name: 'ERROR_CODE_PARSING_CONTAINER_MALFORMED' });
+    await flush();
+    expect(AudioPlayer.getState().status).toBe('paused');
+    AudioPlayer.seek(400);
+    expect(AudioPlayer.getState().time).toBe(400);
+    AudioPlayer.toggle();
+    expect(loads().at(-1).startMs).toBe(400000);
+  });
+
   it('offline with nothing on the phone ahead, native is told to stop at the end of this one', async () => {
     await downloaded(['idA1']);
     setOnline(false);

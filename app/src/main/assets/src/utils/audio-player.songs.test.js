@@ -201,6 +201,23 @@ describe('songs are gated out of reading credit and counters', () => {
     expect(AudioPlayer.getState().rate).toBe(1.75);
   });
 
+  it('(U04.2) a letter that dies in a dead zone gives the song back at 1x, not the reading speed', () => {
+    globalThis.AudioLibraryStore = library(1.5);
+    AudioPlayer.playSongs({ filter: { family: 'fam-a' } });
+    el().dispatchEvent(new Event('playing'));
+    el().currentTime = 100; el().dispatchEvent(new Event('timeupdate'));
+    expect(AudioPlayer.getState().rate).toBe(1);
+    AudioPlayer.playLetter({ volKey: 'vol1', letter: { id: 'letter-a', title: 'Letter A' } });
+    expect(AudioPlayer.getState().rate).toBe(1.5);
+    el().error = { code: 2 };
+    el().dispatchEvent(new Event('error'));
+    const s = AudioPlayer.getState();
+    expect(s.queue[s.qi].key.startsWith('song:')).toBe(true);   // the step was undone
+    expect(s.rate).toBe(1);
+    AudioPlayer.toggle();
+    expect(el().playbackRate).toBe(1);
+  });
+
   it('a songs queue never continues into letters, even with the site order present', () => {
     globalThis.COLLECTIONS = [{ volKey: 'vol1', cardId: 'v1' }];
     globalThis.COL_BY_KEY = new Map([['vol1', { volKey: 'vol1' }]]);

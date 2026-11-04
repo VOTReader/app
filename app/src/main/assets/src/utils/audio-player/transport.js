@@ -281,6 +281,7 @@ export function seek(seconds) {
        read-along test for this passed only on a stale duration an earlier test
        left on the shared element. */
     _seekOnMetadata(seconds);
+    _setErrorTime(Math.max(0, seconds));   // a retry after a load error starts here too (below)
     _syncMediaSessionPosition();
     _syncNative();
     _setLastPersistSec(_lastTick);
@@ -290,6 +291,9 @@ export function seek(seconds) {
   const t = Math.max(0, Math.min(seconds || 0, max || 0));
   try { _el.currentTime = t; } catch (_e) { /* not seekable yet — state still reflects intent */ }
   _state.time = t;
+  // A bar paused on a load error retries from _errorTime (toggle): a place moved there since (a tapped verse, the
+  // scrubber, a skip) is where the listener said to go, not the place it died. Read only on a failed element.
+  _setErrorTime(t);
   _setLastTick(Math.floor(t));
   _syncMediaSessionPosition();
   _syncNative();   // a position JUMP breaks the card's interpolation — resync
