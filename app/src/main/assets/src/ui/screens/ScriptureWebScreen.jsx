@@ -603,7 +603,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                something the reader had not asked about (Corbin, 2026-09-11:
                "just keep x connections"); the density hint that flashes on a
                switch is where the two densities are explained. */
-            : (stats && <p>{web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections'}</p>)}
+            : (stats && <p className="sw-title-count">{web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections'}</p>)}
           {/* the density's line after a switch: seen here, said by .sw-live (one live region) */}
           {hint ? <div className="sw-hint" aria-hidden="true">{hint}</div> : null}
         </div>
