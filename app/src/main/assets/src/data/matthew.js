@@ -95,7 +95,7 @@ var MATTHEW = {
         "segments": [
           { "t": "italic", "v": "\"For only I may add to My Word, yea, an unveiling of the Word's majesty, both subtle and brilliant, that you may have greater understanding. I alone shall take what man has made crooked, and set it straight once again. For I tell you the truth, the translations of men are greatly erred, which leads to an even greater misinterpretation of My Word by the churches of men, who seek not the Truth as it is but long for that which is malleable, embracing only that which yields to their own perverse desires and expectations.\" " },
           { "t": "text", "v": "[The Volumes of Truth, Volume Four, an excerpt from " },
-          { "t": "letter-link", "label": "\"Mistranslation and Misinterpretation Leading to Great Obscurity Among Many Faces\"", "link": { "collection": "Volume Four", "letterTitle": "Mistranslation and Misinterpretation Leading to Great Obscurity Among Many Faces" } },
+          { "t": "letter-link", "label": "\"Mistranslation and Misinterpretation Leading to Great Obscurity Among Many Faces\"", "link": { "collection": "Volume Four", "letterTitle": "Mistranslation and Misinterpretation Leading to Great Obscurity among Many Faces" } },
           { "t": "text", "v": "]" }
         ]
       },
@@ -6574,7 +6574,7 @@ var MATTHEW = {
       "scriptures": [
         {
           "ref": "22:11",
-          "cite": "Wedding Garment: Colossians 3:9-10"
+          "cite": "Colossians 3:9-10"
         },
         {
           "ref": "22:16",

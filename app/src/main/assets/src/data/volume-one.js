@@ -2529,7 +2529,7 @@ var LETTERS_V1 = [
       },
       "5": {
         "type": "scripture",
-        "ref": "Amos 3:7 CJB"
+        "ref": "Amos 3:7 (CJB)"
       }
     },
     "nkjv": {
@@ -2537,7 +2537,7 @@ var LETTERS_V1 = [
       "Jeremiah 36:4": "Then Jeremiah called Baruch the son of Neriah; and Baruch wrote on a scroll of a book, at the instruction of Jeremiah, all the words of the LORD which He had spoken to him.",
       "Jeremiah 1:5": "“Before I formed you in the womb I knew you; Before you were born I sanctified you; I ordained you a prophet to the nations.”",
       "Jeremiah 1:10": "See, I have this day set you over the nations and over the kingdoms, To root out and to pull down, To destroy and to throw down, To build and to plant.”",
-      "Amos 3:7 CJB": "Surely the Lord GOD does nothing, Unless He reveals His secret to His servants the prophets."
+      "Amos 3:7 (CJB)": "Surely the Lord GOD does nothing, Unless He reveals His secret to His servants the prophets."
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/duty-4",
     "soundcloudUrl": "https://soundcloud.com/the-volumes-of-truth/duty?in=the-volumes-of-truth/sets/volume-one",

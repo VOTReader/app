@@ -6261,7 +6261,7 @@ var BIBLE_STUDIES = [
                     {
                       "t": "letter-link",
                       "letterId": "enemies-of-the-lord-come-forth",
-                      "screen": "rebuke-letter",
+                      "screen": "vot-rebuke-letter",
                       "label": "\"Enemies of The Lord, Come Forth\" - A Testament Against The World: The Lord's Rebuke",
                       "link": {
                         "collection": "A Testament Against The World: The Lord's Rebuke",
@@ -14656,9 +14656,9 @@ var BIBLE_STUDIES = [
                       "t": "letter-link",
                       "letterId": "salvation-is-given-and-must-be-received-once-received-forever-shall-it-belong-to-the-redeemed",
                       "screen": "vot-seven-letter",
-                      "label": "\"Salvation Is Given and Must Be Received; Once Received, Forever Shall It Belong to the Redeemed\" - Volume Two",
+                      "label": "\"Salvation Is Given and Must Be Received; Once Received, Forever Shall It Belong to the Redeemed\" - Volume Seven",
                       "link": {
-                        "collection": "Volume Two",
+                        "collection": "Volume Seven",
                         "letterTitle": "Salvation Is Given and Must Be Received; Once Received, Forever Shall It Belong to the Redeemed"
                       }
                     },
@@ -14831,7 +14831,7 @@ var BIBLE_STUDIES = [
                       "label": "\"As I Am, So Shall It Be with Those I Am Sending… The Mystery of God Revealed to the Chosen\" - Volume Seven",
                       "link": {
                         "collection": "Volume Seven",
-                        "letterTitle": "As I Am, So Shall It Be with Those I Am Sending… The Mystery of God Revealed to the Chosen"
+                        "letterTitle": "As I Am, So Shall It Be with Those I Am Sending... The Mystery of God Revealed to the Chosen"
                       }
                     },
                     {
@@ -15614,7 +15614,7 @@ var BIBLE_STUDIES = [
                       "label": "\"One Truth, One Church, One Body… No Walls\" - Volume Two",
                       "link": {
                         "collection": "Volume Two",
-                        "letterTitle": "One Truth, One Church, One Body… No Walls"
+                        "letterTitle": "One Truth, One Church, One Body... No Walls"
                       }
                     },
                     {
@@ -16125,7 +16125,7 @@ var BIBLE_STUDIES = [
                       "label": "\"I Am The Passover and The Lamb, the New Covenant With Men\" - Volume Two",
                       "link": {
                         "collection": "Volume Two",
-                        "letterTitle": "I Am The Passover and The Lamb, the New Covenant With Men"
+                        "letterTitle": "I Am The Passover and The Lamb, The New Covenant with Men"
                       }
                     },
                     {
@@ -16679,7 +16679,7 @@ var BIBLE_STUDIES = [
                       "label": "\"I Am The Passover and The Lamb, the New Covenant With Men\" - Volume Two",
                       "link": {
                         "collection": "Volume Two",
-                        "letterTitle": "I Am The Passover and The Lamb, the New Covenant With Men"
+                        "letterTitle": "I Am The Passover and The Lamb, The New Covenant with Men"
                       }
                     },
                     {
@@ -17094,7 +17094,7 @@ var BIBLE_STUDIES = [
                     },
                     {
                       "t": "letter-link",
-                      "letterId": "given-to-teach",
+                      "letterId": "even-to-children-is-the-spirit-given",
                       "screen": "vot-flock-letter",
                       "label": "\"Even to Children Is the Spirit Given\" - Letters to The Lord's Little Flock",
                       "link": {
@@ -17188,7 +17188,7 @@ var BIBLE_STUDIES = [
                     },
                     {
                       "t": "letter-link",
-                      "letterId": "to-the-nation-once-called-of-itself-under-god",
+                      "letterId": "thus-declares-the-lord-against-the-nation-once-called-of-itself-under-god",
                       "screen": "vot-seven-letter",
                       "label": "\"Thus Declares The Lord Against the Nation Once Called of Itself 'Under God'\" - Volume Seven",
                       "link": {
@@ -19088,7 +19088,7 @@ var BIBLE_STUDIES = [
                       "label": "\"The Prophets Are Sent Out, True and False: the High-Minded Abased, the Lowly Uplifted... The Great and Terrible Day of The Lord Is Near, and Who Shall Stand\" - Volume Seven",
                       "link": {
                         "collection": "Volume Seven",
-                        "letterTitle": "The Prophets Are Sent Out, True and False: the High-Minded Abased, the Lowly Uplifted... The Great and Terrible Day of The Lord Is Near, and Who Shall Stand"
+                        "letterTitle": "The Prophets Are Sent Out, True and False; the High-Minded Abased, the Lowly Uplifted... The Great and Terrible Day of The Lord Is Near, and Who Shall Stand"
                       }
                     },
                     {
@@ -20022,7 +20022,7 @@ var BIBLE_STUDIES = [
                       "label": "\"All Have Been Purchased; Yet Few Have Accepted, Few Are Chosen\" - Volume Two",
                       "link": {
                         "collection": "Volume Two",
-                        "letterTitle": "All Have Been Purchased; Yet Few Have Accepted, Few Are Chosen"
+                        "letterTitle": "All Have Been Purchased... Yet Few Have Accepted, Few Are Chosen"
                       }
                     },
                     {
@@ -28097,7 +28097,7 @@ var BIBLE_STUDIES = [
                       "label": "\"I Am The Passover and The Lamb, the New Covenant With Men\" - Volume Two",
                       "link": {
                         "collection": "Volume Two",
-                        "letterTitle": "I Am The Passover and The Lamb, the New Covenant With Men"
+                        "letterTitle": "I Am The Passover and The Lamb, The New Covenant with Men"
                       }
                     },
                     {
@@ -32483,7 +32483,7 @@ var BIBLE_STUDIES = [
                       "label": "\"Blessed Are Those Who Overcome For My Name’s Sake\" - Volume Three",
                       "link": {
                         "collection": "Volume Three",
-                        "letterTitle": "Blessed Are Those Who Overcome for My Name's Sake"
+                        "letterTitle": "Blessed Are Those Who Overcome for My Name’s Sake"
                       }
                     },
                     {
@@ -34276,7 +34276,7 @@ var BIBLE_STUDIES = [
                       "label": "\"Blessed Are Those Who Overcome For My Name's Sake\" - Volume Three",
                       "link": {
                         "collection": "Volume Three",
-                        "letterTitle": "Blessed Are Those Who Overcome for My Name's Sake"
+                        "letterTitle": "Blessed Are Those Who Overcome for My Name’s Sake"
                       }
                     },
                     {
@@ -51243,7 +51243,7 @@ var BIBLE_STUDIES = [
                 "label": "\"I Am The Passover and The Lamb, the New Covenant With Men\" - Volume Two",
                 "link": {
                   "collection": "Volume Two",
-                  "letterTitle": "I Am The Passover and The Lamb, the New Covenant With Men"
+                  "letterTitle": "I Am The Passover and The Lamb, The New Covenant with Men"
                 }
               }
             ]
@@ -52225,7 +52225,7 @@ var BIBLE_STUDIES = [
                 "label": "\"I Am The Passover and The Lamb, the New Covenant With Men\" - Volume Two",
                 "link": {
                   "collection": "Volume Two",
-                  "letterTitle": "I Am The Passover and The Lamb, the New Covenant With Men"
+                  "letterTitle": "I Am The Passover and The Lamb, The New Covenant with Men"
                 }
               }
             ]
@@ -53176,7 +53176,7 @@ var BIBLE_STUDIES = [
                 "label": "\"Walking in the Footsteps of The Messiah's Passion\" - Volume Four",
                 "link": {
                   "collection": "Volume Four",
-                  "letterTitle": "Walking in the Footsteps of The Messiah's Passion"
+                  "letterTitle": "Walking in the Footsteps of The Messiah’s Passion"
                 }
               }
             ]
@@ -59877,7 +59877,7 @@ var BIBLE_STUDIES = [
                 "label": "Blessed Are Those Who Overcome for My Name’s Sake",
                 "link": {
                   "collection": "Volume Three",
-                  "letterTitle": "Blessed Are Those Who Overcome for My Name's Sake"
+                  "letterTitle": "Blessed Are Those Who Overcome for My Name’s Sake"
                 },
                 "letterId": "blessed-are-those-who-overcome-for-my-name-s-sake",
                 "screen": "vot-three-letter"
@@ -61099,7 +61099,7 @@ var BIBLE_STUDIES = [
                 "label": "The Dust Has Been Shaken Off the Feet of God’s Messengers as a Testament Against You, O Churches of Men",
                 "link": {
                   "collection": "Volume Three",
-                  "letterTitle": "The Dust Has Been Shaken Off the Feet of God's Messengers as a Testament Against You, O Churches of Men"
+                  "letterTitle": "The Dust Has Been Shaken Off the Feet of God’s Messengers as a Testament Against You, O Churches of Men"
                 },
                 "letterId": "the-dust-has-been-shaken-off-the-feet-of-god-s-messengers-as-a-testament-against-you-o-churches-of-men",
                 "screen": "vot-three-letter"
@@ -64283,7 +64283,7 @@ var BIBLE_STUDIES = [
                 "label": "Blessed Are Those Who Overcome for My Name’s Sake",
                 "link": {
                   "collection": "Volume Three",
-                  "letterTitle": "Blessed Are Those Who Overcome for My Name's Sake"
+                  "letterTitle": "Blessed Are Those Who Overcome for My Name’s Sake"
                 },
                 "letterId": "blessed-are-those-who-overcome-for-my-name-s-sake",
                 "screen": "vot-three-letter"
@@ -64444,7 +64444,7 @@ var BIBLE_STUDIES = [
                 "label": "Walking Together in The Father’s Joy",
                 "link": {
                   "collection": "Words To Live By: Part One",
-                  "letterTitle": "Walking Together in The Father's Joy"
+                  "letterTitle": "Walking Together in The Father’s Joy"
                 },
                 "letterId": "walking-together-in-the-father-s-joy",
                 "screen": "wtlb-one-entry"
@@ -65019,7 +65019,7 @@ var BIBLE_STUDIES = [
                 "label": "Blessed Are Those Who Overcome for My Name’s Sake",
                 "link": {
                   "collection": "Volume Three",
-                  "letterTitle": "Blessed Are Those Who Overcome for My Name's Sake"
+                  "letterTitle": "Blessed Are Those Who Overcome for My Name’s Sake"
                 },
                 "letterId": "blessed-are-those-who-overcome-for-my-name-s-sake",
                 "screen": "vot-three-letter"
@@ -66120,7 +66120,7 @@ var BIBLE_STUDIES = [
                 "label": "Blessed Are Those Who Overcome for My Name’s Sake",
                 "link": {
                   "collection": "Volume Three",
-                  "letterTitle": "Blessed Are Those Who Overcome for My Name's Sake"
+                  "letterTitle": "Blessed Are Those Who Overcome for My Name’s Sake"
                 },
                 "letterId": "blessed-are-those-who-overcome-for-my-name-s-sake",
                 "screen": "vot-three-letter"

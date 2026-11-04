@@ -7450,14 +7450,14 @@ var LETTERS_V7 = [
       },
       "4": {
         "type": "scripture",
-        "ref": "(which means “God with us”) - Matthew 1:23"
+        "ref": "Matthew 1:23"
       }
     },
     "nkjv": {
       "Colossians 1:16-17": "16. For by Him all things were created that are in heaven and that are on earth, visible and invisible, whether thrones or dominions or principalities or powers. All things were created through Him and for Him. 17. And He is before all things, and in Him all things consist.",
       "John 1:1-5": "1. In the beginning was the Word, and the Word was with God, and the Word was God. 2. He was in the beginning with God. 3. All things were made through Him, and without Him nothing was made that was made. 4. In Him was life, and the life was the light of men. 5. And the light shines in the darkness, and the darkness did not comprehend it.",
       "John 1:14": "And the Word became flesh and dwelt among us, and we beheld His glory, the glory as of the only begotten of the Father, full of grace and truth.",
-      "(which means “God with us”) - Matthew 1:23": "“Behold, the virgin shall be with child, and bear a Son, and they shall call His name Immanuel,” which is translated, “God with us.” (Matthew 1:23)"
+      "Matthew 1:23": "“Behold, the virgin shall be with child, and bear a Son, and they shall call His name Immanuel,” which is translated, “God with us.” (Matthew 1:23)"
     },
     "audioUrl": "https://thevolumesoftruth.bandcamp.com/track/as-i-am-so-shall-it-be-with-those-i-am-sending-the-mystery-of-god-revealed-to-the-chosen",
     "videoVoiceUrl": "https://www.youtube.com/watch?v=uVaosY1xm0s&list=PLE8FlkxQPQkP4Ljrix_obl1uYSx1VNyqE&index=27",
