@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-75e9e7ee9d';
+const CACHE_VERSION = 'v1.0.2-c622ec93b5';
 const CORPUS_VERSION = 'c75'; // c74->c75 (2026-10-28): audio re-upload watch -- TB2_001_Introduction (new, read by AI with music): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-10-28-054506.json). // PREVIOUS c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,11 +316,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',
-  './dist/app.min.css': '62ad983ad6f009b1637c5747ff2ec8eeaa5bb377a07ee9823f5f2aa36cb779f0',
+  './dist/app.min.css': '8b9fa05d0460785aa1af66a3a7957569ce4b6530579dd5307162eb59a3d340ee',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': 'a5c1e31fbdc4bf2b7a639998a0616f99291d84d85f2fbd48fa7fa3bccce9c40a',
+  './dist/bundle-b.js': '54d5f37aa9f4ebd047183abcbc1ce0646bb9e0c22081437294139d0ccecb31cf',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': '0e2a947e0c2d8480add5d4f7ec7ca02787b32af5499569c36574b9b2964827c6',
+  './dist/bundle-d.js': '5847db6a5340a07e835125235af3cb4cda1c6470b38884f59e070fe4abe2dc77',
   './dist/bundle-w.js': '25e14db10d8ac2d483f3c40feb9a4e1aa45ae9846c4ea61b3ae6499ff440d9b9',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',

@@ -410,3 +410,15 @@ describe('panel density (w4)', () => {
     expect(rule('.sw-sec-go > .sw-sec-head .sw-sec-title')).toMatch(/color:\s*var\(--sw-gold\)/);
   });
 });
+
+/* h1104-7 (w4/w5 minor "the s08 phone subtitle crosses the gold bundle"): on a landscape phone the
+   count sits inline beside the title, right over the chosen verse's gold fan, and with a panel open
+   it says nothing about what the reader chose. There it steps aside; the title stays. */
+describe('the web count with a verse open on a phone', () => {
+  it('steps aside on compact with the panel open, and only the canon count', () => {
+    const r = rule('.sw-root.sw-compact.sw-panel-open .sw-title-count');
+    expect(r, 'the rule').not.toBeNull();
+    expect(r).toMatch(/visibility:\s*hidden/);
+    expect(BARE, 'never on a desk').not.toMatch(/\.sw-root\.sw-panel-open \.sw-title-count/);
+  });
+});

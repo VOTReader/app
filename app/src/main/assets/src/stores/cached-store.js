@@ -692,8 +692,20 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // (the n4-05 refuter's R2-1: sibling keys leaked into the ancestor).
           const ownCopy = baseIsOurs && !exact;
           if (!ownCopy) self._cache = /** @type {any} */ (merged);
+          // dl3: the disk gets THIS merge, taken now, never the live cache. The put waits
+          // its turn in the adapter's write queue (a busy boot queues every store's), and
+          // the stores edit `_cache` in place meanwhile, so the disk got edits the
+          // ancestor below lacked: harmless for records (both sides then hold the same
+          // copy), but a total merged as "the stored figure plus what this tab added"
+          // counted such an edit twice. The ancestor is exactly what was written, and never
+          // the cache itself: an exact save's data has just become `_cache` above, so taking
+          // it uncloned made `_base === _cache`, and the first in-place edit after an Import
+          // & Overwrite went into the ancestor too and was dropped as unchanged (review,
+          // 2026-11-04). An own-copy store's ancestor is not the merge at all, so its write
+          // keeps the merge as it is.
+          const written = ownCopy ? merged : _cloneSnapshot(merged);
           // the next merge's ancestor: what this tab wrote (ownCopy), else the merge
-          const nextBase = /** @type {any} */ (_cloneSnapshot(ownCopy ? ours : merged));
+          const nextBase = /** @type {any} */ (ownCopy ? _cloneSnapshot(ours) : written);
           // ── end synchronous section
           // No subscriber re-render here: STORE-1 is LOSS-PREVENTION, not live
           // cross-tab sync. A sibling's pulled-in records are now in `_cache`
@@ -709,7 +721,7 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // sibling deleted next sat in ours but in neither base nor theirs, and came
           // back as 'our add'); an own-copy store keeps its ancestor (`theirs` would
           // hand it sibling keys it never had, R2-1).
-          return IDBAdapter.put(name, 'v', merged).then(function (r) { self._base = nextBase; return r; }, function (err) {
+          return IDBAdapter.put(name, 'v', written).then(function (r) { self._base = nextBase; return r; }, function (err) {
             if (!ownCopy) self._base = /** @type {any} */ (_cloneSnapshot(theirs));
             throw err;
           });
@@ -1418,6 +1430,7 @@ export const LS_SKIP_LIST = Object.freeze([
   'vot-audio-recent-open',
   'vot-recent-searches',          // search/recent-searches.js
   'vot-journal-draft',            // JournalEditorScreen
+  'vot-note-draft',               // utils/note-draft.js — a note's words typed before a kill (dl4)
   'vot-journal-new-entry-stats',  // use-journal-mutations → JournalEditorScreen
   'vot-restore-inflight',         // use-restore-guard
   'vot-last-seen-build',          // utils/update-toast.js — the last build this profile saw

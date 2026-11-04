@@ -16,7 +16,7 @@ import { resolve, dirname } from 'node:path';
 import { decodeGraph } from '../../utils/scripture-web/decode.js';
 import * as ds from '../../utils/scripture-web/describe.js';
 import * as pm from '../../utils/scripture-web/panel-model.js';
-import { WebPanel, modeOfDetail, subjectKey, strongestFirst, CITED_SHOWN, GO_ON_SHOWN } from './web-panel.jsx';
+import { WebPanel, modeOfDetail, subjectKey, strongestFirst, CITED_SHOWN, GO_ON_SHOWN, trailScroll } from './web-panel.jsx';
 import { arrive, moveTo, stopOf, chainTo, pathOf, EMPTY_TRAIL } from './use-journey.js';
 import * as geo from '../../utils/scripture-web/geometry.js';
 import { frameSetAt } from '../../utils/scripture-web/frame-set.js';
@@ -410,7 +410,7 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     let t = arrive(EMPTY_TRAIL, { verse: places[1][0], label: places[1][1] }, { verse: places[0][0], label: places[0][1] });
     for (const [verse, label] of places.slice(2)) t = arrive(t, { verse, label });
     const { panel } = mount({ detail: detail(), journey: journeyOf(t) });
-    expect([...panel.querySelectorAll('.sw-trail-stops li')].map((c) => c.textContent))
+    expect([...panel.querySelectorAll('.sw-trail-stops li')].map(shownText))
       .toEqual(['Whole web', 'Romans', 'John 3', '1Cor 13', 'Isa 7:14', 'Matt 1:23']);
     // a crumb that shortens its stop's name is named in full for a screen reader
     const romans = [...panel.querySelectorAll('.sw-trail-stops .sw-crumb')].find((b) => b.textContent === '1Cor 13');
@@ -429,9 +429,14 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     expect(bar.getAttribute('aria-label')).toBe('Your path');
     expect(panel.getAttribute('data-trail')).toBe('1');
     const crumbs = [...bar.querySelectorAll('.sw-trail-stops li')];
-    expect(crumbs.map((c) => c.textContent)).toEqual(['Isa 7:14', 'Matt 1:23', 'John 3:16']);
+    expect(crumbs.map(shownText)).toEqual(['Isa 7:14', 'Matt 1:23', 'John 3:16']);
     expect(crumbs[1].classList.contains('is-here')).toBe(true);
-    expect(crumbs[1].querySelector('[aria-current="location"]')).toBeTruthy();
+    const at = crumbs[1].querySelector('[aria-current="location"]');
+    expect(at).toBeTruthy();
+    // h1104-7: an aria-label on a plain span goes unread; the full name is said in words a screen
+    // reader reads, the short one hidden from it
+    expect(at.getAttribute('aria-label')).toBeNull();
+    expect(at.querySelector('.sw-sr-only').textContent).toBe('Matthew 1:23');
     expect(crumbs[1].querySelector('.sw-crumb'), 'where the reader stands is no button').toBeNull();
     expect(crumbs[2].classList.contains('is-ahead')).toBe(true);
     // Back and Forward name where they go, and hand the move to the trail: it flies (never the panel)
@@ -504,8 +509,15 @@ describe('connection mode: Isaiah 7:14 <-> Matthew 1:23', () => {
     const { panel, byLabel } = mount({ detail: found({ kind: 'verse', verse: vid('luke', 1, 31) }), journey });
     const btn = byLabel(/^Your paths, 2$/)[0];
     expect(btn.getAttribute('aria-pressed')).toBe('false');
+    const seen = vi.fn();
+    HTMLElement.prototype.scrollIntoView = seen;
     fireEvent.click(btn);
     expect(panel.getAttribute('aria-label')).toBe('Your paths');
+    // h1104-7: on a phone the verse card's rule hid the view's "Your paths" over its own head
+    expect(panel.getAttribute('data-mode'), 'its own mode, not the card under it').toBe('paths');
+    // and the stop where the reader is, at a later path's foot, is brought into sight
+    expect(seen.mock.contexts.some((el) => el.classList && el.classList.contains('is-here') && el.classList.contains('sw-path-stop'))).toBe(true);
+    delete HTMLElement.prototype.scrollIntoView;
     expect(panel.querySelector('.sw-panel-meta').textContent).toBe('2 paths · 4 stops');
     const paths = [...panel.querySelectorAll('.sw-path')];
     expect(paths).toHaveLength(2);
@@ -882,5 +894,31 @@ describe("exits mode: a fan chip's lines, by the book they go to", () => {
     expect(panel.querySelector('.sw-sec-more .sw-sec-title').textContent).toBe('Connections · ' + pm.exitsModel(g, col).threads.total.toLocaleString());
     const books = pm.exitsModel(g, col).threads.groups.map((x) => x.book);
     expect(books.length, 'its lines go to more than one book').toBeGreaterThan(1);
+  });
+});
+
+/* h1104-7, measured on a 915x412 phone: after a branch the paths button narrows the row to 185 px,
+   and with the stop where the reader is the last, the row's end clamped the scroll at 113 px, so
+   the row began inside "Isa 7:14" and showed "7:14 › Matt 1:23 › Isa 9:6". */
+/** What a crumb shows on screen: its text without the words kept for a screen reader alone. */
+function shownText(/** @type {Element} */ el) {
+  const c = /** @type {Element} */ (el.cloneNode(true));
+  c.querySelectorAll('.sw-sr-only').forEach((x) => x.remove());
+  return c.textContent;
+}
+
+describe('the trail bar row (trailScroll)', () => {
+  const branch = { starts: [11, 97, 163, 242], hereAt: 3, hereWidth: 37, pad: 10, width: 185, scrollWidth: 298 };
+  it('begins at a stop’s own edge when the stop where the reader is ends the row', () => {
+    const { scrollLeft, endRoom } = trailScroll(branch);
+    expect(scrollLeft, 'from "Matt 1:23", less the padding').toBe(153);
+    expect(endRoom, 'the room the end needs for that scroll').toBe(40);
+  });
+  it('asks only the room it needs, and none with the stop mid-row', () => {
+    // hop 3 on the same phone, before the paths button: Isa 7:14 › Matt 1:23 › John 1:1 › Gen 1:1
+    const r = trailScroll({ starts: [11, 97, 163, 242, 313], hereAt: 4, hereWidth: 46, pad: 10, width: 238, scrollWidth: 378 });
+    expect(r).toEqual({ scrollLeft: 153, endRoom: 13 });
+    const mid = trailScroll({ starts: [11, 97, 163, 242, 313], hereAt: 2, hereWidth: 57, pad: 10, width: 238, scrollWidth: 378 });
+    expect(mid).toEqual({ scrollLeft: 0, endRoom: 0 });
   });
 });

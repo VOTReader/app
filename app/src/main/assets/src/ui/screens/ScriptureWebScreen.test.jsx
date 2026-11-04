@@ -559,7 +559,9 @@ describe('Z1/A1 — the zoom ceiling is the 44 px tap rule, not MAX_ZOOM = 4000'
       expect(title().textContent).toBe('Genesis 2:552');
       // home: the way ahead stays in the bar, where the reader is marked
       expect(container.querySelectorAll('.sw-trail-stops li')).toHaveLength(2);
-      expect(container.querySelector('.sw-trail-stops li.is-here').textContent).toBe('Gen 2:552');
+      const here = container.querySelector('.sw-trail-stops li.is-here');
+      expect(here.querySelector('[aria-hidden="true"]').textContent, 'shown short').toBe('Gen 2:552');
+      expect(here.querySelector('.sw-sr-only').textContent, 'said in full').toBe('Genesis 2:552');
     });
 
     /* 2026-11-03: the trail outlives the panel. With it closed (the X, a tap on the sky, Reset) a pill

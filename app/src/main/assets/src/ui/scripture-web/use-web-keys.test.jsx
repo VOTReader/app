@@ -183,6 +183,22 @@ describe('Escape and Back close the go-to first', () => {
     modalRegistry.peek().dismiss('back');
     expect(none.p.closeCards).toHaveBeenCalledTimes(1);
   });
+
+  /* h1104-7: Your paths is a layer over the stop's card. Escape closed the whole panel under it, and
+     the system Back stepped the trail with the paths view still up; the trail bar's own Back
+     already put it away. One layer a press: both put Your paths away first. */
+  it('with Your paths up, Escape and the system Back put it away first', () => {
+    for (const how of ['escape', 'back']) {
+      const trailBack = vi.fn(() => true);
+      const closePaths = vi.fn();
+      const { p } = mountKeys({ detail: { kind: 'verse', verse: 300 }, trailBack, pathsShown: true, closePaths });
+      modalRegistry.peek().dismiss(how);
+      expect(closePaths, how).toHaveBeenCalledTimes(1);
+      expect(trailBack, how + ': no step along the trail under it').not.toHaveBeenCalled();
+      expect(p.closeCards, how + ': the panel stays').not.toHaveBeenCalled();
+      modalRegistry._reset();
+    }
+  });
 });
 
 describe('the help text (G2)', () => {

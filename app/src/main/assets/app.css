@@ -8596,6 +8596,9 @@
     .sw-root.sw-collapse.sw-panel-open[data-panel="dock"] .sw-topbar { max-width: calc(100% - var(--sw-panel-w, 40%) - 153px); }
     .sw-root.sw-compact.sw-collapse.sw-panel-open[data-panel="dock"] .sw-topbar { max-width: calc(100% - var(--sw-panel-w, 42%) - 143px); }
     .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-title { flex-wrap: wrap; row-gap: 0; }
+    /* the count beside the title stood over the chosen verse's gold fan, and says nothing of what was
+       chosen: with a verse open on a phone it steps aside (h1104-7) */
+    .sw-root.sw-compact.sw-panel-open .sw-title-count { visibility: hidden; }
     /* STACKED (use-panel-layout.js stackedFor: a tablet's 348 px of canvas beside the panel at
        768x1024, a small phone's): the strip drops under the header, clear of the density's hint
        line under the title, and the go-to's edge chips under the strip (its 58 px and 8 more);

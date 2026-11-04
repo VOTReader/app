@@ -43,6 +43,10 @@ function push(stdin, { guard = false, env: extra = {} } = {}) {
   const r = spawnSync('sh', [HOOK, 'origin', 'https://example.invalid/repo.git'], { cwd: root, env, input: stdin, encoding: 'utf8' });
   return { out: (r.stdout || '') + (r.stderr || ''), status: r.status, cache };
 }
+/** Each case runs the real hook in sh plus a handful of git calls: 1-2 s alone, but Git Bash spawns crawl when the
+ * commit hook's fast run has every core busy, and one case took over 60 s there (flakes.jsonl 11-04 09:44). The
+ * ceiling is for a loaded machine; a hook that really hangs still fails. */
+const HOOK_RUN_MS = 180_000;
 const line = (sha, base = git(['rev-parse', 'HEAD'])) => `refs/heads/x ${sha} refs/heads/main ${base}\n`;
 
 describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
@@ -56,7 +60,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(0);
     expect(out).toMatch(/\[pre-push\] would run: vitest npm run test:hook/);
     expect(out).not.toMatch(/would run: gradle/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   // nw-landgate (10-23): main went red on a per-file floor (dom-bookmarks.js) after a push the fast run passed
   it.each([
@@ -68,7 +72,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     const { out, status } = push(line(sha));
     expect(status, out).toBe(0);
     expect(out).toMatch(/would run: vitest npm run test:coverage/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it('runs only the tools/ suite when the push changes a gate script and no app source', () => {
     const { sha } = commitWith(plus('tools/check-bundle-budget.js', '\n// pre-push test\n'));
@@ -76,7 +80,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(0);
     expect(out).toMatch(/would run: vitest-tools npx vitest run tools\//);
     expect(out).not.toMatch(/would run: vitest npm/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it('runs the Kotlin tests when the push changes an input the Robolectric suite reads', () => {
     const { sha } = commitWith(plus('app/src/main/AndroidManifest.xml', '\n'));
@@ -84,7 +88,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(0);
     expect(out).toMatch(/would run: gradle \S+ :app:testDebugUnitTest :app:jacocoTestCoverageVerification/);
     expect(out).not.toMatch(/would run: vitest/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it('runs nothing for a push of docs, a branch delete, or commits already on the remote', () => {
     const { sha } = commitWith(plus('AGENTS.md', '\n'));
@@ -94,7 +98,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
       expect(status, out).toBe(0);
       expect(out, stdin).not.toMatch(/would run/);
     }
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it('refuses to test a working tree that is not the commit being pushed', () => {
     // the gates read files on disk; this commit's backup.js is not what is on disk
@@ -103,7 +107,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(1);
     expect(out).toContain('app/src/main/assets/src/utils/backup.js');
     expect(out).not.toMatch(/would run/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it('skips a gate that already passed on the same tree (the pass cache)', () => {
     const { sha, tree } = commitWith(plus('app/src/main/assets/src/utils/backup.js', '\n// cached\n'));
@@ -113,7 +117,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(0);
     expect(out).toMatch(/vitest already passed on tree/);
     expect(out).not.toMatch(/would run: vitest/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it("trusts land.sh's gate run on the commits before its rebase", () => {
     const { sha } = commitWith(plus('app/src/main/assets/src/utils/backup.js', '\n// landed\n'));
@@ -121,7 +125,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     expect(status, out).toBe(0);
     expect(out).toMatch(/gated by land\.sh/);
     expect(out).not.toMatch(/would run/);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it("appends who pushed which commit to the swarm's push log, so a red branch CI pages the pusher (nw12)", () => {
     const { sha } = commitWith(plus('AGENTS.md', '\n'));
@@ -141,7 +145,7 @@ describe('pre-push: the heavy gates run once per push (ln1 item 6)', () => {
     const after = existsSync(real) ? readFileSync(real, 'utf8') : '';
     expect(after).not.toContain(lane);
     expect(after).not.toContain(sha);
-  }, 60_000);
+  }, HOOK_RUN_MS);
 
   it('vitest and gradle run through heavy_run (the machine-wide gates.lock), and the old-branch fallback stays', () => {
     const hook = readFileSync(resolve(root, HOOK), 'utf8');

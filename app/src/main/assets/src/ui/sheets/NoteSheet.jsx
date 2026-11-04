@@ -9,6 +9,9 @@ import { shareText, shareLinkSetting } from '../../utils/copy-share.js';
 import { passageLinkFor } from '../../utils/passage-link.js';
 import { passageLabel, translationTag, siteLinkForKey } from '../../utils/passage-copy.js';
 import { relativeDate } from '../../utils/dates.js';
+import {
+  readNoteDraft, writeNoteDraft, clearNoteDraft, noteDraftRecoverable, clearNoteDraftWhenSaved, NOTE_DRAFT_DELAY_MS,
+} from '../../utils/note-draft.js';
 
 /**
  * @param {{ groupId: any, startInEditMode: any, freshGroup?: any, onClose: any, onOpenNotebookPicker?: any }} props
@@ -28,8 +31,14 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   );
   const note = NoteStore.get(groupId);
   const segs = AnnotationStore.getByGroup(groupId);
-  const [mode, setMode] = React.useState(startInEditMode ? 'edit' : 'read');
-  const [body, setBody] = React.useState(note ? note.body || '' : '');
+  // dl4 (utils/note-draft.js): words typed here before a kill, a closed tab or a crash
+  // come back in the editor, unsaved, as they were left.
+  const [recovered] = React.useState(() => {
+    const d = readNoteDraft(groupId);
+    return noteDraftRecoverable(d, note) ? d : null;
+  });
+  const [mode, setMode] = React.useState(startInEditMode || recovered ? 'edit' : 'read');
+  const [body, setBody] = React.useState(recovered ? recovered.body : (note ? note.body || '' : ''));
   const [menuOpen, setMenuOpen] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [showColors, setShowColors] = React.useState(false);
@@ -63,6 +72,45 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   useModalRegistry({ id: 'note-sheet', dismiss: () => requestClose() });
   // ds2: the text being typed lives only here, so an app update waits until the edit ends.
   useUpdateHold(mode === 'edit', 'note');
+
+  // dl4: the words being typed are written down (synchronously, in localStorage) a beat
+  // after typing stops, when the page is hidden or left, and when the sheet goes away
+  // without Save or Cancel. Refs, so the mount-only listeners read the latest words.
+  const bodyRef = React.useRef(body); bodyRef.current = body;
+  const modeRef = React.useRef(mode); modeRef.current = mode;
+  const discardedRef = React.useRef(false);   // Cancel's discard or Delete: the words go on purpose
+  const keepDraft = React.useCallback(() => {
+    if (discardedRef.current || modeRef.current !== 'edit') return;
+    const cur = NoteStore.get(groupId);
+    if (!cur) return;
+    // Unchanged words write nothing, unless a draft is already down: it follows the words,
+    // so typing back to the saved text never leaves older words to be offered.
+    if (bodyRef.current !== (cur.body || '') || readNoteDraft(groupId)) writeNoteDraft(groupId, bodyRef.current);
+  }, [groupId]);
+  React.useEffect(() => {
+    // A draft no longer worth offering (saved since, or the same words) goes once the note
+    // store's latest write is on disk. A Save whose write failed (a full device) left those
+    // words in memory only, so the draft is then the one copy that outlives the app closing.
+    if (!recovered && note) {
+      const stale = readNoteDraft(groupId);
+      if (stale) clearNoteDraftWhenSaved(NoteStore, groupId, stale.body);
+    }
+    const onVisibility = () => { if (document.visibilityState === 'hidden') keepDraft(); };
+    window.addEventListener('pagehide', keepDraft);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', keepDraft);
+      document.removeEventListener('visibilitychange', onVisibility);
+      keepDraft();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only: keepDraft reads refs; `recovered` and `note` are the opening values
+  }, []);
+  React.useEffect(() => { if (mode === 'edit') discardedRef.current = false; }, [mode]);
+  React.useEffect(() => {
+    if (mode !== 'edit') return undefined;
+    const t = setTimeout(keepDraft, NOTE_DRAFT_DELAY_MS);
+    return () => clearTimeout(t);
+  }, [body, mode, keepDraft]);
   // [13] focus trap — Tab stays inside the sheet (mounted = open).
   const trapRef = useFocusTrap(true);
 
@@ -84,12 +132,17 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   // s29.2: saving an edit of a note that already had words goes back to reading it; a new note closes as before.
   const save = () => {
     const edited = !!(note.body || '').trim();
+    // dl4: the words stay written down until the save that carries them is on disk.
+    writeNoteDraft(groupId, body);
     NoteStore.update(groupId, { body });
+    clearNoteDraftWhenSaved(NoteStore, groupId, body);
     if (edited) setMode('read'); else onClose();
   };
 
   /** @param {'cancel' | 'close'} intent */
   function performDiscard(intent) {
+    discardedRef.current = true;   // the words go on purpose; editing again re-arms the draft (below)
+    clearNoteDraft(groupId);
     setConfirmingDiscard(null);
     setBody(note.body || '');
     if (freshUnsaved) {
@@ -157,6 +210,8 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   uncoveredLine([groupId], AnnotationStore)].filter(Boolean).join(' ');
 
   const remove = () => {
+    discardedRef.current = true;   // dl4: a deleted note keeps no draft
+    clearNoteDraft(groupId);
     AnnotationStore.removeGroup(groupId);
     NoteStore.remove(groupId);
     onClose();
