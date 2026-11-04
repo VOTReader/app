@@ -208,6 +208,7 @@ function _load() {
     } catch (_e) { /* no cache here (a private window): nothing is saved */ _items = new Map(); }
     _restoreQueue();
     _loaded = true;
+    if (!_paused) _next();   // a restored queue of automatic downloads goes on (it waits for Wi-Fi in _next)
     // 'checked', not 'done': the mirror re-reads either way, but a 'done' with nothing downloading told a screen
     // reader "Download finished" at every boot whose first screen had a download control.
     _emit({ type: 'checked' });
@@ -292,8 +293,12 @@ function _restoreQueue() {
   }
   if (!back.length) { _persistQueue(); return; }
   _queue = back.concat(_queue);
-  _paused = true;
-  _closed = saved.paused !== true;
+  // h1104-19: 'closed' keeps a reopened page from using data the listener has not said yes to. Automatic downloads
+  // (wifi) start only on Wi-Fi and were never the listener's to resume: a queue of only those goes on as it was.
+  if (saved.paused === true || back.some((t) => !t.wifi)) {
+    _paused = true;
+    _closed = saved.paused !== true;
+  }
   const b = saved.batch && typeof saved.batch === 'object' ? saved.batch : {};
   const done = Math.max(0, Number(b.done) || 0);
   const failed = Math.max(0, Number(b.failed) || 0);

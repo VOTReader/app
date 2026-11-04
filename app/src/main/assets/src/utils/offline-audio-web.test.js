@@ -431,6 +431,31 @@ describe('offline-audio-web: Download only on Wi-Fi (ra6)', () => {
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('a2'))).toBe(true));
   });
 
+  /* h1104-19: a close in the middle of a plan's automatic downloads left them waiting as 'closed' with a Resume the
+     listener never asked for, and the auto pass would not add to a paused queue, so no plan day downloaded again
+     until a tap. Automatic ones start only on Wi-Fi anyway: they come back as they were, not closed. */
+  it('automatic downloads a close interrupted come back waiting for Wi-Fi, not closed, and go on by themselves', async () => {
+    conn.type = 'wifi';
+    await ready();
+    fetchMock.mockImplementationOnce((_u, init) => new Promise((_r, j) => {   // the first one hangs until the close
+      if (init && init.signal) init.signal.addEventListener('abort', () => j(new DOMException('aborted', 'AbortError')));
+    }));
+    OfflineAudio.download([{ url: URL_OF('p1'), key: 'k', title: 'day 1', wifi: true }, { url: URL_OF('p2'), key: 'k', title: 'day 2', wifi: true }]);
+    await vi.waitFor(() => expect(gets()).toHaveLength(1));
+    WebOfflineAudio._reset();   // the page closes
+    OfflineAudio._reset();
+    fetchMock.mockClear();
+    conn.type = 'cellular';
+    await ready();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(OfflineAudio.paused()).toBe(false);
+    expect(OfflineAudio.reason()).toBe('wifi');
+    expect(gets()).toHaveLength(0);
+    conn.move('wifi');
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('p2'))).toBe(true));
+    expect(OfflineAudio.isSaved(URL_OF('p1'))).toBe(true);
+  });
+
   it('off (the default), mobile data downloads as before', async () => {
     await ready();
     OfflineAudio.download([{ url: URL_OF('m2'), key: 'k', title: 't' }]);
