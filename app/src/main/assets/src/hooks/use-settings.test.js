@@ -11,7 +11,7 @@
    the DOM side (body classes, #custom-fonts, CSS vars) is real jsdom. */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, render, act } from '@testing-library/react';
 
 vi.mock('../utils/platform-bridge.js', () => ({
   PlatformBridge: {
@@ -220,6 +220,30 @@ describe('useSettings — body-class mirror', () => {
     document.body.className = '';
     mount({ savedSettings: { compactTopBar: false } });
     expect(cls().contains('compact-topbar')).toBe(false);
+  });
+
+  /* Settings hunt (2026-11-04): the mirror ran as a PASSIVE effect, i.e. after the App's first paint.
+     The body classes decide what that paint shows: the compact bar hides three icons only through
+     body.compact-topbar, `body:not(.arrows-nav):not(.arrows-off) .letter-body` adds 4rem of padding,
+     vot-large-text re-lays the large sizes. So each launch painted the default bar and arrows first,
+     and the scroll restore (a layout effect later in App) measured that wrong page. Probe: a layout
+     effect after useSettings in the same component, which runs before any passive effect. */
+  it('the classes are on before the first paint (a later layout effect already sees them)', () => {
+    /** @type {Record<string, boolean>} */ const seen = {};
+    function Probe() {
+      useSettings({ savedSettings: { arrowLayout: 'off', fontScale: '2', showScrollNotch: true }, theme: 'light' });
+      React.useLayoutEffect(() => {
+        seen.compact = cls().contains('compact-topbar');
+        seen.arrowsOff = cls().contains('arrows-off');
+        seen.notch = cls().contains('scroll-notch');
+        seen.light = cls().contains('light');
+        seen.large = document.documentElement.classList.contains('vot-large-text');
+        seen.scale = document.documentElement.style.getPropertyValue('--font-scale') === '2';
+      }, []);
+      return null;
+    }
+    render(React.createElement(Probe));
+    expect(seen).toEqual({ compact: true, arrowsOff: true, notch: true, light: true, large: true, scale: true });
   });
 
   it('arrowLayout maps to exactly one arrows-* class', () => {

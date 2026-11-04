@@ -16,10 +16,11 @@
      - updateSetting   (plain arrow fn: sets settings[key] = val, records touched[key])
      - DEFAULT_FLIPS   (the rounds of default changes applied to profiles that never chose;
                         `defaultsRev` and `touched` ride inside settings — see the block above it)
-     - body-class + platform-bridge effect (deps [theme, settings])
+     - body-class + platform-bridge LAYOUT effect (deps [theme, settings])
                         Mirrors theme + every settings flag that has a CSS
                         body-class or a platform-bridge call onto
-                        document.body.classList and PlatformBridge.
+                        document.body.classList and PlatformBridge, before
+                        the paint (2026-11-04: it was passive, after it).
      - RETIRED_SETTINGS + legacyChromeFor — the keys no code reads any more,
                         dropped as the settings load (the two legacy chrome
                         keys translated first, once).
@@ -50,7 +51,7 @@
      usePersistedState (P6k+1) via the returned settings value.
 
    WINDOW: none — wires no window.__* handler bridges. The body-class
-     effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn —
+     layout effect calls PlatformBridge.setLightStatusBar / setKeepScreenOn —
      setLightStatusBar is a no-op on web; setKeepScreenOn uses
      navigator.wakeLock fire-and-forget per [[explicit-async-decision]].
    ═══════════════════════════════════════════════════════════════════════ */
@@ -305,6 +306,15 @@ export function useSettings({ savedSettings, theme }) {
   // native Android bridge call. Split out of the old App() save-state
   // effect (P6g) which had a combined dep array of 8 values.
   //
+  // A LAYOUT effect (settings hunt, 2026-11-04), so the classes are on for the
+  // App's FIRST paint. As a passive effect it ran after that paint: every launch
+  // drew the default bar (body.compact-topbar hides three icons), the split
+  // arrows and their 4rem letter padding (no arrows-off yet), the small-text
+  // layout at 180%+ — and useScrollMemory's restore, a layout effect further down
+  // App, measured that page. The boot script still owns what it can set before
+  // React (theme, font block, --font-scale); this is everything else, and it
+  // runs before the restore because App calls useSettings first.
+  //
   // SAFE TO NARROW THE DEPS to [theme, settings]: the old effect listed
   // all 8 save-state deps, so JOB A (this) re-ran whenever tabs /
   // activeTabIdx / lastRead* / activeReadKey / readItems changed too.
@@ -314,7 +324,7 @@ export function useSettings({ savedSettings, theme }) {
   // value it already has is a no-op). Those runs were pure redundant
   // work; dropping them by narrowing the deps to [theme, settings] is
   // invisible. Do NOT add the other 6 deps back.
-  React.useEffect(() => {
+  React.useLayoutEffect(() => {
     document.body.classList.toggle("light", theme === "light");
     // [10] True Black — an OLED modifier on the DARK theme only (surfaces
     // --bg2/--bg3 drop to pure/near black; everything else untouched).
