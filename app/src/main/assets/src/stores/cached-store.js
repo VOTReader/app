@@ -697,10 +697,13 @@ export function CachedStore(storageKey, defaultVal, opts) {
           // the stores edit `_cache` in place meanwhile, so the disk got edits the
           // ancestor below lacked: harmless for records (both sides then hold the same
           // copy), but a total merged as "the stored figure plus what this tab added"
-          // counted such an edit twice. The ancestor is exactly what was written. (An exact
-          // save's data is already a private copy; an own-copy store's ancestor is not the
-          // merge at all, so its write keeps the merge as it is.)
-          const written = (exact || ownCopy) ? merged : _cloneSnapshot(merged);
+          // counted such an edit twice. The ancestor is exactly what was written, and never
+          // the cache itself: an exact save's data has just become `_cache` above, so taking
+          // it uncloned made `_base === _cache`, and the first in-place edit after an Import
+          // & Overwrite went into the ancestor too and was dropped as unchanged (review,
+          // 2026-11-04). An own-copy store's ancestor is not the merge at all, so its write
+          // keeps the merge as it is.
+          const written = ownCopy ? merged : _cloneSnapshot(merged);
           // the next merge's ancestor: what this tab wrote (ownCopy), else the merge
           const nextBase = /** @type {any} */ (ownCopy ? _cloneSnapshot(ours) : written);
           // ── end synchronous section

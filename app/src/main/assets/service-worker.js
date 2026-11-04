@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-a9b5eff3aa';
+const CACHE_VERSION = 'v1.0.2-eda293224f';
 const CORPUS_VERSION = 'c75'; // c74->c75 (2026-10-28): audio re-upload watch -- TB2_001_Introduction (new, read by AI with music): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-10-28-054506.json). // PREVIOUS c73->c74 (2026-10-19, rebased onto c73 2026-10-22): Answers Only God Can Give re-vendored from the 2026-10-19 capture of the site (aogcg phase 1a; tools/fetch-answers.py, no live fetch). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -318,7 +318,7 @@ const ASSET_INTEGRITY = {
   './': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',
   './dist/app.min.css': '37bb35a1363a7b4ce2d0acd28bebda3510a2b7de092ec8e52b37706d0c4ead0a',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
-  './dist/bundle-b.js': '9fff71fd0a4582ac87567d99ee3a9da34c0074aa41f89959f53fe7250fa5dede',
+  './dist/bundle-b.js': '54d5f37aa9f4ebd047183abcbc1ce0646bb9e0c22081437294139d0ccecb31cf',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
   './dist/bundle-d.js': '38065b18eae21de95e0e6b3dc25ef3f3ca595a2f98ad0374bb02ca9f9a9d68ba',
   './dist/bundle-w.js': '25e14db10d8ac2d483f3c40feb9a4e1aa45ae9846c4ea61b3ae6499ff440d9b9',

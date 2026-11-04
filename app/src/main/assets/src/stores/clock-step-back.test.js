@@ -119,6 +119,24 @@ describe('dl1 — the clock steps back between two saves of one record', () => {
     expect(ReadingPlanStore.get('run1').status).toBe('paused');
   });
 
+  /* dl3, review (myweb lane, 2026-11-04): an exact save (every store an Import & Overwrite
+     writes) wrote its private copy AND made that same object both `_cache` and the next
+     `_base`, so the reader's first in-place edit after the restore went into the ancestor
+     too, read as unchanged at the next merge, and was dropped from screen and disk. */
+  it('the first edits after an Import & Overwrite are kept (a bookmark added, another\'s thought, a highlight)', async () => {
+    BookmarkStore.replaceExact('replaceAll', [{ id: 'bk_r', hlKey: 'bible:psalms:23:1', label: 'Restored', created: 1, updated: 1 }]);
+    AnnotationStore.replaceExact('replaceAll', { 'bible:john:1:1': [{ id: 'a_r', groupId: 'a_r', kind: 'highlight', color: 'yellow', start: 0, end: 2, text: 'In', created: 1, updated: 1 }] });
+    await Promise.all([BookmarkStore.whenSaved(), AnnotationStore.whenSaved()]);
+    BookmarkStore.add({ id: 'bk_new', hlKey: 'bible:psalms:23:4', label: 'Added after the restore' });
+    BookmarkStore.update('bk_r', { thought: 'written after the restore' });
+    AnnotationStore.add('bible:john:1:1', { id: 'a_new', start: 3, end: 6, text: 'the' });
+    await Promise.all([BookmarkStore.whenSaved(), AnnotationStore.whenSaved()]);
+    await reload();
+    expect(BookmarkStore.get('bk_new')).toBeTruthy();
+    expect(BookmarkStore.get('bk_r').thought).toBe('written after the restore');
+    expect(AnnotationStore.get('bible:john:1:1').map((a) => a.id).sort()).toEqual(['a_new', 'a_r']);
+  });
+
   it('two saves of one entry in the same millisecond keep the second', async () => {
     const e = JournalStore.add({ title: 'One', blocks: [] });
     await JournalStore.whenSaved();
