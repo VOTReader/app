@@ -266,8 +266,15 @@ describe('leaks — Journal', () => {
     put('NoteStore', mkStore({ list: () => [] }));
     put('NotebookStore', mkStore({ list: () => [] }));
     const entry = RealJournalStore.add({ title: 'Morning', blocks: [RealJournalHelpers.newBlock('p', { text: 'First' })] });
+    // jsdom has no IndexedDB, so every save here fails and the store retries on its own clock (5 s, then 10 s, ...).
+    // That retry is the store's, once per app, not the editor's: the warm-up arms it, and when the 20 cycles outlast
+    // 5 s (a loaded machine, 2026-11-04) it fired mid-count and re-armed, read as the editor leaking a timeout.
+    const retryDelays = RealJournalStore._backgroundRetryDelays;
+    RealJournalStore._backgroundRetryDelays = [];
     let n = 0;
-    await leakFree('JournalEditorScreen', () => render(<JournalEditorScreen {...navProps} entryId={entry.id} />),
-      () => { fireEvent.change(screen.getByRole('textbox', { name: 'Entry title' }), { target: { value: 'Morning ' + (++n) } }); });
+    try {
+      await leakFree('JournalEditorScreen', () => render(<JournalEditorScreen {...navProps} entryId={entry.id} />),
+        () => { fireEvent.change(screen.getByRole('textbox', { name: 'Entry title' }), { target: { value: 'Morning ' + (++n) } }); });
+    } finally { RealJournalStore._backgroundRetryDelays = retryDelays; }
   });
 });

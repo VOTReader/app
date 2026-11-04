@@ -57,7 +57,7 @@ export function useWebKeys({
   graph, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards,
   camRef, camVRef, lastRailRef, viewRef, modeRef, personalRef, zoomCapFor, yFrameFor,
   resetView, onBack, dropHover, setAnnounce, schedule, cancelFly, goTo, slackFor, filtersOpen, closeFilters,
-  returnShown, returnBack, trailBack,
+  returnShown, returnBack, trailBack, pathsShown = false, closePaths,
 }) {
   const goToOpen = !!(goTo && goTo.isOpen);
   /** Close whatever is on top of the web, one layer a call: the guide, then
@@ -77,10 +77,13 @@ export function useWebKeys({
     if (returnShown) { returnBack(); return true; }
     if (guideOpen) { closeGuide(); return true; }
     if (emptyShown) { dismissEmpty(); return true; }
+    // Your paths (web-panel.jsx), a layer over the stop's card: put away before the trail steps or the
+    // panel closes, as the trail bar's own Back does (h1104-7)
+    if (pathsShown && typeof closePaths === 'function') { closePaths(); return true; }
     if (how === 'back' && typeof trailBack === 'function' && trailBack()) return true;
     if (listOpen || choices || detail || tip) { closeCards(); return true; }
     return false;
-  }, [goToOpen, goTo, filtersOpen, closeFilters, returnShown, returnBack, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards, trailBack]);
+  }, [goToOpen, goTo, filtersOpen, closeFilters, returnShown, returnBack, guideOpen, emptyShown, listOpen, choices, detail, tip, closeGuide, dismissEmpty, closeCards, trailBack, pathsShown, closePaths]);
   // Android Back and the app's Escape dispatcher close the top overlay first
   // instead of leaving the web (the hover chip alone is not worth a Back).
   useModalRegistry({ id: 'scripture-web-overlay', dismiss: closeTopOverlay,
