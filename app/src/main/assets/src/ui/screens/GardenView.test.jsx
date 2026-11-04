@@ -227,6 +227,40 @@ describe('GardenView — accessible names (Wave 0)', () => {
     expect(onPageChange).toHaveBeenCalledWith(120);
     expect(screen.queryByRole('spinbutton', { name: 'Jump to page' })).toBeNull();
   });
+
+  // 10-22 sweep, Discovery views 2: a scrubber across the 209 pages; the number follows it, Go commits
+  it('the scrubber starts at this page, moves the number without turning the page, and Go goes there', () => {
+    setupGardenGlobals(mkPos());
+    const onPageChange = vi.fn();
+    renderGarden({ page: 5, onPageChange });
+    fireEvent.click(screen.getByRole('button', { name: /^5 \/ 209/ }));
+    const scrub = screen.getByRole('slider', { name: 'Page' });
+    expect(scrub.value).toBe('5');
+    expect(scrub.getAttribute('max')).toBe('209');
+    fireEvent.change(scrub, { target: { value: '150' } });
+    expect(screen.getByRole('spinbutton', { name: 'Jump to page' }).value).toBe('150');
+    expect(scrub.getAttribute('aria-valuetext')).toBe('Page 150 of 209');
+    expect(onPageChange).not.toHaveBeenCalled();            // dragging fetches no page on the way
+    const go = screen.getByRole('button', { name: 'Go' });
+    fireEvent.blur(scrub, { relatedTarget: go });           // to Go is inside the form: still open
+    fireEvent.click(go);
+    expect(onPageChange).toHaveBeenCalledWith(150);
+  });
+
+  it('the scrubber: Enter goes, a walk away closes', () => {
+    setupGardenGlobals(mkPos());
+    const onPageChange = vi.fn();
+    renderGarden({ page: 5, onPageChange });
+    fireEvent.click(screen.getByRole('button', { name: /^5 \/ 209/ }));
+    let scrub = screen.getByRole('slider', { name: 'Page' });
+    fireEvent.change(scrub, { target: { value: '42' } });
+    fireEvent.keyDown(scrub, { key: 'Enter' });
+    expect(onPageChange).toHaveBeenCalledWith(42);
+    fireEvent.click(screen.getByRole('button', { name: /^5 \/ 209/ }));
+    scrub = screen.getByRole('slider', { name: 'Page' });
+    fireEvent.blur(scrub, { relatedTarget: document.body });
+    expect(screen.queryByRole('slider', { name: 'Page' })).toBeNull();
+  });
 });
 
 describe('GardenView — pinch must not leak into the swipe test (gap-garden-viewer-and-image-cache-5)', () => {

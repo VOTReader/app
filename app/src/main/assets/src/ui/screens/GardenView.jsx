@@ -215,6 +215,12 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
     setRetryTick((t) => t + 1);
   };
 
+  /** The jump form closes when focus walks out of it; Go, the number and the scrubber are all inside. */
+  const closeIfLeaving = (/** @type {any} */ e) => {
+    if (e.currentTarget.form && e.currentTarget.form.contains(/** @type {Node} */ (e.relatedTarget))) return;
+    setJumpMode(false);setJumpInput("");
+  };
+
   const handleJump = () => {
     const n = parseInt(jumpInput, 10);
     if (n >= 1 && n <= GARDEN_TOTAL) onPageChange(n);
@@ -433,16 +439,20 @@ export function GardenView({ page, onPageChange, onBack, theme: _theme, onThemeC
               value={jumpInput}
               onChange={(e) => setJumpInput(e.target.value)}
               onKeyDown={(e) => {if (e.key === "Escape") {e.stopPropagation();setJumpMode(false);setJumpInput("");}}}
-              onBlur={(e) => {
-                // a tap on Go moves focus inside the form: that is the jump, not a walk away
-                if (e.currentTarget.form && e.currentTarget.form.contains(/** @type {Node} */ (e.relatedTarget))) return;
-                setJumpMode(false);setJumpInput("");
-              }}
+              onBlur={closeIfLeaving}
               placeholder={`1–${GARDEN_TOTAL}`}
               aria-label="Jump to page"
             />
             <span className="garden-jump-hint">/ {GARDEN_TOTAL}</span>
             <button type="submit" className="garden-jump-go">Go</button>
+            {/* The scrubber (10-22 sweep, Discovery views 2): drag across the 209 pages and the number follows;
+                Go goes there, so a drag fetches no page on the way. */}
+            <input type="range" className="garden-jump-scrub" min="1" max={GARDEN_TOTAL} step="1"
+              value={jumpInput === "" ? page : Math.min(GARDEN_TOTAL, Math.max(1, parseInt(jumpInput, 10) || page))}
+              onChange={(e) => setJumpInput(e.target.value)}
+              onKeyDown={(e) => {if (e.key === "Enter") {e.preventDefault();handleJump();} else if (e.key === "Escape") {e.stopPropagation();setJumpMode(false);setJumpInput("");}}}
+              onBlur={closeIfLeaving}
+              aria-label="Page" aria-valuetext={`Page ${jumpInput || page} of ${GARDEN_TOTAL}`} />
           </form>
         ) : (
           // a pill with a chevron, so the counter reads as the way to another page (ideas audit A10.2)

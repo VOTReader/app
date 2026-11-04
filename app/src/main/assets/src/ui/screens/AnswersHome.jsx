@@ -407,7 +407,9 @@ const Contents = React.memo(/** @param {any} props */ function Contents(props) {
           })}
           {shelves.index ? <div className="ans-sechead"><h2 className="ans-h2">{shelves.index.label}</h2></div> : null}
           {fdEntry ? (
-            <AnsRow title={ANSWERS_FD_INDEX_TEXT} sub={fdMeta ? pl(answersTopSections(fdMeta).length, 'category') + ', each answered by The Truth' : null}
+            // The same sentence before the sidecar lands, less its count, so the row keeps its lines (10-22 sweep,
+            // Discovery views 6: at 360 px it grew a line, 76 -> 93 px, when the count arrived)
+            <AnsRow title={ANSWERS_FD_INDEX_TEXT} sub={(fdMeta ? pl(answersTopSections(fdMeta).length, 'category') : 'Categories') + ', each answered by The Truth'}
               onClick={() => openTopic(ANSWERS_FD_INDEX_ID)} />
           ) : null}
           <div className="ans-tools">
