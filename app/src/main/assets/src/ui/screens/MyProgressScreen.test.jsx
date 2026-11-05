@@ -335,6 +335,8 @@ describe('MyProgressScreen — reading section', () => {
       const votBefore = loadVot.mock.calls.length, bibleBefore = loadBible.mock.calls.length;
       fireEvent.click(getByRole('button', { name: 'Try again' }));
       expect(loadVot.mock.calls.length).toBe(votBefore + 1);
+      // h1104-19: it says it is an explicit retry, or the loader's gap after a failure swallows a quick tap
+      expect(loadVot.mock.calls[votBefore][0]).toBe(true);
       expect(loadBible.mock.calls.length).toBe(bibleBefore);
     } finally {
       ['__votCorpus', '__bibleCorpus', '__loadVotCorpus', '__loadBibleCorpus'].forEach((k) => { delete window[k]; });

@@ -220,6 +220,22 @@ describe('Choose: mobile data', () => {
     expect(container.textContent).not.toMatch(/Waiting for Wi-Fi/);
   });
 
+  /* refuter, round 1: on the web a queue a close left waits as 'closed' until the listener asks for more; the plan
+     going in as Wi-Fi-only is not counted as asking, so it sat behind Resume. Wait for Wi-Fi is the listener asking. */
+  it('Wait for Wi-Fi is the listener asking: a queue a close left waiting goes on', () => {
+    const conn = { type: 'cellular', listeners: [], addEventListener: (_e, f) => conn.listeners.push(f), removeEventListener: vi.fn() };
+    Object.defineProperty(window.navigator, 'connection', { configurable: true, value: conn });
+    off.st.sizes.set(U('v2-one'), 150e6);
+    off.reason = vi.fn(() => 'closed');
+    off.resume = vi.fn();
+    const { container, getByRole } = render(<DownloadChooser off={off} />);
+    fireEvent.click(box(container, 'Volume Two'));
+    fireEvent.click(within(footer(container)).getByRole('button'));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Wait for Wi-Fi' }));
+    expect(off.resume).toHaveBeenCalledTimes(1);
+  });
+
   /* #60's leak hunt, item 4: the held plan kept the Apply's own callback, the CLOSED chooser's setState, so Wi-Fi
      arriving told the chooser that was gone and not the one open: a reopened chooser kept saying "Waiting for Wi-Fi"
      after the downloads had started. */

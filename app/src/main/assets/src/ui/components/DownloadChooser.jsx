@@ -98,6 +98,9 @@ function _connection() {
 function _onConnection() { _heldChanged(); }
 /** @param {any} off @param {any[]} items */
 function holdForWifi(off, items) {
+  // Wait for Wi-Fi is the listener asking: on the web a queue a close left waits as 'closed' until they ask for more,
+  // and Wi-Fi-only items are not counted as asking (they are what automatic downloads use), so say yes for them.
+  if (typeof off.reason === 'function' && off.reason() === 'closed' && typeof off.resume === 'function') off.resume();
   off.download(items.map((i) => ({ ...i, wifi: true })));
   const urls = new Set(_held && _held.off === off ? _held.urls : []);
   for (const i of items) urls.add(i.url);

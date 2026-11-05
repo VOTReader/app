@@ -91,6 +91,18 @@ describe('a lazy load that failed offline (h1104-19)', () => {
       'HOLY_DAYS', 'HIDDEN_MANNA', 'AUDIO_MANIFEST']) delete window[g];
   });
 
+  /* refuter, round 1: an update that took over while a note is open sets __votSwTookOver and holds its reload
+     (update-hold.js); the loader's guard reloads at once, so the network coming back must not ask: only a reader does. */
+  it('after an update took over, the network coming back does not ask (the held reload is the update to make)', async () => {
+    installIndexLoaders();
+    window.__loadVotCorpus().catch(() => {});
+    failLatest();
+    await flush();
+    window.__votSwTookOver = true;
+    window.dispatchEvent(new Event('online'));
+    expect(window.__votCorpus._promise, 'the online retry reached the takeover reload').toBe(null);
+  });
+
   it('a corpus nobody asked for is not fetched when the network comes back', () => {
     installIndexLoaders();
     window.dispatchEvent(new Event('online'));

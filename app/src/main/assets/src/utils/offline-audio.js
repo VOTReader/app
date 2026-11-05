@@ -519,8 +519,17 @@ export const OfflineAudio = {
   paused: () => { if (!_loaded) refresh(); return _paused; },
   /** @returns {string | null} why the queue is not moving: paused | wifi | offline | space | retrying; null when it is */
   reason: () => { if (!_loaded) refresh(); return _reason; },
-  /** @returns {{ count: number, bytes: number, unknown: number }} recordings still to download, their known bytes, how many have no size yet */
-  left: () => { if (!_loaded) refresh(); return _left; },
+  /**
+   * What is left to download as recordings: the phone counts songs being kept too (song-keep queues them there, with
+   * no size), and those are not recordings to go (h1104-19).
+   * @returns {{ count: number, bytes: number, unknown: number }} recordings still to download, their known bytes, how many have no size yet
+   */
+  left: () => {
+    if (!_loaded) refresh();
+    const songs = OfflineAudio.songsOnTheirWay().length;
+    if (!songs) return _left;
+    return { count: Math.max(0, _left.count - songs), bytes: _left.bytes, unknown: Math.max(0, _left.unknown - songs) };
+  },
   /** @returns {{ done: number, total: number, failed: number }} this batch (since the queue was last empty): "3 of 31" */
   batch: () => { if (!_loaded) refresh(); return _batch; },
   /**

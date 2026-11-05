@@ -121,3 +121,22 @@ describe('offline-audio, the saved queue\'s words (dl-d2)', () => {
     expect(OfflineAudio.news().seq).toBe(before + 1);
   });
 });
+
+/* h1104-19: the phone's queue counts every item in it, songs being kept too (song-keep queues them there), so the
+   Downloads strip and the Library row said "Downloading 1 of 40 · 40 recordings to go" for 40 songs, and Cancel
+   (which leaves songs alone by design) left the strip up. What is left is the recordings'. */
+describe('offline-audio, what is left counts recordings, not songs being kept (h1104-19)', () => {
+  const song = (i) => 'https://votreader.github.io/songs-1/' + String(i).padStart(12, 'a') + '.mp3';
+  it('songs on their way are not recordings to go', () => {
+    fakeBridge();
+    Object.assign(state, { active: { url: song(1), bytes: 0, total: -1 }, queued: [song(2), url(1)], left: { count: 3, bytes: 1000, unknown: 2 } });
+    OfflineAudio.refresh();
+    expect(OfflineAudio.left()).toEqual({ count: 1, bytes: 1000, unknown: 0 });
+  });
+  it('only songs left: nothing is left to download as recordings', () => {
+    fakeBridge();
+    Object.assign(state, { queued: [song(2), song(3)], left: { count: 2, bytes: 0, unknown: 2 } });
+    OfflineAudio.refresh();
+    expect(OfflineAudio.left()).toEqual({ count: 0, bytes: 0, unknown: 0 });
+  });
+});

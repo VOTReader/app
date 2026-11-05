@@ -199,7 +199,7 @@ export function MyProgressScreen({ onBack, onSearch, onHistory, onSettings, them
     .map(([, load]) => load);
   const corpusFailed = failedLoads.length > 0;
   const retryCorpora = () => failedLoads.forEach((load) => {
-    Promise.resolve(load()).catch((e) => console.warn('Corpus retry failed', e));
+    Promise.resolve(load(true)).catch((e) => console.warn('Corpus retry failed', e));   // Try again: an explicit retry (h1104-19)
   });
   const groupShape = groups
     .flatMap((g) => g.genres.flatMap((genre) => genre.books.map((b) => `${b.id}:${b.total}`)))
