@@ -220,9 +220,9 @@ describe('Choose: mobile data', () => {
     expect(container.textContent).not.toMatch(/Waiting for Wi-Fi/);
   });
 
-  /* refuter, round 1: on the web a queue a close left waits as 'closed' until the listener asks for more; the plan
-     going in as Wi-Fi-only is not counted as asking, so it sat behind Resume. Wait for Wi-Fi is the listener asking. */
-  it('Wait for Wi-Fi is the listener asking: a queue a close left waiting goes on', () => {
+  /* h1104-19, refuter round 2: a queue a close left waiting holds the listener's own items, and Wait for Wi-Fi is only
+     offered on mobile data: resuming it there would spend the data they just chose to save. It stays behind Resume. */
+  it('Wait for Wi-Fi does not start a queue a close left waiting', () => {
     const conn = { type: 'cellular', listeners: [], addEventListener: (_e, f) => conn.listeners.push(f), removeEventListener: vi.fn() };
     Object.defineProperty(window.navigator, 'connection', { configurable: true, value: conn });
     off.st.sizes.set(U('v2-one'), 150e6);
@@ -233,7 +233,7 @@ describe('Choose: mobile data', () => {
     fireEvent.click(within(footer(container)).getByRole('button'));
     fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Apply' }));
     fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Wait for Wi-Fi' }));
-    expect(off.resume).toHaveBeenCalledTimes(1);
+    expect(off.resume).not.toHaveBeenCalled();
   });
 
   /* #60's leak hunt, item 4: the held plan kept the Apply's own callback, the CLOSED chooser's setState, so Wi-Fi
