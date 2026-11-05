@@ -123,6 +123,25 @@ describe('audio-player prefetch', () => {
     expect(vi.getTimerCount()).toBe(0);           // each finish cleared its backstop
   });
 
+  it('a recording that will not load is left alone for a minute: the warm moves on, then tries it again', () => {
+    P._maybePrefetchNext();
+    const w = warmer();
+    expect(w.src).toBe(track('b').url);
+    w.fire('error');
+    expect(w.src).toBe('');
+    P._maybePrefetchNext();                       // the next tick (timeupdate runs about once a second)
+    expect(w.src).toBe(track('c').url);           // not the dead one again
+    w.fire('error');
+    P._maybePrefetchNext();
+    expect(w.src).toBe('');                       // the whole window failed: nothing to fetch
+    vi.advanceTimersByTime(59999);
+    P._maybePrefetchNext();
+    expect(w.src).toBe('');
+    vi.advanceTimersByTime(1);
+    P._maybePrefetchNext();
+    expect(w.src).toBe(track('b').url);           // a bad minute is not for ever
+  });
+
   it('the 45 s backstop frees a wedged warm and leaves its URL retryable', () => {
     P._maybePrefetchNext();
     const w = warmer();

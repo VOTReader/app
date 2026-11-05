@@ -31,6 +31,11 @@ let _warmingUrl = /** @type {string | null} */ (null);
 let _warmTimer = /** @type {ReturnType<typeof setTimeout> | null} */ (null);
 /** Session-level "already warmed" set — the HTTP cache holds the bytes. */
 const _warmedUrls = new Set();
+/** How long a recording that answered with an error is left alone. The ticks that ask for a warm come about once a
+ *  second, so without this a bad URL is re-requested every second for as long as the current track plays. */
+const WARM_RETRY_MS = 60000;
+/** @type {Map<string, number>} URL -> when it may be tried again. */
+const _warmFailedUntil = new Map();
 
 /** Save-Data or a 2g-class link means: never spend speculative bytes. */
 function _connectionPoor() {
@@ -63,16 +68,18 @@ function _warmTargets() {
     // ONLY on audio-bible-v1 (legacy saved tracks + pre-switch resumes), so
     // the skip is a single prefix test; every shipped edition is per-chapter
     // and warms like a letter.
+    if (url && Date.now() < (_warmFailedUntil.get(url) || 0)) continue;   // answered with an error a moment ago
     if (url && !_warmedUrls.has(url) && url.lastIndexOf(AUDIO_BIBLE_RELEASE_PREFIX, 0) !== 0) out.push(url);
   }
   return out;
 }
 
-/** @param {boolean} markWarmed - false leaves the URL eligible for a retry. */
-function _finishWarm(markWarmed) {
+/** @param {boolean} markWarmed - false leaves the URL eligible for a retry. @param {boolean} [failed] - it errored: not for a minute. */
+function _finishWarm(markWarmed, failed) {
   if (!_warmingUrl) return;   // src='' teardown re-fires 'error' — ignore it
   if (_warmTimer) { clearTimeout(_warmTimer); _warmTimer = null; }
   if (markWarmed) _warmedUrls.add(_warmingUrl);
+  if (failed) _warmFailedUntil.set(_warmingUrl, Date.now() + WARM_RETRY_MS);
   _warmingUrl = null;
   if (_warmEl) {
     _warmEl.removeAttribute('src');
@@ -104,7 +111,7 @@ export function _maybePrefetchNext() {
     // start-latency win — mark it done rather than thrash re-requests.
     w.addEventListener('canplaythrough', () => _finishWarm(true));
     w.addEventListener('suspend', () => { if (w.readyState >= 3) _finishWarm(true); });
-    w.addEventListener('error', () => _finishWarm(false));
+    w.addEventListener('error', () => _finishWarm(false, true));
     _warmEl = w;
   }
   _warmingUrl = targets[0];

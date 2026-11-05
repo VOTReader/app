@@ -1922,8 +1922,17 @@ describe('audio-player — gentle queue prefetch', () => {
     const warm = FakeAudio.last;
     warm.dispatchEvent(new Event('error'));  // transient failure
     expect(warm.src).toBe('');
-    main.dispatchEvent(new Event('progress'));   // healthy again → retry
-    expect(warm.src).toBe(URL_OF('idA1'));
+    main.dispatchEvent(new Event('progress'));   // the next tick does not ask for it again at once
+    expect(warm.src).not.toBe(URL_OF('idA1'));
+    warm.dispatchEvent(new Event('error'));      // its neighbour in the window, if it took one
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 60000);
+    try {
+      main.dispatchEvent(new Event('progress')); // a minute on → retry
+      expect(warm.src).toBe(URL_OF('idA1'));
+    } finally {
+      clock.mockRestore();
+    }
 
     AudioPlayer.stop();
     expect(warm.src).toBe('');
