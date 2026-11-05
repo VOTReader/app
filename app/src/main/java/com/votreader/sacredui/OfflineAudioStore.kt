@@ -119,8 +119,6 @@ class OfflineAudioStore(
     class Summary(
         val busy: Boolean, val paused: Boolean, val reason: String?, val done: Int, val total: Int, val failed: Int,
         val activeBytes: Long, val activeTotal: Long, val leftBytes: Long, val wifiOnly: Boolean,
-        /** h1104-19: every queued item is Wi-Fi-only (automatic, or "Wait for Wi-Fi"): the job needs an unmetered network. */
-        val onlyWifi: Boolean = false,
     )
 
     /** How to answer a Range header against a file of a known length. */
@@ -430,8 +428,7 @@ class OfflineAudioStore(
         return synchronized(lock) {
             val a = active
             Summary(pending.isNotEmpty(), paused, reasonNowLocked(), batchDone, batchTotal, batchFailed,
-                a?.bytes ?: 0L, a?.total ?: -1L, leftLocked(listings).first, wifiOnly,
-                pending.isNotEmpty() && pending.values.all { it.wifi })
+                a?.bytes ?: 0L, a?.total ?: -1L, leftLocked(listings).first, wifiOnly)
         }
     }
 
