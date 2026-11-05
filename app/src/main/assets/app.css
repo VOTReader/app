@@ -1326,7 +1326,7 @@
       }
       .audio-bar-back svg { width: 30px; height: 30px; }
       .audio-bar-next svg, .audio-bar-close svg { width: 24px; height: 24px; }
-      .audio-bar-back:disabled { opacity: 0.4; cursor: default; }
+      :is(.audio-bar-back, .audio-bar-next):disabled { opacity: 0.4; cursor: default; }
       .audio-bar-close { margin-left: 4px; }   /* 8 px before Close (brief 3a) */
       .audio-bar-controls { flex: none; margin-left: auto; display: flex; align-items: center; gap: min(0.5rem, 4px); }
       .audio-bar-act { padding: 0 6px; font-size: var(--fs-15); }

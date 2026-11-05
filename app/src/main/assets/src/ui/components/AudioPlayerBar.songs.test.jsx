@@ -119,6 +119,23 @@ describe('the mini-player song skin (final-08, player brief picture 03)', () => 
     expect(AudioPlayer.getState().status).toBe('idle');
   });
 
+  it('on the last song with repeat off, Next is disabled as on the desk: a tap no longer ends the session', () => {
+    playFamilyA();
+    render(<AudioPlayerBar />);
+    emit('playing');
+    const bar = () => document.querySelector('.audio-bar');
+    const n = AudioPlayer.getState().queue.length;
+    act(() => { for (let i = 1; i < n; i++) AudioPlayer.next(); });
+    emit('playing');
+    expect(AudioPlayer.getState().qi).toBe(n - 1);
+    const next = within(bar()).getByRole('button', { name: 'Next song' });
+    expect(next.disabled).toBe(true);
+    fireEvent.click(next);
+    expect(AudioPlayer.getState().status).not.toBe('idle');
+    act(() => { AudioPlayer.setRepeat('all'); });
+    expect(within(bar()).getByRole('button', { name: 'Next song' }).disabled).toBe(false);
+  });
+
   it('offline and paused, a song says it is not on this phone and dims its play', () => {
     playFamilyA();
     emit('playing');

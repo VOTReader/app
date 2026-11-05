@@ -517,7 +517,7 @@ export function AudioPlayerBar() {
         {st.status === 'loading' ? <SpinnerIcon /> : active ? <PauseIcon /> : <PlayIcon />}
       </button>
       {songId && !single ? (
-        <button type="button" className="audio-bar-next" onClick={() => AudioPlayer.next()} aria-label="Next song"><NextIcon /></button>
+        <button type="button" className="audio-bar-next" onClick={() => AudioPlayer.next()} disabled={!restoring && st.qi + 1 >= queue.length && st.repeat !== 'all'} aria-label="Next song"><NextIcon /></button>
       ) : null}
       <button type="button" className="audio-bar-close" onClick={closeWithUndo} aria-label="Close player">
         <CloseGlyph />

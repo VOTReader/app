@@ -48,7 +48,7 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-37087b429e';
+const CACHE_VERSION = 'v1.0.2-c0d4b4043c';
 const CORPUS_VERSION = 'c76'; // c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
@@ -316,11 +316,11 @@ const freshReq = (url) => new Request(url, { cache: 'reload' });
 // ── BEGIN GENERATED: ASSET_INTEGRITY (tools/sync-sw-version.js) ──
 const ASSET_INTEGRITY = {
   './': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',
-  './dist/app.min.css': '1876e45be07807becd185e2e22108ea0075e11af3ea3693fe519e8aea49ca4e8',
+  './dist/app.min.css': '69fa6b38b1e889b987d3d412cf20cb3a8a321826efc95d8bb6f69457ac67a09c',
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': '33ab593571ea40365e454cba9b5d9fe0eb1b8365a6fa73897d62b57d115bb291',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': '69ce0a107d967defc520e9509f301d773a3b1dfa3ac2c593176b43de3c1f3b87',
+  './dist/bundle-d.js': '1eb02f176c961a5b3371008026a1fb39968f71324a15c3130ceda474bf57783c',
   './dist/bundle-w.js': 'e9be59da2cb9374885f5d90418b5e6936e36966bc1de4ce2e13b2fa9dd869d8f',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': 'f53ad8a6866dce7e04bacced6cf83d8c03389bc4acbedbcf46ff64d33c06407b',
