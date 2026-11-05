@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 632 distinct identifiers.
+// Total: 631 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -265,7 +265,6 @@ declare const SRCH_CANONICAL_BOOK_INDEX: any;
 declare const SRCH_GROUP_META: any;
 declare const SRCH_KIND_LABEL: any;
 declare const SRCH_QUICK_PICKS: any;
-declare const STALL_MS: any;
 declare const STUDY_ABBREVS: any;
 declare const Safari7DayModal: any;
 declare const ScreenLayout: any;

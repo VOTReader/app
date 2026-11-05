@@ -2,7 +2,7 @@
 /* translateVerse — resolves a verse to its alt-translation text (NKJV fallback). Pins
    PERF-3: the single-entry { n -> text } index must give the SAME results as the old
    linear scan AND rebuild on a chapter/translation change (no stale cross-chapter leak). */
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -400,33 +400,5 @@ describe('translationLang (es1)', () => {
   });
   it('answers nothing when the registry is not loaded', () => {
     expect(translationLang('rvr')).toBeUndefined();
-  });
-});
-
-/* h1104-19: a translation (or the studies file) whose download stalled, so neither load nor error fired, kept its
-   promise forever: the Bible showed the NKJV with no word, and choosing the translation again handed back the same
-   hung promise until a restart. After STALL_MS it settles as a failure, so the next ask fetches it again. */
-describe('a stalled download settles (h1104-19)', () => {
-  const scripts = (src) => [...document.head.querySelectorAll('script')].filter((s) => s.getAttribute('src') === src);
-  afterEach(() => { vi.useRealTimers(); document.head.innerHTML = ''; delete _translationPromises.tst; });
-  it('a translation script that never answers settles, and the next ask fetches it again', async () => {
-    vi.useFakeTimers();
-    const { loadTranslation } = await import('./translations.js');
-    let settled = false;
-    loadTranslation('tst').then(() => { settled = true; });
-    expect(scripts('src/data/bible-tst.js')).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(46000);
-    expect(settled, 'the promise hung past the stall time').toBe(true);
-    loadTranslation('tst');
-    expect(scripts('src/data/bible-tst.js'), 'the retry got the hung promise back').toHaveLength(2);
-  });
-  it('the studies file that never answers settles false (Try again), and the next ask fetches it again', async () => {
-    vi.useFakeTimers();
-    const { loadBibleStudies } = await import('./translations.js');
-    const first = loadBibleStudies();
-    await vi.advanceTimersByTimeAsync(46000);
-    expect(await first).toBe(false);
-    loadBibleStudies();
-    expect(scripts('src/data/bible-studies.js')).toHaveLength(2);
   });
 });

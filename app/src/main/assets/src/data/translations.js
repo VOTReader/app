@@ -54,11 +54,6 @@ function _baseOf(code) {
   return (opt && opt.base) || null;
 }
 
-/* h1104-19: a download that stalls fires neither load nor error, and its promise stayed cached: the Bible showed the
-   NKJV with no word, and asking again handed back the same hung promise until a restart. After STALL_MS it settles
-   the way a failure does (index.html's lazy loader does the same at 45 s, s01.6); a copy that lands later still loads. */
-const STALL_MS = 45000;
-
 /** @param {string} code */
 function _loadTranslationScript(code) {
   const globalName = 'BIBLE_' + code.toUpperCase();
@@ -68,25 +63,18 @@ function _loadTranslationScript(code) {
     const script = document.createElement('script');
     script.src = 'src/data/bible-' + code + '.js';
     script.async = true;
-    const stall = setTimeout(() => {
-      if (_translationPromises[code] === mine) delete _translationPromises[code];
-      try { if (window.DiagnosticLog) window.DiagnosticLog.warn('translation', 'load stalled for ' + code); } catch (_e) {}
-      resolve(undefined);
-    }, STALL_MS);
-    script.onload = () => {clearTimeout(stall);_translationLoaded[code] = true;resolve(undefined);};
+    script.onload = () => {_translationLoaded[code] = true;resolve(undefined);};
     script.onerror = () => {
-      clearTimeout(stall);
       // ERR2: don't cache the failure — clear the slot so a later open retries,
       // and trace it (the NKJV fallback is otherwise invisible: the user just
       // sees their chosen translation silently revert with no explanation).
-      if (_translationPromises[code] === mine) delete _translationPromises[code];
+      delete _translationPromises[code];
       try { if (window.DiagnosticLog) window.DiagnosticLog.warn('translation', 'failed to load ' + code); } catch (_e) {}
       resolve(undefined);
     };
     document.head.appendChild(script);
   });
-  const mine = _translationPromises[code];
-  return mine;
+  return _translationPromises[code];
 }
 
 export function loadBibleStudies() {
@@ -96,14 +84,8 @@ export function loadBibleStudies() {
     const script = document.createElement('script');
     script.src = 'src/data/bible-studies.js';
     script.async = true;
-    const stall = setTimeout(() => {
-      if (_bibleStudiesPromise === mine) _bibleStudiesPromise = null;
-      try { if (window.DiagnosticLog) window.DiagnosticLog.error('studies', 'load stalled for bible-studies.js'); } catch (_e) {}
-      resolve(false);
-    }, STALL_MS);
-    script.onload = () => { clearTimeout(stall); resolve(true); };
+    script.onload = () => resolve(true);
     script.onerror = () => {
-      clearTimeout(stall);
       // ERR1: do NOT cache the failed promise — null it so a retry (or the next
       // Studies open) re-attempts the load, instead of stranding the user on a
       // permanent "Letter Studies coming soon." dead-end. Resolve FALSE so the
@@ -115,8 +97,7 @@ export function loadBibleStudies() {
     };
     document.head.appendChild(script);
   });
-  const mine = _bibleStudiesPromise;
-  return mine;
+  return _bibleStudiesPromise;
 }
 
 /* Versification alias (data-corpus-4). The WEB and the HNV print the Romans
