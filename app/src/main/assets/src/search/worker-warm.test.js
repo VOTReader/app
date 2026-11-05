@@ -78,6 +78,28 @@ describe('warm on the worker', () => {
     expect([...want.O.keys()].some((k) => k.includes('watchman burneth'))).toBe(true);
   });
 
+  it('reads an index restored from the warm cache as it reads a built one (every launch after the first)', async () => {
+    const built = await buildThere('b5');
+    const stored = new Response(JSON.stringify(built), { headers: { 'x-vot-index-sig': 'sig-1' } });
+    vi.stubGlobal('caches', { open: async () => ({ match: async () => stored.clone() }) });
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(TWIN_JSON, { status: 200 }))));
+    const posts = /** @type {any[]} */ ([]);
+    await handleWorkerMessage({ id: 4, op: 'restore', sig: 'sig-1', key: 'r1' }, (m) => posts.push(structuredClone(m)));
+    let asm = /** @type {any} */ (null);
+    for (const m of posts.filter((p) => !p.done)) {
+      if (m.head) asm = indexAssembler(MiniSearch, m.head, buildMiniSearchOptions());
+      else asm.add(m.part, m.entries);
+    }
+    const page = asm.ms;
+    const got = await warmThere({ key: 'r1', twin: 'http://localhost/search-kjv-twin.json' });
+    expect(got.done.error).toBeUndefined();
+    const want = readWarm(page, twinView(parseKjvTwin(JSON.parse(TWIN_JSON)), page));
+    expect(want.O.size).toBeGreaterThan(5);
+    expect([...got.O]).toEqual([...want.O]);
+    expect([...got.S]).toEqual([...want.S]);
+    expect(plain(got.store)).toEqual(plain(want.store));
+  });
+
   it('reads without a wording when the page has none', async () => {
     const page = await buildThere('b2');
     const got = await warmThere({ key: 'b2', twin: null });
