@@ -11,13 +11,17 @@ import {
   _library,
   _state,
 } from './core.js';
+import { _unreachable } from './offline.js';
 import { _creditSectionLetter, _secHeard, _secKey, _sectionTableFor } from './sections.js';
 
 /** A song the listener put on waits here until it really plays, then goes on Recently played (device check 09-25:
  *  an offline skip over a song that never played put it on the shelf). */
 let _songRecordPending = false;
+/** A Play all with no signal whose top letter is not on the phone: the player passes over it, so what goes on the
+ *  recent shelf (and counts as a play) is decided by what really starts, on 'playing'. */
+let _letterRecordPending = false;
 /** Write from another module of the player (the binding is read-only outside this one). @param {typeof _songRecordPending} v */
-export function _setSongRecordPending(v) { _songRecordPending = v; }
+export function _setSongRecordPending(v) { _songRecordPending = v; _letterRecordPending = v; }
 /**
  * A recording finished playing to its end (owner directive 2026-08-09: a full
  * listen counts like a full read — the item's read count increments). Fired
@@ -112,14 +116,20 @@ export function _countPlay() {
     // and one evening of shuffle must not flush it or inflate My Progress.
     // The shelf takes it only once it plays (_recordSongStart, on 'playing').
     _songRecordPending = _isSong(track);
-    if (_songRecordPending) return;
-    try {
-      if (track && typeof library.recordPlayed === 'function') library.recordPlayed(track);
-    } catch (_e) { /* recent-history failures must not interfere with listening */ }
-    try {
-      if (typeof library.countPlay === 'function') library.countPlay();
-    } catch (_e) { /* the plays counter must never stand between a tap and audio */ }
+    _letterRecordPending = !_songRecordPending && !!track && _unreachable(track);
+    if (_songRecordPending || _letterRecordPending) return;
+    _recordLetter(library, track);
   } catch (_e) { /* no library bridge at all — nothing to record */ }
+}
+
+/** The recent shelf and the lifetime plays, each on its own: neither failure costs the other. */
+function _recordLetter(/** @type {any} */ library, /** @type {any} */ track) {
+  try {
+    if (track && typeof library.recordPlayed === 'function') library.recordPlayed(track);
+  } catch (_e) { /* recent-history failures must not interfere with listening */ }
+  try {
+    if (typeof library.countPlay === 'function') library.countPlay();
+  } catch (_e) { /* the plays counter must never stand between a tap and audio */ }
 }
 
 /**
@@ -128,6 +138,15 @@ export function _countPlay() {
  * @returns {void}
  */
 export function _recordSongStart() {
+  if (_letterRecordPending) {
+    _letterRecordPending = false;
+    try {
+      const library = _library();
+      const track = _state.queue[_state.qi];
+      if (library && !_isSong(track)) _recordLetter(library, track);
+    } catch (_e) { /* the shelf must never stand between a letter and its sound */ }
+    return;
+  }
   if (!_songRecordPending) return;
   const track = _state.queue[_state.qi];
   if (!_isSong(track)) return;

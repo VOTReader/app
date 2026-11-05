@@ -2005,6 +2005,43 @@ describe('audio-player — offline, recordings downloaded to the phone (item 8)'
     expect(document.getElementById(AUDIO_TOAST_ID)).toBeTruthy();
   });
 
+  it('Play all with no signal files the letter it plays, not the one it passed over', async () => {
+    const library = { countPlay: vi.fn(), recordPlayed: vi.fn() };
+    globalThis.AudioLibraryStore = library;
+    try {
+      await downloaded(['idC']);
+      setOnline(false);
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+      expect(library.recordPlayed).not.toHaveBeenCalled();
+      expect(library.countPlay).not.toHaveBeenCalled();
+      el().dispatchEvent(new Event('playing'));
+      expect(library.recordPlayed).toHaveBeenCalledTimes(1);
+      expect(library.recordPlayed).toHaveBeenCalledWith(expect.objectContaining({ url: URL_OF('idC') }));
+      expect(library.countPlay).toHaveBeenCalledTimes(1);
+      el().dispatchEvent(new Event('playing'));   // a resume after a stall is the same play
+      expect(library.recordPlayed).toHaveBeenCalledTimes(1);
+    } finally {
+      delete globalThis.AudioLibraryStore;
+    }
+  });
+
+  it('Play all with no signal, nothing played: stopped before a sound, nothing is filed', async () => {
+    const library = { countPlay: vi.fn(), recordPlayed: vi.fn() };
+    globalThis.AudioLibraryStore = library;
+    try {
+      await downloaded(['idC']);
+      setOnline(false);
+      AudioPlayer.playCollection({ volKey: 'vol1', items: ITEMS });
+      const first = el();
+      AudioPlayer.stop();
+      first.dispatchEvent(new Event('playing'));
+      expect(library.recordPlayed).not.toHaveBeenCalled();
+      expect(library.countPlay).not.toHaveBeenCalled();
+    } finally {
+      delete globalThis.AudioLibraryStore;
+    }
+  });
+
   it('Play all with no signal starts at the first downloaded recording', async () => {
     await downloaded(['idC']);
     setOnline(false);
