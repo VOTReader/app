@@ -48,8 +48,8 @@
  * responses, which no URL scheme can detect.
  */
 
-const CACHE_VERSION = 'v1.0.2-aa413a4502';
-const CORPUS_VERSION = 'c76'; // c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
+const CACHE_VERSION = 'v1.0.2-0d0f6bef06';
+const CORPUS_VERSION = 'c77'; // c76->c77 (2026-11-06): audio re-upload watch -- V1.019 Make Way for the Coming of The Lord (new, TTS Benjamin): Drive bytes re-mirrored to audio-v1 (every replaced asset's old bytes archived under D:\VOT-Archive\_superseded, digest-verified), timings re-cut, gates green (plan plan-2026-11-06-105223.json). // PREVIOUS c75->c76 (2026-11-04): the link checker (tools/corpus-links.test.js, PR #66) found 39 breaks; 28 fixed in the data: 20 Bible-study letter links whose title or volume did not match the letter (straight apostrophes, "…", a capital, one wrong volume), 3 stale study letterIds, 4 footnote refs that did not parse (Amos 3:7 CJB, two "(which means ...) - Matthew 1:23", Matthew "Wedding Garment: Colossians 3:9-10"), and 1 John 3:2 added to MATTHEW_NKJV (text from Volume Six). 11 left in KNOWN_BREAKS (7 misattributed excerpts, 3 Hidden Manna letters not in the corpus, Malachi 4:4-6). Every bump's full note: HISTORY.md, "CORPUS_VERSION changelog".
 
 const CORE_CACHE = `vot-core-${CACHE_VERSION}`;
 const CORPUS_CACHE = `vot-corpus-${CORPUS_VERSION}`;
@@ -320,7 +320,7 @@ const ASSET_INTEGRITY = {
   './dist/bundle-a.js': '08f2491b82005339ac23e82132d9b7d5fcf59d41df3ae0f8972c613ba750aeca',
   './dist/bundle-b.js': '33ab593571ea40365e454cba9b5d9fe0eb1b8365a6fa73897d62b57d115bb291',
   './dist/bundle-c.js': '04748ad1938c349059ce65dbd78a1d0f3eadc80194566082326472c306e5aa0e',
-  './dist/bundle-d.js': 'cb1689a3ee2a84413b290f9a7344593a50240d8c1db10c4ee6ebb1194a7b6241',
+  './dist/bundle-d.js': '5ae9aaa7e5d8f603f266f8db2ade68a6c6e7f78cc4bda7b1beadafee82e29ff9',
   './dist/bundle-w.js': 'd981920eb67e1b04bfc2d0c4d81482680bd3ef2321cbc242bb0fddf6e824915c',
   './html2canvas.min.js': 'e87e550794322e574a1fda0c1549a3c70dae5a93d9113417a429016838eab8cb',
   './index.html': '16f349a2714c1f1900e939dfa97c6102d934e1911afe8dfb3b6033cc2872c971',
@@ -343,7 +343,7 @@ const ASSET_REVISIONS = {
   './answers-holidays-vs-holy-days.jpg': '808b401358f38faf6d1667cb5097e70661b06076ecd53324100c7959bd06fe6e',
   './dist/bundle-a-bible.js': 'e811e8814a927e0447a3aebca8a7c751ad5e3b8923715840e285259586c73e52',
   './dist/bundle-a-matthew.js': 'e88268c42ae19fca4c02ac78177a47602936a0313ca59f3e6cc25a9c7976e58c',
-  './dist/bundle-a-vot.js': 'f5a0c5aa25c89a6474149450b56f2be3f7961537b5a04d6f6f81020349e7376a',
+  './dist/bundle-a-vot.js': '5772b4609eebad196ccd083b81a056fcef90c3253bdc3f0730a5d42f2d50d562',
   './fonts/cinzel-decorative-latin-400-normal.woff2': '6faa34360509b8554ed4448e331401ece5ff179fbfabc76e20697490f775f1f1',
   './fonts/cinzel-decorative-latin-700-normal.woff2': 'ccf78826a008161e97125f965d4e358e53b1921e852f76716e395724363f54fd',
   './fonts/cinzel-latin-400-normal.woff2': 'd06f54fe8b6aa20e6ca62f7d7c143a56677e771a2f643c7a9f501643e26f6c62',
@@ -420,7 +420,7 @@ const ASSET_REVISIONS = {
   './src/data/answers.js': 'a291d3608d84d6d2bcf5dfd2c6d0524e2103d5c7bc3b657cd113d2ac518ba6eb',
   './src/data/audio-lengths.js': 'c0476aeafb8e2e5a892d63b072943ad1b6dd4648b8f9b1d5cefb29ccb510055a',
   './src/data/audio-sync-sections.js': 'a48bd0c2f2352ca5ef21b903fe0f5dc9a6048f0b0492b6cf15d845edd54547ac',
-  './src/data/audio-sync.js': '0945ff2d311be5e6c3acea296da7ed132f38416bea367385afb823fb3a743e97',
+  './src/data/audio-sync.js': 'f5a527c5504ca24d2e8761a286eb2a07928584124680f50a47ed661d0830b686',
   './src/data/bible-asv.js': '552b7ae92a206f103f53f51f33cc8b90365156244aab6b7c47f8da5d16d6a34b',
   './src/data/bible-bsb.js': 'c6298eeaaba6bf491a0cbfe6f22ba3d19357ad29c6c88acd6f5bf4791347a6bd',
   './src/data/bible-hnv.js': '582c866ccba90aa63170c958bda79d554f32dc5749a6949bb289aa51f96eeead',
