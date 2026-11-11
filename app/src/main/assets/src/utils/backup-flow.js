@@ -90,7 +90,7 @@ export function _savedBackupToast(problems, nearLimit) {
  * @param {{ current: number }} ctx.reloadTimerRef  the scheduled reload's timer id (0 when none)
  * @param {(busy: boolean) => void} ctx.setBusy  disables the backup rows
  * @param {(report: null | { message: string, level: 'ok' | 'warn' }) => void} ctx.setVerifyReport
- * @param {(message: string) => Promise<boolean>} ctx.confirmImport  shows the Import & Overwrite sheet and settles once, from any dismiss path
+ * @param {(message: string, details?: { date: string | null, summary: any, space: string } | null) => Promise<boolean>} ctx.confirmImport  shows the Restore this backup? sheet and settles once, from any dismiss path
  * @param {any[]} ctx.diagnosticLog  the crash-log snapshot an export carries
  */
 /** localStorage key: when this device last finished an export (Your Data shows it; in LS_SKIP_LIST). */
@@ -589,8 +589,13 @@ export function createBackupFlow(ctx) {
       // _settleImportConfirm from every dismiss path — so this async function
       // (and therefore the caller's finally, which closes the native import
       // stream on Android) does not complete until the import truly settles.
+      // WS3 settings (st-restore): the sheet also gets what the file holds, to show it as counts. Display only.
+      /** @type {{ date: string | null, summary: any, space: string } | null} */
+      let details = null;
+      try { details = { date: parsed.exportDate || null, summary: summarizeBackupManifest(parsed), space: spaceNote }; } catch (_e) { details = null; }
       const confirmed = await confirmImport(
         `Importing the backup from ${dateLabel} will OVERWRITE the data types contained in this backup; any data type not included is left unchanged.${summary}${spaceNote} This cannot be undone.`,
+        details,
       );
       if (!confirmed) return;                       // Cancel / backdrop / Back / Escape
       // v04-01: the stale pre-import state must not be written over the restore.
@@ -945,7 +950,9 @@ export function createBackupFlow(ctx) {
     // rather than being re-derived from the manifest's claim.
     const _report = (manifest, integrity, kind, salvaged) => {
       hideToast(_TOAST_ID);
-      setVerifyReport(formatVerifyReport(summarizeBackupManifest(manifest), integrity, kind, salvaged));
+      const sum = summarizeBackupManifest(manifest);
+      // WS3 settings (st-verify): the counts travel with the words, for the verdict sheet.
+      setVerifyReport({ ...formatVerifyReport(sum, integrity, kind, salvaged), summary: sum, integrity, kind });
     };
     // Both platforms: envelope-validate the parsed manifest/payload first so a
     // random JSON file reports "not a backup", not a zero-count summary.

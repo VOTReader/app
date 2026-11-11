@@ -309,7 +309,7 @@ describe('axe — Settings', () => {
   it('the Clear All My Data dialog', async () => {
     setupSettingsGlobals({ ScreenLayout: Layout });
     const { getByRole } = renderSettings();
-    act(() => { fireEvent.click(getByRole('button', { name: 'Clear All My Data' })); });
+    act(() => { fireEvent.click(getByRole('button', { name: 'Delete all my data' })); });
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();
     await check();
   });

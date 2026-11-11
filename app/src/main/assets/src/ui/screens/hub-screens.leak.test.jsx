@@ -207,6 +207,6 @@ describe('leaks — Settings', () => {
   it('Settings with the Clear All My Data dialog open', async () => {
     setupSettingsGlobals({ ScreenLayout: Layout });
     // Each mount starts from the same stored state (the harness's group-expand clicks are remembered).
-    await leakFree('SettingsScreen + dialog', () => { localStorage.clear(); return renderSettings(); }, (r) => { fireEvent.click(r.getByRole('button', { name: 'Clear All My Data' })); });
+    await leakFree('SettingsScreen + dialog', () => { localStorage.clear(); return renderSettings(); }, (r) => { fireEvent.click(r.getByRole('button', { name: 'Delete all my data' })); });
   });
 });

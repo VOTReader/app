@@ -22,11 +22,11 @@ const GROUPS = [
   ] },
 ];
 
-const totalTally = () => /** @type {HTMLElement} */ (document.querySelector('.total-row .progress-row-tally')).textContent;
+const totalTally = () => /** @type {HTMLElement} */ ([...document.querySelectorAll('.ui-label-row')].find((r) => r.textContent.startsWith('Read so far')).querySelector('.ui-label-aside')).textContent;
 const clearAllBtn = () => /** @type {HTMLButtonElement} */ (
-  [...document.querySelectorAll('.total-row button')].find((b) => b.textContent === 'Clear All'));
+  [...document.querySelectorAll('.ws3-clear-all button')].find((b) => b.textContent === 'Clear all read marks'));
 const sectionTallies = () => [...document.querySelectorAll('.progress-section-toggle .progress-row-tally')]
-  .map((t) => Number(t.textContent.split('/')[0]));
+  .map((t) => Number(t.textContent.split(' of ')[0]));
 
 beforeEach(() => { setupSettingsGlobals({ buildProgressGroups: () => GROUPS, countReadFor }); });
 afterEach(() => { cleanup(); teardownSettingsGlobals(); });
@@ -39,25 +39,25 @@ describe('SettingsScreen — All Scriptures counts only the books in the table',
     };
     renderSettings({ markAsRead: true }, { readItems });
     expect(sectionTallies()).toEqual([2, 1]);
-    expect(totalTally()).toBe('3 / 38');
+    expect(totalTally()).toBe('3 of 38');
   });
 
   it('never reads more than exist when the off-table marks outnumber the table', () => {
     const readItems = { 'v1:volume-one:1': 1 };
     for (let i = 0; i < 40; i++) readItems[`v1:answers:t${i}`] = 1;
     renderSettings({ markAsRead: true }, { readItems });
-    expect(totalTally()).toBe('1 / 38');
+    expect(totalTally()).toBe('1 of 38');
   });
 
   it('keeps Clear All live while an off-table mark exists, since Clear All wipes it too', () => {
     renderSettings({ markAsRead: true }, { readItems: { 'v1:answers:topic-a': 1 } });
-    expect(totalTally()).toBe('0 / 38');
+    expect(totalTally()).toBe('0 of 38');
     expect(clearAllBtn().disabled).toBe(false);
   });
 
   it('disables Clear All when there is nothing at all to clear', () => {
     renderSettings({ markAsRead: true }, { readItems: {} });
-    expect(totalTally()).toBe('0 / 38');
+    expect(totalTally()).toBe('0 of 38');
     expect(clearAllBtn().disabled).toBe(true);
   });
 });

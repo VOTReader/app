@@ -15,7 +15,7 @@ import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-lin
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { ListRow, Segmented, SectionLabel, UiButton } from '../components/UiParts.jsx';
-import { SelectSheet } from '../components/SelectField.jsx';
+import { ActionSheet, SelectSheet } from '../components/SelectField.jsx';
 import { SettingsNavRow, SettingsStepRow } from '../components/SettingsRow.jsx';
 import { settingsFindContext, SettingsSection, Findable, findMatches, useSettingsFind } from '../components/settings-find.jsx';
 
@@ -404,61 +404,93 @@ function DataInfoRow({ label, value = null, children = null, find = '' }) {
   );
 }
 
-/* StorageTrendValue — BACKLOG [30]. How the reader's own data has grown,
-   from the samples recorded on each Settings visit (utils/user-data-size.js).
-
-   The SENTENCE is the feature; the bars are decoration. A sparkline scaled
-   to its own max flattens exactly the case that matters (steady slow growth
-   looks identical to a spike), and it is unreadable to a screen reader — so
-   the trend is stated in words first, the bars are aria-hidden, and the
-   per-sample figures are exposed to assistive tech as an sr-only list.
-
-   Day one shows text only: a single bar is noise, and a one-point line
-   draws nothing. */
-function StorageTrendValue({ samples }) {
-  if (!samples || samples.length === 0) return null;
-  const first = samples[0];
-  const last = samples[samples.length - 1];
-  const delta = last.b - first.b;
-  const sentence = samples.length === 1
-    ? `First measurement recorded — ${formatBytes(last.b)}. The trend appears the next day you open Settings.`
-    : `Your data has ${delta > 0 ? 'grown' : delta < 0 ? 'shrunk' : 'stayed level'}${delta === 0 ? '' : ' by ' + formatBytes(Math.abs(delta))} across ${samples.length} measurements since ${first.d} — now ${formatBytes(last.b)}.`;
-  const max = samples.reduce((m, s) => (s.b > m ? s.b : m), 0);
-  return (
-    <div className="settings-trend" role="group" aria-label="Your data size over time">
-      <span>{sentence}</span>
-      {samples.length > 1 && (
-        <>
-          <span className="sr-only">{samples.map((s) => `${s.d}: ${formatBytes(s.b)}`).join('. ')}</span>
-          <div className="settings-trend-bars" aria-hidden="true">
-            {samples.map((s) => (
-              <div key={s.d} className="settings-trend-bar"
-                style={max > 0 ? { height: Math.max(2, Math.round((s.b / max) * 24)) + 'px' } : undefined} />
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-/* DataActionRow — label + ⓘ-revealed description + action button. */
-function DataActionRow({ label, desc = null, children = null, className = '', find = '' }) {
-  // WS1 settings (U 8.7): the plain line is always shown under the name, no "i" to open it.
+/* WS3 settings (st-data, st-data2): one Your data row: the name, one plain line, then a value, a pill or a button. */
+function DataRow({ label, desc = null, value = null, pill = false, children = null, className = '', find = '' }) {
   const f = useSettingsFind(label + ' ' + (typeof desc === 'string' ? desc : '') + ' ' + find);
   if (!f.show) return null;
   return (
-    <div className={'settings-row' + (className ? ' ' + className : '')} data-found={f.place ? '' : undefined}>
+    <div className={'settings-row ws3-data-row' + (className ? ' ' + className : '')} data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
         <span className="settings-row-text">
           {f.place ? <span className="ws2-place">{f.place}</span> : null}
           <span className="settings-row-label">{label}</span>
-          {desc && <span className="settings-row-desc">{desc}</span>}
+          {desc ? <span className="settings-row-desc">{desc}</span> : null}
         </span>
+        {value != null && value !== '' ? <span className={pill ? 'ws3-pill' : 'settings-row-value'}>{value}</span> : null}
         {children}
       </div>
     </div>
   );
+}
+
+/* WS3 settings (st-data, st-prog): a row that opens something: icon chip, name, line, chevron. */
+function DataNavRow({ icon, label, desc, onClick, disabled = false, find = '' }) {
+  const f = useSettingsFind(label + ' ' + desc + ' ' + find);
+  if (!f.show) return null;
+  return (
+    <div className="settings-row" data-found={f.place ? '' : undefined}>
+      <button type="button" className="settings-row-head ws2-nav ws3-nav" aria-label={label} disabled={disabled} onClick={onClick}>
+        <span className="ws2-opt-lead" aria-hidden="true"><UiIcon name={icon} size="sm" /></span>
+        <span className="settings-row-text">
+          {f.place ? <span className="ws2-place">{f.place}</span> : null}
+          <span className="settings-row-label">{label}</span>
+          <span className="settings-row-desc">{desc}</span>
+        </span>
+        <span className="settings-select-chev" aria-hidden="true">{'›'}</span>
+      </button>
+    </div>
+  );
+}
+
+/* The Growth row's line (BACKLOG [30]: the sentence is the feature). The mock draws the line and the size, no bars. */
+function growthLine(samples) {
+  if (samples.length === 1) return 'How fast your data grows. First measurement recorded; the trend appears the next day you open Settings.';
+  const first = samples[0];
+  const delta = samples[samples.length - 1].b - first.b;
+  const how = delta > 0 ? 'Grown by ' + formatBytes(delta) : delta < 0 ? 'Shrunk by ' + formatBytes(-delta) : 'Stayed level';
+  return 'How fast your data grows. ' + how + ' across ' + samples.length + ' measurements since ' + first.d + '.';
+}
+
+/* WS3 settings (st-restore, st-verify): what a backup file holds, one line per kind. */
+function BackupCounts({ s }) {
+  const rows = [['Notes', s.notes], ['Highlights', s.highlights], ['Journal entries', s.journal], ['Bookmarks', s.bookmarks]];
+  if (s.annotatedPassages) rows.splice(2, 0, ['Annotated passages', s.annotatedPassages]);
+  return (
+    <div className="ui-group is-inset ws3-counts">
+      {rows.map(([k, n]) => (
+        <div key={k} className="ws3-count"><span>{k}</span><span className="ws3-count-n">{Number(n || 0).toLocaleString('en-US')}</span></div>
+      ))}
+    </div>
+  );
+}
+
+/** "9 November 2026" from an export date; '' when there is none. @param {string | null | undefined} iso */
+function _backupDay(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+/** The check's verdict, its sub line and its plain line, from the report backup-flow hands over. */
+function _verifyWords(r) {
+  const s = r.summary || null;
+  const damaged = ['mismatch', 'malformed', 'trailing', 'truncated'].indexOf(r.integrity) >= 0;
+  const title = !s ? 'This file could not be checked' : r.level === 'ok' ? 'This backup is intact'
+    : damaged ? 'This backup may be damaged' : 'This backup could not be fully checked';
+  let sub = null;
+  if (s) {
+    const how = r.kind === 'legacy' ? 'older format, no checksum' : r.integrity === 'ok' ? 'integrity check passed'
+      : r.integrity === 'absent' ? 'no checksum in this file' : damaged ? 'integrity check failed' : 'the check did not finish';
+    sub = (_backupDay(s.date) ? 'Backup from ' + _backupDay(s.date) + ' · ' : '') + how;
+  }
+  let line = r.message;
+  if (s && r.level === 'ok') {
+    line = s.records.toLocaleString('en-US') + (s.records === 1 ? ' record' : ' records') + ' across ' + s.storeCount
+      + (s.storeCount === 1 ? ' data store' : ' data stores')
+      + (s.mediaCount ? ', plus ' + s.mediaCount + (s.mediaCount === 1 ? ' media file' : ' media files') + (s.mediaBytes ? ' (' + formatBytes(s.mediaBytes) + ')' : '') : '')
+      + '.' + (s.mediaCount && r.integrity === 'ok' ? ' Photos and voice memos were checked for size, not content.' : '');
+  }
+  return { s, title, sub, line };
 }
 
 /* TranslationInfoDesc — the Bible Translation row's ⓘ content: the base
@@ -509,52 +541,49 @@ function TranslationInfoDesc() {
   );
 }
 
-function SectionClearBtn({ label, disabled, onClear }) {
+/* WS3 settings (st-prog): a Reading progress row: the name over a thin bar, "N of M", and Clear, which asks first. */
+function ProgressRow({ label, read, total, canClear, onClear, question, open = false, onToggle = null, sub = false }) {
   const [confirming, setConfirming] = React.useState(false);
   if (confirming) {
     return (
-      <ConfirmStrip
-        question={`Clear read marks and saved positions in "${label}"?`}
-        yesLabel="Yes, clear"
-        onCancel={() => setConfirming(false)}
-        onConfirm={() => { onClear(); setConfirming(false); }}
-      />
+      <ConfirmStrip question={question} yesLabel="Yes, clear"
+        onCancel={() => setConfirming(false)} onConfirm={() => { onClear(); setConfirming(false); }} />
     );
   }
+  const pct = total > 0 ? Math.min(100, Math.round((read / total) * 100)) : 0;
+  const tally = <span className="progress-row-tally">{read.toLocaleString('en-US')} of {total.toLocaleString('en-US')}</span>;
+  const name = (
+    <span className="ws3-prog-name">
+      <span className="progress-row-label">{label}</span>
+      {sub ? null : <span className="ui-progress ws3-prog-bar" aria-hidden="true"><span style={{ width: pct + '%' }} /></span>}
+    </span>
+  );
   return (
-    <button
-      className="settings-clear-btn"
-      aria-label={'Clear ' + label}
-      disabled={disabled}
-      onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
-    >Clear</button>
+    <div className={'progress-row ws3-prog-row' + (sub ? ' is-sub' : '')}>
+      {onToggle ? (
+        <button type="button" className="progress-section-toggle" aria-expanded={open} onClick={(e) => { e.stopPropagation(); onToggle(); }}>
+          <span className="ws3-prog-chev" aria-hidden="true"><UiIcon name={open ? 'down' : 'chev'} size="sm" /></span>
+          {name}{tally}
+        </button>
+      ) : <>{name}{tally}</>}
+      <button type="button" className={'settings-clear-btn ws3-clear' + (sub ? ' is-text' : '')} aria-label={'Clear ' + label}
+        disabled={!canClear} onClick={(e) => { e.stopPropagation(); setConfirming(true); }}>Clear</button>
+    </div>
   );
 }
 
-function AllProgressClearRow({ totalRead, totalItems, hasMarks, hasPartial, onClearAll }) {
+function ClearAllMarks({ canClear, onClearAll }) {
   const [confirming, setConfirming] = React.useState(false);
   return (
-    <>
-      <div className="progress-row total-row">
-        <span className="progress-row-label">All Scriptures</span>
-        <span className="progress-row-tally">{totalRead} / {totalItems}</span>
-        {!confirming && (
-          <button
-            className="settings-clear-btn"
-            disabled={!hasMarks && !hasPartial}
-            onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
-          >Clear All</button>
-        )}
-      </div>
-      {confirming && (
-        <ConfirmStrip
-          question="Clear all read marks and saved positions? Reading totals and streaks are kept."
-          yesLabel="Yes, clear"
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => { onClearAll(); setConfirming(false); }}
-        />
+    <div className="ws3-clear-all">
+      {confirming ? (
+        <ConfirmStrip question="Clear all read marks and saved positions? Reading totals and streaks are kept." yesLabel="Yes, clear"
+          onCancel={() => setConfirming(false)} onConfirm={() => { onClearAll(); setConfirming(false); }} />
+      ) : (
+        <UiButton wide danger className="ws3-clear-all-btn" disabled={!canClear} onClick={() => setConfirming(true)}>Clear all read marks</UiButton>
       )}
-    </>
+      <p className="ws3-foot">Clearing removes read marks and saved positions. Totals and streaks are kept.</p>
+    </div>
   );
 }
 
@@ -582,7 +611,7 @@ function _lastBackupText() {
 /** @param {{ where: string | null, count: number, newestAt: number, tooBig?: number }} st */
 function _snapshotText(st) {
   // ds5 s34.1: past the cap no copy is taken; say so where the copies are described.
-  if (st.tooBig) return 'Paused: your library is too big for an automatic copy (' + Math.round(st.tooBig / 1048576) + ' MB). Export a backup to keep a copy.';
+  if (st.tooBig) return 'Paused: your library is too big for an automatic copy (' + Math.round(st.tooBig / 1048576) + ' MB). Back up now to keep a copy.';
   if (!st.count) return 'The first is taken shortly after the app opens';
   const where = st.where === 'phone' ? 'kept on this phone' : 'kept in this browser (cleared with its site data)';
   return 'Newest ' + _daysAgo(st.newestAt) + ' · ' + st.count + ' ' + where;
@@ -592,7 +621,7 @@ function _snapshotText(st) {
 function _weeklyText(w) {
   if (!w.on) return 'Off';
   // id-datasafe 159: a copy that failed says so, and when the next try is.
-  if (w.failure && w.failure.reason === 'too-big') return 'Paused: your library is too big for this copy. Export keeps all of it';
+  if (w.failure && w.failure.reason === 'too-big') return 'Paused: your library is too big for this copy. Back up now keeps all of it';
   if (w.failure) return 'The last copy could not be saved (' + _daysAgo(w.failure.at) + '). The app tries again a day later';
   if (!w.count) return 'Once a week to Downloads/VOTReader (the last 4 kept)';
   return 'Newest ' + _daysAgo(w.newestAt) + ' · in Downloads/VOTReader, the last 4 kept';
@@ -673,7 +702,7 @@ function RadioRows({ label, value, options, onChange, find = '' }) {
    line and a few synonyms (the `find` words on the row), utils in components/settings-find.jsx. */
 const BACKUP_WORDS = 'keep backup back up export save copy safe restore';
 
-export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch: _onSearch, onHistory: _onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null, initialGroups = null, onSearchLibrary = null, onOpenPlans = null, onOpenGarden = null }) {
+export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch: _onSearch, onHistory: _onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null, initialGroups = null, onSearchLibrary = null, onOpenPlans = null, onOpenGarden = null, onOpenProgress = null }) {
   const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
@@ -885,17 +914,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     return runningText + ' — an update is available ('
       + fmt(buildInfo.server.cacheVersion) + '). Reopen the app to apply it.';
   })();
-  const protectionDisplayText = (() => {
-    if (storageInfo.status === 'loading') return 'Checking…';
-    if (storageInfo.status === 'unavailable') return 'Persistence API unavailable on this browser.';
-    if (storageInfo.persisted) return 'Active — your data is protected from automatic browser cleanup.';
-    if (storageInfo.persistDenied) return 'Browser denied protection. Export regularly as a backup.';
-    if (storageInfo.persistable) return 'Not active — tap "Protect now" to request protection from automatic browser cleanup.';
-    // Not persisted, but there's no user-actionable persistence lever here
-    // (installed app / Android APK / a Chromium browser that auto-decided /
-    // Safari — whose real safeguard is "Add to Home Screen"). The data still
+  // WS3 settings (st-data): Protection is a line and a pill; "Protect now" stays the button where the browser can be asked.
+  const protection = (() => {
+    if (storageInfo.status === 'loading') return { line: 'Checking…', pill: null };
+    if (storageInfo.status === 'unavailable') return { line: 'This browser cannot protect stored data. Back up regularly to keep it safe.', pill: null };
+    if (storageInfo.persisted) return { line: 'Your data is protected from automatic browser cleanup.', pill: 'Protected' };
+    if (storageInfo.persistDenied) return { line: 'The browser said no. Back up regularly to keep it safe.', pill: 'Not protected' };
+    if (storageInfo.persistable) return { line: 'Ask the browser to keep your data safe from automatic cleanup.', pill: null };
+    // No lever here (installed app / Android APK / a Chromium browser that auto-decided / Safari): the data still
     // lives on this device; the honest guidance is to keep a backup.
-    return 'Your data is saved on this device. Export a backup regularly to keep it safe.';
+    return { line: 'Your data is saved on this device. Back up regularly to keep it safe.', pill: 'Saved' };
   })();
   const showProtectButton = storageInfo.status === 'ready' && storageInfo.persistable;
 
@@ -921,23 +949,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const appDataDisplayText = (() => {
-    if (storageInfo.status === 'loading') return 'Checking…';
-    if (storageInfo.status === 'unavailable') return 'Storage info unavailable on this browser.';
-    if (storageInfo.usage == null) return 'Storage info partially unavailable.';
-    const used = formatBytes(storageInfo.usage);
-    return storageInfo.quota != null
-      ? `About ${used} of ${formatBytes(storageInfo.quota)} — everything this app stores on the device, including the offline library, songs kept on this phone and Garden images.`
-      : `About ${used} — everything this app stores on the device, including the offline library, songs kept on this phone and Garden images.`;
-  })();
-  const userDataDisplayText = (() => {
-    if (userData == null) return 'Calculating…';
-    const total = formatBytes(userData.total);
-    const mediaPart = userData.mediaCount > 0
-      ? ` (includes ${userData.mediaCount} journal ${userData.mediaCount === 1 ? 'item' : 'items'} — ${formatBytes(userData.media)})`
-      : '';
-    return `About ${total}${mediaPart} — your highlights, notes, journal, bookmarks, links, reading progress, and history. This is what Export backs up. Garden images are not counted here. Kept songs are not in it; a restore offers to download them again.`;
-  })();
+  const storagePct = storageInfo.usage != null && storageInfo.quota ? Math.min(100, Math.max(1, Math.round((storageInfo.usage / storageInfo.quota) * 100))) : 0;
+  const appDataDisplayText = storageInfo.status === 'loading' ? 'Checking…'
+    : storageInfo.status === 'unavailable' ? 'Storage info unavailable on this browser.' : 'Storage info partially unavailable.';
+  const userDataLine = 'Highlights, notes, journal, bookmarks, links, reading progress and history. This is what a backup holds.'
+    + (userData && userData.mediaCount > 0
+      ? ' Includes ' + (userData.mediaCount === 1 ? '1 journal photo or memo' : userData.mediaCount + ' journal photos and memos') + ' (' + formatBytes(userData.media) + ').'
+      : '');
 
   const [wipeConfirm, setWipeConfirm] = React.useState(false);
   const [wipeText, setWipeText] = React.useState('');
@@ -1027,8 +1045,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     importConfirmResolveRef.current = null;
     if (resolve) resolve(false);
   }, []);
-  useModalRegistry({ id: 'settings-import-confirm', dismiss: () => _settleImportConfirm(false), active: importConfirm != null });
-  const importTrapRef = useFocusTrap(importConfirm != null);
+  // WS3 settings (st-restore): the confirm is an ActionSheet with this id; it registers itself and traps focus.
   // NK5c: diagnostic-log snapshot for the "Your Data" section. The bridge
   // (W1.2 Tier B.2) always exposes getCrashLog: Android merges the native
   // BoundedLogTree with the JS-side DiagnosticLog; web returns the JS
@@ -1058,9 +1075,9 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     setVerifyReport,
     // FIRE-AND-AWAIT (see importConfirmResolveRef above): the sheet settles the
     // promise from every dismiss path, so the import's own cleanup brackets it.
-    confirmImport: (message) => new Promise((resolve) => {
+    confirmImport: (message, details) => new Promise((resolve) => {
       importConfirmResolveRef.current = resolve;
-      setImportConfirm({ message });
+      setImportConfirm({ message, ...(details || {}) });
     }),
     diagnosticLog,
   });
@@ -1639,7 +1656,76 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
         <RootCard mode={mode}>
         <SettingsGroup sub={glance.data} tag={_lastBackupAt() ? null : 'Back up'} {...groupProps('data')}>
+          {/* WS3 settings (st-data): the backup first, as one gold button; restore and check under it. */}
+          <Findable text={'Backup Back up now ' + BACKUP_WORDS + ' votbak file last backup'}>
+            <div className="settings-card ws3-backup">
+              <div className="ws3-backup-label">Backup</div>
+              <h2 className="ws3-backup-title">{_lastBackupAt() ? 'Backed up ' + _daysAgo(_lastBackupAt()) : 'Not backed up from this phone yet'}</h2>
+              <p className="ws3-backup-line">One file (.votbak) with every note, highlight, notebook, journal entry, bookmark, link, reading mark, history record, open tab and setting. No login details, only your data.</p>
+              <UiButton kind="primary" wide icon="dl" disabled={backupBusy} onClick={() => { _runLockedBackupOperation(exportPersonalData); }}>Back up now</UiButton>
+            </div>
+          </Findable>
           <div className="settings-card">
+            <DataNavRow icon="reset" label="Restore from a backup" desc="Replaces your data on this phone with a backup file (.votbak). You confirm first."
+              find="import restore votbak load" disabled={backupBusy} onClick={() => { _runBackupOperation(importPersonalData); }} />
+            <DataNavRow icon="check" label="Check a backup file" desc="Reads the whole file and says what is in it. Nothing on this phone changes."
+              find="verify check test votbak" disabled={backupBusy} onClick={() => { setVerifyReport(null); _runLockedBackupOperation(verifyBackupFile); }} />
+          </div>
+          <SettingsSection label="Kept safe by themselves">
+            {safety && safety.where ? (
+              <DataRow label="Automatic snapshots" find="copies snapshot automatic" pill
+                desc={safety.tooBig ? _snapshotText(safety) : 'The app keeps copies of your data by itself. ' + (safety.count ? _snapshotText(safety) + '.' : 'The first is taken shortly after it opens.')}
+                value={safety.tooBig ? 'Paused' : safety.count ? (safety.count === 1 ? '1 copy' : safety.count + ' copies') : 'None yet'} />
+            ) : null}
+            {weekly && weekly.supported ? (
+              <DataRow label="Weekly copy" desc={_weeklyText(weekly)} find="downloads weekly copy">
+                <UiButton small className="ws2-pill-btn" onClick={() => { toggleWeekly(); }}>{weekly.on ? 'Turn off' : 'Turn on'}</UiButton>
+              </DataRow>
+            ) : null}
+            <DataRow label="Protection" desc={protection.line} value={protection.pill} pill find="persist persistence storage cleanup protect">
+              {showProtectButton ? <UiButton small className="ws2-pill-btn" onClick={() => { storageInfo.requestPersist(); }}>Protect now</UiButton> : null}
+            </DataRow>
+          </SettingsSection>
+          {/* st-data2: how much is stored, then what goes wrong and starting over. */}
+          <SettingsSection label="Storage">
+            <Findable text="Storage total app data space quota used offline library songs Garden images">
+              <div className="ws3-meter">
+                {storageInfo.status === 'ready' && storageInfo.usage != null ? (
+                  <>
+                    <div className="ws3-meter-head">
+                      <span className="ws3-meter-used">{formatBytes(storageInfo.usage)}</span>
+                      {storageInfo.quota != null ? <span className="ws3-meter-of">of {formatBytes(storageInfo.quota)}</span> : null}
+                    </div>
+                    {storageInfo.quota ? (
+                      <span className="ui-progress" role="progressbar" aria-label="Storage used" aria-valuemin={0} aria-valuemax={100} aria-valuenow={storagePct}>
+                        <span style={{ width: storagePct + '%' }} />
+                      </span>
+                    ) : null}
+                  </>
+                ) : <div className="ws3-meter-used is-text">{appDataDisplayText}</div>}
+                <span className="settings-row-desc">Everything the app stores: the offline library, songs kept on this phone and Garden images.</span>
+              </div>
+            </Findable>
+          </SettingsSection>
+          <div className="settings-card">
+            <DataRow label="Your data" desc={userDataLine} value={userData ? formatBytes(userData.total) : 'Calculating…'} find="size bytes" />
+            {/* U09.5: the web's offline library, standing (the APK carries every book in itself). */}
+            {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
+              ? <DataRow label="Offline library" desc={<OfflineLibraryStatus />} find="offline books cache every book without a connection" /> : null}
+            {dataSamples.length > 0 ? (
+              <DataRow label="Growth" desc={growthLine(dataSamples)} value={formatBytes(dataSamples[dataSamples.length - 1].b)} find="trend size grows" />
+            ) : null}
+            <DownloadsStorageRow />
+          </div>
+          <SettingsSection label="If something goes wrong">
+            {/* NK5c: the diagnostic log, always shown now (st-data2), with its count or "Nothing logged". */}
+            <DataRow label="Diagnostic log" find="log errors crash diagnostic warnings"
+              desc={'Warnings, errors and timings; file paths left out. Goes into your next backup.'
+                + (diagnosticLog.length ? ' Last entry ' + new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString() + '.' : '')}
+              value={diagnosticLog.length ? (diagnosticLog.length === 1 ? '1 entry' : diagnosticLog.length + ' entries') : 'Nothing logged'} />
+            <DataRow label="Running on" desc="Where this copy of the app is installed" value={_platformLabel(StorageHealth.getPlatform())} find="platform browser android" />
+          </SettingsSection>
+          <SettingsSection label="This app">
             <DataInfoRow label="App version" value={versionDisplayText}>
               <button
                 className="settings-clear-btn"
@@ -1651,243 +1737,131 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             <DataInfoRow label="What's new">
               <button className="settings-clear-btn" aria-label="Show what's new" onClick={(e) => { e.stopPropagation(); void openWhatsNew(); }}>Show</button>
             </DataInfoRow>
-            <DataInfoRow label="Platform" value={_platformLabel(StorageHealth.getPlatform())} />
-            <DataInfoRow label="Total app data" value={appDataDisplayText} />
-            {/* U09.5: the web's offline library, standing (the APK carries every book in itself). */}
-            {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
-              ? <DataInfoRow label="Offline library" value={<OfflineLibraryStatus />} /> : null}
-            <DataInfoRow label="Your data" value={userDataDisplayText} />
-            {dataSamples.length > 0 && (
-              <DataInfoRow label="Growth" value={<StorageTrendValue samples={dataSamples} />} />
-            )}
-            {/* datasafe 10-05: passive, no nag - when this device last exported, and the automatic snapshots. */}
-            <DataInfoRow label="Last backup" value={_lastBackupText()} />
-            {safety && safety.where && (
-              <DataInfoRow label="Automatic snapshots" value={_snapshotText(safety)} />
-            )}
-            {weekly && weekly.supported && (
-              <DataInfoRow label="Weekly copy" value={_weeklyText(weekly)}>
-                <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); toggleWeekly(); }}>{weekly.on ? 'Turn off' : 'Turn on'}</button>
-              </DataInfoRow>
-            )}
-            <DataInfoRow label="Protection" value={protectionDisplayText}>
-              {showProtectButton && (
-                <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); storageInfo.requestPersist(); }}>Protect now</button>
-              )}
-            </DataInfoRow>
-            <DataActionRow
-              label="Export Your Data"
-              desc="Download every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, open tab, and setting stored on this device as one backup file — look for a file named votreader-backup-<date>.votbak in your Downloads or the folder you chose. No credentials or login info — just your data. Save the file anywhere you control."
-            >
-              <button className="settings-clear-btn" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); _runLockedBackupOperation(exportPersonalData); }}>Export</button>
-            </DataActionRow>
-            <DataActionRow
-              label="Import from Backup"
-              desc="Restore a previously exported backup file (a .votbak file). Replaces all current personal data on this device with the contents of the file. You will be asked to confirm before anything is overwritten."
-            >
-              <button className="settings-clear-btn" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); _runBackupOperation(importPersonalData); }}>Import</button>
-            </DataActionRow>
-            <DataActionRow
-              label="Verify a Backup"
-              desc="Check a backup file without importing it: reads the whole file, verifies its structure and integrity checksum, and reports what it contains. Nothing on this device changes."
-            >
-              <button className="settings-clear-btn" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); setVerifyReport(null); _runLockedBackupOperation(verifyBackupFile); }}>Verify</button>
-            </DataActionRow>
-            {verifyReport && (
-              /* Always-visible result (NOT DataActionRow — its desc hides
-                 behind the ⓘ toggle; a report the user just asked for must
-                 not need a second tap). */
-              <div className={'settings-row' + (verifyReport.level === 'warn' ? ' danger-zone' : '')}>
-                <div className="settings-row-head">
-                  <span className="settings-row-label">Verify Result</span>
-                  <span className="settings-row-grow" />
-                  <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); setVerifyReport(null); }}>Dismiss</button>
-                </div>
-                <div className="settings-row-desc">{verifyReport.message}</div>
-              </div>
-            )}
-            {/* Diagnostic-log status row. Renders only when entries exist
-                (Android: native BoundedLogTree merged with the JS DiagnosticLog;
-                web: the JS DiagnosticLog). Hidden on a clean session to reduce
-                UI noise. */}
-            {diagnosticLog.length > 0 && (
-              <DataActionRow
-                label="Diagnostic Log"
-                desc={`${diagnosticLog.length} recent ${diagnosticLog.length === 1 ? 'entry' : 'entries'} captured (warnings, errors, and timings; content URIs and file paths redacted). Included in your next Export. Last entry: ${new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString()}.`}
-              >
-                <span className="settings-row-value">{diagnosticLog.length} {diagnosticLog.length === 1 ? 'entry' : 'entries'}</span>
-              </DataActionRow>
-            )}
-            <DataActionRow
-              className="danger-zone"
-              label="Clear All Personal Data"
-              desc={`Removes every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, tab thumbnail, search cache, and the automatic copies of your data${weekly && weekly.supported ? ' (the weekly copies in Downloads/VOTReader too)' : ''}. App settings will reset to defaults. This cannot be undone — export first if you want a backup.`}
-            >
-              <button className="settings-clear-btn danger" disabled={backupBusy} onClick={(e) => { e.stopPropagation(); setWipeText(''); setWipeConfirm(true); }}>Clear All My Data</button>
-            </DataActionRow>
-          </div>
+          </SettingsSection>
+          <SettingsSection label="Start over">
+            <DataRow label="Delete all my data" className="ws3-danger" find="clear wipe erase reset delete everything personal"
+              desc={'Every note, highlight, journal entry, bookmark, link, reading mark and tab, and the automatic copies'
+                + (weekly && weekly.supported ? ' (the weekly copies in Downloads/VOTReader too)' : '') + '. Settings go back to their defaults.'}>
+              <UiButton small danger className="ws3-danger-btn" ariaLabel="Delete all my data" disabled={backupBusy}
+                onClick={() => { setWipeText(''); setWipeConfirm(true); }}>Delete</UiButton>
+            </DataRow>
+          </SettingsSection>
         </SettingsGroup>
 
-        {/* The wipe + import-overwrite overlays live OUTSIDE the accordion
-            groups (redesign 2026-07-31): they are fixed-position sheets whose
-            mount must not depend on a group's open state — the import
-            confirm in particular arrives ASYNC after a native file picker. */}
+        {/* The wipe dialog and the two backup sheets live OUTSIDE the groups (redesign 2026-07-31): their mount
+            must not depend on a group's open state; the restore confirm arrives ASYNC after a native file picker. */}
+        {wipeConfirm && (
+          <div
+            className="note-sheet-overlay ws3-dialog-overlay"
+            onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) closeWipe(); }}
+          >
+            <div className="note-sheet ws3-dialog" ref={wipeTrapRef} role="dialog" aria-modal="true" aria-labelledby="settings-wipe-title" aria-describedby="settings-wipe-text" onClick={(e) => e.stopPropagation()}>
+              <h2 className="ws3-dialog-title" id="settings-wipe-title">Delete all your data?</h2>
+              <p className="ws3-dialog-text" id="settings-wipe-text">
+                This removes every note, highlight, notebook, journal entry, bookmark, link, reading mark, history record and saved tab, the search cache and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}. Settings go back to their defaults. <strong>This cannot be undone.</strong>
+              </p>
+              {/* WS3 settings (st-wipe): Back up first, inside the dialog; the dialog stays open while it runs. */}
+              <UiButton wide icon="dl" className="ws3-dialog-backup" disabled={backupBusy} onClick={() => { _runLockedBackupOperation(exportPersonalData); }}>Back up first</UiButton>
+              <input
+                className="ws3-dialog-field"
+                type="text"
+                value={wipeText}
+                autoFocus
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-label="Type DELETE to confirm"
+                placeholder="Type DELETE to confirm"
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => setWipeText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
+              />
+              <div className="ui-btn-row">
+                <UiButton onClick={() => { closeWipe(); }}>Cancel</UiButton>
+                <UiButton danger disabled={!wipeOk}
+                  onClick={() => { if (!wipeOk) return; closeWipe(); _runLockedBackupOperation(clearAllPersonalData); }}>Delete everything</UiButton>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Wave-0 / WS3 settings (st-restore): the restore confirm. Nothing is applied until "Restore and overwrite";
+            Cancel, the backdrop, Back and Escape all settle it false through onClose. */}
+        <ActionSheet id="settings-import-confirm" open={importConfirm != null} onClose={() => _settleImportConfirm(false)}
+          className="ws3-restore" label={importConfirm && _backupDay(importConfirm.date) ? 'Backup from ' + _backupDay(importConfirm.date) : null}
+          title="Restore this backup?"
+          confirm={{ label: 'Restore and overwrite', danger: true, onConfirm: () => { _settleImportConfirm(true); return false; } }}>
+          {importConfirm && importConfirm.summary ? (
+            <>
+              <BackupCounts s={importConfirm.summary} />
+              <p className="ws3-sheet-text">Restoring <strong>overwrites</strong> the kinds of data this backup contains. Any kind it does not include is left unchanged.{importConfirm.space || ''} This cannot be undone.</p>
+            </>
+          ) : importConfirm ? <p className="ws3-sheet-text">{importConfirm.message}</p> : null}
+        </ActionSheet>
+        {/* WS3 settings (st-verify): a check ends in a verdict, the counts, then Restore it or Done. */}
         {(() => {
-            // closeWipe now lives at component scope (shared with the
-            // useModalRegistry registration above) — same dialog, same
-            // dismiss paths, but Back/Escape now close THIS first.
-            return (
-              <>
-                {wipeConfirm && (
-                  <div
-                    className="note-sheet-overlay"
-                    onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) closeWipe(); }}
-                  >
-                    <div className="note-sheet" ref={wipeTrapRef} role="dialog" aria-modal="true" aria-labelledby="settings-wipe-title" onClick={(e) => e.stopPropagation()}>
-                      <div className="note-sheet-header">
-                        <div className="note-sheet-title" id="settings-wipe-title">Delete All Personal Data</div>
-                      </div>
-                      <div style={{ color: "var(--cream)", fontSize: "var(--fs-14)", lineHeight: "1.5", marginBottom: "14px" }}>
-                        This permanently erases every note, highlight, notebook, journal entry, bookmark, link, reading-progress mark, history record, saved tab, the search cache, and the automatic copies of your data{weekly && weekly.supported ? ', including the weekly copies in Downloads/VOTReader' : ''}, then resets all settings to defaults.{' '}
-                        <strong style={{ color: "#c0392b" }}>This cannot be undone.</strong> Export your data first if you want a backup.
-                      </div>
-                      <div style={{ color: "var(--cream-muted)", fontSize: "var(--fs-12)", letterSpacing: "0.04em", marginBottom: "8px" }}>
-                        Type <strong style={{ color: "var(--gold)", letterSpacing: "0.15em" }}>DELETE</strong> to confirm.
-                      </div>
-                      <input
-                        type="text"
-                        value={wipeText}
-                        autoFocus
-                        autoCapitalize="characters"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        aria-label="Type DELETE to confirm"
-                        placeholder="DELETE"
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={(e) => setWipeText(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter' && wipeOk) { closeWipe(); _runLockedBackupOperation(clearAllPersonalData); } }}
-                        style={{
-                          width: "100%", boxSizing: "border-box", textAlign: "center",
-                          fontFamily: "'Cinzel', serif", fontSize: "var(--fs-16)", letterSpacing: "0.22em",
-                          textTransform: "uppercase", color: "var(--cream)",
-                          background: "var(--bg)", border: "1px solid var(--gold-border)",
-                          borderRadius: "6px", padding: "0.7rem 0.5rem", outline: "none", marginBottom: "18px"
-                        }}
-                      />
-                      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                        <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); closeWipe(); }}>Cancel</button>
-                        <button
-                          className="settings-clear-btn danger"
-                          disabled={!wipeOk}
-                          onClick={(e) => { e.stopPropagation(); if (!wipeOk) return; closeWipe(); _runLockedBackupOperation(clearAllPersonalData); }}
-                        >
-                          Delete Everything
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                {/* Wave-0: the import-overwrite confirm sheet (replaces the
-                    native window.confirm). Same overlay/sheet classes as the
-                    wipe dialog; the danger-styled action button keeps the
-                    weight of the choice visible. `proceed` closes the sheet
-                    itself before applying. */}
-                {importConfirm && (
-                  <div
-                    className="note-sheet-overlay"
-                    onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) _settleImportConfirm(false); }}
-                  >
-                    <div className="note-sheet" ref={importTrapRef} role="dialog" aria-modal="true" aria-labelledby="settings-import-title" onClick={(e) => e.stopPropagation()}>
-                      <div className="note-sheet-header">
-                        <div className="note-sheet-title" id="settings-import-title">Import from Backup</div>
-                      </div>
-                      <div style={{ color: "var(--cream)", fontSize: "var(--fs-14)", lineHeight: "1.5", marginBottom: "18px", whiteSpace: "pre-line" }}>
-                        {importConfirm.message}
-                      </div>
-                      <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-                        <button className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); _settleImportConfirm(false); }}>Cancel</button>
-                        <button
-                          className="settings-clear-btn danger"
-                          onClick={(e) => { e.stopPropagation(); _settleImportConfirm(true); }}
-                        >
-                          Import &amp; Overwrite
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            );
-          })()}
+          if (!verifyReport) return null;
+          const v = _verifyWords(verifyReport);
+          return (
+            <ActionSheet id="settings-verify-result" open onClose={() => setVerifyReport(null)} className={'ws3-verify' + (verifyReport.level === 'warn' ? ' is-warn' : '')}
+              title={v.title} sub={v.sub}>
+              {v.s ? <BackupCounts s={v.s} /> : null}
+              <p className="ws3-sheet-text">{v.line}</p>
+              <div className="ui-sheet-foot ws3-sheet-foot">
+                {v.s ? <UiButton disabled={backupBusy} onClick={() => { setVerifyReport(null); _runBackupOperation(importPersonalData); }}>Restore it</UiButton> : <span />}
+                <UiButton kind="primary" onClick={() => setVerifyReport(null)}>Done</UiButton>
+              </div>
+            </ActionSheet>
+          );
+        })()}
 
-        <SettingsGroup label="Mark as Read" sub={glance.progress} {...groupProps('progress')}>
+        <SettingsGroup sub={glance.progress} {...groupProps('progress')}>
           <div className="settings-card">
             <SettingsRow
               label="Mark as read"
-              desc="Checks off a chapter or letter once you have really read it. Off stops recording and keeps what is saved."
+              desc="A chapter or letter is ticked once you have really read it: nearly all the text seen, for about as long as reading takes. A quick scroll to the end does not count."
               find="progress read marks checked"
               checked={settings.markAsRead}
               onToggle={() => onToggle("markAsRead")}
             />
+            {typeof onOpenProgress === 'function' ? (
+              <DataNavRow icon="chart" label="See your progress" desc="Library · Progress" find="progress totals streaks library" onClick={onOpenProgress} />
+            ) : null}
           </div>
           {settings.markAsRead && !searching && (
-            <div className="progress-table">
-              {PROGRESS_GROUPS.map((grp) => {
-                const isOpen = openSections.has(grp.id);
-                const sRead = sectionRead(grp);
-                const sTotal = sectionTotal(grp);
-                return (
-                  <React.Fragment key={grp.id}>
-                    <div
-                      className="progress-row"
-                      style={{ background: "var(--bg)" }}
-                    >
-                      <button
-                        type="button"
-                        className="progress-section-toggle"
-                        aria-expanded={isOpen}
-                        onClick={(e) => { e.stopPropagation(); toggleSection(grp.id); }}
-                      >
-                        <span aria-hidden="true" style={{ color: "var(--gold-dim)", fontSize: "var(--fs-12)", minWidth: "0.75rem" }}>
-                          {isOpen ? "▾" : "▸"}
-                        </span>
-                        <span className="progress-row-label" style={{ color: "var(--gold)" }}>{grp.label}</span>
-                        <span className="progress-row-tally">{sRead} / {sTotal}</span>
-                      </button>
-                      <SectionClearBtn
-                        label={grp.label}
-                        disabled={sRead === 0 && !sectionBooks(grp).some((b) => hasFrontierFor(b.id))}
-                        onClear={() => sectionBooks(grp).forEach((b) => onClearBook(b.id))}
-                      />
-                    </div>
-
-                    {isOpen && grp.genres.map((genre) => (
-                      <React.Fragment key={genre.label}>
-                        <div className="progress-row" style={{ background: "var(--bg2)", paddingTop: "0.45rem", paddingBottom: "0.45rem", paddingLeft: "2rem" }}>
-                          <span style={{ fontFamily: "'Cinzel',serif", fontSize: "var(--fs-10)", letterSpacing: "0.18em", textTransform: "uppercase", color: "var(--gold-dim)", flex: 1 }}>
-                            {genre.label}
-                          </span>
+            <>
+              {/* WS3 settings (st-prog): the total is the label's aside (no longer "All Scriptures"); sections open to their books. */}
+              <SectionLabel aside={totalRead.toLocaleString('en-US') + ' of ' + totalItems.toLocaleString('en-US')}>Read so far</SectionLabel>
+              <div className="settings-card ws3-prog">
+                {PROGRESS_GROUPS.map((grp) => {
+                  const isOpen = openSections.has(grp.id);
+                  const sRead = sectionRead(grp);
+                  return (
+                    <React.Fragment key={grp.id}>
+                      <ProgressRow label={grp.label} read={sRead} total={sectionTotal(grp)} open={isOpen} onToggle={() => toggleSection(grp.id)}
+                        canClear={sRead > 0 || sectionBooks(grp).some((b) => hasFrontierFor(b.id))}
+                        question={`Clear read marks and saved positions in "${grp.label}"?`}
+                        onClear={() => sectionBooks(grp).forEach((b) => onClearBook(b.id))} />
+                      {isOpen ? (
+                        <div className="ws3-prog-books">
+                          {grp.genres.map((genre) => (
+                            <React.Fragment key={genre.label}>
+                              <div className="ws3-prog-genre">{genre.label}</div>
+                              {genre.books.map((src) => (
+                                <ProgressRow key={src.id} sub label={src.label} read={countFor(src.id)} total={src.total}
+                                  canClear={countFor(src.id) > 0 || hasFrontierFor(src.id)}
+                                  question={`Clear read marks and saved positions for “${src.label}”?`}
+                                  onClear={() => onClearBook(src.id)} />
+                              ))}
+                            </React.Fragment>
+                          ))}
                         </div>
-
-                        {genre.books.map((src) => (
-                          <div key={src.id} style={{ paddingLeft: "1rem" }}>
-                            <ClearProgressRow
-                              label={src.label}
-                              total={src.total}
-                              count={countFor(src.id)}
-                              hasPartial={hasFrontierFor(src.id)}
-                              onClear={() => onClearBook(src.id)}
-                            />
-                          </div>
-                        ))}
-                      </React.Fragment>
-                    ))}
-                  </React.Fragment>
-                );
-              })}
-              <div className="progress-divider" />
-              <AllProgressClearRow totalRead={totalRead} totalItems={totalItems} hasMarks={hasAnyMark} hasPartial={frontierKeys.length > 0} onClearAll={onClearAll} />
-            </div>
+                      ) : null}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+              <ClearAllMarks canClear={hasAnyMark || frontierKeys.length > 0} onClearAll={onClearAll} />
+            </>
           )}
         </SettingsGroup>
         </RootCard>

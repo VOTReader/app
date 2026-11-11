@@ -101,7 +101,7 @@ describe('the App version row on Android', () => {
     // nothing at all. These two say the row is really there to be read, so the
     // absence assertion below is about its CONTENT.
     expect(row('App version')).toBeTruthy();
-    expect(valueOf('Platform')).toBeTruthy();
+    expect(row('Running on').querySelector('.settings-row-value').textContent).toBeTruthy();
 
     // The precondition itself, asserted rather than assumed: without this the
     // screen is on the browser path and every line below is about the wrong code.

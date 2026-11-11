@@ -31,7 +31,7 @@ describe('the find box matches the start of a word (s23.3)', () => {
     find('backu');
     expect(foundPlaces().length).toBeGreaterThan(0);
     for (const place of foundPlaces()) expect(place).toMatch(/^Your data/);
-    expect(row('Verify a Backup')).toBeTruthy();
+    expect(row('Check a backup file')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toBe(foundPlaces().length + ' settings');
     find('ackup');
     expect(foundPlaces()).toEqual([]);

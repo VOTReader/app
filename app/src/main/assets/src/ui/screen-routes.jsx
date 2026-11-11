@@ -1186,6 +1186,7 @@ export function buildScreenRoutes({
         onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
         onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
         onOpenGarden={() => handleVolumeSelect('garden')}
+        onOpenProgress={() => { setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('my-progress'); }}
       />
     ),
     'search': () => (

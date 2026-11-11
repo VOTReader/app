@@ -4204,11 +4204,6 @@
     .settings-card { background:var(--bg2); border:1px solid var(--gold-border); border-radius:10px; overflow:hidden; }
     .settings-row { display:flex; flex-direction:column; align-items:stretch; gap:0; padding:0; margin:0; background:none; border:none; border-radius:0; border-bottom:1px solid rgba(214,179,95,0.13); }
     .settings-card > .settings-row:last-child { border-bottom:none; }
-    /* Danger zone (Clear All Personal Data) — visibly set apart from the
-       routine Export/Import rows above it: breathing room + a red-tinted
-       rule so the destructive row can't be mistaken for one of them. */
-    .settings-row.danger-zone { margin-top:0.9rem; border-top:1px solid rgba(199,92,74,0.4); }
-    .settings-row.danger-zone .settings-row-head { padding-top:0.85rem; padding-bottom:0.85rem; }
     /* flex-wrap: at Text Size 300% (cap raised 2026-08-02) a long Cinzel
        label otherwise shoves the right-aligned toggle off-screen on a 375px
        phone — the control wraps to its own line instead (same pattern the
@@ -4507,9 +4502,6 @@
        standalone action buttons so the table reads as a table. */
     .progress-row .settings-clear-btn { padding:0.3rem 0.6rem; font-size:var(--fs-10); flex-shrink:0; }
     .progress-divider { height:1px; background:var(--gold-border); margin:0; }
-    .total-row { background:rgba(200,164,86,0.04); }
-    .total-row .progress-row-label { color:var(--gold); }
-    .total-row .progress-row-tally { color:var(--gold); }
     /* ── SECTION HEADINGS (Bible reader) ── */
     /* PERF4: skip layout/paint of off-screen verse sections on long chapters
        (Psalm 119 = 176 verses). content-visibility:auto is DOM-PRESERVING — the
@@ -6395,21 +6387,6 @@
     .prg-note { padding: 14px var(--card-pad); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); }
     .prg-retry { min-height: var(--tap); padding: 0 var(--sp-2); border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 
-    /* Settings → Your Data → Growth. Same div-bar idiom as the reading-day
-       strip above (no SVG, no dependency, theme-aware through --gold-dim),
-       just shorter because it sits inside a settings row rather than a
-       dashboard panel. The bars are aria-hidden; the sentence beside them
-       is what actually conveys the trend. */
-    .settings-trend-bars {
-      display: flex; align-items: flex-end; gap: 2px;
-      height: 1.5rem; margin-top: 0.35rem;
-    }
-    .settings-trend-bar {
-      flex: 1; min-width: 0;
-      height: 2px;
-      border-radius: 2px 2px 0 0;
-      background: var(--gold-dim);
-    }
 
     /* ══════════════════════════════════════════════════════════════
        NOTES INDEX SCREEN — list of every note with search, filter,
@@ -6968,6 +6945,54 @@
     .ws2-more-page li { margin-bottom:var(--sp-2); }
     .ws2-intro { margin-top:var(--sp-2); }
     /* ── end WS2 settings ── */
+    /* ── WS3 settings (st-data, st-data2, st-restore, st-verify, st-wipe, st-prog) ── */
+    .ws3-backup { padding:var(--card-pad); }
+    .ws3-backup-label, .ws3-prog-genre { color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); letter-spacing:var(--track-label); text-transform:uppercase; }
+    .ws3-backup-title { margin:var(--sp-1) 0 0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-headline); line-height:var(--lh-headline); font-weight:600; }
+    .ws3-backup-line { margin:var(--sp-2) 0 var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws3-nav:disabled { opacity:.5; }
+    .ws3-nav .ws2-opt-lead { margin-right:0; }
+    .ws3-meter .ui-progress { display:block; }
+    .ws3-dialog .ui-btn:not(.is-primary) { background:var(--surface-2); }
+    .ws3-data-row .settings-row-head { align-items:center; gap:var(--sp-3); }
+    .ws3-data-row .settings-row-text { flex:1; min-width:0; }
+    .ws3-data-row .settings-row-value { flex:none; max-width:40%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .ws3-pill { flex:none; padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); white-space:nowrap; }
+    .ws3-meter { padding:var(--card-pad); }
+    .ws3-meter-head { display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-3); }
+    .ws3-meter-used { color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; }
+    .ws3-meter-used.is-text { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:400; }
+    .ws3-meter-of { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws3-meter .settings-row-desc { display:block; margin-top:var(--sp-3); }
+    .ws3-danger-btn.ui-btn { flex:none; }
+    .note-sheet-overlay.ws3-dialog-overlay { align-items:center; justify-content:center; padding:var(--gutter); }
+    .note-sheet.ws3-dialog { width:100%; max-width:420px; border-radius:var(--r-sheet); padding:var(--sp-6) var(--gutter) var(--gutter); background:var(--surface-1); }
+    .ws3-dialog-title { margin:0 0 var(--sp-3); color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-weight:600; }
+    .ws3-dialog-text, .ws3-sheet-text { margin:0 0 var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws3-dialog-text strong, .ws3-sheet-text strong { color:var(--text-1); }
+    .ws3-dialog-field { display:block; width:100%; box-sizing:border-box; height:var(--field-h); margin:var(--sp-3) 0 var(--sp-4); padding:0 var(--sp-4); border:1px solid var(--accent); border-radius:var(--r-field); background:var(--bg); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); outline:none; }
+    .ws3-counts { margin:0 0 var(--sp-4); border-radius:var(--r-card); overflow:hidden; }
+    .ws3-count { display:flex; justify-content:space-between; align-items:center; min-height:var(--row-h-1); padding:0 var(--card-pad); border-bottom:1px solid var(--hairline); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); }
+    .ws3-count:last-child { border-bottom:0; }
+    .ws3-count-n { color:var(--text-2); font-size:var(--ts-meta); }
+    .ws3-sheet-foot { margin-top:0; }
+    .ws3-prog { overflow:hidden; }
+    .ws3-prog .progress-row { flex-wrap:nowrap; gap:var(--sp-3); padding:var(--sp-2) var(--card-pad); border-bottom:1px solid var(--hairline); background:none; }
+    .ws3-prog .progress-section-toggle { display:flex; flex:1; align-items:center; gap:var(--sp-3); min-width:0; min-height:var(--tap); padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .ws3-prog-name { display:flex; flex:1; flex-direction:column; min-width:0; }
+    .ws3-prog .progress-row-label { color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); letter-spacing:0; }
+    .ws3-prog .progress-row-tally { min-width:0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; }
+    .ws3-prog-bar.ui-progress { max-width:140px; margin:var(--sp-2) 0 0; }
+    .ws3-prog-chev { display:inline-flex; flex:none; color:var(--text-3); }
+    .ws3-prog .ws3-clear.settings-clear-btn { flex:none; min-height:36px; padding:0 var(--sp-3); border:0; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
+    .ws3-prog .ws3-clear.is-text { background:none; color:var(--text-2); }
+    .ws3-prog .ws3-clear:disabled { opacity:.45; }
+    .ws3-prog-books { margin:0 var(--sp-3) var(--sp-2); border-radius:var(--r-chip); background:var(--surface-2); }
+    .ws3-prog-genre { padding:var(--sp-3) var(--sp-3) var(--sp-1); }
+    .ws3-prog .progress-row.is-sub { padding:var(--sp-1) var(--sp-3); border-bottom:0; }
+    .ws3-clear-all { margin-top:var(--sp-4); }
+    .ws3-foot { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); text-align:center; }
+    /* ── end WS3 settings ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */
@@ -7423,8 +7448,6 @@
        collapses and the ⓘ info button lands flush against "Clear All My
        Data". Let the head WRAP so the danger button drops to its own line
        instead, and keep a hard minimum gap when it doesn't wrap. */
-    .danger-zone .settings-row-head { flex-wrap: wrap; row-gap: 8px; }
-    .danger-zone .settings-clear-btn { margin-left: auto; }
     .settings-row-head .settings-clear-btn { margin-left: 12px; }
     /* (4) App chrome is NOT text — long-pressing the tabs badge, nav
        buttons, sheet headers, or chain-nav cards must never start a text

@@ -48,7 +48,7 @@ describe('Mark as Read loads the studies it counts (mw17 A09.3)', () => {
       expect(studiesSection()).toBeUndefined();
       window.BIBLE_STUDIES = [{ slug: 'purity' }];
       await act(async () => { landStudies(); });
-      await waitFor(() => expect(studiesSection().textContent).toMatch(/0\s*\/\s*7/));
+      await waitFor(() => expect(studiesSection().textContent).toMatch(/0 of 7/));
     } finally {
       delete window.loadBibleStudies;
       delete window.__loadMatthewCorpus;
@@ -67,7 +67,7 @@ describe('settings filter and lazy progress', () => {
     renderSettings({}, {}, { expandGroups: false });
     findSettings('backup');
     expect(groupHeads()).toHaveLength(0);
-    expect(row('Verify a Backup')).toBeTruthy();
+    expect(row('Check a backup file')).toBeTruthy();
     for (const place of foundPlaces()) expect(place).toMatch(/^Your data/);
     expect(screen.getByRole('status').textContent).toBe(foundPlaces().length + ' settings');
     // The Also section offers the backup itself.
@@ -383,11 +383,9 @@ describe('Listening group', () => {
     });
     renderSettings();
     await act(async () => { await Promise.resolve(); });
-    const value = (label) => [...document.querySelectorAll('.settings-row')]
-      .find((r) => r.querySelector('.settings-row-label') && r.querySelector('.settings-row-label').textContent === label)
-      .querySelector('.settings-data-value').textContent;
-    expect(value('Total app data')).toContain('songs kept on this phone');
-    expect(value('Your data')).toContain('Kept songs are not in it');
+    // WS3 settings (st-data2): the storage card counts kept songs; Your data's line does not claim them.
+    expect(document.querySelector('.ws3-meter').textContent).toContain('songs kept on this phone');
+    expect(row('Your data').querySelector('.settings-row-desc').textContent).not.toContain('songs');
   });
 
   // ra6 (Corbin 2026-10-14, brief design-10, the mock's place): under Songs kept on this phone, off by default.
@@ -556,7 +554,7 @@ describe('mark-as-read section disclosure', () => {
     });
     renderSettings({ markAsRead: true });
 
-    const toggle = screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ });
+    const toggle = screen.getByRole('button', { name: /Scriptures\s*0 of 50/ });
     expect(toggle.getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(toggle);
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
@@ -577,7 +575,7 @@ describe('mark-as-read section disclosure', () => {
     });
     const onClearBook = vi.fn();
     renderSettings({ markAsRead: true }, { onClearBook });
-    fireEvent.click(screen.getByRole('button', { name: /Scriptures\s*0 \/ 50/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Scriptures\s*0 of 50/ }));
     // Each Clear is named for what it clears (a11y pass 2026-11-01): the section's, then the book's.
     const clears = [screen.getByRole('button', { name: 'Clear Scriptures' }), screen.getByRole('button', { name: 'Clear Genesis' })];
     expect(clears.every((button) => !button.disabled)).toBe(true);
@@ -734,14 +732,14 @@ describe('export/import copy names the real .votbak artifact', () => {
 
   it('Export no longer promises a "single JSON file" the user will never find', () => {
     renderSettings();
-    const desc = descOf('Export Your Data');
+    const desc = document.querySelector('.ws3-backup-line').textContent;
     expect(desc).toContain('.votbak');
     expect(desc).not.toContain('single JSON');
   });
 
   it('Import tells the user to pick the .votbak backup', () => {
     renderSettings();
-    const desc = descOf('Import from Backup');
+    const desc = descOf('Restore from a backup');
     expect(desc).toContain('.votbak');
   });
 });
@@ -767,7 +765,7 @@ describe('v3 export manifest limit', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
 
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
     expect(openExportSink).not.toHaveBeenCalled();
@@ -796,7 +794,7 @@ describe('v3 export manifest limit', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
     await vi.waitFor(() => expect(build).toHaveBeenCalledTimes(1));
     return toast;
   };
@@ -838,16 +836,16 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
 
   const openWipeDialog = (props) => {
     renderSettings({}, props);
-    fireEvent.click(screen.getByText('Clear All My Data'));
-    expect(screen.getByText('Delete All Personal Data')).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: 'Delete All Personal Data' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
+    expect(screen.getByText('Delete all your data?')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Delete all your data?' })).toBeTruthy();
   };
 
   it('registers while open and unregisters on Cancel', () => {
     openWipeDialog();
     expect(modalRegistry.peek() && modalRegistry.peek().id).toBe('settings-wipe-dialog');
     fireEvent.click(screen.getByText('Cancel'));
-    expect(screen.queryByText('Delete All Personal Data')).toBeNull();
+    expect(screen.queryByText('Delete all your data?')).toBeNull();
     expect(modalRegistry.isAnyOpen()).toBe(false);
   });
 
@@ -859,7 +857,7 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     // NEITHER dismissal system, so Back navigated away underneath it.
     // (act(): the dismiss setState happens outside a React event.)
     act(() => { modalRegistry.peek().dismiss(); });
-    expect(screen.queryByText('Delete All Personal Data')).toBeNull();
+    expect(screen.queryByText('Delete all your data?')).toBeNull();
     expect(screen.getByTestId('screen-layout')).toBeTruthy();
     expect(onBack).not.toHaveBeenCalled();
   });
@@ -870,9 +868,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
     teardownSettingsGlobals();
     setupSettingsGlobals({ showToast: toastSpy });
     renderSettings();
-    fireEvent.click(screen.getByText('Clear All My Data'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
     fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-    fireEvent.click(screen.getByText('Delete Everything'));
+    fireEvent.click(screen.getByText('Delete everything'));
     await vi.waitFor(() => {
       expect(toastSpy).toHaveBeenCalledWith(
         expect.objectContaining({ text: 'All personal data cleared. Reloading…' })
@@ -900,9 +898,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       teardownSettingsGlobals();
       setupSettingsGlobals({ showToast: toastSpy });
       renderSettings();
-      fireEvent.click(screen.getByText('Clear All My Data'));
+      fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
       fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-      fireEvent.click(screen.getByText('Delete Everything'));
+      fireEvent.click(screen.getByText('Delete everything'));
 
       await vi.waitFor(() => {
         expect(toastSpy).toHaveBeenCalledWith(
@@ -937,9 +935,9 @@ describe('wipe dialog — registered with the modal registry (Wave 0)', () => {
       DiagnosticLog: { warn: diagWarnSpy, error: () => {}, all: () => [], clear: () => {} },
     });
     renderSettings();
-    fireEvent.click(screen.getByText('Clear All My Data'));
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all my data' }));
     fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
-    fireEvent.click(screen.getByText('Delete Everything'));
+    fireEvent.click(screen.getByText('Delete everything'));
 
     // The wipe still succeeds — vot-thumbs is a regenerable cache, not user
     // data, so Clear All must not fail loud over it.
@@ -1009,28 +1007,28 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('asks via a registered sheet and applies NOTHING until Import is tapped', async () => {
     const { confirmSpy, applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     const sheet = await findImportSheet();
     // The destructive semantics are intact — a real choice, in-app…
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(applySpy).not.toHaveBeenCalled();
     // …and Back/Escape would dismiss the sheet, not navigate underneath it.
     expect(sheet.id).toBe('settings-import-confirm');
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
   });
 
   it('dismissing the sheet (Cancel OR the Back/Escape registry path) applies nothing', async () => {
     const { applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
     fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
     expect(applySpy).not.toHaveBeenCalled();
 
     // Re-open and take the registry dismiss route this time.
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
-    fireEvent.click(screen.getByText('Import'));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Restore from a backup' }).disabled).toBe(false));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     const sheet = await findImportSheet();
     act(() => { sheet.dismiss(); });
     expect(screen.queryByText(/will OVERWRITE/)).toBeNull();
@@ -1039,29 +1037,29 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
 
   it('locks all backup actions until the active picker and confirmation settle', async () => {
     const { pickImportFile } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
 
-    for (const name of ['Export', 'Import', 'Verify']) {
+    for (const name of ['Back up now', 'Restore from a backup', 'Check a backup file']) {
       expect(screen.getByRole('button', { name }).disabled).toBe(true);
     }
-    expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
-    fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+    expect(screen.getByRole('button', { name: 'Delete all my data' }).disabled).toBe(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     expect(pickImportFile).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByText('Cancel'));
-    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(false));
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: 'Restore from a backup' }).disabled).toBe(false));
   });
 
   it('keeps destructive data actions locked after import until the scheduled reload', async () => {
     const { applySpy } = setupImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
 
-    expect(screen.getByRole('button', { name: 'Import' }).disabled).toBe(true);
-    expect(screen.getByRole('button', { name: 'Clear All My Data' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Restore from a backup' }).disabled).toBe(true);
+    expect(screen.getByRole('button', { name: 'Delete all my data' }).disabled).toBe(true);
   });
 
   it('brackets the apply with the restore-inflight marker (a crash mid-apply must warn at next boot)', async () => {
@@ -1072,9 +1070,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
       return { importFailures: 0, writeFailures: 0, skippedStores: [], countMismatches: [] };
     });
     setupImport({ applyImportPayload: applySpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     expect(flagDuringApply).not.toBeNull();   // set BEFORE the first mutation
@@ -1086,9 +1084,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     localStorage.removeItem('vot-restore-inflight');
     const applySpy = vi.fn(async () => { throw new Error('corrupt payload'); });
     setupImport({ applyImportPayload: applySpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     // The marker survives a handled failure — the boot guard must warn, because
@@ -1100,9 +1098,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
   it('does not erase another tab\'s restore marker when the import lock is busy', async () => {
     localStorage.setItem('vot-restore-inflight', 'active-tab-marker');
     setupImport({ applyImportPayload: vi.fn(async () => { throw new Error('another backup import is already in progress'); }) });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => {
       expect(localStorage.getItem('vot-restore-inflight')).toBe('active-tab-marker');
@@ -1114,9 +1112,9 @@ describe('import overwrite confirm — in-app sheet, not window.confirm (Wave 0)
     const toastSpy = vi.fn();
     const pendingAnnotations = { ...globalThis.AnnotationStore, getState: () => 'pending' };
     const { applySpy } = setupImport({ AnnotationStore: pendingAnnotations, showToast: toastSpy });
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await findImportSheet();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(toastSpy).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'Storage is temporarily unavailable. Please try again in a moment.' })
@@ -1176,7 +1174,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
     expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
   });
@@ -1201,7 +1199,7 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CHECKSUM));
     expect(textsOf(toastSpy)).not.toMatch(CUT);
   });
@@ -1229,9 +1227,9 @@ describe('a truncated backup is reported as cut, not as failing its checksum', (
     });
     renderSettings();
 
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await screen.findByText(/will OVERWRITE/);
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
 
     await vi.waitFor(() => expect(textsOf(toastSpy)).toMatch(CUT));
     expect(textsOf(toastSpy)).not.toMatch(CHECKSUM);
@@ -1283,19 +1281,19 @@ describe('Android v3 import — native stream not closed until the confirm settl
 
   it('holds v3ImportClose until AFTER apply — never while the sheet is up', async () => {
     const { closeSpy, applySpy } = setupAndroidImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await screen.findByText(/will OVERWRITE/);
     // THE REGRESSION: pre-fix the finally fired here, before the user chose.
     expect(closeSpy).not.toHaveBeenCalled();
     expect(applySpy).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText('Import & Overwrite'));
+    fireEvent.click(screen.getByText('Restore and overwrite'));
     await vi.waitFor(() => expect(applySpy).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(closeSpy).toHaveBeenCalled()); // closed only after apply consumed the stream
   });
 
   it('cancelling still closes the native stream and applies nothing', async () => {
     const { closeSpy, applySpy } = setupAndroidImport();
-    fireEvent.click(screen.getByText('Import'));
+    fireEvent.click(screen.getByRole('button', { name: 'Restore from a backup' }));
     await screen.findByText(/will OVERWRITE/);
     expect(closeSpy).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText('Cancel'));
@@ -1532,7 +1530,7 @@ describe('export escape — the save picker that never settles', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
     return { build, captured };
   };
 
@@ -1557,7 +1555,7 @@ describe('export escape — the save picker that never settles', () => {
       },
     });
     renderSettings();
-    fireEvent.click(screen.getByRole('button', { name: 'Export' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Back up now' }));
 
     const el = await vi.waitFor(() => {
       const found = document.getElementById('vot-toast-export-escape');
@@ -1609,11 +1607,11 @@ describe('Your Data: the last backup and the automatic snapshots (datasafe 10-05
   it('says when this device last exported, or that it has not', () => {
     localStorage.removeItem('vot-last-export');      // an earlier case's export stamped it
     renderSettings();
-    expect(document.body.textContent).toContain('Not exported from this device yet');
+    expect(document.body.textContent).toContain('Not backed up from this phone yet');
     cleanup();
     localStorage.setItem('vot-last-export', String(Date.now()));
     renderSettings();
-    expect(document.body.textContent).toContain('Exported today');
+    expect(document.body.textContent).toContain('Backed up today');
   });
 
   it('shows the newest automatic snapshot and where it is kept', async () => {

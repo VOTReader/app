@@ -279,7 +279,7 @@ try {
   note(`A reading position (recorded by opening the bookmark): ${JSON.stringify(before.lastReadChapters)}`);
 
   await openYourData(A.page);
-  await click(A.page, 'Export');
+  await click(A.page, 'Back up now');
   const exported = await waitToast(A.page, /saved|exported|backup/i, 30000);
   note(`A export toast: ${JSON.stringify(exported)}`);
   // The Blob download lands in `dl`; wait for a complete file (no .crdownload).
@@ -298,12 +298,12 @@ try {
   // ── B: another clean profile, Import through the UI, compare ──
   const B = await freshProfile('B');
   await openYourData(B.page);
-  const [chooser] = await Promise.all([B.page.waitForFileChooser({ timeout: 10000 }), click(B.page, 'Import')]);
+  const [chooser] = await Promise.all([B.page.waitForFileChooser({ timeout: 10000 }), click(B.page, 'Restore from a backup')]);
   await chooser.accept([backupPath]);
-  await B.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Import & Overwrite'), { timeout: 15000 });
+  await B.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Restore and overwrite'), { timeout: 15000 });
   if (shotsDir) await B.page.screenshot({ path: join(shotsDir, 'b2-B-confirm.png') });
   const reloaded = B.page.waitForNavigation({ waitUntil: 'load', timeout: 30000 });
-  await click(B.page, 'Import & Overwrite');
+  await click(B.page, 'Restore and overwrite');
   const doneToast = await waitToast(B.page, /Import complete|Import completed|Import incomplete|failed/i, 30000);
   note(`B import toast: ${JSON.stringify(doneToast)}`);
   if (!/^Import complete\. Reloading/.test(doneToast || '')) fail(`B: the import did not report a clean restore: ${JSON.stringify(doneToast)}`);
@@ -336,12 +336,12 @@ try {
   writeFileSync(cut, bytes.subarray(0, Math.max(0, bytes.length - 1024)));
   const C = await freshProfile('C');
   await openYourData(C.page);
-  const [chooserC] = await Promise.all([C.page.waitForFileChooser({ timeout: 10000 }), click(C.page, 'Import')]);
+  const [chooserC] = await Promise.all([C.page.waitForFileChooser({ timeout: 10000 }), click(C.page, 'Restore from a backup')]);
   await chooserC.accept([cut]);
-  const confirmShown = await C.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Import & Overwrite'), { timeout: 8000 }).then(() => true, () => false);
+  const confirmShown = await C.page.waitForFunction(() => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Restore and overwrite'), { timeout: 8000 }).then(() => true, () => false);
   let cToast;
   if (confirmShown) {
-    await click(C.page, 'Import & Overwrite');
+    await click(C.page, 'Restore and overwrite');
     cToast = await waitToast(C.page, /Import complete|Import completed|incomplete|failed|could not|corrupt|cut short|not a/i, 20000);
   } else {
     cToast = await toastText(C.page);

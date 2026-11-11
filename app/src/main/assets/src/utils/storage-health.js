@@ -174,7 +174,7 @@ const WRITE_FAIL_TOAST_ID = 'vot-toast-writefail';
 /* Names the place the reader can act on, by the labels Settings really shows (A08.6 / s40.1: it said
    "Settings → Storage", a section that never existed). ui/screens/SettingsScreen.toast-path.test.jsx pins each step
    of the path to the rendered Settings screen. */
-export const WRITE_FAIL_TOAST_TEXT = "Couldn't save your last change — device storage may be full. Free up some space, or back up from Settings → Your data → Export.";
+export const WRITE_FAIL_TOAST_TEXT = "Couldn't save your last change — device storage may be full. Free up some space, or back up from Settings → Your data → Back up now.";
 /** @type {Set<string>} */
 let _sessionDismissals = new Set();
 /** @type {ReturnType<typeof setInterval> | null} */

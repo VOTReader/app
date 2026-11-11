@@ -70,7 +70,7 @@ function setup(file) {
 afterEach(() => { cleanup(); teardownSettingsGlobals(); vi.restoreAllMocks(); });
 
 const clickVerify = async () => {
-  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Verify');
+  const btn = Array.from(document.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === 'Check a backup file');
   expect(btn).toBeTruthy();
   await act(async () => { btn.click(); });
   await flush();
@@ -81,13 +81,16 @@ describe('Verify a Backup (web)', () => {
     setup(await buildVotbak());
     renderSettings();
     await clickVerify();
-    const result = await screen.findByText(/Checksum passed/);
-    expect(result.textContent).toContain('3 notes');
-    expect(result.textContent).toContain('2 bookmarks');
-    expect(result.textContent).toContain('1 media file');
-    const dismiss = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Dismiss');
-    await act(async () => { dismiss.click(); });
-    expect(screen.queryByText(/Checksum passed/)).toBeNull();
+    // WS3 settings (st-verify): a verdict sheet, the counts, then Done.
+    const sheet = (await screen.findByText('This backup is intact')).closest('[role="dialog"]');
+    expect(sheet.textContent).toContain('integrity check passed');
+    expect(sheet.textContent).toMatch(/Notes\s*3/);
+    expect(sheet.textContent).toMatch(/Bookmarks\s*2/);
+    expect(sheet.textContent).toContain('1 media file');
+    expect(sheet.textContent).toContain('Restore it');
+    const done = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Done');
+    await act(async () => { done.click(); });
+    expect(screen.queryByText('This backup is intact')).toBeNull();
   });
 
   it('storage-backup-1: a media frame truncated in transit still reports the (intact) manifest, with a truncation warning', async () => {
