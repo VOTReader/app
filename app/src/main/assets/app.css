@@ -630,7 +630,10 @@
         --tone-warn:   #d9a03c;   /* running low */
         /* faces */
         --font-serif:  var(--font-body);   /* the reader's face: titles, row and tile names, reading */
-        --font-ui:     Roboto, 'Segoe UI', system-ui, -apple-system, sans-serif;   /* under 15 px and every control */
+        /* The UI face: the mocks draw the system sans, but the app paints only faces it ships (e2e:phone F1: never a
+           system fallback), so it is the shipped Atkinson Hyperlegible (400/700, fonts/reading; made for low vision,
+           which suits the app's older readers). Its fallbacks are the system sans. One line to change. */
+        --font-ui:     'Atkinson Hyperlegible', Roboto, 'Segoe UI', system-ui, sans-serif;   /* under 15 px and every control */
         /* the seven text sizes (rule 4) + the two between them the mocks use. Content sizes are --fs (they grow with
            Text size); the bars' title is --fsc (chrome does not). */
         --ts-display:  var(--fs-30);   /* a landing hero, serif 600 */
