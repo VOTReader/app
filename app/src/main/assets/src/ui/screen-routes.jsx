@@ -445,7 +445,7 @@ export function buildScreenRoutes({
   // Skip Buttons (player-1025): the step every skip control takes, the phone's lock screen included.
   AudioPlayer.setSkipSeconds(settings.skipSeconds);
   // dl-d5: each running plan's next 7 days, and (opt-in) the next 3 after the one playing, download on Wi-Fi.
-  setAutoDownloads(planTracks, settings.keepNextReady === true);
+  setAutoDownloads(planTracks, settings.keepNextReady === true, settings.keepStarred === true);
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,
@@ -613,7 +613,7 @@ export function buildScreenRoutes({
       const fn = /** @type {any} */ (globalThis).songsFrameTitle;
       return typeof fn === 'function' ? fn(frames[frames.length - 1], /** @type {any} */ (globalThis).AudioLibraryStore) : 'Songs of the Letters';
     }
-    if (typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0) return 'Listening Library';
+    if (typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0) return 'Listen';
     if (sourceScreen === 'home') return 'Home';
     const title = typeof document !== 'undefined' ? String(document.title || '').replace(/\s+[—-]\s+VOTReader$/, '').trim() : '';
     return title && title !== 'VOTReader' ? title : 'Back';
@@ -1527,10 +1527,10 @@ export function buildScreenRoutes({
     ),
     'audio-library': () => (
       <AudioLibraryScreen
-        onOpenCollection={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
         onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
         onOpenSaved={() => _enterAudioSub('audio-library-saved')}
         onOpenStudies={() => _enterAudioSub('audio-library-studies')}
+        onOpenBible={() => _enterAudioSub('audio-library-bible')}
         onOpenOffline={() => _enterAudioSub('audio-library-offline')}
         onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
@@ -1543,7 +1543,7 @@ export function buildScreenRoutes({
     'audio-library-volumes': () => (
       <AudioVolumesScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel="Back to Listen"
         onOpenCollection={(vk) => {
           setAudioColKey(vk);
           setNavOrigin({ screen: 'audio-library-volumes', returnOrigin: navOrigin || null });
@@ -1559,8 +1559,12 @@ export function buildScreenRoutes({
     'audio-library-offline': () => (
       <AudioOfflineScreen
         onBack={goNavOrigin}
-        backLabel={(navOrigin && navOrigin.label) || 'Listening Library'}
+        backLabel={'Back to ' + ((navOrigin && navOrigin.label) || 'Listen')}
         bibleAudio={settings.bibleAudio}
+        keepStarred={settings.keepStarred === true}
+        keepNextReady={settings.keepNextReady === true}
+        wifiOnly={settings.downloadWifiOnly === true}
+        onToggleSetting={toggleSetting}
         letterReader={settings.letterReader}
         onLetterReader={(/** @type {string} */ v) => updateSetting('letterReader', v)}
         onSearch={goSearch}
@@ -1569,10 +1573,22 @@ export function buildScreenRoutes({
         theme={theme} onThemeChange={setTheme}
       />
     ),
+    // listen.html au-bible: The Bible on its own screen; an edition opens its books (au-books).
+    'audio-library-bible': () => (
+      <AudioBibleScreen
+        onBack={goNavOrigin}
+        backLabel="Back to Listen"
+        onOpenEdition={(vk) => {
+          setAudioColKey(vk);
+          setNavOrigin({ screen: 'audio-library-bible', returnOrigin: navOrigin || null });
+          setScreen('audio-library-collection');
+        }}
+      />
+    ),
     'audio-library-studies': () => (
       <AudioStudiesScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel="Back to Listen"
         onOpenStudy={(studyId) => {
           // A study opens the same recordings screen a collection does, as 'study:<id>'.
           setAudioColKey('study:' + studyId);
@@ -1597,19 +1613,16 @@ export function buildScreenRoutes({
           });
           selectStudy(studyId);
         }}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
       />
     ),
     'audio-library-collection': () => (
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'The Volumes'
-          : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Studies'
-          : 'Listening Library'}
+        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'Back to The Volumes of Truth'
+          : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Back to Studies'
+          : navOrigin && navOrigin.screen === 'audio-library-bible' ? 'Back to The Bible'
+          : 'Back to Listen'}
         onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1627,7 +1640,7 @@ export function buildScreenRoutes({
         onBack={_songsBack}
         rootBackLabel={navOrigin && navOrigin.label ? navOrigin.label
           : !navOrigin || navOrigin.screen === 'home' ? 'Home'
-          : navOrigin.screen === 'audio-library' ? 'Listening Library'
+          : navOrigin.screen === 'audio-library' ? 'Listen'
           : navOrigin.screen === 'search' ? 'Search'
           : 'Back'}
         onSearch={goSearch}
@@ -1639,12 +1652,9 @@ export function buildScreenRoutes({
     'audio-library-saved': () => (
       <AudioSavedScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel="Back to Listen"
         onOpenTrack={(track) => _openAudioText(track, 'audio-library-saved')}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
+        onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
       />
     ),
     'matthew-idx': () => {

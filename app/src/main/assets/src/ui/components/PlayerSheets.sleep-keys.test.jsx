@@ -17,7 +17,7 @@ describe('SleepSheet', () => {
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const state = { sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, sleepAtQueueEnd: false };
     render(<SleepSheet state={state} noun="letter" onClose={() => {}} />);
-    expect(document.querySelectorAll('.np-sleep-sheet .np-grid button').length, 'PRECONDITION: the chips rendered').toBe(8);
+    expect(document.querySelectorAll('.np-sleep-sheet .np-grid button').length, 'PRECONDITION: the chips rendered').toBe(7);
     const keyWarnings = err.mock.calls.filter((c) => c.some((a) => typeof a === 'string' && /unique "key" prop/.test(a)));
     expect(keyWarnings).toEqual([]);
   });

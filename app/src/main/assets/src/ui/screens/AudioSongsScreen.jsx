@@ -21,6 +21,9 @@
 import { SongPage } from './SongPage.jsx';
 import { ReadWithMusic, readingLetters } from './ReadWithMusic.jsx';
 import { OfflineNote } from '../components/OfflineAudioControls.jsx';
+import { ListGroup, ListRow, SectionLabel, UiButton } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
 
 /** The first chips after All, in the pictures' order; the rest go under More. */
 const PRIMARY_STYLES = ['worship', 'pop', 'hip-hop', 'cinematic', 'folk'];
@@ -321,16 +324,6 @@ function SongRowPlain({ song, playingId, active, onPlay, onOpen, onRemove }) {
 }
 const SongRow = React.memo(SongRowPlain, sameRowFor((p) => (p.playingId === p.song.id ? (p.active ? 2 : 1) : 0)));
 
-/** @param {{ title: string, id?: string, action?: any }} props */
-function SectionHead({ title, id, action }) {
-  return (
-    <div className="songs-section-head">
-      <h2 id={id}>{title}</h2>
-      {action || null}
-    </div>
-  );
-}
-
 /**
  * A shelf of song tiles (01): cover, title, and "3 versions" for a family with several. No vote UI on tiles.
  * A tap plays the shelf from that song.
@@ -369,20 +362,32 @@ function LovedEmpty({ onNew }) {
 /* ── the screen ───────────────────────────────────────────────────────── */
 
 /**
+ * The bar's title for the top frame (listen.html au-songs, au-style, au-song): the hub "Songs of the Letters", a
+ * style its own name, a song page "Song", a list its own title.
+ * @param {any} top @param {any} library @returns {string}
+ */
+function barTitleOf(top, library) {
+  const cat = catalog();
+  if (top.k === 'hub' && top.st && cat && cat.loaded) return cat.styles()[top.st] || 'Songs';
+  if (top.k === 'song') return 'Song';
+  return songsFrameTitle(top, library);
+}
+
+/**
  * @param {{
  *   route: any[],
  *   onPush: (frame: any) => void,
  *   onReplaceTop: (frame: any) => void,
  *   onBack: () => void,
  *   rootBackLabel?: string,
- *   onSearch: () => void,
- *   onHistory: () => void,
- *   onSettings: () => void,
- *   theme: any,
- *   onThemeChange: (theme: any) => void,
+ *   onSearch?: () => void,
+ *   onHistory?: () => void,
+ *   onSettings?: () => void,
+ *   theme?: any,
+ *   onThemeChange?: (theme: any) => void,
  * }} props
  */
-export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBackLabel = 'Listening Library', onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBackLabel = 'Listen' }) {
   const cat = catalog();
   React.useSyncExternalStore(
     React.useCallback((cb) => (cat ? cat.subscribe(cb) : () => {}), [cat]),
@@ -413,7 +418,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
 
   const frames = Array.isArray(route) && route.length ? route : [{ k: 'hub' }];
   const top = frames[frames.length - 1];
-  const backLabel = frames.length > 1 ? songsFrameTitle(frames[frames.length - 2], library) : rootBackLabel;
+  const backLabel = 'Back to ' + (frames.length > 1 ? songsFrameTitle(frames[frames.length - 2], library) : rootBackLabel);
   const state = AudioPlayer.getState();
   const playingId = currentSongId(state);
   const active = playerIsActive(state);
@@ -423,7 +428,7 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
     body = cat && cat.error ? (
       <div className="songs-state" role="status">
         <p>Songs need a connection the first time.</p>
-        <button type="button" className="songs-outline-action" onClick={() => { void cat.load(); }}>Try again</button>
+        <UiButton onClick={() => { void cat.load(); }}>Try again</UiButton>
       </div>
     ) : (
       <div className="songs-skeleton" role="status" aria-label="Loading songs">
@@ -440,19 +445,12 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
   } else if (top.k === 'list') {
     body = <SongsList frame={top} library={library} playingId={playingId} active={active} onPush={onPush} />;
   } else {
-    body = <SongsHub frame={top} library={library} playingId={playingId} active={active} onPush={onPush} onReplaceTop={onReplaceTop} />;
+    body = <SongsHub frame={top} library={library} playingId={playingId} active={active} onPush={onPush} onReplaceTop={onReplaceTop} onBack={onBack} />;
   }
 
   return (
-    <ScreenLayout navChildren={LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange })}>
-      <div className="songs-screen">
-        {top.k === 'hub' || !cat || !cat.loaded ? (
-          <header className="songs-hero">
-            <div className="songs-eyebrow">Sung by the flock</div>
-            <h1>Songs of the Letters</h1>
-            <p className="songs-intro">Songs made by members of the flock with Suno, from the words of The Volumes of Truth.</p>
-          </header>
-        ) : null}
+    <ScreenLayout utility={{ title: barTitleOf(top, library), onBack, backLabel }}>
+      <div className={'songs-screen' + (top.k === 'song' ? ' is-song' : '')}>
         <OfflineNote text="You’re offline. Songs kept on this phone still play." />
         {body}
       </div>
@@ -461,25 +459,26 @@ export function AudioSongsScreen({ route, onPush, onReplaceTop, onBack, rootBack
 }
 
 /**
- * The hub: Shuffle all, Find, style chips, then either the results or the shelves.
- * @param {{ frame: any, library: any, playingId: string, active: boolean, onPush: (f: any) => void, onReplaceTop: (f: any) => void }} props
+ * The hub (listen.html au-songs, au-songs2): the line, Shuffle all, Find, the style chips with More styles always in
+ * sight, then the shelves. A style is its own frame ({ k: 'hub', st }, au-style): its name in the bar, Find in it,
+ * Shuffle it, its songs; All goes back.
+ * @param {{ frame: any, library: any, playingId: string, active: boolean, onPush: (f: any) => void, onReplaceTop: (f: any) => void, onBack: () => void }} props
  */
-function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
+function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop, onBack }) {
   const cat = catalog();
   const version = cat.getVersion();
   const [query, setQuery] = React.useState(frame.q || '');
-  const [style, setStyle] = React.useState(frame.st || '');
+  const style = frame.st || '';
   const [moreOpen, setMoreOpen] = React.useState(false);
   const [allTiles, setAllTiles] = React.useState(false);
   // A frame restored or pushed with a query (Search's shortcut row) refills the box. The hub's own write-back
   // below echoes here too, so the box is only reset when the frame says something else.
   React.useEffect(() => {
     setQuery((q) => (q === (frame.q || '') ? q : frame.q || ''));
-    setStyle(frame.st || '');
   }, [frame.q, frame.st]);
-  // W2-07: the Find words and the chip live in the hub's frame as they change (a short pause after typing), so
-  // a letter opened from the desk and Back return to the same results. Only while the hub is on top: a list
-  // opened over it writes its own frame first (`open`), and unmounting drops a write still waiting.
+  // W2-07: the Find words live in the hub's frame as they change (a short pause after typing), so a letter opened
+  // from the desk and Back return to the same results. Only while the hub is on top: a list opened over it writes
+  // its own frame first (`open`), and unmounting drops a write still waiting.
   const replaceTopRef = React.useRef(onReplaceTop);
   replaceTopRef.current = onReplaceTop;
   const hubFrame = () => {
@@ -489,11 +488,11 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
     return keep;
   };
   React.useEffect(() => {
-    if ((frame.q || '') === (query.trim() ? query : '') && (frame.st || '') === style) return undefined;
+    if ((frame.q || '') === (query.trim() ? query : '')) return undefined;
     const t = setTimeout(() => replaceTopRef.current(hubFrame()), 400);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hubFrame reads query and style, the deps
-  }, [query, style, frame.q, frame.st]);
+  }, [query, style, frame.q]);
 
   const styles = cat.styles();
   const styleCounts = React.useMemo(() => {
@@ -506,6 +505,7 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const primary = PRIMARY_STYLES.filter((k) => styles[k]);
   const more = Object.keys(styles).filter((k) => primary.indexOf(k) < 0 && styleCounts[k] > 0)
     .sort((a, b) => styleCounts[b] - styleCounts[a]);
+  const styleName = style ? styles[style] || style : '';
 
   const words = query.trim() ? query.trim().split(/\s+/) : [];
   const filtering = !!(words.length || style);
@@ -514,18 +514,25 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const results = filtering ? findSongFamilies(query, style) : [];
   const leadOf = (fam) => (style ? cat.versionsOf(fam).find((s) => s.st.indexOf(style) >= 0 || s.dl === style || (style === 'spanish' && s.lang === 'es')) : null) || cat.featuredOf(fam);
 
-  const shuffleCount = style ? styleCounts[style] || 0 : 0;
-  const shuffleLabel = style ? 'Shuffle ' + (styles[style] || style) + ' (' + shuffleCount.toLocaleString('en-US') + ')' : 'Shuffle all songs';
+  const shuffleLabel = style ? 'Shuffle ' + styleName + ' · ' + songCountLabel(styleCounts[style] || 0) : 'Shuffle all songs';
   const shuffle = () => {
-    AudioPlayer.playSongs({ filter: style ? { style } : {}, shuffle: true, onePerFamily: true, label: style ? (styles[style] || style) + ' songs' : 'Songs of the Letters' });
+    AudioPlayer.playSongs({ filter: style ? { style } : {}, shuffle: true, onePerFamily: true, label: style ? styleName + ' songs' : 'Songs of the Letters' });
   };
-  // Leaving the hub keeps its Find box and chip in its frame, so Back returns to the same results.
+  // Leaving the hub keeps its Find box in its frame, so Back returns to the same results.
   const open = (next) => {
     onReplaceTop(hubFrame());
     onPush(next);
   };
+  // A chip: from the hub a style opens as its own frame; in a style another style takes its place; All goes back.
+  const pickStyle = (key) => {
+    setMoreOpen(false);
+    if (!key) { if (style) onBack(); return; }
+    if (key === style) return;
+    if (style) onReplaceTop({ k: 'hub', st: key });
+    else open({ k: 'hub', st: key });
+  };
   const playResults = (song) => {
-    AudioPlayer.playSongs({ ids: results.map(leadOf).filter(Boolean).map((s) => s.id), startId: song.id, label: 'Songs of the Letters' });
+    AudioPlayer.playSongs({ ids: results.map(leadOf).filter(Boolean).map((s) => s.id), startId: song.id, label: style ? styleName + ' songs' : 'Songs of the Letters' });
   };
 
   // The shelves are sorts over the whole catalog: work them out again only when the catalog or the letters change.
@@ -557,54 +564,61 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
   const playLoved = useLatestFn((s) => playShelf(s, loved, 'All-time loved'));
   const liked = likedSongs();
   const playLiked = useLatestFn((s) => playShelf(s, liked, 'Liked Songs'));
-  const seeAll = (v, label) => (
-    <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'top:' + v })} aria-label={'See all ' + label}>See all<ChevronRightIcon /></button>
-  );
   const savedCount = library ? songsOfIds(library.songSaved()).length : 0;
-  // K1: the songs kept on this phone (and, after a restore, those the backup lists but the phone lacks).
-  const keep = useSongKeep();
-  const keptIds = keep.keptIds();
-  const missingCount = keep.missing().length;
   const recentCount = library ? songsOfIds(library.songRecent()).length : 0;
   const shownTiles = allTiles ? tiles : tiles.slice(0, TILES_FIRST);
+  const moreChip = more.indexOf(style) >= 0 ? style : '';
+
+  const find = (
+    <label className="ui-field songs-find">
+      <UiIcon name="search" />
+      <span className="sr-only">{style ? 'Find a song in ' + styleName : 'Find a song, a letter, or a maker'}</span>
+      <input type="search" aria-label="Find a song" value={query} onChange={(event) => setQuery(event.target.value)}
+        placeholder={style ? 'Find a song in ' + styleName : 'Find a song, a letter, or a maker'} enterKeyHint="search" />
+      {query ? <button type="button" className="songs-find-clear" onClick={() => setQuery('')} aria-label="Clear the song search"><UiIcon name="x" size="sm" /></button> : null}
+    </label>
+  );
+  const chips = (
+    <div className="ui-chips songs-chips" role="group" aria-label="Styles">
+      <button type="button" className="ui-chip" aria-pressed={!style} onClick={() => pickStyle('')}>All</button>
+      {primary.map((key) => (
+        <button key={key} type="button" className="ui-chip" aria-pressed={style === key} onClick={() => pickStyle(key)}>{styles[key]}</button>
+      ))}
+      {moreChip ? <button type="button" className="ui-chip" aria-pressed onClick={() => pickStyle(moreChip)}>{styles[moreChip]}</button> : null}
+      {more.length ? (
+        <button type="button" className="ui-chip songs-chip-more" aria-haspopup="dialog" onClick={() => setMoreOpen(true)}>
+          More styles<UiIcon name="down" size="sm" />
+        </button>
+      ) : null}
+    </div>
+  );
+  const shuffleButton = <UiButton kind="primary" wide icon="shuffle" className="songs-shuffle-btn" onClick={shuffle}>{shuffleLabel}</UiButton>;
 
   return (
     <>
-      <div className="songs-controls">
-        <button type="button" className="songs-shuffle" onClick={shuffle}><ShuffleIcon /><span>{shuffleLabel}</span></button>
-        <div className="songs-find">
-          <SearchIcon />
-          <label>
-            <span className="sr-only">Find a song, a letter, or a maker</span>
-            <input type="search" aria-label="Find a song" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a song, a letter, or a maker" enterKeyHint="search" />
-          </label>
-          {query ? <button type="button" className="songs-find-clear" onClick={() => setQuery('')} aria-label="Clear the song search"><CloseIcon /></button> : null}
+      {style ? (
+        <div className="songs-controls">{find}{chips}{shuffleButton}</div>
+      ) : (
+        <div className="songs-controls">
+          <p className="songs-intro">Made by members of the flock with Suno, from the words of The Volumes of Truth.</p>
+          {shuffleButton}{find}{chips}
         </div>
-        <div className="songs-chips" role="group" aria-label="Styles">
-          <button type="button" className={'songs-chip' + (!style ? ' is-on' : '')} aria-pressed={!style} onClick={() => setStyle('')}>All</button>
-          {primary.map((key) => (
-            <button key={key} type="button" className={'songs-chip' + (style === key ? ' is-on' : '')} aria-pressed={style === key} onClick={() => setStyle(style === key ? '' : key)}>{styles[key]}</button>
-          ))}
-          {more.length ? (
-            <button type="button" className={'songs-chip songs-chip-more' + (more.indexOf(style) >= 0 ? ' is-on' : '')} aria-haspopup="dialog" onClick={() => setMoreOpen(true)}>
-              {more.indexOf(style) >= 0 ? styles[style] : 'More'}<span aria-hidden="true">▾</span>
+      )}
+      <ActionSheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More styles" className="songs-styles-sheet">
+        <div className="songs-styles-grid" role="group" aria-label="More styles">
+          {more.map((key) => (
+            <button key={key} type="button" className="songs-style-cell" aria-pressed={style === key} onClick={() => pickStyle(key)}>
+              <span>{styles[key]}</span><span className="songs-style-count" aria-label={songCountLabel(styleCounts[key])}>{styleCounts[key]}</span>
             </button>
-          ) : null}
+          ))}
         </div>
-      </div>
-      {moreOpen ? (
-        <ChoiceSheet
-          eyebrow="Songs of the Letters" title="More styles" value={style}
-          options={more.map((key) => ({ id: key, label: styles[key], meta: songCountLabel(styleCounts[key]) }))}
-          onChange={setStyle} onClose={() => setMoreOpen(false)}
-        />
-      ) : null}
+      </ActionSheet>
 
       {filtering ? (
-        <section className="songs-section" aria-labelledby="songs-results">
-          <SectionHead id="songs-results" title={style && !words.length ? (styles[style] || 'Songs') : 'Songs'} action={<span className="songs-section-count" aria-live="polite">{songCountLabel(results.length)}</span>} />
+        <section className="songs-section" aria-label={style && !words.length ? styleName : 'Songs'}>
+          {words.length ? <SectionLabel aside={songCountLabel(results.length)} asideLive>Songs</SectionLabel> : null}
           {results.length ? (
-            <div className="songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResultRow} onOpen={openFamily} />)}</div>
+            <div className="ui-group songs-list">{results.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadOf(fam)} playingId={playingId} active={active} onPlay={playResultRow} onOpen={openFamily} />)}</div>
           ) : (
             <p className="songs-empty">No song by that name. Try a word from the letter.</p>
           )}
@@ -612,90 +626,54 @@ function SongsHub({ frame, library, playingId, active, onPush, onReplaceTop }) {
       ) : (
         <>
           {tallyReady && loved.length >= LOVED_MIN ? (
-            <section className="songs-section songs-top-shelf" aria-labelledby="songs-loved">
-              <SectionHead id="songs-loved" title="All-time loved" action={seeAll('loved', 'all-time loved songs')} />
+            <section className="songs-section songs-top-shelf">
+              <SectionLabel aside="See all" asideLabel="See all all-time loved songs" onAside={() => open({ k: 'list', v: 'top:loved' })}>All-time loved</SectionLabel>
               <SongTiles songs={loved.slice(0, SHELF_TILES)} onPlay={playLoved} />
             </section>
           ) : null}
           {newest.length ? (
-            <section className="songs-section songs-top-shelf" aria-labelledby="songs-new">
-              <SectionHead id="songs-new" title="New from the flock" action={newest.length > SHELF_TILES ? seeAll('new', 'new songs') : null} />
+            <section className="songs-section songs-top-shelf">
+              {newest.length > SHELF_TILES
+                ? <SectionLabel aside="See all" asideLabel="See all new songs" onAside={() => open({ k: 'list', v: 'top:new' })}>New from the flock</SectionLabel>
+                : <SectionLabel>New from the flock</SectionLabel>}
               <SongTiles songs={newest.slice(0, SHELF_TILES)} onPlay={playNewRow} />
             </section>
           ) : null}
           {liked.length ? (
-            <section className="songs-section songs-top-shelf" aria-labelledby="songs-liked">
-              <SectionHead id="songs-liked" title="Liked Songs" action={
-                <button type="button" className="songs-see-all" onClick={() => open({ k: 'list', v: 'liked' })} aria-label="See all liked songs">See all<ChevronRightIcon /></button>
-              } />
+            <section className="songs-section songs-top-shelf">
+              <SectionLabel aside="See all" asideLabel="See all liked songs" onAside={() => open({ k: 'list', v: 'liked' })}>Liked Songs</SectionLabel>
               <SongTiles songs={liked.slice(0, SHELF_TILES)} onPlay={playLiked} />
             </section>
           ) : null}
 
-          <section className="songs-section" aria-labelledby="songs-yours">
-            <SectionHead id="songs-yours" title="Your songs" />
-            <div className="songs-card">
-              <button type="button" className="songs-nav-row" onClick={() => open({ k: 'list', v: 'saved' })}>
-                <span className="songs-nav-mark" aria-hidden="true"><StarIcon filled={savedCount > 0} /></span>
-                <span className="songs-nav-label">Saved songs</span>
-                <span className="songs-nav-count">{savedCount}</span>
-                <ChevronRightIcon />
-              </button>
-              <button type="button" className="songs-nav-row" onClick={() => open({ k: 'list', v: 'recent' })}>
-                <span className="songs-nav-mark" aria-hidden="true"><RecentIcon /></span>
-                <span className="songs-nav-label">Recently played songs</span>
-                <span className="songs-nav-count">{recentCount}</span>
-                <ChevronRightIcon />
-              </button>
-              {keep && keep.availability() !== 'none' ? (
-                <button type="button" className="songs-nav-row" onClick={() => open({ k: 'list', v: 'kept' })}>
-                  <span className="songs-nav-mark" aria-hidden="true"><KeepIcon /></span>
-                  <span className="songs-nav-label">Kept on this phone</span>
-                  <span className="songs-nav-count">{keptIds.length ? keptIds.length + ' · ' + formatSongBytes(keep.bytesOf(keptIds)) : missingCount ? 'Download again' : '0'}</span>
-                  <ChevronRightIcon />
-                </button>
-              ) : null}
-            </div>
-          </section>
+          <ListGroup label="Your songs">
+            <ListRow icon="star" one title="Saved songs" value={savedCount || 'None yet'} valueNone={!savedCount} onClick={() => open({ k: 'list', v: 'saved' })} />
+            <ListRow icon="clock" one title="Recently played" value={recentCount || 'None yet'} valueNone={!recentCount} onClick={() => open({ k: 'list', v: 'recent' })} />
+          </ListGroup>
 
           {tiles.length ? (
-            <section className="songs-section" aria-labelledby="songs-letters">
-              <SectionHead id="songs-letters" title="From the letters" />
-              <div className="songs-tiles">
-                {shownTiles.map(({ col, fams, n }) => (
-                  <button key={col} type="button" className="songs-tile" onClick={() => open({ k: 'list', v: 'col:' + col })}>
-                    <span className="songs-mosaic" aria-hidden="true">
-                      {[0, 1, 2, 3].map((i) => <SongCover key={i} song={fams[i] ? cat.featuredOf(fams[i]) : null} />)}
-                    </span>
-                    <span className="songs-tile-copy"><strong>{colLabel(col)}</strong><small>{songCountLabel(n)}</small></span>
-                    <ChevronRightIcon />
-                  </button>
-                ))}
-              </div>
+            <ListGroup label="From the letters">
+              {shownTiles.map(({ col, n }) => (
+                <ListRow key={col} noLead one title={colLabel(col)} value={songCountLabel(n)} onClick={() => open({ k: 'list', v: 'col:' + col })} />
+              ))}
               {tiles.length > TILES_FIRST ? (
-                <button type="button" className="songs-see-all songs-tiles-more" aria-expanded={allTiles} onClick={() => setAllTiles(!allTiles)}>
-                  {allTiles ? 'Show fewer collections' : 'Show all ' + tiles.length + ' collections'}<ChevronRightIcon />
+                <button type="button" className="ui-row is-one no-lead ui-row-press songs-tiles-more" aria-expanded={allTiles} onClick={() => setAllTiles(!allTiles)}>
+                  <span className="ui-link">{allTiles ? 'Show fewer collections' : 'Show all ' + tiles.length + ' collections'}<UiIcon name={allTiles ? 'up' : 'down'} size="sm" /></span>
                 </button>
               ) : null}
-            </section>
+            </ListGroup>
           ) : null}
 
-          <section className="songs-section songs-shelves" aria-label="More songs">
-            {shelves.map(({ shelf, n }) => (
-              <button key={shelf.v} type="button" className="songs-shelf" onClick={() => open({ k: 'list', v: shelf.v })}>
-                <span className="songs-shelf-title">{shelf.title}</span>
-                <span className="songs-shelf-count">{songCountLabel(n)}</span>
-                <ChevronRightIcon />
-              </button>
-            ))}
-            {readings.length ? (
-              <button type="button" className="songs-shelf" onClick={() => open({ k: 'readings' })}>
-                <span className="songs-shelf-title">Letters read with music</span>
-                <span className="songs-shelf-count">{songCountLabel(readings.length, 'letter', 'letters')}</span>
-                <ChevronRightIcon />
-              </button>
-            ) : null}
-          </section>
+          {shelves.length || readings.length ? (
+            <ListGroup label="More to hear">
+              {shelves.map(({ shelf, n }) => (
+                <ListRow key={shelf.v} noLead one title={shelf.title} value={songCountLabel(n)} onClick={() => open({ k: 'list', v: shelf.v })} />
+              ))}
+              {readings.length ? (
+                <ListRow noLead one title="Letters read with music" value={songCountLabel(readings.length, 'letter', 'letters')} onClick={() => open({ k: 'readings' })} />
+              ) : null}
+            </ListGroup>
+          ) : null}
         </>
       )}
     </>
@@ -732,7 +710,7 @@ function SongsTopPage({ frame, playingId, active, onPush, onReplaceTop }) {
       </header>
       <section className="songs-section songs-top-list" role="tabpanel" aria-labelledby={'songs-top-' + tab.v}>
         {songs.length ? (
-          <div className="songs-list">
+          <div className="ui-group songs-list">
             {songs.map((s) => {
               const fam = cat.familyById(s.f);
               return fam && cat.versionsOf(fam).length > 1
@@ -776,8 +754,6 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   const ids = leads.map((s) => s.id);
   const play = (song, shuffle) => AudioPlayer.playSongs({ ids, startId: song ? song.id : undefined, shuffle: !!shuffle, label: content.title });
   // K1: Keep all keeps every version shown here (the count the header states); the Kept list removes instead.
-  /** @type {string[]} */
-  const allIds = fams ? fams.reduce((out, fam) => out.concat(versionsHere(fam).map((s) => s.id)), /** @type {string[]} */ ([])) : ids;
   const missing = keptList ? keep.missing() : [];
   const keptBytes = keptList ? keep.bytesOf(ids) : 0;
   // Rows are memoized: their taps call through these, so they play and open the list as it is now.
@@ -789,20 +765,15 @@ function SongsList({ frame, library, playingId, active, onPush }) {
   return (
     <>
       <header className="songs-hero songs-list-hero">
-        <div className="songs-eyebrow">{content.eyebrow}</div>
-        <h1>{content.title}</h1>
         {count ? <p className="songs-intro">{fams && count > fams.length
           // n3-09: Play all plays one version per song, so the songs and their versions are counted apart
           ? songCountLabel(fams.length) + ' · ' + songCountLabel(count, 'version', 'versions')
           : songCountLabel(count)} · {keptList ? formatSongBytes(keptBytes) + ' · they play with no signal' : hours}</p> : null}
         {ids.length ? (
-          <div className="songs-list-actions">
-            <button type="button" className="songs-shuffle songs-play-all" onClick={() => play(null, false)}><PlayIcon /><span>Play all</span></button>
-            {ids.length > 1 ? <button type="button" className="songs-outline-action" onClick={() => play(null, true)}><ShuffleIcon /><span>Shuffle</span></button> : null}
+          <div className="ui-btn-row songs-list-actions">
+            <UiButton kind="primary" icon="play" onClick={() => play(null, false)}>Play all</UiButton>
+            {ids.length > 1 ? <UiButton icon="shuffle" onClick={() => play(null, true)}>Shuffle</UiButton> : null}
           </div>
-        ) : null}
-        {!keptList && allIds.length ? (
-          <SongKeepAction ids={allIds} noteKey={'keep-list-' + frame.v} label={allIds.length > 1 ? 'Keep all ' + allIds.length.toLocaleString('en-US') : 'Keep this song'} />
         ) : null}
         {keptList && missing.length ? (
           <div className="song-keep-restore">
@@ -828,9 +799,9 @@ function SongsList({ frame, library, playingId, active, onPush }) {
       </header>
       <section className="songs-section" aria-label={content.title}>
         {fams && fams.length ? (
-          <div className="songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={playRow} onOpen={openFamily} inList />)}</div>
+          <div className="ui-group songs-list">{fams.map((fam) => <FamilyRow key={fam.id} fam={fam} song={leadFor(fam)} playingId={playingId} active={active} onPlay={playRow} onOpen={openFamily} inList />)}</div>
         ) : content.songs && content.songs.length ? (
-          <div className="songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={playRow} onOpen={openSongFamily} onRemove={keptList ? removeRow : undefined} />)}</div>
+          <div className="ui-group songs-list">{content.songs.map((song) => <SongRow key={song.id} song={song} playingId={playingId} active={active} onPlay={playRow} onOpen={openSongFamily} onRemove={keptList ? removeRow : undefined} />)}</div>
         ) : (
           <p className="songs-empty">{content.empty}</p>
         )}

@@ -49,7 +49,7 @@ const MANIFEST = {
 };
 
 function installGlobals({ manifest = MANIFEST, studies = STUDIES } = {}) {
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <h1>{utility.title}</h1> : null}{children}</main>;
   globalThis.LibraryNav = () => null;
   Object.assign(globalThis, Shelf, AudioTrack, AudioCoverage, { AudioSeekSlider, CoverageBadge });
   globalThis.AudioPlayer = player;
@@ -106,7 +106,7 @@ describe('the Listening Library hub: Downloads (item 8; downloads brief D3, pict
     const onOpenOffline = vi.fn();
     hub(onOpenOffline);
     const row = screen.getByText('Downloads').closest('button');
-    expect(row.textContent).toContain('2 on this phone · 30 MB');
+    expect(row.textContent).toContain('2 recordings · 30 MB');
     fireEvent.click(row);
     expect(onOpenOffline).toHaveBeenCalledTimes(1);
   });
@@ -124,40 +124,36 @@ describe('the Listening Library hub: Downloads (item 8; downloads brief D3, pict
   });
 });
 
-describe('the Studies screen', () => {
-  it('lists every study in reading order, recorded ones read-along, the rest honest', () => {
+describe('the Studies screen (listen.html au-studies)', () => {
+  const titles = (group) => [...screen.getByRole('group', { name: group }).querySelectorAll('.ui-row-title')].map((t) => t.textContent);
+
+  it('With audio first, in reading order, each with its honest count, opening its recordings', () => {
     const onOpenStudy = vi.fn();
-    render(<AudioStudiesScreen onBack={noop} onOpenStudy={onOpenStudy} onReadStudy={noop} {...common} />);
-    const rows = [...document.querySelectorAll('.audio-library-shelf-row')];
-    expect(rows.map((r) => r.querySelector('strong').textContent)).toEqual(STUDIES.map((s) => s.title));
-    expect(rows[1].textContent).toContain('3 chapters · 2 recorded');
-    expect(rows[1].textContent).toContain('Read-along');
-    expect(rows[2].textContent).toContain('2 chapters · all recorded');
-    fireEvent.click(rows[1]);
+    render(<AudioStudiesScreen onBack={noop} onOpenStudy={onOpenStudy} onReadStudy={noop} />);
+    expect(screen.getByRole('heading', { name: 'Studies' })).toBeTruthy();
+    expect(titles('With audio')).toEqual([STUDIES[1].title, STUDIES[2].title]);
+    expect(screen.getByText('3 chapters · 2 recorded')).toBeTruthy();
+    expect(screen.getByText('2 chapters · all recorded')).toBeTruthy();
+    expect(screen.getByText('2 studies')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open ' + STUDIES[1].title }));
     expect(onOpenStudy).toHaveBeenCalledWith('lamb-of-god');
+    fireEvent.click(screen.getByRole('button', { name: 'Play ' + STUDIES[2].title }));
+    expect(player.playCollection).toHaveBeenCalledWith({ volKey: 'study', items: STUDIES[2].chapters, collectionLabel: STUDIES[2].title });
   });
 
-  // Codex's critique of the built screen (out/mockups/studies/critique.md, 2026-09-23), items 1, 2 and 5.
-  it('a study with no recording yet opens to READ, says so once, and never opens an empty recordings page', () => {
+  // Codex's critique of the built screen (2026-09-23), items 1, 2 and 5: a study with no recording opens to READ.
+  it('To read: a study with no recording yet opens to read and never opens an empty recordings page', () => {
     const onOpenStudy = vi.fn();
     const onReadStudy = vi.fn();
-    render(<AudioStudiesScreen onBack={noop} onOpenStudy={onOpenStudy} onReadStudy={onReadStudy} {...common} />);
-    const silent = document.querySelectorAll('.audio-library-shelf-row')[0];
-    const line = silent.querySelector('small').textContent;
-    expect(line).toBe('3 chapters');                      // the badge carries availability; no 'not yet recorded' twice
-    expect(silent.querySelector('.coverage-badge').textContent).toBe('Read study');
-    expect(silent.textContent).not.toContain('No recording');
-    fireEvent.click(silent);
+    render(<AudioStudiesScreen onBack={noop} onOpenStudy={onOpenStudy} onReadStudy={onReadStudy} />);
+    expect(titles('To read')).toEqual([STUDIES[0].title]);
+    expect(screen.getByText('1 study')).toBeTruthy();
+    const row = screen.getByText(STUDIES[0].title).closest('button');
+    expect(row.textContent).toContain('3 chapters');
+    expect(row.textContent).not.toContain('recorded');
+    fireEvent.click(row);
     expect(onReadStudy).toHaveBeenCalledWith('more-than-a-man');
     expect(onOpenStudy).not.toHaveBeenCalled();
-  });
-
-  it('sets the right expectation: the intro invites listening AND reading, the head counts both', () => {
-    render(<AudioStudiesScreen onBack={noop} onOpenStudy={noop} onReadStudy={noop} {...common} />);
-    const intro = document.querySelector('.audio-library-intro').textContent;
-    expect(intro).toMatch(/listen/i);
-    expect(intro).toMatch(/read/i);
-    expect(document.querySelector('.audio-studies-split').textContent).toBe('2 with audio · 1 to read');
   });
 });
 
@@ -166,15 +162,15 @@ describe('a study in the recordings screen', () => {
     const onOpenText = vi.fn();
     render(<AudioCollectionScreen volKey="study:lamb-of-god" onBack={noop} onOpenText={onOpenText} {...common} />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('YahuShua The Messiah, The Lamb of God');
-    expect(document.querySelector('.audio-library-intro').textContent).toBe('2 of 3 chapters have recordings');
+    expect(document.querySelector('.listen-sum').textContent).toBe('2 recordings');
     // Codex critique 4: the count names what a listener will skip, and each name opens its text.
     const skip = document.querySelector('.audio-collection-text-only');
     expect(skip.textContent).toBe('Text only: Preface');
     fireEvent.click(skip.querySelector('button'));
     expect(onOpenText).toHaveBeenCalledWith(expect.objectContaining({ key: 'study:lamb-of-god-ch0' }));
     // Each row: the chapter's number badge, then its title (the letters' shape).
-    const rows = [...document.querySelectorAll('.audio-collection-item strong')];
-    expect(rows.map((n) => n.querySelector('.audio-collection-num').textContent)).toEqual(['1', '2']);
+    const rows = [...document.querySelectorAll('.listen-rec .ui-row-title')];
+    expect(rows.map((n) => n.querySelector('.listen-rec-num').textContent)).toEqual(['1', '2']);
     expect(rows.map((n) => n.lastChild.textContent)).toEqual(['I Am The Passover', 'Anointing']);
     fireEvent.click(screen.getByText('Play all').closest('button'));
     expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'study', items: STUDIES[1].chapters, collectionLabel: STUDIES[1].title }));
@@ -203,7 +199,7 @@ describe('the Studies screen when the studies will not load (n6-09)', () => {
       if (ok) globalThis.BIBLE_STUDIES = STUDIES;
       return Promise.resolve(ok);
     });
-    render(<AudioStudiesScreen onBack={noop} onOpenStudy={noop} onReadStudy={noop} {...common} />);
+    render(<AudioStudiesScreen onBack={noop} onOpenStudy={noop} onReadStudy={noop} />);
     await act(async () => { await Promise.resolve(); });
     expect(screen.queryByText(/Loading the studies/)).toBeNull();
     expect(screen.getByText(/Couldn.t load the studies/)).toBeTruthy();
@@ -211,6 +207,6 @@ describe('the Studies screen when the studies will not load (n6-09)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await act(async () => { await Promise.resolve(); await Promise.resolve(); });
     expect(window.loadBibleStudies).toHaveBeenCalledTimes(2);
-    expect(document.querySelectorAll('.audio-library-shelf-row').length).toBeGreaterThan(0);
+    expect(document.querySelectorAll('.listen-studies .ui-row').length).toBeGreaterThan(0);
   });
 });

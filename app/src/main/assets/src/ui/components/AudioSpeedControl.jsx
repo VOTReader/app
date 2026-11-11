@@ -135,9 +135,11 @@ export function AudioSpeedControl({ rate }) {
           );
         })}
       </div>
+      {/* listen.html au-speed: the label leads the row, the value sits between \u2212 and + */}
       <div className="audio-speed-row">
-        {stepButton(-1)}
         <span className="audio-speed-fine">Fine-tune by {'1\u00a0%'}</span>
+        {stepButton(-1)}
+        <span className="audio-speed-value" aria-hidden="true">{(pct / 100).toFixed(2) + '\u00d7'}</span>
         {stepButton(1)}
       </div>
     </div>

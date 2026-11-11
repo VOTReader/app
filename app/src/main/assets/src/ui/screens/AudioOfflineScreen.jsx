@@ -16,15 +16,18 @@
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13), lazy bundle-h before. OfflineAudio and AudioPlayer
    live in bundle-d too and are read as free globals at call time - one store, one player (see _entry-d.js). */
 
-import { useOfflineAudio, formatBytes, isLeaving, removeWithUndo, REMOVED_TOAST_ID } from '../components/OfflineAudioControls.jsx';
-import { DownloadChooser, Sheet, TrashIcon } from '../components/DownloadChooser.jsx';
-import { DownloadStrip } from '../components/DownloadStrip.jsx';
+import { EmptyState, ListGroup, ListRow, UiButton } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { canTell } from '../../utils/download-gate.js';
+import { useOfflineAudio, useOnline, formatBytes, isLeaving, removeWithUndo, REMOVED_TOAST_ID } from '../components/OfflineAudioControls.jsx';
+import { DownloadChooser } from '../components/DownloadChooser.jsx';
+import { DownloadStrip, stripModel } from '../components/DownloadStrip.jsx';
 import { DownloadQueue } from '../components/DownloadQueue.jsx';
-import { DownloadFinished } from '../components/DownloadFinished.jsx';
 import { countOf, readerName } from '../../utils/download-tree.js';
 
 export { REMOVED_TOAST_ID };
-/** Rows a group shows before "Show all 30" (picture 11). */
+/** Rows an opened group shows before "Show all 30". */
 const ROWS_SHOWN = 3;
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale?: boolean }} ShelfItem */
@@ -61,7 +64,8 @@ export function readerLookup() {
   };
 }
 /**
- * @typedef {{ id: string, title: string, noun: 'recording' | 'chapter', rows: ShelfRow[], bytes: number, order: number }} ShelfBranch
+ * @typedef {{ id: string, title: string, noun: 'recording' | 'chapter', rows: ShelfRow[], bytes: number, order: number,
+ *   edition?: string }} ShelfBranch
  *   a collection or a book
  */
 /** @typedef {{ id: string, title: string, branches: ShelfBranch[], order: number }} ShelfSection */
@@ -162,7 +166,8 @@ export function shelfSections(items, readerOf) {
       const bookId = g.key.slice(colon + 1);
       const at = books.findIndex((b) => b[0] === bookId);
       const name = at >= 0 ? books[at][1] : g.lead || g.items[0].title.split(' · ')[0];
-      const b = branch(volKey, 'The Bible · ' + (edition.short || edition.label || ''), 1, g.key, name, 'chapter', at < 0 ? 999 : at);
+      const b = branch('bible', 'The Bible', 1, g.key, name, 'chapter', at < 0 ? 999 : at);
+      b.edition = String(edition.short || edition.label || '');
       for (const it of g.items) {
         const title = it.title.startsWith(name + ' · ') ? it.title.slice(name.length + 3) : it.title;
         const ch = /(\d+)$/.exec(title);
@@ -197,45 +202,47 @@ let _openAt = /** @type {null | { tab: 'choose' | 'phone', focus?: string | null
 /** @param {{ tab: 'choose' | 'phone', focus?: string | null }} at */
 export function openDownloadsAt(at) { _openAt = at; }
 
-function CheckCircle() {
-  return <svg className="dl-shelf-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M7.8 12.3l2.9 2.9 5.5-6.2" /></svg>;
+/** What is on its way, by the shelf branch it lands in (a collection's volKey, a Bible book's key, 'study'):
+ *  the recordings (keys) still to come. @param {any[]} queue @returns {Map<string, Set<string>>} */
+function onItsWay(queue) {
+  /** @type {Map<string, Set<string>>} */
+  const by = new Map();
+  for (const t of queue) {
+    const key = (t && t.key) || '';
+    const colon = key.indexOf(':');
+    if (colon <= 0) continue;
+    const volKey = key.slice(0, colon);
+    const id = volKey === 'study' ? 'study' : _edition(volKey) ? key : volKey;
+    if (!by.has(id)) by.set(id, new Set());
+    /** @type {Set<string>} */ (by.get(id)).add(key);
+  }
+  return by;
 }
-function CloseGlyph() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5l11 11" /><path d="M17.5 6.5l-11 11" /></svg>;
-}
-function MoreGlyph() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="12" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="18.5" cy="12" r="1.6" /></svg>;
+
+/** A collection's name by volKey, for a set that is only on its way. @param {string} volKey */
+function _collectionLabel(volKey) {
+  const cols = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS : [];
+  const c = cols.find((/** @type {any} */ x) => x && x.volKey === volKey);
+  return c ? String(c.label || volKey) : '';
 }
 
 /**
- * "Remove Volume One from this phone?" (picture 12): the one confirm for a group and for everything.
- * @param {{ label: string, line: string, onCancel: () => void, onRemove: () => void }} props
+ * The storage card on top of both tabs (listen.html au-dl, au-dlphone): what is on the phone, the free space, a bar.
+ * @param {{ used: number, songs: number, free: number }} props
  */
-function RemoveSheet({ label, line, onCancel, onRemove }) {
+function StorageCard({ used, songs, free }) {
+  const all = used + Math.max(0, free);
   return (
-    <Sheet id="dl-remove-sheet" title={'Remove ' + label + ' from this phone?'} onClose={onCancel}>
-      <p className="dl-sheet-summary dl-remove-line"><TrashIcon /><span>{line + '. You can download them again any time.'}</span></p>
-      <div className="dl-sheet-actions">
-        <button type="button" className="offline-confirm-cancel" onClick={onCancel} data-autofocus>Cancel</button>
-        <button type="button" className="offline-confirm-go dl-remove-go" onClick={onRemove}>Remove</button>
+    <div className="ui-card dl-store">
+      <div className="dl-store-top">
+        <strong className="dl-store-big">{used ? formatBytes(used) : 'Nothing yet'}</strong>
+        {free >= 0 ? <span className="dl-store-free">{formatBytes(free) + ' free'}</span> : null}
       </div>
-    </Sheet>
-  );
-}
-
-/**
- * A group's ⋯: play it, choose more of it, or remove it (which asks next).
- * @param {{ branch: ShelfBranch, onPlay: () => void, onChoose: () => void, onRemove: () => void, onClose: () => void }} props
- */
-function BranchSheet({ branch, onPlay, onChoose, onRemove, onClose }) {
-  return (
-    <Sheet id="dl-branch-sheet" title={branch.title} onClose={onClose}>
-      <div className="dl-menu">
-        <button type="button" className="dl-menu-item" onClick={onPlay} data-autofocus>Play</button>
-        <button type="button" className="dl-menu-item" onClick={onChoose}>Choose more…</button>
-        <button type="button" className="dl-menu-item is-remove" onClick={onRemove}>{'Remove · ' + formatBytes(branch.bytes)}</button>
+      <p className="dl-store-line">{used ? ['On this phone · plays with no signal', songs ? 'songs ' + formatBytes(songs) : ''].filter(Boolean).join(' · ') : 'On this phone'}</p>
+      <div className="ui-progress dl-store-bar" aria-hidden="true">
+        {used && all > 0 ? <span style={{ width: Math.max(1.5, (used / all) * 100) + '%' }} /> : null}
       </div>
-    </Sheet>
+    </div>
   );
 }
 
@@ -251,10 +258,16 @@ function BranchSheet({ branch, onPlay, onChoose, onRemove, onClose }) {
  *   onSettings?: () => void,
  *   theme?: any,
  *   onThemeChange?: (theme: any) => void,
+ *   keepStarred?: boolean,
+ *   keepNextReady?: boolean,
+ *   wifiOnly?: boolean,
+ *   onToggleSetting?: (key: string) => void,
  * }} props
  */
-export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bibleAudio, letterReader, onLetterReader, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioOfflineScreen({ onBack, backLabel = 'Back to Listen', bibleAudio, letterReader,
+  keepStarred = false, keepNextReady = false, wifiOnly = false, onToggleSetting }) {
   const off = useOfflineAudio();
+  const online = useOnline();
   // Nothing on the phone or on its way opens Choose; else what is there (an entry point may say which: openDownloadsAt).
   const [at] = React.useState(() => { const a = _openAt; _openAt = null; return a; });
   const [tab, setTab] = React.useState(() => {
@@ -262,10 +275,9 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
     const p = off && typeof off.pending === 'function' ? off.pending() : { busy: 0, failed: [] };
     return off && (off.items().length || p.busy || p.failed.length) ? 'phone' : 'choose';
   });
-  const [focus, setFocus] = React.useState(() => (at && at.focus) || null);
-  const [asking, setAsking] = React.useState(/** @type {null | { kind: 'all' } | { kind: 'branch', id: string } | { kind: 'menu', id: string }} */ (null));
-  const [sort, setSort] = React.useState(/** @type {'order' | 'size'} */ ('order'));
-  const [open, setOpen] = React.useState(() => /** @type {Set<string> | null} */ (null));
+  const [focus] = React.useState(() => (at && at.focus) || null);
+  const [asking, setAsking] = React.useState(/** @type {null | { kind: 'all' } | { kind: 'branch', id: string }} */ (null));
+  const [open, setOpen] = React.useState(() => /** @type {Set<string>} */ (new Set()));
   const [showAll, setShowAll] = React.useState(() => new Set());
   // A single Remove waits out its Undo (removeWithUndo, brief section 7 item 14): the row steps aside at once.
   const items = off ? off.items().filter((it) => !isLeaving(it.url)) : [];
@@ -280,6 +292,20 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   // new bytes, so the old file would drift.
   React.useEffect(() => { if (off && typeof off.checkForUpdates === 'function') off.checkForUpdates(); }, [off]);
   const stale = items.filter((it) => it.stale);
+  const way = onItsWay(off && typeof off.queue === 'function' ? off.queue() : []);
+  const strip = off ? stripModel(off, online) : null;
+  const running = !!strip && strip.reason == null;
+  // A set only on its way still has its row (au-dlrun: "12 of 29 recordings · the rest are on their way").
+  for (const id of way.keys()) {
+    if (sections.some((sec) => sec.branches.some((b) => b.id === id))) continue;
+    const label = _collectionLabel(id);
+    if (!label) continue;
+    let sec = sections.find((x) => x.id === 'tvot');
+    if (!sec) { sec = { id: 'tvot', title: 'The Volumes of Truth', branches: [], order: 0 }; sections.unshift(sec); }
+    sec.branches.push({ id, title: label, noun: 'recording', rows: [], bytes: 0, order: 1e6 });
+  }
+  const branchesAll = sections.flatMap((sec) => sec.branches);
+  const setName = way.size === 1 ? ((branchesAll.find((b) => way.has(b.id)) || { title: '' }).title) : '';
   const removeRow = (/** @type {ShelfRow} */ row, /** @type {string} */ label) => {
     if (off) removeWithUndo(off, row.items.map((it) => it.url), 'Removed ' + label + (row.bytes ? ' · ' + formatBytes(row.bytes) : ''));
   };
@@ -289,174 +315,170 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
     }
   };
   const tabs = (
-    <div className="dl-tabs" role="tablist" aria-label="Downloads">
+    <div className="ui-seg dl-tabs" role="tablist" aria-label="Downloads">
       {/** @type {Array<['choose' | 'phone', string]>} */ ([['choose', 'Choose'], ['phone', 'On this phone']]).map(([id, name]) => (
         <button key={id} type="button" role="tab" id={'dl-tab-' + id} aria-selected={tab === id} aria-controls="dl-tabpanel"
-          className={'dl-tab' + (tab === id ? ' is-on' : '')} onClick={() => setTab(id)}>{name}</button>
+          className={'ui-seg-item dl-tab' + (tab === id ? ' is-on' : '')} onClick={() => setTab(id)}>{name}</button>
       ))}
     </div>
   );
-  const nav = LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange });
-  const head = (
-    <header className="audio-library-hero dl-hero">
-      <div className="audio-library-eyebrow">Listening Library</div>
-      <h1>Downloads</h1>
-    </header>
-  );
+  // W3b listen (au-dlrun): while a set downloads its card takes the storage card's place, with the one line on keeping
+  // the app open; otherwise the storage card (au-dl, au-dlphone).
+  const runsClosed = !!off && typeof off.runsClosed === 'function' && off.runsClosed();
+  const top = off ? (
+    <>
+      {strip ? <DownloadStrip off={off} name={setName} onMakeRoom={() => setTab('phone')} /> : <StorageCard used={total + songs} songs={songs} free={free} />}
+      {running ? <p className="listen-dl-note dl-run-note">{(runsClosed ? 'It goes on with VOTReader closed.' : 'Keep VOTReader open until it finishes.') + ' You can read and listen meanwhile.'}</p> : null}
+      {tabs}
+    </>
+  ) : null;
+  // listen.html au-dl: the title in the bar, never "Listening Library" (U 8.6).
+  const utility = { title: 'Downloads', onBack, backLabel };
+  // au-dlauto: what downloads by itself, beside what you choose. The last two are Settings' own switches, shown here
+  // because this is where you look for them; all three wait for Wi-Fi (auto-download.js), so they show only where the
+  // phone can tell Wi-Fi from mobile data (as in Settings).
+  const byThemselves = onToggleSetting && canTell() ? (
+    <>
+      <ListGroup label="By themselves" className="dl-auto">
+        <ListRow noLead title="Keep what I star on this phone" meta="Saved recordings download by themselves, on Wi-Fi"
+          switchOn={keepStarred} onClick={() => onToggleSetting('keepStarred')} />
+        <ListRow noLead title="Keep the next 3 ready" meta="While you listen, the next three download ahead"
+          switchOn={keepNextReady} onClick={() => onToggleSetting('keepNextReady')} />
+        <ListRow noLead title="Download only on Wi-Fi" meta="On mobile data a download waits for Wi-Fi"
+          switchOn={wifiOnly} onClick={() => onToggleSetting('downloadWifiOnly')} />
+      </ListGroup>
+      <p className="listen-dl-note">The last two are the same switches as in Settings, shown here because this is where you look for them.</p>
+    </>
+  ) : null;
   if (tab === 'choose' && off) {
     return (
-      <ScreenLayout navChildren={nav}>
+      <ScreenLayout utility={utility}>
         <div className="audio-library-screen dl-screen">
-          {head}
-          {tabs}
+          {top}
           <div role="tabpanel" id="dl-tabpanel" aria-labelledby="dl-tab-choose">
-            <DownloadStrip off={off} onMakeRoom={() => setTab('phone')} />
             <DownloadQueue off={off} only="failed" />
             <DownloadChooser key={focus || ''} off={off} bibleAudio={bibleAudio} focus={focus}
-              letterReader={letterReader} onLetterReader={onLetterReader} />
+              letterReader={letterReader} after={byThemselves} />
           </div>
         </div>
       </ScreenLayout>
     );
   }
 
-  const branchesAll = sections.flatMap((s) => s.branches);
-  // The first group opens by itself (picture 11); after that the listener decides.
-  const opened = open || new Set(branchesAll.length ? [branchesAll[0].id] : []);
-  const flip = (/** @type {string} */ id) => { const s = new Set(opened); if (s.has(id)) s.delete(id); else s.add(id); setOpen(s); };
-  const bySize = (/** @type {{ bytes: number, order: number, title: string }} */ a, /** @type {{ bytes: number, order: number, title: string }} */ b) =>
-    (sort === 'size' ? b.bytes - a.bytes : 0) || a.order - b.order || a.title.localeCompare(b.title, undefined, { numeric: true });
-  const askedBranch = asking && asking.kind !== 'all' ? branchesAll.find((b) => b.id === asking.id) || null : null;
-  const used = total + songs;
-  const barTotal = used + Math.max(0, free);
+  const flip = (/** @type {string} */ id) => { const x = new Set(open); if (x.has(id)) x.delete(id); else x.add(id); setOpen(x); };
+  const byOrder = (/** @type {{ order: number, title: string }} */ a, /** @type {{ order: number, title: string }} */ b) =>
+    a.order - b.order || a.title.localeCompare(b.title, undefined, { numeric: true });
+  const askedBranch = asking && asking.kind === 'branch' ? branchesAll.find((b) => b.id === asking.id) || null : null;
+  const lineOf = (/** @type {ShelfBranch} */ b) => {
+    const coming = way.has(b.id) ? /** @type {Set<string>} */ (way.get(b.id)).size : 0;
+    if (coming) return b.rows.length + ' of ' + countOf(b.rows.length + coming, b.noun) + ' · the rest are on their way';
+    return [b.edition || '', countOf(b.rows.length, b.noun), formatBytes(b.bytes)].filter(Boolean).join(' · ');
+  };
+  const branchRow = (/** @type {ShelfBranch} */ b) => {
+    const isOpen = open.has(b.id);
+    const coming = way.has(b.id);
+    const rows = [...b.rows].sort(byOrder);
+    const shown = showAll.has(b.id) ? rows : rows.slice(0, ROWS_SHOWN);
+    return (
+      <div key={b.id} className={'dl-kept' + (isOpen ? ' is-open' : '')}>
+        <div className="ui-row">
+          <button type="button" className="ui-row-main" onClick={() => flip(b.id)} aria-expanded={isOpen} disabled={!rows.length}>
+            <span className="ui-row-text"><span className="ui-row-title">{b.title}</span><span className="ui-row-meta">{lineOf(b)}</span></span>
+          </button>
+          {coming ? <span className="dl-spin" role="img" aria-label="On its way" /> : (
+            <button type="button" className="ui-row-menu dl-bin" onClick={() => setAsking({ kind: 'branch', id: b.id })}
+              aria-label={'Remove ' + b.title + ' from this phone'}><UiIcon name="trash" size="sm" /></button>
+          )}
+        </div>
+        {isOpen ? (
+          <div className="dl-shelf-rows">
+            {shown.map((r) => {
+              const updating = r.items.some((it) => off.isUpdating && off.isUpdating(it.url));
+              const isStale = !updating && r.items.some((it) => it.stale);
+              const who = b.noun === 'chapter' ? '' : readerName(r.reader);
+              const named = r.title + (who ? ' · ' + who : '');
+              // Part of a reading on the phone says so: "1 of 2 parts" (defect 21).
+              const part = r.parts > 1 && r.items.length < r.parts ? r.items.length + ' of ' + r.parts + ' parts' : '';
+              return (
+                <div key={r.id} className="dl-shelf-row">
+                  <button type="button" className="dl-shelf-play" onClick={() => play(r.items[0], r.reader)} aria-label={'Play ' + named}>
+                    <span className="dl-shelf-title">{r.title}{who ? <span className="dl-reader">{who}</span> : null}</span>
+                    <span className="dl-shelf-size">{[part, formatBytes(r.bytes)].filter(Boolean).join(' · ') + (updating ? ' · Updating' : isStale ? ' · Update available' : '')}</span>
+                  </button>
+                  {isStale ? (
+                    <button type="button" className="ui-link" onClick={() => off.update(r.items)} aria-label={'Update ' + named + ' on this phone'}>Update</button>
+                  ) : null}
+                  <button type="button" className="ui-row-menu" onClick={() => removeRow(r, b.noun === 'chapter' ? b.title + ' · ' + r.title : named)}
+                    aria-label={'Remove ' + named + ' from this phone'}><UiIcon name="x" size="sm" /></button>
+                </div>
+              );
+            })}
+            {rows.length > ROWS_SHOWN && !showAll.has(b.id) ? (
+              <button type="button" className="ui-link dl-shelf-more" onClick={() => setShowAll((p) => new Set(p).add(b.id))}>{'Show all ' + rows.length}</button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+  const asked = asking && asking.kind === 'all' ? { title: 'Remove everything?', n: recordings, noun: 'recording', bytes: total }
+    : askedBranch ? { title: 'Remove ' + askedBranch.title + '?', n: askedBranch.rows.length, noun: askedBranch.noun, bytes: askedBranch.bytes } : null;
+  const doRemove = () => {
+    if (!off || !asking) return;
+    if (asking.kind === 'all') off.removeAll();
+    else if (askedBranch) off.remove(askedBranch.rows.flatMap((r) => r.items.map((it) => it.url)));
+    setAsking(null);
+  };
 
   return (
-    <ScreenLayout navChildren={nav}>
+    <ScreenLayout utility={utility}>
       <div className="audio-library-screen dl-screen">
-        {head}
-        {off ? tabs : null}
+        {top}
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
-          {/* Pinned under the tabs (README: the strip). */}
-          {off ? <DownloadStrip off={off} /> : null}
-          {/* In line (picture 08): those downloading, each waiting with its place and a ×, each that did not download yet with Retry. */}
-          {off ? <DownloadQueue off={off} /> : null}
-          {off && items.length ? <DownloadFinished off={off} items={items} /> : null}
-          {items.length || songs ? (
-            <div className="dl-storage">
-              {barTotal > 0 ? (
-                <div className="dl-storage-bar" aria-hidden="true">
-                  <span className="dl-storage-rec" style={{ width: Math.max(1.5, (total / barTotal) * 100) + '%' }} />
-                  {songs ? <span className="dl-storage-songs" style={{ width: Math.max(1, (songs / barTotal) * 100) + '%' }} /> : null}
-                </div>
-              ) : null}
-              <p className="dl-storage-line">
-                {['Recordings ' + (formatBytes(total) || '0 MB'), songs ? 'Songs ' + formatBytes(songs) : '', free >= 0 ? formatBytes(free) + ' free on this phone' : ''].filter(Boolean).join(' · ')}
-              </p>
-            </div>
-          ) : null}
+          {off ? <DownloadQueue off={off} only="failed" /> : null}
           {/* The browser refused persistent storage (brief section 7 item 3): say plainly what that can mean. */}
           {items.length && off.evictable && off.evictable() ? (
-            <p className="audio-library-intro audio-offline-evictable">This browser may clear downloads when the phone runs low on space. Adding VOTReader to the Home Screen helps keep them.</p>
+            <p className="listen-dl-note audio-offline-evictable">This browser may clear downloads when the phone runs low on space. Adding VOTReader to the Home Screen helps keep them.</p>
           ) : null}
-
           {stale.length > 1 ? (
-            <div className="offline-collection offline-shelf-status">
-              <p className="offline-collection">
-                <span>{'Updates available · ' + many(stale.length)}</span>
-                <button type="button" className="offline-row-link" onClick={() => off.update(stale)}>Update all</button>
-              </p>
-            </div>
+            <p className="listen-dl-note dl-updates">
+              <span>{'Updates available · ' + many(stale.length)}</span>
+              <button type="button" className="ui-link" onClick={() => off.update(stale)}>Update all</button>
+            </p>
           ) : null}
 
-          {items.length ? (
+          {branchesAll.length ? (
             <>
-              {branchesAll.length > 1 ? (
-                <div className="dl-sort">
-                  <label>
-                    <span className="sr-only">Sort</span>
-                    <select value={sort} onChange={(e) => setSort(e.target.value === 'size' ? 'size' : 'order')}>
-                      <option value="order">Sort: Library order</option>
-                      <option value="size">Sort: Size</option>
-                    </select>
-                  </label>
-                </div>
-              ) : null}
-              {sections.map((sec) => (
-                <section key={sec.id} className="dl-shelf-section" aria-label={sec.title}>
-                  <h2 className="dl-shelf-kicker">{sec.title}</h2>
-                  {[...sec.branches].sort(bySize).map((b) => {
-                    const isOpen = opened.has(b.id);
-                    const rows = [...b.rows].sort(bySize);
-                    const shown = showAll.has(b.id) ? rows : rows.slice(0, ROWS_SHOWN);
-                    const line = countOf(b.rows.length, b.noun) + ' · ' + formatBytes(b.bytes);
-                    return (
-                      <article key={b.id} className={'dl-shelf-branch' + (isOpen ? ' is-open' : '')}>
-                        <div className="dl-shelf-head">
-                          <CheckCircle />
-                          <button type="button" className="dl-row-main" onClick={() => flip(b.id)} aria-expanded={isOpen}>
-                            <span className="dl-row-copy"><strong>{b.title}</strong><small>{line}</small></span>
-                            <svg className={'dl-chevron' + (isOpen ? ' is-open' : '')} viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9.5l6 6 6-6" /></svg>
-                          </button>
-                          <button type="button" className="dl-icon-btn" onClick={() => setAsking({ kind: 'menu', id: b.id })}
-                            aria-label={'More for ' + b.title}><MoreGlyph /></button>
-                        </div>
-                        {isOpen ? (
-                          <div className="dl-shelf-rows">
-                            {shown.map((r) => {
-                              const updating = r.items.some((it) => off.isUpdating && off.isUpdating(it.url));
-                              const isStale = !updating && r.items.some((it) => it.stale);
-                              const who = b.noun === 'chapter' ? '' : readerName(r.reader);
-                              const named = r.title + (who ? ' · ' + who : '');
-                              // Part of a reading on the phone says so: "1 of 2 parts" (defect 21).
-                              const part = r.parts > 1 && r.items.length < r.parts ? r.items.length + ' of ' + r.parts + ' parts' : '';
-                              return (
-                                <div key={r.id} className="dl-shelf-row">
-                                  <button type="button" className="dl-shelf-play" onClick={() => play(r.items[0], r.reader)} aria-label={'Play ' + named}>
-                                    <span className="dl-shelf-title">{r.title}{who ? <span className="dl-reader">{who}</span> : null}</span>
-                                    <span className="dl-shelf-size">{[part, formatBytes(r.bytes)].filter(Boolean).join(' · ') + (updating ? ' · Updating' : isStale ? ' · Update available' : '')}</span>
-                                  </button>
-                                  {isStale ? (
-                                    <button type="button" className="offline-row-link" onClick={() => off.update(r.items)} aria-label={'Update ' + named + ' on this phone'}>Update</button>
-                                  ) : null}
-                                  <button type="button" className="dl-icon-btn" onClick={() => removeRow(r, b.noun === 'chapter' ? b.title + ' · ' + r.title : named)} aria-label={'Remove ' + named + ' from this phone'}><CloseGlyph /></button>
-                                </div>
-                              );
-                            })}
-                            {rows.length > ROWS_SHOWN && !showAll.has(b.id) ? (
-                              <button type="button" className="dl-link dl-shelf-more" onClick={() => setShowAll((p) => new Set(p).add(b.id))}>{'Show all ' + rows.length}</button>
-                            ) : null}
-                          </div>
-                        ) : null}
-                      </article>
-                    );
-                  })}
-                </section>
+              {running ? (
+                <ListGroup label="On this phone so far" aside={formatBytes(total) || '0 MB'} className="dl-phone">
+                  {[...branchesAll].sort(byOrder).map(branchRow)}
+                </ListGroup>
+              ) : sections.map((sec) => (
+                <ListGroup key={sec.id} label={sec.title} className="dl-phone">
+                  {[...sec.branches].sort(byOrder).map(branchRow)}
+                </ListGroup>
               ))}
-              {/* With one recording its own × is the whole job (Codex critique of the built screens, 2026-09-24). */}
-              {recordings > 1 ? (
-                <button type="button" className="dl-remove-all" onClick={() => setAsking({ kind: 'all' })}>Remove all downloads</button>
+              {/* With one recording its own bin is the whole job (Codex critique of the built screens, 2026-09-24). */}
+              {recordings > 1 && !running ? (
+                <div className="dl-remove-all">
+                  <UiButton kind="text" danger icon="trash" onClick={() => setAsking({ kind: 'all' })}>Remove everything</UiButton>
+                </div>
               ) : null}
             </>
           ) : (
-            <div className="audio-library-empty">Nothing is on this phone yet. In Choose, tick what you want and tap Download; it then plays with no signal.</div>
+            <EmptyState icon="phone" title="Nothing is on this phone yet"
+              text="In Choose, tick what you want and tap Download. It then plays with no signal."
+              action={off ? { label: 'Choose downloads', onClick: () => setTab('choose') } : null} />
           )}
         </div>
       </div>
-      {asking && asking.kind === 'all' ? (
-        <RemoveSheet label="all downloads" line={many(recordings) + ' · ' + formatBytes(total)}
-          onCancel={() => setAsking(null)} onRemove={() => { off.removeAll(); setAsking(null); }} />
-      ) : null}
-      {asking && asking.kind === 'menu' && askedBranch ? (
-        <BranchSheet branch={askedBranch} onClose={() => setAsking(null)}
-          onPlay={() => { play(askedBranch.rows[0].items[0], askedBranch.rows[0].reader || ''); setAsking(null); }}
-          onChoose={() => { setAsking(null); setFocus(askedBranch.id.startsWith('bible-') ? askedBranch.id.slice(0, askedBranch.id.indexOf(':')) : askedBranch.id); setTab('choose'); }}
-          onRemove={() => setAsking({ kind: 'branch', id: askedBranch.id })} />
-      ) : null}
-      {asking && asking.kind === 'branch' && askedBranch ? (
-        <RemoveSheet label={askedBranch.title} line={countOf(askedBranch.rows.length, askedBranch.noun) + ' · ' + formatBytes(askedBranch.bytes)}
-          onCancel={() => setAsking(null)}
-          onRemove={() => { off.remove(askedBranch.rows.flatMap((r) => r.items.map((it) => it.url))); setAsking(null); }} />
-      ) : null}
+      {/* au-dlremove: asks once and says what it frees. */}
+      <ActionSheet id="dl-remove-sheet" open={!!asked} onClose={() => setAsking(null)} title={asked ? asked.title : ''}
+        cancelLabel="Keep" confirm={{ label: 'Remove', danger: true, onConfirm: doRemove }}>
+        {asked ? countOf(asked.n, asked.noun) + (asked.n === 1 ? ' comes' : ' come') + ' off this phone'
+          + (asked.bytes ? (asked.n === 1 ? ' and frees ' : ' and free ') + formatBytes(asked.bytes) : '') + (asked.n === 1 ? '. It still plays' : '. They still play')
+          + ' whenever you have a signal.' : ''}
+      </ActionSheet>
     </ScreenLayout>
   );
 }

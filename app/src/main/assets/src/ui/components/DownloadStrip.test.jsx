@@ -16,6 +16,9 @@ const queue = (extra = {}) => store({
   pause: vi.fn(() => true), resume: vi.fn(), ...extra,
 });
 
+/** The strip's state as the model says it: the eyebrow, then the line under it (W3b: au-dlrun's card). @param {any} c */
+const said = (c) => ['.dl-strip-head', '.dl-strip-line1'].map((q) => c.querySelector(q).textContent).join(' · ');
+
 describe('DownloadStrip', () => {
   it('says nothing with nothing on its way', () => {
     const { container } = render(<DownloadStrip off={store()} />);
@@ -25,7 +28,7 @@ describe('DownloadStrip', () => {
   it('on a store without the queue calls: the count to go, and Cancel all asks first', () => {
     const off = store({ pending: () => ({ busy: 12, failed: [] }) });
     const { container, getByRole } = render(<DownloadStrip off={off} />);
-    expect(container.textContent).toMatch(/^Downloading · 12 recordings to go/);
+    expect(container.textContent).toMatch(/^Downloading12 recordings to go/);
     fireEvent.click(getByRole('button', { name: 'Cancel all' }));
     expect(off.cancelAll).not.toHaveBeenCalled();
     expect(container.textContent).toMatch(/Cancel all 12 downloads\?/);
@@ -47,10 +50,10 @@ describe('DownloadStrip', () => {
   it('with dl-d2: the count done of the batch, the bytes left, a progress line, and Pause all', () => {
     const off = queue();
     const { container, getByRole } = render(<DownloadStrip off={off} />);
-    expect(container.querySelector('.dl-strip-line1').textContent).toBe('Downloading · 2 of 30 recordings');
+    expect(said(container)).toBe('Downloading · 2 of 30 recordings');
     expect(container.querySelector('.dl-strip-line2').textContent).toBe('191 MB left');
     expect(getByRole('progressbar').getAttribute('aria-valuenow')).toBe('7');
-    fireEvent.click(getByRole('button', { name: 'Pause all' }));
+    fireEvent.click(getByRole('button', { name: 'Pause' }));
     expect(off.pause).toHaveBeenCalledTimes(1);
     expect(getByRole('button', { name: 'Cancel' })).toBeTruthy();
   });
@@ -62,7 +65,7 @@ describe('DownloadStrip', () => {
       overall: () => ({ done: 312, total: 1189, doneBytes: 1.2e9, totalBytes: 4.4e9, rate: 1e6, secondsLeft: 3 * 3600 + 25 * 60 }),
     });
     const { container, getByRole } = render(<DownloadStrip off={off} />);
-    expect(container.querySelector('.dl-strip-line1').textContent).toBe('Downloading · 312 of 1,189 recordings');
+    expect(said(container)).toBe('Downloading · 312 of 1,189 recordings');
     expect(container.querySelector('.dl-strip-line2').textContent).toBe('1.2 of 4.4 GB · about 3 h 25 min left');
     expect(getByRole('progressbar').getAttribute('aria-valuenow')).toBe('27');
   });
@@ -70,9 +73,9 @@ describe('DownloadStrip', () => {
   it('paused: "Paused · 2 of 30 recordings" and Resume all', () => {
     const off = queue({ paused: () => true, reason: () => 'paused' });
     const { container, getByRole, queryByRole } = render(<DownloadStrip off={off} />);
-    expect(container.querySelector('.dl-strip-line1').textContent).toBe('Paused · 2 of 30 recordings');
-    expect(queryByRole('button', { name: 'Pause all' })).toBeNull();
-    fireEvent.click(getByRole('button', { name: 'Resume all' }));
+    expect(said(container)).toBe('Paused · 2 of 30 recordings');
+    expect(queryByRole('button', { name: 'Pause' })).toBeNull();
+    fireEvent.click(getByRole('button', { name: 'Resume' }));
     expect(off.resume).toHaveBeenCalledTimes(1);
   });
 
@@ -81,29 +84,29 @@ describe('DownloadStrip', () => {
     const onMakeRoom = vi.fn();
     const base = { left: () => ({ count: 27, bytes: 191e6 }), batch: () => ({ done: 3, total: 30, failed: 0 }) };
     const { container, getByRole } = render(<DownloadStrip off={queue({ ...base, reason: () => 'space', need: () => 34e6 })} onMakeRoom={onMakeRoom} />);
-    expect(container.textContent).toMatch(/Waiting for storage space · 27 leftNeeds 34 MB more room/);
+    expect(container.textContent).toMatch(/Waiting for storage space27 leftNeeds 34 MB more room/);
     fireEvent.click(getByRole('button', { name: 'Make room' }));
     expect(onMakeRoom).toHaveBeenCalledTimes(1);
     cleanup();
     const wifi = render(<DownloadStrip off={queue({ ...base, reason: () => 'wifi' })} />);
-    expect(wifi.container.textContent).toMatch(/Waiting for Wi-Fi · 27 left191 MB · starts on Wi-Fi/);
+    expect(wifi.container.textContent).toMatch(/Waiting for Wi-Fi27 left191 MB · starts on Wi-Fi/);
     expect(within(wifi.container).queryByRole('progressbar')).toBeNull();
   });
 
   it('with no signal: No connection, and it starts again when online', () => {
     setOnline(false);
     const { container } = render(<DownloadStrip off={store({ pending: () => ({ busy: 4, failed: [] }) })} />);
-    expect(container.textContent).toMatch(/No connection · 4 leftStarts again when you’re online/);
+    expect(container.textContent).toMatch(/No connection4 leftStarts again when you’re online/);
   });
 
   // dl-rework E (defect 25): offline turned "space" and "retrying" into "No connection".
   it('with no signal a wait for space or a retry keeps its own words', () => {
     setOnline(false);
     const space = render(<DownloadStrip off={queue({ reason: () => 'space', need: () => 5e6 })} />);
-    expect(space.container.querySelector('.dl-strip-line1').textContent).toMatch(/^Waiting for storage space/);
+    expect(said(space.container)).toMatch(/^Waiting for storage space/);
     cleanup();
     const retry = render(<DownloadStrip off={queue({ reason: () => 'retrying' })} />);
-    expect(retry.container.querySelector('.dl-strip-line1').textContent).toMatch(/^Trying again/);
+    expect(said(retry.container)).toMatch(/^Trying again/);
   });
 
   // dl-rework D/E: only the store's will-try-again list is left.
@@ -111,8 +114,8 @@ describe('DownloadStrip', () => {
     const failed = [{ url: 'a', key: '', title: 'A' }, { url: 'b', key: '', title: 'B' }];
     const off = queue({ pending: () => ({ busy: 0, failed }), left: () => ({ count: 0, bytes: 0 }), reason: () => 'later', later: () => failed, retryAll: vi.fn() });
     const { container, getByRole, queryByRole } = render(<DownloadStrip off={off} />);
-    expect(container.querySelector('.dl-strip-line1').textContent).toBe('Didn’t download yet · 2 recordings');
-    expect(queryByRole('button', { name: 'Pause all' })).toBeNull();
+    expect(said(container)).toBe('Didn’t download yet · 2 recordings');
+    expect(queryByRole('button', { name: 'Pause' })).toBeNull();
     fireEvent.click(getByRole('button', { name: 'Retry now' }));
     expect(off.retryAll).toHaveBeenCalledTimes(1);
   });

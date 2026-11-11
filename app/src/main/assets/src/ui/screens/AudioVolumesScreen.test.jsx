@@ -22,7 +22,7 @@ import { AudioSeekSlider } from '../components/AudioSeekSlider.jsx';
 import { CoverageBadge } from '../components/CoverageBadge.jsx';
 
 function installGlobals({ votManifest = true } = {}) {
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <h1>{utility.title}</h1> : null}{children}</main>;
   globalThis.LibraryNav = () => null;
   /* The bundle-d slots these screens read across the bundle boundary since
      landing 24 (AudioShelf's rows and icons, the seek slider, the coverage
@@ -73,7 +73,7 @@ describe('AudioVolumesScreen', () => {
     expect(one.textContent).toContain('Recordings available');
     expect(two.textContent).toContain('No recordings yet');
     expect(screen.queryByText('Hidden Manna')).toBeNull();
-    expect(screen.getByText('2 collections').parentElement.querySelector('[aria-hidden]').textContent).toBe('2');
+    expect(screen.getByRole('group', { name: '2 collections' })).toBeTruthy();
   });
 
   // Downloads brief section 7 item 16 (RC.3): with no signal it said "Recordings available" over rows that need one.
@@ -98,7 +98,7 @@ describe('AudioVolumesScreen', () => {
   });
 
   // D4c (downloads brief 3h): online, a collection part on the phone says how much; all of it, All N.
-  it('online, a collection with downloads says "2 of 3 on this phone", and All 3 once every recording is there', () => {
+  it('online, a collection with downloads says "2 of 3 on this phone", and carries the On this phone mark once every recording is there', () => {
     globalThis.colLetterArr = () => [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
     player.hasAudio = () => true;
     globalThis.OfflineAudio = {
@@ -111,7 +111,9 @@ describe('AudioVolumesScreen', () => {
       cleanup();
       globalThis.OfflineAudio.items = () => ['a', 'b', 'c'].map((id) => ({ url: 'u' + id, key: 'one:' + id, title: id, bytes: 1 }));
       renderScreen();
-      expect(screen.getByRole('button', { name: /Volume One/ }).textContent).toContain('All 3 on this phone');
+      const kept = screen.getByRole('button', { name: /Volume One/ });
+      expect(kept.textContent).toContain('3 recordings');
+      expect(kept.querySelector('.ui-row-mark').textContent).toBe('On this phone');
     } finally {
       delete globalThis.OfflineAudio;
       delete globalThis.colLetterArr;

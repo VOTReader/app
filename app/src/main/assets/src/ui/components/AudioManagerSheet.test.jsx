@@ -134,7 +134,7 @@ const subSheet = (cls) => document.querySelector('.' + cls);
 const openSpeed = () => fireEvent.click(tool('Speed, '));
 const openSleep = () => fireEvent.click(tool('Sleep timer'));
 const openUpNext = () => fireEvent.click(tool('Up next'));
-const openVoice = () => fireEvent.click(document.querySelector('.audio-manager-voice-top'));
+const openVoice = () => fireEvent.click(voiceChip());
 const sleepStatus = () => subSheet('np-sleep-sheet').querySelector('.np-sheet-status').textContent;
 const sleepChip = (label) => within(subSheet('np-sleep-sheet')).getByRole('button', { name: label });
 
@@ -144,7 +144,9 @@ const nowRow = () => upNext().querySelector('.np-upnext-now');
 const upcomingTitles = () => Array.from(upNext().querySelectorAll('.np-upnext-list .audio-manager-queue-main strong')).map((n) => n.textContent);
 const playedTitles = () => Array.from(upNext().querySelectorAll('.np-upnext-played .audio-manager-queue-main strong')).map((n) => n.textContent);
 
-const voiceChip = () => document.querySelector('.audio-manager-voice-top');
+/** The Voice tool (Edition for a Bible chapter): the bottom row's, its value the voice playing. */
+const voiceChip = () => Array.from(document.querySelectorAll('.np-tools button')).find((b) => /^(Voice|Edition)[,:]/.test(b.getAttribute('aria-label') || '')) || null;
+const toolValue = (button) => { const v = button.querySelector('.np-tool-value'); return v ? v.textContent : null; };
 const voiceRadios = () => Array.from(subSheet('np-voice-sheet').querySelectorAll('[role="radio"]'));
 const voiceNames = () => voiceRadios().map((r) => r.querySelector('strong').textContent);
 const voiceChecked = () => voiceRadios().map((r) => r.getAttribute('aria-checked'));
@@ -262,20 +264,20 @@ describe('AudioManagerSheet — modal contract', () => {
   });
 });
 
-describe('AudioManagerSheet — the head: kicker, byline, ⋯', () => {
+describe('AudioManagerSheet — the head: kicker, byline, star', () => {
   it('counts the recording in the kicker and names its part and reader in the byline', () => {
     startCollection();
     openSheet();
     expect(screen.getByRole('heading', { name: 'A Word of Warning' })).toBeTruthy();
-    expect(kicker()).toBe('Volume One · Letter 1 of 4');
+    expect(kicker()).toBe('Volume One · 1 of 4');
     // The collection is the part that gives way on a narrow screen; the count is its own unshrinking span.
     expect(document.querySelector('.np-kicker-from').textContent).toBe('Volume One');
-    expect(document.querySelector('.np-kicker-at').textContent).toBe('Letter 1 of 4');
+    expect(document.querySelector('.np-kicker-at').textContent).toBe('1 of 4');
     expect(byline()).toBe('Read by Benjamin');
 
     fireEvent.click(nextTrack());
     expect(screen.getByRole('heading', { name: 'The Wide Path' })).toBeTruthy();
-    expect(kicker()).toBe('Volume One · Letter 2 of 4');
+    expect(kicker()).toBe('Volume One · 2 of 4');
     expect(byline()).toBe('Part 1 · Read by Benjamin');
   });
 
@@ -286,32 +288,41 @@ describe('AudioManagerSheet — the head: kicker, byline, ⋯', () => {
     expect(byline()).toBe('Text-to-speech');
   });
 
-  it('counts a keyless compilation track as a Recording', () => {
+  it('counts a keyless compilation track in its queue', () => {
     const track = (n) => ({ key: null, title: 'Compilation ' + n, sub: 'Compilations', url: URL_OF('comp' + n), readerCode: 'B', partLabel: null });
     render(<AudioManagerSheet open onClose={() => {}} state={{
       status: 'paused', queue: [track(1), track(2)], qi: 1, time: 0, duration: 0, rate: 1,
       sleepEndsAt: 0, sleepMinutes: 0, sleepAtTrackEnd: false, sleepAtQueueEnd: false, restoring: false, sourceMode: 'custom',
     }} />);
-    expect(kicker()).toBe('Compilations · Recording 2 of 2');
+    expect(kicker()).toBe('Compilations · 2 of 2');
   });
 
-  it('saves and unsaves the current recording through AudioLibraryStore from the ⋯ menu', () => {
+  it('saves and unsaves the current recording through AudioLibraryStore with the head\'s star; no ⋯ menu', () => {
     startCollection();
     openSheet();
-    const more = () => screen.getByRole('button', { name: 'More for A Word of Warning' });
+    expect(screen.queryByRole('button', { name: /^More for / })).toBeNull();
+    const star = () => document.querySelector('.np-star');
+    expect(star().getAttribute('aria-label')).toBe('Save A Word of Warning');
+    expect(star().getAttribute('aria-pressed')).toBe('false');
 
-    fireEvent.click(more());
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Save' }));
+    fireEvent.click(star());
     expect(library.toggleSaved).toHaveBeenCalledWith(expect.objectContaining({ url: URL_OF('idPreface') }));
-    expect(screen.queryByRole('menu')).toBeNull();                         // the pick closes the menu
+    expect(star().getAttribute('aria-label')).toBe('Remove A Word of Warning from Saved');
+    expect(star().getAttribute('aria-pressed')).toBe('true');
 
-    fireEvent.click(more());
-    expect(screen.queryByRole('menuitem', { name: 'Save' })).toBeNull();
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Saved · Remove' }));
+    fireEvent.click(star());
     expect(library.toggleSaved).toHaveBeenCalledTimes(2);
+    expect(star().getAttribute('aria-label')).toBe('Save A Word of Warning');
+  });
 
-    fireEvent.click(more());
-    expect(screen.getByRole('menuitem', { name: 'Save' })).toBeTruthy();
+  it('draws each tool\'s value under its word: Speed 1×, Sleep Off, Up next N left (no badge)', () => {
+    startCollection();
+    openSheet();
+    expect(toolValue(tool('Speed, '))).toBe('1×');
+    expect(toolValue(tool('Sleep timer'))).toBe('Off');
+    expect(toolValue(tool('Up next'))).toBe('3 left');
+    expect(document.querySelector('.np-tool-badge')).toBeNull();
+    expect(tool('Read along')).toBeNull();                                  // the Reading now card opens the letter
   });
 });
 
@@ -530,10 +541,12 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     fireEvent.click(inPlayer().getByRole('button', { name: 'Pause' }));   // no playback tick to lean on
     openSleep();
 
-    const labels = within(subSheet('np-sleep-sheet')).getByRole('group', { name: 'Sleep timer' }).querySelectorAll('button');
+    // listen.html au-sleep: four lengths, the two ends, your own time as its own row, Off wide; the head says Off.
+    const labels = subSheet('np-sleep-sheet').querySelectorAll('.np-grid button');
     expect(Array.from(labels).map((b) => b.textContent))
-      .toEqual(['15 min', '30 min', '45 min', '60 min', 'End of this letter', 'End of the queue', 'Custom…', 'Off']);
-    expect(sleepStatus()).toBe('');
+      .toEqual(['15 min', '30 min', '45 min', '60 min', 'End of this letter', 'End of the queue', 'Off']);
+    expect(subSheet('np-sleep-sheet').querySelector('.np-custom-label').textContent).toBe('Your own');
+    expect(sleepStatus()).toBe('Off');
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('true');
 
     fireEvent.click(sleepChip('30 min'));
@@ -542,15 +555,17 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     expect(sleepChip('30 min').getAttribute('aria-pressed')).toBe('true');
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('false');
     expect(tool('Sleep timer').getAttribute('aria-label')).toBe('Sleep timer: 30 min');
+    expect(toolValue(tool('Sleep timer'))).toBe('30 min');
 
     act(() => { vi.advanceTimersByTime(61000); });                      // the sheet's own 1 Hz tick
     expect(sleepStatus()).toBe('Stops in 28:59');
 
     fireEvent.click(sleepChip('Off'));
     expect(AudioPlayer.getState().sleepEndsAt).toBe(0);
-    expect(sleepStatus()).toBe('');
+    expect(sleepStatus()).toBe('Off');
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('true');
-    expect(tool('Sleep timer').getAttribute('aria-label')).toBe('Sleep timer');
+    expect(tool('Sleep timer').getAttribute('aria-label')).toBe('Sleep timer, off');
+    expect(toolValue(tool('Sleep timer'))).toBe('Off');
     expect(AudioPlayer.getState().queue).toHaveLength(4);               // disarming touches nothing else
   });
 
@@ -596,7 +611,7 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     emit('ended');
     expect(AudioPlayer.getState().qi).toBe(0);            // the next recording never started
     expect(AudioPlayer.getState().status).toBe('paused');
-    expect(sleepStatus()).toBe('');                       // one-shot, cleared itself
+    expect(sleepStatus()).toBe('Off');                       // one-shot, cleared itself
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -616,20 +631,19 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     expect(AudioPlayer.getSleepRemainingSeconds()).toBe(0);
 
     fireEvent.click(sleepChip('Off'));
-    expect(sleepStatus()).toBe('');
+    expect(sleepStatus()).toBe('Off');
     expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
 
     emit('ended');
     expect(AudioPlayer.getState().qi).toBe(1);            // disarmed — advanced normally
   });
 
-  it('Custom shows a 5-minute stepper from 20, and Start arms it', () => {
+  it('Your own is a 5-minute stepper from 20, always shown, and Start arms it', () => {
     startCollection();
     openSheet();
     emit('playing');
     openSleep();
 
-    fireEvent.click(sleepChip('Custom…'));
     const value = () => subSheet('np-sleep-sheet').querySelector('.np-custom-value').textContent;
     expect(value()).toBe('20 min');
     expect(AudioPlayer.getState().sleepEndsAt).toBe(0);   // nothing armed until Start
@@ -643,8 +657,8 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     expect(AudioPlayer.getState().sleepMinutes).toBe(20);
     expect(AudioPlayer.getSleepRemainingSeconds()).toBe(1200);
-    expect(subSheet('np-sleep-sheet').querySelector('.np-custom')).toBeNull();
-    expect(sleepChip('Custom · 20 min').getAttribute('aria-pressed')).toBe('true');
+    expect(subSheet('np-sleep-sheet').querySelector('.np-custom').classList.contains('is-active')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Start' }).getAttribute('aria-pressed')).toBe('true');
     expect(sleepChip('15 min').getAttribute('aria-pressed')).toBe('false');
     expect(sleepStatus()).toBe('Stops in 20:00');
   });
@@ -737,7 +751,7 @@ describe('AudioManagerSheet — Up next sheet', () => {
     fireEvent.click(nextTrack());                         // playing: The Wide Path
     openUpNext();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Remove The Seventh Day from queue' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Remove The Seventh Day from Up next' }));
     expect(upcomingTitles()).toEqual(['Grafted In']);
     expect(upNextSub()).toBe('1 left');
     expect(tool('Up next').getAttribute('aria-label')).toBe('Up next, 1 left');
@@ -787,6 +801,30 @@ describe('AudioManagerSheet — Up next editing (L3)', () => {
     fireEvent.click(within(undoBar()).getByRole('button', { name: 'Undo' }));
     expect(upcomingTitles()).toEqual(['The Wide Path', 'The Seventh Day', 'Grafted In']);
     expect(undoBar()).toBeNull();
+  });
+
+  it('(au-upnext) every upcoming row has a visible ×: it removes the row as the swipe does, with Undo', () => {
+    startCollection();
+    openSheet();
+    fireEvent.click(nextTrack());                         // playing: The Wide Path
+    openUpNext();
+    expect(upNext().querySelector('.np-upnext-note').textContent).toBe('Drag the handle to reorder. Tap × to take one out.');
+    const xs = Array.from(upNext().querySelectorAll('.np-upnext-list .ui-row-menu'));
+    expect(xs.map((b) => b.getAttribute('aria-label'))).toEqual(['Remove The Seventh Day from Up next', 'Remove Grafted In from Up next']);
+    expect(xs.every((b) => !b.classList.contains('sr-only') && b.querySelector('svg'))).toBe(true);   // drawn, not screen-reader only
+    // Pressing it starts no swipe: no red strip under the row.
+    fireEvent.pointerDown(xs[0], { clientX: 380, clientY: 10, pointerId: 3 });
+    expect(upNext().querySelector('.np-row-remove')).toBeNull();
+    fireEvent.click(xs[0]);
+    expect(upcomingTitles()).toEqual(['Grafted In']);
+    expect(el().src).toBe(URL_OF('idA'));                 // the playing one never restarted
+    expect(undoBar().textContent).toContain('Removed The Seventh Day');
+    fireEvent.click(within(undoBar()).getByRole('button', { name: 'Undo' }));
+    expect(upcomingTitles()).toEqual(['The Seventh Day', 'Grafted In']);
+    // The played rows and the one playing carry no ×.
+    expect(nowRow().querySelector('.ui-row-menu')).toBeNull();
+    fireEvent.click(within(upNext()).getByRole('button', { name: /^Earlier \(1\)/ }));
+    expect(upNext().querySelector('.np-upnext-played .ui-row-menu')).toBeNull();
   });
 
   it('a short swipe settles back and removes nothing', () => {
@@ -935,10 +973,11 @@ describe('AudioManagerSheet — Voice: letter readers', () => {
     for (const key of ['AUDIO_ALTERNATES', 'COL_BY_KEY', 'colPreface', 'colLetterArr']) delete globalThis[key];
   });
 
-  it('offers no Voice chip for a recording with a single reading', () => {
+  it('offers no Voice choice for a recording with a single reading', () => {
     startCollection();                                    // the preface: one voice
     openSheet();
-    expect(voiceChip()).toBeNull();
+    expect(voiceChip().disabled).toBe(true);
+    expect(document.querySelector('.audio-manager-voice-top')).toBeNull();   // the byline's chip is gone
   });
 
   it('lists every reader, marks the current one, and restarts the letter in the chosen voice', () => {
@@ -946,7 +985,8 @@ describe('AudioManagerSheet — Voice: letter readers', () => {
     openSheet();
     fireEvent.click(nextTrack());                         // The Wide Path — two readings
 
-    expect(voiceChip().getAttribute('aria-label')).toBe('Voice: Read by Benjamin. Choose another');
+    expect(voiceChip().getAttribute('aria-label')).toBe('Voice, Read by Benjamin');
+    expect(toolValue(voiceChip())).toBe('Read by Benjamin');
     openVoice();
     expect(subSheet('np-voice-sheet')).toBeTruthy();
     // The registry label is the whole name ("Read by Benjamin", "Text-to-speech"), never prefixed twice.
@@ -968,7 +1008,7 @@ describe('AudioManagerSheet — Voice: letter readers', () => {
     expect(el().src).toBe(URL_OF('idAv'));
     expect(el().currentTime).toBe(0);                     // restarted, never spliced
     expect(subSheet('np-voice-sheet')).toBeNull();        // the sheet closed on the switch
-    expect(voiceChip().getAttribute('aria-label')).toBe('Voice: Text-to-speech. Choose another');
+    expect(voiceChip().getAttribute('aria-label')).toBe('Voice, Text-to-speech');
     // Row ORDER is the manifest's (primary first) so the list never reshuffles
     // under the finger; only which one is checked moves.
     openVoice();
@@ -1046,9 +1086,10 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     openSheet();
 
     // Counted in the book, not the queue that starts at the chapter picked (pl-l2b).
-    expect(document.querySelector('.np-kicker-at').textContent).toBe('Chapter 2 of 3');
-    expect(voiceChip().getAttribute('aria-label')).toBe('Edition: KJV · Biblical Restoration. Choose another');
-    expect(voiceChip().textContent).toContain('KJV · Biblical Restoration');
+    expect(document.querySelector('.np-kicker-at').textContent).toBe('2 of 3');
+    expect(voiceChip().getAttribute('aria-label')).toBe('Edition, KJV · Biblical Restoration');
+    expect(toolValue(voiceChip())).toBe('KJV · Biblical Restoration');
+    expect(voiceChip().querySelector('.np-tool-word').textContent).toBe('Edition');
     openVoice();
     // WEB ships no rows for this book in the fixture, so it is not offered —
     // a row that taps through to silence is worse than no row.
@@ -1064,7 +1105,7 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     expect(el().currentTime).toBe(0);
     // Every Listen pill elsewhere reads settings.bibleAudio, so the choice moves it.
     expect(setEdition).toHaveBeenCalledWith('wop-nkjv');
-    expect(voiceChip().getAttribute('aria-label')).toBe('Edition: NKJV · Dramatized. Choose another');
+    expect(voiceChip().getAttribute('aria-label')).toBe('Edition, NKJV · Dramatized');
   });
 
   it("a plan's portion switches edition in place: it stays the portion, a book the edition lacks keeps its own (player brief s7)", () => {
@@ -1125,10 +1166,10 @@ describe('AudioManagerSheet — Voice: Bible editions', () => {
     expect(inPlayer().getByRole('button', { name: 'Pause' }).getAttribute('aria-busy')).toBe('false');
   });
 
-  it('shows no Edition chip for a book only one edition has recorded', () => {
+  it('offers no Edition choice for a book only one edition has recorded', () => {
     drive(() => AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'exodus', label: 'KJV · Biblical Restoration Ministries' }));
     openSheet();
-    expect(voiceChip()).toBeNull();
+    expect(voiceChip().disabled).toBe(true);
   });
 
   it('survives an app with no settings bridge wired', () => {
@@ -1179,7 +1220,7 @@ describe('AudioManagerSheet — Open the reading (owner request 2026-08-09)', ()
     const jump = document.querySelector('.audio-manager-jump');
     expect(jump).toBeTruthy();
     expect(jump.classList.contains('np-live')).toBe(true);
-    expect(jump.getAttribute('aria-label')).toBe('Open the reading — A Word of Warning; playback continues');
+    expect(jump.getAttribute('aria-label')).toBe('Open the letter — A Word of Warning; playback continues');
 
     const before = AudioPlayer.getState();
     const loadsBefore = el().loadCalls;
@@ -1197,9 +1238,9 @@ describe('AudioManagerSheet — Open the reading (owner request 2026-08-09)', ()
     expect(el().src).toBe(srcBefore);           // …never restarted
   });
 
-  it('the words "Open the reading" are DRAWN on the screen — in the button\'s text, not only its aria-label (2026-09-12)', () => {
+  it('the words "Open the letter" are DRAWN on the screen — in the button\'s text, not only its aria-label (2026-09-12)', () => {
     // The Settings row "Turn the Page with the Audio" tells a reader who turns it
-    // off to "use Open the reading on the player". A phone shows no title
+    // off to "use Open the letter on the player". A phone shows no title
     // tooltip and reads no aria-label, so the words have to be drawn.
     globalThis.COL_BY_KEY = new Map([['vol1', { letterScreen: 'vol1-letter' }]]);
     window.__openAudioText = vi.fn();
@@ -1208,8 +1249,9 @@ describe('AudioManagerSheet — Open the reading (owner request 2026-08-09)', ()
     openSheet();
     const jump = document.querySelector('.audio-manager-jump');
     // The visible text, never the attribute: textContent does not read aria-label.
-    expect(jump.textContent).toMatch(/Open the reading/);
-    expect(jump.querySelector('.audio-manager-jump-cue').textContent).toMatch(/^Open the reading/);
+    expect(jump.textContent).toMatch(/Open the letter/);
+    expect(jump.querySelector('.audio-manager-jump-cue').textContent).toMatch(/^Open the letter/);
+    expect(jump.getAttribute('aria-label')).toMatch(/^Open the letter — /);   // the name holds the drawn words
   });
 
   it('the button holds no heading or paragraph; the h2 title names the dialog', () => {
@@ -1226,28 +1268,26 @@ describe('AudioManagerSheet — Open the reading (owner request 2026-08-09)', ()
     expect(sheetEl().getAttribute('aria-labelledby')).toBe('audio-manager-title');
   });
 
-  it('the ⋯ menu offers Open the reading too, and Read along does the same', () => {
+  it('the Reading now card is the one way to the letter: no ⋯ menu, no Read along tool', () => {
     globalThis.COL_BY_KEY = new Map([['vol1', { letterScreen: 'vol1-letter' }]]);
     const opener = vi.fn();
     window.__openAudioText = opener;
     startCollection();
     const onClose = vi.fn();
     openSheet(onClose);
-    fireEvent.click(screen.getByRole('button', { name: 'More for A Word of Warning' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Open the reading' }));
+    expect(screen.queryByRole('button', { name: /^More for / })).toBeNull();
+    expect(tool('Read along')).toBeNull();
+    fireEvent.click(document.querySelector('.audio-manager-jump'));
     expect(opener).toHaveBeenCalledTimes(1);
-    fireEvent.click(tool('Read along'));
-    expect(opener).toHaveBeenCalledTimes(2);
-    expect(onClose).toHaveBeenCalledTimes(2);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('a track with no destination draws no Open the reading at all', () => {
+  it('a track with no destination draws no Open the letter at all', () => {
     // No COL_BY_KEY installed → vol1 resolves no letterScreen.
     window.__openAudioText = vi.fn();
     startCollection();
     openSheet();
     expect(document.querySelector('.audio-manager-jump')).toBeNull();
-    expect(tool('Read along').disabled).toBe(true);
     expect(screen.getByRole('heading', { name: 'A Word of Warning' })).toBeTruthy();
   });
 
@@ -1324,7 +1364,7 @@ describe('AudioManagerSheet — a restored bar describes nothing it does not kno
   it('describes the real queue once the rebuild has replaced the placeholder', () => {
     const queue = [PLACEHOLDER, { ...PLACEHOLDER, key: 'vol1:letter-a', title: 'The Wide Path', url: URL_OF('idA') }];
     render(<AudioManagerSheet open state={restoredState({ restoring: false, queue })} onClose={() => {}} />);
-    expect(kicker()).toBe('Volume One · Letter 1 of 2');
+    expect(kicker()).toBe('Volume One · 1 of 2');
     expect(tool('Up next').getAttribute('aria-label')).toBe('Up next, 1 left');
     openUpNext();
     expect(upNextSub()).toBe('1 left');
@@ -1380,7 +1420,7 @@ describe('AudioManagerSheet — switching voice keeps a queue the listener made'
     expect(st.qi).toBe(1);
     expect(st.queue[st.qi].readerCode).toBe('V');
     expect(st.sourceMode).toBe('custom');
-    expect(voiceChip().getAttribute('aria-label')).toBe('Voice: Text-to-speech. Choose another');
+    expect(voiceChip().getAttribute('aria-label')).toBe('Voice, Text-to-speech');
   });
 
   it('does not ask about the voice already playing on an edited queue — there is nothing to switch (sweep v003)', () => {
@@ -1430,7 +1470,7 @@ describe('AudioManagerSheet — switching voice keeps a queue the listener made'
       fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
       expect(confirmStrip()).toBeNull();
       expect(urls()).toEqual(before);
-      expect(voiceChip().getAttribute('aria-label')).toBe('Voice: Read by Benjamin. Choose another');
+      expect(voiceChip().getAttribute('aria-label')).toBe('Voice, Read by Benjamin');
     });
 
     it('drops an open confirm once its voice is the one playing (sweep v003)', () => {
@@ -1488,7 +1528,7 @@ describe('AudioManagerSheet — Bible rows name their chapter (A4)', () => {
     expect(screen.getByRole('heading', { name: 'Psalms 117' })).toBeTruthy();
     // Counted in the book's chapters (pl-l2b; the queue's count read 'Chapter 1 of 34' over Psalms 117), and the byline does not repeat "Chapter 117" under a
     // title that already says 117 (2026-08-10, the title-unique rule).
-    expect(kicker()).toBe('KJV · Biblical Restoration Ministries · Chapter 117 of 150');
+    expect(kicker()).toBe('KJV · Biblical Restoration Ministries · 117 of 150');
     expect(byline()).toBeNull();
     // 150 rows that all read "Psalms" told the listener nothing about which one they were hearing.
     openUpNext();

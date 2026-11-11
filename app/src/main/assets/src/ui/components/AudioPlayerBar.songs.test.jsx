@@ -54,6 +54,8 @@ function library() {
     getVersion: () => version,
     isSaved: (t) => !!t && saved.has(t.key),
     toggleSaved: vi.fn((t) => { if (saved.has(t.key)) saved.delete(t.key); else saved.add(t.key); notify(); }),
+    isSongSaved: (id) => saved.has('song:' + id),
+    toggleSongSaved: vi.fn((id) => { if (saved.has('song:' + id)) saved.delete('song:' + id); else saved.add('song:' + id); notify(); }),
     getPlaybackRate: () => 1, setPlaybackRate: vi.fn(),
     recordPlayed: vi.fn(), recordSongPlayed: vi.fn(), countPlay: vi.fn(), countCompletion: vi.fn(),
   };
@@ -220,67 +222,44 @@ describe('the full player in song mode (pictures 08-09, pl-l2)', () => {
     expect(screen.queryByRole('button', { name: /^Speed/ })).toBeNull();
   });
 
-  it('(W-02) the ⋯ menu opens the song page, and the player closes; the song plays on', () => {
+  it('(W-02) the Song page tool opens the song page, and the player closes; the song plays on', () => {
     window.__openSongs = vi.fn();
     try {
       playFamilyA();
       const desk = openDesk();
-      fireEvent.click(within(desk).getByRole('button', { name: /^More for Come, Love Awaits You/ }));
-      fireEvent.click(screen.getByRole('menuitem', { name: /Song page/ }));
+      expect(within(desk).queryByRole('button', { name: /^More for / })).toBeNull();   // no ⋯ menu (listen.html au-splayer)
+      const page = within(desk).getByRole('button', { name: 'Song page of Come, Love Awaits You' });
+      expect(page.querySelector('.np-tool-value').textContent).toBe('Open');
+      fireEvent.click(page);
       expect(window.__openSongs).toHaveBeenCalledWith([{ k: 'song', v: 'fam-a' }], '');
       expect(screen.queryByRole('dialog')).toBeNull();
       expect(AudioPlayer.getState().status).not.toBe('idle');
     } finally { delete window.__openSongs; }
   });
 
-  it('(K3) a single-version song reaches its Keep from the player: Keep · size, then On this phone, Remove in the menu', async () => {
-    const { SongKeep } = await import('../../utils/song-keep.js');
-    const map = new Map();
-    globalThis.OfflineSongsStore = {
-      all: async () => [...map.values()], get: async (id) => map.get(id) || null,
-      put: async (r) => { map.set(r.id, r); }, delete: async (id) => { map.delete(id); },
-    };
-    if (!globalThis.indexedDB) globalThis.indexedDB = {};
-    SongKeep._reset();
-    await SongKeep.ready();
-    const keepSpy = vi.spyOn(SongKeep, 'keep').mockImplementation(async () => {});
-    try {
-      act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
-      const desk = openDesk();
-      fireEvent.click(within(desk).getByRole('button', { name: 'Keep Lead Me To That Place on this phone · 3 MB' }));
-      expect(keepSpy).toHaveBeenCalledWith(['bbbbbbbbbbb1'], 'keep-desk-bbbbbbbbbbb1');
-      keepSpy.mockRestore();
-      map.set('bbbbbbbbbbb1', { id: 'bbbbbbbbbbb1', blob: new Blob([new Uint8Array(4)]), bytes: 3000000, sha256: '', keptAt: 1 });
-      SongKeep._reset();
-      await act(async () => { await SongKeep.ready(); });
-      cleanup();
-      const desk2 = openDesk();
-      expect(within(desk2).getByRole('button', { name: 'Lead Me To That Place is on this phone' }).textContent).toContain('On this phone');
-      fireEvent.click(within(desk2).getByRole('button', { name: /^More for Lead Me To That Place/ }));
-      await act(async () => { fireEvent.click(screen.getByRole('menuitem', { name: /Remove from this phone/ })); });
-      expect(map.has('bbbbbbbbbbb1')).toBe(false);
-    } finally { keepSpy.mockRestore(); delete globalThis.OfflineSongsStore; SongKeep._reset(); }
+  it('the Song page tool is disabled where no song page can open', () => {
+    playFamilyA();
+    const desk = openDesk();
+    expect(within(desk).getByRole('button', { name: 'Song page of Come, Love Awaits You' }).disabled).toBe(true);
   });
 
-  // Sweep 2026-10-13 (readalong low): offline, the row shows "Keeping needs a connection", but its aria-label still
-  // said "Keep … on this phone · 3 MB", so a screen reader never heard why the button was dimmed.
-  it('(K3) offline, the desk Keep row tells a screen reader it needs a connection', async () => {
-    const { SongKeep } = await import('../../utils/song-keep.js');
-    globalThis.OfflineSongsStore = { all: async () => [], get: async () => null, put: async () => {}, delete: async () => {} };
-    if (!globalThis.indexedDB) globalThis.indexedDB = {};
-    SongKeep._reset();
-    await SongKeep.ready();
-    try {
-      act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
-      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => false });
-      const desk = openDesk();
-      const btn = within(desk).getByRole('button', { name: /needs a connection/ });
-      expect(btn.disabled).toBe(true);
-      expect(btn.getAttribute('aria-label')).toContain('Lead Me To That Place');
-    } finally {
-      Object.defineProperty(window.navigator, 'onLine', { configurable: true, get: () => true });
-      delete globalThis.OfflineSongsStore; SongKeep._reset();
-    }
+  it('the head\'s star saves the song playing, and says so', () => {
+    playFamilyA();
+    const desk = openDesk();
+    const star = () => desk.querySelector('.np-star');
+    expect(star().getAttribute('aria-label')).toBe('Save Come, Love Awaits You');
+    fireEvent.click(star());
+    expect(globalThis.AudioLibraryStore.toggleSongSaved).toHaveBeenCalledWith('aaaaaaaaaaa1');
+    expect(globalThis.AudioLibraryStore.toggleSaved).not.toHaveBeenCalled();     // a song, not a recording
+    expect(star().getAttribute('aria-label')).toBe('Remove Come, Love Awaits You from Saved');
+    expect(star().getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('(U 8.6) the player keeps no song on the phone: Downloads is the one place', () => {
+    act(() => { AudioPlayer.playSongs({ filter: { family: 'fam-b' } }); });
+    const desk = openDesk();
+    expect(within(desk).queryByRole('button', { name: /on this phone|needs a connection/ })).toBeNull();
+    expect(Array.from(desk.querySelectorAll('.np-tools .np-tool-word')).map((n) => n.textContent)).toEqual(['Lyrics', 'Sleep', 'Up next', 'Song page']);
   });
 
   it('the Versions card switches to another version from the start and keeps the queue after it', () => {
@@ -447,7 +426,11 @@ describe('a song row\'s ⋯: Play next / Add to queue (pl-l2 L3)', () => {
     const song = songById('bbbbbbbbbbb1');
     render(<SongListRow song={song} title="Lead Me To That Place" onPlay={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'More for Lead Me To That Place' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Play next' }));
+    // W3d: the row's menu is the song sheet (listen.html au-songmenu).
+    const sheet = screen.getByRole('dialog', { name: 'Lead Me To That Place' });
+    expect(within(sheet).getByRole('button', { name: 'Add to the end of Up next' })).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Play next' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     const st = AudioPlayer.getState();
     expect(st.queue).toHaveLength(before + 1);
     expect(st.queue[st.qi + 1].key).toBe('song:bbbbbbbbbbb1');

@@ -52,7 +52,7 @@ export const SECTIONS = Object.freeze({
   'answers-subject': on('read'), 'answers-az': on('read'),
   // ── LISTEN ──
   'audio-library': on('listen'),
-  'audio-library-volumes': on('listen'), 'audio-library-offline': on('listen'), 'audio-library-studies': on('listen'),
+  'audio-library-volumes': on('listen'), 'audio-library-offline': on('listen'), 'audio-library-studies': on('listen'), 'audio-library-bible': on('listen'),
   'audio-library-collection': on('listen'), 'audio-library-saved': on('listen'), 'audio-library-songs': on('listen'),
   // ── LIBRARY ──
   'library': on('library'), 'reading-plans': on('library'), 'my-progress': on('library'),

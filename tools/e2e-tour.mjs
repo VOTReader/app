@@ -349,7 +349,7 @@ async function run(browser, { width, height, label, light }) {
     if (f.overflowX) fail(`${id}: the page scrolls sideways`);
     cutCheck(f, id);
     const want = EXPECT_SCREEN[id];
-    if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : want === 'reading-plans' ? 'Reading plans' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
+    if (want && !new RegExp(want === 'home' ? 'VOTReader' : want === 'vot-one-letter' ? 'Chosen by God' : want === 'bible-ch' ? 'John' : want === 'journal-home' ? 'Journal' : want === 'reading-plans' ? 'Reading plans' : want === 'audio-library' ? '^Listen —' : 'Settings').test(f.title)) fail(`${id}: expected the ${want} screen, title is "${f.title}"`);
     if (RINGED.includes(id)) {
       /* Wait for the ring to EXIST and then to STOP MOVING, and the second half is not a
          nicety. The overlay re-scrolls an off-screen target for up to RESCROLL_WINDOW_MS,

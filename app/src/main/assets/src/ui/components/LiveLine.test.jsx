@@ -1,7 +1,7 @@
 // @ts-nocheck — drives the REAL AudioPlayer singleton through a fake media element.
 /* THE PLAYER'S "NOW READING" CARD (player brief 3b, pl-l2; picture 05).
    The clause the voice is in, read from the same rows the wash paints and the letter's own blocks in the same text
-   domain; the clauses before it in the same sentence dim; nothing before the first timed clause; "Open the reading"
+   domain; the clauses before it in the same sentence dim; nothing before the first timed clause; "Open the letter"
    whether or not a line is known. A WTLB compilation reads the letter under its clock. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
@@ -173,23 +173,27 @@ describe('rollOffset', () => {
 });
 
 describe('LiveLine', () => {
-  it('shows NOW READING with the bright clause, and opens the reading on a tap', () => {
+  it('shows READING NOW with the bright clause, and opens the letter on a tap', () => {
     playLetter();
     act(() => { tick(9.5); });
     const open = vi.fn();
     render(<LiveLine track={current()} time={9.5} title="Chosen by God" onOpen={open} />);
-    expect(screen.getByText('Now reading')).toBeTruthy();
+    // listen.html au-player: the kicker and the cue share the card's head line.
+    const head = document.querySelector('.np-live-head');
+    expect(head.querySelector('.np-live-kicker').textContent).toBe('Reading now');
+    expect(head.querySelector('.np-live-cue').textContent).toBe('Open the letter ›');
     expect(document.querySelector('.np-live-now').textContent).toBe('many things will I teach you.');
     expect(document.querySelector('.np-live-lead').textContent).toContain('many things will I show you,');
-    fireEvent.click(screen.getByRole('button', { name: 'Open the reading — Chosen by God; playback continues' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open the letter — Chosen by God; playback continues' }));
     expect(open).toHaveBeenCalledTimes(1);
   });
 
-  it('with no line known, is just "Open the reading"', () => {
+  it('with no line known, is just "Open the letter"', () => {
     playLetter();
     render(<LiveLine track={current()} time={0.5} title="Chosen by God" onOpen={() => {}} />);
-    expect(screen.queryByText('Now reading')).toBeNull();
-    expect(screen.getByRole('button').textContent).toContain('Open the reading');
+    expect(screen.queryByText('Reading now')).toBeNull();
+    expect(screen.getByRole('button').textContent).toContain('Open the letter');
+    expect(screen.queryByText(/Now reading|Open the reading/)).toBeNull();
   });
 
   it('with neither a line nor a reading to open, renders nothing', () => {
@@ -212,6 +216,13 @@ describe('liveLineAt — a Bible chapter', () => {
     for (const k of ['BIBLE_AUDIO_MANIFEST', 'BIBLE_AUDIO_BOOKS', 'BIBLE_SYNC_BRM_KJV', 'resolveVerseText']) delete globalThis[k];
   });
   const playJohn = (n) => act(() => { AudioPlayer.playBibleBook({ volKey: 'bible-brm-kjv', bookId: 'john', label: 'KJV', chapterNum: n }); });
+
+  it('a Bible chapter says Open the chapter, in its words and its name alike', () => {
+    playJohn(1);
+    render(<LiveLine track={current()} time={0} title="John 1" onOpen={() => {}} />);
+    expect(document.querySelector('.np-live-cue').textContent).toBe('Open the chapter ›');
+    expect(screen.getByRole('button', { name: 'Open the chapter — John 1; playback continues' })).toBeTruthy();
+  });
 
   it('is the verse being read, in the edition playing, its number as the lead', () => {
     playJohn(1);
@@ -286,10 +297,10 @@ describe('liveLineAt — a Bible chapter', () => {
   it('takes every line the player has room for, counting the card by its parts', () => {
     const LONG = 'word '.repeat(120).trim();
     globalThis.resolveVerseText = () => LONG;
-    // The body is 600 px; the card is 560 of it (2 px border), its kicker 20 and cue 28: 544 px to spare, 17 lines.
+    // The body is 600 px; the card is 560 of it (2 px border), its head (kicker and cue on one line) 28: 544 px to spare, 17 lines.
     const heights = vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockImplementation(function () {
       const c = this.classList;
-      return c.contains('np-live-roll') ? 960 : c.contains('np-live') ? 560 : c.contains('np-live-kicker') ? 20 : c.contains('np-live-cue') ? 28 : 0;
+      return c.contains('np-live-roll') ? 960 : c.contains('np-live') ? 560 : c.contains('np-live-head') ? 28 : c.contains('np-live-kicker') ? 20 : c.contains('np-live-cue') ? 28 : 0;
     });
     const rooms = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(function () {
       const c = this.classList;

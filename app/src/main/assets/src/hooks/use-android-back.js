@@ -214,7 +214,7 @@ function runBackRouter() {
 const BACK_BY_SCREEN = {
   'settings': 'origin', 'history': 'origin', 'about': 'origin', 'reading-plans': 'origin', 'scripture-web': 'origin',
   'audio-library-volumes': 'origin', 'audio-library-collection': 'origin',
-  'audio-library-saved': 'origin', 'audio-library-studies': 'origin', 'audio-library-offline': 'origin',
+  'audio-library-saved': 'origin', 'audio-library-studies': 'origin', 'audio-library-bible': 'origin', 'audio-library-offline': 'origin',
   'notes-index': 'origin', 'my-progress': 'origin', 'links-index': 'origin', 'bookmarks-index': 'origin',
   'highlights-index': 'origin', 'journal-home': 'origin',
   // The Listen and Library tab roots (the layout pass, 2026-11-10): Back goes to Read, whatever opened them.

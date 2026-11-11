@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { _resetToasts } from '../../utils/toast.js';
 import { act, cleanup, fireEvent, render, within } from '@testing-library/react';
 import {
-  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, DownloadWhenOnline, HeroDownload, TrackOnPhone, downloadWhenOnline, formatBytes, offlineMenuItems, useOfflineState,
+  OfflineCollectionAction, OfflineCollectionMark, TrackOnPhone, downloadWhenOnline, formatBytes, useOfflineState,
 } from './OfflineAudioControls.jsx';
 import { AudioOfflineScreen, groupShelf } from '../screens/AudioOfflineScreen.jsx';
 
@@ -50,7 +50,7 @@ function setOnline(v) { Object.defineProperty(window.navigator, 'onLine', { conf
 
 beforeEach(() => {
   setOnline(true);
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <h1>{utility.title}</h1> : null}{children}</main>;
   globalThis.LibraryNav = () => null;
   globalThis.AudioPlayer = { playTrack: vi.fn(), subscribe: () => () => {}, getVersion: () => 0, getState: () => ({ status: 'idle', queue: [], qi: 0 }) };
 });
@@ -67,249 +67,6 @@ describe('formatBytes', () => {
     expect(formatBytes(6_400_000)).toBe('6.4 MB');
     expect(formatBytes(1_480_000_000)).toBe('1.5 GB');
     expect(formatBytes(0)).toBe('');
-  });
-});
-
-describe('a recording row: what the phone holds, and the next step', () => {
-  it('on the web (no store) says nothing at all', () => {
-    fakeStore({ available: false });
-    const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toBe('');
-  });
-
-  it('offers Download with its size, and a tap hands the reading to the phone', () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 18_000_000);
-    const { getByRole } = render(<OfflineRowStatus tracks={[T('a', { partLabel: null })]} name="Letter a" />);
-    const btn = getByRole('button', { name: /download letter a/i });
-    expect(btn.textContent).toMatch(/Download · 18 MB/);
-    fireEvent.click(btn);
-    expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'Letter a' }]);
-  });
-
-  it('asks the phone for the sizes it shows', () => {
-    const s = fakeStore();
-    render(<OfflineRowStatus tracks={[T('a'), T('b')]} name="Letter a" />);
-    expect(s.requestSizes).toHaveBeenCalledWith([U('a'), U('b')]);
-  });
-
-  it('shows the download going, and Cancel stops it', () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 1000);
-    s.st.status.set(U('a'), 'downloading');
-    s.st.progress.set(U('a'), { bytes: 620, total: 1000 });
-    const { container, getByRole } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/Downloading 62%/);
-    fireEvent.click(getByRole('button', { name: /cancel/i }));
-    expect(s.cancel).toHaveBeenCalledWith([U('a')]);
-  });
-
-  // ra6: Download only on Wi-Fi holds what is queued on mobile data; the row says why it is not moving.
-  it('queued while downloads wait for Wi-Fi, the row says Waiting for Wi-Fi, and Cancel still stops it', () => {
-    const s = fakeStore();
-    s.waiting = () => true;
-    s.st.status.set(U('a'), 'queued');
-    const { container, getByRole } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/Waiting for Wi-Fi/);
-    expect(container.textContent).not.toMatch(/Downloading/);
-    fireEvent.click(getByRole('button', { name: /cancel/i }));
-    expect(s.cancel).toHaveBeenCalledWith([U('a')]);
-    // One of the unit's parts on its way: it is downloading, whatever waits behind it.
-    s.st.status.set(U('a'), 'downloading');
-    act(() => s.bump());
-    expect(container.textContent).toMatch(/Downloading 0%/);
-  });
-
-  it('Download all waiting for Wi-Fi says so with the count', () => {
-    const s = fakeStore();
-    s.waiting = () => true;
-    s.st.status.set(U('a'), 'queued');
-    s.st.status.set(U('b'), 'queued');
-    save(s, 'c', 1000);
-    const { container } = render(<OfflineCollectionAction units={[[T('a')], [T('b')], [T('c')]]} label="Volume One" />);
-    expect(container.textContent).toMatch(/Waiting for Wi-Fi · 1 of 3 on this phone/);
-  });
-
-  it('says On this phone with the size once every part is there', () => {
-    const s = fakeStore();
-    save(s, 'a', 16_000_000);
-    const { container, queryByRole } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/On this phone · 16 MB/);
-    expect(queryByRole('button')).toBeNull();
-  });
-
-  it('a failure offers Retry, and a full phone says so plainly', () => {
-    const s = fakeStore();
-    s.st.status.set(U('a'), 'failed');
-    s.st.failure.set(U('a'), 'network');
-    const first = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(first.container.textContent).toMatch(/Didn’t download yet/);
-    fireEvent.click(first.getByRole('button', { name: /retry/i }));
-    expect(s.download).toHaveBeenCalledTimes(1);
-    first.unmount();
-    s.st.failure.set(U('a'), 'space');
-    const second = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(second.container.textContent).toMatch(/Not enough room on this phone/);
-  });
-
-  it('with no signal, a recording not on the phone says it needs a connection', () => {
-    fakeStore();
-    setOnline(false);
-    const { container, queryByRole } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/Needs a connection/);
-    expect(queryByRole('button')).toBeNull();
-  });
-
-  it('offline, the row of the recording playing says it plays from the buffer, not that it needs a connection (RC.5)', () => {
-    fakeStore();
-    setOnline(false);
-    globalThis.AudioPlayer = { ...globalThis.AudioPlayer, getShape: () => 'x', getState: () => ({ status: 'playing', queue: [T('a')], qi: 0 }) };
-    const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    expect(container.textContent).toMatch(/Playing from the buffer/);
-    expect(container.textContent).not.toMatch(/Needs a connection/);
-    const other = render(<OfflineRowStatus tracks={[T('b')]} name="Letter b" />);
-    expect(other.container.textContent).toMatch(/Needs a connection/);
-  });
-
-  it('follows the store live (a download finishing turns the row)', () => {
-    const s = fakeStore();
-    s.st.status.set(U('a'), 'queued');
-    const { container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    // Queued behind another: Waiting, with no empty bar (brief section 7 item 7: it read "Downloading 0%").
-    expect(container.textContent).toMatch(/^Waiting/);
-    expect(container.querySelector('[role="progressbar"]')).toBeNull();
-    act(() => { s.st.status.set(U('a'), 'downloading'); s.st.progress.set(U('a'), { bytes: 0, total: -1 }); s.bump(); });
-    expect(container.textContent).toMatch(/Downloading 0%/);
-    expect(container.querySelector('[role="progressbar"]')).not.toBeNull();
-    act(() => { save(s, 'a', 5_000_000); s.bump(); });
-    expect(container.textContent).toMatch(/On this phone · 5 MB/);
-  });
-});
-
-// Downloads brief section 7 item 6: a whole Bible book started on one tap, with no size or room check (Genesis, 206 MB).
-describe('a book row asks before it downloads', () => {
-  const BOOK = ['g1', 'g2', 'g3', 'g4', 'g5'];
-  it('a book asks with its count, size and the free space; Cancel downloads nothing, Download downloads it', () => {
-    const s = fakeStore();
-    for (const id of BOOK) s.st.sizes.set(U(id), 40e6);
-    const { getByRole, container } = render(<OfflineRowStatus tracks={BOOK.map((id) => T(id))} name="Genesis" />);
-    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
-    expect(s.download).not.toHaveBeenCalled();
-    const ask = getByRole('group', { name: 'Download Genesis' });
-    expect(ask.textContent).toContain('5 recordings · 200 MB');
-    expect(ask.textContent).toContain('Free space on this phone: 5 GB');
-    fireEvent.click(within(ask).getByRole('button', { name: 'Cancel' }));
-    expect(container.querySelector('.offline-confirm')).toBeNull();
-    expect(s.download).not.toHaveBeenCalled();
-    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
-    fireEvent.click(getByRole('button', { name: 'Download 200 MB' }));
-    expect(s.download).toHaveBeenCalledWith(BOOK.map((id) => expect.objectContaining({ url: U(id) })));
-  });
-
-  it('with no room it says so and will not start', () => {
-    const s = fakeStore();
-    s.st.free = 100e6;
-    for (const id of BOOK) s.st.sizes.set(U(id), 40e6);
-    const { getByRole } = render(<OfflineRowStatus tracks={BOOK.map((id) => T(id))} name="Genesis" />);
-    fireEvent.click(getByRole('button', { name: /download genesis to this phone/i }));
-    expect(getByRole('group', { name: 'Download Genesis' }).textContent).toContain('Not enough room');
-    expect(getByRole('button', { name: 'Download 200 MB' }).disabled).toBe(true);
-  });
-
-  it('a letter in two parts still downloads on one tap', () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('p1'), 9e6); s.st.sizes.set(U('p2'), 9e6);
-    const { getByRole } = render(<OfflineRowStatus tracks={[T('p1'), T('p2')]} name="Christmas" />);
-    fireEvent.click(getByRole('button', { name: /download christmas to this phone/i }));
-    expect(s.download).toHaveBeenCalledTimes(1);
-  });
-});
-
-describe('downloads a keyboard or screen reader can follow (n2-06)', () => {
-  it('Download keeps focus: it lands on Cancel, then on the finished line, never the page top', () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 1000);
-    const { getByRole, container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    const btn = getByRole('button', { name: /download letter a/i });
-    btn.focus();
-    fireEvent.click(btn);
-    s.st.status.set(U('a'), 'downloading');
-    s.st.progress.set(U('a'), { bytes: 400, total: 1000 });
-    act(() => s.bump());
-    expect(document.activeElement).toBe(getByRole('button', { name: /cancel the download of letter a/i }));
-    const bar = getByRole('progressbar', { name: /downloading letter a/i });
-    expect(bar.getAttribute('aria-valuenow')).toBe('40');
-    save(s, 'a', 1000);
-    act(() => s.bump());
-    expect(document.activeElement).toBe(container.querySelector('.offline-row.is-saved'));
-  });
-
-  it('a reader who taps plain page text has let go: the finished download does not pull focus back (sweep v105)', async () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 1000);
-    const { getByRole, container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    const btn = getByRole('button', { name: /download letter a/i });
-    btn.focus();
-    fireEvent.click(btn);
-    s.st.status.set(U('a'), 'downloading');
-    act(() => s.bump());
-    const cancel = getByRole('button', { name: /cancel the download of letter a/i });
-    expect(document.activeElement).toBe(cancel);
-    // A tap on text that cannot take focus: the button blurs with nowhere to go and stays in the page.
-    cancel.blur();
-    expect(document.activeElement).toBe(document.body);
-    await act(async () => {});
-    save(s, 'a', 1000);
-    act(() => s.bump());
-    const line = container.querySelector('.offline-row.is-saved');
-    expect(line).not.toBeNull();
-    expect(document.activeElement).toBe(document.body);
-    expect(line.hasAttribute('tabindex')).toBe(false);
-  });
-
-  it('a reader who only left the window still holds the row: focus follows the finished download', async () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 1000);
-    const { getByRole, container } = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    getByRole('button', { name: /download letter a/i }).focus();
-    s.st.status.set(U('a'), 'downloading');
-    act(() => s.bump());
-    const cancel = getByRole('button', { name: /cancel the download of letter a/i });
-    expect(document.activeElement).toBe(cancel);
-    // The window loses focus (another app): a blur with nowhere to go, but the page's focus stays on Cancel.
-    fireEvent.focusOut(cancel, { relatedTarget: null });
-    await act(async () => {});
-    expect(document.activeElement).toBe(cancel);
-    save(s, 'a', 1000);
-    act(() => s.bump());
-    expect(document.activeElement).toBe(container.querySelector('.offline-row.is-saved'));
-  });
-
-  it('a row that never had focus never takes it', () => {
-    const s = fakeStore();
-    const other = document.createElement('button');
-    document.body.appendChild(other);
-    other.focus();
-    render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    s.st.status.set(U('a'), 'downloading');
-    act(() => s.bump());
-    expect(document.activeElement).toBe(other);
-    other.remove();
-  });
-
-  it('news is read out once, in one polite live region: not what happened before the screen opened', () => {
-    const s = fakeStore();
-    let news = { seq: 3, text: 'Download finished' };
-    s.news = () => news;
-    render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" />);
-    render(<OfflineRowStatus tracks={[T('b')]} name="Letter b" />);
-    const regions = document.querySelectorAll('#offline-audio-status');
-    expect(regions).toHaveLength(1);
-    expect(regions[0].getAttribute('role')).toBe('status');
-    expect(regions[0].textContent).toBe('');
-    news = { seq: 4, text: 'Downloading 12 recordings' };
-    act(() => s.bump());
-    expect(regions[0].textContent).toBe('Downloading 12 recordings');
   });
 });
 
@@ -396,38 +153,16 @@ describe('on-phone marks, the row menu and Download when online (D4)', () => {
     expect(view.container.querySelector('.offline-mark.is-all .offline-ring-tick')).toBeTruthy();
   });
 
-  it('a row menu offers Download with its size, Download the rest for a part-saved book, Remove once saved, Cancel while on its way', () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 11e6); s.st.sizes.set(U('b'), 4e6); s.st.sizes.set(U('b2'), 6e6);
-    const texts = (tracks, online = true) => offlineMenuItems({ off: s, online, tracks, name: 'X' }).map((i) => i.text);
-    expect(texts([T('a')])).toEqual(['Download · 11 MB']);
-    expect(texts([T('a')], false)).toEqual(['Download when online']);
-    save(s, 'b', 4e6);
-    expect(texts([T('b'), T('b2')])).toEqual(['Download the rest · 6 MB', 'Remove · 4 MB']);
-    s.st.status.set(U('a'), 'downloading');
-    expect(texts([T('a')])).toEqual(['Cancel download']);
-    s.st.status.delete(U('a'));
-    s.st.free = 150e6;   // under 11 MB + the 200 MB the phone keeps free
-    const [item] = offlineMenuItems({ off: s, online: true, tracks: [T('a')], name: 'X' });
-    expect(item.text).toBe('Not enough room · 11 MB');
-    expect(item.disabled).toBe(true);
-  });
-
   it('with no signal, a store that cannot wait holds the download and sends it the moment the signal returns', () => {
     const s = fakeStore();
     let offline = true;
     const subs = new Set();
     globalThis.NetStatus = { isOffline: () => offline, subscribe: (cb) => { subs.add(cb); return () => subs.delete(cb); }, getVersion: () => 0 };
-    const row = render(<OfflineRowStatus tracks={[T('a')]} name="Letter a" quiet />);
-    expect(row.container.textContent).toBe('');
     act(() => downloadWhenOnline(s, [{ url: U('a'), key: 'one:a', title: 'Letter a' }]));
     expect(s.download).not.toHaveBeenCalled();
-    // Held, it reads as waiting, not as nothing.
-    expect(row.container.textContent).toMatch(/Waiting/);
     offline = false;
     act(() => { for (const cb of [...subs]) cb(); });
     expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'Letter a' }]);
-    expect(row.container.textContent).toBe('');
     act(() => { for (const cb of [...subs]) cb(); });
     expect(s.download).toHaveBeenCalledTimes(1);
   });
@@ -457,44 +192,6 @@ describe('on-phone marks, the row menu and Download when online (D4)', () => {
 });
 
 /* D4b (picture 15): the control beside a Listen pill, and Download when online under one that cannot play. */
-describe('beside the Listen pill (D4b)', () => {
-  it('Download · 10 MB, then a ring with 4 of 10 MB whose tap cancels, then a tick with On this phone', () => {
-    const s = fakeStore();
-    s.st.sizes.set(U('a'), 10e6);
-    const view = render(<HeroDownload tracks={[T('a')]} name="Chosen by God" />);
-    fireEvent.click(view.getByRole('button', { name: 'Download Chosen by God, 10 MB' }));
-    expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'Chosen by God' }]);
-    s.st.status.set(U('a'), 'downloading'); s.st.progress.set(U('a'), { bytes: 4e6 });
-    act(() => s.bump());
-    expect(view.container.querySelector('.hero-dl-cap').textContent).toBe('4 of 10 MB');
-    fireEvent.click(view.getByRole('button', { name: /^Cancel the download of Chosen by God/ }));
-    expect(s.cancel).toHaveBeenCalledWith([U('a')]);
-    s.st.status.delete(U('a')); save(s, 'a', 10e6);
-    act(() => s.bump());
-    expect(view.container.textContent).toBe('On this phone');
-  });
-
-  it('offline it offers nothing for a recording not on the phone (the pill says so), and still shows the tick', () => {
-    const s = fakeStore();
-    setOnline(false);
-    const view = render(<HeroDownload tracks={[T('a')]} name="A" />);
-    expect(view.container.textContent).toBe('');
-    save(s, 'a', 1e6);
-    act(() => s.bump());
-    expect(view.container.textContent).toBe('On this phone');
-  });
-
-  it('Download when online queues it and then says it will', () => {
-    const s = fakeStore();
-    const view = render(<DownloadWhenOnline tracks={[T('a')]} name="A" />);
-    fireEvent.click(view.getByRole('button', { name: 'Download when online' }));
-    expect(s.download).toHaveBeenCalledWith([{ url: U('a'), key: 'one:a', title: 'A' }]);
-    s.st.status.set(U('a'), 'queued');
-    act(() => s.bump());
-    expect(view.container.querySelector('.hero-dl-held').textContent).toBe('It will download when you’re back online.');
-  });
-});
-
 describe('history and Up next rows (D4c)', () => {
   it('a row on the phone ends its line with the tick; one that is not, and the web, add nothing', () => {
     const s = fakeStore();
@@ -510,25 +207,29 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
   beforeEach(() => { globalThis.COLLECTIONS = [{ volKey: 'one', label: 'Volume One' }, { volKey: 'two', label: 'Volume Two' }]; });
   afterEach(() => { delete globalThis.COLLECTIONS; delete globalThis.BIBLE_AUDIO_EDITIONS; delete globalThis.BIBLE_AUDIO_BOOKS; });
 
-  it('groups downloads like the tree, plays one, and asks before removing all', () => {
+  /** Opens every kept set (W3b: a set's readings show once its row is tapped; au-dlphone shows the sets closed). */
+  const openAll = (c) => { for (const b of [...c.querySelectorAll('.dl-kept .ui-row-main[aria-expanded="false"]')]) fireEvent.click(b); };
+
+  it('a card per part, a set per row with its size, plays one, and asks before removing everything (au-dlphone)', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
     save(s, 'b', 12_000_000, 'Matthew 1');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(container.querySelector('h1').textContent).toBe('Downloads');
     expect(getByRole('tab', { name: 'On this phone' }).getAttribute('aria-selected')).toBe('true');
-    expect(container.querySelector('.dl-storage-line').textContent).toBe('Recordings 30 MB · 5 GB free on this phone');
-    expect(container.querySelector('.dl-shelf-section .dl-shelf-kicker').textContent).toBe('The Volumes of Truth');
-    const head = container.querySelector('.dl-shelf-head');
-    expect(head.textContent).toMatch(/Volume One2 recordings · 30 MB/);
+    expect(container.querySelector('.dl-store').textContent).toBe('30 MB5 GB freeOn this phone · plays with no signal');
+    expect(container.querySelector('.dl-phone').previousElementSibling.textContent).toBe('The Volumes of Truth');
+    expect(container.querySelector('.dl-kept').textContent).toBe('Volume One2 recordings · 30 MB');
+    expect(container.querySelectorAll('.dl-shelf-title')).toHaveLength(0);
+    openAll(container);
     expect([...container.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['I Am The Passover', 'Matthew 1']);
     fireEvent.click(getByRole('button', { name: /^play i am the passover/i }));
     expect(globalThis.AudioPlayer.playTrack).toHaveBeenCalledWith(expect.objectContaining({ url: U('a'), key: 'one:a', title: 'I Am The Passover' }));
-    fireEvent.click(getByRole('button', { name: 'Remove all downloads' }));
+    fireEvent.click(getByRole('button', { name: 'Remove everything' }));
     expect(s.removeAll).not.toHaveBeenCalled();
     const sheet = getByRole('dialog');
-    expect(sheet.textContent).toMatch(/Remove all downloads from this phone\?/);
-    expect(sheet.textContent).toMatch(/2 recordings · 30 MB\. You can download them again any time\./);
+    expect(sheet.textContent).toMatch(/Remove everything\?/);
+    expect(sheet.textContent).toMatch(/2 recordings come off this phone and free 30 MB\. They still play whenever you have a signal\./);
     fireEvent.click(within(sheet).getByRole('button', { name: 'Remove' }));
     expect(s.removeAll).toHaveBeenCalledTimes(1);
   });
@@ -542,6 +243,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
       save(s, 'a', 18_000_000, 'I Am The Passover');
       save(s, 'b', 12_000_000, 'Matthew 1');
       const { container, getByRole, queryAllByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      openAll(container);
       fireEvent.click(getByRole('button', { name: /^remove matthew 1 from this phone/i }));
       expect(queryAllByRole('button', { name: /^remove matthew 1/i })).toHaveLength(0);
       const toast = document.getElementById('vot-toast-offline-removed');
@@ -563,6 +265,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
       s.st.saved.set(U('x1'), { url: U('x1'), key: 'one:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 1 });
       s.st.saved.set(U('x2'), { url: U('x2'), key: 'one:x', title: 'Christmas · Part 2', bytes: 6e6, savedAt: 2 });
       const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      openAll(container);
       expect([...container.querySelectorAll('.dl-shelf-row')].map((r) => r.textContent)).toEqual(['Christmas11 MB']);
       fireEvent.click(getByRole('button', { name: /^remove christmas from this phone/i }));
       act(() => { vi.advanceTimersByTime(5100); });
@@ -570,17 +273,16 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     } finally { vi.useRealTimers(); }
   });
 
-  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own × is the whole job.
-  it('a shelf of one offers no Remove all', () => {
+  // Codex critique of the built screens (2026-09-24, 5): with one recording, its own bin is the whole job.
+  it('a shelf of one offers no Remove everything', () => {
     const s = fakeStore();
     save(s, 'a', 18_000_000, 'I Am The Passover');
-    const { container, queryByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.querySelectorAll('.dl-shelf-row')).toHaveLength(1);
-    expect(getByRole('button', { name: /^remove i am the passover/i })).toBeTruthy();
-    expect(queryByRole('button', { name: 'Remove all downloads' })).toBeNull();
+    const { queryByRole, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(getByRole('button', { name: 'Remove Volume One from this phone' })).toBeTruthy();
+    expect(queryByRole('button', { name: 'Remove everything' })).toBeNull();
   });
 
-  it('a Bible book sits under its edition, chapters in order, and its ⋯ removes it after asking (n2-04, picture 12)', () => {
+  it('a Bible book sits under The Bible with its edition in its line, chapters in order, and its bin asks first (au-dlremove)', () => {
     const s = fakeStore();
     globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
     globalThis.BIBLE_AUDIO_BOOKS = [['genesis', 'Genesis']];
@@ -588,32 +290,28 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     ch(10, 1); ch(2, 3); ch(1, 2);
     save(s, 'a', 18_000_000, 'I Am The Passover');
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect([...container.querySelectorAll('.dl-shelf-section .dl-shelf-kicker')].map((k) => k.textContent)).toEqual(['The Volumes of Truth', 'The Bible · KJV · BRM']);
-    fireEvent.click(getByRole('button', { name: /^Genesis3 chapters · 3 MB/ }));
-    const book = container.querySelectorAll('.dl-shelf-branch')[1];
+    expect([...container.querySelectorAll('.ui-label')].map((k) => k.textContent)).toEqual(['The Volumes of Truth', 'The Bible']);
+    fireEvent.click(getByRole('button', { name: /^GenesisKJV · BRM · 3 chapters · 3 MB/ }));
+    const book = container.querySelectorAll('.dl-kept')[1];
     expect([...book.querySelectorAll('.dl-shelf-title')].map((x) => x.textContent)).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
-    fireEvent.click(getByRole('button', { name: 'More for Genesis' }));
-    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Remove · 3 MB' }));
+    fireEvent.click(getByRole('button', { name: 'Remove Genesis from this phone' }));
     expect(s.remove).not.toHaveBeenCalled();
     const sheet = getByRole('dialog');
-    expect(sheet.textContent).toMatch(/Remove Genesis from this phone\?/);
-    expect(sheet.textContent).toMatch(/3 chapters · 3 MB/);
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Remove' }));
+    expect(sheet.textContent).toMatch(/Remove Genesis\?/);
+    expect(sheet.textContent).toMatch(/3 chapters come off this phone and free 3 MB/);
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Keep' }));
+    expect(s.remove).not.toHaveBeenCalled();
+    fireEvent.click(getByRole('button', { name: 'Remove Genesis from this phone' }));
+    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Remove' }));
     expect(s.remove).toHaveBeenCalledWith([U('gen1'), U('gen2'), U('gen10')]);
   });
 
-  it('sorts by size, and a group\'s Choose more opens the tree', () => {
+  it('sets stand in library order', () => {
     const s = fakeStore();
     s.st.saved.set(U('t'), { url: U('t'), key: 'two:t', title: 'Big one', bytes: 90e6, savedAt: 1 });
     save(s, 'a', 18_000_000, 'Small one');
-    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    const heads = () => [...container.querySelectorAll('.dl-shelf-head strong')].map((x) => x.textContent);
-    expect(heads()).toEqual(['Volume One', 'Volume Two']);
-    fireEvent.change(container.querySelector('.dl-sort select'), { target: { value: 'size' } });
-    expect(heads()).toEqual(['Volume Two', 'Volume One']);
-    fireEvent.click(getByRole('button', { name: 'More for Volume Two' }));
-    fireEvent.click(within(getByRole('dialog')).getByRole('button', { name: 'Choose more…' }));
-    expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
+    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect([...container.querySelectorAll('.dl-kept .ui-row-title')].map((x) => x.textContent)).toEqual(['Volume One', 'Volume Two']);
   });
 
   it('groupShelf keeps a download with no key on its own, and a letter\'s parts together', () => {
@@ -631,6 +329,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     save(s, 'a', 18_000_000, 'I Am The Passover');
     s.st.saved.get(U('a')).stale = true;
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    openAll(container);
     expect(s.checkForUpdates).toHaveBeenCalledTimes(1);
     expect(container.textContent).toMatch(/Update available/);
     fireEvent.click(getByRole('button', { name: /^update i am the passover/i }));
@@ -644,7 +343,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     s.pending = () => ({ busy: 12, failed });
     s.failureOf = () => 'network';
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.textContent).toMatch(/Downloading · 12 recordings to go/);
+    expect(container.querySelector('.dl-strip').textContent).toMatch(/^Downloading12 recordings to go/);
     expect(container.textContent).toMatch(/Letter cNo connection when it tried/);
     fireEvent.click(getByRole('button', { name: /^cancel all/i }));
     expect(s.cancelAll).not.toHaveBeenCalled();   // it asks first (dl-rework E, defect 30)
@@ -667,6 +366,7 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
       s.st.saved.set(U('xb1'), { url: U('xb1'), key: 'one:x', title: 'Christmas · Part 1', bytes: 5e6, savedAt: 1 });
       s.st.saved.set(U('xt'), { url: U('xt'), key: 'one:x', title: 'Christmas', bytes: 4e6, savedAt: 2 });
       const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+      openAll(container);
       const rows = [...container.querySelectorAll('.dl-shelf-row')].map((r) => r.textContent);
       expect(rows).toEqual(['ChristmasTimothy4 MB', 'Christmas · Part 1Benjamin1 of 2 parts · 5 MB']);
       fireEvent.click(getByRole('button', { name: /^remove christmas · timothy from this phone/i }));
@@ -688,73 +388,52 @@ describe('On this phone (the shelf, pictures 11-13)', () => {
     expect(container.textContent).toMatch(/Letter cThe server had a problem \(503\) · tries again in 12 min/);
   });
 
-  // dl-rework D (defect 10): the list stopped at 30, and a waiting row had no control.
-  it('the waiting list pages 50 at a time, and each waiting one can be taken off', () => {
+  // W3b (au-dlrun): while a set downloads, its card takes the storage card's place and its row says how much is here.
+  it('a set on its way: the run card names it, its row counts what is here, and it has no bin yet', () => {
     const s = fakeStore();
-    const q = Array.from({ length: 61 }, (_, i) => ({ url: U('w' + i), key: 'one:w' + i, title: 'Letter ' + i }));
-    s.queue = () => q;
-    s.actives = () => [U('w0')];
-    s.pending = () => ({ busy: 61, failed: [] });
-    s.statusOf = (u) => (u === U('w0') ? 'downloading' : 'queued');
-    s.progressOf = () => null;
-    const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
-    expect(container.querySelectorAll('.dl-queue-row:not(.is-more)')).toHaveLength(51);
-    fireEvent.click(getByRole('button', { name: 'Show 10 more · 10 still waiting' }));
-    expect(container.querySelectorAll('.dl-queue-row:not(.is-more)')).toHaveLength(61);
-    fireEvent.click(getByRole('button', { name: 'Take Letter 60 off the queue' }));
-    expect(s.cancel).toHaveBeenCalledWith([U('w60')]);
+    s.queue = () => [{ url: U('w1'), key: 'two:w1', title: 'W1' }, { url: U('w2'), key: 'two:w2', title: 'W2' }];
+    s.pending = () => ({ busy: 2, failed: [] });
+    s.st.saved.set(U('t'), { url: U('t'), key: 'two:t', title: 'T', bytes: 9e6, savedAt: 1 });
+    const { container, queryByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
+    expect(container.querySelector('.dl-store')).toBeNull();
+    expect(container.querySelector('.dl-strip-line1').textContent).toBe('Volume Two');
+    expect(container.textContent).toMatch(/Keep VOTReader open until it finishes\. You can read and listen meanwhile\./);
+    expect(container.querySelector('.dl-phone').previousElementSibling.textContent).toMatch(/^On this phone so far/);
+    expect(container.querySelector('.dl-kept').textContent).toBe('Volume Two1 of 3 recordings · the rest are on their way');
+    expect(queryByRole('button', { name: 'Remove Volume Two from this phone' })).toBeNull();
   });
 
-  // dl-rework E: nothing said what had finished.
-  it('Finished: each set with how much of it is on the phone, a whole set said plainly, the latest first', () => {
-    const s = fakeStore();
-    globalThis.BIBLE_AUDIO_EDITIONS = { 'brm-kjv': { volKey: 'bible-brm-kjv', short: 'KJV · BRM' } };
-    globalThis.BIBLE_AUDIO_BOOKS = [['ruth', 'Ruth']];
-    globalThis.COLLECTIONS = [{ volKey: 'one', label: 'Volume One', cardId: 'one' }];
-    globalThis.colLetterArr = () => [{ id: 'a', title: 'A' }, { id: 'b', title: 'B' }];
-    globalThis.colPreface = () => null;
-    globalThis.AudioPlayer = {
-      playTrack: vi.fn(),
-      playbackTracks: (volKey, item) => (volKey === 'bible-brm-kjv'
-        ? (item.id === 'ruth' ? [1, 2].map((n) => ({ url: U('ruth' + n), partLabel: 'Chapter ' + n })) : [])
-        : [{ url: U(item.id), readerCode: 'B' }]),
-      renditionsFor: (volKey, item) => (volKey === 'one' ? [{ reader: 'B', tracks: [{ url: U(item.id) }] }] : []),
-    };
-    s.st.saved.set(U('ruth1'), { url: U('ruth1'), key: 'bible-brm-kjv:ruth', title: 'Ruth 1', bytes: 1e6, savedAt: 10 });
-    s.st.saved.set(U('ruth2'), { url: U('ruth2'), key: 'bible-brm-kjv:ruth', title: 'Ruth 2', bytes: 1e6, savedAt: 30 });
-    s.st.saved.set(U('a'), { url: U('a'), key: 'one:a', title: 'A', bytes: 1e6, savedAt: 20 });
-    try {
-      const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
-      const fin = container.querySelector('.dl-finished');
-      expect([...fin.querySelectorAll('.dl-finished-set')].map((x) => x.textContent))
-        .toEqual(['All of KJV · BRM is on this phone · 2 chapters', 'Volume One: 1 of 2 letters']);
-      expect([...fin.querySelectorAll('.dl-finished-title')].map((x) => x.textContent)).toEqual(['Ruth 2', 'A', 'Ruth 1']);
-    } finally {
-      delete globalThis.colLetterArr; delete globalThis.colPreface;
-    }
-  });
-
-  it('In line (picture 08): the one downloading with its bytes, then each waiting with its place', () => {
-    const s = fakeStore();
-    const q = [{ url: U('h'), key: 'one:h', title: 'Honor God' }, { url: U('x'), key: 'one:x', title: 'Christmas' }, { url: U('d'), key: 'one:d', title: '' }];
-    s.queue = () => q;
-    s.pending = () => ({ busy: 3, failed: [] });
-    s.statusOf = (u) => (u === U('h') ? 'downloading' : 'queued');
-    s.progressOf = (u) => (u === U('h') ? { bytes: 4_100_000, total: 7_000_000 } : null);
-    const { container } = render(<AudioOfflineScreen onBack={() => {}} />);
-    const rows = [...container.querySelectorAll('.dl-queue-row')].map((r) => r.textContent);
-    expect(rows[0]).toBe('Honor God4.1 of 7 MB');
-    expect(rows[1]).toBe('ChristmasWaiting · 1st in line');
-    expect(rows[2]).toMatch(/Waiting · 2nd in line$/);
-    expect(container.querySelector('.dl-queue-count').textContent).toBe('3');
-  });
-
-  it('nothing on the phone opens Choose; the empty shelf says how to fill it', () => {
+  it('nothing on the phone opens Choose; the empty shelf says how to fill it and its button goes there (au-dlphone0)', () => {
     fakeStore();
     const { container, getByRole } = render(<AudioOfflineScreen onBack={() => {}} />);
     expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
+    expect(container.querySelector('.dl-store').textContent).toBe('Nothing yet5 GB freeOn this phone');
     fireEvent.click(getByRole('tab', { name: 'On this phone' }));
-    expect(container.textContent).toMatch(/Nothing is on this phone yet\. In Choose, tick what you want/);
+    expect(container.textContent).toMatch(/Nothing is on this phone yetIn Choose, tick what you want and tap Download\. It then plays with no signal\./);
+    fireEvent.click(getByRole('button', { name: 'Choose downloads' }));
+    expect(getByRole('tab', { name: 'Choose' }).getAttribute('aria-selected')).toBe('true');
+  });
+
+  // au-dlauto (W3-listen built it, no test yet): the By themselves switches, where the phone can tell Wi-Fi apart.
+  it('By themselves: three switches that say their state and flip their setting; hidden where Wi-Fi cannot be told', () => {
+    fakeStore();
+    const onToggle = vi.fn();
+    const hidden = render(<AudioOfflineScreen onBack={() => {}} onToggleSetting={onToggle} />);
+    expect(hidden.container.querySelector('.dl-auto')).toBeNull();
+    cleanup();
+    Object.defineProperty(window.navigator, 'connection', { configurable: true, value: { type: 'wifi', addEventListener: vi.fn(), removeEventListener: vi.fn() } });
+    try {
+      const { getByRole } = render(<AudioOfflineScreen onBack={() => {}} onToggleSetting={onToggle} keepStarred wifiOnly={false} />);
+      const star = getByRole('switch', { name: /^Keep what I star on this phone/ });
+      expect(star.getAttribute('aria-checked')).toBe('true');
+      expect(getByRole('switch', { name: /^Download only on Wi-Fi/ }).getAttribute('aria-checked')).toBe('false');
+      fireEvent.click(star);
+      fireEvent.click(getByRole('switch', { name: /^Keep the next 3 ready/ }));
+      fireEvent.click(getByRole('switch', { name: /^Download only on Wi-Fi/ }));
+      expect(onToggle.mock.calls.map((c) => c[0])).toEqual(['keepStarred', 'keepNextReady', 'downloadWifiOnly']);
+    } finally {
+      Object.defineProperty(window.navigator, 'connection', { configurable: true, value: undefined });
+    }
   });
 });
 

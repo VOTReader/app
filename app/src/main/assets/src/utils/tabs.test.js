@@ -202,8 +202,8 @@ describe('describeTab', () => {
       expect(describeTab({ screen: 'library' })).toEqual({ title: 'Library', subtitle: 'Your saved content', resolved: true });
       expect(describeTab({ screen: 'my-progress' })).toEqual({ title: 'Progress', subtitle: 'Reading progress', resolved: true });
       expect(describeTab({ screen: 'about' })).toEqual({ title: 'About', subtitle: 'VOTReader', resolved: true });
-      expect(describeTab({ screen: 'audio-library' })).toEqual({ title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true });
-      expect(describeTab({ screen: 'audio-library-offline' })).toEqual({ title: 'Listening Library', subtitle: 'On this phone', resolved: true });
+      expect(describeTab({ screen: 'audio-library' })).toEqual({ title: 'Listen', subtitle: 'Saved & recent recordings', resolved: true });
+      expect(describeTab({ screen: 'audio-library-offline' })).toEqual({ title: 'Listen', subtitle: 'On this phone', resolved: true });
     });
 
     it('names a Scripture genre by its label, not its id (the 2026-09-25 walk)', () => {
