@@ -235,6 +235,41 @@ export function bibleLineAt(track, time) {
   return now ? { lead: String(verse), now, key: track.key, at: through(rows, i, time, now.length) } : null;
 }
 
+/** About how many characters of a letter's opening the card shows before the voice reaches a line. */
+const OPENING_CHARS = 180;
+const OPENING_BLOCKS = 3;
+
+/**
+ * What the card shows before the audio reaches a line (the voice is on the heading, or the timings have not landed):
+ * the opening of the letter, or a Bible chapter's first verse, so the card is never an empty band. Null only while
+ * the text itself has not landed. `at` is 0: nothing has been read yet.
+ * @param {any} track @param {number} time
+ * @returns {{ lead: string, now: string, key: string, at: number } | null}
+ */
+export function openingLineOf(track, time) {
+  if (!track) return null;
+  const ch = AudioPlayer.bibleChapterOfTrack(track);
+  if (ch > 0) {
+    const now = verseWords(track.key.slice(track.key.indexOf(':') + 1), ch, 1, bibleTextEdition(track));
+    return now ? { lead: '1', now, key: track.key, at: 0 } : null;
+  }
+  const sectionKey = track.key == null ? AudioPlayer.sectionLetterKeyAt(track, time) : null;
+  const key = sectionKey || track.key;
+  const unit = unitOfKey(key);
+  if (!unit) return null;
+  const count = Array.isArray(unit.blocks) ? unit.blocks.length : Array.isArray(unit.paragraphs) ? unit.paragraphs.length : 0;
+  let now = '';
+  let used = 0;
+  for (let bi = 0; bi < count && used < OPENING_BLOCKS && now.length < OPENING_CHARS; bi++) {
+    if (unit.blocks && unit.blocks[bi] && unit.blocks[bi].type === 'heading') continue;   // the title is already the player's heading
+    const words = rowWords(unit, [0, bi, -1, -1]);
+    if (!words) continue;
+    now = now ? now + ' ' + words : words;
+    used++;
+  }
+  return now ? { lead: '', now, key, at: 0 } : null;
+}
+
 /** An element's margins, top and bottom. @param {Element} el */
 function marginsOf(el) {
   const cs = getComputedStyle(el);
@@ -303,7 +338,7 @@ export function LiveLine({ track, time, title, onOpen }) {
     if (!isTranslationLoaded(textEdition)) void loadTranslation(textEdition);
     return letGo;
   }, [textEdition]);
-  const line = liveLineAt(track, Number(time) || 0);
+  const line = liveLineAt(track, Number(time) || 0) || openingLineOf(track, Number(time) || 0);
   // The words show in a window of whole lines (no line clamp: a clamped box hid the words being read, and drew lines
   // over each other on the phone); when they run longer it rolls up with the voice, a whole line at a time. In the
   // player the window takes every line the body has room for (Corbin 10-27: the small title leaves "most of the screen
