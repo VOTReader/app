@@ -359,10 +359,10 @@ export const TourController = {
   },
 
   /** Home only, after About, not once the flag is set, not while running, not within three days of Maybe later. */
-  /* Home, or the first letter (n114, A08.1): first run's Begin Reading opens that letter, so the
-     offer meets the reader there instead of waiting for Home. */
-  shouldPrompt(/** @type {{screen?: string, letterId?: string|null}} */ { screen, letterId } = {}) {
-    const here = screen === 'home' || (screen === FIRST_LETTER.screen && letterId === FIRST_LETTER.id);
+  /* Home only (the UI pass, U §4, 2026-11-11): the offer is an inline card at the end of the Read tab and never
+     floats over a reader, so the first letter (n114) no longer shows it. `letterId` is still accepted, and ignored. */
+  shouldPrompt(/** @type {{screen?: string, letterId?: string|null}} */ { screen } = {}) {
+    const here = screen === 'home';
     if (!here || state.active || state.promptDismissed) return false;
     if (laterSnoozed()) return false;
     try {

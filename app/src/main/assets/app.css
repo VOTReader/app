@@ -10130,6 +10130,20 @@
       .tour-strip .tour-btn { order: 2; flex: 0 0 auto; min-height: 44px; padding: 0 14px; font-family: var(--font-body); font-size: min(var(--fs-15), 18px); letter-spacing: 0; text-transform: none; }
       .tour-strip .tour-btn.quiet { order: 3; padding: 0 10px; }
       .tour-strip .tour-never { order: 1; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 44px; margin: 0; padding: 0; }
+      /* The UI pass (U §4, W1 2026-11-11): the offer is an inline card at the end of the Read tab, in the page's flow,
+         never a float. Words left, × at the top right; Show me around (primary) and Later (text) under them. */
+      .tour-prompt.tour-strip.tour-inline {
+        position: relative; left: auto; right: auto; bottom: auto; z-index: auto; max-width: none; max-height: none;
+        margin: var(--label-above) 0 0; padding: 12px 6px 10px var(--card-pad); overflow: visible;
+        border: 0; border-radius: var(--r-card); background: var(--surface-1); color: var(--text-1); box-shadow: none;
+        font-family: var(--font-ui); justify-content: flex-start; gap: var(--sp-2);
+      }
+      .tour-inline .tour-prompt-text { flex: 1 1 calc(100% - 56px); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.4; }
+      .tour-inline .tour-prompt-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; }
+      .tour-inline .tour-btn { min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; }
+      .tour-inline .tour-btn.primary { flex: 0 0 auto; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+      .tour-inline .tour-btn.quiet { background: none; color: var(--text-2); }
+      .tour-inline .tour-never { color: var(--text-3); }
       .tour-wait {
         position: fixed; left: 12px; right: 12px; bottom: var(--dock-message, 16px); z-index: 322; text-align: center;
         font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-muted);

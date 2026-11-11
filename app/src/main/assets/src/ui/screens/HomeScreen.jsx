@@ -17,6 +17,7 @@
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
+import { TourPrompt } from '../components/TourPrompt.jsx';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 
@@ -216,6 +217,8 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           </>
         ) : null}
         <p className="home-status" role="status">{homeStatus}</p>
+        {/* The tour's offer: an inline card at the end of the Read tab only (the UI pass, U §4); never a float. */}
+        <TourPrompt screen="home" />
       </div>
     </ScreenLayout>
   );

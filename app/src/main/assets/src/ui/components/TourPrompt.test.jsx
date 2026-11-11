@@ -1,7 +1,6 @@
-/* TourPrompt — the "New here?" strip at the foot of Home declares the room it takes.
-   RED first (review-tutorial, 2026-09-04): on a 699 px phone the strip covered the last Home tile
-   (Settings) and nothing could scroll it clear. Like the player bar, the strip marks the body while
-   it is up and publishes its measured height, and app.css pads .screen-scroll by that much. */
+/* TourPrompt — the "New here?" offer. Since the UI pass (U §4, 2026-11-11) it is an inline card at the end of the
+   Read tab, in the page's flow: it never floats over a reader, a menu or a sheet (the old strip was fixed over the
+   foot of Home and the first letter, and had to pad the scroller by its measured height). */
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
@@ -24,31 +23,25 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); });
 
-describe('TourPrompt — the strip declares the room it takes', () => {
-  it('marks the body and publishes its height while it is up on Home', () => {
+describe('TourPrompt — an inline card at the end of the Read tab (the UI pass, U §4)', () => {
+  it('shows on Home in the page flow: no float, no body class, no padding of the scroller', () => {
     const { container } = render(<TourPrompt screen="home" />);
-    expect(container.querySelector('.tour-prompt')).toBeTruthy();
-    expect(document.body.classList.contains('tour-prompt-open')).toBe(true);
+    const card = container.querySelector('.tour-prompt');
+    expect(card).toBeTruthy();
+    expect(card.classList.contains('tour-inline')).toBe(true);
+    expect(document.body.classList.contains('tour-prompt-open')).toBe(false);
+    expect(document.documentElement.style.getPropertyValue('--tour-prompt-h')).toBe('');
   });
 
-  it('measures into --tour-prompt-h when it has a height, and clears everything when it goes', () => {
-    const real = HTMLElement.prototype.getBoundingClientRect;
-    HTMLElement.prototype.getBoundingClientRect = function () { return this.classList && this.classList.contains('tour-prompt') ? /** @type {any} */ ({ height: 172, width: 336, top: 0, left: 0, right: 336, bottom: 172, x: 0, y: 0 }) : real.call(this); };
-    try {
-      render(<TourPrompt screen="home" />);
-      expect(document.documentElement.style.getPropertyValue('--tour-prompt-h')).toBe('172px');
-      expect(document.body.classList.contains('tour-prompt-open')).toBe(true);
-      act(() => { TourController.dismissPrompt('later'); });        // Maybe later: the strip leaves
-      expect(document.querySelector('.tour-prompt')).toBeNull();
-      expect(document.body.classList.contains('tour-prompt-open')).toBe(false);
-      expect(document.documentElement.style.getPropertyValue('--tour-prompt-h')).toBe('');
-    } finally { HTMLElement.prototype.getBoundingClientRect = real; }
+  it('leaves on Maybe later', () => {
+    render(<TourPrompt screen="home" />);
+    act(() => { TourController.dismissPrompt('later'); });
+    expect(document.querySelector('.tour-prompt')).toBeNull();
   });
 
-  it('marks nothing off Home', () => {
+  it('shows nowhere off Home', () => {
     render(<TourPrompt screen="settings" />);
     expect(document.querySelector('.tour-prompt')).toBeNull();
-    expect(document.body.classList.contains('tour-prompt-open')).toBe(false);
   });
 
   /* RED 2026-09-10: the strip said "six short stops" after the highlight stop made the tour seven, the
@@ -74,12 +67,9 @@ describe('TourPrompt — the strip declares the room it takes', () => {
     expect(document.querySelector('.tour-prompt')).toBeNull();
   });
 
-  it('shows over the first letter (where Begin Reading lands, n114) and over no other letter', () => {
+  it('never shows over a reader, the first letter included (it used to, n114)', () => {
     const first = TourController.firstLetter();
-    const { unmount } = render(<TourPrompt screen={first.screen} letterId={first.id} />);
-    expect(document.querySelector('.tour-prompt')).toBeTruthy();
-    unmount();
-    render(<TourPrompt screen={first.screen} letterId="the-wide-path" />);
+    render(<TourPrompt screen={first.screen} letterId={first.id} />);
     expect(document.querySelector('.tour-prompt')).toBeNull();
   });
 });

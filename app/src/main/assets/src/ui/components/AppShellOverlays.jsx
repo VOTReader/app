@@ -22,7 +22,6 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
-import { TourPrompt } from './TourPrompt.jsx';
 import { navOriginLabel } from '../../utils/tabs.js';
 import { OPEN_YOUR_DATA_EVENT } from '../../utils/your-data-link.js';
 
@@ -232,9 +231,8 @@ export function AppShellOverlays({
           </div>
         );
       })()}
-      {/* "Show me around": the strip on Home and the tour itself, both bundle-d free globals
-          (guarded like every shell free global: unit tests render the shell without them). */}
-      {typeof TourPrompt !== 'undefined' ? <TourPrompt screen={screen} letterId={tabs && tabs[activeTabIdx] ? tabs[activeTabIdx].letterId : null} /> : null}
+      {/* The tour itself, a bundle-d free global (guarded like every shell free global: unit tests render the shell
+          without it). Its offer, "Show me around", is an inline card at the end of the Read tab (HomeScreen). */}
       {typeof TourOverlay !== 'undefined' ? <TourOverlay /> : null}
     </>
     </ErrorBoundary>

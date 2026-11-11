@@ -1,16 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════
    TourPrompt — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   The quiet slim strip that offers "Show me around" once, after About,
-   over Home or the first letter (where first run's Begin Reading lands):
+   The quiet card that offers "Show me around" once, after About, at the
+   end of the Read tab (HomeScreen draws it; the UI pass, U §4, 2026-11-11):
    Show me around · Later · × (don't show this again). A few
    hundred bytes on the boot path; the tour itself (TourOverlay) ships in
    bundle-d too (it rode lazy bundle-e until lz1, 2026-10-13).
 
-   Shows only when TourController.shouldPrompt says so: Home, About seen,
+   Shows only when TourController.shouldPrompt says so: Home only, About seen,
    the durable flag unset, the tour not running, and not within three days
-   of Maybe later (TOUR_LATER_MS). Nothing is dimmed and nothing is trapped: it is a strip, not
-   a dialog — a reader who ignores it loses nothing.
+   of Maybe later (TOUR_LATER_MS). Nothing is dimmed and nothing is trapped: it is a card in the
+   page, not a dialog and not a float — a reader who ignores it loses nothing.
    ═══════════════════════════════════════════════════════════════════════ */
 
 /** @param {{ screen: string, letterId?: string|null }} props */
@@ -33,24 +33,11 @@ export function TourPrompt({ screen, letterId }) {
     () => (_done ? _done.getVersion() : 0)
   );
   const show = !!(ctl && ctl.shouldPrompt({ screen, letterId }));
-  // The strip is fixed over the foot of Home, and on a 699 px phone it covers the last tile
-  // (Settings) with nothing to scroll it clear (emulator, 2026-09-04). Like the player bar
-  // (body.audio-bar-open), it declares itself: a body class and its measured height, and
-  // app.css pads .screen-scroll by that much, so every tile can still be reached.
-  const ref = React.useRef(/** @type {HTMLDivElement|null} */ (null));
-  React.useLayoutEffect(() => {
-    if (!show) return undefined;
-    const root = document.documentElement;
-    const measure = () => { const el = ref.current; const h = el ? el.getBoundingClientRect().height : 0; if (h) root.style.setProperty('--tour-prompt-h', Math.round(h) + 'px'); };
-    document.body.classList.add('tour-prompt-open');
-    measure();
-    const ro = typeof ResizeObserver !== 'undefined' && ref.current ? new ResizeObserver(measure) : null;
-    if (ro) ro.observe(ref.current);
-    return () => { if (ro) ro.disconnect(); document.body.classList.remove('tour-prompt-open'); root.style.removeProperty('--tour-prompt-h'); };
-  }, [show]);
+  // The UI pass (U §4, W1 2026-11-11): the offer is an inline card at the END of the Read tab, in the page's own flow.
+  // It never floats over a reader, a menu or a sheet, so it no longer marks the body or pads the scroller.
   if (!show) return null;
   return (
-    <div className="tour-prompt tour-strip" role="region" aria-labelledby="tour-prompt-title" ref={ref}>
+    <div className="tour-prompt tour-strip tour-inline" role="region" aria-labelledby="tour-prompt-title">
       {/* n115/n351 (A07.6): slim strip (Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png, variant C);
           the card it replaces was 215 px over Home's cards. The minutes come from the tour itself. */}
       <p className="tour-prompt-text" id="tour-prompt-title">
