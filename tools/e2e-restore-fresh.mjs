@@ -153,12 +153,15 @@ async function openYourData(page) {
   await page.waitForSelector('section[data-settings-group="data"] .settings-group-body', { timeout: 5000 });
 }
 
-/** Home -> Bookmarks -> the seeded bookmark. Returns the text the reading view then shows ('' when
+/** Home -> Library -> Bookmarks -> the seeded bookmark (Home's own Bookmarks shortcut went with the home trim, 2026-11-10). Returns the text the reading view then shows ('' when
  *  the row was missing). A reader's route, so the app records the reading position itself. */
 async function openSeededBookmark(page) {
   await page.evaluate(() => { const h = document.querySelector('[aria-label="Home"]'); if (h) /** @type {HTMLElement} */ (h).click(); });
   await sleep(700);
-  need(await clickIf(page, 'Bookmarks'), 'no Bookmarks shortcut on Home');
+  if (!(await clickIf(page, 'Bookmarks'))) {
+    need((await clickIf(page, 'Personal Study')) || (await clickIf(page, 'Library')), 'no Library on Home');
+    need(await clickIf(page, 'Bookmarks'), 'no Bookmarks in the Library');
+  }
   const listed = await page.waitForFunction(() => [...document.querySelectorAll('.bkm-row')].some((r) => /B2 bookmark/.test(r.textContent || '')), { timeout: 8000 }).then(() => true, () => false);
   if (!listed) return '';
   await page.evaluate(() => {
