@@ -1456,7 +1456,6 @@ export const LS_SKIP_LIST = Object.freeze([
   // deleted them; ls-skip-list.gate.test.js now finds each live key in the source and fails here.
   'vot-notes-tab',                // NotesIndexScreen: the Notes tab the reader last chose
   'vot-answers-fold',             // AnswersTopic: the sections the reader folded
-  'vot-plan-ribbon-hidden',       // PlanRibbon: the plan line hidden for today (retired by plans2; old values stay listed)
   'vot-plans-offer-hidden',       // HomeScreen: the reading-plan offer dismissed
   'vot-plan-quiet-asked',         // PlanPage: the plans already asked about going quiet
   'vot-install-offer',            // InstallCard: the reader's answer to the install offer
