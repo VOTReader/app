@@ -214,8 +214,8 @@ async function seed(page, pairs) {
   }, pairs);
 }
 async function toMyWeb(page) {
-  await clickLabel(page, 'Personal Study'); await sleep(400);
-  await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)
+  // Scripture Web is the Read tab's Explore button (three-tab layout; it was a Personal Study row).
+  await clickLabel(page, 'Scripture Web');
   if (!(await waitFor(page, () => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), NAV_MS))) throw new Error('wait timed out (main-world poll)');
   if (await page.$('.sw-fallback')) return false;
   if (!(await waitFor(page, () => !document.querySelector('.sw-loading'), NAV_MS))) throw new Error('wait timed out (main-world poll)');

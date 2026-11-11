@@ -82,6 +82,9 @@ try {
     const setScale = () => page.evaluate((s) => { document.documentElement.style.setProperty('--font-scale', String(s)); }, scale);
     await setScale();
     const click = async (l) => { await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim().replace(/\s+/g, ' ')).startsWith(l) && b.getBoundingClientRect().width > 0); if (b) b.click(); }, l); await sleep(600); await setScale(); await sleep(150); };
+    // The three-tab layout (Read, Listen, Library; Settings is the gear): a tab by its label, else the reader's Home.
+    const tab = async (l) => { const hit = await page.evaluate((l) => { const t = [...document.querySelectorAll('.tabbar-tab')].find((b) => b.textContent.trim() === l); if (t) t.click(); return !!t; }, l); if (!hit && l === 'Read') await click('Home'); else { await sleep(600); await setScale(); await sleep(150); } };
+    const libTile = async (id) => { await page.evaluate((id) => { const t = document.querySelector('.lib-tile[data-tile="' + id + '"]'); t && t.click(); }, id); await sleep(700); await setScale(); };
     const measure = (name) => page.evaluate((name) => {
       const vw = window.innerWidth;
       const nav = document.querySelector('.top-nav');
@@ -129,17 +132,17 @@ try {
     await click('Volume One'); await stop('volume-index');
     await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn')][1]; b && b.click(); }); await sleep(900); await setScale();
     await stop('letter');
-    await click('Home'); await click('The Holy Bible'); await stop('scriptures');
+    await tab('Read'); await click('The Holy Bible'); await stop('scriptures');
     await click('Gospels'); await stop('gospels');
     await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn')][0]; b && b.click(); }); await sleep(600); await setScale();
     await page.evaluate(() => { const b = [...document.querySelectorAll('.chapter-card-btn')][0]; b && b.click(); }); await sleep(900); await setScale();
     await stop('bible-chapter');
-    await click('Home'); await click('Personal Study'); await stop('library');
-    await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => (t.querySelector('.library-tile-title') || {}).textContent === 'Notes'); t && t.click(); }); await sleep(700); await setScale();
+    await tab('Read'); await tab('Library'); await stop('library');
+    await libTile('notes');
     await stop('notes-index');
-    await click('Back'); await page.evaluate(() => { const t = [...document.querySelectorAll('.library-tile')].find((t) => (t.querySelector('.library-tile-title') || {}).textContent === 'Journal'); t && t.click(); }); await sleep(700); await setScale();
+    await click('Back'); await libTile('journal');
     await stop('journal');
-    await click('Home'); await click('App Configuration'); await sleep(300);
+    await tab('Read'); await click('Settings'); await sleep(300);
     await page.evaluate(() => { for (const h of document.querySelectorAll('.settings-group-head')) if (/Appearance|Your Data/.test(h.textContent)) h.click(); }); await sleep(500); await setScale();
     await stop('settings');
     await click('Search'); await stop('search');

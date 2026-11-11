@@ -90,9 +90,8 @@ async function boot(page, url) {
   await sleep(500);
   await clickIfPresent(page, 'Maybe later');
   await sleep(200);
-  await clickLabel(page, 'Personal Study');
-  await sleep(400);
-  await clickLabel(page, 'Scripture Web');   // the Library row (its "The Whole Counsel" eyebrow left 2026-09-25)
+  // Scripture Web is the Read tab's Explore button (three-tab layout; it was a Personal Study row).
+  await clickLabel(page, 'Scripture Web');
   await page.waitForFunction(() => !!document.querySelector('.sw-root') || !!document.querySelector('.sw-fallback'), { timeout: NAV_MS });
   if (await page.$('.sw-fallback')) return false;
   await page.waitForFunction(() => !document.querySelector('.sw-loading'), { timeout: NAV_MS });
