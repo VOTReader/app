@@ -14,6 +14,7 @@ import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey } fro
 import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
+import { openPlanNav } from './plan-nav.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun} PlanRun */
 /** @typedef {import('../data/plan-catalog.js').LetterSource} LetterSource */
@@ -48,12 +49,16 @@ export function shortDate(key) {
 /** One of today's items as its check: a chapter's number, a letter's title. @param {import('../data/plan-engine.js').PlanItem} it */
 const itemShort = (it) => (it.t ? it.t : it.k.slice(it.k.lastIndexOf(':') + 1));
 
-/** What the items are, counted: "chapters", "letters" or "chapters and letters". @param {PlanRun} run */
-function unitOf(run) {
-  let ch = false, le = false;
-  for (const tr of run.tracks) for (const it of tr.items) { if (it.t) le = true; else ch = true; if (ch && le) return 'chapters and letters'; }
-  return le ? 'letters' : 'chapters';
+/** What the items are, counted: "chapters", "letters" or "chapters and letters"; singular for one. @param {PlanRun} run */
+export function unitOf(run) {
+  let ch = false, le = false, n = 0;
+  for (const tr of run.tracks) for (const it of tr.items) { n++; if (it.t) le = true; else ch = true; }
+  if (ch && le) return 'chapters and letters';
+  return le ? (n === 1 ? 'letter' : 'letters') : (n === 1 ? 'chapter' : 'chapters');
 }
+
+/** "1 day", "4 days". @param {number} n */
+export const daysWord = (n) => n.toLocaleString('en-US') + (n === 1 ? ' day' : ' days');
 
 /**
  * A run's row for the Today card and the Plans screen.
@@ -68,18 +73,17 @@ export function runRow(run, now) {
   const nextItem = today.find((it) => !(it.k in ticks)) || today[0] || null;
   const from = nextItem ? today.indexOf(nextItem) : 0;
   const words = itemsWords(today);
-  // C10: counts, never a percentage rounded down; the finish is the honest one (behind moves it).
+  // C10: counts; the finish is the honest one. plans2: one phrase when it moved, "N days later than planned"
+  // (never behind, missed or catch up), and a paused plan or one not started is never late.
   const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
-  const pace = st.finished ? '' : st.behind > 0 ? st.behind + (st.behind === 1 ? ' day' : ' days') + ' behind · new finish ' + shortDate(st.projected)
-    : st.ahead > 0 ? st.ahead + (st.ahead === 1 ? ' day' : ' days') + ' ahead · finish ' + shortDate(st.projected)
-      : 'on pace to finish ' + shortDate(st.projected);
+  const pace = st.finished ? '' : 'Finishes ' + shortDate(st.projected) + (st.late > 0 ? ' · ' + daysWord(st.late) + ' later than planned' : '');
   return {
     id: run.id, plan: run.plan, name: runName(run, null), loading: false,
     label: st.finished ? '' : itemsLabel(shown, bookTitle),
     tomorrow: st.doneToday ? itemsLabel(today, bookTitle) : '',
     done: st.doneToday, day: st.doneToday ? st.day - 1 : st.day, totalDays: st.total,
-    percent: st.total ? Math.floor(st.doneDays * 100 / st.total) : 0,
-    behind: st.behind, ahead: st.ahead, finished: st.finished, paused: st.paused,
+    percent: st.percent,
+    behind: st.behind, ahead: st.ahead, late: st.late, finished: st.finished, paused: st.paused, notStarted: st.notStarted, start: run.start,
     next: nextItem ? itemRef(nextItem.k) : null,
     // Read again: the day just finished, from its start.
     again: st.doneToday && prev.length ? itemRef(prev[0].k) : null,
@@ -87,6 +91,8 @@ export function runRow(run, now) {
     listen: today.slice(from).map((it) => itemRef(it.k)),
     items: shown.map((it) => ({ k: it.k, short: itemShort(it), label: itemsLabel([it], bookTitle), done: it.k in ticks })),
     todayTicked: st.todayTicked, todayCount: today.length, minutes: words ? minutesFor(words) : 0,
+    // plans2 3.9: what is left of today's portion, in minutes (the Read tab's "7 min left")
+    minutesLeft: (() => { const w = itemsWords(today.filter((it) => !(it.k in ticks))); return w ? minutesFor(w) : 0; })(),
     itemsDone: st.itemsDone, itemsTotal: st.itemsTotal, projected: st.projected, target: st.target,
     counts: fmt(st.itemsDone) + ' of ' + fmt(st.itemsTotal) + ' ' + unitOf(run), pace,
   };
@@ -138,21 +144,10 @@ export function saveRun(run) { const s = _store(); if (s) s.put(run); }
 /** Stop a run: it stays on the device, stopped (finished runs are the archive; stopped ones are not shown). */
 export function stopRun(run, now) { saveRun({ ...run, status: 'stopped', updated: now.getTime(), stopped: todayKey(now) }); }
 
-/* rp-s1: a tapped reminder asks the Plans screen to open that plan's details. The ask waits here until the
-   screen takes it (a cold start reaches the screen after the tap), and a screen already showing hears it. */
-let _openAsk = /** @type {string | null} */ (null);
-const _openSubs = new Set();
-/** @param {string} id */
-export function askPlanOpen(id) { _openAsk = id; for (const f of _openSubs) f(id); }
-/** The plan a reminder asked to open, once. @returns {string | null} */
-export function takePlanOpen() { const id = _openAsk; _openAsk = null; return id; }
-/** @param {(id: string) => void} f @returns {() => void} */
-export function onPlanOpenAsk(f) { _openSubs.add(f); return () => { _openSubs.delete(f); }; }
-
 /**
  * rp-s1, mounted once at the app: hands the native reminder the runs on every store change and at boot (a stop,
  * pause or Clear All drops a reminder because the run is no longer running), and opens the plan a tapped reminder
- * names. A no-op on the web. @param {() => void} openPlans
+ * names (plans2: on that plan's own page). A no-op on the web. @param {() => void} openPlans
  */
 export function usePlanReminders(openPlans) {
   const store = _store();
@@ -169,5 +164,5 @@ export function usePlanReminders(openPlans) {
   }, [store, version]);
   const openRef = React.useRef(openPlans);
   React.useEffect(() => { openRef.current = openPlans; });
-  React.useEffect(() => onReminderOpen((id) => { askPlanOpen(id); openRef.current(); }), []);
+  React.useEffect(() => onReminderOpen((id) => { openPlanNav([{ v: 'list' }, { v: 'plan', id }]); openRef.current(); }), []);
 }

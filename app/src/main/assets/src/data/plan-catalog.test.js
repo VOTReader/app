@@ -37,7 +37,7 @@ describe('Bible items', () => {
 describe('the catalog', () => {
   it('has the call-1A plans and every one starts', () => {
     expect(PLAN_CATALOG.map((p) => p.id)).toEqual(['bible-year', 'new-testament', 'psalms', 'proverbs', 'gospels',   // + S3, letters by date
-      'seven-volumes', 'letters-year', 'volumes', 'letters-chrono', 'collection', 'blessed', 'timothy', 'holy-days', 'matthew-study']);
+      'seven-volumes', 'letters-year', 'volumes', 'letters-chrono', 'collection', 'blessed', 'timothy', 'holy-days', 'matthew-study', 'together-year']);
     for (const p of PLAN_CATALOG) {
       const run = startCatalogPlan(p.id, src, at('2026-10-22'), { volKey: 'one' });
       if (p.id === 'seven-volumes' || p.id === 'letters-year' || p.id === 'volumes') { expect(run).not.toBeNull(); continue; }
@@ -132,13 +132,13 @@ describe('start where I am (n354b)', () => {
   const readOf = (ids) => (bid, cid) => bid === 'volume-one' && ids.includes(cid);
   it('a Volumes plan offers its first unread letter in volume order, and starts there', () => {
     const isRead = readOf(['one-preface', 'one-1', 'one-2']);
-    expect(catalogResume('seven-volumes', src, isRead)).toEqual({ k: 'volume-one:one-3', t: 'Letter 3' });
+    expect(catalogResume('seven-volumes', src, isRead)).toEqual({ k: 'volume-one:one-3', t: 'Letter 3', skipped: 3 });
     const run = /** @type {any} */ (startCatalogPlan('seven-volumes', src, at('2026-10-23'), { from: 'volume-one:one-3' }));
     expect(dayItems(run, 0)[0].k).toBe('volume-one:one-3');
     expect(run.tracks[0].items.some((it) => it.k === 'volume-one:one-1')).toBe(false);
   });
   it('One collection reads its own collection; nothing read, a Bible plan, or no Volumes: no offer', () => {
-    expect(catalogResume('collection', src, readOf(['one-preface']), { volKey: 'one' })).toEqual({ k: 'volume-one:one-1', t: 'Letter 1' });
+    expect(catalogResume('collection', src, readOf(['one-preface']), { volKey: 'one' })).toEqual({ k: 'volume-one:one-1', t: 'Letter 1', skipped: 1 });
     expect(catalogResume('collection', src, readOf(['one-preface']), { volKey: 'two' })).toBeNull();
     expect(catalogResume('seven-volumes', src, readOf([]))).toBeNull();
     expect(catalogResume('bible-year', src, () => true)).toBeNull();

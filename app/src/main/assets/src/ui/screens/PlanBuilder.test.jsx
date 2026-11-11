@@ -5,7 +5,7 @@
 import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen, within, act } from '@testing-library/react';
-import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
+import { PlansHub as ReadingPlansScreen } from './PlansHub.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { dayItems } from '../../data/plan-engine.js';
 
@@ -56,7 +56,7 @@ describe('PlanBuilder', () => {
     expect(run.plan).toBe('custom');
     expect(run.name).toBe('Genesis 1-4');
     expect(dayItems(run, 0).map((it) => it.k)).toEqual(['genesis:1', 'genesis:2']);
-    expect(screen.getByRole('region', { name: 'Genesis 1-4' })).toBeTruthy();   // back on Plans, following it
+    expect(screen.getByRole('group', { name: 'This week' })).toBeTruthy();   // plans2: on the new plan's own page
   });
 
   it('mixes Bible and letters side by side by default, one after the other on request; Back steps back', () => {

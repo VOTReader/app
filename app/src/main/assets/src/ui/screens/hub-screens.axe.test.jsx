@@ -24,7 +24,7 @@ import { ScripturesHome } from './ScripturesHome.jsx';
 import { ScriptureGenre } from './ScriptureGenre.jsx';
 import { StudiesHome } from './StudiesHome.jsx';
 import { AboutScreen } from './AboutScreen.jsx';
-import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
+import { PlansHub as ReadingPlansScreen } from './PlansHub.jsx';
 import { GardenView } from './GardenView.jsx';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings } from './settings-harness.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
@@ -203,7 +203,7 @@ describe('axe — Reading plans and the plan builder', () => {
     put('colLetterArr', () => LETTERS);
     put('colPreface', () => null);
   };
-  const screenOf = () => render(<ReadingPlansScreen readingPlans={[]} isRead={() => false} markAsReadEnabled onPlansMoved={noop} onRead={noop} onBack={noop} />);
+  const screenOf = () => render(<ReadingPlansScreen readingPlans={[]} isRead={() => false} onPlansMoved={noop} onStartSession={noop} onBack={noop} />);
 
   it('no plan yet', async () => {
     plans();
@@ -211,20 +211,33 @@ describe('axe — Reading plans and the plan builder', () => {
     await check();
   });
 
-  it('a plan running behind, its details open', async () => {
+  it('a plan running late: the list, its page, its settings, Adjust, the schedule and a day sheet', async () => {
     plans();
     let run = startCatalogPlan('bible-year', null, daysAgo(4));
     for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
     ReadingPlanStore.put(run);
+    const { getByRole, getAllByRole } = screenOf();
+    await check();
+    fireEvent.click(getByRole('button', { name: /^Bible in a Year: Today/ }));   // the plan's own page
+    await check();
+    fireEvent.click(getByRole('button', { name: 'Plan settings' }));
+    await check();
+    fireEvent.click(getByRole('button', { name: 'Done' }));
+    fireEvent.click(getByRole('button', { name: 'Adjust' }));
+    await check();
+    fireEvent.click(getByRole('button', { name: 'Cancel' }));
+    fireEvent.click(getAllByRole('button', { name: 'Whole schedule' })[0]);
+    await check();
+    fireEvent.click(getByRole('tab', { name: 'What I’ve read' }));
+    await check();
+    fireEvent.click(getAllByRole('button', { name: /^Day 1,/ })[0]);   // the day sheet
+    await check();
+  });
+
+  it('a plan before it starts (the preview)', async () => {
+    plans();
     const { getByRole } = screenOf();
-    await check();
-    fireEvent.click(getByRole('button', { name: 'Plan details' }));
-    await check();
-    fireEvent.click(getByRole('button', { name: 'Previous month' }));   // the days before the plan began
-    // a day that opens nothing is a named image, never a bare span whose aria-label nothing reads
-    expect([...document.querySelectorAll('span.plans-day[aria-label]')].filter((d) => d.getAttribute('role') !== 'img')).toEqual([]);
-    await check();
-    fireEvent.click(getByRole('button', { name: 'Change pace' }));
+    fireEvent.click(getByRole('button', { name: /^Bible in a Year:/ }));
     await check();
   });
 

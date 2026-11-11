@@ -32,12 +32,12 @@ describe('TodayCard (the up-next card)', () => {
     expect(onListen).toHaveBeenCalledWith([{ bid: 'genesis', cid: 49 }, { bid: 'genesis', cid: 50 }], 'bible-year');
   });
 
-  it('a day read through is one row: "Today’s reading is done" and Read ahead, no pills', () => {
+  it('a day read through is one row: "Done today · tomorrow ..." and Read ahead, no pills', () => {
     const onRead = vi.fn();
     const { container } = render(<TodayCard rows={[row({ done: true, tomorrow: 'Exodus 1-4', next: { bid: 'exodus', cid: 1 }, again: { bid: 'genesis', cid: 47 } })]}
       onRead={onRead} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
     expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
-    expect(screen.getByText('Today’s reading is done')).toBeTruthy();
+    expect(screen.getByText('Done today · tomorrow Exodus 1-4')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Read ahead' }));
     expect(onRead).toHaveBeenLastCalledWith({ bid: 'exodus', cid: 1 }, 'bible-year');
     expect(screen.queryByRole('button', { name: /Listen|^Read Genesis/ })).toBeNull();
@@ -56,21 +56,30 @@ describe('TodayCard (the up-next card)', () => {
     expect(onRead).toHaveBeenCalledWith({ bid: 'volume-two', cid: 'x' }, 'volumes');
   });
 
-  it('never scores: behind is a small second line to the Plans screen, and there is no streak', () => {
-    const onOpenPlans = vi.fn();
-    const { container } = render(<TodayCard rows={[row({ behind: 3 })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={onOpenPlans} markAsReadEnabled />);
-    expect(container.textContent).not.toMatch(/streak/i);
+  it('never scores or nags: a plan behind says nothing of it here, and its text opens the plan’s page (plans2 3.8, 3.9)', () => {
+    const onOpenPlan = vi.fn();
+    const { container } = render(<TodayCard rows={[row({ behind: 3 })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} markAsReadEnabled={false} />);
+    expect(container.textContent).not.toMatch(/streak|catch up|behind|Mark as read/i);
     expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
-    fireEvent.click(screen.getByRole('button', { name: '3 days to catch up' }));
-    expect(onOpenPlans).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /^Open Bible in a Year: / }));
+    expect(onOpenPlan).toHaveBeenCalledWith('bible-year');
   });
 
-  it('Mark as read off: a small line that turns it on (C12)', () => {
-    const on = vi.fn();
-    render(<TodayCard rows={[row({ behind: 2 })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled={false} onEnableMarkAsRead={on} />);
-    expect(screen.queryByRole('button', { name: /to catch up/ })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Turn on Mark as read to track this' }));
-    expect(on).toHaveBeenCalled();
+  it('a paused plan is not shown; one not started says when it starts, with nothing to read yet (plans2 3.9)', () => {
+    const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+    const key = tomorrow.getFullYear() + '-' + String(tomorrow.getMonth() + 1).padStart(2, '0') + '-' + String(tomorrow.getDate()).padStart(2, '0');
+    const { container } = render(<TodayCard rows={[row({ id: 'p', paused: true }), row({ id: 'n', notStarted: true, start: key })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} />);
+    expect(container.querySelectorAll('[data-plan]')).toHaveLength(1);
+    expect(screen.getByText('Starts tomorrow')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Read / })).toBeNull();
+  });
+
+  it('a plan just finished keeps a row until it is opened or dismissed (plans2 3.7)', () => {
+    const onOpenPlan = vi.fn();
+    render(<TodayCard rows={[row({ finished: true })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} onOpenPlan={onOpenPlan} />);
+    fireEvent.click(screen.getByRole('button', { name: /You finished Bible in a Year/ }));
+    expect(onOpenPlan).toHaveBeenCalledWith('bible-year');
+    expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy();
   });
 
   it('with no plan, offers one in one row: "Start a reading plan ›" opens the plans, × (Not now) hides it (C8)', () => {

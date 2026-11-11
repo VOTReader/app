@@ -14,7 +14,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runName } from '../../data/plan-catalog.js';
-import { runRow } from '../../utils/plan-runs-view.js';
+import { runRow, shortDate } from '../../utils/plan-runs-view.js';
 import { countMarks } from '../../utils/mark-kinds.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
@@ -55,7 +55,10 @@ export function plansLine(runs) {
   let first = runName(runs[0], null);
   try {
     const row = runRow(runs[0], new Date());
-    if (!row.finished) first += ' · day ' + (row.day + 1) + ' of ' + row.totalDays;
+    // plans2: one phrase per state, the same as the plan's own page (paused, a later start, the day).
+    if (row.paused) first += ' · paused';
+    else if (row.notStarted) first += ' · starts ' + shortDate(row.start).replace(/, \d{4}$/, '');
+    else if (!row.finished) first += ' · day ' + (row.day + 1) + ' of ' + row.totalDays;
   } catch (_e) { /* a Volumes plan before the letters load: its name alone */ }
   return runs.length > 1 ? first + ' · and ' + (runs.length - 1) + ' more' : first;
 }
