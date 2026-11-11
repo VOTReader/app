@@ -84,11 +84,12 @@ describe('Saved answers (O5)', () => {
     const s = stores({});
     const onOpenSaved = vi.fn();
     render(<AnswersHome {...nav} entries={ANSWERS} site={SITE} isRead={() => false} onOpenTopic={noop} onOpenMedia={noop} onOpenSaved={onOpenSaved} />);
-    const row = () => [...document.querySelectorAll('.ans-tools .ans-row')].find((r) => r.querySelector('.ans-row-title').textContent === 'Saved answers');
-    expect(row()).toBeUndefined();
+    // WA1 (a-saved): the door is always offered, beside Charts and videos; its label carries the live count
+    const row = () => screen.getByRole('button', { name: /^Saved answers/ });
+    expect(row().getAttribute('aria-label')).toBe('Saved answers');
     act(() => s.set(MARKS));
-    expect(NB(row().querySelector('.ans-row-sub').textContent)).toBe('3 highlights and notes in 2 topics');
-    expect(row().previousElementSibling.querySelector('.ans-row-title').textContent).toBe('Charts & videos');
+    expect(NB(row().getAttribute('aria-label'))).toBe('Saved answers, 3 highlights and notes in 2 topics');
+    expect(row().previousElementSibling.textContent).toBe('Charts and videos');
     fireEvent.click(row());
     expect(onOpenSaved).toHaveBeenCalledTimes(1);
   });
@@ -99,7 +100,7 @@ describe('Share as a card (O6)', () => {
     stores({});
     render(<AnswersHome {...nav} entries={ANSWERS} site={SITE} isRead={() => false} onOpenTopic={noop} now={new Date(2026, 4, 17, 12)} />);
     const daily = document.querySelector('.ans-daily');
-    fireEvent.click(within(daily.querySelector('.ans-daily-head')).getByLabelText('Share as a card'));
+    fireEvent.click(within(daily).getByLabelText('Share as a card'));
     const sheet = screen.getByRole('dialog', { name: 'Share as a card' });
     // One choice of three that repaints the card: a radio group (a tablist would want panels to show).
     const group = within(sheet).getByRole('radiogroup', { name: 'Card theme' });

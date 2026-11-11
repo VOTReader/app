@@ -8787,8 +8787,8 @@
 .ans-row-sub,.ans-meta,.ans-metarow,.ans-chip,.ans-textbtn,.ans-count,.ans-note,.ans-src,.ans-contents-line,.ans-hit-src,.ans-credit,.ans-figcap,.ans-thumb-t,.ans-rail .ans-row-title{font-size:min(var(--fs-15),5.6vw);line-height:1.45}
 .ans-label{font-family:'Cinzel',serif;font-weight:400;font-size:clamp(var(--fsc-12),3.6vw,var(--fs-13));line-height:1.4;letter-spacing:.14em;text-transform:uppercase;color:var(--gold-dim);margin:0}
 .ans-lead,.ans-lede,.ans-meta,.ans-metarow,.ans-row-sub,.ans-count,.ans-note,.ans-hit-src,.ans-credit,.ans-figcap,.ans-src{color:var(--cream-muted)}
-.ans-num,.ans-chev,.ans-ico,.ans-iconbtn,.ans-search-btn,.ans-disc,.ans-btn{color:var(--gold)}
-.ans-iconbtn,.ans-search-btn,.ans-disc,.ans-btn,.ans-zoom{display:grid;place-items:center} /* the icon boxes, the button, the chart stage */
+.ans-num,.ans-chev,.ans-ico,.ans-search-btn,.ans-disc,.ans-btn{color:var(--gold)}
+.ans-search-btn,.ans-disc,.ans-btn,.ans-zoom{display:grid;place-items:center} /* the icon boxes, the button, the chart stage */
 .ans-metarow,.ans-note,.ans-hit-src,.ans-src{font-style:italic}
 .ans-metarow{white-space:pre-line}
 .ans-metarow b,.ans-metarow strong{font-weight:400}
@@ -8812,16 +8812,12 @@
 
 /* Page frame and landing header */
 .ans-page{padding:0 24px 48px;color:var(--cream)}
-.ans-head,.ans-ask-head,.ans-daily-head,.ans-sechead,.ans-results-sum,.ans-az-head{display:flex;align-items:center;justify-content:space-between;gap:4px 12px}
+.ans-head,.ans-sechead,.ans-results-sum,.ans-az-head{display:flex;align-items:center;justify-content:space-between;gap:4px 12px}
 .ans-head{min-height:48px;margin-top:12px} /* r2: 44 → 48 */
-.ans-iconbtn{width:48px;height:48px;margin-right:-12px} /* r2: 48 box; the icon keeps its place 2px inside the gutter */
 .ans-lede{margin:12px 0 0}
 
 /* Ask block: label, field, chips */
 .ans-ask{margin-top:24px}
-.ans-ask-head,.ans-daily-head{min-height:48px} /* r2 */
-.ans-ask-head{flex-wrap:wrap} /* r2: at every size, not only ts2: at 360 the label and "More questions ›" (about 385px) overflow
-   312, and without wrap each squeezed onto two lines ("START WITH A / QUESTION", "More / questions") */
 .ans-textbtn{display:flex;width:fit-content;align-items:center;gap:4px;min-height:48px;color:var(--cream-dim)} /* r2: 48; block-level (each stands on its own line), so no line-box strut pads it: at Text Size 3 an inline-flex one sat ~20px low */
 .ans-search{position:relative;margin-top:4px}
 .ans-search-input{display:block;width:100%;height:56px;padding:0 56px 0 16px;border:1px solid var(--border);border-radius:12px;background:var(--bg3);color:var(--input-text);outline:none;-webkit-appearance:none}
@@ -8841,8 +8837,6 @@
 /* a row keeps its sub line while the sidecar loads, so the list does not reflow when it lands (idea audit 10-23, s30.1) */
 .ans-row-sub:empty::before{content:"\00a0"}
 .ans-num{flex:0 0 max(40px,1.8em);font-variant-numeric:tabular-nums lining-nums}
-.ans-path{position:relative;margin-top:16px}
-/* r2: .ans-progress is gone (the path card has no bar) */
 
 /* The Ten Commandments: two columns, I-V down the left (variant B arch: ans-variant-b.css) */
 .ans-tablets{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(5,auto);grid-auto-flow:column;column-gap:24px}
@@ -8856,11 +8850,10 @@
 .ans-daily .ans-metarow{margin-top:8px}
 .ans-quote{margin:8px 0 0;font-size:var(--fs-18);line-height:1.6;color:var(--cream)}
 .ans-daily .ans-src{margin:4px 0 0;text-align:right}
-.ans-daily-more{display:none}
 .ans-actions{display:flex;flex-wrap:wrap;gap:0 24px;margin-top:4px}
 /* the source chip's 14px band overlaps the buttons beside it (Share above it at Text Size 2+, the text buttons under it):
    a tap on a button's edge is that button's, not the chip's (acceptance U10) */
-.ans-daily :is(.ans-iconbtn,.ans-textbtn){position:relative;z-index:1}
+.ans-daily .ans-textbtn{position:relative;z-index:1}
 
 /* Tabs and landing sections */
 .ans-tabs{display:flex;margin-top:32px;border-bottom:1px solid var(--border)}
@@ -8988,8 +8981,6 @@ body.light .ans-btn{color:var(--gold-bright)} /* --gold on the faint fill over -
    (5+ letters, 2+2), so this serves the body; heads keep words whole by size (the 10vw stop above) */
 .ans-ts2 .ans-display:not(.is-long){font-size:min(var(--fs-36),10vw)} /* r2: the title meets the heads' 10vw stop at Text Size 2+
    (36 at 360, was 32.4), so no head outgrows its page title; every word of the 120 titles fits ("Commandments" 280 of 312px) */
-.ans-ts2 .ans-daily-more{display:flex}
-.ans-ts2 .ans-daily:not(.is-open) :is(.ans-metarow,.ans-quote){display:none}
 .ans-ts2 .ans-tablets{grid-template-columns:1fr;grid-template-rows:none;grid-auto-flow:row}
 .ans-ts2 .ans-tablet{flex-direction:row;align-items:center;justify-content:flex-start;gap:16px;min-height:56px} /* justify: A25 */
 .ans-ts2 .ans-tablet .ans-num{flex:0 0 max(40px,2.4em);font-size:min(var(--fs-18),7vw)} /* r2: 2.4em holds "VIII" (about 2em), so every label starts on one line */
@@ -9078,7 +9069,6 @@ body.no-bookmark-nav .ans-runhead{top:calc(var(--dock-nav-bottom) + var(--offlin
 /* (the rail is display:none under 1024: the Desktop block's base rule) */
 
 /* A14. Landing tools rows (Charts & videos, Saved answers): margin-top 32 (spec 2.3) */
-.ans-tools{margin-top:32px}
 
 /* A15. Recent searches: the query reads in --cream-dim (spec f06c) */
 .ans-recent .ans-row-title{color:var(--cream-dim)}
@@ -9252,6 +9242,82 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
   100% { background:rgba(var(--land-base),0); }
 }
 
+/* ── WA1 answers (AnswersHome.jsx: a-land, a-contents, a-az; mock v2 answers.html, WA1-answers 2026-11-11) ──
+   The landing as cards on the UI pass tokens; Contents | A-Z and its strip pinned under the bar while the page scrolls. */
+.ans-bar-title{flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1);opacity:0;transition:opacity var(--press)}
+.is-scrolled .ans-bar-title{opacity:1}
+.ans-landing{padding:0 var(--sp-4) 48px}
+.ans-hero-c{padding-top:var(--sp-3);text-align:center}
+.ans-hero-c .ans-label,.ans-k,.ans-landing .ans-sechead .ans-h2{display:block;margin:0;font-family:var(--font-ui);font-size:var(--ts-label);line-height:var(--lh-label);font-weight:600;letter-spacing:var(--track-label);text-transform:uppercase;color:var(--accent)}
+.ans-hero-c .ans-display{margin-top:var(--sp-2);font-family:var(--font-serif);font-size:var(--ts-display);font-weight:600;color:var(--text-1)}
+.ans-hero-c .ans-lede{margin-top:var(--sp-2);font-size:var(--ts-value);font-style:italic;color:var(--text-2)}
+.ans-landing .ans-ask{margin-top:18px}
+.ans-landing .ans-search-input{height:var(--field-h);padding:0 48px 0 46px;border:0;border-radius:var(--r-pill);background:var(--surface-1);color:var(--text-1);font-family:var(--font-ui);font-size:var(--ts-control)}
+.ans-landing .ans-search-input::placeholder{font-style:normal;color:var(--text-2)}
+.ans-landing .ans-search-btn{width:48px;height:var(--field-h);color:var(--text-2)}
+.ans-landing .ans-search:not(.has-q) .ans-search-btn{left:0;right:auto}
+.ans-landing .ans-chips{gap:var(--sp-2);margin-top:10px}
+.ans-landing .ans-chip{min-height:var(--chip-h);padding:0 12px;border:0;border-radius:var(--r-chip);background:var(--surface-1);color:var(--text-1);font-size:var(--ts-value)}
+.ans-landing .ans-chip.is-more{background:var(--accent-soft);color:var(--accent)}
+.ans-start,.ans-landing .ans-daily,.ans-box{border-radius:var(--r-card);background:var(--surface-1)}
+.ans-start{display:flex;align-items:center;gap:12px;width:100%;margin-top:var(--sp-4);padding:14px 12px 14px 16px;color:var(--text-1)}
+.ans-start .ans-row-title{margin-top:2px;font-size:var(--ts-headline)}
+.ans-landing .ans-row-sub,.ans-landing .ans-daily .ans-src{font-family:var(--font-ui);font-size:var(--ts-meta);line-height:var(--lh-meta);font-style:normal;color:var(--text-2)}
+.ans-landing .ans-chev{color:var(--text-3)}
+.ans-landing .ans-daily{margin-top:12px;padding:14px 16px 4px}
+.ans-landing .ans-quote{display:-webkit-box;margin-top:var(--sp-2);overflow:hidden;font-size:var(--ts-headline);line-height:1.45;font-style:italic;font-weight:600;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+.ans-landing .ans-daily .ans-src{margin:var(--sp-2) 0 0;text-align:left}
+.ans-landing .ans-actions{flex-wrap:nowrap;align-items:center;gap:4px;margin:10px -8px 0;padding:2px 0;border-top:1px solid var(--hairline)}
+.ans-landing .ans-actions .ans-textbtn{min-height:var(--tap);padding:0 8px;gap:6px;font-family:var(--font-ui);font-size:var(--ts-value);color:var(--text-1)}
+.ans-landing .ans-actions .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
+.ans-landing .ans-actions .ans-gold{color:var(--accent)}
+.ans-sp{flex:1}
+.ans-two{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.ans-tile-btn{display:flex;align-items:center;justify-content:center;gap:var(--sp-2);min-height:var(--btn-h);border-radius:var(--r-card);background:var(--surface-1);color:var(--text-1);font-family:var(--font-ui);font-size:var(--ts-value)}
+.ans-tile-btn svg{color:var(--accent)}
+.ans-landing .ans-tabs{position:sticky;top:0;z-index:3;margin:18px calc(-1 * var(--sp-4)) 0;padding:var(--sp-2) var(--sp-4);border:0;background:var(--bg)}
+.ans-landing .ans-tab{min-height:var(--seg-h);background:var(--surface-1);font-family:var(--font-ui);font-size:var(--ts-control);color:var(--text-2)}
+.ans-landing .ans-tab:first-child{border-radius:var(--r-chip) 0 0 var(--r-chip)}
+.ans-landing .ans-tab:last-child{border-radius:0 var(--r-chip) var(--r-chip) 0}
+.ans-landing .ans-tab[aria-selected=true]{border-radius:var(--r-chip);background:var(--surface-3);box-shadow:0 0 0 3px var(--surface-1) inset;color:var(--text-1)}
+.ans-landing .ans-tab[aria-selected=true]::after,.ans-landing .ans-az-key[aria-current=true]::after,.ans-landing .ans-az-strip::after{display:none}
+.ans-landing .ans-az-strip{top:52px;gap:var(--sp-2);margin:0 calc(-1 * var(--sp-4));padding:0 var(--sp-4) 4px;border:0;background:var(--bg)}
+.ans-landing .ans-az-key{isolation:isolate;min-width:44px;height:var(--tap);padding:0 12px;font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-1)}
+.ans-landing .ans-az-key::before{content:"";position:absolute;inset:5px 0;z-index:-1;border-radius:var(--r-pill);background:var(--surface-1)}
+.ans-landing .ans-az-strip:not(.ans-jump-strip) .ans-az-key{padding:0}
+.ans-landing .ans-az-strip:not(.ans-jump-strip) .ans-az-key::before{inset:5px}
+.ans-landing .ans-az-key[aria-current=true]{color:var(--accent)}
+.ans-landing .ans-az-key[aria-current=true]::before{background:var(--accent-soft)}
+.ans-landing .ans-az-head{position:static;padding:20px 0 var(--sp-2);border:0;background:none}
+.ans-landing :is([data-az],[data-jump]){scroll-margin-top:104px}
+.ans-landing .ans-sechead{margin:22px 0 var(--sp-2)}
+.ans-landing :is(.ans-count,.ans-note){font-family:var(--font-ui);font-size:var(--ts-meta);font-style:normal;color:var(--text-2)}
+.ans-landing .ans-note{margin:10px 0 var(--sp-2)}
+.ans-box{overflow:hidden}
+.ans-box .ans-row{min-height:var(--row-h);padding:10px 12px 10px 16px;border-bottom:1px solid var(--hairline)}
+.ans-box .ans-row:last-child{border-bottom:0}
+.ans-box+.ans-box{margin-top:12px}
+.ans-box.ans-tablets{column-gap:0}
+.ans-box .ans-tablet{min-height:58px;padding:9px 16px 10px;border-bottom:1px solid var(--hairline)}
+.ans-box .ans-tablet:nth-child(-n+5){border-right:1px solid var(--hairline)}
+.ans-box .ans-tablet:nth-child(5n){border-bottom:0}
+.ans-box .ans-tablet .ans-num{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:.08em;color:var(--accent)}
+.ans-box .ans-tablet .ans-row-title{font-size:var(--ts-body);font-weight:600}
+.ans-landing.is-asking .ans-hero-c{display:none}
+.ans-bar-field{position:relative;flex:1;min-width:0;margin:0 var(--sp-4) 0 4px}
+.ans-bar-field .ans-search-input{display:block;width:100%;height:var(--tap);padding:0 44px 0 16px;border:0;border-radius:var(--r-pill);background:var(--surface-1);color:var(--text-1);font-family:var(--font-ui);font-size:var(--ts-control);outline:none;-webkit-appearance:none}
+.ans-bar-field .ans-search-btn{position:absolute;top:0;right:0;width:44px;height:var(--tap);padding:0;border:0;background:none;color:var(--text-2)}
+nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
+.ans-landing .ans-results .ans-sechead:first-child{margin-top:var(--sp-4)}
+.ans-res{display:block;width:100%;padding:14px 16px;border-radius:var(--r-card);background:var(--surface-1);color:var(--text-1)}
+.ans-res+.ans-res{margin-top:10px}
+.ans-res :is(.ans-row-title,.ans-row-sub,.ans-hit-src){display:block}
+.ans-bar-field .ans-search-input:focus{box-shadow:0 0 0 1.5px var(--accent) inset}
+.ans-res .ans-row-title{font-size:var(--ts-headline)}
+.ans-res .ans-hit-snip{margin-top:var(--sp-2);font-size:var(--ts-body);line-height:1.45;color:var(--text-2)}
+.ans-res .ans-hit-snip mark{color:var(--text-1)}
+.ans-res .ans-hit-src{margin-top:6px;font-family:var(--font-ui);font-size:var(--ts-label);font-style:normal;color:var(--text-2)}
+.ans-more-btn{width:100%;margin-top:12px}
 /* ── INSTALL AS AN APP (ip1, 2026-09-25; mockup lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png) ──
    A card at the end of a chapter or letter, above the prev/next cards; SHOW ME HOW opens a bottom sheet of
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */

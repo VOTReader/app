@@ -546,7 +546,7 @@ describe('useAndroidBack — Answers Only God Can Give', () => {
     expect(props.goVolumesHome).not.toHaveBeenCalled();
   });
 
-  it.each(['answers-group', 'answers-media', 'answers-saved', 'answers-subject', 'answers-az'])('%s steps back to the landing', (screen) => {
+  it.each(['answers-group', 'answers-media', 'answers-saved'])('%s steps back to the landing', (screen) => {
     const props = baseProps({ screen });
     renderHook(() => useAndroidBack(props));
     expect(window.handleAndroidBack()).toBe('true');

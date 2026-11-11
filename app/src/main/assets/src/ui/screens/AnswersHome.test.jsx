@@ -29,7 +29,7 @@ beforeEach(() => {
   try { localStorage.clear(); } catch (_e) { /* */ }
   navProps = null;
   window.ScreenLayout = ({ navChildren, children, className }) => { layoutClass = className; return <div>{navChildren}{children}</div>; };
-  window.LibraryNav = (p) => { navProps = p; return <button type="button" data-testid="nav-back" onClick={p.onBack}>{p.backLabel}</button>; };
+  window.LibraryNav = (p) => { navProps = p; return <div><button type="button" data-testid="nav-back" onClick={p.onBack}>{p.backLabel}</button>{p.leftExtras}</div>; };
   window.SheetHandle = ({ onClose, glyph }) => <button type="button" onClick={onClose} aria-label="Close">{glyph || '‹'}</button>;
   window.useFocusTrap = () => ({ current: null });
   window.ReactDOM = ReactDOM;
@@ -53,14 +53,15 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     render(<AnswersHome {...base} />);
     const panel = document.querySelector('.ans-landing-b');
     expect(texts('.ans-sechead .ans-h2', panel)).toEqual(['The Ten Commandments', 'Other Topics', 'Thus Says The Lord...', 'Index of False Doctrines Within the Churches of Men']);
-    expect(texts('.ans-sechead .ans-count', panel).map(NB)).toEqual(['19 topics across all ten', '16 topics', '85 topics']);
+    expect(texts('.ans-sechead .ans-count', panel).map(NB)).toEqual(['19 topics', '16 topics', '85 topics']);
     expect(texts('.ans-tablet .ans-num')).toEqual(['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']);
     expect(panel.querySelector('.ans-row .ans-row-title').textContent).toBe('Main Page');
-    const groups = [...panel.querySelectorAll('.ans-row')].filter((r) => r.querySelector('.ans-num'));
+    // WA1 (a-az): group numbers dropped; the twelve groups are the rows that count topics
+    const groups = [...panel.querySelectorAll('.ans-row')].filter((r) => /^\d+ topics?/.test(NB((r.querySelector('.ans-row-sub') || { textContent: '' }).textContent)));
     expect(groups.map((r) => r.querySelector('.ans-row-title').textContent)).toEqual(['Signs of this generation', 'Prophets, witnesses & gifts',
       'The nations', 'The churches', 'Scripture & doctrine', 'Holy Days, cross & resurrection', 'Forgiveness to salvation', 'The end & the Kingdom',
       'Warfare, sin, death & judgment', 'The walk of faith', 'Body, marriage & family', 'People of the Bible & creation']);
-    expect(groups[4].getAttribute('aria-label')).toBe('5. Thus Says The Lord... Scripture & doctrine. 9 topics, 3 read');
+    expect(groups[4].getAttribute('aria-label')).toBe('Scripture & doctrine. 9 topics, 3 read');
     expect(screen.getByText('The site numbers these groups; the short names are ours.')).toBeTruthy();
     expect(screen.getByText('Not in the site’s menu').closest('.ans-row').textContent).toContain('Come Out and Fight Against Me');
     expect(document.body.textContent).not.toMatch(/Most spoken of|Browse by subject|Every Topic, A–Z|The End of This Age/);
@@ -72,7 +73,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     expect(NB(row('Main Page').querySelector('.ans-row-sub').textContent)).toBe('12 passages · ~12 min · video · downloads');
     expect(NB(row('The Volumes of Truth').querySelector('.ans-row-sub').textContent)).toBe('39 passages · ~38 min · video · audio · Read');
     expect(NB(row('False Doctrines Within the Churches (Index)').querySelector('.ans-row-sub').textContent)).toBe('46 categories, each answered by The Truth');
-    expect(NB(row('Charts & videos').querySelector('.ans-row-sub').textContent)).toBe('2 charts, 4 videos, 11 playlists and more');
+    expect(NB(screen.getByRole('button', { name: /^Charts and videos/ }).getAttribute('aria-label'))).toBe('Charts and videos, 2 charts, 4 videos, 11 playlists and more');
     expect(document.body.textContent).not.toMatch(/\b0 passages/);
   });
 
@@ -91,16 +92,18 @@ describe('AnswersHome — the landing (f01, f02)', () => {
 
   it('the reading path: Continue in the site\'s order, the start, or nothing read when it is off', () => {
     const first = render(<AnswersHome {...base} />);
-    const path = () => document.querySelector('.ans-path .ans-row');
-    expect(path().querySelector('.ans-row-title').textContent).toBe('Continue: Regarding Faith');
+    const path = () => document.querySelector('.ans-start');
+    expect(path().querySelector('.ans-k').textContent).toBe('Continue');
+    expect(path().querySelector('.ans-row-title').textContent).toBe('Regarding Faith');
     expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('95 of 120 topics · in the site’s order');
     first.unmount();
     const second = render(<AnswersHome {...base} isRead={() => false} pathLast={null} />);
-    expect(path().querySelector('.ans-row-title').textContent).toBe('Start at the beginning');
-    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('Main Page · 12 passages · ~12 min');
+    expect(path().querySelector('.ans-k').textContent).toBe('Start here');
+    expect(path().querySelector('.ans-row-title').textContent).toBe('Main Page');
+    expect(NB(path().querySelector('.ans-row-sub').textContent)).toBe('12 passages · ~12 min');
     second.unmount();
     render(<AnswersHome {...base} pathOn={false} />);
-    expect(path().querySelector('.ans-row-title').textContent).toBe('Start at the beginning');
+    expect(path().querySelector('.ans-k').textContent).toBe('Start here');
     expect(document.querySelector('.ans-read')).toBeNull();
   });
 
@@ -108,10 +111,10 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     const onOpenTopic = vi.fn();
     render(<AnswersHome {...base} onOpenTopic={onOpenTopic} now={new Date(2026, 4, 17, 12)} />);
     const daily = document.querySelector('.ans-daily');
-    expect(daily.querySelector('.ans-metarow').textContent).toContain('7/5/10 From The Lord, Our God and Savior');
-    expect(daily.querySelector('.ans-quote').textContent).toMatch(/^"For I am a Great King!.*God Eternal!"$/);
-    expect(daily.querySelector('.ans-src-t').getAttribute('data-w')).toBe('Excerpt from');
-    expect(daily.querySelector('.ans-src-t').textContent).toBe('“The Alarm of War”');
+        expect(daily.querySelector('.ans-quote').textContent).toMatch(/^"For I am a Great King!.*God Eternal!"$/);
+    // WA1 (a-land): the source line carries the head's date; the label keeps the site's wording
+    expect(daily.querySelector('.ans-src a').getAttribute('aria-label')).toMatch(/^Excerpt from “The Alarm of War”, /);
+    expect(NB(daily.querySelector('.ans-src a').textContent)).toMatch(/^“The Alarm of War” · .+ · 7\/5\/10$/);
     fireEvent.click(within(daily).getByText('Read in context'));
     expect(onOpenTopic.mock.calls[0][0]).toBe('there-is-no-other');
     expect(onOpenTopic.mock.calls[0][1]).toMatch(/^"For I am a Great King!/);
@@ -124,7 +127,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     expect(document.querySelector('.ans-lede').textContent).toBe(SITE.tagline);
     expect(document.querySelectorAll('.ans-chip').length).toBe(6);
     expect(document.querySelectorAll('.ans-tablet').length).toBe(10);
-    expect(document.querySelector('.ans-path')).toBeNull();
+    expect(document.querySelector('.ans-start')).toBeNull();
     expect(document.querySelector('.ans-daily')).toBeNull();
   });
 
@@ -135,7 +138,7 @@ describe('AnswersHome — the landing (f01, f02)', () => {
     expect(onOpenTopic).toHaveBeenCalledWith('regarding-the-trinity', null, 'Answers');
     fireEvent.click(screen.getByText('Scripture & doctrine').closest('button'));
     expect(onOpenGroup).toHaveBeenCalledWith('5');
-    fireEvent.click(screen.getByText('Charts & videos').closest('button'));
+    fireEvent.click(screen.getByText('Charts and videos').closest('button'));
     expect(onOpenMedia).toHaveBeenCalled();
     expect(layoutClass).toContain('ans-wide');
   });
@@ -215,7 +218,7 @@ describe('AnswersHome — the sheets (f03, f01b, f12)', () => {
 
   it('About shows the site\'s page, its nine Sister Sites word for word, and which words are ours', () => {
     render(<AnswersHome {...base} />);
-    fireEvent.click(screen.getByLabelText('About this collection'));
+    fireEvent.click(screen.getByText('About this collection'));
     const d = screen.getByRole('dialog');
     expect(d.querySelector('.ans-h2').textContent).toBe('About Answers Only God Can Give');
     const sister = [...d.querySelectorAll('h3')].find((h) => h.textContent === 'Sister Sites');
@@ -234,19 +237,19 @@ describe('AnswersHome — search (f06)', () => {
     const onOpenTopic = vi.fn();
     render(<AnswersHome {...base} onOpenTopic={onOpenTopic} />);
     fireEvent.change(field(), { target: { value: 'sabbath' } });
-    expect(NB(document.querySelector('.ans-results-sum .ans-meta').textContent)).toBe('In Answers · 73 matches in 22 topics');
-    const subs = texts('.ans-results .ans-row .ans-row-sub').map(NB);
+    expect(NB(document.querySelector('.ans-results .ans-sechead .ans-count').textContent)).toBe('73 matches in 22 topics');
+    const subs = texts('.ans-results .ans-res .ans-row-sub').map(NB);
     expect(subs[0]).toBe('18 of 19 passages · The Fourth Commandment');
     expect(subs[1]).toBe('1 of 18 passages · The Second Commandment');
     expect(subs.length).toBe(8);
-    expect(document.querySelector('.ans-hit mark').textContent).toBe('Sabbath');
+    expect(document.querySelector('.ans-res mark').textContent).toBe('Sabbath');
     expect(NB(document.querySelector('.ans-hit-src').textContent)).toBe('“You Shall Not Desecrate the Sabbath” · Volume 3 · 3/29/06');
     // the browse column steps aside (CSS: .ans-landing.is-query; on a desktop it stays beside the results)
     expect(document.querySelector('.ans-landing').classList.contains('is-query')).toBe(true);
     expect(document.querySelector('.ans-landing-a .ans-chips')).toBeNull();
     fireEvent.click(screen.getByText('Show 14 more topics'));
-    expect(document.querySelectorAll('.ans-results .ans-row').length).toBe(22);
-    fireEvent.click(document.querySelector('.ans-hit'));
+    expect(document.querySelectorAll('.ans-results .ans-res').length).toBe(22);
+    fireEvent.click(document.querySelector('.ans-res'));
     const [id, anchor, from, section, find] = onOpenTopic.mock.calls[0];
     expect(id).toBe('god-speaks-about-the-sabbath');
     expect(anchor.toLowerCase()).toContain('sabbath');
@@ -279,10 +282,10 @@ describe('AnswersHome — search (f06)', () => {
       expect(search.mock.calls[1][1].scope).toEqual({ volumeId: 'answers' });
       // the search called off for the query typed over
       expect(search.mock.calls[0][1].signal.aborted).toBe(true);
-      expect(document.querySelector('.ans-results-sum .ans-meta').textContent).toBe('Searching…');
+      expect(document.querySelector('.ans-results .ans-sechead .ans-count').textContent).toBe('Searching…');
       await act(async () => { answer({ results: [doc('regarding-the-holidays-of-men'), doc('god-speaks-about-the-sabbath')].map((d) => ({ doc: d, terms: [] })) }); });
       expect(texts('.ans-results .ans-row-title').slice(0, 2)).toEqual(['Regarding the Holidays of Men', 'God Speaks About The Sabbath']);
-      expect(NB(document.querySelector('.ans-results-sum .ans-meta').textContent)).toMatch(/^In Answers · /);
+      expect(NB(document.querySelector('.ans-results .ans-sechead .ans-count').textContent)).toMatch(/topic/);
     } finally { delete window.VotSearchMini; }
   });
 
@@ -351,7 +354,7 @@ describe('AnswersHome — A–Z (f05)', () => {
     const keys = [...panel.querySelectorAll('.ans-az-key')];
     expect(keys.length).toBe(27);
     expect(keys.filter((k) => k.disabled).map((k) => k.textContent)).toEqual(['Q', 'X', 'Y', 'Z']);
-    expect(NB(panel.querySelector('.ans-row .ans-row-sub').textContent)).toBe('2 · Prophets, witnesses & gifts · 22 passages');
+    expect(NB(panel.querySelector('.ans-row .ans-row-sub').textContent)).toBe('Prophets, witnesses & gifts · 22 passages');
   });
 
   /* The last letter is too short to reach the strip at the end of the list: the scroll reader saw V
