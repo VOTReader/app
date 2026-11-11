@@ -40,7 +40,7 @@ describe('VersePickerScreen breadcrumb + footer', () => {
   it('shows the link-flow breadcrumb', () => {
     stubGlobals();
     render(<VersePickerScreen {...baseProps} />);
-    expect(screen.getByText('Linking from John 3:16')).toBeTruthy();
+    expect(screen.getByText(/^Linking from John 3:16/)).toBeTruthy();
   });
 
   it('has no ambiguous header ✓ (the old silent-cancel dead-end is gone)', () => {
@@ -79,7 +79,7 @@ describe('VersePickerScreen breadcrumb + footer', () => {
     fireEvent.click(container.querySelector('.picker-verse-num'));
     const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
     expect(btn.disabled).toBe(false);
-    expect(btn.textContent).toBe('Link this selection');
+    expect(btn.textContent).toMatch(/^Link to /);
     fireEvent.click(btn);
     expect(window.persistLink).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledWith({ id: 'lnk1' });
@@ -91,7 +91,7 @@ describe('VersePickerScreen breadcrumb + footer', () => {
     const { container } = render(<VersePickerScreen {...baseProps} returnTargetInsteadOfLink={true} onClose={onClose} />);
     fireEvent.click(container.querySelector('.picker-verse-num'));
     const btn = container.querySelector('.picker-footer-btn');
-    expect(btn.textContent).toBe('Insert this selection');
+    expect(btn.textContent).toMatch(/^Insert /);
     fireEvent.click(btn);
     // return-target mode hands the refined target back through onClose, no link persisted
     expect(window.persistLink).not.toHaveBeenCalled();
@@ -135,7 +135,7 @@ describe('VersePickerScreen find + selectionchange', () => {
       act(() => { vi.advanceTimersByTime(200); });
       const btn = /** @type {HTMLButtonElement} */ (container.querySelector('.picker-footer-btn'));
       expect(btn.disabled).toBe(false);
-      expect(btn.textContent).toBe('Link this selection');
+      expect(btn.textContent).toMatch(/^Link to /);
     } finally {
       window.getSelection = getSelectionOrig;
       vi.useRealTimers();
@@ -177,7 +177,7 @@ describe('VersePickerScreen marks a whole verse taken by its number', () => {
       act(() => { document.dispatchEvent(new Event('selectionchange')); });
       act(() => { vi.advanceTimersByTime(200); });
       expect(container.querySelector('.picker-verse-selectable.is-selected')).toBeNull();
-      expect(container.querySelector('.picker-footer-btn').textContent).toBe('Link this selection');
+      expect(container.querySelector('.picker-footer-btn').textContent).toMatch(/^Link to /);
     } finally {
       window.getSelection = getSelectionOrig;
       vi.useRealTimers();

@@ -223,17 +223,19 @@ describe('axe — LinkPicker', () => {
   it('search view: empty, with recent picks, then with results', async () => {
     linkPickerGlobals({ recent: [{ kind: 'bible-chapter', category: 'Old Testament', label: 'Genesis 1' }] });
     render(<LinkPicker {...linkProps} />);
-    expectModal('Create a Link');
+    expectModal('Link to…');
     expect(screen.getByRole('textbox', { name: 'Search titles and references' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'John' } });
+    expect(await seriousViolations(document)).toEqual([]);
+    fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
     expect(await seriousViolations(document)).toEqual([]);
   });
 
   it('a link just made (the success strip), and the Full text scope', async () => {
     linkPickerGlobals();
     render(<LinkPicker {...linkProps} lastCreatedLink={{ id: 'lnk1', target: { label: 'Genesis 1:1' } }} />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+    expect(screen.getByRole('button', { name: 'Link another' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 

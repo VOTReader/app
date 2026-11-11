@@ -5955,23 +5955,6 @@
 
     /* ── Navigation picker (full picker UI, replaces old simple picker) ── */
     .navpick-sheet { padding: 0; }
-    .navpick-header {
-      display: flex; align-items: center; gap: 14px;
-      padding: 18px 20px 12px;
-    }
-    .navpick-check {
-      width: 22px; height: 22px;
-      stroke: var(--cream); flex-shrink: 0;
-    }
-    .navpick-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-18);
-      color: var(--cream); flex: 1;
-    }
-    .navpick-close {
-      background: none; border: none; color: var(--cream-dim);
-      font-size: var(--fs-30); line-height: 1; padding: 0 6px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
     .navpick-confirm-green {
       background: none; border: none; padding: 0 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -5986,20 +5969,6 @@
       cursor: not-allowed;
       color: var(--cream-dim);
     }
-    .navpick-search-wrap {
-      padding: 4px 18px 12px;
-    }
-    .navpick-search-input {
-      width: 100%; padding: 12px 18px;
-      background: rgba(70,62,48,0.55);
-      border: 1px solid transparent; border-radius: 999px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-16);
-      outline: none; transition: border-color 0.15s, background 0.15s;
-    }
-    body.light .navpick-search-input { background: var(--bg); color: var(--input-text); border-color: var(--gold-border); }
-    .navpick-search-input::placeholder { color: var(--cream-muted); }
-    .navpick-search-input:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
     .navpick-body {
       flex: 1; overflow-y: auto;
       padding: 0 18px 20px;
@@ -6062,62 +6031,11 @@
       color: var(--cream-muted); line-height: 1.5;
     }
     /* ── LinkPicker mode tabs (Search / Browse / Recent) ── */
-    .navpick-tabs {
-      display: flex; gap: 6px;
-      margin: 2px 18px 10px; padding: 3px;
-      background: rgba(0,0,0,0.25);
-      border: 1px solid var(--gold-border); border-radius: 999px;
-    }
-    body.light .navpick-tabs { background: rgba(0,0,0,0.05); }
-    .navpick-tab {
-      flex: 1; min-height: 38px;
-      background: transparent; border: none; border-radius: 999px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--cream-muted);
-      cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .navpick-tab.active {
-      background: rgba(200,164,86,0.16); color: var(--gold-bright);
-      border: 1px solid var(--gold-border);
-    }
-    body.light .navpick-tab.active { color: #7a5c1e; }
     /* ── Search scope toggle (Titles & refs / Full text) ── */
-    .navpick-scope {
-      display: flex; gap: 18px;
-      margin: 4px 22px 0; padding: 0 2px;
-    }
-    .navpick-scope-btn {
-      background: transparent; border: none; border-bottom: 2px solid transparent;
-      padding: 8px 2px; min-height: 36px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.15s ease, border-color 0.15s ease;
-    }
-    .navpick-scope-btn.active { color: var(--gold-bright); border-bottom-color: var(--gold); }
-    body.light .navpick-scope-btn.active { color: #7a5c1e; }
     /* ── Corpus chips (All / Scriptures / Volumes) — SearchScreen's
        .srch-corpus-row control wearing the picker's sheet chrome. Full 44px
        tap height (the underlined scope row above is a text toggle; these are
        standalone pills the finger aims at). ── */
-    .navpick-corpus {
-      display: flex; gap: 6px;
-      margin: 10px 22px 0;
-    }
-    .navpick-corpus-btn {
-      flex: 1; min-height: 44px; padding: 0 6px;
-      background: transparent; border: 1px solid var(--gold-border); border-radius: 999px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-    }
-    .navpick-corpus-btn.active {
-      background: var(--gold-faint); color: var(--gold-bright); border-color: var(--gold-dim);
-    }
-    body.light .navpick-corpus-btn.active { color: #7a5c1e; }
-    .navpick-corpus-btn:active { background: rgba(200,164,86,0.15); }
     .navpick-scope-jump {
       margin-top: 16px; padding: 10px 22px; min-height: 44px;
       background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);
@@ -6143,7 +6061,6 @@
       font-family: 'Cinzel', serif; font-size: var(--fs-13); letter-spacing: 0.08em;
       color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .navpick-row-chevron { margin-left: auto; color: var(--gold-dim); font-size: var(--fs-18); flex-shrink: 0; }
     /* ── Chapter grid (a Bible book / Matthew Study Bible) ── */
     .navpick-ch-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
@@ -6237,19 +6154,6 @@
     .picker-letter-block { transition: background-color 0.35s ease; border-radius: 4px; }
     .picker-letter-block.picker-find-hit { background-color: rgba(200,164,86,0.16); }
     body.light .picker-letter-block.picker-find-hit { background-color: rgba(168,126,40,0.18); }
-    .navpick-flash {
-      display: flex; align-items: center; gap: 8px;
-      margin: 0 18px 8px;
-      padding: 8px 14px;
-      background: rgba(31,121,165,0.18);
-      border-left: 2px solid var(--link-blue);
-      border-radius: 0 6px 6px 0;
-      color: #b9d8e9;
-      font-family: var(--font-body); font-size: var(--fs-15);
-      animation: navpickFlashIn 0.18s ease-out;
-    }
-    .navpick-flash svg { width: 18px; height: 18px; flex-shrink: 0; }
-    body.light .navpick-flash { background: rgba(64,153,198,0.18); color: #1f5876; }
     @keyframes navpickFlashIn {
       from { opacity: 0; transform: translateY(-4px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -6896,7 +6800,6 @@
     /* the picker sheets (LinkPicker, the nav picker, BookmarkCreateSheet) on the sheet tokens: surface-1, 20 px corners,
        no gold edge, the title in the serif. The bookmark sheet's head reads Cancel | title | Save in words (rule 9). */
     .link-picker-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
-    .navpick-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; letter-spacing: 0; }
 
     /* ── Bookmark inline icons ── */
     /* Small flag icon injected at the end of a bookmarked range in
@@ -6976,6 +6879,35 @@
     .rd-nb-sheet .rd-note { margin-bottom: 0; }
     .rd-nb-sheet .rd-foot { margin-top: 16px; }
     /* ── end W2f readers (r-note, r-note-view, r-nbpick) ── */
+    /* ── W2f readers (mock v2 r-link1, r-link2, r-link3): "Link to…" wears the form sheet: where from in a
+       card, Search | Browse | Recent, the field, scope chips; once made, one "Linked to" card with Undo, Link
+       another, Done. The verse picker: the chapter in the bar with Cancel, a field, a gold button naming the verse. ── */
+    .rd-link-sheet { border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; background: var(--surface-1); }
+    .navpick-header { display: flex; align-items: center; margin: 0 0 12px; }
+    .navpick-header .ui-sheet-title { flex: 1; min-width: 0; margin: 0 2px; }
+    .navpick-x { margin-right: -12px; }
+    .navpick-context { padding: 12px 14px; border-radius: var(--r-card); background: var(--surface-2); }
+    .navpick-context-source { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .navpick-context .rd-quote { margin: 6px 0 0; font-size: var(--ts-value); -webkit-line-clamp: 1; }
+    .navpick-tabs { margin-top: 12px; }
+    .rd-link-sheet .navpick-search-wrap { margin-top: 12px; }
+    .navpick-scope, .navpick-corpus { margin-top: 10px; }
+    .rd-link-sheet .ui-chip:not(.is-on) { background: var(--surface-2); }
+    .navpick-row-chevron { flex: none; margin-left: auto; color: var(--text-3); }
+    .rd-link-sheet .rd-note { margin: 12px 2px 0; }
+    .rd-link-done-head { display: flex; align-items: center; gap: 10px; }
+    .rd-link-done-head .ui-sheet-title { margin: 0; }
+    .rd-link-done-tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
+    .navpick-success .rd-note { margin: 10px 2px 16px; }
+    .rd-link-done-foot { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; }
+    .rd-link-another { background: var(--surface-2); }
+    .picker-header.rd-vpick-bar { gap: 4px; min-height: var(--bar-h); padding: calc(var(--inset-top, 0px) + 4px) 8px 4px; border-bottom: 0; }
+    .rd-vpick-bar .picker-title { font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 700; color: var(--text-1); letter-spacing: 0; }
+    .rd-vpick-bar .picker-back { padding: 0; color: var(--text-1); font-size: inherit; }
+    .picker-footer-btn svg { color: currentColor; }
+    .picker-footer-btn:disabled { opacity: 0.45; cursor: default; }
+    .rd-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    /* ── end W2f readers (r-link1, r-link2, r-link3) ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */
@@ -7164,62 +7096,9 @@
        All new rules; each dark rule has a body.light counterpart. */
 
     /* LinkPicker — "what am I linking from" context strip */
-    .navpick-context {
-      margin: 0 18px 12px; padding: 10px 14px;
-      background: var(--gold-faint);
-      border-left: 2px solid var(--gold-dim);
-      border-radius: 0 8px 8px 0;
-      display: flex; flex-direction: column; gap: 3px;
-    }
-    body.light .navpick-context { background: rgba(180,150,90,0.10); }
-    .navpick-context-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--gold-dim);
-    }
-    .navpick-context-source {
-      font-family: var(--font-body); font-size: var(--fs-16);
-      color: var(--cream);
-    }
-    body.light .navpick-context-source { color: var(--input-text); }
-    .navpick-context-excerpt {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted); line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
     /* LinkPicker — success confirmation + separated Undo (replaces the
        old red-×-beside-green-✓ header pair). */
-    .navpick-success {
-      display: flex; align-items: center; gap: 10px;
-      margin: 0 18px 12px; padding: 9px 10px 9px 14px;
-      background: rgba(76,175,80,0.14);
-      border-left: 2px solid var(--ok);
-      border-radius: 0 8px 8px 0;
-      animation: navpickFlashIn 0.18s ease-out;
-    }
-    body.light .navpick-success { background: rgba(76,175,80,0.12); }
-    .navpick-success-check { width: 18px; height: 18px; color: var(--ok); flex-shrink: 0; }
-    .navpick-success-text {
-      flex: 1; min-width: 0;
-      font-family: var(--font-body); font-size: var(--fs-15);
-      color: var(--cream);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    body.light .navpick-success-text { color: var(--input-text); }
-    .navpick-undo {
-      position: relative; flex-shrink: 0;
-      background: none; border: 1px solid var(--gold-border);
-      border-radius: 999px; padding: 8px 18px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--cream-dim); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s, border-color 0.12s;
-    }
     /* WL4 — extend the pill's touch target to ~44px without bloating it. */
-    .navpick-undo::after { content: ''; position: absolute; inset: -6px -4px; }
-    .navpick-undo:active { color: var(--accent-pink); border-color: var(--accent-pink); }
 
     /* Picker screens — step breadcrumb + footer action bar */
     .picker-breadcrumb {
@@ -7236,25 +7115,6 @@
       background: var(--bg);
     }
     body.light .picker-footer { background: var(--bg); }
-    .picker-footer-btn {
-      width: 100%; min-height: 52px;
-      border: 1px solid var(--gold-border);
-      border-radius: 12px;
-      background: var(--gold-faint);
-      color: var(--gold);
-      font-family: 'Cinzel', serif; font-size: var(--fs-14);
-      letter-spacing: 0.05em;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.14s, border-color 0.14s, color 0.14s;
-    }
-    .picker-footer-btn:active { background: rgba(212,183,114,0.22); border-color: var(--gold); }
-    .picker-footer-btn:disabled,
-    .picker-footer-btn.is-disabled {
-      opacity: 0.55; cursor: default;
-      color: var(--cream-muted);
-      background: transparent;
-      border-color: rgba(110,98,76,0.30);
-    }
 
     /* MultiNotePopover — slim scrollbar for the clamped/scrolling case */
     .multinote-popover::-webkit-scrollbar { width: 6px; }

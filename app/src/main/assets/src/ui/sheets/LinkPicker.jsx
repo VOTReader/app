@@ -32,6 +32,7 @@
    reuseEndpoint), so journal card/excerpt modes get them for free.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from '../components/UiIcon.jsx';
 import { navItemPreview } from '../../utils/nav-index.js';
 
 /**
@@ -293,6 +294,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
           : verseWords(item) ? <div className="navpick-row-snippet">{verseWords(item)}</div>
             : <div className="navpick-row-cat">{item.category || ''}</div>}
       </div>
+      <UiIcon name="chev" size="sm" className="navpick-row-chevron" />
     </button>
   );
 
@@ -309,7 +311,7 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
         <div className="navpick-row-label">{label}</div>
         <div className="navpick-row-cat">{count}</div>
       </div>
-      <span className="navpick-row-chevron" aria-hidden="true">{"›"}</span>
+      <UiIcon name="chev" size="sm" className="navpick-row-chevron" />
     </button>
   );
 
@@ -424,70 +426,67 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
     { id: 'browse', label: 'Browse' },
     { id: 'recent', label: 'Recent' },
   ];
-  const dialogTitle = mode === 'card' ? 'Embed a Card' : mode === 'excerpt' ? 'Embed an Excerpt' : 'Create a Link';
+  const dialogTitle = mode === 'card' ? 'Embed a Card' : mode === 'excerpt' ? 'Embed an Excerpt' : 'Link to…';
+  // r-link3 (the UI pass, mock v2 readers): once a link is made the sheet says so in one card,
+  // "Linked to John 15:5", with Undo, Link another and Done in words.
+  const showDone = !mode && !!lastCreatedLink;
+  const linkedTo = (lastCreatedLink && lastCreatedLink.target && lastCreatedLink.target.label) || 'the place you chose';
+  const shortSource = sourceText ? (sourceText.length > 40 ? sourceText.slice(0, 38) + '…' : sourceText) : '';
 
   return (
     <div className="link-picker-overlay" onClick={onClose}>
-      <div className="link-picker-sheet navpick-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-picker-title" onClick={e => e.stopPropagation()}>
-        {/* Header: title + neutral close (×). Close KEEPS any created link;
-            undo lives in the success strip below, clearly separated. */}
+      <div className="link-picker-sheet navpick-sheet rd-form-sheet rd-link-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-picker-title" onClick={e => e.stopPropagation()}>
+        {showDone ? (
+          <div className="navpick-success" role="status">
+            <div className="rd-link-done-head">
+              <span className="rd-link-done-tick" aria-hidden="true"><UiIcon name="check" size="sm" /></span>
+              <h2 className="ui-sheet-title" id="link-picker-title">Linked to {linkedTo}</h2>
+            </div>
+            <p className="rd-note navpick-success-text">
+              {(shortSource ? 'From “' + shortSource + '”' : 'From these words') + (sourceLabel ? ' in ' + sourceLabel : '') + '. A link mark now sits beside those words.'}
+            </p>
+            <div className="rd-link-done-foot">
+              <button type="button" className="ui-btn is-text navpick-undo" onClick={undoLastLink} aria-label="Undo this link">Undo</button>
+              <button type="button" className="ui-btn rd-link-another" onClick={() => onLinkCreated(null)}>Link another</button>
+              <button type="button" className="ui-btn is-primary navpick-close" onClick={onClose}>Done</button>
+            </div>
+          </div>
+        ) : (
+        <>
+        {/* r-link1 (the UI pass, mock v2 readers): "Link to…", where from, then Search | Browse | Recent, the
+            field, and the two scopes as chips. The close keeps nothing half-made: no link exists yet. */}
         <div className="navpick-header">
-          <span className="navpick-title" id="link-picker-title">{dialogTitle}</span>
-          <button
-            className="navpick-close"
-            onClick={onClose}
-            aria-label={lastCreatedLink ? "Done" : "Close"}
-          >
-            ×
-          </button>
+          <h2 className="ui-sheet-title navpick-title" id="link-picker-title">{dialogTitle}</h2>
+          <button type="button" className="rd-field-clear navpick-x navpick-close" onClick={onClose} aria-label="Close"><UiIcon name="x" /></button>
         </div>
-        {/* Source context — reminds the user WHAT they are linking FROM.
-            Only in link mode (card/excerpt journal-insert flows have no
-            source passage). */}
         {!mode && sourceKey && (
           <div className="navpick-context">
-            <span className="navpick-context-label">Linking from</span>
-            <span className="navpick-context-source">{sourceLabel || 'this passage'}</span>
+            <div className="navpick-context-source">From {sourceLabel || 'this passage'}</div>
             {sourceText ? (
-              <span className="navpick-context-excerpt">{'“' + (sourceText.length > 90 ? sourceText.slice(0, 88) + '…' : sourceText) + '”'}</span>
+              <div className="rd-quote navpick-context-excerpt">{sourceText.length > 90 ? sourceText.slice(0, 88) + '…' : sourceText}</div>
             ) : null}
           </div>
         )}
-        {/* Success strip — confirms a link was created + offers a clearly
-            separated Undo (destructive) without closing the picker, so the
-            user can re-pick if they linked the wrong target. */}
-        {lastCreatedLink && (
-          <div className="navpick-success" role="status">
-            <svg className="navpick-success-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
-            <span className="navpick-success-text">
-              Link created{lastCreatedLink.target && lastCreatedLink.target.label ? ' · ' + lastCreatedLink.target.label : ''}
-            </span>
-            <button className="navpick-undo" onClick={undoLastLink} aria-label="Undo this link">Undo</button>
-          </div>
-        )}
-        {/* Mode tabs — Search (find it) / Browse (walk the menus) / Recent
-            (reuse the link network). */}
-        <div className="navpick-tabs" role="tablist" aria-label="How to pick a target">
+        <div className="ui-seg rd-seg navpick-tabs" role="tablist" aria-label="How to pick a target">
           {VIEW_TABS.map((t) => (
             <button
               key={t.id}
+              type="button"
               role="tab"
               aria-selected={view === t.id}
-              className={"navpick-tab" + (view === t.id ? " active" : "")}
+              className="ui-seg-item navpick-tab"
               onClick={() => setView(t.id)}
             >{t.label}</button>
           ))}
         </div>
-        {/* Search input (rounded pill matching reference) — search view only */}
         {view === 'search' && (
           <>
-            <div className="navpick-search-wrap">
+            <div className="ui-field rd-field navpick-search-wrap">
+              <UiIcon name="search" size="sm" />
               <input
                 ref={inputRef}
                 className="navpick-search-input"
-                placeholder={searchScope === 'text' ? "Search any phrase in the text…" : "Search titles & references…"}
+                placeholder={searchScope === 'text' ? "Search any phrase in the text…" : "Search titles and references…"}
                 aria-label={searchScope === 'text' ? "Search any phrase in the text" : "Search titles and references"}
                 value={input}
                 onChange={e => setInput(e.target.value)}
@@ -501,32 +500,26 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
                   e.currentTarget.blur();
                 }}
               />
+              {input && (
+                <button type="button" className="rd-field-clear" aria-label="Clear the search"
+                  onClick={() => { setInput(''); if (inputRef.current) inputRef.current.focus(); }}><UiIcon name="x" size="sm" /></button>
+              )}
             </div>
-            {/* Scope toggle — index search (titles/refs) vs full-text search.
-                Explicitly separate (owner-requested) so each stays predictable. */}
-            <div className="navpick-scope" role="radiogroup" aria-label="Search scope">
-              <button
-                type="button" role="radio" aria-checked={searchScope === 'titles'}
-                className={"navpick-scope-btn" + (searchScope === 'titles' ? " active" : "")}
-                onClick={() => setSearchScope('titles')}
-              >Titles &amp; refs</button>
-              <button
-                type="button" role="radio" aria-checked={searchScope === 'text'}
-                className={"navpick-scope-btn" + (searchScope === 'text' ? " active" : "")}
-                onClick={() => setSearchScope('text')}
-              >Full text</button>
+            {/* Scope: the titles index vs the full text, kept apart (owner-requested) so each stays predictable. */}
+            <div className="ui-chips navpick-scope" role="radiogroup" aria-label="Search scope">
+              <button type="button" role="radio" aria-checked={searchScope === 'titles'}
+                className={'ui-chip navpick-scope-btn' + (searchScope === 'titles' ? ' is-on' : '')} onClick={() => setSearchScope('titles')}>Titles and references</button>
+              <button type="button" role="radio" aria-checked={searchScope === 'text'}
+                className={'ui-chip navpick-scope-btn' + (searchScope === 'text' ? ' is-on' : '')} onClick={() => setSearchScope('text')}>Inside the text</button>
             </div>
-            {/* Corpus chips — SearchScreen's All / Scriptures / Volumes control,
-                same three ids the engine's `corpus` option takes. Only in the
-                Full text scope: it is the engine's filter, and the nav index
-                the Titles scope reads has no corpus discriminator. */}
+            {/* Corpus chips — SearchScreen's All / Scriptures / Volumes control, only in the full-text scope. */}
             {searchScope === 'text' && (
-              <div className="navpick-corpus" role="radiogroup" aria-label="Search corpus">
+              <div className="ui-chips navpick-corpus" role="radiogroup" aria-label="Search corpus">
                 {NAVPICK_CORPUS_SCOPES.map((c) => (
                   <button
                     key={c.id}
                     type="button" role="radio" aria-checked={corpusScope === c.id}
-                    className={"navpick-corpus-btn" + (corpusScope === c.id ? " active" : "")}
+                    className={'ui-chip navpick-corpus-btn' + (corpusScope === c.id ? ' is-on' : '')}
                     onClick={() => setCorpusScope(c.id)}
                   >{c.label}</button>
                 ))}
@@ -560,8 +553,9 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
           ) : searchScope === 'titles' ? (
             results.length > 0 ? (
               <>
-                <div className="navpick-section-label">Titles &amp; places</div>
+                <div className="navpick-section-label">Titles and places</div>
                 {results.map((item, i) => renderItemRow(item, 's' + i))}
+                {!mode && <p className="rd-note">Pick a place, then choose the exact words to link to.</p>}
               </>
             ) : (
               <div className="navpick-empty">
@@ -600,6 +594,8 @@ export function LinkPicker({ sourceKey, sourceLabel, sourceStart, sourceEnd, sou
             </>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   );
