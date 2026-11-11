@@ -53,7 +53,7 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, curr
   // rows all render the SAME one. progressKeyFor threads the tracker's
   // v1:<bid>:<cid> key; absent (legacy caller) → cold chip only.
   const _wpm = readingChipWpm();
-  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm);
+  const minChip = (ch) => readingMinChip(ch, progressKeyFor ? progressKeyFor(ch.num) : null, _wpm, { plain: true });
   // BACKLOG [29a] / C2-C [C7] — the SECOND signal, on the study screens that
   // pass a measured table (utils/matthew-note-weight.js). It answers a
   // question the minute chip is contractually forbidden to answer: study

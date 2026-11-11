@@ -121,7 +121,7 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
     globalThis.countItemWords = countItemWords;
     globalThis.readingMinutes = readingMinutes;
     renderIndex({ book: WORDY_BOOK });
-    expect(document.querySelector('.idx-min-chip').textContent).toBe('~2 min');
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('2 min');
   });
 
   it('uses the measured pace when ReadingStatsStore has one', () => {
@@ -130,7 +130,7 @@ describe('ChapterIndex — "~N min" reading-time chip', () => {
     globalThis.readingMinutes = readingMinutes;
     globalThis.ReadingStatsStore = { measuredWpm: () => 100 };
     renderIndex({ book: WORDY_BOOK });
-    expect(document.querySelector('.idx-min-chip').textContent).toBe('~5 min');
+    expect(document.querySelector('.idx-min-chip').textContent).toBe('5 min');
   });
 
   it('renders no chip when the word counters are absent (guard path)', () => {
@@ -197,7 +197,7 @@ describe('ChapterIndex — commentary-weight chip', () => {
     const WORDY = { ...BOOK, chapters: [{ num: 1, title: 'One', sections: [{ verses: [{ n: 1, text: Array.from({ length: 460 }, () => 'w').join(' ') }] }] }] };
     renderIndex({ book: WORDY, noteWeights: { 1: 3.58 } });
     const card = document.querySelector('.chapter-card-btn');
-    expect(card.querySelector('.idx-min-chip').textContent).toBe('~2 min');
+    expect(card.querySelector('.idx-min-chip').textContent).toBe('2 min');
     expect(card.querySelector('.idx-note-chip').textContent).toBe('3.6× notes');
   });
 });
