@@ -21,7 +21,14 @@
 
    Bridge: window.AndroidBridge.offlineAudioState / offlineAudioSave /
    offlineAudioRemove / offlineAudioCancel, called directly (the
-   setAudioActive pattern; BridgeContractTest pins the four).
+   setAudioActive pattern; BridgeContractTest pins the four), and
+   offlineAudioRetry where the store has it.
+
+   dl-rework (2026-11-10): the stores run DOWNLOADS_AT_ONCE at a time, by
+   priority (tap, bulk, auto); a failure is never dropped but kept on the
+   store's "will try again" list (`later`, across a restart too), and the
+   state says what is on its way (`actives`), in what order (`queue`), the
+   room the queue still needs (`need`), and the batch by bytes.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { isSongUrl, resolveBibleAudio } from './audio-track.js';
@@ -45,10 +52,27 @@ let _evictable = false;
 let _waiting = false;
 /** @type {Set<string>} */
 let _queued = new Set();
-/** @type {{ url: string, bytes: number, total: number } | null} */
-let _active = null;
+/** The downloads on their way (up to the store's DOWNLOADS_AT_ONCE), by URL. @type {Map<string, { bytes: number, total: number }>} */
+let _actives = new Map();
 /** @type {Map<string, string>} */
 let _failed = new Map();
+/**
+ * The store's "will try again" list (dl-rework): failed ones are never dropped; the store tries them again by itself.
+ * @typedef {{ url: string, key: string, title: string, reason: string, status: number, tries: number, at: number }} LaterItem
+ * @type {Map<string, LaterItem>}
+ */
+let _later = new Map();
+/** The order the store downloads in (the ones on their way first), with what each was asked as. @type {Array<{ url: string, key: string, title: string, pri?: number }>} */
+let _order = [];
+/** The room the queue needs before anything left fits (bytes, 0 = none or not known). */
+let _need = 0;
+/** The store downloads with the app closed (the phone app on Android 14+). */
+let _closedRuns = false;
+/** What the last hand-over could not give the store (a call threw midway): the listener is told, and can try again. */
+/** @type {Array<{ url: string, key: string, title: string }>} */
+let _unsent = [];
+/** Samples of the bytes done, [time, bytes], for a rate and a time left. @type {Array<[number, number]>} */
+let _samples = [];
 /** @type {Map<string, number>} sizes (bytes) looked up before a download */
 let _sizes = new Map();
 /** @type {Set<string>} */
@@ -82,8 +106,32 @@ let _paused = false;
 /** @type {string | null} paused | wifi | offline | space | retrying */
 let _reason = null;
 let _left = { count: 0, bytes: 0, unknown: 0 };
-let _batch = { done: 0, total: 0, failed: 0 };
+let _batch = { done: 0, total: 0, failed: 0, bytes: 0, doneBytes: 0 };
 let _loaded = false;
+/** Priorities the stores know: one tapped by itself, a set, automatic ones (plan week, the next 3, kept songs). */
+const PRI = { tap: 0, bulk: 1, auto: 2 };
+/** A hand-over of this many files or fewer is "tapped by itself" when the caller says nothing (a letter, in parts). */
+const TAP_FILES = 3;
+/** The window a download rate is measured over. */
+const RATE_WINDOW_MS = 120000;
+
+/** The bytes done in this batch, with what is on its way. */
+function _doneBytes() {
+  let n = _batch.doneBytes;
+  for (const a of _actives.values()) n += a.bytes;
+  return n;
+}
+
+/** Note how far the batch is, at most once a second, for the rate. */
+function _sample() {
+  // Measured only while something downloads: idle time (waiting to start, a hold) is not a slow rate.
+  if (!_actives.size) { _samples = []; return; }
+  const now = Date.now();
+  const last = _samples[_samples.length - 1];
+  if (last && now - last[0] < 1000) return;
+  _samples.push([now, _doneBytes()]);
+  while (_samples.length > 2 && now - _samples[0][0] > RATE_WINDOW_MS) _samples.shift();
+}
 
 /** @returns {any} the phone app's bridge, or null */
 function _nativeBridge() {
@@ -160,21 +208,40 @@ function refresh() {
   _evictable = s.persisted === false;
   _waiting = s.waiting === true;
   _queued = new Set((Array.isArray(s.queued) ? s.queued : []).filter((u) => typeof u === 'string'));
-  const a = s.active;
-  _active = a && typeof a.url === 'string' ? { url: a.url, bytes: Number(a.bytes) || 0, total: Number(a.total) || -1 } : null;
+  _actives = new Map();
+  // `actives` (dl-rework: several at once); an older store says only `active`.
+  const list = Array.isArray(s.actives) ? s.actives : s.active ? [s.active] : [];
+  for (const a of list) if (a && typeof a.url === 'string') _actives.set(a.url, { bytes: Number(a.bytes) || 0, total: Number(a.total) || -1 });
   _paused = s.paused === true;
   _reason = typeof s.reason === 'string' ? s.reason : null;
+  _need = Number(s.need) > 0 ? Number(s.need) : 0;
+  _closedRuns = s.closedRuns === true;
   const l = s.left && typeof s.left === 'object' ? s.left : {};
   _left = { count: Number(l.count) || 0, bytes: Number(l.bytes) || 0, unknown: Number(l.unknown) || 0 };
   const bt = s.batch && typeof s.batch === 'object' ? s.batch : {};
-  _batch = { done: Number(bt.done) || 0, total: Number(bt.total) || 0, failed: Number(bt.failed) || 0 };
+  const total = Number(bt.total) || 0;
+  if (total < _batch.total || (Number(bt.done) || 0) < _batch.done) _samples = [];   // a new batch: a new rate
+  _batch = { done: Number(bt.done) || 0, total, failed: Number(bt.failed) || 0, bytes: Number(bt.bytes) || 0, doneBytes: Number(bt.doneBytes) || 0 };
+  _later = new Map();
+  for (const t of Array.isArray(s.later) ? s.later : []) {
+    if (!t || typeof t.url !== 'string') continue;
+    const it = { url: t.url, key: String(t.key || ''), title: String(t.title || ''), reason: String(t.reason || 'network'),
+      status: Number(t.status) || 0, tries: Number(t.tries) || 0, at: Number(t.at) || 0 };
+    _later.set(t.url, it);
+    if (!_asked.has(t.url)) _asked.set(t.url, { url: t.url, key: it.key, title: it.title });
+  }
   for (const url of _saved.keys()) _failed.delete(url);
-  // The web store names what each one on its way was asked as (the native state does not): titles after a reload.
+  // What each one on its way was asked as, from the store: titles after a reload or a restart.
+  _order = [];
   if (Array.isArray(s.queue)) {
     for (const q of s.queue) {
-      if (q && typeof q.url === 'string' && !_asked.has(q.url)) _asked.set(q.url, { url: q.url, key: String(q.key || ''), title: String(q.title || '') });
+      if (!q || typeof q.url !== 'string') continue;
+      const it = { url: q.url, key: String(q.key || ''), title: String(q.title || ''), pri: Number(q.pri) || 0 };
+      _order.push(it);
+      if (!_asked.has(q.url)) _asked.set(q.url, { url: it.url, key: it.key, title: it.title });
     }
   }
+  _sample();
   _notify();
 }
 
@@ -197,34 +264,42 @@ function _onEvent(json) {
       return;
     case 'done':
     case 'removed':
-      if (url && _active && _active.url === url) _active = null;
-      if (e.type === 'done' && !_active && !_queued.size) _say('Download finished');
+      if (url) _actives.delete(url);
+      if (e.type === 'done' && !_actives.size && !_queued.size) _say('Download finished');
       refresh();
       return;
     case 'queued': {
       // One event for the whole batch a Download all queued (n2-03), or one per url from an older shell.
       const urls = Array.isArray(e.urls) ? e.urls.filter((u) => typeof u === 'string') : url ? [url] : [];
       if (!urls.length) return;
-      for (const u of urls) { _queued.add(u); _failed.delete(u); }
+      for (const u of urls) { _queued.add(u); _failed.delete(u); _later.delete(u); }
       _say(urls.length === 1 ? 'Download started' : 'Downloading ' + urls.length + ' recordings');
       break;
     }
     case 'progress':
       if (!url) return;
       _queued.delete(url);
-      _active = { url, bytes: Number(e.bytes) || 0, total: Number(e.total) || -1 };
+      _later.delete(url);
+      _actives.set(url, { bytes: Number(e.bytes) || 0, total: Number(e.total) || -1 });
+      _sample();
       break;
-    case 'failed':
+    case 'failed': {
+      // On the "will try again" list (the store keeps it and tries again by itself), not dropped.
       if (!url) return;
       _queued.delete(url);
-      if (_active && _active.url === url) _active = null;
-      _failed.set(url, typeof e.reason === 'string' ? e.reason : 'network');
-      _say(e.reason === 'space' ? 'Download failed: not enough room on this phone' : 'Download failed');
+      _actives.delete(url);
+      const reason = typeof e.reason === 'string' ? e.reason : 'network';
+      _failed.set(url, reason);
+      const t = _asked.get(url) || { url, key: '', title: '' };
+      _later.set(url, { ...t, reason, status: Number(e.status) || 0, tries: 0, at: 0 });
+      _say(reason === 'space' ? 'Not downloaded yet: not enough room on this phone' : 'Not downloaded yet. It will try again by itself.');
       break;
+    }
     case 'cancelled':
       if (!url) return;
       _queued.delete(url);
-      if (_active && _active.url === url) _active = null;
+      _actives.delete(url);
+      _later.delete(url);
       break;
     case 'sizes': {
       const sizes = e.sizes && typeof e.sizes === 'object' ? e.sizes : {};
@@ -275,9 +350,9 @@ function subscribe(cb) {
 function statusOf(url) {
   if (!_loaded) refresh();
   if (_saved.has(url)) return 'saved';
-  if (_active && _active.url === url) return 'downloading';
+  if (_actives.has(url)) return 'downloading';
   if (_queued.has(url)) return 'queued';
-  if (_failed.has(url)) return 'failed';
+  if (_later.has(url) || _failed.has(url)) return 'failed';
   return 'none';
 }
 
@@ -288,8 +363,13 @@ function statusOf(url) {
  * @returns {boolean} a song is saved, queued or downloading
  */
 function _holdsSongs() {
-  if ([..._saved.keys()].some(isSongUrl) || [..._queued].some(isSongUrl)) return true;
-  return !!(_active && isSongUrl(_active.url));
+  if ([..._saved.keys()].some(isSongUrl) || [..._queued].some(isSongUrl) || [..._later.keys()].some(isSongUrl)) return true;
+  return [..._actives.keys()].some(isSongUrl);
+}
+
+/** Everything on its way or on the "will try again" list, songs left out (what a Cancel all stops). */
+function _busyRecordings() {
+  return [...new Set([..._queued, ..._actives.keys(), ..._later.keys()])].filter((u) => !isSongUrl(u) && !_saved.has(u));
 }
 
 /** Send what the rows asked for this turn: every row of a screen mounts in one commit, so one call (n2-02). */
@@ -367,9 +447,11 @@ export const OfflineAudio = {
   isSaved: (url) => statusOf(url) === 'saved',
   statusOf,
   /** @param {string} url @returns {{ bytes: number, total: number } | null} */
-  progressOf: (url) => (_active && _active.url === url ? { bytes: _active.bytes, total: _active.total } : null),
-  /** @param {string} url @returns {string | null} network | space | short | size | disk */
-  failureOf: (url) => _failed.get(url) || null,
+  progressOf: (url) => { const a = _actives.get(url); return a ? { bytes: a.bytes, total: a.total } : null; },
+  /** @param {string} url @returns {string | null} network | server | stalled | space | short | size | disk */
+  failureOf: (url) => (_later.get(url) || { reason: '' }).reason || _failed.get(url) || null,
+  /** @param {string} url @returns {number} the HTTP status the server answered its last try with (0: none) */
+  failureStatusOf: (url) => (_later.get(url) || { status: 0 }).status || 0,
   /**
    * Bytes of `url`: a download's own size, else one looked up (requestSizes), else the build's (AUDIO_LENGTHS,
    * downloads brief 3d), else null.
@@ -410,7 +492,7 @@ export const OfflineAudio = {
    */
   songsOnTheirWay: () => {
     if (!_loaded) refresh();
-    const urls = [..._queued].concat(_active ? [_active.url] : []).filter((u) => isSongUrl(u) && !_saved.has(u));
+    const urls = [..._queued].concat([..._actives.keys()]).filter((u) => isSongUrl(u) && !_saved.has(u));
     return [...new Set(urls)];
   },
   /** Bytes of the recordings on the phone (songs left out). */
@@ -426,46 +508,102 @@ export const OfflineAudio = {
   /** @returns {boolean} downloads wait for Wi-Fi now (Download only on Wi-Fi is on and the phone is on mobile data) */
   waiting: () => { if (!_loaded) refresh(); return _waiting; },
   /**
-   * Download each of `list` to the phone (queued one at a time, natively or in the web store). `bytes`, when known
-   * (the manifest's size), lets the phone total the queue before a byte arrives.
+   * Download each of `list` to the phone (the store runs a few at once, natively or in the web store). `bytes`, when
+   * known (the manifest's size), lets the phone total the queue before a byte arrives. One already waiting is asked
+   * again: its wait ends (one on the "will try again" list is tried now) and it moves up to `priority`.
    * @param {Array<{ url: string, key: string, title: string, bytes?: number, wifi?: boolean }>} list
+   * @param {{ priority?: 'tap' | 'bulk' | 'auto' }} [opts] priority: 'tap' (one the listener tapped by itself) goes ahead
+   *   of a set ('bulk'), and automatic ones ('auto': wifi items, kept songs) go last. Unsaid: up to TAP_FILES files
+   *   is a tap, more a set.
    * @returns {boolean} false where downloads are not possible
    */
-  download(list) {
+  download(list, opts) {
     if (!_loaded) refresh();
     const b = _bridge();
-    const items = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && !_saved.has(t.url))
-      .map((t) => {
-        /** @type {{ url: string, key: string, title: string, bytes?: number, wifi?: boolean }} */
-        const it = { url: t.url, key: String(t.key || ''), title: String(t.title || '') };
-        // The build's size when the caller gave none (brief section 7 item 17): the phone totals the queue with no lookups.
-        const bytes = typeof t.bytes === 'number' && t.bytes > 0 ? t.bytes : bytesOf(t.url);
-        if (bytes && bytes > 0) it.bytes = bytes;
-        // dl-d5: an automatic download, which the phone app starts only on Wi-Fi (with the app closed too).
-        if (t.wifi === true) it.wifi = true;
-        return it;
-      });
+    const asked = (Array.isArray(list) ? list : []).filter((t) => t && typeof t.url === 'string' && !_saved.has(t.url));
+    const said = opts && typeof opts.priority === 'string' && opts.priority in PRI ? opts.priority : null;
+    const items = asked.map((t) => {
+      /** @type {{ url: string, key: string, title: string, bytes?: number, wifi?: boolean, pri: string }} */
+      const it = { url: t.url, key: String(t.key || ''), title: String(t.title || ''), pri: 'bulk' };
+      // The build's size when the caller gave none (brief section 7 item 17): the phone totals the queue with no lookups.
+      const bytes = typeof t.bytes === 'number' && t.bytes > 0 ? t.bytes : bytesOf(t.url);
+      if (bytes && bytes > 0) it.bytes = bytes;
+      // dl-d5: an automatic download, which the phone app starts only on Wi-Fi (with the app closed too).
+      if (t.wifi === true) it.wifi = true;
+      it.pri = t.wifi === true || isSongUrl(t.url) ? 'auto' : said || (asked.length <= TAP_FILES ? 'tap' : 'bulk');
+      return it;
+    });
     if (!b || typeof b.offlineAudioSave !== 'function') return false;
     if (!items.length) return true;
     const sent = _save(b, items);
-    if (!sent) return false;
-    if (sent < items.length) items.length = sent;
-    for (const t of items) { _queued.add(t.url); _failed.delete(t.url); _asked.set(t.url, { url: t.url, key: t.key, title: t.title }); }
-    _warmTimings(items);
+    // A hand-over that stopped midway says so: what was not queued is kept for a Try again (dl-rework E).
+    _unsent = items.slice(sent).map((t) => ({ url: t.url, key: t.key, title: t.title }));
+    if (_unsent.length) _say(_unsent.length + ' of ' + items.length + ' were not added to the downloads. Try again.');
+    if (!sent) { _notify(); return false; }
+    for (const t of items.slice(0, sent)) {
+      _queued.add(t.url); _failed.delete(t.url); _later.delete(t.url); _asked.set(t.url, { url: t.url, key: t.key, title: t.title });
+    }
+    _warmTimings(items.slice(0, sent));
     _notify();
     return true;
   },
+  /** What the last hand-over could not give the store (a call threw midway); [] when it all went. */
+  unsent: () => _unsent,
+  /** Forget what the last hand-over could not give (the listener dismissed it, or asked again). */
+  clearUnsent: () => { if (_unsent.length) { _unsent = []; _notify(); } },
   /**
-   * The recordings on their way (queued or downloading; songs being kept left out) and the ones that failed this
-   * session and can be asked again (n2-05).
+   * The recordings on their way (queued or downloading; songs being kept left out) and the ones that did not download
+   * yet: the store's "will try again" list (kept across a restart), and any this session's store dropped.
    * @returns {{ busy: number, failed: Array<{ url: string, key: string, title: string }> }}
    */
   pending: () => {
     if (!_loaded) refresh();
-    const busy = [..._queued].filter((u) => !isSongUrl(u)).length + (_active && !isSongUrl(_active.url) && !_queued.has(_active.url) ? 1 : 0);
+    const busy = [...new Set([..._queued, ..._actives.keys()])].filter((u) => !isSongUrl(u)).length;
     const failed = [];
-    for (const u of _failed.keys()) { const t = _asked.get(u); if (t && !isSongUrl(u) && !_saved.has(u)) failed.push(t); }
+    for (const t of _later.values()) if (!isSongUrl(t.url) && !_saved.has(t.url)) failed.push(_asked.get(t.url) || t);
+    for (const u of _failed.keys()) {
+      const t = _asked.get(u);
+      if (t && !isSongUrl(u) && !_saved.has(u) && !_later.has(u) && !_queued.has(u) && !_actives.has(u)) failed.push(t);
+    }
     return { busy, failed };
+  },
+  /**
+   * The "will try again" list as the store keeps it: why each did not download, and when it is tried next.
+   * @returns {LaterItem[]}
+   */
+  later: () => { if (!_loaded) refresh(); return [..._later.values()].filter((t) => !isSongUrl(t.url) && !_saved.has(t.url)); },
+  /** Try every one on the "will try again" list now. */
+  retryAll: () => {
+    const b = _bridge();
+    if (b && typeof b.offlineAudioRetry === 'function') { try { b.offlineAudioRetry(); refresh(); return; } catch (_e) { /* an older store */ } }
+    const again = OfflineAudio.pending().failed;
+    if (again.length) OfflineAudio.download(again, { priority: 'bulk' });
+  },
+  /** @returns {boolean} the store downloads with the app closed (the phone app on Android 14+): "Keep VOTReader open" is not true there */
+  runsClosed: () => { if (!_loaded) refresh(); return _closedRuns; },
+  /** @returns {number} how much more room the queue needs before anything left fits (0: none, or not known) */
+  need: () => { if (!_loaded) refresh(); return _need; },
+  /**
+   * The whole batch by bytes and by count, and a rough time left once a rate is known: "312 of 1,189 recordings ·
+   * 1.2 of 4.4 GB · about 40 min left".
+   * @returns {{ done: number, total: number, doneBytes: number, totalBytes: number, rate: number, secondsLeft: number | null }}
+   */
+  overall: () => {
+    if (!_loaded) refresh();
+    const doneBytes = _doneBytes();
+    const totalBytes = Math.max(_batch.bytes, doneBytes);
+    let rate = 0;
+    if (_samples.length > 1) {
+      const a = _samples[0];
+      const z = _samples[_samples.length - 1];
+      const dt = (z[0] - a[0]) / 1000;
+      if (dt >= 10 && z[1] > a[1]) rate = (z[1] - a[1]) / dt;
+    }
+    const leftBytes = Math.max(0, totalBytes - doneBytes);
+    return {
+      done: _batch.done, total: _batch.total, doneBytes, totalBytes, rate,
+      secondsLeft: rate > 0 && leftBytes > 0 && !_left.unknown ? leftBytes / rate : null,
+    };
   },
   /** @param {string[]} urls */
   remove: (urls) => { _send(urls, 'offlineAudioRemove'); },
@@ -491,21 +629,27 @@ export const OfflineAudio = {
     return _save(b, items) > 0;
   },
   /** An update of a recording on the phone is on its way. @param {string} url */
-  isUpdating: (url) => _saved.has(url) && (_queued.has(url) || !!(_active && _active.url === url)),
+  isUpdating: (url) => _saved.has(url) && (_queued.has(url) || _actives.has(url)),
   /** Every RECORDING off the phone (kept songs stay: they are the Songs screens' to remove). */
   removeAll: () => {
     if (!_holdsSongs()) { _send(['*'], 'offlineAudioRemove'); return; }
-    const busy = [..._queued].concat(_active ? [_active.url] : []).filter((u) => !isSongUrl(u));
+    const busy = _busyRecordings();
     if (busy.length) _send(busy, 'offlineAudioCancel');
     const urls = [..._saved.keys()].filter((u) => !isSongUrl(u));
     if (urls.length) _send(urls, 'offlineAudioRemove');
   },
   /** @param {string[]} urls */
-  cancel: (urls) => { _noteCancels(urls); _send(urls, 'offlineAudioCancel'); },
-  /** Stop every recording on its way (songs being kept go on). */
+  cancel: (urls) => {
+    _noteCancels(urls);
+    // The mirror forgets them at once (a waiting row's × must not linger until the store's events arrive).
+    if (Array.isArray(urls)) for (const u of urls) { if (_later.delete(u) || _failed.delete(u)) _notify(); }
+    _send(urls, 'offlineAudioCancel');
+  },
+  /** Stop every recording on its way, and the "will try again" list (songs being kept go on). */
   cancelAll: () => {
-    const busy = [..._queued].concat(_active ? [_active.url] : []).filter((u) => !isSongUrl(u));
+    const busy = _busyRecordings();
     _noteCancels(busy);
+    _unsent = [];
     if (!_holdsSongs()) { _send(['*'], 'offlineAudioCancel'); return; }
     if (busy.length) _send(busy, 'offlineAudioCancel');
   },
@@ -530,18 +674,29 @@ export const OfflineAudio = {
     if (!songs) return _left;
     return { count: Math.max(0, _left.count - songs), bytes: _left.bytes, unknown: Math.max(0, _left.unknown - songs) };
   },
-  /** @returns {{ done: number, total: number, failed: number }} this batch (since the queue was last empty): "3 of 31" */
+  /**
+   * @returns {{ done: number, total: number, failed: number, bytes: number, doneBytes: number }} this batch (since the
+   *   queue was last empty): "3 of 31", and its bytes
+   */
   batch: () => { if (!_loaded) refresh(); return _batch; },
   /**
-   * The recordings on their way in order, the one downloading first ("Waiting · 2nd in line"); songs being kept left
-   * out. key and title are what this session asked them as, '' for ones queued before a restart.
+   * The recordings on their way in the order the store takes them, the ones downloading first ("Waiting · 2nd in
+   * line"); songs being kept left out. key and title are what they were asked as ('' for one an older store forgot).
    * @returns {Array<{ url: string, key: string, title: string }>}
    */
   queue: () => {
     if (!_loaded) refresh();
-    const urls = (_active ? [_active.url] : []).concat([..._queued].filter((u) => !_active || u !== _active.url));
+    const seen = new Set();
+    /** @type {string[]} */
+    const urls = [];
+    const add = (/** @type {string} */ u) => { if (!seen.has(u) && !_saved.has(u) && !_later.has(u)) { seen.add(u); urls.push(u); } };
+    for (const u of _actives.keys()) add(u);
+    for (const t of _order) if (_queued.has(t.url) || _actives.has(t.url)) add(t.url);
+    for (const u of _queued) add(u);
     return urls.filter((u) => !isSongUrl(u)).map((u) => _asked.get(u) || { url: u, key: '', title: '' });
   },
+  /** @returns {string[]} the urls downloading now (up to the store's DOWNLOADS_AT_ONCE) */
+  actives: () => { if (!_loaded) refresh(); return [..._actives.keys()].filter((u) => !isSongUrl(u)); },
   /** Pause all downloads (the one on its way keeps its bytes). @returns {boolean} false where the store cannot */
   pause: () => _call('offlineAudioPause'),
   /** Resume all downloads, from their bytes. @returns {boolean} false where the store cannot */
@@ -554,8 +709,9 @@ export const OfflineAudio = {
     _sizesToSend = new Set(); _sizesFlushQueued = false;
     if (_sizeRetryTimer) clearTimeout(_sizeRetryTimer);
     _sizeRetryTimer = null; _sizeRetry = 0; _news = { seq: 0, text: '' };
-    _active = null; _totalBytes = 0; _freeBytes = -1; _evictable = false; _waiting = false; _loaded = false; _version = 0;
-    _paused = false; _reason = null; _left = { count: 0, bytes: 0, unknown: 0 }; _batch = { done: 0, total: 0, failed: 0 };
+    _actives = new Map(); _later = new Map(); _order = []; _need = 0; _closedRuns = false; _unsent = []; _samples = [];
+    _totalBytes = 0; _freeBytes = -1; _evictable = false; _waiting = false; _loaded = false; _version = 0;
+    _paused = false; _reason = null; _left = { count: 0, bytes: 0, unknown: 0 }; _batch = { done: 0, total: 0, failed: 0, bytes: 0, doneBytes: 0 };
     _install();
   },
 };

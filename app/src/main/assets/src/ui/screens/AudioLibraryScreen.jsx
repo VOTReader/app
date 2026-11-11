@@ -129,12 +129,12 @@ export function editionLine(edition) {
   return parts.join(' · ');
 }
 
-/** The Downloads row's live line, the Downloads strip's own words (picture 02): 'Downloading 3 of 30 · 191 MB left',
- *  'Paused · 3 of 30'; then what is on the phone. @returns {string} */
+/** The Downloads row's live line, the Downloads strip's own words (picture 02): 'Downloading · 3 of 30 recordings ·
+ *  191 MB left', 'Paused · 3 of 30 recordings', 'Didn't download yet · 2 recordings'; then what is on the phone.
+ *  A restored queue goes on by itself since dl-rework, so there is no 'closed' wait to name. @returns {string} */
 function downloadsLine(/** @type {any} */ offline, /** @type {any} */ queueLine, /** @type {number} */ busy, /** @type {any[]} */ downloads) {
   if (queueLine) {
-    return (queueLine.reason === 'closed' ? 'Stopped when VOTReader closed · ' + queueLine.count + ' left' : queueLine.line1)
-      + (queueLine.reason == null && queueLine.leftBytes ? ' · ' + queueLine.leftBytes + ' left' : '');
+    return queueLine.line1 + (queueLine.reason == null && queueLine.leftBytes ? ' · ' + queueLine.leftBytes + ' left' : '');
   }
   if (busy) return 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go';
   if (!downloads.length) return 'Download for offline listening';

@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildTvot, buildBible, buildStudies, checkState, toggleNode, selectRange, initialWanted, planOf, roomShort, groupPicked,
-  chapterRuns, countOf, formatLength,
+  chapterRuns, countOf, formatLength, voiceSplit, byReaderWords, readerName, toggleReading, heldReaders, unitOnPhone,
+  unitHeld, partsOnPhone,
 } from './download-tree.js';
 
 /** A store over a fixed table: url -> [status, bytes]. */
@@ -25,10 +26,15 @@ const player = {
     }
     return [t(volKey + '/' + item.id + '.mp3')];
   },
-  renditionsFor: (/** @type {string} */ volKey, /** @type {any} */ item) => [
-    { reader: 'B', tracks: player.playbackTracks(volKey, item) },
-    { reader: 'T', tracks: [t(volKey + '/' + item.id + '-tim.mp3')] },
-  ],
+  // As the catalog answers: the primary first, nothing for a letter with no recording; Timothy also read every letter
+  // but "Chosen by God" (a voice with a gap, for the fallback).
+  renditionsFor: (/** @type {string} */ volKey, /** @type {any} */ item) => {
+    const primary = player.playbackTracks(volKey, item);
+    if (!primary.length) return [];
+    const out = [{ reader: 'B', tracks: primary }];
+    if (item.id !== 'chosen') out.push({ reader: 'T', tracks: [t(volKey + '/' + item.id + '-tim.mp3')] });
+    return out;
+  },
 };
 const collections = [{ volKey: 'v1', label: 'Volume One' }, { volKey: 'v2', label: 'Volume Two' }, { volKey: 'empty', label: 'Empty' }];
 const items = /** @type {Record<string, any[]>} */ ({
@@ -45,11 +51,34 @@ describe('download-tree: the tree', () => {
     const v1 = tree.children[0];
     expect(v1.units.map((u) => u.id)).toEqual(['v1:warning', 'v1:christmas', 'v1:chosen']);
     expect(v1.units[1].tracks).toHaveLength(2);
+    expect(v1.units[1].readings.map((r) => r.reader)).toEqual(['B', 'T']);
     expect(tree.units).toHaveLength(4);
   });
   it('a voice swaps in that reader where it read the letter', () => {
-    const tree = buildTvot({ collections, itemsOf: (col) => items[col.volKey] || [], player, voice: 'T' });
+    const tree = buildTvot({ collections, itemsOf: (col) => (col.volKey === 'empty' ? [] : items[col.volKey]), player, voice: 'T' });
     expect(tree.children[0].units[1].tracks.map((x) => x.url)).toEqual(['v1/christmas-tim.mp3']);
+    expect(tree.children[0].units[1].reader).toBe('T');
+    expect(tree.children[0].units[1].fallback).toBe(false);
+  });
+  // dl-rework C (defects 1, 4): a voice with no reading of a letter downloaded the default silently.
+  it('a letter the voice did not read keeps its default reading and says so; "only" leaves it out', () => {
+    const tree = buildTvot({ collections, itemsOf: (col) => (col.volKey === 'empty' ? [] : items[col.volKey]), player, voice: 'T' });
+    const chosen = tree.units.find((u) => u.id === 'v1:chosen');
+    expect(chosen && chosen.reader).toBe('B');
+    expect(chosen && chosen.fallback).toBe(true);
+    expect(chosen && chosen.tracks.map((x) => x.url)).toEqual(['v1/chosen.mp3']);
+    const only = buildTvot({ collections, itemsOf: (col) => (col.volKey === 'empty' ? [] : items[col.volKey]), player, voice: 'T', only: true });
+    expect(only.units.map((u) => u.id)).toEqual(['v1:warning', 'v1:christmas', 'v2:one']);
+  });
+  it('the split counts come from the data: how many the voice reads, the rest by their default reader', () => {
+    const tree = buildTvot({ collections, itemsOf: (col) => (col.volKey === 'empty' ? [] : items[col.volKey]), player, voice: 'T' });
+    const s = voiceSplit(tree.units, 'T');
+    expect(s).toEqual({ voice: 3, other: 1, byReader: [['B', 1]], total: 4 });
+    expect(byReaderWords([['T', 67], ['V', 642]])).toBe('67 Timothy, 642 text-to-speech');
+    expect(voiceSplit(tvot().units, '')).toEqual({ voice: 0, other: 4, byReader: [['B', 4]], total: 4 });
+  });
+  it('reader names are one set everywhere', () => {
+    expect(['B', 'T', 'V', 'M', '', 'X'].map(readerName)).toEqual(['Benjamin', 'Timothy', 'Text-to-speech', 'With music', '', '']);
   });
   it('the Bible splits at Malachi: the first 39 books are the Old Testament', () => {
     const books = /** @type {Array<[string, string]>} */ (Array.from({ length: 39 }, (_, i) => ['b' + i, 'B' + i]));
@@ -106,7 +135,19 @@ describe('download-tree: ticks', () => {
   });
   it('the screen opens with what is on the phone or on its way ticked; a letter with one part saved is not', () => {
     const off = fakeStore({ 'v1/warning.mp3': ['saved', 3e6], 'v1/xmas-1.mp3': ['saved', 5e6], 'v2/one.mp3': ['queued', 7e6] });
-    expect([...initialWanted(off, tvot().units)]).toEqual(['v1:warning', 'v2:one']);
+    expect([...initialWanted(off, tvot().units)]).toEqual(['v1:warning', 'v1:warning@B', 'v2:one', 'v2:one@B']);
+  });
+  // dl-rework D: the store keeps a failure to try again by itself; the letter is still on its way, not unticked.
+  it('one on the store\'s will-try-again list stays ticked', () => {
+    const off = fakeStore({ 'v2/one.mp3': ['failed', 7e6] });
+    expect(initialWanted(off, tvot().units).has('v2:one')).toBe(true);
+  });
+  // dl-rework A (defect 21): a letter with part of it on the phone said nothing.
+  it('part of a letter on the phone reads "k of n parts"', () => {
+    const off = fakeStore({ 'v1/xmas-1.mp3': ['saved', 5e6] });
+    const xmas = tvot().units[1];
+    expect(partsOnPhone(off, xmas)).toEqual({ k: 1, n: 2 });
+    expect(unitOnPhone(off, xmas)).toBe(false);
   });
   it('a unit on its way is not added again; unticked, it is removed (its saved parts freed, none counted twice)', () => {
     const off = fakeStore({ 'v1/xmas-1.mp3': ['saved', 5e6], 'v1/xmas-2.mp3': ['downloading', 6e6], 'v2/one.mp3': ['queued', 7e6] });
@@ -116,6 +157,77 @@ describe('download-tree: ticks', () => {
     const dropped = planOf(off, units, new Set());
     expect(dropped.remove.map((u) => u.id)).toEqual(['v1:christmas', 'v2:one']);
     expect(dropped.removeBytes).toBe(5e6);
+  });
+});
+
+// dl-rework A (defects 2, 3, 6): a reading is a thing of its own; what is on the phone never depends on the voice.
+describe('download-tree: readings', () => {
+  const tim = () => buildTvot({ collections, itemsOf: (col) => (col.volKey === 'empty' ? [] : items[col.volKey]), player, voice: 'T' });
+  it('a letter saved in one voice is on the phone under any voice, and says which reader', () => {
+    const off = fakeStore({ 'v1/xmas-1.mp3': ['saved', 5e6], 'v1/xmas-2.mp3': ['saved', 6e6] });
+    const xmas = tim().units[1];
+    expect(xmas.reader).toBe('T');
+    expect(unitOnPhone(off, xmas)).toBe(true);
+    expect(unitHeld(off, xmas)).toBe(true);
+    expect(heldReaders(off, xmas)).toEqual(['B']);
+    // Choosing Timothy adds nothing and removes nothing for it.
+    const units = tim().units;
+    const p = planOf(off, units, initialWanted(off, units), undefined, 'T');
+    expect(p.add).toHaveLength(0);
+    expect(p.remove).toHaveLength(0);
+  });
+  it('one reading can be added beside another, and removed by itself', () => {
+    const off = fakeStore({ 'v1/xmas-1.mp3': ['saved', 5e6], 'v1/xmas-2.mp3': ['saved', 6e6], 'v1/christmas-tim.mp3': ['none', 4e6] });
+    const units = tim().units;
+    const xmas = units[1];
+    let wanted = initialWanted(off, units);
+    wanted = toggleReading(xmas, 'T', wanted);
+    let p = planOf(off, units, wanted, undefined, 'T');
+    expect(p.add.map((u) => [u.id, u.reader])).toEqual([['v1:christmas', 'T']]);
+    expect(p.addBytes).toBe(4e6);
+    expect(p.remove).toHaveLength(0);
+    wanted = toggleReading(xmas, 'B', wanted);   // Benjamin's off, Timothy's on: only Benjamin's goes
+    p = planOf(off, units, wanted, undefined, 'T');
+    expect(p.remove.map((u) => [u.id, u.reader])).toEqual([['v1:christmas', 'B']]);
+    expect(p.removeBytes).toBe(11e6);
+    expect(wanted.has('v1:christmas')).toBe(true);
+    wanted = toggleReading(xmas, 'T', wanted);   // the last reading off: the letter is unticked
+    expect(wanted.has('v1:christmas')).toBe(false);
+  });
+  it('a tap on another reading of a letter ticked for its fetched one adds to it; a tap on the fetched one unticks it', () => {
+    const units = tim().units;
+    const xmas = units[1];
+    const ticked = new Set(['v1:christmas']);   // fetches Timothy's
+    const both = toggleReading(xmas, 'B', ticked);
+    expect(planOf(fakeStore({}), units, both, undefined, 'T').add.map((u) => u.reader)).toEqual(['B', 'T']);
+    expect(toggleReading(xmas, 'T', ticked).has('v1:christmas')).toBe(false);
+  });
+  it('a ticked letter with no reading ticked fetches the chosen voice, or its default where the voice has none', () => {
+    const units = tim().units;
+    const p = planOf(fakeStore({}), units, new Set(['v1:christmas', 'v1:chosen']), undefined, 'T');
+    expect(p.add.map((u) => [u.id, u.reader, u.fallback])).toEqual([['v1:christmas', 'T', false], ['v1:chosen', 'B', true]]);
+  });
+  it('unticking a letter takes every reading of it away', () => {
+    const off = fakeStore({ 'v1/xmas-1.mp3': ['saved', 5e6], 'v1/xmas-2.mp3': ['saved', 6e6], 'v1/christmas-tim.mp3': ['saved', 4e6] });
+    const units = tim().units;
+    const wanted = toggleNode({ units: [units[1]] }, initialWanted(off, units));
+    expect([...wanted].some((id) => id.startsWith('v1:christmas'))).toBe(false);
+    expect(planOf(off, units, wanted).remove.map((u) => u.reader)).toEqual(['B', 'T']);
+  });
+  it('the confirm sheet keeps each reading it was given', () => {
+    const units = tim().units;
+    const both = [{ ...units[1], reader: 'B' }, { ...units[1], reader: 'T' }];
+    const g = groupPicked([{ id: 'v1', title: 'Volume One', noun: /** @type {'recording'} */ ('recording'), units }], both);
+    expect(g[0].units.map((u) => u.reader)).toEqual(['B', 'T']);
+  });
+  // dl-rework F: no stored id changes. What a phone saved before (keyed by URL, `key` = the letter) is found again.
+  it('recordings saved before the readings rework are recognised as they were: ticked, on the phone, by reader', () => {
+    const before = fakeStore({ 'v1/warning.mp3': ['saved', 3e6], 'v1/christmas-tim.mp3': ['saved', 4e6] });
+    const units = buildTvot({ collections, itemsOf: (col) => (col.volKey === 'empty' ? [] : items[col.volKey]), player, voice: '' }).units;
+    const w = initialWanted(before, units);
+    expect([...w]).toEqual(['v1:warning', 'v1:warning@B', 'v1:christmas', 'v1:christmas@T']);
+    expect(heldReaders(before, units[1])).toEqual(['T']);
+    expect(planOf(before, units, w).add).toHaveLength(0);
   });
 });
 

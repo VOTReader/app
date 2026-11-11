@@ -28,26 +28,47 @@ import timber.log.Timber
  * download or resumes, and again from MainActivity.onResume when a queue saved from an earlier run is still busy. Where
  * it cannot (Android 13 and older, or not visible), the downloads still run while the process lives, and a restart
  * picks the saved queue up.
+ *
+ * The job's network rule follows the queue (dl-rework, defects 12 and 13): unmetered when Download only on Wi-Fi is on
+ * or only automatic downloads are left, any network otherwise. A pending job with the other rule is replaced; a
+ * running one finishes and asks for the right one. It does not hold the process up for the "will try again" list
+ * alone: that list is tried at the next start (or while the app runs).
  */
 object DownloadJob {
     const val JOB_ID = 0x0D1D2
     const val NOTIFICATION_ID = 0x0D1D2
     const val CHANNEL_ID = "downloads"
     const val ACTION_PAUSE = "com.votreader.sacredui.DOWNLOADS_PAUSE"
+    /** The job's extras: it was scheduled for an unmetered network. */
+    const val EXTRA_UNMETERED = "unmetered"
 
-    /** Schedule the job if the queue has work and none is scheduled or running. Never throws. */
+    /** The job has work to hold the process up for: something can run now or soon, not only the "will try again" list. */
+    fun wanted(s: OfflineAudioStore.Summary): Boolean = s.busy && !s.paused && !s.onlyLater
+
+    /**
+     * Schedule the job if the queue has work and none is scheduled or running with the network rule it needs now; a
+     * pending one with the other rule is replaced (defect 13: turning Download only on Wi-Fi off left it waiting for
+     * Wi-Fi). Never throws.
+     */
     fun schedule(context: Context, store: OfflineAudioStore) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) return
         try {
             val app = context.applicationContext
             val js = app.getSystemService(JobScheduler::class.java) ?: return
-            if (js.getPendingJob(JOB_ID) != null) return
             val s = store.summary()
-            if (!s.busy || s.paused) return
+            val unmetered = s.needsUnmetered
+            val pending = js.getPendingJob(JOB_ID)
+            if (pending != null) {
+                if (pending.extras.getBoolean(EXTRA_UNMETERED, false) == unmetered || !wanted(s)) return
+                js.cancel(JOB_ID)
+            }
+            if (!wanted(s)) return
+            val extras = android.os.PersistableBundle().apply { putBoolean(EXTRA_UNMETERED, unmetered) }
             val info = JobInfo.Builder(JOB_ID, ComponentName(app, DownloadJobService::class.java))
                 .setUserInitiated(true)
-                .setRequiredNetworkType(if (s.wifiOnly) JobInfo.NETWORK_TYPE_UNMETERED else JobInfo.NETWORK_TYPE_ANY)
+                .setRequiredNetworkType(if (unmetered) JobInfo.NETWORK_TYPE_UNMETERED else JobInfo.NETWORK_TYPE_ANY)
                 .setEstimatedNetworkBytes(s.leftBytes.coerceAtLeast(0L), 0L)
+                .setExtras(extras)
                 .build()
             js.schedule(info)
         } catch (e: Exception) {
@@ -65,6 +86,7 @@ object DownloadJob {
             "space" -> "Waiting for storage space"
             "offline" -> "No connection"
             "retrying" -> "Server didn't answer · trying again"
+            "later" -> "Some downloads will try again later"
             else -> if (s.total > 1) "Downloading $n of ${s.total}" else "Downloading"
         }
         val parts = ArrayList<String>()
@@ -130,14 +152,23 @@ class DownloadJobService : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         val store = OfflineAudioStore.shared(this)
         val first = store.summary()
-        if (!first.busy || first.paused) return false
+        if (!DownloadJob.wanted(first)) return false
+        val unmetered = params.extras.getBoolean(DownloadJob.EXTRA_UNMETERED, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             setNotification(params, DownloadJob.NOTIFICATION_ID, DownloadJob.notification(this, first), JOB_END_NOTIFICATION_POLICY_REMOVE)
         }
         val r = object : Runnable {
             override fun run() {
                 val s = store.summary()
-                if (!s.busy || s.paused) { tick = null; jobFinished(params, false); return }
+                if (!DownloadJob.wanted(s)) { tick = null; jobFinished(params, false); return }
+                // Everything left waits for Wi-Fi on a job that runs on any network (defect 12): this one ends, and one
+                // that waits for an unmetered network takes over (the system starts it on Wi-Fi, not before).
+                if (s.needsUnmetered != unmetered) {
+                    tick = null
+                    jobFinished(params, false)
+                    DownloadJob.schedule(this@DownloadJobService, store)
+                    return
+                }
                 try {
                     NotificationManagerCompat.from(this@DownloadJobService).notify(DownloadJob.NOTIFICATION_ID, DownloadJob.notification(this@DownloadJobService, s))
                 } catch (e: SecurityException) {
@@ -159,7 +190,7 @@ class DownloadJobService : JobService() {
             store.pause()
             return false
         }
-        return store.busy() && !store.isPaused()
+        return DownloadJob.wanted(store.summary())
     }
 
     private companion object {

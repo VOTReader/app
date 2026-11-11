@@ -7,6 +7,10 @@
    recording with a 5 s Undo, a ⋯ per group whose Remove asks first, and Remove all downloads, which asks too. A tap
    on a recording plays it (with no signal too). The Listening Library's Downloads card opens the screen; it exists
    where downloads are possible (the Android app, or a browser that keeps recordings: cf1).
+
+   dl-rework (2026-11-10): a reading is a row of its own, named by its reader (A: removing one removes only it); the
+   strip and "Didn't download yet" show on both tabs, and On this phone lists the queue (paged, each waiting one with a
+   ×) and what has Finished (E). Choose's Letter voice is Settings > Letter Voice itself (B).
 */
 
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13), lazy bundle-h before. OfflineAudio and AudioPlayer
@@ -16,15 +20,46 @@ import { useOfflineAudio, formatBytes, isLeaving, removeWithUndo, REMOVED_TOAST_
 import { DownloadChooser, Sheet, TrashIcon } from '../components/DownloadChooser.jsx';
 import { DownloadStrip } from '../components/DownloadStrip.jsx';
 import { DownloadQueue } from '../components/DownloadQueue.jsx';
-import { countOf } from '../../utils/download-tree.js';
+import { DownloadFinished } from '../components/DownloadFinished.jsx';
+import { countOf, readerName } from '../../utils/download-tree.js';
 
 export { REMOVED_TOAST_ID };
 /** Rows a group shows before "Show all 30" (picture 11). */
 const ROWS_SHOWN = 3;
 
 /** @typedef {{ url: string, key: string, title: string, bytes: number, savedAt: number, stale?: boolean }} ShelfItem */
-/** @typedef {{ id: string, lead: string, title: string, items: ShelfItem[], bytes: number, savedAt: number }} ShelfGroup */
-/** @typedef {{ id: string, title: string, items: ShelfItem[], bytes: number, order: number }} ShelfRow  one recording */
+/**
+ * @typedef {{ id: string, key: string, reader: string, parts: number, lead: string, title: string, items: ShelfItem[],
+ *   bytes: number, savedAt: number }} ShelfGroup  one reading of a recording; parts = how many files that reading has
+ *   (0 unknown)
+ */
+/** @typedef {{ id: string, title: string, items: ShelfItem[], bytes: number, order: number, reader?: string, parts?: number }} ShelfRow  one reading */
+/** @typedef {(it: ShelfItem) => { reader: string, parts: number }} ReaderOf  whose reading a saved recording is */
+
+/**
+ * Whose reading each saved recording is, from the player's catalog (its readings of the letter the recording's key
+ * names). Nothing stored changes: a recording saved before readings were rows is found by its URL (dl-rework F).
+ * @returns {ReaderOf}
+ */
+export function readerLookup() {
+  /** @type {Map<string, Array<{ reader: string, urls: string[] }>>} */
+  const byKey = new Map();
+  const player = typeof AudioPlayer !== 'undefined' ? AudioPlayer : null;
+  return (it) => {
+    const key = it && it.key;
+    const colon = key ? key.indexOf(':') : -1;
+    if (!player || typeof player.renditionsFor !== 'function' || colon <= 0) return { reader: '', parts: 0 };
+    let rs = byKey.get(key);
+    if (!rs) {
+      let list = [];
+      try { list = player.renditionsFor(key.slice(0, colon), { id: key.slice(colon + 1), title: '' }, '') || []; } catch (_e) { list = []; }
+      rs = list.map((/** @type {any} */ r) => ({ reader: String((r && r.reader) || ''), urls: ((r && r.tracks) || []).map((/** @type {any} */ t) => t && t.url) }));
+      byKey.set(key, rs);
+    }
+    const hit = rs.find((r) => r.urls.includes(it.url));
+    return hit ? { reader: hit.reader, parts: hit.urls.length } : { reader: '', parts: 0 };
+  };
+}
 /**
  * @typedef {{ id: string, title: string, noun: 'recording' | 'chapter', rows: ShelfRow[], bytes: number, order: number }} ShelfBranch
  *   a collection or a book
@@ -53,28 +88,35 @@ function _sharedTitle(/** @type {string[]} */ titles) {
 }
 
 /**
- * The shelf by recording (n2-04): a letter's parts and a Bible book's chapters are one group, in their own order
- * (chapter 2 before chapter 10), the group last added to first. A download without a key stands alone.
+ * The shelf by reading (n2-04; dl-rework A, defect 2): a letter's parts and a Bible book's chapters are one group, in
+ * their own order (chapter 2 before chapter 10), the group last added to first; each reading of a letter is a group
+ * of its own (Benjamin's and Timothy's are two rows). A download without a key stands alone.
  * @param {ShelfItem[]} items
+ * @param {ReaderOf} [readerOf] whose reading each is (none: one group per key, as before)
  * @returns {ShelfGroup[]}
  */
-export function groupShelf(items) {
-  /** @type {Map<string, ShelfItem[]>} */
+export function groupShelf(items, readerOf) {
+  /** @type {Map<string, { key: string, reader: string, parts: number, list: ShelfItem[] }>} */
   const byKey = new Map();
   for (const it of items) {
-    const id = it.key || it.url;
+    const key = it.key || it.url;
+    const who = readerOf && it.key ? readerOf(it) : { reader: '', parts: 0 };
+    const id = key + (who.reader ? '@' + who.reader : '');
     const g = byKey.get(id);
-    if (g) g.push(it); else byKey.set(id, [it]);
+    if (g) g.list.push(it); else byKey.set(id, { key, reader: who.reader, parts: who.parts, list: [it] });
   }
   const order = (/** @type {ShelfItem} */ a, /** @type {ShelfItem} */ b) =>
     a.title.localeCompare(b.title, undefined, { numeric: true, sensitivity: 'base' }) || a.url.localeCompare(b.url);
-  const groups = [...byKey.entries()].map(([id, list]) => {
+  const groups = [...byKey.entries()].map(([id, { key, reader, parts, list }]) => {
     list.sort(order);
     const shared = list.length > 1 ? _sharedTitle(list.map((x) => x.title)) : '';
     const base = shared || list[0].title;
-    const edition = id.includes(':') ? _editionOf(id) : '';
+    const edition = key.includes(':') ? _editionOf(key) : '';
     return {
       id,
+      key,
+      reader,
+      parts,
       lead: shared,
       title: edition && !base.includes(edition) ? base + ' · ' + edition : base,
       items: list,
@@ -86,17 +128,18 @@ export function groupShelf(items) {
 }
 
 /** @param {ShelfItem[]} list @returns {ShelfRow} */
-function _row(list, /** @type {string} */ id, /** @type {string} */ title, /** @type {number} */ order) {
-  return { id, title, items: list, bytes: list.reduce((n, x) => n + (x.bytes || 0), 0), order };
+function _row(list, /** @type {string} */ id, /** @type {string} */ title, /** @type {number} */ order, /** @type {string} */ reader = '', /** @type {number} */ parts = 0) {
+  return { id, title, items: list, bytes: list.reduce((n, x) => n + (x.bytes || 0), 0), order, reader, parts };
 }
 
 /**
  * The shelf grouped like the Choose tree (picture 11): The Volumes of Truth › collection › letter (its parts one row),
  * The Bible · edition › book › chapter, then Studies and anything else. Sections, branches and rows in library order.
  * @param {ShelfItem[]} items
+ * @param {ReaderOf} [readerOf] whose reading each is: a letter's readings are rows of their own
  * @returns {ShelfSection[]}
  */
-export function shelfSections(items) {
+export function shelfSections(items, readerOf) {
   const cols = typeof COLLECTIONS !== 'undefined' ? COLLECTIONS : [];
   const books = typeof BIBLE_AUDIO_BOOKS !== 'undefined' && Array.isArray(BIBLE_AUDIO_BOOKS) ? BIBLE_AUDIO_BOOKS : [];
   /** @type {Map<string, ShelfSection>} */
@@ -111,15 +154,15 @@ export function shelfSections(items) {
     if (!b) { b = { id, title, noun, rows: [], bytes: 0, order }; branches.set(id, b); sec.branches.push(b); }
     return b;
   };
-  groupShelf(items).forEach((g) => {
-    const colon = g.id.indexOf(':');
-    const volKey = colon > 0 ? g.id.slice(0, colon) : '';
+  groupShelf(items, readerOf).forEach((g) => {
+    const colon = g.key.indexOf(':');
+    const volKey = colon > 0 ? g.key.slice(0, colon) : '';
     const edition = volKey ? _edition(volKey) : null;
     if (edition) {
-      const bookId = g.id.slice(colon + 1);
+      const bookId = g.key.slice(colon + 1);
       const at = books.findIndex((b) => b[0] === bookId);
       const name = at >= 0 ? books[at][1] : g.lead || g.items[0].title.split(' · ')[0];
-      const b = branch(volKey, 'The Bible · ' + (edition.short || edition.label || ''), 1, g.id, name, 'chapter', at < 0 ? 999 : at);
+      const b = branch(volKey, 'The Bible · ' + (edition.short || edition.label || ''), 1, g.key, name, 'chapter', at < 0 ? 999 : at);
       for (const it of g.items) {
         const title = it.title.startsWith(name + ' · ') ? it.title.slice(name.length + 3) : it.title;
         const ch = /(\d+)$/.exec(title);
@@ -135,13 +178,13 @@ export function shelfSections(items) {
       // In the collection's own order (the preface first); a letter the corpus does not list yet goes last.
       const letters = typeof colLetterArr === 'function' ? colLetterArr(col) || [] : [];
       const pre = typeof colPreface === 'function' ? colPreface(col) : null;
-      const itemId = g.id.slice(colon + 1);
+      const itemId = g.key.slice(colon + 1);
       const at = pre && pre.id === itemId ? -1 : letters.findIndex((/** @type {any} */ l) => l && l.id === itemId);
-      b.rows.push(_row(g.items, g.id, title, at === -1 && !(pre && pre.id === itemId) ? 1e6 : at));
+      b.rows.push(_row(g.items, g.id, title, at === -1 && !(pre && pre.id === itemId) ? 1e6 : at, g.reader, g.parts));
     } else if (volKey === 'study') {
-      branch('study', 'Studies', 2, 'study', 'Bible/Letter Studies', 'recording', 0).rows.push(_row(g.items, g.id, title, 0));
+      branch('study', 'Studies', 2, 'study', 'Bible/Letter Studies', 'recording', 0).rows.push(_row(g.items, g.id, title, 0, g.reader, g.parts));
     } else {
-      branch('other', 'Other recordings', 3, 'other', 'Recordings', 'recording', 0).rows.push(_row(g.items, g.id, title, 0));
+      branch('other', 'Other recordings', 3, 'other', 'Recordings', 'recording', 0).rows.push(_row(g.items, g.id, title, 0, g.reader, g.parts));
     }
   });
   for (const b of branches.values()) b.bytes = b.rows.reduce((n, r) => n + r.bytes, 0);
@@ -201,6 +244,8 @@ function BranchSheet({ branch, onPlay, onChoose, onRemove, onClose }) {
  *   onBack: () => void,
  *   backLabel?: string,
  *   bibleAudio?: string,
+ *   letterReader?: string,
+ *   onLetterReader?: (code: string) => void,
  *   onSearch?: () => void,
  *   onHistory?: () => void,
  *   onSettings?: () => void,
@@ -208,7 +253,7 @@ function BranchSheet({ branch, onPlay, onChoose, onRemove, onClose }) {
  *   onThemeChange?: (theme: any) => void,
  * }} props
  */
-export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bibleAudio, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bibleAudio, letterReader, onLetterReader, onSearch, onHistory, onSettings, theme, onThemeChange }) {
   const off = useOfflineAudio();
   // Nothing on the phone or on its way opens Choose; else what is there (an entry point may say which: openDownloadsAt).
   const [at] = React.useState(() => { const a = _openAt; _openAt = null; return a; });
@@ -224,7 +269,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   const [showAll, setShowAll] = React.useState(() => new Set());
   // A single Remove waits out its Undo (removeWithUndo, brief section 7 item 14): the row steps aside at once.
   const items = off ? off.items().filter((it) => !isLeaving(it.url)) : [];
-  const sections = shelfSections(items);
+  const readerOf = React.useMemo(() => readerLookup(), []);
+  const sections = shelfSections(items, readerOf);
   const total = off ? off.totalBytes() : 0;
   const songs = off && typeof off.songItems === 'function' ? off.songItems().reduce((n, it) => n + (it.bytes || 0), 0) : 0;
   const free = off ? off.freeBytes() : -1;
@@ -237,9 +283,9 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   const removeRow = (/** @type {ShelfRow} */ row, /** @type {string} */ label) => {
     if (off) removeWithUndo(off, row.items.map((it) => it.url), 'Removed ' + label + (row.bytes ? ' · ' + formatBytes(row.bytes) : ''));
   };
-  const play = (/** @type {ShelfItem} */ it) => {
+  const play = (/** @type {ShelfItem} */ it, /** @type {string} */ reader = '') => {
     if (typeof AudioPlayer !== 'undefined' && typeof AudioPlayer.playTrack === 'function') {
-      AudioPlayer.playTrack({ key: it.key, title: it.title, url: it.url, sub: null, readerCode: '', partLabel: null });
+      AudioPlayer.playTrack({ key: it.key, title: it.title, url: it.url, sub: null, readerCode: reader, partLabel: null });
     }
   };
   const tabs = (
@@ -265,7 +311,9 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
           {tabs}
           <div role="tabpanel" id="dl-tabpanel" aria-labelledby="dl-tab-choose">
             <DownloadStrip off={off} onMakeRoom={() => setTab('phone')} />
-            <DownloadChooser key={focus || ''} off={off} bibleAudio={bibleAudio} focus={focus} />
+            <DownloadQueue off={off} only="failed" />
+            <DownloadChooser key={focus || ''} off={off} bibleAudio={bibleAudio} focus={focus}
+              letterReader={letterReader} onLetterReader={onLetterReader} />
           </div>
         </div>
       </ScreenLayout>
@@ -290,8 +338,9 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
           {/* Pinned under the tabs (README: the strip). */}
           {off ? <DownloadStrip off={off} /> : null}
-          {/* In line (picture 08): the one downloading, each waiting with its place, each that did not download with Retry. */}
+          {/* In line (picture 08): those downloading, each waiting with its place and a ×, each that did not download yet with Retry. */}
           {off ? <DownloadQueue off={off} /> : null}
+          {off && items.length ? <DownloadFinished off={off} items={items} /> : null}
           {items.length || songs ? (
             <div className="dl-storage">
               {barTotal > 0 ? (
@@ -356,16 +405,20 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
                             {shown.map((r) => {
                               const updating = r.items.some((it) => off.isUpdating && off.isUpdating(it.url));
                               const isStale = !updating && r.items.some((it) => it.stale);
+                              const who = b.noun === 'chapter' ? '' : readerName(r.reader);
+                              const named = r.title + (who ? ' · ' + who : '');
+                              // Part of a reading on the phone says so: "1 of 2 parts" (defect 21).
+                              const part = r.parts > 1 && r.items.length < r.parts ? r.items.length + ' of ' + r.parts + ' parts' : '';
                               return (
                                 <div key={r.id} className="dl-shelf-row">
-                                  <button type="button" className="dl-shelf-play" onClick={() => play(r.items[0])} aria-label={'Play ' + r.title}>
-                                    <span className="dl-shelf-title">{r.title}</span>
-                                    <span className="dl-shelf-size">{formatBytes(r.bytes) + (updating ? ' · Updating' : isStale ? ' · Update available' : '')}</span>
+                                  <button type="button" className="dl-shelf-play" onClick={() => play(r.items[0], r.reader)} aria-label={'Play ' + named}>
+                                    <span className="dl-shelf-title">{r.title}{who ? <span className="dl-reader">{who}</span> : null}</span>
+                                    <span className="dl-shelf-size">{[part, formatBytes(r.bytes)].filter(Boolean).join(' · ') + (updating ? ' · Updating' : isStale ? ' · Update available' : '')}</span>
                                   </button>
                                   {isStale ? (
-                                    <button type="button" className="offline-row-link" onClick={() => off.update(r.items)} aria-label={'Update ' + r.title + ' on this phone'}>Update</button>
+                                    <button type="button" className="offline-row-link" onClick={() => off.update(r.items)} aria-label={'Update ' + named + ' on this phone'}>Update</button>
                                   ) : null}
-                                  <button type="button" className="dl-icon-btn" onClick={() => removeRow(r, b.noun === 'chapter' ? b.title + ' · ' + r.title : r.title)} aria-label={'Remove ' + r.title + ' from this phone'}><CloseGlyph /></button>
+                                  <button type="button" className="dl-icon-btn" onClick={() => removeRow(r, b.noun === 'chapter' ? b.title + ' · ' + r.title : named)} aria-label={'Remove ' + named + ' from this phone'}><CloseGlyph /></button>
                                 </div>
                               );
                             })}
@@ -395,7 +448,7 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
       ) : null}
       {asking && asking.kind === 'menu' && askedBranch ? (
         <BranchSheet branch={askedBranch} onClose={() => setAsking(null)}
-          onPlay={() => { play(askedBranch.rows[0].items[0]); setAsking(null); }}
+          onPlay={() => { play(askedBranch.rows[0].items[0], askedBranch.rows[0].reader || ''); setAsking(null); }}
           onChoose={() => { setAsking(null); setFocus(askedBranch.id.startsWith('bible-') ? askedBranch.id.slice(0, askedBranch.id.indexOf(':')) : askedBranch.id); setTab('choose'); }}
           onRemove={() => setAsking({ kind: 'branch', id: askedBranch.id })} />
       ) : null}

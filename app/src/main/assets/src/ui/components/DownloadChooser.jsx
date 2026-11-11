@@ -8,7 +8,12 @@
 
    The tree logic is utils/download-tree.js. Globals read at call time, as the other Cluster H screens do:
    OfflineAudio's store comes in as `off`; AudioPlayer, COLLECTIONS, colPreface/colLetterArr (the lazy VOT
-   corpus), BIBLE_AUDIO_EDITIONS/BOOKS, AUDIO_READERS, AudioLengths, useFocusTrap and useModalRegistry.
+   corpus), BIBLE_AUDIO_EDITIONS/BOOKS, AudioLengths, useFocusTrap and useModalRegistry.
+
+   Voices (dl-rework B and C, 2026-11-10): the Letter voice at the top IS Settings > Letter Voice (one saved setting;
+   changing either changes both), above the groups so it stays in view when they fold. With a voice chosen, a line
+   says from the data how many letters it reads and what the rest download in, with a switch for only its letters;
+   each letter row names the reading Apply fetches, and a letter with more than one reading has a tick per reading.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { formatBytes, DownloadIcon, SPACE_MARGIN } from './OfflineAudioControls.jsx';
@@ -16,7 +21,8 @@ import { SheetHandle } from './SheetHandle.jsx';
 import { networkType } from '../../utils/download-gate.js';
 import {
   buildTvot, buildBible, buildStudies, checkState, toggleNode, selectRange, initialWanted, planOf, roomShort, groupPicked,
-  countOf, formatLength, unitOnPhone, unitHeld,
+  countOf, formatLength, unitOnPhone, unitHeld, readerName, readingsOf, readingId, readingOnPhone, readingHeld,
+  toggleReading, voiceSplit, byReaderWords, partsOnPhone, READER_NAMES,
 } from '../../utils/download-tree.js';
 
 /** On mobile data, an Apply past this asks first (brief 3e). */
@@ -41,6 +47,60 @@ function useCorpusVersion() {
 /** @param {string} url @returns {number | null} */
 function _secondsOf(url) {
   return typeof AudioLengths !== 'undefined' ? AudioLengths.secondsOf(url) : null;
+}
+
+/**
+ * The trees the Choose tab ticks, built from the player's catalog: The Volumes of Truth (in `voice`, or each letter's
+ * default reading), each offered Bible edition, and the Studies. Shared with the Finished list (sets and their sizes).
+ * @param {{ voice?: string, only?: boolean }} o
+ */
+export function useDownloadTrees({ voice = '', only = false }) {
+  const corpus = useCorpusVersion();
+  const player = typeof AudioPlayer !== 'undefined' && AudioPlayer && typeof AudioPlayer.playbackTracks === 'function' ? AudioPlayer : _noPlayer;
+  React.useEffect(() => {
+    const w = /** @type {any} */ (window);
+    if (typeof w.__loadVotCorpus === 'function') void w.__loadVotCorpus();
+  }, []);
+  const editions = React.useMemo(() => (typeof BIBLE_AUDIO_EDITIONS !== 'undefined'
+    ? Object.entries(BIBLE_AUDIO_EDITIONS).filter(([, e]) => typeof bibleAudioOffered !== 'function' || bibleAudioOffered(e)) : []), []);
+  const tvot = React.useMemo(() => buildTvot({
+    collections: typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((/** @type {any} */ c) => c.cardId) : [],
+    itemsOf: (col) => {
+      const pre = typeof colPreface === 'function' ? colPreface(col) : null;
+      const letters = typeof colLetterArr === 'function' ? colLetterArr(col) || [] : [];
+      return pre ? [pre, ...letters] : letters;
+    },
+    player,
+    voice,
+    only,
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus: the letters arrive with the lazy corpus, read from globals
+  }), [corpus, voice, only]);
+  const bibles = React.useMemo(() => editions.map(([id, e]) => ({
+    id, edition: e, tree: buildBible({ edition: e, books: typeof BIBLE_AUDIO_BOOKS !== 'undefined' ? BIBLE_AUDIO_BOOKS : [], player }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus: the Bible manifest is read from globals too
+  })).filter((b) => b.tree.units.length), [editions, corpus]);
+  // The studies registry is its own lazy file: asked for here, the branch fills in when it lands.
+  const [studiesIn, setStudiesIn] = React.useState(0);
+  React.useEffect(() => {
+    let live = true;
+    const load = /** @type {any} */ (window).loadBibleStudies;
+    if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesIn((n) => n + 1); }, () => {});
+    return () => { live = false; };
+  }, []);
+  const studies = React.useMemo(() => buildStudies({
+    studies: typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [], player,
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- studiesIn, corpus: the registry and manifest are read from globals
+  }), [studiesIn, corpus]);
+  return { tvot, bibles, studies };
+}
+
+/** A player with no catalog (an older shell, a test): every tree is empty. */
+const _noPlayer = { playbackTracks: () => [] };
+
+/** The reader a Bible edition's recordings carry ('B' for The Scriptures of Truth), or ''. @param {any} tree */
+function _editionReader(tree) {
+  const u = tree && tree.units && tree.units[0];
+  return u && u.reader ? String(u.reader) : '';
 }
 
 /**
@@ -185,31 +245,84 @@ function GroupRow({ node, noun, wanted, off, open, onOpen, onBox, sub, level, ch
   );
 }
 
+/** "Will be removed", or "Will be cancelled" for one only on its way (defect 28). @param {any} off @param {any[]} tracks */
+function _leaveWords(off, tracks) {
+  return tracks.some((t) => off.statusOf(t.url) === 'saved') ? 'Will be removed' : 'Will be cancelled';
+}
+
+/** Where one reading's tracks stand: the bytes on their way, Waiting, Will try again, or ''. @param {any} off @param {any[]} tracks */
+function _movingOf(off, tracks) {
+  let moving = '';
+  for (const t of tracks) {
+    const st = off.statusOf(t.url);
+    const p = st === 'downloading' && typeof off.progressOf === 'function' ? off.progressOf(t.url) : null;
+    if (p && p.total > 0) return 'Downloading ' + Math.floor((p.bytes / p.total) * 100) + '%';
+    if (st === 'downloading' || st === 'queued') moving = moving || 'Waiting';
+    if (st === 'failed') moving = moving || 'Will try again';
+  }
+  return moving;
+}
+
 /**
- * One letter: box, title, "2 parts · 14 min · 11 MB" or "Will be removed".
- * @param {{ unit: any, wanted: Set<string>, off: any, onBox: () => void }} props
+ * A reader's name as a small label: the reading Apply fetches, in brick-free gold; one the chosen voice did not read
+ * says so. @param {{ reader: string, fallback?: boolean, voice?: string }} props
  */
-function UnitRow({ unit, wanted, off, onBox }) {
+function ReaderTag({ reader, fallback, voice }) {
+  const name = readerName(reader);
+  if (!name) return null;
+  return (
+    <span className={'dl-reader' + (fallback ? ' is-fallback' : '')}
+      title={fallback && voice ? 'No ' + readerName(voice) + ' reading of this letter' : undefined}>
+      {name}{fallback && voice ? <span className="sr-only">{', no ' + readerName(voice) + ' reading'}</span> : null}
+    </span>
+  );
+}
+
+/**
+ * One letter: box, title, the reader of the reading Apply fetches, "1 of 2 parts · 14 min · 11 MB" or "Will be
+ * removed"; with more than one reading, a tick per reading (dl-rework A: one can be added or removed by itself).
+ * @param {{ unit: any, wanted: Set<string>, off: any, onBox: () => void, onReading: (reader: string) => void, voice: string }} props
+ */
+function UnitRow({ unit, wanted, off, onBox, onReading, voice }) {
   const on = wanted.has(unit.id);
   const removing = !on && unitHeld(off, unit);
   const s = statsOf(off, [unit]);
-  const parts = unit.tracks.length > 1 ? unit.tracks.length + ' parts' : '';
+  const readings = readingsOf(unit);
+  const many = readings.length > 1 && !!unit.reader;
+  const part = partsOnPhone(off, unit);
+  const parts = part.n > 1 ? (part.k && part.k < part.n ? part.k + ' of ' + part.n + ' parts on this phone' : part.n + ' parts') : '';
   // On its way (picture 08's row states): the bytes it has, or Waiting - never "Downloading 0%".
-  let moving = '';
-  for (const t of unit.tracks) {
-    const st = off.statusOf(t.url);
-    const p = st === 'downloading' && typeof off.progressOf === 'function' ? off.progressOf(t.url) : null;
-    if (p && p.total > 0) { moving = 'Downloading ' + Math.floor((p.bytes / p.total) * 100) + '%'; break; }
-    if (st === 'downloading' || st === 'queued') moving = moving || 'Waiting';
-  }
+  const moving = _movingOf(off, readings.flatMap((r) => r.tracks));
   const meta = [parts, moving, formatLength(s.seconds), s.bytes ? formatBytes(s.bytes) : ''].filter(Boolean).join(' · ');
+  const held = readings.filter((r) => readingOnPhone(off, r)).map((r) => r.reader);
   return (
-    <div className="dl-row dl-unit">
-      <Box state={on ? 'all' : 'none'} removing={removing} label={unit.title} onClick={onBox} />
-      <button type="button" className="dl-row-main" onClick={onBox} tabIndex={-1} aria-hidden="true">
-        <span className="dl-unit-title">{unit.title}</span>
-        {removing ? <em className="dl-remove-note">Will be removed</em> : <span className="dl-unit-meta">{meta}</span>}
-      </button>
+    <div className="dl-unit">
+      <div className="dl-row">
+        <Box state={on ? 'all' : 'none'} removing={removing} label={unit.title} onClick={onBox} />
+        <button type="button" className="dl-row-main" onClick={onBox} tabIndex={-1} aria-hidden="true">
+          <span className="dl-unit-title">{unit.title}</span>
+          {unit.reader ? <ReaderTag reader={held.length && !on ? held[0] : unit.reader} fallback={unit.fallback && !held.length} voice={voice} /> : null}
+          {removing ? <em className="dl-remove-note">{_leaveWords(off, readings.flatMap((r) => r.tracks))}</em> : <span className="dl-unit-meta">{meta}</span>}
+        </button>
+      </div>
+      {many ? (
+        <div className="dl-readings" role="group" aria-label={unit.title + ' readings'}>
+          {readings.map((r) => {
+            const id = readingId(unit, r.reader);
+            const ticked = wanted.has(id) || (on && !readings.some((x) => wanted.has(readingId(unit, x.reader))) && r.tracks === unit.tracks);
+            const here = readingHeld(off, r);
+            const cls = here ? (ticked ? 'is-kept' : 'is-remove') : ticked ? 'is-add' : 'is-none';
+            const said = here ? (ticked ? ', on this phone' : ', will be removed') : ticked ? ', to download' : '';
+            return (
+              <button key={id} type="button" className={'dl-reading ' + cls + (r.tracks === unit.tracks ? ' is-fetch' : '')}
+                aria-pressed={ticked} aria-label={readerName(r.reader) + said} onClick={() => onReading(r.reader)}>
+                {here && ticked ? <svg className="dl-reading-tick" viewBox="0 0 24 24" aria-hidden="true"><CheckGlyph /></svg> : null}
+                {readerName(r.reader)}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -305,12 +418,26 @@ function _bytesOf(units, off, saved) {
 }
 
 /**
- * The one confirm before anything is added or removed (brief 3c, picture 06).
- * @param {{ plan: any, groups: any[], off: any, free: number, onCancel: () => void, onApply: () => void }} props
+ * "41 in Benjamin's voice · 709 in another reading (67 Timothy, 642 text-to-speech)": what a voice does to the letters
+ * being added (dl-rework C). '' with no voice chosen or no letters among them.
+ * @param {any[]} add the plan's entries @param {string} voice
  */
-function ApplySheet({ plan, groups, off, free, onCancel, onApply }) {
+export function splitWords(add, voice) {
+  const letters = add.filter((u) => u && typeof u.id === 'string' && !u.chapter && u.reader);
+  if (!voice || !letters.length) return '';
+  const s = voiceSplit(letters, voice);
+  const mine = s.voice ? s.voice.toLocaleString('en-US') + ' in ' + readerName(voice) + '’s voice' : 'None in ' + readerName(voice) + '’s voice';
+  return s.other ? mine + ' · ' + s.other.toLocaleString('en-US') + ' in another reading (' + byReaderWords(s.byReader) + ')' : mine;
+}
+
+/**
+ * The one confirm before anything is added or removed (brief 3c, picture 06).
+ * @param {{ plan: any, groups: any[], off: any, free: number, voice: string, onCancel: () => void, onApply: () => void }} props
+ */
+function ApplySheet({ plan, groups, off, free, voice, onCancel, onApply }) {
   const add = groupPicked(groups, plan.add);
   const remove = groupPicked(groups, plan.remove);
+  const split = splitWords(plan.add, voice);
   const title = add.length && remove.length ? 'Download and remove?' : add.length ? 'Download these?' : 'Remove these?';
   const size = plan.addBytes != null ? formatBytes(plan.addBytes) : plan.addKnown ? 'at least ' + formatBytes(plan.addKnown) : '';
   const after = free >= 0 && plan.addBytes != null ? free - plan.addBytes + plan.removeBytes : -1;
@@ -319,11 +446,16 @@ function ApplySheet({ plan, groups, off, free, onCancel, onApply }) {
     remove.length && plan.removeBytes ? 'frees ' + formatBytes(plan.removeBytes) : '',
     after > 0 ? formatBytes(after) + ' left after' : '',
   ].filter(Boolean).join(' · ');
-  const line = (/** @type {any} */ g, /** @type {boolean} */ saved) =>
-    [countOf(g.units.length, g.noun), formatBytes(_bytesOf(g.units, off, saved))].filter(Boolean).join(' · ');
+  const line = (/** @type {any} */ g, /** @type {boolean} */ saved) => {
+    const bytes = _bytesOf(g.units, off, saved);
+    // Removing what is only on its way cancels it (defect 28: it read as a removal of something on the phone).
+    const onItsWay = saved && !bytes ? 'on their way: cancelled' : '';
+    return [countOf(g.units.length, g.noun), formatBytes(bytes), onItsWay].filter(Boolean).join(' · ');
+  };
   return (
     <Sheet id="dl-apply-sheet" title={title} onClose={onCancel}>
       <div className="dl-sheet-body">
+        {split ? <p className="dl-sheet-split">{split}</p> : null}
         {add.length ? <div className="dl-sheet-kicker">Add</div> : null}
         {add.map((g) => (
           <div key={'a' + g.id} className="dl-sheet-row"><DownloadIcon /><span><strong>{g.label}</strong><small>{line(g, false)}</small></span></div>
@@ -393,57 +525,75 @@ function Footer({ plan, free, onApply }) {
 }
 
 /**
- * The Choose tab.
- * @param {{ off: any, bibleAudio?: string, focus?: string | null }} props
- *   bibleAudio = Settings' Bible Audio choice (the edition chip picked first); focus = a collection or edition volKey
- *   to open the tree at (a header's "Choose…")
+ * The letter voice: Settings > Letter Voice itself (one saved setting), and what it does to the letters, said before
+ * any tap from the data. Above the groups, so it stays in view when they fold (dl-rework B, C).
+ * @param {{ voice: string, onVoice?: (code: string) => void, units: any[], only: boolean, onOnly: (on: boolean) => void }} props
+ *   units = every letter as the tree builds it in this voice (the "only" switch off)
  */
-export function DownloadChooser({ off, bibleAudio, focus }) {
-  const corpus = useCorpusVersion();
+function VoiceBar({ voice, onVoice, units, only, onOnly }) {
+  const s = voiceSplit(units, voice);
+  const name = readerName(voice);
+  let line = '';
+  if (units.length) {
+    if (!voice) {
+      line = 'Each letter downloads in its default reading: ' + byReaderWords(s.byReader) + '.';
+    } else {
+      line = (s.voice ? name + ' reads ' + countOf(s.voice, 'letter') + '.' : name + ' reads none of these letters.')
+        + (s.other ? ' The other ' + s.other.toLocaleString('en-US') + ' will download in their default reading (' + byReaderWords(s.byReader) + ').' : '');
+    }
+  }
+  return (
+    <div className="dl-voicebar">
+      <label className="dl-voice">
+        <span className="dl-voice-label" aria-hidden="true">Letter voice</span>
+        <select value={voice} onChange={(e) => { if (onVoice) onVoice(e.target.value || 'auto'); }} disabled={!onVoice}
+          aria-label="Letter voice" aria-describedby={line ? 'dl-voice-line' : undefined}>
+          <option value="">Automatic (each letter’s default reading)</option>
+          {Object.entries(READER_NAMES).map(([code, n]) => <option key={code} value={code}>{n}</option>)}
+        </select>
+      </label>
+      {line ? <p className="dl-voice-line" id="dl-voice-line">{line}</p> : null}
+      {voice && s.voice && s.other ? (
+        <label className="dl-only">
+          <input type="checkbox" role="switch" checked={only} onChange={(e) => onOnly(e.target.checked)} />
+          <span>{'Only letters ' + name + ' reads'}</span>
+        </label>
+      ) : null}
+      <p className="dl-voice-note">The same as Settings › Letter Voice: Listen plays in it too.</p>
+    </div>
+  );
+}
+
+/**
+ * The Choose tab.
+ * @param {{ off: any, bibleAudio?: string, focus?: string | null, letterReader?: string, onLetterReader?: (code: string) => void }} props
+ *   bibleAudio = Settings' Bible Audio choice (the edition chip picked first); focus = a collection or edition volKey
+ *   to open the tree at (a header's "Choose…"); letterReader / onLetterReader = Settings' Letter Voice, the one voice
+ *   setting (dl-rework B)
+ */
+export function DownloadChooser({ off, bibleAudio, focus, letterReader, onLetterReader }) {
   const lengthsStore = typeof AudioLengths !== 'undefined' ? AudioLengths.lengthsStore : null;
   React.useSyncExternalStore(lengthsStore ? lengthsStore.subscribe : _noSub, lengthsStore ? lengthsStore.getVersion : _zero);
   React.useEffect(() => {
-    const w = /** @type {any} */ (window);
-    if (typeof w.__loadVotCorpus === 'function') void w.__loadVotCorpus();
     if (typeof AudioLengths !== 'undefined' && typeof AudioLengths.lengthsReady === 'function') void AudioLengths.lengthsReady();
   }, []);
-  const [voice, setVoice] = React.useState('');
-  const editions = React.useMemo(() => (typeof BIBLE_AUDIO_EDITIONS !== 'undefined'
-    ? Object.entries(BIBLE_AUDIO_EDITIONS).filter(([, e]) => typeof bibleAudioOffered !== 'function' || bibleAudioOffered(e)) : []), []);
+  const voice = letterReader && letterReader !== 'auto' && readerName(letterReader) ? letterReader : '';
+  const [onlyVoice, setOnlyVoice] = React.useState(false);
+  const only = !!voice && onlyVoice;
+  const { tvot: tvotAll, bibles, studies } = useDownloadTrees({ voice });
+  const tvotOnly = React.useMemo(() => (only ? {
+    ...tvotAll,
+    children: (tvotAll.children || []).map((c) => ({ ...c, units: c.units.filter((u) => !u.fallback) })).filter((c) => c.units.length),
+    units: tvotAll.units.filter((u) => !u.fallback),
+  } : tvotAll), [tvotAll, only]);
+  const tvot = tvotOnly;
+  const editions = bibles;
   const firstEdition = () => {
-    const byFocus = editions.find(([, e]) => e.volKey === focus);
-    const bySetting = editions.find(([id]) => id === bibleAudio);
-    return (byFocus || bySetting || editions[0] || [''])[0];
+    const byFocus = editions.find((b) => b.edition.volKey === focus);
+    const bySetting = editions.find((b) => b.id === bibleAudio);
+    return (byFocus || bySetting || editions[0] || { id: '' }).id || bibleAudio || '';
   };
   const [editionId, setEditionId] = React.useState(firstEdition);
-
-  const tvot = React.useMemo(() => buildTvot({
-    collections: typeof COLLECTIONS !== 'undefined' ? COLLECTIONS.filter((/** @type {any} */ c) => c.cardId) : [],
-    itemsOf: (col) => {
-      const pre = typeof colPreface === 'function' ? colPreface(col) : null;
-      const letters = typeof colLetterArr === 'function' ? colLetterArr(col) || [] : [];
-      return pre ? [pre, ...letters] : letters;
-    },
-    player: AudioPlayer,
-    voice,
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus: the letters arrive with the lazy corpus, read from globals
-  }), [corpus, voice]);
-  const bibles = React.useMemo(() => editions.map(([id, e]) => ({
-    id, edition: e, tree: buildBible({ edition: e, books: typeof BIBLE_AUDIO_BOOKS !== 'undefined' ? BIBLE_AUDIO_BOOKS : [], player: AudioPlayer }),
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- corpus: the Bible manifest is read from globals too
-  })).filter((b) => b.tree.units.length), [editions, corpus]);
-  // The studies registry is its own lazy file: asked for here, the branch fills in when it lands.
-  const [studiesIn, setStudiesIn] = React.useState(0);
-  React.useEffect(() => {
-    let live = true;
-    const load = /** @type {any} */ (window).loadBibleStudies;
-    if (typeof load === 'function') Promise.resolve(load()).then(() => { if (live) setStudiesIn((n) => n + 1); }, () => {});
-    return () => { live = false; };
-  }, []);
-  const studies = React.useMemo(() => buildStudies({
-    studies: typeof BIBLE_STUDIES !== 'undefined' && Array.isArray(BIBLE_STUDIES) ? BIBLE_STUDIES : [], player: AudioPlayer,
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- studiesIn, corpus: the registry and manifest are read from globals
-  }), [studiesIn, corpus]);
   const allUnits = React.useMemo(() => [...tvot.units, ...bibles.flatMap((b) => b.tree.units), ...studies.units], [tvot, bibles, studies]);
   // The leaves the confirm sheet groups by: collections and books. A book names its edition when more than one is offered.
   const groups = React.useMemo(() => [
@@ -459,9 +609,10 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
   const base = initialWanted(off, allUnits);
   const wanted = new Set(base);
   for (const [id, on] of edits) { if (on) wanted.add(id); else wanted.delete(id); }
+  // Letter ids and reading ids (`<letter>@<reader>`) alike: every id either side holds.
   const setWanted = (/** @type {Set<string>} */ next) => {
     const e = new Map();
-    for (const u of allUnits) { const on = next.has(u.id); if (on !== base.has(u.id)) e.set(u.id, on); }
+    for (const id of new Set([...base, ...next])) { const on = next.has(id); if (on !== base.has(id)) e.set(id, on); }
     setEdits(e);
   };
 
@@ -485,7 +636,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, at the opening the focus came with
   }, []);
 
-  const plan = planOf(off, allUnits, wanted, _secondsOf);
+  const plan = planOf(off, allUnits, wanted, _secondsOf, voice);
   const free = off.freeBytes();
   const [asking, setAsking] = React.useState(/** @type {'' | 'apply' | 'mobile'} */ (''));
 
@@ -504,7 +655,8 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
       if (s !== 'saved' && s !== 'queued' && s !== 'downloading') items.push(_item(t, u.name));
     }
     if (items.length) {
-      if (now) off.download(items);
+      // One letter or chapter by itself goes ahead of a set already downloading (dl-rework D).
+      if (now) off.download(items, { priority: plan.add.length === 1 ? 'tap' : 'bulk' });
       else holdForWifi(off, items);
     }
     if (!now) setEdits(new Map());
@@ -517,30 +669,34 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
 
   const shownBible = bibles.find((b) => b.id === editionId) || bibles[0] || null;
   const tvotHere = statsOf(off, tvot.units).here;
-  const bibleHere = bibles.reduce((n, b) => n + statsOf(off, b.tree.units).here, 0);
+  // The header counts the edition shown, as its chips say (defect 4).
+  const bibleHere = shownBible ? statsOf(off, shownBible.tree.units).here : 0;
   const studiesHere = statsOf(off, studies.units).here;
-  const readerNames = /** @type {any} */ (globalThis).AUDIO_READERS;
-  const readers = readerNames ? Object.entries(readerNames) : [];
   const held = React.useSyncExternalStore(subscribeHeld, heldForWifi);
+  const unitRow = (/** @type {any} */ u) => (
+    <UnitRow key={u.id} unit={u} wanted={wanted} off={off} voice={voice}
+      onBox={() => setWanted(toggleNode({ units: [u] }, wanted))} onReading={(r) => setWanted(toggleReading(u, r, wanted))} />
+  );
+  const chipName = (/** @type {any} */ b) => {
+    const r = readerName(_editionReader(b.tree));
+    return (b.edition.short || b.edition.label) + (r ? ' · ' + r : '');
+  };
 
   return (
     <div className="dl-choose" ref={focusRef}>
       {held ? <p className="dl-held">{'Waiting for Wi-Fi · ' + countOf(held, 'recording')}</p> : null}
+
+      {tvotAll.units.length ? (
+        <VoiceBar voice={voice} onVoice={onLetterReader} units={tvotAll.units} only={only} onOnly={setOnlyVoice} />
+      ) : null}
 
       {tvot.units.length ? (
         <GroupRow node={{ ...tvot, title: 'The Volumes of Truth' }} noun="recording" wanted={wanted} off={off} level={0}
           open={open.has('tvot')} onOpen={() => flip('tvot')} onBox={() => setWanted(toggleNode(tvot, wanted))}
           sub={countOf((tvot.children || []).length, 'collection') + (tvotHere ? ' · ' + tvotHere + ' on this phone' : '')}>
           <div className="dl-tools">
-            <label className="dl-voice">
-              <span className="sr-only">Voice</span>
-              <select value={voice} onChange={(e) => setVoice(e.target.value)}>
-                <option value="">Voice: the one Listen plays</option>
-                {readers.map(([code, name]) => <option key={code} value={code}>{'Voice: ' + String(name).replace(/^Read by /, '')}</option>)}
-              </select>
-            </label>
             <button type="button" className="dl-link" onClick={() => setWanted(toggleNode(tvot, wanted))}>
-              {checkState(tvot, wanted) === 'all' ? 'Untick all of TVOT' : 'Select all of TVOT'}
+              {checkState(tvot, wanted) === 'all' ? 'Untick all of TVOT' : only ? 'Select all ' + readerName(voice) + ' reads' : 'Select all of TVOT'}
             </button>
           </div>
           {(tvot.children || []).map((col) => {
@@ -549,7 +705,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
               <div key={col.id} data-node={col.id}>
                 <GroupRow node={col} noun="recording" wanted={wanted} off={off} level={1}
                   open={open.has(col.id)} onOpen={() => flip(col.id)} onBox={() => setWanted(toggleNode(col, wanted))}>
-                  {many.map((u) => <UnitRow key={u.id} unit={u} wanted={wanted} off={off} onBox={() => setWanted(toggleNode({ units: [u] }, wanted))} />)}
+                  {many.map(unitRow)}
                   {col.units.length > LETTERS_SHOWN && !showAll.has(col.id) ? (
                     <button type="button" className="dl-link dl-show-all" onClick={() => setShowAll((p) => new Set(p).add(col.id))}>{'Show all ' + col.units.length}</button>
                   ) : null}
@@ -565,15 +721,17 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
       {shownBible ? (
         <GroupRow node={{ ...shownBible.tree, id: 'bible', title: 'The Bible' }} noun="chapter" wanted={wanted} off={off} level={0}
           open={open.has('bible')} onOpen={() => flip('bible')} onBox={() => setWanted(toggleNode(shownBible.tree, wanted))}
-          sub={'Old and New Testament' + (bibleHere ? ' · ' + countOf(bibleHere, 'chapter') + ' on this phone' : '')}>
+          sub={(shownBible.edition.short || shownBible.edition.label || 'Old and New Testament')
+            + (bibleHere ? ' · ' + countOf(bibleHere, 'chapter') + ' on this phone' : '')}>
           {bibles.length > 1 ? (
             <div className="dl-editions" role="radiogroup" aria-label="Bible edition">
               {bibles.map((b) => (
                 <button key={b.id} type="button" role="radio" aria-checked={b.id === shownBible.id}
-                  className={'dl-edition' + (b.id === shownBible.id ? ' is-on' : '')} onClick={() => setEditionId(b.id)}>{b.edition.short || b.edition.label}</button>
+                  className={'dl-edition' + (b.id === shownBible.id ? ' is-on' : '')} onClick={() => setEditionId(b.id)}>{chipName(b)}</button>
               ))}
             </div>
           ) : null}
+          {_editionReader(shownBible.tree) ? <p className="dl-edition-reader">{'Read by ' + readerName(_editionReader(shownBible.tree))}</p> : null}
           <div className="dl-tools">
             <button type="button" className="dl-link" onClick={() => setWanted(toggleNode(shownBible.tree, wanted))}>
               {checkState(shownBible.tree, wanted) === 'all' ? 'Untick whole edition' : 'Select whole edition'}
@@ -603,7 +761,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
             <div key={st.id} data-node={st.id}>
               <GroupRow node={st} noun="recording" wanted={wanted} off={off} level={1}
                 open={open.has(st.id)} onOpen={() => flip(st.id)} onBox={() => setWanted(toggleNode(st, wanted))}>
-                {st.units.map((u) => <UnitRow key={u.id} unit={u} wanted={wanted} off={off} onBox={() => setWanted(toggleNode({ units: [u] }, wanted))} />)}
+                {st.units.map(unitRow)}
               </GroupRow>
             </div>
           ))}
@@ -612,7 +770,7 @@ export function DownloadChooser({ off, bibleAudio, focus }) {
 
       <Footer plan={plan} free={free} onApply={() => setAsking('apply')} />
       {asking === 'apply' ? (
-        <ApplySheet plan={plan} groups={groups} off={off} free={free} onCancel={() => setAsking('')} onApply={apply} />
+        <ApplySheet plan={plan} groups={groups} off={off} free={free} voice={voice} onCancel={() => setAsking('')} onApply={apply} />
       ) : null}
       {asking === 'mobile' ? (
         <MobileSheet size={formatBytes(plan.addBytes || plan.addKnown)} onCancel={() => setAsking('')}

@@ -347,8 +347,10 @@ function DownloadConfirm({ off, label, todo, count, onCancel, onGo }) {
       <p className="offline-confirm-line">{recordings + (size ? ' · ' + size : '')}</p>
       {free > 0 ? <p className="offline-confirm-line">{'Free space on this phone: ' + formatBytes(free)}</p> : null}
       {noRoom ? <p className="offline-confirm-warn">Not enough room: free some space on the phone first.</p> : null}
-      {/* Downloads run while the app is open: no background service yet (the refutation of 2026-09-24, SHOULD 9). */}
-      <p className="offline-confirm-line">Keep VOTReader open until it finishes.</p>
+      {/* Only where it is true (dl-rework E, defect 17): the phone app on Android 14+ downloads with the app closed. */}
+      {typeof off.runsClosed === 'function' && off.runsClosed()
+        ? <p className="offline-confirm-line">It goes on with VOTReader closed.</p>
+        : <p className="offline-confirm-line">Keep VOTReader open until it finishes.</p>}
       <div className="offline-confirm-actions">
         <button type="button" className="offline-confirm-cancel" onClick={onCancel}>Cancel</button>
         <button type="button" className="offline-confirm-go" disabled={noRoom} onClick={onGo}>
@@ -407,9 +409,9 @@ export function OfflineRowStatus({ tracks, name, quiet = false }) {
     return (
       <p className="offline-row is-failed" {...focus}>
         <AlertIcon />
-        <span>{u.failed === 'space' ? 'Not enough room on this phone' : 'Download failed'}</span>
+        <span>{u.failed === 'space' ? 'Not enough room on this phone' : 'Didn’t download yet · it tries again'}</span>
         <span aria-hidden="true">·</span>
-        <button type="button" className="offline-row-link" onClick={download} aria-label={'Retry the download of ' + name}>Retry</button>
+        <button type="button" className="offline-row-link" onClick={download} aria-label={'Retry the download of ' + name}>Retry now</button>
       </p>
     );
   }
