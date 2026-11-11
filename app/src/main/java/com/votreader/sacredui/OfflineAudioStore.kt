@@ -1,6 +1,7 @@
 package com.votreader.sacredui
 
 import android.content.Context
+import android.os.Build
 import android.webkit.WebResourceResponse
 import org.json.JSONArray
 import org.json.JSONObject
@@ -20,24 +21,33 @@ import java.nio.file.StandardCopyOption
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.locks.ReentrantLock
-import kotlin.concurrent.withLock
 
 /**
  * Recordings downloaded to the phone (listening item 8; Corbin 2026-09-22: "yes after reset"). Any amount at once:
- * Corbin's downloads picks (2026-10-23 02:3x) allow a whole Bible edition (about 4-5 GB) and all of TVOT, so the page
- * hands the store a list of any length, in calls of up to [MAX_BATCH].
+ * Corbin's downloads picks (2026-10-23 02:3x) allow a whole Bible edition (4.4 to 5.9 GB) and all of TVOT, so the
+ * page hands the store a list of any length, in calls of up to [MAX_BATCH].
  *
- * The queue survives (dl-d2): queue.json holds what is still to download, in order, with the paused switch and the
- * batch's counts, so a close, a kill or a restart picks up where it was. The one download on its way keeps its
- * `<name>.part` and resume.json (its declared size, ETag and the bytes known to be on disk), and goes on from there
- * with an HTTP Range request ([rangeOpener]); a server that answers with the whole file, or a size that changed,
- * starts it again from the top. On Android 14+ a user-initiated data transfer job (DownloadJobService) keeps the
- * process alive with the app closed and shows "Downloading 3 of 31".
+ * The queue survives (dl-d2): queue.json holds what is still to download, in order, with the paused switch, the
+ * batch's counts and the "will try again" list, so a close, a kill or a restart picks up where it was. Each download
+ * on its way keeps its `<name>.part`, and resume.json names each one's declared size, ETag and the bytes known to be
+ * on disk; it goes on from there with an HTTP Range request ([rangeOpener]); a server that answers with the whole
+ * file, or a size that changed, starts it again from the top. On Android 14+ a user-initiated data transfer job
+ * (DownloadJobService) keeps the process alive with the app closed and shows "Downloading 3 of 31".
  *
- * Waiting, never silent: a download holds at the head of the queue with a reason ([reasonNow]: paused, wifi,
- * offline, space, retrying), and a network failure is retried ([retryDelays]) from its bytes before it is a failure.
+ * How the queue runs (dl-rework, 2026-11-10; the browser store offline-audio-web.js keeps the same rules):
+ * - [PARALLEL] downloads at once, each on its own worker ([work]). The next is the first waiting one by priority
+ *   ([Item.pri]: one the listener tapped by itself, then a set, then automatic ones and kept songs), in the order asked
+ *   within each.
+ * - One that does not fit in the free space (plus [SPACE_MARGIN], minus what the others still need) is stepped over;
+ *   the queue holds as 'space' only when nothing left fits ([reasonNow], with the shortfall in the state's `need`).
+ * - A failed download is tried again after [retryDelays], then moves to the "will try again" list (`later`): never
+ *   dropped. That list is tried again by itself with growing gaps ([laterDelays], capped at 30 min), whenever the
+ *   network changes, and at every start. A GitHub 404 or 5xx is recorded as the server's answer ('server' and its
+ *   status), not as no network.
+ * - Waiting, never silent: when nothing can start the state says why ([reasonNow]: paused, wifi, offline, space,
+ *   retrying, later), and a timer ([timer]) or a change (a network, a removal, Resume) looks again.
  *
  * Why native: the release assets answer without Access-Control-Allow-Origin (both the github.com 302 and the
  * release-assets 206), so a page cannot read their bytes, and an opaque cached copy cannot answer the media element's
@@ -51,21 +61,23 @@ import kotlin.concurrent.withLock
  *
  * A download lands whole or not at all: bytes stream to `<name>.part` in constant memory, the count must match the
  * declared length, and only then is it moved into place and indexed; a .part is never served, and one left by a kill
- * is kept only when resume.json names it (cut back to its synced bytes), else swept at start. One download at a time (a single worker thread), redirects followed by hand with every hop's host on
- * the Garden allowlist, free space checked against the declared length plus a margin before a byte is written.
+ * is kept only when resume.json names it (cut back to its synced bytes), else swept at start. Redirects are followed
+ * by hand with every hop's host on the Garden allowlist, and free space is checked against the declared length plus a
+ * margin before a byte is written.
  *
  * Every state change goes to JS as one JSON event through [emit] (JsEvent.OfflineAudio): queued, progress (throttled),
- * done(bytes), failed(reason: network | space | short | size | disk, status?), cancelled, removed, waiting(reason).
+ * done(bytes), failed(reason: network | server | short | size | disk, status?: on the "will try again" list),
+ * cancelled, removed, waiting(reason).
  *
  * Download only on Wi-Fi (ra6, Corbin 2026-10-14): with the page's switch on ([setWifiOnly]) and the network metered
- * ([unmetered] false: mobile data, a metered hotspot, or none), a download waits in the queue, and one on its way
- * stops, keeps its bytes and waits at the head of the queue; on an unmetered network it goes on from them. The state
- * says `waiting`, and each change of the gate sends `checked`, so the rows re-read.
+ * ([unmetered] false: mobile data, a metered hotspot, or none), downloads wait in the queue, and those on their way
+ * stop, keep their bytes and wait; on an unmetered network they go on from them. The state says `waiting`, and each
+ * change of the gate sends `checked`, so the rows re-read.
  */
 class OfflineAudioStore(
     root: File,
     private val opener: (String) -> Opened? = ::openRelease,
-    private val executor: Executor = Executors.newSingleThreadExecutor { r -> Thread(r, "offline-audio").apply { isDaemon = true } },
+    private val executor: Executor = Executors.newFixedThreadPool(PARALLEL) { r -> Thread(r, "offline-audio").apply { isDaemon = true } },
     private val freeBytes: () -> Long = { root.usableSpace },
     private val emit: (String) -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
@@ -77,20 +89,26 @@ class OfflineAudioStore(
     private val rangeOpener: (String, Long, String?) -> Opened? = { url, _, _ -> opener(url) },
     /** The phone has a network at all: a download that failed without one waits for it and spends no retry. */
     private val online: () -> Boolean = { true },
-    /** Waits before each automatic retry of a failed download (the page sees the failure after the last). */
+    /** Waits before each quick retry of a failed download; after the last it moves to the "will try again" list. */
     private val retryDelays: List<Long> = emptyList(),
+    /** The "will try again" list's gaps, growing; the last one repeats. */
+    private val laterDelays: List<Long> = LATER_DELAYS,
     /** The queue has work: the app keeps it going with the app closed (DownloadJob.schedule). */
     private val onBusy: (OfflineAudioStore) -> Unit = {},
+    /** Look again after `ms` (a retry's time, a space or network re-check). */
+    private val timer: (Long, () -> Unit) -> Unit = ::scheduleLater,
+    /** The queue runs with the app closed (the user-initiated job, Android 14+): the page then never says "Keep VOTReader open". */
+    private val runsClosed: Boolean = false,
 ) {
     /**
      * One recording to download: its release URL, the player key it plays under, and a title for the shelf. [update]:
      * it is on the phone already and its release asset changed; the new bytes replace it once whole (sweep n2-01).
      * [bytes]: its size as the page knows it (the manifest's baked bytes), -1 unknown; for the queue's totals only,
-     * the server's declared length is what a download is checked against.
+     * the server's declared length is what a download is checked against. [wifi]: an automatic download (dl-d5: plan
+     * week, the next 3), which starts only on an unmetered network. [pri]: [PRI_TAP], [PRI_BULK] or [PRI_AUTO].
      */
-    /** [wifi]: an automatic download (dl-d5: plan week, the next 3), which starts only on an unmetered network. */
     data class Item(val url: String, val key: String, val title: String, val update: Boolean = false, val bytes: Long = -1L,
-        val wifi: Boolean = false)
+        val wifi: Boolean = false, val pri: Int = if (wifi) PRI_AUTO else PRI_BULK)
 
     /**
      * An open download: the body, its declared length (-1 unknown) and how to release the connection. A Range
@@ -109,16 +127,32 @@ class OfflineAudioStore(
         val size: Long get() = if (start == 0L) length else total
     }
 
-    /** What the bytes on disk of the one download on its way are (resume.json). */
+    /** The server answered [status] (a 404, a 5xx): a server answer, not a missing network. Thrown by an opener. */
+    class ServerAnswer(val status: Int) : IOException("HTTP $status")
+
+    /** What the bytes on disk of one download on its way are (resume.json). */
     private data class Resume(val url: String, val total: Long, val etag: String?, val synced: Long)
 
     /** How one try at a download ended. */
-    private enum class Outcome { Finished, Held, Space, Network }
+    private sealed class Outcome {
+        data object Finished : Outcome()
+        data object Held : Outcome()
+        data object Space : Outcome()
+        data class Failed(val reason: String, val status: Int = 0) : Outcome()
+    }
 
-    /** The batch the notification counts: recordings asked since the queue was last empty. */
+    /** One waiting download's retry state (guarded by lock): its tries, not before [at], and why the last failed. */
+    private class Wait(var tries: Int = 0, var at: Long = 0L, var reason: String = "network", var status: Int = 0,
+        var later: Boolean = false, var noRoom: Boolean = false)
+
+    /** The batch the notification counts: recordings asked since the queue was last empty (kept songs left out). */
     class Summary(
         val busy: Boolean, val paused: Boolean, val reason: String?, val done: Int, val total: Int, val failed: Int,
         val activeBytes: Long, val activeTotal: Long, val leftBytes: Long, val wifiOnly: Boolean,
+        /** Everything left is on the "will try again" list: nothing for the job to hold the process up for. */
+        val onlyLater: Boolean = false,
+        /** What can run needs an unmetered network: the switch is on, or only automatic downloads are left. */
+        val needsUnmetered: Boolean = false,
     )
 
     /** How to answer a Range header against a file of a known length. */
@@ -139,34 +173,45 @@ class OfflineAudioStore(
     private val indexFile = File(dir, "index.json")
     private val lock = Any()
     private val entries = LinkedHashMap<String, Entry>()          // guarded by lock
+    /** Waiting to start (the "will try again" list too), not on its way. */
     private val queued = LinkedHashSet<String>()                  // guarded by lock
     private val cancelled: MutableSet<String> = ConcurrentHashMap.newKeySet()
-    @Volatile private var active: Active? = null
+    /** The downloads on their way, at most [PARALLEL]. */
+    private val actives = LinkedHashMap<String, Active>()         // guarded by lock
+    private val waits = HashMap<String, Wait>()                   // guarded by lock
+    /** The order asked: each new one takes the next number; one put back keeps its own. */
+    private val seqs = HashMap<String, Long>()                    // guarded by lock
+    private var nextSeq = 0L                                      // guarded by lock
+    /** Workers running [work] (started by [ensureWorkers]; one that finds nothing to start leaves). */
+    private var workers = 0                                       // guarded by lock
+    /** The earliest time a [timer] is set to look again; Long.MAX_VALUE: none set. */
+    private var armedAt = Long.MAX_VALUE                          // guarded by lock
 
-    // Download only on Wi-Fi (ra6): the page's switch, and the worker's wait for an unmetered network.
+    // Download only on Wi-Fi (ra6): the page's switch.
     @Volatile private var wifiOnly = false
-    private val gateLock = ReentrantLock()
-    private val gateMoved = gateLock.newCondition()
-    /** Counts the wakes: a hold ends on the first one after it began (a room made, the network back). */
-    @Volatile private var gateStamp = 0L
 
     /** A download on its way stopped (paused, a metered network): it goes back to the queue (never a failure). */
     private class Held : Exception()
 
-    // The saved queue (dl-d2): url -> item for everything queued or downloading, in order (guarded by lock).
+    // The saved queue (dl-d2): url -> item for everything not yet on the phone (waiting, on its way, will try again),
+    // in the order asked (guarded by lock).
     private val queueFile = File(dir, "queue.json")
     private val resumeFile = File(dir, "resume.json")
     private val pending = LinkedHashMap<String, Item>()
     @Volatile private var paused = false
-    @Volatile private var resume: Resume? = null
-    /** Why the head of the queue waits beyond the gate: space, retrying, offline; null when it does not. */
+    /** The bytes on disk of each download on its way (guarded by lock); resume.json mirrors it ([resumeWriteLock]). */
+    private val resumes = HashMap<String, Resume>()
+    private var resumeVersion = 0L   // guarded by lock
+    private val resumeWriteLock = Any()
+    private var resumeWritten = 0L   // guarded by resumeWriteLock
+    /** Why nothing started at the last look: space, retrying, offline, wifi, later; null when something did. */
     @Volatile private var holdReason: String? = null
     private var batchTotal = 0     // guarded by lock
     private var batchDone = 0      // guarded by lock
     private var batchFailed = 0    // guarded by lock
+    private var batchBytes = 0L    // guarded by lock
+    private var batchDoneBytes = 0L // guarded by lock
     private var queueWrittenAt = 0L
-    /** Why the last try of the worker's download failed, for the page once the retries are spent: network | short. */
-    @Volatile private var failReason = "network"
 
     // Release sizes (bytes) per tag: tag -> (fetchedAt, asset name -> bytes), kept in sizes.json for [SIZE_TTL].
     private val sizesFile = File(dir, "sizes.json")
@@ -318,7 +363,7 @@ class OfflineAudioStore(
 
     // ── the page's JSON (AppInterface hands it over untouched; untrusted, a bad shape is a quiet no-op) ──
 
-    /** `[{url, key, title, update?, bytes?}, ...]`: download each (at most [MAX_BATCH] per call; the page chunks). */
+    /** `[{url, key, title, update?, bytes?, wifi?, pri?}, ...]`: download each (at most [MAX_BATCH] per call; the page chunks). */
     fun enqueueJson(json: String?) {
         val arr = parseArray(json) ?: return
         val items = ArrayList<Item>()
@@ -326,8 +371,9 @@ class OfflineAudioStore(
             val o = arr.optJSONObject(i) ?: continue
             val url = o.optString("url")
             val bytes = o.optLong("bytes", -1L).takeIf { it in 1L..MAX_BYTES } ?: -1L
+            val wifi = o.optBoolean("wifi", false)
             if (url.isNotEmpty()) items += Item(url, o.optString("key"), o.optString("title"), o.optBoolean("update", false), bytes,
-                o.optBoolean("wifi", false))
+                wifi, priOf(o.opt("pri"), wifi, url))
         }
         if (items.isNotEmpty()) enqueue(items)
     }
@@ -371,10 +417,16 @@ class OfflineAudioStore(
         if (wifiOnly == on) return
         wifiOnly = on
         gateChanged()
+        // The job's network rule follows the switch (defect 13): the busy hook schedules it again with the new one.
+        if (busy()) busyNow()
     }
 
-    /** The network or the switch changed (MeteredWatch, [setWifiOnly]): a waiting download re-checks, the rows re-read. */
+    /**
+     * The network or the switch changed (MeteredWatch, [setWifiOnly]): what waits looks again, the rows re-read. With a
+     * network, the "will try again" list is tried now too (a network coming back is one of its times).
+     */
     fun gateChanged() {
+        if (runCatching { online() }.getOrDefault(true)) synchronized(lock) { for (w in waits.values) if (w.later || !w.noRoom) w.at = 0L }
         wake()
         send(JSONObject().put("type", "checked").toString())
     }
@@ -385,7 +437,7 @@ class OfflineAudioStore(
     /** Downloads wait now: the switch is on and the network is metered. */
     fun waiting(): Boolean = wifiOnly && !runCatching { unmetered() }.getOrDefault(false)
 
-    /** Pause all (the page's Pause, the notification's): the one on its way stops and keeps its bytes. Survives a restart. */
+    /** Pause all (the page's Pause, the notification's): those on their way stop and keep their bytes. Survives a restart. */
     fun pause() {
         synchronized(lock) {
             if (paused) return
@@ -407,106 +459,76 @@ class OfflineAudioStore(
         if (busy) busyNow()
     }
 
+    /** Retry now: every one on the "will try again" list (and every wait) is tried at once. */
+    fun retryNow() {
+        synchronized(lock) {
+            for ((url, w) in waits) {
+                w.at = 0L; w.noRoom = false
+                if (w.later) { w.later = false; w.tries = 0; if (!isSong(url) && batchFailed > 0) batchFailed-- }
+            }
+            persistQueue()
+        }
+        wake()
+        busyNow()
+        send(JSONObject().put("type", "checked").toString())
+    }
+
     fun isPaused(): Boolean = paused
 
-    /** Something is queued or downloading. */
+    /** Something is queued, downloading or on the "will try again" list. */
     fun busy(): Boolean = synchronized(lock) { pending.isNotEmpty() }
 
-    /** Why the queue is not moving now (paused, wifi, offline, space, retrying), or null when it is, or is empty. */
-    fun reasonNow(): String? {
-        if (!busy()) return null
-        return when {
-            paused -> "paused"
-            waiting() -> "wifi"
-            else -> holdReason
-        }
-    }
+    /** Why the queue is not moving now (paused, wifi, offline, space, retrying, later), or null when it is, or is empty. */
+    fun reasonNow(): String? = synchronized(lock) { reasonNowLocked() }
 
     /** The batch for the notification (DownloadJobService). */
     fun summary(): Summary {
         val listings = synchronized(sizeLock) { sizeCache.mapValues { it.value.second } }
         return synchronized(lock) {
-            val a = active
+            var bytes = 0L
+            var total = 0L
+            for (a in actives.values) { bytes += a.bytes; if (a.total > 0L) total += a.total }
+            val live = queued.filter { waits[it]?.later != true } + actives.keys
+            val onlyLater = pending.isNotEmpty() && live.isEmpty()
+            val autoOnly = live.isNotEmpty() && live.all { pending[it]?.wifi == true }
             Summary(pending.isNotEmpty(), paused, reasonNowLocked(), batchDone, batchTotal, batchFailed,
-                a?.bytes ?: 0L, a?.total ?: -1L, leftLocked(listings).first, wifiOnly)
+                bytes, if (actives.isEmpty()) -1L else total, leftLocked(listings).first, wifiOnly, onlyLater, wifiOnly || autoOnly)
         }
     }
 
-    private fun reasonNowLocked(): String? = if (pending.isEmpty()) null else if (paused) "paused" else if (waiting()) "wifi" else holdReason
+    private fun isLaterLocked(url: String): Boolean = waits[url]?.later == true
 
-    /** (bytes still to download that are known, how many have no known size) over [pending]. Called under [lock]. */
+    private fun reasonNowLocked(): String? = when {
+        pending.isEmpty() -> null
+        actives.isEmpty() && queued.all { isLaterLocked(it) } -> "later"
+        paused -> "paused"
+        waiting() -> "wifi"
+        actives.isNotEmpty() -> null
+        else -> holdReason
+    }
+
+    /** (bytes still to download that are known, how many have no known size) over what is waiting or on its way. Called under [lock]. */
     private fun leftLocked(listings: Map<String, Map<String, Long>>): Pair<Long, Int> {
         var bytes = 0L
         var unknown = 0
-        val a = active
         for ((url, item) in pending) {
+            if (isLaterLocked(url)) continue
+            val a = actives[url]
             val size = item.bytes.takeIf { it > 0L } ?: splitRelease(url)?.let { (tag, asset) -> listings[tag]?.get(asset) }
-                ?: (if (a?.url == url && a.total > 0L) a.total else null)
+                ?: (if (a != null && a.total > 0L) a.total else null)
             if (size == null) { unknown++; continue }
-            bytes += if (a?.url == url) maxOf(0L, size - a.bytes) else size
+            bytes += if (a != null) maxOf(0L, size - a.bytes) else size
         }
         return bytes to unknown
     }
 
     private fun busyNow() = try { onBusy(this) } catch (e: Exception) { Timber.w(e, "offline audio: the busy hook threw") }
 
-    private fun wake() = gateLock.withLock { gateStamp++; gateMoved.signalAll() }
+    /** Something changed (a network, a removal, Resume, a new download): start what may start. */
+    private fun wake() = ensureWorkers()
 
     /** The worker holds while paused or waiting for Wi-Fi. */
     private fun holding(): Boolean = paused || waiting()
-
-    /** Hold the worker while downloads wait, as long as [url] is still queued (a cancel or Remove all ends the wait). */
-    private fun awaitGate(url: String) {
-        while (holding() && synchronized(lock) { queued.contains(url) }) {
-            gateLock.withLock { if (holding()) gateMoved.await(GATE_RECHECK_MS, TimeUnit.MILLISECONDS) }
-        }
-    }
-
-    /** [url] is an automatic download and the network is metered: it may not start now (dl-d5). */
-    private fun heldForWifi(url: String): Boolean =
-        synchronized(lock) { queued.contains(url) && pending[url]?.wifi == true } && !unmeteredNow()
-
-    /**
-     * An automatic download on a metered network (dl-d5): it steps aside for the listener's own (to the back of the
-     * queue, taken up again after them), or, with none to let by, waits for Wi-Fi as 'wifi'. True when it stepped
-     * aside: this run of it ends and the queue's later one picks it up. With the app closed this is the only check,
-     * so mobile data never starts one. A pause meanwhile goes back to the gate's wait.
-     */
-    private fun deferredForWifi(item: Item, name: String): WifiHold {
-        while (heldForWifi(item.url)) {
-            if (paused) return WifiHold.PAUSED
-            val other = synchronized(lock) { queued.any { it != item.url && pending[it]?.wifi != true } }
-            if (other) {
-                synchronized(lock) { if (queued.remove(item.url)) queued.add(item.url) }
-                executor.execute { download(item, name) }
-                return WifiHold.STEPPED_ASIDE
-            }
-            holdFor(item.url, "wifi", GATE_RECHECK_MS)
-        }
-        return WifiHold.GO
-    }
-
-    private enum class WifiHold { GO, STEPPED_ASIDE, PAUSED }
-
-    /**
-     * Hold [url] at the head of the queue for up to [ms] with [why] (space, retrying, offline): one 'waiting' event,
-     * and the wait ends early on a cancel, a pause, a removal (room made) or a change of the network.
-     */
-    private fun holdFor(url: String, why: String, ms: Long) {
-        holdReason = why
-        send(event("waiting", url).put("reason", why).toString())
-        val end = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(ms)
-        val stamp = gateStamp
-        gateLock.withLock {
-            while (gateStamp == stamp && !paused && synchronized(lock) { queued.contains(url) }) {
-                val left = end - System.nanoTime()
-                if (left <= 0L) break
-                gateMoved.awaitNanos(left)
-            }
-        }
-        holdReason = null
-    }
-
 
     /** True when [url] is on the phone (whole, indexed). */
     fun isSaved(url: String): Boolean = synchronized(lock) { entries.containsKey(url) }
@@ -517,46 +539,68 @@ class OfflineAudioStore(
         return File(dir, e.file).takeIf { it.isFile && it.length() > 0L }
     }
 
-    /** Queue [items] (skipping any not from the audio releases, already on the phone, or already queued). */
-    fun enqueue(items: List<Item>) {
-        val fresh = ArrayList<Pair<Item, String>>()
-        synchronized(lock) {
-            if (pending.isEmpty()) { batchTotal = 0; batchDone = 0; batchFailed = 0 }
-            var lifted = false
-            for (item in items) {
-                val name = fileNameFor(item.url) ?: continue
-                // The listener's own Download of one queued automatically: it no longer waits for Wi-Fi (dl-d5).
-                val had = pending[item.url]
-                if (had != null && had.wifi && !item.wifi) { pending[item.url] = had.copy(wifi = false); lifted = true }
-                if ((entries.containsKey(item.url) && !item.update) || pending.containsKey(item.url)) continue
-                queued.add(item.url)
-                pending[item.url] = item
-                fresh += item to name
-            }
-            if (fresh.isNotEmpty() || lifted) { batchTotal += fresh.size; persistQueue() }
-        }
-        // A download waiting for Wi-Fi looks again: it steps aside for one of the listener's own (dl-d5).
-        wake()
-        if (fresh.isEmpty()) return
-        busyNow()
-        // One event for the batch, before any worker starts on it: a Download all of 150 re-drew the screen 150 times
-        // (sweep n2-03). `url` names the first, for a page that reads only that.
-        send(JSONObject().put("type", "queued").put("url", fresh[0].first.url).put("urls", JSONArray(fresh.map { it.first.url })).toString())
-        // Download only on Wi-Fi: held on a metered network, the rows re-read the state and say Waiting for Wi-Fi.
-        if (waiting()) send(JSONObject().put("type", "checked").toString())
-        for ((item, name) in fresh) executor.execute { download(item, name) }
+    /** A new batch: nothing is waiting or on its way (the "will try again" list stays its own). Called under [lock]. */
+    private fun startBatchIfIdleLocked() {
+        if (actives.isNotEmpty() || queued.any { !isLaterLocked(it) }) return
+        batchTotal = 0; batchDone = 0; batchFailed = 0; batchBytes = 0L; batchDoneBytes = 0L
     }
 
     /**
-     * Stop [urls]: one still waiting comes off the queue at once (and says so); the one downloading stops at its next
-     * chunk. The worker skips any task whose URL is no longer queued.
+     * Queue [items] (skipping any not from the audio releases or already on the phone). One already waiting is asked
+     * again: its wait ends (one on the "will try again" list is tried now), it moves up to the higher priority, and
+     * the listener's own lifts an automatic one off Wi-Fi (dl-d5).
+     */
+    fun enqueue(items: List<Item>) {
+        val fresh = ArrayList<Item>()
+        var moved = false
+        synchronized(lock) {
+            startBatchIfIdleLocked()
+            for (item in items) {
+                fileNameFor(item.url) ?: continue
+                val had = pending[item.url]
+                if (had != null) {
+                    var next = had
+                    if (had.wifi && !item.wifi) next = next.copy(wifi = false)
+                    if (item.pri < next.pri) next = next.copy(pri = item.pri)
+                    if (next != had) pending[item.url] = next
+                    waits[item.url]?.let { w ->
+                        if (w.later) { w.later = false; w.tries = 0; if (!isSong(item.url) && batchFailed > 0) batchFailed-- }
+                        w.at = 0L; w.noRoom = false
+                    }
+                    moved = true
+                    continue
+                }
+                if (entries.containsKey(item.url) && !item.update) continue
+                pending[item.url] = item
+                queued.add(item.url)
+                seqs[item.url] = nextSeq++
+                fresh += item
+                if (!isSong(item.url)) { batchTotal++; if (item.bytes > 0L) batchBytes += item.bytes }
+            }
+            if (fresh.isNotEmpty() || moved) persistQueue()
+        }
+        if (fresh.isEmpty() && !moved) return
+        busyNow()
+        // One event for the batch, before any worker starts on it: a Download all of 150 re-drew the screen 150 times
+        // (sweep n2-03). `url` names the first, for a page that reads only that.
+        if (fresh.isNotEmpty()) {
+            send(JSONObject().put("type", "queued").put("url", fresh[0].url).put("urls", JSONArray(fresh.map { it.url })).toString())
+        }
+        // Download only on Wi-Fi: held on a metered network, the rows re-read the state and say Waiting for Wi-Fi.
+        if (waiting() || (moved && fresh.isEmpty())) send(JSONObject().put("type", "checked").toString())
+        ensureWorkers()
+    }
+
+    /**
+     * Stop [urls]: one still waiting (or on the "will try again" list) comes off the queue at once (and says so); one
+     * downloading stops at its next chunk.
      */
     fun cancel(urls: List<String>) {
         val dropped = ArrayList<String>()
         synchronized(lock) {
             for (u in urls) {
                 if (queued.remove(u)) { dropped += u; dropPendingLocked(u, counted = false) }
-                else if (active?.url == u) cancelled.add(u)
+                else if (actives.containsKey(u)) cancelled.add(u)
             }
             if (dropped.isNotEmpty()) persistQueue()
         }
@@ -564,14 +608,14 @@ class OfflineAudioStore(
         if (dropped.isNotEmpty()) wake()
     }
 
-    /** Stop everything queued or downloading. */
+    /** Stop everything queued, downloading or on the "will try again" list. */
     fun cancelAll() {
         val dropped: List<String>
         synchronized(lock) {
             dropped = queued.toList()
             queued.clear()
             for (u in dropped) dropPendingLocked(u, counted = false)
-            active?.let { cancelled.add(it.url) }
+            cancelled.addAll(actives.keys)
             persistQueue()
         }
         for (u in dropped) send(event("cancelled", u).toString())
@@ -579,17 +623,19 @@ class OfflineAudioStore(
     }
 
     /**
-     * [url] leaves the saved queue (done, failed for good, or cancelled while not on its way: [counted] false takes
-     * it off the batch's total). Its resumable bytes go with it, unless it is the one downloading, whose worker owns
-     * them. Called under [lock].
+     * [url] leaves the saved queue (done, or cancelled while not on its way: [counted] false takes it off the batch's
+     * total). Its resumable bytes go with it, unless it is on its way, whose worker owns them. Called under [lock].
      */
     private fun dropPendingLocked(url: String, counted: Boolean) {
         if (pending.remove(url) == null) return
-        if (!counted && batchTotal > 0) batchTotal--
-        val r = resume
-        if (r != null && r.url == url && active?.url != url) {
-            resume = null
-            resumeFile.delete()
+        val w = waits.remove(url)
+        seqs.remove(url)
+        if (!isSong(url)) {
+            if (!counted && batchTotal > 0) batchTotal--
+            if (w?.later == true && batchFailed > 0) batchFailed--
+        }
+        if (resumes.containsKey(url) && !actives.containsKey(url)) {
+            setResumeLocked(url, null)
             fileNameFor(url)?.let { File(dir, it + PART).delete() }
         }
     }
@@ -610,8 +656,14 @@ class OfflineAudioStore(
         for (f in files) File(dir, f).delete()
         if (gone.isNotEmpty()) {
             send(JSONObject().put("type", "removed").put("urls", JSONArray(gone)).toString())
-            wake()   // room made: a download waiting for space looks again
+            roomMade()
         }
+    }
+
+    /** Room was made: what waited for space looks again now. */
+    private fun roomMade() {
+        synchronized(lock) { for (w in waits.values) if (w.noRoom) { w.noRoom = false; w.at = 0L } }
+        wake()
     }
 
     /** Take every downloaded recording off the phone, and stop what is still queued or downloading. */
@@ -626,6 +678,10 @@ class OfflineAudioStore(
         for (f in files) File(dir, f).delete()
         send(JSONObject().put("type", "removed").put("all", true).toString())
     }
+
+    /** The waiting ones in the order they start: by priority, then as asked. Called under [lock]. */
+    private fun orderedLocked(): List<String> =
+        queued.sortedWith(compareBy<String>({ pending[it]?.pri ?: PRI_BULK }, { seqs[it] ?: Long.MAX_VALUE }))
 
     /** Everything the shelf and the rows need, as one JSON object. */
     fun stateJson(): String {
@@ -642,21 +698,82 @@ class OfflineAudioStore(
             items.put(o)
             total += e.bytes
         }
-        val a = active
         val (leftBytes, unknown) = leftLocked(listings)
+        val order = orderedLocked()
+        val waitingNow = order.filter { !isLaterLocked(it) }
+        val activeList = JSONArray()
+        val queue = JSONArray()
+        for (a in actives.values) {
+            activeList.put(JSONObject().put("url", a.url).put("bytes", a.bytes).put("total", a.total))
+            pending[a.url]?.let { queue.put(brief(it)) }
+        }
+        for (u in waitingNow) pending[u]?.let { queue.put(brief(it)) }
+        val later = JSONArray()
+        for (u in order) {
+            val w = waits[u] ?: continue
+            if (!w.later) continue
+            val it = pending[u] ?: continue
+            later.put(brief(it).put("reason", w.reason).put("status", w.status).put("tries", w.tries).put("at", w.at))
+        }
+        val first = actives.values.firstOrNull()
+        val reason = reasonNowLocked()
         return JSONObject()
             .put("items", items)
             .put("totalBytes", total)
             .put("freeBytes", runCatching { freeBytes() }.getOrDefault(-1L))
-            .put("active", if (a == null) JSONObject.NULL else JSONObject().put("url", a.url).put("bytes", a.bytes).put("total", a.total))
-            .put("queued", JSONArray(queued.toList()))
-            .put("waiting", queued.isNotEmpty() && waiting())
+            .put("active", if (first == null) JSONObject.NULL else JSONObject().put("url", first.url).put("bytes", first.bytes).put("total", first.total))
+            .put("actives", activeList)
+            .put("queued", JSONArray(waitingNow))
+            .put("queue", queue)
+            .put("later", later)
+            .put("waiting", (waitingNow.isNotEmpty() || actives.isNotEmpty()) && waiting())
             // dl-d2: the saved queue's own words (BRIDGE.md).
             .put("paused", paused)
-            .put("reason", reasonNowLocked() ?: JSONObject.NULL)
-            .put("left", JSONObject().put("count", pending.size).put("bytes", leftBytes).put("unknown", unknown))
-            .put("batch", JSONObject().put("done", batchDone).put("total", batchTotal).put("failed", batchFailed))
+            .put("reason", reason ?: JSONObject.NULL)
+            .put("need", if (reason == "space") needLocked(listings) else 0L)
+            .put("closedRuns", runsClosed)
+            .put("left", JSONObject().put("count", waitingNow.size + actives.size).put("bytes", leftBytes).put("unknown", unknown))
+            .put("batch", JSONObject().put("done", batchDone).put("total", batchTotal).put("failed", batchFailed)
+                .put("bytes", maxOf(batchBytes, batchDoneBytes)).put("doneBytes", batchDoneBytes))
             .toString()
+    }
+
+    private fun brief(it: Item): JSONObject =
+        JSONObject().put("url", it.url).put("key", it.key).put("title", it.title).put("pri", it.pri)
+
+    /** A waiting one's size: the page's, the listing's, or its kept bytes' declared total; -1 unknown. Called under [lock]. */
+    private fun sizeOfLocked(url: String, item: Item, listings: Map<String, Map<String, Long>>?): Long =
+        item.bytes.takeIf { it > 0L }
+            ?: resumes[url]?.total?.takeIf { it > 0L }
+            ?: listings?.let { l -> splitRelease(url)?.let { (tag, asset) -> l[tag]?.get(asset) } }
+            ?: -1L
+
+    /** The bytes the downloads on their way still need. Called under [lock]. */
+    private fun reservedLocked(except: String? = null): Long {
+        var n = 0L
+        for (a in actives.values) {
+            if (a.url == except) continue
+            val total = if (a.total > 0L) a.total else pending[a.url]?.bytes ?: -1L
+            if (total > 0L) n += maxOf(0L, total - a.bytes)
+        }
+        return n
+    }
+
+    /** How much more room the smallest waiting one needs before it fits (0: none known). Called under [lock]. */
+    private fun needLocked(listings: Map<String, Map<String, Long>>): Long {
+        val free = runCatching { freeBytes() }.getOrDefault(-1L)
+        if (free < 0L) return 0L
+        val room = free - SPACE_MARGIN - reservedLocked()
+        var best = 0L
+        for (u in queued) {
+            if (isLaterLocked(u)) continue
+            val item = pending[u] ?: continue
+            val size = sizeOfLocked(u, item, listings)
+            if (size <= 0L) continue
+            val short = size - (resumes[u]?.synced ?: 0L) - room
+            if (short > 0L && (best == 0L || short < best)) best = short
+        }
+        return best
     }
 
     /**
@@ -691,81 +808,245 @@ class OfflineAudioStore(
 
     // ── download ──────────────────────────────────────────────────────
 
-    private fun download(item: Item, name: String) {
-        var tries = 0
-        while (true) {
-            // Paused, or Download only on Wi-Fi on a metered network: wait (still queued) at the head of the queue.
-            awaitGate(item.url)
-            when (deferredForWifi(item, name)) {
-                WifiHold.STEPPED_ASIDE -> return
-                WifiHold.PAUSED -> continue
-                WifiHold.GO -> Unit
+    /** Start workers up to [PARALLEL] while something waits. A worker leaves when nothing more can start ([takeNext]). */
+    private fun ensureWorkers() {
+        val n = synchronized(lock) {
+            if (queued.isEmpty()) 0
+            else maxOf(0, minOf(PARALLEL, queued.size) - workers).also { workers += it }
+        }
+        repeat(n) {
+            try { executor.execute { work() } } catch (e: Exception) {
+                // An executor shut down (the process is going): the saved queue picks it up at the next start.
+                synchronized(lock) { workers-- }
+                Timber.w(e, "offline audio: a worker could not start")
             }
-            when (attempt(item, name)) {
-                Outcome.Finished -> return
-                Outcome.Held -> continue
-                Outcome.Space -> holdFor(item.url, "space", SPACE_RECHECK_MS)
-                Outcome.Network -> when {
-                    // No network at all: wait for one (a network change wakes it); that spends no retry.
-                    !runCatching { online() }.getOrDefault(true) -> holdFor(item.url, "offline", OFFLINE_RECHECK_MS)
-                    tries < retryDelays.size -> holdFor(item.url, "retrying", retryDelays[tries++])
-                    else -> { failForGood(item.url, failReason); return }
+        }
+    }
+
+    /** One worker: take the next download that may start, run it, again; leave when none may start now. */
+    private fun work() {
+        var left = false
+        try {
+            while (true) {
+                val next = takeNext()
+                if (next == null) { left = true; break }
+                runOne(next.first, next.second)
+            }
+        } catch (e: Throwable) {
+            Timber.w(e, "offline audio: a worker stopped")
+        } finally {
+            // takeNext counted this worker out when it found nothing; any other way out counts it out here.
+            if (!left) synchronized(lock) { workers-- }
+        }
+    }
+
+    /**
+     * The next download that may start now, made active: the first waiting one by priority that is due, allowed on this
+     * network and fits; or null, with the worker counted out and [holdReason] saying why (a timer set to look again).
+     */
+    private fun takeNext(): Pair<Item, Active>? {
+        val listings = synchronized(sizeLock) { sizeCache.mapValues { it.value.second } }
+        var event: String? = null
+        var lookAgain = -1L
+        val picked = synchronized(lock) {
+            val before = holdReason
+            if (paused || waiting()) {
+                workers--
+                if (!paused) lookAgain = GATE_RECHECK_MS
+                return@synchronized null
+            }
+            val now = clock()
+            val free = runCatching { freeBytes() }.getOrDefault(-1L)
+            val room = if (free < 0L) Long.MAX_VALUE else free - SPACE_MARGIN - reservedLocked()
+            var space = false
+            var retry = false
+            var wifi = false
+            var soonest = Long.MAX_VALUE
+            var pick: String? = null
+            for (url in orderedLocked()) {
+                val item = pending[url] ?: continue
+                val w = waits[url]
+                if (w != null && w.at > now) {
+                    soonest = minOf(soonest, w.at)
+                    if (w.noRoom) space = true else if (!w.later) retry = true
+                    continue
                 }
+                if (item.wifi && !unmeteredNow()) { wifi = true; continue }
+                val size = sizeOfLocked(url, item, listings)
+                // Known not to fit: stepped over; the next one may.
+                if (size > 0L && size - (resumes[url]?.synced ?: 0L) > room) { space = true; continue }
+                pick = url
+                break
+            }
+            if (pick != null && !runCatching { online() }.getOrDefault(true)) {
+                holdReason = "offline"
+                if (before != "offline") event = "offline"
+                lookAgain = OFFLINE_RECHECK_MS
+                workers--
+                return@synchronized null
+            }
+            if (pick != null) {
+                val url: String = pick
+                queued.remove(url)
+                cancelled.remove(url)
+                waits[url]?.noRoom = false
+                val act = Active(url)
+                actives[url] = act
+                holdReason = null
+                if (soonest != Long.MAX_VALUE) lookAgain = maxOf(0L, soonest - now)
+                return@synchronized pending[url]!! to act
+            }
+            holdReason = when {
+                space -> "space"
+                retry -> "retrying"
+                wifi -> "wifi"
+                queued.isNotEmpty() -> "later"
+                else -> null
+            }
+            if (holdReason == "space" && before != "space" && actives.isEmpty()) event = "space"
+            lookAgain = when {
+                space -> minOf(SPACE_RECHECK_MS, if (soonest == Long.MAX_VALUE) SPACE_RECHECK_MS else maxOf(0L, soonest - now))
+                soonest != Long.MAX_VALUE -> maxOf(0L, soonest - now)
+                wifi -> GATE_RECHECK_MS
+                else -> -1L
+            }
+            workers--
+            null
+        }
+        event?.let { send(JSONObject().put("type", "waiting").put("url", "").put("reason", it).toString()) }
+        if (lookAgain >= 0L) arm(lookAgain)
+        return picked
+    }
+
+    /** Look again in [ms] (one timer at a time: the earliest asked wins). */
+    private fun arm(ms: Long) {
+        val at = clock() + ms
+        synchronized(lock) {
+            if (at >= armedAt) return
+            armedAt = at
+        }
+        try {
+            timer(ms) {
+                synchronized(lock) { if (armedAt <= clock() + TIMER_SLACK_MS) armedAt = Long.MAX_VALUE }
+                ensureWorkers()
+            }
+        } catch (e: Exception) {
+            synchronized(lock) { armedAt = Long.MAX_VALUE }
+            Timber.w(e, "offline audio: the timer could not be set")
+        }
+    }
+
+    /** Run one download made active by [takeNext], and put it back when it did not land. */
+    private fun runOne(item: Item, act: Active) {
+        val name = fileNameFor(item.url)
+        val out = if (name == null) Outcome.Failed("network") else attempt(item, name, act)
+        when (out) {
+            Outcome.Finished, Outcome.Held -> Unit
+            Outcome.Space -> {
+                synchronized(lock) {
+                    if (pending.containsKey(item.url)) waits.getOrPut(item.url) { Wait() }.apply { noRoom = true; at = clock() + SPACE_RECHECK_MS }
+                }
+                arm(SPACE_RECHECK_MS)
+            }
+            is Outcome.Failed -> {
+                // No network at all: it waits for one (a network change wakes it); that spends no retry.
+                if ((out.reason == "network" || out.reason == "short") && !runCatching { online() }.getOrDefault(true)) return
+                failed(item.url, out.reason, out.status, quick = true)
             }
         }
     }
 
     /**
-     * One try at [item]. Finished: done, failed for good or cancelled (its event sent). Held, Space, Network: it is
-     * queued again at the head with its bytes kept for a resume, unless a cancel landed meanwhile (then Finished).
+     * [url] failed: a quick retry while [retryDelays] last (with [quick]), then the "will try again" list with growing
+     * gaps ([laterDelays]). Never dropped. The page hears 'waiting' (retrying), or 'failed' once it joins the list.
      */
-    private fun attempt(item: Item, name: String): Outcome {
-        val act = Active(item.url)
+    private fun failed(url: String, reason: String, status: Int, quick: Boolean) {
+        val wait: Long
+        val kind: Int   // 1: a quick retry; 2: onto the "will try again" list; 3: on it already, a longer gap
         synchronized(lock) {
-            // Cancelled (or removed by Remove all) while it waited: its 'cancelled' was already sent.
-            if (!queued.remove(item.url)) return Outcome.Finished
-            cancelled.remove(item.url)
-            active = act
+            if (!pending.containsKey(url)) return
+            val w = waits.getOrPut(url) { Wait() }
+            if (!quick) w.tries = maxOf(w.tries, retryDelays.size)
+            w.tries++
+            w.reason = reason
+            w.status = status
+            w.noRoom = false
+            if (w.tries <= retryDelays.size) {
+                kind = 1
+                wait = retryDelays[w.tries - 1]
+            } else {
+                kind = if (w.later) 3 else 2
+                w.later = true
+                wait = laterDelays[minOf(w.tries - retryDelays.size - 1, laterDelays.size - 1)]
+                if (kind == 2 && !isSong(url)) batchFailed++
+            }
+            w.at = clock() + wait
+            persistQueue()
         }
+        when (kind) {
+            1 -> send(event("waiting", url).put("reason", "retrying").toString())
+            2 -> {
+                val e = event("failed", url).put("reason", reason)
+                if (status > 0) e.put("status", status)
+                send(e.toString())
+            }
+            else -> send(JSONObject().put("type", "checked").toString())
+        }
+        arm(wait)
+    }
+
+    /**
+     * One try at [item]. Finished: done or cancelled (its event sent), or moved to the "will try again" list. Held,
+     * Space, Failed: it is queued again with its bytes kept for a resume, unless a cancel landed meanwhile (then
+     * Finished).
+     */
+    private fun attempt(item: Item, name: String, act: Active): Outcome {
         val part = File(dir, name + PART)
-        failReason = "network"
+        var failReason = "network"
         var keepPart = false
         var opened: Opened? = null
         try {
-            val held = resume?.takeIf { it.url == item.url && part.isFile }
+            if (cancelled.contains(item.url)) return cancelledNow(item.url, act)
+            val held = synchronized(lock) { resumes[item.url] }?.takeIf { part.isFile }
             var from = if (held != null) part.length() else 0L
             if (held == null || (held.total > 0L && from > held.total)) { part.delete(); from = 0L }
-            if (from == 0L) setResume(null)
+            if (from == 0L) setResume(item.url, null)
             if (held != null && from > 0L && from == held.total) {
                 // Every byte was on disk when it stopped (a kill between the last byte and the move).
                 return land(item, name, part, from, act)
             }
+            val others = synchronized(lock) { reservedLocked(except = item.url) }
             val known = held?.total?.takeIf { it > 0L } ?: item.bytes
-            if (known > 0L && known - from + SPACE_MARGIN > freeBytes()) { keepPart = from > 0L; return requeue(item.url, Outcome.Space) }
-            opened = if (from > 0L) rangeOpener(item.url, from, held?.etag) else opener(item.url)
-            if (opened == null) { keepPart = from > 0L; return requeue(item.url, Outcome.Network) }
+            if (known > 0L && known - from + SPACE_MARGIN + others > freeBytes()) { keepPart = from > 0L; return requeue(item.url, act, Outcome.Space) }
+            opened = try {
+                if (from > 0L) rangeOpener(item.url, from, held?.etag) else opener(item.url)
+            } catch (e: ServerAnswer) {
+                keepPart = from > 0L
+                return requeue(item.url, act, Outcome.Failed("server", e.status))
+            }
+            if (opened == null) { keepPart = from > 0L; return requeue(item.url, act, Outcome.Failed("network")) }
             if (from > 0L && opened.start != from) {
                 // The server sent the whole file (the ETag changed, or it ignored the Range): the bytes held go, and
                 // this answer is the download from the top. One that starts anywhere else is asked again whole.
-                part.delete(); setResume(null); from = 0L
+                part.delete(); setResume(item.url, null); from = 0L
                 if (opened.start != 0L) {
                     try { opened.onClose() } catch (_: Exception) { }
-                    opened = opener(item.url) ?: return requeue(item.url, Outcome.Network)
+                    opened = opener(item.url) ?: return requeue(item.url, act, Outcome.Failed("network"))
                 }
             }
             if (from > 0L && held!!.total > 0L && opened.size != held.total) {
                 // The file is another size now: the bytes held are not a part of it. Start again from the top.
                 try { opened.onClose() } catch (_: Exception) { }
-                part.delete(); setResume(null); from = 0L
-                opened = opener(item.url) ?: return requeue(item.url, Outcome.Network)
+                part.delete(); setResume(item.url, null); from = 0L
+                opened = opener(item.url) ?: return requeue(item.url, act, Outcome.Failed("network"))
             }
-            if (opened.start != 0L && opened.start != from) return requeue(item.url, Outcome.Network)
+            if (opened.start != 0L && opened.start != from) return requeue(item.url, act, Outcome.Failed("network"))
             val size = opened.size
             act.total = size
             act.bytes = from
-            if (size > MAX_BYTES) { failForGood(item.url, "size"); return Outcome.Finished }
-            if (size > 0 && size - from + SPACE_MARGIN > freeBytes()) { keepPart = from > 0L; return requeue(item.url, Outcome.Space) }
-            setResume(Resume(item.url, size, opened.etag, from))
+            if (size > MAX_BYTES) return failLater(item.url, act, "size")
+            if (size > 0 && size - from + SPACE_MARGIN + others > freeBytes()) { keepPart = from > 0L; return requeue(item.url, act, Outcome.Space) }
+            setResume(item.url, Resume(item.url, size, opened.etag, from))
             send(progress(act).toString())
             var total = from
             var synced = from
@@ -775,18 +1056,18 @@ class OfflineAudioStore(
                     opened.stream.use { input ->
                         val buf = ByteArray(64 * 1024)
                         while (true) {
-                            if (cancelled.contains(item.url)) return cancelledNow(item.url)
-                            if (holding()) { out.fd.sync(); setResume(resume?.copy(synced = total)); throw Held() }
+                            if (cancelled.contains(item.url)) return cancelledNow(item.url, act)
+                            if (holding()) { out.fd.sync(); setResume(item.url, Resume(item.url, size, opened.etag, total)); throw Held() }
                             val n = input.read(buf)
                             if (n < 0) break
                             total += n
-                            if (total > MAX_BYTES) { failForGood(item.url, "size"); return Outcome.Finished }
+                            if (total > MAX_BYTES) return failLater(item.url, act, "size")
                             out.write(buf, 0, n)
                             act.bytes = total
                             if (total - synced >= SYNC_EVERY) {
                                 // What a power cut could lose is what came after the last sync: resume.json says how far
                                 // the bytes are safe, and a restart cuts the .part back to it.
-                                out.fd.sync(); synced = total; setResume(resume?.copy(synced = total))
+                                out.fd.sync(); synced = total; setResume(item.url, Resume(item.url, size, opened.etag, total))
                             }
                             val now = clock()
                             if (now - lastEmit >= PROGRESS_MS) { lastEmit = now; send(progress(act).toString()) }
@@ -797,30 +1078,31 @@ class OfflineAudioStore(
             } catch (e: IOException) {
                 keepPart = true
                 // A full disk is a wait for room, never a network failure to retry.
-                return requeue(item.url, if (runCatching { freeBytes() }.getOrDefault(Long.MAX_VALUE) < SPACE_MARGIN) Outcome.Space else Outcome.Network)
+                return requeue(item.url, act,
+                    if (runCatching { freeBytes() }.getOrDefault(Long.MAX_VALUE) < SPACE_MARGIN) Outcome.Space else Outcome.Failed("network"))
             }
-            if (size > 0 && total < size) { keepPart = true; failReason = "short"; return requeue(item.url, Outcome.Network) }   // the answer ended early
-            if (total <= 0L || (size > 0 && total != size)) { failForGood(item.url, "short"); return Outcome.Finished }
+            if (size > 0 && total < size) { keepPart = true; failReason = "short"; return requeue(item.url, act, Outcome.Failed(failReason)) }   // the answer ended early
+            if (total <= 0L || (size > 0 && total != size)) return failLater(item.url, act, "short")
             // A chunked answer declared no length: its room is checked now, before the move.
-            if (size <= 0 && freeBytes() < SPACE_MARGIN) { failForGood(item.url, "space"); return Outcome.Finished }
+            if (size <= 0 && freeBytes() < SPACE_MARGIN) return requeue(item.url, act, Outcome.Space)
             return land(item, name, part, total, act)
         } catch (_: Held) {
-            // Paused or stopped for a metered network: back at the head of the queue with its bytes (a cancel that
-            // landed meanwhile wins); the worker waits and goes on from them.
+            // Paused or stopped for a metered network: back in the queue with its bytes (a cancel that landed
+            // meanwhile wins); a worker goes on from them once the gate opens.
             keepPart = true
-            return requeue(item.url, Outcome.Held)
+            return requeue(item.url, act, Outcome.Held)
         } catch (e: Exception) {
             Timber.w(e, "offline audio: download of %s failed", item.url)
-            keepPart = part.isFile && resume?.url == item.url
-            return requeue(item.url, Outcome.Network)
+            keepPart = part.isFile && synchronized(lock) { resumes.containsKey(item.url) }
+            return requeue(item.url, act, Outcome.Failed(failReason))
         } finally {
-            val r = resume
-            if (!keepPart || r == null || r.url != item.url) {
+            val kept = synchronized(lock) { resumes.containsKey(item.url) }
+            if (!keepPart || !kept) {
                 if (part.exists()) part.delete()
-                if (r != null && r.url == item.url) setResume(null)
+                if (kept) setResume(item.url, null)
             }
             try { opened?.onClose?.invoke() } catch (_: Exception) { /* release best-effort */ }
-            synchronized(lock) { if (active === act) active = null }
+            synchronized(lock) { if (actives[item.url] === act) actives.remove(item.url) }
         }
     }
 
@@ -843,30 +1125,38 @@ class OfflineAudioStore(
                 outcome = "disk"
             }
             if (outcome == "done") {
-                batchDone++
+                if (!isSong(item.url)) {
+                    batchDone++
+                    batchDoneBytes += total
+                    if (item.bytes <= 0L) batchBytes += total
+                    if (waits[item.url]?.later == true && batchFailed > 0) batchFailed--
+                    batchTotal = maxOf(batchTotal, batchDone + batchFailed)
+                }
                 pending.remove(item.url)
+                waits.remove(item.url)
+                seqs.remove(item.url)
                 // An update left listed by a kill would download again (the index cannot tell it is done): write now.
                 if (item.update) persistQueue() else persistQueueSoon()
             }
             if (outcome == "cancelled") { dropPendingLocked(item.url, counted = false); persistQueue() }
-            if (active === act) active = null   // before the event: the page re-reads the state on it
-            if (resume?.url == item.url) setResume(null)
+            if (actives[item.url] === act) actives.remove(item.url)   // before the event: the page re-reads the state on it
+            if (resumes.containsKey(item.url)) setResumeLocked(item.url, null)
         }
         if (outcome == "done") noteLanded(item.url, total)
         when (outcome) {
             "done" -> send(event("done", item.url).put("bytes", total).toString())
             "cancelled" -> send(event("cancelled", item.url).toString())
-            else -> failForGood(item.url, outcome)
+            else -> { requeue(item.url, act, Outcome.Finished); failed(item.url, outcome, 0, quick = false) }
         }
         return Outcome.Finished
     }
 
     /** The one downloading was cancelled: its bytes go, it leaves the queue. */
-    private fun cancelledNow(url: String): Outcome {
+    private fun cancelledNow(url: String, act: Active): Outcome {
         synchronized(lock) {
             cancelled.remove(url)
-            active = null
-            if (resume?.url == url) setResume(null)
+            if (actives[url] === act) actives.remove(url)
+            if (resumes.containsKey(url)) setResumeLocked(url, null)
             dropPendingLocked(url, counted = false)
             persistQueue()
         }
@@ -875,18 +1165,17 @@ class OfflineAudioStore(
         return Outcome.Finished
     }
 
-    /** Back at the head of the queue for [why] (Finished instead when a cancel landed meanwhile). */
-    private fun requeue(url: String, why: Outcome): Outcome {
+    /** Back in the queue for [why], in its own place (Finished instead when a cancel landed meanwhile). */
+    private fun requeue(url: String, act: Active, why: Outcome): Outcome {
         val again = synchronized(lock) {
-            active = null
+            if (actives[url] === act) actives.remove(url)
             if (cancelled.remove(url) || !pending.containsKey(url)) {
-                if (resume?.url == url) setResume(null)
+                if (resumes.containsKey(url)) setResumeLocked(url, null)
                 dropPendingLocked(url, counted = false)
                 persistQueue()
                 false
             } else {
-                val rest = queued.toList()
-                queued.clear(); queued.add(url); queued.addAll(rest)
+                queued.add(url)
                 true
             }
         }
@@ -899,17 +1188,13 @@ class OfflineAudioStore(
         return why
     }
 
-    /** [url] failed and will not be tried again: off the queue, its bytes gone, the page told why. */
-    private fun failForGood(url: String, reason: String) {
-        synchronized(lock) {
-            queued.remove(url)
-            if (pending.containsKey(url)) batchFailed++
-            if (resume?.url == url) setResume(null)
-            dropPendingLocked(url, counted = true)
-            persistQueue()
-        }
+    /** [url] cannot land as it is (too big, cut short): onto the "will try again" list at once, its bytes gone. */
+    private fun failLater(url: String, act: Active, reason: String): Outcome {
+        synchronized(lock) { if (resumes.containsKey(url)) setResumeLocked(url, null) }
         fileNameFor(url)?.let { File(dir, it + PART).delete() }
-        fail(url, reason)
+        requeue(url, act, Outcome.Finished)
+        if (synchronized(lock) { pending.containsKey(url) }) failed(url, reason, 0, quick = false)
+        return Outcome.Finished
     }
 
     /**
@@ -920,11 +1205,6 @@ class OfflineAudioStore(
      */
     private fun send(json: String) {
         try { emit(json) } catch (e: Exception) { Timber.w(e, "offline audio: an event could not be delivered") }
-    }
-
-    private fun fail(url: String, reason: String) {
-        active = null
-        send(event("failed", url).put("reason", reason).toString())
     }
 
     private fun progress(a: Active) = event("progress", a.url).put("bytes", a.bytes).put("total", a.total)
@@ -982,78 +1262,104 @@ class OfflineAudioStore(
         }
     }
 
-    // ── the saved queue (dl-d2) ───────────────────────────────────────
+    // ── the saved queue (dl-d2; dl-rework: several on their way, the "will try again" list) ──
 
     /**
-     * Read queue.json and resume.json, keep the one .part resume.json names (cut back to the bytes it says were
-     * synced: what came after may not have reached the disk), sweep every other .part, and queue again what is not
-     * on the phone yet. A torn or missing file is an empty queue; the recordings themselves are in the index.
+     * Read queue.json and resume.json, keep each .part resume.json names (cut back to the bytes it says were synced:
+     * what came after may not have reached the disk), sweep every other .part, and queue again what is not on the phone
+     * yet. The "will try again" list comes back too, due now: a start is one of its times. A torn or missing file is an
+     * empty queue; the recordings themselves are in the index. resume.json from before dl-rework (one object for the one
+     * download on its way) is read as a list of one.
      */
     private fun loadQueue() {
         val q = readJsonFile(queueFile)
         val items = ArrayList<Item>()
+        val later = HashMap<String, Wait>()
         if (q != null) {
             paused = q.optBoolean("paused", false)
             q.optJSONObject("batch")?.let { b ->
-                batchTotal = b.optInt("total").coerceAtLeast(0); batchDone = b.optInt("done").coerceAtLeast(0); batchFailed = b.optInt("failed").coerceAtLeast(0)
+                batchTotal = b.optInt("total").coerceAtLeast(0); batchDone = b.optInt("done").coerceAtLeast(0)
+                batchBytes = b.optLong("bytes").coerceAtLeast(0L); batchDoneBytes = b.optLong("doneBytes").coerceAtLeast(0L)
             }
             val arr = q.optJSONArray("items")
             if (arr != null) for (i in 0 until arr.length()) {
                 val o = arr.optJSONObject(i) ?: continue
                 val url = o.optString("url")
                 if (fileNameFor(url) == null) continue
+                val wifi = o.optBoolean("wifi", false)
                 items += Item(url, o.optString("key").take(MAX_TEXT), o.optString("title").take(MAX_TEXT), o.optBoolean("update", false),
-                    o.optLong("bytes", -1L).takeIf { it in 1L..MAX_BYTES } ?: -1L, o.optBoolean("wifi", false))
-            }
-        }
-        val r = readJsonFile(resumeFile)?.let { o ->
-            val url = o.optString("url")
-            if (items.none { it.url == url }) null
-            else Resume(url, o.optLong("total", -1L), o.optString("etag").takeIf { it.isNotEmpty() }, o.optLong("synced", 0L).coerceAtLeast(0L))
-        }
-        val keep = r?.let { fileNameFor(it.url) + PART }
-        dir.listFiles { f -> f.name.endsWith(PART) }?.forEach { if (it.name != keep) runCatching { it.delete() } }
-        resume = r?.let { held ->
-            val f = File(dir, keep!!)
-            try {
-                if (!f.isFile || held.synced <= 0L) { f.delete(); null }
-                else {
-                    if (f.length() > held.synced) RandomAccessFile(f, "rw").use { it.setLength(held.synced) }
-                    if (f.length() < held.synced) held.copy(synced = f.length()) else held
+                    o.optLong("bytes", -1L).takeIf { it in 1L..MAX_BYTES } ?: -1L, wifi, priOf(o.opt("pri"), wifi, url))
+                if (o.optBoolean("later", false)) {
+                    later[url] = Wait(tries = o.optInt("tries").coerceAtLeast(retryDelays.size + 1), at = 0L,
+                        reason = o.optString("reason").takeIf { it.isNotEmpty() }?.take(16) ?: "network",
+                        status = o.optInt("status").coerceIn(0, 999), later = true)
                 }
+            }
+        }
+        val listed = items.map { it.url }.toSet()
+        val held = HashMap<String, Resume>()
+        readJsonFile(resumeFile)?.let { o ->
+            val arr = o.optJSONArray("items")
+            val list = if (arr != null) (0 until arr.length()).mapNotNull { arr.optJSONObject(it) } else listOf(o)
+            for (r in list) {
+                val url = r.optString("url")
+                if (url !in listed || fileNameFor(url) == null) continue
+                held[url] = Resume(url, r.optLong("total", -1L), r.optString("etag").takeIf { it.isNotEmpty() }, r.optLong("synced", 0L).coerceAtLeast(0L))
+            }
+        }
+        val keep = held.keys.mapNotNull { fileNameFor(it)?.plus(PART) }.toSet()
+        dir.listFiles { f -> f.name.endsWith(PART) }?.forEach { if (it.name !in keep) runCatching { it.delete() } }
+        val kept = HashMap<String, Resume>()
+        for ((url, r) in held) {
+            val f = File(dir, fileNameFor(url)!! + PART)
+            try {
+                if (!f.isFile || r.synced <= 0L) { f.delete(); continue }
+                if (f.length() > r.synced) RandomAccessFile(f, "rw").use { it.setLength(r.synced) }
+                kept[url] = if (f.length() < r.synced) r.copy(synced = f.length()) else r
             } catch (e: Exception) {
-                Timber.w(e, "offline audio: a kept .part could not be cut back - it starts again"); f.delete(); null
+                Timber.w(e, "offline audio: a kept .part could not be cut back - it starts again"); f.delete()
             }
         }
-        if (resume == null) resumeFile.delete()
-        val fresh = ArrayList<Pair<Item, String>>()
+        var fresh = 0
         synchronized(lock) {
+            resumes.clear()
+            resumes.putAll(kept)
+            writeResumesLocked()
             for (item in items) {
-                val name = fileNameFor(item.url) ?: continue
                 if ((entries.containsKey(item.url) && !item.update) || pending.containsKey(item.url)) continue
-                queued.add(item.url); pending[item.url] = item; fresh += item to name
+                pending[item.url] = item
+                queued.add(item.url)
+                seqs[item.url] = nextSeq++
+                later[item.url]?.let { waits[item.url] = it }
+                fresh++
             }
-            batchTotal = maxOf(batchTotal, batchDone + batchFailed + pending.size)
-            if (fresh.size != items.size) persistQueue()
+            batchFailed = pending.keys.count { waits[it]?.later == true && !isSong(it) }
+            batchTotal = maxOf(batchTotal, batchDone + pending.keys.count { !isSong(it) })
+            if (fresh != items.size) persistQueue()
         }
-        if (fresh.isEmpty()) return
-        for ((item, name) in fresh) executor.execute { download(item, name) }
+        if (fresh == 0) return
+        ensureWorkers()
         busyNow()
     }
 
     /** Write queue.json whole (temp file + atomic move). Called under [lock]. */
     private fun persistQueue() {
         queueWrittenAt = clock()
-        val items = JSONArray()
+        val list = JSONArray()
         for (item in pending.values) {
-            val o = JSONObject().put("url", item.url).put("key", item.key).put("title", item.title)
+            val o = JSONObject().put("url", item.url).put("key", item.key).put("title", item.title).put("pri", item.pri)
             if (item.update) o.put("update", true)
             if (item.bytes > 0L) o.put("bytes", item.bytes)
             if (item.wifi) o.put("wifi", true)
-            items.put(o)
+            waits[item.url]?.takeIf { it.later }?.let { w ->
+                o.put("later", true).put("tries", w.tries).put("reason", w.reason)
+                if (w.status > 0) o.put("status", w.status)
+            }
+            list.put(o)
         }
-        val json = JSONObject().put("v", 1).put("paused", paused).put("items", items)
-            .put("batch", JSONObject().put("total", batchTotal).put("done", batchDone).put("failed", batchFailed))
+        val json = JSONObject().put("v", 2).put("paused", paused).put("items", list)
+            .put("batch", JSONObject().put("total", batchTotal).put("done", batchDone).put("failed", batchFailed)
+                .put("bytes", batchBytes).put("doneBytes", batchDoneBytes))
         writeWhole(queueFile, json.toString(), "queue")
     }
 
@@ -1066,14 +1372,45 @@ class OfflineAudioStore(
         if (pending.isEmpty() || clock() - queueWrittenAt >= QUEUE_WRITE_MS) persistQueue()
     }
 
-    /** The one download's resumable bytes (null: none); resume.json follows. */
-    private fun setResume(r: Resume?) {
-        resume = r
-        if (r == null) { resumeFile.delete(); return }
-        val o = JSONObject().put("url", r.url).put("total", r.total).put("synced", r.synced)
-        if (r.etag != null) o.put("etag", r.etag)
-        writeWhole(resumeFile, o.toString(), "resume")
+    /** One download's resumable bytes (null: none); resume.json follows, written outside the queue's lock. */
+    private fun setResume(url: String, r: Resume?) {
+        val snap = synchronized(lock) {
+            if (r == null) { if (resumes.remove(url) == null) return } else resumes[url] = r
+            resumes.values.toList() to ++resumeVersion
+        }
+        writeResumes(snap.first, snap.second)
     }
+
+    /** Called under [lock] (cancel, land: rare). */
+    private fun setResumeLocked(url: String, r: Resume?) {
+        if (r == null) { if (resumes.remove(url) == null) return } else resumes[url] = r
+        writeResumesLocked()
+    }
+
+    /** Called under [lock]. */
+    private fun writeResumesLocked() = writeResumes(resumes.values.toList(), ++resumeVersion)
+
+    /**
+     * resume.json, whole: every download's kept bytes ({v: 2, items: [...]}); gone when none. Writers on several
+     * workers never put an older picture over a newer one ([version]).
+     */
+    private fun writeResumes(list: List<Resume>, version: Long) {
+        synchronized(resumeWriteLock) {
+            if (version <= resumeWritten) return
+            resumeWritten = version
+            if (list.isEmpty()) { resumeFile.delete(); return }
+            val arr = JSONArray()
+            for (r in list) {
+                val o = JSONObject().put("url", r.url).put("total", r.total).put("synced", r.synced)
+                if (r.etag != null) o.put("etag", r.etag)
+                arr.put(o)
+            }
+            writeWhole(resumeFile, JSONObject().put("v", 2).put("items", arr).toString(), "resume")
+        }
+    }
+
+    /** A kept song (K1): it rides the same queue, last, and never counts in the recordings' batch. */
+    private fun isSong(url: String): Boolean = splitSong(url) != null
 
     private fun writeWhole(target: File, text: String, what: String) {
         val tmp = File(dir, target.name + ".tmp")
@@ -1149,12 +1486,37 @@ class OfflineAudioStore(
                     val watch = MeteredWatch(app)
                     OfflineAudioStore(app.filesDir, emit = { json -> eventSink?.invoke(json) }, unmetered = watch::unmetered,
                         rangeOpener = ::openReleaseFrom, online = watch::online, retryDelays = RETRY_DELAYS,
-                        onBusy = { store -> DownloadJob.schedule(app, store) })
+                        onBusy = { store -> DownloadJob.schedule(app, store) },
+                        runsClosed = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
                         .also { store -> sharedStore = store; watch.start { store.gateChanged() } }
                 }
             }
 
         const val DIR_NAME = "offline-audio"
+        /** How many recordings download at once (the browser store's DOWNLOADS_AT_ONCE is the same). */
+        const val PARALLEL = 3
+        /** Priorities, first served first: one the listener tapped by itself, a set, automatic ones and kept songs. */
+        const val PRI_TAP = 0
+        const val PRI_BULK = 1
+        const val PRI_AUTO = 2
+
+        /** The page's "pri" ('tap' | 'bulk' | 'auto', or 0-2); unsaid: automatic for a wifi item or a song, else a set. */
+        internal fun priOf(v: Any?, wifi: Boolean, url: String): Int = when {
+            wifi || splitSong(url) != null -> PRI_AUTO
+            v == "tap" -> PRI_TAP
+            v == "auto" -> PRI_AUTO
+            v is Number && v.toInt() in PRI_TAP..PRI_AUTO -> v.toInt()
+            else -> PRI_BULK
+        }
+
+        private val timers: ScheduledExecutorService by lazy {
+            Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "offline-audio-timer").apply { isDaemon = true } }
+        }
+
+        /** The production timer: one daemon thread for every store's looks again. */
+        fun scheduleLater(ms: Long, task: () -> Unit) {
+            timers.schedule({ try { task() } catch (e: Exception) { Timber.w(e, "offline audio: a timed look threw") } }, ms, TimeUnit.MILLISECONDS)
+        }
         private const val PART = ".part"
         private const val MIME = "audio/mpeg"
         private const val PREFIX = "https://github.com/VOTReader/votreader-assets/releases/download/"
@@ -1168,6 +1530,8 @@ class OfflineAudioStore(
         private const val PROGRESS_MS = 500L
         /** A waiting download re-checks the gate this often even unwoken (a lost network callback costs one wait). */
         private const val GATE_RECHECK_MS = 5_000L
+        /** A timer that fires this early still counts as the one set. */
+        private const val TIMER_SLACK_MS = 50L
         private const val MAX_TEXT = 240
 
         // The release host and the asset hosts its 302 goes to (GardenImageCache's allowlist), and the Songs of the
@@ -1197,8 +1561,10 @@ class OfflineAudioStore(
         /** A download that failed with no network looks again this often (a network change looks at once). */
         private const val OFFLINE_RECHECK_MS = 60_000L
         private const val QUEUE_WRITE_MS = 3_000L
-        /** The app's retries of a failed download, each from its bytes: three, then the page shows the failure. */
+        /** The app's quick retries of a failed download, each from its bytes: three, then the "will try again" list. */
         val RETRY_DELAYS = listOf(5_000L, 20_000L, 60_000L)
+        /** The "will try again" list's gaps: growing, capped at 30 min (the last repeats). */
+        val LATER_DELAYS = listOf(2L * 60_000, 5L * 60_000, 10L * 60_000, 20L * 60_000, 30L * 60_000)
         private const val MAX_HEADS_PER_TAG = 40
         private const val LISTING_RETRY_MS = 10L * 60 * 1000
         private const val MAX_LISTING_BYTES = 8L * 1024 * 1024
@@ -1399,6 +1765,8 @@ class OfflineAudioStore(
                     conn.disconnect()
                     return openReleaseFrom(url, 0L, null)
                 }
+                // A 4xx or 5xx is the server's answer (a missing asset, GitHub down), not a lost network (defect 23).
+                if (code >= 400) { conn.disconnect(); throw ServerAnswer(code) }
                 if (code != HttpURLConnection.HTTP_OK) { conn.disconnect(); return null }
                 return Opened(conn.inputStream, conn.contentLengthLong, { conn.disconnect() }, etag = tag)
             }
