@@ -81,9 +81,9 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
   });
 
-  /* rp1: with a reading plan, today's card sits under the title and above Search
-     (r2-home-one.png); with none, Home is as it was; a Bible plan never wakes the Volumes. */
-  it('(rp1) shows the Today card above Search only while a plan runs', async () => {
+  /* rp1, slimmed 2026-11-10: with a reading plan, the up-next card's plan row sits under the title and above
+     Search; with none it offers one until Not now; a Bible plan never wakes the Volumes. */
+  it('(rp1) shows the plan row in the up-next card above Search only while a plan runs', async () => {
     setupGlobals();
     // mw18: plans are runs in ReadingPlanStore; an rp1 settings plan is moved in on the way.
     const { ReadingPlanStore } = await import('../../stores/reading-plan-store.js');
@@ -95,8 +95,9 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     const today = new Date();
     const start = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     const { container } = renderHome({ readingPlans: [{ id: 'bible-year', start }], isRead: () => false, markAsReadEnabled: true, onPlanRead, onPlansMoved: vi.fn() });
-    const card = container.querySelector('.today-card');
+    const card = container.querySelector('.upnext');
     expect(card).not.toBeNull();
+    expect(card.querySelectorAll('[data-plan]')).toHaveLength(1);
     expect(card.textContent).toContain('Genesis 1-3');
     const search = screen.getByRole('button', { name: 'Search library' });
     expect(card.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -108,11 +109,16 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     ReadingPlanStore.replaceAll([]);
     const bare = renderHome({ readingPlans: [], isRead: () => false });
     // mw18 C8: with no plan, Today offers one; Not now hides it on this device, and it stays hidden
-    expect(bare.container.querySelector('.today-card').textContent).toContain('Start a reading plan');
+    expect(bare.container.querySelector('.upnext').textContent).toContain('Start a reading plan');
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
-    expect(bare.container.querySelector('.today-card')).toBeNull();
+    expect(bare.container.querySelector('.upnext')).toBeNull();   // nothing else to show: no empty card
     cleanup();
-    expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.today-card')).toBeNull();
+    expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.upnext')).toBeNull();   // hidden for good
+    cleanup();
+    // The card's last row is Continue (here "Start here": no history yet).
+    const later = renderHome({ readingPlans: [], isRead: () => false, onStartHere: vi.fn() }).container.querySelector('.upnext');
+    expect(later.textContent).not.toContain('Start a reading plan');
+    expect(later.lastElementChild.getAttribute('aria-label')).toBe('Start here: Volume One, Letter 1, Chosen by God');
     localStorage.removeItem('vot-plans-offer-hidden');
     delete window.ReadingPlanStore;
   });
@@ -122,35 +128,18 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     renderHome({ searchEnabled: false, historyEnabled: false });
     expect(screen.queryByRole('button', { name: 'Search library' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
-    expect(document.querySelector('.home-continue')).toBeNull();
+    expect(document.querySelector('.upnext-continue')).toBeNull();
   });
 
-  /* Corbin, 2026-09-11: "add the scripture web button back to the home screen like it was
-     before, as seen in the trailer." Before is b3e3625a's parent — the quick-access button in
-     the shortcut row that trailer cut 7 (recorded at d49de8c2, 21:22, an hour before the
-     removal) shows. It is the control the tour's 'scripture-web' stop rings. The 2026-09-05
-     removal ("still under construction, make users drill for it") is reversed for Home only;
-     the Library entry keeps its own route. The row's other three are the control, as before:
-     a Home with no shortcut row at all satisfies nothing here. */
-  it('Home offers the Scripture Web shortcut again, beside the others, and it opens the web', () => {
+  /* The layout pass (the owner, 2026-11-10): History, Notes, Highlights, Bookmarks and Scripture Web leave Home's
+     quick row for the Library; Search stays, and the History tile stays. */
+  it('quick access holds only Search; the History tile stays', () => {
     setupGlobals();
-    const onScriptureWeb = vi.fn();
-    renderHome({ onNotes: () => {}, onBookmarks: () => {}, onScriptureWeb });
-
-    const shortcuts = document.querySelector('.home-shortcuts');
-    expect(shortcuts).toBeTruthy();
-    const labels = [...shortcuts.querySelectorAll('button')].map((x) => x.textContent.trim());
-    expect(labels).toEqual(['Search library', 'History', 'Notes', 'Bookmarks', 'Scripture Web']);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
-    expect(onScriptureWeb).toHaveBeenCalledTimes(1);
-  });
-
-  it('with no onScriptureWeb the row still has no Scripture Web button (a route decides, not Home)', () => {
-    setupGlobals();
-    renderHome({ onNotes: () => {}, onBookmarks: () => {} });
-    expect(screen.queryByRole('button', { name: /Scripture Web/i })).toBeNull();
-    expect(document.querySelector('.home-shortcuts')).toBeTruthy();
+    renderHome({ onNotes: () => {}, onHighlights: () => {}, onBookmarks: () => {}, onScriptureWeb: () => {} });
+    const labels = [...document.querySelectorAll('.home-shortcuts button')].map((x) => x.textContent.trim());
+    expect(labels).toEqual(['Search library']);
+    for (const name of ['Notes', 'Highlights', 'Bookmarks', /Scripture Web/]) expect(screen.queryByRole('button', { name })).toBeNull();
+    expect(document.querySelector('.home-nav-item:last-child').textContent).toContain('History');
   });
 
   it('reorders by keyboard while preserving hidden History and focus', () => {
@@ -410,19 +399,6 @@ describe('the Home reorder hint', () => {
   });
 });
 
-/* U08.1: Highlights were four taps from a letter (Library, Personal Study, Highlights); Home's row holds them now. */
-describe('Home shortcut to Highlights', () => {
-  it('sits after Notes and opens the Highlights list', () => {
-    setupGlobals();
-    const onHighlights = vi.fn();
-    renderHome({ onNotes: () => {}, onHighlights, onBookmarks: () => {} });
-    const buttons = [...document.querySelectorAll('.home-shortcuts button')];
-    expect(buttons.map((x) => x.textContent.trim())).toEqual(['Search library', 'History', 'Notes', 'Highlights', 'Bookmarks']);
-    buttons[3].click();
-    expect(onHighlights).toHaveBeenCalledTimes(1);
-  });
-});
-
 /* n131/n352 (A07.2, L1.1, U02.1): "Recent reading" opened a History list. The newest place is one tap now
    (Continue: title, place), and before any reading the row says where to start. */
 describe('HomeScreen — the Continue row', () => {
@@ -457,7 +433,7 @@ describe('HomeScreen — the Continue row', () => {
   it('with History switched off there is no row', () => {
     setupGlobals();
     renderHome({ historyEnabled: false, history: [LETTER], onContinue: vi.fn(), onStartHere: vi.fn() });
-    expect(document.querySelector('.home-continue')).toBeNull();
+    expect(document.querySelector('.upnext-continue')).toBeNull();
   });
 });
 

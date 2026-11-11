@@ -3526,41 +3526,47 @@
     .home-shortcuts button { flex:1 1 auto; min-height:44px; padding:0.45rem 0.7rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font-family:var(--font-body); font-size:var(--fs-14); cursor:pointer; overflow-wrap:anywhere; }
     .home-shortcuts .home-search-action { display:flex; align-items:center; gap:0.6rem; flex-basis:100%; text-align:left; background:var(--gold-faint); }
     .home-search-action svg { width:18px; height:18px; flex-shrink:0; }
-    /* n131/n352: Home's Continue row (Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png, A and C): one tap back
-       to the newest place, or "Start here" before any reading. A full-width row under Search, eyebrow over title. */
-    .home-shortcuts .home-continue { flex-basis:100%; display:grid; grid-template-columns:1fr auto; column-gap:0.6rem; align-items:center; text-align:left; padding:0.55rem 0.9rem; }
-    .home-continue-eyebrow { grid-column:1; font-family:var(--font-cinzel); font-size:var(--fs-11); letter-spacing:0.14em; text-transform:uppercase; color:var(--gold); }
-    .home-continue-title { grid-column:1; color:var(--cream); font-size:var(--fs-15); line-height:1.3; }
-    .home-continue-place { color:var(--cream-muted); }
-    .home-continue-chev { grid-column:2; grid-row:1 / span 2; font-size:var(--fs-18); color:var(--gold); }
     .prg-start { margin:0.25rem 0 1rem; }
     @media (hover:hover) { .home-shortcuts button:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    /* rp1: the Today card (TodayCard.jsx; mockups lanes/myweb/out/mockups/rp1/r2-home-*.png) */
-    .today-card { width:100%; max-width:30rem; margin:0 0 0.75rem; padding:0.85rem 1rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream); font-family:var(--font-body); box-sizing:border-box; }
-    .today-head { display:flex; align-items:center; justify-content:space-between; gap:0.5rem; }
+    /* Home's up-next card (TodayCard.jsx; the layout pass 2026-11-10, mock read.png): one slim row per running plan,
+       then Continue, in one card. Rows ~54 px; the pills draw 36 px and take a 44 px press through ::after. */
+    .upnext { width:100%; max-width:30rem; margin:0 0 0.75rem; border:1px solid var(--gold-border); border-radius:12px; background:var(--bg3); color:var(--cream); font-family:var(--font-body); text-align:left; box-sizing:border-box; overflow:hidden; }
+    body.light .upnext { background:var(--bg2); }
+    .upnext-row { display:flex; align-items:center; gap:0.6rem; width:100%; min-height:54px; padding:0.45rem 0.5rem 0.45rem 0.875rem; box-sizing:border-box; }
+    .upnext-row + .upnext-row { border-top:1px solid var(--gold-border); }
+    .upnext-text { display:flex; flex-direction:column; flex:1; min-width:0; }
+    .upnext-eyebrow { font-family:var(--font-cinzel); font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .upnext-title { color:var(--cream); font-size:var(--fs-18); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .upnext-place { color:var(--cream-muted); }
+    .upnext-sub { align-self:flex-start; min-height:32px; margin:-0.2rem 0 -0.35rem; padding:0; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); font-style:italic; text-align:left; }
+    button.upnext-sub { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
+    .upnext-actions { display:flex; align-items:center; gap:0.45rem; flex:none; }
+    .upnext-pill { position:relative; display:inline-flex; align-items:center; gap:0.4rem; height:36px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:18px; background:transparent; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; cursor:pointer; }
+    .upnext-pill::after { content:''; position:absolute; inset:-4px -2px; }
+    .upnext-pill-solid { padding:0 1rem; border-color:var(--gold); background:var(--gold); color:var(--bg); font-weight:700; }
+    .upnext-pill:disabled { opacity:0.5; cursor:default; }
+    .upnext-go { display:flex; align-items:center; gap:0.6rem; flex:1; min-width:0; min-height:44px; margin:0; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .upnext-row.upnext-go { padding:0.45rem 0.5rem 0.45rem 0.875rem; }
+    .upnext-chev { flex:none; padding:0 0.45rem; color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
+    .upnext-x { flex:none; width:44px; height:44px; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-20); line-height:1; cursor:pointer; }
+    .upnext-textlink { flex:none; min-height:44px; padding:0 0.5rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
+    @media (hover:hover) {
+      .upnext-pill:hover { border-color:var(--gold); background:var(--gold-faint); }
+      .upnext-pill-solid:hover { background:var(--gold-bright); }
+      .upnext-go:hover .upnext-title, .upnext-x:hover { color:var(--gold-bright); }
+    }
     .today-eyebrow { color:var(--gold); font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; }
-    .today-plans-link, .today-link { min-height:44px; padding:0 0.25rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
-    .today-plans-link { margin:-0.6rem -0.25rem -0.6rem 0; }
-    .today-one { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; flex-wrap:wrap; margin-top:0.1rem; }
-    .today-one-text { display:flex; flex-direction:column; min-width:0; }
-    .today-title { margin:0; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-20); font-weight:400; line-height:1.25; }
-    .today-plan { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
+    .today-link { min-height:44px; padding:0 0.25rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
     .today-actions { display:flex; gap:0.5rem; }
     .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
     .today-btn-wide { width:100%; margin-top:0.6rem; }
-    @media (hover:hover) { .today-btn:hover, .today-row-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
+    @media (hover:hover) { .today-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
     .today-progress-row { display:flex; align-items:center; gap:0.75rem; margin-top:0.7rem; }
     .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
     .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
     .today-percent { color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
-    .today-rows { list-style:none; margin:0.35rem 0 0; padding:0; }
-    .today-row + .today-row { border-top:1px solid var(--gold-border); }
-    .today-row-btn { display:flex; align-items:center; gap:0.85rem; width:100%; min-height:56px; padding:0.45rem 0.25rem; border:1px solid transparent; border-radius:6px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-    .today-row-text { display:flex; flex-direction:column; min-width:0; }
-    .today-row-title { color:var(--cream); font-size:var(--fs-18); }
     .today-check { flex:none; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1.5px solid var(--gold); border-radius:50%; color:var(--bg, #000); }
     .today-check[data-done="1"] { background:var(--gold); }
-    .today-note { margin:0.5rem 0 0; color:var(--cream-muted); font-size:var(--fs-13); font-style:italic; }
     /* rp1: the Plans screen (ReadingPlansScreen.jsx; mockup r2-plans.png) */
     .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:1.25rem 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }   /* 1.25rem top: the personal-study header's one inset */
     .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
@@ -3609,9 +3615,8 @@
     .plans-audio-auto span { flex:1 1 auto; min-width:0; }
     .plans-hold { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
     .plans-mark { display:block; margin:0 auto; font-size:var(--fs-13); }
-    /* mw18 landing 1: Home's done state, the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
-    .today-done { display:flex; align-items:center; gap:0.75rem; margin-top:0.35rem; }
-    .today-links, .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }
+    /* mw18 landing 1: the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
+    .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }
     .today-btn:disabled { opacity:0.5; cursor:default; }
     .plans-plan .today-eyebrow { display:block; margin-bottom:0.25rem; }
     .plans-done { display:flex; align-items:center; gap:0.65rem; }

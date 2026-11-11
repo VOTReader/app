@@ -142,22 +142,10 @@ function makeRoutes(overrides = {}) {
   return { routes: buildScreenRoutes(props), props };
 }
 
-describe('Scripture Web is offered from Home again, and still reached by drilling', () => {
-  /* Corbin, 2026-09-11: "add the scripture web button back to the home screen like it was
-     before, as seen in the trailer." This is the case b3e3625a replaced (2026-09-05, "make
-     users drill for it"), put back: Home opens it and captures its origin, so back from the
-     web returns to Home. The Library entry and the deep link were never touched and stay. */
-  it('the Home route opens Scripture Web from Home and back returns through the captured origin', () => {
-    const { routes, props } = makeRoutes();
-    // (Until lz1 the entry also warmed lazy bundle-f; the Scripture Web ships in bundle-d now.)
-    routes.home().props.onScriptureWeb();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
-    expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
-
-    const next = makeRoutes({ navOrigin: { screen: 'home', returnOrigin: null } });
-    next.routes['scripture-web']().props.onBack();
-    expect(next.props.goNavOrigin).toHaveBeenCalledTimes(1);
-    expect(next.props.setScreen).not.toHaveBeenCalled();
+describe('Scripture Web is reached from the Library (Home lost its button, 2026-11-10)', () => {
+  it('Home no longer offers it', () => {
+    const { routes } = makeRoutes();
+    expect(routes.home().props.onScriptureWeb).toBeUndefined();
   });
 
   it('the Library entry still opens it, and back returns through the origin', () => {

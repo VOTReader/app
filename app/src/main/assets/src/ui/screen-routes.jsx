@@ -1137,14 +1137,6 @@ export function buildScreenRoutes({
         onStartHere={() => _openFirstLetter('Home')}
         onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
         onOpenSongs={() => _openSongs([{ k: 'hub' }], { screen: 'home' })}
-        onNotes={goNotesIndex}
-        onHighlights={goHighlightsIndex}
-        onBookmarks={goBookmarksIndex}
-        onScriptureWeb={() => {
-          // Same entry as the Library's: capture Home as the origin so back returns here.
-          setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
-          setScreen('scripture-web');
-        }}
         historyEnabled={settings.historyEnabled !== false}
         onAbout={goAbout}
         searchEnabled={settings.searchEnabled !== false}

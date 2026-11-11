@@ -1,6 +1,5 @@
 // @ts-nocheck
-/* TodayCard (rp1): the reader's plans for today on Home, built to the round-2
-   mockups (lanes/myweb/out/mockups/rp1/r2-home-one.png, r2-home-two.png). */
+/* TodayCard (rp1): Home's up-next card, slim rows to the layout mock read.png (2026-11-10). */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
 import { TodayCard, useNow } from './TodayCard.jsx';
@@ -11,85 +10,96 @@ const row = (o) => ({ id: 'bible-year', name: 'Bible in a Year', loading: false,
   day: 46, totalDays: 365, behind: 0, finished: false, next: { bid: 'genesis', cid: 47 }, again: null,
   listen: [{ bid: 'genesis', cid: 47 }, { bid: 'genesis', cid: 48 }], todayTicked: 0, todayCount: 4, minutes: 13, tomorrow: '', ...o });
 
-describe('TodayCard', () => {
-  it('shows nothing without a plan', () => {
+describe('TodayCard (the up-next card)', () => {
+  it('shows nothing with no plan, no offer and no Continue row', () => {
     const { container } = render(<TodayCard rows={[]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} />);
     expect(container.firstChild).toBeNull();
   });
 
-  it('one plan: the day, the portion, "plan · 2 of 4 · about 13 min", Read, and Listen to today’s portion (mw18 r2-home-states)', () => {
+  it('one plan: one slim row, "Today · Day 47 of 365", the portion, Read, and a Listen pill for today’s portion', () => {
     const onRead = vi.fn(), onListen = vi.fn();
-    render(<TodayCard rows={[row({ todayTicked: 2, listen: [{ bid: 'genesis', cid: 49 }, { bid: 'genesis', cid: 50 }], next: { bid: 'genesis', cid: 49 } })]}
+    const { container } = render(<TodayCard rows={[row({ todayTicked: 2, listen: [{ bid: 'genesis', cid: 49 }, { bid: 'genesis', cid: 50 }], next: { bid: 'genesis', cid: 49 } })]}
       onRead={onRead} onListen={onListen} onOpenPlans={vi.fn()} markAsReadEnabled />);
+    expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
     expect(screen.getByText('Today · Day 47 of 365')).toBeTruthy();
-    expect(screen.getByRole('heading', { name: 'Genesis 47-50' })).toBeTruthy();
-    expect(screen.getByText('Bible in a Year · 2 of 4 · about 13 min')).toBeTruthy();
-    expect(document.body.textContent).not.toMatch(/%/);   // C10: no percentage rounded down
+    expect(screen.getByText('Genesis 47-50')).toBeTruthy();
+    expect(container.textContent).not.toMatch(/%|Plans/);   // C10: no percentage; plans live in the Library
     fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 47-50' }));
     expect(onRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 49 }, 'bible-year');
-    fireEvent.click(screen.getByRole('button', { name: 'Listen to Genesis 47-50' }));
+    const listen = screen.getByRole('button', { name: 'Listen to Genesis 47-50' });
+    expect(listen.className).toBe('upnext-pill');
+    fireEvent.click(listen);
     expect(onListen).toHaveBeenCalledWith([{ bid: 'genesis', cid: 49 }, { bid: 'genesis', cid: 50 }], 'bible-year');
   });
 
-  it('a day read through: Done today, tomorrow’s portion, Read ahead and Read again (C2)', () => {
+  it('a day read through is one row: "Today’s reading is done" and Read ahead, no pills', () => {
     const onRead = vi.fn();
-    render(<TodayCard rows={[row({ done: true, label: 'Genesis 47-50', tomorrow: 'Exodus 1-4', next: { bid: 'exodus', cid: 1 }, again: { bid: 'genesis', cid: 47 } })]}
+    const { container } = render(<TodayCard rows={[row({ done: true, tomorrow: 'Exodus 1-4', next: { bid: 'exodus', cid: 1 }, again: { bid: 'genesis', cid: 47 } })]}
       onRead={onRead} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
-    expect(screen.getByRole('heading', { name: 'Done today' })).toBeTruthy();
-    expect(screen.getByText('Tomorrow: Exodus 1-4')).toBeTruthy();
+    expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
+    expect(screen.getByText('Today’s reading is done')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Read ahead' }));
     expect(onRead).toHaveBeenLastCalledWith({ bid: 'exodus', cid: 1 }, 'bible-year');
-    fireEvent.click(screen.getByRole('button', { name: 'Read again' }));
-    expect(onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 47 }, 'bible-year');
-    expect(screen.queryByRole('button', { name: /Listen/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Listen|^Read Genesis/ })).toBeNull();
   });
 
-  it('two plans: a row each with its check and day, and one Listen to today for the first not done (r2-home-two)', () => {
-    const onRead = vi.fn(), onListen = vi.fn();
-    const rows = [row({ done: true, tomorrow: 'Exodus 1-4' }), row({ id: 'volumes', name: 'The Volumes in Order', label: 'Volume Two, Letters 14-15', day: 11, next: { bid: 'volume-two', cid: 'x' }, listen: [{ bid: 'volume-two', cid: 'x' }] })];
-    render(<TodayCard rows={rows} onRead={onRead} onListen={onListen} onOpenPlans={vi.fn()} markAsReadEnabled />);
-    const items = screen.getAllByRole('listitem');
-    expect(items).toHaveLength(2);
-    expect(items[0].querySelector('.today-check').getAttribute('data-done')).toBe('1');
-    expect(items[1].querySelector('.today-check').getAttribute('data-done')).toBe('0');
-    fireEvent.click(screen.getByRole('button', { name: /Read Volume Two, Letters 14-15/ }));
+  it('two plans: a row each, named by plan and day; a third waits on the Reading plans screen', () => {
+    const onRead = vi.fn();
+    const rows = [row(), row({ id: 'volumes', name: 'The Volumes in Order', label: 'Volume Two, Letters 14-15', day: 11, totalDays: 120, next: { bid: 'volume-two', cid: 'x' }, listen: [{ bid: 'volume-two', cid: 'x' }] }),
+      row({ id: 'third', name: 'Third', label: 'Psalm 1' })];
+    const { container } = render(<TodayCard rows={rows} onRead={onRead} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
+    expect(container.querySelectorAll('[data-plan]')).toHaveLength(2);
+    expect(screen.getByText('Bible in a Year · Day 47 of 365')).toBeTruthy();
+    expect(screen.getByText('The Volumes in Order · Day 12 of 120')).toBeTruthy();
+    expect(screen.queryByText('Psalm 1')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Read Volume Two, Letters 14-15' }));
     expect(onRead).toHaveBeenCalledWith({ bid: 'volume-two', cid: 'x' }, 'volumes');
-    fireEvent.click(screen.getByRole('button', { name: 'Listen to today' }));
-    expect(onListen).toHaveBeenCalledWith([{ bid: 'volume-two', cid: 'x' }], 'volumes');
-    expect(screen.getByText('The Volumes in Order · Day 12')).toBeTruthy();
-    expect(screen.getByText('Done · Tomorrow: Exodus 1-4')).toBeTruthy();
   });
 
-  it('never scores: a day behind is a quiet line to the Plans screen, and there is no streak', () => {
+  it('never scores: behind is a small second line to the Plans screen, and there is no streak', () => {
     const onOpenPlans = vi.fn();
-    const { container } = render(<TodayCard rows={[row({ behind: 2 })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={onOpenPlans} markAsReadEnabled />);
+    const { container } = render(<TodayCard rows={[row({ behind: 3 })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={onOpenPlans} markAsReadEnabled />);
     expect(container.textContent).not.toMatch(/streak/i);
-    fireEvent.click(screen.getByRole('button', { name: '2 days to catch up' }));
+    expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: '3 days to catch up' }));
     expect(onOpenPlans).toHaveBeenCalled();
   });
 
-  it('says why nothing ticks when Mark as read is off, with a button that turns it on (C12)', () => {
+  it('Mark as read off: a small line that turns it on (C12)', () => {
     const on = vi.fn();
-    render(<TodayCard rows={[row()]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled={false} onEnableMarkAsRead={on} />);
-    expect(screen.getByText(/Mark as read is off/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Turn it on' }));
+    render(<TodayCard rows={[row({ behind: 2 })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled={false} onEnableMarkAsRead={on} />);
+    expect(screen.queryByRole('button', { name: /to catch up/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Turn on Mark as read to track this' }));
     expect(on).toHaveBeenCalled();
   });
 
-  it('with no plan, offers one when asked to: Browse plans, and Not now hides it (C8)', () => {
+  it('with no plan, offers one in one row: "Start a reading plan ›" opens the plans, × (Not now) hides it (C8)', () => {
     const onOpenPlans = vi.fn(), onHideOffer = vi.fn();
-    render(<TodayCard rows={[]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={onOpenPlans} offerStart onHideOffer={onHideOffer} />);
-    expect(screen.getByRole('heading', { name: 'Start a reading plan' })).toBeTruthy();
-    expect(screen.getByText('A few minutes a day, at your own pace')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Browse plans' }));
+    const { container } = render(<TodayCard rows={[]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={onOpenPlans} offerStart onHideOffer={onHideOffer} />);
+    expect(container.querySelectorAll('.upnext-row')).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button', { name: /Start a reading plan/ }));
     expect(onOpenPlans).toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
+    const x = screen.getByRole('button', { name: 'Not now' });
+    expect(x.textContent).toBe('×');
+    fireEvent.click(x);
     expect(onHideOffer).toHaveBeenCalled();
   });
 
-  it('a Volumes plan waiting for the letters to load says so', () => {
+  it('Continue (the children) is the card’s last row, and holds the card up alone', () => {
+    const cont = <button type="button" className="upnext-row upnext-go">Continue</button>;
+    const { container } = render(<TodayCard rows={[row()]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled>{cont}</TodayCard>);
+    const rowsNow = container.querySelectorAll('.upnext-row');
+    expect(rowsNow).toHaveLength(2);
+    expect(rowsNow[1].textContent).toBe('Continue');
+    cleanup();
+    const alone = render(<TodayCard rows={[]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()}>{cont}</TodayCard>);
+    expect(alone.container.querySelectorAll('.upnext-row')).toHaveLength(1);
+  });
+
+  it('a Volumes plan waiting for the letters to load says so, with nothing to press yet', () => {
     render(<TodayCard rows={[row({ id: 'volumes', name: 'The Volumes in Order', loading: true, label: '', next: null })]} onRead={vi.fn()} onListen={vi.fn()} onOpenPlans={vi.fn()} markAsReadEnabled />);
     expect(screen.getByText('Loading the Volumes…')).toBeTruthy();
+    expect(screen.queryByRole('button')).toBeNull();
   });
 });
 

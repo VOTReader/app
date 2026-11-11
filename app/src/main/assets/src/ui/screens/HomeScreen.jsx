@@ -59,34 +59,44 @@ export function continueLabel(entry) {
   return entry.bookTitle ? { title: entry.bookTitle + (entry.chapterNum ? ' ' + entry.chapterNum : ''), place: '' } : null;
 }
 
-/** @param {{ entry: any, onContinue?: (entry: any) => void, onStartHere?: () => void }} props */
+/** Whether ContinueRow draws anything (the card must not draw an empty box around it).
+    @param {any} entry @param {any} onContinue @param {any} onStartHere */
+const hasContinueRow = (entry, onContinue, onStartHere) => (entry ? !!(onContinue && continueLabel(entry)) : !!onStartHere);
+
+/** The up-next card's last row (TodayCard children): the newest place read, or where to start before any reading.
+    @param {{ entry: any, onContinue?: (entry: any) => void, onStartHere?: () => void }} props */
 function ContinueRow({ entry, onContinue, onStartHere }) {
   const lab = continueLabel(entry);
   if (lab && onContinue) {
     return (
-      <button type="button" className="home-continue" onClick={() => onContinue(entry)}
+      <button type="button" className="upnext-row upnext-go upnext-continue" onClick={() => onContinue(entry)}
         aria-label={'Continue: ' + lab.title + (lab.place ? ', ' + lab.place : '')}>
-        <span className="home-continue-eyebrow" aria-hidden="true">Continue</span>
-        <span className="home-continue-title" aria-hidden="true">{lab.title}{lab.place ? <span className="home-continue-place">{' · ' + lab.place}</span> : null}</span>
-        <span className="home-continue-chev" aria-hidden="true">›</span>
+        <span className="upnext-text" aria-hidden="true">
+          <span className="upnext-eyebrow">Continue</span>
+          <span className="upnext-title">{lab.title}{lab.place ? <span className="upnext-place">{' · ' + lab.place}</span> : null}</span>
+        </span>
+        <span className="upnext-chev" aria-hidden="true">›</span>
       </button>
     );
   }
   if (entry || !onStartHere) return null;
   return (
-    <button type="button" className="home-continue" onClick={onStartHere} aria-label="Start here: Volume One, Letter 1, Chosen by God">
-      <span className="home-continue-eyebrow" aria-hidden="true">Start here</span>
-      <span className="home-continue-title" aria-hidden="true">Volume One, Letter 1<span className="home-continue-place"> · Chosen by God</span></span>
-      <span className="home-continue-chev" aria-hidden="true">›</span>
+    <button type="button" className="upnext-row upnext-go upnext-continue" onClick={onStartHere} aria-label="Start here: Volume One, Letter 1, Chosen by God">
+      <span className="upnext-text" aria-hidden="true">
+        <span className="upnext-eyebrow">Start here</span>
+        <span className="upnext-title">Volume One, Letter 1<span className="upnext-place"> · Chosen by God</span></span>
+      </span>
+      <span className="upnext-chev" aria-hidden="true">›</span>
     </button>
   );
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, onNotes, onHighlights, onBookmarks, onScriptureWeb, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
   // U09.2: the Scriptures card names the edition the Bible shows ("WEB · NKJV until it downloads").
   useOfflineEditions(translation);
-  // rp1: the reader's plans for today, above Search (TodayCard.jsx)
+  // rp1: the reader's plans for today and the Continue row, one up-next card above Search (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
+  const newest = Array.isArray(history) ? history[0] || null : null;
   // mw18 C8: with no plan running (and the plans store loaded, so a plan never flashes the offer at boot),
   // Today offers one; "Not now" hides the offer on this device.
   const [offerHidden, setOfferHidden] = React.useState(() => { try { return localStorage.getItem(PLAN_OFFER_KEY) === '1'; } catch (_e) { return false; } });
@@ -373,27 +383,20 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled} tracksOf={planTracks}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
           onEnableMarkAsRead={onEnableMarkAsRead} onOpenPlans={() => onOpenPlans && onOpenPlans()}
-          offerStart={offerPlan} onHideOffer={hideOffer} />
-        <nav className="home-shortcuts" aria-label="Quick access">
-          {searchEnabled !== false && <button type="button" className="home-search-action" onClick={onSearch}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
-            Search library
-          </button>}
-          {/* n131/n352 (A07.2, L1.1, U02.1): "Recent reading" opened a list. The newest place is now one
-              tap (Continue), and before any reading the row says where to start; the list is "History".
-              Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png (A and C). */}
-          {historyEnabled !== false && <ContinueRow entry={Array.isArray(history) ? history[0] : null} onContinue={onContinue} onStartHere={onStartHere} />}
-          {historyEnabled !== false && <button type="button" onClick={onHistory}>History</button>}
-          {onNotes && <button type="button" onClick={onNotes}>Notes</button>}
-          {/* U08.1: Highlights were four taps from a letter; now one from Home. */}
-          {onHighlights && <button type="button" onClick={onHighlights}>Highlights</button>}
-          {onBookmarks && <button type="button" onClick={onBookmarks}>Bookmarks</button>}
-          {/* Back on the landing page (Corbin, 2026-09-11: "like it was before, as
-              seen in the trailer") — the button b3e3625a removed on 2026-09-05
-              while the web was under construction. The tour's 'scripture-web'
-              stop rings it. */}
-          {onScriptureWeb && <button type="button" onClick={onScriptureWeb}>Scripture Web</button>}
-        </nav>
+          offerStart={offerPlan} onHideOffer={hideOffer}>
+          {/* n131/n352 (A07.2, L1.1, U02.1): the newest place is one tap (Continue), and before any reading the row
+              says where to start. The layout pass (2026-11-10) made it the up-next card's last row; History,
+              Notes, Highlights, Bookmarks and Scripture Web left this row for the Library. */}
+          {historyEnabled !== false && hasContinueRow(newest, onContinue, onStartHere) ? <ContinueRow entry={newest} onContinue={onContinue} onStartHere={onStartHere} /> : null}
+        </TodayCard>
+        {searchEnabled !== false && (
+          <nav className="home-shortcuts" aria-label="Quick access">
+            <button type="button" className="home-search-action" onClick={onSearch}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
+              Search library
+            </button>
+          </nav>
+        )}
         <div className="home-nav-list">
           {orderedItems.map((item, i) => (
             <button
