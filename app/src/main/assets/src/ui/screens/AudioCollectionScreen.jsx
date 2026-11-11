@@ -210,7 +210,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
 
   // A Bible edition's bar says its name ("KJV"); the line under it says the reading (listen.html au-books).
   const edition = bible ? Object.values(BIBLE_AUDIO_EDITIONS).find((entry) => entry && entry.volKey === volKey) || null : null;
-  const utility = { title: (edition ? editionName(edition) : label) || 'Recordings', onBack, backLabel };
+  // A study's bar says its own name ("Purity"); what it is goes on the line under it (listen.html au-study).
+  const studyName = study && label ? label.replace(/\s*(?:-\s*Bible\/Letter Study|\(Bible\/Letter Study\))\s*$/, '') || label : '';
+  const utility = { title: (edition ? editionName(edition) : studyName || label) || 'Recordings', onBack, backLabel };
 
   if (!label && !items.length) {
     return (
@@ -226,7 +228,8 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
   // listen.html au-coll: "29 recordings · 2 h 5 min" (the hero's long sentence went with the hero).
   const countLine = bible
     ? (playable.length === 1 ? 'One book' : playable.length + ' books')
-    : playable.length + (playable.length === 1 ? ' recording' : ' recordings');
+    : study ? 'Bible/Letter Study · ' + playable.length + (playable.length === 1 ? ' chapter' : ' chapters')
+      : playable.length + (playable.length === 1 ? ' recording' : ' recordings');
 
   // The reading each row's own Play plays: what a download saves (AudioPlayer.playbackTracks, item 8).
   const ownTracks = (item) => (typeof AudioPlayer.playbackTracks === 'function'

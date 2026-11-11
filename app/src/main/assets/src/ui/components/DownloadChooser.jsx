@@ -519,7 +519,7 @@ function Footer({ plan, free, onApply }) {
     ? ['Remove ' + (both ? plan.remove.length.toLocaleString('en-US') : countOf(plan.remove.length, nounOf(plan.remove))),
       plan.removeBytes ? formatBytes(plan.removeBytes) : ''].filter(Boolean).join(' · ')
     : '';
-  let line1 = addLine || removeLine || 'Tick what you want on this phone';
+  const line1 = addLine || removeLine;
   /** @type {any} */
   let line2 = freeText ? freeText + ' on this phone' : '';
   if (short) line2 = <span className="dl-footer-warn">{'Needs ' + formatBytes(short) + ' more room. Untick some, or remove downloads you’ve finished.'}</span>;
@@ -528,7 +528,7 @@ function Footer({ plan, free, onApply }) {
   return (
     <div className="dl-footer" role="region" aria-label="What Apply does">
       <div className="dl-footer-text"><p>{line1}</p>{line2 ? <p className="dl-footer-sub">{line2}</p> : null}</div>
-      <button type="button" className="dl-footer-go" disabled={!!short || !(adding || removing)} onClick={onApply}>{label}</button>
+      <button type="button" className="dl-footer-go" disabled={!!short} onClick={onApply}>{label}</button>
     </div>
   );
 }
@@ -780,7 +780,8 @@ export function DownloadChooser({ off, bibleAudio, focus, letterReader, after = 
       ) : null}
 
       {after}
-      <Footer plan={plan} free={free} onApply={() => setAsking('apply')} />
+      {/* listen.html au-dl: no bar until something is ticked or unticked */}
+      {plan.add.length || plan.remove.length ? <Footer plan={plan} free={free} onApply={() => setAsking('apply')} /> : null}
       {asking === 'apply' ? (
         <ApplySheet plan={plan} groups={groups} off={off} free={free} voice={voice} onCancel={() => setAsking('')} onApply={apply} />
       ) : null}

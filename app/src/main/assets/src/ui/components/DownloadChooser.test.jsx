@@ -62,8 +62,7 @@ describe('Choose: ticks and the footer', () => {
     expect(box(container, 'Volume One').getAttribute('aria-checked')).toBe('mixed');
     expect(box(container, 'Volume Two').getAttribute('aria-checked')).toBe('false');
     expect(within(container).getByRole('button', { name: 'Select all' }), 'the eyebrow selects all of TVOT (au-dl)').toBeTruthy();
-    expect(footer(container).textContent).toMatch(/Tick what you want on this phone/);
-    expect(within(footer(container)).getByRole('button').disabled).toBe(true);
+    expect(footer(container), 'no bar until something changes (au-dl)').toBeNull();
   });
 
   it('ticking a collection adds it: the footer counts recordings (Christmas once), bytes, and Download asks once', () => {
@@ -187,7 +186,7 @@ describe('Choose: voices and readings', () => {
     const { container, getByRole } = render(<DownloadChooser off={off} letterReader="T" onLetterReader={() => {}} />);
     openV1(container);
     expect(box(container, 'Christmas').getAttribute('aria-checked')).toBe('true');
-    expect(footer(container).textContent).toMatch(/Tick what you want on this phone/);
+    expect(footer(container)).toBeNull();
     const xmas = container.querySelectorAll('.dl-unit')[1];
     expect(within(xmas).getByRole('button', { name: 'Benjamin, on this phone' }).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(within(xmas).getByRole('button', { name: 'Timothy' }));
@@ -254,7 +253,7 @@ describe('Choose: rows on their way', () => {
     const metas = [...container.querySelectorAll('.dl-unit-meta')].map((m) => m.textContent);
     expect(metas).toEqual(['Waiting', '2 parts · Downloading 50%']);
     expect(box(container, 'Volume One').getAttribute('aria-checked')).toBe('true');
-    expect(footer(container).textContent).toMatch(/Tick what you want on this phone/);
+    expect(footer(container)).toBeNull();
   });
 });
 

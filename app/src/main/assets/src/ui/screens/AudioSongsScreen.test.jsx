@@ -445,7 +445,7 @@ describe('AudioSongsScreen -- the verbatim gate on the song page', () => {
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'born-again' }]);
     const { letter, lyrics } = await aboutRows('Born Again');
     expect(letter.querySelector('.ui-row-title').textContent).toBe('Born Again');
-    expect(letter.querySelector('.ui-row-meta').textContent).toBe('Inspired by the letter');
+    expect(letter.querySelector('.ui-row-over').textContent).toBe('Inspired by the letter');
     fireEvent.click(letter);
     expect(window.__openAudioText).toHaveBeenCalledWith({ key: 'three:born-again', title: 'Born Again' });
     expect(within(screen.getByRole('region', { name: 'Lyrics of Born Again' })).getByText('A line the song sings')).toBeTruthy();
@@ -459,7 +459,7 @@ describe('AudioSongsScreen -- the verbatim gate on the song page', () => {
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'come-love-awaits-you' }]);
     const { letter, lyrics } = await aboutRows('Come, Love Awaits You');
     expect(letter.querySelector('.ui-row-title').textContent).toBe('Come, Love Awaits You');
-    expect(letter.querySelector('.ui-row-meta').textContent).toBe('From the letter');
+    expect(letter.querySelector('.ui-row-over').textContent).toBe('From the letter');
     expect(screen.getByText('A line the song sings')).toBeTruthy();
     expect(lyrics.querySelector('.ui-row-meta').textContent).toBe('Words from the letter “Come, Love Awaits You” · lyrics transcribed');
   });
@@ -470,7 +470,7 @@ describe('AudioSongsScreen -- the verbatim gate on the song page', () => {
     renderScreen([{ k: 'hub' }, { k: 'song', v: 'no-vs' }]);
     const { letter, lyrics } = await aboutRows('Old Catalog Song');
     expect(letter.querySelector('.ui-row-title').textContent).toBe('Old Letter');
-    expect(letter.querySelector('.ui-row-meta').textContent).toBe('Inspired by the letter');
+    expect(letter.querySelector('.ui-row-over').textContent).toBe('Inspired by the letter');
     expect(screen.getByText('A line the song sings')).toBeTruthy();
     expect(lyrics.querySelector('.ui-row-meta').textContent).toBe('Lyrics transcribed from the song');
   });

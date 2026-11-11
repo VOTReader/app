@@ -1400,8 +1400,8 @@
       .song-lyrics-card { margin: 14px 0; padding: 12px 14px; border: 1px solid var(--gold-border); border-radius: 10px; background: var(--bg3); }
       .song-lyrics-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 36px; }
       .song-lyrics-head > span { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-13); font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; }
-      .song-lyrics-follow { min-height: 36px; padding: 0 12px; border: 1px solid var(--gold-border); border-radius: 999px; background: transparent; color: var(--cream-dim); font-size: var(--fs-13); cursor: pointer; }
-      .song-lyrics-follow.is-on { border-color: var(--gold); color: var(--gold); }
+      .song-lyrics-follow { min-height: 36px; padding: 0; border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); cursor: pointer; }
+      .song-lyrics-follow.is-on { color: var(--text-2); }
       .song-lyrics-lines { position: relative; max-height: 13.5em; margin-top: 6px; overflow-y: auto; overscroll-behavior: contain; }
       .song-lyrics-lines:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       .song-lyrics-line { margin: 0; padding: 2px 6px; border-radius: 6px; color: var(--cream); font-size: var(--fs-16); font-style: italic; line-height: 1.5; }
@@ -1491,9 +1491,8 @@
       .now-playing .np-cover { --np-cover: min(68vw, clamp(96px, calc(100dvh - 30rem), 280px)); width: var(--np-cover); height: var(--np-cover); border-radius: 12px; }
       .now-playing .np-cover .song-cover-note { font-size: var(--fs-48); }
       .np-version { font-size: var(--fs-15); }
-      .np-from { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--cream-dim); font-family: var(--font-body); font-size: var(--fs-16); font-style: italic; cursor: pointer; }
-      .np-from em { color: var(--cream); }
-      .np-from span { color: var(--gold); font-style: normal; }
+      .np-from { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; cursor: pointer; }
+      .np-from em { font-style: normal; }
       .np-lyrics-head { display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; }
       .now-playing .np-cover-small { width: 72px; height: 72px; flex: 0 0 72px; border-radius: 8px; }
       .np-lyrics-head .np-title { font-size: var(--fs-24); }
@@ -1529,6 +1528,7 @@
       }
       .audio-manager-round svg { width: 26px; height: 26px; }
       .np-transport .np-skip svg { width: 34px; height: 34px; }
+      .np-transport .audio-manager-round { border: 0; } /* listen.html au-player: bare icons around the one gold disc */
       .audio-manager-play { width: 76px; height: 76px; border-color: var(--gold); background: var(--gold); color: var(--bg); }
       .audio-manager-play svg { width: 32px; height: 32px; }
       .audio-manager-play.is-loading { animation: audio-bar-pulse 1.1s ease-in-out infinite; }
@@ -1607,7 +1607,7 @@
       .np-custom.is-active { background: var(--accent-soft); }
       .audio-speed-fine, .np-custom-label { flex: 1; min-width: 0; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; }
       .audio-speed-row .audio-manager-round, .np-custom .audio-manager-round {
-        width: 38px; height: 38px; border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--fs-20);
+        width: 38px; height: 38px; border: 0; border-radius: 50%; background: var(--surface-3); color: var(--accent); font-family: var(--font-ui); font-size: var(--fs-20);
       }
       .audio-speed-value, .np-custom-value { min-width: 3.6em; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); text-align: center; font-variant-numeric: tabular-nums; }
       .audio-speed-step:disabled, .np-custom .audio-manager-round:disabled { opacity: 0.38; cursor: default; }
@@ -1619,7 +1619,7 @@
         background: transparent; color: var(--text-1); text-align: left; cursor: pointer;
       }
       .np-radio:first-child { border-top: 0; }
-      .np-radio-dot { flex: 0 0 22px; width: 22px; height: 22px; margin-left: auto; border: 2px solid var(--text-2); border-radius: 50%; }
+      .np-radio-dot { flex: 0 0 22px; width: 22px; height: 22px; margin-left: auto; border: 2px solid var(--text-3); border-radius: 50%; }
       .np-radio.is-active .np-radio-dot { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 42%, transparent 47%); }
       .np-radio-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
       .np-radio-copy strong { font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; }
@@ -1729,7 +1729,7 @@
          bar, the run card, the kept rows with a bin. Brick = marked for removal. ── */
       .dl-screen, .dl-sheet { --dl-brick:#c4664a; }
       body.light .dl-screen, body.light .dl-sheet { --dl-brick:#9b3a2a; }
-      .dl-store { margin:var(--sp-2) 0 0; }
+      .dl-store { margin:0; }
       .dl-store-top { display:flex; align-items:baseline; justify-content:space-between; gap:var(--sp-3); }
       .dl-store-big { color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-title); font-weight:600; line-height:1.2; }
       .dl-store-free, .dl-store-line { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
@@ -3252,6 +3252,8 @@
     .ui-i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
     .ui-i-sm { width: var(--icon-sm); height: var(--icon-sm); }
     .ui-i-fill { fill: currentColor; stroke: none; }
+    /* pause is two strokes: a filled pause (a row's play button while it plays) draws them heavy, not as nothing */
+    .ui-i-fill[data-icon="pause"] { fill: none; stroke: currentColor; stroke-width: 3.4; }
     .bar-action { display: flex; align-items: center; justify-content: center; flex: none; min-width: var(--tap); min-height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill); background: none; cursor: pointer; }
 
     /* ── THE SHARED SURFACES (W1, the UI pass; mock/v2 base.css). Surfaces, not outlines: a group, tile or card is a
@@ -3315,7 +3317,7 @@
     .root-row-icon, .ui-row-lead { flex: none; display: flex; align-items: center; justify-content: center; width: var(--icon-chip); height: var(--icon-chip); border-radius: var(--r-chip); background: var(--surface-2); color: var(--accent); }
     .ui-group.is-inset .ui-row-lead { background: var(--surface-3); }
     .root-row-icon svg, .ui-row-lead svg { width: 20px; height: 20px; }
-    .ui-row-lead.is-play { border-radius: var(--r-pill); }
+    .ui-row-lead.is-play { padding: 0; border: 0; border-radius: var(--r-pill); cursor: pointer; } /* a button: no UA border (it drew a grey ring) */
     .ui-row-lead.is-play svg { width: 14px; height: 14px; margin-left: 1px; }
     .ui-row-lead.is-cover { background: radial-gradient(circle at 30% 25%, #463812, #17120a 72%); font-family: var(--font-serif); font-size: var(--fs-14); font-weight: 700; }
     .root-row-text, .ui-row-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
@@ -4000,7 +4002,6 @@
     body.light .select-sheet-option.selected { background:rgba(122,92,16,0.12); box-shadow:0 0 14px rgba(122,92,16,0.14) inset; }
     .select-sheet-option-main { display:flex; align-items:center; gap:0.6rem; }
     .select-sheet-option-label { font-family:'Cinzel',serif; font-size:var(--fs-15); color:var(--gold-bright); letter-spacing:0.04em; flex:1; }
-    .select-sheet-option-check { color:var(--gold-bright); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
     /* Right-aligned per-option status (Reading Font picker: "Built in" /
        "Downloaded" / "~77 KB" / "Downloading…"). */
     .select-sheet-option-meta { font-family:'Cinzel',serif; font-size:var(--fs-10); letter-spacing:0.1em; text-transform:uppercase; color:var(--gold-dim); flex-shrink:0; white-space:nowrap; }
@@ -5949,9 +5950,13 @@
     .select-sheet-title, .ui-sheet-title { margin: 0 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; letter-spacing: 0; text-align: left; line-height: 1.25; }
     .ui-sheet-sub { margin: 2px 2px 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
     .ui-sheet-head { margin-bottom: 14px; }
+    .ui-row-over { display: block; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .ui-sheet-head.has-lead { display: flex; align-items: center; gap: var(--sp-3); }
+    .ui-sheet-head-text { flex: 1; min-width: 0; }
+    .ui-sheet-head .ui-sheet-lead { width: 44px; height: 44px; border-radius: 9px; }
     .select-sheet-title { margin-bottom: 14px; }
     .select-sheet-ornament { display: none; }
-    /* a picker's options: one inset group of rows; the chosen one carries the gold tick */
+    /* a picker's options: one inset group of rows; the chosen one carries the radio */
     .select-sheet-options { display: flex; flex-direction: column; gap: 0; border-radius: var(--r-card); background: var(--surface-2); overflow: hidden; }
     .select-sheet-option {
       position: relative; display: block; width: 100%; min-height: var(--row-h-1); padding: 14px var(--card-pad);
@@ -5966,7 +5971,9 @@
     .select-sheet-option-main { display: flex; align-items: center; gap: var(--sp-3); }
     .select-sheet-option-label { flex: 1; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-body); font-weight: 500; letter-spacing: 0; }
     .select-sheet-option.selected .select-sheet-option-label { color: var(--accent); }
-    .select-sheet-option-check { flex-shrink: 0; display: grid; place-items: center; width: 22px; height: 22px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); font-size: var(--fs-13); line-height: 1; }
+    /* the chosen option's radio (listen.html / settings.html .rad.on); the others draw the empty ring (.rad) */
+    .select-sheet-option-check { flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--accent); background: radial-gradient(circle, var(--accent) 0 5px, transparent 5.5px); }
+    :is(.select-sheet-options[role="radiogroup"], .song-choice-sheet .select-sheet-options) > .select-sheet-option:not(.selected) .select-sheet-option-main::after { content: ''; flex: 0 0 22px; width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--text-3); }
     .select-sheet-option-meta { flex-shrink: 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); letter-spacing: 0; text-transform: none; white-space: nowrap; }
     .select-sheet-option-desc { margin-top: 2px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: 1.45; }
     .select-sheet-group { position: relative; display: block; margin: 0; padding: 14px var(--card-pad) 4px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; }
@@ -8943,7 +8950,7 @@ body.light .install-step-num { color: #fff; }
 
     /* ── THE LISTEN FAMILY (W3-listen, 2026-11-11; R/mock/v2/listen.html au-*). Built on the shared rows, sheets and
        buttons; only what the family adds lives here. Delete with the screens, not one by one. ─────────────────────── */
-    .listen-screen { padding-top: var(--sp-1); }
+    .listen-screen, .dl-screen { padding-top: var(--sp-1); }
     .listen-sum { margin: var(--sp-1) 2px var(--sp-4); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
     .listen-coll-actions { margin-bottom: var(--sp-4); }
     .listen-coll-actions .ui-btn:only-child { grid-column: 1 / -1; }

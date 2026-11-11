@@ -128,7 +128,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
                   {opt.lead ? <span className="ws2-opt-lead" aria-hidden="true">{opt.lead}</span> : null}
                   <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
                   {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
-                  {isSelected ? <span className="select-sheet-option-check" aria-hidden="true">{"✓"}</span> : null}
+                  {isSelected ? <span className="select-sheet-option-check" aria-hidden="true" /> : null}
                 </div>
                 {opt.desc ? <div className="select-sheet-option-desc">{opt.desc}</div> : null}
                 {/* a sample set in the option's own face: shown, not read out on every card */}
@@ -159,17 +159,17 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
      [Cancel] [label]; `children` is the body (a sentence, a field). An
      onConfirm that returns false keeps the sheet open (a refused name).
    Both can carry `label` (the gold label over the title) and `sub` (one muted
-   line under it: "Chosen by God · Just now").
+   line under it: "Chosen by God · Just now"), and `lead`, a small picture beside them.
 
      <ActionSheet open={!!row} onClose={close} title={row.text} sub="Chosen by God · Just now"
        actions={[{ id: 'open', icon: 'book', label: 'Open in the letter', onSelect: openIt },
                  { id: 'del', icon: 'trash', label: 'Delete note', danger: true, onSelect: askDelete }]} />
    ──────────────────────────────────────────────────────────────────────── */
-/** @param {{ id?: string, open: boolean, onClose: () => void, title: any, label?: any, sub?: any,
+/** @param {{ id?: string, open: boolean, onClose: () => void, title: any, label?: any, sub?: any, lead?: any,
      actions?: Array<{ id: string, label: any, sub?: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
      confirm?: { label: string, onConfirm: () => (void | boolean), danger?: boolean, disabled?: boolean } | null, cancelLabel?: string,
      children?: any, portal?: boolean, className?: string }} props */
-export function ActionSheet({ id, open, onClose, title, label, sub, actions = [], confirm = null, cancelLabel = 'Cancel', children, portal = false, className = '' }) {
+export function ActionSheet({ id, open, onClose, title, label, sub, lead = null, actions = [], confirm = null, cancelLabel = 'Cancel', children, portal = false, className = '' }) {
   const ownId = React.useId();
   const sheetId = id || `action-sheet-${ownId}`;
   const titleId = `action-sheet-title-${ownId}`;
@@ -189,11 +189,23 @@ export function ActionSheet({ id, open, onClose, title, label, sub, actions = []
       <div id={sheetId} className={'select-sheet ui-sheet' + (className ? ' ' + className : '')} ref={trapRef} role="dialog" aria-modal="true"
         aria-labelledby={titleId} aria-describedby={sub ? subId : undefined} onClick={(e) => e.stopPropagation()}>
         <SheetHandle onClose={onClose} />
-        <div className="ui-sheet-head">
-          {label ? <div className="ui-sheet-label">{label}</div> : null}
-          <h2 className="ui-sheet-title" id={titleId}>{title}</h2>
-          {sub ? <div className="ui-sheet-sub" id={subId}>{sub}</div> : null}
-        </div>
+        {/* `lead`: a small picture beside the title (the song menu's cover, listen.html au-songmenu) */}
+        {lead ? (
+          <div className="ui-sheet-head has-lead">
+            {lead}
+            <div className="ui-sheet-head-text">
+              {label ? <div className="ui-sheet-label">{label}</div> : null}
+              <h2 className="ui-sheet-title" id={titleId}>{title}</h2>
+              {sub ? <div className="ui-sheet-sub" id={subId}>{sub}</div> : null}
+            </div>
+          </div>
+        ) : (
+          <div className="ui-sheet-head">
+            {label ? <div className="ui-sheet-label">{label}</div> : null}
+            <h2 className="ui-sheet-title" id={titleId}>{title}</h2>
+            {sub ? <div className="ui-sheet-sub" id={subId}>{sub}</div> : null}
+          </div>
+        )}
         {children != null ? <div className="ui-sheet-body">{children}</div> : null}
         {actions.length ? (
           <div className="ui-sheet-actions" role="group" aria-labelledby={titleId}>

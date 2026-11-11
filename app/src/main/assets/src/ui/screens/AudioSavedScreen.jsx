@@ -16,6 +16,9 @@ import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { queueMenuItems } from '../components/queue-menu.js';
 import { songClock, currentSongId } from '../components/SongParts.jsx';
 import { remainingLabel } from '../components/AudioShelf.jsx';
+import { formatClock } from '../components/AudioSeekSlider.jsx';
+import { secondsOf } from '../../utils/audio-lengths.js';
+import { readerName } from '../../utils/download-tree.js';
 
 /** The song catalog (bundle-d's SongCatalog), or null before it is wired. @returns {any} */
 function songCatalog() {
@@ -110,7 +113,7 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
         <div className="root-screen listen-saved">
           <EmptyState icon="star" title="Nothing saved yet"
             text="Tap the star beside any recording or song to keep it here. What you save travels with your VOTReader backup."
-            action={onOpenVolumes ? { label: 'Browse The Volumes of Truth', onClick: onOpenVolumes } : undefined} />
+            action={onOpenVolumes ? { label: 'Browse The Volumes of Truth', onClick: onOpenVolumes, kind: 'secondary' } : undefined} />
         </div>
       </ScreenLayout>
     );
@@ -130,7 +133,10 @@ export function AudioSavedScreen({ onBack, backLabel = 'Back to Listen', onOpenT
           {shownTracks.map((track) => {
             const name = trackName(track);
             const playing = !!(current && current.url === track.url && active);
-            const meta = [trackMeta(track), remainingLabel(track)].filter(Boolean).join(' · ');
+            // au-saved: "Volume Two · Text-to-speech · 1:43": where it is from, the voice, and its length (or time left)
+            const secs = secondsOf(track.url);
+            const meta = [trackMeta(track), readerName(track.readerCode), remainingLabel(track) || (secs ? formatClock(secs) : '')]
+              .filter(Boolean).join(' · ');
             return (
               <ListRow key={track.url} current={!!(current && current.url === track.url)}
                 lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + name} playing={playing} onClick={() => playTrack(track)} />}

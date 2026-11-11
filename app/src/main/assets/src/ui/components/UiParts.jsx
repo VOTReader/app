@@ -56,13 +56,14 @@ export function ListGroup({ label, aside, onAside, inset = false, children, clas
  *   switchOn a switch row (true / false): the row is one button, role="switch", the switch drawn where the chevron goes
  *   star     the row's one button besides its menu (rule 12): { on, label, onClick }, a Save star (listen.html au-coll)
  *   remove   a visible × in the menu's place (Recently played, au-root): { label, onClick }
- * @param {{ icon?: string, lead?: any, title: any, meta?: any, value?: any, valueNone?: boolean,
+ *   over     a small line above the title ("From the letter" over the letter's name, au-song)
+ * @param {{ icon?: string, lead?: any, over?: any, title: any, meta?: any, value?: any, valueNone?: boolean,
  *   mark?: { label: string, icon?: string, tick?: boolean } | null, menu?: { label: string, onClick: () => void } | null,
  *   star?: { on: boolean, label: string, onClick: () => void } | null, remove?: { label: string, onClick: () => void } | null, switchOn?: boolean,
  *   onClick?: () => void, chevron?: boolean, one?: boolean, noLead?: boolean, ariaLabel?: string, className?: string,
  *   current?: boolean }} props
  */
-export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, star = null, remove = null, switchOn, onClick, chevron,
+export function ListRow({ icon, lead, over, title, meta, value, valueNone = false, mark = null, menu = null, star = null, remove = null, switchOn, onClick, chevron,
   one = false, noLead = false, ariaLabel, className = '', current = false }) {
   const leading = noLead ? null : (lead || (icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null));
   const showChev = chevron === undefined ? !!onClick && !menu && !remove : chevron;
@@ -70,6 +71,7 @@ export function ListRow({ icon, lead, title, meta, value, valueNone = false, mar
     <>
       {leading}
       <span className="ui-row-text">
+        {over ? <span className="ui-row-over">{over}</span> : null}
         <span className="ui-row-title">{title}</span>
         {meta ? <span className="ui-row-meta">{meta}</span> : null}
       </span>
@@ -207,7 +209,7 @@ export function ToolRow({ children, label }) {
 
 /**
  * The empty state (rule 15): a title, ONE sentence on how it fills, ONE button that goes there.
- * @param {{ icon?: string, title: any, text: any, action?: { label: string, onClick: () => void, icon?: string } | null }} props
+ * @param {{ icon?: string, title: any, text: any, action?: { label: string, onClick: () => void, icon?: string, kind?: 'primary' | 'secondary' } | null }} props
  */
 export function EmptyState({ icon = 'info', title, text, action = null }) {
   return (
@@ -215,7 +217,7 @@ export function EmptyState({ icon = 'info', title, text, action = null }) {
       <span className="ui-empty-icon" aria-hidden="true"><UiIcon name={icon} /></span>
       <h3 className="ui-empty-title">{title}</h3>
       <p className="ui-empty-text">{text}</p>
-      {action ? <UiButton kind="primary" icon={action.icon} onClick={action.onClick}>{action.label}</UiButton> : null}
+      {action ? <UiButton kind={action.kind || 'primary'} icon={action.icon} onClick={action.onClick}>{action.label}</UiButton> : null}
     </div>
   );
 }

@@ -243,7 +243,7 @@ export function SongMenuSheet({ song, title, line = '', onOpenPage, onClose }) {
   ];
   const tap = (/** @type {1 | -1} */ v) => { SongVotes.tap(id, v); };
   return (
-    <ActionSheet open portal onClose={onClose} title={title} sub={sub} actions={actions} className="song-menu-sheet">
+    <ActionSheet open portal onClose={onClose} title={title} sub={sub} lead={<SongCover song={song} className="ui-sheet-lead" />} actions={actions} className="song-menu-sheet">
       <div className="ui-btn-row song-menu-votes" role="group" aria-label={'Your vote on ' + title}>
         <button type="button" className={'ui-btn song-vote-up' + (vote === 1 ? ' is-on' : '')} aria-pressed={vote === 1} onClick={() => tap(1)}>
           <UiIcon name="like" filled={vote === 1} />I like it
@@ -312,7 +312,7 @@ export function ChoiceSheet({ title, eyebrow, options, value, onChange, onClose 
               <div className="select-sheet-option-main">
                 <span className="select-sheet-option-label">{opt.label}</span>
                 {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
-                {opt.id === value ? <span className="select-sheet-option-check">✓</span> : null}
+                {opt.id === value ? <span className="select-sheet-option-check" aria-hidden="true" /> : null}
               </div>
             </button>
           ))}
