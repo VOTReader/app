@@ -230,7 +230,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
       <div className="plan-card plan-today plan-today-paused">
         <p className="plan-today-head"><span className="root-eyebrow">Paused</span></p>
         <p className="plan-today-title">{run.paused ? 'Paused since ' + monthDay(run.paused) : 'Paused'}</p>
-        <p className="plan-today-sub">The plan waits for you. Nothing counts while it is paused.</p>
+        <p className="plan-today-sub">{'Day ' + (st.day + 1) + ' is waiting for you · ' + itemsLabel(today, bookTitle)}</p>
         <button type="button" className="plan-btn" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume</button>
       </div>
     );
@@ -341,7 +341,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
         </>
       ) : null}
 
-      {coming.length ? (
+      {coming.length && !st.paused ? (
         <>
           <PlanSec title="Coming up" link="Whole schedule" onLink={() => onSchedule()} />
           <ol className="root-list plan-days-list" aria-label="Coming up">

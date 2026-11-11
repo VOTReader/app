@@ -69,8 +69,8 @@ export function DaySheet({ run, day, now, preview = false, onClose, onRead }) {
   );
 }
 
-/** One schedule row. @param {{ d: any, onOpen: () => void, note?: boolean, read?: boolean }} props */
-function DayRow({ d, onOpen, note, read }) {
+/** One schedule row. @param {{ d: any, run: any, onOpen: () => void, note?: boolean, read?: boolean }} props */
+function DayRow({ d, run, onOpen, note, read }) {
   const when = read ? (d.doneOn ? dayDate(d.doneOn) : 'Read before the start') : dayDate(d.date);
   return (
     <li className={'plan-sched-item' + (d.today ? ' is-today' : '')} data-day={d.day}>
@@ -79,7 +79,7 @@ function DayRow({ d, onOpen, note, read }) {
         <span className="plan-day-when"><span className="plan-day-n">{dayEyebrow(d)}</span><span className="plan-day-date">{when}</span></span>
         <span className="plan-day-portion">{itemsLabel(d.items, bookTitle)}</span>
         {note ? <span className="plan-note-mark" aria-hidden="true">✎</span> : null}
-        {d.done ? <PlanTick on /> : <span className="plan-day-min">{d.today && d.items.length > 1 ? '' : minText(d.minutes)}</span>}
+        {d.done ? <PlanTick on /> : <span className="plan-day-min">{d.today && d.items.length > 1 ? d.items.filter((it) => it.k in ((run && run.ticks) || {})).length + ' of ' + d.items.length : minText(d.minutes)}</span>}
       </button>
     </li>
   );
@@ -141,7 +141,7 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
         <ol className="root-list plan-sched" ref={(el) => { listRef.current = el; }} aria-label="Coming up">
           {ahead.map((d) => (
             <React.Fragment key={d.day}>
-              <DayRow d={d} onOpen={() => setSheet(d.day)} note={!!(noteOf && noteOf(d.day))} />
+              <DayRow d={d} run={run} onOpen={() => setSheet(d.day)} note={!!(noteOf && noteOf(d.day))} />
               {d.ends.map((name) => (
                 <li key={'e' + name} className="plan-sched-end"><span aria-hidden="true">◆</span>{' ' + name + ' finished'}</li>
               ))}
@@ -153,7 +153,7 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
           <MonthHistory doneOn={doneOn} month={new Date(now.getFullYear(), now.getMonth(), 1, 12)} today={todayKey(now)} />
           {readDays.length ? (
             <ol className="root-list plan-sched" aria-label="What I’ve read">
-              {readDays.map((d) => <DayRow key={d.day} d={d} read onOpen={() => setSheet(d.day)} note={!!(noteOf && noteOf(d.day))} />)}
+              {readDays.map((d) => <DayRow key={d.day} d={d} run={run} read onOpen={() => setSheet(d.day)} note={!!(noteOf && noteOf(d.day))} />)}
             </ol>
           ) : (
             <div className="plan-card plan-empty">

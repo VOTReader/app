@@ -88,7 +88,7 @@ describe('the reading session', () => {
     expect(host.unmarkRead).not.toHaveBeenCalled();
   });
 
-  it('Next moves in place to the next item; the last one is FINISH DAY, then Day done and DONE goes back', () => {
+  it('Next moves in place to the next item; the last one is FINISH DAY, then Day done and DONE goes back', async () => {
     const run = start();
     const first = render(<PlanRibbon bid="genesis" cid={1} />);
     fireEvent.click(screen.getByRole('button', { name: 'Next · Genesis 2 →' }));
@@ -105,6 +105,7 @@ describe('the reading session', () => {
     expect(Object.keys(ticks(run.id)).sort()).toEqual(['genesis:1', 'genesis:2', 'genesis:3']);
     act(() => { fireEvent.click(screen.getByRole('button', { name: 'Done' })); });
     expect(planSession()).toBeNull();
+    await new Promise((r) => setTimeout(r, 5));              // back once the overlay has gone
     expect(host.back).toHaveBeenCalled();
   });
 

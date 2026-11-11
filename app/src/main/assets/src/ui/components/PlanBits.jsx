@@ -6,11 +6,10 @@
    handle, a title, worded actions, U rule 13), the bar title, a section
    title with its link, chips, the seven day toggles, a switch, and the
    date and count words every plan screen says the same way.
-   Free globals: React, ReactDOM.
+   Free globals: React, ReactDOM, useModalRegistry, useFocusTrap (bundle-b's: the Back and Escape dispatcher reads
+   that one registry; an import here would make a second one nothing reads).
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useModalRegistry } from '../../hooks/use-modal-registry.js';
-import { useFocusTrap } from '../../hooks/use-focus-trap.js';
 import { SheetHandle } from './SheetHandle.jsx';
 import { dayNum } from '../../data/plan-engine.js';
 

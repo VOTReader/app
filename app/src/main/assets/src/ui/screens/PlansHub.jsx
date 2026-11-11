@@ -18,7 +18,6 @@ import { endPlanSession } from '../../utils/plan-session.js';
 import { usePlanRuns, saveRun, shortDate } from '../../utils/plan-runs-view.js';
 import { runStatus, newRun, dayNum, itemKinds } from '../../data/plan-engine.js';
 import { runName, planDef } from '../../data/plan-catalog.js';
-import { useModalRegistry } from '../../hooks/use-modal-registry.js';
 import { useVolumesSeq, useNow } from '../components/TodayCard.jsx';
 import { PlanBarTitle, GEAR, countOf } from '../components/PlanBits.jsx';
 import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
@@ -106,8 +105,15 @@ export function PlansHub({ readingPlans, isRead, onPlansMoved, onBack, backLabel
   const [buildStep, setBuildStep] = React.useState(/** @type {1 | 2} */ (1));
   const started = React.useRef(/** @type {string | null} */ (null));
   React.useEffect(() => { setSettings(false); setDaySheet(top && top.v === 'plan' && typeof /** @type {any} */ (top).sheet === 'number' ? /** @type {any} */ (top).sheet : null); }, [top]);
-  // The phone's Back pops a view before it leaves Reading plans (the builder holds its own steps).
-  useModalRegistry({ id: 'plans-stack', dismiss: () => { popPlanView(); }, active: stack.length > 1 && !(top && top.v === 'build') });
+  // The phone's Back (and Escape) pops a view before it leaves Reading plans: the screen's own back level
+  // (window.__screenBack, as Notes' notebooks do; a sheet open on top is the modal registry's and closes first).
+  // The builder holds its own steps.
+  React.useEffect(() => {
+    if (stack.length <= 1 || (top && top.v === 'build')) return undefined;
+    const fn = () => popPlanView();
+    window.__screenBack = fn;
+    return () => { if (window.__screenBack === fn) window.__screenBack = null; };
+  }, [stack.length, top]);
   const store = _store();
   /** @type {any[]} */
   const finished = (store && typeof store.all === 'function' ? store.all() : [])

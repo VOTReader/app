@@ -15,15 +15,13 @@
      began), Write a note and Read ahead.
    Outside a session, a plan item shows one quiet line at its end:
    "Counts for Bible in a Year · Day 12 · 2 of 3" with Next.
-   Free globals: React, ReactDOM.
+   Free globals: React, ReactDOM, useModalRegistry, useFocusTrap (bundle-b's).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { usePlanRuns, runRow, itemRef } from '../../utils/plan-runs-view.js';
 import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, itemKinds, sections, streak } from '../../data/plan-engine.js';
 import { bookTitle, runName } from '../../data/plan-catalog.js';
 import { usePlanSession, sessionKeyOf, sessionReachedEnd, sessionNotRead, sessionNextKey, endPlanSession, planSessionHost, sessionRun, refOf } from '../../utils/plan-session.js';
-import { useModalRegistry } from '../../hooks/use-modal-registry.js';
-import { useFocusTrap } from '../../hooks/use-focus-trap.js';
 import { useNow } from './TodayCard.jsx';
 import { PlanTick } from './PlanBits.jsx';
 
@@ -73,7 +71,8 @@ function quarterLine(before, after) {
  */
 export function DayDone({ runId, day, name, onClose }) {
   const onDone = () => onClose(true);
-  useModalRegistry({ id: 'plan-day-done', dismiss: onDone });
+  // The phone's Back closes it and stays (the press is spent on the overlay); DONE closes it and goes back.
+  useModalRegistry({ id: 'plan-day-done', dismiss: () => onClose(false) });
   const trapRef = useFocusTrap(true);
   const store = /** @type {any} */ (globalThis).ReadingPlanStore;
   const run = store && typeof store.get === 'function' ? store.get(runId) : null;
@@ -146,7 +145,8 @@ function SessionEnd({ k }) {
   const lastOne = nextK && left.length === 1;
   // The session ends when Day done closes (it lives inside this panel, which shows only while the session does).
   const finish = () => setDone({ runId: s.runId, day: s.day, name: s.name });
-  const closeDone = (/** @type {boolean} */ back) => { setDone(null); endPlanSession(); if (back && host) host.back(); };
+  // Back runs once the overlay has unmounted (its registry entry gone), else the Back would only close it again.
+  const closeDone = (/** @type {boolean} */ back) => { setDone(null); endPlanSession(); if (back && host) setTimeout(() => host.back(), 0); };
   return (
     <aside className="plan-card plan-end" ref={(el) => { ref.current = el; }} aria-label="Reading plan">
       <p className="plan-end-read">{ticked ? <><PlanTick on />{' ' + itemName(run, k) + ' read'}</> : itemName(run, k)}</p>

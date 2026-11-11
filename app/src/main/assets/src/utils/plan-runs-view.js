@@ -91,6 +91,8 @@ export function runRow(run, now) {
     listen: today.slice(from).map((it) => itemRef(it.k)),
     items: shown.map((it) => ({ k: it.k, short: itemShort(it), label: itemsLabel([it], bookTitle), done: it.k in ticks })),
     todayTicked: st.todayTicked, todayCount: today.length, minutes: words ? minutesFor(words) : 0,
+    // plans2 3.9: what is left of today's portion, in minutes (the Read tab's "7 min left")
+    minutesLeft: (() => { const w = itemsWords(today.filter((it) => !(it.k in ticks))); return w ? minutesFor(w) : 0; })(),
     itemsDone: st.itemsDone, itemsTotal: st.itemsTotal, projected: st.projected, target: st.target,
     counts: fmt(st.itemsDone) + ' of ' + fmt(st.itemsTotal) + ' ' + unitOf(run), pace,
   };

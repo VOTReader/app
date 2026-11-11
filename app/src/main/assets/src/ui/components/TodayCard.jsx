@@ -97,7 +97,7 @@ export function useNow() {
 /**
  * @typedef {{ id: string, name: string, loading: boolean, label: string, done: boolean, day: number,
  *   totalDays: number, behind: number, finished: boolean, next: any, again?: any, listen?: any[], tomorrow?: string,
- *   todayTicked?: number, todayCount?: number, minutes?: number, paused?: boolean, notStarted?: boolean, start?: string }} TodayRow
+ *   todayTicked?: number, todayCount?: number, minutes?: number, minutesLeft?: number, paused?: boolean, notStarted?: boolean, start?: string }} TodayRow
  */
 
 /** The most plans the card shows; the rest are on the Reading plans screen. */
@@ -173,7 +173,7 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlan, onOpenPlans, tracksOf,
       ) : (
         <button type="button" className="upnext-text upnext-open" onClick={open} aria-label={'Open ' + r.name + ': ' + title}>
           <span className="upnext-title">{title}</span>
-          {ready && r.minutes ? <span className="upnext-sub">{r.minutes + ' min left'}</span> : null}
+          {ready && (r.minutesLeft || r.minutes) ? <span className="upnext-sub">{(r.minutesLeft || r.minutes) + ' min left'}</span> : null}
         </button>
       )}
       {ready ? (
