@@ -11,6 +11,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { BookmarkCreateSheet } from './BookmarkCreateSheet.jsx';
 import { BookmarkPopover } from './BookmarkPopover.jsx';
 import { BookmarkRowActionSheet } from '../screens/BookmarksScreen.jsx';
@@ -154,19 +155,20 @@ describe('BookmarkCreateSheet — thought field removed', () => {
 });
 
 describe('BookmarkRowActionSheet — thought actions removed', () => {
-  it('offers Open / Edit Label / Delete only — no Add/Edit Thought', () => {
+  it('offers Open / Rename / Delete bookmark only — no Add/Edit Thought', () => {
     window.BookmarkStore = { remove: vi.fn(), update: vi.fn() };
+    window.ReactDOM = ReactDOM;   // the sheet portals to <body>
     render(
       <BookmarkRowActionSheet
         bkm={{ id: 'b1', hlKey: 'k', label: 'A bookmark', thought: 'legacy' }}
-        onClose={() => {}} onNavigate={() => {}} onEditLabel={() => {}} onDelete={() => {}}
+        onClose={() => {}} onNavigate={() => {}} onRename={() => {}} onDelete={() => {}}
       />
     );
-    expect(screen.getByText('Open Bookmark')).toBeTruthy();
-    expect(screen.getByText('Edit Label')).toBeTruthy();
-    expect(screen.getByText('Delete Bookmark')).toBeTruthy();
+    expect(screen.getByText('Open')).toBeTruthy();
+    expect(screen.getByText('Rename')).toBeTruthy();
+    expect(screen.getByText('Delete bookmark')).toBeTruthy();
     expect(screen.queryByText(/Thought/)).toBeNull();
-    expect(screen.getByRole('dialog', { name: 'Bookmark actions' }).getAttribute('aria-modal')).toBe('true');
+    expect(screen.getByRole('dialog', { name: 'A bookmark' }).getAttribute('aria-modal')).toBe('true');
   });
 });
 

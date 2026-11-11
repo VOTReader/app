@@ -14,6 +14,7 @@
    Bundled helpers:
    - _bookmarkSourceLabel
    - _bookmarkSourceEndpoint
+   - _bookmarkSourcePlace (W2, the UI pass: where it is, for a row's meta line)
    =================================================================== */
 
 /* ── Source label for a bookmark ─────────────────────────────── */
@@ -67,6 +68,25 @@ export function _bookmarkSourceLabel(hlKey) {
   }
 
   return hlKey;
+}
+
+/* ── Where a bookmark (or any hlKey) is, beyond its own name ─────────
+   "Volume One" for a letter, the book's testament for a chapter ("New Testament"), "Studies", "Journal": the
+   second half of "Chosen by God · Volume One" (mock v2 l-book, l-links). '' when nothing more is known. */
+export function _bookmarkSourcePlace(hlKey) {
+  if (!hlKey) return '';
+  var parts = hlKey.split(':');
+  var kind = parts[0];
+  if (kind === 'letter' || kind === 'wtlb' || kind === 'blessed' || kind === 'holy-days') {
+    var ctx = (typeof findEntryContext === 'function') ? findEntryContext(parts[1], kind === 'letter' ? 'letter' : kind) : null;
+    return ctx && ctx.collection ? ctx.collection : '';
+  }
+  if (kind === 'bible') {
+    return (typeof bookCategory === 'function') ? bookCategory(parts[1]) : '';
+  }
+  if (kind === 'study') return 'Studies';
+  if (kind === 'journal') return 'Journal';
+  return '';
 }
 
 export function _bookmarkSourceEndpoint(hlKey) {

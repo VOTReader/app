@@ -173,7 +173,7 @@ async function openSeededBookmark(page) {
   if (!listed) return '';
   await page.evaluate(() => {
     const row = [...document.querySelectorAll('.bkm-row')].find((r) => /B2 bookmark/.test(r.textContent || ''));
-    const go = row && row.querySelector('.bkm-row-content');
+    const go = row && row.querySelector('.ui-row-main');
     if (go) /** @type {HTMLElement} */ (go).click();
   });
   await page.waitForFunction(() => /In the beginning/i.test((document.querySelector('.screen-layout') || document.body).textContent || ''), { timeout: 10000 }).catch(() => null);

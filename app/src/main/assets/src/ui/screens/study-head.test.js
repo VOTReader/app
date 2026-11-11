@@ -17,11 +17,14 @@ const read = (...p) => readFileSync(resolve(here, ...p), 'utf8');
 const TITLES = {
   MyProgressScreen: 'Progress',
   JournalHubScreen: 'Journal',
-  NotesIndexScreen: 'Notes',
   BookmarksScreen: 'Bookmarks',
   LinksScreen: 'Links',
-  HighlightsScreen: 'Highlights & Underlines',
   ReadingPlansScreen: 'Reading plans',   // rp1 (web-builder, 2026-09-25) joined the family
+};
+// The UI pass (U rule 10, W2 2026-11-11): a utility screen's title is the bar's, with no second title in the page.
+const BAR_TITLED = {
+  NotesIndexScreen: 'Notes',
+  HighlightsScreen: 'Highlights',
 };
 const RETIRED = [
   'library-eyebrow', 'library-title', 'library-sub', 'jrn-hub-header', 'jrn-hub-title', 'jrn-hub-count',
@@ -35,6 +38,14 @@ describe('the personal-study family shares one page header', () => {
     const src = read(file + '.jsx');
     expect(src).toMatch(/<header className="study-head( inset)?">/);
     expect(src).toContain('<h1 className="study-head-title">' + title + '</h1>');
+    for (const cls of RETIRED) expect(uses(src, cls), cls).toBe(false);
+  });
+
+  it.each(Object.entries(BAR_TITLED))('%s is titled "%s" in the utility bar, with no page header', (file, title) => {
+    const src = read(file + '.jsx');
+    expect(src).toContain('<ScreenLayout utility={{');
+    expect(src).toMatch(new RegExp("title: [^,]*'" + title + "'"));
+    expect(src).not.toContain('study-head');
     for (const cls of RETIRED) expect(uses(src, cls), cls).toBe(false);
   });
 

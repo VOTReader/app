@@ -7,61 +7,11 @@
    bundle-d fills — one copy of each law, and no second module state.
    mark-kinds.js is the exception: pure, stateless, a few lines (v05-04). */
 import { isCountedMark } from '../../utils/mark-kinds.js';
+import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+import { Chip, EmptyState, UiButton } from '../components/UiParts.jsx';
 
-/* Self-contained CSS injection (segregated from the main stylesheet,
-   same pattern as journal-styles.js). All classes prefixed `hlx-`. */
-(function injectHighlightStyles() {
-  if (typeof document === 'undefined' || document.getElementById('hlx-styles')) return;
-  var R = [];
-  R.push('.hlx-screen { padding: 0 0 90px; }');
-  // The header is the shared personal-study header (.study-head in app.css).
-  R.push('.hlx-controls { padding: 10px 18px 6px; display: flex; flex-direction: column; gap: 10px; }');
-  // C2-C [C9]: the three `.hlx-search` rules MOVED to app.css (they now sit
-  // directly after .notes-index-search, whose class this input also carries).
-  // Injected CSS is invisible to the static sheet's tooling and to anyone
-  // reading app.css for the search-field treatment; the box itself renders
-  // unchanged. Do not re-add them here.
-  R.push('.hlx-sort-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }');
-  R.push('.hlx-sort-label { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); }');
-  // Filter rows (Type chips + Color dots), each with a leading label.
-  R.push('.hlx-filter-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 4px; }');
-  // 7px vertical padding lifts the pill to a ≥24px AA touch height (5px read 21px).
-  R.push('.hlx-type-chip { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 12px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
-  R.push('.hlx-type-chip.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
-  R.push('.hlx-type-chip:hover { color: var(--gold); }');
-  // Granular color-filter dots (mirror the highlight/underline picker).
-  // Explicit box-sizing + appearance reset + flex:0 0 auto so the
-  // <button> never collapses to a sliver inside the flex row.
-  R.push('.hlx-color-all { appearance: none; -webkit-appearance: none; background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.06em; padding: 7px 12px; border-radius: 999px; cursor: pointer; flex: 0 0 auto; }');
-  R.push('.hlx-color-all.active { background: var(--gold-faint); border-color: var(--gold); color: var(--gold); }');
-  R.push('.hlx-color-dot { appearance: none; -webkit-appearance: none; box-sizing: border-box; width: 24px; height: 24px; min-width: 24px; flex: 0 0 24px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.15); cursor: pointer; padding: 0; margin: 0; line-height: 0; font-size: 0; transition: transform 0.1s, border-color 0.12s; }');
-  R.push('.hlx-color-dot:hover { transform: scale(1.12); }');
-  R.push('.hlx-color-dot.active { border-color: var(--cream); box-shadow: 0 0 0 2px var(--gold), 0 0 6px var(--gold-glow); transform: scale(1.12); }');
-  R.push('.hlx-list { padding: 8px 14px; display: flex; flex-direction: column; gap: 8px; }');
-  R.push('.hlx-row { display: flex; gap: 12px; padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: background 0.15s, border-color 0.15s; }');
-  R.push('body.light .hlx-row { background: #faf5e7; }');
-  R.push('.hlx-row:hover { background: var(--bg3); border-color: var(--gold-border); }');
-  R.push('.hlx-row:active { transform: scale(0.995); }');
-  R.push('.hlx-swatch { flex-shrink: 0; width: 14px; height: 14px; border-radius: 4px; margin-top: 3px; border: 1px solid rgba(255,255,255,0.12); }');
-  // A squiggle's swatch is a wavy stroke in the mark's colour (an inline SVG wave, v05-04),
-  // sitting where the underline swatch's line sits.
-  R.push('.hlx-swatch.is-squiggle { background: transparent !important; border: none; border-radius: 0; width: 16px; height: 8px; margin-top: 7px; display: flex; }');
-  R.push('.hlx-swatch.is-underline { background: transparent !important; border-radius: 0; height: 0; margin-top: 10px; border: none; border-bottom: 3px solid; width: 16px; }');
-  R.push('.hlx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }');
-  R.push('.hlx-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }');
-  R.push('.hlx-source { font-family: var(--font-cinzel); font-size: var(--fs-13); color: var(--gold); letter-spacing: 0.03em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%; }');
-  R.push('.hlx-kind { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); border: 1px solid var(--gold-border); border-radius: 999px; padding: 1px 7px; }');
-  R.push('.hlx-text { font-family: var(--font-garamond); font-style: italic; font-size: var(--fs-14); color: var(--cream-dim); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }');
-  R.push('body.light .hlx-text { color: #5a4f3d; }');
-  R.push('.hlx-date { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 2px; }');
-  R.push('.hlx-empty { padding: 60px 30px; text-align: center; }');
-  R.push('.hlx-empty-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-18); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }');
-  R.push('.hlx-empty-hint { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-15); line-height: 1.5; max-width: 320px; margin: 0 auto; }');
-  var el = document.createElement('style');
-  el.id = 'hlx-styles';
-  el.textContent = R.join('\n');
-  document.head.appendChild(el);
-})();
+/* The screen's CSS is app.css's "W2 LIBRARY FAMILY: Highlights" block (the UI pass moved it out of the old injected
+   sheet, so the static sheet's tooling sees it). */
 
 /* Canonical palette order + display hex (mirrors HL_COLORS). 'cyan'
    is a legacy alias for teal kept so old marks still resolve. */
@@ -136,41 +86,37 @@ export function _collectMarks() {
   });
 }
 
-/* One row. The whole row navigates to the source (no expand state —
-   highlight text is short by nature; the source IS the full context). */
+/** A colour's hex at a given strength, for the mark drawn behind the words. @param {string} hex @param {number} alpha */
+function _tint(hex, alpha) {
+  var n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + alpha + ')';
+}
+
+/** The three kinds by their one name each (X-hidden-decisions: Highlighter, Underline, Squiggle). */
+export var KIND_NAME = { highlight: 'Highlighter', underline: 'Underline', squiggle: 'Squiggle' };
+
+/* One row (mock v2 l-high): a colour bar, the words drawn in their own mark (a highlighter behind them, an
+   underline or a squiggle under them), then "place · when". The whole row opens the place. */
 export function HighlightRow(props) {
   var m = props.mark;
   var sourceLabel = props.source || ((typeof _bookmarkSourceLabel === 'function') ? _bookmarkSourceLabel(m.hlKey) : m.hlKey);
   var date = (typeof relativeDate === 'function') ? relativeDate(m.updated || m.created) : '';
   var hex = _hlColorHex(m.color);
-  var isUnderline = m.kind === 'underline';
-  var isSquiggle = m.kind === 'squiggle';
+  var kind = m.kind === 'underline' || m.kind === 'squiggle' ? m.kind : 'highlight';
+  /** @type {any} */
+  var markStyle = kind === 'highlight'
+    ? { background: _tint(hex, 0.24) }
+    : { textDecorationLine: 'underline', textDecorationStyle: kind === 'squiggle' ? 'wavy' : 'solid', textDecorationColor: hex };
+  var open = function() { if (props.onNavigate) props.onNavigate(m); };
   return (
-    <div
-      className="hlx-row"
-      role="button" tabIndex={0}
-      onClick={function() { props.onNavigate && props.onNavigate(m); }}
-      onKeyDown={function(e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); props.onNavigate && props.onNavigate(m); } }}
-    >
-      <span
-        className={'hlx-swatch' + (isUnderline ? ' is-underline' : isSquiggle ? ' is-squiggle' : '')}
-        style={isUnderline ? { borderBottomColor: hex } : isSquiggle ? undefined : { background: hex }}
-      >
-        {isSquiggle && (
-          <svg width="16" height="8" viewBox="0 0 16 8" aria-hidden="true" focusable="false">
-            <path d="M0 4 Q2 0 4 4 T8 4 T12 4 T16 4" fill="none" stroke={hex} strokeWidth="2" strokeLinecap="round" />
-          </svg>
-        )}
-      </span>
+    <button type="button" className={'hlx-row is-' + kind} onClick={open}
+      aria-label={KIND_NAME[kind] + ': ' + (m.text || '') + ' · ' + sourceLabel}>
+      <span className="hlx-swatch" style={{ background: hex }} aria-hidden="true" />
       <span className="hlx-body">
-        <span className="hlx-top">
-          <span className="hlx-source">{sourceLabel}</span>
-          <span className="hlx-kind">{isUnderline ? 'Underline' : isSquiggle ? 'Squiggle' : 'Highlight'}</span>
-        </span>
-        {m.text && <span className="hlx-text">{'“'}{m.text}{'”'}</span>}
-        {date && <span className="hlx-date">{date}</span>}
+        {m.text && <span className="hlx-text"><span className="hlx-mark" style={markStyle}>{m.text}</span></span>}
+        <span className="hlx-meta">{[sourceLabel, date].filter(Boolean).join(' · ')}</span>
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -252,119 +198,61 @@ export function HighlightsScreen(props) {
   }
 
   // s19.5: an empty filtered list names what filtered it and offers the way back.
-  var TYPE_WORDS = { highlight: 'highlights', underline: 'underlines', squiggle: 'squiggles' };
+  var TYPE_WORDS = { highlight: 'highlighter marks', underline: 'underlines', squiggle: 'squiggles' };
   function filterWords() {
     var parts = [];
     if (colorFilter) parts.push(colorFilter);
-    parts.push(typeFilter !== 'all' ? TYPE_WORDS[typeFilter] || typeFilter : 'marks');
+    parts.push(typeFilter !== 'all' ? TYPE_WORDS[typeFilter] || typeFilter : 'highlights');
     var words = parts.join(' ');
     return query.trim() ? '“' + query.trim() + '” in ' + words : words;
   }
   function showAll() { setQuery(''); setTypeFilter('all'); setColorFilter(null); }
 
-  function typeChip(val, label) {
-    return (
-      <button
-        type="button"
-        className={'hlx-type-chip' + (typeFilter === val ? ' active' : '')}
-        aria-pressed={typeFilter === val}
-        onClick={function() { setTypeFilter(val); }}
-      >{label}</button>
-    );
-  }
-
-  // Standard app-wide Library nav (back + Home left, icon cluster right).
-  var navChildren = LibraryNav({
-    onBack: onBack, onSearch: props.onSearch, onHistory: props.onHistory,
-    onSettings: props.onSettings,
-    theme: props.theme, onThemeChange: props.onThemeChange
-  });
+  var TYPES = [['all', 'All'], ['highlight', 'Highlighter'], ['underline', 'Underline'], ['squiggle', 'Squiggle']];
 
   return (
-    <ScreenLayout navChildren={navChildren}>
-      <div className="hlx-screen">
-        <header className="study-head inset">
-          <h1 className="study-head-title">Highlights & Underlines</h1>
-          <span className="study-head-count">{marks.length + (marks.length === 1 ? ' mark' : ' marks')}</span>
-        </header>
-        {marks.length > 0 && (
-          <div className="hlx-controls">
-            {/* C2-C [C9]: same class, same type, same aria wording as every
-                sibling index search (Notes / Bookmarks / Links / History).
-                type="search" is what gives it the platform clear affordance
-                and the search keyboard; `hlx-search` keeps its own look. */}
-            <input
-              className="notes-index-search hlx-search" type="search"
-              placeholder="Search marks…" aria-label="Search marks"
-              value={query} onChange={function(e) { setQuery(e.target.value); }}
-            />
-            {/* Standardized date sort — identical class + wording to every
-                other Library list (Notes/Bookmarks/Links/Journal). */}
-            <div className="hlx-sort-row">
-              <button
-                className="notes-index-sort-btn"
-                onClick={function() { setSortNewest(function(v) { return !v; }); }}
-                title="Toggle sort order"
-              >{sortNewest ? 'Sort: Newest ↓' : 'Sort: Oldest ↑'}</button>
+    <ScreenLayout utility={{ title: 'Highlights', onBack: onBack }}>
+      <div className="hlx-screen lib-screen">
+        {marks.length === 0 ? (
+          <EmptyState icon="pen" title="No highlights yet"
+            text="Select some words while you read and tap a colour to mark them. Every mark you make collects here."
+            action={props.onStartReading ? { label: 'Start reading', onClick: props.onStartReading } : null} />
+        ) : (
+          <>
+            <ListSearch placeholder="Search highlights" value={query} onChange={setQuery} />
+            <div className="ui-chips hlx-chips" role="group" aria-label="Kind">
+              {TYPES.map(function(t) {
+                return <Chip key={t[0]} on={typeFilter === t[0]} onClick={function() { setTypeFilter(t[0]); }}>{t[1]}</Chip>;
+              })}
             </div>
-            {/* Type filter chips */}
-            <div className="hlx-filter-row">
-              <span className="hlx-sort-label">Type</span>
-              {typeChip('all', 'All')}
-              {typeChip('highlight', 'Highlights')}
-              {typeChip('underline', 'Underlines')}
-              {typeChip('squiggle', 'Squiggles')}
-            </div>
-            {/* Granular color filter — always available, the actual color dots
-                just like the highlight/underline picker. Tap a dot to show only
-                that color; tap "All" (or the active dot again) to clear. */}
-            {presentColors.length > 0 && (
-              <div className="hlx-filter-row">
-                <span className="hlx-sort-label">Color</span>
-                <button
-                  type="button"
-                  className={'hlx-color-all' + (colorFilter === null ? ' active' : '')}
-                  aria-pressed={colorFilter === null}
-                  onClick={function() { setColorFilter(null); }}
-                >All</button>
+            {presentColors.length > 1 && (
+              <div className="ui-chips hlx-chips" role="group" aria-label="Colour">
+                <Chip on={colorFilter === null} onClick={function() { setColorFilter(null); }}>Any colour</Chip>
                 {presentColors.map(function(c) {
                   return (
-                    <button
-                      key={c}
-                      type="button"
-                      className={'hlx-color-dot' + (colorFilter === c ? ' active' : '')}
-                      style={{ backgroundColor: _hlColorHex(c) }}
-                      title={c.charAt(0).toUpperCase() + c.slice(1)}
-                      aria-label={'Filter ' + c}
-                      aria-pressed={colorFilter === c}
-                      onClick={function() { setColorFilter(colorFilter === c ? null : c); }}
-                    />
+                    <Chip key={c} on={colorFilter === c} onClick={function() { setColorFilter(colorFilter === c ? null : c); }}>
+                      <span className="hlx-dot" style={{ background: _hlColorHex(c) }} aria-hidden="true" />{c.charAt(0).toUpperCase() + c.slice(1)}
+                    </Chip>
                   );
                 })}
               </div>
             )}
-          </div>
-        )}
-        {sorted.length === 0
-          ? (
-              <div className="hlx-empty">
-                <div className="hlx-empty-title">{marks.length === 0 ? 'No Marks Yet' : 'No Matches'}</div>
-                <div className="hlx-empty-hint">{marks.length === 0
-                  ? 'Select any passage while reading and tap a color to highlight or underline it. Your marks collect here.'
-                  : 'Nothing matches ' + filterWords() + '.'}</div>
-                {marks.length > 0 && (
-                  <button type="button" className="notes-index-sort-btn hlx-show-all" onClick={showAll}>Show all</button>
-                )}
+            <ListLine count={sorted.length} of={marks.length} noun="highlight" sort={sortNewest ? 'newest' : 'oldest'}
+              onSort={function(id) { setSortNewest(id === 'newest'); }} />
+            {sorted.length === 0 ? (
+              <div className="lib-none">
+                <p className="hlx-none-text">Nothing matches {filterWords()}.</p>
+                <UiButton kind="text" small className="hlx-show-all" onClick={showAll}>Show all</UiButton>
               </div>
-            )
-          : (
-              <div className="hlx-list">
+            ) : (
+              <div className="hlx-list ui-group">
                 {sorted.map(function(m) {
                   return <HighlightRow key={m.groupId} mark={m} source={sourceOf.get(m).text} onNavigate={navigate} />;
                 })}
               </div>
-            )
-        }
+            )}
+          </>
+        )}
       </div>
     </ScreenLayout>
   );

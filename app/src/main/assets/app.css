@@ -6977,11 +6977,6 @@
        sort. Each row leads with its source label and shows a body
        preview, anchored quote, and any notebook chips.
        ════════════════════════════════════════════════════════════ */
-    .notes-index-screen {
-      max-width: 45rem; margin: 0 auto;
-      padding: 1.25rem 1rem 4rem;
-      width: 100%;
-    }
 
     .notes-index-search {
       width: 100%; padding: 11px 16px;
@@ -6998,29 +6993,6 @@
     .notes-index-search:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
     body.light .notes-index-search:focus { background: var(--white); }
 
-    /* C2-C [C9] — the Highlights search box. It was the one index search that
-       was neither `type="search"` nor on the shared class, and its styling
-       lived in HighlightsScreen's JS-INJECTED stylesheet, out of reach of the
-       static sheet's tooling. The input now carries BOTH classes; these three
-       rules moved here verbatim from that injected sheet and, sitting after
-       .notes-index-search at equal specificity, still win every property they
-       declare — the box renders exactly as it did.
-
-       Two neutralisers are the only additions, both purely to hold that
-       "exactly": the shared rule's 0.85rem bottom margin would double up on
-       .hlx-controls' own 10px flex gap, and its focus BACKGROUND would repaint
-       a box whose own focus rule only ever changed the border. What the shared
-       class does add, deliberately, is the placeholder colour every sibling
-       search box already uses.
-
-       Nothing else moved: no other .hlx-* rule references .hlx-search, and its
-       parent .hlx-controls stays with the rest of the screen's sheet. */
-    .hlx-search { background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; box-sizing: border-box; }
-    body.light .hlx-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }
-    .hlx-search:focus { border-color: var(--gold); }
-    .notes-index-search.hlx-search { margin-bottom: 0; }
-    .notes-index-search.hlx-search:focus { background: var(--bg2); }
-    body.light .notes-index-search.hlx-search:focus { background: #f7f2e8; }
     .notes-index-controls {
       display: flex; flex-wrap: wrap; gap: 0.45rem;
       margin-bottom: 1rem;
@@ -7079,6 +7051,21 @@
     .note-row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
     .note-row-nb { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); }
     .note-row-nb-icon { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+    /* Highlights (mock v2 l-high): the kind and colour chips, rows in one card, the words in their own mark. */
+    .hlx-chips { margin-top: var(--sp-3); }
+    .hlx-chips + .hlx-chips { margin-top: var(--sp-2); }
+    .hlx-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+    .hlx-row { position: relative; display: flex; gap: 14px; width: 100%; padding: 14px 12px 14px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }
+    .hlx-row:active { background: var(--surface-2); }
+    .hlx-row + .hlx-row::before { content: ""; position: absolute; top: 0; left: 32px; right: 0; height: 1px; background: var(--hairline); }
+    .hlx-swatch { flex: none; align-self: stretch; width: 4px; border-radius: 2px; }
+    .hlx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .hlx-text { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); line-height: 27px; overflow-wrap: break-word; }
+    .hlx-mark { padding: 1px 3px; border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+    .hlx-meta { margin-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .hlx-none-text { margin: 0 0 var(--sp-2); }
+    /* Bookmarks (mock v2 l-book): rows are ListRows; the reader's thought is read in the bookmark's sheet. */
+    .bkm-thought { margin: 0 2px var(--sp-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; }
     /* ── end W2 LIBRARY FAMILY: the lists ── */
     .notes-empty {
       padding: 3rem 1rem; text-align: center;
@@ -7749,111 +7736,6 @@
       100% { color: var(--gold-dim);    transform: scale(1);    filter: none; }
     }
 
-    /* ── Bookmarks Screen ── */
-    .bkm-screen {
-      max-width: 45rem; margin: 0 auto;
-      padding: 1.25rem 1rem 4rem;
-      width: 100%;
-    }
-    /* One bookmark row */
-    .bkm-row {
-      display: flex; align-items: flex-start; gap: 0.4rem;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
-      margin-bottom: 0.55rem;
-      overflow: hidden;
-      transition: border-color 0.18s ease;
-    }
-    @media (hover: hover) { .bkm-row:hover { border-color: var(--gold); } }
-    .bkm-row-content {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 0.2rem;
-      padding: 0.85rem 0 0.85rem 1rem;
-      background: transparent; border: none;
-      text-align: left; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .bkm-row-content:active { background: var(--gold-faint); }
-    @media (hover: hover) { .bkm-row-content:hover:not(:disabled) { background: var(--gold-faint); } }
-    .bkm-row-content:disabled { cursor: default; }
-    .bkm-row-source {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--gold);
-    }
-    .bkm-row-label {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-16); color: var(--cream-dim);
-      line-height: 1.3; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-    /* Optional "why" thought displayed under the label on a row.
-       Subtler than the label; truncates to a single line by default.
-       Long thoughts (>80 chars) become tappable for read-more expansion;
-       the expanded mode drops the ellipsis and wraps. */
-    .bkm-row-passage { display: block; margin-top: 2px; color: var(--cream-dim); font-size: var(--fs-14); font-style: italic; line-height: 1.4; }
-    .bkm-row-thought {
-      display: block;
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-13); color: var(--cream-muted);
-      line-height: 1.35; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-      margin-top: 2px;
-      padding-left: 8px;
-      border-left: 2px solid var(--gold-faint);
-    }
-    .bkm-row-thought.is-collapsible {
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s, border-color 0.12s;
-    }
-    .bkm-row-thought.is-collapsible:hover,
-    .bkm-row-thought.is-collapsible:active {
-      color: var(--cream-dim);
-      border-left-color: var(--gold-border);
-    }
-    .bkm-row-thought.is-expanded {
-      white-space: normal; overflow: visible; text-overflow: clip;
-    }
-    /* When the thought is wrapped in JrnExpandable, truncation is handled
-       in JS (head + … + Show more/less button). The parent's nowrap clamp
-       would otherwise hide everything past line 1 and make the toggle a
-       no-op, so reset wrapping for the expandable body. */
-    .bkm-row-thought:has(.bkm-row-thought-body) {
-      white-space: normal; overflow: visible; text-overflow: clip;
-    }
-    .bkm-row-thought-body {
-      white-space: normal; display: block;
-    }
-    /* Tiny "· More" / "· Less" affordance at the end of a collapsible
-       thought line. Cinzel caps so it reads as UI rather than content. */
-    .bkm-row-edit-input {
-      width: 100%; background: var(--bg3);
-      border: 1px solid var(--gold-border); border-radius: 6px;
-      color: var(--cream-dim); font-family: var(--font-body);
-      font-size: var(--fs-16); padding: 4px 8px;
-      outline: none;
-    }
-    .bkm-row-edit-input:focus { border-color: var(--gold); }
-    .bkm-row-meta {
-      display: flex; flex-direction: column; align-items: flex-end;
-      gap: 0.25rem; padding: 0.7rem 0.6rem 0.7rem 0.3rem;
-      flex-shrink: 0;
-    }
-    .bkm-row-date {
-      font-size: var(--fs-11); color: var(--cream-muted);
-      white-space: nowrap;
-    }
-    .bkm-row-more {
-      background: none; border: none; cursor: pointer;
-      color: var(--cream-muted); padding: 14px; margin: -12px;   /* 44 px to hit, laid out as 20 (#10) */
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s;
-    }
-    .bkm-row-more:active, .bkm-row-more:hover { color: var(--gold); }
-    .bkm-row-more svg { width: 16px; height: 16px; display: block; }
 
     /* ── Bookmark inline popover ── */
     .bkm-popover {

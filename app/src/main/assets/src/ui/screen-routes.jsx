@@ -1263,6 +1263,7 @@ export function buildScreenRoutes({
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
           }
         }}
+        onStartReading={() => _openFirstLetter('Highlights')}
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}

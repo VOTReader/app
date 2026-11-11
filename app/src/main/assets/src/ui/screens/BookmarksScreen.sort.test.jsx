@@ -7,13 +7,15 @@
    UNREACHABLE — implemented, tested by nothing, reachable by no one, and
    indistinguishable from a finished feature to the next reader of the file.
 
-   Wire or delete; the half-state is the finding. Wired: the same one button
-   (the shape NotesIndexScreen and LinksScreen use) now cycles the whole list.
+   Wire or delete; the half-state is the finding. Wired: since the UI pass the
+   line over the list says its order ("Newest first") and opens a sheet of all
+   four (Newest first, Oldest first, Place A-Z, Name A-Z).
    These are also this screen's first tests (BACKLOG [D6] names the gap).
 */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { BookmarksScreen } from './BookmarksScreen.jsx';
 /* The screen reads the source label as a free global now that it is lazy and
    the derivation stayed in bundle-d — so the stub here is the REAL law, which
@@ -33,6 +35,7 @@ const BOOKMARKS = [
 ];
 
 beforeEach(() => {
+  globalThis.ReactDOM = ReactDOM;
   globalThis.ScreenLayout = ({ children, navChildren }) => (
     <div data-testid="screen-layout">{navChildren}{children}</div>
   );
@@ -57,59 +60,70 @@ const show = () => render(
   <BookmarksScreen onBack={() => {}} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />,
 );
 
-const sortBtn = () => document.querySelector('.notes-index-sort-btn');
-const sources = () => [...document.querySelectorAll('.bkm-row-source')].map((el) => el.textContent);
-const labels = () => [...document.querySelectorAll('.bkm-row-label')].map((el) => el.textContent);
-const step = () => fireEvent.click(sortBtn());
+const sortBtn = () => document.querySelector('.lib-qline .ui-tool');
+const rowsOf = () => [...document.querySelectorAll('.bkm-row')];
+const labels = () => rowsOf().map((r) => r.querySelector('.ui-row-title').textContent);
+const sources = () => rowsOf().map((r) => r.querySelector('.ui-row-meta').textContent.split(' · ')[0]);
+const pick = (name) => {
+  fireEvent.click(sortBtn());
+  fireEvent.click([...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent.includes(name)));
+};
+const box = () => document.querySelector('input[type="search"]');
 
-describe('BookmarksScreen — the sort cycle reaches every implemented mode', () => {
-  it('starts newest-first', () => {
+describe('BookmarksScreen — the sort sheet reaches every implemented order', () => {
+  it('starts newest-first and says so', () => {
     show();
-    expect(sortBtn().textContent).toBe('Sort: Newest ↓');
+    expect(sortBtn().getAttribute('aria-label')).toBe('Sort: Newest first');
     expect(sources()).toEqual(['Alpha 1', 'Mu 1', 'Zeta 1']);
   });
 
-  it('steps to oldest-first', () => {
+  it('offers the four orders', () => {
     show();
-    step();
-    expect(sortBtn().textContent).toBe('Sort: Oldest ↑');
+    fireEvent.click(sortBtn());
+    expect([...document.querySelectorAll('[role="radio"]')].map((b) => b.textContent.replace('✓', ''))).toEqual(['Newest first', 'Oldest first', 'Place A-Z', 'Name A-Z']);
+  });
+
+  it('oldest-first', () => {
+    show();
+    pick('Oldest first');
+    expect(sortBtn().getAttribute('aria-label')).toBe('Sort: Oldest first');
     expect(sources()).toEqual(['Zeta 1', 'Mu 1', 'Alpha 1']);
   });
 
-  it('reaches source A-Z — which nothing could reach before', () => {
+  it('by place, which is not the name order', () => {
     show();
-    step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Source A-Z');
+    pick('Place A-Z');
     expect(sources()).toEqual(['Alpha 1', 'Mu 1', 'Zeta 1']);
-    // …and it is genuinely sorting by SOURCE: the labels are not in order.
     expect(labels()).toEqual(['Mu note', 'Zeta note', 'Alpha note']);
   });
 
-  it('reaches label A-Z — likewise, and it is a different order', () => {
+  it('by name, a different order again', () => {
     show();
-    step(); step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Label A-Z');
+    pick('Name A-Z');
     expect(labels()).toEqual(['Alpha note', 'Mu note', 'Zeta note']);
     expect(sources()).toEqual(['Zeta 1', 'Alpha 1', 'Mu 1']);
   });
 
-  it('wraps back to the start on the fourth press', () => {
-    show();
-    step(); step(); step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Newest ↓');
-    expect(sources()).toEqual(['Alpha 1', 'Mu 1', 'Zeta 1']);
-  });
-
-  it('names itself as a cycle, not a toggle', () => {
-    show();
-    expect(sortBtn().getAttribute('title')).toBe('Cycle sort order');
-  });
-
   it('sorts the FILTERED list, not the whole store', () => {
     show();
-    fireEvent.change(document.querySelector('input.notes-index-search'), { target: { value: 'note' } });
-    step(); step(); step();   // → label A-Z
+    fireEvent.change(box(), { target: { value: 'note' } });
+    pick('Name A-Z');
     expect(labels()).toEqual(['Alpha note', 'Mu note', 'Zeta note']);
+  });
+});
+
+/* The name said once (bug: the card repeated it): a label that is the place's own name shows once. */
+describe('BookmarkRow — the name once, then where it is', () => {
+  it('a label equal to the place shows once; a different label names the place in the meta line', () => {
+    globalThis.BookmarkStore = { ...globalThis.BookmarkStore, all: () => [
+      { id: 'x1', hlKey: 'bible:alpha:1', label: 'Alpha 1', created: 5, updated: 5 },
+      { id: 'x2', hlKey: 'bible:mu:1', label: '', created: 4, updated: 4 },
+      { id: 'x3', hlKey: 'bible:zeta:1', label: 'My place', created: 3, updated: 3 },
+    ] };
+    show();
+    expect(labels()).toEqual(['Alpha 1', 'Mu 1', 'My place']);
+    expect(rowsOf()[0].querySelector('.ui-row-meta')).toBeNull();
+    expect(rowsOf()[2].querySelector('.ui-row-meta').textContent).toMatch(/^Zeta 1/);
   });
 });
 
@@ -125,10 +139,8 @@ describe('BookmarksScreen — large libraries', () => {
     globalThis.BookmarkStore = { ...globalThis.BookmarkStore, all: () => { alls++; return many.slice(); } };
     globalThis._bookmarkSourceLabel = (k) => { resolves++; return _bookmarkSourceLabel(k); };
     show();
-    step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Source A-Z');
-    const box = document.querySelector('input.notes-index-search');
-    for (const q of ['n', 'no', 'not', 'note']) fireEvent.change(box, { target: { value: q } });
+    pick('Place A-Z');
+    for (const q of ['n', 'no', 'not', 'note']) fireEvent.change(box(), { target: { value: q } });
     expect(sources().length).toBe(60);
     expect(sources()[0]).toBe('Alpha 12');   // A-Z on the label text: 'alpha 12' < 'alpha 3'
     expect(alls).toBe(1);
@@ -136,46 +148,47 @@ describe('BookmarksScreen — large libraries', () => {
   });
 });
 
-/* ds5 s19.9 (idea sweep 2026-10-22): Escape cancels a label edit, but the input also saves on
-   blur, and a browser may blur it as it unmounts: the cancelled text could still be saved. */
-describe('BookmarkRow — Escape on a label edit never saves (ds5 s19.9)', () => {
-  it('a blur that follows Escape does not save the typed label', async () => {
-    const { BookmarkRow } = await import('./BookmarksScreen.jsx');
-    const saves = [];
-    const cancels = [];
-    const bkm = BOOKMARKS[0];
-    render(<BookmarkRow bkm={bkm} source="Zeta 1" onNavigate={() => {}} onLongPress={() => {}}
-      editingId={bkm.id} onEditSave={(id, v) => saves.push(v)} onEditCancel={() => cancels.push(1)} />);
-    const input = document.querySelector('.bkm-row-edit-input');
-    fireEvent.change(input, { target: { value: 'typed then cancelled' } });
-    fireEvent.keyDown(input, { key: 'Escape' });
-    fireEvent.blur(input);                       // the blur some browsers fire on the way out
-    expect(saves).toEqual([]);
-    expect(cancels.length).toBeGreaterThanOrEqual(1);
+/* ds5 s19.9 moved with the UI pass: a label is renamed in its own sheet (Cancel | Save), so Cancel closes it
+   without saving and only Save writes. */
+describe('Bookmarks — Rename in its own sheet', () => {
+  const openRename = () => {
+    fireEvent.click(rowsOf()[0].querySelector('.ui-row-menu'));
+    fireEvent.click([...document.querySelectorAll('.ui-sheet .ui-row-press')].find((r) => r.textContent === 'Rename'));
+  };
+  const field = () => document.querySelector('input[aria-label="Bookmark name"]');
+  const sheetButton = (name) => [...document.querySelectorAll('.ui-sheet button')].find((b) => b.textContent === name);
+
+  it('Cancel never saves; Save writes the new name', () => {
+    const updates = [];
+    globalThis.BookmarkStore = { ...globalThis.BookmarkStore, update: (id, v) => updates.push([id, v]) };
+    show();
+    openRename();
+    fireEvent.change(field(), { target: { value: 'typed then cancelled' } });
+    fireEvent.click(sheetButton('Cancel'));
+    expect(updates).toEqual([]);
+    expect(field()).toBeNull();
+    openRename();
+    fireEvent.change(field(), { target: { value: 'kept' } });
+    fireEvent.click(sheetButton('Save'));
+    expect(updates).toEqual([['b3', { label: 'kept' }]]);
   });
 
-  it('Enter still saves', async () => {
-    const { BookmarkRow } = await import('./BookmarksScreen.jsx');
-    const saves = [];
-    const bkm = BOOKMARKS[0];
-    render(<BookmarkRow bkm={bkm} source="Zeta 1" onNavigate={() => {}} onLongPress={() => {}}
-      editingId={bkm.id} onEditSave={(id, v) => saves.push(v)} onEditCancel={() => {}} />);
-    const input = document.querySelector('.bkm-row-edit-input');
-    fireEvent.change(input, { target: { value: 'kept' } });
-    fireEvent.keyDown(input, { key: 'Enter' });
-    expect(saves).toEqual(['kept']);
+  it('the menu says Open, Rename, Delete bookmark in plain words', () => {
+    show();
+    fireEvent.click(rowsOf()[0].querySelector('.ui-row-menu'));
+    expect([...document.querySelectorAll('.ui-sheet .ui-row-title')].map((t) => t.textContent)).toEqual(['Open', 'Rename', 'Delete bookmark']);
   });
 });
 
 /* n118: one empty-state pattern. No bookmarks: the how-to and one primary button, no search or sort. */
 describe('BookmarksScreen — empty state', () => {
-  it('hides search and sort, keeps the instruction, offers one button that goes Home', () => {
+  it('hides search and sort, names the bar button, offers one button that goes Home', () => {
     globalThis.BookmarkStore = { ...globalThis.BookmarkStore, all: () => [] };
     let home = 0;
     const r = render(<BookmarksScreen onBack={() => {}} onHome={() => { home++; }} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />);
     expect(r.container.querySelector('input')).toBeNull();
     expect(sortBtn()).toBeNull();
-    expect(r.container.querySelector('.notes-empty-hint').textContent).toMatch(/tap Bookmark in the toolbar/);
+    expect(r.container.querySelector('.ui-empty-text').textContent).toMatch(/Tap the bookmark at the top of any letter or chapter/);
     fireEvent.click(r.getByRole('button', { name: 'Start reading' }));
     expect(home).toBe(1);
   });
@@ -192,13 +205,13 @@ describe('BookmarksScreen — search matches thoughts', () => {
     globalThis.BookmarkStore = { ...globalThis.BookmarkStore,
       all: () => BOOKMARKS.map((b) => (b.id === 'b2' ? { ...b, thought: 'Remember the Shepherd here' } : b)) };
     show();
-    fireEvent.change(document.querySelector('input.notes-index-search'), { target: { value: 'shepherd' } });
+    fireEvent.change(box(), { target: { value: 'shepherd' } });
     expect(labels()).toEqual(['Zeta note']);
   });
 
   it('a bookmark with no thought still matches on label and source', () => {
     show();
-    fireEvent.change(document.querySelector('input.notes-index-search'), { target: { value: 'alpha' } });
+    fireEvent.change(box(), { target: { value: 'alpha' } });
     expect(labels().sort()).toEqual(['Alpha note', 'Mu note']);
   });
 });

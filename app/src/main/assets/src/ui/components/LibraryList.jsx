@@ -19,8 +19,8 @@ export const SORT_OPTIONS = Object.freeze([
   { id: 'oldest', label: 'Oldest first' },
 ]);
 
-/** @param {string} id @returns {string} */
-export const sortLabel = (id) => (SORT_OPTIONS.find((o) => o.id === id) || SORT_OPTIONS[0]).label;
+/** @param {string} id @param {ReadonlyArray<{ id: string, label: string }>} [options] @returns {string} */
+export const sortLabel = (id, options = SORT_OPTIONS) => (options.find((o) => o.id === id) || options[0]).label;
 
 /**
  * The search pill: a muted icon and a type=search field.
@@ -39,9 +39,11 @@ export function ListSearch({ placeholder, label, value, onChange, className = ''
 /**
  * The quiet line over a list: how many ("1 note", "3 of 12 notes" while searching) and the sort, which says what it
  * is set to (rule 14) and opens a two-choice sheet.
- * @param {{ count: number, noun: string, of?: number, sort?: string, onSort?: (id: string) => void }} props
+ * `options` replaces the two orders for a list that has more (Bookmarks: by place, by name).
+ * @param {{ count: number, noun: string, of?: number, sort?: string, onSort?: (id: string) => void,
+ *   options?: ReadonlyArray<{ id: string, label: string }> }} props
  */
-export function ListLine({ count, noun, of, sort, onSort }) {
+export function ListLine({ count, noun, of, sort, onSort, options = SORT_OPTIONS }) {
   const [picking, setPicking] = React.useState(false);
   const words = of != null && of !== count ? count.toLocaleString('en-US') + ' of ' + countOf(of, noun) : countOf(count, noun);
   return (
@@ -49,9 +51,9 @@ export function ListLine({ count, noun, of, sort, onSort }) {
       <span className="lib-qline-count">{words}</span>
       {onSort && sort ? (
         <>
-          <ValueTool variant="link" name="Sort" value={sortLabel(sort)} onClick={() => setPicking(true)} />
+          <ValueTool variant="link" name="Sort" value={sortLabel(sort, options)} onClick={() => setPicking(true)} />
           <SelectSheet open={picking} onClose={() => setPicking(false)} title="Sort" value={sort}
-            options={[...SORT_OPTIONS]} onChange={onSort} portal />
+            options={[...options]} onChange={onSort} portal />
         </>
       ) : null}
     </div>

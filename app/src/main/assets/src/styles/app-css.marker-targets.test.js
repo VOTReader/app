@@ -92,9 +92,4 @@ describe('#10 — out of the text the targets are 44 px', () => {
     expect(hit.margin).toBe('-13px');          // 44 - 2 x 13 = the dot's 18 px
   });
 
-  it('the bookmark row\'s options button is 44 px across in the room of its 20 px glyph box', () => {
-    const more = decls('.bkm-row-more');
-    expect(more.padding).toBe('14px');         // 16 px glyph + 2 x 14
-    expect(more.margin).toBe('-12px');         // laid out as the 20 px it was
-  });
 });
