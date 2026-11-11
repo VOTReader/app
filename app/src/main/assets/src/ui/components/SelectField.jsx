@@ -2,6 +2,8 @@
    SelectField — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { ListRow, UiButton } from './UiParts.jsx';
+
 /* Options are { id, label, desc? } plus optional presentation fields
    added for the Reading Font picker (2026-07-31), ignored elsewhere:
    - labelStyle: inline style for the option's label span (the font picker
@@ -91,11 +93,6 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
         <SheetHandle onClose={onClose} />
         {eyebrow ? <div className="select-sheet-eyebrow">{eyebrow}</div> : null}
         <div className="select-sheet-title" id={titleId}>{title}</div>
-        <div className="select-sheet-ornament" aria-hidden="true">
-          <div className="select-sheet-ornament-line" />
-          <div className="select-sheet-ornament-diamond">{"✦"}</div>
-          <div className="select-sheet-ornament-line r" />
-        </div>
         <div className="select-sheet-options" role="radiogroup" aria-labelledby={titleId} onKeyDown={moveFocus}>
           {options.map((opt, i) => {
             const isSelected = opt.id === value;
@@ -125,6 +122,75 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
             );
           })}
         </div>
+      </div>
+    </>
+  );
+  return portal ? ReactDOM.createPortal(sheet, document.body) : sheet;
+}
+
+/* ── ActionSheet (U rule 13; W1, the UI pass 2026-11-11) ───────────────────
+   A sheet has a title, worded actions, and Cancel / the action as words.
+   No menu inside a menu: an action that needs a second level closes this
+   sheet and opens its own sheet or screen (the caller does it in onSelect).
+
+   Two shapes, one component:
+   - a menu: `actions` rows (icon chip + words, an optional value at the right,
+     `danger` for destroying something). Picking one calls onSelect, then
+     onClose (unless keepOpen).
+   - a confirm: `confirm: { label, onConfirm, danger }` draws the foot
+     [Cancel] [label]; `children` is the body (a sentence, a field).
+   Both can carry `label` (the gold label over the title) and `sub` (one muted
+   line under it: "Chosen by God · Just now").
+
+     <ActionSheet open={!!row} onClose={close} title={row.text} sub="Chosen by God · Just now"
+       actions={[{ id: 'open', icon: 'book', label: 'Open in the letter', onSelect: openIt },
+                 { id: 'del', icon: 'trash', label: 'Delete note', danger: true, onSelect: askDelete }]} />
+   ──────────────────────────────────────────────────────────────────────── */
+/** @param {{ id?: string, open: boolean, onClose: () => void, title: any, label?: any, sub?: any,
+     actions?: Array<{ id: string, label: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
+     confirm?: { label: string, onConfirm: () => void, danger?: boolean } | null, cancelLabel?: string,
+     children?: any, portal?: boolean, className?: string }} props */
+export function ActionSheet({ id, open, onClose, title, label, sub, actions = [], confirm = null, cancelLabel = 'Cancel', children, portal = false, className = '' }) {
+  const ownId = React.useId();
+  const sheetId = id || `action-sheet-${ownId}`;
+  const titleId = `action-sheet-title-${ownId}`;
+  const subId = `action-sheet-sub-${ownId}`;
+  useModalRegistry({ id: sheetId, dismiss: onClose, active: open });
+  const trapRef = useFocusTrap(open);
+  React.useEffect(() => {
+    if (!open) return;
+    const prev = window.__closeSheet;
+    window.__closeSheet = onClose;
+    return () => { window.__closeSheet = prev || null; };
+  }, [open, onClose]);
+  if (!open) return null;
+  const sheet = (
+    <>
+      <div className="select-sheet-backdrop open" aria-hidden="true" onClick={onClose} />
+      <div id={sheetId} className={'select-sheet ui-sheet' + (className ? ' ' + className : '')} ref={trapRef} role="dialog" aria-modal="true"
+        aria-labelledby={titleId} aria-describedby={sub ? subId : undefined} onClick={(e) => e.stopPropagation()}>
+        <SheetHandle onClose={onClose} />
+        <div className="ui-sheet-head">
+          {label ? <div className="ui-sheet-label">{label}</div> : null}
+          <h2 className="ui-sheet-title" id={titleId}>{title}</h2>
+          {sub ? <div className="ui-sheet-sub" id={subId}>{sub}</div> : null}
+        </div>
+        {children != null ? <div className="ui-sheet-body">{children}</div> : null}
+        {actions.length ? (
+          <div className="ui-sheet-actions" role="group" aria-labelledby={titleId}>
+            {actions.map((a) => (
+              <ListRow key={a.id} icon={a.icon} noLead={!a.icon} one title={a.label} value={a.value} chevron={a.value != null ? true : false}
+                className={'ui-sheet-action' + (a.danger ? ' is-danger' : '')}
+                onClick={() => { a.onSelect(); if (!a.keepOpen) onClose(); }} />
+            ))}
+          </div>
+        ) : null}
+        {confirm ? (
+          <div className="ui-sheet-foot">
+            <UiButton onClick={onClose}>{cancelLabel}</UiButton>
+            <UiButton kind="primary" danger={!!confirm.danger} onClick={() => { confirm.onConfirm(); onClose(); }}>{confirm.label}</UiButton>
+          </div>
+        ) : null}
       </div>
     </>
   );

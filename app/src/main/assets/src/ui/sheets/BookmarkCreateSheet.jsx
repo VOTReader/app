@@ -129,12 +129,12 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
         aria-labelledby="bookmark-create-title"
         onClick={function(e) { e.stopPropagation(); }}
       >
-        <div className="navpick-header">
+        <div className="navpick-header bkm-create-head">
           <button
             className="navpick-close navpick-close-undo"
             onClick={onCancel}
             aria-label="Cancel"
-          >×</button>
+          >Cancel</button>
           <span className="navpick-title" id="bookmark-create-title">{title}</span>
           <button
             className="navpick-confirm-green"
@@ -143,9 +143,8 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
             aria-label={saveTitle}
             title={canSave ? saveTitle : (isEditMode ? 'No changes to save' : 'Add a label')}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <polyline points="20 6 9 17 4 12" />
-            </svg>
+            {/* rule 9 (the UI pass, W1): Cancel and Save are words, never a red cross and a green tick */}
+            Save
           </button>
         </div>
 
