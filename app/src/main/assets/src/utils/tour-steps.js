@@ -162,9 +162,11 @@ const STOPS = [
      the trailer slide's own (Creative's cut 8), so the app and the trailer agree, and they name
      both halves by their on-screen names. It sat after the Bible stop until 2026-09-13, when the
      Bible moved to the end so the tour could finish with the verses still being read. */
+  /* The layout pass (2026-11-10): Home's quick row lost its Scripture Web button, so the stop rings the Library's
+     Scripture Web tile instead (enter goLibrary, one navigation as before). */
   {
-    id: 'scripture-web', screen: 'home', enter: 'goHome',
-    target: { selector: '.home-shortcuts button', text: 'Scripture Web' }, act: null,
+    id: 'scripture-web', screen: 'library', enter: 'goLibrary',
+    target: { selector: '.library-tile', text: 'Scripture Web' }, act: null,
     label: 'The Scripture Web',
     title: 'See the Scriptures as a web',
     text: 'Every place one verse points to another is drawn as a thread. Scripture Web shows the whole Bible\'s threads. My Web holds the links you make yourself.',

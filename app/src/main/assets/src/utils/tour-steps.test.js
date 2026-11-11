@@ -128,13 +128,13 @@ describe('tour-steps — shape', () => {
      shortcut the same ask restores, so `enter` is goHome (the Bible stop left the tour on
      bible-ch). Its three sentences are the trailer slide's own (Creative's cut 8 plan), so the
      app and the trailer agree, and they name BOTH halves by their on-screen names. */
-  it('the scripture-web stop follows the highlight stop (the Bible moved to the end, 2026-09-13), returns Home, and rings the shortcut the ask restored', () => {
+  it('the scripture-web stop follows the highlight stop (the Bible moved to the end, 2026-09-13) and rings the Library tile (Home lost its button, 2026-11-10)', () => {
     const sw = TOUR_STEPS.find((s) => s.id === 'scripture-web');
     const hl = TOUR_STEPS.find((s) => s.id === 'highlight');
     expect(TOUR_STEPS.indexOf(sw)).toBe(TOUR_STEPS.indexOf(hl) + 1);
-    expect(sw.screen).toBe('home');
-    expect(sw.enter).toBe('goHome');
-    expect(sw.target).toEqual({ selector: '.home-shortcuts button', text: 'Scripture Web' });
+    expect(sw.screen).toBe('library');
+    expect(sw.enter).toBe('goLibrary');
+    expect(sw.target).toEqual({ selector: '.library-tile', text: 'Scripture Web' });
     expect(sw.act).toBeNull();
     expect(sw.primary).toBe('Next');
   });

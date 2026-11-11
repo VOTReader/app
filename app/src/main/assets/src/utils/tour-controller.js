@@ -11,7 +11,7 @@
      SettingsScreen (Help)    start('settings') · reads step.settingsGroup · stopsWord()
      TourOverlay              next() · back() · skip() · targetPressed() ·
                               clearHighlightDemo()
-     App (hooks/use-tour.js)  attachNav({ goHome, openLetter, openBible,
+     App (hooks/use-tour.js)  attachNav({ goHome, goLibrary, openLetter, openBible,
                               goJournalHub, goReadingPlans, openSettingsData, ensureListening })
 
    A stop's `enter` runs through that nav every time the stop becomes

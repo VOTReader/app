@@ -8,6 +8,7 @@
    app's current closures. Nothing here decides anything — the stops do.
 
      goHome            App's goHome
+     goLibrary         App's goLibrary (the Scripture Web tile)
      openLetter        Volume One › "Chosen by God" (short, has a recording)
      openBible         John 3, in whatever translation the reader chose
      goJournalHub      App's goJournalHub (Library › Journal)
@@ -30,11 +31,12 @@ import { FIRST_LETTER } from '../utils/tour-steps.js';
 export const TOUR_LETTER = FIRST_LETTER;
 const TOUR_BIBLE = Object.freeze({ bookId: 'john', chapterNum: 3, screen: 'bible-ch' });
 
-export function useTour({ goHome, goJournalHub, goReadingPlans, goSettings, setScreen, setLetterId, setBookId, setChapterNum }) {
+export function useTour({ goHome, goLibrary, goJournalHub, goReadingPlans, goSettings, setScreen, setLetterId, setBookId, setChapterNum }) {
   React.useEffect(() => {
     const openBible = () => { setBookId(TOUR_BIBLE.bookId); setChapterNum(TOUR_BIBLE.chapterNum); setScreen(TOUR_BIBLE.screen); };
     TourController.attachNav({
       goHome,
+      goLibrary,
       openLetter: () => { setLetterId(TOUR_LETTER.id); setScreen(TOUR_LETTER.screen); },
       openBible,
       goJournalHub,
