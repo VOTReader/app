@@ -79,7 +79,7 @@ const navTitles = () => [...document.querySelectorAll('.bottom-nav-title')].map(
 describe('ChapterView — every label follows the book it was handed', () => {
   it('names Matthew when Matthew is the book (unchanged behaviour)', () => {
     renderCh();
-    expect(eyebrow()).toBe('Matthew Study Bible \xA0\xB7\xA0 Chapter 2');   // A02.2: the study edition, not plain Matthew
+    expect(eyebrow()).toBe('Matthew Study Bible');   // r-study (W2h): the number is in the title, "Matthew 2"   // A02.2: the study edition, not plain Matthew
     expect(navTitles()).toEqual(['Matthew 1', 'Matthew 3']);
     expect(bookmarkProps.label).toBe('Matthew 2 (Study)');
   });
@@ -88,7 +88,7 @@ describe('ChapterView — every label follows the book it was handed', () => {
     // Pre-fix: eyebrow "Matthew · Chapter 2", nav cards "Matthew 1"/"Matthew 3",
     // bookmark "Matthew 2 (Study)" — on a screen showing Mark.
     renderCh(book({ id: 'mark', title: 'Mark' }));
-    expect(eyebrow()).toBe('Mark Study Bible \xA0\xB7\xA0 Chapter 2');
+    expect(eyebrow()).toBe('Mark Study Bible');
     expect(navTitles()).toEqual(['Mark 1', 'Mark 3']);
     expect(bookmarkProps.label).toBe('Mark 2 (Study)');
     expect(document.body.textContent).not.toContain('Matthew');
@@ -96,7 +96,7 @@ describe('ChapterView — every label follows the book it was handed', () => {
 
   it('drops the book half rather than inventing one when the book has no title', () => {
     renderCh(book({ id: 'unknown', title: undefined }));
-    expect(eyebrow()).toBe('Chapter 2');
+    expect(eyebrow()).toBe('Study Bible');
     expect(navTitles()).toEqual(['Chapter 1', 'Chapter 3']);
     expect(bookmarkProps.label).toBe('Chapter 2 (Study)');
     expect(document.body.textContent).not.toContain('undefined');
@@ -120,14 +120,14 @@ describe('ChapterView — the hero heading is the chapter title (A02.12)', () =>
   const h1 = () => document.querySelector('h1.hero-title').textContent;
   it('shows the chapter title, once, and not "Chapter N" again', () => {
     renderCh(book({ subtitle: 'The Gospel According to Matthew' }), 2, { showChapterTitle: true });
-    expect(h1()).toBe('Ch 2');
+    expect(h1()).toBe('Matthew 2'); expect(document.querySelector('.rd-hero-sub').textContent).toBe('Ch 2');
     expect(document.querySelectorAll('.hero-subtitle-tappable')).toHaveLength(0);
   });
   it('a hidden title leaves the book subtitle and a way back', () => {
     let hidden = null;
     renderCh(book({ subtitle: 'The Gospel According to Matthew' }), 2,
       { showChapterTitle: true, titleFocusHidden: true, setTitleFocusHidden: (v) => { hidden = v; } });
-    expect(h1()).toBe('The Gospel According to Matthew');
+    expect(document.querySelector('.rd-hero-sub').textContent).toBe('The Gospel According to Matthew');
     fireEvent.click(document.querySelector('.hero-subtitle-restore'));
     expect(hidden).toBe(false);
   });

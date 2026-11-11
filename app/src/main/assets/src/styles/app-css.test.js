@@ -711,7 +711,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.audio-library-section-head span', '.select-sheet-eyebrow',
     '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
-    '.section-heading', '.compact-list-header',
+    '.section-heading',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',

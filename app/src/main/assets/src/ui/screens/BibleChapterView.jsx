@@ -5,6 +5,7 @@
 import { savedScrollFor } from '../components/pager-preview.jsx';
 import { AudioPlayer, AUDIO_TOAST_ID } from '../../utils/audio-player.js';
 import { showToast } from '../../utils/toast.js';
+import { TranslationPill } from '../components/TranslationPill.jsx';
 import { HeroListen, bibleHero } from '../components/AudioPlayButton.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
@@ -18,7 +19,7 @@ import { recordingTranslationFor, textForRecording } from '../../utils/audio-tex
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
 
-export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null }) {
+export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook, nextBook, onPrevBook, onNextBook, nextBoundaryTitle, prevBoundaryTitle, onSearch, onSettings, onHistory, theme, onThemeChange, surpriseAnchor, onMarkRead, readTrackKey, markAsReadEnabled, translation: readerTranslation, restoredNames, showChapterTitle, showSectionHeadings, titleFocusHidden, setTitleFocusHidden, headingsFocusHidden, setHeadingsFocusHidden, onLinkOpen, backHint, onTapThroughBack, navBack = null, inert = false, restoreScroll = null, bibleAudio = null, readAlongOn = true, readAlongFollow = true, onStudyNotes = null, onTranslation = null }) {
   const bodyRef = React.useRef(null);
   // The words on screen match the voice (critique 2026-10-05 #6): while this
   // book's recording is loaded, the chapter shows the recording's translation
@@ -284,22 +285,19 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
           <PlanSessionStrip bid={book.id} cid={chapter.num} inert={inert} />
           <header className="hero" ref={heroRef}>
             <div className="hero-content">
-              <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
+              {/* r-bible (W2h): "John 3" is the title; the chapter's headings are the italic line under it (tap it to
+                  hide it; the book's subtitle stands in). */}
+              <div className="hero-eyebrow">The Scriptures of Truth</div>
               {recordingTextShown && (
                 <div className="hero-audio-text" role="status">{translationLabel(translation)} text, to match the recording</div>
               )}
-              <h1 className="hero-title">
-                {titleIsTappable ? (
-                  <button
-                    type="button"
-                    className="hero-title-action"
-                    onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))}
-                    title="Tap to hide chapter title"
-                  >
-                    {titleText}
-                  </button>
-                ) : titleText}
-              </h1>
+              <h1 className="hero-title">{book.title} {chapter.num}</h1>
+              {titleText ? (titleIsTappable ? (
+                <button type="button" className="hero-title-action rd-hero-sub"
+                  onClick={tapToggle(() => setTitleFocusHidden && setTitleFocusHidden(true))} title="Tap to hide chapter title">
+                  {titleText}
+                </button>
+              ) : <p className="rd-hero-sub">{titleText}</p>) : null}
               {canFocusTitle && titleFocusHidden && (
                 <button
                   className="hero-subtitle-restore"
@@ -316,9 +314,12 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   playBibleBook still branches on shape for it.) Mirrors the
                   letter hero pill; inert peeks keep it (same
                   pointer-events:none contract). */}
-              {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
-                <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
-              )}
+              <div className="rd-hero-row">
+                {bibleAudio && AudioPlayer.hasAudio(bibleAudio.volKey, book.id) && (
+                  <HeroListen {...bibleHero(bibleAudio, book, chapter.num)} />
+                )}
+                <TranslationPill translation={shownTranslation} short onTranslation={!inert && typeof onTranslation === 'function' ? onTranslation : null} />
+              </div>
               {/* A02.2: plain Matthew and the Matthew Study Bible did not know about each other. The plain chapter
                   opens the same chapter with its study notes (a peek keeps the line, inert, as it keeps Listen). */}
               {onStudyNotes && (

@@ -6,11 +6,9 @@
    switch writes settings.scriptureLayout: Groups = 'genre'; All books = 'canon' (the old 'compact' and 'grid' read as
    All books). */
 
-import { translationName, translationSheetOptions, translationShortName } from '../../data/translations.js';
-import { SelectSheet } from '../components/SelectField.jsx';
+import { TranslationPill } from '../components/TranslationPill.jsx';
 import { ListGroup, ListRow, Segmented } from '../components/UiParts.jsx';
 import { BarAction } from '../components/RootNav.jsx';
-import { UiIcon } from '../components/UiIcon.jsx';
 import { countOf } from '../../utils/download-tree.js';
 
 export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, onCycleLayout, translation, onTranslation }) {
@@ -41,15 +39,8 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, on
   };
   const handleBook = (id) => onSelect(id);
 
-  const [pickOpen, setPickOpen] = React.useState(false);
-  const closePick = React.useCallback(() => setPickOpen(false), []);
   const canPick = typeof onTranslation === 'function'
     && typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) && TRANSLATION_OPTIONS.length > 1;
-  const code = translation || 'nkjv';
-  const codeOpt = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS)
-    ? TRANSLATION_OPTIONS.find((o) => o && o.id === code) : null;
-  const codeLabel = codeOpt ? codeOpt.label : code.toUpperCase();
-
   const allBooks = layout && layout !== 'genre';
   const utility = {
     title: 'The Scriptures of Truth', onBack, backLabel: 'Back to Home',
@@ -60,24 +51,10 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, on
 
   const tools = (
     <div className="rd-bindex-tools">
-      {canPick ? (
-        <button type="button" className="rd-trans-pill" aria-haspopup="dialog" aria-expanded={pickOpen}
-          aria-label={'Bible translation: ' + translationName(translation) + '. Change'} onClick={() => setPickOpen(true)}>
-          <span className="rd-trans-code">{codeLabel}</span>
-          <span className="rd-trans-name">{translationShortName(translation)}</span>
-          <UiIcon name="down" size="sm" />
-        </button>
-      ) : (
-        <span className="rd-trans-pill is-still"><span className="rd-trans-code">{codeLabel}</span>
-          <span className="rd-trans-name">{translationShortName(translation)}</span></span>
-      )}
+      <TranslationPill translation={translation} onTranslation={canPick ? onTranslation : null} />
       {typeof onCycleLayout === 'function' ? (
         <Segmented label="Show" options={[{ id: 'genre', label: 'Groups' }, { id: 'canon', label: 'All books' }]}
           value={allBooks ? 'canon' : 'genre'} onChange={(v) => onCycleLayout(v)} />
-      ) : null}
-      {canPick ? (
-        <SelectSheet open={pickOpen} onClose={closePick} portal title="Bible translation"
-          value={code} options={translationSheetOptions()} onChange={onTranslation} />
       ) : null}
     </div>
   );

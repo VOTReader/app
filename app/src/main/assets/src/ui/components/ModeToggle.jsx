@@ -22,40 +22,23 @@
    — the two callbacks write them; this component holds no state of its own.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { Segmented } from './UiParts.jsx';
+
 export function ModeToggle({ mode, onChange, showStudy, onShowStudyChange }) {
   const isPdf = mode === 'pdf';
   const current = !showStudy ? 'off' : (isPdf ? 'pdf' : 'inline');
-  const pick = (next) => {
+  const pick = (/** @type {string} */ next) => {
     if (next === current) return;
     if (next === 'off') { onShowStudyChange(false); return; }
     if (!showStudy) onShowStudyChange(true);
     if (next !== (isPdf ? 'pdf' : 'inline')) onChange(next);
   };
-  const seg = (id, label, title, glyph) => (
-    <button
-      type="button"
-      className={'mode-btn' + (current === id ? ' active' : '')}
-      aria-pressed={current === id}
-      onClick={() => pick(id)}
-      title={title}
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true" focusable="false">{glyph}</svg>
-      {label}
-    </button>
-  );
-  // The caption floats over scripture with no other context — without it a
-  // first-time reader can't tell what "PDF / Inline / Off" applies to
-  // (tooltips don't exist on touch). It labels the group for a screen reader too.
+  // r-study (W2h): under the title, in words, in the page (it floated over the Scripture as "PDF / Inline / Off").
   return (
-    <div className="mode-toggle-wrap">
-      <div className="mode-toggle-label" id="mode-toggle-caption">Study Notes</div>
-      <div className="mode-toggle" role="group" aria-labelledby="mode-toggle-caption">
-        {seg('pdf', 'PDF', 'Study notes as the PDF page', <path d="M2 6h20M2 12h20M2 18h12" />)}
-        <div className="mode-divider" />
-        {seg('inline', 'Inline', 'Study notes in the text', <path d="M12 20h9M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z" />)}
-        <div className="mode-divider" />
-        {seg('off', 'Off', 'No study notes, references, or further reading', <><circle cx="12" cy="12" r="9" /><line x1="4.5" y1="4.5" x2="19.5" y2="19.5" /></>)}
-      </div>
+    <div className="rd-study-switch">
+      <div className="rd-study-label" aria-hidden="true">Study notes</div>
+      <Segmented label="Study notes" value={current} onChange={pick}
+        options={[{ id: 'inline', label: 'In the text' }, { id: 'pdf', label: 'As the page' }, { id: 'off', label: 'Off' }]} />
     </div>
   );
 }

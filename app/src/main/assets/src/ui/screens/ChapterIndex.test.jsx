@@ -14,6 +14,7 @@
 */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
+import { utilityNav } from '../components/RootNav.jsx';
 import { render, cleanup } from '@testing-library/react';
 import { ChapterIndex } from './ChapterIndex.jsx';
 import { LibraryNav } from '../components/LibraryNav.jsx';
@@ -24,9 +25,7 @@ const GLOBALS = ['ScreenLayout', 'HomeBtn', 'NavButtons', 'LibraryNav',
   'countItemWords', 'readingMinutes', 'ReadingStatsStore'];
 
 function setupGlobals() {
-  globalThis.ScreenLayout = ({ children, navChildren }) => (
-    <div data-testid="screen-layout">{navChildren}{children}</div>
-  );
+  globalThis.ScreenLayout = ({ children, navChildren, utility }) => (<div>{utility ? utilityNav(utility) : navChildren}{children}</div>);
   globalThis.HomeBtn = () => null;
   globalThis.NavButtons = () => null;
   // The REAL shared nav — the back-button assertions below are the contract
@@ -75,14 +74,14 @@ describe('ChapterIndex — back affordance names the real destination', () => {
     setupGlobals();
     renderIndex();
     expect(backBtn().getAttribute('aria-label')).toBe('Back to Books');
-    expect(backBtn().getAttribute('title')).toBe('← Books');
+    expect(backBtn().getAttribute('title')).toBe('Back to Books');
   });
 
   it('names the genre destination in tooltip + TalkBack label when backLabel is passed', () => {
     setupGlobals();
     renderIndex({ backLabel: 'Poetry & Wisdom' });
     expect(backBtn().getAttribute('aria-label')).toBe('Back to Poetry & Wisdom');
-    expect(backBtn().getAttribute('title')).toBe('← Poetry & Wisdom');
+    expect(backBtn().getAttribute('title')).toBe('Back to Poetry & Wisdom');
   });
 });
 

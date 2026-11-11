@@ -1746,6 +1746,7 @@ export function buildScreenRoutes({
     'bible-ch': () => {
       if (book && chapter) return (
       <BibleChapterView
+        onTranslation={(/** @type {string} */ v) => updateSetting('translation', v)}
         book={book} chapter={chapter}
         bibleAudio={bibleAudioFor(book.id)}
         onIndex={_fromSearchIndex ? _backToIndex(goBibleIdx) : book?.chapters.length === 1 ? genreId ? () => setScreen('scripture-genre') : goScripturesHome : goBibleIdx}

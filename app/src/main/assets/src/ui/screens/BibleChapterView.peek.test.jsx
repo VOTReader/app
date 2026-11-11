@@ -64,10 +64,10 @@ const renderCh = (extra) => render(
 );
 
 describe('BibleChapterView pager.peek at a BOOK boundary', () => {
-  it('keeps the tappable chapter title as an h1 containing a native button', () => {
+  it('titles the chapter by book and number, its tappable title a native button under the h1 (r-bible)', () => {
     globalThis.ScreenLayout = ({ children, pager }) => { capturedPager = pager; return <main>{children}</main>; };
     renderCh({ showChapterTitle: true, titleFocusHidden: false, setTitleFocusHidden: () => {} });
-    expect(screen.getByRole('heading', { level: 1, name: 'Ch 3' })).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/ 3$/);
     // The button's accessible name IS the title text (name-from-content) — an
     // aria-label here would hide the title from screen readers entirely.
     expect(screen.getByRole('button', { name: 'Ch 3' })).toBeTruthy();

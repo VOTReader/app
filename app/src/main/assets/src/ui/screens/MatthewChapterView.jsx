@@ -87,8 +87,8 @@ export function MatthewChapterView({
         backHint={backHint} onTapThroughBack={tapThroughBack} navBack={navBack}
         onLinkOpen={openLinkSidebar}
         onNavigateToLink={onNavigateToLink}
+        heroExtra={<ModeToggle mode={mode} onChange={setMode} showStudy={showStudy} onShowStudyChange={setShowStudy} />}
       />
-      <ModeToggle mode={mode} onChange={setMode} showStudy={showStudy} onShowStudyChange={setShowStudy} />
     </>
   );
 }
