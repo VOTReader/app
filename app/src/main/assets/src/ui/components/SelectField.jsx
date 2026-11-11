@@ -150,7 +150,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
                  { id: 'del', icon: 'trash', label: 'Delete note', danger: true, onSelect: askDelete }]} />
    ──────────────────────────────────────────────────────────────────────── */
 /** @param {{ id?: string, open: boolean, onClose: () => void, title: any, label?: any, sub?: any,
-     actions?: Array<{ id: string, label: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
+     actions?: Array<{ id: string, label: any, sub?: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
      confirm?: { label: string, onConfirm: () => (void | boolean), danger?: boolean, disabled?: boolean } | null, cancelLabel?: string,
      children?: any, portal?: boolean, className?: string }} props */
 export function ActionSheet({ id, open, onClose, title, label, sub, actions = [], confirm = null, cancelLabel = 'Cancel', children, portal = false, className = '' }) {
@@ -182,7 +182,7 @@ export function ActionSheet({ id, open, onClose, title, label, sub, actions = []
         {actions.length ? (
           <div className="ui-sheet-actions" role="group" aria-labelledby={titleId}>
             {actions.map((a) => (
-              <ListRow key={a.id} icon={a.icon} noLead={!a.icon} one title={a.label} value={a.value} chevron={a.value != null ? true : false}
+              <ListRow key={a.id} icon={a.icon} noLead={!a.icon} one={!a.sub} title={a.label} meta={a.sub} value={a.value} chevron={a.value != null ? true : false}
                 className={'ui-sheet-action' + (a.danger ? ' is-danger' : '')}
                 onClick={() => { a.onSelect(); if (!a.keepOpen) onClose(); }} />
             ))}

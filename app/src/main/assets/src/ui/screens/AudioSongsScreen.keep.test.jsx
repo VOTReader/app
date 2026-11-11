@@ -1,6 +1,6 @@
 // @ts-nocheck -- classic-global screen contract is isolated here.
-/* Songs of the Letters -- Keep on this phone (K1) on the Songs screens: the song page's
-   card in its three states, Keep all on a list, the hub's Kept row, the Kept list with
+/* Songs of the Letters -- Keep on this phone (K1) on the Songs screens: since W3d no Keep card on the song page,
+   no Keep all on a list and no Kept row on the hub (Downloads is the one place, U 8.6); the Kept list with
    Remove and a Remove all confirm strip, and a restore's "Download your N songs again". */
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within, act } from '@testing-library/react';
@@ -22,6 +22,7 @@ import { SongKeep, formatSongBytes } from '../../utils/song-keep.js';
 import { SongCatalog, adoptSongCatalog, _resetSongCatalogForTests } from '../../utils/song-catalog.js';
 import { SONG_FIXTURE } from '../../utils/song-catalog.fixture.js';
 import { NetStatus } from '../../utils/net-status.js';
+import { utilityNav } from '../components/RootNav.jsx';
 
 let store;
 let library;
@@ -39,7 +40,7 @@ function fakeStore(ids = []) {
 }
 
 async function install({ kept = [], listed = kept } = {}) {
-  globalThis.ScreenLayout = ({ children, navChildren }) => <main>{navChildren}{children}</main>;
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <nav>{utilityNav(utility)}</nav> : null}{children}</main>;
   globalThis.LibraryNav = ({ backLabel }) => <nav>{backLabel}</nav>;
   globalThis.useModalRegistry = () => {};
   globalThis.useFocusTrap = () => null;
@@ -88,74 +89,36 @@ afterEach(() => {
   globalThis.fetch = realFetch;
 });
 
-describe('Keep on this phone -- the song page card (r2-more-screens, third panel)', () => {
-  it('offers the whole family with its catalog size, then says Keeping 1 of 2 with a bar and Cancel', async () => {
+/* W3d (design brief U 8.6): Downloads is the one place to keep songs. The song page's Keep card, a list's Keep all
+   and the hub's Kept row are gone; the Kept list stays (Settings and the player open it) with its Remove and Remove all. */
+describe('Keep on this phone -- one place to download (U 8.6)', () => {
+  it('the song page carries no Keep card, kept or not', async () => {
     await install();
-    // A download that waits until it is cancelled, as fetch does with an abort signal.
-    globalThis.fetch = vi.fn((_url, opts) => new Promise((_ok, fail) => {
-      opts.signal.addEventListener('abort', () => fail(new DOMException('cancelled', 'AbortError')));
-    }));
     renderScreen([{ k: 'song', v: 'fam-a' }]);
-    expect(screen.getByRole('heading', { name: 'Keep for offline listening' })).toBeTruthy();
-    expect(screen.getByText('Keep all 2 versions on your phone to listen without internet.')).toBeTruthy();
-    const go = screen.getByRole('button', { name: 'Keep · 6 MB' });   // 2 x 3,000,000 bytes, from the catalog
-    await act(async () => { fireEvent.click(go); });
-    expect(screen.getByRole('heading', { name: 'Keeping…' })).toBeTruthy();
-    expect(screen.getByText('Keeping 1 of 2…')).toBeTruthy();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Cancel' })); });
-    expect(screen.getByRole('heading', { name: 'Keep for offline listening' })).toBeTruthy();
-  });
-
-  it('a family all on the phone reads Available offline, On this phone, with its size', async () => {
+    expect(screen.queryByRole('heading', { name: 'Keep for offline listening' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Keep/ })).toBeNull();
+    cleanup();
     await install({ kept: ['aaaaaaaaaaa1', 'aaaaaaaaaaa2'] });
     renderScreen([{ k: 'song', v: 'fam-a' }]);
-    expect(screen.getByRole('heading', { name: 'Available offline' })).toBeTruthy();
-    expect(screen.getByText('On this phone')).toBeTruthy();
-    expect(screen.getByText('2 versions · 6 MB')).toBeTruthy();
-  });
-
-  it('refuses early, in words, when the phone lacks the room', async () => {
-    await install();
-    Object.defineProperty(window.navigator, 'storage', { configurable: true, value: { estimate: async () => ({ quota: 4e6, usage: 0 }), persist: async () => true } });
-    renderScreen([{ k: 'song', v: 'fam-a' }]);
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Keep · 6 MB' })); });
-    expect(screen.getByRole('status').textContent).toBe('Not enough room: needs 6 MB, 4 MB free.');
-    // The page's own lyrics request aside, nothing was fetched: no song started downloading.
-    expect(globalThis.fetch.mock.calls.map(([url]) => String(url)).filter((u) => !u.includes('/songs/lyrics/'))).toEqual([]);
-  });
-
-  it('an iPhone in a Safari tab is told to add the app to its Home Screen', async () => {
-    await install();
-    Object.defineProperty(window.navigator, 'standalone', { configurable: true, value: false });
-    try {
-      renderScreen([{ k: 'song', v: 'fam-a' }]);
-      expect(screen.getByText('Add VOTReader to your Home Screen to keep songs.')).toBeTruthy();
-      expect(screen.queryByRole('button', { name: /^Keep ·/ })).toBeNull();
-    } finally { delete window.navigator.standalone; }
+    expect(screen.queryByRole('heading', { name: 'Available offline' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /from this phone/ })).toBeNull();
   });
 });
 
 describe('Keep on this phone -- lists, the hub row and the Kept list', () => {
-  it('a collection offers Keep all N with the size of every version', async () => {
-    await install();
-    renderScreen([{ k: 'list', v: 'col:wtlb1' }]);
-    expect(screen.getByRole('button', { name: 'Keep all 2 · 6 MB' })).toBeTruthy();
-  });
-
-  it('the hub counts the kept songs and their size in Your songs, and opens the Kept list', async () => {
+  it('a collection offers no Keep all, and the hub no Kept row, even with songs kept', async () => {
     await install({ kept: ['aaaaaaaaaaa1'] });
-    const onPush = vi.fn();
-    renderScreen([{ k: 'hub' }], onPush);
-    const row = screen.getByRole('button', { name: /Kept on this phone/ });
-    expect(row.textContent).toContain('1 · 3 MB');
-    fireEvent.click(row);
-    expect(onPush).toHaveBeenCalledWith({ k: 'list', v: 'kept' });
+    renderScreen([{ k: 'list', v: 'col:wtlb1' }]);
+    expect(screen.queryByRole('button', { name: /^Keep all/ })).toBeNull();
+    cleanup();
+    renderScreen([{ k: 'hub' }]);
+    expect(screen.queryByText(/Kept on this phone/)).toBeNull();
   });
 
   it('the Kept list plays its songs, removes one, and Remove all asks first', async () => {
     await install({ kept: ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'] });
     renderScreen([{ k: 'list', v: 'kept' }]);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Kept on this phone');
+    expect(document.querySelector('.bar-title').textContent).toBe('Kept on this phone');
     expect(document.querySelectorAll('.songs-row')).toHaveLength(2);
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove Lead Me To That Place from this phone' })); });
     expect(store.map.has('bbbbbbbbbbb1')).toBe(false);
@@ -176,28 +139,19 @@ describe('Keep on this phone -- lists, the hub row and the Kept list', () => {
   });
 });
 
-/* K3 (Songs walk W2, 2026-09-25): which rows are on the phone, a Remove on a kept song's page, the Remove all
+/* K3 (Songs walk W2, 2026-09-25): which rows are on the phone, the Remove all
    strip in the app's own confirm grammar, and the hub's Find words kept in its frame. */
-describe('K3 -- kept rows, Remove on the page, the Remove all strip, Find kept', () => {
+describe('K3 -- kept rows, the Remove all strip, Find kept', () => {
   it('(W2-02) a kept song\'s row carries a quiet On this phone mark; the others do not', async () => {
     await install({ kept: ['aaaaaaaaaaa1'] });
     library.songRecent = () => ['aaaaaaaaaaa1', 'bbbbbbbbbbb1'];
     renderScreen([{ k: 'list', v: 'recent' }]);
     const rows = [...document.querySelectorAll('.songs-row')];
-    const byTitle = (t) => rows.find((r) => r.querySelector('strong').textContent === t);
+    const byTitle = (t) => rows.find((r) => r.querySelector('.ui-row-title').textContent === t);
     const mark = byTitle('Come, Love Awaits You').querySelector('.songs-row-kept');
     expect(mark).not.toBeNull();
     expect(mark.textContent).toContain('On this phone');
     expect(byTitle('Lead Me To That Place').querySelector('.songs-row-kept')).toBeNull();
-  });
-
-  it('(W2-06) a kept song\'s page card has a quiet Remove that takes it off the phone', async () => {
-    await install({ kept: ['bbbbbbbbbbb1'] });
-    renderScreen([{ k: 'song', v: 'fam-b' }]);
-    expect(screen.getByRole('heading', { name: 'Available offline' })).toBeTruthy();
-    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Remove Lead Me To That Place from this phone' })); });
-    expect(store.map.has('bbbbbbbbbbb1')).toBe(false);
-    expect(screen.getByRole('heading', { name: 'Keep for offline listening' })).toBeTruthy();
   });
 
   it('(W2-05) Remove all asks in the Downloads screen\'s strip: Keep them, Yes, remove all', async () => {

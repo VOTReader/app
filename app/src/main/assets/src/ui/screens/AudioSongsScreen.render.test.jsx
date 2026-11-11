@@ -107,10 +107,10 @@ describe('AudioSongsScreen -- (n3-04) the player clock does not redraw the songs
   it('a pause redraws only the playing row, and its button says Play', () => {
     renderScreen([{ k: 'list', v: 'col:wtlb1' }]);
     const current = () => document.querySelector('.songs-row.is-current');
-    expect(current().querySelector('.song-play').className).toContain('is-playing');
+    expect(current().querySelector('.ui-row-main').getAttribute('aria-label')).toMatch(/^Pause /);
     rowRenders = 0;
     act(() => setPlayerState(playing(firstId, 'paused')));
-    expect(current().querySelector('.song-play').className).not.toContain('is-playing');
+    expect(current().querySelector('.ui-row-main').getAttribute('aria-label')).toMatch(/^Play /);
     expect(rowRenders).toBe(1);
   });
 
@@ -120,7 +120,7 @@ describe('AudioSongsScreen -- (n3-04) the player clock does not redraw the songs
     act(() => setPlayerState(playing(secondId)));
     const rows = [...document.querySelectorAll('.songs-row.is-current')];
     expect(rows.length).toBe(1);
-    expect(rows[0].querySelector('strong').textContent).toBe(BIG.families.find((f) => f.id === BIG.songs[1].f).t);
+    expect(rows[0].querySelector('.ui-row-title').textContent).toBe(BIG.families.find((f) => f.id === BIG.songs[1].f).t);
     expect(rowRenders).toBe(2);
   });
 
@@ -129,7 +129,7 @@ describe('AudioSongsScreen -- (n3-04) the player clock does not redraw the songs
     act(() => setPlayerState(playing(secondId, 'paused')));
     player.playSongs.mockClear();
     const last = [...document.querySelectorAll('.songs-row')].pop();
-    act(() => { last.querySelector('.song-play').click(); });
+    act(() => { last.querySelector('.ui-row-main').click(); });
     expect(player.playSongs).toHaveBeenCalledTimes(1);
     expect(player.playSongs.mock.calls[0][0].ids.length).toBe(300);
   });
@@ -137,8 +137,8 @@ describe('AudioSongsScreen -- (n3-04) the player clock does not redraw the songs
 
 describe('AudioSongsScreen -- (n3-04) long lists skip the rows off screen', () => {
   const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../../../app.css'), 'utf8');
-  it('a list row outside a card is content-visibility:auto with a remembered height, whole focus rings, and none while scroll restores', () => {
-    const rule = css.match(/\.songs-list:not\(\.songs-card\) > \.songs-row \{([^}]*)\}/);
+  it('a list row is content-visibility:auto with a remembered height, whole focus rings, and none while scroll restores', () => {
+    const rule = css.match(/\.songs-list > \.songs-row \{([^}]*)\}/);
     expect(rule).toBeTruthy();
     expect(rule[1]).toMatch(/content-visibility:auto/);
     expect(rule[1]).toMatch(/contain-intrinsic-size:auto \d+px/);

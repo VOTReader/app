@@ -447,7 +447,11 @@ describe('a song row\'s ⋯: Play next / Add to queue (pl-l2 L3)', () => {
     const song = songById('bbbbbbbbbbb1');
     render(<SongListRow song={song} title="Lead Me To That Place" onPlay={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: 'More for Lead Me To That Place' }));
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Play next' }));
+    // W3d: the row's menu is the song sheet (listen.html au-songmenu).
+    const sheet = screen.getByRole('dialog', { name: 'Lead Me To That Place' });
+    expect(within(sheet).getByRole('button', { name: 'Add to the end of Up next' })).toBeTruthy();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Play next' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
     const st = AudioPlayer.getState();
     expect(st.queue).toHaveLength(before + 1);
     expect(st.queue[st.qi + 1].key).toBe('song:bbbbbbbbbbb1');

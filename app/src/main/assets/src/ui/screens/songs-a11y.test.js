@@ -17,10 +17,10 @@ const line = (s, needle) => s.split(/\r?\n/).find((l) => l.includes(needle)) || 
 describe('song screens: accessibility (n3-11)', () => {
   it('the Find box is a named search field and the count is announced', () => {
     const s = src('AudioSongsScreen.jsx');
-    const input = line(s, 'placeholder="Find a song');
-    expect(input).toMatch(/type="search"/);
+    const input = line(s, '<input type="search"');
     expect(input).toMatch(/aria-label="Find a song"/);
-    expect(s).toMatch(/<span className="songs-section-count" aria-live="polite">/);
+    // The results count is the Songs label's aside, a polite live region (AudioSongsScreen.test renders it).
+    expect(line(s, 'aside={songCountLabel(results.length)}')).toMatch(/asideLive/);
   });
 
   it('the lyrics box is a region and follows along without smooth motion when asked', () => {
@@ -31,7 +31,8 @@ describe('song screens: accessibility (n3-11)', () => {
   });
 
   it('the song page Play button is a command, not a toggle', () => {
-    const play = line(src('SongPage.jsx'), 'className="songs-shuffle song-page-play"');
+    const play = line(src('SongPage.jsx'), '<UiButton kind="primary" icon={isCurrent && active');
+    expect(play).toBeTruthy();
     expect(play).not.toMatch(/aria-pressed/);
   });
 });

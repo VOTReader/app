@@ -1978,90 +1978,42 @@
       .songs-hero { padding:.55rem 0 1rem; }
       .songs-eyebrow { color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); font-weight:600; letter-spacing:.22em; text-transform:uppercase; }
       .songs-screen h1 { margin:.2rem 0 0; color:var(--cream); font-family:inherit; font-size:var(--fs-30); font-weight:500; line-height:1.15; }
-      .songs-intro { margin:.45rem 0 0; color:var(--cream-dim); font-size:var(--fs-16); font-style:italic; line-height:1.45; }
-      .songs-controls { display:grid; grid-template-columns:minmax(0,1fr); gap:.7rem; }
+      /* W3d listen: the hub's line, Find (.ui-field), the chips (.ui-chip) with More styles in gold (au-songs) */
+      .songs-intro { margin:4px 2px 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+      .songs-controls { display:grid; grid-template-columns:minmax(0,1fr); gap:12px; }
       .songs-shuffle, .songs-outline-action { min-height:48px; display:inline-flex; align-items:center; justify-content:center; gap:.6rem; padding:.5rem 1.2rem; border:1px solid var(--gold); border-radius:999px; font-family:inherit; font-size:var(--fs-16); font-weight:600; letter-spacing:.06em; text-transform:uppercase; cursor:pointer; }
       .songs-shuffle { width:100%; background:var(--gold); color:var(--bg); }
       .songs-outline-action { background:transparent; color:var(--gold); }
       .songs-shuffle svg, .songs-outline-action svg { width:22px; height:22px; flex:none; }
-      .songs-find { display:flex; align-items:center; gap:.6rem; min-height:48px; padding:0 .25rem 0 1rem; border:1px solid var(--gold-border); border-radius:999px; background:var(--bg3); }
-      .songs-find:focus-within { border-color:var(--gold); }
-      .songs-find > svg { width:20px; height:20px; flex:none; color:var(--cream-dim); }
-      .songs-find label { flex:1; min-width:0; display:flex; }
-      .songs-find input { width:100%; min-width:0; min-height:44px; padding:0; border:0; background:transparent; color:var(--input-text); font:inherit; font-size:var(--fs-16); outline:none; -webkit-appearance:none; appearance:none; }
+      .songs-find input { flex:1; min-width:0; }
       .songs-find input::-webkit-search-cancel-button { -webkit-appearance:none; appearance:none; display:none; }
-      .songs-find input::placeholder { color:var(--cream-dim); opacity:.85; }
-      .songs-find-clear { width:44px; height:44px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--cream); cursor:pointer; }
-      .songs-find-clear svg { width:20px; height:20px; }
-      .songs-chips { display:flex; flex-wrap:wrap; gap:.5rem; }
-      .songs-chip { position:relative; min-height:40px; display:inline-flex; align-items:center; gap:.35rem; padding:.3rem 1.1rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-16); cursor:pointer; }
-      .songs-chip::before { content:""; position:absolute; inset:-2px 0; }
-      .songs-chip.is-on { border-color:var(--gold); background:var(--gold); color:var(--bg); }
-      .songs-chip-more span { font-size:var(--fs-12); color:var(--gold); }
-      .songs-chip-more.is-on span { color:var(--bg); }
+      .songs-find-clear { width:44px; height:44px; margin-right:-10px; flex:none; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:50%; background:transparent; color:var(--text-2); cursor:pointer; }
+      .songs-chip-more { color:var(--accent); }
       .songs-section { margin-top:1.4rem; }
-      .songs-section-head { display:flex; align-items:center; justify-content:space-between; gap:.75rem; min-height:32px; margin:0 0 .45rem; }
-      .songs-section-head h2 { margin:0; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-14); font-weight:600; letter-spacing:.22em; text-transform:uppercase; }
-      .songs-section-count { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
       .songs-see-all { display:inline-flex; align-items:center; gap:.1rem; min-height:44px; padding:0 .15rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; }
-      .songs-see-all svg, .songs-nav-row > svg, .songs-tile > svg, .songs-shelf > svg { width:20px; height:20px; flex:none; color:var(--gold); }
+      .songs-see-all svg { width:20px; height:20px; flex:none; color:var(--gold); }
       .songs-card { border:1px solid var(--border); border-radius:10px; background:var(--bg3); overflow:hidden; }
-      .songs-row { display:flex; align-items:center; gap:.6rem; padding:.55rem .1rem; border-bottom:1px solid var(--border); }
-      .songs-card .songs-row { padding:.55rem .7rem .55rem .55rem; border-bottom:0; border-top:1px solid var(--border); }
-      .songs-card .songs-row:first-child { border-top:0; }
-      /* n3-04 (sweep 2): a collection or search list runs to 900 rows; those off screen skip layout and paint (as
-         PERF4's .letter-para). ~75 px is a row at 100 % (56 px cover + padding); `auto` remembers each drawn height.
-         Scroll restore needs real heights: body.scroll-restoring lifts it (with the letters' rule, PERF4). The row
-         clips what it paints: the clip margin keeps the ▶ focus ring and the versions link's 44 px target whole. */
-      .songs-list:not(.songs-card) > .songs-row { content-visibility:auto; contain-intrinsic-size:auto 75px; overflow-clip-margin:14px; }
-      .songs-row-main { flex:1; min-width:0; display:flex; align-items:center; gap:.85rem; min-height:56px; padding:0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+      /* W3d listen: a song row is a .ui-row (au-style). A list runs to 900 rows: those off screen skip layout and paint
+         (n3-04, as PERF4's .letter-para); body.scroll-restoring lifts it. */
+      .songs-list > .songs-row { content-visibility:auto; contain-intrinsic-size:auto 64px; overflow-clip-margin:14px; }
+      .songs-row .ui-row-lead.is-cover { width:44px; height:44px; border:0; border-radius:8px; background:var(--surface-2); }
+      .songs-row.is-current .ui-row-title { color:var(--accent); }
+      .songs-row.is-unavailable .ui-row-main { opacity:.45; }
+      .songs-row-kept { display:inline-flex; margin-right:4px; vertical-align:-3px; color:var(--accent); }
+      .songs-row-kept svg { width:16px; height:16px; }
       .song-cover { position:relative; flex:none; width:56px; height:56px; display:inline-flex; align-items:center; justify-content:center; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; background:var(--bg3); }
       .song-cover-note { color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
       .song-cover img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
-      .songs-row-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:.12rem; }
-      .songs-row-copy strong { overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; color:var(--cream); font-size:var(--fs-18); font-weight:400; line-height:1.25; }
-      .songs-row-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-15); font-style:italic; white-space:nowrap; text-overflow:ellipsis; }
-      .songs-row.is-current .songs-row-copy strong { color:var(--gold); }
       .songs-row-len { flex:none; color:var(--cream-dim); font-size:var(--fs-15); font-style:italic; font-variant-numeric:tabular-nums; }
       .song-play { flex:none; width:44px; height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:1.5px solid var(--gold); border-radius:50%; background:transparent; color:var(--gold); cursor:pointer; }
       .song-play svg { width:20px; height:20px; }
       .song-play:not(.is-playing) svg { margin-left:2px; }
       .song-play.is-playing { background:var(--gold); color:var(--bg); }
-      /* W-02 (walk 2026-09-25): a song row plays on a tap anywhere. .songs-row-hit is the row-wide target under the
-         row's content (which lets taps through); the "N versions ›" link, the ▶ and Remove sit above it. */
-      .song-tap-row { position:relative; }
-      .song-tap-row > .songs-row-hit { position:absolute; inset:0; z-index:0; width:100%; padding:0; border:0; border-radius:inherit; background:none; cursor:pointer; }
-      .song-tap-row > .song-cover, .song-tap-row > .songs-row-copy, .song-tap-row > .songs-row-len { position:relative; z-index:1; pointer-events:none; }
-      .song-tap-row > .songs-row-copy { margin-left:.25rem; }
-      .song-tap-row > .song-play, .song-tap-row > .song-keep-remove, .songs-row-versions { position:relative; z-index:2; pointer-events:auto; }
-      .songs-row-line { display:flex; align-items:center; gap:.3rem; min-width:0; }
-      .songs-row-line small { min-width:0; }
-      .songs-row-versions { flex:none; min-height:44px; margin:-13px 0; padding:0 .1rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-15); font-style:italic; white-space:nowrap; cursor:pointer; }
-      .songs-row-versions:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-      @media (hover:hover) { .song-tap-row:hover .songs-row-copy strong, .songs-row-versions:hover { color:var(--gold-bright); } }
-      .songs-nav-row { display:flex; align-items:center; gap:.9rem; width:100%; min-height:60px; padding:.5rem .8rem; border:0; border-top:1px solid var(--border); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .songs-card > .songs-nav-row:first-child { border-top:0; }
-      .songs-nav-mark { width:40px; height:40px; flex:none; display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--gold-border); border-radius:50%; color:var(--gold); }
-      .songs-nav-mark svg { width:20px; height:20px; }
-      .songs-nav-label { flex:1; min-width:0; color:var(--cream); font-size:var(--fs-18); }
-      .songs-nav-count { color:var(--cream-dim); font-size:var(--fs-16); font-variant-numeric:tabular-nums; }
       /* Two columns while a tile stays 10rem wide (rem grows with Text size), else one; never more than two. Two
          fixed columns left a title 48 px at 150% and 0 px at 300% (pl-l0, Songs at large text). */
-      .songs-tiles { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, max(10rem, calc(50% - .3rem))), 1fr)); gap:.6rem; }
-      .songs-tile { display:flex; align-items:center; gap:.6rem; min-height:76px; padding:.45rem .4rem .45rem .45rem; border:1px solid var(--border); border-radius:10px; background:var(--bg3); color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .songs-mosaic { flex:none; display:grid; grid-template-columns:repeat(2,28px); grid-template-rows:repeat(2,28px); gap:2px; overflow:hidden; border:1px solid var(--gold-border); border-radius:7px; }
-      .songs-mosaic .song-cover { width:28px; height:28px; border:0; border-radius:0; }
-      .songs-mosaic .song-cover-note { font-size:var(--fs-12); }
-      .songs-tile-copy { flex:1; min-width:0; display:flex; flex-direction:column; gap:.1rem; }
-      .songs-tile-copy strong { color:var(--cream); font-size:var(--fs-16); font-weight:400; line-height:1.25; }
-      .songs-tile-copy small { color:var(--cream-dim); font-size:var(--fs-14); font-style:italic; }
       /* pl-l0 (player brief section 7): at 200% text a shelf row ran to 449 px on a 412 px screen. The grid's one
          column grew to the row's min-content (the title's longest word plus a count that could not wrap); now the
          column never passes the screen, the count wraps before the title has to, and the title keeps its words whole. */
-      .songs-shelves { display:grid; grid-template-columns:minmax(0,1fr); gap:.55rem; }
-      .songs-shelf { display:flex; align-items:center; gap:.6rem; min-height:52px; padding:.5rem .7rem .5rem 1rem; border:1px solid var(--gold); border-radius:10px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .songs-shelf-title { flex:1; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-13); font-weight:600; letter-spacing:.14em; text-transform:uppercase; }
-      .songs-shelf-count { color:var(--cream); font-size:var(--fs-15); text-align:right; }
       /* Songs at large text (Text size 1.8 and up: the root class vot-large-text, as mw19 pins the reader): px
          gutters, row covers and lengths hidden (the title needs the width; the bar hides its type mark the same way,
          player brief 3a), a shelf's count under its title, the versions link free to wrap. At 300% the hub ran to 458-663 px on a 412 px screen. */
@@ -2070,20 +2022,8 @@
       .vot-large-text .songs-find { padding-left:12px; }
       .vot-large-text .songs-row .song-cover, .vot-large-text .songs-row-len { display:none; }
       .vot-large-text .songs-card .songs-row { padding:8px 10px 8px 8px; }
-      .vot-large-text .songs-row-line { flex-wrap:wrap; }
-      .vot-large-text .songs-row-versions { margin:0; white-space:normal; }
-      .vot-large-text .songs-shelf { flex-wrap:wrap; padding:12px 12px 12px 16px; }
-      .vot-large-text .songs-shelf-title { flex-basis:100%; letter-spacing:.04em; }
-      .vot-large-text .songs-shelf-count { margin-left:auto; }
-      .vot-large-text .songs-nav-mark { display:none; }
-      .vot-large-text .songs-nav-row { gap:12px; padding:8px 12px; }
-      .vot-large-text .songs-nav-label { min-width:auto; }
-      .vot-large-text .songs-chip { max-width:100%; padding:4px 14px; }
-      .vot-large-text .songs-mosaic { display:none; }
-      .vot-large-text .songs-tile { gap:12px; padding:8px 10px 8px 12px; }
-      .vot-large-text .songs-row-copy strong, .vot-large-text .songs-tile-copy strong { overflow-wrap:anywhere; }
+      .vot-large-text .songs-row-copy strong { overflow-wrap:anywhere; }
       .songs-list-actions { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.9rem; }
-      .songs-list-actions .songs-play-all { width:auto; flex:1 1 10rem; }
       .songs-empty { margin:.5rem 0; color:var(--cream-dim); font-style:italic; }
       .songs-state { padding:1.5rem 0; color:var(--cream-dim); text-align:center; }
       .songs-state p { margin:0 0 1rem; font-size:var(--fs-18); font-style:italic; }
@@ -2094,34 +2034,32 @@
       .songs-skeleton-row i { display:block; height:.8rem; border-radius:4px; background:var(--gold-faint); }
       .songs-skeleton-row i + i { width:55%; }
       .coverage-badge.coverage-badge-songs { border-color:var(--gold); color:var(--gold); }
-      .songs-shuffle:focus-visible, .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-chip:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible, .songs-nav-row:focus-visible, .songs-tile:focus-visible, .songs-shelf:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
-      @media (hover:hover) { .songs-shuffle:hover { background:var(--gold-bright); border-color:var(--gold-bright); }.songs-outline-action:hover, .songs-chip:not(.is-on):hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-nav-row:hover, .songs-tile:hover, .songs-shelf:hover, .songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
-      @media (max-width:360px) { .songs-tiles { grid-template-columns:minmax(0,1fr); }.songs-row-len { display:none; } }
-      /* The song page (L3, picture final-03): centred cover and title, PLAY filled and SAVE outlined, version rows. */
-      .song-page { display: flex; flex-direction: column; align-items: center; padding-top: .4rem; text-align: center; }
-      .song-page-eyebrow { margin-bottom: .7rem; }
-      .song-page-cover { width: 200px; height: 200px; border-radius: 10px; }
-      .song-page-cover .song-cover-note { font-size: var(--fs-48); }
-      .songs-screen .song-page h1 { margin-top: .8rem; }
-      .song-page-letter { min-height: 44px; margin-top: .3rem; padding: 0 .25rem; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-18); cursor: pointer; }
-      .song-page-letter em { text-decoration: underline; text-decoration-color: var(--gold-border); text-underline-offset: .18em; }
-      .song-page-shelf { margin: .1rem 0 0; color: var(--cream-dim); font-size: var(--fs-16); font-style: italic; }
-      .song-page-makers { margin: .35rem 0 0; color: var(--cream-dim); font-size: var(--fs-15); }
-      .song-page-actions { display: flex; gap: .6rem; width: 100%; margin-top: 1rem; }
-      .song-page-actions > button { flex: 1 1 0; width: auto; }
-      .song-page-save.is-saved { background: var(--gold-faint); }
-      .song-page .songs-section { width: 100%; text-align: left; }
-      .song-versions { border-top: 1px solid var(--border); }
-      .song-version { display: flex; align-items: center; gap: .6rem; padding: .3rem .1rem; border-bottom: 1px solid var(--border); }
-      .song-version-main { flex: 1; min-width: 0; display: flex; align-items: center; gap: .75rem; min-height: 48px; padding: 0; border: 0; background: none; color: var(--cream); font: inherit; font-size: var(--fs-18); text-align: left; cursor: pointer; }
-      .song-version-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-      .song-version.is-current .song-version-label { color: var(--gold); }
-      .song-page-more { width: 100%; margin-top: .75rem; font-size: var(--fs-18); font-weight: 500; letter-spacing: 0; text-transform: none; }
-      .song-page-lyrics p { margin: 0; color: var(--cream); font-size: var(--fs-18); font-style: italic; line-height: 1.5; }
+      .songs-shuffle:focus-visible, .songs-outline-action:focus-visible, .songs-find-clear:focus-visible, .songs-see-all:focus-visible, .songs-row-main:focus-visible, .song-play:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      @media (hover:hover) { .songs-shuffle:hover { background:var(--gold-bright); border-color:var(--gold-bright); }.songs-outline-action:hover, .song-play:not(.is-playing):hover { background:var(--gold-faint); }.songs-row-main:hover .songs-row-copy strong { color:var(--gold-bright); } }
+      @media (max-width:360px) { .songs-row-len { display:none; } }
+      /* W3d listen: the song page (au-song): cover, title, one line, Play | Save, the vote, From the letter and Lyrics rows. */
+      .song-page { display:flex; flex-direction:column; align-items:center; padding-top:4px; text-align:center; }
+      .song-page-cover { width:180px; height:180px; border:0; border-radius:16px; }
+      .song-page-cover .song-cover-note { font-size:var(--fs-48); }
+      .songs-screen .song-page h1 { margin-top:14px; }
+      .song-page-line { margin:6px 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); line-height:var(--lh-meta); }
+      .song-page-actions { width:100%; margin-top:16px; }
+      .song-page-actions > .ui-btn { flex:1 1 0; }
+      .song-page-save.is-saved { background:var(--accent-soft); color:var(--accent); }
+      .song-page-about, .song-page-lyrics, .song-page .songs-section { width:100%; margin-top:8px; text-align:left; }
+      .song-page-lyrics { padding:16px; border-radius:var(--r-card); background:var(--surface-1); }
+      .song-page-lyrics p { margin:0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-body); line-height:1.5; }
+      .song-page-lyrics p.is-break { height:.75em; }
+      .song-version { display:flex; align-items:center; gap:10px; padding:6px 12px 6px 16px; border-top:1px solid var(--hairline); }
+      .song-version:first-child { border-top:0; }
+      .song-version-main { flex:1; min-width:0; display:flex; align-items:center; gap:12px; min-height:48px; padding:0; border:0; background:none; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-body); text-align:left; cursor:pointer; }
+      .song-version-label { flex:1; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+      .song-version.is-current .song-version-label { color:var(--accent); }
+      .song-page-more { width:100%; margin-top:8px; }
       /* A04.7: Hebrew lines (dir="auto" finds them) run right to left and stand upright; italic Hebrew is a slant no
          Hebrew type has. */
       .song-page-lyrics p:dir(rtl), .song-lyrics-line:dir(rtl) { font-style: normal; }
-      .song-version-main:focus-visible, .song-page-letter:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+      .song-version-main:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Keep on this phone (K1, picture r2-more-screens, third panel): a card in three states — KEEP FOR OFFLINE
          LISTENING with a filled KEEP · 64 MB, KEEPING… with a thin bar and Cancel, AVAILABLE OFFLINE with a check —
          and the same states on one line for a list and a letter's songs card. Tokens only. */
@@ -2170,16 +2108,13 @@
       .song-vote-up.is-on { color: var(--gold); }
       .song-vote:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; }
       @media (hover: hover) { .song-vote:hover { color: var(--gold-bright); } }
-      .song-tap-row > .song-vote-pair { position: relative; z-index: 2; pointer-events: auto; margin-right: -4px; }
       .song-version > .song-vote-pair { margin-right: -4px; }
       /* Large text: when the row is narrower than ~22rem (the title column would fall under ~45% of it: about 125-150 %
          on a 412 px phone), the pair takes its own line under the meta, left-aligned with the title; the ▶ stays right. */
-      .songs-row, .song-version { flex-wrap: wrap; container-type: inline-size; }
+      .song-version { flex-wrap: wrap; container-type: inline-size; }
       @container (max-width: 22rem) {
-        .song-tap-row > .song-vote-pair { order: 10; flex: 1 0 100%; margin: -4px 0 0; padding-left: calc(56px + .6rem + .25rem - 13px); }
         .song-version > .song-vote-pair { order: 10; flex: 1 0 100%; margin: -4px 0 0 -13px; }
       }
-      .vot-large-text .song-tap-row > .song-vote-pair { padding-left: 0; margin-left: -5px; }
       /* The song page's question: a centred line above the seek bar, not a transport control (07). */
       .song-vote-ask { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0 .35rem; margin: .35rem 0 .25rem; }
       .song-vote-ask-q { color: var(--vote-taupe); font-size: var(--fs-16); font-style: italic; text-align: center; }
@@ -2203,7 +2138,6 @@
       .songs-top-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
       .songs-top-line { margin: .6rem 0 0; color: var(--vote-taupe); font-size: var(--fs-15); font-style: italic; }
       .vot-large-text .songs-top-tabs { flex-wrap: wrap; gap: 0 1rem; overflow: visible; }
-      .vot-large-text .songs-section-head .songs-see-all { white-space: nowrap; }
       /* The first thumbs-down (08): once per install, anchored to the thumb-down; OK or a tap elsewhere closes it. */
       .song-vote-note { position: fixed; z-index: 1000; display: flex; align-items: center; gap: .6rem; max-width: min(20rem, calc(100vw - 16px)); padding: .45rem .35rem .45rem .85rem; border: 1px solid #3a3220; border-radius: 8px; background: #14120e; color: var(--cream); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
       .song-vote-note p { margin: 0; font-size: var(--fs-15); line-height: 1.3; }
@@ -2259,7 +2193,7 @@
       .offline-note { margin: 0 auto 1rem; padding: 0 1rem; }
       .songs-row.is-unavailable .song-play, .songs-row.is-unavailable .songs-row-copy strong,
       .song-version.is-unavailable > button, .reading-row.is-unavailable > button { opacity: .45; }
-      .songs-row.is-unavailable .songs-row-hit, .song-version.is-unavailable > button, .reading-row.is-unavailable > button { cursor: default; }
+      .song-version.is-unavailable > button, .reading-row.is-unavailable > button { cursor: default; }
       .audio-sec-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.5rem; }
       .audio-sec-chip {
         display: inline-flex; align-items: center; gap: 0.4em;
@@ -3605,6 +3539,18 @@
     .listen-chapters-all { display: block; padding: var(--sp-3) var(--card-pad); }
     .listen-studies .ui-row-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
     /* -- end W3c listen */
+    /* -- W3d listen: Songs (listen.html au-styles, au-songmenu, au-songs2) */
+    .songs-styles-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .songs-style-cell { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: var(--btn-h); padding: 0 14px; border: 0; border-radius: var(--r-field); background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); text-align: left; cursor: pointer; }
+    .songs-style-cell[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+    .songs-style-count { color: var(--text-2); font-size: var(--ts-meta); font-variant-numeric: tabular-nums; }
+    .songs-tiles-more { width: 100%; border: 0; background: none; text-align: left; cursor: pointer; }
+    .songs-tiles-more .ui-link { display: inline-flex; align-items: center; gap: 4px; font-size: var(--ts-meta); }
+    .songs-screen > .ui-label, .songs-screen .ui-label-row { margin-top: var(--label-above); }
+    .song-menu-votes { margin-bottom: 10px; }
+    .song-menu-votes > .ui-btn { flex: 1 1 0; }
+    .song-menu-votes > .ui-btn.is-on { background: var(--accent-soft); color: var(--accent); }
+    /* -- end W3d listen */
     /* buttons (rule 9): primary gold fill and dark ink; secondary surface fill, primary text, gold icon; text button muted,
        no box. 48 high pills; small 38. Red only for destroying something. */
     .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: var(--btn-h); padding: 0 18px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; line-height: 1.2; white-space: nowrap; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }

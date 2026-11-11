@@ -19,13 +19,15 @@ import { UiIcon } from './UiIcon.jsx';
 const cx = (...parts) => parts.filter(Boolean).join(' ');
 
 /** The 12 px gold section label, with an optional aside: a muted count, or a gold link when `onAside` is given.
- * @param {{ children: any, aside?: any, onAside?: () => void, id?: string }} props */
-export function SectionLabel({ children, aside, onAside, id }) {
+ * `asideLabel` names the link when several on a screen read the same ("See all" -> "See all liked songs");
+ * `asideLive` announces a count that changes as the reader types (a Find box's results).
+ * @param {{ children: any, aside?: any, onAside?: () => void, asideLabel?: string, asideLive?: boolean, id?: string }} props */
+export function SectionLabel({ children, aside, onAside, asideLabel, asideLive = false, id }) {
   if (aside == null) return <h2 className="ui-label" id={id}>{children}</h2>;
   return (
     <div className="ui-label-row">
       <h2 className="ui-label" id={id}>{children}</h2>
-      {onAside ? <button type="button" className="ui-link" onClick={onAside}>{aside}</button> : <span className="ui-label-aside">{aside}</span>}
+      {onAside ? <button type="button" className="ui-link" onClick={onAside} aria-label={asideLabel}>{aside}</button> : <span className="ui-label-aside" aria-live={asideLive ? 'polite' : undefined}>{aside}</span>}
     </div>
   );
 }

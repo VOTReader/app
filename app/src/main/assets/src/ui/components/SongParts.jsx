@@ -15,14 +15,18 @@
 
 import { songThumbUrl, songById, familyById, SONGS_HOST, SongCatalog, songTrack } from '../../utils/song-catalog.js';
 import { songIdOfKey } from '../../utils/audio-track.js';
-import { PlayIcon, PauseIcon } from './AudioShelf.jsx';
+import { PlayIcon, PauseIcon, audioLibraryStore } from './AudioShelf.jsx';
 import { SheetHandle } from './SheetHandle.jsx';
 import { SongKeep } from '../../utils/song-keep.js';
 import { NetStatus, isNetworkError } from '../../utils/net-status.js';
 import { KeepIcon, useSongsOnline } from './SongKeepParts.jsx';
-import { SongVotePair } from './SongVoteParts.jsx';
-import { RowMenu, openRowMenu } from './RowMenu.jsx';
+import { useSongVote } from './SongVoteParts.jsx';
+import { SongVotes } from '../../utils/song-votes.js';
 import { queueMenuItems } from './queue-menu.js';
+import { ActionSheet } from './SelectField.jsx';
+import { UiIcon } from './UiIcon.jsx';
+import { AUDIO_TOAST_ID } from '../../utils/audio-player.js';
+import { showToast } from '../../utils/toast.js';
 
 /**
  * A length in seconds as the pictures print it: 4:12 (1:02:05 past an hour).
@@ -159,38 +163,96 @@ export function SongPlayButton({ playing, label, onClick, className = '', disabl
  *   current?: boolean, playing?: boolean, onPlay: () => void, children?: any }} props
  */
 export function SongListRow({ song, title, line = '', versions = 0, onVersions, len = '', current = false, playing = false, onPlay, children = null }) {
-  // Each row hears the keep store itself: the letter card and the hub draw rows without subscribing to it.
+  // Each row hears the keep store and Saved itself: the letter card and the hub draw rows without subscribing to them.
   React.useSyncExternalStore(SongKeep.subscribe, SongKeep.getVersion);
-  const kept = !!(song && song.id) && SongKeep.isKept(song.id);
+  const library = songLibrary();
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (library && typeof library.subscribe === 'function' ? library.subscribe(cb) : () => {}), [library]),
+    React.useCallback(() => (library && typeof library.getVersion === 'function' ? library.getVersion() : 0), [library])
+  );
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const id = song && song.id ? String(song.id) : '';
+  const kept = !!id && SongKeep.isKept(id);
   const off = !useSongsOnline() && !kept && !current;
-  // sy4-3: the length ends the meta line (pictures song-voting 05, player 15), so the vote pair has room at the right.
-  const meta = line && len ? line + ' · ' + len : line || len;
-  // Play next / Add to queue (player brief 3c): the row's ⋯, and a long-press on the row.
-  const menu = song && song.id && !off ? queueMenuItems({ tracks: [songTrack(song)], name: title }) : [];
+  // W3d (listen.html au-style): cover, title, one meta line ("maker · 4:30", "4:10 · 2 versions"), the star, one menu.
+  const meta = [line, len, versions > 1 ? versions + ' versions' : ''].filter(Boolean).join(' · ');
+  const saved = !!id && !!library && typeof library.isSongSaved === 'function' && library.isSongSaved(id);
+  const openPage = onVersions || (song && song.f && typeof window !== 'undefined' && typeof window.__openSongs === 'function'
+    ? () => window.__openSongs([{ k: 'song', v: song.f }], '') : undefined);
   return (
-    <div className={'songs-row song-tap-row' + (current ? ' is-current' : '') + (off ? ' is-unavailable' : '')}
-      onContextMenu={menu.length ? openRowMenu : undefined}>
-      <button type="button" className="songs-row-hit" tabIndex={-1} aria-hidden="true" onClick={onPlay} disabled={off} />
-      <SongCover song={song} />
-      <span className="songs-row-copy">
-        <strong>{title}</strong>
-        {meta || kept || (versions > 1 && onVersions) ? (
-          <span className="songs-row-line">
-            {kept ? <span className="songs-row-kept" title="On this phone"><KeepIcon /><span className="sr-only">On this phone</span></span> : null}
-            {meta ? <small>{meta}</small> : null}
-            {versions > 1 && onVersions ? (
-              <button type="button" className="songs-row-versions" onClick={(event) => { event.stopPropagation(); onVersions(); }} aria-label={'All ' + versions + ' versions of ' + title}>
-                {(meta ? '· ' : '') + versions + ' versions'} <span aria-hidden="true">›</span>
-              </button>
-            ) : null}
-          </span>
-        ) : null}
-      </span>
-      {song && song.id ? <SongVotePair song={song} title={title} /> : null}
+    <div className={'ui-row songs-row' + (current ? ' is-current' : '') + (off ? ' is-unavailable' : '')}
+      onContextMenu={id ? (event) => { event.preventDefault(); setMenuOpen(true); } : undefined}>
+      <button type="button" className="ui-row-main" onClick={onPlay} disabled={off} aria-current={current ? 'true' : undefined}
+        aria-label={(playing ? 'Pause ' : 'Play ') + title}>
+        <SongCover song={song} className="ui-row-lead is-cover" />
+        <span className="ui-row-text">
+          <span className="ui-row-title">{title}</span>
+          {meta || kept ? (
+            <span className="ui-row-meta">
+              {kept ? <span className="songs-row-kept" title="On this phone"><KeepIcon /><span className="sr-only">On this phone</span></span> : null}
+              {meta}
+            </span>
+          ) : null}
+        </span>
+      </button>
       {children}
-      {menu.length ? <RowMenu label={'More for ' + title} items={menu} /> : null}
-      <SongPlayButton playing={playing} label={title} onClick={onPlay} disabled={off} />
+      {id && library ? (
+        <button type="button" className={'ui-row-star' + (saved ? ' is-on' : '')} aria-pressed={saved} title={saved ? 'Saved' : 'Save'}
+          aria-label={(saved ? 'Remove ' + title + ' from Saved' : 'Save ' + title)} onClick={() => library.toggleSongSaved(id)}>
+          <UiIcon name="star" filled={saved} />
+        </button>
+      ) : null}
+      {id ? (
+        <button type="button" className="ui-row-menu" aria-label={'More for ' + title} title={'More for ' + title} aria-haspopup="dialog"
+          onClick={(event) => { event.stopPropagation(); setMenuOpen(true); }}>
+          <UiIcon name="more" />
+        </button>
+      ) : null}
+      {menuOpen ? <SongMenuSheet song={song} title={title} line={line} onOpenPage={openPage} onClose={() => setMenuOpen(false)} /> : null}
     </div>
+  );
+}
+
+/** The listen store (Saved, Recently played), or null before it is published. @returns {any} */
+function songLibrary() {
+  return typeof audioLibraryStore === 'function' ? audioLibraryStore() : null;
+}
+
+/**
+ * The song menu (listen.html au-songmenu): the song and its line, I like it | Not for me, then Play next, Add to the
+ * end of Up next, Save, Song page and lyrics, Open the letter. One menu, the same order on every song row.
+ * @param {{ song: any, title: string, line?: string, onOpenPage?: () => void, onClose: () => void }} props
+ */
+export function SongMenuSheet({ song, title, line = '', onOpenPage, onClose }) {
+  const id = String(song.id);
+  const vote = useSongVote(id);
+  const library = songLibrary();
+  const saved = !!library && typeof library.isSongSaved === 'function' && library.isSongSaved(id);
+  const letter = songLetterOf(song);
+  // The song's collection, not the row's line (a style list's row names its maker): "Letters from Timothy · 2:53".
+  const sub = [SongCatalog.songAlbumLabel(song) || line, songClock(song.d)].filter(Boolean).join(' · ');
+  const say = (/** @type {string} */ text) => { if (typeof showToast === 'function') showToast({ id: AUDIO_TOAST_ID, className: 'vot-toast', text, ariaLive: 'polite' }); };
+  const actions = [
+    ...queueMenuItems({ tracks: [songTrack(song)], name: title }).map((m) => ({
+      id: m.id, icon: m.id === 'next' ? 'next' : 'plus', label: m.id === 'queue' ? 'Add to the end of Up next' : m.text, onSelect: m.onSelect,
+    })),
+    ...(library ? [{ id: 'save', icon: 'star', label: saved ? 'Remove from Saved' : 'Save', onSelect: () => { library.toggleSongSaved(id); say(saved ? 'Removed from Saved' : 'Saved: ' + title); } }] : []),
+    ...(onOpenPage ? [{ id: 'page', icon: 'music', label: 'Song page and lyrics', onSelect: onOpenPage }] : []),
+    ...(letter && typeof window.__openAudioText === 'function'
+      ? [{ id: 'letter', icon: 'book', label: 'Open the letter', sub: letter.title, onSelect: () => window.__openAudioText({ key: letter.key, title: letter.title }) }] : []),
+  ];
+  const tap = (/** @type {1 | -1} */ v) => { SongVotes.tap(id, v); };
+  return (
+    <ActionSheet open portal onClose={onClose} title={title} sub={sub} actions={actions} className="song-menu-sheet">
+      <div className="ui-btn-row song-menu-votes" role="group" aria-label={'Your vote on ' + title}>
+        <button type="button" className={'ui-btn song-vote-up' + (vote === 1 ? ' is-on' : '')} aria-pressed={vote === 1} onClick={() => tap(1)}>
+          <UiIcon name="like" filled={vote === 1} />I like it
+        </button>
+        <button type="button" className={'ui-btn song-vote-down' + (vote === -1 ? ' is-on' : '')} aria-pressed={vote === -1} onClick={() => tap(-1)}>
+          <UiIcon name="nope" filled={vote === -1} />Not for me
+        </button>
+      </div>
+    </ActionSheet>
   );
 }
 
