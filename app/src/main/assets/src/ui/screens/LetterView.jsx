@@ -9,6 +9,7 @@ import { AudioPlayer } from '../../utils/audio-player.js';
 import { excerptLanding } from '../../utils/excerpt-landing.js';
 import { blockReadText } from '../../utils/segment-dom-text.js';
 import { LetterListenRow, LetterSongsCard, LetterAudioLinks } from '../components/LetterSongs.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
 import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { landingRange, scrollLandingIntoView, markLanding, clearLanding } from '../../utils/landing-mark.js';
 import { FindInUnit } from '../components/FindInUnit.jsx';
@@ -347,8 +348,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
   const hasFn = letter.footnotes ? Object.keys(letter.footnotes).length > 0 : false;
   // "Says The Lord." standing alone as the letter's final block (closing /
   // closing-fn) — drives where the ✦ ornament-divider renders (see below).
-  const _lastBlock = letter.blocks.length > 0 ? letter.blocks[letter.blocks.length - 1] : null;
-  const closingEndsBody = !!_lastBlock && (_lastBlock.type === 'closing' || _lastBlock.type === 'closing-fn');
 
   return (
     <ScreenLayout
@@ -585,23 +584,13 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
                 A letter whose last block is ordinary text (closing phrase
                 inline mid-paragraph, or no closing at all) keeps the divider in
                 its old spot between footnotes and the prev/next cards. */}
-            {closingEndsBody && (
-              <div className="ornament-divider" aria-hidden="true">
-                <div className="ornament-divider-line" />
-                <div className="ornament-divider-symbol">✦</div>
-                <div className="ornament-divider-line" />
-              </div>
-            )}
-
-            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} onRef={handleScripClick} />}
-
-            {!closingEndsBody && (
-              <div className="ornament-divider" aria-hidden="true">
-                <div className="ornament-divider-line" />
-                <div className="ornament-divider-symbol">✦</div>
-                <div className="ornament-divider-line" />
-              </div>
-            )}
+            {/* W2d r-end (mock v2): one ✦ under the text whatever the last block is, then Marked as read,
+                then the footnotes (they sat between the text and the ✦). */}
+            <div className="ornament-divider" aria-hidden="true">
+              <div className="ornament-divider-line" />
+              <div className="ornament-divider-symbol">✦</div>
+              <div className="ornament-divider-line" />
+            </div>
 
             {!studyMode && !inert && markAsReadEnabled && onMarkRead && isRead ? (
               <MarkReadRow read={isRead(letter.id)} onMark={() => onMarkRead()} onUndo={onUnmark} />
@@ -609,6 +598,8 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             {!studyMode && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? (
               <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={letter.id} inert={inert} />
             ) : null}
+
+            {hasFn && <FootnoteListSection footnotes={letter.footnotes} nkjv={letter.nkjv} onInAppLink={wrappedInAppLink} onGoToRef={goToScriptureRef} onRef={handleScripClick} />}
 
             <div className="related-section">
               {letter.addendum && (
@@ -668,6 +659,9 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               {/* Songs of the Letters (L4): in-app songs sit above the external ↗ Audio / Video links. */}
               {!studyMode ? <LetterSongsCard volKey={volKey} letterId={letter.id} letterTitle={letter.title} showSongs={showSongs} /> : null}
 
+              {/* W2d r-end: the outside recordings and videos are one group, "On the website" (it hides when empty). */}
+              <div className="rd-web">
+              <div className="rd-web-label" role="heading" aria-level={2}>On the website</div>
               <LetterAudioLinks letter={letter} />
 
               {/* C2-C [C5]: the presence guard its four siblings above all
@@ -680,19 +674,20 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
               <div className="related-card">
                 <div className="related-card-title" role="heading" aria-level={2}>Videos</div>
                 {letter.videos?.map((v, i) => (
-                  <a key={i} className="related-link" href={v.url} target="_blank" rel="noopener noreferrer">▶ {v.label}</a>
+                  <a key={i} className="related-link" href={v.url} target="_blank" rel="noopener noreferrer"><UiIcon name="film" size="sm" />{v.label}</a>
                 ))}
                 {letter.videoVoiceUrl && (
-                  <a className="related-link" href={letter.videoVoiceUrl} target="_blank" rel="noopener noreferrer">▶ {letter.videoVoiceLabel || "Video (with voice over)"}</a>
+                  <a className="related-link" href={letter.videoVoiceUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="film" size="sm" />{letter.videoVoiceLabel || "Video with voice over"}</a>
                 )}
                 {letter.videoMusicUrl && (
-                  <a className="related-link" href={letter.videoMusicUrl} target="_blank" rel="noopener noreferrer">▶ Video (excerpts set to music)</a>
+                  <a className="related-link" href={letter.videoMusicUrl} target="_blank" rel="noopener noreferrer"><UiIcon name="film" size="sm" />Video set to music</a>
                 )}
                 <a className="related-link" href="https://www.youtube.com/user/trumpetcallofgod" target="_blank" rel="noopener noreferrer">
-                  <span style={{ color: '#cc4444' }} aria-hidden="true">▶</span> Official YouTube Channel
+                  <UiIcon name="out" size="sm" />YouTube channel
                 </a>
               </div>
               )}
+              </div>
             </div>
 
             {/* U01.3: the letter ends on Next letter. Related, songs, audio and videos sit above it, and the install
@@ -700,39 +695,39 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
             <div className="bottom-nav">
               {letter.prevLetter ? (
                 <button className="bottom-nav-card" onClick={() => onNavigate(letter.prevLetter.id)}>
-                  <div className="bottom-nav-label">‹ Previous {unit}</div>
+                  <div className="bottom-nav-label">Previous {String(unit).toLowerCase()}</div>
                   <div className="bottom-nav-title">{letter.prevLetter.title}</div>
                 </button>
               ) : prevBoundary ? (
                 <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                  <div className="bottom-nav-label">{prevBoundary.short ? `‹ Previous · ${prevBoundary.short}` : "‹ Previous Book"}</div>
+                  <div className="bottom-nav-label">{prevBoundary.short ? `Previous · ${prevBoundary.short}` : "Previous book"}</div>
                   <div className="bottom-nav-title">{prevBoundary.title}</div>
                 </button>
               ) : (
                 <div className="bottom-nav-card placeholder">
-                  <div className="bottom-nav-label">‹ Previous {unit}</div>
+                  <div className="bottom-nav-label">Previous {String(unit).toLowerCase()}</div>
                   <div className="bottom-nav-title">—</div>
                 </div>
               )}
 
               {letter.nextLetter ? (
                 <button className="bottom-nav-card next" onClick={() => onNavigate(letter.nextLetter.id)}>
-                  <div className="bottom-nav-label">Next {unit} ›</div>
+                  <div className="bottom-nav-label">Next {String(unit).toLowerCase()}</div>
                   <div className="bottom-nav-title">{letter.nextLetter.title}</div>
                 </button>
               ) : nextBoundary ? (
                 <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                  <div className="bottom-nav-label">{nextBoundary.short ? `Next · ${nextBoundary.short} ›` : "Next Book ›"}</div>
+                  <div className="bottom-nav-label">{nextBoundary.short ? `Next · ${nextBoundary.short}` : "Next book"}</div>
                   <div className="bottom-nav-title">{nextBoundary.title}</div>
                 </button>
               ) : letter.nextLetterExternal ? (
                 <a className="bottom-nav-card next" href={letter.nextLetterExternal.url} target="_blank" rel="noopener noreferrer">
-                  <div className="bottom-nav-label">Next {unit} ›</div>
+                  <div className="bottom-nav-label">Next {String(unit).toLowerCase()}</div>
                   <div className="bottom-nav-title">{letter.nextLetterExternal.title}</div>
                 </a>
               ) : (
                 <div className="bottom-nav-card next placeholder">
-                  <div className="bottom-nav-label">Next {unit} ›</div>
+                  <div className="bottom-nav-label">Next {String(unit).toLowerCase()}</div>
                   <div className="bottom-nav-title">—</div>
                 </div>
               )}

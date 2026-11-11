@@ -139,12 +139,12 @@ describe('LetterView — a study names its parts (A02.10)', () => {
     expect(document.querySelector('.hero-eyebrow').textContent).toBe('Purity \xA0\xB7\xA0 Part 1');
     expect(band().querySelector('.mini-title-eyebrow').textContent).toBe('Purity \xB7 Part 1');
     const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);
-    expect(labels).toEqual(['\u2039 Previous Part', 'Next Part \u203A']);
+    expect(labels).toEqual(['Previous part', 'Next part']);
   });
 
   it('a letter still says Letter', () => {
     renderLetter();
     const labels = [...document.querySelectorAll('.bottom-nav-label')].map((n) => n.textContent);
-    expect(labels).toEqual(['\u2039 Previous Letter', 'Next Letter \u203A']);
+    expect(labels).toEqual(['Previous letter', 'Next letter']);
   });
 });

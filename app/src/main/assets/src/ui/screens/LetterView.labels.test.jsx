@@ -142,9 +142,9 @@ describe('LetterView — the Videos card appears only when there are videos [C5]
   it('renders it for a letter with a voice-over video', () => {
     renderLetter({}, { ...LETTER, videoVoiceUrl: 'https://youtube.com/watch?v=a' });
     expect(videoCard()).toBeTruthy();
-    expect(document.body.textContent).toContain('Video (with voice over)');
+    expect(document.body.textContent).toContain('Video with voice over');
     // The channel link belongs to the card and rides along with it.
-    expect(document.body.textContent).toContain('Official YouTube Channel');
+    expect(document.body.textContent).toContain('YouTube channel');
   });
 
   it('renders it for a letter with a set-to-music video', () => {
