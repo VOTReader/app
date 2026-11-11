@@ -69,13 +69,12 @@ describe.each([
 
   it('does NOT print the title twice when vol duplicates the letter', () => {
     render(<Comp scriptures={[]} votNotes={[DUPLICATED]} onVotLetterClick={() => {}} />);
-    // The quoted title stays; the caption above it must be gone.
-    const hits = screen.getAllByText((_t, el) => !!el && /^["“”]?The Promise["“”]?$/.test(
-      (el.textContent || '').trim()));
-    // Only the quoted-title element (and its ancestors are excluded by the
-    // exact-match regex) — never a second bare "The Promise" caption.
-    const exactCaptions = hits.filter((el) => (el.textContent || '').trim() === 'The Promise');
-    expect(exactCaptions).toHaveLength(0);
+    // The title stays (r-study2, W2i: a serif title, no quotes); the caption above it must be gone.
+    const hits = screen.getAllByText((_t, el) => !!el && !el.children.length
+      && (el.textContent || '').trim() === 'The Promise');
+    expect(hits).toHaveLength(1);
+    expect(hits[0].className).toBe('vot-note-letter');
+    expect(document.querySelector('.vot-note-vol')).toBeNull();
   });
 
   it('renders a volume-less note as static text, not a dead-end button', () => {
