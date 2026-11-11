@@ -1682,12 +1682,9 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
   // main: the subtitle there is "0 links you have made" and the legend is the
   // Scripture Web's distance ramp, which My Web never draws.
 
-  it('R3 with no links the subtitle invites, it does not count to zero', async () => {
+  it('R3 with no links the bar never counts to zero; the empty card is the one invitation (FA, mock w-mine0)', async () => {
     await openMyWeb();
-    const sub = document.querySelector('.sw-title p');
-    expect(sub).toBeTruthy();
-    expect(sub.textContent).not.toMatch(/\d/);
-    expect(sub.textContent).toMatch(/\bLink\b/);
+    expect(document.querySelector('.sw-title p')).toBeNull();
   });
 
   it('R4 in My Web the legend names the two families, Timothy’s notes then your links, one line each; never the canon axis, the distance ramp or chapter length', async () => {

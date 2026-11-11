@@ -621,7 +621,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
                links (R3), and the links not on the web said, never dropped (item
                27): describe.js, the My Web stream's words */
             ? <>
-              <p>{myWebHeadline(personalCount, contextCount)}</p>
+              {/* FA (w-mine0, w-list): with no links the empty card says how; the bar adds no second invitation (mock) */}
+              {personalCount > 0 ? <p>{myWebHeadline(personalCount, contextCount)}</p> : null}
               {skippedCount > 0 && <p>{myWebSkippedLine(skippedCount, pendingCount)}</p>}
             </>
             /* The count shown, alone: "15,402 of 63,418" read as a fraction of
