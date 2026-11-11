@@ -133,16 +133,12 @@ describe('axe — MultiNotePopover', () => {
 
 describe('axe — AnnotationActionChip', () => {
   const chip = { x: 100, y: 100, hlKey: 'bible:genesis:1:1', groupId: 'g1' };
-  it('main row, then the colour and style panels', async () => {
+  it('the sheet: its words, the style switch, the colours and the four tiles (r-mark)', async () => {
     noteStores('');
     g.NoteStore.get = () => null;
     render(<AnnotationActionChip chip={chip} onClose={noop} onNoteRequest={noop} />);
     expectModal('highlight actions');
-    expect(await seriousViolations(document)).toEqual([]);
-    fireEvent.click(screen.getByText('Color'));
-    expect(await seriousViolations(document)).toEqual([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    fireEvent.click(screen.getByText('Style'));
+    expect(screen.getByText('Add note')).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 

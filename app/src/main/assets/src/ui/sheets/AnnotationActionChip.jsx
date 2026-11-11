@@ -1,66 +1,43 @@
 /* ═══════════════════════════════════════════════════════════════════════
    AnnotationActionChip — Cluster D (esbuild bundle-d.js)
+   r-mark (the UI pass, mock v2 readers): a tapped mark opens the selection's
+   sheet docked at the foot: its words, the style switch, the ten colours, then
+   Add note, Copy, Share and Remove. A style or colour tap applies and closes.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { uncoveredLine } from '../../renderer/mark-overlap.js';
 import { snapshotGroups, offerUndoRemoved } from '../../utils/annotation-undo.js';
+import { copyText as copyToClipboard, shareText } from '../../utils/copy-share.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 
-/**
- * Where the chip's top edge goes (cz2, 2026-10-05). It opens 10 px under the tap; when that would cross the bottom
- * (the gesture inset and 8 px of air) it flips 10 px above the tap, and it never climbs under the top bar (nav
- * bottom + 8). A mark tapped at y 880 of 915 used to open the chip 26 px off the screen.
- * @param {number} y tap point @param {number} h chip height @param {number} vh innerHeight
- * @param {number} insetBottom @param {number} navBottom
- */
-export function chipTop(y, h, vh, insetBottom, navBottom) {
-  const floor = vh - insetBottom - 8;
-  let top = y + 10;
-  if (top + h > floor) top = y - 10 - h;
-  return Math.max(navBottom + 8, Math.min(top, floor - h));
-}
+const STYLES = [['highlight', 'Highlight', 'Highlighter'], ['underline', 'Underline', 'Underline'], ['squiggle', 'Squiggle underline', 'Squiggle']];
 
 export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
-  const [mode, setMode] = React.useState('main'); // 'main' | 'confirm' | 'colors' | 'style'
-  // Reset mode whenever a fresh chip opens (different group)
+  const [confirming, setConfirming] = React.useState(false);
+  // Reset whenever a fresh chip opens (different group)
   const lastGroupRef = React.useRef(null);
   React.useEffect(() => {
     if (chip && chip.groupId !== lastGroupRef.current) {
       lastGroupRef.current = chip.groupId;
-      setMode('main');
+      setConfirming(false);
     }
   }, [chip]);
   // Same modal treatment its popover siblings got (MultiNotePopover,
   // BookmarkPopover): scrim + Escape already existed; this adds the
   // focus/semantics half. Must run before the early returns (hooks rule).
   const trapRef = useFocusTrap(!!chip);
-  // Measured placement (the height differs by mode): runs after every render, before paint.
-  React.useLayoutEffect(() => {
-    const el = trapRef.current;
-    if (!chip || !el) return;
-    const cs = getComputedStyle(document.documentElement);
-    const insetBottom = parseFloat(cs.getPropertyValue('--inset-bottom')) || 0;
-    const nav = document.querySelector('.top-nav');
-    const navBottom = nav ? nav.getBoundingClientRect().bottom : (parseFloat(cs.getPropertyValue('--inset-top')) || 0);
-    const box = el.getBoundingClientRect();
-    el.style.top = chipTop(chip.y, box.height, window.innerHeight, insetBottom, navBottom) + 'px';
-    // s28.7: the left edge clamps on the chip's real width (the per-mode estimate let a wide chip run off the right).
-    if (box.width > 0) el.style.left = Math.max(8, Math.min(chip.x - box.width / 2, window.innerWidth - box.width - 8)) + 'px';
-  });
   if (!chip) return null;
-  const { x, y, hlKey, groupId } = chip;
+  const { hlKey, groupId } = chip;
   const ann = (AnnotationStore.get(hlKey) || []).find(h => h.groupId === groupId);
   if (!ann) return null;
   const kind = ann.kind || 'highlight';
   const kindLabel = kind === 'underline' ? 'underline' : kind === 'squiggle' ? 'squiggle' : 'highlight';
   // Note-ness is a NoteStore entry, not the kind.
   const isNote = typeof NoteStore !== 'undefined' && !!NoteStore.get(groupId);
-
-  // Width estimate by mode for viewport clamping
-  const widthByMode = { main: 280, confirm: 280, colors: 320, style: 220 };
-  const cw = widthByMode[mode] || 200;
-  const cx = Math.max(8, Math.min(x - cw / 2, window.innerWidth - cw - 8));
-  const cy = Math.max(8, y + 10);
+  const segs = AnnotationStore.getByGroup ? AnnotationStore.getByGroup(groupId) : [];
+  // Write-time normalize (see SelectionToolbar): old collapsed ann.text must not seed a fresh note's fullText.
+  const words = normalizeExcerptDisplay((segs.length ? segs.map(s => s.ann.text || '') : [ann.text || '']).join(' … '));
 
   const remove = () => {
     const gone = snapshotGroups([groupId]);   // A06.6
@@ -77,24 +54,21 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   };
 
   const restyle = (newKind) => {
-    // Change the VISUAL style (highlight / underline / squiggle) of an existing
-    // annotation. Note-ness is unchanged — it's a NoteStore entry, not the kind.
+    // Change the VISUAL style of an existing annotation. Note-ness is unchanged.
     AnnotationStore.convertGroup(groupId, newKind);
     // Mirror the NoteSheet: restyling a note updates the last-used note default.
     if (isNote && typeof NoteDefaultStore !== 'undefined') NoteDefaultStore.set(newKind, ann.color);
     onClose();
   };
 
+  const toast = (m) => { if (typeof showToast === 'function') showToast(m); };
+  const copy = () => { onClose(); copyToClipboard(words).then((r) => toast(r === 'copied' ? 'Copied' : 'Could not copy')); };
+  const share = () => { onClose(); shareText(words).then((r) => { if (r === 'copied-instead') toast('Copied'); else if (r === 'failed') toast('Could not share'); }); };
+
   const convertToNote = () => {
-    // Attach a note to this mark — keep its current style + color (note-ness
-    // is a NoteStore entry now, so no kind change). Record it as the next
-    // note's default, then open the sheet to write the body.
-    const segs = AnnotationStore.getByGroup(groupId);
-    // Write-time normalize (see SelectionToolbar) — old collapsed ann.text
-    // must not seed a fresh note's fullText.
-    const fullText = normalizeExcerptDisplay(segs.map(s => s.ann.text || '').join(' … '));
+    // Attach a note to this mark, keeping its style + colour; record it as the next note's default.
     const keys = [...new Set(segs.map(s => s.key))];
-    NoteStore.set(groupId, { color: ann.color, fullText, keys, body: '' });
+    NoteStore.set(groupId, { color: ann.color, fullText: words, keys, body: '' });
     if (typeof NoteDefaultStore !== 'undefined') {
       NoteDefaultStore.set(kind === 'note' ? 'highlight' : kind, ann.color);
     }
@@ -107,136 +81,50 @@ export function AnnotationActionChip({ chip, onClose, onNoteRequest }) {
   return (
     <>
       <div
-        style={{ position: 'fixed', inset: 0, zIndex: 2999 }}
+        className="rd-sheet-scrim"
         aria-hidden="true"
         onClick={onClose}
         onContextMenu={(e) => { e.preventDefault(); onClose(); }}
       />
       <div
-        className="ann-chip"
+        className="ann-chip rd-sheet"
         ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label={`${kindLabel} actions`}
-        style={{ position: 'fixed', left: cx, top: cy, zIndex: 3000 }}
         onClick={(e) => e.stopPropagation()}
       >
-        {mode === 'main' && (
-          <>
-            {/* Destructive action LAST + separated (see .ann-chip-btn.danger
-                margin/border in app.css) so a tap aimed at the common actions
-                (Color/Style/Note) can't land on Remove. */}
-            <button
-              className="ann-chip-btn"
-              onClick={() => setMode('colors')}
-              title="Recolor"
-            >
-              <svg viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="8" />
-                <circle cx="8" cy="9" r="1.4" fill="currentColor" stroke="none" />
-                <circle cx="12" cy="7" r="1.4" fill="currentColor" stroke="none" />
-                <circle cx="16" cy="9" r="1.4" fill="currentColor" stroke="none" />
-                <circle cx="17" cy="14" r="1.4" fill="currentColor" stroke="none" />
-              </svg>
-              <span>Color</span>
-            </button>
-            <button
-              className="ann-chip-btn"
-              onClick={() => setMode('style')}
-              title="Style"
-            >
-              <svg viewBox="0 0 24 24">
-                <line x1="5" y1="8" x2="19" y2="8" />
-                <line x1="5" y1="12" x2="14" y2="12" />
-                <path d="M4 18q1.5-2.5 3 0t3 0 3 0 3 0" />
-              </svg>
-              <span>Style</span>
-            </button>
-            {!isNote && (
-              <button
-                className="ann-chip-btn"
-                onClick={convertToNote}
-                title="Convert to note"
-                aria-haspopup="dialog"
-              >
-                <svg viewBox="0 0 24 24">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="8" y1="13" x2="16" y2="13" />
-                  <line x1="8" y1="17" x2="16" y2="17" />
-                </svg>
-                <span>Note</span>
-              </button>
-            )}
-            <button
-              className="ann-chip-btn danger"
-              onClick={() => setMode('confirm')}
-              title="Remove"
-            >
-              <svg viewBox="0 0 24 24">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-              <span>Remove</span>
-            </button>
-          </>
-        )}
-        {mode === 'confirm' && (
+        {confirming ? (
           <ConfirmStrip
             // RC.11: a mark it covers comes back, so the question says so.
             question={[`Remove this ${kindLabel}?`, uncoveredLine([groupId], AnnotationStore)].filter(Boolean).join(' ')}
             yesLabel="Yes, remove"
-            onCancel={() => setMode('main')}
+            onCancel={() => setConfirming(false)}
             onConfirm={remove}
           />
-        )}
-        {mode === 'colors' && (
-          <div className="ann-chip-colors">
-            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back" aria-label="Back">‹</button>
-            {HL_COLORS.map(c => (
-              <button
-                key={c}
-                type="button"
-                className={'ann-chip-color-btn' + (ann.color === c ? ' active' : '')}
-                data-color={c}
-                onClick={() => recolor(c)}
-                title={c}
-                aria-label={c}
-                aria-pressed={ann.color === c}
-              />
-            ))}
-          </div>
-        )}
-        {mode === 'style' && (
-          <div className="ann-chip-colors">
-            <button className="ann-chip-back" onClick={() => setMode('main')} title="Back" aria-label="Back">‹</button>
-            {/* The glyph is the same "A" in three looks, so the name comes from aria-label and the
-                current style from aria-pressed (as in SelectionToolbar). */}
-            <button
-              type="button"
-              className={'sel-style-btn' + (kind !== 'underline' && kind !== 'squiggle' ? ' active' : '')}
-              onClick={() => restyle('highlight')}
-              title="Highlight"
-              aria-label="Highlight"
-              aria-pressed={kind !== 'underline' && kind !== 'squiggle'}
-            ><span className="sel-style-glyph">A</span><span className="sel-style-name">Highlight</span></button>
-            <button
-              type="button"
-              className={'sel-style-btn sel-style-btn-underline' + (kind === 'underline' ? ' active' : '')}
-              onClick={() => restyle('underline')}
-              title="Underline"
-              aria-label="Underline"
-              aria-pressed={kind === 'underline'}
-            ><span className="sel-style-glyph">A</span><span className="sel-style-name">Underline</span></button>
-            <button
-              type="button"
-              className={'sel-style-btn sel-style-btn-squiggle' + (kind === 'squiggle' ? ' active' : '')}
-              onClick={() => restyle('squiggle')}
-              title="Squiggle underline"
-              aria-label="Squiggle underline"
-              aria-pressed={kind === 'squiggle'}
-            ><span className="sel-style-glyph">A</span><span className="sel-style-name">Squiggle</span></button>
-          </div>
+        ) : (
+          <>
+            {words && <div className="rd-quote">{words}</div>}
+            <div className="ui-seg rd-seg" role="group" aria-label="Style">
+              {STYLES.map(([id, label, word]) => (
+                <button key={id} type="button" className={'ui-seg-item sel-style-btn' + (id === 'highlight' ? '' : ' sel-style-btn-' + id) + (kind === id || (id === 'highlight' && kind === 'note') ? ' active' : '')}
+                  onClick={() => restyle(id)} title={label} aria-label={label} aria-pressed={kind === id || (id === 'highlight' && kind === 'note')}>{word}</button>
+              ))}
+            </div>
+            <div className="rd-colors">
+              {HL_COLORS.map(c => (
+                <button key={c} type="button" className={'sel-color-btn' + (ann.color === c ? ' active' : '')} data-color={c}
+                  onClick={() => recolor(c)} title={c} aria-label={c} aria-pressed={ann.color === c} />
+              ))}
+            </div>
+            {/* Destructive action LAST, in red, so a tap aimed at the common actions can't land on it. */}
+            <div className="rd-tiles is-4">
+              {!isNote && <button type="button" className="rd-tile ann-chip-btn" onClick={convertToNote} title="Add note" aria-haspopup="dialog"><UiIcon name="note" /><span>Add note</span></button>}
+              <button type="button" className="rd-tile ann-chip-btn" onClick={copy} title="Copy"><UiIcon name="copy" /><span>Copy</span></button>
+              <button type="button" className="rd-tile ann-chip-btn" onClick={share} title="Share"><UiIcon name="share" /><span>Share</span></button>
+              <button type="button" className="rd-tile ann-chip-btn is-danger" onClick={() => setConfirming(true)} title="Remove"><UiIcon name="trash" /><span>Remove</span></button>
+            </div>
+          </>
         )}
       </div>
     </>

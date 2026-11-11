@@ -32,7 +32,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import * as ReactDOM from 'react-dom';
-import { SelectionToolbar, computeToolbarPlacement } from './SelectionToolbar.jsx';
+import { SelectionToolbar } from './SelectionToolbar.jsx';
 import { dockTop } from './selection-drag.js';
 import { snapSelectionRange as realSnapSelectionRange } from '../../renderer/annotation-engine.jsx';
 import { showToast as realShowToast, _resetToasts } from '../../utils/toast.js';
@@ -144,7 +144,7 @@ describe('SelectionToolbar — W4.5 mouse-drag selection', () => {
     expect(tb).not.toBeNull();
     expect(tb.querySelector('.sel-toolbar-colors')).not.toBeNull();
     expect([...tb.querySelectorAll('.sel-action-btn span')].map((s) => s.textContent))
-      .toEqual(['Note', 'Link', 'Copy', 'Share', 'Search', 'Bookmark']);
+      .toEqual(['Note', 'Link', 'Bookmark', 'Copy', 'Share', 'Search']);
   });
 
   it('does not raise the toolbar on a plain click (collapsed selection)', async () => {
@@ -576,138 +576,6 @@ describe('SelectionToolbar — verse-number crossing (Android menu + copy)', () 
     expect(writtenTexts[0]).toMatch(/5/);
     // Copy text also includes the reading content
     expect(writtenTexts[0]).toMatch(/God called the li/);
-  });
-});
-
-describe('computeToolbarPlacement — near-top placement policy', () => {
-  // toolbarH 150, navBottom 60 → minY = 60+8+150 = 218; lineH 28 → half a line above (14), a line below (32:
-  // the end handle hangs under the last line).
-  const base = { toolbarH: 150, navBottom: 60, viewportH: 800, lineH: 28 };
-
-  it('fits above: sits a little above the selection, no scroll', () => {
-    expect(computeToolbarPlacement({ ...base, selTop: 400, selBottom: 420, maxScrollUp: 500 }))
-      .toEqual({ y: 386, scrollUp: 0 }); // 400 − 14
-  });
-
-  it('near the top: sits below the selection, clear of its end handle, and the page does not move (rs1)', () => {
-    // above = 100−14 = 86 < 218. The old policy scrolled the page 174 px here before it looked below; on the S22
-    // that moved the page 69 to 149 px under every long-press in the middle of the screen. Below: 120 + 32 + 150.
-    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 120, maxScrollUp: 500 }))
-      .toEqual({ y: 302, scrollUp: 0 });
-  });
-
-  it('at the very top of the document (no scroll room): fully below, never a partial scroll', () => {
-    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 120, maxScrollUp: 40 }))
-      .toEqual({ y: 302, scrollUp: 0 });
-  });
-
-  it('viewport-spanning selection (nothing fits): clamps under the nav so the end handle stays reachable', () => {
-    // below = 700+32+150 = 882 > 792; the assist would push the end (700) past the screen → last resort.
-    expect(computeToolbarPlacement({ ...base, selTop: 100, selBottom: 700, maxScrollUp: 500 }))
-      .toEqual({ y: 218, scrollUp: 0 });
-  });
-
-  it('a selection starting OFF-SCREEN above never triggers the assist scroll (no yank-back)', () => {
-    // Reachable now that real scrolling + edge auto-scroll let a selection run
-    // far past the viewport: measured on-device, the release yanked the reader
-    // ~2000px back up. selTop -1900 is above navBottom 60 -> assist refused;
-    // selBottom 700 leaves no room below either, so it clamps under the nav.
-    expect(computeToolbarPlacement({ ...base, selTop: -1900, selBottom: 700, maxScrollUp: 2563 }))
-      .toEqual({ y: 218, scrollUp: 0 });
-    // Same off-screen start, but with room below -> below, still no scroll.
-    expect(computeToolbarPlacement({ ...base, selTop: -1900, selBottom: 200, maxScrollUp: 2563 }))
-      .toEqual({ y: 382, scrollUp: 0 });
-  });
-
-  it('the assist only fills the gap neither side leaves, capped, and never pushes the end off the screen', () => {
-    // A short screen (420): above = 150−14 = 136 < 218; below = 250+32+150 = 432 > 412 → assist 82.
-    const short = { ...base, viewportH: 420 };
-    expect(computeToolbarPlacement({ ...short, selTop: 150, selBottom: 250, maxScrollUp: 900 }))
-      .toEqual({ y: 218, scrollUp: 82 });
-    // A deficit past one toolbar-plus-gap (164) is refused: 218 − (62−14) = 170.
-    expect(computeToolbarPlacement({ ...short, selTop: 62, selBottom: 250, maxScrollUp: 900 }))
-      .toEqual({ y: 218, scrollUp: 0 });
-    // The end would land at 340 + 82 = 422, past the screen's 412: refused (rs1).
-    expect(computeToolbarPlacement({ ...short, selTop: 150, selBottom: 340, maxScrollUp: 900 }))
-      .toEqual({ y: 218, scrollUp: 0 });
-  });
-
-  it('the gaps track the text line height and are sane-bounded', () => {
-    // Largest text size: lineH 48 → 24 above.
-    expect(computeToolbarPlacement({ ...base, lineH: 48, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(476);
-    // Absurd computed lineHeight clamps at 40 above.
-    expect(computeToolbarPlacement({ ...base, lineH: 500, selTop: 500, selBottom: 520, maxScrollUp: 0 }).y).toBe(460);
-    // Below: the gap is at least 32 (the handle), at most 80.
-    expect(computeToolbarPlacement({ ...base, lineH: 10, selTop: 100, selBottom: 120, maxScrollUp: 0 }).y).toBe(302);
-    expect(computeToolbarPlacement({ ...base, lineH: 500, selTop: 100, selBottom: 120, maxScrollUp: 0 }).y).toBe(350);
-  });
-});
-
-describe('SelectionToolbar — near-top selection never sits under the toolbar (layout effect)', () => {
-  /* jsdom has no layout engine: the placement layout effect bails on
-     offsetWidth/offsetHeight 0. Stub the prototype getters so ONLY the
-     .sel-toolbar element reports a real size (320×150) — every other element
-     keeps jsdom's 0, matching production geometry closely enough to drive the
-     placement math. No .top-nav in the test DOM → navBottom falls back to 60,
-     so minY = 218; the rangeOver rect is top 100 / bottom 116 and jsdom's
-     lineHeight is unparseable → lineH falls back to 28 → 14 above, 32 below. */
-  let restoreSize;
-  beforeEach(() => {
-    const ow = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
-    const oh = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight');
-    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
-      configurable: true,
-      get() { return this.classList && this.classList.contains('sel-toolbar') ? 320 : 0; },
-    });
-    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-      configurable: true,
-      get() { return this.classList && this.classList.contains('sel-toolbar') ? 150 : 0; },
-    });
-    restoreSize = () => {
-      Object.defineProperty(HTMLElement.prototype, 'offsetWidth', ow);
-      Object.defineProperty(HTMLElement.prototype, 'offsetHeight', oh);
-    };
-  });
-  afterEach(() => { restoreSize(); });
-
-  /** Scrollable reading container (stands in for .screen-scroll) with a
-      controllable scrollTop, holding a [data-hl-key] paragraph. */
-  function scrollerWithContainer(scrollTop) {
-    const s = document.createElement('div');
-    s.style.overflowY = 'auto';
-    Object.defineProperty(s, 'scrollHeight', { configurable: true, get: () => 2000 });
-    Object.defineProperty(s, 'clientHeight', { configurable: true, get: () => 700 });
-    let st = scrollTop;
-    Object.defineProperty(s, 'scrollTop', { configurable: true, get: () => st, set: (v) => { st = v; } });
-    document.body.appendChild(s);
-    const p = document.createElement('p');
-    p.setAttribute('data-hl-key', 'bible:test:1:1');
-    p.textContent = 'The Revelation of Jesus Christ';
-    s.appendChild(p);
-    return { scroller: s, container: p };
-  }
-
-  it('with scroll room: the toolbar sits BELOW the selection, clear of it, and the page does not move (rs1; the 2026-07-29 fix scrolled 174 px)', () => {
-    const { scroller, container } = scrollerWithContainer(500);
-    mount();
-    stubSelection(rangeOver(container, 0, 14)); // rect top 100, bottom 116
-    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    const tb = /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
-    expect(tb).not.toBeNull();
-    expect(scroller.scrollTop).toBe(500);
-    expect(tb.style.top).toBe('298px');     // bottom edge; its TOP at 148, a line under the selection's 116
-  });
-
-  it('at the top of the document (scrollTop 0): places the toolbar fully BELOW the selection (RED pre-fix: clamped on top of it)', () => {
-    const { scroller, container } = scrollerWithContainer(0);
-    mount();
-    stubSelection(rangeOver(container, 0, 14));
-    act(() => { fire(container, 'contextmenu', { clientX: 20, clientY: 20 }); });
-    const tb = /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
-    expect(tb).not.toBeNull();
-    expect(scroller.scrollTop).toBe(0);     // nothing to reveal — no pointless jump
-    // y 298 → toolbar TOP at 298−150 = 148, a line's gap under selBottom 116.
-    expect(tb.style.top).toBe('298px');
   });
 });
 
@@ -1154,7 +1022,7 @@ describe('SelectionToolbar — Listen from here', () => {
     return /** @type {HTMLElement} */ (document.querySelector('.sel-toolbar'));
   }
 
-  it('offers it, in its own row between the colours and the actions, on text with a recording', async () => {
+  it('offers it, in the pair row under the six actions, on text with a recording', async () => {
     const c = readingContainer('letter:one:chosen:3', 'Many things will I teach you. And though you feel weak');
     const start = vi.fn(() => true);
     /** @type {any} */ (window).__votListenFrom = { has: (k) => k === 'letter:one:chosen:3', start };
@@ -1164,13 +1032,14 @@ describe('SelectionToolbar — Listen from here', () => {
     expect(btn).not.toBeNull();
     expect(btn.textContent.trim()).toBe('Listen from here');
     expect(btn.getAttribute('type')).toBe('button');
+    // r-sel: in the pair row under the six tiles.
     const rows = [...tb.children].map((el) => el.className);
-    const iListen = rows.findIndex((cl) => /sel-toolbar-listen/.test(cl));
-    expect(iListen).toBeGreaterThan(rows.findIndex((cl) => /sel-toolbar-styles/.test(cl)));
-    expect(iListen).toBeLessThan(rows.findIndex((cl) => /sel-toolbar-actions/.test(cl)));
+    const iListen = rows.findIndex((cl) => /rd-pair/.test(cl));
+    expect(btn.closest('.rd-pair')).not.toBeNull();
+    expect(iListen).toBeGreaterThan(rows.findIndex((cl) => /sel-toolbar-actions/.test(cl)));
     // The six actions are untouched.
     expect([...tb.querySelectorAll('.sel-action-btn span')].map((s) => s.textContent))
-      .toEqual(['Note', 'Link', 'Copy', 'Share', 'Search', 'Bookmark']);
+      .toEqual(['Note', 'Link', 'Bookmark', 'Copy', 'Share', 'Search']);
     expect(start).not.toHaveBeenCalled();
   });
 
@@ -1191,7 +1060,7 @@ describe('SelectionToolbar — Listen from here', () => {
     mount();
     let tb = await raise(c, 4, 14);
     expect(tb.querySelector('.sel-listen-btn')).toBeNull();
-    expect(tb.querySelector('.sel-toolbar-listen')).toBeNull();
+    expect(tb.querySelector('.sel-listen-btn')).toBeNull();
     cleanup();
     /** @type {any} */ (window).__votListenFrom = { has: () => false, start: vi.fn(() => true) };
     mount();
@@ -1223,12 +1092,12 @@ describe('SelectionToolbar — Repeat', () => {
     /** @type {any} */ (window).__votListenFrom = { has: () => true, start: vi.fn(() => true), repeat };
     mount();
     const tb = await raise(c, 4, 14);
-    const row = /** @type {HTMLElement} */ (tb.querySelector('.sel-toolbar-listen'));
+    const row = /** @type {HTMLElement} */ (tb.querySelector('.rd-pair'));
     const btn = /** @type {HTMLButtonElement} */ (row.querySelector('.sel-repeat-btn'));
     expect(btn).not.toBeNull();
     expect(btn.textContent.trim()).toBe('Repeat');
     expect(btn.getAttribute('aria-label')).toBe('Repeat this passage 3 times');
-    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['sel-listen-btn', 'sel-repeat-btn']);
+    expect([...row.querySelectorAll('button')].map((b) => b.className)).toEqual(['rd-pair-btn sel-listen-btn', 'rd-pair-btn sel-repeat-btn']);
     act(() => { fire(btn, 'click'); });
     expect(repeat).toHaveBeenCalledTimes(1);
     const [keys, label, times] = repeat.mock.calls[0];
@@ -1708,11 +1577,6 @@ describe('dockTop: the toolbar measures its room below the selection against the
     box('audio-bar', 845, 70); box('mode-toggle-wrap', 600, 51, 'none');
     expect(dockTop(document, 915)).toBe(845);
   });
-  it('keeps the toolbar off the player: below the selection only when it fits above the dock', () => {
-    const base = { selTop: 100, selBottom: 700, toolbarH: 48, navBottom: 67, lineH: 28, maxScrollUp: 0 };
-    expect(computeToolbarPlacement({ ...base, viewportH: 915 }).y).toBe(780);   // 700 + a line (32, rs1) + 48
-    expect(computeToolbarPlacement({ ...base, viewportH: 745 }).y).toBe(123);
-  });
 });
 
 /* The Scripture Web's door (the navigation stream, w3; the digest's A2 "doors in from reading").
@@ -1751,30 +1615,30 @@ describe('SelectionToolbar — the Scripture Web door', () => {
     expect(document.querySelector('.sel-toolbar')).toBeNull();
   });
 
-  it('a letter: "See this letter\u2019s scriptures", for the page\'s own letter', async () => {
+  it('a letter: "Its Scriptures", for the page\'s own letter', async () => {
     const open = vi.fn(() => true);
     /** @type {any} */ (window).__openScriptureWeb = open;
     const c = readingContainer('letter:the-wide-path:4', 'Enter by the narrow gate');
     mount();
     const btn = door(await raise(c, 0, 9));
-    expect(btn.textContent.trim()).toBe('See this letter\u2019s scriptures');
+    expect(btn.textContent.trim()).toBe('Its Scriptures');
     act(() => { btn.click(); });
     expect(open).toHaveBeenCalledWith('this-letter');
   });
 
-  it('its own full-width row under the six actions, which stay two rows of three', async () => {
+  it('the pair row under the six actions, which stay two rows of three', async () => {
     /** @type {any} */ (window).__openScriptureWeb = vi.fn(() => true);
     const c = readingContainer('bible:john:3:16', 'For God so loved the world');
     mount();
     const tb = await raise(c, 0, 10);
     const btn = door(tb);
-    const row = btn.closest('.sel-toolbar-row');
-    expect(row.classList.contains('sel-toolbar-web')).toBe(true);
+    const row = btn.closest('.rd-pair');
+    expect(row).not.toBeNull();
     expect(row.querySelectorAll('button')).toHaveLength(1);
     expect(btn.classList.contains('sel-action-btn'), 'not a seventh cell in the grid').toBe(false);
     expect([...tb.querySelectorAll('.sel-toolbar-actions .sel-action-btn span')].map((s) => s.textContent))
-      .toEqual(['Note', 'Link', 'Copy', 'Share', 'Search', 'Bookmark']);
-    const rows = [...tb.querySelectorAll('.sel-toolbar-row')];
+      .toEqual(['Note', 'Link', 'Bookmark', 'Copy', 'Share', 'Search']);
+    const rows = [...tb.children];
     expect(rows.indexOf(row)).toBeGreaterThan(rows.findIndex((r) => r.classList.contains('sel-toolbar-actions')));
   });
 
@@ -1832,9 +1696,9 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
     const tb = await raise(c, 0, 22);
     const btn = door(tb);
     expect(btn.textContent.trim()).toBe('Share as a card');
-    expect(btn.closest('.sel-toolbar-row').classList.contains('sel-toolbar-web')).toBe(true);
+    expect(btn.closest('.rd-pair')).not.toBeNull();
     expect([...tb.querySelectorAll('.sel-toolbar-actions .sel-action-btn span')].map((s) => s.textContent))
-      .toEqual(['Note', 'Link', 'Copy', 'Share', 'Search', 'Bookmark']);
+      .toEqual(['Note', 'Link', 'Bookmark', 'Copy', 'Share', 'Search']);
     act(() => { btn.click(); });
     expect(document.querySelector('.sel-toolbar')).toBeNull();
     const sheet = document.querySelector('[role="dialog"][aria-label="Share as a card"]');
@@ -1852,7 +1716,7 @@ describe('SelectionToolbar — Share as a card (Answers)', () => {
       mount();
       const tb = await raise(c, 0, 22);
       const web = /** @type {HTMLButtonElement} */ (tb.querySelector('[data-door="web"]'));
-      expect(web.textContent.trim()).toBe('See this topic’s scriptures');
+      expect(web.textContent.trim()).toBe('Its Scriptures');
       act(() => { web.click(); });
       expect(open).toHaveBeenCalledWith('this-letter');
     } finally { delete /** @type {any} */ (window).__openScriptureWeb; }

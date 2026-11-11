@@ -84,11 +84,11 @@ describe('leaks — note and annotation sheets', () => {
     noteStores('Reflection');
     await leakFree('MultiNotePopover', () => render(<MultiNotePopover payload={{ groupIds: ['g1', 'g2'], x: 180, y: 300 }} onClose={noop} onPick={noop} />));
   });
-  it('AnnotationActionChip, its colour panel open', async () => {
+  it('AnnotationActionChip, its remove confirm open', async () => {
     noteStores('');
     g.NoteStore.get = () => null;
     await leakFree('AnnotationActionChip', () => render(<AnnotationActionChip chip={{ x: 100, y: 100, hlKey: 'bible:genesis:1:1', groupId: 'g1' }} onClose={noop} onNoteRequest={noop} />),
-      () => { fireEvent.click(screen.getByText('Color')); });
+      () => { fireEvent.click(screen.getByText('Remove')); });
   });
   it('BookmarkCreateSheet', async () => {
     await leakFree('BookmarkCreateSheet', () => render(<BookmarkCreateSheet pending={{ hlKey: 'bible:john:3:16', defaultLabel: 'John 3:16', sourceLabel: 'John 3', excerpt: 'For God so loved the world' }}

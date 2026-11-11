@@ -5548,37 +5548,6 @@
        Tap 🎨 → chip expands to color row.
        Outside tap → dismisses entirely.
        ════════════════════════════════════════════════════════════ */
-    .ann-chip {
-      background: rgba(38,32,24,0.97);
-      border: 1px solid var(--gold-border);
-      border-radius: 12px;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.55);
-      display: flex; align-items: stretch;
-      overflow: hidden;
-      animation: annChipIn 0.16s ease;
-      -webkit-user-select: none; user-select: none;
-    }
-    body.light .ann-chip { background: rgba(232,222,200,0.97); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
-    @keyframes annChipIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-    .ann-chip-btn {
-      background: none; border: none;
-      padding: 9px 13px;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-      color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, color 0.12s;
-      min-width: 56px;
-    }
-    .ann-chip-btn + .ann-chip-btn { border-left: 1px solid rgba(224,201,127,0.12); }
-    .ann-chip-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
-    .ann-chip-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-    /* Destructive Remove sits LAST in the chip, behind a real gutter + a
-       stronger divider, so a tap aimed at Color/Style/Note can't reach it. */
-    .ann-chip-btn.danger { color: var(--danger); margin-left: 6px; border-left: 1px solid var(--gold-border); }
-    .ann-chip-btn.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     /* Confirm strip — replaces the chip in place. */
     .ann-chip-confirm {
       display: flex; align-items: center; gap: 10px;
@@ -5641,38 +5610,62 @@
     }
     .ann-chip-back:active { color: var(--cream); }
 
-    /* ── SELECTION TOOLBAR ───────────────────────────────────────── */
-    .sel-toolbar {
-      position: fixed; z-index: 9000;
-      background: rgb(38,32,24); border: 1px solid var(--gold-border);
-      border-radius: 14px; padding: 8px 10px 6px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.6);
-      display: flex; flex-direction: column; gap: 4px;
-      opacity: 1;
-      animation: selToolbarIn 0.16s ease;
-      width: max-content; max-width: min(360px, calc(100vw - 16px));
+    /* ── W2e readers (mock v2 r-sel, r-mark): the reader's action sheet. The selection's bar and a
+       tapped mark's chip are one bottom sheet docked at the foot (never placed against the words, so it
+       never moves the page): style switch, ten colours in a row, worded tiles, then a pair row. ── */
+    .rd-sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000;
+      display: flex; flex-direction: column; max-height: 85vh; overflow-y: auto;
+      background: var(--surface-1); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+      padding: var(--sp-5) var(--gutter) calc(var(--inset-bottom, 0px) + var(--sp-6));
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.6);
+      animation: rdSheetIn 0.18s ease;
       -webkit-user-select: none; user-select: none;
-      /* No backdrop-filter — promotes the toolbar to a GPU layer and makes
-         the action labels and "A" style buttons render fuzzy. The background
-         is SOLID (7c, 2026-09-24): at 0.97 alpha a settled capture still
-         showed the letter text through it, over the Listen from here row. */
     }
-    body.light .sel-toolbar { background: rgb(232,222,200); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
-    /* cp1 sweep: while the selection is being changed (a handle drag, Shift+
-       arrows) the toolbar steps aside — it sat two lines above the words, over
-       the lines a start handle is dragged up into — and fades back where the
-       selection settles (SelectionToolbar SETTLE_MS). */
-    .sel-toolbar { transition: opacity 0.12s ease; }
+    body.light .rd-sheet { box-shadow: 0 -10px 30px rgba(0,0,0,0.14); }
+    .rd-sheet::before { content: ''; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--surface-3); }
+    @keyframes rdSheetIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+    /* cp1 sweep: while the selection is being changed (a handle drag, Shift+arrows) the sheet steps aside
+       and fades back where the selection settles (SelectionToolbar SETTLE_MS). */
+    .sel-toolbar.rd-sheet { transition: opacity 0.12s ease; }
     .sel-toolbar.is-adjusting { opacity: 0; pointer-events: none; }
-    /* Animate ONLY opacity (transform is set via inline style for positioning,
-       and animating transform here clobbered the inline translateY(-100%)
-       that makes the toolbar sit above the y-coordinate). */
-    @keyframes selToolbarIn {
-      from { opacity:0; }
-      to   { opacity:1; }
+    .ann-chip.rd-sheet { z-index: 3000; }
+    .rd-sheet-scrim { position: fixed; inset: 0; z-index: 2999; }
+    .rd-quote {
+      margin: 2px 0 12px; padding-left: 12px; border-left: 2px solid var(--surface-3);
+      color: var(--text-2); font-family: var(--font-serif); font-style: italic; font-size: var(--ts-body); line-height: 1.45;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
     }
-    .sel-toolbar-row { display: flex; align-items: center; gap: 6px; }
-    .sel-toolbar-styles { padding: 2px 0; }
+    .rd-seg { background: var(--surface-2); }
+    .rd-seg .sel-style-btn { width: auto; height: auto; min-height: var(--seg-h); border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; }
+    .rd-seg .sel-style-btn.active { border: 0; background: var(--surface-3); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--accent-ring); }
+    .rd-colors { display: flex; justify-content: space-between; margin: 14px 1px; }
+    .rd-colors .sel-color-btn { position: relative; width: 28px; height: 28px; padding: 0; }
+    .rd-colors .sel-color-btn:not(.sel-color-underline):not(.sel-color-squiggle) { border: 0; }
+    .rd-colors .sel-color-btn::before { content: ''; position: absolute; inset: -8px -4px; }
+    .rd-colors .sel-color-btn.active { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--text-1); }
+    .rd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .rd-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .rd-tile, .rd-pair-btn, .sel-link-choice-btn {
+      display: flex; align-items: center; justify-content: center; border: 0; border-radius: var(--r-field);
+      background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); font-weight: 500;
+      cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--press) ease;
+    }
+    .rd-tile { flex-direction: column; gap: 5px; min-height: 58px; padding: 6px 4px; font-size: var(--ts-meta); }
+    .rd-pair { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .rd-pair-btn, .sel-link-choice-btn { flex: 1 1 40%; gap: 7px; min-height: var(--tap); padding: 0 12px; font-size: var(--ts-value); white-space: nowrap; }
+    .rd-pair-btn.sel-repeat-btn { flex: 0 1 auto; }
+    .rd-tile svg, .rd-pair-btn svg { flex-shrink: 0; color: var(--accent); }
+    .rd-tile:active, .rd-pair-btn:active, .sel-link-choice-btn:active { background: var(--surface-3); }
+    :is(.rd-tile, .rd-pair-btn).is-danger, :is(.rd-tile, .rd-pair-btn).is-danger svg { color: var(--tone-danger); }
+    :is(.rd-tile, .rd-pair-btn, .sel-link-choice-btn, .sel-link-choice-cancel):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* cp2: Share held offers the website link too, in a row above the tiles. */
+    .sel-link-choice { display: flex; gap: 10px; margin-bottom: 8px; }
+    .sel-link-choice-cancel { flex: 0 0 auto; min-height: var(--tap); padding: 0 14px; border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
+    .rd-sheet .ann-chip-confirm { padding: 4px 0; }
+    /* ── end W2e readers (r-sel, r-mark) ── */
+
+    /* ── the style buttons and colour dots (NoteSheet shares them) ── */
     .sel-toolbar-divider {
       width: 1px; height: 24px; background: var(--gold-border);
       margin: 0 4px; flex-shrink: 0;
@@ -5700,11 +5693,7 @@
     /* Color circles. They WRAP onto a second row (zones L2, 2026-10-05): the row scrolled sideways, so on a
        360 or 412 px phone purple, teal, brown and gray sat out of sight past the bar's edge with nothing to
        say they were there (tools/e2e-phone-fit.mjs W1). Same colours, same size. */
-    .sel-toolbar-colors {
-      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-      flex-grow: 1; min-width: 0;
-      padding: 2px 0;
-    }
+
     .sel-color-btn {
       width: 34px; height: 34px; border-radius: 50%;   /* U06.2: 26 px dots at a 32 px pitch took near misses */
       border: 2px solid transparent; cursor: pointer;
@@ -5755,17 +5744,6 @@
     .sel-color-btn.sel-color-squiggle[data-color="teal"]   { border-color: var(--hl-teal); }
     .sel-color-btn.sel-color-squiggle[data-color="brown"]  { border-color: var(--hl-brown); }
     .sel-color-btn.sel-color-squiggle[data-color="gray"]   { border-color: var(--hl-gray); }
-    /* Clear/remove circle (X) at end of color row */
-    /* Gap before the destructive ✕ so it reads as its own action, not the
-       next swatch in the color row (it was flush against the last color). */
-    .sel-color-clear {
-      background: transparent; color: var(--cream-dim);
-      border: 2px solid var(--gold-border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: var(--fs-14); font-weight: 600;
-      margin-left: 10px;
-    }
-    .sel-color-clear:active { background: rgba(244,143,177,0.2); border-color: var(--accent-pink) !important; color: var(--accent-pink); }
     /* Blank ("no color") swatch — outline circle + diagonal slash (the
        universal "none" glyph). Shown in the note + chip color rows only when
        the Highlight style is active; squiggle/underline are always a visible
@@ -5784,95 +5762,10 @@
     /* Side-scroll cue — fade the right edge of the color strips so it's clear
        the palette continues off-screen (the colors overflow horizontally on
        a phone). Applied to all three color rows for consistency. */
-    .sel-toolbar-colors, .ann-chip-colors, .note-sheet-menu-colors {
+    .ann-chip-colors, .note-sheet-menu-colors {
       -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
       mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
     }
-    /* Action button row: 5 buttons, equal-width grid */
-    /* 3-across so the 6 actions form two balanced rows (5-across left a lone
-       orphan button wrapping onto its own row) and each target gets wider. */
-    .sel-toolbar-actions {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 2px; padding-top: 4px;
-      border-top: 1px solid var(--gold-border);
-    }
-    /* Plain words under the icons ("Note", "Bookmark"), not 10 px capitals: the
-       redesign's round 6 (2026-09-25) drew every take this way, and each of the
-       three columns has ~105 px, room for "Bookmark" at 13 px. Pinned to px
-       below, like the rest of the toolbar. */
-    .sel-action-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      padding: 8px 6px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: none;
-      color: var(--cream-dim); font-family: var(--font-body);
-      font-size: var(--fs-13); letter-spacing: 0; text-transform: none;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .sel-action-btn:active { background: var(--gold-faint); }
-    .sel-action-btn svg { width: 18px; height: 18px; stroke: var(--cream-dim); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-    /* LISTEN FROM HERE (item 7, 2026-09-24): an outlined action in its own
-       row between the colours and the six actions (Codex mockup r1 option 2);
-       rendered only on text with a recording. Gold, so it reads as the
-       listening action, not a seventh annotation tool; 44 px tall with a
-       12 px semibold label and a solid gold edge after Codex's critique of the
-       built row (7b). */
-    .sel-toolbar-listen { padding-top: 2px; gap: 0; }
-    .sel-listen-btn {
-      flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold);
-      color: var(--gold); font-family: 'Cinzel', serif;
-      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .sel-listen-btn:active { background: var(--gold-faint); }
-    /* cp2: Share held offers the website link too, in a row above the actions. */
-    .sel-link-choice { gap: 8px; }
-    .sel-link-choice-btn {
-      flex: 1 1 auto; min-height: 44px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold); color: var(--gold);
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .sel-link-choice-btn:active { background: var(--gold-faint); }
-    .sel-link-choice-cancel {
-      flex: 0 0 auto; min-width: 44px; min-height: 44px; border-radius: 8px; cursor: pointer;
-      background: none; border: 1px solid transparent; color: var(--cream-muted); font-size: var(--fs-15);
-      -webkit-tap-highlight-color: transparent;
-    }
-    .sel-listen-btn svg { width: 15px; height: 15px; fill: var(--gold); stroke: none; flex-shrink: 0; }
-    /* REPEAT (rp1 part 3, mockup r1-repeat.png): the right-hand segment of the
-       same outlined box, Listen from here on the left, one gold divider. */
-    .sel-repeat-btn {
-      flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 44px; padding: 6px 14px; border-radius: 0 8px 8px 0; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold); border-left-width: 0;
-      color: var(--gold); font-family: 'Cinzel', serif;
-      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .sel-repeat-btn:active { background: var(--gold-faint); }
-    .sel-repeat-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .sel-listen-btn:not(:last-child) { border-radius: 8px 0 0 8px; }
-    /* THE SCRIPTURE WEB'S DOOR (the navigation stream; review of 2026-10-18): its own row under the
-       six actions, the Listen row's outlined shape, since as a seventh action it laid the grid of
-       three out 3/3/1 with an orphan; full width, so it says what it does ("Show in Scripture Web") */
-    .sel-toolbar-web { padding-top: 4px; }
-    .sel-web-btn {
-      flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold);
-      color: var(--gold); font-family: 'Cinzel', serif;
-      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .sel-web-btn:active { background: var(--gold-faint); }
-    .sel-web-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
-
     /* ── LINK ICON (next to verse) ───────────────────────────────── */
     .verse-link-icon {
       display: inline-flex; align-items: center; justify-content: center;
@@ -7915,11 +7808,6 @@
     .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
     .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }
     .sel-style-btn { font-size: var(--fsc-16); }
-    .sel-action-btn { font-size: var(--fsc-13); }
-    .sel-listen-btn { font-size: var(--fsc-12); }
-    .sel-repeat-btn { font-size: var(--fsc-12); }
-    .sel-web-btn { font-size: var(--fsc-12); }
-    .ann-chip-btn { font-size: var(--fsc-10); }
     .mode-toggle-label { font-size: var(--fsc-10); }
     .ascroll-step { font-size: var(--fsc-20); }
     .ascroll-cancel { font-size: var(--fsc-10); }

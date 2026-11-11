@@ -93,7 +93,7 @@ const BANNED = ['tutorial', 'onboarding', 'coach mark', 'coachmark', 'modal', 'U
     bookmark" against "Highlight, or Note"). The second sentence names what the bar really holds
     (SelectionToolbar: the colours, then Note, Link, Copy, Share; n88, A06.8): it said "Highlight, or
     Note", and the bar has no Highlight button. */
-export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A bar appears: tap a colour to highlight it, or choose Note, Link, Copy or Share.';
+export const HIGHLIGHT_GESTURE_WORDS = 'Hold your finger on any line for a moment. A sheet rises: tap a colour to highlight it, or choose Note, Link, Copy or Share.';
 
 /** THE FIRST LETTER (n114, A08.1): Volume One, Letter 1, "Chosen by God" (short, with a recording). The tour's
     letter stops open it, first run's Begin Reading opens it, and the tour is offered over it there. */

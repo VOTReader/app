@@ -257,20 +257,23 @@ describe('app.css — the redesign walk\'s large-type fixes hold', () => {
   });
 });
 
-/* THE SELECTION TOOLBAR SAYS ITS ACTIONS IN WORDS (redesign round 6, 2026-09-25): "Note", "Link",
-   "Bookmark" under the icons at 13 px, pinned to px like the rest of the floating chrome, not 10 px
-   spaced capitals. */
-describe('app.css — the selection toolbar labels are plain words', () => {
-  it('sets them in the body face, sentence case, 13 px, pinned', () => {
-    const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-    const blocks = [];
-    const re = /(?:^|\n)\s*\.sel-action-btn \{([^}]*)\}/g;
-    let m;
-    while ((m = re.exec(bare))) blocks.push(m[1]);
-    expect(blocks.length).toBe(2);   // the base rule and the chrome pin
-    expect(blocks[0]).toMatch(/text-transform:\s*none/);
-    expect(blocks[0]).toMatch(/font-family:\s*var\(--font-body\)/);
-    expect(blocks[1]).toMatch(/font-size:\s*var\(--fsc-13\)/);
+/* r-sel (the UI pass, mock v2 readers): the selection is one bottom sheet docked at the foot, its six
+   actions worded tiles in the UI face over surface-2, a pair row under them, solid in both themes. */
+describe('app.css — the selection sheet (r-sel)', () => {
+  it('docks at the foot on the sheet surface, never placed against the words', () => {
+    const sheet = ruleBlock(CSS, '.rd-sheet {');
+    expect(sheet).toMatch(/position:\s*fixed/);
+    expect(sheet).toMatch(/bottom:\s*0/);
+    expect(sheet).toMatch(/background:\s*var\(--surface-1\)/);
+  });
+  it('words its actions in tiles: UI face, sentence case, a gold icon', () => {
+    const tile = ruleBlock(CSS, '.rd-tile, .rd-pair-btn, .sel-link-choice-btn {');
+    expect(tile).toMatch(/font-family:\s*var\(--font-ui\)/);
+    expect(tile).toMatch(/background:\s*var\(--surface-2\)/);
+    expect(ruleBlock(CSS, '.rd-tile svg, .rd-pair-btn svg {')).toMatch(/color:\s*var\(--accent\)/);
+  });
+  it('Listen from here and the pair row take a full finger', () => {
+    expect(ruleBlock(CSS, '\n    .rd-pair-btn, .sel-link-choice-btn {')).toMatch(/min-height:\s*var\(--tap\)/);
   });
 });
 
@@ -648,35 +651,6 @@ describe('app.css — one pill grammar in the Scripture Web strip', () => {
     const opt = /(?:^|\s)color\s*:\s*([^;]+);/.exec(ruleBlock(CSS, '.sw-seg-btn {') || '');
     expect(btn && opt, 'a pill rule has no color').toBeTruthy();
     expect(opt[1].trim()).toBe(btn[1].trim());
-  });
-});
-
-/* Item 7b (2026-09-24), Codex's critique of the built LISTEN FROM HERE row
-   (lanes/readalong/out/mockups/listen-from-here/critique.md): a daily listener's
-   finger target and a primary action's weight, in both themes. */
-describe('app.css — the selection toolbar\'s Listen from here', () => {
-  it('takes a full finger (44 px) and reads as the primary action: 12 px semibold label, solid gold edge, 15 px icon', () => {
-    const block = ruleBlock(CSS, '.sel-listen-btn {');
-    expect(block).toMatch(/min-height:\s*44px/);
-    expect(block).toMatch(/font-size:\s*var\(--fs-12\)/);
-    expect(block).toMatch(/font-weight:\s*600/);
-    expect(block).toMatch(/border:\s*1px solid var\(--gold\)/);
-    const icon = ruleBlock(CSS, '.sel-listen-btn svg');
-    expect(icon).toMatch(/width:\s*15px/);
-    expect(icon).toMatch(/height:\s*15px/);
-  });
-});
-
-/* Item 7c (2026-09-24): the selection toolbar is SOLID. Its comment always said "Bg is already 0.97 alpha so it
-   reads as solid", but a settled 360x800 capture (1.2 s after it rose, lanes/readalong/out/listen-from-look/
-   toolbar.png) showed the letter text plainly through it, over the new Listen from here row; the same capture
-   with the background forced opaque (toolbar-opaque.png) showed none. */
-describe('app.css — the selection toolbar is opaque in both themes', () => {
-  it('paints a solid background, dark and light', () => {
-    const dark = ruleBlock(CSS, '.sel-toolbar {');
-    expect(dark).toMatch(/background:\s*rgb\(38,\s*32,\s*24\)/);
-    const light = ruleBlock(CSS, 'body.light .sel-toolbar {');
-    expect(light).toMatch(/background:\s*rgb\(232,\s*222,\s*200\)/);
   });
 });
 
