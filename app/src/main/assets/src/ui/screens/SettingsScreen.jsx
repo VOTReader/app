@@ -1426,7 +1426,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             )}
             <SettingsRow
               label="Turn the Page with the Audio"
-              desc="The reading moves with the audio. Off keeps the audio going; use Open the reading on the player."
+              desc="The reading moves with the audio. Off keeps the audio going; use Open the letter on the player."
               checked={settings.audioTurnPage !== false}
               onToggle={() => onToggle("audioTurnPage")}
             />

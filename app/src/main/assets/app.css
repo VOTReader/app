@@ -3550,6 +3550,21 @@
     .song-menu-votes { margin-bottom: 10px; }
     .song-menu-votes > .ui-btn { flex: 1 1 0; }
     .song-menu-votes > .ui-btn.is-on { background: var(--accent-soft); color: var(--accent); }
+    /* W3d listen: the players (au-player, au-splayer): a quiet kicker, the star in the bar, a Reading now card,
+       four worded tools that show their values */
+    .np-kicker, .np-kicker-from, .np-kicker-at, .np-kicker-dot { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 400; letter-spacing: 0; text-transform: none; }
+    .np-star { width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: center; justify-self: end; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--text-1); cursor: pointer; }
+    .np-star.is-on { color: var(--accent); }
+    .np-tools .np-tool { gap: 2px; padding: 10px 4px 8px; border-radius: var(--r-card); background: var(--surface-1); color: var(--accent); }
+    .np-tools .np-tool.is-on { background: var(--accent-soft); }
+    .np-tools .np-tool-box, .np-tools .np-tool.is-on .np-tool-box { width: auto; height: 26px; border: 0; background: none; }
+    .np-tools .np-tool-box svg { width: var(--icon); height: var(--icon); }
+    .np-tools .np-tool-word { color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .np-tool-value { max-width: 100%; overflow: hidden; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); line-height: var(--lh-label); white-space: nowrap; text-overflow: ellipsis; }
+    .np-live { display: block; width: 100%; padding: 14px 16px 16px; border: 0; border-radius: var(--r-card); background: var(--surface-1); text-align: left; }
+    .np-live-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .np-live .np-live-kicker { margin: 0; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; }
+    .np-live .np-live-cue { margin: 0 0 0 auto; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); }
     /* -- end W3d listen */
     /* buttons (rule 9): primary gold fill and dark ink; secondary surface fill, primary text, gold icon; text button muted,
        no box. 48 high pills; small 38. Red only for destroying something. */

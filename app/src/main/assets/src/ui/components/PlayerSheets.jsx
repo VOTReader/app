@@ -30,6 +30,7 @@ import { PlayIcon, PauseIcon, chapterTitleOf } from './AudioShelf.jsx';
 export { chapterTitleOf };
 import { formatClock } from './AudioSeekSlider.jsx';
 import { NextIcon } from './SongParts.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 /** @param {string | null | undefined} value @returns {string} */
 function trackLabel(value) { return value || 'Untitled recording'; }
@@ -217,8 +218,9 @@ export function VoiceSheet({ voices, title, needsConfirm, single, onClose }) {
    Editing (pl-l2 L3): a row's grip drags it up or down (arrow keys on the grip
    move it one place, Delete removes it); a sideways swipe removes it, a red
    strip under it saying so; every removal and Clear upcoming says what went
-   with an Undo for 5 s. Screen readers keep a Move earlier / Move later /
-   Remove button per row. Rows carry their length ("Volume One · 6:12"), a
+   with an Undo for 5 s. Every upcoming row has a visible × that removes it
+   the same way (listen.html au-upnext); screen readers keep a Move earlier /
+   Move later button per row. Rows carry their length ("Volume One · 6:12"), a
    Bible chapter its title, the head the time left in the queue. */
 
 /** Above this many rows the window applies; below it the queue renders whole. */
@@ -319,12 +321,16 @@ function QueueRow({ track, index, qi, count, played, onRemove }) {
               }}>
               <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M5 8h14M5 12h14M5 16h14" /></svg>
             </button>
-            {/* What a finger does by drag or swipe, as buttons a screen reader can reach. */}
+            {/* What a finger does by drag, as buttons a screen reader can reach. */}
             <span className="np-row-sr">
               <button type="button" className="sr-only" disabled={!canMoveUp} onClick={() => AudioPlayer.moveUpcoming(index, index - 1)} aria-label={'Move ' + words.title + ' earlier'} />
               <button type="button" className="sr-only" disabled={!canMoveDown} onClick={() => AudioPlayer.moveUpcoming(index, index + 1)} aria-label={'Move ' + words.title + ' later'} />
-              <button type="button" className="sr-only" onClick={() => onRemove(index)} aria-label={'Remove ' + words.title + ' from queue'} />
             </span>
+            {/* listen.html au-upnext: × takes one out, the same removal (and Undo) as the swipe. Its press starts no swipe. */}
+            <button type="button" className="ui-row-menu np-row-x" aria-label={'Remove ' + words.title + ' from Up next'} title="Remove"
+              onPointerDown={(e) => e.stopPropagation()} onClick={() => onRemove(index)}>
+              <UiIcon name="x" />
+            </button>
           </>
         )}
       </div>
@@ -420,6 +426,7 @@ export function UpNextSheet({ state, onClose }) {
           setNote('Showing ' + (Math.min(queue.length, to + QUEUE_PAGE) - state.qi - 1) + ' of ' + upcoming + ' upcoming recordings.');
         }}>{'Show ' + Math.min(QUEUE_PAGE, queue.length - to) + ' later'}</button>
       ) : null}
+      {upcoming > 0 && !restoring ? <p className="np-sheet-note np-upnext-note">Drag the handle to reorder. Tap × to take one out.</p> : null}
       {upcoming > 0 ? null : <p className="audio-manager-empty">Play a collection to line up more recordings, or choose Play next or Add to queue on any recording.</p>}
       {undo ? (
         <div className="np-undo" role="status">

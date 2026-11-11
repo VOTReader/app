@@ -4,17 +4,17 @@
    sheet: the bar's tap opens it full screen (a right-side panel on a wide
    window), ⌄ or a drag down on its head closes it.
 
-     head        ⌄ · "VOLUME ONE · LETTER 3 OF 30" · ⋯ (Save, Open the reading)
-     body        a reading: the title in the reading serif, "Read by …" and the
-                 Voice chip, "Open the reading ›"; a WTLB compilation names the
+     head        ⌄ · "VOLUME ONE · 3 OF 30" · the Save star (listen.html au-player)
+     body        a reading: the title in the reading serif, "Read by …",
+                 the Reading now card, "Open the letter ›"; a WTLB compilation names the
                  letter under the clock and "Entry 12 of 25 in this recording".
                  A song: its cover (or its lyrics), the version chip, the letter
                  it comes from, "Do you like this song?"
      dock        pinned to the thumb zone, never scrolled away (fixes 27a, U04.3):
                  the scrubber (a compilation's letters as ticks), the transport
                  (reading: prev · −10 · play · +10 · next, the step Settings sets; song: shuffle · prev ·
-                 play · next · repeat) and the bottom row (Speed · Sleep · Up next
-                 · Read along; a song: Lyrics · Sleep · Up next · On this phone),
+                 play · next · repeat) and the bottom row, each tool with its value
+                 (Speed · Sleep · Voice · Up next; a song: Lyrics · Sleep · Up next · Song page),
                  each of which opens a small sheet (PlayerSheets.jsx).
 
    This is deliberately a controller, never a second player: all transport,
@@ -22,18 +22,16 @@
    remain in utils/audio-player.js. The screen only renders that public state.
 */
 
+import { UiIcon } from './UiIcon.jsx';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { BIBLE_AUDIO_EDITIONS, bibleAudioOffered, displayPartLabel, queuePlace, songIdOfKey } from '../../utils/audio-track.js';
 import { songById, familyById, versionsOf, isVerbatimSong } from '../../utils/song-catalog.js';
 import { SongCover, ChoiceSheet, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, songClock, songLetterOf } from './SongParts.jsx';
 import { SongLyricsCard } from './SongDeskParts.jsx';
 import { SongVoteAsk } from './SongVoteParts.jsx';
-import { useSongKeep, useSongsOnline } from './SongKeepParts.jsx';
-import { formatSongBytes } from '../../utils/song-keep.js';
 import { AudioSeekSlider, formatClock as formatTime } from './AudioSeekSlider.jsx';
 import { useDragToClose } from './SheetHandle.jsx';
 import { hasTextDestination, PlayIcon, PauseIcon } from './AudioShelf.jsx';
-import { RowMenu } from './RowMenu.jsx';
 import { SpeedSheet, SleepSheet, VoiceSheet, UpNextSheet } from './PlayerSheets.jsx';
 import { LiveLine } from './LiveLine.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
@@ -189,10 +187,7 @@ function SkipIcon({ dir, sec }) {
 }
 function MoonIcon() { return <svg {...ICON}><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z" /></svg>; }
 function ListIcon() { return <svg {...ICON}><path d="M5 7h14M5 12h14M5 17h9" /></svg>; }
-function BookIcon() { return <svg {...ICON} strokeWidth={1.5}><path d="M12 6.5C9.8 5 7 4.6 3.5 5v13c3.5-.4 6.3 0 8.5 1.5 2.2-1.5 5-1.9 8.5-1.5V5c-3.5-.4-6.3 0-8.5 1.5z" /><path d="M12 6.5v13" /></svg>; }
 function QuoteIcon() { return <svg {...ICON} fill="currentColor" stroke="none"><path d="M10 7c-2.8.6-4.6 2.8-4.6 5.9V17H10v-4.6H7.7c.1-1.6 1-2.7 2.6-3.1zm8 0c-2.8.6-4.6 2.8-4.6 5.9V17H18v-4.6h-2.3c.1-1.6 1-2.7 2.6-3.1z" /></svg>; }
-function KeepIcon() { return <svg {...ICON}><path d="M12 4v11" /><path d="M7 10.5l5 5 5-5" /><path d="M5 19.5h14" /></svg>; }
-function KeptIcon() { return <svg {...ICON}><circle cx="12" cy="12" r="8.5" /><path d="M8.2 12.3l2.6 2.6 5-5.2" /></svg>; }
 
 /**
  * What the kicker counts this recording as: "Letter 3 of 30", "Chapter 3 of 50", "Recording 2 of 6".
@@ -214,9 +209,9 @@ function sleepNoun(track, isSong) {
 
 /**
  * The bottom row's one button: an icon (or the speed) in a box, its word under it.
- * @param {{ label: string, word: string, onClick: () => void, children: any, badge?: number, on?: boolean, disabled?: boolean, haspopup?: boolean, className?: string }} props
+ * @param {{ label: string, word: string, value?: string, onClick: () => void, children: any, badge?: number, on?: boolean, disabled?: boolean, haspopup?: boolean, className?: string }} props
  */
-function Tool({ label, word, onClick, children, badge = 0, on = false, disabled = false, haspopup = true, className = '' }) {
+function Tool({ label, word, value = '', onClick, children, badge = 0, on = false, disabled = false, haspopup = true, className = '' }) {
   return (
     <button
       type="button"
@@ -231,6 +226,7 @@ function Tool({ label, word, onClick, children, badge = 0, on = false, disabled 
         {badge > 0 ? <span className="np-tool-badge" aria-hidden="true">{badge > 99 ? '99+' : badge}</span> : null}
       </span>
       <span className="np-tool-word" aria-hidden="true">{word}</span>
+      {value ? <span className="np-tool-value" aria-hidden="true">{value}</span> : null}
     </button>
   );
 }
@@ -293,8 +289,6 @@ export function AudioManagerSheet({ open, state, onClose }) {
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
     React.useCallback(() => library && typeof library.getVersion === 'function' ? library.getVersion() : 0, [library])
   );
-  const keep = useSongKeep();
-  const online = useSongsOnline();
 
   // The close bridge is the player's while no sheet of its own is up (a sheet holds it then, and hands it back).
   React.useEffect(() => {
@@ -339,7 +333,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
   const bibleCh = AudioPlayer.bibleChapterOfTrack(current);
   const bibleParts = bibleCh > 0 ? ((/** @type {any} */ (globalThis).BIBLE_AUDIO_MANIFEST || {})[current.key] || []) : [];
   const counted = bibleParts.length >= bibleCh && bibleCh > 0 ? { at: bibleCh, of: bibleParts.length } : queuePlace(queue, state.qi);
-  const kickerAt = songId || restoring || (single && !bibleCh) || counted.of < 2 ? '' : placeNoun(current) + ' ' + counted.at + ' of ' + counted.of;
+  const kickerAt = songId || restoring || (single && !bibleCh) || counted.of < 2 ? '' : counted.at + ' of ' + counted.of;
   const kickerFrom = songId ? (current.sub || 'Songs of the Letters') : (current.sub || (kickerAt ? '' : 'The Volumes of Truth'));
   // Suppressed when it would only echo the title: a per-chapter Bible track is titled "Genesis 2" and labelled
   // "Chapter 2" (2026-08-10). The label itself is untouched; see displayPartLabel.
@@ -369,19 +363,15 @@ export function AudioManagerSheet({ open, state, onClose }) {
   // The verbatim gate (Corbin 2026-09-25): an interpretation keeps the way to its letter but never says it is the
   // letter's words.
   const fromWords = isVerbatimSong(song) ? 'From the letter' : 'Inspired by the letter';
-  const songName = current.title || 'this song';
-  const keepOk = !!songId && keep.availability() === 'ok';
-  const keepState = keepOk ? keep.progressOf([songId]) : null;
-  const kept = !!(keepState && keepState.total > 0 && keepState.kept === keepState.total);
-  const keeping = !!(keepState && keepState.busy);
   const canPage = !!(song && song.f) && typeof window !== 'undefined' && typeof window.__openSongs === 'function';
-
-  const menu = [
-    { id: 'save', text: saved ? 'Saved · Remove' : 'Save', icon: 'save', onSelect: () => { toggleSavedRecording(library, current); } },
-  ];
-  if (canRead) menu.push({ id: 'read', text: songId ? (letter ? fromWords.replace('From', 'Open') : 'Open the reading') : 'Open the reading', icon: 'open', onSelect: openReading });
-  if (kept) menu.push({ id: 'unkeep', text: 'Remove from this phone', icon: 'remove', onSelect: () => { void keep.remove([songId]); } });
-  if (canPage) menu.push({ id: 'page', text: 'Song page', icon: 'open', onSelect: () => { window.__openSongs([{ k: 'song', v: song.f }], ''); onClose(); } });
+  const name = heading || current.title || (songId ? 'this song' : 'this recording');
+  const starOn = songId ? !!(library && typeof library.isSongSaved === 'function' && library.isSongSaved(songId)) : saved;
+  const toggleStar = () => {
+    if (songId) { if (library && typeof library.toggleSongSaved === 'function') library.toggleSongSaved(songId); }
+    else toggleSavedRecording(library, current);
+  };
+  const rateWord = (Math.round(state.rate * 100) / 100) + '×';
+  const upWord = restoring ? '' : upcoming ? upcoming.toLocaleString('en-US') + ' left' : 'None left';
 
   const play = (
     <button
@@ -417,7 +407,10 @@ export function AudioManagerSheet({ open, state, onClose }) {
             {kickerFrom && kickerAt ? <span className="np-kicker-dot" aria-hidden="true">{' · '}</span> : null}
             {kickerAt ? <span className="np-kicker-at">{kickerAt}</span> : null}
           </div>
-          <RowMenu label={'More for ' + (heading || 'this recording')} items={menu} />
+          <button type="button" className={'np-star' + (starOn ? ' is-on' : '')} aria-pressed={starOn} onClick={toggleStar}
+            aria-label={starOn ? 'Remove ' + name + ' from Saved' : 'Save ' + name} title={starOn ? 'Saved' : 'Save'}>
+            <UiIcon name="star" filled={starOn} />
+          </button>
         </header>
 
         <div className={'np-body' + (songId ? (lyrics ? ' np-body-lyrics' : '') : ' np-body-spoken')}>
@@ -456,12 +449,6 @@ export function AudioManagerSheet({ open, state, onClose }) {
               <h2 className="np-title" id="audio-manager-title">{heading || 'Untitled recording'}</h2>
               <div className="np-byrow">
                 {byline ? <p className="np-byline">{byline}</p> : null}
-                {voices ? (
-                  <button type="button" className="np-chip np-voice audio-manager-voice-top" aria-haspopup="dialog" onClick={() => setSheet('voice')}
-                    aria-label={(voices.kind === 'edition' ? 'Edition: ' : 'Voice: ') + voices.activeLabel + '. Choose another'}>
-                    {voices.kind === 'edition' ? voices.activeLabel : 'Voice'} <span aria-hidden="true">▾</span>
-                  </button>
-                ) : null}
               </div>
               <LiveLine track={current} time={state.time} title={heading || ''} onOpen={canRead ? openReading : null} />
               {state.failed ? (
@@ -498,28 +485,22 @@ export function AudioManagerSheet({ open, state, onClose }) {
           )}
           <div className="np-tools">
             {songId ? (
-              <Tool label={lyrics ? 'Hide lyrics' : 'Lyrics'} word="Lyrics" on={lyrics} haspopup={false} onClick={() => setLyrics(!lyrics)}><QuoteIcon /></Tool>
+              <Tool label={lyrics ? 'Hide lyrics' : 'Lyrics'} word="Lyrics" value={lyrics ? 'Hide' : 'Show'} on={lyrics} haspopup={false} onClick={() => setLyrics(!lyrics)}><QuoteIcon /></Tool>
             ) : (
-              <Tool label={'Speed, ' + String(Math.round(state.rate * 100) / 100) + '×'} word="Speed" on={Math.abs(state.rate - 1) > 0.005} onClick={() => setSheet('speed')}>
-                <span className="np-tool-rate">{(Math.round(state.rate * 100) / 100).toFixed(Math.round(state.rate * 100) % 10 ? 2 : 1)}×</span>
+              <Tool label={'Speed, ' + rateWord} word="Speed" value={rateWord} on={Math.abs(state.rate - 1) > 0.005} onClick={() => setSheet('speed')}>
+                <UiIcon name="clock" />
               </Tool>
             )}
-            <Tool label={sleepOn ? 'Sleep timer: ' + sleepWord : 'Sleep timer'} word={sleepWord} on={sleepOn} onClick={() => setSheet('sleep')}><MoonIcon /></Tool>
-            <Tool label={'Up next' + (upcoming ? ', ' + upcoming + ' left' : '')} word="Up next" badge={restoring ? 0 : upcoming} onClick={() => setSheet('upnext')}><ListIcon /></Tool>
-            {songId ? (
-              keepOk ? (
-                <Tool
-                  label={kept ? songName + ' is on this phone' : keeping ? 'Keeping ' + songName + ' on this phone'
-                    : online ? 'Keep ' + songName + ' on this phone' + (keepState && keepState.needBytes ? ' · ' + formatSongBytes(keepState.needBytes) : '')
-                      : 'Keeping needs a connection · ' + songName}
-                  word={kept ? 'On this phone' : keeping ? 'Keeping…' : 'Keep on phone'}
-                  on={kept} haspopup={false} disabled={!kept && !keeping && !online}
-                  onClick={() => { if (kept || keeping) return; void keep.keep([songId], 'keep-desk-' + songId); }}
-                >{kept ? <KeptIcon /> : <KeepIcon />}</Tool>
-              ) : null
-            ) : (
-              <Tool label="Read along" word="Read along" haspopup={false} disabled={!canRead} onClick={openReading}><BookIcon /></Tool>
+            <Tool label={sleepOn ? 'Sleep timer: ' + sleepWord : 'Sleep timer, off'} word="Sleep" value={sleepOn ? sleepWord : 'Off'} on={sleepOn} onClick={() => setSheet('sleep')}><MoonIcon /></Tool>
+            {songId ? null : (
+              <Tool label={voices ? (voices.kind === 'edition' ? 'Edition, ' : 'Voice, ') + voices.activeLabel :'Voice: ' + (reader || 'this recording has one')} word={voices && voices.kind === 'edition' ? 'Edition' : 'Voice'}
+                value={voices ? voices.activeLabel : reader || ''} disabled={!voices} onClick={() => setSheet('voice')}><UiIcon name="mic" /></Tool>
             )}
+            <Tool label={'Up next' + (upcoming ? ', ' + upcoming + ' left' : '')} word="Up next" value={upWord} onClick={() => setSheet('upnext')}><ListIcon /></Tool>
+            {songId ? (
+              <Tool label={'Song page of ' + name} word="Song page" value="Open" haspopup={false} disabled={!canPage}
+                onClick={() => { window.__openSongs([{ k: 'song', v: song.f }], ''); onClose(); }}><UiIcon name="music" /></Tool>
+            ) : null}
           </div>
         </div>
 

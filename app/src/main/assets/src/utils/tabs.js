@@ -122,7 +122,7 @@ export function describeTab(tab) {
   const _idxCol = COL_BY_INDEX_SC.get(s);
   if (_idxCol) return { title: _idxCol.label, subtitle: _idxCol.kind === 'letter' ? 'Letter index' : 'Entry index', resolved: true };
   if (s === 'volumes-home') return { title: 'Volumes', subtitle: 'The Volumes of Truth', resolved: true };
-  if (s === 'audio-library') return { title: 'Listening Library', subtitle: 'Saved & recent recordings', resolved: true };
+  if (s === 'audio-library') return { title: 'Listen', subtitle: 'Saved & recent recordings', resolved: true };   // the Listen tab's root (listen.html au-listen)
   if (s === 'audio-library-volumes') return { title: 'Listening Library', subtitle: 'The Volumes of Truth', resolved: true };
   if (s === 'audio-library-collection') return { title: 'Listening Library', subtitle: 'Recordings in one source', resolved: true };
   if (s === 'audio-library-saved') return { title: 'Listening Library', subtitle: 'Saved recordings', resolved: true };
