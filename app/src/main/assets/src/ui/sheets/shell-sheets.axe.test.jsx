@@ -470,7 +470,7 @@ describe('axe — AppShellOverlays', () => {
   it('the Garden warning, its quality options a named group', async () => {
     overlayGlobals();
     render(<AppShellOverlays {...overlayProps} gardenWarningOpen />);
-    expectModal(/Before You Begin|No connection/);
+    expectModal(/Before you begin|No connection/);
     expect(screen.getByRole('group', { name: 'Image Quality' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
@@ -508,7 +508,7 @@ describe('axe — the shell’s nav cluster', () => {
     try {
       render(<StorageHealthBanner onNavigateSettings={noop} />);
     } finally { StorageHealth.getReport = orig; }
-    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(document.querySelector('.sh-banner .ui-notice')).toBeTruthy();  // WS6: the one notice style; red (an alert) only when a change is lost
     expect(await seriousViolations(document)).toEqual([]);
   });
 });

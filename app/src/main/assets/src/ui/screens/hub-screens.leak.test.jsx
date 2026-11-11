@@ -194,7 +194,7 @@ describe('leaks — the Garden', () => {
     const l = new Set();
     put('GardenPosStore', { getState: () => 'loaded', get: () => 0, set: noop, subscribe: (cb) => { l.add(cb); return () => { l.delete(cb); }; } });
     await leakFree('GardenView', () => render(<GardenView page={3} onPageChange={noop} onBack={noop} theme="dark" onThemeChange={noop} tier="std" />),
-      (r) => { fireEvent.click(r.getByRole('button', { name: /jump to a page/ })); });
+      (r) => { fireEvent.click(r.getByRole('button', { name: /go to a page/ })); });
   });
 });
 
