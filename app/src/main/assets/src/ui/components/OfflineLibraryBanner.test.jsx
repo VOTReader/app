@@ -38,8 +38,8 @@ describe('OfflineLibraryBanner (B5)', () => {
     await act(async () => { await OfflineLibrary.check(() => fakeWorker({ CHECK_OFFLINE: status(['a', 'b', 'c']) }), 1000); });
     const b = container.querySelector('.offline-library-banner');
     expect(b).not.toBeNull();
-    expect(b && b.getAttribute('role')).toBe('status');
-    expect(b && b.textContent).toContain('Offline library incomplete.');
+    expect(b && b.querySelector('.ui-notice').getAttribute('role')).toBe('status');  // WS6: the Notice inside the strip
+    expect(b && b.textContent).toContain('Offline library incomplete');
     expect(b && b.textContent).toContain('3 files did not download.');
     expect(getByText('Retry')).toBeTruthy();
   });
@@ -51,7 +51,7 @@ describe('OfflineLibraryBanner (B5)', () => {
     expect(container.textContent).toContain('1 file did not download.');
     fireEvent.click(getByText('Retry'));
     await settle();
-    expect(container.textContent).toContain('Offline library complete.');
+    expect(container.textContent).toContain('Offline library complete');
   });
 
   it('a repair that fails says what is still missing and how to fix it', async () => {
@@ -81,7 +81,7 @@ describe('OfflineLibraryBanner (B5)', () => {
     fireEvent.click(getByLabelText('Dismiss'));
     expect(container.querySelector('.offline-library-banner')).toBeNull();
     await act(async () => { release(status([])); for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
-    expect(container.textContent).toContain('Offline library complete.');
+    expect(container.textContent).toContain('Offline library complete');
   });
 
   it('dismiss hides it for this session', async () => {

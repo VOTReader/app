@@ -26,6 +26,7 @@
 
 import { OfflineLibraryBanner, useTopStrip } from './OfflineLibraryBanner.jsx';
 import { showToast } from '../../utils/toast.js';
+import { Notice } from './UiParts.jsx';
 
 /** ds5 s16.1: a banner action that failed says so; the banner itself stays. Runs fn now (a throw is a rejection). */
 function _attempt(/** @type {() => any} */ fn) {
@@ -55,31 +56,24 @@ export function StorageHealthBanner({ onNavigateSettings }) {
   // notice (it renders nothing unless files are missing). Data danger wins.
   if (!scenario) return <OfflineLibraryBanner />;
 
+  // WS6 (mock sy-notices): the one notice style. The strip keeps its place under the bar (and its classes, which
+  // name the severity); red only when a change is being lost, the private window is plain information.
+  const tone = /** @type {'info' | 'warn' | 'danger'} */ (scenario.tone || (scenario.style === 'danger' ? 'danger' : scenario.style === 'amber' ? 'warn' : 'info'));
+  const split = scenario.title ? [scenario.title, scenario.text] : _split(scenario.text);
   return (
-    <div ref={ref} className={`sh-banner sh-banner-${scenario.style}`} role="alert">
-      <div className="sh-banner-text">{scenario.text}</div>
-      <div className="sh-banner-actions">
-        {scenario.buttons.map((btn, i) => (
-          <button
-            key={i}
-            className={`sh-banner-btn${btn.primary ? ' sh-banner-btn-primary' : ''}`}
-            onClick={btn.onClick}
-          >
-            {btn.label}
-          </button>
-        ))}
-        {scenario.dismissable && (
-          <button
-            className="sh-banner-dismiss"
-            onClick={() => StorageHealth.dismissScenario(scenario.id)}
-            aria-label="Dismiss"
-          >
-            {"✕"}
-          </button>
-        )}
-      </div>
+    <div ref={ref} className={`sh-banner sh-banner-${scenario.style}`}>
+      <Notice tone={tone} icon={scenario.icon} title={split[0]} text={split[1]}
+        actions={scenario.buttons.map((btn) => ({ label: btn.label, onClick: btn.onClick, kind: btn.kind || (btn.primary ? 'primary' : 'secondary'),
+          className: 'sh-banner-btn' + (btn.primary ? ' sh-banner-btn-primary' : '') }))}
+        onDismiss={scenario.dismissable ? () => StorageHealth.dismissScenario(scenario.id) : undefined} />
     </div>
   );
+
+  /** "Title. The rest." -> [title, rest]: a notice's one-line title is its first sentence. @param {string} t */
+  function _split(t) {
+    const m = /^(.+?[.!?])\s+([\s\S]*)$/.exec(t);
+    return m ? [m[1].replace(/\.$/, ''), m[2]] : [t.replace(/\.$/, ''), ''];
+  }
 
   /**
    * @param {import('../../utils/storage-health.js').StorageHealthReport} r
@@ -150,9 +144,10 @@ export function StorageHealthBanner({ onNavigateSettings }) {
       return {
         id: 'write-failed',
         style: 'danger',
-        text: "Your last change couldn't be saved — storage is full. Your work is still on screen but won't be kept if you close the app. Export your data now.",
+        title: 'Your last change could not be saved',
+        text: 'Storage is full. Your work is still on screen but will not be kept if you close the app.',
         dismissable: false,
-        buttons: [{ label: 'Export now', primary: true, onClick: _goExport }],
+        buttons: [{ label: 'Back up now', primary: true, onClick: _goExport }],
       };
     }
 
@@ -160,7 +155,9 @@ export function StorageHealthBanner({ onNavigateSettings }) {
       return {
         id: 'private-mode',
         style: 'danger',
-        text: "You're in a private window. Nothing you save here will be kept when you close it.",
+        tone: 'info', icon: 'info',
+        title: 'You are in a private window',
+        text: 'Nothing you save here will be kept when you close it.',
         dismissable: false,
         buttons: [],
       };
@@ -171,21 +168,25 @@ export function StorageHealthBanner({ onNavigateSettings }) {
       return {
         id: 'critical',
         style: 'danger',
-        text: `Storage is almost full — ${remainText} remaining. Your data may not save. Export now to avoid losing it.`,
+        tone: 'warn',
+        title: 'Storage is almost full',
+        text: `${remainText} remaining. Your data may not save: back up now so nothing is lost.`,
         dismissable: false,
-        buttons: [{ label: 'Export now', primary: true, onClick: _goExport }],
+        buttons: [{ label: 'Back up now', primary: true, onClick: _goExport }],
       };
     }
 
-    if (tier === StorageHealth.TIER.WARNING) {
+    if (tier === StorageHealth.TIER.WARNING && !StorageHealth.isDismissed('warning')) {
       var warnRemain = remaining != null ? formatBytes(remaining) : 'limited space';
       return {
         id: 'warning',
         style: 'amber',
-        text: `Storage is running low — ${warnRemain} remaining. New notes and recordings may not save.`,
+        title: 'Storage is running low',
+        text: `${warnRemain} remaining. New notes and recordings may not save.`,
         dismissable: false,
         buttons: [
-          { label: 'Export data', primary: true, onClick: _goExport },
+          { label: 'Back up', onClick: _goExport },
+          { label: 'Not now', kind: 'text', onClick: () => StorageHealth.dismissScenario('warning') },
         ],
       };
     }
