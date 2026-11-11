@@ -12,9 +12,11 @@ import { ListRow, UiButton } from './UiParts.jsx';
    - group: a heading drawn above the first option of each run (A09.4);
    - sample / sampleStyle: a sample line under the description, in its own style (A09.4).
    `valueStyle` does the same for the closed row's current-value span. */
-export function SelectField({ eyebrow, title, label, desc, value, options, onChange, valueStyle = null, valueLabel = null }) {
+export function SelectField({ eyebrow, title, label, desc, line = null, value, options, onChange, valueStyle = null, valueLabel = null }) {
   const [open, setOpen] = React.useState(false);
-  const [showDesc, setShowDesc] = React.useState(false);
+  // WS1 settings (st-restored): a long description (a node, not a sentence) waits behind "More" under its one plain line.
+  const long = desc != null && typeof desc !== 'string';
+  const [more, setMore] = React.useState(false);
   const fieldId = React.useId();
   const sheetId = `select-sheet-${fieldId}`;
   const descId = `select-desc-${fieldId}`;
@@ -22,28 +24,23 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
   // valueLabel: the closed row may say more than the option's own label (U09.2: "WEB · NKJV until it downloads").
   const shown = valueLabel || selected.label;
 
+  // WS1 settings (U 8.7): name, its plain line always shown (no "i" to open), then the value and a chevron.
   return (
     <div className="settings-row">
       <div className="settings-row-head">
-        <span className="settings-row-label">{label}</span>
-        {desc && (
-          <button
-            type="button"
-            className="settings-info-btn"
-            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
-            aria-expanded={showDesc}
-            aria-controls={showDesc ? descId : undefined}
-            onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
-          >i</button>
-        )}
-        <span className="settings-row-grow" />
+        <span className="settings-row-text">
+          <span className="settings-row-label">{label}</span>
+          {desc && !long && <span className="settings-row-desc" id={descId}>{desc}</span>}
+          {long && line ? <span className="settings-row-desc" id={descId}>{line}</span> : null}
+          {long ? <button type="button" className="ws1-more" aria-expanded={more} onClick={() => setMore((v) => !v)}>{more ? 'Less' : 'More'}</button> : null}
+        </span>
         <button type="button" className="settings-select-trigger" aria-label={label + ': ' + shown} aria-haspopup="dialog" aria-expanded={open} aria-controls={open ? sheetId : undefined}
-          aria-describedby={showDesc && desc ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+          aria-describedby={desc && (!long || line) ? descId : undefined} onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
           <span className="settings-row-value" style={valueStyle}>{shown}</span>
           <span className="settings-select-chev">{"›"}</span>
         </button>
       </div>
-      {showDesc && desc && <div className="settings-row-desc" id={descId}>{desc}</div>}
+      {long && more ? <div className="settings-row-desc ws1-more-body">{desc}</div> : null}
       <SelectSheet id={sheetId} open={open} onClose={() => setOpen(false)} eyebrow={eyebrow} title={title || label}
         value={value} options={options} onChange={onChange} />
     </div>

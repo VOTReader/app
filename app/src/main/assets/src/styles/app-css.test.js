@@ -248,7 +248,6 @@ describe('app.css — the redesign walk\'s large-type fixes hold', () => {
     expect(block('.study-head-count')).toMatch(/margin-left:\s*auto/);
   });
   it('Settings keeps its icon, chevron and gaps in px', () => {
-    expect(ruleBlock(CSS, '.settings-group-icon {')).toMatch(/width:\s*36px/);
     expect(ruleBlock(CSS, '.settings-group-chevron {')).toMatch(/width:\s*24px/);
     expect(ruleBlock(CSS, '.settings-group-head {')).toMatch(/gap:\s*12px/);
   });
@@ -470,27 +469,8 @@ describe('app.css — bottom-nav cards fit the row at large type', () => {
   });
 });
 
-/* HIT AREA IS NOT PAINT (design-perf, 2026-09-04 install-guide read). The
-   Settings ⓘ button kept its 44 px touch target by painting a 44 px bordered
-   square, as tall as the row and taller than the 26 px Export button beside
-   it. The target stays 44 px; the paint is a ring drawn inside it. */
-describe('app.css — the Settings ⓘ button paints a ring smaller than its hit area', () => {
-  const block = ruleBlock(CSS, '.settings-info-btn {');
-  it('keeps the 44 px touch target', () => {
-    expect(block).toMatch(/width:\s*44px/);
-    expect(block).toMatch(/height:\s*44px/);
-  });
-  it('paints no box border; the visible ring is a gradient inside the cell', () => {
-    expect(block).toMatch(/border:\s*0\b/);
-    expect(block).not.toMatch(/border:\s*1px/);
-    expect(block).toMatch(/radial-gradient\(/);
-  });
-  it('the pressed state paints the same ring, filled', () => {
-    const open = ruleBlock(CSS, '.settings-info-btn[aria-expanded="true"]');
-    expect(open).toMatch(/radial-gradient\(/);
-    expect(open).not.toMatch(/border-color/);
-  });
-});
+/* WS1 settings (2026-11-11): the Settings ⓘ button is gone (each row's plain line is always shown); its
+   hit-area-is-not-paint test went with it. */
 
 /* SELECTION IN A GOLD-ON-BLACK APP (design-perf, cut 6 read). Native text
    selection painted in Chrome's blue in the picker (a literal

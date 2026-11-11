@@ -43,7 +43,7 @@ describe('Mark as Read loads the studies it counts (mw17 A09.3)', () => {
     window.buildProgressGroups = () => (window.BIBLE_STUDIES ? [STUDIES] : []);
     try {
       renderSettings({ markAsRead: true }, {}, { expandGroups: false });
-      fireEvent.click(groupHead('Mark as Read'));
+      fireEvent.click(groupHead('Reading progress'));
       expect(window.loadBibleStudies).toHaveBeenCalledTimes(1);
       expect(window.__loadMatthewCorpus).toHaveBeenCalledTimes(1);
       const studiesSection = () => [...document.querySelectorAll('.progress-section-toggle')].find((t) => /Studies/.test(t.textContent));
@@ -62,16 +62,15 @@ describe('Mark as Read loads the studies it counts (mw17 A09.3)', () => {
 describe('settings filter and lazy progress', () => {
   it('finds and expands backup settings, then restores the previous accordion state', () => {
     renderSettings({}, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Appearance'));
     fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: 'backup' } });
     expect(groupHeads()).toHaveLength(1);
-    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('true');
+    expect(groupHead('Your data').getAttribute('aria-expanded')).toBe('true');
     expect(row('Verify a Backup')).toBeTruthy();
-    fireEvent.click(groupHead('Your Data'));
-    expect(groupHead('Your Data').getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(groupHead('Your data'));
+    expect(groupHead('Your data').getAttribute('aria-expanded')).toBe('false');
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
-    expect(groupHeads()).toHaveLength(11);   // ten plus the tour's Help group
-    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
+    expect(groupHeads()).toHaveLength(8);   // the root's eight group rows
+    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('false');
     expect(document.activeElement).toBe(screen.getByLabelText('Find settings'));
   });
 
@@ -104,7 +103,8 @@ describe('settings filter and lazy progress', () => {
       fireEvent.click(groupHead('Appearance'));
       expect(window.__loadVotCorpus).not.toHaveBeenCalled();
       expect(window.__loadBibleCorpus).not.toHaveBeenCalled();
-      fireEvent.click(groupHead('Mark as Read'));
+      fireEvent.click(screen.getByRole('button', { name: 'Back to Settings' }));
+      fireEvent.click(groupHead('Reading progress'));
       expect(window.__loadVotCorpus).toHaveBeenCalledTimes(1);
       expect(window.__loadBibleCorpus).toHaveBeenCalledTimes(1);
     } finally {
@@ -147,9 +147,8 @@ describe('settings preference folio', () => {
 
   it('connects each expanded group header to its mounted body', () => {
     renderSettings({}, {}, { expandGroups: false });
-    const head = groupHead('Appearance');
-    fireEvent.click(head);
-    const controlledId = head.getAttribute('aria-controls');
+    fireEvent.click(groupHead('Appearance'));
+    const controlledId = groupHead('Appearance').getAttribute('aria-controls');
     expect(controlledId).toBe('settings-group-appearance');
     expect(document.getElementById(controlledId)).toBeTruthy();
   });
@@ -197,7 +196,6 @@ describe('auto-scroll settings disclosure', () => {
   // Sweep low (mw10): the Tabs row promised 999 reading places; the cap is 50 (use-tab-actions MAX_TABS).
   it('the Tabs row states the real tab cap', () => {
     renderSettings({});
-    fireEvent.click(screen.getByRole('button', { name: 'Show description for Tabs' }));
     expect(screen.queryByText(/up to 999/)).toBeNull();
     expect(screen.getByText(/Run up to 50 independent reading places/)).toBeTruthy();
   });
@@ -263,17 +261,17 @@ describe('read-along settings disclosure', () => {
 describe('Copy & Share group', () => {
   it('holds Share Includes (the website link by default, share-fn 2026-10-25) and Highlight the Passage (off by default)', () => {
     renderSettings();
-    const labels = groupRowLabels('Copy & Share');
+    const labels = groupRowLabels('Sharing');
     expect(labels).toContain('Share Includes');
     expect(labels).toContain('Highlight the Passage');
     expect(within(row('Highlight the Passage')).getByRole('switch').getAttribute('aria-checked')).toBe('false');
-    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight off');
+    expect(groupHead('Sharing').textContent).toContain('Links point to the website · Highlight off');
   });
 
   it('writes through the keys Copy and Share read', () => {
     const onToggle = vi.fn();
     renderSettings({ shareLink: 'site', linkHighlight: true }, { onToggle });
-    expect(groupHead('Copy & Share').textContent).toContain('Share: website link · Highlight on');
+    expect(groupHead('Sharing').textContent).toContain('Links point to the website · Highlight on');
     fireEvent.click(within(row('Highlight the Passage')).getByRole('switch'));
     expect(onToggle).toHaveBeenCalledWith('linkHighlight');
   });
@@ -282,7 +280,7 @@ describe('Copy & Share group', () => {
     renderSettings({}, {}, { expandGroups: false });
     for (const word of ['share', 'link', 'highlight']) {
       fireEvent.change(screen.getByLabelText('Find settings'), { target: { value: word } });
-      expect(groupHeads().map((h) => h.textContent), word).toEqual(expect.arrayContaining([expect.stringContaining('Copy & Share')]));
+      expect(groupHeads().map((h) => h.textContent), word).toEqual(expect.arrayContaining([expect.stringContaining('Sharing')]));
     }
   });
 });
@@ -309,11 +307,11 @@ describe('Listening group', () => {
     expect(reading).toContain('Chapter Titles');
   });
 
-  it('sits between Reading and Auto-Scroll', () => {
+  it('sits between Reading and Buttons and tools', () => {
     renderSettings({}, {}, { expandGroups: false });
     const labels = groupHeads().map((h) => h.querySelector('.settings-section-label').textContent.trim());
     expect(labels.indexOf('Listening')).toBe(labels.indexOf('Reading') + 1);
-    expect(labels.indexOf('Auto-Scroll')).toBe(labels.indexOf('Listening') + 1);
+    expect(labels.indexOf('Buttons and tools')).toBe(labels.indexOf('Listening') + 1);
   });
 
   it('keeps the read-along disclosure discipline inside its new group', () => {
@@ -667,7 +665,6 @@ describe('P1-9 — every settings toggle has an accessible name', () => {
 describe('export/import copy names the real .votbak artifact', () => {
   const descOf = (label) => {
     const r = row(label);
-    fireEvent.click(within(r).getByLabelText('Show description for ' + label));
     return r.querySelector('.settings-row-desc').textContent;
   };
 
@@ -1249,48 +1246,53 @@ describe('Android v3 import — native stream not closed until the confirm settl
    a closed group's body is UNMOUNTED, not hidden — out of tab order and
    screen-reader order, same discipline as the auto-scroll disclosure.
    ─────────────────────────────────────────────────────────────────────── */
-describe('settings groups — collapsible accordion', () => {
-  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top bar',
-    'Search, Tabs & History', 'Copy & Share', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
+describe('settings groups — each group is its own screen (WS1 st-root)', () => {
+  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Buttons and tools', 'Sharing', 'A Return to The Garden',
+    'Your data', 'Reading progress'];
+  const back = () => fireEvent.click(screen.getByRole('button', { name: 'Back to Settings' }));
 
-  it('renders all 11 group headers, every one collapsed on entry', () => {
-    renderSettings({}, {}, { expandGroups: false });
-    expect(groupHeads().length).toBe(GROUPS.length);
-    for (const label of GROUPS) {
-      const head = groupHead(label);
-      expect(head).toBeTruthy();
-      expect(head.getAttribute('aria-expanded')).toBe('false');
-    }
-    // Collapsed means UNMOUNTED — zero setting rows exist yet.
+  it('the root shows the eight groups as rows, then Show me around and About as rows of their own', () => {
+    renderSettings({}, { onAbout: () => {} }, { expandGroups: false });
+    expect(groupHeads().map((h) => h.querySelector('.settings-section-label').textContent)).toEqual(GROUPS);
+    for (const label of GROUPS) expect(groupHead(label).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.getByRole('button', { name: /^Show me around/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^About VOTReader/ })).toBeTruthy();
+    // The root mounts no setting rows.
     expect(rowLabels().length).toBe(0);
     expect(document.querySelectorAll('.settings-card').length).toBe(0);
   });
 
-  it('opening a group mounts its rows; closing unmounts them again', () => {
+  it('a row opens its group as a screen; Back returns to the root', () => {
     renderSettings({}, {}, { expandGroups: false });
     fireEvent.click(groupHead('Appearance'));
-    expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('true');
-    expect(row('Light Theme')).toBeTruthy();
-    expect(row('Reading Position Marker')).toBeUndefined(); // other groups stay closed
+    expect(screen.getByRole('radio', { name: 'Light' })).toBeTruthy();
+    expect(groupHead('Reading')).toBeUndefined();
+    expect(row('Reading Position Marker')).toBeUndefined();
+    expect(screen.queryByLabelText('Find settings')).toBeNull();
+    back();
+    expect(groupHeads()).toHaveLength(GROUPS.length);
+    expect(screen.queryByRole('radio', { name: 'Light' })).toBeNull();
+  });
+
+  it('Theme is Dark | Light and writes through onThemeChange', () => {
+    const onThemeChange = vi.fn();
+    renderSettings({}, { onThemeChange }, { expandGroups: false });
     fireEvent.click(groupHead('Appearance'));
-    expect(row('Light Theme')).toBeUndefined();
+    expect(screen.getByRole('radio', { name: 'Dark' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
+    expect(onThemeChange).toHaveBeenCalledWith('light');
   });
 
-  it('groups open independently', () => {
-    renderSettings({}, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Reading'));
-    fireEvent.click(groupHead('Your Data'));
-    expect(row('Chapter Titles')).toBeTruthy();
-    expect(row('Export Your Data')).toBeTruthy();
-    expect(row('Light Theme')).toBeUndefined();
-  });
-
-  it('Auto-Scroll lives in its own group and keeps its nested disclosure', () => {
+  it('Auto-scroll is a screen inside Reading, and Back goes to Reading', () => {
     renderSettings({ autoScroll: true, autoScrollNext: true }, {}, { expandGroups: false });
-    fireEvent.click(groupHead('Auto-Scroll'));
+    fireEvent.click(groupHead('Reading'));
+    fireEvent.click(screen.getByRole('button', { name: /^Auto-scroll/ }));
     expect(row('Auto-Scroll')).toBeTruthy();
     expect(row('Scroll Speed')).toBeTruthy();
     expect(row('Auto-Continue Pause')).toBeTruthy();
+    expect(row('Chapter Titles')).toBeUndefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Back to Reading' }));
+    expect(row('Chapter Titles')).toBeTruthy();
   });
 });
 
@@ -1314,11 +1316,10 @@ describe('settings folio summary', () => {
 
   it('links each accordion header to its mounted body', () => {
     renderSettings({}, {}, { expandGroups: false });
-    const appearance = groupHead('Appearance');
     // s23.4: closed, the body is not mounted, so the header points at nothing.
-    expect(appearance.hasAttribute('aria-controls')).toBe(false);
-    fireEvent.click(appearance);
-    expect(appearance.getAttribute('aria-controls')).toBe('settings-group-appearance');
+    expect(groupHead('Appearance').hasAttribute('aria-controls')).toBe(false);
+    fireEvent.click(groupHead('Appearance'));
+    expect(groupHead('Appearance').getAttribute('aria-controls')).toBe('settings-group-appearance');
     expect(document.getElementById('settings-group-appearance')).toBeTruthy();
   });
 });
@@ -1350,13 +1351,13 @@ describe('dependency-gated rows unmount with their dependency', () => {
 
   // The three tabs (2026-11-10): one top bar everywhere, so the Compact | Icons choice and the gear, History and theme
   // chips changed nothing and left Settings (their stored keys stay); the bookmark is the one icon left to choose.
-  it('the Top bar group holds the reading page’s bookmark switch and nothing that does nothing', () => {
+  it('Buttons and tools holds the reading page’s bookmark switch and nothing that does nothing', () => {
     const onToggle = vi.fn();
     renderSettings({}, { onToggle });
     expect(screen.queryByRole('radiogroup', { name: 'Top Bar' })).toBeNull();
     for (const name of ['Settings Gear', 'Theme', 'Compact Top Bar']) expect(screen.queryByRole('switch', { name })).toBeNull();
     expect(screen.getAllByRole('switch', { name: 'History' }).length).toBe(1);   // the feature row only
-    fireEvent.click(screen.getByRole('switch', { name: 'Bookmark' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Bookmark button' }));
     expect(onToggle).toHaveBeenCalledWith('showBookmarkNav');
   });
 });

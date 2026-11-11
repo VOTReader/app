@@ -9,7 +9,7 @@
         — WHAT THE BACKUP WRITES AND RESTORES. The source of truth: a
           store missing here is not in the user's only backup at all.
      2. utils/user-data-size.js  USER_DATA_STORES
-        — what Settings → Your Data COUNTS. A store missing here is
+        — what Settings → Your data COUNTS. A store missing here is
           backed up but invisible in the size number.
      3. utils/import-validators.js  STORE_SHAPES
         — what the import trust boundary VALIDATES. A store missing
@@ -209,14 +209,14 @@ describe('user-data parity — extraction sanity', () => {
   });
 });
 
-/* ── leg 2: Settings → Your Data counts everything the backup carries ── */
+/* ── leg 2: Settings → Your data counts everything the backup carries ── */
 
 describe('user-data parity — USER_DATA_STORES (the "Your Data" size)', () => {
   it('counts every store the backup writes', () => {
     expectCovered(
       BACKED_UP, USER_DATA_STORES,
       'USER_DATA_STORES', 'app/src/main/assets/src/utils/user-data-size.js',
-      'the store is backed up but its bytes are invisible in Settings → Your Data, '
+      'the store is backed up but its bytes are invisible in Settings → Your data, '
       + 'so the number under-reports what the reader would lose.',
     );
   });

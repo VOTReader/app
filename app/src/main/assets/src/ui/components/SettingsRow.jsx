@@ -2,28 +2,17 @@
    SettingsRow — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* WS1 settings (U 8.7, 2026-11-11): a settings row is its name, its plain line, and the control. The line is
+   always shown (no "i" button to open it) and describes the switch. */
 export function SettingsRow({ label, desc = null, checked, onToggle, disabled = false, disabledReason = null }) {
-  // Compact layout (Settings Option B): label + toggle on a single line; the
-  // (often long) description is hidden behind the ⓘ button and revealed on tap.
-  const [showDesc, setShowDesc] = React.useState(false);
-  // s15.9: the description, while shown, is linked to the ⓘ that opened it and describes the switch.
   const descId = `settings-desc-${React.useId()}`;
-  const descShown = !!(showDesc && desc);
   return (
     <div className={`settings-row${disabled ? " settings-row-disabled" : ""}`}>
       <div className="settings-row-head">
-        <span className="settings-row-label">{label}</span>
-        {desc && (
-          <button
-            type="button"
-            className="settings-info-btn"
-            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
-            aria-expanded={showDesc}
-            aria-controls={descShown ? descId : undefined}
-            onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
-          >i</button>
-        )}
-        <span className="settings-row-grow" />
+        <span className="settings-row-text">
+          <span className="settings-row-label">{label}</span>
+          {desc && <span className="settings-row-desc" id={descId}>{desc}</span>}
+        </span>
         <label className="settings-toggle">
           {/* P1-9 (Wave 0): the text label is a SIBLING span, so this
               wrapping <label> gives the input no accessible name — TalkBack
@@ -39,7 +28,7 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
             checked={checked}
             aria-checked={!!checked}
             aria-label={label}
-            aria-describedby={descShown ? descId : undefined}
+            aria-describedby={desc ? descId : undefined}
             disabled={!!disabled}
             onChange={disabled ? undefined : onToggle}
           />
@@ -47,7 +36,6 @@ export function SettingsRow({ label, desc = null, checked, onToggle, disabled = 
           <div className="settings-toggle-thumb" />
         </label>
       </div>
-      {descShown && <div className="settings-row-desc" id={descId}>{desc}</div>}
       {disabled && disabledReason && (
         <div className="settings-row-disabled-hint">{disabledReason}</div>
       )}

@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   your-data-link — one tap from anywhere to Settings → Your Data
+   your-data-link — one tap from anywhere to Settings → Your data
    ═══════════════════════════════════════════════════════════════════════
    id-datasafe2 171: the write-failure toast (storage-health.js) opens Your
    Data in one tap. The ask rides a window flag plus an event, not module

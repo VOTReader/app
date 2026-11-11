@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    backup-verify — read-only .votbak inspection (FABLE5-BACKLOG [15])
    ═══════════════════════════════════════════════════════════════════════
-   Pure helpers behind Settings → Your Data → "Verify a Backup". The heavy
+   Pure helpers behind Settings → Your data → "Verify a Backup". The heavy
    lifting (magic/frame/CRC checks) is the EXISTING import read path —
    readContainer on web, the v3ImportBegin/NextBlob/ReadChunk/Verify bridge
    walk on Android — run WITHOUT the apply step. These helpers only turn a

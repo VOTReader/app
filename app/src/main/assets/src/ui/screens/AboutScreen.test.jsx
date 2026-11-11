@@ -105,7 +105,7 @@ describe('AboutScreen — page one (A08.6 / U02.3)', () => {
   it('gives the backup path Settings really has', () => {
     setupGlobals();
     const { container } = renderAbout();
-    expect(container.querySelector('.about-body').textContent).toContain('Settings → Your Data → Export');
+    expect(container.querySelector('.about-body').textContent).toContain('Settings → Your data → Export');
   });
 
   it('folds the credits and privacy policy under one line, still on page one', () => {

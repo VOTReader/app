@@ -4165,19 +4165,7 @@
       }
     /* ── SETTINGS SCREEN ── */
     .settings-screen { min-height:100%; width:100%; box-sizing:border-box; display:flex; flex-direction:column; align-items:stretch; padding:clamp(1.25rem,3vw,2rem) clamp(1rem,4vw,3rem) 5rem; }
-    .settings-header { width:100%; max-width:62rem; margin:0 auto 1.25rem; text-align:left; }
-    .settings-title { font-family:'Cinzel Decorative',serif; font-size:clamp(var(--fs-24),4vw,var(--fs-30)); color:var(--cream); margin:0 0 0.65rem; letter-spacing:0.02em; }
-    .settings-intro { max-width:38rem; margin:0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-16); line-height:1.55; }
-    .settings-save-note { display:flex; align-items:center; gap:0.75rem; margin:1rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-15); }
-    .settings-save-note > span { width:0.55rem; height:0.55rem; flex:0 0 auto; border-radius:50%; background:var(--gold); box-shadow:0 0 0 4px var(--gold-faint); }
     .settings-groups { width:100%; max-width:62rem; margin:0 auto; }
-    .settings-find { margin-bottom:1.25rem; font-family:var(--font-body); font-size:var(--fs-16); color:var(--cream); }
-    .settings-find label { display:block; margin-bottom:0.35rem; }
-    .settings-find-controls { display:flex; flex-wrap:wrap; gap:0.5rem; }
-    .settings-find input { flex:1 1 12rem; width:100%; min-width:0; min-height:44px; border:1px solid var(--gold-border); border-radius:6px; padding:0.6rem 0.8rem; background:var(--bg2); color:var(--cream); font:inherit; }
-    .settings-find input::placeholder { color:var(--cream-muted); opacity:1; }
-    .settings-find button { min-height:44px; padding:0.5rem 0.75rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--gold); font:inherit; cursor:pointer; }
-    .settings-find p { margin:0.5rem 0 0; color:var(--cream-muted); }
     .settings-section { width:100%; margin-bottom:0.75rem; }
     .settings-section-label { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.75rem; display:flex; align-items:center; gap:0.6rem; }
     .settings-section-label::after { content:''; flex:1; height:1px; background:linear-gradient(to right,var(--gold-border),transparent); }
@@ -4191,8 +4179,6 @@
     /* The icon box, chevron and gaps are decoration, pinned in px: in rem they grew with
        Text Size and left the group's words a 100 px column of a 302 px head at 180 %
        (values wrapping one word a line, heads 138-271 px tall; the 09-25 walk). */
-    .settings-group-icon { display:grid; place-items:center; flex:0 0 auto; width:36px; height:36px; border:1px solid var(--gold-border); border-radius:9px; color:var(--gold); background:var(--bg2); }
-    .settings-group-icon svg { width:20px; height:20px; }
     .settings-group-titles { display:flex; flex-direction:column; gap:0.22rem; flex:1; min-width:0; }
     .settings-group-head .settings-section-label { margin:0; font-size:var(--fs-13); letter-spacing:0.12em; color:var(--cream); }
     .settings-group-head .settings-section-label::after { content:none; }
@@ -4246,9 +4232,6 @@
     .settings-data-value { font-size:var(--fs-13); color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
     /* Hit area is not paint: the target stays 44 px, the visible ⓘ is a 29 px hairline ring drawn
        inside it (a 44 px bordered square stood taller than the 26 px Export button beside it). */
-    .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:0; border-radius:50%; background:radial-gradient(circle, transparent 13px, var(--gold-border) 13.5px, var(--gold-border) 14.5px, transparent 15px); color:var(--gold); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-13); cursor:pointer; }
-    @media (hover:hover){ .settings-info-btn:hover{ color:var(--gold); background:radial-gradient(circle, transparent 13px, var(--gold-dim) 13.5px, var(--gold-dim) 14.5px, transparent 15px); } }
-    .settings-info-btn[aria-expanded="true"]{ color:var(--gold); background:radial-gradient(circle, var(--gold-faint) 13.5px, var(--gold) 13.5px, var(--gold) 14.5px, transparent 15px); }
     /* Compact select trigger — the label stays in place; value + chevron open the sheet */
     .settings-select-trigger { display:flex; align-items:center; justify-content:flex-end; gap:0.35rem; min-height:44px; background:var(--gold-faint); border:1px solid var(--gold-border); border-radius:6px; cursor:pointer; padding:0.35rem 0.55rem; font-family:inherit; max-width:60%; }
     .settings-select-chev { color:var(--gold-dim); font-size:var(--fs-16); line-height:1; flex-shrink:0; }
@@ -4260,8 +4243,6 @@
     .settings-step-input { width:3.4em; min-height:44px; text-align:center; font-family:inherit; font-size:var(--fs-15); color:var(--gold); background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0 0.2rem; }
     .settings-step-unit { font-size:var(--fs-13); color:var(--gold); font-style:italic; margin-left:-0.15rem; }
     /* Top-Nav button chips */
-    .settings-chip-note { font-size:var(--fs-12); color:var(--cream-muted); font-style:italic; padding:0.65rem 0.95rem 0; }
-    .settings-chips { display:flex; flex-wrap:wrap; gap:0.45rem; padding:0.7rem 0.95rem 0.8rem; }
     /* A09.5 (mockup B-topbar A): one two-way choice, Compact | Icons, in place of the nested switch. */
     .settings-seg { display:flex; gap:3px; margin:0 0.95rem 0.2rem; padding:3px; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg); }
     .settings-seg > button { flex:1; min-height:44px; border:0; border-radius:8px; background:transparent; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-15); cursor:pointer; }
@@ -4269,16 +4250,9 @@
     .vot-large-text .settings-seg { margin-left:12px; margin-right:12px; }
     /* max-width + shrinkable label: 300%-cap spill fix (chip must never run
        off-screen; the mini toggle stays, the label wraps). */
-    .settings-chip { display:flex; align-items:center; gap:0.5rem; border:1px solid var(--gold-border); border-radius:20px; padding:0.3rem 0.5rem 0.3rem 0.7rem; background:transparent; cursor:pointer; max-width:100%; }
-    .settings-chip-label { min-width:0; }
-    @media (hover:hover){ .settings-chip:hover{ border-color:var(--gold-dim); } }
-    .settings-chip-label { font-family:'Cinzel',serif; font-size:var(--fs-11); letter-spacing:0.04em; color:var(--cream); }
-    .settings-chip .settings-toggle { width:34px; height:20px; }
-    .settings-chip .settings-toggle-thumb { width:14px; height:14px; }
-    .settings-chip .settings-toggle input:checked ~ .settings-toggle-thumb { transform:translateX(14px); }
     /* Disabled (dependent) row state — kept visible but clearly inactive */
     .settings-row-disabled { opacity:0.48; filter:saturate(0.55); transition:opacity 0.25s ease, filter 0.25s ease; }
-    .settings-row-disabled .settings-row-label, .settings-row-disabled .settings-chip-label { color:var(--cream-muted); }
+    .settings-row-disabled .settings-row-label { color:var(--cream-muted); }
     .settings-row-disabled .settings-toggle-track { background:var(--cream-muted) !important; opacity:0.35 !important; }
     .settings-row-disabled .settings-toggle { cursor:not-allowed; }
     .settings-row-disabled-hint {
@@ -6908,6 +6882,50 @@
     .picker-footer-btn:disabled { opacity: 0.45; cursor: default; }
     .rd-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     /* ── end W2f readers (r-link1, r-link2, r-link3) ── */
+    /* ── WS1 settings (st-root, st-find, st-look, st-read): each group its own screen ── */
+    .ws1-sr-only { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+    .ws1-settings.settings-screen { display:block; padding:var(--sp-2) var(--gutter) var(--sp-8); }
+    .ws1-settings .settings-groups { max-width:40rem; }
+    .ws1-settings .settings-find { margin:0 0 var(--sp-4); }
+    .ws1-find.ui-field { border-radius:var(--r-pill); }
+    .ws1-find.ui-field.is-on { box-shadow:0 0 0 1.5px var(--accent); }
+    .ws1-find input { flex:1; min-width:0; border:0; background:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-control); outline:none; }
+    .ws1-find input::-webkit-search-cancel-button { display:none; }
+    .ws1-find-clear { display:grid; place-items:center; width:var(--tap); height:var(--tap); margin-right:calc(-1 * var(--sp-3)); border:0; background:none; color:var(--text-2); }
+    .ws1-find-status { margin:var(--sp-3) var(--sp-1) 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-label); letter-spacing:var(--track-label); text-transform:uppercase; }
+    .ws1-root-card { margin-bottom:var(--grid-gap); }
+    .ws1-settings .settings-section.is-root { margin:0; }
+    .ws1-settings .settings-section.is-root + .settings-section.is-root > .settings-group-head { border-top:1px solid var(--hairline); }
+    .settings-group-head.ui-row { min-height:var(--row-h); margin:0; padding:var(--sp-3) var(--card-pad); gap:var(--sp-3); border:0; border-radius:0; background:none; box-shadow:none; transform:none; text-align:left; }
+    .settings-group-head.ui-row .settings-section-label { margin:0; font-family:var(--font-serif); font-size:var(--ts-body); letter-spacing:0; text-transform:none; color:var(--text-1); }
+    .settings-group-head.ui-row .settings-group-sub { font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); color:var(--text-2); }
+    .ws1-tag.ui-row-mark { padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-size:var(--ts-label); }
+    .ws1-foot { margin:var(--sp-5) 0 0; text-align:center; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws1-settings .settings-section.is-screen { margin:0; }
+    .ws1-settings .settings-section.is-screen > .settings-group-body { margin:0; }
+    .ws1-settings .settings-group-body > .ui-label:first-child { margin-top:var(--sp-2); }
+    .ws1-settings .settings-card { margin-bottom:var(--sp-3); border:0; border-radius:var(--r-card); background:var(--surface-1); }
+    .ws1-settings .settings-row { border-bottom:1px solid var(--hairline); }
+    .ws1-settings .settings-row-head { flex-wrap:nowrap; gap:var(--sp-3); min-height:var(--row-h-1); padding:var(--sp-3) var(--card-pad); }
+    .ws1-settings .settings-row-text { display:flex; flex-direction:column; gap:2px; }
+    .ws1-settings .settings-row-label { font-family:var(--font-serif); font-size:var(--ts-body); letter-spacing:0; color:var(--text-1); }
+    .ws1-settings .settings-row-desc { padding:0; font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); font-style:normal; color:var(--text-2); }
+    .ws1-settings .settings-row-value { font-family:var(--font-ui); font-size:var(--ts-value); font-style:normal; color:var(--text-1); }
+    .ws1-note { margin:0 var(--sp-1) var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws1-theme { margin-bottom:var(--sp-4); }
+    .ws1-txtsize .txtsize-preview { margin:0; padding:var(--card-pad) var(--card-pad) var(--sp-2); border:0; background:none; font-style:normal; font-family:var(--font-serif); color:var(--text-1); }
+    .ws1-txtsize .txtsize-controls { margin:0; padding:0 var(--card-pad); }
+    .ws1-a { color:var(--text-2); font-family:var(--font-serif); line-height:1; }
+    .ws1-a.is-small { font-size:var(--ts-label); }
+    .ws1-a.is-large { font-size:var(--ts-title); color:var(--text-1); }
+    .ws1-txtsize-foot { display:flex; align-items:center; gap:var(--sp-2); padding:var(--sp-1) var(--card-pad) var(--sp-3); }
+    .ws1-txtsize-foot .txtsize-value { font-family:var(--font-ui); font-size:var(--ts-value); font-weight:700; color:var(--text-1); }
+    .ws1-txtsize-foot .txtsize-reset.txtsize-reset-full { min-height:var(--tap); border:0; background:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws1-door { margin:0 0 var(--sp-3); }
+    .ws1-more { align-self:flex-start; min-height:var(--tap); padding:0; border:0; background:none; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws1-settings .ws1-more-body { padding:0 var(--card-pad) var(--sp-3); }
+    .ws1-settings .ui-row-meta { overflow:visible; text-overflow:clip; -webkit-line-clamp:unset; }
+    /* ── end WS1 settings (st-root, st-find, st-look, st-read) ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */
@@ -7332,7 +7350,6 @@
     /* Settings at large text (Text Size 1.8 and up, the root class vot-large-text; U05.3): px gutters, no group icon,
        the value buttons take the full row and wrap, so nothing is cut at the card edge at 300%. */
     .vot-large-text .settings-screen { padding-left: 12px; padding-right: 12px; }
-    .vot-large-text .settings-group-icon { display: none; }
     .vot-large-text .settings-group-head .settings-section-label { overflow-wrap: anywhere; }
     .vot-large-text .settings-row-head { padding-left: 12px; padding-right: 12px; }
     .vot-large-text .settings-select-trigger { max-width: 100%; flex: 1 1 100%; justify-content: space-between; text-align: left; }

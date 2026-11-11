@@ -13,6 +13,15 @@ import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions
 import { openWhatsNew } from '../../utils/whats-new.js';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ListRow, Segmented, SectionLabel } from '../components/UiParts.jsx';
+
+/* WS1 settings: the root's group titles (U 8.7, X-hidden 6 "Groups"), and the bar title of each group's screen. */
+const GROUP_TITLES = {
+  appearance: 'Appearance', reading: 'Reading', listening: 'Listening', autoscroll: 'Auto-scroll',
+  features: 'Buttons and tools', share: 'Sharing', garden: 'A Return to The Garden', data: 'Your data',
+  progress: 'Reading progress', help: 'Help',
+};
 
 /* Session-4 — Text Size slider (replaces the WL1 4-step selector; the same
    settings.fontScale key persists the raw --font-scale multiplier as a
@@ -33,13 +42,13 @@ function TextSizeSliderRow({ value, onChange }) {
   const v = clampFontScale(value);
   const pct = Math.round(v * 100);
   return (
-    <div className="settings-row">
-      <div className="settings-row-head">
-        <span className="settings-row-label">Text Size</span>
-        <span className="settings-row-grow" />
-        <span className="settings-row-value">{pct === 100 ? "Standard" : pct + "%"}</span>
+    <div className="settings-row ws1-txtsize">
+      {/* WS1 settings (st-look): the one preview on top, the slider between a small and a large A, the value under it. */}
+      <div className="txtsize-preview">
+        “Your word is a lamp to my feet and a light to my path.”
       </div>
       <div className="txtsize-controls">
+        <span className="ws1-a is-small" aria-hidden="true">A</span>
         <input
           type="range"
           className="txtsize-slider"
@@ -51,23 +60,20 @@ function TextSizeSliderRow({ value, onChange }) {
           aria-label="Text size"
           aria-valuetext={pct === 100 ? 'Standard' : pct + ' percent'}
         />
-        <span className="txtsize-value">{pct}%</span>
+        <span className="ws1-a is-large" aria-hidden="true">A</span>
+      </div>
+      <div className="ws1-txtsize-foot">
+        <span className="txtsize-value">{pct === 100 ? 'Standard · 100%' : pct + '%'}</span>
+        <span className="settings-row-grow" />
         {/* A09.11: shown only away from 100% (a disabled ghost at 30% read as broken), and named for what it does. */}
         {pct !== 100 && (
           <button
             type="button"
             className="txtsize-reset txtsize-reset-full"
+            aria-label="Reset to 100%"
             onClick={() => onChange("1")}
-          >Reset to 100%</button>
+          >Reset</button>
         )}
-      </div>
-      <div className="txtsize-preview">
-        “Your word is a lamp to my feet and a light to my path.”
-      </div>
-      <div className="settings-row-desc">
-        Slide to shrink or enlarge reading text anywhere in the app. Icons and
-        navigation stay the same size. Independent of your device’s own
-        font-size setting.
       </div>
     </div>
   );
@@ -193,23 +199,6 @@ function HistoryClearRow({ historyCount, onClearHistory }) {
 }
 
 /* NavChip — compact pill toggle for the Top bar group. */
-function NavChip({ label, checked, onToggle, disabled = false }) {
-  return (
-    <label className={"settings-chip" + (disabled ? " settings-row-disabled" : "")}>
-      <span className="settings-chip-label">{label}</span>
-      <span className="settings-toggle">
-        {/* P1-9: same switch contract as SettingsRow — the chip label IS
-            inside the wrapping <label> so the name resolved, but explicit
-            aria-label + role="switch" keeps every toggle in the app on one
-            announced pattern ("<name>, switch, on/off"). */}
-        <input type="checkbox" role="switch" checked={checked} aria-checked={!!checked} aria-label={label} disabled={!!disabled} onChange={disabled ? undefined : onToggle} />
-        <span className="settings-toggle-track" />
-        <span className="settings-toggle-thumb" />
-      </span>
-    </label>
-  );
-}
-
 
 /* SettingsGroup — collapsible section shell (Settings redesign 2026-07-31).
    Every section is an accordion group: a tappable folio header (icon, Cinzel
@@ -218,46 +207,43 @@ function NavChip({ label, checked, onToggle, disabled = false }) {
    discipline: closed content is out of tab order and screen-reader order,
    and the screen opens as a compact 8-line overview instead of a wall.
    Module scope so React identity is stable across SettingsScreen renders. */
-function SettingsGroupIcon({ sectionId }) {
-  const paths = {
-    appearance: <><circle cx="12" cy="12" r="3.2" /><path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5 7 7M17 17l1.5 1.5M18.5 5.5 17 7M7 17l-1.5 1.5" /></>,
-    reading: <><path d="M4.5 5.5c2.3-1 4.7-.8 7.5.7v12.2c-2.8-1.5-5.2-1.7-7.5-.7z" /><path d="M19.5 5.5c-2.3-1-4.7-.8-7.5.7v12.2c2.8-1.5 5.2-1.7 7.5-.7z" /><path d="M12 6.2v12.2" /></>,
-    listening: <><path d="M5 9.5a7 7 0 0 1 14 0v2.3a2.3 2.3 0 0 1-2.3 2.3H15v-5h1.4a4.4 4.4 0 0 0-8.8 0H9v5H7.3A2.3 2.3 0 0 1 5 11.8z" /><path d="M15 14.1c-.4 2.5-1.5 3.8-3.3 3.8h-1.2" /></>,
-    autoscroll: <><path d="M12 4v16M7.5 8.5 12 4l4.5 4.5M7.5 15.5 12 20l4.5-4.5" /></>,
-    topnav: <><rect x="3.5" y="5" width="17" height="14" rx="2" /><path d="M7 9h3M14 9h3M7 14h3M14 14h3" /></>,
-    features: <><circle cx="11" cy="11" r="6" /><path d="m16 16 4 4M8.5 11h5M11 8.5v5" /></>,
-    garden: <><path d="M4 19c3.8-5.4 7-8.1 10.2-8.1 2.1 0 3.9 1 5.8 3.1" /><path d="M5 17.5C4.3 12 6.9 7.7 12.5 5c.6 3.2-.3 5.7-2.7 7.5" /><path d="M4 20h16" /></>,
-    share: <><circle cx="17" cy="6.2" r="2.3" /><circle cx="7" cy="12" r="2.3" /><circle cx="17" cy="17.8" r="2.3" /><path d="m9 10.8 6-3.4M9 13.2l6 3.4" /></>,
-    data: <><path d="M5 5.5h14v13H5z" /><path d="M8 9h8M8 12h8M8 15h5" /></>,
-    progress: <><circle cx="12" cy="12" r="8.5" /><path d="m8 12 2.6 2.7L16.5 9" /></>,
-    help: <><circle cx="12" cy="12" r="8.5" /><path d="M9.4 9.6a2.6 2.6 0 1 1 3.8 2.3c-.8.4-1.2 1-1.2 1.9" /><path d="M12 17h.01" /></>,
-  };
-  return (
-    <span className="settings-group-icon" aria-hidden="true">
-      <svg viewBox="0 0 24 24" focusable="false" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
-        {paths[sectionId] || paths.appearance}
-      </svg>
-    </span>
-  );
-}
-
-function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hidden = false, children = null }) {
+/* WS1 settings (st-root, 2026-11-11): each group is its own screen. `mode` says how a group draws:
+   root   - one row on the Settings root (icon chip, name, current values, chevron); a tap opens its screen.
+   screen - the open group's body alone (the bar carries its name); a closed group draws nothing.
+   search - a matching group under its own small head, open, while the find field holds words.
+   The head stays a .settings-group-head with aria-expanded in every mode, so the tour, the restore e2e and
+   the tests find a group the same way they always did. */
+const GROUP_ICONS = { appearance: 'sun', reading: 'book', listening: 'head', autoscroll: 'scroll', features: 'search',
+  share: 'share', garden: 'img', data: 'data', progress: 'check', help: 'help' };
+function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hidden = false, mode = 'search', tag = null, children = null }) {
   if (hidden) return null;
+  if (mode === 'screen' && !open) return null;
+  const root = mode === 'root';
   return (
-    <section className={'settings-section' + (open ? ' open' : '')} data-settings-group={sectionId}>
-      <button type="button" className="settings-group-head" aria-expanded={open} aria-controls={open ? 'settings-group-' + sectionId : undefined} onClick={onToggle}>
-        <SettingsGroupIcon sectionId={sectionId} />
-        <span className="settings-group-titles">
-          <span className="settings-section-label">{label}</span>
-          {sub && <span className="settings-group-sub">{sub}</span>}
+    <section className={'settings-section is-' + mode + (open ? ' open' : '')} data-settings-group={sectionId}>
+      <button type="button" className={'settings-group-head' + (root ? ' ui-row ui-row-press' : '') + (mode === 'screen' ? ' ws1-sr-only' : '')}
+        aria-expanded={open} aria-controls={open ? 'settings-group-' + sectionId : undefined} onClick={onToggle}
+        tabIndex={mode === 'screen' ? -1 : undefined}>
+        {root ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={GROUP_ICONS[sectionId] || 'gear'} /></span> : null}
+        <span className={root ? 'ui-row-text' : 'settings-group-titles'}>
+          <span className={(root ? 'ui-row-title ' : '') + 'settings-section-label'}>{label}</span>
+          {sub && <span className={(root ? 'ui-row-meta ' : '') + 'settings-group-sub'}>{sub}</span>}
         </span>
-        <span className={'settings-group-chevron' + (open ? ' open' : '')} aria-hidden="true">
-          <svg viewBox="0 0 16 16" focusable="false"><path d="m3 6 5 5 5-5" /></svg>
-        </span>
+        {root && tag ? <span className="ui-row-mark ws1-tag">{tag}</span> : null}
+        {root ? <UiIcon name="chev" className="ui-row-chev" /> : (
+          <span className={'settings-group-chevron' + (open ? ' open' : '')} aria-hidden="true">
+            <svg viewBox="0 0 16 16" focusable="false"><path d="m3 6 5 5 5-5" /></svg>
+          </span>
+        )}
       </button>
       {open && <div className="settings-group-body" id={'settings-group-' + sectionId}>{children}</div>}
     </section>
   );
+}
+
+/** The root's cards: one .ui-group around a run of group rows, only on the root. */
+function RootCard({ mode, children }) {
+  return mode === 'root' ? <div className="ui-group ws1-root-card">{children}</div> : <>{children}</>;
 }
 
 /* AudioRateRow — Listening → Default Speed.
@@ -479,27 +465,16 @@ function StorageTrendValue({ samples }) {
 
 /* DataActionRow — label + ⓘ-revealed description + action button. */
 function DataActionRow({ label, desc = null, children = null, className = '' }) {
-  const [showDesc, setShowDesc] = React.useState(false);
-  const descId = `settings-desc-${React.useId()}`;
-  const descShown = !!(showDesc && desc);
+  // WS1 settings (U 8.7): the plain line is always shown under the name, no "i" to open it.
   return (
     <div className={'settings-row' + (className ? ' ' + className : '')}>
       <div className="settings-row-head">
-        <span className="settings-row-label">{label}</span>
-        {desc && (
-          <button
-            type="button"
-            className="settings-info-btn"
-            aria-label={(showDesc ? 'Hide description for ' : 'Show description for ') + label}
-            aria-expanded={showDesc}
-            aria-controls={descShown ? descId : undefined}
-            onClick={(e) => { e.stopPropagation(); setShowDesc((v) => !v); }}
-          >i</button>
-        )}
-        <span className="settings-row-grow" />
+        <span className="settings-row-text">
+          <span className="settings-row-label">{label}</span>
+          {desc && <span className="settings-row-desc">{desc}</span>}
+        </span>
         {children}
       </div>
-      {descShown && <div className="settings-row-desc" id={descId}>{desc}</div>}
     </div>
   );
 }
@@ -666,12 +641,12 @@ const SHARE_LINK_OPTIONS = [
 ];
 
 const SETTINGS_TOPICS = {
-  appearance: 'appearance theme light dark text size font typeface',
-  reading: 'reading bible translation offline editions download all chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
-  listening: 'listening bible letter audio voice speed rate skip seconds read along highlight playback follow',
+  // WS1 settings (st-find): synonyms the 2026-11-10 capture typed and missed (wifi, dark mode, songs, keep, night).
+  appearance: 'appearance theme light dark mode night day text size font typeface letters bigger smaller zoom',
+  reading: 'reading bible translation version nkjv kjv offline editions download all chapter titles section headings restored names chapter letter arrows previous next scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on awake dim lock double tap click fullscreen full screen auto scroll',
+  listening: 'listening bible letter audio voice reader speed rate skip length seconds read along highlight words playback follow turn page songs music wifi wi fi keep ready downloads star',
   autoscroll: 'auto scroll hands free reading speed continue pause',
-  topnav: 'top bar nav buttons icons bookmark',
-  features: 'search synonyms synonym filter stop words tabs history',
+  features: 'buttons tools search synonyms synonym filter stop words tabs history clear top bar nav icons bookmark',
   share: 'copy share sharing link links website app highlight passage words thevolumesoftruth',
   garden: 'a return to the garden image quality pictures',
   data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
@@ -685,7 +660,7 @@ const SETTINGS_TOPICS = {
 /** @type {Record<string, string[]>} */
 const SETTINGS_TOPIC_WORDS = Object.fromEntries(Object.entries(SETTINGS_TOPICS).map(([id, t]) => [id, t.split(' ')]));
 
-export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch, onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null }) {
+export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch: _onSearch, onHistory: _onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null, initialGroups = null }) {
   const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
@@ -711,20 +686,32 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   // Accordion state for the top-level setting GROUPS (redesign 2026-07-31).
   // All collapsed on entry — the screen reads as a scannable table of
   // contents; session-local on purpose (a fresh visit starts compact).
-  const [openGroups, setOpenGroups] = React.useState(() => new Set());
+  // WS1 settings: the open set IS the screen. Empty: the root (every group a row). One id: that group's
+  // screen. `initialGroups` opens screens on arrival (the tests open them all; a deep link opens one).
+  const [openGroups, setOpenGroups] = React.useState(() => new Set(initialGroups || []));
   const [settingsQuery, setSettingsQuery] = React.useState('');
   const settingsFindRef = React.useRef(null);
   const [closedMatches, setClosedMatches] = React.useState(() => new Set());
   const queryWords = settingsQuery.toLowerCase().trim().split(/[\s-]+/).filter(Boolean);
   const searching = queryWords.length > 0;
+  const mode = searching ? 'search' : (openGroups.size ? 'screen' : 'root');
   const matchesGroup = (id) => queryWords.every((word) => SETTINGS_TOPIC_WORDS[id].some((w) => w.startsWith(word)));
   const groupOpen = (id) => searching ? matchesGroup(id) && !closedMatches.has(id) : openGroups.has(id);
   const toggleGroup = (id) => (searching ? setClosedMatches : setOpenGroups)((prev) => {
+    if (!searching && prev.size === 0) return new Set([id]);
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
-  const groupProps = (id) => ({ sectionId: id, open: groupOpen(id), hidden: !matchesGroup(id), onToggle: () => toggleGroup(id) });
+  // Auto-scroll is a screen inside Reading (st-auto): no row of its own on the root.
+  const groupProps = (id) => ({ sectionId: id, mode, label: GROUP_TITLES[id], open: groupOpen(id),
+    hidden: !matchesGroup(id) || (mode === 'root' && id === 'autoscroll'), onToggle: () => toggleGroup(id) });
+  const openScreen = (id) => setOpenGroups(new Set([id]));
+  const screenTitle = mode === 'screen' ? GROUP_TITLES[[...openGroups][0]] || 'Settings' : 'Settings';
+  const goUp = () => {
+    if (mode === 'screen') { setOpenGroups(openGroups.has('autoscroll') && openGroups.size === 1 ? new Set(['reading']) : new Set()); return; }
+    if (typeof onBack === 'function') onBack();
+  };
   const changeSettingsQuery = (value) => { setSettingsQuery(value); setClosedMatches(new Set()); };
   const matchingCount = Object.keys(SETTINGS_TOPICS).filter(matchesGroup).length;
   const progressOpen = groupOpen('progress');
@@ -753,7 +740,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     React.useCallback((cb) => (_tour ? _tour.subscribe(cb) : () => {}), [_tour]),
     () => (_tour ? _tour.getVersion() : 0)
   );
-  const _tourGroup = _tour ? (() => { const t = _tour.getState(); return t.active && t.step && t.step.settingsGroup; })() : null;
+  const startTour = () => { if (typeof TourController !== 'undefined') TourController.start('settings'); };
+  const _tourGroup = _tour ?(() => { const t = _tour.getState(); return t.active && t.step && t.step.settingsGroup; })() : null;
   React.useEffect(() => {
     if (_tourGroup) setOpenGroups((prev) => (prev.has(_tourGroup) ? prev : new Set([...prev, _tourGroup])));
   }, [_tourGroup]);
@@ -1116,55 +1104,57 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
   return (
     <ScreenLayout
-      navChildren={LibraryNav({
-        // hide:['settings'] — you are already on Settings. The three icons
-        // used to be hand-copied SVGs inline purely to omit the gear.
-        onBack, backTitle: 'Back', backLabel, hide: ['settings'],
-        onHistory, onSearch, theme, onThemeChange,
-      })}
+      utility={{
+        title: screenTitle, onBack: goUp,
+        backLabel: mode === 'screen' ? (openGroups.has('autoscroll') && openGroups.size === 1 ? 'Back to Reading' : 'Back to Settings') : backLabel,
+      }}
     >
-      <div className={'settings-screen' + (textScalePercent >= 180 ? ' settings-large-type' : '')}>
-        <header className="settings-header">
-          <h1 className="settings-title">Settings</h1>
-          <p className="settings-intro">Shape the way you read, listen, and move through the library.</p>
-          <p className="settings-save-note"><span aria-hidden="true" />Changes save on this device</p>
-        </header>
+      <div className={'settings-screen ws1-settings is-' + mode + (textScalePercent >= 180 ? ' settings-large-type' : '')}>
+        <h1 className="ws1-sr-only">{screenTitle}</h1>
 
         <div className="settings-groups">
-        <div className="settings-find">
-          <label htmlFor="settings-find-input">Find settings</label>
-          <div className="settings-find-controls">
-            <input ref={settingsFindRef} id="settings-find-input" type="search" placeholder="Find a setting" value={settingsQuery} onChange={(e) => changeSettingsQuery(e.target.value)} />
-            {settingsQuery && <button type="button" onClick={() => { changeSettingsQuery(''); settingsFindRef.current?.focus(); }}>Clear filter</button>}
+        {mode !== 'screen' && (
+          <div className="settings-find">
+            <label htmlFor="settings-find-input" className="ws1-sr-only">Find settings</label>
+            <div className={'ui-field ws1-find' + (searching ? ' is-on' : '')}>
+              <UiIcon name="search" />
+              <input ref={settingsFindRef} id="settings-find-input" type="search" placeholder="Find a setting" value={settingsQuery} onChange={(e) => changeSettingsQuery(e.target.value)} />
+              {settingsQuery && <button type="button" className="ws1-find-clear" aria-label="Clear filter" onClick={() => { changeSettingsQuery(''); settingsFindRef.current?.focus(); }}><UiIcon name="x" size="sm" /></button>}
+            </div>
+            {searching && <p role="status" className="ws1-find-status">{matchingCount ? matchingCount + (matchingCount === 1 ? ' matching group' : ' matching groups') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
           </div>
-          {searching && <p role="status">{matchingCount ? matchingCount + (matchingCount === 1 ? ' matching group' : ' matching groups') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
-        </div>
+        )}
 
-        <SettingsGroup label="Appearance" sub={glance.appearance} {...groupProps('appearance')}>
+        <RootCard mode={mode}>
+        <SettingsGroup sub={glance.appearance} {...groupProps('appearance')}>
+          {/* WS1 settings (st-look): Theme is Dark | Light (X-hidden 1 "theme"), then text size, then the font. */}
+          <SectionLabel>Theme</SectionLabel>
+          <Segmented label="Theme" className="ws1-theme" options={[{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }]}
+            value={theme === 'light' ? 'light' : 'dark'} onChange={(v) => { if (v !== theme) onThemeChange(v); }} />
+          {/* [10] True Black toggle REMOVED 2026-08-03 (owner: "just make
+              it default, looks better anyway") — pure-black surfaces are
+              now the dark theme's own tokens in app.css. A persisted
+              settings.trueBlack key is an ignored orphan. */}
+          <SectionLabel>Text size</SectionLabel>
           <div className="settings-card">
-            <SettingsRow
-              label="Light Theme"
-              desc="Switch between the dark (default) and light reading themes. Also in a reading page's ⋯ menu."
-              checked={theme === "light"}
-              onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
-            />
-            {/* [10] True Black toggle REMOVED 2026-08-03 (owner: "just make
-                it default, looks better anyway") — pure-black surfaces are
-                now the dark theme's own tokens in app.css. A persisted
-                settings.trueBlack key is an ignored orphan. */}
             <TextSizeSliderRow
               value={settings.fontScale || "1"}
               onChange={(v) => onSetting("fontScale", v)}
             />
-            {/* Reading Font (2026-07-31) — replaces the two-state "Modern
-                Fonts" toggle. settings.fontStyle now holds any READING_FONTS
-                id; "classic"/"modern" keep their historical meanings so
-                persisted + backup-imported values stay valid. */}
+          </div>
+          <p className="ws1-note">Changes reading text everywhere in the app. Icons and menus stay the same size, and your phone’s own font size does not affect it.</p>
+          {/* Reading Font (2026-07-31) — replaces the two-state "Modern
+              Fonts" toggle. settings.fontStyle now holds any READING_FONTS
+              id; "classic"/"modern" keep their historical meanings so
+              persisted + backup-imported values stay valid. */}
+          <SectionLabel>Reading font</SectionLabel>
+          <div className="settings-card">
             <FontPickerRow
               value={settings.fontStyle || "classic"}
               onSelect={(id) => onSetting("fontStyle", id)}
             />
           </div>
+          <p className="ws1-note">Theme and text size are also in every reader’s menu.</p>
         </SettingsGroup>
 
         <SettingsGroup label="Reading" sub={glance.reading} {...groupProps('reading')}>
@@ -1174,6 +1164,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               title="Bible Translation"
               label="Bible Translation"
               desc={<TranslationInfoDesc />}
+              line="Verse text for the 66 books. More explains the editions and the Restored Name."
               value={settings.translation || "nkjv"}
               valueLabel={editionShownLabel(settings.translation || "nkjv")}
               options={TRANSLATION_OPTIONS}
@@ -1293,6 +1284,12 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               onToggle={() => onToggle("doubleTapFullscreen")}
             />
           </div>
+          {/* WS1 settings (st-read2): Auto-scroll is a screen inside Reading, its row says what it is set to. */}
+          {mode === 'screen' && (
+            <div className="ui-group ws1-door">
+              <ListRow icon="scroll" title="Auto-scroll" meta={glance.autoscroll} onClick={() => openScreen('autoscroll')} />
+            </div>
+          )}
         </SettingsGroup>
 
         {/* Listening (2026-08-09). The audio controls were scattered: the two
@@ -1478,19 +1475,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           </div>
         </SettingsGroup>
 
-        {/* The three tabs (2026-11-10): one top bar for every screen (app.css, ONE TOP-BAR RULE), so the
-            Compact | Icons choice and the gear, History and theme chips changed nothing and left; their stored keys
-            stay. The one optional icon left is a reading page's bookmark. */}
-        <SettingsGroup label="Top bar" sub={glance.topnav} {...groupProps('topnav')}>
-          <div className="settings-card">
-            <div className="settings-chip-note">On a reading page, the bookmark icon beside Search.</div>
-            <div className="settings-chips">
-              <NavChip label="Bookmark" checked={settings.showBookmarkNav !== false} onToggle={() => onToggle("showBookmarkNav")} />
-            </div>
-          </div>
-        </SettingsGroup>
-
-        <SettingsGroup label="Search, Tabs & History" sub={glance.features} {...groupProps('features')}>
+        <SettingsGroup sub={glance.features} {...groupProps('features')}>
           <div className="settings-card">
             <SettingsRow
               label="Search"
@@ -1530,6 +1515,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
           </div>
           <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
+          {/* WS1 settings (st-tools): the old Top bar group's one row lives here now. The three tabs (2026-11-10)
+              gave every screen one top bar, so the bookmark on a reading page is the one optional icon left. */}
+          <div className="settings-card">
+            <SettingsRow
+              label="Bookmark button"
+              desc="On a reading page, the bookmark icon beside Search."
+              checked={settings.showBookmarkNav !== false}
+              onToggle={() => onToggle("showBookmarkNav")}
+            />
+          </div>
         </SettingsGroup>
 
         {/* Copy & Share (cp3, Corbin 2026-09-27). A copy of a letter ends with its
@@ -1575,8 +1570,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
           </div>
         </SettingsGroup>
+        </RootCard>
 
-        <SettingsGroup label="Your Data" sub={glance.data} {...groupProps('data')}>
+        <RootCard mode={mode}>
+        <SettingsGroup sub={glance.data} tag={_lastBackupAt() ? null : 'Back up'} {...groupProps('data')}>
           <div className="settings-card">
             <DataInfoRow label="App version" value={versionDisplayText}>
               <button
@@ -1827,11 +1824,27 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             </div>
           )}
         </SettingsGroup>
+        </RootCard>
+
+        {/* WS1 settings (st-root): Show me around and About VOTReader are rows of their own on the root. The
+            section stays "help" (and .open) so the tour and smoke:ci's About step find the About row as before. */}
+        {mode === 'root' && (
+          <section className="settings-section is-root open" data-settings-group="help">
+            <div className="ui-group ws1-root-card">
+              <ListRow icon="help" title="Show me around" onClick={startTour}
+                meta={'A short tour: ' + (_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes')} />
+              {typeof onAbout === 'function' ? (
+                <ListRow icon="info" title="About VOTReader" meta="Version, updates, What’s new and credits" onClick={onAbout} />
+              ) : null}
+            </div>
+            <p className="ws1-foot">Changes save on this phone.</p>
+          </section>
+        )}
 
         {/* review-tutorial: the tour is re-openable from here, whatever the Home strip decided. */}
-        <SettingsGroup label="Help" sub={glance.help} {...groupProps('help')}>
+        {mode !== 'root' && <SettingsGroup sub={glance.help} {...groupProps('help')}>
           <div className="settings-card settings-help-body">
-            <button type="button" className="settings-help-btn" onClick={() => { if (typeof TourController !== 'undefined') TourController.start('settings'); }}>Show me around</button>
+            <button type="button" className="settings-help-btn" onClick={startTour}>Show me around</button>
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no
                 controller on the page the note states no number rather than a stale one. */}
             <p className="settings-help-note">A short tour of the app: {_tour && typeof _tour.stopsWord === 'function' && typeof _tour.minutesWord === 'function' ? `${_tour.stopsWord()} stops, about ${_tour.minutesWord()} minutes` : 'a few stops, a few minutes'}. It points at the real buttons; you can leave at any time.</p>
@@ -1843,7 +1856,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               </button>
             ) : null}
           </div>
-        </SettingsGroup>
+        </SettingsGroup>}
         </div>
       </div>
     </ScreenLayout>

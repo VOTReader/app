@@ -39,11 +39,11 @@ describe('settingsGlance', () => {
 describe('settingsGlance — Your Data says when the last backup was', () => {
   const now = new Date(2026, 9, 22, 20, 0).getTime();
   it('never', () => {
-    expect(settingsGlance({ lastBackupAt: 0, now }).data).toBe('Last backup: never · Back up & restore');
+    expect(settingsGlance({ lastBackupAt: 0, now }).data).toBe('Last backup: never');
   });
   it('today, yesterday, N days ago', () => {
-    expect(settingsGlance({ lastBackupAt: now - 3600e3, now }).data).toBe('Last backup: today · Back up & restore');
-    expect(settingsGlance({ lastBackupAt: now - 86400e3, now }).data).toBe('Last backup: yesterday · Back up & restore');
-    expect(settingsGlance({ lastBackupAt: now - 12 * 86400e3, now }).data).toBe('Last backup: 12 days ago · Back up & restore');
+    expect(settingsGlance({ lastBackupAt: now - 3600e3, now }).data).toBe('Last backup: today');
+    expect(settingsGlance({ lastBackupAt: now - 86400e3, now }).data).toBe('Last backup: yesterday');
+    expect(settingsGlance({ lastBackupAt: now - 12 * 86400e3, now }).data).toBe('Last backup: 12 days ago');
   });
 });

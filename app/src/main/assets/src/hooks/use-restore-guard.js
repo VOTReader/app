@@ -47,7 +47,7 @@ export function useRestoreGuard() {
       if (typeof showToast !== 'function') return;
       showToast({
         id: 'vot-restore-guard', className: 'vot-toast',
-        text: 'Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your Data).',
+        text: 'Your last restore may not have finished. If anything looks missing, import your backup file again (Settings → Your data).',
         durationMs: 0,
       });
     };

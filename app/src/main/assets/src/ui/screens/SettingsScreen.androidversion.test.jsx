@@ -7,7 +7,7 @@
    this branch it passes and a header that says otherwise is a lie the next reader
    would act on. The BRANCH is still parked; that note lives with the branch.
 
-   WHY. Settings → Your Data → "App version" answers the question completely
+   WHY. Settings → Your data → "App version" answers the question completely
    in a browser: it reads CACHE_VERSION from the controlling service worker and
    compares it against a read-only probe of the deployed one, which is what
    separates "stale cache" from "never deployed" — the pair of situations that

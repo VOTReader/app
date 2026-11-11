@@ -55,7 +55,7 @@ export function settingsGlance(o) {
       'Headings ' + onOff(s.showSectionHeadings !== false),
       'Restored names ' + onOff(s.restoredNames !== false),
     ].join(' · '),
-    share: 'Share: ' + (s.shareLink === 'app' ? 'app link' : 'website link') + ' · Highlight ' + onOff(!!s.linkHighlight),
+    share: 'Links point to the ' + (s.shareLink === 'app' ? 'app' : 'website') + ' · Highlight ' + onOff(!!s.linkHighlight),
     listening: [
       (o && o.readerLabel) || 'Default voice',
       'Read-along ' + onOff(s.readAlongHighlight !== false),
@@ -67,7 +67,7 @@ export function settingsGlance(o) {
         : feats.map(([n, on]) => n + ' ' + onOff(on)).join(' · '),
     garden: (o && o.gardenLabel) || 'Image quality',
     progress: s.markAsRead ? 'Marking chapters as read' : 'Off',
-    data: 'Last backup: ' + (o && o.lastBackupAt ? daysAgo(o.lastBackupAt, o.now) : 'never') + ' · Back up & restore',
+    data: 'Last backup: ' + (o && o.lastBackupAt ? daysAgo(o.lastBackupAt, o.now) : 'never'),
     help: 'Show me around & About',
   };
 }

@@ -368,7 +368,6 @@ describe('axe — the hub components on their own', () => {
       <SelectField label="Bible Translation" desc="The default edition." value="nkjv" options={[{ id: 'nkjv', label: 'NKJV', desc: 'New King James' }, { id: 'kjv', label: 'KJV' }]} onChange={noop} />
       <FontPickerRow value="classic" onSelect={noop} />
     </main>);
-    fireEvent.click(getByRole('button', { name: 'Show description for Mark as read' }));
     await check();
     act(() => { fireEvent.click(getByRole('button', { name: /^Bible Translation:/ })); });
     expect(document.querySelector('[role="dialog"]')).not.toBeNull();

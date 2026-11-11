@@ -25,7 +25,6 @@ describe('SettingsScreen — the dice and the reading marker rows carry their on
     const r = row('Reading Position Marker');
     expect(r).toBeTruthy();
     expect(rowLabels()).not.toContain('Reading Position Dot');
-    fireEvent.click(r.querySelector('.settings-info-btn'));
     const desc = r.querySelector('.settings-row-desc').textContent;
     expect(desc).toMatch(/where you left off reading/);
     expect(desc).toMatch(/top bar/);
@@ -38,7 +37,6 @@ describe('SettingsScreen — the dice and the reading marker rows carry their on
   it('D7: the marker row says a place opened from a search counts once you read it, by your scroll or 8 seconds', () => {
     renderSettings();
     const r = row('Reading Position Marker');
-    fireEvent.click(r.querySelector('.settings-info-btn'));
     const desc = r.querySelector('.settings-row-desc').textContent;
     expect(desc).not.toMatch(/the moment you open/);
     expect(desc).toMatch(/search/);
