@@ -36,6 +36,7 @@
  * @returns {boolean}
  */
 import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 
 export function thumbAspectMismatch(naturalW, naturalH, boxW, boxH) {
   if (!naturalW || !naturalH || !boxW || !boxH) return false;
@@ -67,14 +68,13 @@ function _tabsDragTrace(msg) {
   } catch (_e) { /* ignore */ }
 }
 
-export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onMenu, onReorder, onClearAll, onDedupe, MAX_TABS, thumbnails }) {
+export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, onMenu, onReorder, onClearAll, onDedupe, MAX_TABS, thumbnails, clearAsk = false, onClearAsk = (/** @type {boolean} */ _v) => {} }) {
   const total = tabs.length;
   // Current theme for thumbnail theme-normalization (see the map below).
   // Read from the body class — the authoritative live-theme signal — so no
   // new prop threads through AppShellOverlays; the overview remounts per
   // open, and the theme can't change while it covers the screen.
   const currentTheme = (typeof document !== 'undefined' && document.body.classList.contains('light')) ? 'light' : 'dark';
-  const [confirmingClearAll, setConfirmingClearAll] = React.useState(false);
 
   /* ── Drag-to-reorder — v2, a pointer-events state machine ────────────────
      The LIFECYCLE (one gesture object, document-capture pointer listeners,
@@ -277,43 +277,25 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
 
   return (
     <div className="tabs-overview">
-      <div className="tabs-overview-header">
-        <div className="tabs-overview-eyebrow">Reading Places</div>
-        <h1 className="tabs-overview-title" id="tabs-overview-title">Tabs</h1>
-        <div className="tabs-overview-ornament" aria-hidden="true">
-          <div className="tabs-overview-ornament-line" />
-          <div className="tabs-overview-ornament-diamond">{"✦"}</div>
-          <div className="tabs-overview-ornament-line r" />
-        </div>
-        <div className="tabs-overview-meta">{total} / {MAX_TABS} {total === 1 ? 'tab' : 'tabs'} open</div>
-        <div className="tabs-overview-actions">
-          {confirmingClearAll && canClearAll ? (
-            <ConfirmStrip
-              question={hasPinned
-                ? `Close ${unpinnedCount} ${unpinnedCount === 1 ? 'tab' : 'tabs'}? Pinned tabs stay open.`
-                : `Close all ${total} tabs?`}
-              yesLabel={hasPinned ? 'Yes, close them' : 'Yes, close all'}
-              onCancel={() => setConfirmingClearAll(false)}
-              onConfirm={() => { onClearAll(); setConfirmingClearAll(false); }}
-            />
-          ) : (
-            <button
-              className="settings-clear-btn"
-              onClick={(e) => { e.stopPropagation(); setConfirmingClearAll(true); }}
-              disabled={!canClearAll}
-              title={unpinnedCount === 0 ? 'Every tab is pinned; pinned tabs stay open' : undefined}
-            >Clear All</button>
+      {/* r-tabs (W2h): the title and Close all are in the bar; one plain line here. Merge shows only with duplicates. */}
+      {clearAsk && canClearAll ? (
+        <ConfirmStrip
+          question={hasPinned
+            ? `Close ${unpinnedCount} ${unpinnedCount === 1 ? 'tab' : 'tabs'}? Pinned tabs stay open.`
+            : `Close all ${total} tabs?`}
+          yesLabel={hasPinned ? 'Yes, close them' : 'Yes, close all'}
+          onCancel={() => onClearAsk(false)}
+          onConfirm={() => { onClearAll(); onClearAsk(false); }}
+        />
+      ) : (
+        <div className="tabs-overview-line">
+          <p className="tabs-overview-meta">{total} of {MAX_TABS} open. Each tab keeps its own place.</p>
+          {dupeCount > 0 && (
+            <button type="button" className="ui-link" onClick={(e) => { e.stopPropagation(); onDedupe(); }}>
+              Merge duplicates · {dupeCount}</button>
           )}
-          <button
-            className="tabs-action-btn"
-            onClick={(e) => {e.stopPropagation();onDedupe();}}
-            disabled={dupeCount === 0}
-            title={dupeCount === 0 ? 'No duplicate tabs' : `Merge ${dupeCount} duplicate ${dupeCount === 1 ? 'tab' : 'tabs'}`}
-          >{/* n133: plain words, and an off button says why on its own face (a title tooltip
-              never shows on a phone). */}
-            {dupeCount === 0 ? 'No duplicates' : `Merge duplicates · ${dupeCount}`}</button>
         </div>
-      </div>
+      )}
       <div className="tabs-overview-grid">
         {tabs.map((t, i) => {
           // Prefer the live describeTab label; but if its corpus isn't loaded
@@ -381,14 +363,7 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                 title="Tab actions"
                 aria-label={'Tab actions: ' + title}
                 aria-haspopup="dialog"
-              >{"⋮"}</button>
-              <button
-                className="tab-card-close"
-                onClick={(e) => {e.stopPropagation();onClose(i);}}
-                onPointerDown={(e) => e.stopPropagation()}
-                title="Close tab"
-                aria-label={'Close tab: ' + title}
-              >{"\xD7"}</button>
+              ><UiIcon name="more" size="sm" /></button>
               <div className="tab-card-thumb-wrap">
                 {/* draggable=false: a long-press/drag landing on the thumbnail
                     IMAGE otherwise starts the browser's native image drag,
@@ -404,29 +379,33 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
                       <div className="tab-card-thumb-sigil" aria-hidden="true">{"✦"}</div>
                     </div>
                 }
-                <div className="tab-card-thumb-scrim" />
               </div>
               <div className="tab-card-body">
-                <div className="tab-card-eyebrow">
-                  {t.pinned && (
-                    /* [7] pin badge — bulk-close-immune tab. */
-                    <svg className="tab-card-pin" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Pinned">
-                      <path d="M16 3a1 1 0 0 1 1 1v1l-1 6 3 3v2h-6v5l-1 2-1-2v-5H5v-2l3-3-1-6V4a1 1 0 0 1 1-1h8z" />
-                    </svg>
-                  )}
-                  Tab {i + 1} / {total}
-                </div>
-                <div className="tab-card-title">{title}</div>
-                <div className="tab-card-subtitle">{subtitle}</div>
-                {/* UX8: only show the progress bar once there's REAL progress.
-                    A 0%-wide bar read as "unread" even for a short tab the user
-                    had read fully (it never scrolled, so pct stayed 0); an absent
-                    bar is the honest signal for "no tracked progress yet". */}
-                {tabHasProgressBar(t) && pctLive > 0 && (
-                  <div className="tab-card-progress">
-                    <div className="tab-card-progress-fill" style={{ width: `${Math.round(pctLive * 100)}%` }} />
+                <div className="tab-card-text">
+                  <div className="tab-card-title">
+                    {t.pinned && (
+                      /* [7] pin badge — bulk-close-immune tab. */
+                      <svg className="tab-card-pin" viewBox="0 0 24 24" fill="currentColor" role="img" aria-label="Pinned">
+                        <path d="M16 3a1 1 0 0 1 1 1v1l-1 6 3 3v2h-6v5l-1 2-1-2v-5H5v-2l3-3-1-6V4a1 1 0 0 1 1-1h8z" />
+                      </svg>
+                    )}
+                    {title}
                   </div>
-                )}
+                  <div className="tab-card-subtitle">{subtitle}</div>
+                  {/* UX8: only show the progress bar once there's REAL progress (a 0% bar read as "unread"). */}
+                  {tabHasProgressBar(t) && pctLive > 0 && (
+                    <div className="tab-card-progress">
+                      <div className="tab-card-progress-fill" style={{ width: `${Math.round(pctLive * 100)}%` }} />
+                    </div>
+                  )}
+                </div>
+                <button
+                  className="tab-card-close"
+                  onClick={(e) => {e.stopPropagation();onClose(i);}}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Close tab"
+                  aria-label={'Close tab: ' + title}
+                ><UiIcon name="x" size="sm" /></button>
               </div>
             </div>
           );
@@ -438,8 +417,8 @@ export function TabsOverview({ tabs, activeTabIdx, onSelect, onClose, onNewTab, 
             title="New tab"
             aria-label="New tab"
           >
-            <span className="tab-card-new-plus">+</span>
-            <span className="tab-card-new-label">New Tab</span>
+            <span className="tab-card-new-plus"><UiIcon name="plus" /></span>
+            <span className="tab-card-new-label">New tab</span>
           </button>
         )}
       </div>

@@ -19,75 +19,67 @@ import { createPressDrag } from '../../utils/press-drag.js';
 /** @type {any} */ (globalThis).scrollKeyForTab = () => 'home';
 /** @type {any} */ (globalThis).ConfirmStrip = ConfirmStrip;
 
-/** @param {boolean[]} pins one entry per tab: pinned or not */
+/** r-tabs (W2h): Close all is the bar's (AppShellOverlays); the overview shows the confirm while clearAsk is set.
+ * @param {boolean[]} pins one entry per tab: pinned or not */
 function renderOverview(pins) {
   const tabs = pins.map((pinned, i) => ({ screen: 'home', scrollPositions: {}, __i: i, ...(pinned ? { pinned: true } : {}) }));
   const onClearAll = vi.fn();
+  const onClearAsk = vi.fn();
   render(
     <TabsOverview
       tabs={tabs} activeTabIdx={0}
       onSelect={vi.fn()} onClose={vi.fn()} onNewTab={vi.fn()} onMenu={vi.fn()}
       onReorder={vi.fn()} onClearAll={onClearAll} onDedupe={vi.fn()}
-      MAX_TABS={999} thumbnails={null}
+      MAX_TABS={999} thumbnails={null} clearAsk onClearAsk={onClearAsk}
     />,
   );
-  const clearBtn = () => /** @type {HTMLButtonElement} */ ([...document.querySelectorAll('button')].find((b) => b.textContent === 'Clear All'));
   const question = () => document.querySelector('.ann-chip-confirm-q')?.textContent;
   const yes = () => /** @type {HTMLButtonElement} */ (document.querySelector('.ann-chip-confirm-yes'));
-  return { onClearAll, clearBtn, question, yes };
+  return { onClearAll, onClearAsk, question, yes };
 }
 
 afterEach(cleanup);
 
-describe('TabsOverview Clear All counts what it will close (sweep v081)', () => {
+describe('TabsOverview Close all counts what it will close (sweep v081)', () => {
   it('with two of five tabs pinned it asks to close the three unpinned ones and says pinned tabs stay', () => {
     const o = renderOverview([true, true, false, false, false]);
-    expect(o.clearBtn().disabled).toBe(false);
-    fireEvent.click(o.clearBtn());
     expect(o.question()).toBe('Close 3 tabs? Pinned tabs stay open.');
     fireEvent.click(o.yes());
     expect(o.onClearAll).toHaveBeenCalledTimes(1);
+    expect(o.onClearAsk).toHaveBeenCalledWith(false);
   });
 
   it('one unpinned tab beside a pinned one is still worth closing', () => {
-    const o = renderOverview([true, false]);
-    expect(o.clearBtn().disabled).toBe(false);
-    fireEvent.click(o.clearBtn());
-    expect(o.question()).toBe('Close 1 tab? Pinned tabs stay open.');
+    expect(renderOverview([true, false]).question()).toBe('Close 1 tab? Pinned tabs stay open.');
   });
 
-  it('is off when every open tab is pinned: Clear All would close nothing', () => {
-    const o = renderOverview([true, true, true]);
-    expect(o.clearBtn().disabled).toBe(true);
+  it('asks nothing when every open tab is pinned: Close all would close nothing', () => {
+    expect(renderOverview([true, true, true]).question()).toBeUndefined();
   });
 
   it('with nothing pinned it still asks to close all of them', () => {
-    const o = renderOverview([false, false, false]);
-    fireEvent.click(o.clearBtn());
-    expect(o.question()).toBe('Close all 3 tabs?');
+    expect(renderOverview([false, false, false]).question()).toBe('Close all 3 tabs?');
   });
 
-  it('a lone unpinned tab stays off, as before (Clear All would only swap it for a new one)', () => {
-    const o = renderOverview([false]);
-    expect(o.clearBtn().disabled).toBe(true);
+  it('a lone unpinned tab asks nothing, as before (Close all would only swap it for a new one)', () => {
+    expect(renderOverview([false]).question()).toBeUndefined();
   });
 });
 
-/* n133: "Merge duplicates" in plain words, and an off button says why on its own face. */
+/* n133: "Merge duplicates" in plain words; r-tabs (W2h) shows it only when there are some. */
 describe('TabsOverview Merge duplicates', () => {
   const show = (tabs) => render(
     <TabsOverview tabs={tabs} activeTabIdx={0} onSelect={vi.fn()} onClose={vi.fn()} onNewTab={vi.fn()} onMenu={vi.fn()}
       onReorder={vi.fn()} onClearAll={vi.fn()} onDedupe={vi.fn()} MAX_TABS={999} thumbnails={null} />,
   );
-  const btn = () => /** @type {HTMLButtonElement} */ (document.querySelector('.tabs-action-btn'));
-  it('says No duplicates while it is off, and counts them when there are some', () => {
+  const btn = () => /** @type {HTMLButtonElement | null} */ (document.querySelector('.tabs-overview-line .ui-link'));
+  it('is absent with no duplicates, and counts them when there are some', () => {
     // tabContentKey is this file's stub: `k${__i}`, so the same __i is the same content.
     show([{ screen: 'home', scrollPositions: {}, __i: 0 }, { screen: 'home', scrollPositions: {}, __i: 1 }]);
-    expect(btn().textContent).toBe('No duplicates');
-    expect(btn().disabled).toBe(true);
+    expect(btn()).toBeNull();
+    expect(document.querySelector('.tabs-overview-meta').textContent).toBe('2 of 999 open. Each tab keeps its own place.');
     cleanup();
     show([{ screen: 'home', scrollPositions: {}, __i: 0 }, { screen: 'home', scrollPositions: {}, __i: 0 }]);
     expect(btn().textContent).toBe('Merge duplicates · 1');
-    expect(btn().disabled).toBe(false);
   });
 });

@@ -708,7 +708,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
     '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
     '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
-    '.audio-library-section-head span', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
+    '.audio-library-section-head span', '.select-sheet-eyebrow',
     '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
     '.section-heading', '.compact-list-header',
@@ -805,7 +805,8 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('body:has(.garden-fullscreen, .sw-root, .sw-fallback) {', '--dock-transport')).toBe('0px');
   });
   it('every dock surface is opaque, and the reading text scrolls clear of the stack (cz7)', () => {
-    for (const sel of ['\n    .ascroll-pill {', '\n    .find-pill {', '.mode-toggle {']) {
+    expect(decl('\n    .find-pill {', 'background')).toBe('var(--bg)'); // r-find (W2h): the find row is the page's own ground
+    for (const sel of ['\n    .ascroll-pill {', '.mode-toggle {']) {
       expect(decl(sel, 'background'), sel).toBe('var(--bg3)');
     }
     expect(decl('.vot-toast {', 'background')).toBe('rgb(20,20,24)');

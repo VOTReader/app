@@ -63,8 +63,8 @@ export function RootGear({ onSettings }) {
 export const UTILITY_MAX_ACTIONS = 2;
 
 /** `lead` (a worded action such as the journal editor's Done) takes Back's place.
- * @param {{ title: string, onBack?: () => void, backLabel?: string, actions?: any[], lead?: any }} props */
-export function utilityNav({ title, onBack, backLabel = 'Back', actions = [], lead = null }) {
+ * @param {{ title: string, onBack?: () => void, backLabel?: string, actions?: any[], lead?: any, titleId?: string }} props */
+export function utilityNav({ title, onBack, backLabel = 'Back', actions = [], lead = null, titleId = undefined }) {
   const list = (Array.isArray(actions) ? actions : [actions]).filter(Boolean);
   if (list.length > UTILITY_MAX_ACTIONS && typeof console !== 'undefined') {
     console.warn('[utility bar] ' + title + ': ' + list.length + ' actions, the bar holds ' + UTILITY_MAX_ACTIONS);
@@ -76,7 +76,7 @@ export function utilityNav({ title, onBack, backLabel = 'Back', actions = [], le
           <UiIcon name="back" />
         </button>
       ) : null}
-      {title ? <h1 className="bar-title">{title}</h1> : <span className="bar-title" aria-hidden="true" />}
+      {title ? <h1 className="bar-title" id={titleId}>{title}</h1> : <span className="bar-title" aria-hidden="true" />}
       {list.slice(0, UTILITY_MAX_ACTIONS).map((a, i) => <React.Fragment key={i}>{a}</React.Fragment>)}
     </>
   );
@@ -93,9 +93,9 @@ export function BarAction({ icon, label, onClick, pressed, disabled = false }) {
   );
 }
 
-/** A worded bar action ("Done", "Save"): gold text, no box. @param {{ label: string, onClick: () => void }} props */
-export function BarTextAction({ label, onClick }) {
-  return <button type="button" className="bar-text-action" onClick={onClick}>{label}</button>;
+/** A worded bar action ("Done", "Save"): gold text, no box. @param {{ label: string, onClick: () => void, disabled?: boolean }} props */
+export function BarTextAction({ label, onClick, disabled = false }) {
+  return <button type="button" className="bar-text-action" onClick={onClick} disabled={disabled}>{label}</button>;
 }
 
 /** The screen's own ⋯ menu, last in the bar. Only where it holds something (rule 11).

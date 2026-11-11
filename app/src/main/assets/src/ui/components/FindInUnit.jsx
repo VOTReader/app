@@ -60,6 +60,7 @@
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { usePageMenu } from '../../utils/page-menu.js';
 import { markStopWords } from '../screens/search-model.js';
+import { UiIcon } from './UiIcon.jsx';
 
 const HL_ALL = 'vot-find';
 const HL_CURRENT = 'vot-find-current';
@@ -572,7 +573,7 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
 
   if (typeof document === 'undefined' || !document.body) return null;
   if (asking) {
-    // The same pill, the field where the search words sit: "[faith ]  2 of 7  ‹ › ×".
+    // r-find (W2h): the field with its count, then up, down and Done in words: "[faith  2 of 7]  ^ v  Done".
     const where = 'Find in this ' + noun;
     const status = !typed ? '' : !count ? 'No matches' : (Math.max(0, cur) + 1) + ' of ' + count;
     const onKey = (/** @type {any} */ e) => {
@@ -585,6 +586,7 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
     };
     return ReactDOM.createPortal(
       <div className="find-pill find-pill-ask" role="search" aria-label={where}>
+        <div className="find-pill-field">
         <svg className="find-pill-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
           <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
         </svg>
@@ -604,9 +606,10 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
           spellCheck={false}
         />
         <span className={'find-pill-count' + (typed && !count ? ' find-pill-none' : '')} role="status" aria-live="polite">{status}</span>
-        <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={!typed || count < 2} onClick={() => go(-1)}>‹</button>
-        <button type="button" className="find-pill-btn" aria-label="Next place" disabled={!typed || count < 2} onClick={() => go(1)}>›</button>
-        <button type="button" className="find-pill-btn find-pill-close" aria-label="Close find" onClick={closeAsk}>×</button>
+        </div>
+        <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={!typed || count < 2} onClick={() => go(-1)}><UiIcon name="up" /></button>
+        <button type="button" className="find-pill-btn" aria-label="Next place" disabled={!typed || count < 2} onClick={() => go(1)}><UiIcon name="down" /></button>
+        <button type="button" className="find-pill-done" onClick={closeAsk}>Done</button>
       </div>,
       document.body
     );
@@ -619,11 +622,13 @@ export function FindInUnit({ anchor, unitId, mainRef, noun = 'letter', keyPrefix
   const aside = !related.only && related.n ? ' · ' + related.n + ' related' : '';
   return ReactDOM.createPortal(
     <div className="find-pill" role="toolbar" aria-label={'Search words in this ' + noun}>
-      <span className="find-pill-word">{find.label || find.terms[0]}</span>
-      <span className="find-pill-count" role="status" aria-live="polite">{counted}{aside ? <span className="find-pill-related">{aside}</span> : null}</span>
-      <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2 && cur >= 0} onClick={() => go(-1)}>‹</button>
-      <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2 && cur >= 0} onClick={() => go(1)}>›</button>
-      <button type="button" className="find-pill-btn find-pill-close" aria-label="Close" onClick={() => setClosed(true)}>×</button>
+      <div className="find-pill-field">
+        <span className="find-pill-word">{find.label || find.terms[0]}</span>
+        <span className="find-pill-count" role="status" aria-live="polite">{counted}{aside ? <span className="find-pill-related">{aside}</span> : null}</span>
+      </div>
+      <button type="button" className="find-pill-btn" aria-label="Previous place" disabled={count < 2 && cur >= 0} onClick={() => go(-1)}><UiIcon name="up" /></button>
+      <button type="button" className="find-pill-btn" aria-label="Next place" disabled={count < 2 && cur >= 0} onClick={() => go(1)}><UiIcon name="down" /></button>
+      <button type="button" className="find-pill-done" onClick={() => setClosed(true)}>Done</button>
     </div>,
     document.body
   );
