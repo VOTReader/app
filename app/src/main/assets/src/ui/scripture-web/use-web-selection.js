@@ -401,7 +401,8 @@ export function useWebSelection({
       const count = p && p.graph ? p.graph.count : 0;
       const links = opts ? nearestLinks(p.graph, opts) : Array.from({ length: count }, (_, index) => ({ index }));
       for (const hit of links) found.push({ kind: 'link', index: hit.index });
-      if (!found.length && showUnderlay && p && p.underlay) {
+      // then Timothy's notes nearest the view, always (WA6, w-list: the panel keeps the two apart)
+      if (showUnderlay && p && p.underlay) {
         const near = opts ? nearestUnderlay(p.underlay, opts, 36)
           : Array.from({ length: Math.min(p.underlay.count, 36) }, (_, index) => ({ index }));
         for (const hit of near) found.push({ kind: 'underlay', index: hit.index });

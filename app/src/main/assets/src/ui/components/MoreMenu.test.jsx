@@ -345,9 +345,10 @@ describe('MoreMenuBtn — the screen\'s own items (utils/page-menu.js)', () => {
 
   it('lists them first, closes, then runs the one tapped', () => {
     const onPin = vi.fn();
+    // one offerer's list, and (WA6) a second's after it: the slot holds a list per offerer
     globalThis.__votPageMenu = [
-      { key: 'pin', label: 'Pin entry', onSelect: onPin },
-      { key: 'delete', label: 'Delete entry…', danger: true, onSelect: vi.fn() },
+      [{ key: 'pin', label: 'Pin entry', onSelect: onPin }],
+      [{ key: 'delete', label: 'Delete entry…', danger: true, onSelect: vi.fn() }],
     ];
     const { open, menu, item } = setup();
     open();
@@ -360,7 +361,7 @@ describe('MoreMenuBtn — the screen\'s own items (utils/page-menu.js)', () => {
 
   it('Find in this letter (idea 160) heads the menu with its magnifier, and its tap closes the menu', () => {
     const onFind = vi.fn();
-    globalThis.__votPageMenu = [{ key: 'find-in-unit', label: 'Find in this letter', icon: 'find', onSelect: onFind }];
+    globalThis.__votPageMenu = [[{ key: 'find-in-unit', label: 'Find in this letter', icon: 'find', onSelect: onFind }]];
     const { open, item, menu } = setup();
     open();
     const first = document.querySelector('.more-menu [role="menuitem"]');

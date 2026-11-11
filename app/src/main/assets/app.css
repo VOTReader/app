@@ -7843,52 +7843,6 @@
       left: calc((100% - var(--sw-panel-w, 42%)) / 2); max-width: calc(100% - var(--sw-panel-w, 42%) - 32px);
     }
     .sw-root.sw-narrow .sw-filter-pill { top: auto; bottom: calc(84px + var(--sw-safe-bottom)); max-width: calc(100% - 28px); }
-    /* the sheet: every filter, over the web's foot, the web behind it showing what they leave */
-    .sw-filter-sheet {
-      position: absolute; z-index: 7; left: 50%; transform: translateX(-50%);
-      bottom: calc(12px + var(--sw-safe-bottom)); width: min(620px, calc(100% - 32px)); max-height: calc(100% - 96px);
-      display: flex; flex-direction: column; box-sizing: border-box;
-      background: var(--sw-control-fill); border: 1px solid var(--sw-panel-edge); border-radius: 14px;
-      font-family: var(--sw-font); color: var(--sw-text);
-      -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
-    }
-    .sw-filter-head { display: flex; align-items: center; gap: 14px; padding: 10px 10px 8px 18px; border-bottom: 1px solid var(--sw-hairline); }
-    .sw-filter-head h2 { margin: 0; font-size: var(--fsc-18); font-weight: 500; color: var(--sw-title); }
-    .sw-filter-count { color: var(--sw-text-meta); font-size: var(--fsc-15); font-variant-numeric: tabular-nums; }
-    .sw-filter-clear {
-      margin-left: auto; position: relative; min-height: 36px; padding: 0 8px;
-      background: transparent; border: 0; color: var(--sw-gold); font: inherit; font-size: var(--fsc-15); cursor: pointer;
-    }
-    .sw-filter-clear:disabled { color: var(--sw-text-muted); cursor: default; }
-    .sw-filter-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 0; border-radius: 6px; }
-    .sw-filter-close { width: 40px; min-width: 40px; height: 40px; border-radius: 50%; }
-    .sw-filter-body { overflow-y: auto; overscroll-behavior: contain; padding: 6px 18px 14px; }
-    .sw-filter-row { display: flex; align-items: center; gap: 14px; padding: 7px 0; }
-    .sw-filter-name { flex: 0 0 92px; color: var(--sw-text-meta); font-size: var(--fsc-15); }
-    .sw-filter-seg { flex-wrap: wrap; }
-    .sw-filter-toggles, .sw-filter-books { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-    .sw-filter-and { color: var(--sw-text-muted); }
-    .sw-filter-book .sw-select {
-      min-height: 38px; padding: 0 10px; max-width: 190px;
-      background: var(--sw-control-fill); color: var(--sw-text); border: 1px solid var(--sw-control-border); border-radius: 6px;
-      font-family: var(--sw-font); font-size: var(--fsc-15); }
-    /* a phone's sheet stands at the right, the height of the frame, so the web the filters leave is
-       there beside it (the S22 look, 2026-10-22: a sheet over the foot hid nearly all of it); each
-       row's name over its choices, the body scrolling */
-    .sw-root.sw-compact .sw-filter-sheet {
-      left: auto; right: calc(8px + var(--sw-safe-right)); transform: none;
-      top: calc(8px + var(--sw-safe-top)); bottom: calc(8px + var(--sw-safe-bottom)); max-height: none;
-      width: min(400px, 46%);
-    }
-    .sw-root.sw-compact .sw-filter-head { padding: 4px 6px 4px 14px; gap: 10px; }
-    .sw-root.sw-compact .sw-filter-head h2 { font-size: var(--fsc-16); }
-    .sw-root.sw-compact .sw-filter-count { font-size: var(--fsc-13); }
-    .sw-root.sw-compact .sw-filter-body { padding: 2px 14px 10px; }
-    .sw-root.sw-compact .sw-filter-row { flex-direction: column; align-items: flex-start; gap: 4px; padding: 5px 0; }
-    .sw-root.sw-compact .sw-filter-name { flex-basis: auto; font-size: var(--fsc-13); }
-    .sw-root.sw-compact .sw-filter-seg .sw-seg-btn { min-height: 32px; padding: 0 10px; font-size: var(--fsc-14); }
-    .sw-root.sw-compact .sw-filter-book .sw-select { min-height: 32px; font-size: var(--fsc-14); max-width: 150px; }
-    .sw-root.sw-compact .sw-filter-toggles .sw-btn { min-height: 32px; font-size: var(--fsc-14); padding: 0 10px; }
     /* The canvas carried a CC-BY credit line of its own until 2026-09-11; it printed over the
        book labels in landscape. Since Q5 it is the legend's tail (.sw-legend .sw-credit). */
     .sw-live {
@@ -8247,6 +8201,58 @@
     .sw-list .sw-choice-list .sw-row { border-radius: 0; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
     .sw-list .sw-choice-list .sw-row:first-child { box-shadow: none; }
     /* ── end WA5 web ── */
+    /* ── WA6 web: Filters, My Web with no links and My Web's list to the v2 pictures (mock web.html w-filters, w-mine0,
+       w-list). The chrome only, dark in both themes as the web's always is; the drawing is untouched. ── */
+    /* Filters: the docked panel's place at the right; "Filters  1 on  Clear all  x", then one full-width segmented row
+       per choice under its 12 px gold label (Distance with each band's dot, Testament, Strength, Show only, Between books) */
+    .sw-filter-sheet {
+      position: absolute; z-index: 7; top: 0; right: 0; bottom: 0; width: var(--sw-panel-w, clamp(420px, 40%, 780px));
+      display: flex; flex-direction: column; box-sizing: border-box;
+      background: var(--sw-panel); border-left: 1px solid var(--sw-panel-edge); color: var(--sw-text);
+      font-family: var(--font-ui); animation: sw-panel-in 220ms ease-out;
+    }
+    .sw-filter-head { display: flex; align-items: center; gap: 8px; min-height: 52px; box-sizing: border-box; padding: calc(4px + var(--sw-safe-top)) calc(6px + var(--sw-safe-right)) 4px 18px; border-bottom: 1px solid var(--sw-hairline); }
+    .sw-filter-head h2 { margin: 0; font-family: var(--sw-font); font-size: var(--fsc-20); font-weight: 700; line-height: 1; color: var(--sw-title); }
+    .sw-filter-count { flex: 1 1 auto; min-width: 0; padding-left: 4px; color: var(--sw-text-meta); font-size: var(--fsc-13); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .sw-filter-clear { position: relative; min-height: 44px; padding: 0 10px; background: none; border: 0; color: var(--sw-gold); font: 600 var(--fsc-15) var(--font-ui); cursor: pointer; }
+    .sw-filter-clear:disabled { color: var(--sw-text-muted); font-weight: 500; cursor: default; }
+    .sw-filter-clear:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; border-radius: 8px; }
+    .sw-root .sw-filter-close { width: 44px; min-width: 44px; height: 44px; border: 0; border-radius: 50%; background: none; color: var(--sw-text-meta); }
+    .sw-filter-body { flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 0 calc(16px + var(--sw-safe-right)) calc(14px + var(--sw-safe-bottom)) 16px; }
+    .sw-filter-name { display: block; margin: 12px 0 6px; font-size: var(--fsc-12); font-weight: 600; line-height: 14px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sw-gold); }
+    /* the filters' rows and My Web's Yours | Timothy's notes: a tray with the chosen part lifted and ringed */
+    .sw-root :is(.sw-filter-seg, .sw-list-tabs) { display: flex; width: 100%; box-sizing: border-box; padding: 3px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); }
+    .sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn {
+      flex: 1 1 0; min-width: 0; min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 0 6px; border: 0; border-radius: 8px; background: none; color: var(--sw-text-meta); font: 500 var(--fsc-14) var(--font-ui); white-space: nowrap;
+    }
+    .sw-root :is(.sw-filter-seg, .sw-list-tabs) .sw-seg-btn.is-on { background: rgba(255, 255, 255, 0.1); color: var(--sw-title); box-shadow: inset 0 0 0 1px rgba(214, 179, 95, 0.45); }
+    .sw-filter-dot { flex: none; width: 8px; height: 8px; border-radius: 4px; }
+    .sw-filter-dot.is-near { background: #6fbf73; }
+    .sw-filter-dot.is-middle { background: #e0a05a; }
+    .sw-filter-dot.is-far { background: #a66fd0; }
+    .sw-filter-toggles, .sw-filter-books { display: flex; align-items: center; gap: 8px; }
+    .sw-root .sw-filter-toggles .sw-toggle { flex: 1 1 0; min-width: 0; min-height: 40px; justify-content: center; gap: 8px; padding: 0 8px; border: 0; border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--sw-title); font: 500 var(--fsc-14) var(--font-ui); }
+    .sw-root .sw-filter-toggles .sw-toggle.is-on { background: var(--sw-active-fill); color: var(--sw-gold); box-shadow: inset 0 0 0 1px var(--sw-active-border); }
+    .sw-filter-and { flex: none; color: var(--sw-text-muted); font-size: var(--fsc-13); }
+    .sw-filter-book { flex: 1 1 0; min-width: 0; }
+    .sw-filter-book .sw-select { width: 100%; min-height: 40px; padding: 0 10px; border: 0; border-radius: 10px; background-color: rgba(255, 255, 255, 0.06); color: var(--sw-title); font: 500 var(--fsc-14) var(--font-ui); }
+    /* My Web with no links yet: a card with its link mark, the title, the two sentences and the gold Start reading; the
+       x inside it at the right. Still inert but for its two buttons, so a drag across it moves the web */
+    .sw-root .sw-empty { box-sizing: border-box; width: min(452px, calc(100% - 48px)); padding: 16px 16px 14px 18px; border-radius: 16px; background: rgba(19, 19, 18, 0.96); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6); text-align: left; text-shadow: none; }
+    .sw-empty-in { display: flex; align-items: flex-start; gap: 14px; }
+    .sw-empty-mark { flex: none; width: 38px; height: 38px; display: grid; place-items: center; border-radius: 10px; background: rgba(255, 255, 255, 0.07); color: var(--sw-gold); }
+    .sw-root .sw-empty-title { margin: 2px 30px 4px 0; font-family: var(--sw-font); font-size: var(--fsc-20); font-weight: 700; line-height: 1.2; color: var(--sw-title); }
+    .sw-root .sw-empty-body { font-family: var(--font-ui); font-size: var(--fsc-14); line-height: 1.45; color: var(--sw-text-meta); }
+    .sw-root .sw-empty-close { top: 4px; right: 4px; border: 0; background: none; color: var(--sw-text-meta); }
+    .sw-empty-foot { display: flex; justify-content: flex-end; margin-top: 10px; }
+    .sw-empty-go { pointer-events: auto; position: relative; min-height: 40px; padding: 0 18px; border: 0; border-radius: 20px; background: var(--sw-gold); color: #1a1608; font: 600 var(--fsc-15) var(--font-ui); cursor: pointer; }
+    .sw-empty-go::after { content: ''; position: absolute; left: 0; right: 0; top: -2px; bottom: -2px; }
+    .sw-empty-go:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: 3px; }
+    /* My Web's list: "Links" and its line, Yours | Timothy's notes, then one card of rows */
+    .sw-root .sw-list-tabs { margin-top: 12px; }
+    .sw-list-tabs + .sw-choice-list { margin-top: 10px; }
+    /* ── end WA6 web ── */
 
       /* ══════════════════════════════════════════════════════════════════
          "Show me around" — the tour (review-tutorial, 2026-09-04)

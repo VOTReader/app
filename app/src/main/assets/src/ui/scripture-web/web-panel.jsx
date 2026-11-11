@@ -814,6 +814,9 @@ export function WebPanel(props) {
     lightThreads(base);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- baseKey is base's content: the trigger
   }, [mode, baseKey, webMode, lightThreads]);
+  // WA6 (w-list): My Web's list keeps the reader's links and Timothy's notes apart; it opens on Yours when there
+  // are any (null: not chosen yet)
+  const [mineSide, setMineSide] = React.useState(/** @type {string | null} */ (null));
 
   if (!g || !mode) return null;
   const containerClass = 'sw-panel ' + (mode === 'list' ? 'sw-list' : mode === 'chooser' ? 'sw-choice' : 'sw-sheet');
@@ -879,6 +882,37 @@ export function WebPanel(props) {
           </Section>
         </React.Fragment>
       );
+    } else if (webMode === 'personal') {
+      // WA6 (w-list): "Links", then Yours · N | Timothy's notes, then one card of rows; a note's row says its Volume
+      const yours = listItems.filter((it) => it.kind !== 'underlay');
+      const notes = listItems.filter((it) => it.kind === 'underlay');
+      const side = mineSide || (yours.length || !notes.length ? 'yours' : 'notes');
+      const rows = side === 'notes' ? notes : yours;
+      const tab = (/** @type {string} */ k, /** @type {string} */ words) => (
+        <button type="button" className={'sw-seg-btn' + (side === k ? ' is-on' : '')} aria-pressed={side === k}
+          onClick={() => setMineSide(k)}>{words}</button>
+      );
+      body = (
+        <React.Fragment>
+          <div className="sw-panel-head sw-inview-head">
+            <h2 className="sw-panel-title">Links</h2>
+            <div className="sw-sheet-meta sw-panel-meta">Tap one to see it and open both ends</div>
+          </div>
+          <div className="sw-seg sw-list-tabs" role="group" aria-label="Whose links">
+            {tab('yours', 'Yours · ' + yours.length)}
+            {notes.length ? tab('notes', 'Timothy’s notes') : null}
+          </div>
+          {rows.length ? (
+            <ul className="sw-rows sw-choice-list">
+              {rows.map((item, i) => (
+                <ConnectionRow key={i} title={connectionTitle(item)}
+                  text={item.kind === 'underlay' ? item.volume || connectionMeta(item) : connectionMeta(item)}
+                  mainClass="sw-choice-row" onMain={() => onChoose(item)} />
+              ))}
+            </ul>
+          ) : <div className="sw-list-empty">You have no links on the web yet.</div>}
+        </React.Fragment>
+      );
     } else body = (
       <React.Fragment>
         <PanelHead over={listEyebrow(webMode, chapter, lensOn)} title={null} meta={listMeta(chapter, listItems.length)} />
@@ -891,7 +925,7 @@ export function WebPanel(props) {
                 onLight={item.kind === 'arc' ? (on) => light(on ? [item.index] : null) : undefined} />
             ))}
           </ul>
-        ) : <div className="sw-list-empty">{webMode === 'personal' ? 'You have no links on the web yet.' : 'No nearby connections at this location.'}</div>}
+        ) : <div className="sw-list-empty">No nearby connections at this location.</div>}
       </React.Fragment>
     );
   } else if (mode === 'chooser') {

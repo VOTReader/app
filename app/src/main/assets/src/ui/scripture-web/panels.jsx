@@ -196,21 +196,32 @@ export function legendFor(mode, credit, chips) {
   ];
 }
 
-/** The empty-web notice on a My Web with no links yet: what to do, in one
- * sentence, and a close the screen's dismissEmpty remembers. */
-export function EmptyWebNotice({ onDismiss }) {
+/** The empty-web notice on a My Web with no links yet: what to do, a close the screen's dismissEmpty
+ * remembers, and (WA6, w-mine0) Start reading, which leaves the web for the reading it came from. */
+export function EmptyWebNotice({ onDismiss, onStart }) {
   return (
     <div className="sw-empty">
-      <div className="sw-empty-title">Your web is still being woven.</div>
-      {/* Two short sentences, so the panel covers under half the band on the
-          800x360 frame (the walk's R3); the faint threads behind it are
-          Timothy's notes, and the panel must not hide them. */}
-      <div className="sw-empty-body">
-        Select text anywhere in the app, tap <strong>Link</strong>, and pick
-        where it goes. The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.
+      <div className="sw-empty-in">
+        <span className="sw-empty-mark" aria-hidden="true"><UiIcon name="link" /></span>
+        <div>
+          <div className="sw-empty-title">Your web is still being woven</div>
+          {/* the faint threads behind the card are Timothy's notes: it stays small and inert but for its buttons */}
+          <div className="sw-empty-body">
+            Select text anywhere in the app, tap Link, and pick where it goes. It shows here as a gold thread.
+            The faint threads are Timothy&rsquo;s notes, the Volumes&rsquo; own citations.
+          </div>
+        </div>
       </div>
-      <button type="button" className="sw-empty-close" aria-label="Dismiss"
-        onClick={onDismiss}>×</button>
+      {onStart ? (
+        <div className="sw-empty-foot">
+          <button type="button" className="sw-empty-go" onClick={onStart}>Start reading</button>
+        </div>
+      ) : null}
+      <button type="button" className="sw-empty-close" aria-label="Dismiss" onClick={onDismiss}>
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
     </div>
   );
 }

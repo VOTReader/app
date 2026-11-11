@@ -39,6 +39,10 @@ import {
 import { answersFragmentStart } from '../../utils/answers-links.js';
 import { wtlbHlKey } from '../../utils/hl-keys.js';
 import { endsOnClosing } from '../../utils/closing-breaks.js';
+import { usePageMenu } from '../../utils/page-menu.js';
+import { answersIndexOf } from '../../utils/answers-search.js';
+import { answersCardFor, answersShownText, answersCardWords, ANSWERS_CARD_MAX_WORDS } from '../../utils/answers-extras.js';
+import { AnswersCardSheet } from '../sheets/AnswersCardSheet.jsx';
 
 /** The pictures' own sizes, so a figure holds its place before it decodes. */
 const IMG_WH = { 'answers-chart-chronology.jpg': [2000, 1545], 'answers-holidays-vs-holy-days.jpg': [1472, 960], 'answers-banner.jpg': [1200, 304] };
@@ -377,6 +381,31 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
   const tcRow = rows.find((r) => r.trumpet);
   const tcAt = tcRow ? tcRow.at : entry.paragraphs.length;
 
+  // X-hidden 69 (WA6): "Share as a card" in the topic's ⋯ menu, beside "Find in this topic" when that is there.
+  // The card holds the passage the reader is in: from the section on view on, the first passage whose words fit a card
+  // whole, else its first paragraph that does (a card holds 80 words), else that passage as it is (the sheet then
+  // asks for a shorter one); its words as the page shows them, its source and date its own (answersCardFor).
+  // Other words go through the selection's card door.
+  const cardRef = React.useRef(() => {});
+  cardRef.current = () => {
+    const item = answersIndexOf(entries || [entry]).find((t) => t.entry === entry);
+    const all = item ? item.passages.filter((x) => x.paras.length) : [];
+    const from = rows[cur] ? rows[cur].at : 0;
+    const at = all.findIndex((x) => x.paras[x.paras.length - 1].index >= from);
+    const ps = at > 0 ? all.slice(at).concat(all.slice(0, at)) : all;
+    if (!ps.length) return;
+    const text = (/** @type {any[]} */ qs) => qs.map((q) => answersShownText(entry.paragraphs[q.index].text)).join('\n');
+    const fits = (/** @type {string} */ w) => { const n = answersCardWords(w); return n > 0 && n <= ANSWERS_CARD_MAX_WORDS; };
+    let pick = null;
+    for (const p of ps) { if (fits(text(p.paras))) { pick = p.paras; break; } }
+    if (!pick) for (const p of ps) { const q = p.paras.find((x) => fits(text([x]))); if (q) { pick = [q]; break; } }
+    if (!pick) pick = ps[0].paras;
+    setSheet({ kind: 'card', card: answersCardFor(entry, item, pick[0].index, text(pick), meta && meta.sections) });
+  };
+  const cardMenu = React.useMemo(() => (inert || !ready ? null
+    : [{ key: 'answers-card', label: 'Share as a card', icon: /** @type {'share'} */ ('share'), onSelect: () => cardRef.current() }]), [inert, ready]);
+  usePageMenu(cardMenu);
+
   // Fold on or off moves every paragraph into or out of its section's div.ans-fold, so React mounts
   // them anew and the marks painted inside them go with the old ones: say so, and the pass re-paints.
   const foldedRef = React.useRef(folded);
@@ -667,6 +696,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
           onStep={(n) => { const c = answersBrowseShelves(entries).commandments.find((x) => x.num === n); if (c) setSheet({ kind: 'cmd', shelf: c }); }}
           onOpenTopic={(id) => { setSheet(null); nav.openTopic(id, null); }} onGoToRef={nav.goToRef ? (ref) => { setSheet(null); nav.goToRef(ref); } : undefined} />
       ) : null}
+      {sheet && sheet.kind === 'card' ? <AnswersCardSheet card={sheet.card} onClose={() => setSheet(null)} /> : null}
       {sheet && sheet.kind === 'chart' ? (
         <ChartViewer chart={sheet.chart} onClose={() => { const f = sheet.from; setSheet(null); if (f && f.focus) f.focus({ preventScroll: true }); }} />
       ) : null}

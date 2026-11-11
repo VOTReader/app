@@ -731,7 +731,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
       {web.canon && graph && web.sheetOpen ? (
         <FilterSheet web={web} graph={graph} density={density} chooseDensity={chooseDensity} total={stats ? stats.shown : 0} />
       ) : null}
-      {emptyShown && <EmptyWebNotice onDismiss={dismissEmpty} />}
+      {emptyShown && !listOpen && <EmptyWebNotice onDismiss={dismissEmpty} onStart={onBack} />}
       {tip && <TipChip info={tip} viewport={viewRef.current} inset={panelInsetRef.current} />}
       {/* THE DOCKED PANEL (web-panel.jsx): one panel at the right edge while anything is open; Nearby
           over the chooser over the open card, the precedence the state has */}
@@ -769,6 +769,8 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
           {/* WA5: the count its own span, so a card open can let it go and keep the credit (app.css WA5 web) */}
           <div className="sw-legend-sub">{mode !== 'personal' && stats ? (
             <span className="sw-legend-count">{(web.on ? web.shown.toLocaleString() + ' shown' : stats.shown.toLocaleString() + ' connections') + ' · '}</span>
+          ) : null}{mode === 'personal' && graph && personalCount === 0 ? (
+            <span className="sw-legend-count">No links of yours yet · </span>
           ) : null}<span className="sw-credit">{(graph && graph.attribution) || WEB_CREDIT}</span></div>
         </div>
         <div className="sw-wbot-end">

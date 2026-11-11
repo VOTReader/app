@@ -1318,13 +1318,15 @@ describe('the Nearby list reads the lens (landing 15)', () => {
 
   // Sweep mw12: My Web's list is the reader's links (every one, nearest the middle first since w3
   // item 29); its header said 'Your nearby links' and its empty line 'No nearby connections at this location.'
+  // WA6 (w-list): titled "Links", the reader's own under "Yours · N" (Timothy's notes their own tab)
   it('on My Web the list says what it is: your links, with no "nearby" and no "at this location"', async () => {
     const { container } = await mountList();
     fireEvent.click(screen.getByRole('button', { name: /my web/i }));
     await act(async () => { await new Promise((r) => setTimeout(r, 60)); });
     fireEvent.click(screen.getByRole('button', { name: 'List' }));
     const list = container.querySelector('.sw-list');
-    expect(list.querySelector('.sw-sheet-eyebrow').textContent).toBe('Your links');
+    expect(list.querySelector('.sw-panel-title').textContent).toBe('Links');
+    expect(list.querySelector('.sw-list-tabs .sw-seg-btn.is-on').textContent).toBe('Yours · 0');
     expect(list.textContent).not.toMatch(/nearby links|at this location/i);
     expect(list.querySelector('.sw-list-empty').textContent).toBe('You have no links on the web yet.');
   });
@@ -1706,7 +1708,8 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     // WA4: the credit is the key's second line (.sw-legend-sub), My Web's with no count before it
     const credit = legend.querySelector('.sw-legend-sub');
     expect(credit, 'the credit, in the legend').toBeTruthy();
-    expect(credit.textContent).toBe('Cross-reference data © OpenBible.info (CC-BY)');
+    // WA6 (w-mine0): with no links of the reader's yet the line says so before the credit
+    expect(credit.textContent).toBe('No links of yours yet · Cross-reference data © OpenBible.info (CC-BY)');
     expect(legend.lastElementChild, 'the credit is the legend\'s last item').toBe(credit);
     expect(legend.querySelector('.sw-legend-line .sw-credit'), 'said once').toBeNull();
     expect(credit.closest('[aria-hidden="true"]'), 'the credit is read, not hidden').toBeNull();
@@ -1719,7 +1722,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
 
   it('offers a Dismiss control on the notice', async () => {
     await openMyWeb();
-    expect(screen.getByText('Your web is still being woven.')).toBeTruthy();
+    expect(screen.getByText('Your web is still being woven')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Dismiss' })).toBeTruthy();
   });
 
@@ -1727,20 +1730,20 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const updateSetting = vi.fn();
     await openMyWeb({ updateSetting });
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
   });
 
   it('does not pitch the notice again once the dismissal is stored', async () => {
     await openMyWeb({ settings: { swEmptyDismissed: true } });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
   });
 
   it('closes on Escape while focus is inside the notice', async () => {
     const updateSetting = vi.fn();
     await openMyWeb({ updateSetting });
     fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(updateSetting).toHaveBeenCalledWith('swEmptyDismissed', true);
   });
 
@@ -1753,7 +1756,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const onBack = vi.fn();
     await openMyWeb({ onBack });
     fireEvent.keyDown(screen.getByRole('button', { name: 'Dismiss' }), { key: 'Escape' });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(onBack).not.toHaveBeenCalled();
   });
 
@@ -1776,7 +1779,7 @@ describe('My Web — the empty-web notice is dismissible (M2)', () => {
     const onBack = vi.fn();
     await openMyWeb({ onBack });
     fireEvent.keyDown(document.querySelector('.sw-root'), { key: 'Escape' });
-    expect(screen.queryByText('Your web is still being woven.')).toBeNull();
+    expect(screen.queryByText('Your web is still being woven')).toBeNull();
     expect(onBack).not.toHaveBeenCalled();
   });
 
