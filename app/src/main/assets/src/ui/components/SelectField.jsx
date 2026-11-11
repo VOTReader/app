@@ -56,8 +56,9 @@ export function SelectField({ eyebrow, title, label, desc, value, options, onCha
    Renders nothing while closed; picking an option calls onChange, then
    onClose. `portal` moves it to <body> for callers inside the top bar. */
 /** @param {{ id?: string, open: boolean, onClose: () => void, eyebrow?: string, title: string, value: string,
-     options: any[], onChange: (v: string) => void, portal?: boolean }} props */
-export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false }) {
+     options: any[], onChange: (v: string) => void, portal?: boolean, note?: string }} props
+   `note`: one muted line under the options (listen.html au-voicepref: "Your pick is used wherever that reading exists."). */
+export function SelectSheet({ id, open, onClose, eyebrow, title, value, options, onChange, portal = false, note = '' }) {
   const ownId = React.useId();
   const sheetId = id || `select-sheet-${ownId}`;
   const titleId = `select-sheet-title-${ownId}`;
@@ -122,6 +123,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
             );
           })}
         </div>
+        {note ? <p className="select-sheet-note">{note}</p> : null}
       </div>
     </>
   );

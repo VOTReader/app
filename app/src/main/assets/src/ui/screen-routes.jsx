@@ -1635,12 +1635,9 @@ export function buildScreenRoutes({
     'audio-library-saved': () => (
       <AudioSavedScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel="Back to Listen"
         onOpenTrack={(track) => _openAudioText(track, 'audio-library-saved')}
-        onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
+        onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
       />
     ),
     'matthew-idx': () => {

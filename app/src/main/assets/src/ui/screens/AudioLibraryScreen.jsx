@@ -25,10 +25,10 @@ import { secondsOf } from '../../utils/audio-lengths.js';
 import { bibleEditionPartialDetail } from '../../utils/audio-coverage.js';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
 import { SelectSheet } from '../components/SelectField.jsx';
+import { ListRow as UiRow, RowPlay } from '../components/UiParts.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
+import { remainingLabel, relativePlayedAt } from '../components/AudioShelf.jsx';
 
-/** Recent list disclosure state. Deliberately localStorage, not the tab state:
- *  it is a shelf preference, not a place the reader navigated to. */
-const RECENT_OPEN_KEY = 'vot-audio-recent-open';
 /** Rows shown before "Show all" — enough to recognize the trail, short enough
  *  that Browse stays reachable without a long scroll. */
 const RECENT_PREVIEW = 8;
@@ -73,21 +73,6 @@ function clock(value) {
   const mins = Math.floor(seconds / 60);
   const rest = seconds % 60;
   return mins + ':' + (rest < 10 ? '0' : '') + rest;
-}
-
-/** @returns {boolean} */
-function readRecentOpen() {
-  try {
-    if (typeof localStorage === 'undefined') return true;
-    return localStorage.getItem(RECENT_OPEN_KEY) !== '0';
-  } catch (_e) { return true; }   // private mode / blocked storage — default open
-}
-
-/** @param {boolean} open @returns {void} */
-function writeRecentOpen(open) {
-  try {
-    if (typeof localStorage !== 'undefined') localStorage.setItem(RECENT_OPEN_KEY, open ? '1' : '0');
-  } catch (_e) { /* the disclosure still works for this session */ }
 }
 
 /** Books this Bible edition actually ships, counted off the manifest rather
@@ -151,6 +136,12 @@ export function letterVoiceOptions() {
       id, label: String(label), desc: 'Prefer this reading wherever it exists',
     })),
   ];
+}
+
+/** The Letter voice sheet on the Listen root (listen.html au-voicepref): the five choices, the rule said once under
+ *  them, Automatic's own line kept. Settings > Listening keeps letterVoiceOptions as it is. */
+export function rootVoiceOptions() {
+  return letterVoiceOptions().map((o) => ({ id: o.id, label: o.label, desc: o.id === 'auto' ? 'Each recording’s own reader' : '' }));
 }
 
 /** The Letter voice row's value: the current choice in its own words. @param {string | undefined} code @returns {string} */
@@ -267,7 +258,6 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
     return () => { live = false; };
   }, []);
 
-  const [recentOpen, setRecentOpen] = React.useState(readRecentOpen);
   const [recentAll, setRecentAll] = React.useState(false);
   const [bibleOpen, setBibleOpen] = React.useState(false);
   const [voiceOpen, setVoiceOpen] = React.useState(false);
@@ -304,12 +294,6 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
   // Continue listening: what is in the player, else the newest recording played.
   const resume = current || recent[0] || null;
   const left = current ? minutesLeft(state) : '';
-
-  const toggleRecent = () => {
-    const next = !recentOpen;
-    setRecentOpen(next);
-    writeRecentOpen(next);
-  };
 
   return (
     <ScreenLayout root navChildren={rootNavStart({ title: 'Listen', onSearch })} navEnd={<RootGear onSettings={onSettings} />}>
@@ -383,34 +367,37 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
           <div className="root-section-row">
             <h2 className="root-section" id="audio-library-recent">Recently played</h2>
             {recent.length ? <button type="button" className="root-link" onClick={() => clearHistory(library)} aria-label="Clear recently played">Clear</button> : null}
-            <button type="button" className={'audio-library-disclosure' + (recentOpen ? ' is-open' : '')} onClick={toggleRecent}
-              aria-expanded={recentOpen} aria-controls="audio-library-recent-list"
-              aria-label={recentOpen ? 'Collapse recently played' : 'Expand recently played'}>
-              <ChevronIcon />
-            </button>
           </div>
-          <div id="audio-library-recent-list">
-            {recentOpen ? (
-              shownRecent.length ? (
-                <>
-                  {/* Per-row × (owner directive 2026-08-09): one stray start no longer needs the whole history cleared. */}
-                  <div className="audio-library-list">{shownRecent.map((track) => <AudioShelfRow key={track.url} track={track} source="recent" onOpenTrack={onOpenTrack} onRemove={(item) => library && library.removeRecent(item.url)} />)}</div>
-                  {recent.length > shownRecent.length ? (
-                    <button type="button" className="audio-library-more" onClick={() => setRecentAll(true)}>Show all {recent.length}</button>
-                  ) : null}
-                </>
-              ) : (
-                <div className="audio-library-empty">Start a recording and it will appear here, ready for an easy return.</div>
-              )
-            ) : null}
+          {/* listen.html au-root: round play, title, "Volume Two · Just now", star, a visible × (owner 2026-08-09). */}
+          <div className="ui-group" role="group" aria-labelledby="audio-library-recent">
+            {shownRecent.map((track) => {
+              const name = trackName(track);
+              const isCur = !!(current && current.url === track.url);
+              const playing = isCur && active;
+              const starred = !!(library && typeof library.isSaved === 'function' && library.isSaved(track));
+              const opens = hasTextDestination(track);
+              return (
+                <UiRow key={track.url} current={isCur}
+                  lead={<RowPlay label={(playing ? 'Pause ' : 'Play ') + name} playing={playing}
+                    onClick={() => (isCur ? AudioPlayer.toggle() : AudioPlayer.playTrack(track))} />}
+                  title={name} meta={[track.sub || trackMeta(track), remainingLabel(track) || relativePlayedAt(track.playedAt)].filter(Boolean).join(' · ')}
+                  onClick={opens ? () => onOpenTrack(track) : undefined} ariaLabel={opens ? 'Open text for ' + name : undefined}
+                  star={{ on: starred, label: starred ? 'Remove ' + name + ' from Saved' : 'Save ' + name, onClick: () => toggleSavedRecording(library, track) }}
+                  remove={{ label: 'Remove ' + name + ' from recently played', onClick: () => { if (library) library.removeRecent(track.url); } }} />
+              );
+            })}
           </div>
+          {recent.length > shownRecent.length ? (
+            <button type="button" className="ui-link listen-recent-more" onClick={() => setRecentAll(true)}>Show all {recent.length}</button>
+          ) : null}
         </section>
         ) : null}
       </div>
       {/* The same choice as Settings > Listening > Letter Voice, picked here (the hub, 2026-11-10). */}
       {onSetLetterReader ? (
-        <SelectSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} eyebrow="Listening" title="Letter Voice"
-          value={letterReader || 'auto'} options={letterVoiceOptions()} onChange={onSetLetterReader} portal />
+        <SelectSheet open={voiceOpen} onClose={() => setVoiceOpen(false)} title="Letter voice"
+          value={letterReader || 'auto'} options={rootVoiceOptions()} onChange={onSetLetterReader} portal
+          note="Your pick is used wherever that reading exists." />
       ) : null}
     </ScreenLayout>
   );

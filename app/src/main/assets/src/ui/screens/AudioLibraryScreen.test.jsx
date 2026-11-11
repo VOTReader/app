@@ -131,7 +131,7 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     expect(screen.queryByText('Recently played')).toBeNull();
   });
 
-  it('recently played collapses, remembers the choice, and folds long trails behind Show all', () => {
+  it('recently played is always open (no disclosure, listen.html au-root) and folds long trails behind Show all', () => {
     installGlobals({ recent: manyRecent(11) });
     renderScreen();
     expect(screen.getAllByText('Recent 1').length).toBeGreaterThan(0);
@@ -139,13 +139,8 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show all 11' }));
     expect(screen.getByText('Recent 11')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse recently played' }));
-    expect(screen.queryByText('Recent 2')).toBeNull();
-    expect(localStorage.getItem('vot-audio-recent-open')).toBe('0');
-
-    fireEvent.click(screen.getByRole('button', { name: 'Expand recently played' }));
+    expect(screen.queryByRole('button', { name: 'Collapse recently played' })).toBeNull();
     expect(screen.getByText('Recent 2')).toBeTruthy();
-    expect(localStorage.getItem('vot-audio-recent-open')).toBe('1');
   });
 
   it('one doorway per source family: the Volumes together, the Bible opening its editions in place', () => {

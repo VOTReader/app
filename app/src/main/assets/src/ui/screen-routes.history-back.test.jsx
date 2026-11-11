@@ -461,7 +461,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     const { routes: nextRoutes, props: nextProps } = makeRoutes();
     const saved = nextRoutes['audio-library-saved']();
     expect(saved.props.onBack).toBe(nextProps.goNavOrigin);
-    expect(saved.props.backLabel).toBe('Listening Library');
+    expect(saved.props.backLabel).toBe('Back to Listen');
     saved.props.onOpenTrack({ key: 'one:wide-path' });
     expect(nextProps.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'audio-library-saved',

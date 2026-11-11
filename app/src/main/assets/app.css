@@ -3592,8 +3592,12 @@
     .ui-progress { margin: var(--sp-3) 0 0; }
     .listen-progress > span, .ui-progress > span { display: block; height: 100%; border-radius: 2px; background: var(--accent); }
     .listen-recent { margin-top: 4px; }
-    .listen-recent .audio-library-disclosure { flex: none; }
-    .listen-recent .audio-library-list { border: 0; border-radius: var(--r-card); background: var(--surface-1); }
+    /* -- W3c listen: Recently played on the root, Saved, the Letter voice sheet (listen.html au-root, au-saved,
+       au-saved0, au-voicepref, 2026-11-11) */
+    .listen-recent-more { display: block; margin: var(--sp-3) auto 0; }
+    .listen-saved-find { margin-bottom: var(--sp-2); }
+    .listen-saved-note, .select-sheet-note { margin: var(--sp-3) 4px 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
+    /* -- end W3c listen */
     /* buttons (rule 9): primary gold fill and dark ink; secondary surface fill, primary text, gold icon; text button muted,
        no box. 48 high pills; small 38. Red only for destroying something. */
     .ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: var(--btn-h); padding: 0 18px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; line-height: 1.2; white-space: nowrap; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }

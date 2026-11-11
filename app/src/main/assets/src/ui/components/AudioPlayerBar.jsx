@@ -225,7 +225,7 @@ function FinishedBar({ fin, barRef }) {
   );
 }
 
-export function AudioPlayerBar() {
+export function AudioPlayerBar({ hidden = false } = {}) {
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
   // The song skin says "Not on this phone" the moment the signal goes (and stops when it returns): the player only
   // re-renders the bar on its own events, so the bar listens for online/offline itself. It also re-reads the keep
@@ -237,7 +237,8 @@ export function AudioPlayerBar() {
   // The end of the order (player brief 3g "Ended"): the bar stays 10 s as Finished, with Replay. It never vanishes silently.
   const fin = open ? null : AudioPlayer.finished();
   const finShown = !!fin;
-  const shown = open || finShown;
+  // The Listen root's Continue card is the player there (listen.html au-root): no second bar under it.
+  const shown = !hidden && (open || finShown);
   const [managerOpen, setManagerOpen] = React.useState(false);
   const barRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
   // Swipes on the bar (brief 3a), each with a button that does the same: left / right = Next / Previous (the full
@@ -342,6 +343,7 @@ export function AudioPlayerBar() {
   const starting = st.status === 'loading' && !(st.duration > 0) && !((Number(st.time) || 0) >= 1);
   const lateStart = useStillLoading(starting, (head && head.url) || '');
 
+  if (hidden) return null;
   if (!open) return fin ? <FinishedBar fin={fin} barRef={barRef} /> : null;
 
   const queue = st.queue || [];

@@ -53,16 +53,17 @@ export function ListGroup({ label, aside, onAside, inset = false, children, clas
  *   one      a one-line row (54 px); `noLead` drops the leading slot (the hairline then starts at the padding)
  *   switchOn a switch row (true / false): the row is one button, role="switch", the switch drawn where the chevron goes
  *   star     the row's one button besides its menu (rule 12): { on, label, onClick }, a Save star (listen.html au-coll)
+ *   remove   a visible × in the menu's place (Recently played, au-root): { label, onClick }
  * @param {{ icon?: string, lead?: any, title: any, meta?: any, value?: any, valueNone?: boolean,
  *   mark?: { label: string, icon?: string, tick?: boolean } | null, menu?: { label: string, onClick: () => void } | null,
- *   star?: { on: boolean, label: string, onClick: () => void } | null, switchOn?: boolean,
+ *   star?: { on: boolean, label: string, onClick: () => void } | null, remove?: { label: string, onClick: () => void } | null, switchOn?: boolean,
  *   onClick?: () => void, chevron?: boolean, one?: boolean, noLead?: boolean, ariaLabel?: string, className?: string,
  *   current?: boolean }} props
  */
-export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, star = null, switchOn, onClick, chevron,
+export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, star = null, remove = null, switchOn, onClick, chevron,
   one = false, noLead = false, ariaLabel, className = '', current = false }) {
   const leading = noLead ? null : (lead || (icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null));
-  const showChev = chevron === undefined ? !!onClick && !menu : chevron;
+  const showChev = chevron === undefined ? !!onClick && !menu && !remove : chevron;
   const body = (
     <>
       {leading}
@@ -81,7 +82,7 @@ export function ListRow({ icon, lead, title, meta, value, valueNone = false, mar
   );
   const rowCls = cx('ui-row', one && 'is-one', (noLead || !leading) && 'no-lead', className);
   const aria = current ? 'true' : undefined;
-  if (menu || star) {
+  if (menu || star || remove) {
     return (
       <div className={rowCls}>
         {onClick
@@ -94,6 +95,11 @@ export function ListRow({ icon, lead, title, meta, value, valueNone = false, mar
         {menu ? (
           <button type="button" className="ui-row-menu" onClick={menu.onClick} aria-label={menu.label} title={menu.label} aria-haspopup="dialog">
             <UiIcon name="more" />
+          </button>
+        ) : null}
+        {remove ? (
+          <button type="button" className="ui-row-menu" onClick={remove.onClick} aria-label={remove.label} title={remove.label}>
+            <UiIcon name="x" />
           </button>
         ) : null}
       </div>
