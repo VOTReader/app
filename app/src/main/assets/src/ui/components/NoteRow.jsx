@@ -4,11 +4,14 @@
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { relativeDate } from '../../utils/dates.js';
+import { UiIcon } from './UiIcon.jsx';
 
 /**
- * @param {{ note: any, onTap: any, onTapSegment?: any, hideNotebookId?: any }} props
+ * One note as a card (UI pass, mock v2 library.html l-notes): the colour dot, the place in gold and when, the row's
+ * ONE menu (rule 12), then the note itself and the words it is anchored to.
+ * @param {{ note: any, onTap: any, onTapSegment?: any, hideNotebookId?: any, menu?: { label: string, onClick: () => void } | null }} props
  */
-export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
+export function NoteRow({ note, onTap, onTapSegment, hideNotebookId, menu = null }) {
   const sourceLabel = noteSourceLabel(note);
   // A multi-chapter note ("John 3:16 · John 4:1-2") used to be one inert string
   // over a row that always navigated to keys[0] — every segment past the first
@@ -46,9 +49,9 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
     >
       <button type="button" className="note-row-open"
         aria-label={'Open note: ' + (segments.length > 0 ? segments.map((seg) => seg.label).join(' · ') : sourceLabel)} />
-      <span className="note-row-swatch" style={{ background: swatchBg }} />
       <span className="note-row-body">
         <span className="note-row-source-line">
+          <span className="note-row-swatch" style={{ background: swatchBg }} />
           {segments.length > 0 ? (
             <span className="note-row-source">
               {segments.map((seg, i) => (
@@ -67,13 +70,17 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
             <span className="note-row-source">{sourceLabel}</span>
           )}
           {date && <span className="note-row-date">{date}</span>}
+          {menu ? (
+            <button type="button" className="note-row-menu" aria-label={menu.label} title={menu.label} aria-haspopup="dialog"
+              onClick={(e) => { e.stopPropagation(); menu.onClick(); }}><UiIcon name="more" size="sm" /></button>
+          ) : null}
         </span>
         {bodyText && (Exp && bodyText.length > 160
           ? <Exp text={bodyText} threshold={160} className="note-row-preview note-row-preview-expandable" tapToToggle={true} />
           : <span className="note-row-preview">{bodyText}</span>)}
         {anchorText && (Exp && anchorText.length > 160
-          ? <Exp text={"“" + anchorText + "”"} threshold={160} className="note-row-anchor note-row-anchor-expandable" tapToToggle={true} />
-          : <span className="note-row-anchor">{"“"}{anchorText}{"”"}</span>)}
+          ? <Exp text={anchorText} threshold={160} className="note-row-anchor note-row-anchor-expandable" tapToToggle={true} />
+          : <span className="note-row-anchor">{anchorText}</span>)}
         {noteNbs.length > 0 && (
           <span className="note-row-tags">
             {noteNbs.slice(0, 2).map(nb => (

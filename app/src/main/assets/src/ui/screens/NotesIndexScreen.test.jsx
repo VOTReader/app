@@ -1,3 +1,4 @@
+// @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
 /* NotesIndexScreen — full-text search over the Notes index.
    ──────────────────────────────────────────────────────────
    filterNotesByQuery matches a note's body, its anchor excerpt (fullText,
@@ -12,6 +13,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
 import { render, cleanup, fireEvent, act } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { NotesIndexScreen, filterNotesByQuery } from './NotesIndexScreen.jsx';
 import { NoteRow } from '../components/NoteRow.jsx';
 import { noteSourceSegments } from '../../utils/note-source.js';
@@ -31,6 +33,7 @@ const NOTES = [
 const NBS = [{ id: 'nb1', name: 'Faith' }];
 
 function setupGlobals() {
+  globalThis.ReactDOM = ReactDOM;   // the sheets portal to <body>
   window.noteSourceLabel = (n) => SRC[(n.keys || [])[0]] || 'Note';
   // NoteRow is the REAL component and renders one tap target per source
   // segment, so the segmenter it reads has to be here too.
@@ -47,7 +50,10 @@ function setupGlobals() {
     list: () => NBS,
     get: (id) => NBS.find(nb => nb.id === id) || null,
   };
-  window.ScreenLayout = ({ children }) => <div>{children}</div>;
+  // The utility bar's title and menu, as the real bar draws them (title text, the menu button).
+  window.ScreenLayout = ({ children, utility }) => (
+    <div><h1 className="t-bar-title">{utility && utility.title}</h1>{utility && utility.menu}{children}</div>
+  );
   window.LibraryNav = () => null;
   // Cross-bundle: the screen ships in bundle-g and reads this from bundle-d's
   // window slot (src/ui/_entry-g.js) rather than importing a second copy.
@@ -149,7 +155,7 @@ describe('NotesIndexScreen — link-out back pill', () => {
       tapThrough();
       const onBack = vi.fn();
       const { container, getByText } = render(<NotesIndexScreen {...props} navOrigin={ORIGIN} onBack={onBack} />);
-      expect(container.querySelector('.nb-drilled-title').textContent).toBe('Faith');
+      expect(container.querySelector('.t-bar-title').textContent).toBe('Faith');
       expect(getByText('My Journal · Morning')).toBeTruthy();
       fireEvent.click(container.querySelector('.back-hint-pill'));
       expect(onBack).toHaveBeenCalledTimes(1);
@@ -164,72 +170,153 @@ describe('NotesIndexScreen — link-out back pill', () => {
   });
 });
 
-describe('NotesIndexScreen drilled header', () => {
-  it('shows the Notes index header at the top level (the shared personal-study header)', () => {
+/* The UI pass (mock v2 library.html l-notes ... l-notebook): the title is the bar's, All notes | Notebooks is one
+   segmented control, every list has a search pill and the line "N notes · Newest first", a note's menu holds
+   Open, Edit, Move to a notebook, Share and Delete, and the bar's menu holds the rare things. */
+const seg = (c, name) => [...c.querySelectorAll('.ui-seg-item')].find((b) => b.textContent === name);
+const chosen = (c) => c.querySelector('.ui-seg-item[aria-checked="true"]').textContent;
+const rowNamed = (c, name) => [...c.querySelectorAll('.ui-row-main, .ui-row-press')].find((b) => b.querySelector('.ui-row-title').textContent === name);
+
+describe('NotesIndexScreen bar and notebooks', () => {
+  it('titles the bar Notes at the top, and the notebook inside one', () => {
     const { container } = render(<NotesIndexScreen {...props} />);
-    expect(container.querySelector('.study-head-title').textContent).toBe('Notes');
-    expect(container.querySelector('.nb-drilled-title')).toBeNull();
+    expect(container.querySelector('.t-bar-title').textContent).toBe('Notes');
+    fireEvent.click(rowNamed(container, 'Faith'));
+    expect(container.querySelector('.t-bar-title').textContent).toBe('Faith');
+    expect(container.querySelector('.ui-seg')).toBeNull();
   });
 
-  it('replaces it with the notebook name as the drilled title (no stacked headers)', () => {
-    const { container, getByText } = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(getByText('Faith'));
-    expect(container.querySelector('.nb-drilled-title').textContent).toBe('Faith');
-    expect(container.querySelector('.study-head-title')).toBeNull();
+  it('counts the notebook’s notes, not the whole index', () => {
+    const { container } = render(<NotesIndexScreen {...props} />);
+    expect(rowNamed(container, 'Faith').querySelector('.ui-row-value').textContent).toBe('2 notes');
+    expect(rowNamed(container, 'Not in a notebook').querySelector('.ui-row-value').textContent).toBe('1 note');
+    fireEvent.click(rowNamed(container, 'Faith'));
+    expect(container.querySelector('.lib-qline-count').textContent).toBe('2 notes');
   });
 
-  it('counts the drilled notebook’s notes, not the whole index', () => {
+  it('calls the unfiled notes "Not in a notebook", with the line on how to file them', () => {
     const { container, getByText } = render(<NotesIndexScreen {...props} />);
-    // 3 notes total, 2 of them in Faith (g1 + g3).
-    expect(container.querySelector('.study-head-count').textContent).toBe('3 notes');
-    fireEvent.click(getByText('Faith'));
-    expect(container.querySelector('.nb-drilled-count').textContent).toBe('2 notes');
+    fireEvent.click(rowNamed(container, 'Not in a notebook'));
+    expect(container.querySelector('.t-bar-title').textContent).toBe('Not in a notebook');
+    expect(getByText(/Notes you have not filed stay here/)).toBeTruthy();
+  });
+
+  it('New notebook: a name and a colour in one sheet, Create disabled until named', () => {
+    const add = vi.fn(() => ({ id: 'nb2', name: 'Hope' }));
+    const setColor = vi.fn();
+    window.NotebookStore = { ...window.NotebookStore, add, setColor };
+    window.HL_COLORS = ['yellow', 'green'];
+    const { container, getByRole } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(getByRole('button', { name: 'New notebook' }));
+    const create = getByRole('button', { name: 'Create' });
+    expect(create.disabled).toBe(true);
+    fireEvent.change(getByRole('textbox', { name: 'Notebook name' }), { target: { value: 'Hope' } });
+    fireEvent.click(getByRole('radio', { name: 'Green' }));
+    fireEvent.click(getByRole('button', { name: 'Create' }));
+    expect(add).toHaveBeenCalledWith('Hope');
+    expect(setColor).toHaveBeenCalledWith('nb2', 'green');
+    expect(container.querySelector('.ui-sheet')).toBeNull();
+    delete window.HL_COLORS;
+  });
+
+  it('the notebook menu renames, and a taken name keeps the sheet open and says so', () => {
+    const rename = vi.fn(() => false);
+    window.NotebookStore = { ...window.NotebookStore, rename };
+    const { container, getByRole, getByText } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(rowNamed(container, 'Faith'));
+    fireEvent.click(getByRole('button', { name: 'Notebook options' }));
+    fireEvent.click(rowNamed(document.body, 'Rename'));
+    fireEvent.change(getByRole('textbox', { name: 'Notebook name' }), { target: { value: 'Hope' } });
+    fireEvent.click(getByRole('button', { name: 'Save' }));
+    expect(rename).toHaveBeenCalledWith('nb1', 'Hope');
+    expect(getByText('Another notebook is already called Hope.')).toBeTruthy();
   });
 });
 
 describe('NotesIndexScreen search box', () => {
-  it('filters the All Notes tab live and shows No Matches on zero hits', () => {
-    const { container, getByText } = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(getByText('All Notes'));
-
-    const input = container.querySelector('input.notes-index-search');
-    expect(input).not.toBeNull();
+  it('filters All notes live and says when nothing matches', () => {
+    localStorage.setItem('vot-notes-tab', 'all-notes');
+    const { container, getByRole } = render(<NotesIndexScreen {...props} />);
+    const input = getByRole('searchbox', { name: 'Search notes' });
     expect(container.querySelectorAll('.note-row').length).toBe(3);
-
     fireEvent.change(input, { target: { value: 'covenant' } });
     expect(container.querySelectorAll('.note-row').length).toBe(2);
-
+    expect(container.querySelector('.lib-qline-count').textContent).toBe('2 of 3 notes');
     fireEvent.change(input, { target: { value: 'grafted in' } });
     expect(container.querySelectorAll('.note-row').length).toBe(1);
-
     fireEvent.change(input, { target: { value: 'zzqxjv' } });
     expect(container.querySelectorAll('.note-row').length).toBe(0);
-    expect(container.querySelector('.notes-empty-title').textContent).toBe('No Matches');
-
+    expect(container.querySelector('.lib-none').textContent).toBe('No notes match “zzqxjv”.');
     fireEvent.change(input, { target: { value: '' } });
     expect(container.querySelectorAll('.note-row').length).toBe(3);
   });
 
   it('filters a drilled notebook view too', () => {
-    const { container, getByText } = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(getByText('Faith'));
-
-    const input = container.querySelector('input.notes-index-search');
-    expect(input).not.toBeNull();
-    expect(container.querySelectorAll('.note-row').length).toBe(2); // g1 + g3
-
+    const { container, getByRole } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(rowNamed(container, 'Faith'));
+    const input = getByRole('searchbox', { name: 'Search this notebook' });
+    expect(container.querySelectorAll('.note-row').length).toBe(2);
     fireEvent.change(input, { target: { value: 'covenant' } });
     expect(container.querySelectorAll('.note-row').length).toBe(1);
-
-    fireEvent.change(input, { target: { value: 'zzqxjv' } });
-    expect(container.querySelector('.notes-empty-title').textContent).toBe('No Matches');
   });
 
-  it('keeps the "Nothing here yet" empty state when the drilled notebook is truly empty', () => {
+  it('an empty notebook shows no search box and says how it fills, with a way to All notes', () => {
     window.NoteStore.list = () => [];
-    const { container, getByText } = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(getByText('Faith'));
-    expect(container.querySelector('.notes-empty-title').textContent).toBe('Nothing here yet');
+    window.NotebookStore = { ...window.NotebookStore, list: () => NBS };
+    const { container, getByRole } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(rowNamed(container, 'Faith'));
+    expect(container.querySelector('input[type="search"]')).toBeNull();
+    expect(container.querySelector('.ui-empty-title').textContent).toBe('Nothing here yet');
+    fireEvent.click(getByRole('button', { name: 'All notes' }));
+    expect(container.querySelector('.t-bar-title').textContent).toBe('Notes');
+    expect(chosen(container)).toBe('All notes');
+  });
+
+  it('sorts oldest first from the sort sheet', () => {
+    localStorage.setItem('vot-notes-tab', 'all-notes');
+    const { container, getByRole } = render(<NotesIndexScreen {...props} />);
+    expect(container.querySelector('.note-row .note-row-preview').textContent).toBe('The covenant of peace');
+    fireEvent.click(getByRole('button', { name: 'Sort: Newest first' }));
+    fireEvent.click(getByRole('radio', { name: 'Oldest first' }));
+    expect(container.querySelector('.note-row .note-row-preview').textContent).toBe('Unrelated musing');
+    expect(getByRole('button', { name: 'Sort: Oldest first' })).toBeTruthy();
+  });
+});
+
+describe('NotesIndexScreen — a note’s menu', () => {
+  afterEach(() => { delete window.noteSourceNav; delete window.AnnotationStore; });
+
+  it('holds Open, Edit note, Move to a notebook (naming its notebook), Share and Delete note', () => {
+    window.noteSourceNav = () => ({ type: 'letter', letterId: 'grafted-in' });
+    localStorage.setItem('vot-notes-tab', 'all-notes');
+    const onEditNote = vi.fn(), onMoveNote = vi.fn(), onNavigateToSource = vi.fn();
+    window.navHandoff = { peek: () => null, set: () => {}, clear: () => {} };
+    const { getAllByRole } = render(<NotesIndexScreen {...props} onEditNote={onEditNote} onMoveNote={onMoveNote} onNavigateToSource={onNavigateToSource} />);
+    fireEvent.click(getAllByRole('button', { name: 'Note options' })[0]);
+    const labels = [...document.querySelectorAll('.ui-sheet .ui-row-title')].map((t) => t.textContent);
+    expect(labels).toEqual(['Open in the letter', 'Edit note', 'Move to a notebook', 'Share', 'Delete note']);
+    expect(rowNamed(document.body, 'Move to a notebook').querySelector('.ui-row-value').textContent).toBe('Faith');
+    fireEvent.click(rowNamed(document.body, 'Edit note'));
+    expect(onEditNote).toHaveBeenCalledWith('g1');
+    fireEvent.click(getAllByRole('button', { name: 'Note options' })[1]);
+    expect(rowNamed(document.body, 'Move to a notebook').querySelector('.ui-row-value').textContent).toBe('Not in one');
+    fireEvent.click(rowNamed(document.body, 'Move to a notebook'));
+    expect(onMoveNote).toHaveBeenCalledWith('g2');
+    delete window.navHandoff;
+  });
+
+  it('Delete note asks first, then removes the note and its mark', () => {
+    localStorage.setItem('vot-notes-tab', 'all-notes');
+    const remove = vi.fn(), removeGroup = vi.fn();
+    window.NoteStore.remove = remove;
+    window.AnnotationStore = { removeGroup };
+    const { getAllByRole, getByRole } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(getAllByRole('button', { name: 'Note options' })[0]);
+    fireEvent.click(rowNamed(document.body, 'Delete note'));
+    expect(remove).not.toHaveBeenCalled();
+    fireEvent.click(getByRole('button', { name: 'Delete' }));
+    expect(removeGroup).toHaveBeenCalledWith('g1');
+    expect(remove).toHaveBeenCalledWith('g1');
   });
 });
 
@@ -247,9 +334,9 @@ describe('NotesIndexScreen — large libraries', () => {
       list: () => { lists++; return notes.slice(); },
     };
     window.NotebookStore = { ...window.NotebookStore, list: () => { nbLists++; return NBS.slice(); } };
-    const { container, getByText } = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(getByText('All Notes'));
-    const input = container.querySelector('input.notes-index-search');
+    const { container, getByRole } = render(<NotesIndexScreen {...props} />);
+    fireEvent.click(seg(container, 'All notes'));
+    const input = getByRole('searchbox', { name: 'Search notes' });
     for (const q of ['c', 'co', 'cov', 'cove']) fireEvent.change(input, { target: { value: q } });
     expect(container.querySelectorAll('.note-row').length).toBe(2);
     expect(lists).toBe(1);
@@ -262,60 +349,42 @@ describe('NotesIndexScreen — large libraries', () => {
   });
 });
 
-/* U03.8/U08.4: Notes opened on Notebooks, a lone "Uncategorized" row, a tap away from every note. */
+/* U03.8/U08.4: Notes opened on Notebooks, a lone row, a tap away from every note. */
 describe('NotesIndexScreen opening tab', () => {
-  const active = (c) => c.querySelector('.notes-tab.active').textContent;
   it('opens on All notes while the reader has no notebook of their own', () => {
     window.NotebookStore = { ...window.NotebookStore, list: () => [] };
     const { container } = render(<NotesIndexScreen {...props} />);
-    expect(active(container)).toMatch(/All notes/i);
+    expect(chosen(container)).toBe('All notes');
   });
 
   it('opens on Notebooks when there are notebooks, then on whichever tab the reader last chose', () => {
     const first = render(<NotesIndexScreen {...props} />);
-    expect(active(first.container)).toMatch(/Notebooks/i);
-    fireEvent.click([...first.container.querySelectorAll('.notes-tab')].find((b) => /All notes/i.test(b.textContent)));
+    expect(chosen(first.container)).toBe('Notebooks');
+    fireEvent.click(seg(first.container, 'All notes'));
     first.unmount();
     const again = render(<NotesIndexScreen {...props} />);
-    expect(active(again.container)).toMatch(/All notes/i);
+    expect(chosen(again.container)).toBe('All notes');
   });
 });
 
-/* n116 / n118 / n189: one empty-state pattern. An empty list shows its how-to and no search box; the
-   Notebooks tab teaches how a note is made while there are none; every search box has a name. */
-describe('NotesIndexScreen empty states and search names', () => {
-  it('the Notebooks tab carries the how-to-make-a-note hint while there are no notes', () => {
+/* Rule 15: an empty list says how it fills, with one button that goes there; no search box over nothing. */
+describe('NotesIndexScreen empty states', () => {
+  it('no notes and no notebooks: one empty state with Start reading, on either tab', () => {
     window.NoteStore.list = () => [];
+    window.NotebookStore = { ...window.NotebookStore, list: () => [] };
+    const onStartReading = vi.fn();
+    const { container, getByRole } = render(<NotesIndexScreen {...props} onStartReading={onStartReading} />);
+    expect(container.querySelector('.ui-empty-title').textContent).toBe('No notes yet');
+    expect(container.querySelector('.ui-empty-text').textContent).toBe('Select some words while you read and tap Note. Every note you write collects here.');
+    expect(container.querySelector('input[type="search"]')).toBeNull();
+    fireEvent.click(getByRole('button', { name: 'Start reading' }));
+    expect(onStartReading).toHaveBeenCalledTimes(1);
+    fireEvent.click(seg(container, 'Notebooks'));
+    expect(container.querySelector('.ui-empty-title').textContent).toBe('No notes yet');
+  });
+
+  it('a full list shows no empty state', () => {
     const { container } = render(<NotesIndexScreen {...props} />);
-    expect(container.querySelector('.notes-tab.active').textContent).toMatch(/Notebooks/i);
-    expect(container.querySelector('.notes-empty-hint').textContent).toMatch(/Long-press text in any chapter, tap Note/);
-  });
-
-  it('the Notebooks tab shows no hint once a note exists', () => {
-    const { container } = render(<NotesIndexScreen {...props} />);
-    expect(container.querySelector('.notes-empty')).toBeNull();
-  });
-
-  it('an empty All notes list shows no search box; a full one names its box', () => {
-    localStorage.setItem('vot-notes-tab', 'all-notes');
-    window.NoteStore.list = () => [];
-    const empty = render(<NotesIndexScreen {...props} />);
-    expect(empty.container.querySelector('input.notes-index-search')).toBeNull();
-    empty.unmount();
-    window.NoteStore.list = () => NOTES;
-    const full = render(<NotesIndexScreen {...props} />);
-    expect(full.getByRole('searchbox', { name: 'Search all notes' })).toBeTruthy();
-  });
-
-  it('an empty notebook shows no search box; a full one names its box', () => {
-    const { container, getByText, getByRole } = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(getByText('Faith'));
-    expect(getByRole('searchbox', { name: 'Search notes in this notebook' })).toBeTruthy();
-    cleanup();
-    window.NoteStore.list = () => [];
-    const again = render(<NotesIndexScreen {...props} />);
-    fireEvent.click(again.getByText('Faith'));
-    expect(again.container.querySelector('input.notes-index-search')).toBeNull();
-    void container;
+    expect(container.querySelector('.ui-empty')).toBeNull();
   });
 });

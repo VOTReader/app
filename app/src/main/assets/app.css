@@ -5258,13 +5258,6 @@
       text-shadow:0 1px 2px rgba(0,0,0,0.85);
     }
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
-    /* [11] notebook color tags — card dot + drilled-header swatch row. */
-    .nb-card-dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.4rem; vertical-align:0.02rem; box-shadow:0 0 0 1px rgba(0,0,0,0.35); }
-    .nb-card-dot.is-none { background:transparent; box-shadow:inset 0 0 0 1px var(--cream-muted); }
-    .nb-color-row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; padding:0.4rem 0 0.7rem; }
-    .nb-color-swatch { width:1.5rem; height:1.5rem; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; }
-    .nb-color-swatch.selected { border-color:var(--cream); box-shadow:0 0 0 2px var(--gold-border); }
-    .nb-color-swatch.default { position:relative; }
     /* [7] pin badge on bulk-close-immune tabs. */
     .tab-card-pin { width:0.7rem; height:0.7rem; vertical-align:-0.12rem; margin-right:0.25rem; color:var(--gold); }
     /* [7] inline rename editor inside the TabActionSheet. */
@@ -6989,171 +6982,6 @@
       padding: 1.25rem 1rem 4rem;
       width: 100%;
     }
-    /* Tab strip at top of the Notes hub: [Notebooks] [All Notes] */
-    .notes-tabs {
-      display: flex; gap: 0;
-      border-bottom: 1px solid var(--gold-border);
-      margin: 0 0 1.1rem;
-    }
-    .notes-tab {
-      flex: 1;
-      padding: 11px 12px 13px;
-      background: transparent; border: none;
-      border-bottom: 2px solid transparent;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: color 0.15s, border-color 0.15s;
-      margin-bottom: -1px;
-    }
-    .notes-tab.active {
-      color: var(--gold);
-      border-bottom-color: var(--gold);
-    }
-    @media (hover: hover) {
-      .notes-tab:hover:not(.active) { color: var(--cream-dim); }
-    }
-    /* The Notebooks tab: one row per notebook (the redesign, 2026-09-25, Codex
-       mockup r5 take 1). It was a grid of gold-outlined cards, each with a
-       10 px "DEFAULT" / "NOTEBOOK" eyebrow over a gold Cinzel name, and a
-       dashed box for New Notebook. Now: the colour dot and name, the count at
-       the right, a chevron, on hairlines; "New notebook" is a row too. */
-    .nb-card-grid {
-      display: flex; flex-direction: column;
-      border-top: 1px solid var(--border);
-    }
-    .nb-card {
-      position: relative;
-      display: flex; align-items: center; gap: 0.75rem;
-      width: 100%; min-height: 3.5rem; box-sizing: border-box;
-      padding: 0.7rem 0.2rem;
-      background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
-      color: var(--cream-dim);
-      cursor: pointer; text-align: left;
-      font-family: var(--font-body);
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.18s ease;
-    }
-    @media (hover: hover) {
-      .nb-card:hover { background: var(--gold-faint); }
-      .nb-card:hover .nb-card-name { color: var(--gold-bright); }
-    }
-    .nb-card:active { background: var(--gold-faint); }
-    .nb-card-name {
-      flex: 1; min-width: 0;
-      font-family: var(--font-body); font-size: var(--fs-18);
-      color: var(--cream-dim); line-height: 1.3;
-      overflow-wrap: break-word;
-    }
-    .nb-card-count {
-      flex: 0 0 auto;
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; white-space: nowrap;
-    }
-    .nb-card-arrow {
-      flex: 0 0 auto;
-      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1;
-      color: var(--gold-dim);
-    }
-    .nb-card.new-notebook { color: var(--gold); }
-    /* The + stands where a notebook's colour dot does (same width and gap), so
-       "New notebook" starts at the names' edge. */
-    .nb-card.new-notebook .nb-card-plus {
-      display: inline-block; width: 0.55rem; margin-right: 0.4rem; text-align: center;
-      font-weight: 400; line-height: 1;
-    }
-    .nb-card.new-notebook .nb-card-name { color: inherit; }
-    @media (hover: hover) { .nb-card.new-notebook:hover .nb-card-name { color: var(--gold-bright); } }
-    /* Inline-create card state: replaces card content with input + actions */
-    .nb-card-create-form {
-      display: flex; flex-direction: column; gap: 8px;
-      width: 100%; align-items: stretch;
-    }
-    .nb-card-create-input {
-      padding: 9px 12px;
-      background: var(--bg); border: 1px solid var(--gold-border); border-radius: 8px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-15);
-      outline: none; width: 100%; box-sizing: border-box;
-    }
-    body.light .nb-card-create-input { background: var(--bg); color: var(--input-text); }
-    .nb-card-create-input:focus { border-color: var(--gold); }
-    .nb-card-create-actions { display: flex; gap: 6px; }
-    .nb-card-create-actions button { flex: 1; }
-    /* Drilled view header — TWO rows: [‹ back][notebook name][count] over a
-       row of actions. One row for all of it made the name the only flexible
-       item, so at --font-scale 1.6 the uppercase Cinzel buttons ate the row
-       and the name ellipsised to nothing. Split, the name gets nearly the
-       whole title row and the actions wrap among themselves instead. The
-       name is CONTENT (the screen title while drilled), so it stays in rem
-       and scales — deliberately NOT in the chrome-pin block at the end. */
-    .nb-drilled-header {
-      display: flex; flex-direction: column; gap: 0.5rem;
-      margin-bottom: 0.9rem;
-    }
-    .nb-drilled-titlerow {
-      display: flex; align-items: center; gap: 0.55rem;
-      min-width: 0;
-    }
-    .nb-drilled-actions {
-      display: flex; align-items: center; gap: 0.55rem;
-      flex-wrap: wrap;
-    }
-    .nb-drilled-actions:empty { display: none; }
-    .nb-drilled-back {
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-dim);
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      display: inline-flex; align-items: center; justify-content: center;
-      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      flex-shrink: 0;
-    }
-    .nb-drilled-back:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
-    /* A notebook's name is the screen's title while drilled in: the same face
-       and count as the personal-study header (.study-head), in one line. */
-    .nb-drilled-title {
-      margin: 0;
-      font-family: 'Cinzel Decorative', serif; font-size: clamp(var(--fs-20), 3.4vw, var(--fs-24));
-      letter-spacing: 0.02em; color: var(--cream); line-height: 1.2;
-      flex: 1; min-width: 0;
-      overflow-wrap: break-word;   /* wraps, never "Study o…" (180 %, the 09-25 walk) */
-    }
-    .nb-drilled-count {
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .nb-drilled-action {
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-muted);
-      padding: 6px 10px; border-radius: 6px;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      /* Own row now, so the label can carry a real touch target. */
-      min-height: 44px;
-      display: inline-flex; align-items: center; justify-content: center;
-    }
-    .nb-drilled-action:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
-    /* Extra gap before the destructive Delete so a tap aimed at Rename
-       can't land on it (flex gap 0.55rem + this margin ≈ 16px clear). */
-    .nb-drilled-action.danger { color: var(--danger); border-color: rgba(239,154,154,0.35); margin-left: 0.45rem; }
-    .nb-drilled-action.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
-    /* Inline rename input in drilled header */
-    .nb-drilled-rename {
-      flex: 1; min-width: 0;
-      padding: 7px 12px;
-      background: var(--bg); border: 1px solid var(--gold); border-radius: 8px;
-      color: var(--cream);
-      font-family: 'Cinzel', serif; font-size: var(--fs-16);
-      letter-spacing: 0.06em;
-      outline: none;
-    }
-    body.light .nb-drilled-rename { background: var(--bg); color: var(--input-text); }
-    .nb-drilled-rename-note { margin: 0.35rem 0 0; font-family: var(--font-body); font-size: var(--fs-14); color: var(--danger); }
 
     .notes-index-search {
       width: 100%; padding: 11px 16px;
@@ -7215,116 +7043,43 @@
       display: inline-flex; align-items: center; gap: 0.35rem;
     }
     .notes-index-sort-btn:active { background: var(--gold-faint); }
-    .notes-index-list {
-      display: flex; flex-direction: column;
-      gap: 0.6rem;
-    }
-    .note-row {
-      display: flex; gap: 0.85rem;
-      padding: 0.95rem 1rem;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
-      cursor: pointer; text-align: left;
-      -webkit-tap-highlight-color: transparent;
-      transition: border-color 0.18s ease, background 0.18s ease, transform 0.1s ease;
-      align-items: flex-start;
-    }
-    @media (hover: hover) { .note-row:hover { border-color: var(--gold); background: var(--gold-faint); } }
-    .note-row:active { transform: scale(0.99); }
-    /* The row's keyboard / screen-reader control (NoteRow): a full-row button laid under the text; the
-       segment buttons and the expandable preview sit above it (positioned, later in the flow). */
-    .note-row { position: relative; }
-    .note-row-open {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      margin: 0; padding: 0; border: 0; border-radius: 10px; background: transparent;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .note-row .note-row-open:focus-visible { outline-offset: 2px; border-radius: 10px; }
-    .note-row-source-seg, .note-row-preview-expandable, .note-row-anchor-expandable { position: relative; }
-    .note-row-swatch {
-      flex-shrink: 0;
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      margin-top: 0.4rem;
-      border: 1.5px solid rgba(255,255,255,0.10);
-    }
-    body.light .note-row-swatch { border-color: rgba(0,0,0,0.10); }
-    .note-row-body {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 0.18rem;
-    }
-    .note-row-source-line {
-      display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
-    }
-    .note-row-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
-      color: var(--gold-bright); letter-spacing: 0.04em;
-      flex-shrink: 1; min-width: 0;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    body.light .note-row-source { color: var(--gold); }
-    /* Each source segment of a multi-chapter note is its own tap target
-       (NoteRow onTapSegment). Reset the native button and carry the same
-       dotted-underline affordance the inline scripture refs use, so it reads
-       as a link rather than as chrome. */
-    .note-row-source-seg {
-      font: inherit; color: inherit; letter-spacing: inherit;
-      background: none; border: 0; padding: 0; margin: 0;
-      border-bottom: 1px dotted var(--tap-ref-sub);
-      cursor: pointer;
-    }
-    .note-row-date {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-    /* No CSS clamp — short/medium notes show in FULL; only text past the
-       JrnExpandable char threshold (160) collapses behind "Show more". A
-       visual line-clamp here would re-open the "donut hole" (clipped with an
-       ellipsis but under the char threshold, so no Show-more button). */
-    .note-row-preview {
-      font-family: var(--font-body); font-size: var(--fs-15);
-      color: var(--cream); line-height: 1.4;
-      overflow-wrap: break-word; word-break: break-word;
-    }
-    /* When the preview is wrapped in JrnExpandable, the truncation is
-       handled in JS (head + …); revert the line-clamp so the toggle
-       button is visible alongside the head text. */
-    .note-row-preview-expandable {
-      display: block; -webkit-line-clamp: unset; overflow: visible;
-    }
-    /* Same as .note-row-preview — no clamp; the anchor shows in full until
-       the JrnExpandable threshold, then collapses behind "Show more". */
-    .note-row-anchor {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-13); color: var(--cream-muted);
-      line-height: 1.4;
-      overflow-wrap: break-word; word-break: break-word;
-    }
-    .note-row-anchor-expandable {
-      display: block; -webkit-line-clamp: unset; overflow: visible;
-    }
-    .note-row-tags {
-      display: flex; flex-wrap: wrap; gap: 0.35rem;
-      margin-top: 0.25rem;
-    }
-    .note-row-nb {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-muted);
-      padding: 2px 7px;
-      border: 1px solid rgba(204,196,180,0.18);
-      border-radius: 999px;
-      background: transparent;
-    }
-    .note-row-nb-icon {
-      width: 9px; height: 9px;
-      stroke: currentColor; fill: none; stroke-width: 1.6;
-    }
+    /* ── W2 LIBRARY FAMILY: the lists (mock v2 library.html; LibraryList.jsx, NoteRow.jsx) ─────────────────────
+       Every Library list: title in the bar, a search pill, one quiet line "N things · Newest first", rows with a
+       menu. Notes are cards (dot, place, when, menu; the note; the words it holds). */
+    .lib-screen { max-width: 45rem; margin: 0 auto; padding: var(--sp-1) var(--gutter) var(--sp-8); box-sizing: border-box; }
+    .lib-seg { margin-bottom: var(--sp-3); }
+    .lib-search { margin-bottom: 0; }
+    .lib-qline { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin: 14px 2px var(--sp-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .lib-none, .lib-foot { margin: var(--sp-4) 2px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .lib-new { margin-top: var(--sp-3); }
+    .lib-nb-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .lib-name { margin-bottom: var(--sp-3); }
+    .lib-taken { margin: 0 2px var(--sp-3); color: var(--tone-danger); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .lib-colour-label { margin: var(--sp-1) 2px var(--sp-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .lib-colours { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: 0 2px var(--sp-4); }
+    .lib-colour { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; }
+    .lib-colour[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--text-1); }
+    .notes-index-list { display: flex; flex-direction: column; gap: 10px; }
+    .note-row { position: relative; display: block; padding: 14px 12px 14px var(--card-pad); border-radius: var(--r-card); background: var(--surface-1); cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; transition: background-color var(--press) ease; }
+    .note-row:active { background: var(--surface-2); }
+    /* The row's keyboard / screen-reader control: a full-row button laid under the text; the segment, menu and
+       Show more buttons sit above it (positioned, later in the flow). */
+    .note-row-open { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; border-radius: var(--r-card); background: transparent; cursor: pointer; }
+    .note-row-source-seg, .note-row-preview-expandable, .note-row-anchor-expandable, .note-row-menu { position: relative; }
+    .note-row-body { display: flex; flex-direction: column; min-width: 0; }
+    .note-row-source-line { display: flex; align-items: center; gap: 9px; min-height: 20px; }
+    .note-row-swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+    .note-row-source { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; }
+    .note-row-source-seg { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+    .note-row-date { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .note-row-menu { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin: -12px -8px -12px -6px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }
+    /* No CSS clamp: only text past JrnExpandable's 160-character threshold collapses behind "Show more". */
+    .note-row-preview { display: block; margin-top: var(--sp-2); color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); line-height: 26px; overflow-wrap: break-word; }
+    .note-row-anchor { display: block; margin-top: 10px; padding-left: 12px; border-left: 2px solid var(--surface-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; overflow-wrap: break-word; }
+    .note-row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .note-row-nb { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); }
+    .note-row-nb-icon { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+    /* ── end W2 LIBRARY FAMILY: the lists ── */
     .notes-empty {
       padding: 3rem 1rem; text-align: center;
       font-family: var(--font-body);

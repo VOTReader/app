@@ -260,9 +260,6 @@ describe('app.css — the redesign walk\'s large-type fixes hold', () => {
   it('a wrapped header count stays at the right', () => {
     expect(block('.study-head-count')).toMatch(/margin-left:\s*auto/);
   });
-  it('a notebook title wraps instead of being cut', () => {
-    expect(block('.nb-drilled-title')).not.toMatch(/white-space:\s*nowrap|text-overflow:\s*ellipsis/);
-  });
   it('Settings keeps its icon, chevron and gaps in px', () => {
     expect(ruleBlock(CSS, '.settings-group-icon {')).toMatch(/width:\s*36px/);
     expect(ruleBlock(CSS, '.settings-group-chevron {')).toMatch(/width:\s*24px/);
@@ -290,19 +287,11 @@ describe('app.css — the selection toolbar labels are plain words', () => {
   });
 });
 
-/* THE NOTEBOOKS ARE ROWS (redesign, 2026-09-25, Codex mockup r5 take 1): gold-outlined cards with
-   10 px "DEFAULT" / "NOTEBOOK" eyebrows and a dashed New Notebook box became rows on hairlines. */
+/* THE NOTEBOOKS ARE ROWS: since the UI pass (W2) they are the shared ListRow in a ListGroup (UiParts), so the
+   old .nb-card rules are gone; no eyebrow and no dashed box can come back. */
 describe('app.css — the Notebooks tab is rows', () => {
-  it('a notebook sits on a hairline, with no box', () => {
-    const row = ruleBlock(CSS, '.nb-card {');
-    expect(row).toMatch(/border:\s*0/);
-    expect(row).toMatch(/border-bottom:\s*1px solid var\(--border\)/);
-    expect(row).toMatch(/background:\s*none/);
-    expect(ruleBlock(CSS, '.nb-card-grid {')).toMatch(/flex-direction:\s*column/);
-  });
-  it('no eyebrow and no dashed box are left', () => {
-    expect(CSS).not.toMatch(/\.nb-card-eyebrow/);
-    expect(CSS).not.toMatch(/\.nb-card\.(uncategorized|new-notebook)\s*\{[^}]*dashed/);
+  it('no notebook card, eyebrow or dashed box is left', () => {
+    expect(CSS).not.toMatch(/\.nb-card/);
   });
 });
 
@@ -764,8 +753,8 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
     '.section-heading', '.compact-list-header',
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
-    '.back-hint-pill', '.notes-tab', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
-    '.nb-drilled-action', '.coverage-badge', '.coverage-badge-detail',
+    '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
+    '.coverage-badge', '.coverage-badge-detail',
     '.history-entry-time', '.history-search-count', '.bkm-row-source', '.link-row-date',
     '.link-row-side-eyebrow', '.link-row-side-cat', '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
     '.part-group-num', '.idx-note-chip',

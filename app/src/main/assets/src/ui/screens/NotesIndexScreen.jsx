@@ -6,6 +6,41 @@
    Study bundle-g until lz1) and reads normalizeExcerptDisplay from the window slots
    bundle-d fills — one copy of each law, and no second module state. */
 import { composeNotesExport, notesExportFilename, shareNotesExport } from '../../utils/notes-export.js';
+import { clearNoteDraft } from '../../utils/note-draft.js';
+import { countOf } from '../../utils/download-tree.js';
+import { relativeDate } from '../../utils/dates.js';
+import { BarMenu } from '../components/RootNav.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { ListGroup, ListRow, Segmented, UiButton, EmptyState } from '../components/UiParts.jsx';
+import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+
+/** The notebook every unfiled note is in (X-hidden-decisions: "Uncategorized" becomes this). */
+export const NOT_IN_A_NOTEBOOK = 'Not in a notebook';
+
+/** A highlight colour id as a word: 'yellow' -> 'Yellow'. @param {string} c */
+export const colourName = (c) => (c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Gold');
+
+/** The menu's open row, by where the note lives. @param {any} nav */
+export function openWords(nav) {
+  if (nav.type === 'bible' || nav.type === 'study') return 'Open the passage';
+  if (nav.type === 'journal') return 'Open the journal entry';
+  return 'Open in the letter';
+}
+
+/** The notebook colours: gold (no tag) then the highlight colours. @param {{ value: string | null, onPick: (c: string | null) => void }} props */
+function ColourDots({ value, onPick }) {
+  const colours = typeof HL_COLORS !== 'undefined' ? HL_COLORS : [];
+  return (
+    <div className="lib-colours" role="radiogroup" aria-label="Notebook colour">
+      <button type="button" role="radio" aria-checked={!value} aria-label="Gold" className="lib-colour"
+        style={{ background: 'var(--gold)' }} onClick={() => onPick(null)} />
+      {colours.map((/** @type {string} */ c) => (
+        <button key={c} type="button" role="radio" aria-checked={value === c} aria-label={colourName(c)} className="lib-colour"
+          style={{ background: 'var(--hl-' + c + ')' }} onClick={() => onPick(c)} />
+      ))}
+    </div>
+  );
+}
 
 /**
  * Case-insensitive full-text filter for the Notes index — matches a note's
@@ -35,7 +70,12 @@ function _lastTab() {
   try { const t = localStorage.getItem(NOTES_TAB_KEY); return t === 'notebooks' || t === 'all-notes' ? t : null; } catch (_e) { return null; }
 }
 
-export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNavigateToSource, navOrigin = null, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
+/**
+ * @param {{ onBack: () => void, onHome?: any, onOpenNote: (gid: string) => void, onEditNote?: (gid: string) => void,
+ *   onMoveNote?: (gid: string) => void, onStartReading?: () => void, onNavigateToSource: (nav: any, meta?: any) => void,
+ *   navOrigin?: any, theme?: any, onThemeChange?: any, onSearch?: any, onHistory?: any, onSettings?: any, historyEnabled?: any }} props
+ */
+export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onEditNote, onMoveNote, onStartReading, onNavigateToSource, navOrigin = null, theme: _theme, onThemeChange: _onThemeChange, onSearch: _onSearch, onHistory: _onHistory, onSettings: _onSettings, historyEnabled: _historyEnabled }) {
   // Subscribe to NoteStore + NotebookStore mutations so the index re-renders
   // on any add/remove/rename/membership change.
   const noteVer = React.useSyncExternalStore(
@@ -80,14 +120,6 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const [backPill, setBackPill] = React.useState(
     (_retPill && (_retPill.origin === undefined || _retPill.origin === navOrigin)) ? _retPill : null);
   React.useEffect(() => { if (typeof window !== 'undefined' && window.navHandoff) window.navHandoff.clear('notesReturnCtx'); }, []);
-  const [newNbInline, setNewNbInline] = React.useState(false);
-  const [newNbName, setNewNbName] = React.useState('');
-  const [renaming, setRenaming] = React.useState(false);
-  const [renameValue, setRenameValue] = React.useState('');
-  const [renameTaken, setRenameTaken] = React.useState('');
-  // [11] notebook color-tag swatch row (drilled header's Color action).
-  const [colorPicking, setColorPicking] = React.useState(false);
-  const [confirmDeleteNb, setConfirmDeleteNb] = React.useState(false);
   const [allNotesSort, setAllNotesSort] = React.useState('newest'); // 'newest' | 'oldest'
   const [drilledSort, setDrilledSort] = React.useState('newest');
   // One shared query filters the All Notes tab AND any drilled notebook —
@@ -97,10 +129,10 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
 
   // Build the back-pill source label from the user's current location.
   // — Drilled into a user notebook: that notebook's name
-  // — Drilled into Uncategorized: "Uncategorized"
+  // — Drilled into the unfiled notes: "Not in a notebook"
   // — All Notes tab: "My Notes" (default)
   const currentSourceTitle = () => {
-    if (drilledNbId === 'uncategorized') return 'Uncategorized';
+    if (drilledNbId === 'uncategorized') return NOT_IN_A_NOTEBOOK;
     if (drilledNbId) {
       const nb = NotebookStore.get(drilledNbId);
       if (nb && nb.name) return nb.name;
@@ -163,38 +195,47 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   const drilledNotesShown = React.useMemo(() => filterNotesByQuery(drilledNotes, searchQuery), [drilledNotes, searchQuery]);
   const allNotesShown = React.useMemo(() => filterNotesByQuery(allNotesSorted, searchQuery), [allNotesSorted, searchQuery]);
 
-  const createNotebook = () => {
-    const trimmed = newNbName.trim();
-    if (!trimmed) return;
-    NotebookStore.add(trimmed);
-    setNewNbName('');
-    setNewNbInline(false);
-  };
-
   const drilledNb = drilledNbId && drilledNbId !== 'uncategorized' ? NotebookStore.get(drilledNbId) : null;
-  const drilledTitle = drilledNbId === 'uncategorized' ? 'Uncategorized' : (drilledNb ? drilledNb.name : '');
+  const drilledTitle = drilledNbId === 'uncategorized' ? NOT_IN_A_NOTEBOOK : (drilledNb ? drilledNb.name : '');
 
-  const startRename = () => {
-    if (!drilledNb) return;
-    setRenameValue(drilledNb.name);
-    setRenameTaken('');
-    setRenaming(true);
+  // ── Sheets (rule 13: one level each; a second level closes this one and opens its own) ──
+  const [noteMenu, setNoteMenu] = React.useState(/** @type {any} */ (null));
+  const [noteToDelete, setNoteToDelete] = React.useState(/** @type {any} */ (null));
+  const [barMenu, setBarMenu] = React.useState(false);
+  const [nbSheet, setNbSheet] = React.useState(/** @type {null | 'new' | 'rename' | 'colour' | 'delete'} */ (null));
+  const [nbName, setNbName] = React.useState('');
+  const [nbColour, setNbColour] = React.useState(/** @type {string | null} */ (null));
+  const [nameTaken, setNameTaken] = React.useState('');
+  const closeNbSheet = React.useCallback(() => { setNbSheet(null); setNameTaken(''); }, []);
+  const closeNoteMenu = React.useCallback(() => setNoteMenu(null), []);
+  const closeBarMenu = React.useCallback(() => setBarMenu(false), []);
+  const closeDelete = React.useCallback(() => setNoteToDelete(null), []);
+
+  const openNewNotebook = () => { setNbName(''); setNbColour(null); setNameTaken(''); setNbSheet('new'); };
+  const createNotebook = () => {
+    const trimmed = nbName.trim();
+    if (!trimmed) return false;
+    const nb = NotebookStore.add(trimmed);
+    if (nb && nbColour) NotebookStore.setColor(nb.id, nbColour);
+    return true;
   };
   const commitRename = () => {
-    const trimmed = renameValue.trim();
-    // ds5 s11.3: a name another notebook has is refused; keep the field open.
-    if (trimmed && drilledNb && NotebookStore.rename(drilledNb.id, trimmed) === false) {
-      setRenameTaken(trimmed);
-      return;
-    }
-    setRenameTaken('');
-    setRenaming(false);
+    const trimmed = nbName.trim();
+    if (!trimmed || !drilledNb) return false;
+    // ds5 s11.3: a name another notebook has is refused; the sheet stays open and says so.
+    if (NotebookStore.rename(drilledNb.id, trimmed) === false) { setNameTaken(trimmed); return false; }
+    return true;
   };
   const deleteCurrent = () => {
     if (!drilledNb) return;
     NotebookStore.remove(drilledNb.id);
-    setConfirmDeleteNb(false);
     setDrilledNbId(null);
+  };
+  /** @param {any} note */
+  const deleteNote = (note) => {
+    clearNoteDraft(note.groupId);
+    if (typeof AnnotationStore !== 'undefined') AnnotationStore.removeGroup(note.groupId);
+    NoteStore.remove(note.groupId);
   };
 
   // "Share as text" — compose the visible list as a markdown document and
@@ -212,23 +253,77 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
   // ── Hierarchical back: a drilled-in notebook is its own navigation level ──
   // Unwind it to the Notebooks list before Back leaves the screen, so no level
   // is skipped. popDrill is the single source of that transition — used by the
-  // nav-bar back arrow, the in-content ‹ button, AND the global back router
-  // (Android hardware back / web Escape), which calls window.__screenBack.
-  const popDrill = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); setColorPicking(false); };
+  // bar's Back AND the global back router (Android hardware back / web Escape),
+  // which calls window.__screenBack.
+  const popDrill = () => { setDrilledNbId(null); setNbSheet(null); setSearchQuery(''); };
   const handleNavBack = () => { if (drilledNbId) { popDrill(); } else { onBack(); } };
   React.useEffect(() => {
     // Register the screen-back interceptor only while drilled in. When not
     // drilled, no interceptor → the global router falls through to its normal
     // notes-index → origin route. See use-android-back.js §(1b).
     if (!drilledNbId) return undefined;
-    const fn = () => { setDrilledNbId(null); setRenaming(false); setConfirmDeleteNb(false); setColorPicking(false); return true; };
+    const fn = () => { setDrilledNbId(null); setNbSheet(null); setSearchQuery(''); return true; };
     window.__screenBack = fn;
     return () => { if (window.__screenBack === fn) window.__screenBack = null; };
   }, [drilledNbId]);
 
+  // The bar's menu holds the rare things (rule 11), and only shows when it holds something.
+  const shownList = drilledNbId ? drilledNotesShown : allNotesShown;
+  const barActions = [];
+  if (shownList.length > 0) {
+    barActions.push({ id: 'share', icon: 'share', label: drilledNbId ? 'Share as text' : 'Share all as text',
+      onSelect: () => exportNotes(drilledNbId ? drilledTitle : 'My Notes', shownList) });
+  }
+  if (drilledNb) {
+    barActions.push(
+      { id: 'rename', icon: 'pen', label: 'Rename', onSelect: () => { setNbName(drilledNb.name); setNameTaken(''); setNbSheet('rename'); } },
+      { id: 'colour', icon: 'spark', label: 'Colour', value: drilledNb.color ? colourName(drilledNb.color) : 'Gold', onSelect: () => setNbSheet('colour') },
+      { id: 'delete', icon: 'trash', label: 'Delete notebook', danger: true, onSelect: () => setNbSheet('delete') },
+    );
+  }
+
+  /** @param {any} note */
+  const noteActions = (note) => {
+    const nav = typeof noteSourceNav === 'function' ? noteSourceNav(note) : null;
+    const nbs = (note.notebookIds || []).map((id) => NotebookStore.get(id)).filter(Boolean);
+    /** @type {any[]} */
+    const acts = [];
+    if (nav) acts.push({ id: 'open', icon: 'book', label: openWords(nav), onSelect: () => navToSource(note, nav) });
+    acts.push(
+      { id: 'edit', icon: 'pen', label: 'Edit note', onSelect: () => (onEditNote ? onEditNote(note.groupId) : onOpenNote(note.groupId)) },
+      { id: 'move', icon: 'journal', label: 'Move to a notebook', value: nbs.length ? (nbs.length === 1 ? nbs[0].name : countOf(nbs.length, 'notebook')) : 'Not in one',
+        onSelect: () => { if (onMoveNote) onMoveNote(note.groupId); } },
+      { id: 'share', icon: 'share', label: 'Share', onSelect: () => exportNotes(noteSourceLabel(note), [note]) },
+      { id: 'delete', icon: 'trash', label: 'Delete note', danger: true, onSelect: () => setNoteToDelete(note) },
+    );
+    if (!onMoveNote) return acts.filter((a) => a.id !== 'move');
+    return acts;
+  };
+  /** @param {any} note */
+  const rowMenu = (note) => ({ label: 'Note options', onClick: () => setNoteMenu(note) });
+  /** @param {any} note */
+  const noteHead = (note) => (note.body || normalizeExcerptDisplay(note.fullText) || noteSourceLabel(note)).slice(0, 120);
+
+  const emptyAll = (
+    <EmptyState icon="note" title="No notes yet"
+      text="Select some words while you read and tap Note. Every note you write collects here."
+      action={onStartReading ? { label: 'Start reading', onClick: onStartReading } : null} />
+  );
+  const noMatch = <p className="lib-none">No notes match “{searchQuery.trim()}”.</p>;
+  const cards = (/** @type {any[]} */ list, /** @type {any} */ hide) => (
+    <div className="notes-index-list">
+      {list.map((note) => <NoteRow key={note.groupId} note={note} onTap={onRowTap} onTapSegment={navToSource} hideNotebookId={hide} menu={rowMenu(note)} />)}
+    </div>
+  );
+
   return (
-    <ScreenLayout navChildren={LibraryNav({ onBack: handleNavBack, onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}>
-      <div className="notes-index-screen">
+    <ScreenLayout utility={{
+      title: drilledNbId ? drilledTitle : 'Notes',
+      onBack: handleNavBack,
+      backLabel: drilledNbId ? 'Back to Notebooks' : undefined,
+      menu: barActions.length ? <BarMenu label={drilledNbId ? 'Notebook options' : 'Notes options'} onClick={() => setBarMenu(true)} /> : null,
+    }}>
+      <div className="notes-index-screen lib-screen">
         {backPill && (
           <div className="back-hint-row">
             <button
@@ -241,281 +336,78 @@ export function NotesIndexScreen({ onBack, onHome: _onHome, onOpenNote, onNaviga
             </button>
           </div>
         )}
-        {/* Top-level header only. While drilled, the notebook's own name IS
-            the screen title (.nb-drilled-title below) — rendering both stacked
-            two headers on top of each other. */}
         {!drilledNbId && (
-          <header className="study-head">
-            <h1 className="study-head-title">Notes</h1>
-            <span className="study-head-count">{allNotes.length}{allNotes.length === 1 ? " note" : " notes"}</span>
-          </header>
+          <Segmented label="Notes view" className="lib-seg" value={tab}
+            options={[{ id: 'all-notes', label: 'All notes' }, { id: 'notebooks', label: 'Notebooks' }]}
+            onChange={(id) => setTab(/** @type {'notebooks' | 'all-notes'} */ (id))} />
         )}
-        {/* Tab strip — hidden while drilled in */}
-        {!drilledNbId && (
-          <div className="notes-tabs">
-            <button
-              className={"notes-tab" + (tab === 'notebooks' ? ' active' : '')}
-              aria-pressed={tab === 'notebooks'}
-              onClick={() => setTab('notebooks')}
-            >Notebooks</button>
-            <button
-              className={"notes-tab" + (tab === 'all-notes' ? ' active' : '')}
-              aria-pressed={tab === 'all-notes'}
-              onClick={() => setTab('all-notes')}
-            >All Notes</button>
-          </div>
-        )}
-        {/* ── DRILLED VIEW (inside a notebook) ── */}
+
+        {/* ── ONE NOTEBOOK ── */}
         {drilledNbId && (
           <>
-            {/* Two rows: the name owns the title row (with the back chevron and
-                a right-aligned count), the actions sit below it. One flex row
-                for all of it made the name the only shrinkable item, so at a
-                large --font-scale the buttons crushed it to an ellipsis. */}
-            <div className="nb-drilled-header">
-              <div className="nb-drilled-titlerow">
-                <button className="nb-drilled-back" onClick={popDrill} title="Back to Notebooks" aria-label="Back to Notebooks">‹</button>
-                {renaming
-                  ? <input
-                      className="nb-drilled-rename"
-                      autoFocus type="text" value={renameValue}
-                      aria-label="Notebook name"
-                      onChange={e => { setRenameValue(e.target.value); setRenameTaken(''); }}
-                      // No onBlur commit — explicit Save/Cancel buttons own the
-                      // commit so tapping a button doesn't race the blur handler
-                      // (Android has no Escape key; blur-commit was non-obvious).
-                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitRename(); } else if (e.key === 'Escape') setRenaming(false); }}
-                      maxLength={60}
-                    />
-                  : <>
-                      <h1 className="nb-drilled-title">{drilledTitle}</h1>
-                      <span className="nb-drilled-count">{drilledNotes.length}{drilledNotes.length === 1 ? " note" : " notes"}</span>
-                    </>
-                }
-              </div>
-              {renaming && renameTaken && (
-                <p className="nb-drilled-rename-note" role="alert">Another notebook is already called {renameTaken}.</p>
-              )}
-              {/* Rename mode: explicit Save / Cancel. Otherwise (user notebooks
-                  only, not Uncategorized): Rename / Delete. */}
-              <div className="nb-drilled-actions">
-                {renaming
-                  ? <>
-                      <button className="nb-drilled-action" onClick={commitRename} title="Save name">Save</button>
-                      <button className="nb-drilled-action" onClick={() => { setRenameTaken(''); setRenaming(false); }} title="Cancel rename">Cancel</button>
-                    </>
-                  : <>
-                      {/* ds5 s21.1: Share sends what the reader sees, a search's matches included. */}
-                      {drilledNotesShown.length > 0 && (
-                        <button className="nb-drilled-action" onClick={() => exportNotes(drilledTitle, drilledNotesShown)} title="Share notebook as text">Share as text</button>
-                      )}
-                      {drilledNb && <>
-                        <button className="nb-drilled-action" onClick={startRename} title="Rename notebook">Rename</button>
-                        <button className="nb-drilled-action" onClick={() => setColorPicking(v => !v)} title="Color tag" aria-expanded={colorPicking}>Color</button>
-                        <button className="nb-drilled-action danger" onClick={() => setConfirmDeleteNb(true)} title="Delete notebook">Delete</button>
-                      </>}
-                    </>
-                }
-              </div>
-            </div>
-            {/* [11] color-tag picker — the HL_COLORS swatches + a gold
-                "default" swatch that clears the tag. */}
-            {colorPicking && drilledNb && (
-              <div className="nb-color-row" role="radiogroup" aria-label="Notebook color">
-                <button
-                  className={'nb-color-swatch default' + (!drilledNb.color ? ' selected' : '')}
-                  role="radio"
-                  aria-checked={!drilledNb.color}
-                  style={{ background: 'var(--gold)' }}
-                  aria-label="Default gold"
-                  onClick={() => { NotebookStore.setColor(drilledNb.id, null); setColorPicking(false); }}
-                />
-                {(typeof HL_COLORS !== 'undefined' ? HL_COLORS : []).map(c => (
-                  <button
-                    key={c}
-                    className={'nb-color-swatch' + (drilledNb.color === c ? ' selected' : '')}
-                    role="radio"
-                    aria-checked={drilledNb.color === c}
-                    style={{ background: 'var(--hl-' + c + ')' }}
-                    aria-label={c}
-                    onClick={() => { NotebookStore.setColor(drilledNb.id, c); setColorPicking(false); }}
-                  />
-                ))}
-              </div>
-            )}
-            {confirmDeleteNb && (
-              <ConfirmStrip
-                style={{ marginBottom: '0.8rem' }}
-                question={`Delete “${drilledTitle}”? Notes will move to Uncategorized.`}
-                onCancel={() => setConfirmDeleteNb(false)}
-                onConfirm={deleteCurrent}
-              />
-            )}
-            {/* One empty-state pattern (n118): an empty list shows no search box. */}
-            {drilledNotes.length > 0 && (
-              <input
-                className="notes-index-search"
-                type="search"
-                placeholder="Search notes…"
-                aria-label="Search notes in this notebook"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            )}
-            {drilledNotes.length > 0 && (
-              <div className="notes-index-controls">
-                <button
-                  className="notes-index-sort-btn"
-                  onClick={() => setDrilledSort(s => s === 'newest' ? 'oldest' : 'newest')}
-                  style={{ marginLeft: 'auto' }} title="Toggle sort order"
-                >{drilledSort === 'newest' ? "Sort: Newest ↓" : "Sort: Oldest ↑"}</button>
-              </div>
-            )}
+            {drilledNotes.length > 0 && <ListSearch placeholder="Search this notebook" value={searchQuery} onChange={setSearchQuery} />}
+            {drilledNotes.length > 0 && <ListLine count={drilledNotesShown.length} of={drilledNotes.length} noun="note" sort={drilledSort} onSort={setDrilledSort} />}
             {drilledNotes.length === 0
-              ? (
-                  <div className="notes-empty">
-                    <div className="notes-empty-title">Nothing here yet</div>
-                    <div className="notes-empty-hint">
-                      {drilledNbId === 'uncategorized'
-                        ? "Notes that aren't in any notebook will appear here."
-                        : "Add notes to this notebook from the ⋯ menu on any note."
-                      }
-                    </div>
-                  </div>
-                )
-              : drilledNotesShown.length === 0
-                ? (
-                    <div className="notes-empty">
-                      <div className="notes-empty-title">No Matches</div>
-                      <div className="notes-empty-hint">Try a different search term.</div>
-                    </div>
-                  )
-                : (
-                    <div className="notes-index-list">
-                      {drilledNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} onTapSegment={navToSource} hideNotebookId={drilledNbId} />)}
-                    </div>
-                  )
-            }
+              ? <EmptyState icon="journal" title="Nothing here yet"
+                  text={drilledNbId === 'uncategorized' ? 'Notes that are not in a notebook collect here.' : 'Put a note here with Move to a notebook, in its menu.'}
+                  action={{ label: 'All notes', onClick: () => { popDrill(); setTab('all-notes'); } }} />
+              : drilledNotesShown.length === 0 ? noMatch : cards(drilledNotesShown, drilledNbId)}
+            {drilledNbId === 'uncategorized' && drilledNotes.length > 0 && (
+              <p className="lib-foot">Notes you have not filed stay here. Move one with its menu. A notebook you make can be renamed, recoloured, shared as text or deleted from the menu at the top.</p>
+            )}
           </>
         )}
-        {/* ── NOTEBOOKS TAB (rows since 2026-09-25) ── */}
-        {/* n116: the Notebooks tab used to show only an empty Uncategorized row to a reader with
-            no notes; it now carries the same how-to as All notes' empty state. */}
-        {!drilledNbId && tab === 'notebooks' && allNotes.length === 0 && (
-          <div className="notes-empty notes-empty-inline">
-            <div className="notes-empty-title">No Notes Yet</div>
-            <div className="notes-empty-hint">Long-press text in any chapter, tap Note in the toolbar, and your notes will appear here. Notebooks gather them by theme.</div>
-          </div>
-        )}
-        {!drilledNbId && tab === 'notebooks' && (
-          <div className="nb-card-grid">
-            <button
-              className="nb-card uncategorized"
-              onClick={() => setDrilledNbId('uncategorized')}
-            >
-              {/* A hollow dot: no colour, and every name starts at one edge. */}
-              <span className="nb-card-name"><span className="nb-card-dot is-none" aria-hidden="true" />Uncategorized</span>
-              <span className="nb-card-count">{counts.__uncategorized}{counts.__uncategorized === 1 ? " note" : " notes"}</span>
-              <span className="nb-card-arrow" aria-hidden="true">›</span>
-            </button>
-            {notebooks.map(nb => (
-              <button
-                key={nb.id}
-                className="nb-card"
-                onClick={() => setDrilledNbId(nb.id)}
-              >
-                <span className="nb-card-name">
-                  {/* [11] color-tag dot — absent color renders gold. */}
-                  <span className="nb-card-dot" style={{ background: nb.color ? 'var(--hl-' + nb.color + ')' : 'var(--gold)' }} />
-                  {nb.name}
-                </span>
-                <span className="nb-card-count">{(counts[nb.id] || 0)}{(counts[nb.id] || 0) === 1 ? " note" : " notes"}</span>
-                <span className="nb-card-arrow" aria-hidden="true">›</span>
-              </button>
-            ))}
-            {newNbInline
-              ? (
-                  <div className="nb-card" style={{ cursor: 'default' }}>
-                    <div className="nb-card-create-form">
-                      <input
-                        className="nb-card-create-input"
-                        autoFocus type="text"
-                        placeholder="Notebook name…"
-                        aria-label="Notebook name"
-                        value={newNbName}
-                        onChange={e => setNewNbName(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createNotebook(); } else if (e.key === 'Escape') { setNewNbInline(false); setNewNbName(''); } }}
-                        maxLength={60}
-                      />
-                      <div className="nb-card-create-actions">
-                        <button className="note-sheet-secondary" onClick={() => { setNewNbInline(false); setNewNbName(''); }} style={{ padding: '7px 10px' }}>Cancel</button>
-                        <button className={"note-sheet-save" + (newNbName.trim() ? '' : ' disabled')} onClick={createNotebook} disabled={!newNbName.trim()} style={{ padding: '7px 10px' }}>Create</button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              : (
-                  <button
-                    className="nb-card new-notebook"
-                    onClick={() => setNewNbInline(true)}
-                  >
-                    <span className="nb-card-name"><span className="nb-card-plus" aria-hidden="true">+</span>New notebook</span>
-                  </button>
-                )
-            }
-          </div>
-        )}
-        {/* ── ALL NOTES TAB ── */}
-        {!drilledNbId && tab === 'all-notes' && (
+
+        {/* ── NOTEBOOKS ── */}
+        {!drilledNbId && tab === 'notebooks' && (allNotes.length === 0 && notebooks.length === 0 ? emptyAll : (
           <>
-            {allNotes.length > 0 && (
-              <input
-                className="notes-index-search"
-                type="search"
-                placeholder="Search notes…"
-                aria-label="Search all notes"
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-            )}
-            {allNotes.length > 0 && (
-              <div className="notes-index-controls">
-                <button
-                  className="notes-index-sort-btn"
-                  onClick={() => exportNotes('My Notes', allNotesShown)}
-                  disabled={allNotesShown.length === 0}
-                  title="Share all notes as text"
-                >Share as Text</button>
-                <button
-                  className="notes-index-sort-btn"
-                  onClick={() => setAllNotesSort(s => s === 'newest' ? 'oldest' : 'newest')}
-                  style={{ marginLeft: 'auto' }} title="Toggle sort order"
-                >{allNotesSort === 'newest' ? "Sort: Newest ↓" : "Sort: Oldest ↑"}</button>
-              </div>
-            )}
-            {allNotes.length === 0
-              ? (
-                  <div className="notes-empty">
-                    <div className="notes-empty-title">No Notes Yet</div>
-                    <div className="notes-empty-hint">Long-press text in any chapter, tap Note in the toolbar, and your notes will appear here.</div>
-                  </div>
-                )
-              : allNotesShown.length === 0
-                ? (
-                    <div className="notes-empty">
-                      <div className="notes-empty-title">No Matches</div>
-                      <div className="notes-empty-hint">Try a different search term.</div>
-                    </div>
-                  )
-                : (
-                    <div className="notes-index-list">
-                      {allNotesShown.map(note => <NoteRow key={note.groupId} note={note} onTap={onRowTap} onTapSegment={navToSource} />)}
-                    </div>
-                  )
-            }
+            <ListGroup ariaLabel="Notebooks" className="lib-list">
+              <ListRow one icon="note" title={NOT_IN_A_NOTEBOOK} value={countOf(counts.__uncategorized, 'note')} onClick={() => setDrilledNbId('uncategorized')} />
+              {notebooks.map((nb) => (
+                <ListRow key={nb.id} one title={nb.name} value={countOf(counts[nb.id] || 0, 'note')} onClick={() => setDrilledNbId(nb.id)}
+                  lead={<span className="ui-row-lead" aria-hidden="true"><span className="lib-nb-dot" style={{ background: nb.color ? 'var(--hl-' + nb.color + ')' : 'var(--gold)' }} /></span>} />
+              ))}
+            </ListGroup>
+            <UiButton wide icon="plus" className="lib-new" onClick={openNewNotebook}>New notebook</UiButton>
           </>
-        )}
+        ))}
+
+        {/* ── ALL NOTES ── */}
+        {!drilledNbId && tab === 'all-notes' && (allNotes.length === 0 ? emptyAll : (
+          <>
+            <ListSearch placeholder="Search notes" value={searchQuery} onChange={setSearchQuery} />
+            <ListLine count={allNotesShown.length} of={allNotes.length} noun="note" sort={allNotesSort} onSort={setAllNotesSort} />
+            {allNotesShown.length === 0 ? noMatch : cards(allNotesShown, undefined)}
+          </>
+        ))}
       </div>
+
+      <ActionSheet open={barMenu} onClose={closeBarMenu} title={drilledNbId ? drilledTitle : 'Notes'} actions={barActions} portal />
+      <ActionSheet open={!!noteMenu} onClose={closeNoteMenu} title={noteMenu ? noteHead(noteMenu) : ''}
+        sub={noteMenu ? [noteSourceLabel(noteMenu), relativeDate(noteMenu.updated || noteMenu.created)].filter(Boolean).join(' · ') : ''}
+        actions={noteMenu ? noteActions(noteMenu) : []} portal />
+      <ActionSheet open={!!noteToDelete} onClose={closeDelete} title="Delete this note?"
+        confirm={{ label: 'Delete', danger: true, onConfirm: () => deleteNote(noteToDelete) }} portal>
+        The note and the mark it sits on are removed from this phone.
+      </ActionSheet>
+      <ActionSheet open={nbSheet === 'new' || nbSheet === 'rename'} onClose={closeNbSheet}
+        title={nbSheet === 'rename' ? 'Rename notebook' : 'New notebook'}
+        confirm={{ label: nbSheet === 'rename' ? 'Save' : 'Create', onConfirm: nbSheet === 'rename' ? commitRename : createNotebook, disabled: !nbName.trim() }} portal>
+        <label className="ui-field is-square lib-name">
+          <input type="text" autoFocus value={nbName} placeholder="Notebook name" aria-label="Notebook name" maxLength={60}
+            onChange={(e) => { setNbName(e.target.value); setNameTaken(''); }} />
+        </label>
+        {nameTaken ? <p className="lib-taken" role="alert">Another notebook is already called {nameTaken}.</p> : null}
+        {nbSheet === 'new' ? (<><div className="lib-colour-label">Colour</div><ColourDots value={nbColour} onPick={setNbColour} /></>) : null}
+      </ActionSheet>
+      <ActionSheet open={nbSheet === 'colour'} onClose={closeNbSheet} title="Colour" sub={drilledTitle} portal>
+        <ColourDots value={drilledNb ? drilledNb.color || null : null}
+          onPick={(c) => { if (drilledNb) NotebookStore.setColor(drilledNb.id, c); closeNbSheet(); }} />
+      </ActionSheet>
+      <ActionSheet open={nbSheet === 'delete'} onClose={closeNbSheet} title={'Delete “' + drilledTitle + '”?'}
+        confirm={{ label: 'Delete', danger: true, onConfirm: deleteCurrent }} portal>
+        Its notes stay, in {NOT_IN_A_NOTEBOOK}.
+      </ActionSheet>
     </ScreenLayout>
   );
 }

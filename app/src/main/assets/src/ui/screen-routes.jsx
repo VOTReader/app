@@ -193,6 +193,7 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {(vol: any, letter: any, excerpt: any) => void} goToLetterFromMatthew
  * @property {import('../hooks/use-tabs.js').TabSetter<'navOrigin'>} setNavOrigin
  * @property {*} setNoteSheetTarget
+ * @property {*} setNotebookPickerTarget
  * @property {*} bcvPrevBook
  * @property {*} bcvNextBook
  * @property {() => void} bcvOnPrevBook
@@ -268,7 +269,7 @@ export function buildScreenRoutes({
   // ── Tap through / linking / overlays ──
   openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
   backHint, tapThroughBack, goToLetterFromMatthew,
-  setNavOrigin, setNoteSheetTarget,
+  setNavOrigin, setNoteSheetTarget, setNotebookPickerTarget,
   // ── Bible chapter boundary props (from useReadingChainNav) ──
   bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
   bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
@@ -1340,6 +1341,9 @@ export function buildScreenRoutes({
         navOrigin={navOrigin}
         onHome={goHome}
         onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
+        onEditNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: true })}
+        onMoveNote={setNotebookPickerTarget}
+        onStartReading={() => _openFirstLetter('Notes')}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Notes' });

@@ -678,7 +678,7 @@ function App() {
     journalEntryId, createAndEditJournal,
     openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
     backHint, tapThroughBack, goToLetterFromMatthew,
-    setNavOrigin, setNoteSheetTarget,
+    setNavOrigin, setNoteSheetTarget, setNotebookPickerTarget,
     bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
     prophecyCardStatesRef, saveProphecyCardStates,

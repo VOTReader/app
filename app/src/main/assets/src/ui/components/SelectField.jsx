@@ -137,8 +137,9 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
    - a menu: `actions` rows (icon chip + words, an optional value at the right,
      `danger` for destroying something). Picking one calls onSelect, then
      onClose (unless keepOpen).
-   - a confirm: `confirm: { label, onConfirm, danger }` draws the foot
-     [Cancel] [label]; `children` is the body (a sentence, a field).
+   - a confirm: `confirm: { label, onConfirm, danger, disabled }` draws the foot
+     [Cancel] [label]; `children` is the body (a sentence, a field). An
+     onConfirm that returns false keeps the sheet open (a refused name).
    Both can carry `label` (the gold label over the title) and `sub` (one muted
    line under it: "Chosen by God · Just now").
 
@@ -148,7 +149,7 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
    ──────────────────────────────────────────────────────────────────────── */
 /** @param {{ id?: string, open: boolean, onClose: () => void, title: any, label?: any, sub?: any,
      actions?: Array<{ id: string, label: any, icon?: string, value?: any, danger?: boolean, onSelect: () => void, keepOpen?: boolean }>,
-     confirm?: { label: string, onConfirm: () => void, danger?: boolean } | null, cancelLabel?: string,
+     confirm?: { label: string, onConfirm: () => (void | boolean), danger?: boolean, disabled?: boolean } | null, cancelLabel?: string,
      children?: any, portal?: boolean, className?: string }} props */
 export function ActionSheet({ id, open, onClose, title, label, sub, actions = [], confirm = null, cancelLabel = 'Cancel', children, portal = false, className = '' }) {
   const ownId = React.useId();
@@ -188,7 +189,8 @@ export function ActionSheet({ id, open, onClose, title, label, sub, actions = []
         {confirm ? (
           <div className="ui-sheet-foot">
             <UiButton onClick={onClose}>{cancelLabel}</UiButton>
-            <UiButton kind="primary" danger={!!confirm.danger} onClick={() => { confirm.onConfirm(); onClose(); }}>{confirm.label}</UiButton>
+            <UiButton kind="primary" danger={!!confirm.danger} disabled={!!confirm.disabled}
+              onClick={() => { if (confirm.onConfirm() !== false) onClose(); }}>{confirm.label}</UiButton>
           </div>
         ) : null}
       </div>
