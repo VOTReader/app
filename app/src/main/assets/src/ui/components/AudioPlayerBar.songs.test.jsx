@@ -196,7 +196,7 @@ describe('the mini-player song skin (final-08, player brief picture 03)', () => 
     expect(css).toContain(':where(.audio-bar, .audio-manager-sheet, .np-sheet) button { font-family: inherit; }');
     const journal = readFileSync(resolve(here, '../../styles/journal-styles.js'), 'utf-8');
     // cz1: the FAB rides the bottom dock, whose player row is the bar plus its pull tab while one is open.
-    expect(journal).toContain('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px));');
+    expect(journal).toContain('.jrn-fab { position: fixed; bottom: calc(16px + max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px));');
   });
 });
 

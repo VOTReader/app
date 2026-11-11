@@ -858,7 +858,7 @@ describe('bottom dock stack (cz1)', () => {
     expect(exit).toContain("'bottom:var(--dock-toast-bottom, calc(env(safe-area-inset-bottom, 0px) + 2rem))'");
     expect(exit).toContain("'top:var(--dock-toast-top, auto)'");
     const jrn = readFileSync(join(SRC_ROOT, 'styles', 'journal-styles.js'), 'utf8');
-    expect(jrn).toContain('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px));');
+    expect(jrn).toContain('.jrn-fab { position: fixed; bottom: calc(16px + max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px));');
     expect(jrn).not.toContain('body.audio-bar-open .jrn-fab');
   });
 });

@@ -628,7 +628,7 @@
     await step('Library → Journal', async function () { return lib(/My Journal|^\s*Journal(?![a-z])/, /Journal/); });
     await step('Library → Progress', async function () {
       await lib(/My Progress|^\s*Progress(?![a-z])/);
-      return /Most Annotated/i.test(document.body.textContent || '');
+      return /Most (Annotated|marked)/i.test(document.body.textContent || '');   // W2b: the section is Most marked (mock v2 l-prog2)
     });
     await step('Settings', async function () {
       openSettings(); await sleep(360);
