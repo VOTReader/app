@@ -43,7 +43,7 @@ import { pageSiteLink } from '../../utils/passage-copy.js';
 import { copyText } from '../../utils/copy-share.js';
 import { CopyFallbackSheet } from '../sheets/CopyFallbackSheet.jsx';
 import { SelectSheet } from './SelectField.jsx';
-import { translationName } from '../../data/translations.js';
+import { translationName, translationSheetOptions } from '../../data/translations.js';
 import { pageMenu } from '../../utils/page-menu.js';
 import { AnnotationHintItem } from './AnnotationHint.jsx';
 import { UiIcon } from './UiIcon.jsx';
@@ -334,8 +334,8 @@ export function MoreMenuBtn() {
         document.body,
       ) : null}
       {canPickTranslation ? (
-        <SelectSheet open={pickOpen} onClose={closePick} portal eyebrow="Reading" title="Bible Translation"
-          value={ctx.translation || 'nkjv'} options={TRANSLATION_OPTIONS} onChange={/** @type {(v: string) => void} */ (ctx.onTranslation)} />
+        <SelectSheet open={pickOpen} onClose={closePick} portal title="Bible translation"
+          value={ctx.translation || 'nkjv'} options={translationSheetOptions()} onChange={/** @type {(v: string) => void} */ (ctx.onTranslation)} />
       ) : null}
       {fallback ? (
         <CopyFallbackSheet

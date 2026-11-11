@@ -1,11 +1,19 @@
 /* ═══════════════════════════════════════════════════════════════════════
    ScripturesHome — Cluster D (esbuild bundle-d.js)
-   ═══════════════════════════════════════════════════════════════════════ */
+   ═══════════════════════════════════════════════════════════════════════
+   r-bindex (W2h, mock v2 readers.html): the utility bar (Back, "The Scriptures of Truth", Search; no gear, rule 11), then the
+   translation pill (code + name, opens "Bible translation") and a Groups | All books switch, then grouped lists. The
+   switch writes settings.scriptureLayout: Groups = 'genre'; All books = 'canon' (the old 'compact' and 'grid' read as
+   All books). */
 
-import { translationName } from '../../data/translations.js';
+import { translationName, translationSheetOptions, translationShortName } from '../../data/translations.js';
 import { SelectSheet } from '../components/SelectField.jsx';
+import { ListGroup, ListRow, Segmented } from '../components/UiParts.jsx';
+import { BarAction } from '../components/RootNav.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { countOf } from '../../utils/download-tree.js';
 
-export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory, onSettings, theme, onThemeChange, layout, onCycleLayout, translation, onTranslation }) {
+export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, onCycleLayout, translation, onTranslation }) {
   // Q8: pre-trigger the Bible corpus load when this screen mounts so the
   // user's likely next action (tap a genre tile or book) doesn't pay the
   // full ~7 MB download wait. The subscription re-renders this component
@@ -24,230 +32,80 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, onHistory,
   }, []);
   const bibleLoaded = typeof window.__bibleCorpus !== 'undefined' && window.__bibleCorpus.loaded;
 
-  // Every tile answers at once, loaded or not. A genre needs no BOOKS; a book
+  // Every row answers at once, loaded or not. A genre needs no BOOKS; a book
   // goes through onSelect (useReadingPositionNav's selectScriptureBook), which
-  // opens the "Loading Bible…" view until the text lands. These used to wait
-  // for the load in silence and then navigate — seconds with no sign the tap
-  // registered, then a jump from wherever the reader had gone meanwhile.
+  // opens the "Loading Bible…" view until the text lands.
   const handleTile = (group) => {
     if (group.single) {onSelect(group.books[0].id, true);} else
     onGenre(group.id);
   };
   const handleBook = (id) => onSelect(id);
 
-  const allGenres = [...SCRIPTURE_GENRES.ot, ...SCRIPTURE_GENRES.nt];
-  const allBooks = allGenres.flatMap((g) => g.books);
-
-  // showHome:false — this IS a hub landing; its back button (class nav-home)
-  // is the right-cluster margin-right:auto anchor (app.css:319).
-  const navBar = LibraryNav({
-    onBack, backLabel: 'Home', showHome: false,
-    onSettings, onHistory, onSearch, theme, onThemeChange,
-  });
-
-  /* ── Layout cycle button ──
-     Resolves the current option EXACTLY the way the Settings SelectField
-     does (`options.find(o => o.id === value) || options[0]`, SelectField:8),
-     so an unknown persisted value cycles from the head of the table instead
-     of desyncing from the Settings row. Both writers go through the same
-     table + the same React state, so they can never disagree.
-     SCRIPTURE_LAYOUT_OPTIONS is an index.html classic-script const (global
-     LEXICAL env, NOT a window property) — typeof-guard it by bare name. */
-  const layoutOpts = typeof SCRIPTURE_LAYOUT_OPTIONS !== 'undefined' ? SCRIPTURE_LAYOUT_OPTIONS : [];
-  const layoutIdx = Math.max(0, layoutOpts.findIndex((o) => o.id === layout));
-  const nextLayout = layoutOpts.length ? layoutOpts[(layoutIdx + 1) % layoutOpts.length] : null;
-  const [flash, setFlash] = React.useState('');
-  React.useEffect(() => {
-    if (!flash) return undefined;
-    const t = setTimeout(() => setFlash(''), 1500);
-    return () => clearTimeout(t);
-  }, [flash]);
-
-  const cycleBtn = nextLayout ? (
-    <div className="scripture-layout-cycle">
-      <button
-        className="scripture-layout-cycle-btn"
-        onClick={() => { setFlash(nextLayout.label); if (onCycleLayout) onCycleLayout(nextLayout.id); }}
-        aria-label="Change Scripture layout"
-        title={`Layout: ${layoutOpts[layoutIdx].label} — tap to change`}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <rect x="14" y="14" width="7" height="7" rx="1" />
-        </svg>
-      </button>
-      {/* Visible caption matching the aria semantics (the Wave-0
-          .surprise-fab-caption precedent). Always-mounted live region so
-          TalkBack announces the insertion; the key restarts the fade. */}
-      <div className="scripture-layout-cycle-caption" role="status" aria-live="polite">
-        {flash ? <span key={flash}>{flash}</span> : null}
-      </div>
-    </div>
-  ) : null;
-
   const [pickOpen, setPickOpen] = React.useState(false);
   const closePick = React.useCallback(() => setPickOpen(false), []);
   const canPick = typeof onTranslation === 'function'
     && typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS) && TRANSLATION_OPTIONS.length > 1;
+  const code = translation || 'nkjv';
+  const codeOpt = typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS)
+    ? TRANSLATION_OPTIONS.find((o) => o && o.id === code) : null;
+  const codeLabel = codeOpt ? codeOpt.label : code.toUpperCase();
 
-  const hero = (
-    <>
-      {cycleBtn}
-      {/* The eyebrow names the translation and, given onTranslation, opens the
-          same picker as Settings > Reading (mw17 A02.1: switching used to mean
-          knowing that path). */}
+  const allBooks = layout && layout !== 'genre';
+  const utility = {
+    title: 'The Scriptures of Truth', onBack, backLabel: 'Back to Home',
+    actions: [
+      onSearch ? <BarAction key="s" icon="search" label="Search" onClick={onSearch} /> : null,
+    ],
+  };
+
+  const tools = (
+    <div className="rd-bindex-tools">
       {canPick ? (
-        <button type="button" className="home-eyebrow home-eyebrow-pick" aria-haspopup="dialog" aria-expanded={pickOpen}
-          aria-label={'Bible translation: ' + translationName(translation) + '. Change'}
-          onClick={() => setPickOpen(true)}>
-          {translationName(translation)}<span className="home-eyebrow-chev" aria-hidden="true">{"▾"}</span>
+        <button type="button" className="rd-trans-pill" aria-haspopup="dialog" aria-expanded={pickOpen}
+          aria-label={'Bible translation: ' + translationName(translation) + '. Change'} onClick={() => setPickOpen(true)}>
+          <span className="rd-trans-code">{codeLabel}</span>
+          <span className="rd-trans-name">{translationShortName(translation)}</span>
+          <UiIcon name="down" size="sm" />
         </button>
       ) : (
-        <div className="home-eyebrow">{translationName(translation)}</div>
+        <span className="rd-trans-pill is-still"><span className="rd-trans-code">{codeLabel}</span>
+          <span className="rd-trans-name">{translationShortName(translation)}</span></span>
       )}
-      {canPick ? (
-        <SelectSheet open={pickOpen} onClose={closePick} portal eyebrow="Reading" title="Bible Translation"
-          value={translation || 'nkjv'} options={TRANSLATION_OPTIONS} onChange={onTranslation} />
+      {typeof onCycleLayout === 'function' ? (
+        <Segmented label="Show" options={[{ id: 'genre', label: 'Groups' }, { id: 'canon', label: 'All books' }]}
+          value={allBooks ? 'canon' : 'genre'} onChange={(v) => onCycleLayout(v)} />
       ) : null}
-      <h1 className="home-title">The Scriptures of Truth</h1>
-      <div className="home-ornament">
-        <div className="home-ornament-line" />
-        <div className="home-ornament-diamond" />
-        <div className="home-ornament-line r" />
-      </div>
-    </>
+      {canPick ? (
+        <SelectSheet open={pickOpen} onClose={closePick} portal title="Bible translation"
+          value={code} options={translationSheetOptions()} onChange={onTranslation} />
+      ) : null}
+    </div>
   );
 
-  /* ── GENRE GRID (default) ── */
-  if (layout === "genre" || !layout) return (
-    <ScreenLayout navChildren={navBar}>
-      <div className="home-screen scriptures-landing">
-        {hero}
-        <div className="genre-columns">
-          <div className="genre-col genre-col-stretch">
-            <div className="genre-col-label">Old Testament</div>
-            {SCRIPTURE_GENRES.ot.map((g) => {
-              const totalCh = bibleLoaded
-                ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0)
-                : '—';
-              const bookCount = g.books.length;
-              const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
-              return (
-                <button key={g.id} className="genre-tile" onClick={() => handleTile(g)}>
-                  <div className="genre-tile-title">{g.label}</div>
-                  <div className="genre-tile-sub">{bookLabel}{" · "}{totalCh} Chapters</div>
-                </button>
-              );
-            })}
-          </div>
-          <div className="genre-col genre-col-stretch">
-            <div className="genre-col-label">New Testament</div>
-            {SCRIPTURE_GENRES.nt.map((g) => {
-              const totalCh = bibleLoaded
-                ? g.books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0)
-                : '—';
-              const bookCount = g.books.length;
-              const bookLabel = `${bookCount} ${bookCount === 1 ? "Book" : "Books"}`;
-              return (
-                <button key={g.id} className="genre-tile" onClick={() => handleTile(g)}>
-                  <div className="genre-tile-title">{g.label}</div>
-                  <div className="genre-tile-sub">{bookLabel}{" · "}{totalCh} Chapters</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </ScreenLayout>
-  );
+  const chapters = (books) => (bibleLoaded
+    ? countOf(books.reduce((s, b) => s + (BOOKS[b.id]?.chapters.length || 0), 0), 'chapter')
+    : '— chapters');
+  const sections = [
+    { label: 'Old Testament', genres: SCRIPTURE_GENRES.ot },
+    { label: 'New Testament', genres: SCRIPTURE_GENRES.nt },
+  ];
 
-  /* ── COMPACT LIST ── */
-  if (layout === "compact") return (
-    <ScreenLayout navChildren={navBar}>
-      <div className="home-screen">
-        {hero}
-        <div className="compact-list">
-          {[
-            { label: "Old Testament", genres: SCRIPTURE_GENRES.ot },
-            { label: "New Testament", genres: SCRIPTURE_GENRES.nt }
-          ].map((section) => (
-            <React.Fragment key={section.label}>
-              <div className="compact-list-header" style={{ fontSize: "var(--fs-10)", color: "var(--gold)", marginTop: "0.8rem" }}>{section.label}</div>
-              {section.genres.map((g) => (
-                <div key={g.id} className="compact-list-group">
-                  <div className="compact-list-header">{g.label}</div>
-                  {g.books.map((b) => (
-                    <button key={b.id} className="compact-list-item" onClick={() => handleBook(b.id)}>
-                      <span className="compact-list-title">{b.title}</span>
-                      <span className="compact-list-detail">{b.detail}</span>
-                    </button>
-                  ))}
-                </div>
-              ))}
-            </React.Fragment>
-          ))}
-        </div>
-      </div>
-    </ScreenLayout>
-  );
-
-  /* ── BOOK GRID ── */
-  if (layout === "grid") return (
-    <ScreenLayout navChildren={navBar}>
-      <div className="home-screen">
-        {hero}
-        <div className="flat-grid">
-          {allBooks.map((b) => (
-            <button key={b.id} className="flat-grid-card" onClick={() => handleBook(b.id)}>
-              <div className="flat-grid-title">{b.title}</div>
-              <div className="flat-grid-detail">{b.detail}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </ScreenLayout>
-  );
-
-  /* ── CANONICAL SCROLL ── */
-  const otBooks = SCRIPTURE_GENRES.ot.flatMap((g) => g.books);
-  const ntBooks = SCRIPTURE_GENRES.nt.flatMap((g) => g.books);
-  let canonNum = 0;
   return (
-    <ScreenLayout navChildren={navBar}>
-      <div className="home-screen">
-        {hero}
-        <div className="canon-scroll">
-          <div className="canon-scroll-divider">Old Testament</div>
-          {otBooks.map((b) => {
-            canonNum++;
-            return (
-              <button key={b.id} className="canon-card" style={{ animationDelay: `${canonNum * 0.3 % 5}s` }} onClick={() => handleBook(b.id)}>
-                <span className="canon-card-num">{String(canonNum).padStart(2, "0")}</span>
-                <div className="canon-card-body">
-                  <div className="canon-card-title">{b.title}</div>
-                  {CANON_SUBTITLES[b.id] && <div className="canon-card-sub">{CANON_SUBTITLES[b.id]}</div>}
-                  <div className="canon-card-detail">{b.detail}</div>
-                </div>
-              </button>
-            );
-          })}
-          <div className="canon-scroll-divider">New Testament</div>
-          {ntBooks.map((b) => {
-            canonNum++;
-            return (
-              <button key={b.id} className="canon-card" style={{ animationDelay: `${canonNum * 0.3 % 5}s` }} onClick={() => handleBook(b.id)}>
-                <span className="canon-card-num">{String(canonNum).padStart(2, "0")}</span>
-                <div className="canon-card-body">
-                  <div className="canon-card-title">{b.title}</div>
-                  {CANON_SUBTITLES[b.id] && <div className="canon-card-sub">{CANON_SUBTITLES[b.id]}</div>}
-                  <div className="canon-card-detail">{b.detail}</div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+    <ScreenLayout utility={utility} className="rd-bindex-screen">
+      <div className="home-screen scriptures-landing rd-bindex">
+        {tools}
+        {sections.map((sec) => (
+          <ListGroup key={sec.label} label={sec.label}>
+            {allBooks
+              ? sec.genres.flatMap((g) => g.books).map((b) => (
+                <ListRow key={b.id} noLead title={b.title} value={String(b.detail || '').toLowerCase()} onClick={() => handleBook(b.id)} />
+              ))
+              : sec.genres.map((g) => (
+                <ListRow key={g.id} noLead title={g.label} value={countOf(g.books.length, 'book') + ' · ' + chapters(g.books)}
+                  onClick={() => handleTile(g)} />
+              ))}
+          </ListGroup>
+        ))}
       </div>
     </ScreenLayout>
   );

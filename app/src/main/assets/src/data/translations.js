@@ -406,3 +406,21 @@ export function translationName(code) {
   return found.desc.split(/\s[—–-]\s/)[0];
 }
 
+/** r-bindex (W2h): the name without "Version" and its year, for the translation pill ("New King James"). */
+export function translationShortName(code) {
+  return translationName(code).replace(/\s+Version(\s+\d{4})?$/, '').replace(/\s+\d{4}$/, '');
+}
+
+/** r-trans (W2h): "Bible translation" rows as the mock draws them: the code, the name, one plain line
+ * ("The default", "Modern, public domain"). Built from TRANSLATION_OPTIONS (index.html), never a second list. */
+export function translationSheetOptions() {
+  const opts = (typeof TRANSLATION_OPTIONS !== 'undefined' && Array.isArray(TRANSLATION_OPTIONS)) ? TRANSLATION_OPTIONS : [];
+  return opts.map((o) => {
+    const parts = String(o.desc || '').split(/\s[—–]\s/);
+    let line = (parts[1] || '').split(' · ')[0].split(':')[0].trim();
+    if (line === 'default') line = 'The default';
+    line = line ? line.charAt(0).toUpperCase() + line.slice(1) : '';
+    return { id: o.id, code: o.label, label: parts[0] || o.label, desc: line };
+  });
+}
+

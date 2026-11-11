@@ -104,11 +104,13 @@ export function SelectSheet({ id, open, onClose, eyebrow, title, value, options,
               {heading}
               <button
                 type="button"
-                className={`select-sheet-option${isSelected ? " selected" : ""}`}
+                className={`select-sheet-option${isSelected ? " selected" : ""}${opt.code ? " has-code" : ""}`}
                 role="radio"
                 aria-checked={isSelected}
                 onClick={() => { onChange(opt.id); onClose(); }}
               >
+                {/* r-trans (W2h): an option may lead with a short code ("NKJV") in its own column */}
+                {opt.code ? <span className="select-sheet-option-code">{opt.code}</span> : null}
                 <div className="select-sheet-option-main">
                   <span className="select-sheet-option-label" style={opt.labelStyle}>{opt.label}</span>
                   {opt.meta ? <span className="select-sheet-option-meta">{opt.meta}</span> : null}
