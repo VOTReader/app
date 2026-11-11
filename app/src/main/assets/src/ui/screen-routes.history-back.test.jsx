@@ -389,7 +389,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     routes['audio-library']().props.onOpenTrack({ key: 'one:wide-path' });
     expect(props.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'audio-library',
-      sourceLetterTitle: 'Listening Library',
+      sourceLetterTitle: 'Listen',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
       silent: true,
     });
@@ -401,7 +401,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     routes['audio-library']().props.onOpenTrack({ key: 'bible-brm-kjv:jeremiah', partLabel: 'Chapter 46' });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'jeremiah', chapter: 46 },
-      { sourceLetterTitle: 'Listening Library', silent: true }
+      { sourceLetterTitle: 'Listen', silent: true }
     );
     // The letter machinery must not fire for a Bible destination.
     expect(props.pushFromLetter).not.toHaveBeenCalled();
@@ -413,7 +413,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     routes['audio-library']().props.onOpenTrack({ key: 'bible-wop-nkjv:matthew', partLabel: null });
     expect(props.navigateToLink).toHaveBeenCalledWith(
       { type: 'bible', bookId: 'matthew', chapter: 1 },
-      { sourceLetterTitle: 'Listening Library', silent: true }
+      { sourceLetterTitle: 'Listen', silent: true }
     );
   });
 
@@ -474,7 +474,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     saved.props.onOpenTrack({ key: 'one:wide-path' });
     expect(nextProps.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'audio-library-saved',
-      sourceLetterTitle: 'Listening Library',
+      sourceLetterTitle: 'Listen',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
       silent: true,
     });
@@ -483,7 +483,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     collection.props.onOpenText({ key: 'one:wide-path' });
     expect(nextProps.pushFromLetter).toHaveBeenCalledWith({
       sourceScreen: 'audio-library-collection',
-      sourceLetterTitle: 'Listening Library',
+      sourceLetterTitle: 'Listen',
       destSnapshot: { screen: 'vot-one-letter', letterId: 'wide-path' },
       silent: true,
     });

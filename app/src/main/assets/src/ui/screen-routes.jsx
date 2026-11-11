@@ -613,7 +613,7 @@ export function buildScreenRoutes({
       const fn = /** @type {any} */ (globalThis).songsFrameTitle;
       return typeof fn === 'function' ? fn(frames[frames.length - 1], /** @type {any} */ (globalThis).AudioLibraryStore) : 'Songs of the Letters';
     }
-    if (typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0) return 'Listening Library';
+    if (typeof sourceScreen === 'string' && sourceScreen.indexOf('audio-library') === 0) return 'Listen';
     if (sourceScreen === 'home') return 'Home';
     const title = typeof document !== 'undefined' ? String(document.title || '').replace(/\s+[—-]\s+VOTReader$/, '').trim() : '';
     return title && title !== 'VOTReader' ? title : 'Back';
@@ -1632,7 +1632,7 @@ export function buildScreenRoutes({
         onBack={_songsBack}
         rootBackLabel={navOrigin && navOrigin.label ? navOrigin.label
           : !navOrigin || navOrigin.screen === 'home' ? 'Home'
-          : navOrigin.screen === 'audio-library' ? 'Listening Library'
+          : navOrigin.screen === 'audio-library' ? 'Listen'
           : navOrigin.screen === 'search' ? 'Search'
           : 'Back'}
         onSearch={goSearch}
