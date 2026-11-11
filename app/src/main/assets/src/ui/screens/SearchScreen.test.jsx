@@ -2106,8 +2106,12 @@ describe('SearchScreen (search200 UX, track B)', () => {
       expect(direct(), 'a range quotes its first verses').toEqual(['John 3:16-18 | For God so loved the world For God did not send His Son He who believes']);
       r.unmount();
       searchReturns({ parsed: { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3 } });
-      await typeIn(baseProps(), 'john 3');
+      r = await typeIn(baseProps(), 'john 3');
       expect(direct(), 'a chapter is still a chapter').toEqual(['John 3 | Open chapter']);
+      r.unmount();
+      searchReturns({ parsed: { kind: 'named-passage', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 1, verseEnd: 21, label: 'born again' } });
+      await typeIn(baseProps(), 'born again');
+      expect(direct(), 'a named passage is labelled "Passage"').toEqual(['John 3:1-21 | Passage']);
     } finally {
       delete /** @type {any} */ (globalThis).resolveVerseText;
       delete /** @type {any} */ (globalThis).translateVerse;

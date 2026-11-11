@@ -4553,6 +4553,8 @@
     .srch-card.card-direct { background:var(--gold-faint); }
     .srch-card.card-direct .srch-card-ref { color:var(--gold-bright); font-size:var(--fs-12); }
     .srch-card.card-direct .srch-card-snippet { color:var(--gold-dim); font-size:var(--fs-10); letter-spacing:0.14em; text-transform:uppercase; font-family:'Cinzel',serif; margin-top:0.2rem; }
+    /* A verse quoted on a reference card reads as a verse: sentence case, normal spacing. */
+    .srch-card.card-direct .srch-card-snippet.is-quote { color:var(--cream-muted); font-size:var(--fs-15); letter-spacing:normal; text-transform:none; font-family:var(--font-body); }
     /* Every other place a letter says the words (SrchCard): one quiet row under the
        snippet, "2 more places in this letter", opening to a list of short passages,
        each its own tap. The wrap carries the card's divider, so the row and the list

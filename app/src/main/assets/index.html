@@ -60,7 +60,7 @@
        dashboard. The service worker never caches it (cross-origin). -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-lHaZRO+XTq37MmtY6tQQiJBbIbIE4D6UKhkFCVcGahQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-nnLx98+HsWi37YJk6e1qAc9vxnxE8hb3hztmPKCL6YI=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
+    script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com 'sha256-KrCrqChr49L/9eQz0XfeoIewH7pxp9QwzSdVBhfYJlY=' 'sha256-SdHeaSB00vLuWtlXAGW5HleMhIoSGBnE8r4sfLLxkTw=' 'sha256-lHaZRO+XTq37MmtY6tQQiJBbIbIE4D6UKhkFCVcGahQ=' 'sha256-79or+lRGHwm3HPYyzoPNtjy0oNLAx5t38j3Hy7YyzUw=' 'sha256-JL8G0InkZ3e5HB3Xb+aTzOQWUd8CwYv41C2TXkwQG/Q=' 'sha256-I++hYARmT4R7fLHbrRxZZPhrbSoMaCFNvILOjFvzf6U=' 'sha256-93LctYA8RqLNc3VB7jQsDmh+W9A6SrjyOpygY7y0O9o=' 'sha256-KZF5ftNhgcWqYZiXjAtTzakqXXb7foQL9m0e8imGkDg=' 'sha256-7owNy5eFsM+Q7vaVi9yV5QKYEmbtfgnSGObRM5R/3Lw=';
     style-src 'self' 'unsafe-inline';
     img-src 'self' data: blob: https://github.com https://release-assets.githubusercontent.com https://objects.githubusercontent.com https://votreader.github.io;
     font-src 'self' data:;
@@ -701,8 +701,8 @@ const SRCH_KIND_LABEL = {
   'letter': { label: 'Letter', cls: 'badge-letter' },
   'letter-title': { label: 'Letter', cls: 'badge-letter' },
   'footnote': { label: 'Footnote', cls: 'badge-footnote' },
-  'wtlb': { label: 'WTLB', cls: 'badge-letter' },
-  'wtlb-title': { label: 'WTLB', cls: 'badge-letter' },
+  'wtlb': { label: 'Words To Live By', cls: 'badge-letter' },
+  'wtlb-title': { label: 'Words To Live By', cls: 'badge-letter' },
   'blessed': { label: 'Blessed', cls: 'badge-letter' },
   'blessed-title': { label: 'Blessed', cls: 'badge-letter' },
   'holy-day': { label: 'Holy Day', cls: 'badge-letter' },
@@ -727,8 +727,8 @@ const SRCH_GROUP_META = {
   'v6': { label: 'Volume Six', order: 7 },
   'v7': { label: 'Volume Seven', order: 8 },
   'rebuke': { label: "The Lord's Rebuke", order: 9 },
-  'wtlb1': { label: 'WTLB · Part One', order: 10 },
-  'wtlb2': { label: 'WTLB · Part Two', order: 11 },
+  'wtlb1': { label: 'Words To Live By · Part One', order: 10 },
+  'wtlb2': { label: 'Words To Live By · Part Two', order: 11 },
   'blessed': { label: 'The Blessed', order: 12 },
   'flock': { label: "Lord's Little Flock", order: 13 },
   'timothy': { label: 'Letters from Timothy', order: 14 },

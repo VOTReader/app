@@ -228,7 +228,7 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
         <div className="srch-card-top">
           <span className="srch-card-ref">{atVerse ? 'Open at ' + entry.__label : entry.__label}</span>
         </div>
-        <div className="srch-card-snippet">{entry.__sub || 'Go'}</div>
+        <div className={'srch-card-snippet' + (entry.__quote ? ' is-quote' : '')}>{entry.__sub || 'Go'}</div>
       </button>
     );
 

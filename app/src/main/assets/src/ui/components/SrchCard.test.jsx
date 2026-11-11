@@ -393,3 +393,13 @@ describe('SrchCard — a long heading badge is cut at a word', () => {
     expect(badge('Supercalifragilisticexpialidocious heading'), 'one word longer than the cut is cut in it').toBe('Supercalifragilisticexpialid…');
   });
 });
+
+describe('a reference card (half-baked 7)', () => {
+  it('a quoted verse is marked as a quote (sentence case in CSS), a plain label is not', () => {
+    const quote = render(<SrchCard entry={{ __direct: true, __label: 'John 3:16', __sub: 'For God so loved the world', __quote: true, ref: { verseStart: 16 } }} terms={[]} onSelect={() => {}} isDirect />);
+    expect(quote.container.querySelector('.srch-card-snippet').classList.contains('is-quote')).toBe(true);
+    cleanup();
+    const label = render(<SrchCard entry={{ __direct: true, __label: 'John 3', __sub: 'Open chapter', ref: {} }} terms={[]} onSelect={() => {}} isDirect />);
+    expect(label.container.querySelector('.srch-card-snippet').classList.contains('is-quote')).toBe(false);
+  });
+});

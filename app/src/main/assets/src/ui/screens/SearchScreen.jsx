@@ -589,7 +589,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         ? p.chapter + ':' + p.verseStart + '-' + p.chapterEnd + (p.verseEnd ? ':' + p.verseEnd : '')
         : p.chapter + (p.chapterEnd ? '-' + p.chapterEnd : '') + (p.verseStart ? ':' + p.verseStart + (p.verseEnd ? '-' + p.verseEnd : '') : ''));
       const quote = refQuote(p, settings.translation || 'nkjv');
-      out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: quote || (p.kind === 'named-passage' ? 'Named passage — open' : 'Open chapter'), ref: p });
+      out.push({ __direct: true, __corpus: curCorpus, __label: lbl, __sub: quote || (p.kind === 'named-passage' ? 'Passage' : 'Open chapter'), __quote: !!quote, ref: p });
     } else if (p.kind === 'ref-letter') {
       const lr = letterRefCards(p, /** @type {any} */ (window).VotSearchData, window);
       for (const c of lr.cards) out.push({ __direct: true, __corpus: curCorpus, ...c });
