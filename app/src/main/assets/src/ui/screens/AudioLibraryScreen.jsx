@@ -353,9 +353,8 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
               ))}
             </div>
           ) : null}
-          {/* au-root: Studies is always one of the four (its screen says when none has a recording yet). */}
-          {onOpenStudies && studies.count > 0 ? (
-            <ListRow icon={STUDIES_ICON} title="Studies" onClick={() => onOpenStudies()}
+          {studies.recorded > 0 ? (
+            <ListRow icon={STUDIES_ICON} title="Studies" onClick={() => { if (onOpenStudies) onOpenStudies(); }}
               sub={studies.count + (studies.count === 1 ? ' study' : ' studies') + ' · ' + studies.recorded + ' with audio'} />
           ) : null}
           {onOpenSongs ? (
