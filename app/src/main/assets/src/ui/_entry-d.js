@@ -291,6 +291,7 @@ import { AudioVolumesScreen } from './screens/AudioVolumesScreen.jsx';
 import { AudioCollectionScreen } from './screens/AudioCollectionScreen.jsx';
 import { AudioSavedScreen } from './screens/AudioSavedScreen.jsx';
 import { AudioStudiesScreen } from './screens/AudioStudiesScreen.jsx';
+import { AudioBibleScreen } from './screens/AudioBibleScreen.jsx';
 import { AudioOfflineScreen } from './screens/AudioOfflineScreen.jsx';
 import { AudioSongsScreen, songsFrameTitle } from './screens/AudioSongsScreen.jsx';
 
@@ -420,7 +421,7 @@ Object.assign(window, {
   composeNotesExport, notesExportFilename, shareNotesExport,
   JournalInsertSheet, JournalRecordingSheet,
   StudiesHome, BibleStudyIndex, BibleStudyChapterView, MatthewChapterView,
-  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioOfflineScreen, AudioSongsScreen,
+  AudioLibraryScreen, AudioVolumesScreen, AudioCollectionScreen, AudioSavedScreen, AudioStudiesScreen, AudioBibleScreen, AudioOfflineScreen, AudioSongsScreen,
   // W-03: the back pill over a letter opened from a Songs screen names that screen's top frame (screen-routes).
   songsFrameTitle,
   // App (composition root)

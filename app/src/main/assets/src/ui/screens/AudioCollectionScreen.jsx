@@ -17,7 +17,8 @@
 import { OfflineCollectionMark, OfflineNote, rowOnPhone, useOfflineAudio, useOnline } from '../components/OfflineAudioControls.jsx';
 import { CollectionDownload } from '../components/CollectionDownload.jsx';
 import { ActionSheet } from '../components/SelectField.jsx';
-import { EmptyState, ListGroup, ListRow, RowPlay, SectionLabel, UiButton } from '../components/UiParts.jsx';
+import { EmptyState, ListGroup, ListRow, RowPlay, SectionLabel, Segmented, UiButton } from '../components/UiParts.jsx';
+import { editionName, editionReading } from './AudioBibleScreen.jsx';
 import { UiIcon } from '../components/UiIcon.jsx';
 import { audioLibraryStore } from '../components/AudioShelf.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
@@ -38,6 +39,16 @@ import { secondsOf, lengthsReady, lengthsStore } from '../../utils/audio-lengths
    shelf, one copy of each table. */
 
 /** 'bible-*' volKeys are recorded Bible editions, not letter collections. */
+/** Chapters a book shows before "Show all N chapters". */
+const CHAPTERS_SHOWN = 7;
+
+/** 'ot' for BIBLE_AUDIO_BOOKS' first 39 books, else 'nt'. @param {string} bookId @returns {'ot' | 'nt'} */
+function bookHalf(bookId) {
+  const books = typeof BIBLE_AUDIO_BOOKS !== 'undefined' && Array.isArray(BIBLE_AUDIO_BOOKS) ? BIBLE_AUDIO_BOOKS : [];
+  const at = books.findIndex((b) => b[0] === bookId);
+  return at >= 0 && at < 39 ? 'ot' : 'nt';
+}
+
 function isBibleVol(volKey) {
   return typeof volKey === 'string' && volKey.lastIndexOf('bible-', 0) === 0;
 }
@@ -168,6 +179,15 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
   // One book's chapters, disclosed. Rendered only while open — a Bible edition
   // lists 66 books and Psalms alone would put 150 rows on the page uninvited.
   const [openChapters, setOpenChapters] = React.useState(/** @type {string | null} */ (null));
+  // A book's chapters past the first seven wait behind "Show all N chapters" (listen.html au-chapters).
+  const [allChapters, setAllChapters] = React.useState(/** @type {string | null} */ (null));
+  // The Old / New Testament switch (au-books): the half the playing book is in, else the Old.
+  const [half, setHalf] = React.useState(() => {
+    const st = AudioPlayer.getState();
+    const now = Array.isArray(st.queue) ? st.queue[st.qi] : null;
+    const id = now && typeof now.key === 'string' && now.key.indexOf(volKey + ':') === 0 ? now.key.slice(volKey.length + 1) : '';
+    return id && bookHalf(id) === 'nt' ? 'nt' : 'ot';
+  });
 
   const { label, items, col } = resolveSource(volKey);
   const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(srcKey, item.id));
@@ -188,7 +208,9 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
   const current = queue[state.qi] || null;
   const live = state.status === 'playing' || state.status === 'loading';
 
-  const utility = { title: label || 'Recordings', onBack, backLabel };
+  // A Bible edition's bar says its name ("KJV"); the line under it says the reading (listen.html au-books).
+  const edition = bible ? Object.values(BIBLE_AUDIO_EDITIONS).find((entry) => entry && entry.volKey === volKey) || null : null;
+  const utility = { title: (edition ? editionName(edition) : label) || 'Recordings', onBack, backLabel };
 
   if (!label && !items.length) {
     return (
@@ -228,7 +250,11 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
     for (const item of playable) { const s = tracksSeconds(ownTracks(item)); if (!s) { totalSec = 0; break; } totalSec += s; }
   }
   const heroLine = noneHere ? 'On this phone: 0 of ' + playable.length + ' · needs a connection'
-    : countLine + (totalSec > 0 ? ' · ' + queueTime(totalSec) : '');
+    : (edition ? editionReading(edition) + ' · ' : '') + countLine + (totalSec > 0 ? ' · ' + queueTime(totalSec) : '');
+  // The testament switch shows only for an edition with books in both halves.
+  const halves = bible ? { ot: playable.filter((item) => bookHalf(item.id) === 'ot').length, nt: playable.filter((item) => bookHalf(item.id) === 'nt').length } : null;
+  const split = !!(halves && halves.ot && halves.nt);
+  const shownItems = split ? playable.filter((item) => bookHalf(item.id) === half) : playable;
 
   const playFrom = (item) => {
     if (current && current.key === srcKey + ':' + item.id) { AudioPlayer.toggle(); return; }
@@ -284,7 +310,13 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
             {/* The one Download for the whole collection (Corbin 11-11): no single letter has one. A Bible edition
                 downloads from Downloads, by edition, testament or book. */}
             {offline && !bible && !saveFirst ? <CollectionDownload label={label} unitsFor={unitsFor} readers={readers} onOpenDownloads={openDownloads} /> : null}
+            {offline && bible && typeof window.__openDownloads === 'function'
+              ? <UiButton icon="dl" onClick={() => openDownloads('choose')}>Download</UiButton> : null}
           </div>
+        ) : null}
+        {split && halves ? (
+          <Segmented label="Testament" value={half} onChange={(v) => setHalf(v)}
+            options={[{ id: 'ot', label: 'Old Testament · ' + halves.ot }, { id: 'nt', label: 'New Testament · ' + halves.nt }]} />
         ) : null}
 
         {sections ? (
@@ -302,7 +334,7 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
 
         {playable.length ? (
           <ListGroup className="listen-recs" ariaLabel={playable.length + ' recordings'}>
-            {playable.map((item) => {
+            {shownItems.map((item) => {
               const key = srcKey + ':' + item.id;
               const renditions = AudioPlayer.renditionsFor(srcKey, item, label);
               const primary = renditions[0] || null;
@@ -359,27 +391,35 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Lis
               return (
                 <React.Fragment key={item.id}>
                   <ListRow
-                    className={'listen-rec' + (unavailable ? ' is-unavailable' : '')}
+                    className={'listen-rec' + (unavailable ? ' is-unavailable' : '') + (chapters ? ' listen-book' : '') + (chaptersOpen ? ' is-open' : '')}
+                    onClick={chapters ? () => setOpenChapters(chaptersOpen ? null : item.id) : undefined} chevron={!!chapters}
+                    ariaLabel={chapters ? (chaptersOpen ? 'Hide the chapters of ' : 'Show the chapters of ') + name : undefined}
                     current={isCurrent}
                     lead={<RowPlay label={(rowPlaying ? 'Pause ' : 'Play ') + (item.title || 'this recording')} playing={rowPlaying} onClick={() => playFrom(item)} />}
                     title={<>{!bible && item.num ? <span className="listen-rec-num">{item.num}</span> : null}{item.title}</>}
                     meta={<>{line}{partly ? <CoverageBadge state={COVERAGE_READ_ALONG} detail={partly} /> : null}</>}
                     mark={!unavailable && held && held.state === 'saved' ? { tick: true, label: 'On this phone' } : null}
-                    star={starTrack ? { on: starred, label: starred ? 'Remove ' + name + ' from Saved' : 'Save ' + name, onClick: toggleStar } : null}
+                    star={starTrack && !bible ? { on: starred, label: starred ? 'Remove ' + name + ' from Saved' : 'Save ' + name, onClick: toggleStar } : null}
                     menu={{ label: 'More for ' + name, onClick: () => setMenuFor(item.id) }}
                   />
                   {chaptersOpen ? (
                     <div className="listen-chapters" id={'audio-chapters-' + item.id} role="group" aria-label={'Chapters of ' + name}>
-                      {chapters.map((/** @type {any} */ track, /** @type {number} */ index) => {
+                      {(allChapters === item.id ? chapters : chapters.slice(0, CHAPTERS_SHOWN)).map((/** @type {any} */ track, /** @type {number} */ index) => {
                         const chapterNum = index + 1;
                         const playingThis = !!(current && current.url === track.url);
+                        // listen.html au-chapters: the number, its headings under it, the length at the right.
                         return (
-                          <ListRow key={track.url} one current={playingThis}
+                          <ListRow key={track.url} current={playingThis}
                             lead={<RowPlay label={'Play ' + name + ' ' + chapterNum} onClick={() => AudioPlayer.playBibleBook({ volKey, bookId: item.id, label, chapterNum })} />}
-                            title={[track.partLabel || ('Chapter ' + chapterNum), chapterTitleOf(track)].filter(Boolean).join(' · ')}
+                            title={track.partLabel || ('Chapter ' + chapterNum)} meta={chapterTitleOf(track) || null}
                             value={secondsOf(track.url) ? formatClock(secondsOf(track.url)) : ''} />
                         );
                       })}
+                      {allChapters !== item.id && chapters.length > CHAPTERS_SHOWN ? (
+                        <button type="button" className="ui-link listen-chapters-all" onClick={() => setAllChapters(item.id)}>
+                          {'Show all ' + chapters.length + ' chapters'}
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </React.Fragment>

@@ -62,6 +62,7 @@ beforeEach(() => {
   /** @type {any} */ (globalThis).AudioVolumesScreen = () => null;
   /** @type {any} */ (globalThis).AudioCollectionScreen = () => null;
   /** @type {any} */ (globalThis).AudioSavedScreen = () => null;
+  /** @type {any} */ (globalThis).AudioBibleScreen = () => null;
   // The link-out surfaces under navigation-tabs-1. notes/links/bookmarks are
   // rendered unguarded by their routes, so they must exist as real globals.
   /** @type {any} */ (globalThis).NotesIndexScreen = () => null;
@@ -91,6 +92,7 @@ afterEach(() => {
   delete /** @type {any} */ (globalThis).AudioVolumesScreen;
   delete /** @type {any} */ (globalThis).AudioCollectionScreen;
   delete /** @type {any} */ (globalThis).AudioSavedScreen;
+  delete /** @type {any} */ (globalThis).AudioBibleScreen;
   delete /** @type {any} */ (globalThis).NotesIndexScreen;
   delete /** @type {any} */ (globalThis).LinksScreen;
   delete /** @type {any} */ (globalThis).BookmarksScreen;
@@ -415,19 +417,26 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     );
   });
 
-  it('hub → collection chains the hub (and ITS origin) so back unwinds level by level', () => {
-    // Library → hub already chained; opening a collection pushes a third link.
+  it('hub → The Bible → an edition chains each level so back unwinds level by level (au-bible)', () => {
     const hubOrigin = { screen: 'library', returnOrigin: null };
     const { routes, props } = makeRoutes({ navOrigin: hubOrigin });
-    routes['audio-library']().props.onOpenCollection('one');
-    expect(props.setAudioColKey).toHaveBeenCalledWith('one');
+    routes['audio-library']().props.onOpenBible();
     expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library', returnOrigin: hubOrigin });
-    expect(props.setScreen).toHaveBeenCalledWith('audio-library-collection');
+    expect(props.setScreen).toHaveBeenCalledWith('audio-library-bible');
 
-    const { routes: nextRoutes, props: nextProps } = makeRoutes({ navOrigin: { screen: 'audio-library', returnOrigin: hubOrigin } });
+    const bibleOrigin = { screen: 'audio-library', returnOrigin: hubOrigin };
+    const { routes: bRoutes, props: bProps } = makeRoutes({ navOrigin: bibleOrigin });
+    const bible = bRoutes['audio-library-bible']();
+    expect(bible.props.onBack).toBe(bProps.goNavOrigin);
+    bible.props.onOpenEdition('bible-brm-kjv');
+    expect(bProps.setAudioColKey).toHaveBeenCalledWith('bible-brm-kjv');
+    expect(bProps.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library-bible', returnOrigin: bibleOrigin });
+    expect(bProps.setScreen).toHaveBeenCalledWith('audio-library-collection');
+
+    const { routes: nextRoutes, props: nextProps } = makeRoutes({ navOrigin: { screen: 'audio-library-bible', returnOrigin: bibleOrigin } });
     const collection = nextRoutes['audio-library-collection']();
     expect(collection.props.onBack).toBe(nextProps.goNavOrigin);
-    expect(collection.props.backLabel).toBe('Back to Listen');
+    expect(collection.props.backLabel).toBe('Back to The Bible');
   });
 
   it('hub → The Volumes → collection is a four-deep chain that still unwinds level by level', () => {

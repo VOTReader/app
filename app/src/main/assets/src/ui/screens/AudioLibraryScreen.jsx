@@ -22,7 +22,6 @@ import { useOfflineAudio, formatBytes, OfflineNote, useOnline } from '../compone
 import { stripModel } from '../components/DownloadStrip.jsx';
 import { showUndoToast } from '../../utils/toast.js';
 import { secondsOf } from '../../utils/audio-lengths.js';
-import { bibleEditionPartialDetail } from '../../utils/audio-coverage.js';
 import { rootNavStart, RootGear } from '../components/RootNav.jsx';
 import { SelectSheet } from '../components/SelectField.jsx';
 import { ListRow as UiRow, RowPlay } from '../components/UiParts.jsx';
@@ -77,7 +76,7 @@ function clock(value) {
 
 /** Books this Bible edition actually ships, counted off the manifest rather
  *  than assumed to be 66 — a partial edition must not overstate itself. @param {string} volKey */
-function bibleBookCount(volKey) {
+export function bibleBookCount(volKey) {
   if (typeof BIBLE_AUDIO_MANIFEST === 'undefined' || !BIBLE_AUDIO_MANIFEST) return 0;
   const prefix = volKey + ':';
   let count = 0;
@@ -85,33 +84,6 @@ function bibleBookCount(volKey) {
     if (key.lastIndexOf(prefix, 0) === 0) count++;
   }
   return count;
-}
-
-/** The reader code the manifest carries for this edition's first row, or ''
- *  when it names none (the KJV/NKJV/WEB editions carry no code). @param {string} volKey */
-function bibleReaderCode(volKey) {
-  if (typeof BIBLE_AUDIO_MANIFEST === 'undefined' || !BIBLE_AUDIO_MANIFEST) return '';
-  const prefix = volKey + ':';
-  for (const key in BIBLE_AUDIO_MANIFEST) {
-    if (key.lastIndexOf(prefix, 0) === 0) { const row = BIBLE_AUDIO_MANIFEST[key][0]; return row && row[1] ? String(row[1]) : ''; }
-  }
-  return '';
-}
-
-/**
- * An edition row's true second line (mt1, 2026-09-21): a noun that agrees with its count, the registry's
- * description where the edition has one, and the reader when the manifest names one (unless the label already
- * does: at 360 px the repeat pushed the line past its ellipsis). @param {any} edition @returns {string}
- */
-export function editionLine(edition) {
-  const books = bibleBookCount(edition.volKey);
-  const description = edition.description || '';
-  const parts = [books ? books + (books === 1 ? ' book' : ' books') : 'Read chapter by chapter'];
-  if (description) parts.push(description);
-  const reader = /read by/i.test(edition.label) ? null : audioReaderLabel(bibleReaderCode(edition.volKey));
-  if (reader) parts.push(reader);
-  else if (!description && books) parts.push('chapter by chapter');
-  return parts.join(' · ');
 }
 
 /** The Downloads row's live line, the Downloads strip's own words (picture 02): 'Downloading · 3 of 30 recordings ·
@@ -209,7 +181,6 @@ const SONGS_ICON = <svg {...ICON}><path d="M9 18V5l11-2v13" /><circle cx="6.5" c
 const DOWNLOAD_ICON = <svg {...ICON}><path d="M12 4v11M7 11l5 5 5-5M5 20h14" /></svg>;
 const SAVED_ICON = <svg {...ICON}><path d="M12 3.7l2.55 5.17 5.71.83-4.13 4.03.98 5.69L12 16.74l-5.11 2.68.98-5.69-4.13-4.03 5.71-.83L12 3.7z" /></svg>;
 const VOICE_ICON = <svg {...ICON}><path d="M12 15a3 3 0 003-3V6a3 3 0 00-6 0v6a3 3 0 003 3zM6 11v1a6 6 0 0012 0v-1M12 18v3" /></svg>;
-const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5" cy="18" r="2.5" /></svg>;
 
 /**
  * The LISTEN tab's root (the layout pass, 2026-11-10, mock listen.png): Continue listening; "Listen to": the
@@ -217,7 +188,7 @@ const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5"
  * Saved recordings with their count and the Letter voice setting with its value; then Recently played, as before.
  * Every destination the hub had is still one tap away; only the arrangement changed.
  * @param {{
- *   onOpenCollection: (volKey: string) => void,
+ *   onOpenBible?: () => void,
  *   onOpenVolumes: () => void,
  *   onOpenSaved: () => void,
  *   onOpenStudies?: () => void,
@@ -230,7 +201,7 @@ const EDITION_ICON = <svg {...ICON}><path d="M9 18V6l10-2v12" /><circle cx="6.5"
  *   onSettings: () => void,
  * }} props
  */
-export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSaved, onOpenStudies, onOpenOffline, onOpenSongs, onOpenTrack, onSetLetterReader, letterReader, onSearch, onSettings }) {
+export function AudioLibraryScreen({ onOpenVolumes, onOpenSaved, onOpenStudies, onOpenBible, onOpenOffline, onOpenSongs, onOpenTrack, onSetLetterReader, letterReader, onSearch, onSettings }) {
   const library = audioLibraryStore();
   React.useSyncExternalStore(
     React.useCallback((callback) => library && typeof library.subscribe === 'function' ? library.subscribe(callback) : () => {}, [library]),
@@ -259,7 +230,6 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
   }, []);
 
   const [recentAll, setRecentAll] = React.useState(false);
-  const [bibleOpen, setBibleOpen] = React.useState(false);
   const [voiceOpen, setVoiceOpen] = React.useState(false);
 
   const state = AudioPlayer.getState();
@@ -325,17 +295,8 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
           <ListRow icon={LETTERS_ICON} title="The Volumes of Truth" onClick={() => onOpenVolumes()}
             sub={collections.length ? collections.length + (collections.length === 1 ? ' collection' : ' collections') + ' · the Letters read aloud' : 'The Letters read aloud'} />
           {editions.length ? (
-            <ListRow icon={BIBLE_ICON} title="The Bible" expanded={bibleOpen} onClick={() => setBibleOpen((v) => !v)}
+            <ListRow icon={BIBLE_ICON} title="The Bible" onClick={() => { if (onOpenBible) onOpenBible(); }}
               sub={editions.map(editionShort).join(' · ')} />
-          ) : null}
-          {bibleOpen ? (
-            <div className="root-sublist" role="group" aria-label="Bible recordings">
-              {editions.map((edition) => (
-                <ListRow key={edition.volKey} className="root-row-sub-item" icon={EDITION_ICON} title={edition.label}
-                  sub={editionLine(edition)} onClick={() => onOpenCollection(edition.volKey)}
-                  badge={<CoverageBadge state={bibleEditionCoverage(edition.volKey)} detail={bibleEditionPartialDetail(edition.volKey)} />} />
-              ))}
-            </div>
           ) : null}
           {studies.recorded > 0 ? (
             <ListRow icon={STUDIES_ICON} title="Studies" onClick={() => { if (onOpenStudies) onOpenStudies(); }}

@@ -199,7 +199,9 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
 
   it('lists the books its manifest ships and plays them forward-only', () => {
     renderScreen('bible-brm-kjv');
-    expect(screen.getByRole('heading', { name: 'KJV · Biblical Restoration Ministries' })).toBeTruthy();
+    // listen.html au-books: the bar says "KJV", the line under it the reading and the books.
+    expect(screen.getByRole('heading', { name: 'KJV' })).toBeTruthy();
+    expect(document.querySelector('.listen-sum').textContent).toMatch(/^Biblical Restoration Ministries · \d+ books/);
     expect(screen.getByText('Genesis')).toBeTruthy();
     expect(screen.queryByText('Psalms')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Play Exodus' }));
@@ -218,6 +220,31 @@ describe('AudioCollectionScreen -- a Bible edition', () => {
     expect(screen.getByText('Chapter 3')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Play Jonah 3' }));
     expect(queueUrls()).toEqual([OT('brm1_jonah_003'), OT('brm1_jonah_004')]);
+  });
+
+  it('a book row opens its chapters under it (au-chapters): number, length, the first seven then Show all', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': perChapter('jonah', 9) };
+    globalThis.BIBLE_AUDIO_BOOKS = [['jonah', 'Jonah']];
+    renderScreen('bible-brm-kjv');
+    expect(screen.queryByRole('button', { name: /Save Jonah/ })).toBeNull();          // the mock's book row: no star
+    fireEvent.click(screen.getByRole('button', { name: 'Show the chapters of Jonah' }));
+    expect(screen.getByText('Chapter 7')).toBeTruthy();
+    expect(screen.queryByText('Chapter 8')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 9 chapters' }));
+    expect(screen.getByText('Chapter 9')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide the chapters of Jonah' }));
+    expect(screen.queryByText('Chapter 1')).toBeNull();
+  });
+
+  it('switches between the Old and New Testament, each counting its books (au-books)', () => {
+    globalThis.BIBLE_AUDIO_MANIFEST = { 'bible-brm-kjv:jonah': perChapter('jonah', 2), 'bible-brm-kjv:mark': perChapter('mark', 2) };
+    globalThis.BIBLE_AUDIO_BOOKS = [...Array.from({ length: 38 }, (_v, i) => ['ot' + i, 'OT ' + i]), ['jonah', 'Jonah'], ['mark', 'Mark']];
+    renderScreen('bible-brm-kjv');
+    expect(screen.getByText('Jonah')).toBeTruthy();
+    expect(screen.queryByText('Mark')).toBeNull();
+    fireEvent.click(screen.getByRole('radio', { name: 'New Testament · 1' }));
+    expect(screen.getByText('Mark')).toBeTruthy();
+    expect(screen.queryByText('Jonah')).toBeNull();
   });
 
   it('offers Open the book on a Bible book, keyed like every other row', () => {
