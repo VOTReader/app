@@ -128,12 +128,15 @@ import { ReadingPlanStore } from '../stores/reading-plan-store.js';
 /**
  * A read, a full listen or a manual mark ticks the reading plans that hold it,
  * whatever the Mark-as-read switch says: a running plan tracks its own days
- * (mw18, Corbin's call 3b). Never throws into the read path.
- * @param {string} bid @param {string | number} cid
+ * (mw18, Corbin's call 3b). Never throws into the read path. plans2: one read
+ * record: true when a plan being followed holds the item, and then the read
+ * record is written too even with Mark as read off (following a plan is
+ * asking for it); only reads outside plans stay unmarked with the switch off.
+ * @param {string} bid @param {string | number} cid @returns {boolean}
  */
 function notePlans(bid, cid) {
-  try { ReadingPlanStore.noteRead(bid, cid); }
-  catch (e) { console.warn('reading-plan tick failed', e); }
+  try { return ReadingPlanStore.noteRead(bid, cid) === true; }
+  catch (e) { console.warn('reading-plan tick failed', e); return false; }
 }
 
 /**
@@ -176,8 +179,8 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
   };
 
   const markRead = (bid, cid, payload) => {
-    notePlans(bid, cid);
-    if (enabledRef.current === false) return;
+    const inPlan = notePlans(bid, cid);
+    if (enabledRef.current === false && !inPlan) return;
     const key = getReadKey(bid, cid);
     const prev = readItems[key];
     // Count-valued since 2026-08-03: `true` (legacy) reads as 1 via
@@ -262,16 +265,16 @@ export function useReadProgress({ savedReadItems, markAsReadEnabled }) {
           // Listening Library, but no chapter is claimed read.
           const chapter = Math.floor(Number(chapterNum) || 0);
           if (chapter > 0) {
-            notePlans(itemId, chapter);
-            if (enabledRef.current !== false) credit(getReadKey(itemId, chapter));
+            const inPlan = notePlans(itemId, chapter);
+            if (enabledRef.current !== false || inPlan) credit(getReadKey(itemId, chapter));
           }
           return;
         }
         const col = (typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY) ? COL_BY_KEY.get(volKey) : null;
         const rk = col && col.readKey;
         if (!rk) return;
-        notePlans(rk, itemId);
-        if (enabledRef.current === false) return;
+        const inPlan = notePlans(rk, itemId);
+        if (enabledRef.current === false && !inPlan) return;
         credit(getReadKey(rk, itemId));
       } catch (e) { console.warn('listen count failed', e); }
     };

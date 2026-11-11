@@ -69,8 +69,10 @@ export const ReadingPlanStore = extendStore(
     put(run) {
       if (!_valid(run)) return;
       if (this._shouldDefer('put', run)) return;
-      const list = this._load().filter((r) => !r || r.id !== run.id);
-      list.push(run);
+      // plans2: a saved run keeps its place (running plans stay in start order; a save used to move it to the end).
+      const list = this._load().slice();
+      const at = list.findIndex((r) => r && r.id === run.id);
+      if (at >= 0) list[at] = run; else list.push(run);
       this._cache = list;
       this._save();
       this._bump();
@@ -88,10 +90,13 @@ export const ReadingPlanStore = extendStore(
      * A chapter or letter was read (or listened to the end, or marked): tick it in
      * every running or paused run that holds it. Dated by the reader's local date.
      * @param {string} bid @param {string | number} cid @param {Date} [now]
+     * @returns {boolean} whether a plan being followed holds it (plans2: such a read is a plan tick, and every plan
+     *   tick writes the read record too, Mark as read on or off)
      */
     noteRead(bid, cid, now) {
-      if (!bid || cid == null || cid === '') return;
-      if (this._shouldDefer('noteRead', bid, cid, now)) return;
+      if (!bid || cid == null || cid === '') return false;
+      const held = this.holds(bid, cid);
+      if (this._shouldDefer('noteRead', bid, cid, now)) return held;
       const when = now || new Date();
       const key = todayKey(when);
       const keys = _keysFor(String(bid), cid);
@@ -103,10 +108,22 @@ export const ReadingPlanStore = extendStore(
         if (out !== r) changed = true;
         return out;
       });
-      if (!changed) return;
+      if (!changed) return held;
       this._cache = next;
       this._save();
       this._bump();
+      return held;
+    },
+
+    /**
+     * Whether a running or paused run holds this chapter or letter (plans2: the reader keeps its read detector on for
+     * plan items when Mark as read is off).
+     * @param {string} bid @param {string | number} cid
+     */
+    holds(bid, cid) {
+      if (!bid || cid == null || cid === '') return false;
+      const keys = _keysFor(String(bid), cid);
+      return this.active().some((r) => r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
     },
 
     /**

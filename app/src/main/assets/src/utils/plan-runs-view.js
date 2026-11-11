@@ -48,12 +48,16 @@ export function shortDate(key) {
 /** One of today's items as its check: a chapter's number, a letter's title. @param {import('../data/plan-engine.js').PlanItem} it */
 const itemShort = (it) => (it.t ? it.t : it.k.slice(it.k.lastIndexOf(':') + 1));
 
-/** What the items are, counted: "chapters", "letters" or "chapters and letters". @param {PlanRun} run */
-function unitOf(run) {
-  let ch = false, le = false;
-  for (const tr of run.tracks) for (const it of tr.items) { if (it.t) le = true; else ch = true; if (ch && le) return 'chapters and letters'; }
-  return le ? 'letters' : 'chapters';
+/** What the items are, counted: "chapters", "letters" or "chapters and letters"; singular for one. @param {PlanRun} run */
+export function unitOf(run) {
+  let ch = false, le = false, n = 0;
+  for (const tr of run.tracks) for (const it of tr.items) { n++; if (it.t) le = true; else ch = true; }
+  if (ch && le) return 'chapters and letters';
+  return le ? (n === 1 ? 'letter' : 'letters') : (n === 1 ? 'chapter' : 'chapters');
 }
+
+/** "1 day", "4 days". @param {number} n */
+export const daysWord = (n) => n.toLocaleString('en-US') + (n === 1 ? ' day' : ' days');
 
 /**
  * A run's row for the Today card and the Plans screen.
@@ -68,18 +72,17 @@ export function runRow(run, now) {
   const nextItem = today.find((it) => !(it.k in ticks)) || today[0] || null;
   const from = nextItem ? today.indexOf(nextItem) : 0;
   const words = itemsWords(today);
-  // C10: counts, never a percentage rounded down; the finish is the honest one (behind moves it).
+  // C10: counts; the finish is the honest one. plans2: one phrase when it moved, "N days later than planned"
+  // (never behind, missed or catch up), and a paused plan or one not started is never late.
   const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
-  const pace = st.finished ? '' : st.behind > 0 ? st.behind + (st.behind === 1 ? ' day' : ' days') + ' behind · new finish ' + shortDate(st.projected)
-    : st.ahead > 0 ? st.ahead + (st.ahead === 1 ? ' day' : ' days') + ' ahead · finish ' + shortDate(st.projected)
-      : 'on pace to finish ' + shortDate(st.projected);
+  const pace = st.finished ? '' : 'Finishes ' + shortDate(st.projected) + (st.late > 0 ? ' · ' + daysWord(st.late) + ' later than planned' : '');
   return {
     id: run.id, plan: run.plan, name: runName(run, null), loading: false,
     label: st.finished ? '' : itemsLabel(shown, bookTitle),
     tomorrow: st.doneToday ? itemsLabel(today, bookTitle) : '',
     done: st.doneToday, day: st.doneToday ? st.day - 1 : st.day, totalDays: st.total,
-    percent: st.total ? Math.floor(st.doneDays * 100 / st.total) : 0,
-    behind: st.behind, ahead: st.ahead, finished: st.finished, paused: st.paused,
+    percent: st.percent,
+    behind: st.behind, ahead: st.ahead, late: st.late, finished: st.finished, paused: st.paused, notStarted: st.notStarted, start: run.start,
     next: nextItem ? itemRef(nextItem.k) : null,
     // Read again: the day just finished, from its start.
     again: st.doneToday && prev.length ? itemRef(prev[0].k) : null,

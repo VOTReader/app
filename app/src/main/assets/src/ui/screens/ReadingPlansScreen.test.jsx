@@ -50,11 +50,11 @@ describe('ReadingPlansScreen', () => {
     expect(plan.querySelector('.plans-day[data-state="today"]')).not.toBeNull();
     fireEvent.click(within(plan).getByRole('button', { name: 'Read today: Genesis 4-7' }));
     expect(p.onRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 4 });
-    expect(within(plan).getByText(/days? behind/)).toBeTruthy();
+    expect(within(plan).getByText(/days? later than planned/)).toBeTruthy();
     fireEvent.click(within(plan).getByRole('button', { name: 'Catch up' }));
     expect(within(plan).getByText(/^At this pace you finish /)).toBeTruthy();
     act(() => { fireEvent.click(within(plan).getByRole('button', { name: /^Catch me up/ })); });
-    expect(within(screen.getByRole('region', { name: 'Bible in a Year' })).queryByText(/days? behind/)).toBeNull();
+    expect(within(screen.getByRole('region', { name: 'Bible in a Year' })).queryByText(/days? later than planned/)).toBeNull();
   });
 
   it('stops a plan only after asking; the run is kept, stopped', () => {
@@ -98,7 +98,7 @@ describe('ReadingPlansScreen', () => {
     const plan = screen.getByRole('region', { name: 'Bible in a Year' });
     expect(within(plan).getByRole('heading', { name: 'Genesis 1-3' })).toBeTruthy();
     expect(within(plan).getByText('1 of 3 today')).toBeTruthy();
-    expect(within(plan).getByText(/^1 of 1,189 chapters · on pace to finish /)).toBeTruthy();
+    expect(within(plan).getByText(/^1 of 1,189 chapters · Finishes /)).toBeTruthy();
     expect(plan.textContent).not.toMatch(/%/);
     fireEvent.click(within(plan).getByRole('button', { name: 'Listen to today: Genesis 1-3' }));
     expect(p.onListen).toHaveBeenCalledWith([{ bid: 'genesis', cid: 2 }, { bid: 'genesis', cid: 3 }], 'Bible in a Year');

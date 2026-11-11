@@ -119,8 +119,8 @@ describe('useReadProgress — audio listen bridge: Bible chapters', () => {
   });
 });
 
-describe('useReadProgress — reading plans tick even with Mark as read off (mw18, call 3b)', () => {
-  it('a completed read, a manual mark and a full listen each tick the running plan; the read record stays off', async () => {
+describe('useReadProgress — reading plans tick even with Mark as read off (mw18, call 3b; plans2 one read record)', () => {
+  it('a completed read, a manual mark and a full listen each tick the running plan AND write the read record; a read outside plans stays unmarked', async () => {
     const { ReadingPlanStore } = await import('../stores/reading-plan-store.js');
     const { newRun } = await import('../data/plan-engine.js');
     localStorage.clear();
@@ -135,6 +135,9 @@ describe('useReadProgress — reading plans tick even with Mark as read off (mw1
     act(() => result.current.markRead('genesis', 2));
     act(() => window.__votAudioListened('one', 'the-wide-path'));
     expect(Object.keys(ReadingPlanStore.get(run.id).ticks).sort()).toEqual(['genesis:1', 'genesis:2', 'vol-one:the-wide-path']);
-    expect(result.current.readItems).toEqual({});
+    // plans2: every plan tick writes the read record too, so Progress shows one number.
+    expect(Object.keys(result.current.readItems).sort()).toEqual(['v1:genesis:1', 'v1:genesis:2', 'v1:vol-one:the-wide-path']);
+    act(() => result.current.markRead('exodus', 1, { words: 600, activeMs: 120000 }));
+    expect(result.current.readItems['v1:exodus:1']).toBeUndefined();
   });
 });
