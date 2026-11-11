@@ -1,21 +1,13 @@
 // @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
-/* LibraryScreen tests — Wave 0 MISC-SCREENS item (3).
-   ──────────────────────────────────────
-   The "No X yet" empty tiles never said how X happens. Each empty tile
-   now carries a one-line guidance caption (.library-tile-guide) in the
-   voice of the destination screens' own empty states (NotesIndexScreen,
-   BookmarksScreen, LinksScreen, HighlightsScreen, JournalHubScreen).
-   Captions vanish once the tile has real content.
-*/
+/* LibraryScreen — the LIBRARY tab's root (the layout pass, 2026-11-10, mock library.png): Reading plans and
+   Progress rows; "Yours" tiles with a real count from each store, or a plain line of what the tile holds while
+   it is empty; "Recently read" with the three newest History rows and See all. Scripture Web left for Read. */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, render, cleanup, fireEvent, screen } from '@testing-library/react';
-import { LibraryScreen } from './LibraryScreen.jsx';
-import { DEFAULT_LIBRARY_ORDER } from '../../stores/library-order-store.js';
+import { LibraryScreen, readWhen, plansLine, RECENT_ROWS } from './LibraryScreen.jsx';
 
-const GLOBALS = ['ScreenLayout', 'LibraryNav', 'NoteStore', 'LinkStore', 'BookmarkStore',
-  'JournalStore', 'AnnotationStore', 'ReadingStatsStore', 'ReadingStreakStore',
-  'JournalStatsStore', 'AudioLibraryStore', 'LibraryOrderStore', 'createPressDrag'];
+const GLOBALS = ['ScreenLayout', 'NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore', 'COL_BY_INDEX_SC'];
 
 const fakeStore = (extra = {}) => ({
   subscribe: () => () => {}, getVersion: () => 0, all: () => ({}), count: () => 0,
@@ -23,37 +15,15 @@ const fakeStore = (extra = {}) => ({
 });
 
 function setupGlobals(over = {}) {
-  globalThis.ScreenLayout = ({ children, navChildren }) => (
-    <div data-testid="screen-layout">{navChildren}{children}</div>
+  globalThis.ScreenLayout = ({ children, navChildren, navEnd, root }) => (
+    <div data-testid="screen-layout" data-root={root ? '1' : '0'}><nav>{navChildren}{navEnd}</nav>{children}</div>
   );
-  globalThis.LibraryNav = () => null;
   globalThis.NoteStore = over.NoteStore || fakeStore();
   globalThis.LinkStore = over.LinkStore || fakeStore({ all: () => [] });
   globalThis.BookmarkStore = over.BookmarkStore || fakeStore();
   globalThis.JournalStore = over.JournalStore || fakeStore();
   globalThis.AnnotationStore = over.AnnotationStore || fakeStore();
-  globalThis.ReadingStatsStore = over.ReadingStatsStore || fakeStore({ get: () => ({}) });
-  globalThis.ReadingStreakStore = over.ReadingStreakStore || fakeStore({ get: () => ({}) });
-  globalThis.JournalStatsStore = over.JournalStatsStore || fakeStore({ get: () => ({}) });
-  globalThis.AudioLibraryStore = over.AudioLibraryStore || fakeStore({ saved: () => [], getPlays: () => 0 });
-  /* DERIVED FROM THE REAL DEFAULT, never re-typed.
-     This list used to be a hand-written copy that had fallen a tile behind:
-     it omitted 'scripture-web', which DEFAULT_LIBRARY_ORDER has carried since
-     the tile shipped. So no case in this file had ever rendered that tile, and
-     the screen's own suite could not have caught its removal, its caption, or
-     its route — it would have reported green either way. A stub that has to
-     agree with a constant is two definitions of one thing; this is the one
-     that gets deleted. */
-  globalThis.LibraryOrderStore = over.LibraryOrderStore || {
-    get: () => [...DEFAULT_LIBRARY_ORDER],
-    set: () => {},
-    subscribe: () => () => {},
-    getVersion: () => 0,
-  };
-  // The shared press-drag lifecycle — inert here; no gesture is simulated.
-  globalThis.createPressDrag = () => ({
-    start: () => {}, suppressed: () => false, destroy: () => {}, land: () => {},
-  });
+  if (over.ReadingPlanStore) globalThis.ReadingPlanStore = over.ReadingPlanStore;
 }
 
 afterEach(() => {
@@ -63,180 +33,82 @@ afterEach(() => {
 
 const renderLibrary = (props = {}) => render(
   <LibraryScreen
-    onBack={() => {}}
-    onOpenNotes={() => {}}
-    onOpenLinks={() => {}}
-    onOpenBookmarks={() => {}}
-    onOpenJournal={() => {}}
-    onOpenHighlights={() => {}}
-    onOpenProgress={() => {}}
-    onOpenAudio={() => {}}
-    totalReadCount={0}
-    theme="dark"
-    onThemeChange={() => {}}
-    onSearch={() => {}}
-    onHistory={() => {}}
-    onSettings={() => {}}
-    historyEnabled={true}
+    onOpenNotes={() => {}} onOpenLinks={() => {}} onOpenBookmarks={() => {}} onOpenJournal={() => {}}
+    onOpenHighlights={() => {}} onOpenProgress={() => {}} onOpenPlans={() => {}}
+    onSearch={() => {}} onSettings={() => {}}
+    historyEnabled={true} history={[]} onOpenHistory={() => {}} onOpenHistoryEntry={() => {}}
     {...props}
   />
 );
 
-const tileEl = (title) => [...document.querySelectorAll('.library-tile')]
-  .find((t) => { const h = t.querySelector('.library-tile-title'); return h && h.textContent.trim() === title; });
+const tile = (title) => [...document.querySelectorAll('.lib-tile')].find((t) => t.querySelector('.root-tile-title').textContent === title);
+const tileLine = (title) => tile(title).querySelector('.root-tile-detail').textContent;
 
-/* The "Still under construction." caption went on this tile on 2026-09-05, the day the Home
-   shortcut left ("make users drill for it, still under construction"). On 2026-09-11 the shortcut
-   is back on Home and the tour teaches the web, so a caption one screen away saying it is not
-   ready contradicts both (the Orchestrator's call, for Corbin's morning veto). The tile keeps its
-   count and stays the way in from the Library. Asserted as ABSENCE with a control on the same
-   render: the empty Notes tile still carries ITS guide, so the guide span itself is alive. */
-describe('Scripture Web is reachable from the Library, and no longer says it is unfinished', () => {
-  it('renders the tile with its count and no caption; the empty Notes tile still has its guide', () => {
-    expect(DEFAULT_LIBRARY_ORDER).toContain('scripture-web');
+describe('LibraryScreen — the Library root', () => {
+  it('is a root titled Library, with Search and the gear', () => {
     setupGlobals();
-    const onOpenScriptureWeb = vi.fn();
-    renderLibrary({ onOpenScriptureWeb });
-
-    const tile = screen.getByText('Scripture Web').closest('button');
-    expect(tile).toBeTruthy();
-    expect(tile.querySelector('.library-tile-guide')).toBeNull();
-    expect(tile.textContent).not.toMatch(/under construction/i);
-    expect(tile.textContent).toMatch(/cross-references/);
-
-    // The control: the guide span still exists on a tile that has something to say.
-    expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeTruthy();
-
-    // Still the way in.
-    fireEvent.click(tile);
-    expect(onOpenScriptureWeb).toHaveBeenCalledTimes(1);
-  });
-});
-
-/* The redesign (2026-09-25, Codex mockup r4 take 1): one row each, the count at the right. The
-   visible count is a bare figure so the column of numbers lines up; its unit rides an sr-only span,
-   so a screen reader still hears "12 notes". An empty row shows no count at all (its guide line
-   teaches instead) and says "No notes yet" to a screen reader only. */
-describe('LibraryScreen — a row per thing, the count at the right', () => {
-  const visible = (el) => [...el.childNodes]
-    .filter((n) => !(n.nodeType === 1 && n.classList.contains('sr-only')))
-    .map((n) => n.textContent).join('');
-
-  it('a row with something shows a bare count, its description, and no guide', () => {
-    setupGlobals({ NoteStore: fakeStore({ count: () => 1204 }) });
-    renderLibrary();
-    const row = tileEl('Notes');
-    const count = row.querySelector('.library-tile-detail');
-    expect(count.classList.contains('sr-only')).toBe(false);
-    expect(visible(count)).toBe('1,204');
-    expect(count.textContent).toBe('1,204 notes');            // what a screen reader hears
-    expect(row.querySelector('.library-tile-desc').textContent).toBe('Your notes on passages');
-    expect(row.querySelector('.library-tile-guide')).toBeNull();
+    const onSettings = vi.fn();
+    renderLibrary({ onSettings });
+    expect(screen.getByTestId('screen-layout').getAttribute('data-root')).toBe('1');
+    expect(screen.getByRole('heading', { level: 1, name: 'Library' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(onSettings).toHaveBeenCalledTimes(1);
   });
 
-  it('an empty row shows no count and teaches instead; a screen reader hears that it is empty', () => {
+  it('Reading plans and Progress rows open their screens', () => {
     setupGlobals();
-    renderLibrary();
-    const row = tileEl('Bookmarks');
-    const count = row.querySelector('.library-tile-detail');
-    expect(count.classList.contains('sr-only')).toBe(true);
-    expect(count.textContent).toBe('No bookmarks yet');
-    expect(row.querySelector('.library-tile-desc')).toBeNull();
-    expect(row.querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
+    const onOpenPlans = vi.fn(), onOpenProgress = vi.fn();
+    renderLibrary({ onOpenPlans, onOpenProgress });
+    fireEvent.click(screen.getByRole('button', { name: /Reading plans/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Progress/ }));
+    expect(onOpenPlans).toHaveBeenCalledTimes(1);
+    expect(onOpenProgress).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: /Reading plans/ }).textContent).toContain('The Bible, the letters, short starts');
   });
 
-  it('Progress keeps its words on the figure', () => {
-    setupGlobals({ NoteStore: fakeStore({ count: () => 1 }) });
-    renderLibrary({ totalReadCount: 27 });
-    expect(visible(tileEl('Progress').querySelector('.library-tile-detail'))).toBe('27 read');
-  });
-
-  it('has no Milestones tile (removed 2026-10-05)', () => {
+  it('Yours: five tiles in the mock order, each opening its list; no Scripture Web', () => {
     setupGlobals();
+    const handlers = { onOpenNotes: vi.fn(), onOpenHighlights: vi.fn(), onOpenBookmarks: vi.fn(), onOpenJournal: vi.fn(), onOpenLinks: vi.fn() };
+    renderLibrary(handlers);
+    expect([...document.querySelectorAll('.lib-tile .root-tile-title')].map((t) => t.textContent)).toEqual(['Notes', 'Highlights', 'Bookmarks', 'Journal', 'Links']);
+    for (const t of ['Notes', 'Highlights', 'Bookmarks', 'Journal', 'Links']) fireEvent.click(tile(t));
+    for (const fn of Object.values(handlers)) expect(fn).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Scripture Web/)).toBeNull();
+  });
+
+  it('an empty tile says what it holds; a tile with something gives its real count', () => {
+    setupGlobals({
+      NoteStore: fakeStore({ count: () => 23 }),
+      BookmarkStore: fakeStore({ count: () => 1 }),
+      JournalStore: fakeStore({ count: () => 4 }),
+      AnnotationStore: fakeStore({ all: () => ({ 'v1:john:3': [{ id: 'a1', kind: 'highlight', color: 'yellow' }] }) }),
+    });
     renderLibrary();
-    expect(tileEl('Milestones')).toBeUndefined();
-    expect(document.body.textContent).not.toMatch(/Milestone/);
+    expect(tileLine('Notes')).toBe('23 notes');
+    expect(tileLine('Highlights')).toBe('1 marked passage');
+    expect(tileLine('Bookmarks')).toBe('1 place');
+    expect(tileLine('Journal')).toBe('4 entries');
+    expect(tileLine('Links')).toBe('Passages you joined together');
   });
 
-  it('Scripture Web has no count and no empty state, just its size on the line', () => {
-    setupGlobals();
+  it('a blank-colour note is not counted as a highlight (n363)', () => {
+    setupGlobals({ AnnotationStore: fakeStore({ all: () => ({
+      'v1:john:3': [{ id: 'b1', kind: 'highlight', color: 'blank' }, { id: 'a1', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
+      'v1:john:4': [{ id: 'a2', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
+    }) }) });
     renderLibrary();
-    const row = tileEl('Scripture Web');
-    expect(row.querySelector('.library-tile-detail')).toBeNull();
-    expect(row.querySelector('.library-tile-desc').textContent).toBe('63,418 cross-references');
+    expect(tileLine('Highlights')).toBe('1 marked passage');
   });
 
-  it('no row carries a "My …" eyebrow, and the icon and chevron are hidden from screen readers', () => {
-    setupGlobals();
-    renderLibrary();
-    expect(document.querySelector('.library-tile-eyebrow')).toBeNull();
-    expect(document.body.textContent).not.toMatch(/My Notes|My Marks|The Whole Counsel/);
-    for (const row of document.querySelectorAll('.library-tile')) {
-      expect(row.querySelector('.library-tile-icon').getAttribute('aria-hidden')).toBe('true');
-      expect(row.querySelector('.library-tile-arrow').getAttribute('aria-hidden')).toBe('true');
-    }
-  });
-});
-
-describe('LibraryScreen — empty-tile guidance captions', () => {
-  /* The tiles that CAN be empty: every tile but Scripture Web, which ships full (63,418
-     cross-references) and so has nothing to explain. Its "Still under construction." caption of
-     2026-09-05 rode the guide span while the Home shortcut was gone; both are back to before
-     (2026-09-11), so the count here is derived from the order MINUS that one tile. */
-  const EMPTIABLE = DEFAULT_LIBRARY_ORDER.filter((id) => id !== 'scripture-web');
-
-  it('every empty tile explains how its content happens', () => {
-    setupGlobals();
-    renderLibrary();
-    const guides = [...document.querySelectorAll('.library-tile-guide')];
-    /* DERIVED, not re-typed. This was a hard 7 while the shared stub carried a
-       hand-copied seven-id order, and the two agreed only by accident — the app
-       had eight tiles. Counting against the order means adding a tile fails
-       this case for the right reason (its caption is missing) rather than for
-       the wrong one (a number nobody updated). */
-    expect(EMPTIABLE).toHaveLength(DEFAULT_LIBRARY_ORDER.length - 1);   // the filter found its tile
-    expect(guides).toHaveLength(EMPTIABLE.length);
-    guides.forEach((g) => expect(g.textContent.length).toBeGreaterThan(10));
-    // Spot-pin the voice/accuracy of each caption against the destination
-    // screens' own empty-state copy.
-    expect(tileEl('Notes').querySelector('.library-tile-guide').textContent).toMatch(/tap Note/i);
-    expect(tileEl('Links').querySelector('.library-tile-guide').textContent).toMatch(/tap Link/i);
-    expect(tileEl('Journal').querySelector('.library-tile-guide').textContent).toMatch(/New Entry/);
-    expect(tileEl('Bookmarks').querySelector('.library-tile-guide').textContent).toMatch(/tap Bookmark/i);
-    expect(tileEl('Highlights & Underlines').querySelector('.library-tile-guide').textContent).toMatch(/tap a color/i);
-    expect(tileEl('Progress').querySelector('.library-tile-guide').textContent).toMatch(/read/i);
-    // The last is never empty, so it is the one tile with no guide at all.
-    expect(tileEl('Scripture Web').querySelector('.library-tile-guide')).toBeNull();
-  });
-
-  it('a tile with real content drops its caption', () => {
-    setupGlobals({ NoteStore: fakeStore({ count: () => 3 }) });
-    renderLibrary();
-    expect(tileEl('Notes').querySelector('.library-tile-guide')).toBeNull();
-    expect(tileEl('Notes').querySelector('.library-tile-detail').textContent).toBe('3 notes');
-    // Every other tile keeps its caption.
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 1);
-  });
-
-  it('the Progress tile drops its caption once anything is read', () => {
-    setupGlobals();
-    renderLibrary({ totalReadCount: 7 });
-    expect(tileEl('Progress').querySelector('.library-tile-guide')).toBeNull();
-    expect(document.querySelectorAll('.library-tile-guide')).toHaveLength(EMPTIABLE.length - 1);
-  });
-
-  /* The counts read their stores directly at render; what re-renders the screen when one changes
-     is LibraryScreen's subscription to each of the five. Until 2026-10-05 that subscription rode
-     the milestones engine's store list; with Milestones gone it is the screen's own fixed list, and
-     these cases are what pin it: drop a store from it and its count goes stale while Library is open. */
+  /* The counts read their stores directly at render; what re-renders the screen when one changes is the screen's
+     subscription to each store. Drop a store from that list and its count goes stale while the Library is open. */
   it.each([
     ['Notes', 'NoteStore', (n) => fakeStore({ count: () => n })],
     ['Links', 'LinkStore', (n) => fakeStore({ all: () => Array.from({ length: n }, (_, i) => ({ id: 'l' + i })) })],
     ['Bookmarks', 'BookmarkStore', (n) => fakeStore({ count: () => n })],
     ['Journal', 'JournalStore', (n) => fakeStore({ count: () => n })],
-    ['Highlights & Underlines', 'AnnotationStore',
-      (n) => fakeStore({ all: () => (n ? { 'v1:john:3': [{ id: 'a1', kind: 'highlight' }] } : {}) })],
-  ])('updates the %s count while Library stays open', (title, storeName, make) => {
+    ['Highlights', 'AnnotationStore', (n) => fakeStore({ all: () => (n ? { 'v1:john:3': [{ id: 'a1', kind: 'highlight' }] } : {}) })],
+  ])('updates the %s count while the Library stays open', (title, storeName, make) => {
     let version = 0;
     let n = 0;
     const listeners = new Set();
@@ -248,79 +120,59 @@ describe('LibraryScreen — empty-tile guidance captions', () => {
     };
     setupGlobals({ [storeName]: live });
     renderLibrary();
-    const detail = () => tileEl(title).querySelector('.library-tile-detail').textContent;
-    expect(detail()).toMatch(/^No /);
-
-    act(() => {
-      n = 1;
-      version++;
-      listeners.forEach((cb) => cb());
-    });
-    expect(detail()).toMatch(/^1 /);
-  });
-
-  it('a blank-colour note is not counted as a highlight (n363)', () => {
-    setupGlobals({ AnnotationStore: fakeStore({ all: () => ({
-      'v1:john:3': [{ id: 'b1', kind: 'highlight', color: 'blank' }, { id: 'a1', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
-      'v1:john:4': [{ id: 'a2', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
-    }) }) });
-    renderLibrary();
-    expect(tileEl('Highlights & Underlines').querySelector('.library-tile-detail').textContent).toMatch(/^1 /);
-  });
-
-  it('adopts a restored custom tile order after asynchronous hydration', () => {
-    let version = 0;
-    let order = ['notes', 'links', 'journal', 'bookmarks', 'highlights', 'progress'];
-    let listener = null;
-    const orderStore = {
-      get: () => order,
-      set: () => {},
-      getVersion: () => version,
-      subscribe: (cb) => { listener = cb; return () => { listener = null; }; },
-    };
-    setupGlobals({ LibraryOrderStore: orderStore });
-    renderLibrary();
-    expect(tileEl('Notes')).toBe(document.querySelector('.library-tile'));
-
-    act(() => {
-      order = ['progress', 'notes', 'links', 'journal', 'bookmarks', 'highlights'];
-      version++;
-      listener();
-    });
-    expect(tileEl('Progress')).toBe(document.querySelector('.library-tile'));
+    expect(tileLine(title)).not.toMatch(/^\d/);
+    act(() => { n = 1; version++; listeners.forEach((cb) => cb()); });
+    expect(tileLine(title)).toMatch(/^1 /);
   });
 });
 
-/* n199: Home's Alt+ArrowUp/Down reorder, shared, on the Library's tiles. */
-describe('LibraryScreen keyboard reorder (n199)', () => {
-  it('Alt+ArrowDown swaps a tile with the next one, stores it and says so', () => {
-    const set = vi.fn();
-    setupGlobals({ LibraryOrderStore: { get: () => [...DEFAULT_LIBRARY_ORDER], set, subscribe: () => () => {}, getVersion: () => 0 } });
-    renderLibrary();
-    const first = document.querySelectorAll('.library-tile')[0];
-    const firstId = DEFAULT_LIBRARY_ORDER[0], secondId = DEFAULT_LIBRARY_ORDER[1];
-    fireEvent.keyDown(first, { key: 'ArrowDown', altKey: true });
-    expect(set).toHaveBeenCalledTimes(1);
-    expect(set.mock.calls[0][0].slice(0, 2)).toEqual([secondId, firstId]);
-    expect(document.querySelector('[role="status"]').textContent).toMatch(/moved later\.$/);
-    expect(first.getAttribute('aria-describedby')).toBe('library-reorder-hint');
-  });
+describe('LibraryScreen — Recently read', () => {
+  const NOW = Date.now();
+  const rows = [
+    { type: 'letter', letterTitle: 'Wisdom Has Spoken', letterNum: 14, volumeScreen: 'vot-index', ts: NOW },
+    { type: 'bible', bookId: 'genesis', bookTitle: 'Genesis', chapterNum: 1, ts: NOW - 1000 },
+    { type: 'bible', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: NOW - 86400000 },
+    { type: 'bible', bookId: 'acts', bookTitle: 'Acts', chapterNum: 2, ts: NOW - 3 * 86400000 },
+  ];
 
-  it('a plain arrow, or Alt+ArrowUp on the first tile, moves nothing', () => {
-    const set = vi.fn();
-    setupGlobals({ LibraryOrderStore: { get: () => [...DEFAULT_LIBRARY_ORDER], set, subscribe: () => () => {}, getVersion: () => 0 } });
-    renderLibrary();
-    const first = document.querySelectorAll('.library-tile')[0];
-    fireEvent.keyDown(first, { key: 'ArrowDown' });
-    fireEvent.keyDown(first, { key: 'ArrowUp', altKey: true });
-    expect(set).not.toHaveBeenCalled();
-  });
-
-  it('Back names its destination (n177)', () => {
+  it('shows the three newest with their place and day, opens one, and See all opens History', () => {
     setupGlobals();
-    let navOpts = null;
-    globalThis.LibraryNav = (o) => { navOpts = o; return null; };
-    renderLibrary();
-    expect(navOpts.backLabel).toBe('Home');
+    globalThis.COL_BY_INDEX_SC = new Map([['vot-index', { label: 'Volume Two' }]]);
+    const onOpenHistory = vi.fn(), onOpenHistoryEntry = vi.fn();
+    renderLibrary({ history: rows, onOpenHistory, onOpenHistoryEntry });
+    const list = [...document.querySelectorAll('.root-row-plain')];
+    expect(list).toHaveLength(RECENT_ROWS);
+    expect(list[0].textContent).toBe('Wisdom Has SpokenVolume Two, Letter 14 · today›');
+    expect(list[1].textContent).toContain('The Scriptures of Truth · today');
+    expect(list[2].textContent).toContain('John 3');
+    fireEvent.click(list[1]);
+    expect(onOpenHistoryEntry).toHaveBeenCalledWith(rows[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'See all' }));
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+  });
+
+  it('is gone with History switched off, and with nothing read', () => {
+    setupGlobals();
+    renderLibrary({ history: rows, historyEnabled: false });
+    expect(screen.queryByText('Recently read')).toBeNull();
+    cleanup();
+    renderLibrary({ history: [] });
+    expect(screen.queryByText('Recently read')).toBeNull();
+  });
+
+  it('says when in a word', () => {
+    const now = new Date(2026, 10, 10, 9);
+    expect(readWhen(new Date(2026, 10, 10, 1).getTime(), now)).toBe('today');
+    expect(readWhen(new Date(2026, 10, 9, 23).getTime(), now)).toBe('yesterday');
+    expect(readWhen(new Date(2026, 10, 3).getTime(), now)).toBe('Nov 3');
+    expect(readWhen(undefined, now)).toBe('');
+  });
+});
+
+describe('LibraryScreen — the plans line', () => {
+  it('names what plans there are with none running, else the plan that runs', () => {
+    expect(plansLine([])).toBe('The Bible, the letters, short starts');
+    expect(plansLine([{ id: 'x', plan: 'nope', name: 'My plan' }])).toMatch(/^My plan/);
+    expect(plansLine([{ id: 'x', name: 'A' }, { id: 'y', name: 'B' }])).toMatch(/^A.* · and 1 more$/);
   });
 });

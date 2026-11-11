@@ -224,3 +224,18 @@ describe('ScreenLayout pager wiring', () => {
     expect(container.querySelector('.pager-peek-next')).toBeTruthy();
   });
 });
+
+/* The three tab roots (the layout pass, 2026-11-10): no resume dot and no ⋯ menu; navEnd (the gear) after Tabs. */
+describe('ScreenLayout — a tab root', () => {
+  it('draws navEnd in the ⋯ menu’s place and marks the bar a root bar', () => {
+    const { container } = render(
+      <SL root hideTabsBtn navChildren={<h1 className="root-title">Library</h1>} navEnd={<button data-testid="gear">gear</button>}>
+        <p>page</p>
+      </SL>,
+    );
+    const nav = container.querySelector('.top-nav');
+    expect(nav.className).toBe('top-nav top-nav-root');
+    expect(nav.lastElementChild.getAttribute('data-testid')).toBe('gear');
+    expect(container.querySelector('.nav-more-btn, .reading-dot-nav')).toBeNull();
+  });
+});

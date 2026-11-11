@@ -50,7 +50,7 @@ function manyRecent(count) {
 }
 
 function installGlobals({ saved = [savedTrack], recent = [recentTrack], activeSaved = true, votManifest = true } = {}) {
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.ScreenLayout = ({ children, navChildren, navEnd }) => <main><nav>{navChildren}{navEnd}</nav>{children}</main>;
   globalThis.LibraryNav = () => null;
   /* The bundle-d slots these screens read across the bundle boundary since
      landing 24 (AudioShelf's rows and icons, the seek slider, the coverage
@@ -99,151 +99,132 @@ afterEach(() => {
   localStorage.removeItem('vot-audio-recent-open');
 });
 
-describe('AudioLibraryScreen -- the hub', () => {
-  it('shows resume, the saved sub-menu row, recent rows, and both browse groups', () => {
+/* The LISTEN tab's root (the layout pass, 2026-11-10, mock listen.png): Continue listening; Listen to (the Volumes,
+   the Bible with its editions in place, Studies, Songs); On this phone (Downloads, Saved recordings, Letter voice);
+   then Recently played, as before. Every destination the hub had is one tap away still. */
+const openBible = () => fireEvent.click(screen.getByRole('button', { name: /^The Bible/ }));
+const editionRows = () => [...document.querySelectorAll('.root-sublist .root-row')];
+const editionRow = (re) => editionRows().find((r) => re.test(r.querySelector('.root-row-title').textContent));
+
+describe('AudioLibraryScreen -- the Listen root', () => {
+  it('is a root titled Listen; Continue listening plays the newest recording; the saved row opens the shelf', () => {
     const onOpenSaved = vi.fn();
     renderScreen({ onOpenSaved });
-    expect(screen.getByRole('heading', { name: 'Listening Library' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Resume last' })).toBeTruthy();
-    expect(screen.getByText('The Narrow Path')).toBeTruthy();     // recent, open by default
-    expect(screen.getByRole('button', { name: /The Volumes of Truth/ })).toBeTruthy();
-    expect(screen.getByRole('button', { name: /Biblical Restoration Ministries/ })).toBeTruthy();
-
-    // The saved shelf is a doorway now, not an inline list.
-    expect(screen.queryByText('The Wide Path')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /Saved recordings/ }));
-    expect(onOpenSaved).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Resume last' }));
+    expect(screen.getByRole('heading', { level: 1, name: 'Listen' })).toBeTruthy();
+    expect(screen.getByText('Continue listening')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'The Narrow Path' })).toBeTruthy();   // no part label: the title alone
+    fireEvent.click(screen.getByRole('button', { name: 'Continue listening: The Narrow Path' }));
     expect(player.playTrack).toHaveBeenCalledWith(recentTrack);
+    expect([...document.querySelectorAll('.root-section')].map((h) => h.textContent)).toEqual(['Listen to', 'On this phone', 'Recently played']);
+    // The saved shelf is a doorway, with its count.
+    expect(screen.queryByText('The Wide Path')).toBeNull();
+    const saved = screen.getByRole('button', { name: /Saved recordings/ });
+    expect(saved.querySelector('.root-row-count').textContent).toBe('1');
+    fireEvent.click(saved);
+    expect(onOpenSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it('with nothing played yet there is no Continue card and no Recently played', () => {
+    installGlobals({ recent: [] });
+    renderScreen();
+    expect(screen.queryByText('Continue listening')).toBeNull();
+    expect(screen.queryByText('Recently played')).toBeNull();
   });
 
   it('recently played collapses, remembers the choice, and folds long trails behind Show all', () => {
     installGlobals({ recent: manyRecent(11) });
     renderScreen();
-    expect(screen.getByText('Recent 1')).toBeTruthy();
+    expect(screen.getAllByText('Recent 1').length).toBeGreaterThan(0);
     expect(screen.queryByText('Recent 11')).toBeNull();           // beyond the 8-row preview
     fireEvent.click(screen.getByRole('button', { name: 'Show all 11' }));
     expect(screen.getByText('Recent 11')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Collapse recently played' }));
-    expect(screen.queryByText('Recent 1')).toBeNull();
+    expect(screen.queryByText('Recent 2')).toBeNull();
     expect(localStorage.getItem('vot-audio-recent-open')).toBe('0');
 
     fireEvent.click(screen.getByRole('button', { name: 'Expand recently played' }));
-    expect(screen.getByText('Recent 1')).toBeTruthy();
+    expect(screen.getByText('Recent 2')).toBeTruthy();
     expect(localStorage.getItem('vot-audio-recent-open')).toBe('1');
   });
 
-  it('browse offers one doorway per source family — the Volumes together, each Bible edition', () => {
+  it('one doorway per source family: the Volumes together, the Bible opening its editions in place', () => {
     installGlobals({ votManifest: false });                       // lazy corpus not yet landed
     const onOpenCollection = vi.fn();
     const onOpenVolumes = vi.fn();
     renderScreen({ onOpenCollection, onOpenVolumes });
-
-    // The fourteen collections do NOT splay across the hub (owner directive) —
-    // one doorway carries them all, like the Scriptures'.
-    expect(screen.queryByRole('button', { name: /^♪?\s*Volume One/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Volume One/ })).toBeNull();
     const volumesRow = screen.getByRole('button', { name: /The Volumes of Truth/ });
-    expect(volumesRow.textContent).toContain('1 collection');     // the fixture registry has one (and it agrees)
+    expect(volumesRow.textContent).toContain('1 collection · the Letters read aloud');
     fireEvent.click(volumesRow);
     expect(onOpenVolumes).toHaveBeenCalledTimes(1);
     expect(onOpenCollection).not.toHaveBeenCalled();
 
-    const bibleRow = screen.getByRole('button', { name: /Biblical Restoration Ministries/ });
-    expect(bibleRow.textContent).toContain('2 books');            // counted off its own manifest
-    fireEvent.click(bibleRow);
+    const bible = screen.getByRole('button', { name: /^The Bible/ });
+    expect(bible.getAttribute('aria-expanded')).toBe('false');
+    expect(bible.querySelector('.root-row-sub').textContent).toMatch(/^KJV · NKJV · WEB/);
+    expect(editionRows()).toHaveLength(0);
+    openBible();
+    expect(bible.getAttribute('aria-expanded')).toBe('true');
+    const brm = editionRow(/Biblical Restoration Ministries/);
+    expect(brm.textContent).toContain('2 books');                  // counted off its own manifest
+    fireEvent.click(brm);
     expect(onOpenCollection).toHaveBeenCalledWith('bible-brm-kjv');
   });
 
-  /* mt1 (Corbin 2026-09-21, S22 screenshot of this shelf): "1 books · chapter
-     by chapter" under Matthew and John. Every source row gets a true second
-     line: a counted noun that agrees, the registry's one-line description
-     where it has one, and the reader when the manifest knows it. */
-  it('every Browse row has a true second line: agreeing plurals, the edition description, the reader the manifest knows', () => {
+  /* mt1 (Corbin 2026-09-21): every edition row has a true second line: a counted noun that agrees, the registry's
+     description where it has one, and the reader when the manifest knows it. */
+  it('every edition row has a true second line: agreeing plurals, the edition description, the reader the manifest knows', () => {
     installGlobals({ votManifest: false });
     globalThis.BIBLE_AUDIO_MANIFEST['bible-tsot-matthew:matthew'] = [['tsot-1', 'B']];
     globalThis.BIBLE_AUDIO_MANIFEST['bible-john-film:john'] = [['gjn-1', '']];
     renderScreen();
-    const lineUnder = (re) => screen.getByRole('button', { name: re }).querySelector('small').textContent;
+    openBible();
+    const lineUnder = (re) => editionRow(re).querySelector('.root-row-sub').textContent;
     expect(lineUnder(/Biblical Restoration Ministries/)).toBe('2 books · chapter by chapter');
-    // The reader rides the second line only when the label does not already
-    // name one: Matthew's label says "(read by Benjamin)", and at 360 px the
-    // repeat pushed "· R…" off the end of the line (headless look, 21:2x).
     expect(lineUnder(/The Scriptures of Truth/)).toBe('1 book · Corrected Version by Timothy, with The Lord');
     globalThis.BIBLE_AUDIO_MANIFEST['bible-brm-kjv:genesis'] = [['g', 'T']];   // a reader the label does not carry
-    cleanup(); renderScreen();
+    cleanup(); renderScreen(); openBible();
     expect(lineUnder(/Biblical Restoration Ministries/)).toBe('2 books · Read by Timothy');
     expect(lineUnder(/The Gospel of John/)).toBe('1 book · Film audio, listening only');
-    expect(lineUnder(/The Volumes of Truth/)).toBe('1 collection · the Letters read aloud');
-    expect(document.querySelector('.audio-library-browse').textContent).not.toMatch(/\b1 (books|collections)\b/);
   });
 
-  /* 2026-09-12: an edition whose assets are not on the release (tsot-matthew,
-     every chapter 404ed live) was offered nowhere, through ONE registry flag and
-     ONE predicate (utils/audio-track.hide.test.js owns the registry half). The
-     shelf is the first door: it lists the REAL registry, so the counts here are
-     the registry's. 2026-09-13: the mirror landed and the flag line is deleted;
-     this case reads the edition back on the shelf, so the flag's return reddens
-     it. The filter itself is dormant on this registry (nothing is flagged): the
-     derived line at the end keeps the shelf ON the predicate, and the synthetic
-     Settings case is the live witness that a flagged entry is filtered. */
-  it('the shelf offers every edition the registry OFFERS — all five today, tsot-matthew back among them (mirrored 2026-09-13)', () => {
+  /* 2026-09-12/13: the shelf lists every edition the registry OFFERS, through the one predicate every door asks. */
+  it('the Bible offers every edition the registry OFFERS — all five today', () => {
     installGlobals({ votManifest: false });
-    // Same fixture as the hide's case: the manifest carries the edition's row,
-    // so the shelf's answer is the flag's alone.
     globalThis.BIBLE_AUDIO_MANIFEST['bible-tsot-matthew:matthew'] = [['tsot-1', '']];
     renderScreen();
-    // The browse shelf only: the saved-recordings row shares the row class.
-    const rows = [...document.querySelectorAll('.audio-library-browse .audio-library-shelf-row')]
-      .map((row) => row.querySelector('strong').textContent)
-      .filter((label) => label !== 'The Volumes of Truth');
-    // The door itself, as the reader sees it:
+    openBible();
+    const rows = editionRows().map((row) => row.querySelector('.root-row-title').textContent);
     expect(rows).toContain(AT.BIBLE_AUDIO_EDITIONS['tsot-matthew'].label);
     expect(Object.keys(AT.BIBLE_AUDIO_EDITIONS)).toHaveLength(5);
-    expect(rows).toHaveLength(5);                                  // none hidden today
-    // And the rule it follows — the same predicate every other door asks:
-    expect(typeof AT.bibleAudioOffered, 'audio-track.js must export bibleAudioOffered').toBe('function');
     expect(rows).toEqual(Object.values(AT.BIBLE_AUDIO_EDITIONS).filter(AT.bibleAudioOffered).map((e) => e.label));
   });
 
-  it('turns the active recording into a clear control deck with progress and contextual actions', () => {
+  it('the active recording: Now playing, its progress, pause, and its text from the art', () => {
     setPlayerState({ queue: [savedTrack], qi: 0, status: 'playing', time: 48, duration: 120 });
     const openTrack = vi.fn();
     renderScreen({ onOpenTrack: openTrack });
-    expect(screen.getByText('Playing now')).toBeTruthy();
-    // The shared scrubber, not a painted div: a listener can MOVE this one.
-    const slider = screen.getByRole('slider', { name: 'Playback position' });
-    expect(slider.value).toBe('48');
-    expect(slider.max).toBe('120');
-    fireEvent.change(slider, { target: { value: '90' } });
-    expect(player.seek).toHaveBeenCalledWith(90);
-
+    expect(screen.getByText('Now playing')).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'The Wide Path · Part 1' })).toBeTruthy();
+    expect(screen.getByText('Volume One · 1 min left')).toBeTruthy();
+    expect(screen.getByRole('progressbar', { name: 'Playback position' }).getAttribute('aria-valuenow')).toBe('40');
     fireEvent.click(screen.getByRole('button', { name: 'Pause current recording' }));
     expect(player.toggle).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Open current recording text' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open the text of The Wide Path' }));
     expect(openTrack).toHaveBeenCalledWith(savedTrack);
-    fireEvent.click(screen.getByRole('button', { name: 'Remove current recording from saved recordings' }));
-    expect(globalThis.AudioLibraryStore.toggleSaved).toHaveBeenCalledWith(savedTrack);
   });
 
-  it('carries the mini-player transport rules onto the hub card', () => {
-    // A queue of one: prev survives as a Restart, next is absent — the same
-    // conditional pair AudioPlayerBar renders.
-    setPlayerState({ queue: [savedTrack], qi: 0, status: 'playing', time: 10, duration: 120 });
-    renderScreen();
-    fireEvent.click(screen.getByRole('button', { name: 'Restart current recording' }));
-    expect(player.prev).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole('button', { name: 'Next recording' })).toBeNull();
-
+  it('Letter voice shows the setting and opens it', () => {
+    const onOpenLetterVoice = vi.fn();
+    renderScreen({ onOpenLetterVoice, letterReader: 'auto' });
+    const row = screen.getByRole('button', { name: /Letter voice/ });
+    expect(row.textContent).toContain('Automatic · each recording’s own reader');
+    fireEvent.click(row);
+    expect(onOpenLetterVoice).toHaveBeenCalledTimes(1);
     cleanup();
-    setPlayerState({ queue: [savedTrack, recentTrack], qi: 0, status: 'playing', time: 10, duration: 120 });
-    renderScreen();
-    expect(screen.queryByRole('button', { name: 'Restart current recording' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Previous recording' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Next recording' }));
-    expect(player.prev).toHaveBeenCalledTimes(2);
-    expect(player.next).toHaveBeenCalledTimes(1);
+    renderScreen({ onOpenLetterVoice, letterReader: 'T' });
+    expect(screen.getByRole('button', { name: /Letter voice/ }).textContent).toContain('Read by Timothy');
   });
 
   it('drops one recent row without clearing the whole trail', () => {
@@ -319,12 +300,11 @@ describe('AudioLibraryScreen -- the offline line counts what is on the phone (RC
 });
 
 describe('AudioLibraryScreen -- the read-along badge', () => {
-  /* Hub order 2026-09-22: the shelf says which editions light their words.
-     The John film is the one listening-only edition (audio-track.js declares
-     `timed: false` — its narration is a translation this corpus does not
-     carry), and until now nothing on the way in said so. */
+  /* The editions say which ones light their words (hub order 2026-09-22). The John film is the one listening-only
+     edition (audio-track.js declares `timed: false`). The badges ride the edition rows the Bible row opens; the
+     top rows are the mock's plain rows. */
   function badgeIn(name) {
-    const row = [...document.querySelectorAll('.audio-library-shelf-row')].find((b) => b.textContent.includes(name));
+    const row = editionRows().find((b) => b.textContent.includes(name));
     return row ? row.querySelector('.coverage-badge') : null;
   }
 
@@ -334,6 +314,7 @@ describe('AudioLibraryScreen -- the read-along badge', () => {
       'bible-john-film:john': [['j', '']],
     };
     renderScreen();
+    openBible();
     const brm = badgeIn('Biblical Restoration Ministries');
     expect(brm.textContent).toBe('Read-along');
     expect(brm.className).toContain('coverage-badge-read-along');
@@ -342,29 +323,23 @@ describe('AudioLibraryScreen -- the read-along badge', () => {
     expect(film.getAttribute('title')).toMatch(/not timed/i);
   });
 
-  it('gives the Letters shelf its badge too -- every letter is timed', () => {
-    renderScreen();
-    expect(badgeIn('The Volumes of Truth').textContent).toBe('Read-along');
-  });
-
-  /* Songs of the Letters (L2): one Browse row under the Volumes, badge SONGS, the real count once the catalog is in. */
-  it('offers Songs of the Letters as a Browse row that names its songs and opens the hub', () => {
+  /* Songs of the Letters (L2): one row under the Volumes, the real count once the catalog is in. */
+  it('offers Songs of the Letters as a row that names its songs and opens the hub', () => {
     const load = vi.fn(() => Promise.resolve(true));
     const visible = { hid: false, sh: 1 };
     globalThis.SongCatalog = { loaded: false, subscribe: () => () => {}, getVersion: () => 0, load, songs: () => [] };
     globalThis.songCountLabel = (n) => n.toLocaleString('en-US') + (n === 1 ? ' song' : ' songs');
     const onOpenSongs = vi.fn();
     const first = renderScreen({ onOpenSongs });
-    expect(load).toHaveBeenCalledTimes(1);                        // the Library warms the catalog a tap before the hub
+    expect(load).toHaveBeenCalledTimes(1);                        // the hub warms the catalog a tap before Songs
     let row = screen.getByRole('button', { name: /Songs of the Letters/ });
-    expect(row.textContent).toContain('Made by the flock');
-    expect(badgeIn('Songs of the Letters').textContent).toBe('Songs');
+    expect(row.textContent).toContain('Sung by the flock');
     first.unmount();
 
     globalThis.SongCatalog = { loaded: true, subscribe: () => () => {}, getVersion: () => 1, load, songs: () => Array.from({ length: 1083 }, (_, i) => (i === 0 ? { hid: true, sh: 1 } : visible)) };
     renderScreen({ onOpenSongs });
     row = screen.getByRole('button', { name: /Songs of the Letters/ });
-    expect(row.textContent).toContain('1,082 songs · made by the flock');   // hidden rows never count
+    expect(row.textContent).toContain('1,082 songs · sung by the flock');   // hidden rows never count
     fireEvent.click(row);
     expect(onOpenSongs).toHaveBeenCalledTimes(1);
     delete globalThis.SongCatalog;

@@ -1132,17 +1132,17 @@ export function buildScreenRoutes({
         showSurprise={settings.showSurpriseButton}
         onSettings={goSettings}
         onSearch={goSearch}
-        onHistory={goHistory}
         onContinue={_openHistoryEntry}
         onStartHere={() => _openFirstLetter('Home')}
-        onOpenAudio={() => { setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null }); setScreen('audio-library'); }}
-        onOpenSongs={() => _openSongs([{ k: 'hub' }], { screen: 'home' })}
+        onScriptureWeb={() => {
+          // Read > Explore is the Scripture Web's one way in (the layout pass, 2026-11-10): Home is its origin.
+          setNavOrigin({ screen: 'home', returnOrigin: navOrigin || null });
+          setScreen('scripture-web');
+        }}
         historyEnabled={settings.historyEnabled !== false}
-        onAbout={goAbout}
         searchEnabled={settings.searchEnabled !== false}
         history={readHistory}
         translation={settings.translation}
-        theme={theme} onThemeChange={setTheme}
         readingPlans={settings.readingPlans}
         isRead={isRead}
         markAsReadEnabled={settings.markAsRead !== false}
@@ -1189,7 +1189,6 @@ export function buildScreenRoutes({
     ),
     'library': () => _kickVot(
         <LibraryScreen
-          onBack={goHome}
           onOpenNotes={goNotesIndex}
           onOpenLinks={goLinksIndex}
           onOpenBookmarks={goBookmarksIndex}
@@ -1198,16 +1197,14 @@ export function buildScreenRoutes({
           onOpenProgress={goProgress}
           onOpenPlans={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
           readingPlanCount={(typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore ? ReadingPlanStore.active().length : 0) || (Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0)}
-          onOpenScriptureWeb={() => {
-            setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null });
-            setScreen('scripture-web');
-          }}
           totalReadCount={Object.keys(readItems || {}).length}
           onSearch={goSearch}
-          onHistory={goHistory}
           onSettings={goSettings}
           historyEnabled={settings.historyEnabled !== false}
-          theme={theme} onThemeChange={setTheme}
+          history={readHistory}
+          onOpenHistory={goHistory}
+          onOpenHistoryEntry={_openHistoryEntry}
+          isRead={isRead}
         />
     ),
     // rp1: the reading plans; back returns to where it was opened
@@ -1433,10 +1430,6 @@ export function buildScreenRoutes({
     ),
     'audio-library': () => (
       <AudioLibraryScreen
-        onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'library' ? 'Library'
-          : navOrigin && navOrigin.screen === 'volumes-home' ? 'Volumes'
-          : 'Home'}
         onOpenCollection={(vk) => { setAudioColKey(vk); _enterAudioSub('audio-library-collection'); }}
         onOpenVolumes={() => _enterAudioSub('audio-library-volumes')}
         onOpenSaved={() => _enterAudioSub('audio-library-saved')}
@@ -1444,10 +1437,10 @@ export function buildScreenRoutes({
         onOpenOffline={() => _enterAudioSub('audio-library-offline')}
         onOpenSongs={() => { setAudioColKey(encodeSongsRoute([{ k: 'hub' }])); _enterAudioSub(SONGS_SCREEN); }}
         onOpenTrack={(track) => _openAudioText(track, 'audio-library')}
+        letterReader={settings.letterReader}
+        onOpenLetterVoice={() => { window.navHandoff.set('settingsGroup', 'listening'); goSettings(); }}
         onSearch={goSearch}
-        onHistory={goHistory}
         onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
       />
     ),
     'audio-library-volumes': () => (
@@ -1607,7 +1600,6 @@ export function buildScreenRoutes({
             selectStudy(slug);
           }
         }}
-        onOpenAnswers={() => { _startNewTrail(); resetAnswersLanding(); setScreen('answers-home'); }}
         onBack={goHome}
         onSearch={goSearch}
         onHistory={goHistory}

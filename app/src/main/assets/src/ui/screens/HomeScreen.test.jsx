@@ -1,46 +1,28 @@
 // @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
-/* HomeScreen tests — Wave 0 MISC-SCREENS item (5).
-   ──────────────────────────────────────
-   The Surprise FAB was a bare "breathing dice" glyph: an aria-label for
-   screen readers, but nothing on screen telling a sighted user what the
-   pulsing icon does. It now carries a visible "Surprise Me" caption that
-   matches the accessible name (label-in-name), pinned here.
-*/
+/* HomeScreen — the READ tab's root (the layout pass, 2026-11-10, mock read.png): the root top bar, a search
+   field, the up-next card (plans and Continue), "Read" with four tiles, "Explore" with Scripture Web and
+   Surprise me. Listening, Songs, the Library, Settings and History tiles, the title block and (i) are gone. */
 
 import 'fake-indexeddb/auto';   // mw18: the rp1 test saves runs in ReadingPlanStore (IDB); a failed save's toast would leak
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen, act } from '@testing-library/react';
-import { HomeScreen, continueLabel } from './HomeScreen.jsx';
-import { LibraryNav } from '../components/LibraryNav.jsx';
+import { HomeScreen, continueLabel, readTileOrder, READ_TILES } from './HomeScreen.jsx';
 import { NavButtons } from '../components/NavButtons.jsx';
-
-// The press-drag lifecycle stays real (inert: no gesture is simulated); the reorder test reads the config
-// HomeScreen hands it, to drive its drop commit directly.
-const pressDrag = vi.hoisted(() => ({ cfg: null }));
-vi.mock('../../utils/press-drag.js', async (importOriginal) => {
-  const real = await importOriginal();
-  return { ...real, createPressDrag: (c) => { pressDrag.cfg = c; return real.createPressDrag(c); } };
-});
 import { ThemeBtn } from '../components/ThemeBtn.jsx';
 
-
-const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'createPressDrag', 'translationLabel', 'LibraryNav', 'NavButtons'];
+const GLOBALS = ['ScreenLayout', 'ThemeBtn', 'HomeOrderStore', 'translationLabel', 'NavButtons'];
 
 function setupGlobals() {
-  globalThis.ScreenLayout = ({ children, navChildren }) => (
-    <div data-testid="screen-layout">{navChildren}{children}</div>
+  // The stub draws what a root's ScreenLayout draws: the bar's start, then navEnd (the gear), then the page.
+  globalThis.ScreenLayout = ({ children, navChildren, navEnd, root }) => (
+    <div data-testid="screen-layout" data-root={root ? '1' : '0'}><nav>{navChildren}{navEnd}</nav>{children}</div>
   );
   globalThis.ThemeBtn = () => null;
-  globalThis.LibraryNav = LibraryNav;
   globalThis.NavButtons = NavButtons;
   globalThis.HomeOrderStore = {
     get: () => ['volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history'],
     set: () => {},
   };
-  // The shared press-drag lifecycle — inert here; no gesture is simulated.
-  globalThis.createPressDrag = () => ({
-    start: () => {}, suppressed: () => false, destroy: () => {}, land: () => {},
-  });
   globalThis.translationLabel = () => 'NKJV';
 }
 
@@ -57,18 +39,70 @@ const renderHome = (props = {}) => render(
     showSurprise={true}
     onSettings={() => {}}
     onSearch={() => {}}
-    onHistory={() => {}}
+    onScriptureWeb={() => {}}
     historyEnabled={true}
-    onAbout={() => {}}
     history={[]}
-    theme="dark"
-    onThemeChange={() => {}}
     translation="nkjv"
     {...props}
   />
 );
 
-describe('HomeScreen — shortcuts and demand loading', () => {
+const tileTitles = () => [...document.querySelectorAll('.home-tile .root-tile-title')].map((t) => t.textContent);
+
+describe('HomeScreen — the Read root', () => {
+  it('is a root: its bar names VOTReader, has Search and the gear, and no About or Back', () => {
+    setupGlobals();
+    const onSettings = vi.fn();
+    renderHome({ onSettings });
+    expect(screen.getByTestId('screen-layout').getAttribute('data-root')).toBe('1');
+    expect(screen.getByRole('heading', { level: 1, name: 'VOTReader' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Search' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(onSettings).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole('button', { name: /About/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Back/ })).toBeNull();
+  });
+
+  it('has the search field, then four READ tiles, then Explore; the old tiles and the title block are gone', () => {
+    setupGlobals();
+    const onSearch = vi.fn();
+    const { container } = renderHome({ onSearch });
+    fireEvent.click(screen.getByRole('button', { name: 'Search the letters and the Bible' }));
+    expect(onSearch).toHaveBeenCalledTimes(1);
+    expect(tileTitles()).toEqual(['The Volumes of Truth', 'The Scriptures of Truth', 'Studies', 'Answers Only God Can Give']);
+    expect([...container.querySelectorAll('.root-section')].map((h) => h.textContent)).toEqual(['Read', 'Explore']);
+    for (const gone of ['Listening Library', 'Songs of the Letters', 'Library', 'Settings', 'History']) {
+      expect(container.querySelector('.home-tile[data-tile="' + gone.toLowerCase() + '"]')).toBeNull();
+      expect(tileTitles()).not.toContain(gone);
+    }
+    expect(container.querySelector('.home-main-title, .home-main-amp, .home-ornament, .home-nav-item, .home-shortcuts')).toBeNull();
+  });
+
+  it('a tile opens its place; Answers opens a fresh landing', () => {
+    setupGlobals();
+    const onSelect = vi.fn();
+    renderHome({ onSelect });
+    fireEvent.click(screen.getByRole('button', { name: /The Volumes of Truth/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Answers Only God Can Give/ }));
+    expect(onSelect.mock.calls.map((c) => c[0])).toEqual(['volumes', 'answers']);
+  });
+
+  it('keeps the four in the saved order, ignores the ids that left Home, and adds any it lacks', () => {
+    expect(readTileOrder(['history', 'studies', 'library', 'volumes'])).toEqual(['studies', 'volumes', 'scriptures', 'answers']);
+    expect(readTileOrder(null)).toEqual([...READ_TILES]);
+  });
+
+  it('Alt+arrow moves a tile, stores it and says so', () => {
+    setupGlobals();
+    HomeOrderStore.set = vi.fn();
+    renderHome();
+    const tiles = [...document.querySelectorAll('.home-tile')];
+    fireEvent.keyDown(tiles[1], { key: 'ArrowUp', altKey: true });
+    expect(HomeOrderStore.set).toHaveBeenCalledTimes(1);
+    expect(readTileOrder(HomeOrderStore.set.mock.calls[0][0]).slice(0, 2)).toEqual(['scriptures', 'volumes']);
+    expect(screen.getByRole('status').textContent).toBe('The Scriptures of Truth moved earlier.');
+  });
+
   it('keeps corpora idle until a destination is approached, even with Surprise enabled', () => {
     setupGlobals();
     window.__loadVotCorpus = vi.fn(() => Promise.resolve());
@@ -81,11 +115,26 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
   });
 
-  /* rp1, slimmed 2026-11-10: with a reading plan, the up-next card's plan row sits under the title and above
-     Search; with none it offers one until Not now; a Bible plan never wakes the Volumes. */
-  it('(rp1) shows the plan row in the up-next card above Search only while a plan runs', async () => {
+  it('Explore holds Scripture Web (its one way in) and Surprise me', () => {
     setupGlobals();
-    // mw18: plans are runs in ReadingPlanStore; an rp1 settings plan is moved in on the way.
+    const onScriptureWeb = vi.fn();
+    renderHome({ onScriptureWeb });
+    const buttons = [...document.querySelectorAll('.root-explore-btn')].map((b) => b.textContent);
+    expect(buttons).toEqual(['Scripture Web', 'Surprise me']);
+    fireEvent.click(screen.getByRole('button', { name: 'Scripture Web' }));
+    expect(onScriptureWeb).toHaveBeenCalledTimes(1);
+  });
+
+  it('Search switched off takes the field and the bar icon with it', () => {
+    setupGlobals();
+    renderHome({ searchEnabled: false });
+    expect(screen.queryByRole('button', { name: /Search/ })).toBeNull();
+  });
+
+  /* rp1, slimmed 2026-11-10: with a reading plan, the up-next card's plan row sits under the search field;
+     with none it offers one until Not now; a Bible plan never wakes the Volumes. */
+  it('(rp1) shows the plan row in the up-next card under the search field only while a plan runs', async () => {
+    setupGlobals();
     const { ReadingPlanStore } = await import('../../stores/reading-plan-store.js');
     localStorage.clear();
     ReadingPlanStore._resetForTests({ forceLoaded: true });
@@ -96,77 +145,43 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     const start = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
     const { container } = renderHome({ readingPlans: [{ id: 'bible-year', start }], isRead: () => false, markAsReadEnabled: true, onPlanRead, onPlansMoved: vi.fn() });
     const card = container.querySelector('.upnext');
-    expect(card).not.toBeNull();
     expect(card.querySelectorAll('[data-plan]')).toHaveLength(1);
     expect(card.textContent).toContain('Genesis 1-3');
-    const search = screen.getByRole('button', { name: 'Search library' });
-    expect(card.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(container.querySelector('.home-main-title').compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const search = container.querySelector('.root-search');
+    expect(search.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 1-3' }));
     expect(onPlanRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
     cleanup();
     ReadingPlanStore.replaceAll([]);
     const bare = renderHome({ readingPlans: [], isRead: () => false });
-    // mw18 C8: with no plan, Today offers one; Not now hides it on this device, and it stays hidden
     expect(bare.container.querySelector('.upnext').textContent).toContain('Start a reading plan');
     fireEvent.click(screen.getByRole('button', { name: 'Not now' }));
     expect(bare.container.querySelector('.upnext')).toBeNull();   // nothing else to show: no empty card
     cleanup();
-    expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.upnext')).toBeNull();   // hidden for good
-    cleanup();
-    // The card's last row is Continue (here "Start here": no history yet).
-    const later = renderHome({ readingPlans: [], isRead: () => false, onStartHere: vi.fn() }).container.querySelector('.upnext');
-    expect(later.textContent).not.toContain('Start a reading plan');
-    expect(later.lastElementChild.getAttribute('aria-label')).toBe('Start here: Volume One, Letter 1, Chosen by God');
+    expect(renderHome({ readingPlans: [], isRead: () => false }).container.querySelector('.upnext')).toBeNull();
     localStorage.removeItem('vot-plans-offer-hidden');
     delete window.ReadingPlanStore;
   });
+});
 
-  it('honors disabled Search and History in quick access', () => {
+describe('HomeScreen — Surprise me', () => {
+  const NAME = 'Surprise me — open a random chapter or letter';
+
+  it('says what it does: the name opens with the visible caption (label-in-name), and the tooltip is the same string', () => {
     setupGlobals();
-    renderHome({ searchEnabled: false, historyEnabled: false });
-    expect(screen.queryByRole('button', { name: 'Search library' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'History' })).toBeNull();
-    expect(document.querySelector('.upnext-continue')).toBeNull();
+    renderHome();
+    const btn = screen.getByRole('button', { name: NAME });
+    expect(btn.getAttribute('title')).toBe(NAME);
+    expect(btn.textContent).toBe('Surprise me');
+    expect(NAME.startsWith(btn.textContent)).toBe(true);
   });
 
-  /* The layout pass (the owner, 2026-11-10): History, Notes, Highlights, Bookmarks and Scripture Web leave Home's
-     quick row for the Library; Search stays, and the History tile stays. */
-  it('quick access holds only Search; the History tile stays', () => {
+  it('is not there when the setting is off', () => {
     setupGlobals();
-    renderHome({ onNotes: () => {}, onHighlights: () => {}, onBookmarks: () => {}, onScriptureWeb: () => {} });
-    const labels = [...document.querySelectorAll('.home-shortcuts button')].map((x) => x.textContent.trim());
-    expect(labels).toEqual(['Search library']);
-    for (const name of ['Notes', 'Highlights', 'Bookmarks', /Scripture Web/]) expect(screen.queryByRole('button', { name })).toBeNull();
-    expect(document.querySelector('.home-nav-item:last-child').textContent).toContain('History');
-  });
-
-  it('reorders by keyboard while preserving hidden History and focus', () => {
-    setupGlobals();
-    HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];
-    HomeOrderStore.set = vi.fn();
-    renderHome({ historyEnabled: false });
-    const card = screen.getByRole('button', { name: /The Scriptures of Truth/ });
-    card.focus();
-    fireEvent.keyDown(card, { key: 'ArrowUp', altKey: true });
-    expect(HomeOrderStore.set).toHaveBeenCalledWith(['scriptures', 'history', 'volumes', 'studies', 'listening', 'library', 'settings']);
-    expect(document.activeElement).toBe(card);
-  });
-
-  // Sweep mw12: a drag hands commitDrop indices into the VISIBLE tiles, but it spliced the saved order (which
-  // still holds a hidden History) with them, so a different tile moved once History sat above the dragged one.
-  it('a drag reorder with History hidden moves the tile that was dragged', () => {
-    setupGlobals();
-    HomeOrderStore.get = () => ['volumes', 'history', 'scriptures', 'studies', 'listening', 'library', 'settings'];
-    HomeOrderStore.set = vi.fn();
-    renderHome({ historyEnabled: false });
-    // visible: volumes(0) scriptures(1) studies(2) listening(3) library(4) settings(5); drag Studies up to the top
-    act(() => { pressDrag.cfg.onCommit({ idx: 2, targetIdx: 0, data: {} }); });
-    expect(HomeOrderStore.set).toHaveBeenLastCalledWith(['studies', 'volumes', 'history', 'scriptures', 'listening', 'library', 'settings']);
-    // and down: Volumes (now visible 1) to the last visible slot
-    act(() => { pressDrag.cfg.onCommit({ idx: 1, targetIdx: 5, data: {} }); });
-    expect(HomeOrderStore.set).toHaveBeenLastCalledWith(['studies', 'history', 'scriptures', 'listening', 'library', 'settings', 'volumes']);
+    renderHome({ showSurprise: false });
+    expect(screen.queryByRole('button', { name: NAME })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Scripture Web' })).toBeTruthy();
   });
 
   it('waits for every Surprise source and prevents repeated taps', async () => {
@@ -178,7 +193,7 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     window.loadBibleStudies = vi.fn(() => Promise.resolve());
     const onSurprise = vi.fn();
     renderHome({ onSurprise });
-    const button = screen.getByRole('button', { name: /Surprise Me/ });
+    const button = screen.getByRole('button', { name: NAME });
     fireEvent.click(button);
     fireEvent.click(button);
     expect(button.disabled).toBe(true);
@@ -193,9 +208,9 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     window.__loadVotCorpus = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined);
     const onSurprise = vi.fn();
     renderHome({ onSurprise });
-    const button = screen.getByRole('button', { name: /Surprise Me/ });
+    const button = screen.getByRole('button', { name: NAME });
     await act(async () => { fireEvent.click(button); });
-    expect(screen.getByRole('status').textContent).toContain('try Surprise Me again');
+    expect(screen.getByRole('status').textContent).toContain('try Surprise me again');
     expect(button.disabled).toBe(false);
     await act(async () => { fireEvent.click(button); });
     expect(onSurprise).toHaveBeenCalledTimes(1);
@@ -207,84 +222,10 @@ describe('HomeScreen — shortcuts and demand loading', () => {
     window.__loadVotCorpus = () => new Promise((resolve) => { finish = resolve; });
     const onSurprise = vi.fn();
     const view = renderHome({ onSurprise });
-    fireEvent.click(screen.getByRole('button', { name: /Surprise Me/ }));
+    fireEvent.click(screen.getByRole('button', { name: NAME }));
     view.unmount();
     await act(async () => { finish(); });
     expect(onSurprise).not.toHaveBeenCalled();
-  });
-});
-
-describe('HomeScreen — Listening Library card', () => {
-  it('(W-04) the Songs card says Over 1,000 before the catalog lands, asks for it, then says the real count', async () => {
-    vi.useFakeTimers();
-    setupGlobals();
-    globalThis.HomeOrderStore = { get: () => ['listening', 'songs'], set: () => {} };
-    const listeners = new Set();
-    const cat = { loaded: false, v: 0, songs: () => Array.from({ length: 1082 }, () => ({ hid: false, sh: 1 })),
-      subscribe: (cb) => { listeners.add(cb); return () => listeners.delete(cb); }, getVersion: () => cat.v, load: vi.fn(async () => {}) };
-    globalThis.SongCatalog = cat;
-    try {
-      renderHome({ onOpenSongs: () => {} });
-      expect(screen.getByText('Over 1,000 songs from the words of the letters')).toBeTruthy();
-      act(() => { vi.advanceTimersByTime(1600); });
-      expect(cat.load).toHaveBeenCalledTimes(1);
-      act(() => { cat.loaded = true; cat.v++; for (const cb of listeners) cb(); });
-      expect(screen.getByText('1,082 songs from the words of the letters')).toBeTruthy();
-    } finally { delete globalThis.SongCatalog; vi.useRealTimers(); }
-  });
-
-  it('renders the card pixel-consistent with its neighbors and routes through onOpenAudio', () => {
-    setupGlobals();
-    const onOpenAudio = vi.fn();
-    const onSelect = vi.fn();
-    renderHome({ onOpenAudio, onSelect });
-
-    const card = screen.getByRole('button', { name: /Listening Library/ });
-    expect(card.className).toContain('home-nav-item');           // same anatomy as the other six
-    expect(card.textContent).toContain('Audio Readings');        // eyebrow
-    expect(card.textContent).toContain('The Letters & Scriptures, read aloud');
-
-    fireEvent.click(card);
-    expect(onOpenAudio).toHaveBeenCalledTimes(1);                // origin-aware capture path…
-    expect(onSelect).not.toHaveBeenCalled();                     // …never the origin-less chain
-  });
-});
-
-describe('HomeScreen — Surprise FAB naming', () => {
-  const NAME = 'Surprise Me — open a random chapter or letter';
-
-  it('exposes an accessible name that says what the button does', () => {
-    setupGlobals();
-    renderHome();
-    const fab = screen.getByRole('button', { name: NAME });
-    expect(fab.className).toContain('surprise-fab');
-  });
-
-  /* C2-C [C8]: hover said "Open a Random Chapter or Letter" and TalkBack said
-     "Surprise Me" — two different answers to the same question. One string
-     now feeds both. */
-  it('gives the tooltip and the accessible name the SAME string', () => {
-    setupGlobals();
-    renderHome();
-    const fab = screen.getByRole('button', { name: NAME });
-    expect(fab.getAttribute('title')).toBe(NAME);
-    expect(fab.getAttribute('aria-label')).toBe(fab.getAttribute('title'));
-  });
-
-  it('shows a visible caption the accessible name still contains (label-in-name)', () => {
-    setupGlobals();
-    renderHome();
-    const fab = screen.getByRole('button', { name: NAME });
-    const caption = fab.querySelector('.surprise-fab-caption');
-    expect(caption).toBeTruthy();
-    expect(caption.textContent).toBe('Surprise Me');
-    expect(NAME.startsWith(caption.textContent)).toBe(true);
-  });
-
-  it('renders no FAB when the setting is off', () => {
-    setupGlobals();
-    renderHome({ showSurprise: false });
-    expect(screen.queryByRole('button', { name: NAME })).toBeNull();
   });
 });
 
@@ -339,66 +280,6 @@ describe('NavButtons — the icon cluster names itself', () => {
   });
 });
 
-describe('the Home reorder hint', () => {
-  /* Corbin, 2026-09-05: the hint read "Hold to rearrange · Keyboard: Alt + ↑ / ↓"
-     and the keyboard half is going. It is the only line on Home that teaches a
-     gesture, and half of it taught a shortcut almost nobody on a phone can press.
-
-     The Alt+Arrow HANDLER stays — it still reorders, it is just no longer
-     advertised. That is a discoverability loss for a keyboard-only user, and it
-     is deliberate rather than overlooked; see the branch handoff. */
-
-  const hint = () => document.getElementById('home-reorder-hint');
-
-  it('RED: says nothing about a keyboard shortcut', () => {
-    setupGlobals();
-    renderHome();
-
-    const el = hint();
-    // PRESENCE CONTROL, and it is load-bearing: "the text does not mention a
-    // keyboard" is satisfied by a hint that was deleted, or never rendered at
-    // all. These two say the line is really there to be read, so the absence
-    // below is about its CONTENT.
-    expect(el).toBeTruthy();
-    expect(el.textContent).toMatch(/hold to rearrange/i);
-
-    expect(el.textContent).not.toMatch(/keyboard/i);
-    expect(el.textContent).not.toMatch(/alt/i);
-    expect(el.textContent).not.toContain('↑');
-    expect(el.textContent).not.toContain('↓');
-  });
-
-  it('is still what describes every tile, so the gesture reaches assistive tech', () => {
-    // The hint is not decoration: each tile carries aria-describedby pointing at
-    // it. Shortening the text must not orphan that reference — a describedby to
-    // a missing id is silently nothing.
-    setupGlobals();
-    const { container } = renderHome();
-
-    const tiles = [...container.querySelectorAll('.home-nav-item')];
-    expect(tiles.length).toBeGreaterThan(0);
-    for (const t of tiles) expect(t.getAttribute('aria-describedby')).toBe('home-reorder-hint');
-    expect(hint()).toBeTruthy();
-  });
-
-  it('CONTROL: Alt+ArrowUp still reorders, so only the ADVERTISEMENT was removed', () => {
-    // The behaviour outlives its hint. Without this, deleting the handler along
-    // with the text would pass every assertion above.
-    setupGlobals();
-    const set = vi.fn();
-    globalThis.HomeOrderStore = {
-      get: () => ['volumes', 'scriptures', 'studies', 'listening', 'library', 'settings', 'history'],
-      set,
-    };
-    const { container } = renderHome();
-
-    const tiles = [...container.querySelectorAll('.home-nav-item')];
-    fireEvent.keyDown(tiles[1], { key: 'ArrowUp', altKey: true });
-    expect(set).toHaveBeenCalledTimes(1);
-    expect(set.mock.calls[0][0].slice(0, 2)).toEqual(['scriptures', 'volumes']);
-  });
-});
-
 /* n131/n352 (A07.2, L1.1, U02.1): "Recent reading" opened a History list. The newest place is one tap now
    (Continue: title, place), and before any reading the row says where to start. */
 describe('HomeScreen — the Continue row', () => {
@@ -437,15 +318,3 @@ describe('HomeScreen — the Continue row', () => {
   });
 });
 
-/* home-quote (Corbin 2026-10-26: "Can you remove the card text at the top feature"): no excerpt and no source
-   line under the title; Today sits under the ornament. */
-describe('HomeScreen — the top feature', () => {
-  it('is the title alone: no passage or source line under it', () => {
-    setupGlobals();
-    const { container } = renderHome({});
-    expect(container.querySelector('.home-main-title')).not.toBeNull();
-    expect(container.querySelector('.home-daily, .home-daily-quote, .home-daily-src')).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Answer of the day/ })).toBeNull();
-    expect(container.textContent).not.toMatch(/From “/);
-  });
-});

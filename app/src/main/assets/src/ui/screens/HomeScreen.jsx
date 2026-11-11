@@ -1,50 +1,29 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   HomeScreen — Cluster D (esbuild bundle-d.js)
+   HomeScreen — the READ tab's root (esbuild bundle-d.js)
+   ═══════════════════════════════════════════════════════════════════════
+   The layout pass (2026-11-10, mock read.png): the top bar (VOTReader,
+   Search, Tabs, the Settings gear; RootNav.jsx), a search field, the up-next
+   card (today's plan rows and Continue; TodayCard.jsx), "Read" with four
+   tiles in a 2 x 2 grid and "Explore" with Scripture Web and Surprise me.
+   Listening, Songs, the Library, Settings and History left Home for their
+   own homes (the Listen and Library tabs, the gear); so did the title block
+   and the (i) button (About is in Settings > Help).
+
+   The four tiles keep the reader's saved order (HomeOrderStore; the other
+   ids it holds are ignored) and Alt+arrow still moves one. The hold-to-drag
+   gesture did not come along: it was built for one column, the grid is two.
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { resetAnswersLanding } from './AnswersHome.jsx';
 import { TodayCard, useTodayRows } from '../components/TodayCard.jsx';
-import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
+import { rootNavStart, RootGear } from '../components/RootNav.jsx';
 import { editionShownLabel, useOfflineEditions } from '../../utils/offline-editions.js';
 import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 
-// Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
-// failing device names itself (same pattern as [tabdrag]/[thumb]).
-function _homeDragTrace(msg) {
-  try { console.warn('[homedrag] ' + msg); } catch (_e) { /* ignore */ }
-  try {
-    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
-      DiagnosticLog.error('homedrag', msg);
-    }
-  } catch (_e) { /* ignore */ }
-}
+/** The four READ tiles, in their default order. */
+export const READ_TILES = Object.freeze(['volumes', 'scriptures', 'answers', 'studies']);
 
-/**
- * The Songs card's italic line: "1,082 songs from the words of the letters" once the catalog is loaded. W-04 (walk
- * 2026-09-25): a cold first launch has no catalog yet, and the line said no number at all; it now says "Over 1,000"
- * (the library has passed a thousand since its first publish) until the real count arrives.
- */
-function songsDetail() {
-  const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
-  const n = cat && cat.loaded ? cat.songs().filter((s) => !s.hid && s.sh).length : 0;
-  return n ? n.toLocaleString('en-US') + ' songs from the words of the letters' : 'Over 1,000 songs from the words of the letters';
-}
-
-/** Re-render Home when the song catalog lands, and ask for it once Home has painted (it is fetched once per launch). */
-function useSongCatalogCount() {
-  const cat = typeof SongCatalog !== 'undefined' ? SongCatalog : null;
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (cat ? cat.subscribe(cb) : () => {}), [cat]),
-    () => (cat ? cat.getVersion() : 0)
-  );
-  React.useEffect(() => {
-    if (!cat || cat.loaded) return undefined;
-    const t = setTimeout(() => { if (!cat.loaded) void cat.load(); }, 1500);
-    return () => clearTimeout(t);
-  }, [cat]);
-}
-
-/** localStorage: the reader said "Not now" to Today's reading-plan offer (C8). */
+/** localStorage: the reader said "Not now" to the up-next card's reading-plan offer (C8). */
 const PLAN_OFFER_KEY = 'vot-plans-offer-hidden';
 
 /** Home's Continue row: what the newest History row names, as a title and its place. @param {any} entry */
@@ -91,78 +70,59 @@ function ContinueRow({ entry, onContinue, onStartHere }) {
   );
 }
 
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onHistory, onOpenAudio, onOpenSongs, historyEnabled, searchEnabled, onAbout, history, onContinue, onStartHere, theme, onThemeChange, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
-  // U09.2: the Scriptures card names the edition the Bible shows ("WEB · NKJV until it downloads").
+/**
+ * The tiles in the reader's saved order: the four READ ids as HomeOrderStore holds them, any it lacks after.
+ * @param {any} stored @returns {string[]}
+ */
+export function readTileOrder(stored) {
+  const seen = (Array.isArray(stored) ? stored : []).filter((id) => READ_TILES.includes(id));
+  return [...new Set([...seen, ...READ_TILES])];
+}
+
+const SEARCH_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4-4" /></svg>;
+const WEB_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="5" cy="6" r="2" /><circle cx="19" cy="7" r="2" /><circle cx="12" cy="18" r="2" /><path d="M7 6.4l10 .4M6 8l5 8.4M18 9l-5 7.4" /></svg>;
+const STAR_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l2.2 5.6L20 9.3l-4.4 3.9L17 19l-5-3-5 3 1.4-5.8L4 9.3l5.8-.7z" /></svg>;
+
+/**
+ * @param {{ onSelect: (id: string) => void, onSurprise: () => void, showSurprise?: boolean, onSettings: () => void,
+ *   onSearch: () => void, onScriptureWeb?: () => void, historyEnabled?: boolean, searchEnabled?: boolean, history?: any[],
+ *   onContinue?: (entry: any) => void, onStartHere?: () => void, translation?: string, readingPlans?: any,
+ *   isRead?: any, markAsReadEnabled?: boolean, onPlanRead?: (next: any) => void, onPlanListen?: (items: any[], name: string) => void,
+ *   planTracks?: any, onOpenPlans?: () => void, onPlansMoved?: (left: any[]) => void, onEnableMarkAsRead?: () => void }} props
+ */
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onScriptureWeb, historyEnabled, searchEnabled, history, onContinue, onStartHere, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+  // U09.2: the Scriptures tile names the edition the Bible shows ("WEB · NKJV until it downloads").
   useOfflineEditions(translation);
-  // rp1: the reader's plans for today and the Continue row, one up-next card above Search (TodayCard.jsx)
+  // rp1: the reader's plans for today and the Continue row, one up-next card under the search field (TodayCard.jsx)
   const todayRows = useTodayRows(readingPlans, isRead, onPlansMoved);
   const newest = Array.isArray(history) ? history[0] || null : null;
   // mw18 C8: with no plan running (and the plans store loaded, so a plan never flashes the offer at boot),
-  // Today offers one; "Not now" hides the offer on this device.
+  // the card offers one; × (Not now) hides the offer on this device.
   const [offerHidden, setOfferHidden] = React.useState(() => { try { return localStorage.getItem(PLAN_OFFER_KEY) === '1'; } catch (_e) { return false; } });
   const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
   const offerPlan = !offerHidden && !todayRows.length && !(Array.isArray(readingPlans) && readingPlans.length)
     && !!planStore && (typeof planStore.getState !== 'function' || planStore.getState() === 'loaded');
   const hideOffer = () => { setOfferHidden(true); try { localStorage.setItem(PLAN_OFFER_KEY, '1'); } catch (_e) { /* private window: hidden for this visit */ } };
-  useSongCatalogCount();
-  /* ──────────────────────────────────────────────────────────────
-     Drag-and-drop home tiles (1s long-press → lift → drag → snap)
-       Architecture note: we use IMPERATIVE DOM manipulation for all
-     drag visuals, not React state. React state updates at 60fps in
-     Android WebView are too slow to feel smooth and were causing
-     the "card doesn't follow finger" bug. Instead:
-         - React state only tracks: order, pressingIdx, dragIdx
-         (used purely for CSS class toggling — .pressing, .dragging)
-       - All transform/translateY animation is done via direct
-         .style.transform writes through refs stored in cardRefs
-       - Move listeners are attached synchronously in onTouchStart/
-         onMouseDown (not via useEffect) so no moves are missed
-     ────────────────────────────────────────────────────────────── */
 
-
-  const ITEMS_BY_ID = {
-    volumes: { id: "volumes", eyebrow: "Prophetic Letters", title: "The Volumes of Truth", detail: "Letters from The Lord, Our God and Savior" },
-    scriptures: { id: "scriptures", eyebrow: "The Holy Bible", title: "The Scriptures of Truth", detail: `Genesis to Revelation · ${editionShownLabel(translation)}` },
-    answers: { id: "answers", eyebrow: "Topics & Doctrines", title: "Answers Only God Can Give", detail: "The Lord sets the record straight" },
-    studies: { id: "studies", eyebrow: "Study Editions", title: "Studies", detail: "Letter Studies · Matthew Study Bible" },
-    listening: { id: "listening", eyebrow: "Audio Readings", title: "Listening Library", detail: "The Letters & Scriptures, read aloud" },
-    // Songs of the Letters (L2): the count only once the catalog is in; Home never fetches it on its own.
-    songs: { id: "songs", eyebrow: "Sung by the Flock", title: "Songs of the Letters", detail: songsDetail() },
-    library: { id: "library", eyebrow: "Personal Study", title: "Library", detail: "Notes, journal & bookmarks" },
-    settings: { id: "settings", eyebrow: "App Configuration", title: "Settings", detail: "Display, themes & preferences" },
-    history: { id: "history", eyebrow: "Recently Visited", title: "History", detail: "Resume where you left off" }
+  /** @type {Record<string, { eyebrow: string, title: string, detail: string }>} */
+  const TILES = {
+    volumes: { eyebrow: 'Prophetic Letters', title: 'The Volumes of Truth', detail: '7 volumes · 7 collections' },
+    scriptures: { eyebrow: 'The Holy Bible', title: 'The Scriptures of Truth', detail: 'Genesis to Revelation · ' + editionShownLabel(translation) },
+    answers: { eyebrow: 'Topics & Doctrines', title: 'Answers Only God Can Give', detail: 'Ask a question' },
+    studies: { eyebrow: 'Study Editions', title: 'Studies', detail: 'Matthew Study Bible and more' },
   };
-  // DEFAULT_ORDER + the validation logic moved into HomeOrderStore
-  // (W2.3b.4). HomeScreen reads via the store; HydrationGate has
-  // resolved by the time this component mounts so the read is sync
-  // from the in-memory cache.
-  const [order, setOrder] = React.useState(() => HomeOrderStore.get());
-
-  /* Drag architecture — IMPERATIVE DOM, not React state.
-     React state re-renders at <60fps in Android WebView; direct writes to
-     element.style.transform are effectively instant. We only keep state
-     for what drives CSS classes (.pressing, .dragging) and for the final
-     order commit. */
-  /* Drag-to-reorder rides the SHARED pointer-events lifecycle
-     (utils/press-drag.js — createPressDrag, extracted from the tabs v2
-     redesign): one gesture object, document-capture listeners, force-reset
-     on every new grab, explicit pointercancel commit, landing glide, click
-     suppression. This screen owns only the 1D geometry + visuals. */
-  const [pressingIdx, setPressingIdx] = React.useState(-1);
-  const [dragIdx, setDragIdx] = React.useState(-1);
-
-  const cardRefs = React.useRef([]); // DOM refs to each card
-  const orderRef = React.useRef(order);
-  React.useEffect(() => {orderRef.current = order;}, [order]);
-  const visibleIdsRef = React.useRef(/** @type {string[]} */ ([]));
+  const [order, setOrder] = React.useState(() => (typeof HomeOrderStore !== 'undefined' ? HomeOrderStore.get() : []));
+  const shown = readTileOrder(order);
 
   // Warm only the destination the reader is approaching. Offline precaching
   // remains the service worker's job; opening Home no longer executes corpora.
+  /** @param {string} id */
   const warmDestination = (id) => {
-    const load = id === 'scriptures' ? window.__loadBibleCorpus
-      : id === 'answers' ? window.__loadAnswersCorpus
-      : ['volumes', 'studies', 'library', 'listening', 'songs'].includes(id) ? window.__loadVotCorpus : null;
-    if (typeof load === 'function') load().catch((e) => console.warn('Destination pre-load failed', e));
+    const w = /** @type {any} */ (window);
+    const load = id === 'scriptures' ? w.__loadBibleCorpus
+      : id === 'answers' ? w.__loadAnswersCorpus
+      : ['volumes', 'studies'].includes(id) ? w.__loadVotCorpus : null;
+    if (typeof load === 'function') load().catch((/** @type {any} */ e) => console.warn('Destination pre-load failed', e));
   };
   const [surpriseBusy, setSurpriseBusy] = React.useState(false);
   const [homeStatus, setHomeStatus] = React.useState('');
@@ -174,293 +134,87 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
     surprisePending.current = true;
     setSurpriseBusy(true);
     setHomeStatus('Preparing a reading…');
+    const w = /** @type {any} */ (window);
     try {
       await Promise.all([
-        window.__loadVotCorpus, window.__loadBibleCorpus, window.__loadMatthewCorpus,
+        w.__loadVotCorpus, w.__loadBibleCorpus, w.__loadMatthewCorpus,
         typeof loadBibleStudies === 'function' ? loadBibleStudies : null,
       ].filter((load) => typeof load === 'function').map((load) => load()));
       if (mounted.current) { setHomeStatus(''); onSurprise(); }
     } catch (_e) {
-      if (mounted.current) setHomeStatus('Could not prepare a reading. Check your connection and try Surprise Me again.');
+      if (mounted.current) setHomeStatus('Could not prepare a reading. Check your connection and try Surprise me again.');
     } finally {
       surprisePending.current = false;
       if (mounted.current) setSurpriseBusy(false);
     }
   };
 
-  const setCardRef = (i) => (el) => {cardRefs.current[i] = el;};
-
-  const clearInlineTransforms = () => {
-    cardRefs.current.forEach((el) => {
-      if (!el) return;
-      el.style.transform = "";
-      el.style.transition = "";
-      el.style.zIndex = "";
-      el.style.opacity = "";
-    });
-  };
-
-  // Shift siblings out of the way of the dragged card based on current target slot.
-  const applySiblingShifts = (from, newTarget, h) => {
-    cardRefs.current.forEach((el, i) => {
-      if (!el || i === from) return;
-      let shift = 0;
-      if (from < newTarget && i > from && i <= newTarget) shift = -h;else
-      if (from > newTarget && i < from && i >= newTarget) shift = h;
-      el.style.transition = "transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
-      el.style.transform = `translateY(${shift}px)`;
-    });
-  };
-
-  // The shared lifecycle — created once; the callbacks below read only refs
-  // + stable setters, so first-render closures stay correct.
-  const dragRef = React.useRef(/** @type {any} */ (null));
-
-  // Drop commit — SYNCHRONOUS at release: the order write + transform clear
-  // land in ONE paint while the ghost glides into the target slot above the
-  // hidden real tile. Tiles are keyed by ID, so the grabbed NODE persists
-  // across the reorder — it is the reveal target at landing.
-  // g.idx / g.targetIdx index the VISIBLE tiles (cards, tops), while the saved order also holds a
-  // hidden History: move by id, so the dragged tile is the one that moves (sweep mw12).
-  const commitDrop = (g) => {
-    const ids = visibleIdsRef.current;
-    const from = g.idx;
-    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, ids.length - 1) : from;
-    clearInlineTransforms();
-    setDragIdx(-1);
-    setPressingIdx(-1);
-    const grabbedEl = g.data.el || null;
-    if (grabbedEl) grabbedEl.style.opacity = "0";
-    try {
-      if (to !== from && to >= 0 && ids[from] && ids[to]) {
-        const newOrder = orderRef.current.filter((id) => id !== ids[from]);
-        const at = newOrder.indexOf(ids[to]);
-        newOrder.splice(to > from ? at + 1 : at, 0, ids[from]);
-        setOrder(newOrder);
-        HomeOrderStore.set(newOrder);
-      }
-    } catch (err) {
-      _homeDragTrace('reorder commit threw: ' + String(err).slice(0, 120));
-    }
-    const ghost = g.data.ghost;
-    if (ghost) {
-      const snapTop = (g.data.tops && (g.data.tops[to] ?? g.data.tops[from])) ?? 0;
-      ghost.style.transition = "top 0.22s cubic-bezier(0.2,0.8,0.3,1), transform 0.22s cubic-bezier(0.2,0.8,0.3,1)";
-      ghost.style.top = snapTop + "px";
-      ghost.style.transform = "scale(1)";
-    }
-    dragRef.current.land(ghost, grabbedEl, 230);
-  };
-
-  if (!dragRef.current) {
-    dragRef.current = createPressDrag({
-      trace: _homeDragTrace,
-      onGlow: (idx) => setPressingIdx(idx),
-      onGlowClear: () => setPressingIdx(-1),
-      // DRAG MODE (~1.4s hold): measure the live slot height, capture the
-      // natural tops, and lift the tile off as a fixed-position ghost.
-      onEngage: (g) => {
-        setDragIdx(g.idx);
-        let h = 80;
-        if (cardRefs.current[0] && cardRefs.current[1]) {
-          h = cardRefs.current[1].offsetTop - cardRefs.current[0].offsetTop;
-        } else if (cardRefs.current[0]) {
-          h = cardRefs.current[0].offsetHeight + 10;
-        }
-        g.data.h = h;
-        g.data.tops = cardRefs.current.map((r) => r ? r.getBoundingClientRect().top : 0);
-        const el = cardRefs.current[g.idx];
-        g.data.el = el || null;
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          g.data.offY = g.startY - rect.top;
-          const ghost = el.cloneNode(true);
-          ghost.className = "home-nav-item drag-flying";
-          ghost.style.cssText = [
-          "position:fixed",
-          "top:" + rect.top + "px",
-          "left:" + rect.left + "px",
-          "width:" + rect.width + "px",
-          "height:" + rect.height + "px",
-          "z-index:9999",
-          "pointer-events:none",
-          "margin:0",
-          "box-sizing:border-box",
-          "transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)",
-          "transform:scale(1.05)"].
-          join(";");
-          document.body.appendChild(ghost);
-          g.data.ghost = ghost;
-        }
-        pickupBuzz(55);
-      },
-      // ACTIVE DRAG: the ghost follows the finger vertically; the drop slot
-      // is picked against the captured natural tops.
-      onDragMove: (g, _x, y) => {
-        const ghost = g.data.ghost;
-        if (ghost) {
-          ghost.style.transition = "none";
-          ghost.style.top = (y - g.data.offY) + "px";
-          ghost.style.transform = "scale(1.05)";
-        }
-        const tops = g.data.tops || [];
-        const h = g.data.h || 80;
-        const centerY = y - g.data.offY + h * 0.5;
-        let t = 0;
-        for (let i = 1; i < tops.length; i++) {
-          if (centerY >= tops[i] - h * 0.3) t = i;
-        }
-        t = Math.max(0, Math.min(orderRef.current.length - 1, t));
-        if (t !== g.targetIdx) {
-          g.targetIdx = t;
-          applySiblingShifts(g.idx, t, h);
-        }
-      },
-      onCommit: commitDrop,
-      onAbortDrag: (g) => {
-        if (g.data.ghost && g.data.ghost.parentNode) g.data.ghost.parentNode.removeChild(g.data.ghost);
-        clearInlineTransforms();
-        setDragIdx(-1);
-      },
-    });
-  }
-
-  // Unmount mid-gesture: one call tears down timers, listeners, ghost, landing.
-  React.useEffect(() => () => { dragRef.current.destroy(); }, []);
-
-  const startPress = (idx, clientX, clientY, pointerId) =>
-    dragRef.current.start(idx, clientX, clientY, pointerId, cardRefs.current[idx]);
-
-  const handleTap = (id) => {
-    if (id === "settings") {onSettings();return;}
-    if (id === "history") {onHistory();return;}
-    // Like settings/history, the Listening Library needs origin-aware Back,
-    // so it takes its own capture-and-switch callback rather than onSelect.
-    if (id === "listening") {if (onOpenAudio) onOpenAudio();return;}
-    if (id === "songs") {if (onOpenSongs) onOpenSongs();return;}
-    // The Home card is a fresh visit: the landing forgets a query or an open
-    // commandment left from before (Back from a topic keeps them).
-    if (id === "answers") resetAnswersLanding();
+  /** @param {string} id */
+  const openTile = (id) => {
+    // The tile is a fresh visit: the Answers landing forgets a query or an open commandment left from before
+    // (Back from a topic keeps them).
+    if (id === 'answers') resetAnswersLanding();
     onSelect(id);
   };
 
-  const isFirstVisit = !window.__homeAnimShown;
-  React.useEffect(() => {window.__homeAnimShown = true;}, []);
-
-  const orderedItems = order.map((id) => ITEMS_BY_ID[id]).filter((item) => {
-    if (!item) return false;
-    if (item.id === "history" && historyEnabled === false) return false;
-    return true;
-  });
-  visibleIdsRef.current = orderedItems.map((item) => item.id);
-
   return (
-    <ScreenLayout navChildren={LibraryNav({
-      // Home has no back and no Home button. The About button keeps its INLINE
-      // marginRight:'auto' — with neither of the CSS anchors present it is the
-      // right-cluster anchor on this screen. Do not add a second auto-margin.
-      hideBack: true, showHome: false, hide: ['settings', 'history'],
-      leftExtras: (
-        <button className="nav-search-btn" onClick={onAbout} title="About VOTReader" aria-label="About VOTReader" style={{ marginRight: 'auto', color: 'var(--gold)' }}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-            <circle cx="12" cy="12" r="9.5" />
-            <line x1="12" y1="11" x2="12" y2="17" strokeLinecap="round" />
-            <circle cx="12" cy="7.5" r="1.2" fill="currentColor" stroke="none" />
-          </svg>
-        </button>
-      ),
-      onSearch, theme, onThemeChange,
-    })}>
-      <div className={`home-screen home-screen-app${isFirstVisit ? "" : " home-fast"}`}>
-        <h1 className="home-main-title">The Volumes of Truth</h1>
-        <div className="home-main-amp" aria-hidden="true">&amp;</div>
-        <h2 className="home-main-title2">The Scriptures of Truth</h2>
-        <div className="home-ornament">
-          <div className="home-ornament-line" />
-          <div className="home-ornament-diamond" />
-          <div className="home-ornament-line r" />
-        </div>
+    <ScreenLayout root navChildren={rootNavStart({ title: 'VOTReader', onSearch: searchEnabled !== false ? onSearch : undefined })}
+      navEnd={<RootGear onSettings={onSettings} />}>
+      <div className="root-screen home-root">
+        {searchEnabled !== false ? (
+          <button type="button" className="root-search" onClick={onSearch} aria-label="Search the letters and the Bible">
+            {SEARCH_ICON}<span aria-hidden="true">Search the letters and the Bible</span>
+          </button>
+        ) : null}
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled} tracksOf={planTracks}
           onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
           onEnableMarkAsRead={onEnableMarkAsRead} onOpenPlans={() => onOpenPlans && onOpenPlans()}
           offerStart={offerPlan} onHideOffer={hideOffer}>
           {/* n131/n352 (A07.2, L1.1, U02.1): the newest place is one tap (Continue), and before any reading the row
-              says where to start. The layout pass (2026-11-10) made it the up-next card's last row; History,
-              Notes, Highlights, Bookmarks and Scripture Web left this row for the Library. */}
+              says where to start: the card's last row (the layout pass, 2026-11-10). */}
           {historyEnabled !== false && hasContinueRow(newest, onContinue, onStartHere) ? <ContinueRow entry={newest} onContinue={onContinue} onStartHere={onStartHere} /> : null}
         </TodayCard>
-        {searchEnabled !== false && (
-          <nav className="home-shortcuts" aria-label="Quick access">
-            <button type="button" className="home-search-action" onClick={onSearch}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true"><circle cx="11" cy="11" r="8" /><path d="m17 17 4 4" /></svg>
-              Search library
-            </button>
-          </nav>
-        )}
-        <div className="home-nav-list">
-          {orderedItems.map((item, i) => (
-            <button
-              key={item.id}
-              ref={setCardRef(i)}
-              aria-describedby="home-reorder-hint"
-              onPointerEnter={() => warmDestination(item.id)}
-              onFocus={() => warmDestination(item.id)}
-              onKeyDown={(e) => {
-                if (dragIdx >= 0) return;
-                const moved = altArrowReorder(e, order, orderedItems.map((it) => it.id), i);
-                if (!moved) return;
-                HomeOrderStore.set(moved.order);
-                setOrder(moved.order);
-                setHomeStatus(item.title + ' moved ' + (moved.up ? 'up.' : 'down.'));
-              }}
-              className={`home-nav-item${i === pressingIdx ? " pressing" : ""}${i === dragIdx ? " dragging" : ""}`}
-              onPointerDown={(e) => {
-                if (e.isPrimary === false) return; // a second finger never owns a gesture
-                if (e.pointerType === 'mouse' && e.button !== 0) return;
-                startPress(i, e.clientX, e.clientY, e.pointerId);
-              }}
-              onDragStart={(e) => e.preventDefault()}
-              onClick={(e) => {
-                if (dragRef.current.suppressed()) {e.preventDefault();e.stopPropagation();return;}
-                handleTap(item.id);
-              }}
-            >
-              <span className="hni-text">
-                <span className="hni-eyebrow">{item.eyebrow}</span>
-                <span className="hni-title">{item.title}</span>
-                <span className="hni-detail">{item.detail}</span>
-              </span>
-              <span className="hni-arrow" aria-hidden="true">{"›"}</span>
-            </button>
-          ))}
-        </div>
-        <span id="home-reorder-hint" className="home-rearrange-hint">Hold to rearrange</span>
-        <p className="home-status" role="status">{homeStatus}</p>
-        {showSurprise && (
-          /* Wave 0: the breathing dice was visually anonymous — a sighted
-             user had no way to know what it does. The visible caption
-             matches the accessible name (label-in-name) so the two never
-             drift; aria-hidden keeps the name sourced from aria-label
-             alone.
 
-             C2-C [C8]: the tooltip and the accessible name USED to be two
-             different strings — hover said "Open a Random Chapter or Letter",
-             TalkBack said "Surprise Me". One string now feeds both, and it
-             is the descriptive one; it still OPENS with the visible caption,
-             so label-in-name (2.5.3) holds, which a bare swap to the
-             descriptive title would have broken. */
-          <button className="surprise-fab" onClick={openSurprise} disabled={surpriseBusy} aria-busy={surpriseBusy} title="Surprise Me — open a random chapter or letter" aria-label="Surprise Me — open a random chapter or letter">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="3.5" />
-              <circle cx="8" cy="8" r="1.15" fill="currentColor" stroke="none" />
-              <circle cx="16" cy="8" r="1.15" fill="currentColor" stroke="none" />
-              <circle cx="12" cy="12" r="1.15" fill="currentColor" stroke="none" />
-              <circle cx="8" cy="16" r="1.15" fill="currentColor" stroke="none" />
-              <circle cx="16" cy="16" r="1.15" fill="currentColor" stroke="none" />
-            </svg>
-            <span className="surprise-fab-caption" aria-hidden="true">Surprise Me</span>
-          </button>
-        )}
+        <h2 className="root-section">Read</h2>
+        <div className="root-tiles">
+          {shown.map((id, i) => {
+            const t = TILES[id];
+            return (
+              <button key={id} type="button" className="root-tile home-tile" data-tile={id} aria-describedby="home-reorder-hint"
+                onClick={() => openTile(id)} onPointerEnter={() => warmDestination(id)} onFocus={() => warmDestination(id)}
+                onKeyDown={(e) => {
+                  const moved = altArrowReorder(e, order, shown, i);
+                  if (!moved) return;
+                  if (typeof HomeOrderStore !== 'undefined') HomeOrderStore.set(moved.order);
+                  setOrder(moved.order);
+                  setHomeStatus(t.title + ' moved ' + (moved.up ? 'earlier.' : 'later.'));
+                }}>
+                <span className="root-tile-eyebrow">{t.eyebrow}</span>
+                <span className="root-tile-title">{t.title}</span>
+                <span className="root-tile-detail">{t.detail}</span>
+              </button>
+            );
+          })}
+        </div>
+        <span id="home-reorder-hint" className="sr-only">Press Alt with an arrow key to move a tile.</span>
+
+        {onScriptureWeb || showSurprise ? (
+          <>
+            <h2 className="root-section">Explore</h2>
+            <div className="root-explore">
+              {onScriptureWeb ? <button type="button" className="root-explore-btn" onClick={onScriptureWeb}>{WEB_ICON}<span>Scripture Web</span></button> : null}
+              {/* Wave 0 / C2-C [C8]: the visible caption opens the accessible name (label-in-name), and the name says
+                  what the button does. */}
+              {showSurprise ? (
+                <button type="button" className="root-explore-btn surprise-btn" onClick={openSurprise} disabled={surpriseBusy} aria-busy={surpriseBusy}
+                  title="Surprise me — open a random chapter or letter" aria-label="Surprise me — open a random chapter or letter">
+                  {STAR_ICON}<span aria-hidden="true">Surprise me</span>
+                </button>
+              ) : null}
+            </div>
+          </>
+        ) : null}
+        <p className="home-status" role="status">{homeStatus}</p>
       </div>
     </ScreenLayout>
   );

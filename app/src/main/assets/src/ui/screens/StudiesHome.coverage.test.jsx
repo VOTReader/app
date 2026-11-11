@@ -108,17 +108,10 @@ describe('StudiesHome -- the read-along badge', () => {
   });
 });
 
-describe('StudiesHome -- the Answers row (U14)', () => {
-  const answersNum = () => [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Answers Only God Can Give')).querySelector('.chapter-card-num').textContent;
-  const props = { onRetry: noop, onSelectStudy: noop, onOpenAnswers: noop, onBack: noop, onSearch: noop, onHistory: noop, onSettings: noop, theme: 'dark', onThemeChange: noop };
-  it('is numbered after the studies once they are in, and not "1" while they load or after they fail', () => {
-    const a = render(<StudiesHome {...props} studies={STUDIES} studiesLoading={false} studiesError={null} />);
-    expect(answersNum()).toBe('4');
-    a.unmount();
-    const b = render(<StudiesHome {...props} studies={null} studiesLoading studiesError={null} />);
-    expect(answersNum()).toBe('');
-    b.unmount();
-    render(<StudiesHome {...props} studies={null} studiesLoading={false} studiesError="offline" />);
-    expect(answersNum()).toBe('');
+describe('StudiesHome -- no Answers row (one home for Answers: the Read tab, 2026-11-10)', () => {
+  it('lists the studies and nothing after them', () => {
+    render(<StudiesHome onRetry={noop} onSelectStudy={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop}
+      studies={STUDIES} studiesLoading={false} studiesError={null} />);
+    expect(document.body.textContent).not.toContain('Answers Only God Can Give');
   });
 });

@@ -13,8 +13,8 @@ import { fileURLToPath } from 'url';
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p) => readFileSync(resolve(here, ...p), 'utf8');
 
+// LibraryScreen left the family on 2026-11-10: it is the Library tab's root, named in the root top bar (RootNav.jsx).
 const TITLES = {
-  LibraryScreen: 'Library',
   MyProgressScreen: 'Progress',
   JournalHubScreen: 'Journal',
   NotesIndexScreen: 'Notes',

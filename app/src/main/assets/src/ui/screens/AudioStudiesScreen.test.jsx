@@ -76,7 +76,7 @@ describe('the Listening Library hub: one doorway for the studies', () => {
   it('shows a Bible/Letter Studies row with the honest count, and it opens the studies', () => {
     const onOpenStudies = vi.fn();
     render(<AudioLibraryScreen onBack={noop} onOpenCollection={noop} onOpenVolumes={noop} onOpenSaved={noop} onOpenTrack={noop} onOpenStudies={onOpenStudies} {...common} />);
-    const row = screen.getByText('Bible/Letter Studies').closest('button');
+    const row = screen.getByText('Studies', { selector: '.root-row-title' }).closest('button');
     // '2 recorded' read as two CHAPTERS (Codex critique 3): it counts studies with audio.
     expect(row.textContent).toContain('3 studies · 2 with audio');
     fireEvent.click(row);
@@ -86,7 +86,7 @@ describe('the Listening Library hub: one doorway for the studies', () => {
   it('shows no studies row while no study has a recording (a doorway to nothing to hear)', () => {
     installGlobals({ manifest: { 'one:wide-path': [['idWide', 'B']] } });
     render(<AudioLibraryScreen onBack={noop} onOpenCollection={noop} onOpenVolumes={noop} onOpenSaved={noop} onOpenTrack={noop} onOpenStudies={noop} {...common} />);
-    expect(screen.queryByText('Bible/Letter Studies')).toBeNull();
+    expect(screen.queryByText('Studies', { selector: '.root-row-title' })).toBeNull();
   });
 });
 

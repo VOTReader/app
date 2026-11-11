@@ -1,434 +1,150 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   LibraryScreen — Cluster D (esbuild bundle-d.js)
+   LibraryScreen — the LIBRARY tab's root (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════
-   One row per thing the reader keeps (the redesign, 2026-09-25, Codex
-   mockup r4 take 1): icon, name, one line, the count at the right. The
-   line says what the row holds, or while it is empty (Wave 0's guide) how
-   to start it; an empty row shows no count, and screen readers hear
-   "No notes yet" from an sr-only detail instead.
+   The layout pass (2026-11-10, mock library.png): Reading plans and
+   Progress as rows; "Yours": Notes, Highlights, Bookmarks, Journal and
+   Links as tiles, each with a real count from its store (a plain line of
+   what it holds while it is empty); "Recently read": the three newest
+   History rows and See all (gone with History switched off). Scripture Web
+   left for Read > Explore; Settings is the gear in the top bar.
 
-   Drag-to-reorder: same imperative DOM / long-press architecture as
-   HomeScreen (1D reference) and TabsOverview (2D grid). The sibling
-   shifts keep their 2D FLIP (nearest centre, real viewport coords), which
-   serves one column of rows as the special case it is.
-
-   Order is persisted via LibraryOrderStore (IDB, key vot-library-order).
-
-   Ref-sync rule (from the TabsOverview fix): dragIdxRef.current and
-   pressingIdxRef.current are set SYNCHRONOUSLY inside the 1.4 s timer
-   callback, not only via useEffect. On mobile, touchmove fires before
-   React re-renders so the useEffect-only path leaves the refs stale.
+   The tiles no longer drag to reorder: the old grid's long-press gesture
+   and LibraryOrderStore order belonged to one list of eight, and the page
+   is now three short sections (LibraryOrderStore keeps what it holds).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { runName } from '../../data/plan-catalog.js';
+import { runRow } from '../../utils/plan-runs-view.js';
 import { countMarks } from '../../utils/mark-kinds.js';
-import { createPressDrag, pickupBuzz } from '../../utils/press-drag.js';
-import { altArrowReorder } from '../../utils/keyboard-reorder.js';
 import { useStoreVersionByName } from '../../hooks/use-store-version.js';
+import { rootNavStart, RootGear } from '../components/RootNav.jsx';
+import { continueLabel } from './HomeScreen.jsx';
 
-// Abnormal-path trace for the tile drag — console.warn + DiagnosticLog so a
-// failing device names itself (same pattern as [tabdrag]/[thumb]).
-function _libDragTrace(msg) {
-  try { console.warn('[libdrag] ' + msg); } catch (_e) { /* ignore */ }
-  try {
-    if (typeof DiagnosticLog !== 'undefined' && DiagnosticLog && typeof DiagnosticLog.error === 'function') {
-      DiagnosticLog.error('libdrag', msg);
-    }
-  } catch (_e) { /* ignore */ }
-}
-
-// The stores behind the Notes, Links, Bookmarks, Journal and Highlights counts.
+// The stores behind the Notes, Links, Bookmarks, Journal, Highlights and plan lines.
 const LIBRARY_COUNT_STORES = Object.freeze(['NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore']);
 
-export function LibraryScreen({ onBack, onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, readingPlanCount, onOpenScriptureWeb, totalReadCount, theme, onThemeChange, onSearch, onHistory, onSettings, historyEnabled: _historyEnabled }) {
-  // The tile counts below read these stores directly; subscribing to each one is
-  // what keeps a count live while the Library stays open (a note saved in a
-  // sheet, a bookmark removed). Fixed list — stable hook order.
+/** How many History rows the page shows. */
+export const RECENT_ROWS = 3;
+
+/** "23 notes" / "1 note", or null for none. @param {number} n @param {string} one @param {string} many */
+const counted = (n, one, many) => (n > 0 ? n.toLocaleString('en-US') + ' ' + (n === 1 ? one : many) : null);
+
+/**
+ * When a History row was read, in a word: "today", "yesterday", or the date.
+ * @param {any} ts @param {Date} [now] @returns {string}
+ */
+export function readWhen(ts, now = new Date()) {
+  if (typeof ts !== 'number' || !isFinite(ts)) return '';
+  const day = (/** @type {Date} */ d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(now) - day(new Date(ts))) / 86400000);
+  if (days <= 0) return 'today';
+  if (days === 1) return 'yesterday';
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+/** The second line of a History row: its place ("Volume Two, Letter 14", or the Bible) and when. @param {any} entry @param {any} lab */
+function recentLine(entry, lab) {
+  const place = lab.place || (entry.type === 'study-chapter' ? 'Studies' : entry.type === 'letter' ? '' : 'The Scriptures of Truth');
+  return [place, readWhen(entry.ts)].filter(Boolean).join(' · ');
+}
+
+/** The Reading plans row's line: the plan that runs and its day, or what plans there are. @param {any[]} runs */
+export function plansLine(runs) {
+  if (!runs.length) return 'The Bible, the letters, short starts';
+  let first = runName(runs[0], null);
+  try {
+    const row = runRow(runs[0], new Date());
+    if (!row.finished) first += ' · day ' + (row.day + 1) + ' of ' + row.totalDays;
+  } catch (_e) { /* a Volumes plan before the letters load: its name alone */ }
+  return runs.length > 1 ? first + ' · and ' + (runs.length - 1) + ' more' : first;
+}
+
+const ICON = { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: /** @type {const} */ ('round'), strokeLinejoin: /** @type {const} */ ('round'), 'aria-hidden': true };
+const PLANS_ICON = <svg {...ICON}><rect x="4" y="5" width="16" height="15" rx="2" /><path d="M4 10h16M9 3v4M15 3v4" /></svg>;
+const PROGRESS_ICON = <svg {...ICON}><path d="M5 19V9M10 19V5M15 19v-7M20 19v-4" /></svg>;
+
+/**
+ * @param {{ onOpenNotes: () => void, onOpenLinks: () => void, onOpenBookmarks: () => void, onOpenJournal: () => void,
+ *   onOpenHighlights: () => void, onOpenProgress: () => void, onOpenPlans: () => void, readingPlanCount?: number,
+ *   totalReadCount?: number, onSearch: () => void, onSettings: () => void, historyEnabled?: boolean, history?: any[],
+ *   onOpenHistory?: () => void, onOpenHistoryEntry?: (entry: any) => void, isRead?: any }} props
+ */
+export function LibraryScreen({ onOpenNotes, onOpenLinks, onOpenBookmarks, onOpenJournal, onOpenHighlights, onOpenProgress, onOpenPlans, onSearch, onSettings, historyEnabled, history, onOpenHistory, onOpenHistoryEntry }) {
+  // The lines below read these stores directly; subscribing to each one is what keeps a count live while the
+  // Library stays open (a note saved in a sheet, a bookmark removed). Fixed list — stable hook order.
   const storeVersions = LIBRARY_COUNT_STORES.map(useStoreVersionByName);
   const annVer = storeVersions[LIBRARY_COUNT_STORES.indexOf('AnnotationStore')];
   const planStore = /** @type {any} */ (globalThis).ReadingPlanStore;
   /** @type {any[]} */
   const runningPlans = planStore && typeof planStore.active === 'function' ? planStore.active() : [];
-  const planCount = runningPlans.length || readingPlanCount || 0;
 
-  const noteCount      = NoteStore.count();
-  const linkCount      = LinkStore.all().length;
-  const bookmarkCount  = (typeof BookmarkStore  !== 'undefined') ? BookmarkStore.count()  : 0;
-  const journalCount   = (typeof JournalStore   !== 'undefined') ? JournalStore.count()   : 0;
+  const g = /** @type {any} */ (globalThis);
+  const noteCount = typeof g.NoteStore !== 'undefined' ? g.NoteStore.count() : 0;
+  const linkCount = typeof g.LinkStore !== 'undefined' ? g.LinkStore.all().length : 0;
+  const bookmarkCount = typeof g.BookmarkStore !== 'undefined' ? g.BookmarkStore.count() : 0;
+  const journalCount = typeof g.JournalStore !== 'undefined' ? g.JournalStore.count() : 0;
   // The mark walk runs once per AnnotationStore version, not on every render.
   const highlightCount = React.useMemo(
-    () => (typeof AnnotationStore === 'undefined' ? 0 : countMarks(AnnotationStore.all())),
+    () => (typeof g.AnnotationStore === 'undefined' ? 0 : countMarks(g.AnnotationStore.all())),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: all() is the live object
     [annVer],
   );
 
-  // ── Tile metadata (static) ──────────────────────────────────────────
-  // Defined inline so the SVG JSX resolves in component scope.
-  //   count  the figure at the right, null while the row is empty
-  //   unit   read after it by a screen reader only (" notes"), so the
-  //          visible figures line up in one column
-  //   empty  what a screen reader hears for an empty row
-  //   desc   the second line while the row has something
-  //   guide  Wave 0: the second line while it is EMPTY, a one-line "how X
-  //          happens" in the voice of the destination screen's own empty
-  //          state (NotesIndexScreen / BookmarksScreen / LinksScreen /
-  //          HighlightsScreen / JournalHubScreen)
-  const tally = (n, one, many) => ({
-    count: n > 0 ? n.toLocaleString('en-US') : null,
-    unit: ' ' + (n === 1 ? one : many),
-    empty: 'No ' + many + ' yet',
-  });
-  const TILES_BY_ID = {
-    notes: {
-      id: 'notes', title: 'Notes', ...tally(noteCount, 'note', 'notes'),
-      desc: 'Your notes on passages',
-      guide: noteCount === 0 ? 'Long-press text in any chapter and tap Note.' : null,
-      onClick: onOpenNotes,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-          <line x1="8" y1="13" x2="16" y2="13" />
-          <line x1="8" y1="17" x2="16" y2="17" />
-        </svg>
-      ),
-    },
-    links: {
-      id: 'links', title: 'Links', ...tally(linkCount, 'link', 'links'),
-      desc: 'Passages you joined together',
-      guide: linkCount === 0 ? 'Select text, tap Link, and pick a destination.' : null,
-      onClick: onOpenLinks,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
-      ),
-    },
-    journal: {
-      id: 'journal', title: 'Journal', ...tally(journalCount, 'entry', 'entries'),
-      desc: 'Your dated reflections',
-      guide: journalCount === 0 ? 'Tap "New Entry" in the Journal to write your first reflection.' : null,
-      onClick: onOpenJournal,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M19 4H8a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h11z" />
-          <line x1="9" y1="9" x2="16" y2="9" />
-          <line x1="9" y1="13" x2="16" y2="13" />
-        </svg>
-      ),
-    },
-    bookmarks: {
-      id: 'bookmarks', title: 'Bookmarks', ...tally(bookmarkCount, 'bookmark', 'bookmarks'),
-      desc: 'Places to come back to',
-      guide: bookmarkCount === 0 ? 'Select text and tap Bookmark in the toolbar.' : null,
-      onClick: onOpenBookmarks,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-        </svg>
-      ),
-    },
-    highlights: {
-      id: 'highlights', title: 'Highlights & Underlines', ...tally(highlightCount, 'mark', 'marks'),
-      desc: 'Passages you marked',
-      guide: highlightCount === 0 ? 'Select a passage and tap a color to highlight or underline it.' : null,
-      onClick: onOpenHighlights,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <path d="M9 11l-4 4 4 4 11-11-4-4-7 7" />
-          <line x1="13" y1="7" x2="17" y2="11" />
-        </svg>
-      ),
-    },
-    progress: {
-      id: 'progress', title: 'Progress',
-      count: totalReadCount ? totalReadCount.toLocaleString('en-US') + ' read' : null, unit: '',
-      empty: 'Nothing read yet',
-      desc: 'Your reading at a glance',
-      guide: !totalReadCount ? 'Chapters you read are counted here.' : null,
-      onClick: onOpenProgress,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <line x1="6" y1="20" x2="6" y2="14" />
-          <line x1="12" y1="20" x2="12" y2="9" />
-          <line x1="18" y1="20" x2="18" y2="4" />
-          <path d="M3 20h18" />
-        </svg>
-      ),
-    },
-    // rp1: the way in to a reading plan (the Today card on Home shows it once it runs)
-    plans: {
-      id: 'plans', title: 'Reading plans',
-      count: planCount ? String(planCount) : null, unit: planCount === 1 ? ' plan running' : ' plans running',
-      empty: 'No plan yet',
-      // mw18 C12: the row names the plans running, never ones the reader has not started.
-      desc: runningPlans.length ? runningPlans.map((r) => runName(r, null)).join(', ') : 'The Bible, the letters, short starts',
-      guide: !planCount ? 'Read the Bible in a year, or the Volumes in order.' : null,
-      onClick: onOpenPlans,
-      icon: (
-        <svg viewBox="0 0 24 24">
-          <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
-        </svg>
-      ),
-    },
-    'scripture-web': {
-      id: 'scripture-web', title: 'Scripture Web',
-      // Never empty and nothing of the reader's to count: the line carries its size.
-      count: null, unit: '', empty: null,
-      desc: '63,418 cross-references',
-      // No guide: the "Still under construction." caption of 2026-09-05 left with the
-      // Home shortcut's return (2026-09-11) — the tour teaches the web now, and a tile
-      // one screen away saying it is not ready would contradict it.
-      onClick: onOpenScriptureWeb,
-      icon: (
-        // Three nested arcs over a baseline — the visualization in miniature.
-        <svg viewBox="0 0 24 24">
-          <path d="M3 19a9 9 0 0 1 18 0" />
-          <path d="M6 19a6 6 0 0 1 12 0" />
-          <path d="M9 19a3 3 0 0 1 6 0" />
-          <line x1="2" y1="19" x2="22" y2="19" />
-        </svg>
-      ),
-    },
-  };
+  const TILES = [
+    { id: 'notes', title: 'Notes', line: counted(noteCount, 'note', 'notes') || 'Your notes on passages', onClick: onOpenNotes },
+    { id: 'highlights', title: 'Highlights', line: counted(highlightCount, 'marked passage', 'marked passages') || 'Passages you marked', onClick: onOpenHighlights },
+    { id: 'bookmarks', title: 'Bookmarks', line: counted(bookmarkCount, 'place', 'places') || 'Places to come back to', onClick: onOpenBookmarks },
+    { id: 'journal', title: 'Journal', line: counted(journalCount, 'entry', 'entries') || 'Your dated reflections', onClick: onOpenJournal },
+    { id: 'links', title: 'Links', line: counted(linkCount, 'link', 'links') || 'Passages you joined together', onClick: onOpenLinks },
+  ];
 
-  /* ── Drag-to-reorder — the SHARED pointer-events lifecycle ────────────
-     (utils/press-drag.js — createPressDrag, extracted from the tabs v2
-     redesign). This screen owns only the 2D grid geometry + visuals. */
-  const libraryOrderVersion = React.useSyncExternalStore(
-    React.useCallback((cb) => LibraryOrderStore.subscribe(cb), []),
-    () => LibraryOrderStore.getVersion()
-  );
-  const [order, setOrder] = React.useState(() => LibraryOrderStore.get());
-  React.useEffect(() => { setOrder(LibraryOrderStore.get()); }, [libraryOrderVersion]);
-  const [pressingIdx, setPressingIdx] = React.useState(-1);
-  const [libraryStatus, setLibraryStatus] = React.useState('');
-  const [dragIdx, setDragIdx] = React.useState(-1);
-
-  const cardRefs = React.useRef([]);
-  const orderRef = React.useRef(order);
-  React.useEffect(() => { orderRef.current = order; }, [order]);
-
-  const setCardRef = (i) => (el) => { cardRefs.current[i] = el; };
-
-  const clearInlineTransforms = () => {
-    cardRefs.current.forEach((el) => {
-      if (!el) return;
-      el.style.transform = ''; el.style.transition = '';
-      el.style.zIndex = ''; el.style.opacity = '';
-    });
-  };
-
-  // FLIP sibling shifts — 2D because the grid wraps rows.
-  const applySiblingShifts = (from, to, rects) => {
-    cardRefs.current.forEach((el, i) => {
-      if (!el || i === from) return;
-      let visualIdx = i;
-      if (from < to) { if (i > from && i <= to) visualIdx = i - 1; }
-      else           { if (i >= to && i < from) visualIdx = i + 1; }
-      const tgt = rects[visualIdx] || rects[i];
-      const src = rects[i];
-      if (!tgt || !src) return;
-      el.style.transition = 'transform 0.22s cubic-bezier(0.2,0.8,0.3,1)';
-      el.style.transform  = `translate(${tgt.cx - src.cx}px,${tgt.cy - src.cy}px)`;
-    });
-  };
-
-  // Nearest card by 2D squared distance.
-  const pickTarget = (cx, cy, rects) => {
-    let best = 0, bestD = Infinity;
-    for (let i = 0; i < rects.length; i++) {
-      const dx = cx - rects[i].cx, dy = cy - rects[i].cy;
-      const d = dx * dx + dy * dy;
-      if (d < bestD) { bestD = d; best = i; }
-    }
-    return Math.max(0, Math.min(orderRef.current.length - 1, best));
-  };
-
-  const dragRef = React.useRef(/** @type {any} */ (null));
-
-  // Drop commit — SYNCHRONOUS at release: order write + transform clear land
-  // in ONE paint while the ghost glides into the target slot above the
-  // hidden real tile (tiles are keyed by ID, so the grabbed NODE persists
-  // across the reorder — it is the reveal target).
-  const commitDrop = (g) => {
-    const from = g.idx;
-    const to = g.targetIdx >= 0 ? Math.min(g.targetIdx, orderRef.current.length - 1) : from;
-    clearInlineTransforms();
-    setDragIdx(-1);
-    setPressingIdx(-1);
-    const grabbedEl = g.data.el || null;
-    if (grabbedEl) grabbedEl.style.opacity = '0';
-    try {
-      if (to !== from && to >= 0) {
-        const newOrder = [...orderRef.current];
-        const [moved]  = newOrder.splice(from, 1);
-        newOrder.splice(to, 0, moved);
-        setOrder(newOrder);
-        LibraryOrderStore.set(newOrder);
-      }
-    } catch (err) {
-      _libDragTrace('reorder commit threw: ' + String(err).slice(0, 120));
-    }
-    const ghost = g.data.ghost;
-    if (ghost) {
-      const snap = g.data.rects && (g.data.rects[to] || g.data.rects[from]);
-      if (snap) {
-        ghost.style.transition =
-          'left 0.22s cubic-bezier(0.2,0.8,0.3,1),top 0.22s cubic-bezier(0.2,0.8,0.3,1),transform 0.22s cubic-bezier(0.2,0.8,0.3,1)';
-        ghost.style.left      = snap.left + 'px';
-        ghost.style.top       = snap.top  + 'px';
-        ghost.style.transform = 'scale(1)';
-      }
-    }
-    dragRef.current.land(ghost, grabbedEl, 230);
-  };
-
-  if (!dragRef.current) {
-    dragRef.current = createPressDrag({
-      trace: _libDragTrace,
-      onGlow: (idx) => setPressingIdx(idx),
-      onGlowClear: () => setPressingIdx(-1),
-      onEngage: (g) => {
-        setDragIdx(g.idx);
-        // Capture every card's natural viewport rect at drag start.
-        g.data.rects = cardRefs.current.map((el) => {
-          if (!el) return { left: 0, top: 0, cx: 0, cy: 0, w: 0, h: 0 };
-          const r = el.getBoundingClientRect();
-          return { left: r.left, top: r.top, cx: r.left + r.width / 2, cy: r.top + r.height / 2, w: r.width, h: r.height };
-        });
-        const el = cardRefs.current[g.idx];
-        g.data.el = el || null;
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          g.data.offX = g.startX - rect.left;
-          g.data.offY = g.startY - rect.top;
-          const ghost = el.cloneNode(true);
-          ghost.className = 'library-tile drag-flying';
-          ghost.style.cssText = [
-            'position:fixed',
-            'top:'    + rect.top    + 'px',
-            'left:'   + rect.left   + 'px',
-            'width:'  + rect.width  + 'px',
-            'height:' + rect.height + 'px',
-            'z-index:9999',
-            'pointer-events:none',
-            'margin:0',
-            'box-sizing:border-box',
-            'transition:transform 0.16s cubic-bezier(0.2,0.8,0.3,1)',
-            'transform:scale(1.05)',
-          ].join(';');
-          // A large Text Size stacks each row's count under its words through an
-          // @container query on the list; the ghost lives on <body>, outside that
-          // container, so it copies the row's computed layout to look the same.
-          const srcMain = el.querySelector('.library-tile-main');
-          const ghostMain = ghost.querySelector('.library-tile-main');
-          if (srcMain && ghostMain) {
-            const cs = getComputedStyle(srcMain);
-            ghostMain.style.flexDirection = cs.flexDirection;
-            ghostMain.style.alignItems = cs.alignItems;
-            ghostMain.style.gap = cs.gap;
-          }
-          document.body.appendChild(ghost);
-          g.data.ghost = ghost;
-        }
-        pickupBuzz(55);
-      },
-      onDragMove: (g, x, y) => {
-        const ghost = g.data.ghost;
-        if (ghost) {
-          ghost.style.transition = 'none';
-          ghost.style.left = (x - g.data.offX) + 'px';
-          ghost.style.top  = (y - g.data.offY) + 'px';
-          ghost.style.transform = 'scale(1.05)';
-        }
-        const r0 = g.data.rects && g.data.rects[g.idx];
-        const cx = (x - g.data.offX) + (r0 ? r0.w * 0.5 : 0);
-        const cy = (y - g.data.offY) + (r0 ? r0.h * 0.5 : 0);
-        const t = pickTarget(cx, cy, g.data.rects || []);
-        if (t !== g.targetIdx) {
-          g.targetIdx = t;
-          applySiblingShifts(g.idx, t, g.data.rects || []);
-        }
-      },
-      onCommit: commitDrop,
-      onAbortDrag: (g) => {
-        if (g.data.ghost && g.data.ghost.parentNode) g.data.ghost.parentNode.removeChild(g.data.ghost);
-        clearInlineTransforms();
-        setDragIdx(-1);
-      },
-    });
-  }
-
-  // Unmount mid-gesture: one call tears down timers, listeners, ghost, landing.
-  React.useEffect(() => () => { dragRef.current.destroy(); }, []);
-
-  const startPress = (idx, clientX, clientY, pointerId) =>
-    dragRef.current.start(idx, clientX, clientY, pointerId, cardRefs.current[idx]);
-
-  // Trim stale refs when a future reorder changes card count (safe no-op here,
-  // but mirrors the TabsOverview pattern for consistency).
-  cardRefs.current.length = order.length;
-
-  const orderedTiles = order.map((id) => TILES_BY_ID[id]).filter(Boolean);
+  const recent = historyEnabled !== false && Array.isArray(history)
+    ? history.map((entry) => ({ entry, lab: continueLabel(entry) })).filter((r) => r.lab).slice(0, RECENT_ROWS)
+    : [];
 
   return (
-    <ScreenLayout
-      navChildren={LibraryNav({ onBack: onBack, backLabel: 'Home', onSearch: onSearch, onHistory: onHistory, onSettings: onSettings, theme: theme, onThemeChange: onThemeChange })}
-    >
-      <div className="library-screen">
-        <header className="study-head">
-          <h1 className="study-head-title">Library</h1>
-          <p className="study-head-sub">Your notes, reflections and saved passages.</p>
-        </header>
-        <div className="library-grid">
-          {orderedTiles.map((tile, i) => (
-            <button
-              key={tile.id}
-              ref={setCardRef(i)}
-              className={'library-tile' + (i === pressingIdx ? ' pressing' : '') + (i === dragIdx ? ' dragging' : '')}
-              onClick={(e) => {
-                if (dragRef.current.suppressed()) { e.preventDefault(); e.stopPropagation(); return; }
-                tile.onClick();
-              }}
-              onPointerDown={(e) => {
-                if (e.isPrimary === false) return; // a second finger never owns a gesture
-                if (e.pointerType === 'mouse' && e.button !== 0) return;
-                startPress(i, e.clientX, e.clientY, e.pointerId);
-              }}
-              onDragStart={(e) => e.preventDefault()}
-              aria-describedby="library-reorder-hint"
-              onKeyDown={(e) => {
-                // n199: Home's Alt+ArrowUp/Down reorder, through the one shared handler.
-                if (dragIdx >= 0) return;
-                const moved = altArrowReorder(e, order, orderedTiles.map((t) => t.id), i);
-                if (!moved) return;
-                setOrder(moved.order);
-                LibraryOrderStore.set(moved.order);
-                setLibraryStatus(tile.title + ' moved ' + (moved.up ? 'earlier.' : 'later.'));
-              }}
-            >
-              <span className="library-tile-icon" aria-hidden="true">{tile.icon}</span>
-              {/* main: the words and the count, which wraps under them when a large
-                  Text Size leaves no room beside them (app.css). */}
-              <span className="library-tile-main">
-                <span className="library-tile-text">
-                  <span className="library-tile-title">{tile.title}</span>
-                  {tile.guide
-                    ? <span className="library-tile-guide">{tile.guide}</span>
-                    : <span className="library-tile-desc">{tile.desc}</span>}
-                </span>
-                {tile.count != null
-                  ? <span className="library-tile-detail">{tile.count}{tile.unit ? <span className="sr-only">{tile.unit}</span> : null}</span>
-                  : tile.empty && <span className="library-tile-detail sr-only">{tile.empty}</span>}
-              </span>
-              <span className="library-tile-arrow" aria-hidden="true">›</span>
+    <ScreenLayout root navChildren={rootNavStart({ title: 'Library', onSearch })} navEnd={<RootGear onSettings={onSettings} />}>
+      <div className="root-screen library-root">
+        <div className="root-list">
+          <button type="button" className="root-row" onClick={onOpenPlans}>
+            <span className="root-row-icon" aria-hidden="true">{PLANS_ICON}</span>
+            <span className="root-row-text"><span className="root-row-title">Reading plans</span><span className="root-row-sub">{plansLine(runningPlans)}</span></span>
+            <span className="root-row-chev" aria-hidden="true">›</span>
+          </button>
+          <button type="button" className="root-row" onClick={onOpenProgress}>
+            <span className="root-row-icon" aria-hidden="true">{PROGRESS_ICON}</span>
+            <span className="root-row-text"><span className="root-row-title">Progress</span><span className="root-row-sub">Your reading at a glance</span></span>
+            <span className="root-row-chev" aria-hidden="true">›</span>
+          </button>
+        </div>
+
+        <h2 className="root-section">Yours</h2>
+        <div className="root-tiles lib-tiles">
+          {TILES.map((t) => (
+            <button key={t.id} type="button" className="root-tile lib-tile" data-tile={t.id} onClick={t.onClick}>
+              <span className="root-tile-title">{t.title}</span>
+              <span className="root-tile-detail">{t.line}</span>
             </button>
           ))}
         </div>
-        <span id="library-reorder-hint" className="sr-only">Hold to rearrange, or press Alt with an arrow key.</span>
-        <p className="sr-only" role="status">{libraryStatus}</p>
+
+        {recent.length ? (
+          <section aria-labelledby="library-recent">
+            <div className="root-section-row">
+              <h2 className="root-section" id="library-recent">Recently read</h2>
+              {onOpenHistory ? <button type="button" className="root-link" onClick={onOpenHistory}>See all</button> : null}
+            </div>
+            <div className="root-list">
+              {recent.map(({ entry, lab }, i) => (
+                <button key={(entry.ts || 0) + ':' + i} type="button" className="root-row root-row-plain"
+                  onClick={() => { if (onOpenHistoryEntry) onOpenHistoryEntry(entry); }}>
+                  <span className="root-row-text"><span className="root-row-title">{lab.title}</span><span className="root-row-sub">{recentLine(entry, lab)}</span></span>
+                  <span className="root-row-chev" aria-hidden="true">›</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        ) : null}
       </div>
     </ScreenLayout>
   );

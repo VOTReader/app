@@ -116,7 +116,7 @@ describe('axe — Library', () => {
   it('populated', async () => {
     setup({ notes: 3, links: 2, bookmarks: 4, journal: 5 });
     const { container } = show();
-    expect(container.querySelectorAll('.library-tile').length).toBeGreaterThan(3);
+    expect(container.querySelectorAll('.lib-tile').length).toBeGreaterThan(3);
     expect(await seriousViolations(container)).toEqual([]);
   });
 

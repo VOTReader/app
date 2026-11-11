@@ -41,9 +41,11 @@ function applySavedScrollToEl(el, saved) {
 /**
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
  *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean,
- *   className?: string }} props  className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2)
+ *   className?: string, root?: boolean, navEnd?: any }} props  className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2).
+ *   root: one of the three tab roots (Read, Listen, Library; the layout pass 2026-11-10): no resume dot and no ⋯ menu
+ *   (its items live in the Library and Settings); `navEnd` is drawn after Tabs instead (the Settings gear, RootNav.jsx).
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '' }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '', root = false, navEnd = null }) {
   const scrollRef = React.useRef(null);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
@@ -308,11 +310,11 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   const Main = landmarks ? 'main' : 'div';
   return (
     <div className={className ? 'screen-layout ' + className : 'screen-layout'}>
-      <Nav className="top-nav">
+      <Nav className={root ? 'top-nav top-nav-root' : 'top-nav'}>
         {navChildren}
-        <ResumeReadingNavBtn />
+        {root ? null : <ResumeReadingNavBtn />}
         {hideTabsBtn ? null : <TabsNavBtn />}
-        <MoreMenuBtn />
+        {root ? navEnd : <MoreMenuBtn />}
       </Nav>
       {pager ? (
         <div className="pager-viewport">

@@ -800,6 +800,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     window.addEventListener(OPEN_YOUR_DATA_EVENT, take);
     return () => window.removeEventListener(OPEN_YOUR_DATA_EVENT, take);
   }, []);
+  // The layout pass (2026-11-10): a row elsewhere that IS a setting (the Listen tab's Letter voice) opens Settings
+  // with its group open and in view, through the navHandoff slot 'settingsGroup'.
+  React.useEffect(() => {
+    const hand = /** @type {any} */ (window).navHandoff;
+    const id = hand ? hand.take('settingsGroup') : null;
+    if (!id || !Object.prototype.hasOwnProperty.call(SETTINGS_TOPICS, id)) return;
+    setOpenGroups((prev) => (prev.has(id) ? prev : new Set([...prev, id])));
+    setTimeout(() => {
+      const el = document.querySelector('[data-settings-group="' + id + '"]');
+      if (el && el.scrollIntoView) el.scrollIntoView({ block: 'start' });
+    }, 0);
+  }, []);
 
   // W2.5 — navigator.storage estimate + persist. The hook reads once
   // on mount; the derived display strings below pick the right text

@@ -142,22 +142,22 @@ function makeRoutes(overrides = {}) {
   return { routes: buildScreenRoutes(props), props };
 }
 
-describe('Scripture Web is reached from the Library (Home lost its button, 2026-11-10)', () => {
-  it('Home no longer offers it', () => {
-    const { routes } = makeRoutes();
-    expect(routes.home().props.onScriptureWeb).toBeUndefined();
-  });
-
-  it('the Library entry still opens it, and back returns through the origin', () => {
+describe('Scripture Web has one way in: Read > Explore (the three tabs, 2026-11-10)', () => {
+  it('the Home route opens Scripture Web from Home and back returns through the captured origin', () => {
     const { routes, props } = makeRoutes();
-    routes.library().props.onOpenScriptureWeb();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'library', returnOrigin: null });
+    routes.home().props.onScriptureWeb();
+    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
     expect(props.setScreen).toHaveBeenCalledWith('scripture-web');
 
-    const next = makeRoutes({ navOrigin: { screen: 'library', returnOrigin: null } });
+    const next = makeRoutes({ navOrigin: { screen: 'home', returnOrigin: null } });
     next.routes['scripture-web']().props.onBack();
     expect(next.props.goNavOrigin).toHaveBeenCalledTimes(1);
     expect(next.props.setScreen).not.toHaveBeenCalled();
+  });
+
+  it('the Library no longer offers it', () => {
+    const { routes } = makeRoutes();
+    expect(routes.library().props.onOpenScriptureWeb).toBeUndefined();
   });
 
   it('the route itself still resolves, so deep links keep working', () => {
@@ -366,25 +366,17 @@ describe('screen-routes — bible-idx onBack consumes fromSearch', () => {
 });
 
 describe('screen-routes — the Listening Library returns to its actual origin', () => {
-  it('Home → Listening Library carries Home as the visible and hardware-back origin', () => {
+  it('is the Listen tab root: no Back of its own (system Back goes to Read), Letter voice opens Settings at Listening', () => {
     const { routes, props } = makeRoutes();
-    routes.home().props.onOpenAudio();
-    expect(props.setNavOrigin).toHaveBeenCalledWith({ screen: 'home', returnOrigin: null });
-    expect(props.setScreen).toHaveBeenCalledWith('audio-library');
-
-    // The state update causes App to rebuild this factory on the next render;
-    // label parity is asserted with that rebuilt nav state below.
     const audio = routes['audio-library']();
-    expect(audio.props.onBack).toBe(props.goNavOrigin);
-    expect(audio.props.backLabel).toBe('Home');
-  });
-
-  it('keeps origin-true back labels for legacy Library/Volumes origins', () => {
-    const { routes, props } = makeRoutes({ navOrigin: { screen: 'library' } });
-    const audio = routes['audio-library']();
-    expect(audio.props.onBack).toBe(props.goNavOrigin);
-    expect(audio.props.backLabel).toBe('Library');
-    expect(makeRoutes({ navOrigin: { screen: 'volumes-home' } }).routes['audio-library']().props.backLabel).toBe('Volumes');
+    expect(audio.props.onBack).toBeUndefined();
+    expect(audio.props.backLabel).toBeUndefined();
+    const prev = window.navHandoff;
+    const set = vi.fn();
+    window.navHandoff = { set, clear: vi.fn(), take: vi.fn(), peek: vi.fn() };
+    try { audio.props.onOpenLetterVoice(); } finally { window.navHandoff = prev; }
+    expect(set).toHaveBeenCalledWith('settingsGroup', 'listening');
+    expect(props.goSettings).toHaveBeenCalledTimes(1);
   });
 
   it('has no Milestones route, and neither Library nor My Progress offers one (removed 2026-10-05)', () => {
