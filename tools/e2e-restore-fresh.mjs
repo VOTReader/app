@@ -96,16 +96,29 @@ async function freshProfile(tag, { downloads } = {}) {
   // the profile stayed on About page 1 - which hides the Settings gear.
   const deadline = Date.now() + 30000;
   while (Date.now() < deadline) {
-    const home = await page.evaluate(() => /Personal Study/.test(document.body.textContent || ''));
-    if (home) break;
-    // First run's Begin Reading opens Volume One, Letter 1 (n114, 52553a0c7); its Home button brings the walk to Home.
-    if (!(await clickIf(page, 'Continue')) && !(await clickIf(page, 'Begin Reading')) && !(await clickIf(page, 'Home'))) await sleep(250);
+    if (await onHome(page)) break;
+    // First run's Begin Reading opens Volume One, Letter 1 (n114, 52553a0c7); its Home button, or the Read tab
+    // wherever the bar shows (the three tabs, 2026-11-10), brings the walk to Home.
+    if (!(await clickIf(page, 'Continue')) && !(await clickIf(page, 'Begin Reading')) && !(await openTab(page, 'Read')) && !(await clickIf(page, 'Home'))) await sleep(250);
   }
-  need(await page.evaluate(() => /Personal Study/.test(document.body.textContent || '')), `${tag}: never reached Home past the first-run pages`);
+  need(await onHome(page), `${tag}: never reached Home past the first-run pages`);
   await hydrated(page);
   // The tour offer over Home on a first visit can also arrive a beat late.
   for (let i = 0; i < 8 && !(await clickIf(page, 'Maybe later')); i++) await sleep(250);
   return { ctx, page, errors };
+}
+
+/** Home is the Read tab's root (.home-root, the three-tab layout of 2026-11-10); it no longer carries the old tiles' eyebrows. */
+const onHome = (page) => page.evaluate(() => !!document.querySelector('.home-root'));
+/** Tap a bottom tab (.tabbar-tab) by its label; false when the bar is not up on this screen. */
+async function openTab(page, label) {
+  const hit = await page.evaluate((label) => {
+    const t = [...document.querySelectorAll('.tabbar-tab')].find((b) => (b.textContent || '').trim() === label);
+    if (t) /** @type {HTMLElement} */ (t).click();
+    return !!t;
+  }, label);
+  if (hit) await sleep(450);
+  return hit;
 }
 
 const booted = (page) => page.waitForFunction(() => document.querySelector('#root') && document.querySelector('#root').children.length > 0, { timeout: 30000 });
@@ -128,23 +141,16 @@ async function click(page, label) { need(await clickIf(page, label), `no control
 
 /** Settings -> Your Data, open. */
 async function openYourData(page) {
-  // The compact top bar (54b14b14) keeps Settings inside its "More" menu:
-  // open it first when no gear or Settings control is on screen.
-  await page.evaluate(() => {
-    const direct = document.querySelector('[aria-label="Settings"]')
-      || [...document.querySelectorAll('button,[role=button]')].find((b) => /Settings/.test(b.textContent || ''));
-    const more = document.querySelector('button[aria-label="More"]');
-    if (!direct && more) /** @type {HTMLElement} */ (more).click();
-  });
-  await sleep(300);
+  // Settings is the gear in the top bar of every screen with a bar (the three tabs, 2026-11-10; the More menu is
+  // gone there). Where a screen has no gear, the walk goes to Home by the Read tab first.
+  if (!(await page.evaluate(() => !!document.querySelector('[aria-label="Settings"]')))) await openTab(page, 'Read');
   const via = await page.evaluate(() => {
     const gear = document.querySelector('[aria-label="Settings"]');
-    const tile = gear || [...document.querySelectorAll('button,[role=button]')].find((b) => /Settings/.test(b.textContent || ''));
-    if (!tile) return null;
-    /** @type {HTMLElement} */ (tile).click();
-    return gear ? 'gear' : 'tile';
+    if (!gear) return null;
+    /** @type {HTMLElement} */ (gear).click();
+    return 'gear';
   });
-  need(via, 'no way into Settings from this screen');
+  need(via, 'no Settings gear on this screen');
   const found = await page.waitForSelector('section[data-settings-group="data"] .settings-group-head', { timeout: 10000 }).then(() => true, () => false);
   if (!found && shotsDir) await page.screenshot({ path: join(shotsDir, 'b2-no-your-data.png') });
   need(found, `Settings opened (via ${via}) but it has no "Your Data" group`);
@@ -153,15 +159,16 @@ async function openYourData(page) {
   await page.waitForSelector('section[data-settings-group="data"] .settings-group-body', { timeout: 5000 });
 }
 
-/** Home -> Library -> Bookmarks -> the seeded bookmark (Home's own Bookmarks shortcut went with the home trim, 2026-11-10). Returns the text the reading view then shows ('' when
+/** Library tab -> Bookmarks tile -> the seeded bookmark (Home's own Bookmarks shortcut went with the home trim, and the Library is a tab since the three-tab layout, 2026-11-10). Returns the text the reading view then shows ('' when
  *  the row was missing). A reader's route, so the app records the reading position itself. */
 async function openSeededBookmark(page) {
-  await page.evaluate(() => { const h = document.querySelector('[aria-label="Home"]'); if (h) /** @type {HTMLElement} */ (h).click(); });
-  await sleep(700);
-  if (!(await clickIf(page, 'Bookmarks'))) {
-    need((await clickIf(page, 'Personal Study')) || (await clickIf(page, 'Library')), 'no Library on Home');
-    need(await clickIf(page, 'Bookmarks'), 'no Bookmarks in the Library');
+  // From a reader the bar is hidden: its Home button (or the Read tab) comes first, then the Library tab.
+  if (!(await openTab(page, 'Library'))) {
+    await page.evaluate(() => { const h = document.querySelector('[aria-label="Home"]'); if (h) /** @type {HTMLElement} */ (h).click(); });
+    await sleep(700);
+    need(await openTab(page, 'Library'), 'no Library tab on Home');
   }
+  need(await clickIf(page, 'Bookmarks'), 'no Bookmarks tile in the Library');
   const listed = await page.waitForFunction(() => [...document.querySelectorAll('.bkm-row')].some((r) => /B2 bookmark/.test(r.textContent || '')), { timeout: 8000 }).then(() => true, () => false);
   if (!listed) return '';
   await page.evaluate(() => {

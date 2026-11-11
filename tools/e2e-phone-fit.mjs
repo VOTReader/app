@@ -13,7 +13,8 @@
  * WHAT. The built app (its own tree, an OS-assigned port), a fresh profile at 360x800 (and 412x915 for the
  * highlight bar), walked through onboarding, Home, the volumes, a letter top and end, the More menu, History,
  * Open tabs, Search, Settings, Library, Listening, the Bible and a chapter end, and the highlight bar on a
- * selected passage. On each screen it asks Chrome (CDP CSS.getPlatformFontsForNode) which faces painted every
+ * selected passage. The walk drives the three-tab layout (2026-11-10): Home is the Read tab, Library and Listening
+ * are tabs, Settings is the gear, History is the Library's "Recently read" See all, and the ⋯ menu is a reader's. On each screen it asks Chrome (CDP CSS.getPlatformFontsForNode) which faces painted every
  * visible text run, and asserts:
  *   F1  every face is one the app ships (isCustomFont: a bundled @font-face), never a system fallback;
  *   W1  the highlight bar's swatches all sit inside the viewport at 360 and 412 (no sideways overflow);
@@ -198,7 +199,8 @@ async function main() {
       for (let i = 0; i < 60; i++) {
         const ok = await page.evaluate((src, s) => {
           const rx = new RegExp(src, 'i');
-          const el = [...document.querySelectorAll(s)].find((b) => b.offsetParent !== null
+          // shown = has a box (a position:fixed control, the tab bar, has no offsetParent but is on screen)
+          const el = [...document.querySelectorAll(s)].find((b) => b.getClientRects().length > 0 && getComputedStyle(b).visibility !== 'hidden'
             && (rx.test((b.textContent || '').trim()) || rx.test((b.getAttribute('aria-label') || '').trim())));
           if (!el) return false;
           el.click();
@@ -207,15 +209,17 @@ async function main() {
         if (ok) { await sleep(600); return; }
         await sleep(250);
       }
-      const have = await page.evaluate((s) => [...document.querySelectorAll(s)].filter((b) => b.offsetParent !== null)
+      const have = await page.evaluate((s) => [...document.querySelectorAll(s)].filter((b) => b.getClientRects().length > 0)
         .map((b) => (b.textContent || b.getAttribute('aria-label') || '').trim().slice(0, 24)).slice(0, 14).join(' | '), sel);
       throw new Error(`walk: no control matching ${re} (have: ${have})`);
     };
     const goHome = async () => {
       for (let i = 0; i < 6; i++) {
-        if (await page.evaluate(() => !!document.querySelector('.home-shortcuts'))) return;
+        if (await page.evaluate(() => !!document.querySelector('.home-root'))) return;   // Home = the Read tab's root
         await page.evaluate(() => {
-          const b = document.querySelector('button[title="Home"]')
+          // The Read tab where the bar shows; a reader hides the bar and has its Home button.
+          const b = [...document.querySelectorAll('.tabbar-tab')].find((x) => (x.textContent || '').trim() === 'Read')
+            || document.querySelector('button[title="Home"]')
             || [...document.querySelectorAll('button')].find((x) => /back/i.test(x.getAttribute('aria-label') || ''));
           if (b) b.click(); else history.back();
         });
@@ -265,15 +269,23 @@ async function main() {
       await clickText(/^Maybe later$/);
     });
     await step('home', async () => { await goHome(); await check('home'); });
-    await step('more-menu', async () => {
-      await clickText(/^More$/, 'button'); await check('more-menu');
-      await page.keyboard.press('Escape'); await sleep(300);
+    // The three-tab bar is the replacement for Home's old More menu: three tabs, none a stub, Read lit on Home.
+    await step('tab-bar', async () => {
+      const tabs = await page.evaluate(() => [...document.querySelectorAll('.tabbar-tab')].map((b) => ({ t: (b.textContent || '').trim(), on: b.classList.contains('is-on') })));
+      if (tabs.map((t) => t.t).join() !== 'Read,Listen,Library') throw new Error(`tab bar shows ${JSON.stringify(tabs)}, wanted Read, Listen, Library`);
+      if (!tabs[0].on) throw new Error('the Read tab is not lit on Home');
+      const more = await page.evaluate(() => !!document.querySelector('.top-nav .nav-more-btn') && getComputedStyle(document.querySelector('.top-nav .nav-more-btn')).display !== 'none');
+      if (more) throw new Error('Home still shows the More menu (the menu is for readers only)');
+      await check('tab-bar');
     });
     await step('letter', async () => {
       await goHome();
       await clickText(/Prophetic Letters/); await check('volumes');
       await clickText(/^Volume One/); await check('volume-one');
       await clickText(/A Word of Warning/); await check('letter-top');
+      // The ⋯ menu of page options is a reader's (its tap targets are in TAP48).
+      await clickText(/^More$/, 'button'); await check('more-menu');
+      await page.keyboard.press('Escape'); await sleep(300);
       // W2: the reading top bar as shipped (default settings) fits 360 and 412. (With every optional top-bar
       // button switched on - History, theme, gear, nav arrows - it already overflowed on main before L3.)
       for (const w of [360, 412]) {
@@ -301,10 +313,18 @@ async function main() {
       await page.setViewport({ width: 360, height: 800 });
       if (!(await toEnd())) throw new Error('no end of text'); await sleep(700); await toEnd(); await check('letter-end');
     });
-    await step('history', async () => { await goHome(); await clickText(/^Recently VisitedHistory/); await check('history'); });
+    await step('history', async () => {
+      await goHome(); await clickText(/^Library$/, '.tabbar-tab'); await clickText(/^See all$/); await check('history');
+      // A screen with the bar: Back, Search, Tabs, the gear last; no Home icon, no ⋯ (the top-bar rule).
+      const bar = await page.evaluate(() => [...document.querySelectorAll('.top-nav button')]
+        .filter((b) => b.getClientRects().length > 0 && getComputedStyle(b).display !== 'none')
+        .map((b) => b.getAttribute('aria-label') || b.className));
+      const names = bar.map((n) => (/^Open tabs/.test(n) ? 'Tabs' : /^Back/.test(n) ? 'Back' : n));
+      if (names.join() !== 'Back,Search,Tabs,Settings') throw new Error(`top bar on History reads ${names.join(', ')}, wanted Back, Search, Tabs, Settings`);
+    });
     await step('tabs', async () => { await clickText(/Open tabs/, 'button'); await check('open-tabs'); await page.keyboard.press('Escape'); });
     await step('search', async () => {
-      await goHome(); await clickText(/^Search library/);
+      await goHome(); await clickText(/^Search the letters and the Bible/);
       await page.evaluate(() => {
         const box = document.querySelector('input[type="search"], .srch-input, input');
         const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
@@ -314,9 +334,9 @@ async function main() {
       await page.waitForSelector('.srch-sort-btn', { timeout: 30000 });
       await check('search');
     });
-    await step('settings', async () => { await goHome(); await clickText(/^App ConfigurationSettings/); await check('settings'); });
-    await step('library', async () => { await goHome(); await clickText(/^Personal StudyLibrary/); await check('library'); });
-    await step('listening', async () => { await goHome(); await clickText(/^Audio ReadingsListening Library/); await check('listening'); });
+    await step('settings', async () => { await goHome(); await clickText(/^Settings$/); await check('settings'); });
+    await step('library', async () => { await goHome(); await clickText(/^Library$/, '.tabbar-tab'); await check('library'); });
+    await step('listening', async () => { await goHome(); await clickText(/^Listen$/, '.tabbar-tab'); await check('listening'); });
     await step('bible', async () => {
       await goHome(); await clickText(/^The Holy Bible/); await check('bible');
       await clickText(/^The Law/); await clickText(/Genesis$/); await check('genesis');
