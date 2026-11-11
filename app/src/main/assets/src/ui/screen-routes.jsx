@@ -381,7 +381,7 @@ export function buildScreenRoutes({
   // Skip Buttons (player-1025): the step every skip control takes, the phone's lock screen included.
   AudioPlayer.setSkipSeconds(settings.skipSeconds);
   // dl-d5: each running plan's next 7 days, and (opt-in) the next 3 after the one playing, download on Wi-Fi.
-  setAutoDownloads(planTracks, settings.keepNextReady === true);
+  setAutoDownloads(planTracks, settings.keepNextReady === true, settings.keepStarred === true);
   /* ─────────────────────────────────────────────────────────────────────
      Built-in prop-builder helpers. Previously defined inside App() and
      threaded as 5 props (colIdxProps, colReadNavProps, _idxNav,
@@ -1465,8 +1465,12 @@ export function buildScreenRoutes({
     'audio-library-offline': () => (
       <AudioOfflineScreen
         onBack={goNavOrigin}
-        backLabel={(navOrigin && navOrigin.label) || 'Listening Library'}
+        backLabel={'Back to ' + ((navOrigin && navOrigin.label) || 'Listen')}
         bibleAudio={settings.bibleAudio}
+        keepStarred={settings.keepStarred === true}
+        keepNextReady={settings.keepNextReady === true}
+        wifiOnly={settings.downloadWifiOnly === true}
+        onToggleSetting={toggleSetting}
         letterReader={settings.letterReader}
         onLetterReader={(/** @type {string} */ v) => updateSetting('letterReader', v)}
         onSearch={goSearch}

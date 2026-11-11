@@ -289,6 +289,8 @@ export function useSettings({ savedSettings, theme }) {
       downloadWifiOnly: false,
       // Keep the next 3 ready (dl-d5, call 5A): off by default.
       keepNextReady: false,
+      // Keep what I star on this phone (W3-listen, Downloads > By themselves): off by default.
+      keepStarred: false,
       // The player's skip buttons, seconds (Corbin 10-25: "10s by default, adjustable in settings"; it was a fixed 15).
       skipSeconds: 10,
       ...savedS,

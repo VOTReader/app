@@ -51,14 +51,15 @@ export function ListGroup({ label, aside, onAside, inset = false, children, clas
  *   menu     ONE menu: { label, onClick }; with a menu the row's own tap is a separate button beside it
  *   onClick  the row opens something: it is a button, with a chevron unless `chevron={false}` or it has a menu
  *   one      a one-line row (54 px); `noLead` drops the leading slot (the hairline then starts at the padding)
+ *   switchOn a switch row (true / false): the row is one button, role="switch", the switch drawn where the chevron goes
  *   star     the row's one button besides its menu (rule 12): { on, label, onClick }, a Save star (listen.html au-coll)
  * @param {{ icon?: string, lead?: any, title: any, meta?: any, value?: any, valueNone?: boolean,
  *   mark?: { label: string, icon?: string, tick?: boolean } | null, menu?: { label: string, onClick: () => void } | null,
- *   star?: { on: boolean, label: string, onClick: () => void } | null,
+ *   star?: { on: boolean, label: string, onClick: () => void } | null, switchOn?: boolean,
  *   onClick?: () => void, chevron?: boolean, one?: boolean, noLead?: boolean, ariaLabel?: string, className?: string,
  *   current?: boolean }} props
  */
-export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, star = null, onClick, chevron,
+export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, star = null, switchOn, onClick, chevron,
   one = false, noLead = false, ariaLabel, className = '', current = false }) {
   const leading = noLead ? null : (lead || (icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null));
   const showChev = chevron === undefined ? !!onClick && !menu : chevron;
@@ -96,6 +97,15 @@ export function ListRow({ icon, lead, title, meta, value, valueNone = false, mar
           </button>
         ) : null}
       </div>
+    );
+  }
+  if (onClick && switchOn !== undefined) {
+    return (
+      <button type="button" role="switch" aria-checked={!!switchOn} className={cx(rowCls, 'ui-row-press', 'is-switch')} onClick={onClick} aria-label={ariaLabel}>
+        {leading}
+        <span className="ui-row-text"><span className="ui-row-title">{title}</span>{meta ? <span className="ui-row-meta">{meta}</span> : null}</span>
+        <span className={cx('ui-switch', switchOn && 'is-on')} aria-hidden="true" />
+      </button>
     );
   }
   if (onClick) {

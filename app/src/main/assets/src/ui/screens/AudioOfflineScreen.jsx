@@ -16,6 +16,8 @@
 /* Cluster H (the Listening Library) - bundle-d since lz1 (2026-10-13), lazy bundle-h before. OfflineAudio and AudioPlayer
    live in bundle-d too and are read as free globals at call time - one store, one player (see _entry-d.js). */
 
+import { ListGroup, ListRow } from '../components/UiParts.jsx';
+import { canTell } from '../../utils/download-gate.js';
 import { useOfflineAudio, formatBytes, isLeaving, removeWithUndo, REMOVED_TOAST_ID } from '../components/OfflineAudioControls.jsx';
 import { DownloadChooser, Sheet, TrashIcon } from '../components/DownloadChooser.jsx';
 import { DownloadStrip } from '../components/DownloadStrip.jsx';
@@ -251,9 +253,14 @@ function BranchSheet({ branch, onPlay, onChoose, onRemove, onClose }) {
  *   onSettings?: () => void,
  *   theme?: any,
  *   onThemeChange?: (theme: any) => void,
+ *   keepStarred?: boolean,
+ *   keepNextReady?: boolean,
+ *   wifiOnly?: boolean,
+ *   onToggleSetting?: (key: string) => void,
  * }} props
  */
-export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bibleAudio, letterReader, onLetterReader, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioOfflineScreen({ onBack, backLabel = 'Back to Listen', bibleAudio, letterReader, onLetterReader,
+  keepStarred = false, keepNextReady = false, wifiOnly = false, onToggleSetting }) {
   const off = useOfflineAudio();
   // Nothing on the phone or on its way opens Choose; else what is there (an entry point may say which: openDownloadsAt).
   const [at] = React.useState(() => { const a = _openAt; _openAt = null; return a; });
@@ -289,31 +296,40 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
     }
   };
   const tabs = (
-    <div className="dl-tabs" role="tablist" aria-label="Downloads">
+    <div className="ui-seg dl-tabs" role="tablist" aria-label="Downloads">
       {/** @type {Array<['choose' | 'phone', string]>} */ ([['choose', 'Choose'], ['phone', 'On this phone']]).map(([id, name]) => (
         <button key={id} type="button" role="tab" id={'dl-tab-' + id} aria-selected={tab === id} aria-controls="dl-tabpanel"
-          className={'dl-tab' + (tab === id ? ' is-on' : '')} onClick={() => setTab(id)}>{name}</button>
+          className={'ui-seg-item dl-tab' + (tab === id ? ' is-on' : '')} onClick={() => setTab(id)}>{name}</button>
       ))}
     </div>
   );
-  const nav = LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange });
-  const head = (
-    <header className="audio-library-hero dl-hero">
-      <div className="audio-library-eyebrow">Listening Library</div>
-      <h1>Downloads</h1>
-    </header>
-  );
+  // listen.html au-dl: the title in the bar, never "Listening Library" (U 8.6).
+  const utility = { title: 'Downloads', onBack, backLabel };
+  // au-dlauto: what downloads by itself, beside what you choose. The last two are Settings' own switches, shown here
+  // because this is where you look for them; all three wait for Wi-Fi (auto-download.js), so they show only where the
+  // phone can tell Wi-Fi from mobile data (as in Settings).
+  const byThemselves = onToggleSetting && canTell() ? (
+    <ListGroup label="By themselves" className="dl-auto">
+      <ListRow noLead title="Keep what I star on this phone" meta="Saved recordings download by themselves, on Wi-Fi"
+        switchOn={keepStarred} onClick={() => onToggleSetting('keepStarred')} />
+      <ListRow noLead title="Keep the next 3 ready" meta="While you listen, the next three download ahead"
+        switchOn={keepNextReady} onClick={() => onToggleSetting('keepNextReady')} />
+      <ListRow noLead title="Download only on Wi-Fi" meta="On mobile data a download waits for Wi-Fi"
+        switchOn={wifiOnly} onClick={() => onToggleSetting('downloadWifiOnly')} />
+    </ListGroup>
+  ) : null;
   if (tab === 'choose' && off) {
     return (
-      <ScreenLayout navChildren={nav}>
+      <ScreenLayout utility={utility}>
         <div className="audio-library-screen dl-screen">
-          {head}
           {tabs}
           <div role="tabpanel" id="dl-tabpanel" aria-labelledby="dl-tab-choose">
             <DownloadStrip off={off} onMakeRoom={() => setTab('phone')} />
             <DownloadQueue off={off} only="failed" />
             <DownloadChooser key={focus || ''} off={off} bibleAudio={bibleAudio} focus={focus}
               letterReader={letterReader} onLetterReader={onLetterReader} />
+            {byThemselves}
+            {byThemselves ? <p className="listen-dl-note">The last two are the same switches as in Settings, shown here because this is where you look for them.</p> : null}
           </div>
         </div>
       </ScreenLayout>
@@ -331,9 +347,8 @@ export function AudioOfflineScreen({ onBack, backLabel = 'Listening Library', bi
   const barTotal = used + Math.max(0, free);
 
   return (
-    <ScreenLayout navChildren={nav}>
+    <ScreenLayout utility={utility}>
       <div className="audio-library-screen dl-screen">
-        {head}
         {off ? tabs : null}
         <div role={off ? 'tabpanel' : undefined} id="dl-tabpanel" aria-labelledby={off ? 'dl-tab-phone' : undefined}>
           {/* Pinned under the tabs (README: the strip). */}
