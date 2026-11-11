@@ -2701,6 +2701,7 @@
       /* The grabber pill is a bottom-sheet affordance; the ‹ close button
          (sheet-handle-back, the single AT stop) carries close in the rail. */
       .fn-sheet.rail .sheet-handle-grab { display: none; }
+      .fn-sheet.rail .sheet-handle-row { margin: 0; }
     }
     /* ── SheetHandle (SheetHandle.jsx) — THE shared sheet grabber ──
        (.fn-sheet-handle / .select-sheet-handle / .link-action-handle are
@@ -6112,15 +6113,24 @@
       box-shadow: 0 -10px 30px rgba(0,0,0,0.35);
     }
     body.light .select-sheet { box-shadow: 0 -10px 30px rgba(0,0,0,0.12); }
-    .sheet-handle-row { margin: -0.25rem 0 var(--sp-1); }
-    .sheet-handle-back { color: var(--text-2); }
+    /* POL3 (mock base.css .sheet .grab + .sh): the grabber 8 px from the sheet's top, the title row (48 high) right
+       under it, the close x on the title row at the right, level with the title. The grab button keeps its 44 px
+       hit box; its lower part lies over the title row's middle, where nothing is tapped. */
+    .sheet-handle-row { position: relative; margin: -8px 0 -16px; }
+    .sheet-handle-grab { align-items: flex-start; padding-top: 8px; }
+    .sheet-handle-back { position: absolute; top: calc(100% - 26px); right: -10px; margin: 0; color: var(--text-2); }
+    .link-action-sheet .sheet-handle-back { right: calc(var(--gutter) - 10px); }
+    /* what follows the grabber (the title, or a head with its own words at the right) leaves the x its room */
+    .sheet-handle-row + :not(:is(.plan-sheet, .ui-sheet:has(> .ui-sheet-foot), .jrn-insert-sheet, .fn-sheet, .audio-manager-sheet, .ans-sheet) *) { padding-right: 34px; }
     .sheet-handle-back:active { color: var(--text-1); }
     .sheet-handle-bar { width: 36px; height: 4px; background: var(--surface-3); }
     /* POL1 (rule 13): a sheet with worded actions (Cancel | Save, Done) closes by its words, so it draws no x.
        The grabber stays; the words are the screen-reader and keyboard close. */
     .plan-sheet .sheet-handle-back, .ui-sheet:has(> .ui-sheet-foot) .sheet-handle-back, .jrn-insert-sheet .sheet-handle-back { display: none; }
     /* the full player's put-away chevron and the Answers sheets keep theirs at the left (mock listen p-full, answers) */
-    .audio-manager-sheet .sheet-handle-back, .ans-sheet .sheet-handle-back { grid-column: 1; justify-self: start; margin: 0 0 0 -8px; }
+    .audio-manager-sheet .sheet-handle-row, .ans-sheet .sheet-handle-row { position: static; margin: -0.25rem 0 var(--sp-1); }
+    .audio-manager-sheet .sheet-handle-grab, .ans-sheet .sheet-handle-grab { align-items: center; padding-top: 0; }
+    .audio-manager-sheet .sheet-handle-back, .ans-sheet .sheet-handle-back { position: static; grid-column: 1; justify-self: start; margin: 0 0 0 -8px; }
     .sheet-handle-grab:active .sheet-handle-bar { background: var(--text-3); }
     @media (hover:hover) { .sheet-handle-back:hover { color: var(--text-1); } .sheet-handle-grab:hover .sheet-handle-bar { background: var(--text-3); } }
     .select-sheet-eyebrow, .ui-sheet-label { margin: 0 2px 2px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; text-align: left; line-height: var(--lh-label); }
@@ -6158,8 +6168,9 @@
     .ui-sheet-body:empty { display: none; }
     .ui-sheet-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
     .ui-sheet-foot .ui-btn:not(.is-primary) { background: var(--surface-2); }
-    .ui-sheet-foot .ui-btn.is-danger.is-primary { background: var(--tone-danger); color: var(--accent-ink); }
-    body.light .ui-sheet-foot .ui-btn.is-danger.is-primary { color: #ffffff; }
+    /* a destroying confirm: red words on the plain inset button (mock .btn.in.red), not a red fill */
+    .ui-sheet-foot .ui-btn.is-danger.is-primary { background: var(--surface-2); color: var(--tone-danger); font-weight: 500; }
+    .ui-sheet-foot .ui-btn.is-danger.is-primary svg { color: var(--tone-danger); }
     /* the row-action sheets (Bookmarks, Links, the Journal): the same sheet, worded rows, a gold icon per row */
     .link-action-overlay { background: var(--scrim); }
     .link-action-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; padding: var(--sp-2) 0 var(--sp-6); }
