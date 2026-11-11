@@ -14,14 +14,16 @@
 import { coverageCopy } from '../../utils/audio-coverage.js';
 
 /**
- * @param {{ state: 'read-along' | 'listening-only' | 'no-recording', detail?: string | null }} props
+ * @param {{ state: 'read-along' | 'listening-only' | 'no-recording', detail?: string | null, label?: string }} props
  *   `detail` is the honest count beside a partly recorded work ("14 of 16 parts").
+ *   `label` words the badge itself in place of the state's own word (the Studies list says "Text only" and
+ *   "Audio for 14 of 16 parts").
  */
-export function CoverageBadge({ state, detail }) {
+export function CoverageBadge({ state, detail, label }) {
   const copy = coverageCopy(state);
   return (
     <span className="coverage-badge-wrap">
-      <span className={'coverage-badge coverage-badge-' + state} title={copy.title}>{copy.label}</span>
+      <span className={'coverage-badge coverage-badge-' + state} title={copy.title}>{label || copy.label}</span>
       {detail ? <span className="coverage-badge-detail">{detail}</span> : null}
     </span>
   );

@@ -63,11 +63,13 @@ describe('StudiesHome -- the read-along badge', () => {
   it('marks a partly recorded study read-along AND says how much of it is recorded', () => {
     renderHome();
     const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Lamb of God'));
-    expect(card.querySelector('.coverage-badge').textContent).toBe('Read-along');
+    expect(card.querySelector('.coverage-badge').textContent).toBe('Audio for 1 of 2 chapters');
+    expect(card.querySelector('.coverage-badge').className).toContain('coverage-badge-read-along');
     // n6-12: a study in parts counts its recorded CHAPTERS - the row already
     // says "1 Part", and "1 of 2 parts" beside it contradicted it
     expect(card.textContent).toContain('1 Part');
     expect(card.textContent).toContain('1 of 2 chapters');
+    expect(card.textContent).not.toMatch(/read-along/i);
   });
 
   it('(n6-12) a study with no parts keeps "parts", which agrees with its row', () => {
@@ -77,13 +79,13 @@ describe('StudiesHome -- the read-along badge', () => {
     render(<StudiesHome studies={two} studiesLoading={false} studiesError={null} onRetry={noop} onSelectStudy={noop} onBack={noop} onSearch={noop} onHistory={noop} onSettings={noop} theme="dark" onThemeChange={noop} />);
     const card = [...document.querySelectorAll('.chapter-card-btn')].find((b) => b.textContent.includes('Grace'));
     expect(card.textContent).toContain('2 Parts');
-    expect(card.textContent).toContain('1 of 2 parts');
+    expect(card.textContent).toContain('Audio for 1 of 2 parts');
   });
 
   it('marks a study with no recording, so a listener knows before tapping', () => {
     renderHome();
     const badge = badgeOf('The Trinity');
-    expect(badge.textContent).toBe('No recording');
+    expect(badge.textContent).toBe('Text only');
     expect(badge.className).toContain('coverage-badge-no-recording');
   });
 
@@ -91,7 +93,7 @@ describe('StudiesHome -- the read-along badge', () => {
     renderHome();
     const badge = badgeOf('Purity');
     expect(badge.getAttribute('title')).toMatch(/light/i);
-    expect(screen.getAllByText('Read-along').length).toBe(2);
+    expect(screen.getAllByText('Read-along').length).toBe(1);
   });
 
   it('marks the Matthew Study Bible read-along -- its recording is a Bible edition', () => {
@@ -104,7 +106,7 @@ describe('StudiesHome -- the read-along badge', () => {
   it('says no recording rather than throwing when the manifest has not landed', () => {
     delete window.AUDIO_MANIFEST;
     renderHome();
-    expect(badgeOf('Purity').textContent).toBe('No recording');
+    expect(badgeOf('Purity').textContent).toBe('Text only');
   });
 });
 

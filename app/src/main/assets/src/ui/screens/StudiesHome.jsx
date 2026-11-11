@@ -70,8 +70,12 @@ export function StudiesHome({ studies, studiesLoading, studiesError, onRetry, on
                       way in used to admit. A locked study promises nothing
                       yet, so it carries no badge. */}
                   {s.locked ? null : (() => {
+                    // Half-baked 10: plain words. No recording is "Text only"; a partly recorded study says how much has audio.
                     const coverage = studyCoverage(s);
-                    return <CoverageBadge state={coverage.state} detail={studyCoverageDetail(coverage, s.parts ? 'chapters' : 'parts')} />;
+                    const partial = studyCoverageDetail(coverage, s.parts ? 'chapters' : 'parts');
+                    if (coverage.state === 'no-recording') return <CoverageBadge state={coverage.state} label="Text only" />;
+                    if (partial) return <CoverageBadge state={coverage.state} label={'Audio for ' + partial} />;
+                    return <CoverageBadge state={coverage.state} />;
                   })()}
                 </div>
               </button>
