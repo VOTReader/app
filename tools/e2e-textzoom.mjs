@@ -106,6 +106,9 @@ try {
       for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) {
         const a = boxes[i], b = boxes[j];
         if (a.e.contains(b.e) || b.e.contains(a.e)) continue;
+        // The tab bar is fixed over the page's foot and the page scrolls under it (its end padding lets the last row
+        // clear it), so a row passing beneath the bar is not two controls overlapping. Everything else still counts.
+        if (!!a.e.closest('.tabbar') !== !!b.e.closest('.tabbar')) continue;
         const ix = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left), iy = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
         if (ix > 6 && iy > 6) overlaps.push(`${label(a.e)} × ${label(b.e)}`);
       }
