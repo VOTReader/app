@@ -129,7 +129,12 @@ try {
     return hit;
   };
   const heroTitle = () => page.evaluate(() => { const s = document.querySelector('.screen-layout > .pager-viewport > .screen-scroll, .screen-layout > .screen-scroll'); const h = s && s.querySelector('.hero-title'); return h ? h.textContent.trim() : null; });
-  const goHome = async () => { await click('Home', { settle: 600 }); };
+  // The three-tab layout: Home is the Read tab (the full player put away first), else the older Home control.
+  const tab = (l) => page.evaluate((l) => { const t = [...document.querySelectorAll('.tabbar-tab')].find((b) => b.textContent.trim() === l); if (t) t.click(); return !!t; }, l);
+  const goHome = async () => {
+    await page.keyboard.press('Escape'); await sleep(300);
+    if (await tab('Read')) { await sleep(600); if (await tab('Read')) await sleep(600); } else await click('Home', { settle: 600 });
+  };
   const openStudyChapter = async () => {
     await click('Studies', { contains: true, settle: 800 });
     // StudiesHome lists the studies as chapter cards; the corpus is lazy, so wait for the card.
@@ -187,11 +192,13 @@ try {
   // ── 3. away, then the desk's "Open the reading" — back on the chapter, still playing ──
   await goHome();
   await click('Open listening controls', { settle: 800, contains: true });
-  const opener = (await controls()).find((c) => c.startsWith('Open the reading'));
+  // The desk's opener reads "Open the letter — …" (a chapter's: "Open the chapter — …"; it read "Open the reading").
+  const OPENER = /^Open the (reading|letter|chapter)\b/;
+  const opener = (await controls()).find((c) => OPENER.test(c));
   note(`3: desk opener ${JSON.stringify(opener || null)}`);
-  if (!opener) fail('3: the desk has no "Open the reading — …" control for the study recording (hasTextDestination)');
+  if (!opener) fail('3: the desk has no "Open the letter — …" control for the study recording (hasTextDestination)');
   else {
-    await click('Open the reading', { settle: 900 });
+    await click(opener.split(' — ')[0], { settle: 900 });
     const title3 = await heroTitle();
     const paused = await page.evaluate(() => window.__e2eAudioEl ? window.__e2eAudioEl.paused : null);
     note(`3: landed on ${JSON.stringify(title3)}; paused=${paused}`);
@@ -208,7 +215,9 @@ try {
   const resident = await page.evaluate(() => typeof BIBLE_STUDIES !== 'undefined');
   note(`4: after reload the study corpus is ${resident ? 'RESIDENT (the walk cannot see the no-await path)' : 'not resident'}`);
   if (resident) fail('4: precondition — BIBLE_STUDIES is already loaded on Home after a reload; the no-await arm cannot be measured here');
-  await click('Listening Library', { contains: true, settle: 900 });
+  // The Listening Library is the Listen tab now; the study recordings sit under its Studies row.
+  if (await tab('Listen')) { await sleep(900); if (!(await controls()).some((c) => c.startsWith('Open text for'))) await click('Studies', { contains: true, settle: 900 }); }
+  else await click('Listening Library', { contains: true, settle: 900 });
   const rowOpener = (await controls()).find((c) => c.startsWith('Open text for'));
   note(`4: library row opener ${JSON.stringify(rowOpener || null)}`);
   if (!rowOpener) fail('4: the Listening Library row has no "Open text for …" control for the study recording');

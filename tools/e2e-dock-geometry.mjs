@@ -23,7 +23,7 @@
  *   G2  every visible control lies inside the viewport, below the top bar (inset-top + --bar-h, 56 px since the UI pass) and above
  *       the gesture inset (the player's own padding is the one thing allowed under it);
  *   G4  scrolled to its end, the reading text's last line rests clear above every control that stays up (the
- *       scroller's end padding is the dock's live height; toasts and the first-run hint come and go);
+ *       scroller's end padding is the dock's live height; toasts come and go);
  *   G3  every control the case expects is visible (a stopped auto-scroll pill and the tour prompt step aside
  *       while find is open). The Study Notes toggle and the prophecy Expand FAB left the dock (POL1/POL2, 2026-11-11):
  *       both are in the page now.
@@ -59,14 +59,13 @@ const PARTS = {
   stopped:    '<div class="ascroll-pill"><div style="height:44px;width:100vw"></div></div>',
   expanded:   '<div class="ascroll-pill is-running is-expanded"><div style="height:44px;width:100vw"></div><div class="ascroll-row ascroll-dwell-row" style="height:44px"></div></div>',
   find:       '<div class="find-pill"><div style="height:44px;width:100vw"></div></div>',
-  hint:       '<div class="ann-hint-pill"><div style="height:57px;width:100vw"></div></div>',            // 79px with its padding
   toast:      '<div class="vot-toast show"><div style="height:38px;width:100vw"></div></div>',          // two lines: 68px
   rootexit:   `<div id="vot-root-exit-toast" style="${ROOT_EXIT};opacity:1"><div style="height:20px;width:200px"></div></div>`,
   tour:       '<div class="tour-prompt"><div style="height:192px"></div></div>',                         // 218px
   fab:        '<button class="jrn-fab jrn-fab-newentry"></button>',
 };
-// What can be on screen at once. Reading screens: hint yields to the player (AnnotationHint), autoscroll and
-// find hide it (app.css). Home and first run's Letter 1: the tour prompt, which stacks on
+// What can be on screen at once. (The first-run annotation hint no longer floats: W2d made it the first row of the
+// reader's More menu, AnnotationHint.jsx, and its .ann-hint-pill rules are gone.) Home and first run's Letter 1: the tour prompt, which stacks on
 // the reading screen's rows and steps aside while find is open, and on a short screen for the pill
 // (tour-dock). Journal: the FAB.
 const CASES = [];
@@ -74,7 +73,6 @@ for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded', 'st
   for (const msg of ['', 'toast', 'rootexit']) {
     const c = [player && 'player', as, find && 'find', msg].filter(Boolean);
     CASES.push(c);
-    if (!player && !as && !find) CASES.push([...c, 'hint']);
   }
 for (const player of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
   CASES.push(['tour', player && 'player', msg].filter(Boolean));
@@ -98,7 +96,7 @@ try {
     for (const ins of insetsFor(w, h)) {
       await page.setContent('<!doctype html><html><head></head><body class="history-in-nav"></body></html>');
       await page.addStyleTag({ content: CSS });
-      // The hint slides up 8px as it enters; measure where things rest.
+      // Docked things slide in as they enter; measure where they rest.
       await page.addStyleTag({ content: '*, *::before, *::after { animation: none !important; transition: none !important; }' });
       await page.addScriptTag({ content: JOURNAL });
       if (ins) await page.evaluate(([t, b]) => {
@@ -124,7 +122,7 @@ try {
           }
           const sys = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-bottom')) || 0;
           const navBottom = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-top')) || 0) + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 67.4);
-          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .ann-hint-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
+          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
           const vis = els.map((el) => ({ el, k: el.className || el.id, cs: getComputedStyle(el), q: el.getBoundingClientRect() }))
             .filter((o) => o.cs.display !== 'none' && o.q.width && o.q.height);
           const out = { hits: [], off: [], missing: [], shown: [], text: [] };
@@ -132,7 +130,7 @@ try {
           scroller.scrollTop = 1e6;
           const last = document.getElementById('dock-last').getBoundingClientRect();
           for (const o of vis) {
-            if (o.el.closest('.vot-toast, #vot-root-exit-toast, .ann-hint-pill')) continue;
+            if (o.el.closest('.vot-toast, #vot-root-exit-toast')) continue;
             if (o.q.top < last.bottom - 0.5) out.text.push(`${o.k} top ${Math.round(o.q.top)} < last line ${Math.round(last.bottom)}`);
           }
           for (let i = 0; i < vis.length; i++) for (let j = i + 1; j < vis.length; j++) {
@@ -148,7 +146,7 @@ try {
               out.off.push(`${o.k} [${[o.q.left, o.q.top, o.q.right, o.q.bottom].map(Math.round)}]`);
           }
           const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', stopped: '.ascroll-pill', find: '.find-pill',
-            hint: '.ann-hint-pill', toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab' };
+            toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab' };
           for (const k of c) {
             const el = document.querySelector(want[k]);
             const shown = vis.some((o) => o.el === el);

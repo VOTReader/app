@@ -88,21 +88,22 @@ export const ReadingPlanStore = extendStore(
 
     /**
      * A chapter or letter was read (or listened to the end, or marked): tick it in
-     * every running or paused run that holds it. Dated by the reader's local date.
+     * every running run that holds it (a paused one counts nothing). Dated by the reader's local date.
      * @param {string} bid @param {string | number} cid @param {Date} [now]
      * @returns {boolean} whether a plan being followed holds it (plans2: such a read is a plan tick, and every plan
      *   tick writes the read record too, Mark as read on or off)
      */
     noteRead(bid, cid, now) {
       if (!bid || cid == null || cid === '') return false;
-      const held = this.holds(bid, cid);
+      const keys = _keysFor(String(bid), cid);
+      // P2 3.8: a paused plan counts nothing while paused, so only a running run ticks, or holds the read.
+      const held = this.all().some((r) => r.status === 'running' && r.tracks.some((t) => t.items.some((it) => keys.includes(it.k))));
       if (this._shouldDefer('noteRead', bid, cid, now)) return held;
       const when = now || new Date();
       const key = todayKey(when);
-      const keys = _keysFor(String(bid), cid);
       let changed = false;
       const next = this._load().map((r) => {
-        if (!_valid(r) || (r.status !== 'running' && r.status !== 'paused')) return r;
+        if (!_valid(r) || r.status !== 'running') return r;
         let out = r;
         for (const k of keys) out = tickItem(out, k, key, when.getTime());
         if (out !== r) changed = true;
