@@ -70,8 +70,9 @@ describe('settings filter and lazy progress', () => {
     expect(row('Check a backup file')).toBeTruthy();
     for (const place of foundPlaces()) expect(place).toMatch(/^Your data/);
     expect(screen.getByRole('status').textContent).toBe(foundPlaces().length + ' settings');
-    // The Also section offers the backup itself.
+    // The Also section offers the backup itself, and the big backup card stays out of the found rows (WS5, mock st-find).
     expect(screen.getByRole('button', { name: /^Keep a backup/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Back up now' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Clear filter' }));
     expect(groupHeads()).toHaveLength(8);   // the root's eight group rows
     expect(groupHead('Appearance').getAttribute('aria-expanded')).toBe('false');

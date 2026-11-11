@@ -179,13 +179,13 @@ export function AboutScreen({ onContinue, onBack, firstRun = true, onYourData = 
   );
   if (page === 'credits') {
     return (
-      <ScreenLayout utility={{ title: 'Credits and privacy', onBack: () => setPage(1), backLabel: 'Back to Welcome' }}>
+      <ScreenLayout utility={{ title: 'Credits and privacy', onBack: () => setPage(1), backLabel: 'Back to Welcome' }} hideTabsBtn>
         <div className="ws3-about"><CreditsBody makers={songMakers()} /></div>
       </ScreenLayout>
     );
   }
   return (
-    <ScreenLayout utility={page === 2 ? { title: '', onBack: () => setPage(1), backLabel: 'Back to Welcome' } : null}>
+    <ScreenLayout utility={page === 2 ? { title: '', onBack: () => setPage(1), backLabel: 'Back to Welcome' } : null} hideTabsBtn>
       <div className={'ws4-fr is-page-' + page} key={page}>
         {page === 1 ? (
           <>

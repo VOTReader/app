@@ -50,7 +50,8 @@ describe('TourPrompt — an inline card at the end of the Read tab (the UI pass,
   it('names the minutes the tour actually takes', () => {
     render(<TourPrompt screen="home" />);
     const text = document.querySelector('.tour-prompt-text').textContent;
-    expect(text).toBe(`New here? Take the ${steps.TOUR_MINUTES_WORD}-minute tour.`);
+    const stops = steps.TOUR_STOPS_WORD.charAt(0).toUpperCase() + steps.TOUR_STOPS_WORD.slice(1);
+    expect(text).toBe(`Let me show you around${stops} short stops, about ${steps.TOUR_MINUTES_WORD} minutes.`);
   });
 
   /* n115/n351 (A07.6): the 215 px card is one slim row: words, Show me around, Later, and ×, which
@@ -61,7 +62,7 @@ describe('TourPrompt — an inline card at the end of the Read tab (the UI pass,
     expect(strip.querySelector('h2')).toBeNull();
     expect([...strip.querySelectorAll('button')].map((b) => b.getAttribute('aria-label') || b.textContent))
       .toEqual(['Show me around', 'Maybe later', 'Don’t show this again']);
-    expect(getByRole('button', { name: 'Maybe later' }).textContent).toBe('Later');
+    expect(getByRole('button', { name: 'Maybe later' }).textContent).toBe('Maybe later');
     act(() => { getByRole('button', { name: 'Don’t show this again' }).click(); });
     expect(TourDoneFlagStore.is()).toBe(true);
     expect(document.querySelector('.tour-prompt')).toBeNull();

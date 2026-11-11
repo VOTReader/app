@@ -1597,15 +1597,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
         <RootCard mode={mode} last>
         <SettingsGroup sub={glance.data} tag={_lastBackupAt() ? null : 'Back up'} {...groupProps('data')}>
-          {/* WS3 settings (st-data): the backup first, as one gold button; restore and check under it. */}
-          <Findable text={'Backup Back up now ' + BACKUP_WORDS + ' votbak file last backup'}>
+          {/* WS3 settings (st-data): the backup first, as one gold button; restore and check under it.
+              WS5 (st-find): while finding, the card stays out of the found rows; Also · Keep a backup is its door. */}
+          {mode === 'search' ? null : <Findable text={'Backup Back up now ' + BACKUP_WORDS + ' votbak file last backup'}>
             <div className="settings-card ws3-backup">
               <div className="ws3-backup-label">Backup</div>
               <h2 className="ws3-backup-title">{_lastBackupAt() ? 'Backed up ' + _daysAgo(_lastBackupAt()) : 'Not backed up from this phone yet'}</h2>
               <p className="ws3-backup-line">One file (.votbak) with every note, highlight, notebook, journal entry, bookmark, link, reading mark, history record, open tab and setting. No login details, only your data.</p>
               <UiButton kind="primary" wide icon="dl" disabled={backupBusy} onClick={() => { _runLockedBackupOperation(exportPersonalData); }}>Back up now</UiButton>
             </div>
-          </Findable>
+          </Findable>}
           <div className="settings-card">
             <DataNavRow icon="reset" label="Restore from a backup" desc="Replaces your data on this phone with a backup file (.votbak). You confirm first."
               find="import restore votbak load" disabled={backupBusy} onClick={() => { _runBackupOperation(importPersonalData); }} />

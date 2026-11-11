@@ -8948,6 +8948,39 @@
         font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-muted);
         background: var(--bg3); border: 1px solid var(--gold-border); border-radius: 16px; padding: 12px;
       }
+      /* ── WS5 tour (mock settings.html tr-offer, tr-welcome, tr-stop, tr-after, tr-end) ──────────────
+         The card is a surface card in the UI face: the gold label with Skip tour at its right, a bar of the
+         stops, a serif title, the words, then Back | Next as pills (Not now | Start on the welcome card).
+         Type keeps the caps above (fs ladder, so Text Size still scales it). */
+      .tour-card { background: var(--surface-1); color: var(--text-1); border: 1px solid var(--hairline); border-radius: var(--r-sheet);
+        padding: 12px var(--card-pad) 12px; font-family: var(--font-ui); box-shadow: var(--shadow-float); }
+      .tour-head { display: flex; align-items: center; gap: var(--sp-2); }
+      .tour-head .tour-eyebrow { flex: 1; min-width: 0; }
+      .tour-card .tour-eyebrow { margin: 4px 0; font-family: var(--font-ui); font-weight: 700; letter-spacing: var(--track-label); color: var(--accent); }
+      .tour-card .tour-btn.tour-skip { flex: 0 0 auto; min-height: var(--tap); margin: -8px -8px -8px 0; padding: 0 8px; background: none;
+        color: var(--text-2); font-size: min(var(--fs-13), 16px); font-weight: 400; }
+      .tour-progress { display: flex; gap: 3px; margin: 2px 0 12px; }
+      .tour-progress span { flex: 1; height: 3px; border-radius: 2px; background: var(--surface-3); }
+      .tour-progress span.is-on { background: var(--accent); }
+      .tour-card .tour-title { margin: 2px 0 6px; font-family: var(--font-serif); font-size: min(var(--fs-18), 26px); font-weight: 700; color: var(--text-1); }
+      .tour-card .tour-text { margin: 0 0 8px; font-family: var(--font-ui); font-size: min(var(--fs-15), 22px); line-height: 1.45; color: var(--text-1); }
+      .tour-card .tour-tip { margin: 0 0 8px; font-family: var(--font-ui); font-style: normal; font-size: min(var(--fs-14), 20px); color: var(--text-2); }
+      .tour-card .tour-row { padding: 8px 0 12px; background: var(--surface-1); }
+      .tour-card.has-more .tour-row { box-shadow: 0 -14px 14px -12px var(--surface-1); }
+      .tour-card .tour-btn { min-height: var(--tap); padding: 0 18px; border: 0; border-radius: var(--r-pill); background: var(--surface-2);
+        color: var(--text-1); font-family: var(--font-ui); letter-spacing: 0; text-transform: none; font-weight: 500; }
+      .tour-card .tour-btn.primary { flex: 0 0 auto; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+      .tour-card .tour-btn.quiet { background: none; color: var(--text-2); padding: 0 10px 0 2px; }
+      /* The offer: label and × on one line, the title, one meta line, then the two buttons. */
+      .tour-prompt.tour-strip.tour-inline { display: block; padding: 12px var(--card-pad) 14px; }
+      .tour-inline .tour-prompt-kicker { margin: 0 40px 4px 0; color: var(--accent); }
+      .tour-inline .tour-prompt-text { margin: 0 0 12px; }
+      .tour-inline .tour-prompt-title { display: block; line-height: var(--lh-headline); }
+      .tour-inline .tour-prompt-meta { display: block; margin-top: 2px; color: var(--text-2); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+      .tour-inline .tour-row { position: static; display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: 0; padding: 0; background: none; justify-content: flex-start; }
+      .tour-inline .tour-btn { font-size: min(var(--fs-14), 18px); }
+      .tour-inline .tour-never { position: absolute; top: 2px; right: 2px; width: var(--tap); height: var(--tap); }
+      /* ── end WS5 tour ── */
       .settings-help-btn {
         font-family: var(--font-cinzel); font-size: var(--fs-14); letter-spacing: 0.08em; text-transform: uppercase;
         min-height: 48px; padding: 0 16px; border-radius: 12px; width: 100%;

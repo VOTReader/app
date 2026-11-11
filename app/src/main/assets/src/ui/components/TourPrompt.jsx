@@ -13,6 +13,8 @@
    page, not a dialog and not a float — a reader who ignores it loses nothing.
    ═══════════════════════════════════════════════════════════════════════ */
 
+const cap = (w) => String(w || '').charAt(0).toUpperCase() + String(w || '').slice(1);
+
 /** @param {{ screen: string, letterId?: string|null }} props */
 export function TourPrompt({ screen, letterId }) {
   const ctl = typeof TourController !== 'undefined' ? TourController : null;
@@ -40,12 +42,17 @@ export function TourPrompt({ screen, letterId }) {
     <div className="tour-prompt tour-strip tour-inline" role="region" aria-labelledby="tour-prompt-title">
       {/* n115/n351 (A07.6): slim strip (Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png, variant C);
           the card it replaces was 215 px over Home's cards. The minutes come from the tour itself. */}
+      {/* WS5 tour (tr-offer, mock settings.html): a gold "New here?" label with × at its right, the title,
+          one meta line, then Show me around (primary) and Maybe later (text). */}
+      <p className="ui-label tour-prompt-kicker">New here?</p>
       <p className="tour-prompt-text" id="tour-prompt-title">
-        <span className="tour-prompt-title">New here?</span> Take the {ctl.minutesWord()}-minute tour.
+        <span className="tour-prompt-title">Let me show you around</span>
+        <span className="tour-prompt-meta">{cap(ctl.stopsWord())} short stops, about {ctl.minutesWord()} minutes.</span>
       </p>
-      <button type="button" className="tour-btn primary" onClick={() => ctl.start('prompt')}>Show me around</button>
-      {/* "Later" on screen; the name keeps the whole phrase (the visible word is inside it). */}
-      <button type="button" className="tour-btn quiet" aria-label="Maybe later" onClick={() => ctl.dismissPrompt('later')}>Later</button>
+      <div className="tour-row">
+        <button type="button" className="tour-btn primary" onClick={() => ctl.start('prompt')}>Show me around</button>
+        <button type="button" className="tour-btn quiet" onClick={() => ctl.dismissPrompt('later')}>Maybe later</button>
+      </div>
       <button type="button" className="tour-never" aria-label="Don’t show this again" title="Don’t show this again" onClick={() => ctl.dismissPrompt('never')}>
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18" /></svg>
       </button>

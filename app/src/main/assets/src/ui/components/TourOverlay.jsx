@@ -438,7 +438,12 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   ] : [{ left: 0, top: 0, width: vw, height: vh }];
   const px = (n) => Math.round(n) + 'px';
   const first = st.index === 0;
-  const primary = step.primary || 'Next';
+  // WS5 tour (tr-after): once the reader has done the stop's thing, Next names the stop that follows.
+  const nextStep = typeof ctl.peek === 'function' ? ctl.peek(1) : null;
+  const primary = (step.primary || 'Next') === 'Next' && st.pressed && nextStep && nextStep.title
+    ? 'Next: ' + nextStep.title.charAt(0).toLowerCase() + nextStep.title.slice(1) : (step.primary || 'Next');
+  // WS5 tour (tr-stop): "2 of 13 · Listen" draws a bar of 13 under the eyebrow, 2 of them lit.
+  const of = /^(\d+) of (\d+)/.exec(String(step.eyebrow || ''));
   // After the tour (or the reader) pressed the ringed control, the card says what to look for.
   const text = st.pressed && step.after ? step.after : step.text;
   const hint = missing ? 'I could not find it on this screen. Press Next to go on.' : (st.pressed ? null : (step.tip || null));
@@ -450,7 +455,15 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
       {ring && !opened && <div className="tour-ring" aria-hidden="true" style={{ left: px(ring.left), top: px(ring.top), width: px(ring.width), height: px(ring.height) }} />}
       {ring && clear && <div className={'tour-arrow ' + (below ? 'up' : 'down')} aria-hidden="true" style={{ left: px(ring.left + ring.width / 2 - 10), top: below ? px(cardTop - 20) : px(cardTop + h) }} />}
       <div className={'tour-card' + (docked ? ' docked' : '') + (hasMore ? ' has-more' : '')} ref={setCardEl} role="dialog" aria-modal="true" aria-labelledby="tour-title" style={cardStyle} data-scroller-top={dockedTop} onScroll={checkMore}>
-        <div className="tour-eyebrow">{step.eyebrow}</div>
+        <div className="tour-head">
+          <div className="tour-eyebrow">{step.eyebrow}</div>
+          {first ? null : <button type="button" className="tour-btn quiet tour-skip" aria-label="Skip, leave the tour" onClick={() => ctl.skip()}>Skip tour</button>}
+        </div>
+        {of ? (
+          <div className="tour-progress" aria-hidden="true">
+            {Array.from({ length: Number(of[2]) }, (_, k) => <span key={k} className={k < Number(of[1]) ? 'is-on' : ''} />)}
+          </div>
+        ) : null}
         <h2 className="tour-title" id="tour-title">{step.title}</h2>
         <div aria-live="polite">
           <p className="tour-text" id={descId}>{text}</p>
@@ -460,9 +473,11 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
           {/* Decorative on purpose: the words below are reachable by scrolling and a screen reader
               already has the whole card, so this says nothing it would have to repeat. */}
           {hasMore && <span className="tour-more" aria-hidden="true" />}
-          <button type="button" className="tour-btn quiet" aria-label="Skip, leave the tour" onClick={() => ctl.skip()}>Skip</button>
+          {/* WS5 tour: the welcome card says Not now | Start; every stop after it Back | Next, Skip tour up top. */}
+          {first
+            ? <button type="button" className="tour-btn quiet" aria-label="Not now, leave the tour" onClick={() => ctl.skip()}>Not now</button>
+            : <button type="button" className="tour-btn" aria-label="Back, previous stop" onClick={() => ctl.back()}>Back</button>}
           <span className="tour-sp" />
-          <button type="button" className="tour-btn" aria-label="Back, previous stop" disabled={first} onClick={() => ctl.back()}>Back</button>
           <button type="button" className="tour-btn primary" data-autofocus onClick={() => ctl.next()}>{primary}</button>
         </div>
       </div>

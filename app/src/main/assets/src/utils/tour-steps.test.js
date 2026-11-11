@@ -231,7 +231,7 @@ describe('tour-steps — words', () => {
 
   it("uses the trailer's phrases verbatim", () => {
     const all = TOUR_STEPS.map((s) => s.title + ' ' + s.text).join(' ');
-    for (const w of ['Press Listen', 'The words light up as they are read', 'verse by verse', 'Journal', 'a backup', 'Export']) expect(all, w).toContain(w);
+    for (const w of ['Press Listen', 'The words light up as they are read', 'verse by verse', 'Journal', 'a backup', 'Back up now']) expect(all, w).toContain(w);
     expect(TOUR_WORDS).toContain('Press Listen');
   });
 });

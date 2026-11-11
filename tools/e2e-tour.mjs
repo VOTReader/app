@@ -100,6 +100,9 @@ async function stripGeometry(page, note) {
   await page.evaluate(() => Promise.race([document.fonts.ready, new Promise((r) => setTimeout(r, 3000))]));
   const g = await page.evaluate(() => {
     const p = document.querySelector('.tour-prompt'); if (!p) return null;
+    // The offer is a card at the END of the Read tab (U section 4, the UI pass), in the page's flow: a reader scrolls
+    // down to it, so the walk does too before it asks whether the card and its x sit inside the frame.
+    p.scrollIntoView({ block: 'end' });
     const r = p.getBoundingClientRect();
     const never = p.querySelector('.tour-never'); const nr = never ? never.getBoundingClientRect() : null;
     const row = p.querySelector('.tour-row');
@@ -339,7 +342,8 @@ async function run(browser, { width, height, label, light }) {
     if (f.step !== id) { fail(`expected stop ${id}, the tour is at ${f.step} (${f.title})`); break; }
     if (!f.dialog || !f.labelled) fail(`${id}: the card is not a labelled modal dialog`);
     if (!f.skip) fail(`${id}: Skip is not on the card`);
-    if (f.back !== (id === 'welcome' ? 'disabled' : 'enabled')) fail(`${id}: Back is ${f.back}`);
+    // WS5 tour (tr-welcome, mock settings.html): the welcome card has Not now | Start and no Back; every stop after it has Back.
+    if (f.back !== (id === 'welcome' ? 'missing' : 'enabled')) fail(`${id}: Back is ${f.back}`);
     /* Focus lives in the card — or, on a stop that opens with the listening sheet up (back-to-words:
        the sheet the player stop opened), in the sheet, whose own trap is the topmost: the card's ‹
        words point INTO the sheet, and Escape or ‹ closes it and hands focus back (asserted below). */
