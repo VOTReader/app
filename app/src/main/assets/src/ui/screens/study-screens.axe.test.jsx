@@ -604,7 +604,7 @@ describe('axe — JournalRecordingSheet', () => {
       nativeListRecordings: () => '[]', nativeRecordCancel: noop, nativeRecordStop: noop, nativeDeleteRecording: noop,
     });
     render(<JournalRecordingSheet onSave={noop} onClose={noop} />);
-    const dialog = screen.getByRole('dialog', { name: 'Voice Recording' });
+    const dialog = screen.getByRole('dialog', { name: 'Voice recording' });
     expect(await seriousViolations(dialog)).toEqual([]);
     expect(within(dialog).getByRole('status').textContent).toMatch(/microphone/i);
   });
