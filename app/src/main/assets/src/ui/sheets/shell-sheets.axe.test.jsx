@@ -100,10 +100,12 @@ describe('axe — NoteSheet', () => {
     noteStores('A thought');
     render(<NoteSheet groupId="g1" startInEditMode={false} onClose={noop} />);
     expectModal('Note');
-    const opts = screen.getByRole('button', { name: 'Options' });
-    expect(opts.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(opts);
-    expect(opts.getAttribute('aria-expanded')).toBe('true');
+    // r-note-view (W2f): four worded buttons; the colour dot opens the colours in place.
+    const dot = screen.getByRole('button', { name: 'Change note color' });
+    expect(dot.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(dot);
+    expect(dot.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 

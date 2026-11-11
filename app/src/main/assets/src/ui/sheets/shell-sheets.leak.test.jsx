@@ -73,7 +73,7 @@ describe('leaks — note and annotation sheets', () => {
   it('NoteSheet, its options menu open', async () => {
     noteStores('A thought');
     await leakFree('NoteSheet', () => render(<NoteSheet groupId="g1" startInEditMode={false} onClose={noop} />),
-      () => { fireEvent.click(screen.getByRole('button', { name: 'Options' })); });
+      () => { fireEvent.click(screen.getByRole('button', { name: 'Delete' })); });
   });
   it('NoteSheet in edit mode, typed into', async () => {
     noteStores('');

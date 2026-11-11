@@ -5573,42 +5573,6 @@
     .ann-chip-confirm-yes { color: var(--danger); border-color: rgba(239,154,154,0.35); }
     .ann-chip-confirm-yes:active { background: rgba(244,143,177,0.18); color: var(--accent-pink); }
     /* Color row inside the chip (replaces buttons when 🎨 is tapped). */
-    .ann-chip-colors {
-      display: flex; align-items: center; gap: 8px;
-      padding: 9px 11px;
-      max-width: min(360px, calc(100vw - 16px));
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .ann-chip-colors::-webkit-scrollbar { display: none; }
-    .ann-chip-color-btn {
-      width: 34px; height: 34px; border-radius: 50%;   /* U06.2 / RC.10: the toolbar's size, a thumb's target */
-      border: 1.5px solid transparent;
-      cursor: pointer; flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.12s, border-color 0.12s;
-    }
-    .ann-chip-color-btn:active { transform: scale(0.88); }
-    .ann-chip-color-btn.active { border-color: var(--cream); box-shadow: 0 0 0 2px var(--gold) inset; }
-    .ann-chip-color-btn[data-color="yellow"] { background: var(--hl-yellow); }
-    .ann-chip-color-btn[data-color="green"]  { background: var(--hl-green); }
-    .ann-chip-color-btn[data-color="pink"]   { background: var(--hl-pink); }
-    .ann-chip-color-btn[data-color="red"]    { background: var(--hl-red); }
-    .ann-chip-color-btn[data-color="orange"] { background: var(--hl-orange); }
-    .ann-chip-color-btn[data-color="blue"]   { background: var(--hl-blue); }
-    .ann-chip-color-btn[data-color="purple"] { background: var(--hl-purple); }
-    .ann-chip-color-btn[data-color="teal"]   { background: var(--hl-teal); }
-    .ann-chip-color-btn[data-color="brown"]  { background: var(--hl-brown); }
-    .ann-chip-color-btn[data-color="gray"]   { background: var(--hl-gray); }
-    .ann-chip-back {
-      background: none; border: none;
-      padding: 6px 4px;
-      color: var(--cream-muted); cursor: pointer;
-      font-size: var(--fs-18); line-height: 1;
-      -webkit-tap-highlight-color: transparent;
-      flex-shrink: 0;
-    }
-    .ann-chip-back:active { color: var(--cream); }
 
     /* ── W2e readers (mock v2 r-sel, r-mark): the reader's action sheet. The selection's bar and a
        tapped mark's chip are one bottom sheet docked at the foot (never placed against the words, so it
@@ -5666,10 +5630,6 @@
     /* ── end W2e readers (r-sel, r-mark) ── */
 
     /* ── the style buttons and colour dots (NoteSheet shares them) ── */
-    .sel-toolbar-divider {
-      width: 1px; height: 24px; background: var(--gold-border);
-      margin: 0 4px; flex-shrink: 0;
-    }
     /* Style toggle: highlight-fill "A" and underline "A" */
     .sel-style-btn {
       width: 30px; height: 30px; border-radius: 8px;
@@ -5681,11 +5641,7 @@
       transition: border-color 0.12s, background 0.12s, color 0.12s;
       flex-shrink: 0;
     }
-    .sel-style-btn-underline .sel-style-glyph { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
-    .sel-style-btn-squiggle .sel-style-glyph { text-decoration: underline; text-decoration-style: wavy; text-decoration-thickness: 1.6px; text-underline-offset: 2px; }
     /* A06.5: each glyph says what it is under it. */
-    .sel-style-btn:has(.sel-style-name) { width: auto; min-width: 44px; height: auto; min-height: 44px; padding: 2px 6px; flex-direction: column; gap: 1px; }
-    .sel-style-name { font-family: var(--font-ui, system-ui, sans-serif); font-size: var(--fsc-10, 10px); font-weight: 500; letter-spacing: 0; line-height: 1.1; }
     .sel-style-btn.active {
       border-color: var(--gold); background: var(--gold-faint);
       color: var(--gold);
@@ -5749,12 +5705,12 @@
        the Highlight style is active; squiggle/underline are always a visible
        color, so blank never appears there. Distinct from the underline/
        squiggle rings (no slash) and from solid highlight fills. */
-    .sel-color-btn[data-color="blank"], .ann-chip-color-btn[data-color="blank"] {
+    .sel-color-btn[data-color="blank"] {
       background: transparent;
       border: 2px solid var(--cream-dim);
       position: relative; overflow: hidden;
     }
-    .sel-color-btn[data-color="blank"]::after, .ann-chip-color-btn[data-color="blank"]::after {
+    .sel-color-btn[data-color="blank"]::after {
       content: ''; position: absolute; left: 50%; top: 50%;
       width: 2px; height: 150%; background: var(--cream-dim);
       transform: translate(-50%, -50%) rotate(45deg);
@@ -5762,10 +5718,6 @@
     /* Side-scroll cue — fade the right edge of the color strips so it's clear
        the palette continues off-screen (the colors overflow horizontally on
        a phone). Applied to all three color rows for consistency. */
-    .ann-chip-colors, .note-sheet-menu-colors {
-      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
-      mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
-    }
     /* ── LINK ICON (next to verse) ───────────────────────────────── */
     .verse-link-icon {
       display: inline-flex; align-items: center; justify-content: center;
@@ -6460,28 +6412,11 @@
          insets) so the sheet always sits inside the safe region. */
       max-height: 100%; overflow-y: auto;
     }
-    body.light .note-sheet { background: var(--bg3); }
     .note-sheet-header {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 12px;
     }
     /* #10: the dot is 18 px; the button around it is the 44 px a finger needs, laid out as the dot. */
-    .note-sheet-color-hit {
-      display: flex; align-items: center; justify-content: center;
-      width: 44px; height: 44px; margin: -13px; padding: 0;
-      background: none; border: none; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .note-sheet-color-dot {
-      display: block;
-      width: 18px; height: 18px; border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.15);
-      flex-shrink: 0; padding: 0;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: transform 0.12s, box-shadow 0.12s;
-    }
-    @media (hover: hover) { .note-sheet-color-dot:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(214,179,95,0.25); } }
-    .note-sheet-color-dot:active { transform: scale(0.92); }
     .note-sheet-title {
       flex: 1;
       font-family: 'Cinzel', serif; font-size: var(--fs-12);
@@ -6501,140 +6436,18 @@
     }
     .note-sheet-menu-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
     .note-sheet-menu-btn svg { width: 18px; height: 18px; }
-    .note-sheet-anchor {
-      font-family: var(--font-body);
-      font-size: var(--fs-15); font-style: italic;
-      color: var(--cream-muted); line-height: 1.5;
-      padding: 8px 12px; margin-bottom: 12px;
-      border-left: 2px solid var(--gold-border);
-      background: rgba(200,164,86,0.04); border-radius: 0 6px 6px 0;
-    }
     /* Relative date under the anchor in NoteSheet read mode. */
-    .note-sheet-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold-dim);
-      margin: -8px 0 12px;
-    }
-    .note-sheet-body {
-      font-family: var(--font-body);
-      font-size: var(--fs-16); color: var(--cream);
-      line-height: 1.6; white-space: pre-wrap; word-break: break-word;
-      padding: 4px 2px 10px;
-    }
-    .note-sheet-empty {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-15); color: var(--cream-muted);
-      padding: 14px 2px; text-align: center;
-    }
     /* Empty-note primary action — a real tappable affordance instead of a
        "Tap ⋯ → Edit" instruction. Dashed outline reads as "fill me in". */
-    .note-sheet-empty-btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; margin: 10px 0 4px; padding: 12px;
-      background: transparent;
-      border: 1px dashed var(--gold-border); border-radius: 8px;
-      color: var(--gold-dim); cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s, border-color 0.12s, background 0.12s;
-    }
-    .note-sheet-empty-btn svg { width: 15px; height: 15px; }
-    .note-sheet-empty-btn:active { color: var(--gold); border-color: var(--gold); background: var(--gold-faint); }
-    @media (hover: hover) { .note-sheet-empty-btn:hover { color: var(--gold); border-color: var(--gold); } }
-    .note-sheet-textarea {
-      width: 100%; min-height: 120px; padding: 10px 14px;
-      background: var(--bg); border: 1px solid var(--gold-border);
-      border-radius: 8px; color: var(--cream-dim); resize: vertical;
-      font-family: var(--font-body); font-size: var(--fs-16);
-      outline: none; transition: border-color 0.15s;
-      box-sizing: border-box;
-    }
-    body.light .note-sheet-textarea { background: var(--bg); color: var(--input-text); }
-    .note-sheet-textarea:focus { border-color: var(--gold); }
-    .note-sheet-footer {
-      display: flex; gap: 10px; margin-top: 12px;
-    }
     /* Discard ConfirmStrip swaps in for the footer when a dismissal
        arrives with unsaved note text (honest-Save, 2026-07-12). */
     .note-sheet-discard-confirm { margin-top: 12px; width: 100%; }
-    .note-sheet-save {
-      flex: 1; min-height: 44px;
-      padding: 11px; border-radius: 8px; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.16em; text-transform: uppercase;
-      background: var(--gold); border: 1px solid var(--gold);
-      color: var(--bg); transition: background 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .note-sheet-save:active { background: var(--gold-bright); }
-    .note-sheet-save.disabled, .note-sheet-save:disabled {
-      background: transparent;
-      border-color: var(--gold-border);
-      color: var(--cream-muted);
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
-    .note-sheet-save.disabled:active, .note-sheet-save:disabled:active { background: transparent; }
-    .note-sheet-secondary {
-      flex: 1; min-height: 44px;
-      padding: 11px; border-radius: 8px; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.16em; text-transform: uppercase;
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-dim); transition: background 0.15s, color 0.15s, border-color 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .note-sheet-secondary:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
     /* ⋯ menu panel — slides in below the header */
-    .note-sheet-menu {
-      margin-top: 8px;
-      border: 1px solid var(--gold-border); border-radius: 10px;
-      overflow: hidden;
-      background: rgba(0,0,0,0.18);
-    }
-    body.light .note-sheet-menu { background: rgba(0,0,0,0.04); }
-    .note-sheet-menu-item {
-      display: block; width: 100%; padding: 12px 16px;
-      background: none; border: none;
-      text-align: left; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-dim);
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, color 0.12s;
-    }
-    .note-sheet-menu-item + .note-sheet-menu-item { border-top: 1px solid rgba(224,201,127,0.10); }
-    .note-sheet-menu-item:active { background: rgba(224,201,127,0.08); color: var(--gold); }
     /* Destructive Delete gets a visible gap + stronger rule above it so it
        reads as its own zone below the routine menu items. */
-    .note-sheet-menu-item.danger { color: var(--danger); margin-top: 6px; border-top: 1px solid rgba(224,201,127,0.25); }
-    .note-sheet-menu-item.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
-    .note-sheet-menu-item.disabled { color: var(--cream-muted); opacity: 0.5; cursor: not-allowed; }
-    .note-sheet-menu-item.disabled:active { background: none; color: var(--cream-muted); }
-    .note-sheet-menu-colors {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 14px;
-      flex-wrap: wrap;
-    }
     /* Edit-mode style + color picker (mirrors the selection toolbar): the 3
        style buttons + a divider + the horizontally-scrolling color row. */
-    .note-edit-style-row {
-      display: flex; align-items: center; gap: 6px;
-      padding: 4px 16px 10px;
-      min-width: 0;
-    }
     /* Notebook row in edit mode — tappable, shows current assignment */
-    .note-edit-nb-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 16px 6px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      border: none; background: none; width: 100%; text-align: left;
-      color: var(--cream-dim); font-size: var(--fs-13);
-    }
-    .note-edit-nb-row:active { color: var(--gold); }
-    .note-edit-nb-row svg { flex-shrink: 0; width: 14px; height: 14px; stroke: var(--gold-dim); }
 
     /* ══════════════════════════════════════════════════════════════
        LIBRARY SCREEN — the reader's own things, one row each (the
@@ -6877,188 +6690,14 @@
       transition: padding-bottom 0.18s ease;
       animation: selectSheetBackdropIn 0.22s ease;
     }
-    .nb-picker {
-      width: 100%; max-width: 480px;
-      background: var(--bg3);
-      border-top: 1px solid var(--gold-border);
-      border-radius: 18px 18px 0 0;
-      padding: 18px 16px 24px;
-      animation: sheetRiseIn 0.28s cubic-bezier(0.32,0.72,0,1);
-      max-height: 100%; overflow-y: auto;
-    }
-    .nb-picker-header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 14px;
-    }
-    .nb-picker-title {
-      flex: 1;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold);
-    }
-    .nb-picker-close {
-      background: none; border: none;
-      width: 32px; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--cream-muted); cursor: pointer;
-      font-size: var(--fs-24); line-height: 1;
-      border-radius: 6px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-close:active { background: rgba(224,201,127,0.10); color: var(--gold); }
-    .nb-picker-new {
-      display: flex; gap: 8px;
-      margin-bottom: 12px;
-    }
-    .nb-picker-new-input {
-      flex: 1;
-      padding: 10px 14px;
-      background: var(--bg);
-      border: 1px solid var(--gold-border);
-      border-radius: 8px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-15);
-      outline: none;
-    }
-    body.light .nb-picker-new-input { background: var(--bg); color: var(--input-text); }
-    .nb-picker-new-input:focus { border-color: var(--gold); }
-    .nb-picker-new-btn {
-      padding: 10px 14px; border-radius: 8px;
-      background: var(--gold); border: 1px solid var(--gold);
-      color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-new-btn:active { background: var(--gold-bright); }
-    .nb-picker-new-btn:disabled, .nb-picker-new-btn.disabled {
-      background: transparent; color: var(--cream-muted);
-      border-color: var(--gold-border);
-      opacity: 0.55; cursor: not-allowed;
-    }
-    .nb-picker-list {
-      display: flex; flex-direction: column;
-      gap: 4px;
-    }
-    .nb-picker-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 11px 12px;
-      background: transparent; border: 1px solid transparent;
-      border-radius: 8px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .nb-picker-row:active { background: var(--gold-faint); }
     /* The row's toggle (a checkbox button holding the box and the name; Delete is its sibling). */
-    .nb-picker-row-toggle {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center; gap: 12px;
-      margin: 0; padding: 0; border: 0; background: transparent;
-      color: inherit; font: inherit; text-align: left;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    @media (hover: hover) { .nb-picker-row:hover { background: var(--gold-faint); } }
-    .nb-picker-row.checked { background: var(--gold-faint); border-color: var(--gold-border); }
-    .nb-picker-check {
-      flex-shrink: 0;
-      width: 20px; height: 20px;
-      border: 1.5px solid var(--gold-border);
-      border-radius: 5px;
-      display: flex; align-items: center; justify-content: center;
-      color: transparent;
-    }
-    .nb-picker-row.checked .nb-picker-check {
-      background: var(--gold);
-      border-color: var(--gold);
-      color: var(--bg);
-    }
-    .nb-picker-check svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-    .nb-picker-name {
-      flex: 1; min-width: 0;
-      font-family: var(--font-body); font-size: var(--fs-16);
-      color: var(--cream); line-height: 1.3;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .nb-picker-empty {
-      padding: 1.5rem 1rem; text-align: center;
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted);
-    }
-    .nb-picker-row-delete {
-      background: none; border: none;
-      color: var(--cream-muted);
-      font-size: var(--fs-14);
-      padding: 4px 8px;
-      border-radius: 4px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      flex-shrink: 0;
-      /* Destructive-control separation: a faint divider + gap keep the
-         delete × from reading as part of the toggle row, and a WL4 ::after
-         overlay gives the small glyph a 44px effective hit area. */
-      position: relative;
-      margin-left: 10px; padding-left: 14px;
-      border-left: 1px solid var(--border);
-      border-radius: 0 4px 4px 0;
-    }
-    .nb-picker-row-delete::after {
-      content: ""; position: absolute;
-      top: 50%; left: 50%;
-      width: 44px; height: 44px;
-      transform: translate(-50%, -50%);
-    }
-    .nb-picker-row-delete:active { color: var(--accent-pink); background: rgba(244,143,177,0.12); }
 
     /* ── Notebook picker footer — the transactional Save/Cancel pair
        (2026-07-12): membership toggles buffer locally; Save commits,
        Cancel/×/backdrop discard (ConfirmStrip-gated when dirty). ── */
-    .nb-picker-footer {
-      display: flex; gap: 12px;
-      margin-top: 16px; padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-    .nb-picker-cancel {
-      flex: 1; padding: 12px 0; border-radius: 8px;
-      background: transparent; border: 1px solid var(--border);
-      color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-cancel:active { background: var(--gold-faint); color: var(--gold); }
-    .nb-picker-save {
-      flex: 1.4; padding: 12px 0; border-radius: 8px;
-      background: var(--gold); border: 1px solid var(--gold);
-      color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-save:active { background: var(--gold-bright); }
-    .nb-picker-save:disabled {
-      background: transparent; color: var(--cream-muted);
-      border-color: var(--gold-border);
-      opacity: 0.55; cursor: not-allowed;
-    }
     .nb-picker-discard-confirm { margin-top: 16px; width: 100%; }
 
     /* ── NoteSheet inline notebook chips (in read mode header area) ── */
-    .note-sheet-nb-chips {
-      display: flex; flex-wrap: wrap; gap: 0.35rem;
-      margin: 0.6rem 0 0.4rem;
-    }
-    .note-sheet-nb-chip {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-muted);
-      padding: 3px 9px;
-      border: 1px solid rgba(204,196,180,0.20);
-      border-radius: 999px;
-    }
-    .note-sheet-nb-chip svg {
-      width: 10px; height: 10px;
-      stroke: currentColor; fill: none; stroke-width: 1.6;
-    }
 
     /* ── Multi-note disambiguation popover ── */
     .multinote-overlay {
@@ -7304,6 +6943,39 @@
     .rd-foot .ui-btn:not(.is-primary) { background: var(--surface-2); }
     .rd-foot .ui-btn:disabled { opacity: 0.45; cursor: default; }
     /* ── end W2e readers (r-bm) ── */
+    /* ── W2f readers (mock v2 r-note, r-note-view, r-nbpick): the note sheet and the notebook picker wear the
+       bookmark sheet's form (.rd-form-sheet): surface-1, a grab, a serif title, the words as a quote, fields on
+       surface-2, a worded row for the notebook, Cancel | Save; a note read shows four worded buttons. ── */
+    .rd-note-sheet, .rd-nb-sheet { box-sizing: border-box; border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; background: var(--surface-1); }
+    .rd-nb-sheet { width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; animation: sheetRiseIn 0.28s cubic-bezier(0.32,0.72,0,1); }
+    .rd-note-head { display: flex; align-items: center; gap: 4px; margin: 0 0 12px; }
+    .rd-note-head .ui-sheet-title { flex: 1; min-width: 0; margin: 0; }
+    .note-sheet-color-hit { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -13px; padding: 0; border: 0; background: none; cursor: pointer; }
+    .note-sheet-color-dot.sel-color-btn { display: block; width: 12px; height: 12px; padding: 0; border: 0; border-radius: 50%; pointer-events: none; }
+    .note-sheet-color-dot[data-color="blank"] { box-shadow: inset 0 0 0 1.5px var(--text-3); }
+    .rd-note-sheet .rd-note-head + .rd-colors { margin-top: 0; }
+    .note-sheet-body { margin: 0 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .note-sheet-empty-btn { justify-content: flex-start; min-height: var(--tap); padding: 0 2px; color: var(--accent); }
+    .note-sheet-date { margin: 8px 2px 16px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .note-sheet-textarea { display: block; width: 100%; min-height: 104px; box-sizing: border-box; padding: 12px 14px; resize: vertical; border: 1px solid var(--accent-ring); border-radius: var(--r-field); background: var(--surface-2); color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); line-height: 1.45; }
+    .note-sheet-textarea:focus { outline: none; border-color: var(--accent); }
+    .rd-label { margin: 16px 2px 8px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .rd-note-sheet .rd-colors { margin: 12px 1px 14px; }
+    .rd-note-nb, .nb-picker-list { margin: 0 0 14px; }
+    .note-edit-nb-row .ui-row-value { margin-left: auto; }
+    .note-sheet-menu .ann-chip-confirm { padding: 4px 0; }
+    .nb-picker-row { display: flex; align-items: center; padding-right: 12px; border-top: 1px solid var(--hairline); }
+    .nb-picker-none + .nb-picker-row, .nb-picker-row + .nb-picker-row { border-top: 1px solid var(--hairline); }
+    .nb-picker-row-toggle { flex: 1; min-width: 0; cursor: pointer; }
+    .nb-picker-list .ui-row-title { flex: 1; min-width: 0; text-align: left; }
+    .nb-picker-row-delete:active { color: var(--tone-danger); }
+    .nb-picker-new { display: flex; gap: 8px; }
+    .nb-picker-new .ui-field { flex: 1; }
+    .nb-picker-new-btn { flex: none; border-radius: var(--r-field); background: var(--surface-2); }
+    .nb-picker-new-btn:disabled { opacity: 0.45; cursor: default; }
+    .rd-nb-sheet .rd-note { margin-bottom: 0; }
+    .rd-nb-sheet .rd-foot { margin-top: 16px; }
+    /* ── end W2f readers (r-note, r-note-view, r-nbpick) ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */
