@@ -583,8 +583,9 @@
       await goHome();
       openTab('Listen'); await sleep(360);
       clickByText(/The Volumes of Truth/); await sleep(400);
-      // The collection list lives one level in, not splayed across the hub.
-      return /Volume One/.test(document.body.textContent || '') && /Collections/.test(document.body.textContent || '');
+      // The collection list lives one level in, not splayed across the hub; its title sits in the bar (listen.html au-vols).
+      const bar = document.querySelector('.bar-title');
+      return /Volume One/.test(document.body.textContent || '') && !!bar && /The Volumes of Truth/.test(bar.textContent || '');
     });
     await step('Scripture Web', async function () {
       // Reached from the Library like every other personal-study surface. The
