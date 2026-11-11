@@ -541,10 +541,12 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     fireEvent.click(inPlayer().getByRole('button', { name: 'Pause' }));   // no playback tick to lean on
     openSleep();
 
-    const labels = within(subSheet('np-sleep-sheet')).getByRole('group', { name: 'Sleep timer' }).querySelectorAll('button');
+    // listen.html au-sleep: four lengths, the two ends, your own time as its own row, Off wide; the head says Off.
+    const labels = subSheet('np-sleep-sheet').querySelectorAll('.np-grid button');
     expect(Array.from(labels).map((b) => b.textContent))
-      .toEqual(['15 min', '30 min', '45 min', '60 min', 'End of this letter', 'End of the queue', 'Custom…', 'Off']);
-    expect(sleepStatus()).toBe('');
+      .toEqual(['15 min', '30 min', '45 min', '60 min', 'End of this letter', 'End of the queue', 'Off']);
+    expect(subSheet('np-sleep-sheet').querySelector('.np-custom-label').textContent).toBe('Your own');
+    expect(sleepStatus()).toBe('Off');
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('true');
 
     fireEvent.click(sleepChip('30 min'));
@@ -560,7 +562,7 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
 
     fireEvent.click(sleepChip('Off'));
     expect(AudioPlayer.getState().sleepEndsAt).toBe(0);
-    expect(sleepStatus()).toBe('');
+    expect(sleepStatus()).toBe('Off');
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('true');
     expect(tool('Sleep timer').getAttribute('aria-label')).toBe('Sleep timer, off');
     expect(toolValue(tool('Sleep timer'))).toBe('Off');
@@ -609,7 +611,7 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     emit('ended');
     expect(AudioPlayer.getState().qi).toBe(0);            // the next recording never started
     expect(AudioPlayer.getState().status).toBe('paused');
-    expect(sleepStatus()).toBe('');                       // one-shot, cleared itself
+    expect(sleepStatus()).toBe('Off');                       // one-shot, cleared itself
     expect(sleepChip('Off').getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -629,20 +631,19 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     expect(AudioPlayer.getSleepRemainingSeconds()).toBe(0);
 
     fireEvent.click(sleepChip('Off'));
-    expect(sleepStatus()).toBe('');
+    expect(sleepStatus()).toBe('Off');
     expect(AudioPlayer.getState().sleepAtTrackEnd).toBe(false);
 
     emit('ended');
     expect(AudioPlayer.getState().qi).toBe(1);            // disarmed — advanced normally
   });
 
-  it('Custom shows a 5-minute stepper from 20, and Start arms it', () => {
+  it('Your own is a 5-minute stepper from 20, always shown, and Start arms it', () => {
     startCollection();
     openSheet();
     emit('playing');
     openSleep();
 
-    fireEvent.click(sleepChip('Custom…'));
     const value = () => subSheet('np-sleep-sheet').querySelector('.np-custom-value').textContent;
     expect(value()).toBe('20 min');
     expect(AudioPlayer.getState().sleepEndsAt).toBe(0);   // nothing armed until Start
@@ -656,8 +657,8 @@ describe('AudioManagerSheet — Sleep timer sheet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start' }));
     expect(AudioPlayer.getState().sleepMinutes).toBe(20);
     expect(AudioPlayer.getSleepRemainingSeconds()).toBe(1200);
-    expect(subSheet('np-sleep-sheet').querySelector('.np-custom')).toBeNull();
-    expect(sleepChip('Custom · 20 min').getAttribute('aria-pressed')).toBe('true');
+    expect(subSheet('np-sleep-sheet').querySelector('.np-custom').classList.contains('is-active')).toBe(true);
+    expect(screen.getByRole('button', { name: 'Start' }).getAttribute('aria-pressed')).toBe('true');
     expect(sleepChip('15 min').getAttribute('aria-pressed')).toBe('false');
     expect(sleepStatus()).toBe('Stops in 20:00');
   });

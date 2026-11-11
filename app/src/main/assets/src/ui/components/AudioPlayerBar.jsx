@@ -487,8 +487,9 @@ export function AudioPlayerBar({ hidden = false } = {}) {
         aria-label={summaryLabel}
         aria-expanded={managerOpen}
       >
-        <span className="audio-bar-mark" aria-hidden="true">
-          {songId ? <SongCover song={song || { id: songId }} className="audio-bar-cover" /> : <BookMark />}
+        {/* readers.html r-listen: a letter in a run shows its place as the cover ("1" of 29); alone, the book. */}
+        <span className={'audio-bar-mark' + (!songId && place ? ' is-num' : '')} aria-hidden="true">
+          {songId ? <SongCover song={song || { id: songId }} className="audio-bar-cover" /> : place ? counted.at : <BookMark />}
         </span>
         <span className="audio-bar-summary-text">
           <span className="audio-bar-title">

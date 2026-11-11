@@ -87,7 +87,6 @@ export function SpeedSheet({ rate, onClose }) {
     <PlayerSheet id="np-speed" title="Speed" aside={<AudioSpeedReadout rate={rate} />} onClose={onClose} className="np-speed-sheet">
       <AudioSpeedControl rate={rate} />
       <p className="np-sheet-note">Applies to letters and chapters. Songs always play at 1×.</p>
-      <button type="button" className="np-sheet-done" onClick={onClose}>Done</button>
     </PlayerSheet>
   );
 }
@@ -109,42 +108,46 @@ export function SleepSheet({ state, noun, onClose }) {
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
   }, [state.sleepEndsAt]);
-  const [custom, setCustom] = React.useState(/** @type {number | null} */ (null));
   const left = AudioPlayer.getSleepRemainingSeconds();
   const preset = [15, 30, 45, 60];
-  // A countdown armed at a length no chip names is the Custom one.
+  // A countdown armed at a length no chip names is the listener's own one.
   const customArmed = !!state.sleepEndsAt && preset.indexOf(state.sleepMinutes) < 0;
+  const [custom, setCustom] = React.useState(customArmed ? state.sleepMinutes : 20);
+  const off = !state.sleepEndsAt && !state.sleepAtTrackEnd && !state.sleepAtQueueEnd;
   const status = state.sleepAtTrackEnd ? 'Stops after this ' + noun
     : state.sleepAtQueueEnd ? 'Stops at the end of the queue'
-      : left > 0 ? 'Stops in ' + countdown(left) : '';
-  const off = !state.sleepEndsAt && !state.sleepAtTrackEnd && !state.sleepAtQueueEnd;
+      : left > 0 ? 'Stops in ' + countdown(left) : off ? 'Off' : '';
   /** @param {string} key a stable key (the presets render from a list) @param {string} label @param {boolean} on @param {() => void} act */
   const chip = (key, label, on, act) => (
     <button key={key} type="button" className={on ? 'is-active ' : ''} aria-pressed={on} onClick={act}>{label}</button>
   );
+  // listen.html au-sleep: four lengths, the two ends, your own time as a row of its own (no Custom chip to open
+  // first), Off as one wide button.
   return (
     <PlayerSheet
       id="np-sleep" title="Sleep timer" onClose={onClose} className="np-sleep-sheet"
-      aside={status ? <span className="np-sheet-status" role="status">{status}</span> : <span className="np-sheet-status" role="status" />}
+      aside={<span className="np-sheet-status" role="status">{status}</span>}
     >
-      <div className="np-grid" role="group" aria-label="Sleep timer">
-        {preset.map((m) => chip('min-' + m, m + ' min', !customArmed && state.sleepMinutes === m, () => { setCustom(null); AudioPlayer.setSleepTimer(m); }))}
-        {chip('track-end', 'End of this ' + noun, !!state.sleepAtTrackEnd, () => { setCustom(null); AudioPlayer.setSleepAtTrackEnd(); })}
-        {chip('queue-end', 'End of the queue', !!state.sleepAtQueueEnd, () => { setCustom(null); AudioPlayer.setSleepAtQueueEnd(); })}
-        {chip('custom', customArmed ? 'Custom · ' + state.sleepMinutes + ' min' : 'Custom…', customArmed || custom != null,
-          () => setCustom(customArmed ? state.sleepMinutes : 20))}
-        {chip('off', 'Off', off, () => { setCustom(null); AudioPlayer.clearSleepTimer(); })}
+      <div className="np-grid np-sleep-mins" role="group" aria-label="Sleep after">
+        {preset.map((m) => chip('min-' + m, m + ' min', !customArmed && state.sleepMinutes === m, () => AudioPlayer.setSleepTimer(m)))}
       </div>
-      {custom != null ? (
-        <div className="np-custom">
-          <button type="button" className="audio-manager-round" aria-label="5 minutes less" disabled={custom <= CUSTOM_MIN}
-            onClick={() => setCustom(Math.max(CUSTOM_MIN, custom - CUSTOM_STEP))}>−</button>
-          <span className="np-custom-value" aria-live="polite">{custom} min</span>
-          <button type="button" className="audio-manager-round" aria-label="5 minutes more" disabled={custom >= CUSTOM_MAX}
-            onClick={() => setCustom(Math.min(CUSTOM_MAX, custom + CUSTOM_STEP))}>+</button>
-          <button type="button" className="np-custom-go" onClick={() => { AudioPlayer.setSleepTimer(custom); setCustom(null); }}>Start</button>
-        </div>
-      ) : null}
+      <div className="np-grid np-sleep-ends" role="group" aria-label="Sleep at the end">
+        {chip('track-end', 'End of this ' + noun, !!state.sleepAtTrackEnd, () => AudioPlayer.setSleepAtTrackEnd())}
+        {chip('queue-end', 'End of the queue', !!state.sleepAtQueueEnd, () => AudioPlayer.setSleepAtQueueEnd())}
+      </div>
+      <div className={'np-custom' + (customArmed ? ' is-active' : '')} role="group" aria-label="Your own time">
+        <span className="np-custom-label">Your own</span>
+        <button type="button" className="audio-manager-round" aria-label="5 minutes less" disabled={custom <= CUSTOM_MIN}
+          onClick={() => setCustom(Math.max(CUSTOM_MIN, custom - CUSTOM_STEP))}>−</button>
+        <span className="np-custom-value" aria-live="polite">{custom} min</span>
+        <button type="button" className="audio-manager-round" aria-label="5 minutes more" disabled={custom >= CUSTOM_MAX}
+          onClick={() => setCustom(Math.min(CUSTOM_MAX, custom + CUSTOM_STEP))}>+</button>
+        <button type="button" className="np-custom-go" aria-pressed={customArmed && state.sleepMinutes === custom}
+          onClick={() => AudioPlayer.setSleepTimer(custom)}>Start</button>
+      </div>
+      <div className="np-grid np-sleep-off">
+        {chip('off', 'Off', off, () => AudioPlayer.clearSleepTimer())}
+      </div>
       <p className="np-sheet-note">The voice fades out over the last 20 seconds. When it stops, you can keep listening for 15 minutes more.</p>
     </PlayerSheet>
   );
@@ -152,9 +155,10 @@ export function SleepSheet({ state, noun, onClose }) {
 
 /**
  * @param {{ voices: { kind: 'reader'|'edition', chips: Array<{ id: string, label: string, active: boolean, select: () => void, swap: () => boolean }> },
- *   title: string, needsConfirm: boolean, single: boolean, onClose: () => void }} props
+ *   title: string, noun?: string, needsConfirm: boolean, single: boolean, onClose: () => void }} props noun names what
+ *   the voice is for ("Voice for this letter"): letter, chapter or recording
  */
-export function VoiceSheet({ voices, title, needsConfirm, single, onClose }) {
+export function VoiceSheet({ voices, title, noun = 'letter', needsConfirm, single, onClose }) {
   const active = voices.chips.find((c) => c.active);
   const [picked, setPicked] = React.useState(active ? active.id : '');
   const [confirming, setConfirming] = React.useState(false);
@@ -170,8 +174,9 @@ export function VoiceSheet({ voices, title, needsConfirm, single, onClose }) {
     setConfirming(true);
   };
   return (
-    <PlayerSheet id="np-voice" title={edition ? 'Edition' : 'Voice'} sub={title} onClose={onClose} className="np-voice-sheet">
-      <div className="np-radios" role="radiogroup" aria-label={edition ? 'Recorded edition for this chapter' : 'Reader for this recording'}>
+    // listen.html au-voice: "Voice for this letter" says what it is for; the letter's name is on the player behind it.
+    <PlayerSheet id="np-voice" title={edition ? 'Edition for this chapter' : 'Voice for this ' + noun} onClose={onClose} className="np-voice-sheet">
+      <div className="np-radios" role="radiogroup" aria-label={(edition ? 'Recorded edition for ' : 'Reader for ') + (title || 'this recording')}>
         {voices.chips.map((c) => (
           <button
             key={c.id}
@@ -181,11 +186,11 @@ export function VoiceSheet({ voices, title, needsConfirm, single, onClose }) {
             className={'np-radio' + (c.id === picked ? ' is-active' : '')}
             onClick={() => { setPicked(c.id); setConfirming(false); }}
           >
-            <span className="np-radio-dot" aria-hidden="true" />
             <span className="np-radio-copy">
               <strong>{c.label}</strong>
               <small>{c.active ? 'Playing now' : edition ? 'Recorded edition' : /text-to-speech/i.test(c.label) ? 'A computer voice' : 'A recorded reading'}</small>
             </span>
+            <span className="np-radio-dot" aria-hidden="true" />
           </button>
         ))}
       </div>
@@ -257,10 +262,11 @@ export function queueRowWords(track) {
 
 /**
  * One upcoming (or played) row.
- * @param {{ track: any, index: number, qi: number, count: number, played: boolean, onRemove: (index: number) => void }} props
+ * @param {{ track: any, index: number, qi: number, count: number, played: boolean, nowSub?: string, onRemove: (index: number) => void }} props
  */
-function QueueRow({ track, index, qi, count, played, onRemove }) {
-  const words = queueRowWords(track);
+function QueueRow({ track, index, qi, count, played, nowSub, onRemove }) {
+  // The collection the playing one is from is said once, on it; a row repeats only what differs (au-upnext: "3:19").
+  const words = queueRowWords(nowSub && track.sub === nowSub && !chapterTitleOf(track) ? { ...track, sub: '' } : track);
   const ref = React.useRef(/** @type {HTMLLIElement | null} */ (null));
   const drag = React.useRef(/** @type {null | { x: number, y: number, mode: 'grip' | 'swipe', id: number }} */ (null));
   const [shift, setShift] = React.useState({ x: 0, y: 0 });
@@ -298,13 +304,24 @@ function QueueRow({ track, index, qi, count, played, onRemove }) {
       {shift.x ? <span className={'np-row-remove' + (shift.x > 0 ? ' is-right' : '')} aria-hidden="true">Remove</span> : null}
       <div className="np-row" style={moving ? { transform: 'translate(' + shift.x + 'px,' + shift.y + 'px)' } : undefined}
         onPointerDown={played ? undefined : start('swipe')} onPointerMove={move} onPointerUp={end} onPointerCancel={cancel}>
+        {/* listen.html au-upnext: grip | title over meta | ×; the row number went (the order is the list's own). */}
+        {played ? <span className="np-grip is-spacer" aria-hidden="true" /> : (
+          <button type="button" className="np-grip" aria-label={'Reorder ' + words.title} aria-keyshortcuts="ArrowUp ArrowDown Delete"
+            onPointerDown={start('grip')} onPointerMove={move} onPointerUp={end} onPointerCancel={cancel}
+            onKeyDown={(e) => {
+              if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onRemove(index); return; }
+              const by = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+              if (by && index + by > qi && index + by < count) { e.preventDefault(); AudioPlayer.moveUpcoming(index, index + by); }
+            }}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M5 9h14M5 15h14" /></svg>
+          </button>
+        )}
         <button
           type="button"
           className="audio-manager-queue-main"
           onClick={() => { if (!moving) AudioPlayer.playAt(index); }}
           aria-label={(played ? 'Play again: ' : 'Play now: ') + words.title}
         >
-          <span className="audio-manager-queue-number">{index + 1}</span>
           <span>
             <strong>{words.title}</strong>
             <small>{words.sub}<TrackOnPhone url={track.url} /></small>
@@ -312,15 +329,6 @@ function QueueRow({ track, index, qi, count, played, onRemove }) {
         </button>
         {played ? null : (
           <>
-            <button type="button" className="np-grip" aria-label={'Reorder ' + words.title} aria-keyshortcuts="ArrowUp ArrowDown Delete"
-              onPointerDown={start('grip')} onPointerMove={move} onPointerUp={end} onPointerCancel={cancel}
-              onKeyDown={(e) => {
-                if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); onRemove(index); return; }
-                const by = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
-                if (by && index + by > qi && index + by < count) { e.preventDefault(); AudioPlayer.moveUpcoming(index, index + by); }
-              }}>
-              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"><path d="M5 8h14M5 12h14M5 16h14" /></svg>
-            </button>
             {/* What a finger does by drag, as buttons a screen reader can reach. */}
             <span className="np-row-sr">
               <button type="button" className="sr-only" disabled={!canMoveUp} onClick={() => AudioPlayer.moveUpcoming(index, index - 1)} aria-label={'Move ' + words.title + ' earlier'} />
@@ -383,12 +391,12 @@ export function UpNextSheet({ state, onClose }) {
   };
   /** @param {any} track @param {number} index */
   const row = (track, index) => (
-    <QueueRow key={track.url + ':' + index} track={track} index={index} qi={state.qi} count={queue.length} played={index < state.qi} onRemove={remove} />
+    <QueueRow key={track.url + ':' + index} track={track} index={index} qi={state.qi} count={queue.length} played={index < state.qi} nowSub={current.sub} onRemove={remove} />
   );
   return (
     <PlayerSheet
       id="np-upnext" title="Up next" sub={sub} onClose={onClose} className="np-upnext-sheet audio-manager-queue"
-      aside={upcoming > 0 && !restoring ? <button type="button" className="np-sheet-link" onClick={clear}>Clear upcoming</button> : null}
+      aside={upcoming > 0 && !restoring ? <button type="button" className="np-sheet-link" aria-label="Clear upcoming" onClick={clear}>Clear</button> : null}
     >
       <div className="np-upnext-now" aria-current="true">
         <span className="np-upnext-now-copy">

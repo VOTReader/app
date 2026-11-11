@@ -506,7 +506,7 @@ export function AudioManagerSheet({ open, state, onClose }) {
 
         {sheet === 'speed' ? <SpeedSheet rate={state.rate} onClose={closeSheet} /> : null}
         {sheet === 'sleep' ? <SleepSheet state={state} noun={sleepNoun(current, !!songId)} onClose={closeSheet} /> : null}
-        {sheet === 'voice' && voices ? <VoiceSheet voices={voices} title={heading || ''} needsConfirm={needsVoiceConfirm} single={single} onClose={closeSheet} /> : null}
+        {sheet === 'voice' && voices ? <VoiceSheet voices={voices} title={heading || ''} noun={sleepNoun(current, !!songId)} needsConfirm={needsVoiceConfirm} single={single} onClose={closeSheet} /> : null}
         {sheet === 'upnext' ? <UpNextSheet state={state} onClose={closeSheet} /> : null}
         {sheet === 'versions' && fam ? (
           <ChoiceSheet

@@ -1343,8 +1343,8 @@
         margin: 0 auto; max-width: 720px;
         display: flex; flex-wrap: wrap; align-items: center; gap: min(0.5rem, 4px);
         padding: min(0.5rem, 8px) min(0.6rem, 8px) calc(max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px)) + min(0.5rem, 8px));
-        background: var(--bg3);
-        border: 1px solid var(--gold-border); border-bottom: 0;
+        background: var(--surface-2);   /* W3e listen: readers.html r-listen, the mini player on surface-2 */
+        border: 0;
         border-radius: 14px 14px 0 0;
         box-shadow: 0 -6px 22px rgba(0,0,0,0.45);
         /* Swipes (brief 3a): the bar is the gesture's, so the page underneath never pans from it. */
@@ -1370,27 +1370,32 @@
       .audio-bar-mark {
         flex-shrink: 0; width: 40px; height: 40px; border-radius: 8px;
         display: flex; align-items: center; justify-content: center;
-        background: var(--gold-faint); border: 1px solid var(--gold-border); color: var(--gold);
+        background: radial-gradient(circle at 30% 25%, #463812, #17120a 72%); color: var(--accent);
       }
-      .audio-bar-mark svg { width: 24px; height: 24px; }
+      .audio-bar-mark svg { width: 22px; height: 22px; }
+      .audio-bar-mark.is-num { font-family: var(--font-serif); font-size: var(--ts-value); font-weight: 700; font-variant-numeric: tabular-nums; }
       .audio-bar.is-song .audio-bar-mark { background: none; border: 0; }
       .audio-bar-cover { width: 40px; height: 40px; border-radius: 8px; }
       .audio-bar-cover .song-cover-note { font-size: var(--fsc-20); }
       .vot-large-text .audio-bar-mark { display: none; }
       .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
       .audio-bar-title {
-        display: block; font-size: var(--fs-15); color: var(--cream); line-height: 1.25;
+        display: block; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; line-height: 1.25;
         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
       }
       .vot-large-text .audio-bar-title { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
       .audio-bar-part { color: var(--cream-muted); }
-      /* Line 2 wraps rather than cut "Volume One · 3 of 30 · 12 min left" short (picture 04); the chips stay whole. */
+      /* Line 2 is one line (r-listen: "1 of 29 · 1 min left · Volu…"): the place first, so the edge loses the source;
+         at large text it wraps between its parts. The chips stay whole. */
       .audio-bar-sub {
-        display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px;
-        font-size: var(--fs-13); color: var(--cream-muted); line-height: 1.3;
+        display: flex; align-items: center; gap: 2px 6px; min-width: 0;
+        color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta);
       }
-      .audio-bar-line2 { min-width: 0; font-variant-numeric: tabular-nums; }
-      .audio-bar-seg { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+      .audio-bar-line2 { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+      .vot-large-text .audio-bar-sub { flex-wrap: wrap; }
+      .vot-large-text .audio-bar-line2 { white-space: normal; }
+      .audio-bar-seg { white-space: nowrap; }
+      .vot-large-text .audio-bar-seg, .audio-bar-line2.is-failed .audio-bar-seg { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
       .audio-bar-line2.is-loop { color: var(--gold); }
       .audio-bar-line2.is-offline { color: var(--cream-dim); }
       .audio-bar-line2.is-failed .audio-bar-seg { white-space: normal; }
@@ -1621,104 +1626,111 @@
       /* Large text (200 %+): the body gives way first; the dock never scrolls (picture 06). */
       @media (max-height: 760px) { .audio-manager-play { width: 68px; height: 68px; } }
 
-      /* ── The player's small sheets (PlayerSheets.jsx, pictures 10-13): the select-sheet grammar over the player. ── */
-      .np-sheet-backdrop { position: fixed; inset: 0; z-index: 260; background: rgba(0, 0, 0, 0.62); animation: audio-manager-fade 0.16s ease-out; }
+      /* ── W3e listen: the player's small sheets (PlayerSheets.jsx; listen.html au-speed, au-sleep, au-voice, au-upnext).
+         A surface-1 sheet, a serif sheet title with its value in gold beside it, surface-2 options in a fixed grid, a
+         step row (label | − value + | Start), the note in the meta line, one primary pill. ── */
+      .np-sheet-backdrop { position: fixed; inset: 0; z-index: 260; background: var(--scrim, rgba(0, 0, 0, 0.62)); animation: audio-manager-fade 0.16s ease-out; }
       .np-sheet {
         position: fixed; z-index: 261; left: 50%; bottom: max(var(--keyboard-height, 0px), var(--inset-bottom, 0px)); transform: translateX(-50%);
         width: min(620px, 100%); max-height: calc(88vh - var(--inset-top, 0px)); overflow-y: auto; overscroll-behavior: contain;
-        padding: 0.6rem 16px calc(16px + var(--dock-sys)); background: var(--bg3); color: var(--cream);
-        border: 1px solid var(--gold-border); border-bottom: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -18px 42px rgba(0, 0, 0, 0.45);
+        padding: var(--sp-2) var(--sp-4) calc(var(--sp-4) + var(--dock-sys)); background: var(--surface-1); color: var(--text-1);
+        border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; box-shadow: var(--shadow-float, 0 -18px 42px rgba(0, 0, 0, 0.45));
         animation: np-sheet-rise 0.2s cubic-bezier(0.22, 0.8, 0.28, 1);
       }
       @keyframes np-sheet-rise { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
-      .np-sheet-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 2px 0 14px; }
-      .np-sheet-titles { min-width: 0; }
-      .np-sheet-title { margin: 0; color: var(--cream); font-family: var(--font-body); font-size: var(--fs-30); font-weight: 500; line-height: 1.15; }
-      .np-sheet-sub { margin: 2px 0 0; color: var(--cream-dim); font-size: var(--fs-16); }
-      .np-sheet-status { color: var(--gold); font-size: var(--fs-16); font-variant-numeric: tabular-nums; text-align: right; }
-      .np-sheet-note { margin: 14px 0; color: var(--cream-dim); font-size: var(--fs-15); font-style: italic; line-height: 1.45; text-align: center; }
-      .np-sheet-done, .np-sheet-go {
-        width: 100%; min-height: 52px; border: 1px solid var(--gold); border-radius: 12px; background: transparent; color: var(--gold);
-        font-family: var(--font-body); font-size: var(--fs-18); cursor: pointer;
+      .np-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3); margin: 2px 0 var(--sp-4); }
+      .np-sheet-titles { flex: 1; min-width: 0; }
+      .np-sheet-title { margin: 0 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; line-height: 1.25; }
+      .np-sheet-sub { margin: 2px 2px 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+      .np-sheet-status { color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-value); font-variant-numeric: tabular-nums; text-align: right; }
+      .np-sheet-note { margin: var(--sp-3) 2px 0; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+      .np-sheet-go {
+        width: 100%; min-height: var(--btn-h); margin-top: var(--sp-4); border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink);
+        font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 600; cursor: pointer;
       }
-      .np-sheet-go { border-radius: 999px; background: var(--gold); color: var(--bg); }
-      .np-sheet-link { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--gold); font-family: var(--font-body); font-size: var(--fs-16); cursor: pointer; }
-      .np-chips, .np-grid { display: grid; gap: 8px; }
-      .np-chips { grid-template-columns: repeat(auto-fit, minmax(max(64px, 4.4em), 1fr)); }
-      .np-grid { grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); }
+      .np-sheet-link { min-height: 44px; padding: 0 6px; border: 0; background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; cursor: pointer; }
+      .np-chips, .np-grid { display: grid; gap: var(--sp-2); grid-template-columns: repeat(var(--np-cols, 3), minmax(0, 1fr)); }
+      .np-sleep-mins { --np-cols: 4; }
+      .np-sleep-ends { --np-cols: 2; margin-top: var(--sp-2); }
+      .np-sleep-off { --np-cols: 1; margin-top: var(--sp-2); }
       .np-chips button, .np-grid button {
-        min-height: 52px; padding: 6px 8px; border: 1px solid var(--gold-border); border-radius: 10px; background: transparent;
-        color: var(--cream); font-family: var(--font-body); font-size: var(--fs-16); line-height: 1.2; cursor: pointer;
+        min-height: 44px; padding: 4px 6px; border: 0; border-radius: var(--r-field); background: var(--surface-2);
+        color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; line-height: 1.2; cursor: pointer;
       }
-      .np-chips button.is-active, .np-grid button.is-active { border-color: var(--gold); background: var(--gold); color: var(--bg); }
-      /* Speed: the readout in the head, the 1 % stepper under the presets. */
-      .np-speed-sheet .audio-speed-readout { color: var(--gold); font-family: var(--font-body); font-size: var(--fs-30); font-weight: 500; }
+      .np-chips button.is-active, .np-grid button.is-active { background: var(--accent-soft); color: var(--accent); }
+      /* Speed: the value in the head (tap to type one), the 1 % step row under the presets. */
+      .np-speed-sheet .audio-speed-readout { color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; }
       .audio-speed-readout button, .audio-speed-readout input {
         margin: 0; padding: 0.1rem 0.35rem; border: 1px solid transparent; border-radius: 6px; background: transparent;
         color: inherit; font: inherit; font-variant-numeric: tabular-nums; cursor: pointer; min-height: 44px;
       }
-      .audio-speed-readout button { border-bottom: 1px dotted var(--gold-border); }
-      .audio-speed-readout input { width: 4.2em; border-color: var(--gold-border); cursor: text; -moz-appearance: textfield; }
+      .audio-speed-readout input { width: 4.2em; border-color: var(--accent); cursor: text; -moz-appearance: textfield; }
       .audio-speed-readout input::-webkit-outer-spin-button, .audio-speed-readout input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-      .audio-speed-row { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 16px; }
-      .audio-speed-fine { color: var(--cream-dim); font-size: var(--fs-16); }
-      .audio-speed-step { border-color: var(--gold); font-size: var(--fs-24); }
-      .audio-speed-step:disabled { opacity: 0.38; cursor: default; }
-      .np-custom { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
-      .np-custom-value { min-width: 4.5em; color: var(--cream); font-size: var(--fs-20); text-align: center; font-variant-numeric: tabular-nums; }
-      .np-custom-go { min-height: 48px; padding: 0 20px; border: 1px solid var(--gold); border-radius: 999px; background: var(--gold); color: var(--bg); font-size: var(--fs-16); cursor: pointer; }
-      .np-custom .audio-manager-round:disabled { opacity: 0.38; }
-      /* Voice: radio rows. */
-      .np-radios { display: flex; flex-direction: column; gap: 10px; }
-      .np-radio {
-        min-height: 64px; display: flex; align-items: center; gap: 14px; padding: 10px 14px; border: 1px solid var(--gold-border); border-radius: 12px;
-        background: transparent; color: var(--cream); text-align: left; cursor: pointer;
+      .audio-speed-row, .np-custom {
+        display: flex; align-items: center; gap: var(--sp-2); min-height: 56px; margin-top: var(--sp-2); padding: 0 var(--sp-2) 0 var(--sp-3);
+        border-radius: var(--r-field); background: var(--surface-2);
       }
-      .np-radio.is-active { border-color: var(--gold); }
-      .np-radio-dot { flex: 0 0 24px; width: 24px; height: 24px; border: 2px solid var(--cream-dim); border-radius: 50%; }
-      .np-radio.is-active .np-radio-dot { border-color: var(--gold); background: radial-gradient(circle, var(--gold) 0 45%, transparent 50%); }
-      .np-radio-copy { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      .np-radio-copy strong { font-family: var(--font-body); font-size: var(--fs-18); font-weight: 500; }
-      .np-radio-copy small { color: var(--cream-dim); font-size: var(--fs-15); }
+      .np-custom.is-active { background: var(--accent-soft); }
+      .audio-speed-fine, .np-custom-label { flex: 1; min-width: 0; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; }
+      .audio-speed-row .audio-manager-round, .np-custom .audio-manager-round {
+        width: 38px; height: 38px; border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--fs-20);
+      }
+      .audio-speed-value, .np-custom-value { min-width: 3.6em; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); text-align: center; font-variant-numeric: tabular-nums; }
+      .audio-speed-step:disabled, .np-custom .audio-manager-round:disabled { opacity: 0.38; cursor: default; }
+      .np-custom-go { min-height: var(--btn-h-sm); margin-left: 4px; padding: 0 var(--sp-4); border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; cursor: pointer; }
+      /* Voice: radio rows in one group, the mark on the right. */
+      .np-radios { display: flex; flex-direction: column; border-radius: var(--r-card); background: var(--surface-2); overflow: hidden; }
+      .np-radio {
+        min-height: 60px; display: flex; align-items: center; gap: var(--sp-3); padding: 10px var(--sp-4); border: 0; border-top: 1px solid var(--hairline);
+        background: transparent; color: var(--text-1); text-align: left; cursor: pointer;
+      }
+      .np-radio:first-child { border-top: 0; }
+      .np-radio-dot { flex: 0 0 22px; width: 22px; height: 22px; margin-left: auto; border: 2px solid var(--text-2); border-radius: 50%; }
+      .np-radio.is-active .np-radio-dot { border-color: var(--accent); background: radial-gradient(circle, var(--accent) 0 42%, transparent 47%); }
+      .np-radio-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .np-radio-copy strong { font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; }
+      .np-radio-copy small { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
       /* The standard ConfirmStrip, wrapped for the sheet: it supplies its own surface here. */
-      .audio-manager-voice-confirm { margin: 0.6rem 0; padding: 0.35rem 0.15rem 0; min-width: 0; flex-wrap: wrap; border-top: 1px solid var(--gold-border); }
+      .audio-manager-voice-confirm { margin: 0.6rem 0; padding: 0.35rem 0.15rem 0; min-width: 0; flex-wrap: wrap; border-top: 1px solid var(--hairline); }
       .audio-manager-voice-confirm .ann-chip-confirm-q { font-size: var(--fs-14); }
       .audio-manager-voice-confirm .ann-chip-confirm-btn { min-height: 44px; }
-      /* Up next (picture 10). */
-      .np-upnext-now { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--gold-faint); }
+      /* Up next: the playing one, then the rows in one group: grip | title over meta | ×. */
+      .np-upnext-now { display: flex; align-items: center; gap: 10px; padding: 10px var(--sp-3); border-radius: var(--r-card); background: var(--accent-soft); }
       .np-upnext-now-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-      .np-upnext-now-copy strong { color: var(--cream); font-family: var(--font-body); font-size: var(--fs-18); font-weight: 500; overflow-wrap: anywhere; }
-      .np-upnext-now-copy small { color: var(--cream-dim); font-size: var(--fs-14); }
-      .np-upnext-now .audio-manager-round { width: 48px; height: 48px; }
-      .np-upnext-play { border-color: var(--gold); }
-      .np-upnext-earlier { width: 100%; min-height: 48px; margin: 10px 0 2px; padding: 0 12px; text-align: left; border: 1px solid var(--gold-border); border-radius: 10px; background: transparent; color: var(--cream-dim); font-size: var(--fs-16); cursor: pointer; }
+      .np-upnext-now-copy strong { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; overflow-wrap: anywhere; }
+      .np-upnext-now-copy small { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+      .np-upnext-now .audio-manager-round { width: 44px; height: 44px; }
+      .np-upnext-play { border-color: var(--accent); }
+      .np-upnext-earlier { width: 100%; min-height: 44px; margin: var(--sp-2) 0 0; padding: 0 var(--sp-3); text-align: left; border: 0; border-radius: var(--r-field); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
       .audio-manager-queue ol { margin: 0; padding: 0; list-style: none; }
-      .audio-manager-queue li { position: relative; min-width: 0; border-top: 1px solid rgba(200, 164, 86, 0.13); overflow: hidden; }
+      .audio-manager-queue ol:not(:empty) { margin-top: var(--sp-2); border-radius: var(--r-card); background: var(--surface-2); overflow: hidden; }
+      .audio-manager-queue li { position: relative; min-width: 0; border-top: 1px solid var(--hairline); overflow: hidden; }
+      .audio-manager-queue li:first-child { border-top: 0; }
       /* A row slides over a red strip when swiped (it says what letting go does) and lifts when its grip drags it. */
-      .np-row { position: relative; z-index: 1; display: flex; align-items: center; min-width: 0; background: var(--bg3); touch-action: pan-y; }
+      .np-row { position: relative; z-index: 1; display: flex; align-items: center; min-width: 0; background: var(--surface-2); touch-action: pan-y; }
       .audio-manager-queue li.is-dragging { overflow: visible; z-index: 2; }
-      .audio-manager-queue li.is-dragging .np-row { border: 1px solid var(--gold-border); border-radius: 10px; box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
+      .audio-manager-queue li.is-dragging .np-row { border-radius: var(--r-field); box-shadow: 0 10px 26px rgba(0, 0, 0, 0.45); }
       .np-row-remove {
         position: absolute; inset: 0; display: flex; align-items: center; justify-content: flex-end; padding: 0 20px;
-        background: #8e2a26; color: #fff; font-family: var(--font-body); font-size: var(--fs-16);
+        background: #8e2a26; color: #fff; font-family: var(--font-ui); font-size: var(--ts-control);
       }
       .np-row-remove.is-right { justify-content: flex-start; }
-      .np-grip { flex: 0 0 48px; width: 48px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: none; color: var(--cream-dim); cursor: grab; touch-action: none; }
-      .np-grip svg { width: 22px; height: 22px; }
-      .np-grip:focus-visible { outline: 2px solid var(--gold); outline-offset: -2px; }
+      .np-grip { flex: 0 0 44px; width: 44px; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: 0; background: none; color: var(--text-2); cursor: grab; touch-action: none; }
+      .np-grip.is-spacer { flex-basis: 16px; width: 16px; }
+      .np-grip svg { width: 18px; height: 18px; }
+      .np-grip:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .np-row .np-row-x { color: var(--text-2); }
       .np-undo {
-        position: sticky; bottom: 0; z-index: 3; margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
-        min-height: 52px; padding: 4px 8px 4px 16px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg); color: var(--cream);
-        font-family: var(--font-body); font-size: var(--fs-16); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.3);
+        position: sticky; bottom: 0; z-index: 3; margin-top: var(--sp-3); display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+        min-height: 52px; padding: 4px 8px 4px 16px; border-radius: var(--r-field); background: var(--surface-3); color: var(--text-1);
+        font-family: var(--font-ui); font-size: var(--ts-control); box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.3);
       }
-      .audio-manager-queue-main { flex: 1; min-width: 0; min-height: 56px; padding: 0.45rem 0.25rem; display: flex; align-items: center; gap: 0.6rem; border: 0; background: transparent; color: var(--cream); cursor: pointer; text-align: left; }
-      .audio-manager-queue-number { width: 1.6rem; flex: 0 0 1.6rem; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); text-align: center; }
-      .audio-manager-queue-main > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 0.12rem; }
-      .audio-manager-queue-main strong { color: var(--cream); font-family: var(--font-body); font-size: var(--fs-16); font-weight: 400; line-height: 1.25; overflow-wrap: anywhere; }
-      .audio-manager-queue-main small { color: var(--cream-dim); font-size: var(--fs-13); line-height: 1.3; }
-      @media (hover: hover) { .audio-manager-queue-main:hover strong { color: var(--gold-bright); } }
-      .audio-manager-queue li.is-played .audio-manager-queue-main strong { color: var(--cream-muted); }
-      .audio-manager-queue li.is-played .audio-manager-queue-number { opacity: 0.62; }
+      .audio-manager-queue-main { flex: 1; min-width: 0; min-height: 56px; padding: 8px 0; display: flex; align-items: center; border: 0; background: transparent; color: var(--text-1); cursor: pointer; text-align: left; }
+      .audio-manager-queue-main > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+      .audio-manager-queue-main strong { overflow: hidden; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 500; line-height: 1.3; white-space: nowrap; text-overflow: ellipsis; }
+      .audio-manager-queue-main small { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+      @media (hover: hover) { .audio-manager-queue-main:hover strong { color: var(--accent); } }
+      .audio-manager-queue li.is-played .audio-manager-queue-main strong { color: var(--text-2); }
       .audio-manager-queue-page {
         width: 100%; min-height: 44px; margin: 6px 0; padding: 0.35rem; border: 1px dashed var(--gold-border); border-radius: 8px;
         background: transparent; color: var(--gold-dim); cursor: pointer; font-family: var(--font-body); font-size: var(--fs-14);
