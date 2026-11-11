@@ -37,7 +37,7 @@ describe('offline-audio, a whole edition in one Download (dl-d2)', () => {
     const calls = b.offlineAudioSave.mock.calls.map((c) => JSON.parse(c[0]));
     expect(calls.map((c) => c.length)).toEqual([400, 400, 389]);
     expect(calls.flat().map((t) => t.url)).toEqual(list(1189).map((t) => t.url));
-    expect(calls[0][0]).toEqual({ url: url(1), key: 'bible-kjv-1', title: 'Chapter 1', bytes: 1000 });
+    expect(calls[0][0]).toEqual({ url: url(1), key: 'bible-kjv-1', title: 'Chapter 1', bytes: 1000, pri: 'bulk' });
     expect(OfflineAudio.statusOf(url(1189))).toBe('queued');
   });
 
@@ -47,6 +47,30 @@ describe('offline-audio, a whole edition in one Download (dl-d2)', () => {
     expect(OfflineAudio.download(list(900))).toBe(true);
     expect(OfflineAudio.statusOf(url(400))).toBe('queued');
     expect(OfflineAudio.statusOf(url(401))).toBe('none');
+  });
+
+  // dl-rework E (defect 31): a hand-over that stopped midway still read as success, and nothing said what was left out.
+  it('a hand-over that stops midway says what was not queued, and keeps it for a Try again', () => {
+    let n = 0;
+    const b = fakeBridge({ offlineAudioSave: vi.fn(() => { if (++n === 2) throw new Error('bridge'); }) });
+    OfflineAudio.download(list(900));
+    expect(OfflineAudio.unsent().map((t) => t.url)).toEqual(list(900).slice(400).map((t) => t.url));
+    expect(OfflineAudio.news().text).toBe('500 of 900 were not added to the downloads. Try again.');
+    b.offlineAudioSave.mockImplementation(() => {});
+    OfflineAudio.download(OfflineAudio.unsent());
+    expect(OfflineAudio.unsent()).toEqual([]);
+    expect(OfflineAudio.statusOf(url(900))).toBe('queued');
+  });
+
+  it('priorities: a few files are a tap, a set is bulk, automatic ones and kept songs go last; a caller may say', () => {
+    const b = fakeBridge();
+    OfflineAudio.download(list(2));
+    OfflineAudio.download(list(10).slice(2));
+    OfflineAudio.download([{ url: url(20), key: 'k', title: 't', wifi: true }]);
+    OfflineAudio.download([{ url: 'https://votreader.github.io/songs-1/0123456789ab.mp3', key: 'song', title: 's' }]);
+    OfflineAudio.download([{ url: url(30), key: 'k', title: 't' }], { priority: 'bulk' });
+    const pri = b.offlineAudioSave.mock.calls.map((c) => JSON.parse(c[0])[0].pri);
+    expect(pri).toEqual(['tap', 'bulk', 'auto', 'auto', 'bulk']);
   });
 
   it('remove and cancel go 400 at a time too; everything (*) is one call', () => {
@@ -69,7 +93,37 @@ describe('offline-audio, the saved queue\'s words (dl-d2)', () => {
     expect(OfflineAudio.paused()).toBe(false);
     expect(OfflineAudio.reason()).toBe('space');
     expect(OfflineAudio.left()).toEqual({ count: 28, bytes: 214e6, unknown: 1 });
-    expect(OfflineAudio.batch()).toEqual({ done: 3, total: 31, failed: 0 });
+    expect(OfflineAudio.batch()).toEqual(expect.objectContaining({ done: 3, total: 31, failed: 0 }));
+  });
+
+  // dl-rework E (defects 19, 26): the batch by bytes with both counts, a time left, and failures from the store.
+  it('reads the batch by bytes, a time left once a rate is known, and the will-try-again list across a restart', () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(1_000_000);
+      fakeBridge();
+      Object.assign(state, {
+        queued: [url(5)], actives: [{ url: url(4), bytes: 0, total: 4e6 }], left: { count: 2, bytes: 6e6, unknown: 0 },
+        batch: { done: 3, total: 5, failed: 1, bytes: 20e6, doneBytes: 12e6 },
+        later: [{ url: url(9), key: 'bible-kjv-9', title: 'Chapter 9', reason: 'server', status: 503, tries: 5, at: 1_600_000 }],
+        need: 0, closedRuns: true,
+      });
+      OfflineAudio.refresh();
+      expect(OfflineAudio.overall()).toEqual(expect.objectContaining({ done: 3, total: 5, doneBytes: 12e6, totalBytes: 20e6, secondsLeft: null }));
+      vi.setSystemTime(1_020_000);
+      send({ type: 'progress', url: url(4), bytes: 2e6, total: 4e6 });   // 2 MB in 20 s: 100 kB/s
+      const o = OfflineAudio.overall();
+      expect(o.doneBytes).toBe(14e6);
+      expect(Math.round(o.rate)).toBe(100000);
+      expect(Math.round(/** @type {number} */ (o.secondsLeft))).toBe(60);
+      expect(OfflineAudio.statusOf(url(9))).toBe('failed');
+      expect(OfflineAudio.failureOf(url(9))).toBe('server');
+      expect(OfflineAudio.failureStatusOf(url(9))).toBe(503);
+      expect(OfflineAudio.pending().failed.map((t) => t.title)).toEqual(['Chapter 9']);
+      expect(OfflineAudio.runsClosed()).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('an older phone app without the fields reads as not paused, nothing left', () => {

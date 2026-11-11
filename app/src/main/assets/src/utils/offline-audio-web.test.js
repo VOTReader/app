@@ -172,24 +172,32 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.isSaved(URL_OF('b'))).toBe(false);
   });
 
-  it('a cut-off download is failed and nothing half-saved stays', async () => {
+  it('a cut-off download is not kept half-saved, and goes on the will-try-again list', async () => {
     await ready();
+    WebOfflineAudio._setTiming({ retry: [] });
     fetchMock.mockImplementationOnce(async () => relayResponse(3000, 5000));
     OfflineAudio.download([{ url: URL_OF('c'), key: 'k', title: 't' }]);
     await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('c'))).toBe('short'));
     expect(OfflineAudio.isSaved(URL_OF('c'))).toBe(false);
+    expect(OfflineAudio.later().map((t) => t.url)).toEqual([URL_OF('c')]);
     expect(await (await caches.open(OFFLINE_AUDIO_CACHE)).match(URL_OF('c'))).toBeUndefined();
   });
 
-  // dl-d2: a failed fetch is tried again at 5, 20 and 60 s before it is a failure; no room is a wait, never a failure.
-  it('a relay refusal or a failed fetch is tried 3 more times, then a network failure', async () => {
+  // dl-d2: a failed fetch is tried again at 5, 20 and 60 s; dl-rework D: then it is kept on the will-try-again list
+  // (never dropped), and a 404 is the server's answer, not "no network".
+  it('a relay 404 is tried 3 more times, then kept to try again later as a server answer, never dropped', async () => {
     await ready();
-    WebOfflineAudio._setTiming({ retry: [5, 5, 5] });
+    WebOfflineAudio._setTiming({ retry: [5, 5, 5], later: [60000] });
     fetchMock.mockImplementation(async () => relayResponse(0, 0, 404));
     OfflineAudio.download([{ url: URL_OF('d'), key: 'k', title: 't' }]);
-    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('d'))).toBe('network'));
+    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('d'))).toBe('server'));
+    expect(OfflineAudio.failureStatusOf(URL_OF('d'))).toBe(404);
     expect(fetchMock).toHaveBeenCalledTimes(4);
-    expect(OfflineAudio.batch()).toEqual({ done: 0, total: 1, failed: 1 });
+    expect(OfflineAudio.batch()).toEqual(expect.objectContaining({ done: 0, total: 1, failed: 1 }));
+    expect(OfflineAudio.reason()).toBe('later');
+    expect(OfflineAudio.pending().failed.map((t) => t.url)).toEqual([URL_OF('d')]);
+    expect(OfflineAudio.later()[0]).toEqual(expect.objectContaining({ reason: 'server', status: 404, tries: 4 }));
+    expect(OfflineAudio.later()[0].at).toBeGreaterThan(Date.now());
   });
 
   /* #60's leak hunt, item 5: a relay refusal (a body with it) or a 200 with no Content-Length gave up on the job
@@ -205,7 +213,7 @@ describe('offline-audio-web (cf1)', () => {
     };
     fetchMock.mockImplementationOnce(async () => answer(503, {}));
     OfflineAudio.download([{ url: URL_OF('r1'), key: 'k', title: 't' }]);
-    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r1'))).toBe('network'));
+    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r1'))).toBe('server'));
     fetchMock.mockImplementationOnce(async () => answer(200, {}));
     OfflineAudio.download([{ url: URL_OF('r2'), key: 'k', title: 't' }]);
     await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r2'))).toBe('size'));
@@ -251,18 +259,19 @@ describe('offline-audio-web (cf1)', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('downloads one at a time and a cancel stops the queue', async () => {
+  it('downloads 3 at a time, and a cancel takes waiting ones off the queue', async () => {
     await ready();
-    let release;
-    fetchMock.mockImplementationOnce(() => new Promise((r) => { release = () => r(relayResponse(5000)); }));
-    OfflineAudio.download([1, 2, 3].map((i) => ({ url: URL_OF('q' + i), key: 'k', title: 't' })));
-    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('q1'))).toBe('downloading'));
-    expect(OfflineAudio.statusOf(URL_OF('q2'))).toBe('queued');
-    OfflineAudio.cancel([URL_OF('q2'), URL_OF('q3')]);
-    release();
-    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('q1'))).toBe(true));
-    expect(OfflineAudio.statusOf(URL_OF('q2'))).toBe('none');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const releases = [];
+    for (let i = 0; i < 3; i++) fetchMock.mockImplementationOnce(() => new Promise((r) => { releases.push(() => r(relayResponse(5000))); }));
+    OfflineAudio.download([1, 2, 3, 4, 5].map((i) => ({ url: URL_OF('q' + i), key: 'k', title: 't' })));
+    await vi.waitFor(() => expect(OfflineAudio.actives()).toHaveLength(3));
+    expect([1, 2, 3].map((i) => OfflineAudio.statusOf(URL_OF('q' + i)))).toEqual(['downloading', 'downloading', 'downloading']);
+    expect(OfflineAudio.statusOf(URL_OF('q4'))).toBe('queued');
+    OfflineAudio.cancel([URL_OF('q4'), URL_OF('q5')]);
+    releases.forEach((r) => r());
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('q3'))).toBe(true));
+    expect(OfflineAudio.statusOf(URL_OF('q4'))).toBe('none');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it('removes one, then all', async () => {
@@ -299,7 +308,8 @@ describe('offline-audio-web (cf1)', () => {
     expect(OfflineAudio.statusOf(URL_OF('w1'))).toBe('none');
     expect(OfflineAudio.statusOf(URL_OF('w2'))).toBe('none');
     expect((await (await caches.open(OFFLINE_AUDIO_CACHE)).keys())).toEqual([]);
-    expect(fetchMock.mock.calls.filter((c) => !(c[1] && c[1].method === 'HEAD'))).toHaveLength(2);   // s1, w1: w2 never
+    // s1, then w1 and w2 side by side (3 at once): nothing after the Remove all.
+    expect(fetchMock.mock.calls.filter((c) => !(c[1] && c[1].method === 'HEAD'))).toHaveLength(3);
   });
 
   it('a download whose cancel lands as its last bytes are stored does not stay saved', async () => {
@@ -441,7 +451,7 @@ describe('offline-audio-web: Download only on Wi-Fi (ra6)', () => {
       if (init && init.signal) init.signal.addEventListener('abort', () => j(new DOMException('aborted', 'AbortError')));
     }));
     OfflineAudio.download([{ url: URL_OF('p1'), key: 'k', title: 'day 1', wifi: true }, { url: URL_OF('p2'), key: 'k', title: 'day 2', wifi: true }]);
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('p2'))).toBe(true));   // side by side: p2 lands, p1 hangs
     WebOfflineAudio._reset();   // the page closes
     OfflineAudio._reset();
     fetchMock.mockClear();
@@ -452,8 +462,7 @@ describe('offline-audio-web: Download only on Wi-Fi (ra6)', () => {
     expect(OfflineAudio.reason()).toBe('wifi');
     expect(gets()).toHaveLength(0);
     conn.move('wifi');
-    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('p2'))).toBe(true));
-    expect(OfflineAudio.isSaved(URL_OF('p1'))).toBe(true);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('p1'))).toBe(true));
   });
 
   it('off (the default), mobile data downloads as before', async () => {
@@ -477,22 +486,24 @@ describe('offline-audio-web: Download only on Wi-Fi (ra6)', () => {
     conn.type = 'wifi';
     await ready();
     gate.setWifiOnly(true);
-    fetchMock.mockImplementationOnce((_u, init) => new Promise((r, j) => {
+    const hang = (_u, init) => new Promise((r, j) => {
       if (init && init.signal) init.signal.addEventListener('abort', () => j(new DOMException('aborted', 'AbortError')));
-    }));
+    });
+    fetchMock.mockImplementationOnce(hang).mockImplementationOnce(hang);
     OfflineAudio.download([{ url: URL_OF('m4'), key: 'k', title: 't' }, { url: URL_OF('m5'), key: 'k', title: 't' }]);
-    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m4'))).toBe('downloading'));
+    await vi.waitFor(() => expect(OfflineAudio.actives()).toHaveLength(2));
     conn.move('cellular');
     await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m4'))).toBe('queued'));
+    await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('m5'))).toBe('queued'));
     expect(OfflineAudio.waiting()).toBe(true);
     expect(OfflineAudio.failureOf(URL_OF('m4'))).toBe(null);
-    expect(gets()).toHaveLength(1);   // m5 never started on mobile data
+    expect(gets()).toHaveLength(2);
     expect((await (await caches.open(OFFLINE_AUDIO_CACHE)).keys())).toEqual([]);
     conn.move('wifi');
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('m5'))).toBe(true));
     expect(OfflineAudio.isSaved(URL_OF('m4'))).toBe(true);
-    // Back at the head of the queue: m4 again before m5.
-    expect(gets().map((c) => c[0])).toEqual([RELAY + 'audio-v1/m4.mp3', RELAY + 'audio-v1/m4.mp3', RELAY + 'audio-v1/m5.mp3']);
+    // Back in line in their own order: m4 again before m5.
+    expect(gets().map((c) => c[0])).toEqual(['m4', 'm5', 'm4', 'm5'].map((n) => RELAY + 'audio-v1/' + n + '.mp3'));
   });
 
   it('a cancel while it waits takes it off the queue: Wi-Fi afterwards fetches nothing', async () => {
@@ -522,107 +533,161 @@ describe('offline-audio-web: the queue (dl-d2)', () => {
   };
   const three = () => [1, 2, 3].map((i) => ({ url: URL_OF('r' + i), key: 'one:r' + i, title: 'Letter ' + i, bytes: 5000 }));
 
-  it('Pause all stops the one on its way and holds the queue; Resume all goes on from the head', async () => {
+  it('Pause all stops the ones on their way and holds the queue; Resume all goes on from the head', async () => {
     await ready();
-    hangNext();
+    hangNext(); hangNext();
     OfflineAudio.download(three().slice(0, 2));
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));   // on its way: the relay asked
+    await vi.waitFor(() => expect(gets()).toHaveLength(2));   // on their way: the relay asked
     expect(OfflineAudio.pause()).toBe(true);
     await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('r1'))).toBe('queued'));
     expect(OfflineAudio.paused()).toBe(true);
     expect(OfflineAudio.reason()).toBe('paused');
     expect(OfflineAudio.failureOf(URL_OF('r1'))).toBe(null);
     await new Promise((r) => setTimeout(r, 20));
-    expect(gets()).toHaveLength(1);
+    expect(gets()).toHaveLength(2);
     expect(OfflineAudio.resume()).toBe(true);
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r2'))).toBe(true));
-    expect(gets()).toEqual([RELAY + 'audio-v1/r1.mp3', RELAY + 'audio-v1/r1.mp3', RELAY + 'audio-v1/r2.mp3']);
-    expect(OfflineAudio.batch()).toEqual({ done: 2, total: 2, failed: 0 });
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r1'))).toBe(true));
+    expect(gets()).toEqual(['r1', 'r2', 'r1', 'r2'].map((n) => RELAY + 'audio-v1/' + n + '.mp3'));
+    expect(OfflineAudio.batch()).toEqual(expect.objectContaining({ done: 2, total: 2, failed: 0, bytes: 10000, doneBytes: 10000 }));
     expect(OfflineAudio.paused()).toBe(false);
   });
 
   it('left counts what is still to come with its known bytes; batch counts "N of M"; a cancel leaves the count', async () => {
     await ready();
-    hangNext();
+    hangNext(); hangNext(); hangNext(); hangNext();
     OfflineAudio.download([...three(), { url: URL_OF('r4'), key: 'k', title: 'no size' }]);
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));   // on its way: the relay asked
+    await vi.waitFor(() => expect(gets()).toHaveLength(3));   // on their way: the relay asked
     expect(OfflineAudio.left()).toEqual({ count: 4, bytes: 15000, unknown: 1 });
-    expect(OfflineAudio.batch()).toEqual({ done: 0, total: 4, failed: 0 });
+    expect(OfflineAudio.batch()).toEqual(expect.objectContaining({ done: 0, total: 4, failed: 0, bytes: 15000 }));
     OfflineAudio.cancel([URL_OF('r3')]);
     await vi.waitFor(() => expect(OfflineAudio.batch().total).toBe(3));
     expect(OfflineAudio.queue().map((q) => q.title)).toEqual(['Letter 1', 'Letter 2', 'no size']);
   });
 
-  it('a queue left when the page closed comes back waiting as closed, fetches nothing, and Resume downloads it', async () => {
+  // dl-rework D (defect 15): a restored queue waited as 'closed' for a Resume tap; it goes on by itself now.
+  it('a queue left when the page closed goes on by itself at the next open, titles and all', async () => {
     await ready();
-    hangNext();
+    hangNext(); hangNext(); hangNext();
     OfflineAudio.download(three());
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));   // on its way: the relay asked
+    await vi.waitFor(() => expect(gets()).toHaveLength(3));   // on their way: the relay asked
     WebOfflineAudio._reset();   // the page closes
     OfflineAudio._reset();
     fetchMock.mockClear();
+    const releases = [];
+    for (let i = 0; i < 3; i++) fetchMock.mockImplementationOnce(() => new Promise((r) => { releases.push(() => r(relayResponse(5000))); }));
     await ready();
-    await vi.waitFor(() => expect(OfflineAudio.reason()).toBe('closed'));
-    expect(OfflineAudio.paused()).toBe(true);
-    expect(OfflineAudio.left()).toEqual({ count: 3, bytes: 15000, unknown: 0 });
-    expect(OfflineAudio.queue().map((q) => q.title)).toEqual(['Letter 1', 'Letter 2', 'Letter 3']);
-    expect(OfflineAudio.statusOf(URL_OF('r2'))).toBe('queued');
-    await new Promise((r) => setTimeout(r, 20));
-    expect(gets()).toHaveLength(0);
-    OfflineAudio.resume();
+    await vi.waitFor(() => expect(gets()).toHaveLength(3));
+    expect(OfflineAudio.paused()).toBe(false);
+    expect(OfflineAudio.queue().map((q) => q.title).sort()).toEqual(['Letter 1', 'Letter 2', 'Letter 3']);
+    releases.forEach((r) => r());
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r1'))).toBe(true));
     await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r3'))).toBe(true));
     expect(OfflineAudio.reason()).toBe(null);
     expect(localStorage.getItem('vot.offlineAudioQueue')).toBe(null);
   });
 
-  it('dl-d5: an automatic download is not the listener asking: a closed queue stays closed', async () => {
+  // dl-rework D (defects 18, 19): a failure was held in memory, so a restart forgot it and nothing tried it again.
+  it('the will-try-again list survives a restart and is tried again at the next open', async () => {
     await ready();
-    hangNext();
-    OfflineAudio.download(three());
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));
+    WebOfflineAudio._setTiming({ retry: [], later: [600000] });
+    fetchMock.mockImplementationOnce(async () => relayResponse(0, 0, 503));
+    OfflineAudio.download([{ url: URL_OF('z1'), key: 'one:z1', title: 'Zed' }]);
+    await vi.waitFor(() => expect(OfflineAudio.later()).toHaveLength(1));
+    expect(JSON.parse(localStorage.getItem('vot.offlineAudioQueue')).items[0]).toEqual(expect.objectContaining({ url: URL_OF('z1'), later: true, reason: 'server', status: 503 }));
     WebOfflineAudio._reset();   // the page closes
     OfflineAudio._reset();
     fetchMock.mockClear();
     await ready();
-    await vi.waitFor(() => expect(OfflineAudio.reason()).toBe('closed'));
-    OfflineAudio.download([{ url: URL_OF('auto'), key: 'k', title: 'auto', wifi: true }]);
-    await new Promise((r) => setTimeout(r, 20));
-    expect(OfflineAudio.reason()).toBe('closed');
-    expect(gets()).toHaveLength(0);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('z1'))).toBe(true));
+    expect(gets()).toEqual([RELAY + 'audio-v1/z1.mp3']);
+    expect(OfflineAudio.later()).toEqual([]);
+    expect(OfflineAudio.items()[0].title).toBe('Zed');
   });
 
-  it('a queue paused by Pause all is still paused, not closed, after a reload', async () => {
+  it('the will-try-again list is tried again by itself when its time comes, and when the signal comes back', async () => {
     await ready();
-    hangNext();
+    WebOfflineAudio._setTiming({ retry: [], later: [40, 600000] });
+    fetchMock.mockImplementationOnce(async () => { throw new TypeError('Failed to fetch'); });
+    fetchMock.mockImplementationOnce(async () => { throw new TypeError('Failed to fetch'); });
+    OfflineAudio.download([{ url: URL_OF('y1'), key: 'k', title: 'Y' }]);
+    // Its first gap (40 ms) passes and it is tried by itself; the second try fails too and waits 10 min.
+    await vi.waitFor(() => expect(gets()).toHaveLength(2));
+    await vi.waitFor(() => expect(OfflineAudio.later()[0]).toEqual(expect.objectContaining({ tries: 2, reason: 'network' })));
+    window.dispatchEvent(new Event('online'));   // the signal is back: no 10 min wait
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('y1'))).toBe(true));
+  });
+
+  // dl-rework D (defect 14): a connection that stopped without an error held the browser's queue for good.
+  it('a transfer with no bytes for the stall time is aborted and tried again', async () => {
+    await ready();
+    WebOfflineAudio._setTiming({ stall: 60, retry: [5] });
+    let cancelled = false;
+    fetchMock.mockImplementationOnce(async () => new Response(new ReadableStream({
+      start(c) { c.enqueue(new Uint8Array(100)); },   // a first chunk, then nothing ever again
+      cancel() { cancelled = true; },
+    }), { headers: { 'Content-Length': '5000' } }));
+    OfflineAudio.download([{ url: URL_OF('st'), key: 'k', title: 't' }]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('st'))).toBe(true), { timeout: 3000 });
+    expect(gets()).toHaveLength(2);
+    expect(cancelled).toBe(true);
+    expect(OfflineAudio.items()[0].bytes).toBe(5000);
+  });
+
+  // dl-rework D (defect 11): the first one that did not fit held the whole queue.
+  it('one that does not fit is stepped over; the queue holds only when nothing left fits, and says the real shortfall', async () => {
+    await ready();
+    navigator.storage.estimate = async () => ({ quota: 8000, usage: 0 });
+    OfflineAudio.download([
+      { url: URL_OF('big'), key: 'k', title: 'Big', bytes: 20000 },
+      { url: URL_OF('small'), key: 'k', title: 'Small', bytes: 5000 },
+    ]);
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('small'))).toBe(true));
+    await vi.waitFor(() => expect(OfflineAudio.reason()).toBe('space'));
+    expect(gets()).toEqual([RELAY + 'audio-v1/small.mp3']);
+    expect(OfflineAudio.statusOf(URL_OF('big'))).toBe('queued');
+    expect(OfflineAudio.need()).toBe(12000);   // 20,000 wanted, 8,000 free
+  });
+
+  // dl-rework D (defect 9): one tapped by itself waited behind a whole edition.
+  it('one tapped by itself goes ahead of a set, and automatic ones go last', async () => {
+    await ready();
+    const releases = [];
+    for (let i = 0; i < 3; i++) fetchMock.mockImplementationOnce(() => new Promise((r) => { releases.push(() => r(relayResponse(5000))); }));
+    OfflineAudio.download([1, 2, 3, 4, 5].map((i) => ({ url: URL_OF('b' + i), key: 'k', title: 'set ' + i })), { priority: 'bulk' });
+    await vi.waitFor(() => expect(gets()).toHaveLength(3));
+    OfflineAudio.download([{ url: URL_OF('auto1'), key: 'k', title: 'auto' }], { priority: 'auto' });
+    OfflineAudio.download([{ url: URL_OF('tap1'), key: 'k', title: 'tap' }]);   // one file, unsaid: a tap
+    // The store's order, read again after its 'queued' event.
+    await vi.waitFor(() => expect(OfflineAudio.queue().map((q) => q.title)).toEqual(['set 1', 'set 2', 'set 3', 'tap', 'set 4', 'set 5', 'auto']));
+    releases[0]();
+    await vi.waitFor(() => expect(gets().length).toBeGreaterThanOrEqual(4));
+    expect(gets()[3]).toBe(RELAY + 'audio-v1/tap1.mp3');
+    releases[1](); releases[2]();
+    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('auto1'))).toBe(true));
+    expect(gets().slice(3)).toEqual(['tap1', 'b4', 'b5', 'auto1'].map((n) => RELAY + 'audio-v1/' + n + '.mp3'));
+  });
+
+  it('a queue paused by Pause all is still paused after a reload, and fetches nothing', async () => {
+    await ready();
+    hangNext(); hangNext(); hangNext();
     OfflineAudio.download(three());
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));   // on its way: the relay asked
+    await vi.waitFor(() => expect(gets()).toHaveLength(3));   // on their way: the relay asked
     OfflineAudio.pause();
     WebOfflineAudio._reset();
     OfflineAudio._reset();
+    fetchMock.mockClear();
     await ready();
     await vi.waitFor(() => expect(OfflineAudio.reason()).toBe('paused'));
-  });
-
-  it('asking for another download after a close is a yes: the whole queue goes on', async () => {
-    await ready();
-    hangNext();
-    OfflineAudio.download(three().slice(0, 1));
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));   // on its way: the relay asked
-    WebOfflineAudio._reset();
-    OfflineAudio._reset();
-    await ready();
-    await vi.waitFor(() => expect(OfflineAudio.reason()).toBe('closed'));
-    OfflineAudio.download(three().slice(2));
-    await vi.waitFor(() => expect(OfflineAudio.isSaved(URL_OF('r3'))).toBe(true));
-    expect(OfflineAudio.isSaved(URL_OF('r1'))).toBe(true);
-    expect(OfflineAudio.batch()).toEqual({ done: 2, total: 2, failed: 0 });
+    await new Promise((r) => setTimeout(r, 20));
+    expect(gets()).toHaveLength(0);
   });
 
   it('Cancel all empties the queue and a later download starts unpaused', async () => {
     await ready();
-    hangNext();
+    hangNext(); hangNext(); hangNext();
     OfflineAudio.download(three());
-    await vi.waitFor(() => expect(gets()).toHaveLength(1));   // on its way: the relay asked
+    await vi.waitFor(() => expect(gets()).toHaveLength(3));   // on their way: the relay asked
     OfflineAudio.pause();
     OfflineAudio.cancelAll();
     await vi.waitFor(() => expect(OfflineAudio.statusOf(URL_OF('r1'))).toBe('none'));
