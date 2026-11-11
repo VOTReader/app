@@ -1232,3 +1232,34 @@ describe('TourOverlay — the cap floors to the last whole line above the button
     } finally { if (r) r.restore(); window.innerHeight = vh0; }
   });
 });
+
+/* Half-baked 22: the "Highlighted · Undo" toast sat over the tour card's Back. While the card is up the toast lane
+   (body.tour-open + --tour-toast-bottom / --tour-toast-top, read by app.css) is the room beside the card. */
+describe('TourOverlay — the toast lane (half-baked 22)', () => {
+  const root = () => document.documentElement.style;
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('puts the toast just above a card that has room above it, and clears the lane when the tour ends', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      return /** @type {any} */ (this.classList && this.classList.contains('tour-card') ? { top: 500, bottom: 760, left: 12, right: 380, width: 368, height: 260, x: 12, y: 500 } : { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0 });
+    });
+    startAt('welcome');
+    render(<TourOverlay />);
+    expect(document.body.classList.contains('tour-open')).toBe(true);
+    expect(root().getPropertyValue('--tour-toast-bottom')).toBe((window.innerHeight - 500 + 10) + 'px');
+    expect(root().getPropertyValue('--tour-toast-top')).toBe('auto');
+    act(() => { TourController.skip(); });
+    expect(document.body.classList.contains('tour-open')).toBe(false);
+    expect(root().getPropertyValue('--tour-toast-bottom')).toBe('');
+  });
+
+  it('puts the toast under a card that sits at the top of the screen', () => {
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function () {
+      return /** @type {any} */ (this.classList && this.classList.contains('tour-card') ? { top: 60, bottom: 300, left: 12, right: 380, width: 368, height: 240, x: 12, y: 60 } : { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0 });
+    });
+    startAt('welcome');
+    render(<TourOverlay />);
+    expect(root().getPropertyValue('--tour-toast-top')).toBe('310px');
+    expect(root().getPropertyValue('--tour-toast-bottom')).toBe('auto');
+  });
+});

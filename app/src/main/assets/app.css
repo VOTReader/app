@@ -9807,6 +9807,8 @@
          the 80px it leaves free there is that lane (a two-line toast is 68px). */
       .tour-prompt { max-height: calc(100vh - var(--dock-tour) - var(--dock-under-nav) - 80px); max-height: calc(100dvh - var(--dock-tour) - var(--dock-under-nav) - 80px); }
       body.tour-prompt-open:not(:has(.find-pill)) { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
+      /* While the tour card is up a toast sits beside it, never over its Back (TourOverlay sets the two lengths). */
+      body.tour-open { --dock-toast-bottom: var(--tour-toast-bottom, var(--dock-message)); --dock-toast-top: var(--tour-toast-top, auto); }
       /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
          later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
          second drops to its own line, right-aligned under a full-width primary, instead of the

@@ -401,6 +401,34 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
   });
   React.useEffect(() => () => { const p = padOnRef.current; if (p) { p.style.scrollPaddingBottom = ''; padOnRef.current = null; } }, []);
 
+  // Half-baked 22: while the card is up, a toast sits beside it, never over its Back. body.tour-open moves the
+  // toast lane (app.css) to the room above the card, or below it when the card sits at the top of the screen;
+  // the card's measured edges feed it on every render (the card moves between stops).
+  const cardUp = active && st.ready;
+  React.useLayoutEffect(() => {
+    if (!cardUp) return undefined;
+    document.body.classList.add('tour-open');
+    return () => {
+      document.body.classList.remove('tour-open');
+      document.documentElement.style.removeProperty('--tour-toast-bottom');
+      document.documentElement.style.removeProperty('--tour-toast-top');
+    };
+  }, [cardUp]);
+  React.useLayoutEffect(() => {
+    const el = cardRef.current;
+    if (!cardUp || !el) return;
+    const r = el.getBoundingClientRect();
+    const vh = window.innerHeight;
+    const root = document.documentElement.style;
+    if (r.top >= 110) {            // room above the card: the toast's bottom edge rests just over its top
+      root.setProperty('--tour-toast-bottom', Math.round(vh - r.top + 10) + 'px');
+      root.setProperty('--tour-toast-top', 'auto');
+    } else {                       // the card is at the top: the toast goes under it
+      root.setProperty('--tour-toast-bottom', 'auto');
+      root.setProperty('--tour-toast-top', Math.round(r.bottom + 10) + 'px');
+    }
+  });
+
   if (!active) return null;
   if (!st.ready) return <div className="tour-wait" role="status">One moment…</div>;
 
