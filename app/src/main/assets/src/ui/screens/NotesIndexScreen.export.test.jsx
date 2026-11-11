@@ -1,6 +1,7 @@
+// @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
 /* NotesIndexScreen — the "Share as text" affordances.
    ─────────────────────────────────────────────────────
-   A drilled notebook's header offers Share next to Rename/Delete (and on
+   A drilled notebook's bar menu offers Share next to Rename/Delete (and on
    Uncategorized, which has no Rename/Delete); the All Notes tab offers
    "Share as Text" in the controls row. Both hand the VISIBLE list to the
    notes-export composer with noteSourceLabel as the resolver and deliver
@@ -10,6 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 
 vi.mock('../../utils/notes-export.js', async (importOriginal) => {
   const real = await importOriginal();
@@ -31,7 +33,7 @@ const GLOBALS = {
     list: () => [{ id: 'nb1', name: 'Devotional' }],
     get: (id) => (id === 'nb1' ? { id: 'nb1', name: 'Devotional' } : null),
   },
-  ScreenLayout: ({ children }) => <div>{children}</div>,
+  ScreenLayout: ({ children, utility }) => <div>{utility && utility.menu}{children}</div>,
   LibraryNav: () => null,
   ConfirmStrip: () => null,
   NoteRow: ({ note }) => <div className="note-row-stub">{note.groupId}</div>,
@@ -39,7 +41,7 @@ const GLOBALS = {
   normalizeExcerptDisplay,   // the search filter reads it (ds5 s21.1 tests type a query)
 };
 
-beforeEach(() => { Object.assign(window, GLOBALS); localStorage.removeItem('vot-notes-tab'); });
+beforeEach(() => { Object.assign(window, GLOBALS); globalThis.ReactDOM = ReactDOM; localStorage.removeItem('vot-notes-tab'); });
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
@@ -51,17 +53,24 @@ const renderScreen = () => render(
 );
 
 const drillInto = (utils, name) => {
-  const card = [...utils.container.querySelectorAll('.nb-card')].find(c => c.textContent.includes(name));
-  fireEvent.click(card);
+  const row = [...utils.container.querySelectorAll('.ui-row-press')].find(c => c.textContent.includes(name));
+  fireEvent.click(row);
 };
+/** Open the bar's menu and pick a row by its words. */
+const fromMenu = (utils, menuName, label) => {
+  fireEvent.click(utils.getByRole('button', { name: menuName }));
+  const row = [...document.querySelectorAll('.ui-sheet .ui-row-press')].find((r) => r.querySelector('.ui-row-title').textContent === label);
+  fireEvent.click(row);
+};
+const menuLabels = () => [...document.querySelectorAll('.ui-sheet .ui-row-title')].map((t) => t.textContent);
 
 describe('NotesIndexScreen Share as text', () => {
-  it('drilled notebook header offers Share (alongside Rename/Delete) and exports that notebook', () => {
+  it('a notebook’s bar menu offers Share as text (with Rename, Colour, Delete) and exports that notebook', () => {
     const utils = renderScreen();
     drillInto(utils, 'Devotional');
-    expect(utils.getByTitle('Rename notebook')).toBeTruthy();
-    expect(utils.getByTitle('Delete notebook')).toBeTruthy();
-    fireEvent.click(utils.getByTitle('Share notebook as text'));
+    fireEvent.click(utils.getByRole('button', { name: 'Notebook options' }));
+    expect(menuLabels()).toEqual(['Share as text', 'Rename', 'Colour', 'Delete notebook']);
+    fireEvent.click([...document.querySelectorAll('.ui-sheet .ui-row-press')][0]);
     expect(shareNotesExport).toHaveBeenCalledTimes(1);
     const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
     expect(arg.title).toBe('Devotional');
@@ -73,10 +82,10 @@ describe('NotesIndexScreen Share as text', () => {
     expect(arg.text).toContain('thought one');
   });
 
-  it('All Notes tab offers "Share as Text" and exports every note as My Notes', () => {
+  it('All notes: the bar menu offers "Share all as text" and exports every note as My Notes', () => {
     const utils = renderScreen();
-    fireEvent.click(utils.getByText('All Notes'));
-    fireEvent.click(utils.getByTitle('Share all notes as text'));
+    fireEvent.click(utils.getByRole('radio', { name: 'All notes' }));
+    fromMenu(utils, 'Notes options', 'Share all as text');
     expect(shareNotesExport).toHaveBeenCalledTimes(1);
     const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
     expect(arg.title).toBe('My Notes');
@@ -87,9 +96,9 @@ describe('NotesIndexScreen Share as text', () => {
   // ds5 s21.1: a search narrows what Share sends to what the reader sees.
   it('All Notes Share sends only the notes a search shows', () => {
     const utils = renderScreen();
-    fireEvent.click(utils.getByText('All Notes'));
-    fireEvent.change(utils.getByPlaceholderText('Search notes…'), { target: { value: 'thought two' } });
-    fireEvent.click(utils.getByTitle('Share all notes as text'));
+    fireEvent.click(utils.getByRole('radio', { name: 'All notes' }));
+    fireEvent.change(utils.getByPlaceholderText('Search notes'), { target: { value: 'thought two' } });
+    fromMenu(utils, 'Notes options', 'Share all as text');
     const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
     expect(arg.text).toContain('thought two');
     expect(arg.text).not.toContain('thought one');
@@ -98,16 +107,16 @@ describe('NotesIndexScreen Share as text', () => {
   it('a drilled notebook Share sends only the notes a search shows', () => {
     const utils = renderScreen();
     drillInto(utils, 'Devotional');
-    fireEvent.change(utils.getByPlaceholderText('Search notes…'), { target: { value: 'thought one' } });
-    fireEvent.click(utils.getByTitle('Share notebook as text'));
+    fireEvent.change(utils.getByPlaceholderText('Search this notebook'), { target: { value: 'thought one' } });
+    fromMenu(utils, 'Notebook options', 'Share as text');
     const arg = vi.mocked(shareNotesExport).mock.calls[0][0];
     expect(arg.text).toContain('thought one');
     expect(arg.text).not.toContain('thought two');
   });
 
-  it('hides Share in a drilled view with no notes (nothing to export)', () => {
+  it('a view with nothing to export has no Share, and no menu at all when the menu would be empty', () => {
     const utils = renderScreen();
-    drillInto(utils, 'Uncategorized');
-    expect(utils.queryByTitle('Share notebook as text')).toBeNull();
+    drillInto(utils, 'Not in a notebook');
+    expect(utils.queryByRole('button', { name: 'Notebook options' })).toBeNull();
   });
 });

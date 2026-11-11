@@ -52,14 +52,14 @@ describe('menu → direct block emission', () => {
 
   it('renders all four sections', () => {
     mountSheet();
-    for (const h of ['From the Library', 'From Your Annotations', 'Capture', 'Text']) {
+    for (const h of ['From the library', 'From your notes and marks', 'Capture', 'Text']) {
       expect(screen.getByText(h)).toBeTruthy();
     }
   });
 
   it('Body Text emits an empty p block and closes', () => {
     const { onClose, onInsertBlock } = mountSheet();
-    fireEvent.click(screen.getByText('Body Text'));
+    fireEvent.click(screen.getByText('Paragraph'));
     expect(onInsertBlock).toHaveBeenCalledTimes(1);
     const block = onInsertBlock.mock.calls[0][0];
     expect(block.type).toBe('p');
@@ -78,8 +78,8 @@ describe('menu → direct block emission', () => {
     const onInsertImage = vi.fn();
     const onRecordAudio = vi.fn();
     const { onClose, onInsertBlock } = mountSheet({ onInsertImage, onRecordAudio });
-    fireEvent.click(screen.getByText('Image'));
-    fireEvent.click(screen.getByText('Voice Recording'));
+    fireEvent.click(screen.getByText('Photo'));
+    fireEvent.click(screen.getByText('Voice recording'));
     expect(onInsertImage).toHaveBeenCalled();
     expect(onRecordAudio).toHaveBeenCalled();
     expect(onInsertBlock).not.toHaveBeenCalled();
@@ -176,7 +176,7 @@ describe('journal drill — entry → block picker', () => {
   it('excludeJournalId keeps the host entry out of the list', () => {
     setupJournal([source, { id: 'host', title: 'Host Entry', created: 1, blocks: [] }]);
     mountSheet({ excludeJournalId: 'host' });
-    fireEvent.click(screen.getByText('Journal Entry'));
+    fireEvent.click(screen.getByText('Journal entry'));
     expect(screen.queryByText('Host Entry')).toBeNull();
     expect(screen.getByText('Morning Entry')).toBeTruthy();
   });
@@ -184,7 +184,7 @@ describe('journal drill — entry → block picker', () => {
   it('whole-entry option emits a journal-card', () => {
     setupJournal();
     const { onInsertBlock } = mountSheet();
-    fireEvent.click(screen.getByText('Journal Entry'));
+    fireEvent.click(screen.getByText('Journal entry'));
     fireEvent.click(screen.getByText('Morning Entry'));
     fireEvent.click(screen.getByText('Link the Whole Entry'));
     const block = onInsertBlock.mock.calls[0][0];
@@ -195,7 +195,7 @@ describe('journal drill — entry → block picker', () => {
   it('block picker lists only embeddable blocks (divider filtered out)', () => {
     setupJournal();
     const { container } = mountSheet();
-    fireEvent.click(screen.getByText('Journal Entry'));
+    fireEvent.click(screen.getByText('Journal entry'));
     fireEvent.click(screen.getByText('Morning Entry'));
     // whole-entry row + p + quote + image = 4 rows; the divider must not appear
     expect(container.querySelectorAll('.jrn-picker-item').length).toBe(4);
@@ -205,7 +205,7 @@ describe('journal drill — entry → block picker', () => {
   it('choosing a text block emits a journal-excerpt carrying source attribution', () => {
     setupJournal();
     const { onInsertBlock } = mountSheet();
-    fireEvent.click(screen.getByText('Journal Entry'));
+    fireEvent.click(screen.getByText('Journal entry'));
     fireEvent.click(screen.getByText('Morning Entry'));
     fireEvent.click(screen.getByText('first paragraph'));
     const block = onInsertBlock.mock.calls[0][0];
@@ -220,7 +220,7 @@ describe('journal drill — entry → block picker', () => {
   it('choosing an image block shares the mediaId but mints a new block id', () => {
     setupJournal();
     const { onInsertBlock } = mountSheet();
-    fireEvent.click(screen.getByText('Journal Entry'));
+    fireEvent.click(screen.getByText('Journal entry'));
     fireEvent.click(screen.getByText('Morning Entry'));
     fireEvent.click(screen.getByText(/— sunrise/)); // describeBlock: "[Image] — sunrise"
     const block = onInsertBlock.mock.calls[0][0];
@@ -233,7 +233,7 @@ describe('journal drill — entry → block picker', () => {
   it('back() from the block picker returns to the entry list, then to the menu', () => {
     setupJournal();
     mountSheet();
-    fireEvent.click(screen.getByText('Journal Entry'));
+    fireEvent.click(screen.getByText('Journal entry'));
     fireEvent.click(screen.getByText('Morning Entry'));
     expect(screen.getByText('Pick from Entry')).toBeTruthy();
     fireEvent.click(screen.getByLabelText('Back'));
@@ -288,7 +288,7 @@ describe('LinkPicker bridge → targetToJournalBlock mapping', () => {
   it('missing bridge: Card click warns and keeps the sheet open (no crash, no close)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { onClose } = mountSheet();
-    fireEvent.click(screen.getByText('Card'));
+    fireEvent.click(screen.getByText('Letter or chapter'));
     expect(warn).toHaveBeenCalledWith('LinkPicker bridge unavailable');
     expect(onClose).not.toHaveBeenCalled();
     warn.mockRestore();
@@ -314,7 +314,7 @@ describe('LinkPicker bridge → targetToJournalBlock mapping', () => {
   });
 
   it('bible card (no excerpt text) becomes a chapter-card', () => {
-    const { onInsertBlock, fire } = captureBridge('Card');
+    const { onInsertBlock, fire } = captureBridge('Letter or chapter');
     fire({ type: 'bible', bookId: 'john', chapter: 3 });
     const block = onInsertBlock.mock.calls[0][0];
     expect(block.type).toBe('chapter-card');
@@ -324,7 +324,7 @@ describe('LinkPicker bridge → targetToJournalBlock mapping', () => {
 
   it('letter target resolves volKey through COLLECTIONS by label', () => {
     g.COLLECTIONS = [{ label: 'Volume One', volKey: 'v1' }];
-    const { onInsertBlock, fire } = captureBridge('Card');
+    const { onInsertBlock, fire } = captureBridge('Letter or chapter');
     fire({ type: 'letter', letterId: 'the-wide-path', collection: 'Volume One' });
     const block = onInsertBlock.mock.calls[0][0];
     expect(block.type).toBe('letter-card');
@@ -334,13 +334,13 @@ describe('LinkPicker bridge → targetToJournalBlock mapping', () => {
 
   it('letter target with UNRESOLVABLE volKey inserts nothing (null guard)', () => {
     g.COLLECTIONS = [];
-    const { onInsertBlock, fire } = captureBridge('Card');
+    const { onInsertBlock, fire } = captureBridge('Letter or chapter');
     fire({ type: 'letter', letterId: 'orphan', collection: 'Unknown Volume' });
     expect(onInsertBlock).not.toHaveBeenCalled();
   });
 
   it('null target inserts nothing', () => {
-    const { onInsertBlock, fire } = captureBridge('Card');
+    const { onInsertBlock, fire } = captureBridge('Letter or chapter');
     fire(null);
     expect(onInsertBlock).not.toHaveBeenCalled();
   });

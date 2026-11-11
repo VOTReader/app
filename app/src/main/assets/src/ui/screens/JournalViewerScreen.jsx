@@ -2,7 +2,7 @@
    JournalViewerScreen — Cluster B (esbuild bundle-b.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { usePageMenu } from '../../utils/page-menu.js';
+import { BarTextAction, BarMenu } from '../components/RootNav.jsx';
 
 /* Shared utility for rendering inline markup in p/h2/quote text. */
 function jrnInteractiveProps(activate, role) {
@@ -727,20 +727,6 @@ export function JournalViewerScreen(props) {
   var _menuStep = useState(0);   // 1: the sheet opens on Delete's first confirm
   var menuStep = _menuStep[0]; var setMenuStep = _menuStep[1];
 
-  // id-datasafe 122: a pencil edits, and Pin and Delete head the top bar's ⋯ menu
-  // (utils/page-menu.js), so the viewer no longer sets its own ⋮ beside that ⋯. Without
-  // the compact top bar there is no ⋯, and the ⋮ entry sheet stays.
-  var compactBar = typeof document !== 'undefined' && document.body.classList.contains('compact-topbar');
-  var entryPinned = !!(entry && entry.pinned);
-  var hasEntry = !!entry;
-  var pageItems = React.useMemo(function() {
-    if (!hasEntry || !compactBar) return null;
-    return [
-      { key: 'pin', label: entryPinned ? 'Unpin entry' : 'Pin entry', onSelect: function() { JournalStore.togglePin(entryId); } },
-      { key: 'delete', label: 'Delete entry…', danger: true, onSelect: function() { setMenuStep(1); setMenuOpen(true); } },
-    ];
-  }, [entryId, hasEntry, entryPinned, compactBar, setMenuOpen, setMenuStep]);
-  usePageMenu(pageItems);
 
   // A {{ref:}} tap can OUTLIVE this screen: when the Bible corpus is still
   // loading, onScriptureRef retries for up to 10s (40 x 250ms). Held here so a
@@ -773,21 +759,19 @@ export function JournalViewerScreen(props) {
     onBack && onBack();
   }
 
-  function buildNavChildren(extras) {
-    return LibraryNav({
-      onBack: jrnGoBack,
-      onSearch: props.onSearch,
-      onHistory: props.onHistory,
-      onSettings: props.onSettings,
-      theme: props.theme,
-      onThemeChange: props.onThemeChange,
-      rightExtras: (extras && extras.right) || null
-    });
+  // mock v2 l-jview: the utility bar. Back, Edit as a word, the entry's own menu (Edit / Pin /
+  // Delete with the three-step confirm: JournalCardMenu). No gear, no app-wide menu (rule 11).
+  function utilityBar(withEntry) {
+    return {
+      title: '', onBack: jrnGoBack, backLabel: 'Back to Journal',
+      actions: withEntry && onEdit ? [<BarTextAction key="edit" label="Edit" onClick={function() { onEdit(); }} />] : [],
+      menu: withEntry ? <BarMenu label="Entry options" expanded={menuOpen} onClick={function() { setMenuOpen(true); }} /> : null
+    };
   }
 
   if (!entry) {
     return (
-      <ScreenLayout navChildren={buildNavChildren()}>
+      <ScreenLayout utility={utilityBar(false)}>
         <div className="jrn-empty">
           <div className="jrn-empty-title">Entry Not Found</div>
           <div className="jrn-empty-hint">This journal entry may have been deleted.</div>
@@ -891,43 +875,10 @@ export function JournalViewerScreen(props) {
     onBack && onBack();
   }
 
-  // ONE ⋯ nav icon opens the same entry-options sheet the hub cards use
-  // (Edit / Pin / Delete-with-triple-confirm) — JournalCardMenu, with the
-  // redundant "Open Entry" item hidden since we're already inside the entry.
-  var editBtn = onEdit ? (
-    <button
-      className="nav-search-btn jrn-entry-edit-btn"
-      onClick={function() { onEdit(); }}
-      title="Edit entry"
-      aria-label="Edit entry"
-    >
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-      </svg>
-    </button>
-  ) : null;
-  var navExtras = compactBar ? editBtn : (
-    <button
-      className="nav-search-btn jrn-entry-menu-btn"
-      onClick={function() { setMenuOpen(true); }}
-      title="Entry options"
-      aria-label="Entry options"
-      aria-haspopup="dialog"
-      aria-expanded={menuOpen}
-    >
-      <svg viewBox="0 0 24 24" fill="currentColor">
-        <circle cx="12" cy="5" r="1.6" />
-        <circle cx="12" cy="12" r="1.6" />
-        <circle cx="12" cy="19" r="1.6" />
-      </svg>
-    </button>
-  );
-
   var displayTitle = JournalHelpers.entryDisplayTitle(entry);
 
   return (
-    <ScreenLayout navChildren={buildNavChildren({ right: navExtras })}>
+    <ScreenLayout utility={utilityBar(true)}>
       <div className="jrn-viewer">
         {jrnBack ? (
           <div className="back-hint-row">

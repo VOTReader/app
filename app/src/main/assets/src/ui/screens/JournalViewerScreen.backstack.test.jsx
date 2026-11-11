@@ -52,14 +52,12 @@ const B = {
 };
 
 function setupGlobals() {
-  window.ScreenLayout = ({ children, navChildren }) => (
+  window.ScreenLayout = ({ children, utility }) => (
     <div>
-      <div className="test-nav">{navChildren}</div>
+      <div className="test-nav">{utility && utility.onBack ? <button type="button" className="test-nav-back" onClick={utility.onBack}>Nav back</button> : null}</div>
       {children}
     </div>
   );
-  // The nav arrow is the viewer's jrnGoBack, the same handler as the pill.
-  window.LibraryNav = (opts) => <button type="button" className="test-nav-back" onClick={opts.onBack}>Nav back</button>;
   window.JournalStore = {
     subscribe: () => () => {},
     getVersion: () => 1,

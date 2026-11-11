@@ -46,7 +46,7 @@ beforeEach(() => {
   globalThis.JournalMediaStore = { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn() };
   globalThis.showToast = () => {};
   globalThis.StorageHealth = { onWriteFailure: () => {}, onWriteSuccess: () => {} };   // a landed save reports success (fake-indexeddb)
-  globalThis.ScreenLayout = ({ navChildren, children }) => React.createElement('div', null, navChildren, children);
+  globalThis.ScreenLayout = ({ utility, children }) => React.createElement('div', null, utility && utility.lead, utility && utility.actions, utility && utility.menu, children);
   globalThis.LibraryNav = () => null;
   globalThis.ConfirmStrip = () => null;
   globalThis.JournalImageBlock = () => null;
@@ -112,7 +112,7 @@ describe('JournalEditorScreen — background-kill data safety', () => {
 
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
 
-    fireEvent.click(document.querySelector('.jrn-fab-plus'));            // openInsertSheet
+    fireEvent.click(document.querySelector('.jrn-ebar-insert'));            // openInsertSheet
     fireEvent.click(document.querySelector('[data-testid="open-rec"]')); // handleInsertAudio → showRec
     fireEvent.click(document.querySelector('[data-testid="rec-save"]')); // onRecordingSaved → insert + immediate save
 
@@ -384,7 +384,7 @@ describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 
     ta.setSelectionRange(5, 5);            // caret between "hello" and " world"
     fireEvent.focus(ta);                   // focusTextarea tracks { idx, caret }
 
-    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('.jrn-ebar-insert'));
     fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
     fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
 
@@ -405,7 +405,7 @@ describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 
     ta.setSelectionRange(2, 2);
     fireEvent.focus(ta);
 
-    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('.jrn-ebar-insert'));
     fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
     fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
 
@@ -422,7 +422,7 @@ describe('JournalEditorScreen — insert never splits (UX-BATCH session 3, item 
     });
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
     // No focus event — activeTextareaRef is empty (picker-style insert).
-    fireEvent.click(document.querySelector('.jrn-fab-plus'));
+    fireEvent.click(document.querySelector('.jrn-ebar-insert'));
     fireEvent.click(document.querySelector('[data-testid="open-rec"]'));
     fireEvent.click(document.querySelector('[data-testid="rec-save"]'));
 
@@ -578,7 +578,7 @@ describe('JournalEditorScreen — P1-6: no bare registry dismiss for the recordi
     const entry = JournalStore.add({ title: 't', blocks: [JournalHelpers.newBlock('p', { text: 'x' })] });
     render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
 
-    fireEvent.click(document.querySelector('.jrn-fab-plus'));            // openInsertSheet
+    fireEvent.click(document.querySelector('.jrn-ebar-insert'));            // openInsertSheet
     fireEvent.click(document.querySelector('[data-testid="open-rec"]')); // handleInsertAudio → showRec
 
     // The stubbed JournalRecordingSheet doesn't register itself, so anything

@@ -56,59 +56,48 @@ const show = () => render(
   <HighlightsScreen onBack={() => {}} onNavigateToSource={() => {}} theme="dark" onThemeChange={() => {}} />,
 );
 
-const box = () => document.querySelector('input[placeholder="Search marks…"]');
+const box = () => document.querySelector('input[type="search"]');
 const rows = () => [...document.querySelectorAll('.hlx-row .hlx-text')].map((el) => el.textContent);
+const chip = (name) => [...document.querySelectorAll('.ui-chip')].find((b) => b.textContent === name);
 
-describe('HighlightsScreen — search-box parity [C9]', () => {
-  it('is a real search input, not a text input', () => {
+/* The UI pass (mock v2 l-high): the shared search pill, the line "N highlights · Newest first", one chip row
+   for the kinds by their one name each (Highlighter, Underline, Squiggle) and one for the colours in use. */
+describe('HighlightsScreen — the list parts', () => {
+  it('has the shared search pill, a real search field named by its words', () => {
     show();
     expect(box().getAttribute('type')).toBe('search');
-  });
-
-  it('carries the shared index-search class alongside its own', () => {
-    show();
-    const cls = box().className.split(/\s+/);
-    expect(cls).toContain('notes-index-search');
-    expect(cls).toContain('hlx-search');
-  });
-
-  it('names itself the way its siblings do', () => {
-    show();
-    expect(box().getAttribute('aria-label')).toBe('Search marks');
+    expect(box().getAttribute('aria-label')).toBe('Search highlights');
+    expect(box().closest('.ui-field')).toBeTruthy();
   });
 
   it('still filters the marks it always filtered', () => {
     show();
     expect(rows()).toHaveLength(2);
     fireEvent.change(box(), { target: { value: 'shepherd' } });
-    expect(rows()).toEqual(['“The Lord is my shepherd”']);
+    expect(rows()).toEqual(['The Lord is my shepherd']);
+    expect(document.querySelector('.lib-qline-count').textContent).toBe('1 of 2 highlights');
     fireEvent.change(box(), { target: { value: '' } });
     expect(rows()).toHaveLength(2);
   });
 
-  it('keeps the sort toggle and the filter chips beside it untouched', () => {
+  it('says its sort, and names the kinds and the colours in use', () => {
     show();
-    expect(document.querySelector('.hlx-sort-row .notes-index-sort-btn').textContent).toBe('Sort: Newest ↓');
-    expect([...document.querySelectorAll('.hlx-type-chip')].map((c) => c.textContent))
-      .toEqual(['All', 'Highlights', 'Underlines', 'Squiggles']); // v05-04 added Squiggles
-  });
-});
-
-describe('HighlightsScreen — the migrated stylesheet [C9]', () => {
-  it('no longer injects .hlx-search rules (they live in app.css now)', () => {
-    show();
-    const sheet = document.getElementById('hlx-styles');
-    expect(sheet).toBeTruthy();                       // the rest of the screen still injects
-    expect(sheet.textContent).toContain('.hlx-row');
-    expect(sheet.textContent).not.toContain('.hlx-search');
+    expect(document.querySelector('.lib-qline .ui-tool').getAttribute('aria-label')).toBe('Sort: Newest first');
+    const groups = [...document.querySelectorAll('.hlx-chips')].map((g) => [...g.querySelectorAll('.ui-chip')].map((c) => c.textContent));
+    expect(groups).toEqual([['All', 'Highlighter', 'Underline', 'Squiggle'], ['Any colour', 'Yellow', 'Blue']]);
   });
 
-  it('keeps the classes the injected sheet still owns', () => {
+  it('draws the words in their own mark', () => {
     show();
-    const sheet = document.getElementById('hlx-styles');
-    for (const cls of ['.hlx-controls', '.hlx-sort-row', '.hlx-type-chip', '.hlx-list']) {
-      expect(sheet.textContent, cls).toContain(cls);
-    }
+    const marks = [...document.querySelectorAll('.hlx-mark')];
+    const byText = (t) => marks.find((m) => m.textContent === t);
+    expect(byText('The Lord is my shepherd').style.background).toMatch(/rgba\(255, 215, 0, 0\.24\)/);
+    expect(byText('For God so loved the world').style.textDecorationLine).toBe('underline');
+  });
+
+  it('injects no stylesheet of its own any more (its rules are in app.css)', () => {
+    show();
+    expect(document.getElementById('hlx-styles')).toBeNull();
   });
 });
 
@@ -116,16 +105,25 @@ describe('HighlightsScreen — the migrated stylesheet [C9]', () => {
 describe('HighlightsScreen — filters', () => {
   it('chips carry aria-pressed, and an empty result names the filter with Show all', () => {
     show();
-    const chip = (name) => [...document.querySelectorAll('.hlx-type-chip')].find((b) => b.textContent === name);
     expect(chip('All').getAttribute('aria-pressed')).toBe('true');
-    fireEvent.click(chip('Squiggles'));
-    expect(chip('Squiggles').getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(chip('Squiggle'));
+    expect(chip('Squiggle').getAttribute('aria-pressed')).toBe('true');
     expect(chip('All').getAttribute('aria-pressed')).toBe('false');
-    expect(document.querySelector('.hlx-empty-hint').textContent).toBe('Nothing matches squiggles.');
+    expect(document.querySelector('.hlx-none-text').textContent).toBe('Nothing matches squiggles.');
     fireEvent.click(document.querySelector('.hlx-show-all'));
     expect(rows().length).toBe(2);
     fireEvent.change(box(), { target: { value: 'zzz' } });
-    expect(document.querySelector('.hlx-empty-hint').textContent).toBe('Nothing matches “zzz” in marks.');
+    expect(document.querySelector('.hlx-none-text').textContent).toBe('Nothing matches “zzz” in highlights.');
+  });
+
+  it('with nothing marked: says how, with Start reading', () => {
+    globalThis.AnnotationStore = { subscribe: () => () => {}, getVersion: () => 0, all: () => ({}) };
+    let started = 0;
+    render(<HighlightsScreen onBack={() => {}} onNavigateToSource={() => {}} onStartReading={() => { started++; }} />);
+    expect(document.querySelector('.ui-empty-title').textContent).toBe('No highlights yet');
+    expect(box()).toBeNull();
+    fireEvent.click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Start reading'));
+    expect(started).toBe(1);
   });
 });
 

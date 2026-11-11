@@ -284,7 +284,7 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
       <div className="picker-footer">
         <button
           type="button"
-          className="picker-footer-btn"
+          className="ui-btn is-primary is-wide picker-footer-btn"
           onPointerDown={pressFooter}
           onPointerUp={releaseFooter}
           onPointerCancel={releaseFooter}

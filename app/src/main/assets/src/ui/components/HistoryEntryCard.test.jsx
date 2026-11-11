@@ -35,10 +35,10 @@ afterEach(() => {
 });
 
 const label = () => {
-  const el = document.querySelector('.chapter-card-label');
+  const el = document.querySelector('.history-entry-label');
   return el ? el.textContent : null;
 };
-const title = () => document.querySelector('.chapter-card-title').textContent;
+const title = () => document.querySelector('.ui-row-title').textContent;
 
 const show = (entry, props = {}) => render(
   <HistoryEntryCard entry={entry} onSelect={() => {}} {...props} />,
@@ -115,7 +115,7 @@ describe('HistoryEntryCard — row mechanics', () => {
       <HistoryEntryCard entry={entry} onSelect={(e) => picked.push(e)} chip={<span className="idx-min-chip">~3 min</span>} />,
     );
     expect(document.querySelector('.idx-min-chip').textContent).toBe('~3 min');
-    fireEvent.click(document.querySelector('.chapter-card-btn'));
+    fireEvent.click(document.querySelector('.ui-row'));
     expect(picked).toEqual([entry]);
   });
 });

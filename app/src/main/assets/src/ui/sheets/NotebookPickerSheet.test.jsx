@@ -60,7 +60,7 @@ describe('NotebookPickerSheet — buffered toggles', () => {
   it('is a labelled modal and notebook rows work from the keyboard', () => {
     setupStores();
     render(<NotebookPickerSheet groupId="g1" onClose={() => {}} />);
-    const dialog = screen.getByRole('dialog', { name: 'Add to Notebook' });
+    const dialog = screen.getByRole('dialog', { name: 'Move to a notebook' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     // Sweep low (mw10): the row was role=button around its Delete button (axe nested-interactive). The
     // toggle is now its own native checkbox button (Enter / Space are the browser's), Delete its sibling.
@@ -109,7 +109,7 @@ describe('NotebookPickerSheet — buffered toggles', () => {
     const onClose = vi.fn();
     const { container } = render(<NotebookPickerSheet groupId="g1" onClose={onClose} />);
     fireEvent.click(screen.getByText('Psalms Study'));
-    fireEvent.click(container.querySelector('.nb-picker-close'));
+    fireEvent.click(container.querySelector('.nb-picker-cancel'));
     expect(onClose).not.toHaveBeenCalled();
     expect(container.querySelector('.nb-picker-discard-confirm')).toBeTruthy();
     fireEvent.click(screen.getByText('Yes, discard'));
@@ -121,7 +121,7 @@ describe('NotebookPickerSheet — buffered toggles', () => {
     setupStores({ memberIds: ['nb1'] });
     const onClose = vi.fn();
     const { container } = render(<NotebookPickerSheet groupId="g1" onClose={onClose} />);
-    fireEvent.click(container.querySelector('.nb-picker-close'));
+    fireEvent.click(container.querySelector('.nb-picker-cancel'));
     expect(onClose).toHaveBeenCalledOnce();
   });
 

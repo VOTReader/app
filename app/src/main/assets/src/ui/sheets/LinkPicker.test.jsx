@@ -41,7 +41,7 @@ describe('LinkPicker dialog semantics', () => {
   it('is a labelled modal with focus contained inside the picker', () => {
     stubGlobals();
     render(<LinkPicker {...baseProps} />);
-    const dialog = screen.getByRole('dialog', { name: 'Create a Link' });
+    const dialog = screen.getByRole('dialog', { name: 'Link to…' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     expect(dialog.contains(document.activeElement)).toBe(true);
   });
@@ -52,8 +52,8 @@ describe('LinkPicker source context', () => {
     stubGlobals();
     const { container } = render(<LinkPicker {...baseProps} />);
     expect(container.querySelector('.navpick-context')).toBeTruthy();
-    expect(screen.getByText('Linking from')).toBeTruthy();
-    expect(screen.getByText('John 3:16')).toBeTruthy();
+    expect(screen.getByText(/^From /)).toBeTruthy();
+    expect(screen.getByText('From John 3:16')).toBeTruthy();
   });
 
   it('card/excerpt journal mode (no source) shows NO context strip', () => {
@@ -80,7 +80,7 @@ describe('LinkPicker success strip + Undo', () => {
   it('shows the success strip with the created target label', () => {
     stubGlobals();
     render(<LinkPicker {...baseProps} lastCreatedLink={{ id: 'lnk1', target: { label: 'Genesis 1:1' } }} />);
-    expect(screen.getByText(/Link created · Genesis 1:1/)).toBeTruthy();
+    expect(screen.getByText(/Linked to Genesis 1:1/)).toBeTruthy();
   });
 
   it('Undo removes the link + clears state but does NOT close the picker', () => {
@@ -115,7 +115,7 @@ describe('LinkPicker mode tabs', () => {
     const { container } = render(<LinkPicker {...baseProps} />);
     const tabs = [...container.querySelectorAll('.navpick-tab')];
     expect(tabs.map(t => t.textContent)).toEqual(['Search', 'Browse', 'Recent']);
-    expect(tabs[0].className).toContain('active');
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
     expect(container.querySelector('.navpick-search-input')).toBeTruthy();
   });
 });
@@ -242,8 +242,8 @@ describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
     const { container } = render(<LinkPicker {...baseProps} />);
     try {
       const scopes = [...container.querySelectorAll('.navpick-scope-btn')];
-      expect(scopes.map(b => b.textContent)).toEqual(['Titles & refs', 'Full text']);
-      expect(scopes[0].className).toContain('active');
+      expect(scopes.map(b => b.textContent)).toEqual(['Titles and references', 'Inside the text']);
+      expect(scopes[0].getAttribute('aria-checked')).toBe('true');
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       await act(async () => { vi.advanceTimersByTime(600); });
       await act(async () => { await Promise.resolve(); });
@@ -263,7 +263,7 @@ describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       expect(screen.getByText('No titles match')).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Search the full text instead' }));
-      expect([...container.querySelectorAll('.navpick-scope-btn')][1].className).toContain('active');
+      expect([...container.querySelectorAll('.navpick-scope-btn')][1].getAttribute('aria-checked')).toBe('true');
       await act(async () => { vi.advanceTimersByTime(300); });
       await act(async () => { await Promise.resolve(); });
       expect(screen.getByText('In the text')).toBeTruthy();
@@ -278,7 +278,7 @@ describe('LinkPicker search scope toggle (Titles & refs / Full text)', () => {
     stubEngine();
     const { container } = render(<LinkPicker {...baseProps} />);
     try {
-      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       await act(async () => { vi.advanceTimersByTime(300); });
       await act(async () => { await Promise.resolve(); });
@@ -316,7 +316,7 @@ describe('LinkPicker search: Enter shows the results and makes no link (A06.7)',
     };
     const { container } = render(<LinkPicker {...baseProps} />);
     try {
-      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
       const box = container.querySelector('.navpick-search-input');
       fireEvent.change(box, { target: { value: 'god so loved' } });
       await act(async () => { vi.advanceTimersByTime(300); });
@@ -394,10 +394,10 @@ describe('LinkPicker corpus scope (All / Scriptures / Volumes)', () => {
     const { container } = render(<LinkPicker {...baseProps} />);
     // Titles & refs is the picker's default scope — no corpus chips there.
     expect(container.querySelector('.navpick-corpus')).toBeNull();
-    fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
     const chips = [...container.querySelectorAll('.navpick-corpus-btn')];
     expect(chips.map((c) => c.textContent)).toEqual(['All', 'Scriptures', 'Volumes']);
-    expect(chips[0].className).toContain('active');
+    expect(chips[0].getAttribute('aria-checked')).toBe('true');
     expect(chips[0].getAttribute('aria-checked')).toBe('true');
   });
 
@@ -407,7 +407,7 @@ describe('LinkPicker corpus scope (All / Scriptures / Volumes)', () => {
     stubCorpusEngine();
     const { container } = render(<LinkPicker {...baseProps} />);
     try {
-      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       await settle();
       expect(window.VotSearchMini.search).toHaveBeenLastCalledWith('god so loved', expect.objectContaining({ corpus: 'all' }));
@@ -426,7 +426,7 @@ describe('LinkPicker corpus scope (All / Scriptures / Volumes)', () => {
     const { container } = render(<LinkPicker {...baseProps} />);
     const labels = () => [...container.querySelectorAll('.navpick-row-label')].map((e) => e.textContent);
     try {
-      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       await settle();
       expect(labels()).toEqual(['John 3:16', 'The Wide Path']);
@@ -452,14 +452,14 @@ describe('LinkPicker corpus scope (All / Scriptures / Volumes)', () => {
     }));
     const { container } = render(<LinkPicker {...baseProps} />);
     try {
-      fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
       fireEvent.click(screen.getByRole('radio', { name: 'Scriptures' }));
       fireEvent.change(container.querySelector('.navpick-search-input'), { target: { value: 'god so loved' } });
       await settle();
       expect(screen.getByText('Nothing in Scriptures matches')).toBeTruthy();
       fireEvent.click(screen.getByRole('button', { name: 'Search every corpus instead' }));
       await settle();
-      expect([...container.querySelectorAll('.navpick-corpus-btn')][0].className).toContain('active');
+      expect([...container.querySelectorAll('.navpick-corpus-btn')][0].getAttribute('aria-checked')).toBe('true');
       expect([...container.querySelectorAll('.navpick-row-label')].map((e) => e.textContent)).toEqual(['The Wide Path']);
     } finally {
       vi.useRealTimers();

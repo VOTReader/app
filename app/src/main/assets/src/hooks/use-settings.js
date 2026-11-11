@@ -110,6 +110,8 @@ export const RETIRED_SETTINGS = Object.freeze([
   'trueBlack',                                               // True Black is the dark theme (2026-08-03)
   'showProgressBar',                                         // retired 2026-08-03
   'backupReminder', 'lastExportAt', 'lastBackupRemindedAt',  // the boot backup toast, retired 2026-08-04
+  'compactTopBar', 'showThemeBtn', 'historyInNav', 'showSettingsGear', // the old icon-row switches (W2d, X-hidden 116):
+                                                            // the three tabs drew one bar whatever they said
 ]);
 
 /**
@@ -214,7 +216,7 @@ export function useSettings({ savedSettings, theme }) {
       //  2026-08-04 — the boot backup-freshness toast is retired. RETIRED_SETTINGS
       //  drops the stale keys from old vot-state blobs, since 2026-11-04.)
       scriptureLayout: "genre", gardenTier: GARDEN_DEFAULT_TIER,
-      showSettingsGear: true, translation: "nkjv", restoredNames: true, fontStyle: "classic",
+      translation: "nkjv", restoredNames: true, fontStyle: "classic",
       // Recorded Bible edition for the whole-book Listen pill ('off' hides it).
       // Values are BIBLE_AUDIO_EDITIONS keys (utils/audio-track.js); an unknown
       // persisted value acts as 'off' (bibleAudioEdition() returns null).
@@ -236,14 +238,7 @@ export function useSettings({ savedSettings, theme }) {
       // the sweep behind audioTurnPage's fix; on main since the 07-31 row). New key:
       // `...savedS` cannot shadow it, so every profile starts ON, as the row's desc says.
       searchSynonyms: true,
-      historyInNav: true,
       showBookmarkNav: true,
-      showThemeBtn: true,
-      // The compact top bar (the redesign, 2026-09-25): Settings, History and the theme switch
-      // leave the bar for its ⋯ menu (ui/components/MoreMenu.jsx), with Text size beside them.
-      // A NEW key, so `...savedS` cannot shadow it and every existing profile gets the calmer bar;
-      // off restores the old icon row exactly (the three toggles above govern it again).
-      compactTopBar: true,
       // Copy & Share (cp3, Corbin 2026-09-27): the link a tap on Share attaches ('app' | 'site';
       // holding Share still offers both), and whether a website link also quotes the copied words
       // so the site opens on them highlighted (off: the link names the letter alone). The website's
@@ -312,7 +307,7 @@ export function useSettings({ savedSettings, theme }) {
   //
   // A LAYOUT effect (settings hunt, 2026-11-04), so the classes are on for the
   // App's FIRST paint. As a passive effect it ran after that paint: every launch
-  // drew the default bar (body.compact-topbar hides three icons), the split
+  // drew the split
   // arrows and their 4rem letter padding (no arrows-off yet), the small-text
   // layout at 180%+ — and useScrollMemory's restore, a layout effect further down
   // App, measured that page. The boot script still owns what it can set before
@@ -332,14 +327,9 @@ export function useSettings({ savedSettings, theme }) {
     document.body.classList.toggle("light", theme === "light");
     // [10] True Black — an OLED modifier on the DARK theme only (surfaces
     // --bg2/--bg3 drop to pure/near black; everything else untouched).
-    document.body.classList.toggle("no-gear", !settings.showSettingsGear);
     document.body.classList.toggle("no-search", settings.searchEnabled === false);
     document.body.classList.toggle("no-history", settings.historyEnabled === false);
-    document.body.classList.toggle("history-in-nav", !!settings.historyInNav);
     document.body.classList.toggle("no-bookmark-nav", settings.showBookmarkNav === false);
-    document.body.classList.toggle("no-theme-nav", settings.showThemeBtn === false);
-    // The three tabs (2026-11-10): the compact bar is the only bar (its switch left Settings; the stored key stays).
-    document.body.classList.toggle("compact-topbar", true);
     document.body.classList.toggle("arrows-right", settings.arrowLayout === 'right');
     document.body.classList.toggle("arrows-left", settings.arrowLayout === 'left');
     document.body.classList.toggle("arrows-nav", settings.arrowLayout === 'nav');

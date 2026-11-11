@@ -187,11 +187,6 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
               aria-label="Show chapter summary"
             >+ Show summary</button>
           )}
-          <div className="hero-ornament">
-            <div className="hero-ornament-line" />
-            <div className="hero-ornament-diamond" />
-            <div className="hero-ornament-line r" />
-          </div>
           {/* Matthew parity (2026-08-10): the study screen is a Bible chapter
               too, and the listening desk's title jump can LAND here — a screen
               you can be sent to by the player had no way to start it. Same

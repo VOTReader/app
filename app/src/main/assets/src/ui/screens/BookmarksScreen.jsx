@@ -16,6 +16,11 @@
    reader outside this file, so they ride with the screen.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { ActionSheet } from '../components/SelectField.jsx';
+import { _bookmarkSourcePlace } from '../../utils/bookmark-source.js';
+import { ListRow, EmptyState } from '../components/UiParts.jsx';
+import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+
 /* The bundle-d slots, guarded so that rendering this screen alone (a test,
    or a host without bundle-d's slots) degrades to the raw key rather
    than throwing. */
@@ -26,211 +31,76 @@ function srcEndpoint(hlKey) {
   return (typeof _bookmarkSourceEndpoint === 'function') ? _bookmarkSourceEndpoint(hlKey) : null;
 }
 
-/* ── BookmarkRow component ───────────────────────────────────── */
+/** Where a bookmark is, beyond its name: "Volume One" for a letter, "Studies", "Journal" (bookmark-source.js,
+    imported: it is one bundle with this screen). */
+function srcPlace(hlKey) {
+  return _bookmarkSourcePlace(hlKey);
+}
+
 /**
- * @param {{ key?: any, bkm: any, source?: string, onNavigate: any, onLongPress: any, editingId: any, onEditSave: any, onEditCancel: any }} props
+ * A bookmark's name, said once (bug: the card repeated it): the reader's label, or the place's own name when the
+ * label is that name or empty.
+ * @param {any} bkm @param {string} source @returns {{ name: string, where: string }}
  */
-export function BookmarkRow({ bkm, source = '', onNavigate, onLongPress, editingId, onEditSave, onEditCancel }) {
-  var useState = React.useState;
-  var useEffect = React.useEffect;
-  var useRef = React.useRef;
+export function bookmarkWords(bkm, source) {
+  var label = String(bkm.label || '').trim();
+  var same = !label || label.toLowerCase() === String(source || '').trim().toLowerCase();
+  var place = srcPlace(bkm.hlKey);
+  return { name: same ? (source || label || 'Bookmark') : label, where: [same ? '' : source, place].filter(Boolean).join(' · ') };
+}
 
-  var inputRef = useRef(null);
-  var cancelledRef = useRef(false);   // ds5 s19.9: Escape cancelled; the unmount's blur must not save
-
-  var _editState = useState(bkm.label || '');
-  var editValue = _editState[0];
-  var setEditValue = _editState[1];
-
-  var isEditing = editingId === bkm.id;
+/* ── BookmarkRow (mock v2 l-book): the bookmark icon, the name once, then where it is and when; ONE menu ── */
+/**
+ * @param {{ key?: any, bkm: any, source?: string, onNavigate: any, onMenu: any }} props
+ */
+export function BookmarkRow({ bkm, source = '', onNavigate, onMenu }) {
   var sourceLabel = source || srcLabel(bkm.hlKey);
+  var words = bookmarkWords(bkm, sourceLabel);
   var date = (typeof relativeDate === 'function') ? relativeDate(bkm.updated || bkm.created) : '';
-  var hasThought = !isEditing && bkm.thought && bkm.thought.trim();
-
-  useEffect(function() {
-    if (isEditing) {
-      cancelledRef.current = false;
-      setEditValue(bkm.label || '');
-      setTimeout(function() {
-        if (inputRef.current) {
-          inputRef.current.focus();
-          inputRef.current.select();
-        }
-      }, 50);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot at edit-start: fires only when isEditing flips. bkm.label is read at that moment for the seed; tracking it in deps would clobber in-progress edits if the underlying bookmark mutated externally. setEditValue is a useState setter (identity-stable).
-  }, [isEditing]);
-
-  // A06.9: the passage under the label, shown only when it says something the label does not.
-  var norm = function(t) { return String(t || '').replace(/\s+/g, ' ').trim().toLowerCase(); };
-  var passage = typeof bkm.text === 'string' && bkm.text.trim() && norm(bkm.label).indexOf(norm(bkm.text)) < 0
-    ? '“' + (bkm.text.length > 160 ? bkm.text.slice(0, 157).trim() + '…' : bkm.text.trim()) + '”' : '';
-
-  var commitEdit = function() {
-    if (cancelledRef.current) return;
-    var v = editValue.trim();
-    if (v) onEditSave(bkm.id, v);
-    else onEditCancel();
-  };
-
-  var onKeyDown = function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); commitEdit(); }
-    else if (e.key === 'Escape') { cancelledRef.current = true; onEditCancel(); }
-  };
-
   return (
-    <div
-      className="bkm-row"
-      onContextMenu={function(e) { e.preventDefault(); if (onLongPress) onLongPress(bkm, e); }}
-    >
-      <div
-        className={'bkm-row-content' + (isEditing ? ' is-disabled' : '')}
-        role="button"
-        tabIndex={isEditing ? -1 : 0}
-        onClick={function() { if (!isEditing && onNavigate) onNavigate(bkm); }}
-        onKeyDown={function(e) {
-          if ((e.key === 'Enter' || e.key === ' ') && !isEditing && onNavigate) {
-            e.preventDefault(); onNavigate(bkm);
-          }
-        }}
-      >
-        <span className="bkm-row-source">{sourceLabel}</span>
-        {isEditing
-          ? (
-            <input
-              ref={inputRef}
-              className="bkm-row-edit-input"
-              type="text"
-              value={editValue}
-              onChange={function(e) { setEditValue(e.target.value); }}
-              onKeyDown={onKeyDown}
-              onBlur={commitEdit}
-              onClick={function(e) { e.stopPropagation(); }}
-              placeholder="Bookmark label"
-              maxLength={200}
-            />
-          )
-          : <span className="bkm-row-label">{bkm.label || '(no label)'}</span>
-        }
-        {/* A06.9: the words it was made on, when the label is not already them. */}
-        {!isEditing && passage ? <span className="bkm-row-passage">{passage}</span> : null}
-        {hasThought && (typeof JrnExpandable !== 'undefined'
-          ? (
-            <div className="bkm-row-thought" onClick={function(e) { e.stopPropagation(); }}>
-              <JrnExpandable text={bkm.thought} threshold={140} className="bkm-row-thought-body" />
-            </div>
-          )
-          : <span className="bkm-row-thought">{bkm.thought}</span>
-        )}
-      </div>
-      <div className="bkm-row-meta">
-        {date && <span className="bkm-row-date">{date}</span>}
-        <button
-          className="bkm-row-more"
-          onClick={function(e) { e.stopPropagation(); if (onLongPress) onLongPress(bkm, e); }}
-          title="Options"
-          aria-label="Bookmark options"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="5" r="1" />
-            <circle cx="12" cy="12" r="1" />
-            <circle cx="12" cy="19" r="1" />
-          </svg>
-        </button>
-      </div>
-    </div>
+    <ListRow icon="mark" className="bkm-row" title={words.name} meta={[words.where, date].filter(Boolean).join(' · ')}
+      onClick={function() { if (onNavigate) onNavigate(bkm); }}
+      menu={{ label: 'Bookmark options', onClick: function() { if (onMenu) onMenu(bkm); } }} />
   );
 }
 
-/* ── BookmarkRowActionSheet ──────────────────────────────────── */
-export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onEditLabel, onDelete }) {
-  var useState = React.useState;
-
-  var _state = useState(false);
-  var confirming = _state[0];
-  var setConfirming = _state[1];
-  var trapRef = useFocusTrap(!!bkm);
-
+/* ── BookmarkRowActionSheet (mock v2 l-book-menu): Open, Rename, Delete bookmark in plain words; Rename and Delete
+   each open their own sheet (rule 13: no menu inside a menu). ── */
+export function BookmarkRowActionSheet({ bkm, onClose, onNavigate, onRename, onDelete }) {
   if (!bkm) return null;
-
-  var doDelete = function() {
-    BookmarkStore.remove(bkm.id);
-    onDelete();
-    onClose();
-  };
-
+  var source = srcLabel(bkm.hlKey);
+  var words = bookmarkWords(bkm, source);
+  var thought = bkm.thought && String(bkm.thought).trim();
   return (
-    <div className="link-action-overlay" onClick={onClose}>
-      <div className="link-action-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-label="Bookmark actions" onClick={function(e) { e.stopPropagation(); }}>
-        <SheetHandle onClose={onClose} />
-        {!confirming && (
-          <>
-            <button className="link-action-btn" onClick={function() { onNavigate(bkm); onClose(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-              <span>Open Bookmark</span>
-            </button>
-            <button className="link-action-btn" onClick={function() { onEditLabel(bkm.id); onClose(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-              </svg>
-              <span>Edit Label</span>
-            </button>
-            <button className="link-action-btn link-action-btn-danger" onClick={function() { setConfirming(true); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6" />
-                <path d="M14 11v6" />
-              </svg>
-              <span>Delete Bookmark</span>
-            </button>
-          </>
-        )}
-        {confirming && (
-          <ConfirmStrip
-            style={{ padding: '14px 12px' }}
-            question="Delete this bookmark?"
-            onCancel={function() { setConfirming(false); }}
-            onConfirm={doDelete}
-          />
-        )}
-      </div>
-    </div>
+    <ActionSheet open={!!bkm} onClose={onClose} title={words.name} sub={words.where || undefined} portal
+      actions={[
+        { id: 'open', icon: 'book', label: 'Open', onSelect: function() { onNavigate(bkm); } },
+        { id: 'rename', icon: 'pen', label: 'Rename', onSelect: function() { onRename(bkm); } },
+        { id: 'delete', icon: 'trash', label: 'Delete bookmark', danger: true, onSelect: function() { onDelete(bkm); } },
+      ]}>
+      {thought ? <p className="bkm-thought">{thought}</p> : null}
+    </ActionSheet>
   );
 }
 
-
-/* The sort cycle, in the order the one button steps through it. Each `mode`
-   IS a branch of displayBookmarks' comparator; adding a mode to one without
-   the other is what produced the dead branches C2-C [C10] found. */
-var SORT_CYCLE = [
-  { mode: 'recent',    label: 'Sort: Newest ↓' },
-  { mode: 'oldest',    label: 'Sort: Oldest ↑' },
-  { mode: 'source-az', label: 'Sort: Source A-Z' },
-  { mode: 'label-az',  label: 'Sort: Label A-Z' },
-];
+/* The orders the sort sheet offers, each a branch of displayBookmarks' comparator (C2-C [C10]). */
+export var BOOKMARK_SORTS = Object.freeze([
+  { id: 'newest', label: 'Newest first' },
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'source-az', label: 'Place A-Z' },
+  { id: 'label-az', label: 'Name A-Z' },
+]);
 
 /* ── BookmarksScreen ─────────────────────────────────────────── */
 export function BookmarksScreen(props) {
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
-  var theme = props.theme;
-  var onThemeChange = props.onThemeChange;
-  var onSearch = props.onSearch;
-  var onHistory = props.onHistory;
 
   // Subscribe to BookmarkStore — re-renders when any bookmark mutates.
   var bkmVer = React.useSyncExternalStore(
     React.useCallback(function(cb) { return BookmarkStore.subscribe(cb); }, []),
     function() { return BookmarkStore.getVersion(); }
   );
-  // (props.onHome drives the empty state's one button; historyEnabled is
-  //  accepted by the component's API but unused here.)
 
   var useState = React.useState;
   var useMemo = React.useMemo;
@@ -239,46 +109,30 @@ export function BookmarksScreen(props) {
   var searchQuery = _sq[0];
   var setSearchQuery = _sq[1];
 
-  var _ss = useState('recent');
+  // C2-C [C10]: all four orders the comparator has are reachable, now from the sort sheet.
+  var _ss = useState('newest');
   var sortMode = _ss[0];
   var setSortMode = _ss[1];
-
-  // (Pre-Q3.3f-dead: var _sm = useState(false) + showSortMenu/setShowSortMenu
-  //  destructure — neither half was referenced. Removed.)
-  //
-  // C2-C [C10]: 'source-az' and 'label-az' were IMPLEMENTED in the comparator
-  // below and unreachable from the UI — the control was a two-state
-  // recent/oldest toggle, so half the sort logic was dead weight that read as
-  // a finished feature. The toggle becomes a CYCLE over the same one button
-  // (the screen's existing control shape — see NotesIndexScreen), so the
-  // comparator's four branches and the affordance finally describe each other.
-  var nextSort = function() {
-    setSortMode(function(m) {
-      var i = SORT_CYCLE.findIndex(function(s) { return s.mode === m; });
-      return SORT_CYCLE[(i + 1) % SORT_CYCLE.length].mode;
-    });
-  };
-  var sortLabel = (SORT_CYCLE.find(function(s) { return s.mode === sortMode; }) || SORT_CYCLE[0]).label;
 
   var _as = useState(null);
   var actionTarget = _as[0];
   var setActionTarget = _as[1];
-
-  // W1.5(a.2) — Escape-key dispatch registration for the long-press
-  // action sheet rendered at the bottom of this screen.
-  useModalRegistry({
-    id: 'bookmark-row-action-sheet',
-    dismiss: function() { setActionTarget(null); },
-    active: !!actionTarget,
-  });
-
-  var _ei = useState(null);
-  var editingId = _ei[0];
-  var setEditingId = _ei[1];
+  var _rn = useState(null);
+  var renaming = _rn[0];
+  var setRenaming = _rn[1];
+  var _rv = useState('');
+  var renameValue = _rv[0];
+  var setRenameValue = _rv[1];
+  var _dl = useState(null);
+  var deleting = _dl[0];
+  var setDeleting = _dl[1];
+  var closeAction = React.useCallback(function() { setActionTarget(null); }, [setActionTarget]);
+  var closeRename = React.useCallback(function() { setRenaming(null); }, [setRenaming]);
+  var closeDelete = React.useCallback(function() { setDeleting(null); }, [setDeleting]);
 
   /* One list and one source label per bookmark per store version (sweep W69): a fresh slice per
-     render kept the memo below from ever holding, and the search, the Source A-Z comparator and
-     every row each resolved the label again (a corpus or journal lookup, 2 n log n per sort). */
+     render kept the memo below from ever holding, and the search and every row each resolved the
+     label again (a corpus or journal lookup). */
   // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the store version: all() is the live array
   var allBookmarks = useMemo(function() { return BookmarkStore.all().slice(); }, [bkmVer]);
   var sourceOf = useMemo(function() {
@@ -297,7 +151,6 @@ export function BookmarksScreen(props) {
           return label.includes(q) || sourceOf.get(bkm).lower.includes(q) || thought.includes(q);
         })
       : allBookmarks.slice();
-
     filtered.sort(function(a, b) {
       if (sortMode === 'oldest') return (a.created || 0) - (b.created || 0);
       if (sortMode === 'source-az') {
@@ -315,8 +168,6 @@ export function BookmarksScreen(props) {
     return filtered;
   }, [allBookmarks, sourceOf, searchQuery, sortMode]);
 
-  // (Pre-Q3.3f-dead: var sortLabels = {...} — defined but never referenced.)
-
   var navigateToBookmark = function(bkm) {
     var endpoint = srcEndpoint(bkm.hlKey);
     if (!endpoint) return;
@@ -325,102 +176,55 @@ export function BookmarksScreen(props) {
     }
   };
 
-  var onDeleteDone = function() {};
-
-  var onEditSave = function(id, newLabel) {
-    BookmarkStore.update(id, { label: newLabel });
-    setEditingId(null);
+  var saveRename = function() {
+    var v = renameValue.trim();
+    if (!v || !renaming) return false;
+    BookmarkStore.update(renaming.id, { label: v });
+    return true;
   };
 
-  var navChildren = LibraryNav({
-    onBack: onBack, onSearch: onSearch, onHistory: onHistory,
-    onSettings: props.onSettings,
-    theme: theme, onThemeChange: onThemeChange
-  });
-
   return (
-    <ScreenLayout navChildren={navChildren}>
-      <div className="bkm-screen">
-        <header className="study-head">
-          <h1 className="study-head-title">Bookmarks</h1>
-          <span className="study-head-count">
-            {allBookmarks.length}
-            {allBookmarks.length === 1 ? ' bookmark' : ' bookmarks'}
-          </span>
-        </header>
-
-        {/* One empty-state pattern (n118): an empty list shows its how-to and one button,
-            no search box or sort. */}
-        {allBookmarks.length > 0 && (
+    <ScreenLayout utility={{ title: 'Bookmarks', onBack: onBack }}>
+      <div className="bkm-screen lib-screen">
+        {/* One empty-state pattern (rule 15): how it fills (the bar's bookmark button), one button, no search box. */}
+        {allBookmarks.length === 0 ? (
+          <EmptyState icon="mark" title="No bookmarks yet"
+            text="Tap the bookmark at the top of any letter or chapter to keep your place. Your bookmarks collect here."
+            action={props.onHome ? { label: 'Start reading', onClick: function() { (props.onStartReading || props.onHome)(); } } : null} />
+        ) : (
           <>
-            <input
-              className="notes-index-search"
-              type="search"
-              placeholder="Search bookmarks…"
-              aria-label="Search bookmarks"
-              value={searchQuery}
-              onChange={function(e) { setSearchQuery(e.target.value); }}
-            />
-            <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
-              <button
-                className="notes-index-sort-btn"
-                style={{ marginLeft: 'auto' }}
-                onClick={nextSort}
-                title="Cycle sort order"
-              >
-                {sortLabel}
-              </button>
-            </div>
+            <ListSearch placeholder="Search bookmarks" value={searchQuery} onChange={setSearchQuery} />
+            <ListLine count={displayBookmarks.length} of={allBookmarks.length} noun="bookmark" sort={sortMode} onSort={setSortMode} options={BOOKMARK_SORTS} />
+            {displayBookmarks.length === 0
+              ? <p className="lib-none">No bookmarks match “{searchQuery.trim()}”.</p>
+              : (
+                <div className="ui-group bkm-list" role="group" aria-label="Bookmarks">
+                  {displayBookmarks.map(function(bkm) {
+                    return <BookmarkRow key={bkm.id} bkm={bkm} source={sourceOf.get(bkm).text} onNavigate={navigateToBookmark} onMenu={setActionTarget} />;
+                  })}
+                </div>
+              )}
           </>
         )}
 
-        {allBookmarks.length === 0 && (
-          <div className="notes-empty">
-            <div className="notes-empty-title">No Bookmarks Yet</div>
-            <div className="notes-empty-hint">
-              Select text in any letter or Bible chapter, then tap Bookmark in the toolbar. Your bookmarks will appear here.
-            </div>
-            {props.onHome && (
-              <button type="button" className="empty-cta" onClick={function() { props.onHome(); }}>Start reading</button>
-            )}
-          </div>
-        )}
-
-        {allBookmarks.length > 0 && displayBookmarks.length === 0 && (
-          <div className="notes-empty">
-            <div className="notes-empty-title">No Matches</div>
-            <div className="notes-empty-hint">Try a different search term.</div>
-          </div>
-        )}
-
-        {displayBookmarks.length > 0 && (
-          <div className="notes-index-list" style={{ marginTop: '0.75rem' }}>
-            {displayBookmarks.map(function(bkm) {
-              return (
-                <BookmarkRow
-                  key={bkm.id}
-                  bkm={bkm}
-                  source={sourceOf.get(bkm).text}
-                  onNavigate={navigateToBookmark}
-                  onLongPress={function(b) { setActionTarget(b); }}
-                  editingId={editingId}
-                  onEditSave={onEditSave}
-                  onEditCancel={function() { setEditingId(null); }}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {actionTarget && (
-          <BookmarkRowActionSheet
-            bkm={actionTarget}
-            onClose={function() { setActionTarget(null); }}
-            onNavigate={function(bkm) { navigateToBookmark(bkm); setActionTarget(null); }}
-            onEditLabel={function(id) { setEditingId(id); setActionTarget(null); }}
-            onDelete={onDeleteDone}
-          />
-        )}
+        <BookmarkRowActionSheet
+          bkm={actionTarget}
+          onClose={closeAction}
+          onNavigate={navigateToBookmark}
+          onRename={function(bkm) { setRenameValue(bkm.label || srcLabel(bkm.hlKey)); setRenaming(bkm); }}
+          onDelete={setDeleting}
+        />
+        <ActionSheet open={!!renaming} onClose={closeRename} title="Rename bookmark" portal
+          confirm={{ label: 'Save', onConfirm: saveRename, disabled: !renameValue.trim() }}>
+          <label className="ui-field is-square lib-name">
+            <input type="text" autoFocus value={renameValue} placeholder="Bookmark name" aria-label="Bookmark name" maxLength={200}
+              onChange={function(e) { setRenameValue(e.target.value); }} />
+          </label>
+        </ActionSheet>
+        <ActionSheet open={!!deleting} onClose={closeDelete} title="Delete this bookmark?" portal
+          confirm={{ label: 'Delete', danger: true, onConfirm: function() { if (deleting) BookmarkStore.remove(deleting.id); } }}>
+          {deleting ? bookmarkWords(deleting, srcLabel(deleting.hlKey)).name + ' is removed from your bookmarks.' : null}
+        </ActionSheet>
       </div>
     </ScreenLayout>
   );

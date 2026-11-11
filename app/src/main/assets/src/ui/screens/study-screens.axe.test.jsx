@@ -15,6 +15,7 @@
 import 'fake-indexeddb/auto'; // the stores' real IDB write path, so no 'IndexedDB is not available' write failures (console-clean)
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, act, screen, within } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { seriousViolations } from '../a11y/axe-run.js';
 
 import { LibraryScreen } from './LibraryScreen.jsx';
@@ -72,7 +73,9 @@ beforeEach(() => {
   modalRegistry._reset();
   localStorage.clear();
   document.documentElement.lang = 'en';
-  put('ScreenLayout', ({ children, navChildren }) => <div>{navChildren}<main>{children}</main></div>);
+  // The utility bar (W1) draws its title and menu; the stub draws the menu button so a test can open it.
+  put('ScreenLayout', ({ children, navChildren, utility }) => <div>{navChildren}{utility ? <h1>{utility.title}</h1> : null}{utility && utility.menu}<main>{children}</main></div>);
+  put('ReactDOM', ReactDOM);   // the sheets portal to <body>
   put('LibraryNav', (opts) => <>{(opts && opts.leftExtras) || null}{(opts && opts.rightExtras) || null}</>);
   put('ConfirmStrip', ConfirmStrip);
   put('JrnExpandable', ExpandableText);
@@ -116,7 +119,7 @@ describe('axe — Library', () => {
   it('populated', async () => {
     setup({ notes: 3, links: 2, bookmarks: 4, journal: 5 });
     const { container } = show();
-    expect(container.querySelectorAll('.lib-tile').length).toBeGreaterThan(3);
+    expect(container.querySelectorAll('.lib-row').length).toBeGreaterThan(3);
     expect(await seriousViolations(container)).toEqual([]);
   });
 
@@ -147,33 +150,40 @@ describe('axe — Notes', () => {
     put('NotebookStore', mkStore({ list: () => NBS, get: (id) => NBS.find((nb) => nb.id === id) || null, setColor: noop, rename: noop, remove: noop, add: noop }));
   }
   const show = () => render(<NotesIndexScreen {...navProps} onOpenNote={noop} onNavigateToSource={noop} historyEnabled />);
-  const tab = (name) => screen.getByRole('button', { name });
+  const tab = (name) => screen.getByRole('radio', { name });
+  const menuRow = (label) => [...document.querySelectorAll('.ui-sheet .ui-row-press')].find((r) => r.textContent.startsWith(label));
 
-  it('notebooks tab, a new-notebook form open', async () => {
+  it('notebooks tab, the New notebook sheet open', async () => {
     setup();
-    const { container } = show();
+    show();
     fireEvent.click(tab('Notebooks'));
-    fireEvent.click(screen.getByText('New notebook'));
-    expect(await seriousViolations(container)).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'New notebook' }));
+    expect(await seriousViolations(document.body)).toEqual([]);
   });
 
-  it('all-notes tab (real NoteRows)', async () => {
+  it('all-notes tab (real NoteRows), then a note menu', async () => {
     setup();
     const { container } = show();
-    fireEvent.click(tab('All Notes'));
+    fireEvent.click(tab('All notes'));
     expect(container.querySelectorAll('.note-row').length).toBe(3);
     expect(await seriousViolations(container)).toEqual([]);
+    fireEvent.click(screen.getAllByRole('button', { name: 'Note options' })[0]);
+    expect(await seriousViolations(document.body)).toEqual([]);
   });
 
-  it('drilled into a notebook: rename field, colour picker', async () => {
+  it('drilled into a notebook: its menu, the colour sheet, the rename sheet', async () => {
     setup();
-    const { container } = show();
+    show();
     fireEvent.click(tab('Notebooks'));
     fireEvent.click(screen.getByText('Faith').closest('button'));
-    fireEvent.click(screen.getByText('Color'));
-    expect(await seriousViolations(container)).toEqual([]);
-    fireEvent.click(screen.getByText('Rename'));
-    expect(await seriousViolations(container)).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: 'Notebook options' }));
+    expect(await seriousViolations(document.body)).toEqual([]);
+    fireEvent.click(menuRow('Colour'));
+    expect(await seriousViolations(document.body)).toEqual([]);
+    fireEvent.click(screen.getByRole('radio', { name: 'Gold' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Notebook options' }));
+    fireEvent.click(menuRow('Rename'));
+    expect(await seriousViolations(document.body)).toEqual([]);
   });
 
   it('empty', async () => {
@@ -182,29 +192,26 @@ describe('axe — Notes', () => {
     expect(await seriousViolations(container)).toEqual([]);
   });
 
-  it('the tabs say which is pressed; the colour swatches are radios; the fields are named', () => {
+  it('the switch says which view is chosen; the colour dots are radios; the fields are named', () => {
     setup();
     show();
-    fireEvent.click(tab('All Notes'));
-    expect(tab('All Notes').getAttribute('aria-pressed')).toBe('true');
-    expect(tab('Notebooks').getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(tab('All notes'));
+    expect(tab('All notes').getAttribute('aria-checked')).toBe('true');
+    expect(tab('Notebooks').getAttribute('aria-checked')).toBe('false');
     fireEvent.click(tab('Notebooks'));
-    expect(tab('Notebooks').getAttribute('aria-pressed')).toBe('true');
-    fireEvent.click(screen.getByText('New notebook'));
+    expect(tab('Notebooks').getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'New notebook' }));
     expect(screen.getByRole('textbox', { name: 'Notebook name' })).toBeTruthy();
-    fireEvent.click(screen.getByText('Cancel'));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     fireEvent.click(screen.getByText('Faith').closest('button'));
-    const color = screen.getByRole('button', { name: 'Color' });
-    expect(color.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(color);
-    expect(color.getAttribute('aria-expanded')).toBe('true');
-    const group = screen.getByRole('radiogroup', { name: 'Notebook color' });
+    fireEvent.click(screen.getByRole('button', { name: 'Notebook options' }));
+    expect(menuRow('Colour').querySelector('.ui-row-value').textContent).toBe('Blue');
+    fireEvent.click(menuRow('Colour'));
+    const group = screen.getByRole('radiogroup', { name: 'Notebook colour' });
     const radios = [...group.querySelectorAll('[role="radio"]')];
     expect(radios.length).toBe(4);
-    expect(screen.getByRole('radio', { name: 'blue' }).getAttribute('aria-checked')).toBe('true');
-    expect(screen.getByRole('radio', { name: 'Default gold' }).getAttribute('aria-checked')).toBe('false');
-    fireEvent.click(screen.getByText('Rename'));
-    expect(screen.getByRole('textbox', { name: 'Notebook name' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Blue' }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.getByRole('radio', { name: 'Gold' }).getAttribute('aria-checked')).toBe('false');
   });
 });
 
@@ -239,7 +246,7 @@ describe('axe — Bookmarks', () => {
     expect(container.querySelectorAll('.bkm-row').length).toBe(2);
     expect(await seriousViolations(container)).toEqual([]);
     fireEvent.click(screen.getAllByRole('button', { name: 'Bookmark options' })[0]);
-    expect(screen.getByRole('dialog', { name: 'Bookmark actions' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Born again' })).toBeTruthy();
     expect(await seriousViolations(document.body)).toEqual([]);
   });
 
@@ -249,17 +256,12 @@ describe('axe — Bookmarks', () => {
     expect(await seriousViolations(container)).toEqual([]);
   });
 
-  /* KNOWN, NOT FIXED (needs a visual change): .bkm-row-content is a role=button div, and a long
-     thought's Show more button (and the label field while editing) sits inside it, a control
-     inside a control. Fixing it means restructuring the row (NoteRow's full-row .note-row-open
-     shape), which moves what is drawn, so this pins the one finding until that lands: when the
-     row is fixed this fails, and the expectation becomes []. */
-  it('KNOWN: a long thought nests its Show more inside the row button (nested-interactive)', async () => {
+  /* Was KNOWN (a long thought's Show more nested inside the row button): since the UI pass the row is a ListRow
+     (its tap and its menu are sibling buttons) and the thought is read in the bookmark's sheet. */
+  it('a long thought nests nothing inside the row button', async () => {
     setup([{ id: 'b2', hlKey: 'bible:john:3', label: 'Born again', thought: 'A long thought about it. '.repeat(10), created: 200, updated: 200 }]);
     const { container } = show();
-    const v = await seriousViolations(container);
-    expect(v.length).toBe(1);
-    expect(v[0]).toMatch(/^serious nested-interactive: .*\.bkm-row-content/);
+    expect(await seriousViolations(container)).toEqual([]);
   });
 });
 
@@ -418,7 +420,7 @@ describe('axe — History', () => {
     const year = container.querySelector('.history-year-header');
     if (year) fireEvent.click(year);
     expect(await seriousViolations(container)).toEqual([]);
-    fireEvent.change(container.querySelector('input.notes-index-search'), { target: { value: 'psalm' } });
+    fireEvent.change(container.querySelector('.history-screen .lib-search input'), { target: { value: 'psalm' } });
     expect(await seriousViolations(container)).toEqual([]);
   });
 
@@ -476,7 +478,7 @@ describe('axe — Journal hub', () => {
     expect(await seriousViolations(container)).toEqual([]);
     fireEvent.click(screen.getAllByRole('button', { name: 'Entry options' })[0]);
     expect(await seriousViolations(document.body)).toEqual([]);
-    fireEvent.click(screen.getByText('Delete Entry'));
+    fireEvent.click(screen.getByText('Delete entry'));
     expect(await seriousViolations(document.body)).toEqual([]);
   });
 
@@ -484,13 +486,13 @@ describe('axe — Journal hub', () => {
     journalGlobals([]);
     const { container } = render(<JournalHubScreen {...navProps} onOpenEntry={noop} onCreateEntry={noop} />);
     expect(await seriousViolations(container)).toEqual([]);
-    const all = screen.getByRole('button', { name: 'All Entries' });
-    const pinned = screen.getByRole('button', { name: 'Pinned' });
-    expect(all.getAttribute('aria-pressed')).toBe('true');
-    expect(pinned.getAttribute('aria-pressed')).toBe('false');
+    const all = screen.getByRole('radio', { name: 'All entries' });
+    const pinned = screen.getByRole('radio', { name: 'Pinned' });
+    expect(all.getAttribute('aria-checked')).toBe('true');
+    expect(pinned.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(pinned);
-    expect(all.getAttribute('aria-pressed')).toBe('false');
-    expect(pinned.getAttribute('aria-pressed')).toBe('true');
+    expect(all.getAttribute('aria-checked')).toBe('false');
+    expect(pinned.getAttribute('aria-checked')).toBe('true');
     expect(await seriousViolations(container)).toEqual([]);
   });
 });
@@ -527,7 +529,7 @@ describe('axe — Journal editor', () => {
       objectUrl: () => Promise.resolve(null), get: () => Promise.resolve(null),
     });
     put('showToast', noop);
-    put('StorageHealth', { onWriteFailure: noop });
+    put('StorageHealth', { onWriteFailure: noop, onWriteSuccess: noop });   // the store calls both on a landed or failed write (storage-health.js 939)
     put('JournalBlockView', JournalBlockView);
     put('JournalImageBlock', JournalImageBlock);
     put('JournalAudioBlock', JournalAudioBlock);
@@ -602,7 +604,7 @@ describe('axe — JournalRecordingSheet', () => {
       nativeListRecordings: () => '[]', nativeRecordCancel: noop, nativeRecordStop: noop, nativeDeleteRecording: noop,
     });
     render(<JournalRecordingSheet onSave={noop} onClose={noop} />);
-    const dialog = screen.getByRole('dialog', { name: 'Voice Recording' });
+    const dialog = screen.getByRole('dialog', { name: 'Voice recording' });
     expect(await seriousViolations(dialog)).toEqual([]);
     expect(within(dialog).getByRole('status').textContent).toMatch(/microphone/i);
   });

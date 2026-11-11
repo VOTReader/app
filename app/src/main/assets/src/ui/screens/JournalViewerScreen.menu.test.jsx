@@ -15,9 +15,11 @@
    (imported from the hub module, exactly how the bundle globalizes it). */
 
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import { render, screen, fireEvent, cleanup, act } from '@testing-library/react';
+import { render, screen, fireEvent, cleanup, within } from '@testing-library/react';
 import { JournalViewerScreen } from './JournalViewerScreen.jsx';
 import { JournalHubScreen, JournalCardMenu } from './JournalHubScreen.jsx';
+import * as ReactDOM from 'react-dom';
+/** @type {any} */ (globalThis).ReactDOM = ReactDOM;   // the sheets portal
 
 /** @type {any} */ (globalThis).JournalCardMenu = JournalCardMenu;
 
@@ -28,9 +30,10 @@ const ENTRY = {
 };
 
 function setupGlobals({ entries = [ENTRY] } = {}) {
-  window.ScreenLayout = ({ children, navChildren }) => (
+  // The utility bar's actions and menu, as the real bar draws them.
+  window.ScreenLayout = ({ children, utility }) => (
     <div>
-      <div className="test-nav">{navChildren}</div>
+      <div className="test-nav">{utility && utility.actions}{utility && utility.menu}</div>
       {children}
     </div>
   );
@@ -69,13 +72,17 @@ afterEach(() => {
 });
 
 describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
-  it('the nav carries ONE ⋯ extra — the separate pin and delete icons are gone', () => {
+  it('mock v2 l-jview: the bar carries Edit as a word and ONE ⋯; no pencil, no pin or delete icons', () => {
     setupGlobals();
-    const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
-    expect(container.querySelector('.jrn-entry-menu-btn')).toBeTruthy();
-    expect(container.querySelector('.jrn-entry-menu-btn').getAttribute('aria-haspopup')).toBe('dialog');
+    const onEdit = vi.fn();
+    const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
+    expect(screen.getByLabelText('Entry options').getAttribute('aria-haspopup')).toBe('dialog');
+    expect(screen.queryByLabelText('Edit entry')).toBeNull();
     expect(container.querySelector('.jrn-pin-btn')).toBeNull();
     expect(container.querySelector('.jrn-del-btn')).toBeNull();
+    fireEvent.click(container.querySelector('.test-nav .bar-text-action'));
+    expect(onEdit).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.test-nav .bar-text-action').textContent).toBe('Edit');
   });
 
   it('⋯ opens Edit/Pin/Delete — the pen FAB is gone (Edit now lives in the menu); Open stays hidden', () => {
@@ -83,29 +90,29 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
     // No floating pen — the edit affordance moved INTO the ⋯ menu.
     expect(container.querySelector('.jrn-fab-action.is-edit')).toBeNull();
-    fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    expect(screen.queryByText('Open Entry')).toBeNull();       // already inside the entry
-    expect(screen.getByText('Edit Entry')).toBeTruthy();
-    expect(screen.getByText('Unpin Entry')).toBeTruthy();      // ENTRY.pinned = true
-    expect(screen.getByText('Delete Entry')).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: 'Entry options' })).toBeTruthy();
+    fireEvent.click(screen.getByLabelText('Entry options'));
+    expect(screen.queryByText('Open')).toBeNull();       // already inside the entry
+    expect(within(screen.getByRole('dialog')).getByText('Edit')).toBeTruthy();
+    expect(screen.getByText('Unpin')).toBeTruthy();      // ENTRY.pinned = true
+    expect(screen.getByText('Delete entry')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Morning Reflection' })).toBeTruthy();   // mock v2 l-jmenu: the sheet is titled by the entry
     expect(modalRegistry.peek().id).toBe('journal-card-menu');
   });
 
   it('the menu Edit item calls onEdit', () => {
     const onEdit = vi.fn();
     setupGlobals();
-    const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
-    fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    fireEvent.click(screen.getByText('Edit Entry'));
+    render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
+    fireEvent.click(screen.getByLabelText('Entry options'));
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('Edit'));
     expect(onEdit).toHaveBeenCalled();
   });
 
   it('the menu pin item toggles the pin in the store', () => {
     setupGlobals();
-    const { container } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
-    fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    fireEvent.click(screen.getByText('Unpin Entry'));
+    render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={() => {}} />);
+    fireEvent.click(screen.getByLabelText('Entry options'));
+    fireEvent.click(screen.getByText('Unpin'));
     expect(window.JournalStore.togglePin).toHaveBeenCalledWith('e1');
   });
 
@@ -113,8 +120,8 @@ describe('JournalViewerScreen — decongested nav + ⋯ entry menu', () => {
     setupGlobals();
     const onBack = vi.fn();
     const { container } = render(<JournalViewerScreen entryId="e1" onBack={onBack} onEdit={() => {}} />);
-    fireEvent.click(container.querySelector('.jrn-entry-menu-btn'));
-    fireEvent.click(screen.getByText('Delete Entry'));
+    fireEvent.click(screen.getByLabelText('Entry options'));
+    fireEvent.click(screen.getByText('Delete entry'));
     expect(screen.getByText('Delete this entry?')).toBeTruthy();
     fireEvent.click(screen.getByText('Continue'));
     fireEvent.click(screen.getByText('I am sure'));
@@ -193,30 +200,5 @@ describe('JournalHubScreen — inline pin indicator (no timestamp overlap)', () 
     const { container } = render(<JournalHubScreen onBack={() => {}} onOpenEntry={() => {}} />);
     expect(container.querySelector('.jrn-card-pin-inline')).toBeNull();
     expect(container.querySelector('.jrn-card-pin-marker')).toBeNull();
-  });
-});
-
-/* id-datasafe 122: with the compact top bar (the default) the viewer's own ⋮ sat beside the
-   bar's ⋯. A pencil now edits and Pin / Delete head the ⋯ menu (utils/page-menu.js). */
-describe('JournalViewerScreen — a pencil, and Pin / Delete in the top bar ⋯ (id-datasafe 122)', () => {
-  beforeEach(() => { document.body.classList.add('compact-topbar'); });
-  afterEach(() => { document.body.classList.remove('compact-topbar'); });
-
-  it('shows a pencil instead of its own ⋮, and offers Pin and Delete to the ⋯ menu', async () => {
-    const { pageMenu } = await import('../../utils/page-menu.js');
-    setupGlobals();
-    const onEdit = vi.fn();
-    const { container, unmount } = render(<JournalViewerScreen entryId="e1" onBack={() => {}} onEdit={onEdit} />);
-    expect(container.querySelector('.jrn-entry-menu-btn')).toBeNull();
-    fireEvent.click(screen.getByLabelText('Edit entry'));
-    expect(onEdit).toHaveBeenCalledTimes(1);
-    const items = pageMenu();
-    expect(items.map((i) => i.label)).toEqual(['Unpin entry', 'Delete entry…']);
-    items[0].onSelect();
-    expect(window.JournalStore.togglePin).toHaveBeenCalledWith('e1');
-    act(() => { items[1].onSelect(); });
-    expect(screen.getByText('Delete this entry?')).toBeTruthy();   // straight to the first confirm
-    unmount();
-    expect(pageMenu()).toBeNull();                                 // gone with the screen
   });
 });

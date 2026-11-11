@@ -10,6 +10,7 @@
 
 import { describe, it, afterEach, beforeEach, vi } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { installLeakHarness, expectNoLeaks } from '../leak/leak-harness.js';
 
 import { LibraryScreen } from './LibraryScreen.jsx';
@@ -62,7 +63,8 @@ beforeEach(() => {
   modalRegistry._reset();
   localStorage.clear();
   document.documentElement.lang = 'en';
-  put('ScreenLayout', ({ children, navChildren }) => <div>{navChildren}<main>{children}</main></div>);
+  put('ScreenLayout', ({ children, navChildren, utility }) => <div>{navChildren}{utility && utility.menu}<main>{children}</main></div>);
+  put('ReactDOM', ReactDOM);   // the sheets portal to <body>
   put('LibraryNav', (opts) => <>{(opts && opts.leftExtras) || null}{(opts && opts.rightExtras) || null}</>);
   put('ConfirmStrip', ConfirmStrip);
   put('JrnExpandable', ExpandableText);
@@ -131,14 +133,15 @@ describe('leaks — Notes', () => {
   const show = () => render(<NotesIndexScreen {...navProps} onOpenNote={noop} onNavigateToSource={noop} historyEnabled />);
   it('all notes', async () => {
     setup();
-    await leakFree('NotesIndexScreen', show, () => { fireEvent.click(screen.getByRole('button', { name: 'All Notes' })); });
+    await leakFree('NotesIndexScreen', show, () => { fireEvent.click(screen.getByRole('radio', { name: 'All notes' })); });
   });
   it('a notebook drilled into, its rename field open', async () => {
     setup();
     await leakFree('NotesIndexScreen notebook', show, () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Notebooks' }));
+      fireEvent.click(screen.getByRole('radio', { name: 'Notebooks' }));
       fireEvent.click(screen.getByText('Faith').closest('button'));
-      fireEvent.click(screen.getByText('Rename'));
+      fireEvent.click(screen.getByRole('button', { name: 'Notebook options' }));
+      fireEvent.click(screen.getByText('Rename').closest('button'));
     });
   });
 });
@@ -211,7 +214,7 @@ describe('leaks — Progress and History', () => {
       { type: 'chapter', key: 'ch:john:3', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: now - 400 * 86400000 },
     ];
     await leakFree('HistoryScreen', () => render(<HistoryScreen history={H} {...navProps} onSelect={noop} onPruneDay={noop} onHome={noop} />),
-      (r) => { fireEvent.change(r.container.querySelector('input.notes-index-search'), { target: { value: 'psalm' } }); });
+      (r) => { fireEvent.change(r.container.querySelector('.history-screen .lib-search input'), { target: { value: 'psalm' } }); });
   });
 });
 
@@ -256,7 +259,7 @@ describe('leaks — Journal', () => {
     put('createPressDrag', createPressDrag);
     put('JournalMediaStore', { compressImage: vi.fn(), put: vi.fn(), delete: vi.fn(), objectUrl: () => Promise.resolve(null), get: () => Promise.resolve(null) });
     put('showToast', noop);
-    put('StorageHealth', { onWriteFailure: noop });
+    put('StorageHealth', { onWriteFailure: noop, onWriteSuccess: noop });   // the store calls both on a landed or failed write (storage-health.js 939)
     put('JournalBlockView', JournalBlockView);
     put('JournalImageBlock', JournalImageBlock);
     put('JournalAudioBlock', JournalAudioBlock);

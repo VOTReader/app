@@ -393,11 +393,11 @@ function _sourceWords(srcKey) {
  *
  * @param {Record<string, { id: string, groupId?: string }[]> | null | undefined} annData
  * @param {number} [limit]
- * @returns {{ key: string, label: string, collection: string, count: number, words: number, per1k: number }[]}
+ * @returns {{ key: string, label: string, collection: string, hlKey: string, count: number, words: number, per1k: number }[]}
  */
 export function mostAnnotatedSources(annData, limit = 5) {
   if (!annData || typeof annData !== 'object') return [];
-  /** @type {Map<string, { label: string, collection: string, ids: Set<string> }>} */
+  /** @type {Map<string, { label: string, collection: string, hlKey: string, ids: Set<string> }>} */
   const groups = new Map();
   Object.keys(annData).forEach((hlKey) => {
     const segs = annData[hlKey];
@@ -406,7 +406,7 @@ export function mostAnnotatedSources(annData, limit = 5) {
     if (!src) return;
     let g = groups.get(src.key);
     if (!g) {
-      g = { label: src.label, collection: src.collection, ids: new Set() };
+      g = { label: src.label, collection: src.collection, hlKey, ids: new Set() };
       groups.set(src.key, g);
     }
     segs.forEach((a) => { if (a) g.ids.add(a.groupId || a.id); });
@@ -415,7 +415,7 @@ export function mostAnnotatedSources(annData, limit = 5) {
     .map(([key, g]) => {
       const words = _sourceWords(key);
       const per1k = words > 0 ? Math.round((g.ids.size / words) * 10000) / 10 : 0;
-      return { key, label: g.label, collection: g.collection, count: g.ids.size, words, per1k };
+      return { key, label: g.label, collection: g.collection, hlKey: g.hlKey, count: g.ids.size, words, per1k };
     })
     .sort((a, b) => (b.per1k - a.per1k) || (b.count - a.count) || a.label.localeCompare(b.label))
     .slice(0, limit);

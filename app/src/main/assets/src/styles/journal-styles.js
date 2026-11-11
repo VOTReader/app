@@ -21,95 +21,48 @@
   R('.library-tile.jrn-active { cursor: pointer; }');
 
   // Hub screen
-  R('.jrn-hub { padding: 0 0 110px; }');
-  // The hub's header is the shared personal-study header (.study-head in app.css).
-
-  // Nav layout — push everything except the back arrow to the right.
-  // ScreenLayout's nav is a flex row; this spacer eats the gap between
-  // the back chevron and the icon cluster.
-  R('.jrn-nav-spacer { flex: 1; min-width: 0; }');
-
-  // Tab strip
-  R('.jrn-tabs { display: flex; border-bottom: 1px solid var(--gold-border); padding: 0 18px; margin-top: 6px; }');
-  R('.jrn-tab { background: none; border: none; padding: 12px 14px 14px; font-family: var(--font-cinzel); text-transform: uppercase; letter-spacing: 0.08em; font-size: var(--fs-11); color: var(--gold-dim); cursor: pointer; position: relative; transition: color 0.2s; }');
-  R('.jrn-tab.active { color: var(--gold); }');
-  R('.jrn-tab.active::after { content: ""; position: absolute; bottom: -1px; left: 14px; right: 14px; height: 2px; background: var(--gold); border-radius: 2px 2px 0 0; }');
-  R('.jrn-tab:hover { color: var(--gold); }');
-
-  // Controls row
-  R('.jrn-controls { display: flex; gap: 10px; padding: 12px 18px; align-items: center; flex-wrap: wrap; }');
-  // "Done" pill — exits edit mode on the hub. Gold-outlined to match other
-  // small chips in the app (settings rows, notebook actions).
-  R('.jrn-done-btn { background: var(--gold-faint); border: 1px solid var(--gold); color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-11); padding: 6px 14px; border-radius: 999px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; white-space: nowrap; }');
-  R('.jrn-done-btn:hover { background: var(--gold); color: var(--bg); }');
-  // min-width:0 — an <input> keeps an intrinsic ~20ch width that flex:1 cannot shrink below, so
-  // at a large text size the box ran past the right edge of the toolbar (a11y-ux-6, measured at 2.0).
-  R('.jrn-search { flex: 1; min-width: 0; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; }');
-  R('body.light .jrn-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }');
-  R('.jrn-search:focus { border-color: var(--gold); }');
-  R('.jrn-sort-btn { background: var(--bg2); border: 1px solid var(--border); color: var(--cream-dim); font-family: var(--font-garamond); font-size: var(--fs-13); padding: 6px 12px; border-radius: 6px; cursor: pointer; white-space: nowrap; }');
-  R('.jrn-sort-btn:hover { border-color: var(--gold-border); color: var(--gold); }');
-
-  // Entry list / cards
-  R('.jrn-list { padding: 0 14px; display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }');
-  R('.jrn-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px 14px 22px; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.1s; position: relative; }');
-  R('body.light .jrn-card { background: #faf5e7; }');
-  R('.jrn-card:hover { background: var(--bg3); border-color: var(--gold-border); }');
-  R('body.light .jrn-card:hover { background: #f3ecdc; }');
-  R('.jrn-card:active { transform: scale(0.99); }');
-  // Pinned indicator — an INLINE glyph inside the date span, flowing with the
-  // text so it can never draw over the timestamp at any width or font-scale
-  // (the old absolute top-right marker sat exactly on the date on narrow
-  // Android screens). Purely decorative — pin/unpin lives in the ⋯ menus.
-  R('.jrn-card-pin-inline { display: inline-block; width: 0.75rem; height: 0.75rem; vertical-align: -0.09rem; margin-right: 0.375rem; color: var(--gold); filter: drop-shadow(0 0 4px var(--gold-glow)); }');
-  // Per-card ⋯ (3-dot) options button — top-right corner.
-  R('.jrn-card { padding-right: 42px; }');
-  R('.jrn-card-menu-btn { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; background: transparent; border: none; color: var(--gold-dim); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.12s, color 0.12s; z-index: 2; }');
-  R('.jrn-card-menu-btn:hover { background: var(--gold-faint); color: var(--gold); }');
-  R('.jrn-card-menu-btn:active { transform: scale(0.92); }');
-  R('.jrn-card-menu-btn svg { width: 18px; height: 18px; }');
-
-  R('.jrn-card-mood { position: absolute; left: 8px; top: 14px; bottom: 14px; width: 3px; border-radius: 2px; background: var(--gold); }');
+  // W2b (mock v2 l-jrn): the hub is a .lib-screen; Segmented, ListSearch, ListLine and EmptyState draw from app.css.
+  R('.jrn-hub { padding-bottom: 96px; }');
+  R('.jrn-hub .ui-seg { margin-top: var(--sp-1); }');
+  R('.jrn-hub .jrn-search { margin-top: 12px; }');
+  R('.jrn-list { display: flex; flex-direction: column; gap: var(--sp-2); }');
+  R('.jrn-card { position: relative; background: var(--surface-1); border-radius: var(--r-card); padding: 14px 48px 14px var(--card-pad); cursor: pointer; }');
+  R('.jrn-card:active { background: var(--surface-2); }');
+  R('.jrn-card-open { outline-offset: 2px; }');
+  R('.jrn-card-title { margin: 0; font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: var(--lh-headline); color: var(--text-1); overflow-wrap: anywhere; }');
+  R('.jrn-card-title.untitled { font-style: italic; color: var(--text-2); }');
+  R('.jrn-card-preview { margin: var(--sp-1) 0 0; font-family: var(--font-serif); font-size: var(--ts-body); line-height: 1.45; color: var(--text-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }');
+  R('.jrn-card-snippet { -webkit-line-clamp: 3; }');
+  R('.jrn-card-snippet mark { background: var(--accent-soft); color: inherit; border-radius: 2px; padding: 0 1px; }');
+  R('.jrn-card-hit-where { color: var(--text-2); font-style: italic; }');
+  R('.jrn-card-date { display: block; margin-top: 6px; font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); }');
+  R('.jrn-card-pin-inline { display: inline-block; width: 0.8rem; height: 0.8rem; vertical-align: -0.1rem; margin-right: 0.35rem; color: var(--accent); }');
+  R('.jrn-card-mood { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 0.45rem; vertical-align: 0.05rem; background: var(--accent); }');
   R('.jrn-card-mood.silver { background: #b8b8b8; }');
   R('.jrn-card-mood.deep { background: #a8543f; }');
   R('.jrn-card-mood.quiet { background: #6b8593; }');
-  R('.jrn-card-mood.none { background: transparent; }');
-  R('.jrn-card-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 6px; }');
-  R('.jrn-card-title { font-family: var(--font-garamond); font-size: var(--fs-16); font-weight: 500; color: var(--cream); margin: 0; }');
-  R('body.light .jrn-card-title { color: #2a2520; }');
-  R('.jrn-card-title.untitled { font-style: italic; color: var(--cream-muted); }');
-  R('.jrn-card-date { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold-dim); white-space: nowrap; }');
-  R('.jrn-card-time { opacity: 0.62; font-size: 0.85em; letter-spacing: 0.04em; }');
-  R('.jrn-card-preview { font-family: var(--font-garamond); font-size: var(--fs-14); color: var(--cream-dim); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }');
-  R('body.light .jrn-card-preview { color: #5a4f3d; }');
-  // id-datasafe 121: a search card's snippet marks the hit and says where it was found.
-  R('.jrn-card-snippet { -webkit-line-clamp: 3; }');
-  R('.jrn-card-snippet mark { background: var(--gold-faint); color: inherit; border-radius: 2px; padding: 0 1px; }');
-  R('.jrn-card-hit-where { color: var(--gold-dim); font-style: italic; }');
+  R('.jrn-card-menu-btn { position: absolute; top: 6px; right: 4px; width: var(--tap); height: var(--tap); border: 0; border-radius: 50%; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }');
+  R('.jrn-card-menu-btn:active { background: var(--surface-2); }');
   R('.jrn-card-attachments { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }');
-  R('.jrn-attach { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--gold-faint); border-radius: 4px; font-size: var(--fs-10); font-family: var(--font-cinzel); text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); }');
-  R('.jrn-attach svg { width: 10px; height: 10px; stroke: currentColor; fill: none; stroke-width: 1.8; }');
-  R('.jrn-card-meta { display: flex; gap: 8px; margin-top: 8px; font-size: var(--fs-11); font-family: var(--font-cinzel); text-transform: uppercase; letter-spacing: 0.06em; color: var(--gold-dim); align-items: center; flex-wrap: wrap; }');
-  R('.jrn-card-meta-sep { color: var(--gold-dim); opacity: 0.5; }');
-  R('.jrn-tags { display: flex; gap: 4px; flex-wrap: wrap; }');
-  R('.jrn-tag { color: var(--gold); font-style: italic; font-family: var(--font-garamond); font-size: var(--fs-12); text-transform: none; letter-spacing: 0; }');
+  R('.jrn-attach { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--r-pill); background: var(--surface-2); font-family: var(--font-ui); font-size: var(--ts-label); color: var(--text-2); }');
+  R('.jrn-tags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }');
+  R('.jrn-tag { color: var(--accent); font-style: italic; font-family: var(--font-serif); font-size: var(--ts-value); }');
   R('.jrn-empty { padding: 60px 30px; text-align: center; }');
-  R('.jrn-empty-title { font-family: var(--font-cinzel); color: var(--gold); font-size: var(--fs-18); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 12px; }');
-  R('.jrn-empty-hint { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-15); line-height: 1.5; max-width: 320px; margin: 0 auto; }');
-
+  R('.jrn-empty-title { font-family: var(--font-serif); color: var(--text-1); font-size: var(--ts-sheet); margin-bottom: 12px; }');
+  R('.jrn-empty-hint { font-family: var(--font-ui); color: var(--text-2); font-size: var(--ts-value); line-height: 1.5; max-width: 320px; margin: 0 auto; }');
+  // The delete sheet (l-jdel): a three-part step bar, the entry, the step's sentence.
+  R('.jrn-del-steps { display: flex; gap: 6px; margin: 2px 0 14px; }');
+  R('.jrn-del-steps i { flex: 1; height: 3px; border-radius: 2px; background: var(--surface-3); }');
+  R('.jrn-del-steps i.is-on { background: var(--tone-danger); }');
+  R('.jrn-del-sheet .jrn-tripledel-question { margin: 12px 2px 4px; font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); }');
   R('.jrn-rename-input { width: 100%; background: var(--bg3); border: 1px solid var(--gold); color: var(--cream); font-family: var(--font-cinzel); font-size: var(--fs-16); padding: 8px 14px; border-radius: 6px; outline: none; text-transform: uppercase; letter-spacing: 0.04em; }');
   R('body.light .jrn-rename-input { background: white; color: #2a2520; }');
 
   // Editor screen — single body surface, title-only header, no inline + icons
   R('.jrn-editor { display: flex; flex-direction: column; flex: 1; padding-bottom: calc(96px + env(safe-area-inset-bottom)); }');
   R('.jrn-editor-meta { padding: 18px 22px 4px 44px; }');
-  R('.jrn-editor-title { width: 100%; background: none; border: none; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-20); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; outline: none; padding: 0; }');
-  R('body.light .jrn-editor-title { color: #8b6f30; }');
-  R('.jrn-editor-title::placeholder { color: var(--gold-dim); opacity: 0.6; font-style: italic; text-transform: none; letter-spacing: 0.02em; font-weight: 400; }');
-  R('.jrn-saved-ind { font-style: italic; color: var(--gold-dim); font-family: var(--font-garamond); font-size: var(--fs-12); text-transform: none; letter-spacing: 0; padding: 0 8px; }');
   // Entry date under the editor title — same quiet eyebrow the viewer shows,
   // so the editor reads as the same document, not a different place.
-  R('.jrn-editor-date { font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 6px; }');
   R('.jrn-blocks { padding: 6px 18px 24px; display: flex; flex-direction: column; gap: 0; }');
   R('.jrn-body-surface { min-height: 65vh; cursor: text; }');
   R('.jrn-block { position: relative; padding: 0; }');
@@ -253,9 +206,6 @@
   // Viewer
   R('.jrn-viewer { display: flex; flex-direction: column; flex: 1; padding-bottom: 60px; }');
   R('.jrn-viewer-meta { padding: 22px 22px 12px; }');
-  R('.jrn-viewer-title { font-family: var(--font-cinzel); font-size: var(--fs-24); font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.05em; margin: 0; }');
-  R('.jrn-viewer-title.untitled { font-style: italic; color: var(--gold-dim); text-transform: none; letter-spacing: 0.02em; font-weight: 400; }');
-  R('.jrn-viewer-date { font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.1em; color: var(--gold-dim); margin-top: 6px; }');
   R('.jrn-viewer-blocks { padding: 8px 22px 100px; display: flex; flex-direction: column; gap: 12px; }');
   R('.jrn-viewer-blocks .jrn-p { font-family: var(--font-garamond); font-size: var(--fs-16); line-height: 1.7; color: var(--cream-dim); margin: 4px 0; }');
   R('body.light .jrn-viewer-blocks .jrn-p { color: #3a3528; }');
@@ -290,24 +240,7 @@
   // that LOOKS tappable but does nothing is the exact confusion the shared
   // SheetHandle module was built to kill; this sheet's real header already
   // carries ‹ back and × close buttons, so the fake bar just went away.)
-  R('.jrn-insert-section { padding: 12px 18px 4px; }');
-  R('.jrn-insert-section + .jrn-insert-section { border-top: 1px solid var(--gold-border); }');
-  R('.jrn-insert-section h4 { font-family: var(--font-cinzel); font-size: var(--fs-10); text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); opacity: 0.72; margin: 0 0 8px; }');
   R('.jrn-insert-list { display: flex; flex-direction: column; gap: 1px; }');
-  R('.jrn-insert-item { display: flex; align-items: center; gap: 14px; padding: 11px 10px; border-radius: 10px; cursor: pointer; transition: background 0.12s; background: none; border: none; width: 100%; text-align: left; -webkit-tap-highlight-color: transparent; }');
-  R('@media (hover: hover) { .jrn-insert-item:hover { background: var(--bg3); } body.light .jrn-insert-item:hover { background: #f3ecdc; } }');
-  R('.jrn-insert-item:active { background: var(--bg2); }');
-  R('body.light .jrn-insert-item:active { background: #ece2cc; }');
-  R('.jrn-insert-icon { width: 40px; height: 40px; border-radius: 10px; background: var(--gold-faint); border: 1px solid var(--gold-border); display: flex; align-items: center; justify-content: center; color: var(--gold); flex-shrink: 0; font-family: var(--font-cinzel); font-size: var(--fs-13); transition: background 0.12s, border-color 0.12s, transform 0.1s; }');
-  R('.jrn-insert-icon svg { width: 19px; height: 19px; stroke: currentColor; fill: none; stroke-width: 1.75; }');
-  R('@media (hover: hover) { .jrn-insert-item:hover .jrn-insert-icon { background: var(--gold-border); border-color: var(--gold); } }');
-  R('.jrn-insert-item:active .jrn-insert-icon { transform: scale(0.93); }');
-  R('.jrn-insert-text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }');
-  R('.jrn-insert-label { font-family: var(--font-garamond); font-size: var(--fs-16); color: var(--cream); }');
-  R('body.light .jrn-insert-label { color: #2a2520; }');
-  R('.jrn-insert-desc { font-family: var(--font-garamond); font-style: italic; font-size: var(--fs-12); color: var(--cream-dim); }');
-  R('.jrn-insert-chevron { flex-shrink: 0; margin-left: 6px; color: var(--gold-dim); font-size: var(--fs-20); line-height: 1; font-family: var(--font-cinzel); transition: transform 0.12s, color 0.12s; }');
-  R('@media (hover: hover) { .jrn-insert-item:hover .jrn-insert-chevron { color: var(--gold); transform: translateX(2px); } }');
 
   // Library / Note / Journal pickers (sheet shell + LinkPicker-style search)
   R('.jrn-picker-search-row { padding: 8px 14px 6px; }');
@@ -371,13 +304,8 @@
   // divider blocks (which have no inner embed border of their own) get the same
   // outline the card / image / audio blocks already carry, so the editor is
   // visually uniform — one gold-bordered box per block.
-  R('.jrn-block-edit .jrn-grow-p, .jrn-block-edit .jrn-grow-h2 { border: 1px solid var(--gold-border); border-radius: 8px; background: var(--bg3); padding: 8px 12px; transition: border-color 0.15s; }');
-  R('body.light .jrn-block-edit .jrn-grow-p, body.light .jrn-block-edit .jrn-grow-h2 { background: #f3ecdc; }');
-  R('.jrn-block-edit .jrn-grow-p:focus-within, .jrn-block-edit .jrn-grow-h2:focus-within { border-color: var(--gold); }');
   R('.jrn-block-edit .jrn-block-quote { border: 1px solid var(--gold-border); border-left: 3px solid var(--gold); border-radius: 8px; background: var(--bg3); padding: 10px 14px 10px 15px; }');
   R('body.light .jrn-block-edit .jrn-block-quote { background: #f3ecdc; }');
-  R('.jrn-block-edit .jrn-divider { border: 1px solid var(--gold-border); border-radius: 8px; background: var(--bg3); padding: 12px 0; margin: 0; }');
-  R('body.light .jrn-block-edit .jrn-divider { background: #f3ecdc; }');
   // Drag-to-reorder grip — lives in a left gutter (the editor's .jrn-blocks
   // gets padding-left:44px below), the opposite corner from the delete x —
   // the same grab-left / destroy-right separation the tab cards use.
@@ -425,68 +353,78 @@
   // Recording sheet
   R('.jrn-rec-content { padding: 24px 24px 30px; text-align: center; }');
   R('.jrn-rec-requesting { font-family: var(--font-garamond); font-style: italic; color: var(--cream-dim); font-size: var(--fs-14); padding: 20px 0; }');
-  R('.jrn-rec-status { display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.12em; color: #d05a4a; }');
-  R('.jrn-rec-status::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #d05a4a; animation: jrnPulseRec 1s ease-in-out infinite; }');
   R('.jrn-rec-status.is-paused { color: var(--gold-dim); }');
   R('.jrn-rec-status.is-paused::before { background: var(--gold-dim); animation: none; }');
   R('@keyframes jrnPulseRec { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }');
-  R('.jrn-rec-time { font-family: var(--font-cinzel); font-size: var(--fs-36); font-weight: 500; color: var(--cream); letter-spacing: 0.05em; margin: 16px 0; }');
-  R('body.light .jrn-rec-time { color: #2a2520; }');
   R('.jrn-rec-time-total { color: var(--gold-dim); font-size: var(--fs-20); font-weight: 400; }');
-  R('.jrn-rec-waveform { display: flex; align-items: center; justify-content: center; height: 56px; gap: 3px; margin: 12px 0; }');
-  R('.jrn-rec-waveform .bar { width: 3px; background: var(--gold-dim); border-radius: 1px; transition: height 0.15s, background 0.1s; min-height: 4px; }');
   R('.jrn-rec-waveform .bar.is-played { background: var(--gold); }');
   R('.jrn-rec-waveform.is-scrubbable { cursor: pointer; padding: 0 6px; }');
-  R('.jrn-rec-error { font-family: var(--font-garamond); font-style: italic; color: #d05a4a; font-size: var(--fs-14); padding: 14px 24px; }');
   R('.jrn-rec-actions { display: flex; justify-content: center; gap: 14px; margin-top: 24px; align-items: center; }');
-  // Review row holds ONLY the destructive × and the Save ✓ — give the pair a
-  // wider gutter than the generic action row so a Save tap can't graze Discard.
-  R('.jrn-rec-review-actions { gap: 34px; }');
   // Discard confirm — warm-red banner in place of the action row (same
   // ConfirmStrip skin the block-delete confirm uses).
   R('.jrn-rec-discard-confirm { margin-top: 24px; padding: 10px 12px; background: rgba(199, 92, 74, 0.14); border: 1px solid rgba(199, 92, 74, 0.45); border-radius: 8px; }');
   R('.jrn-rec-discard-confirm .ann-chip-confirm-q { color: #c75c4a; }');
-  // Pill-style legacy buttons (cancel + close + error close)
-  R('.jrn-rec-cancel { background: none; padding: 10px 24px; border-radius: 999px; font-family: var(--font-cinzel); font-size: var(--fs-11); text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; border: 1px solid var(--gold-dim); color: var(--gold-dim); }');
-  R('.jrn-rec-cancel:hover { color: var(--gold); border-color: var(--gold); }');
-  // Pause / resume button (round, gold outline)
-  R('.jrn-rec-pause-btn { width: 56px; height: 56px; border-radius: 50%; background: none; border: 2px solid var(--gold); color: var(--gold); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-rec-pause-btn svg { width: 22px; height: 22px; fill: currentColor; }');
-  R('.jrn-rec-pause-btn:hover { background: var(--gold-faint); }');
-  // Stop / finish button (round, red square)
-  R('.jrn-rec-stop-btn { width: 56px; height: 56px; border-radius: 50%; background: #d05a4a; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 4px 14px rgba(208, 90, 74, 0.4); }');
-  R('.jrn-rec-stop-btn svg { width: 22px; height: 22px; }');
-  R('.jrn-rec-stop-btn:hover { background: #b84a3c; }');
   // Preview play / pause (round, gold-outlined)
   R('.jrn-rec-preview-actions { display: flex; justify-content: center; margin: 4px 0 6px; }');
   R('.jrn-rec-pp { width: 64px; height: 64px; border-radius: 50%; background: var(--gold); border: none; color: var(--bg); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 6px 18px rgba(212, 183, 114, 0.35); }');
   R('.jrn-rec-pp svg { width: 26px; height: 26px; fill: currentColor; }');
   R('.jrn-rec-pp:hover { transform: scale(1.04); }');
   // Discard (red ×) + Confirm (green ✓) in preview
-  R('.jrn-rec-discard-btn { width: 52px; height: 52px; border-radius: 50%; background: none; border: 2px solid #c75c4a; color: #c75c4a; cursor: pointer; font-size: var(--fs-24); line-height: 1; display: flex; align-items: center; justify-content: center; padding: 0; }');
-  R('.jrn-rec-discard-btn:hover { background: rgba(199, 92, 74, 0.12); }');
-  R('.jrn-rec-confirm-btn { width: 52px; height: 52px; border-radius: 50%; background: #4caf50; border: none; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; box-shadow: 0 4px 14px rgba(76, 175, 80, 0.4); }');
-  R('.jrn-rec-confirm-btn svg { width: 24px; height: 24px; }');
-  R('.jrn-rec-confirm-btn:hover { background: #3e9a42; }');
   R('.jrn-rec-preview .jrn-rec-status { color: var(--gold); }');
   R('.jrn-rec-preview .jrn-rec-status::before { background: var(--gold); animation: none; }');
 
   // Floating Action Buttons
   //   .jrn-fab            — base FAB (gold filled, bottom-right by default)
-  //   .jrn-fab-plus       — editor's + insert button (bottom-right)
-  R('.jrn-fab { position: fixed; bottom: calc(24px + var(--dock-sys, env(safe-area-inset-bottom, 0px)) + var(--dock-player, 0px)); right: calc(22px + env(safe-area-inset-right)); width: 56px; height: 56px; border-radius: 50%; background: var(--gold); color: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(212, 183, 114, 0.4); z-index: 35; transition: transform 0.15s, background 0.15s, box-shadow 0.15s; padding: 0; }');
+  R('.jrn-fab { position: fixed; bottom: calc(16px + max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px)); right: calc(22px + env(safe-area-inset-right)); width: 56px; height: 56px; border-radius: 50%; background: var(--gold); color: var(--bg); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(212, 183, 114, 0.4); z-index: 35; transition: transform 0.15s, background 0.15s, box-shadow 0.15s; padding: 0; }');
   R('.jrn-fab:hover { transform: scale(1.05); }');
   R('.jrn-fab:active { transform: scale(0.96); }');
   R('.jrn-fab svg { width: 24px; height: 24px; display: block; }');
   // W3-01 (songs walk, 2026-09-25): the mini-player (z 150, ~70 px) covered the FAB. It rides the bottom dock
   // (app.css, cz1): --dock-player is the bar plus its pull tab while one is open, --dock-sys the gesture bar.
-  R('.jrn-fab-plus { right: calc(22px + env(safe-area-inset-right)); left: auto; }');
   // "New Entry" pill — the hub's primary create action. Wider than a round
   // FAB so the label reads clearly; the "+" insert FAB lives only in the
   // editor now.
-  R('.jrn-fab-newentry { width: auto; min-width: 56px; height: 52px; border-radius: 999px; padding: 0 22px 0 18px; gap: 9px; font-family: var(--font-cinzel); font-size: var(--fs-12); text-transform: uppercase; letter-spacing: 0.08em; }');
+  // "New entry" (mock v2 l-jrn): a gold pill at the right, above the tab bar (it sat under it: the bug U 8.4 names).
+  R('.jrn-fab-newentry { width: auto; min-width: 56px; height: var(--btn-h); border-radius: var(--r-pill); padding: 0 20px 0 16px; gap: 8px; font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 600; color: var(--accent-ink); }');
   R('.jrn-fab-newentry svg { width: 19px; height: 19px; }');
   R('.jrn-fab-newentry-label { white-space: nowrap; }');
+
+  // ── W2c (mock v2 l-jview, l-jedit, l-jins, l-jrec) ─────────────────────────────
+  // The entry's head: the title in the reader's face, the date as a plain meta line.
+  R('.jrn-viewer-title, .jrn-editor-title { font-family: var(--font-serif); font-size: var(--ts-display); line-height: 1.2; font-weight: 600; color: var(--text-1); margin: 0; }');
+  R('.jrn-viewer-title.untitled { font-style: italic; color: var(--text-2); font-weight: 400; }');
+  R('.jrn-editor-title { width: 100%; background: none; border: none; outline: none; padding: 0; }');
+  R('.jrn-editor-title::placeholder { color: var(--text-3); font-style: italic; font-weight: 400; }');
+  R('.jrn-viewer-date, .jrn-editor-date { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin-top: var(--sp-1); }');
+  R('.jrn-editor-meta { padding: 14px 22px 4px; }');
+  R('.jrn-saved-ind { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); padding: 0 var(--sp-1); margin-left: auto; }');
+  // Writing: no boxes; the block being written sits on surface-1 (mock .blk.on).
+  R('.jrn-block-edit .jrn-grow-p, .jrn-block-edit .jrn-grow-h2 { border: none; border-radius: var(--r-field); background: none; padding: 8px 10px; transition: background var(--press); }');
+  R('.jrn-block-edit .jrn-grow-p:focus-within, .jrn-block-edit .jrn-grow-h2:focus-within { background: var(--surface-1); }');
+  // The bottom bar: Insert (gold) + Photo, Voice, Excerpt, above the system bar and any player.
+  R('.jrn-ebar { position: fixed; left: 0; right: 0; bottom: calc(max(var(--dock-tabbar, 0px), var(--dock-sys, env(safe-area-inset-bottom, 0px))) + var(--dock-player, 0px)); z-index: 40; display: flex; gap: var(--sp-2); padding: 10px 12px 12px; background: var(--bg); border-top: 1px solid var(--hairline); overflow-x: auto; }');
+  R('.jrn-ebar .ui-btn { flex: 0 0 auto; gap: 6px; }');
+  // Insert: ten tiles in four groups, one view.
+  R('.jrn-ins-groups { padding: 0 var(--sp-1) var(--sp-5); overflow-y: auto; }');
+  R('.jrn-ins-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin: 14px 2px 8px; }');
+  R('.jrn-ins-label:first-child { margin-top: 0; }');
+  R('.jrn-ins-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-2); }');
+  R('.jrn-ins-tile { min-height: 52px; border-radius: var(--r-field); background: var(--surface-2); border: none; display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-family: var(--font-ui); font-size: var(--ts-control); font-weight: 500; color: var(--text-1); text-align: left; cursor: pointer; }');
+  R('.jrn-ins-tile:active { background: var(--surface-3); }');
+  R('.jrn-ins-tile .ui-i { color: var(--accent); flex: 0 0 auto; }');
+  R('.jrn-ins-close .ui-i { width: var(--icon); height: var(--icon); }');
+  // Voice recording: the status in red, the time large, the wave, the cap, three worded buttons.
+  R('.jrn-rec-status { display: block; font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; color: var(--tone-danger); }');
+  R('.jrn-rec-time { font-family: var(--font-serif); font-size: var(--ts-display); font-weight: 600; line-height: 1.1; color: var(--text-1); margin: 8px 0 0; transform: scale(1.45); transform-origin: center top; padding-bottom: 14px; }');
+  R('.jrn-rec-waveform { display: flex; align-items: center; justify-content: center; height: 64px; gap: 3px; margin: 6px 0 4px; }');
+  R('.jrn-rec-waveform .bar { width: 3px; background: var(--accent); border-radius: 2px; transition: height 0.15s, background 0.1s; min-height: 6px; }');
+  R('.jrn-rec-cap { font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); margin-bottom: var(--sp-2); }');
+  R('.jrn-rec-actions .ui-btn { flex: 1 1 0; gap: 8px; }');
+  R('.jrn-rec-actions .ui-btn svg { width: var(--icon-sm); height: var(--icon-sm); }');
+  R('.jrn-rec-actions .jrn-rec-stop-btn, .jrn-rec-actions .jrn-rec-confirm-btn { flex-grow: 1.3; }');
+  R('.jrn-insert-sheet .note-sheet-title, .jrn-rec-sheet .note-sheet-title { font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--text-1); }');
+  R('.jrn-rec-error { font-family: var(--font-ui); font-size: var(--ts-value); line-height: var(--lh-meta); color: var(--tone-danger); padding: 14px 8px; }');
+  // ── end W2c ──────────────────────────────────────────────────────────────────
 
   var styleEl = document.createElement('style');
   styleEl.id = 'jrn-styles';

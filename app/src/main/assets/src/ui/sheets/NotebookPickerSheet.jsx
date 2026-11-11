@@ -14,6 +14,8 @@
    store-side cleanup moves notes to Uncategorized).
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from '../components/UiIcon.jsx';
+
 export function NotebookPickerSheet({ groupId, onClose }) {
   // Subscribe to both stores. The note's notebookIds list is in NoteStore;
   // the available notebooks list is in NotebookStore.
@@ -101,79 +103,71 @@ export function NotebookPickerSheet({ groupId, onClose }) {
     onClose();
   }
 
+  // r-nbpick (the UI pass, mock v2 readers): "Move to a notebook". A card of choices, first "Not in a
+  // notebook" (ticked while the note is in none; a tap takes it out of every one), then each notebook with
+  // its tick and a bin; "New notebook" with a field and Create; Cancel | Save at the foot.
   return (
     <div className="nb-picker-overlay" onClick={requestClose}>
-      <div className="nb-picker" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="notebook-picker-title" onClick={e => e.stopPropagation()}>
-        <div className="nb-picker-header">
-          <span className="nb-picker-title" id="notebook-picker-title">{storedIds.size > 0 ? "Manage Notebooks" : "Add to Notebook"}</span>
-          <button className="nb-picker-close" onClick={requestClose} aria-label="Close">×</button>
+      <div className="nb-picker rd-form-sheet rd-nb-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="notebook-picker-title" onClick={e => e.stopPropagation()}>
+        <div className="ui-sheet-head">
+          <h2 className="ui-sheet-title" id="notebook-picker-title">Move to a notebook</h2>
         </div>
+        <div className="ui-group is-inset nb-picker-list">
+          <button type="button" className={'ui-row is-one no-lead ui-row-press nb-picker-none' + (selected.size === 0 ? ' checked' : '')}
+            role="checkbox" aria-checked={selected.size === 0} onClick={() => setSelected(new Set())}>
+            <span className="ui-row-title">Not in a notebook</span>
+            {selected.size === 0 && <span className="ui-row-mark is-tick"><UiIcon name="check" size="sm" /></span>}
+          </button>
+          {notebooks.map(nb => {
+            if (confirmDeleteNb === nb.id) {
+              return (
+                <ConfirmStrip
+                  key={nb.id}
+                  question={`Delete “${nb.name}”? Notes will move to Uncategorized.`}
+                  onCancel={() => setConfirmDeleteNb(null)}
+                  onConfirm={() => deleteNb(nb.id)}
+                />
+              );
+            }
+            const checked = selected.has(nb.id);
+            return (
+              // The toggle is its own checkbox button and Delete its sibling (sweep mw10: no nested control).
+              <div key={nb.id} className={'nb-picker-row' + (checked ? ' checked' : '')} onClick={() => toggle(nb.id)}>
+                <button type="button" className="ui-row is-one no-lead nb-picker-row-toggle" role="checkbox" aria-checked={checked}>
+                  <span className="ui-row-title nb-picker-name">{nb.name}</span>
+                  {checked && <span className="ui-row-mark is-tick"><UiIcon name="check" size="sm" /></span>}
+                </button>
+                <button
+                  type="button"
+                  className="ui-row-menu nb-picker-row-delete"
+                  onClick={(e) => { e.stopPropagation(); setConfirmDeleteNb(nb.id); }}
+                  title={'Delete notebook ' + nb.name}
+                  aria-label={'Delete notebook ' + nb.name}
+                ><UiIcon name="trash" size="sm" /></button>
+              </div>
+            );
+          })}
+        </div>
+        <div className="rd-label">New notebook</div>
         <div className="nb-picker-new">
-          <input
-            ref={inputRef}
-            className="nb-picker-new-input"
-            type="text"
-            placeholder="New notebook name…"
-            aria-label="New notebook name"
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createNotebook(); } }}
-            maxLength={60}
-          />
-          <button
-            className={"nb-picker-new-btn" + (newName.trim() ? '' : ' disabled')}
-            onClick={createNotebook}
-            disabled={!newName.trim()}
-          >Create</button>
+          <div className="ui-field is-square rd-field">
+            <input
+              ref={inputRef}
+              className="nb-picker-new-input"
+              type="text"
+              placeholder="Notebook name"
+              aria-label="New notebook name"
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); createNotebook(); } }}
+              maxLength={60}
+            />
+          </div>
+          <button type="button" className="ui-btn nb-picker-new-btn" onClick={createNotebook} disabled={!newName.trim()}>Create</button>
         </div>
-        {notebooks.length === 0
-          ? <div className="nb-picker-empty">No notebooks yet. Type a name above to create your first one.</div>
-          : <div className="nb-picker-list">
-              {notebooks.map(nb => {
-                if (confirmDeleteNb === nb.id) {
-                  return (
-                    <ConfirmStrip
-                      key={nb.id}
-                      question={`Delete “${nb.name}”? Notes will move to Uncategorized.`}
-                      onCancel={() => setConfirmDeleteNb(null)}
-                      onConfirm={() => deleteNb(nb.id)}
-                    />
-                  );
-                }
-                const checked = selected.has(nb.id);
-                return (
-                  // The row was role=button around its Delete button (a nested control, sweep mw10): the
-                  // toggle is now its own checkbox button and Delete its sibling. The row keeps the
-                  // pointer tap for its padding; the checkbox's click bubbles to it.
-                  <div
-                    key={nb.id}
-                    className={"nb-picker-row" + (checked ? ' checked' : '')}
-                    onClick={() => toggle(nb.id)}
-                  >
-                    <button type="button" className="nb-picker-row-toggle" role="checkbox" aria-checked={checked}>
-                      <span className="nb-picker-check" aria-hidden="true">
-                        {checked && (
-                          <svg viewBox="0 0 24 24">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        )}
-                      </span>
-                      <span className="nb-picker-name">{nb.name}</span>
-                    </button>
-                    <button
-                      className="nb-picker-row-delete"
-                      onClick={(e) => { e.stopPropagation(); setConfirmDeleteNb(nb.id); }}
-                      title={'Delete notebook ' + nb.name}
-                      aria-label={'Delete notebook ' + nb.name}
-                    >×</button>
-                  </div>
-                );
-              })}
-            </div>
-        }
-        {/* Footer — the HONEST Save: nothing above commits until this button.
-            Swaps to a discard ConfirmStrip when a dismissal arrives with
-            unsaved changes. Save is disabled when there's nothing to save. */}
+        {notebooks.length === 0 && <p className="rd-note">No notebooks yet. Name one here to make your first.</p>}
+        {/* The HONEST Save: nothing above commits until it. A dismissal with unsaved changes swaps the foot
+            for a discard ConfirmStrip. Save is off while there is nothing to save. */}
         {confirmingDiscard ? (
           <ConfirmStrip
             className="nb-picker-discard-confirm"
@@ -183,14 +177,10 @@ export function NotebookPickerSheet({ groupId, onClose }) {
             onConfirm={onClose}
           />
         ) : (
-          <div className="nb-picker-footer">
-            <button className="nb-picker-cancel" onClick={requestClose}>Cancel</button>
-            <button
-              className="nb-picker-save"
-              onClick={commit}
-              disabled={!dirty}
-              title={dirty ? 'Save notebook changes' : 'No changes to save'}
-            >Save</button>
+          <div className="ui-btn-row rd-foot">
+            <button type="button" className="ui-btn nb-picker-cancel" onClick={requestClose}>Cancel</button>
+            <button type="button" className="ui-btn is-primary nb-picker-save" onClick={commit} disabled={!dirty}
+              title={dirty ? 'Save notebook changes' : 'No changes to save'}>Save</button>
           </div>
         )}
       </div>

@@ -70,7 +70,7 @@ const bible = (bookId) => ({ type: 'bible', key: 'bible:' + bookId + ':3:16', bo
 const letter = (id) => ({ type: 'letter', key: 'letter:' + id + ':2', letterId: id, label: id });
 const studyCh = (id) => ({ type: 'study-letter', key: 'letter:' + id + ':0', label: id });
 const show = () => render(<LinksScreen onBack={() => {}} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />);
-const callout = () => document.querySelector('.links-broken-callout');
+const callout = () => document.querySelector('.links-broken');
 
 describe('_endpointResolves: an end whose corpus has not landed is unknown, not broken (W49)', () => {
   it('a Bible end before the Bible corpus has loaded', () => {
@@ -116,9 +116,9 @@ describe('LinksScreen broken-links callout (W49)', () => {
     expect(callout()).toBeNull();
     act(() => { window.__votCorpus.land(); });
     expect(callout()).not.toBeNull();
-    expect(callout().textContent).toMatch(/^1 link points/);
-    // n271: the hint names the visible row button, not a hidden long-press.
-    expect(callout().textContent).toMatch(/Tap ⋮ on a link to remove it\.$/);
+    expect(callout().querySelector('.ui-notice-title').textContent).toBe('1 link leads nowhere');
+    // n271: the hint names the visible row menu, not a hidden long-press.
+    expect(callout().textContent).toMatch(/Remove one with its menu\.$/);
   });
 
   it('loads the Bible Studies when only they can decide, then re-checks', async () => {
@@ -137,7 +137,7 @@ describe('LinksScreen broken-links callout (W49)', () => {
       finish(true);
     });
     expect(callout()).not.toBeNull();
-    expect(callout().textContent).toMatch(/^1 link points/);
+    expect(callout().querySelector('.ui-notice-title').textContent).toBe('1 link leads nowhere');
   });
 
   it('never loads the Bible Studies when no link needs them', () => {
@@ -171,7 +171,7 @@ describe('LinksScreen empty state and search name', () => {
     let home = 0;
     const r = render(<LinksScreen onBack={() => {}} onHome={() => { home++; }} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />);
     expect(r.container.querySelector('input')).toBeNull();
-    expect(r.container.querySelector('.notes-index-sort-btn')).toBeNull();
+    expect(r.container.querySelector('.lib-qline')).toBeNull();
     fireEvent.click(r.getByRole('button', { name: 'Start reading' }));
     expect(home).toBe(1);
   });

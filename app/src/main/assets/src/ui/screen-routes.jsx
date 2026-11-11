@@ -42,7 +42,12 @@
    as a pure helper so the decoupling is pinned by test
    (ChapterIndex.test.jsx). */
 import { h } from './jsx-h.js';
-import { bookTitle } from '../data/plan-catalog.js';
+import { bookTitle, runName } from '../data/plan-catalog.js';
+import { runStatus } from '../data/plan-engine.js';
+import { beginPlanSession, setPlanSessionHost, refOf } from '../utils/plan-session.js';
+import { openPlanNav, keepPlanNav } from '../utils/plan-nav.js';
+import { suppressNextHistoryPush } from '../hooks/use-history-sync.js';
+import { writePlanNote } from './screens/PlansHub.jsx';
 import { AudioPlayer } from '../utils/audio-player.js';
 import { setWifiOnly } from '../utils/download-gate.js';
 import { setAutoDownloads } from '../utils/auto-download.js';
@@ -190,9 +195,11 @@ export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapt
  * @property {(entry: any) => void} pushFromLetter
  * @property {*} backHint
  * @property {() => void} tapThroughBack
+ * @property {(dest: any) => void} [retargetTop]
  * @property {(vol: any, letter: any, excerpt: any) => void} goToLetterFromMatthew
  * @property {import('../hooks/use-tabs.js').TabSetter<'navOrigin'>} setNavOrigin
  * @property {*} setNoteSheetTarget
+ * @property {*} setNotebookPickerTarget
  * @property {*} bcvPrevBook
  * @property {*} bcvNextBook
  * @property {() => void} bcvOnPrevBook
@@ -267,8 +274,8 @@ export function buildScreenRoutes({
   journalEntryId, createAndEditJournal,
   // ── Tap through / linking / overlays ──
   openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
-  backHint, tapThroughBack, goToLetterFromMatthew,
-  setNavOrigin, setNoteSheetTarget,
+  backHint, tapThroughBack, goToLetterFromMatthew, retargetTop,
+  setNavOrigin, setNoteSheetTarget, setNotebookPickerTarget,
   // ── Bible chapter boundary props (from useReadingChainNav) ──
   bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
   bcvPrevBoundaryTitle, bcvNextBoundaryTitle,
@@ -351,6 +358,63 @@ export function buildScreenRoutes({
     const started = items.length > 0 && AudioPlayer.playPortion({ items, label: typeof label === 'string' ? label : 'Today' }) !== false;
     if (!started) openPlanItem(list[0]);
   };
+  // plans2 3.5: a reading session, one sitting of one plan day (utils/plan-session.js). It opens the item tapped, else
+  // the first not read yet, with a silent way back to where it began (a plan page keeps its place: keepPlanNav).
+  const _planStore = () => (typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore && typeof ReadingPlanStore.get === 'function' ? ReadingPlanStore : null);
+  const startPlanSession = (/** @type {string} */ runId, /** @type {number} */ day, /** @type {string} */ k) => {
+    const store = _planStore();
+    const run = store ? store.get(runId) : null;
+    const s = run ? beginPlanSession({ runId, day, name: runName(run, null) }) : null;
+    if (!s) return;
+    const first = k && s.keys.includes(k) ? k : (s.keys.find((x) => !(run.ticks && x in run.ticks)) || s.keys[0]);
+    if (screen === 'reading-plans') keepPlanNav();
+    openPlanItem(refOf(first));
+  };
+  // Next inside a session moves the reader in place and carries the way back along (retargetTop, as the audio follow
+  // does), so Back still returns to where the session began. Matthew's study chapters open the ordinary way.
+  const _movePlanItem = (/** @type {{ bid: string, cid: any }} */ ref) => {
+    const col = _planCol(ref.bid);
+    if (!col && ref.bid === 'matthew') { openPlanItem(ref); return; }
+    suppressNextHistoryPush();
+    setSurpriseAnchor(null);
+    let dest;
+    if (col) {
+      setActiveReadKey('vol:' + col.volKey, () => setLastReadForVol(col.volKey, ref.cid));
+      setLetterId(ref.cid);
+      setScreen(col.letterScreen);
+      dest = { screen: col.letterScreen, bookId: null, chapterNum: null, letterId: ref.cid, studyId: null, studyChapterId: null };
+    } else {
+      setActiveReadKey(ref.bid, () => setLastReadChapters((prev) => ({ ...prev, [ref.bid]: ref.cid })));
+      setBookId(ref.bid);
+      setChapterNum(ref.cid);
+      setScreen('bible-ch');
+      dest = { screen: 'bible-ch', bookId: ref.bid, chapterNum: ref.cid, letterId: null, studyId: null, studyChapterId: null };
+    }
+    if (typeof retargetTop === 'function') retargetTop(dest);
+  };
+  const _openPlansAt = (/** @type {any[]} */ views) => { openPlanNav(views); setNavOrigin({ screen: 'library', returnOrigin: null }); setScreen('reading-plans'); };
+  setPlanSessionHost({
+    move: _movePlanItem,
+    back: () => { if (typeof window.handleAndroidBack === 'function') window.handleAndroidBack(); else goNavOrigin(); },
+    markRead: (bid, cid) => markRead(bid, cid),
+    unmarkRead: (bid, cid) => unmarkRead(bid, cid),
+    isRead,
+    openPlans: _openPlansAt,
+    openNote: (runId, day) => {
+      const store = _planStore();
+      openPlanNav([{ v: 'list' }, { v: 'plan', id: runId }]);
+      writePlanNote(store ? store.get(runId) : null, day, goJournalEditor);
+    },
+  });
+  // The Read tab's plan row: Read starts a session on the plan's portion (Read ahead: the next day's), the text opens
+  // the plan's own page.
+  const readPlanRow = (/** @type {any} */ next, /** @type {string} */ planId) => {
+    const store = _planStore();
+    const run = store && planId ? store.get(planId) : null;
+    if (!run) { openPlanItem(next); return; }
+    startPlanSession(planId, runStatus(run, new Date()).day, next ? next.bid + ':' + next.cid : undefined);
+  };
+  const openPlanPage = (/** @type {string} */ planId) => { openPlanNav([{ v: 'list' }, { v: 'plan', id: planId }]); goReadingPlans(); };
   // mw18 S6: the recordings of a plan's coming days, saved to the phone from Plan details (the same tracks Listen plays).
   const planTracks = (refs) => AudioPlayer.portionTracks(planPortion((Array.isArray(refs) ? refs : []).filter(Boolean)));
   function planPortion(list) {
@@ -481,7 +545,16 @@ export function buildScreenRoutes({
   // `plain`: "results" is a word, not a title, so the pill reads it in its label's case (Track D).
   const _readerBackHint = _searchBack ? { title: RESULTS_LABEL, volumeLabel: null, plain: true } : backHint;
   const _searchLook = isSearchLook({ fromSearch, searchLanding, screen, bookId, chapterNum, letterId, studyId, studyChapterId });
-  const _readerMarkAsRead = _searchLook ? false : settings.markAsRead;
+  // plans2: following a plan is asking for its reads to count, so a plan's chapter or letter keeps the read detector on
+  // with Mark as read off (only reads outside plans stay unmarked).
+  const _planHoldsOpen = () => {
+    const store = _planStore();
+    if (!store || typeof store.holds !== 'function') return false;
+    if (screen === 'bible-ch' || screen === 'matthew-ch') return store.holds(screen === 'matthew-ch' ? 'matthew' : bookId, chapterNum);
+    const col = activeVolKey ? COL_BY_KEY.get(activeVolKey) : null;
+    return !!(col && letterId && store.holds(col.readKey, letterId));
+  };
+  const _readerMarkAsRead = _searchLook ? false : settings.markAsRead === false && _planHoldsOpen() ? true : settings.markAsRead;
   const sharedViewProps = {
     onSearch: goSearch, onSettings: goSettings, onHistory: goHistory,
     theme, onThemeChange: setTheme, surpriseAnchor,
@@ -1149,7 +1222,8 @@ export function buildScreenRoutes({
         readingPlans={settings.readingPlans}
         isRead={isRead}
         markAsReadEnabled={settings.markAsRead !== false}
-        onPlanRead={openPlanItem}
+        onPlanRead={readPlanRow}
+        onOpenPlan={openPlanPage}
         onPlanListen={listenPlanItem}
         planTracks={planTracks}
         onEnableMarkAsRead={() => updateSetting('markAsRead', true)}
@@ -1184,10 +1258,7 @@ export function buildScreenRoutes({
         onHome={goHome}
         onSelect={_openHistoryEntry}
         onStartReading={() => _openFirstLetter('History')}
-        onSearch={goSearch}
-        onSettings={goSettings}
-        onHistory={goHistory}
-        theme={theme} onThemeChange={setTheme}
+        onClearHistory={clearHistory}
       />
     ),
     'library': () => _kickVot(
@@ -1198,7 +1269,7 @@ export function buildScreenRoutes({
           onOpenJournal={goJournalHub}
           onOpenHighlights={goHighlightsIndex}
           onOpenProgress={goProgress}
-          onOpenPlans={() => { setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
+          onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'library', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
           readingPlanCount={(typeof ReadingPlanStore !== 'undefined' && ReadingPlanStore ? ReadingPlanStore.active().length : 0) || (Array.isArray(settings.readingPlans) ? settings.readingPlans.length : 0)}
           totalReadCount={Object.keys(readItems || {}).length}
           onSearch={goSearch}
@@ -1210,23 +1281,19 @@ export function buildScreenRoutes({
           isRead={isRead}
         />
     ),
-    // rp1: the reading plans; back returns to where it was opened
+    // rp1: the reading plans; back returns to where it was opened. plans2: one screen, a stack of views (PlansHub.jsx).
     'reading-plans': () => (
-      <ReadingPlansScreen
+      <PlansHub
         onBack={goNavOrigin}
         backLabel={navOrigin && navOrigin.screen === 'home' ? 'Home' : 'Library'}
         readingPlans={settings.readingPlans}
         isRead={isRead}
-        markAsReadEnabled={settings.markAsRead !== false}
         onPlansMoved={(/** @type {any[]} */ left) => updateSetting('readingPlans', left)}
-        onRead={openPlanItem}
         onListen={listenPlanItem}
         onNote={goJournalEditor}
         planTracks={planTracks}
         onSearch={goSearch}
-        onHistory={goHistory}
-        onSettings={goSettings}
-        theme={theme} onThemeChange={setTheme}
+        onStartSession={startPlanSession}
       />
     ),
     // The Personal Study screens.
@@ -1241,7 +1308,11 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         historyEnabled={settings.historyEnabled !== false}
         onStartReading={() => _openFirstLetter('Progress')}
-        theme={theme} onThemeChange={setTheme}
+        onOpenNotes={goNotesIndex}
+        onOpenHighlights={goHighlightsIndex}
+        onOpenBookmarks={goBookmarksIndex}
+        onOpenLinks={goLinksIndex}
+        onOpenSource={(endpoint) => _listOpen(endpoint, { sourceLetterTitle: 'Progress' })}
       />
     ),
     // Link-outs from the index / viewer / web screens do NOT write navOrigin.
@@ -1262,6 +1333,7 @@ export function buildScreenRoutes({
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Highlights' });
           }
         }}
+        onStartReading={() => _openFirstLetter('Highlights')}
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
@@ -1325,7 +1397,11 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         entryId={journalEntryId}
         // U03.6: an entry just made with New entry goes Back to the Journal list (its read-only view was a second Back away).
-        onBack={() => { if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId); }}
+        onBack={() => {
+          // plans2: a plan day's note goes Back to the plan it was written from.
+          if (window.navHandoff.take('journalPlanReturn') === journalEntryId) { window.navHandoff.take('journalNewEntry'); keepPlanNav(); setNavOrigin({ screen: 'library', returnOrigin: null }); setScreen('reading-plans'); return; }
+          if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId);
+        }}
         onHome={goHome}
         onSearch={goSearch}
         onHistory={goHistory}
@@ -1340,6 +1416,9 @@ export function buildScreenRoutes({
         navOrigin={navOrigin}
         onHome={goHome}
         onOpenNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: false })}
+        onEditNote={(gid) => setNoteSheetTarget({ groupId: gid, startInEditMode: true })}
+        onMoveNote={setNotebookPickerTarget}
+        onStartReading={() => _openFirstLetter('Notes')}
         onNavigateToSource={(endpoint, meta) => {
           if (endpoint) {
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Notes' });
@@ -1365,6 +1444,13 @@ export function buildScreenRoutes({
           if (endpoint) {
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Links' });
           }
+        }}
+        onStartReading={() => _openFirstLetter('Links')}
+        onOpenMyWeb={() => {
+          // "See in My Web" / "Open My Web" (W2): the Scripture Web takes navHandoff 'webMine' and starts in My Web.
+          window.navHandoff.set('webMine', true);
+          setNavOrigin({ screen: 'links-index', returnOrigin: navOrigin || null });
+          setScreen('scripture-web');
         }}
         onSearch={goSearch}
         onHistory={goHistory}

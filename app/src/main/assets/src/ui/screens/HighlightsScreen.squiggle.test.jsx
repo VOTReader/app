@@ -33,19 +33,20 @@ describe('Highlights & Underlines — squiggles (v05-04)', () => {
     expect(_collectMarks().map((m) => m.kind).sort()).toEqual(['highlight', 'squiggle', 'underline']);
   });
 
-  it('lists the squiggle with its own label and a wavy swatch in its colour', () => {
+  it('lists the squiggle by its name, its words drawn over a wavy line', () => {
     show();
     const row = rows().find((r) => r.textContent.includes('Jesus wept'));
     expect(row).toBeTruthy();
-    expect(row.querySelector('.hlx-kind').textContent).toBe('Squiggle');
-    expect(row.querySelector('.hlx-swatch').className).toContain('is-squiggle');
+    expect(row.getAttribute('aria-label')).toMatch(/^Squiggle: Jesus wept/);
+    expect(row.className).toContain('is-squiggle');
+    expect(row.querySelector('.hlx-mark').style.textDecorationStyle).toBe('wavy');
   });
 
-  it('a Squiggles type chip shows only the squiggles', () => {
+  it('a Squiggle chip shows only the squiggles', () => {
     show();
-    const chip = [...document.querySelectorAll('.hlx-type-chip')].find((b) => b.textContent === 'Squiggles');
+    const chip = [...document.querySelectorAll('.ui-chip')].find((b) => b.textContent === 'Squiggle');
     expect(chip).toBeTruthy();
     fireEvent.click(chip);
-    expect(rows().map((r) => r.querySelector('.hlx-text').textContent)).toEqual(['“Jesus wept”']);
+    expect(rows().map((r) => r.querySelector('.hlx-text').textContent)).toEqual(['Jesus wept']);
   });
 });

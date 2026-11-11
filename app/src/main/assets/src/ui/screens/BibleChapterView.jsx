@@ -10,7 +10,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
-import { PlanRibbon } from '../components/PlanRibbon.jsx';
+import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
@@ -280,6 +280,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         const titleIsTappable = titleEffective && hasCuratedTitle;
         // Plain black, no amber banner (Corbin 2026-11-01), like every reading page.
         return (
+          <>
+          <PlanSessionStrip bid={book.id} cid={chapter.num} inert={inert} />
           <header className="hero" ref={heroRef}>
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
@@ -306,11 +308,6 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
                   aria-label="Show chapter title"
                 >+ Show chapter title</button>
               )}
-              <div className="hero-ornament">
-                <div className="hero-ornament-line" />
-                <div className="hero-ornament-diamond" />
-                <div className="hero-ornament-line r" />
-              </div>
               {/* Recorded Bible edition (comment corrected 2026-08-10): every
                   shipped edition is one track per CHAPTER, so this pill starts
                   the book's queue positioned at THIS chapter and auto-advance
@@ -329,6 +326,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               )}
             </div>
           </header>
+          </>
         );
       })()}
       <div className="page-wrapper">

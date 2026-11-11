@@ -221,7 +221,7 @@ import { ScriptureGenre } from './screens/ScriptureGenre.jsx';
 import { ScripturesHome } from './screens/ScripturesHome.jsx';
 // What the always-present app shell mounts (BookmarksScreen is imported below
 // with the other screens you go to).
-import { _bookmarkSourceLabel, _bookmarkSourceEndpoint } from '../utils/bookmark-source.js';
+import { _bookmarkSourceLabel, _bookmarkSourceEndpoint, _bookmarkSourcePlace } from '../utils/bookmark-source.js';
 import { BookmarkPopover } from './sheets/BookmarkPopover.jsx';
 
 // ── Sheets ──────────────────────────────────────────────────────────────
@@ -262,6 +262,7 @@ import { ScriptureWebScreen, ensureScriptureWebData } from './screens/ScriptureW
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
 import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
+import { PlansHub } from './screens/PlansHub.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import {
@@ -391,7 +392,7 @@ Object.assign(window, {
   HomeScreen,
   ChapterIndex,
   ScriptureGenre, ScripturesHome,
-  _bookmarkSourceLabel, _bookmarkSourceEndpoint, BookmarkPopover,
+  _bookmarkSourceLabel, _bookmarkSourceEndpoint, _bookmarkSourcePlace, BookmarkPopover,
   // Sheets
   TabsOverview, TabActionSheet, MultiNotePopover,
   NotebookPickerSheet, NoteSheet,
@@ -410,6 +411,7 @@ Object.assign(window, {
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
   HistoryScreen,
   ReadingPlansScreen,
+  PlansHub,
   NotesIndexScreen,
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,

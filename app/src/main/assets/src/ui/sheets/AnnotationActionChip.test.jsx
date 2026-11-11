@@ -9,7 +9,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { AnnotationActionChip, chipTop } from './AnnotationActionChip.jsx';
+import { AnnotationActionChip } from './AnnotationActionChip.jsx';
 import { ConfirmStrip } from '../components/ConfirmStrip.jsx';
 
 // The chip's confirm mode renders the REAL ConfirmStrip (a bare global at
@@ -50,7 +50,6 @@ describe('AnnotationActionChip style switcher', () => {
   it('style buttons are named for their style and say which one is current', () => {
     setupStores({ id: 'g1', groupId: 'g1', kind: 'underline', color: 'yellow', text: 'hi' });
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Style'));
     expect(screen.getByRole('button', { name: 'Highlight' }).getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByRole('button', { name: 'Underline' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: 'Squiggle underline' }).getAttribute('aria-pressed')).toBe('false');
@@ -59,15 +58,16 @@ describe('AnnotationActionChip style switcher', () => {
   it('colour swatches say which colour is current', () => {
     setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'green', text: 'hi' });
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Recolor'));
     expect(screen.getByRole('button', { name: 'green' }).getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByRole('button', { name: 'yellow' }).getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('shows a Style button on the main row', () => {
-    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' });
-    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    expect(screen.getByTitle('Style')).toBeTruthy();
+  it('r-mark: the sheet shows the words, the style switch and the colours at once', () => {
+    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi there' });
+    const { container } = render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
+    expect(container.querySelector('.rd-quote').textContent).toBe('hi there');
+    expect(screen.getByTitle('Highlight').textContent).toBe('Highlighter');
+    expect(container.querySelectorAll('.rd-colors .sel-color-btn').length).toBe(3);
   });
 
   it('opens the style mode and restyles a highlight via convertGroup, then closes', () => {
@@ -75,16 +75,14 @@ describe('AnnotationActionChip style switcher', () => {
     setupStores(ann);
     const onClose = vi.fn();
     render(<AnnotationActionChip chip={chipProps} onClose={onClose} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Style'));
     fireEvent.click(screen.getByTitle('Squiggle underline'));
     expect(window.AnnotationStore.convertGroup).toHaveBeenCalledWith('g1', 'squiggle');
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('marks the current kind active in the style mode', () => {
+  it('marks the current kind active in the style switch', () => {
     setupStores({ id: 'g1', groupId: 'g1', kind: 'underline', color: 'yellow', text: 'hi' });
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Style'));
     expect(screen.getByTitle('Underline').className).toContain('active');
     expect(screen.getByTitle('Highlight').className).not.toContain('active');
     expect(screen.getByTitle('Squiggle underline').className).not.toContain('active');
@@ -94,7 +92,6 @@ describe('AnnotationActionChip style switcher', () => {
     const ann = { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'blue', text: 'hi' };
     setupStores(ann, { isNote: true });
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Style'));
     fireEvent.click(screen.getByTitle('Underline'));
     expect(window.AnnotationStore.convertGroup).toHaveBeenCalledWith('g1', 'underline');
     expect(window.NoteDefaultStore.set).toHaveBeenCalledWith('underline', 'blue');
@@ -104,18 +101,8 @@ describe('AnnotationActionChip style switcher', () => {
     const ann = { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' };
     setupStores(ann); // not a note
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Style'));
     fireEvent.click(screen.getByTitle('Underline'));
     expect(window.NoteDefaultStore.set).not.toHaveBeenCalled();
-  });
-
-  it('Back returns to the main row without mutating', () => {
-    setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' });
-    render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
-    fireEvent.click(screen.getByTitle('Style'));
-    fireEvent.click(screen.getByTitle('Back'));
-    expect(screen.getByTitle('Style')).toBeTruthy(); // main row again
-    expect(window.AnnotationStore.convertGroup).not.toHaveBeenCalled();
   });
 
   // Destructive-action placement: Remove is LAST on the main row (after
@@ -124,12 +111,12 @@ describe('AnnotationActionChip style switcher', () => {
     setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' });
     const { container, unmount } = render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
     let labels = [...container.querySelectorAll('.ann-chip-btn')].map(b => b.textContent);
-    expect(labels).toEqual(['Color', 'Style', 'Note', 'Remove']);
+    expect(labels).toEqual(['Add note', 'Copy', 'Share', 'Remove']);
     unmount();
     setupStores({ id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'hi' }, { isNote: true });
     const r2 = render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
     labels = [...r2.container.querySelectorAll('.ann-chip-btn')].map(b => b.textContent);
-    expect(labels).toEqual(['Color', 'Style', 'Remove']); // no Note button on an existing note
+    expect(labels).toEqual(['Copy', 'Share', 'Remove']); // no Add note on an existing note
   });
 
   it('Remove still confirm-gates: tapping it swaps to the ConfirmStrip, not an instant delete', () => {
@@ -157,23 +144,5 @@ describe('AnnotationActionChip style switcher', () => {
     render(<AnnotationActionChip chip={chipProps} onClose={() => {}} onNoteRequest={() => {}} />);
     fireEvent.click(screen.getByTitle('Remove'));
     expect(screen.getByText('Remove this highlight?')).toBeTruthy();
-  });
-});
-
-describe('chipTop: the chip stays on the screen (cz2)', () => {
-  // 412x915, chip 51 px tall, nav bottom 67.
-  it('opens 10 px under the tap when it fits', () => {
-    expect(chipTop(400, 51, 915, 0, 67)).toBe(410);
-  });
-  it('flips above the tap near the bottom (a mark at y 880 opened the chip 26 px off the screen)', () => {
-    expect(chipTop(880, 51, 915, 0, 67)).toBe(819);
-    expect(chipTop(880, 51, 915, 0, 67) + 51).toBeLessThanOrEqual(915 - 8);
-  });
-  it('counts the APK gesture inset as the bottom', () => {
-    expect(chipTop(860, 51, 915, 24, 67)).toBe(799);
-  });
-  it('never climbs under the top bar', () => {
-    expect(chipTop(70, 51, 915, 0, 135)).toBe(143);
-    expect(chipTop(100, 400, 300, 0, 67)).toBe(75);
   });
 });

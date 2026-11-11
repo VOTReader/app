@@ -1,191 +1,72 @@
 /* ═══════════════════════════════════════════════════════════════════════
    AnnotationHint — Cluster D (esbuild bundle-d.js)
    ───────────────────────────────────────────────────────────────────────
-   First-run discoverability for the annotation system. The long-press →
-   toolbar gesture is invisible chrome: a brand-new reader has no way to
-   learn that highlights/notes/bookmarks exist short of stumbling into a
-   text selection. This pill teaches the ONE gesture, exactly once, to
-   exactly the audience that needs it:
+   First-run discoverability for the annotation system: the long-press that
+   opens the selection sheet is invisible chrome, so a new reader is told the
+   ONE gesture in words.
 
-   - Renders ONLY while the user has ZERO annotations, notes, AND
-     bookmarks — the moment they create their first mark the store
-     subscription re-renders this to null, permanently (they have data
-     now, so on every future boot the condition is already false). No
-     persisted "seen" flag is needed: the data itself is the flag, so
-     there's no IDB schema change and nothing new to export/import.
-   - The ✕ dismissal is DURABLE (W0 P1-1): it records
-     AnnHintDismissedFlagStore (bundle-b, IDB 'vot-ann-hint-dismissed',
-     hydrated before App renders so the .is() read below is synchronous).
-     The old session-only window flag let the pill re-pitch on every cold
-     boot to exactly the dismissers who never annotate — the tail case the
-     old design called acceptable, but a re-teach on every launch is a
-     nag, not a tip. The window flag remains ONLY as the no-store fallback
-     for bare-test hosts.
-   - Waits ~2.5s after the reading screen mounts so it never competes
-     with the page-load moment, and renders position:fixed OUTSIDE the
-     .pager-track (ScreenLayout renders it as a stickyNav sibling) so a
-     swipe-settle transform can't displace it.
-   - The pill container is pointer-events:none (W0 P1-1, app.css) so it
-     stops swallowing the very long-press it teaches; the ✕ re-enables
-     pointer events on itself. That works because the ✕ is a native
-     <button> with its OWN onClick — nothing is delegated to the now
-     pointer-inert container. Keep it that way.
-   - YIELDS (journey F2.1, 2026-09-12): holds while the tour is up or the
-     audio bar is open — on the tour's Listen stop the card, this pill and
-     the bar stacked three deep at the bottom of a phone, and outside the
-     tour the pill was drawn over the bar — and comes when they leave. The
-     tour's state is read through the bundle-b global TourController (the
-     controller must not be imported here: a second bundled copy would be a
-     second, silent state); the player is this bundle's own module.
-     It also holds while the install card is on screen (search200 UX B1):
-     on a first reader open the pill sat on the card's heading. InstallCard
-     is this bundle's own module too.
-   - SAYS THE TOUR'S WORDS for the same gesture, through
-     TourController.highlightWords(): tour-steps.js owns the sentence pair
-     the highlight stop opens with, so this pill cannot drift from it as its
-     own copy did ("highlight, note, or bookmark" vs "Highlight, or Note").
+   W2d (mock v2 r-letter, 2026-11-11): nothing floats over a reader, so the
+   tip is no longer a pill over the text. It is the first row of the reader's
+   More menu (MoreMenu.jsx), saying the tour's own words for the gesture
+   (TourController.highlightWords(), tour-steps.js), so the two cannot drift.
+
+   - Shown ONLY while the reader has ZERO highlights, notes AND bookmarks, and
+     has not set the durable flag AnnHintDismissedFlagStore (bundle-b, IDB
+     'vot-ann-hint-dismissed', hydrated before App renders). The store
+     subscriptions re-render it to null the moment a first mark lands.
+   - A tap on the row is "Got it": it sets the flag and closes the menu.
+     SelectionToolbar sets the same flag on the reader's first long-press
+     (hint1), so once the gesture is learned the row goes for good.
+   - Stores and TourController are bundle-b bare globals (never imported: a
+     second bundled copy would be a second, silent state); a host without
+     them (bare tests) never shows the row.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { AudioPlayer } from '../../utils/audio-player.js';
-import { isInstallCardOnScreen, subscribeInstallCardOnScreen } from './InstallCard.jsx';
-
-/** U10.7: how long the tip stays before it fades by itself, and how long the fade takes. */
-export const HINT_FADE_AFTER_MS = 20000;
-const HINT_FADE_MS = 600;
-
-export function AnnotationHint() {
-  // Store subscriptions — any first annotation/note/bookmark re-renders
-  // this component and extinguishes the hint. Guarded typeof access: the
-  // stores (bundle-b) always precede this component (bundle-d) at runtime,
-  // but hosts that render ScreenLayout bare (tests) shouldn't need them.
-  // TourController rides the same bridge and the same guard: without it
-  // there are no words to say, so the pill never shows (as without stores).
-  const _has = typeof AnnotationStore !== 'undefined'
-    && typeof NoteStore !== 'undefined'
-    && typeof BookmarkStore !== 'undefined'
-    && typeof TourController !== 'undefined';
-  const _tour = _has ? TourController : null;
+/** Re-render on a store's notify; a missing store (bare tests) never notifies. @param {any} store */
+function useVersion(store) {
+  const ok = !!(store && typeof store.subscribe === 'function' && typeof store.getVersion === 'function');
   React.useSyncExternalStore(
-    React.useCallback((cb) => (_tour ? _tour.subscribe(cb) : () => {}), [_tour]),
-    () => (_tour ? _tour.getVersion() : 0)
+    React.useCallback((/** @type {() => void} */ cb) => (ok ? store.subscribe(cb) : () => {}), [store, ok]),
+    () => (ok ? store.getVersion() : 0)
   );
-  React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getVersion);
-  // The install card on screen (search200 UX B1): both sit at the bottom of a chapter's end.
-  const cardOnScreen = React.useSyncExternalStore(subscribeInstallCardOnScreen, isInstallCardOnScreen);
-  // The audio bar is open whenever the player is not idle (AudioPlayerBar.jsx).
-  const yielding = !!(_tour && _tour.getState().active) || AudioPlayer.getState().status !== 'idle' || cardOnScreen;
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (_has ? AnnotationStore.subscribe(cb) : () => {}), [_has]),
-    () => (_has ? AnnotationStore.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (_has ? NoteStore.subscribe(cb) : () => {}), [_has]),
-    () => (_has ? NoteStore.getVersion() : 0)
-  );
-  React.useSyncExternalStore(
-    React.useCallback((cb) => (_has ? BookmarkStore.subscribe(cb) : () => {}), [_has]),
-    () => (_has ? BookmarkStore.getVersion() : 0)
-  );
+}
 
-  const [delayDone, setDelayDone] = React.useState(false);
-  // Durable dismissal (W0 P1-1). AnnHintDismissedFlagStore is a bundle-b
-  // bare global (same bridge as the data stores above) and is hydrated
-  // before App renders, so the .is() read in the initializer is the
-  // synchronous, post-hydration truth. Missing global (bare-test hosts)
-  // → the old session-only window flag keeps those hosts working.
-  const _flag = typeof AnnHintDismissedFlagStore !== 'undefined'
-    ? AnnHintDismissedFlagStore : null;
-  const [dismissedHere, setDismissed] = React.useState(
-    () => (_flag ? _flag.is()
-      : (typeof window !== 'undefined' && !!window.__annHintDismissed))
-  );
-  // hint1 (lw1): the reader's first long-press sets the same flag
-  // (SelectionToolbar, when its bar comes up), so the pill goes for good
-  // once the gesture is learned, even with no mark saved yet.
-  const _flagSubs = !!(_flag && typeof _flag.subscribe === 'function' && typeof _flag.getVersion === 'function');
-  const flagVer = React.useSyncExternalStore(
-    React.useCallback((cb) => (_flagSubs ? _flag.subscribe(cb) : () => {}), [_flag, _flagSubs]),
-    () => (_flagSubs ? _flag.getVersion() : 0)
-  );
-  // U15 (AOGCG, 2026-10-22): at most once per install. The pill records the same durable flag the
-  // moment it shows (the effect below), keeps showing on THIS screen, and never pitches again; a
-  // later set by someone else (the ✕ elsewhere, hint1's long-press) still sends it away at once.
-  // A ref, not state: _flag.set() re-renders through the subscription above before a setState would
-  // land, and that render must already know the set was this pill's own (else it blinks out and back).
-  const shownAt = React.useRef(/** @type {number | null} */ (null));
-  const dismissed = dismissedHere || (shownAt.current == null ? !!(_flag && _flag.is()) : flagVer > shownAt.current);
-  React.useEffect(() => {
-    const t = setTimeout(() => setDelayDone(true), 2500);
-    return () => clearTimeout(t);
-  }, []);
+/** True while the tip still has someone to teach. */
+export function useAnnotationHintWanted() {
+  const has = typeof AnnotationStore !== 'undefined' && typeof NoteStore !== 'undefined'
+    && typeof BookmarkStore !== 'undefined' && typeof TourController !== 'undefined';
+  const flag = typeof AnnHintDismissedFlagStore !== 'undefined' ? AnnHintDismissedFlagStore : null;
+  useVersion(has ? AnnotationStore : null);
+  useVersion(has ? NoteStore : null);
+  useVersion(has ? BookmarkStore : null);
+  useVersion(flag);
+  if (!has || !flag || flag.is()) return false;
+  return !(Object.keys(AnnotationStore.all() || {}).length > 0 || NoteStore.count() > 0 || BookmarkStore.count() > 0);
+}
 
-  // Missing stores (bare-test hosts) → treat as "has data": never show.
-  const hasAnyData = !_has ||
-    Object.keys(AnnotationStore.all() || {}).length > 0 ||
-    NoteStore.count() > 0 ||
-    BookmarkStore.count() > 0;
+const HAND = (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 11.5V5.5a1.5 1.5 0 0 1 3 0v5" />
+    <path d="M12 10.5v-1a1.5 1.5 0 0 1 3 0v2" />
+    <path d="M15 11.5v-.5a1.5 1.5 0 0 1 3 0v3.5c0 3.5-2 6-5.5 6S7.3 18.6 6 16l-1.8-3.5a1.4 1.4 0 0 1 2.4-1.4L8 13V7" />
+  </svg>
+);
 
-  const visible = !(hasAnyData || dismissed || !delayDone || yielding);
-  // U10.7: the tip goes by itself, after about 20 s up, two screens of the reader's scrolling, or the reader reaching
-  // the page's end (it stayed over the text through the letter's end). It fades, then leaves; the durable flag was
-  // already set when it showed. Each page's position is taken as the tip shows: a browser coalesces scroll events, so
-  // a first event can come a whole screen down, and a short letter has less than two screens to scroll.
-  const [fading, setFading] = React.useState(false);
-  React.useEffect(() => {
-    if (!visible) return undefined;
-    let moved = 0;
-    /** @type {WeakMap<EventTarget, number>} */
-    const last = new WeakMap();
-    document.querySelectorAll('.screen-scroll').forEach((el) => last.set(el, el.scrollTop));
-    last.set(document, window.scrollY || 0);
-    const onScroll = (/** @type {Event} */ e) => {
-      const t = /** @type {any} */ (e.target);
-      const el = t && typeof t.scrollTop === 'number' ? t : null;
-      const top = el ? el.scrollTop : (window.scrollY || 0);
-      const key = t || document;
-      const was = last.get(key);
-      last.set(key, top);
-      if (was == null || top === was) return;
-      moved += Math.abs(top - was);
-      const atEnd = !!el && el.scrollHeight > el.clientHeight && top + el.clientHeight >= el.scrollHeight - 2;
-      if (atEnd || moved > 2 * (window.innerHeight || 800)) setFading(true);
-    };
-    const timer = setTimeout(() => setFading(true), HINT_FADE_AFTER_MS);
-    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
-    return () => { clearTimeout(timer); document.removeEventListener('scroll', onScroll, { capture: true }); };
-  }, [visible]);
-  React.useEffect(() => {
-    if (!fading) return undefined;
-    const t = setTimeout(() => setDismissed(true), HINT_FADE_MS);
-    return () => clearTimeout(t);
-  }, [fading]);
-  React.useEffect(() => {
-    if (!visible || shownAt.current != null) return;
-    if (!_flag) { window.__annHintDismissed = true; shownAt.current = 0; return; }
-    shownAt.current = Infinity;                       // showing: holds through the set's own notify
-    _flag.set();
-    shownAt.current = _flagSubs ? _flag.getVersion() : 0;
-  }, [visible, _flag, _flagSubs]);
-
-  if (!visible) return null;
-
+/**
+ * The tip as a More-menu row. `onDone` closes the menu.
+ * @param {{ onDone: () => void }} props
+ */
+export function AnnotationHintItem({ onDone }) {
+  const wanted = useAnnotationHintWanted();
+  if (!wanted) return null;
   return (
-    <div className={'ann-hint-pill' + (fading ? ' is-fading' : '')} role="status">
-      <svg className="ann-hint-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M9 11.5V5.5a1.5 1.5 0 0 1 3 0v5" />
-        <path d="M12 10.5v-1a1.5 1.5 0 0 1 3 0v2" />
-        <path d="M15 11.5v-.5a1.5 1.5 0 0 1 3 0v3.5c0 3.5-2 6-5.5 6S7.3 18.6 6 16l-1.8-3.5a1.4 1.4 0 0 1 2.4-1.4L8 13V7" opacity="0.9" />
-      </svg>
-      <span className="ann-hint-text">{_tour.highlightWords()}</span>
-      <button
-        className="ann-hint-close"
-        onClick={() => {
-          // Persist first (survives the cold boot), then hide locally.
-          // The no-store fallback keeps the legacy session semantics.
-          if (_flag) _flag.set(); else window.__annHintDismissed = true;
-          setDismissed(true);
-        }}
-      >Got it</button>
-    </div>
+    <button type="button" role="menuitem" className="more-menu-item more-menu-hint"
+      onClick={() => { AnnHintDismissedFlagStore.set(); onDone(); }}>
+      {HAND}
+      <span className="more-menu-item-text">
+        <span>{TourController.highlightWords()}</span>
+        <span className="more-menu-item-sub">Got it</span>
+      </span>
+    </button>
   );
 }

@@ -29,7 +29,7 @@ describe('Highlights & Underlines — a note with no colour (A06.4)', () => {
     expect(_collectMarks().map((m) => m.groupId)).toEqual(['g1']);
     render(<HighlightsScreen onBack={() => {}} onNavigateToSource={() => {}} theme="dark" onThemeChange={() => {}} />);
     const rows = [...document.querySelectorAll('.hlx-row')];
-    expect(rows.map((r) => r.querySelector('.hlx-text').textContent)).toEqual(['“The Lord is my shepherd”']);
-    expect(document.querySelector('.study-head-count').textContent).toBe('1 mark');
+    expect(rows.map((r) => r.querySelector('.hlx-text').textContent)).toEqual(['The Lord is my shepherd']);
+    expect(document.querySelector('.lib-qline-count').textContent).toBe('1 highlight');
   });
 });

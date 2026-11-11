@@ -15,7 +15,8 @@ import { passageCopy, passageLabel, translationTag, quotedPassage } from '../../
 import { readingBlocksIn, readingRange } from '../../utils/reading-range.js';
 import { listenFromTarget, startListenFrom, repeatTarget, startRepeat, REPEAT_TIMES } from '../../utils/listen-from.js';
 // A dragged selection stays in the reading column and scrolls it gently at the edges (rs1); the bottom dock's top.
-import { startSelectionDrag, selectionDragging, dockTop } from './selection-drag.js';
+import { startSelectionDrag, selectionDragging } from './selection-drag.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 // The chrome list is shared with applyDOMHighlights' re-anchor (v05-02): what the recorder leaves out, the re-finder must too.
 import { ANNOTATION_CHROME } from '../../renderer/anchor-view.js';
 import { snapshotGroups, offerUndoRemoved, offerUndoAdded } from '../../utils/annotation-undo.js';
@@ -86,9 +87,8 @@ function webDoorOf(selInfo) {
     return open(start, { check: true }) ? { start, label: 'Show in Scripture Web' } : null;
   }
   if (/^(letter|wtlb):/.test(key)) {
-    // an Answers topic is a page of the site, not a letter (the S22 seam walk 10-22, F6)
-    const what = answersCardKey(selInfo) ? 'topic' : 'letter';
-    return open('this-letter', { check: true }) ? { start: 'this-letter', label: 'See this ' + what + '\u2019s scriptures' } : null;
+    // r-sel: "Its Scriptures", half the pair row; it reads for a letter and an Answers topic alike
+    return open('this-letter', { check: true }) ? { start: 'this-letter', label: 'Its Scriptures' } : null;
   }
   return null;
 }
@@ -116,77 +116,6 @@ function hlDisplayText(container, tcText, start, end) {
     off = nEnd;
   }
   return parts.join('') || tcText.slice(start, end);
-}
-
-/** Nearest scrollable ancestor of `node` — the reading screen's .screen-scroll
-    in practice, but derived structurally so picker screens and future layouts
-    work too. Returns null when nothing above the node actually scrolls.
-    @param {Node|null} node */
-function findScrollParent(node) {
-
-  let el = node && node.nodeType === 3 ? /** @type {Text} */ (node).parentElement : /** @type {Element|null} */ (node);
-  while (el && el !== document.body && el !== document.documentElement) {
-    if (el.scrollHeight > el.clientHeight + 1) {
-      const oy = getComputedStyle(el).overflowY;
-      if (oy === 'auto' || oy === 'scroll') return el;
-    }
-    el = el.parentElement;
-  }
-  return null;
-}
-
-
-/** Decide where the toolbar goes relative to the current selection. The
-    returned `y` is the toolbar's BOTTOM edge (the element renders with
-    translateY(-100%), hanging upward from pos.y); `scrollUp` is how many px
-    the reading container should scroll up (scrollTop -= scrollUp) BEFORE the
-    toolbar shows, sliding the selection down to make room.
-
-    Placement policy (the Android near-top fix):
-      1. Prefer ABOVE the selection with a two-line gap, so the selected text
-         and its native drag handles stay visible and grabbable.
-      2. No room under the top-nav? Auto-scroll the container up exactly the
-         deficit — the selection slides down and the toolbar still sits two
-         lines above it.
-      3. Container can't scroll that far (selection at the very top of the
-         document — nothing above to reveal)? Sit fully BELOW the selection
-         with the same two-line gap instead. Never on top of it.
-      4. Viewport-spanning selection (nothing fits anywhere): clamp under the
-         nav as before — the selection's end handle in the lower half of the
-         screen stays reachable.
-    rs1 (2026-10-22): BELOW comes before any scroll, and the gaps are what the
-    handles need. Android's handles hang below their lines, so above the first
-    line a little air will do; below, the toolbar clears the end handle under
-    the last line by one line. With the old two-line gaps the toolbar (about
-    300 px with its Listen and Scripture Web rows) fit on neither side of a
-    long-press in the middle of an S22's screen, and the assist moved the page
-    69 to 149 px under every such press.
-    @param {{ selTop: number, selBottom: number, toolbarH: number,
-              navBottom: number, viewportH: number, lineH: number,
-              maxScrollUp: number }} a
-    @returns {{ y: number, scrollUp: number }} */
-export function computeToolbarPlacement({ selTop, selBottom, toolbarH, navBottom, viewportH, lineH, maxScrollUp }) {
-  const margin = 8;
-  const gapAbove = Math.min(Math.max(lineH / 2, 12), 40);
-  const gapBelow = Math.min(Math.max(lineH, 32), 80);
-  const minY = navBottom + margin + toolbarH; // lowest y whose toolbar TOP still clears the nav
-  const above = selTop - gapAbove;
-  if (above >= minY) return { y: above, scrollUp: 0 };
-  const below = selBottom + gapBelow + toolbarH;
-  if (below <= viewportH - margin) return { y: below, scrollUp: 0 };
-  const deficit = minY - above;
-  // ASSIST-SCROLL GUARD (2026-07-29). The assist exists for a selection sitting
-  // JUST under the nav: scroll up a little, and the toolbar fits above it. It
-  // must never fire for a selection whose START is already off-screen above —
-  // there is no "room above" to reveal, and the scroll would be enormous.
-  // Measured before this guard: extending a selection down past the viewport
-  // (now easy, with real scrolling + edge auto-scroll) left selTop ~-1900, so
-  // the release yanked the reader back ~2000px. The selection must also still
-  // be the thing on screen: cap the assist at one toolbar-plus-gap of travel,
-  // and (rs1) never push its end, where the finger let go, off the screen.
-  const assistable = selTop >= navBottom && deficit <= toolbarH + gapAbove && selBottom + deficit <= viewportH - margin;
-  if (assistable && deficit <= maxScrollUp) return { y: minY, scrollUp: deficit };
-  return { y: minY, scrollUp: 0 };
 }
 
 /** Two ranges over the same boundary points.
@@ -220,7 +149,7 @@ function ShareLinkChoice({ onApp, onSite, onCancel }) {
     <div className="sel-toolbar-row sel-link-choice" role="group" aria-label="Share with which link">
       <button type="button" className="sel-link-choice-btn" onClick={onApp}>App link</button>
       <button type="button" className="sel-link-choice-btn" onClick={onSite}>Website link</button>
-      <button type="button" className="sel-link-choice-cancel" onClick={onCancel} aria-label="Cancel">✕</button>
+      <button type="button" className="sel-link-choice-cancel" onClick={onCancel} aria-label="Cancel">Cancel</button>
     </div>
   );
 }
@@ -269,7 +198,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
   // can arrive AFTER the raise (a long-press dispatches contextmenu before the
   // queued selectionchange): that is not the selection changing.
   const shownRangeRef = React.useRef(/** @type {Range | null} */ (null));
-  const [pos, setPos] = React.useState({ x: 0, y: 0 });
   const [selInfo, setSelInfo] = React.useState(null); // { hlKey, start, end, text, copyText, existingHl, multiVerse, listen }
   const [activeStyle, setActiveStyle] = React.useState('highlight'); // 'highlight' | 'underline'
   // Confirm-strip mode for the ✕ remove button. Resets whenever the
@@ -406,129 +334,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     return () => { window.__hideSelectionToolbar = null; };
   }, []);
 
-  // Authoritative placement pass. computeAndShow seeds pos from an ESTIMATE
-  // (the toolbar hasn't rendered yet, so its real size is unknown); this
-  // layout effect re-derives the final placement BEFORE PAINT once the
-  // rendered width/height are measurable:
-  //   x — clamp so no part runs off either edge (the old bug was a selection
-  //       near the right margin leaving the far buttons untappable);
-  //   y — computeToolbarPlacement (see its docstring): above-with-gap,
-  //       else auto-scroll the reading container up to make room, else flip
-  //       fully below. Replaces the old blind Math.max(p.y, navBottom+h)
-  //       clamp, which shoved a near-top toolbar DOWN ONTO the selection —
-  //       covering the text and the native drag handles (owner-reported on
-  //       Android). The scroll (scrollTop -= scrollUp) is synchronous here,
-  //       so content and toolbar land together in one frame.
-  // SCROLL-FOLLOW (2026-07-29): extracted from the layout effect so the SAME
-  // placement math runs both on commit AND on every scroll frame while the
-  // toolbar is up. `allowAssistScroll` is the one difference: the initial
-  // placement may scroll the container up to make room (the near-top assist),
-  // but a scroll-driven re-place must NEVER move the container — that would
-  // fight the user's own finger.
-  const placeFromSelection = React.useCallback((allowAssistScroll) => {
-    const el = toolbarRef.current;
-    if (!el) return;
-    const w = el.offsetWidth;
-    const h = el.offsetHeight;
-    if (!w || !h) return; // jsdom / not yet laid out — nothing to place against
-    const margin = 8;
-    const maxLeft = Math.max(margin, window.innerWidth - w - margin);
-    const navEl = document.querySelector('.top-nav');
-    const navBottom = navEl ? navEl.getBoundingClientRect().bottom : 60;
-    let placed = null;
-    let selX = null;
-    try {
-      const sel = window.getSelection();
-      if (sel && !sel.isCollapsed && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        if (rect && (rect.width > 0 || rect.height > 0)) {
-          const container = findHlContainer(range.startContainer);
-          let lineH = 28;
-          if (container) {
-            const lh = parseFloat(getComputedStyle(container).lineHeight);
-            if (lh > 0 && isFinite(lh)) lineH = lh;
-          }
-          const scroller = findScrollParent(container || range.startContainer);
-          placed = computeToolbarPlacement({
-            selTop: rect.top,
-            selBottom: rect.bottom,
-            toolbarH: h,
-            navBottom,
-            viewportH: dockTop(),
-            lineH,
-            maxScrollUp: allowAssistScroll && scroller ? scroller.scrollTop : 0,
-          });
-          if (allowAssistScroll && placed.scrollUp > 0 && scroller) scroller.scrollTop -= placed.scrollUp;
-          // Track the selection horizontally too, so a scroll-follow re-place
-          // stays centred on the (possibly re-wrapped) selection.
-          selX = rect.left + rect.width / 2 - w / 2;
-        }
-      }
-    } catch (_e) { /* selection gone mid-frame — fall through to the plain clamp */ }
-    setPos((p) => {
-      const baseX = selX == null ? p.x : selX;
-      const x = Math.min(Math.max(margin, baseX), maxLeft);
-      // No live rect (selection cleared between commit and effect): keep the
-      // old defensive clamp so the toolbar at least never overlaps the nav.
-      const y = placed ? placed.y : Math.max(p.y, navBottom + h + margin);
-      return (x === p.x && y === p.y) ? p : { x, y };
-    });
-  }, [findHlContainer]);
-
-  React.useLayoutEffect(() => {
-    if (!visible) return;
-    placeFromSelection(true);
-  }, [visible, selInfo, placeFromSelection]);
-
-  // ── Scroll-follow + edge auto-scroll (2026-07-29, owner-reported) ────────
-  // The owner: "once you open highlight it locks scroll ... it'd be better if
-  // you could just scroll normally." VERIFIED ON-DEVICE (vot_api34, CDP): the
-  // native selection layer does NOT block scrolling — an identical synthetic
-  // drag scrolled 192px both with and without a live selection, and the
-  // selection survived. So P1-15's premise ("the page can't scroll") was
-  // wrong. What actually made scrolling feel broken:
-  //   (a) the toolbar was placed ONCE and never moved — measured: content
-  //       scrolled 200px, toolbar moved 0px. A stranded 196px-tall pane
-  //       hovering over unrelated text reads as "the page is stuck", and it
-  //       covers the very lines you were trying to reach (a drag started on
-  //       the pane hits the pane, not the scroller);
-  //   (b) extending a selection PAST the viewport had no natural gesture, so
-  //       ▲/▼ nudge buttons were added instead.
-  // Fixes: the toolbar now re-places from the live selection rect on every
-  // scroll frame (rAF-coalesced), and dragging a selection handle into the
-  // top/bottom edge band auto-scrolls the container — the standard e-reader
-  // gesture. The ▲/▼ row is retired.
-  React.useEffect(() => {
-    if (!visible) return undefined;
-    const sel = window.getSelection();
-    let scroller = null;
-    try {
-      if (sel && sel.rangeCount > 0) {
-        const r = sel.getRangeAt(0);
-        scroller = findScrollParent(findHlContainer(r.startContainer) || r.startContainer);
-      }
-    } catch (_e) { /* selection gone — nothing to follow */ }
-    if (!scroller) return undefined;
-
-    let rafId = 0;
-    const onScroll = () => {
-      if (rafId) return;                       // coalesce to one re-place per frame
-      rafId = requestAnimationFrame(() => {
-        rafId = 0;
-        const s = window.getSelection();
-        if (!s || s.isCollapsed || s.rangeCount === 0) return;
-        placeFromSelection(false);             // never move the container here
-      });
-    };
-    scroller.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll, { passive: true });
-    return () => {
-      if (rafId) cancelAnimationFrame(rafId);
-      scroller.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, [visible, selInfo, placeFromSelection, findHlContainer]);
 
   // EDGE AUTO-SCROLL and the drag guard (rs1, 2026-10-22): selection-drag.js keeps a dragged end in the
   // reading column and scrolls the column gently while an end is held at its edge. It replaces an effect
@@ -665,17 +470,6 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         const repeat = listen ? repeatTarget([hlKey]) : null;
         setSelInfo({ hlKey, start, end, text, copyText: selCopyText, shareText: selShareText, share: selShare, existingHl: existing || null, multiVerse: false, listen, repeat });
       }
-      const rect = live.getBoundingClientRect();
-      const toolbarW = 320;
-      let x = rect.left + rect.width / 2 - toolbarW / 2;
-      x = Math.max(8, Math.min(x, window.innerWidth - toolbarW - 8));
-      // Estimate only — the placement layout effect derives the real position
-      // (incl. the near-top scroll-assist / below-flip) before paint, once the
-      // toolbar's true height is measurable. The old `y = rect.bottom + 10`
-      // near-top flip was wrong: with translateY(-100%) that put the toolbar's
-      // BOTTOM just under the selection, i.e. its body on top of the text.
-      const y = rect.top - 10;
-      setPos({ x, y });
       shownRangeRef.current = live.cloneRange();
       setAdjusting(false);
       setVisible(true);
@@ -1467,13 +1261,26 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
     return HighlightStore.get(c.dataset.hlKey).length > 0;
   });
 
+  // r-sel (the UI pass, mock v2 readers): one bottom sheet docked at the foot of the screen, so it never
+  // has to be placed against the words or move the page to make room. Style switch, ten colours in a row,
+  // six worded tiles, then Listen from here and the Scriptures door side by side.
+  const styleBtn = (id, label, word) => (
+    <button
+      type="button"
+      className={'ui-seg-item sel-style-btn' + (id === 'highlight' ? '' : ' sel-style-btn-' + id) + (activeStyle === id ? ' active' : '')}
+      onClick={() => setActiveStyle(id)}
+      title={label}
+      aria-label={label}
+      aria-pressed={activeStyle === id}
+    >{word}</button>
+  );
+  const hasPair = selInfo.listen || webDoor || cardKey || selInfo.existingHl || mvHasExisting;
   return (
     <div
       ref={toolbarRef}
-      className={'sel-toolbar' + (adjusting ? ' is-adjusting' : '')}
+      className={'sel-toolbar rd-sheet' + (adjusting ? ' is-adjusting' : '')}
       role="toolbar"
       aria-label="Text selection actions"
-      style={{ left: pos.x, top: pos.y, transform: 'translateY(-100%)' }}
       onPointerDown={(e) => {
         e.stopPropagation();
         suppressRef.current = true;
@@ -1493,11 +1300,8 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         document.addEventListener('pointercancel', end, true);
       }}
     >
-      {/* While confirming a remove, the whole toolbar collapses to the
-          ConfirmStrip so the user is focused on the single decision (and
-          can't accidentally tap an unrelated action). Cancel returns to
-          the normal toolbar; Yes calls removeHighlight which also hides
-          the toolbar. */}
+      {/* While confirming a remove, the whole sheet collapses to the
+          ConfirmStrip so the user is focused on the single decision. */}
       {confirmingRemove ? (
         <ConfirmStrip
           question={[removeNoteCount > 0
@@ -1511,43 +1315,17 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
         />
       ) : (
       <>
-      {/* Top row: style toggle + colors. Every control carries an accessible
-          name (P1-11a): the style buttons' visible glyph is a bare "A" in
-          three flavors, so the NAME comes from aria-label, with aria-pressed
-          tracking the active style; swatches announce their color. */}
+      {/* Every control carries an accessible name (P1-11a); aria-pressed tracks the
+          active style and the current colour; swatches announce "<colour> <style>". */}
       {showColors && (
-        <div className="sel-toolbar-row sel-toolbar-styles">
-          <button
-            type="button"
-            className={"sel-style-btn" + (activeStyle === 'highlight' ? ' active' : '')}
-            onClick={() => setActiveStyle('highlight')}
-            title="Highlight"
-            aria-label="Highlight"
-            aria-pressed={activeStyle === 'highlight'}
-          ><span className="sel-style-glyph">A</span><span className="sel-style-name">Highlight</span></button>
-          <button
-            type="button"
-            className={"sel-style-btn sel-style-btn-underline" + (activeStyle === 'underline' ? ' active' : '')}
-            onClick={() => setActiveStyle('underline')}
-            title="Underline"
-            aria-label="Underline"
-            aria-pressed={activeStyle === 'underline'}
-          ><span className="sel-style-glyph">A</span><span className="sel-style-name">Underline</span></button>
-          <button
-            type="button"
-            className={"sel-style-btn sel-style-btn-squiggle" + (activeStyle === 'squiggle' ? ' active' : '')}
-            onClick={() => setActiveStyle('squiggle')}
-            title="Squiggle underline"
-            aria-label="Squiggle underline"
-            aria-pressed={activeStyle === 'squiggle'}
-          ><span className="sel-style-glyph">A</span><span className="sel-style-name">Squiggle</span></button>
-          <div className="sel-toolbar-divider" />
-          <div className="sel-toolbar-colors">
+        <>
+          <div className="ui-seg rd-seg sel-toolbar-styles" role="group" aria-label="Style">
+            {styleBtn('highlight', 'Highlight', 'Highlighter')}
+            {styleBtn('underline', 'Underline', 'Underline')}
+            {styleBtn('squiggle', 'Squiggle underline', 'Squiggle')}
+          </div>
+          <div className="rd-colors sel-toolbar-colors">
             {HL_COLORS.map(c => {
-              // "Current color" = the existing annotation over this exact
-              // selection already uses this swatch in the active style — the
-              // same condition that paints the .active ring, now also exposed
-              // as aria-pressed so the state is announced, not just shown.
               const isCurrent = !!(selInfo.existingHl && selInfo.existingHl.color === c
                 && (selInfo.existingHl.kind || 'highlight') === activeStyle);
               return (
@@ -1563,80 +1341,22 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
                 />
               );
             })}
-            {(selInfo.existingHl || mvHasExisting) && (
-              <button
-                type="button"
-                className="sel-color-btn sel-color-clear"
-                onClick={() => {
-                  let n = 0;
-                  selectionGroups().forEach((gid) => { if (typeof NoteStore !== 'undefined' && NoteStore.get(gid)) n += 1; });
-                  setRemoveNoteCount(n);
-                  setConfirmingRemove(true);
-                }}
-                title="Remove highlight"
-                aria-label="Remove highlight"
-              >
-                ✕
-              </button>
-            )}
           </div>
-        </div>
-      )}
-      {/* Listen from here: its own row between the colours and the actions
-          (the Codex mockup pick, r1 option 2), only on text with a recording. */}
-      {selInfo.listen && (
-        <div className="sel-toolbar-row sel-toolbar-listen">
-          <button type="button" className="sel-listen-btn" onClick={handleListen}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" /></svg>
-            <span>Listen from here</span>
-          </button>
-          {selInfo.repeat && (
-            <button type="button" className="sel-repeat-btn" onClick={handleRepeat} aria-label={'Repeat this passage ' + REPEAT_TIMES + ' times'}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M17 2.5l3 3-3 3M4 11.5v-1a5 5 0 015-5h11M7 21.5l-3-3 3-3M20 12.5v1a5 5 0 01-5 5H4" />
-              </svg>
-              <span>Repeat</span>
-            </button>
-          )}
-        </div>
+        </>
       )}
       {choosingLink && canChooseLink && (
         <ShareLinkChoice onApp={() => handleShare('app')} onSite={() => handleShare('site')} onCancel={() => setChoosingLink(false)} />
       )}
-      {/* Action buttons: note only for single-container; link + copy/share/search always */}
-      <div className="sel-toolbar-row sel-toolbar-actions">
-        {/* Note works for multi-verse / multi-paragraph selections too — the
-            handleNote multiVerse branch spans every [data-hl-key] container in
-            the range, so a whole chapter or letter can become a single note.
-            (Previously gated behind !mv, which made Note vanish the moment a
-            selection crossed a paragraph break or verse boundary.) */}
-        <button className="sel-action-btn" onClick={handleNote} title="Note" aria-haspopup="dialog">
-          <svg viewBox="0 0 24 24">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-            <polyline points="14 2 14 8 20 8" />
-            <line x1="8" y1="13" x2="16" y2="13" />
-            <line x1="8" y1="17" x2="16" y2="17" />
-          </svg>
-          <span>Note</span>
-        </button>
+      {/* Note works for multi-verse / multi-paragraph selections too (handleNote's multiVerse branch). */}
+      <div className="rd-tiles sel-toolbar-actions">
+        <button className="rd-tile sel-action-btn" onClick={handleNote} title="Note" aria-haspopup="dialog"><UiIcon name="note" /><span>Note</span></button>
         {showColors && (
-          <button className="sel-action-btn" onClick={handleLink} title="Link" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24">
-              <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-              <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-            </svg>
-            <span>Link</span>
-          </button>
+          <button className="rd-tile sel-action-btn" onClick={handleLink} title="Link" aria-haspopup="dialog"><UiIcon name="link" /><span>Link</span></button>
         )}
-        <button className="sel-action-btn" onClick={copyText} title="Copy">
-          <svg viewBox="0 0 24 24">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-          </svg>
-          <span>Copy</span>
-        </button>
+        <button className="rd-tile sel-action-btn" onClick={handleBookmark} title="Bookmark" aria-haspopup="dialog"><UiIcon name="mark" /><span>Bookmark</span></button>
+        <button className="rd-tile sel-action-btn" onClick={copyText} title="Copy"><UiIcon name="copy" /><span>Copy</span></button>
         <button
-          className="sel-action-btn"
+          className="rd-tile sel-action-btn"
           onClick={onShareTap}
           onPointerDown={onSharePress}
           onPointerUp={onShareRelease}
@@ -1644,52 +1364,39 @@ export function SelectionToolbar({ onLinkRequest, onNoteRequest, onBookmarkReque
           onPointerCancel={onShareRelease}
           onContextMenu={onShareMenu}
           title={canChooseLink ? 'Share (hold or right-click to choose the link)' : 'Share'}
-        >
-          <svg viewBox="0 0 24 24">
-            <circle cx="18" cy="5" r="3" />
-            <circle cx="6" cy="12" r="3" />
-            <circle cx="18" cy="19" r="3" />
-            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
-            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
-          </svg>
-          <span>Share</span>
-        </button>
-        <button className="sel-action-btn" onClick={handleSearch} title="Search">
-          <svg viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" />
-            <line x1="21" y1="21" x2="16.65" y2="16.65" />
-          </svg>
-          <span>Search</span>
-        </button>
-        <button className="sel-action-btn" onClick={handleBookmark} title="Bookmark" aria-haspopup="dialog">
-          <svg viewBox="0 0 24 24">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
-          </svg>
-          <span>Bookmark</span>
-        </button>
+        ><UiIcon name="share" /><span>Share</span></button>
+        <button className="rd-tile sel-action-btn" onClick={handleSearch} title="Search"><UiIcon name="search" /><span>Search</span></button>
       </div>
-      {/* The Scripture Web's door: its own full-width row under the six actions, outlined like
-          Listen from here (as a seventh action the grid of three laid out 3/3/1, review of
-          2026-10-18). The icon is the web itself: two threads crossing over the canon's line. */}
-      {webDoor && (
-        <div className="sel-toolbar-row sel-toolbar-web">
-          <button type="button" className="sel-web-btn" data-door="web" onClick={handleWeb}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-              <path d="M2 17.5h20M3 17.5a6 11 0 0 1 12 0M9 17.5a6 9 0 0 1 12 0" />
-            </svg>
-            <span>{webDoor.label}</span>
-          </button>
-        </div>
-      )}
-      {/* AOGCG O6: a passage of an Answers topic as a typographic card, in the same outlined full-width row. */}
-      {cardKey && (
-        <div className="sel-toolbar-row sel-toolbar-web">
-          <button type="button" className="sel-web-btn" data-door="card" aria-haspopup="dialog" onClick={handleCard}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 4v11M8 8l4-4 4 4M5 13v6h14v-6" />
-            </svg>
-            <span>Share as a card</span>
-          </button>
+      {/* The pair row: Listen from here (only on text with a recording) and its Repeat, the
+          Scripture Web's door, an Answers card, and Remove when the words already carry a mark. */}
+      {hasPair && (
+        <div className="rd-pair">
+          {selInfo.listen && (
+            <button type="button" className="rd-pair-btn sel-listen-btn" onClick={handleListen}><UiIcon name="play" filled /><span>Listen from here</span></button>
+          )}
+          {selInfo.listen && selInfo.repeat && (
+            <button type="button" className="rd-pair-btn sel-repeat-btn" onClick={handleRepeat} aria-label={'Repeat this passage ' + REPEAT_TIMES + ' times'}><UiIcon name="repeat" /><span>Repeat</span></button>
+          )}
+          {webDoor && (
+            <button type="button" className="rd-pair-btn sel-web-btn" data-door="web" onClick={handleWeb}><UiIcon name="web" /><span>{webDoor.label}</span></button>
+          )}
+          {cardKey && (
+            <button type="button" className="rd-pair-btn sel-web-btn" data-door="card" aria-haspopup="dialog" onClick={handleCard}><UiIcon name="share" /><span>Share as a card</span></button>
+          )}
+          {(selInfo.existingHl || mvHasExisting) && (
+            <button
+              type="button"
+              className="rd-pair-btn is-danger sel-color-clear"
+              onClick={() => {
+                let n = 0;
+                selectionGroups().forEach((gid) => { if (typeof NoteStore !== 'undefined' && NoteStore.get(gid)) n += 1; });
+                setRemoveNoteCount(n);
+                setConfirmingRemove(true);
+              }}
+              title="Remove highlight"
+              aria-label="Remove highlight"
+            ><UiIcon name="trash" /><span>Remove</span></button>
+          )}
         </div>
       )}
       </>

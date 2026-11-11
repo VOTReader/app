@@ -194,8 +194,7 @@ describe('NoteSheet honest-Save close semantics (2026-07-12)', () => {
     setupStores({ body: 'original words' });
     const onClose = vi.fn();
     const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={onClose} />);
-    fireEvent.click(container.querySelector('.note-sheet-menu-btn'));
-    fireEvent.click(screen.getByText('Edit note'));
+    fireEvent.click(screen.getByText('Edit'));
     fireEvent.change(container.querySelector('.note-sheet-textarea'), { target: { value: 'changed words' } });
     fireEvent.click(screen.getByText('Save'));
     expect(window.NoteStore.update).toHaveBeenCalledWith('g1', { body: 'changed words' });
@@ -210,8 +209,7 @@ describe('NoteSheet honest-Save close semantics (2026-07-12)', () => {
       <NoteSheet groupId="g1" startInEditMode={false} onClose={onClose} />
     );
     // Enter edit via ⋯ → Edit note
-    fireEvent.click(container.querySelector('.note-sheet-menu-btn'));
-    fireEvent.click(screen.getByText('Edit note'));
+    fireEvent.click(screen.getByText('Edit'));
     fireEvent.change(container.querySelector('.note-sheet-textarea'), { target: { value: 'changed words' } });
     fireEvent.click(screen.getByText('Cancel'));
     const confirm = container.querySelector('.note-sheet-discard-confirm');
@@ -249,9 +247,8 @@ describe('NoteSheet Share outcome (A15)', () => {
   }
   async function shareFromMenu() {
     setupStores({ body: 'Saved note' });
-    const { container } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
-    fireEvent.click(/** @type {Element} */ (container.querySelector('.note-sheet-menu-btn')));
-    fireEvent.click(screen.getByText('Share'));
+    render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+        fireEvent.click(screen.getByText('Share'));
     await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
   }
 
@@ -281,9 +278,8 @@ describe('NoteSheet Share outcome (A15)', () => {
     for (const key of ['bible:john:3:16', 'journal:abc:0']) {
       setupStores({ body: 'Saved note' });
       window.AnnotationStore.getByGroup = () => [{ key, ann: { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'anchor' } }];
-      const { container, unmount } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
-      fireEvent.click(/** @type {Element} */ (container.querySelector('.note-sheet-menu-btn')));
-      fireEvent.click(screen.getByText('Share'));
+      const { unmount } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+            fireEvent.click(screen.getByText('Share'));
       await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
       unmount();
     }
@@ -309,9 +305,8 @@ describe('NoteSheet Share outcome (A15)', () => {
         g.StateStore = { get: () => ({ settings }) };
         setupStores({ body: 'Saved note' });
         window.AnnotationStore.getByGroup = () => [{ key: 'letter:the-wide-path:1', ann: { id: 'g1', groupId: 'g1', kind: 'highlight', color: 'yellow', text: 'anchor' } }];
-        const { container, unmount } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
-        fireEvent.click(/** @type {Element} */ (container.querySelector('.note-sheet-menu-btn')));
-        fireEvent.click(screen.getByText('Share'));
+        const { unmount } = render(<NoteSheet groupId="g1" startInEditMode={false} onClose={() => {}} />);
+                fireEvent.click(screen.getByText('Share'));
         await act(async () => { for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0)); });
         unmount();
       }
@@ -359,9 +354,8 @@ describe('NoteSheet edit-mode style and colour buttons', () => {
 /* ds5 A06.1 (idea sweep 2026-10-22): Delete note removes the note's mark too, and the confirm said
    only 'Delete this note?'. It now names the mark, as the toolbar's remove confirm does. */
 describe('NoteSheet delete confirm names the mark that goes with the note (ds5 A06.1)', () => {
-  const openDelete = (container) => {
-    fireEvent.click(container.querySelector('.note-sheet-menu-btn'));
-    fireEvent.click(screen.getByText('Delete note'));
+  const openDelete = (_container) => {
+        fireEvent.click(screen.getByText('Delete'));
   };
 
   it('a coloured highlight: "Delete this note and its highlight?"', () => {

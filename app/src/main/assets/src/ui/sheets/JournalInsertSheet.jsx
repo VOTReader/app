@@ -3,6 +3,8 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { openJournalLinkPicker } from '../../utils/journal-link-picker.js';
 
 /** The note picker lists the newest this many (a long list is slow to draw). */
 var NOTE_PICKER_CAP = 200;
@@ -41,91 +43,8 @@ export function JournalInsertSheet(props) {
   function insertBodyText() { emitBlock(JournalHelpers.newBlock('p', { text: '' })); }
 
   // ── Card / Excerpt via LinkPicker ────────────────────────
-  function openCardPicker() {
-    if (typeof window.__openLinkPickerForTarget !== 'function') {
-      console.warn('LinkPicker bridge unavailable');
-      return;
-    }
-    close();
-    window.__openLinkPickerForTarget('card', function(target, item) {
-      try {
-        var block = targetToJournalBlock(target, item, false);
-        if (block && onInsertBlock) onInsertBlock(block);
-      } catch (e) { console.warn('Insert card failed', e); }
-    });
-  }
-  function openExcerptPicker() {
-    if (typeof window.__openLinkPickerForTarget !== 'function') {
-      console.warn('LinkPicker bridge unavailable');
-      return;
-    }
-    close();
-    window.__openLinkPickerForTarget('excerpt', function(target, item) {
-      try {
-        var block = targetToJournalBlock(target, item, true);
-        if (block && onInsertBlock) onInsertBlock(block);
-      } catch (e) { console.warn('Insert excerpt failed', e); }
-    });
-  }
-
-  function targetToJournalBlock(target, item, asExcerpt) {
-    if (!target) return null;
-    var t = target.type;
-    if (t === 'bible' || t === 'study') {
-      var hasText = !!(target.text && target.text.length);
-      var hasVerse = target.verse != null;
-      if (asExcerpt && hasText) {
-        var ref = target.label || ((target.bookId || '') + ' ' + (target.chapter || '')
-          + (hasVerse ? (':' + target.verse + (target.verseEnd ? '-' + target.verseEnd : '')) : ''));
-        return JournalHelpers.newBlock('verse-block', {
-          ref: ref,
-          text: target.text,
-          partial: !!target.partial,
-          bookId: target.bookId,
-          chapter: target.chapter,
-          verse: target.verse || null,
-          verseEnd: target.verseEnd || null,
-          isStudy: t === 'study'
-        });
-      }
-      if (target.bookId != null && target.chapter != null) {
-        return JournalHelpers.newBlock('chapter-card', {
-          bookId: target.bookId,
-          chapter: target.chapter,
-          isStudy: t === 'study'
-        });
-      }
-      return null;
-    }
-    if (t === 'letter' || t === 'wtlb' || t === 'blessed' || t === 'holy-days' || t === 'study-letter') {
-      var letterId = target.letterId || target.entryId || target.studyChapterId;
-      var volKey = target.volKey;
-      if (!volKey && target.collection && typeof COLLECTIONS !== 'undefined') {
-        for (var i = 0; i < COLLECTIONS.length; i++) {
-          if (COLLECTIONS[i].label === target.collection) { volKey = COLLECTIONS[i].volKey; break; }
-        }
-      }
-      if (!volKey && item && item.collection && typeof COLLECTIONS !== 'undefined') {
-        for (var j = 0; j < COLLECTIONS.length; j++) {
-          if (COLLECTIONS[j].label === item.collection) { volKey = COLLECTIONS[j].volKey; break; }
-        }
-      }
-      var extra = { volKey: volKey, letterId: letterId };
-      if (t === 'study-letter') {
-        extra.studyId = target.studyId;
-        extra.studyChapterId = target.studyChapterId || letterId;
-      }
-      if (asExcerpt && target.text) {
-        extra.excerpt = target.text;
-        extra.blockKey = target.blockKey || null;
-        extra.start = target.start != null ? target.start : null;
-        extra.end = target.end != null ? target.end : null;
-      }
-      if (!volKey || !letterId) return null;
-      return JournalHelpers.newBlock('letter-card', extra);
-    }
-    return null;
-  }
+  function openCardPicker() { if (window.__openLinkPickerForTarget) close(); openJournalLinkPicker('card', onInsertBlock); }
+  function openExcerptPicker() { if (window.__openLinkPickerForTarget) close(); openJournalLinkPicker('excerpt', onInsertBlock); }
 
   function pickBookmark() { setQuery(''); setMode('pick-bookmark'); }
   function pickNote() { setQuery(''); setMode('pick-note'); }
@@ -167,131 +86,42 @@ export function JournalInsertSheet(props) {
     else close();
   }
 
-  // ── Menu icons (SVG icons for visual polish) ──────────────
-  var ICONS = {
-    card: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <line x1="7" y1="10" x2="17" y2="10" />
-        <line x1="7" y1="14" x2="13" y2="14" />
-      </svg>
-    ),
-    excerpt: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 9h.01M6 15h.01" />
-        <line x1="10" y1="8" x2="20" y2="8" />
-        <line x1="10" y1="12" x2="20" y2="12" />
-        <line x1="10" y1="16" x2="16" y2="16" />
-        <path d="M3 4v16" />
-      </svg>
-    ),
-    bookmark: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M6 3a1 1 0 0 0-1 1v17l7-4 7 4V4a1 1 0 0 0-1-1H6z" />
-      </svg>
-    ),
-    note: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-        <polyline points="14 2 14 8 20 8" />
-        <line x1="8" y1="13" x2="16" y2="13" />
-        <line x1="8" y1="17" x2="14" y2="17" />
-      </svg>
-    ),
-    journal: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M19 4H8a3 3 0 0 0-3 3v13a3 3 0 0 1 3-3h11z" />
-        <line x1="9" y1="9" x2="16" y2="9" />
-        <line x1="9" y1="13" x2="16" y2="13" />
-      </svg>
-    ),
-    notebook: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
-        <polyline points="15 4 15 9 20 9" />
-        <line x1="8" y1="14" x2="15" y2="14" />
-      </svg>
-    ),
-    image: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="9" cy="9" r="1.6" />
-        <path d="M21 15l-5-5L5 21" />
-      </svg>
-    ),
-    audio: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <rect x="9" y="3" width="6" height="12" rx="3" />
-        <path d="M5 11a7 7 0 0 0 14 0" />
-        <line x1="12" y1="18" x2="12" y2="21" />
-        <line x1="9" y1="21" x2="15" y2="21" />
-      </svg>
-    ),
-    divider: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="6" cy="12" r="1.5" />
-        <circle cx="12" cy="12" r="1.5" />
-        <circle cx="18" cy="12" r="1.5" />
-      </svg>
-    ),
-    body: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="4" y1="7" x2="20" y2="7" />
-        <line x1="4" y1="12" x2="20" y2="12" />
-        <line x1="4" y1="17" x2="14" y2="17" />
-      </svg>
-    )
-  };
-
-  // `drill` items open a further picker (a chevron signals "choose next");
-  // the rest act immediately (insert a block / open the device UI).
-  function insertItem(icon, label, desc, onClick, drill) {
+  // mock v2 l-jins: ten tiles in four groups, all in one view (no scrolling).
+  function tile(icon, label, onClick) {
     return (
-      <button type="button" className={'jrn-insert-item' + (drill ? ' has-drill' : '')} onClick={onClick}>
-        <span className="jrn-insert-icon" aria-hidden="true">{icon}</span>
-        <span className="jrn-insert-text">
-          <span className="jrn-insert-label">{label}</span>
-          <span className="jrn-insert-desc">{desc}</span>
-        </span>
-        {drill && <span className="jrn-insert-chevron" aria-hidden="true">›</span>}
+      <button type="button" className="jrn-ins-tile" onClick={onClick}>
+        <UiIcon name={icon} size="sm" />
+        <span>{label}</span>
       </button>
     );
   }
 
   function renderMenu() {
     return (
-      <>
-        <div className="jrn-insert-section">
-          <h4>From the Library</h4>
-          <div className="jrn-insert-list">
-            {insertItem(ICONS.card,    'Card',    'Embed a chapter or letter title',         openCardPicker, true)}
-            {insertItem(ICONS.excerpt, 'Excerpt', 'Embed a portion — pick word-precise text', openExcerptPicker, true)}
-          </div>
+      <div className="jrn-ins-groups">
+        <div className="jrn-ins-label">From the library</div>
+        <div className="jrn-ins-tiles">
+          {tile('note', 'Letter or chapter', openCardPicker)}
+          {tile('quote', 'Excerpt', openExcerptPicker)}
         </div>
-        <div className="jrn-insert-section">
-          <h4>From Your Annotations</h4>
-          <div className="jrn-insert-list">
-            {insertItem(ICONS.bookmark, 'Bookmark',      'Pull in a saved passage',         pickBookmark, true)}
-            {insertItem(ICONS.note,     'Note',          'Reference one of your annotations', pickNote, true)}
-            {insertItem(ICONS.journal,  'Journal Entry', 'Link to another journal entry',   pickJournal, true)}
-            {insertItem(ICONS.notebook, 'Notebook',      'Link to a notebook of notes',     pickNotebook, true)}
-          </div>
+        <div className="jrn-ins-label">From your notes and marks</div>
+        <div className="jrn-ins-tiles">
+          {tile('mark', 'Bookmark', pickBookmark)}
+          {tile('pen', 'Note', pickNote)}
+          {tile('journal', 'Journal entry', pickJournal)}
+          {tile('list', 'Notebook', pickNotebook)}
         </div>
-        <div className="jrn-insert-section">
-          <h4>Capture</h4>
-          <div className="jrn-insert-list">
-            {insertItem(ICONS.image, 'Image',           'From device gallery',     pickImage)}
-            {insertItem(ICONS.audio, 'Voice Recording', 'Record a memo or prayer', pickAudio)}
-          </div>
+        <div className="jrn-ins-label">Capture</div>
+        <div className="jrn-ins-tiles">
+          {tile('img', 'Photo', pickImage)}
+          {tile('mic', 'Voice recording', pickAudio)}
         </div>
-        <div className="jrn-insert-section" style={{ paddingBottom: '20px' }}>
-          <h4>Text</h4>
-          <div className="jrn-insert-list">
-            {insertItem(ICONS.body, 'Body Text', 'A new line to write freely', insertBodyText)}
-            {insertItem(ICONS.divider, 'Divider', '3-diamond ornament', insertDivider)}
-          </div>
+        <div className="jrn-ins-label">Text</div>
+        <div className="jrn-ins-tiles">
+          {tile('plus', 'Paragraph', insertBodyText)}
+          {tile('minus', 'Divider', insertDivider)}
         </div>
-      </>
+      </div>
     );
   }
 
@@ -585,7 +415,7 @@ export function JournalInsertSheet(props) {
             <button className="note-sheet-menu-btn" onClick={back} aria-label="Back" style={{ fontSize: 'var(--fsc-18)' }}>‹</button>
           )}
           <span className="note-sheet-title" id="journal-insert-title" style={{ flex: 1 }}>{titleStr()}</span>
-          <button className="note-sheet-menu-btn" onClick={close} aria-label="Close" style={{ fontSize: 'var(--fsc-18)' }}>×</button>
+          <button type="button" className="note-sheet-menu-btn jrn-ins-close" onClick={close} aria-label="Close"><UiIcon name="x" /></button>
         </div>
         {body()}
       </div>

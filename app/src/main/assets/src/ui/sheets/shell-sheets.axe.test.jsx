@@ -100,10 +100,12 @@ describe('axe — NoteSheet', () => {
     noteStores('A thought');
     render(<NoteSheet groupId="g1" startInEditMode={false} onClose={noop} />);
     expectModal('Note');
-    const opts = screen.getByRole('button', { name: 'Options' });
-    expect(opts.getAttribute('aria-expanded')).toBe('false');
-    fireEvent.click(opts);
-    expect(opts.getAttribute('aria-expanded')).toBe('true');
+    // r-note-view (W2f): four worded buttons; the colour dot opens the colours in place.
+    const dot = screen.getByRole('button', { name: 'Change note color' });
+    expect(dot.getAttribute('aria-expanded')).toBe('false');
+    fireEvent.click(dot);
+    expect(dot.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 
@@ -133,16 +135,12 @@ describe('axe — MultiNotePopover', () => {
 
 describe('axe — AnnotationActionChip', () => {
   const chip = { x: 100, y: 100, hlKey: 'bible:genesis:1:1', groupId: 'g1' };
-  it('main row, then the colour and style panels', async () => {
+  it('the sheet: its words, the style switch, the colours and the four tiles (r-mark)', async () => {
     noteStores('');
     g.NoteStore.get = () => null;
     render(<AnnotationActionChip chip={chip} onClose={noop} onNoteRequest={noop} />);
     expectModal('highlight actions');
-    expect(await seriousViolations(document)).toEqual([]);
-    fireEvent.click(screen.getByText('Color'));
-    expect(await seriousViolations(document)).toEqual([]);
-    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
-    fireEvent.click(screen.getByText('Style'));
+    expect(screen.getByText('Add note')).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 
@@ -161,8 +159,8 @@ describe('axe — BookmarkCreateSheet', () => {
   it('create mode: a labelled field', async () => {
     render(<BookmarkCreateSheet pending={{ hlKey: 'bible:john:3:16', defaultLabel: 'John 3:16', sourceLabel: 'John 3', excerpt: 'For God so loved the world' }}
       onConfirm={noop} onCancel={noop} />);
-    expectModal('New Bookmark');
-    expect(screen.getByRole('textbox', { name: 'Label' })).toBeTruthy();
+    expectModal('New bookmark');
+    expect(screen.getByRole('textbox', { name: 'Bookmark name' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 
@@ -225,17 +223,19 @@ describe('axe — LinkPicker', () => {
   it('search view: empty, with recent picks, then with results', async () => {
     linkPickerGlobals({ recent: [{ kind: 'bible-chapter', category: 'Old Testament', label: 'Genesis 1' }] });
     render(<LinkPicker {...linkProps} />);
-    expectModal('Create a Link');
+    expectModal('Link to…');
     expect(screen.getByRole('textbox', { name: 'Search titles and references' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'John' } });
+    expect(await seriousViolations(document)).toEqual([]);
+    fireEvent.click(screen.getByRole('radio', { name: 'Inside the text' }));
     expect(await seriousViolations(document)).toEqual([]);
   });
 
   it('a link just made (the success strip), and the Full text scope', async () => {
     linkPickerGlobals();
     render(<LinkPicker {...linkProps} lastCreatedLink={{ id: 'lnk1', target: { label: 'Genesis 1:1' } }} />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Full text' }));
+    expect(screen.getByRole('button', { name: 'Link another' })).toBeTruthy();
     expect(await seriousViolations(document)).toEqual([]);
   });
 

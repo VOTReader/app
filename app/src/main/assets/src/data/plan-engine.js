@@ -10,9 +10,26 @@
      (`segs`), the reading weekdays, a planned finish (`target`) and its own
      dated ticks. Progress is the run's ticks only, so a plan run twice starts
      clean (rp1 counted anything ever read, so a rerun started done).
-   - TODAY is the first day not fully read. A missed day costs nothing: the
-     projected finish moves and is shown honestly. Catch me up moves the
-     target there; Spread it out re-cuts what is left to keep the target.
+   - TODAY is the first day not fully read. A day not read costs nothing:
+     the projected finish moves and the plan page says so once, quietly
+     ("4 days later than planned", lateDays). Keep my daily amount moves
+     the target there (catchUp); Finish on time re-cuts what is left to
+     keep the target (spreadOut). A paused plan, or one whose start date
+     is still ahead, is never late.
+   - plans2 (2026-11-10, the reading-plans redesign): a run may start on a
+     later date (`start` in the future: no portion until then); reads made
+     before the start can be credited (ticks with no date: they count
+     toward progress, never toward "done today" or days in a row);
+     schedule() lists every day, sections() the road (books or
+     collections), streak() the days in a row and this week.
+
+   The decisions the screens read, in one place:
+     - is day d done?            isDayDone(run, d)
+     - what is today's portion?  runStatus(run, now).day / .todayItems
+                                 (none while .notStarted or .finished)
+     - is the plan late?         runStatus(run, now).late (calendar days
+                                 later than planned; 0 while paused,
+                                 before the start, or finished)
    - Bible days are cut by chapter count (the classic one-year table: 365
      days reproduce rp1's biblePortion exactly), letter days by words, so
      "2 letters" is never 1 minute one day and 25 the next.
@@ -26,8 +43,9 @@
 export const WORDS_PER_MIN = 200;
 
 /**
- * @typedef {{ k: string, w: number, t?: string, s?: string }} PlanItem
- *   k '<bid>:<cid>' (the read-key tail), w its words, t/s a letter's title and collection short name
+ * @typedef {{ k: string, w: number, t?: string, s?: string, p?: 1 }} PlanItem
+ *   k '<bid>:<cid>' (the read-key tail), w its words, t/s a letter's title and collection short name, p 1 on a
+ *   collection's preface (plans2: counted apart, "29 letters and a preface"; older runs have no p)
  * @typedef {{ kind: string, by: 'count' | 'words', items: PlanItem[] }} PlanTrack
  * @typedef {{ day0: number, from: number[], to: number[], days: number }} PlanSeg
  * @typedef {{ mode: 'days' | 'minutes' | 'items' | 'by', n?: number, date?: string }} PlanPace
@@ -35,8 +53,11 @@ export const WORDS_PER_MIN = 200;
  *   status: 'running' | 'paused' | 'finished' | 'stopped', tracks: PlanTrack[], share?: 'side' | 'serial',
  *   weekdays: boolean[], segs: PlanSeg[], target: string, ticks: Record<string, string>,
  *   paused?: string, pauses?: string[][], pace?: PlanPace, finished?: string, from?: string, stopped?: string,
- *   known?: string, notes?: Record<string, string>, remind?: string, autoAudio?: boolean }} PlanRun
+ *   known?: string, notes?: Record<string, string>, remind?: string, autoAudio?: boolean, credited?: number,
+ *   seen?: boolean }} PlanRun
  *   autoAudio: false turns off the plan week's automatic download (dl-d5); absent is on
+ *   credited: how many reads from before the start were counted (plans2; their ticks carry no date)
+ *   seen: a finished run's finish page was opened or its Home row dismissed (plans2)
  */
 
 // ── dates ────────────────────────────────────────────────────────────────
@@ -191,14 +212,23 @@ export function itemsLabel(items, bookTitle) {
   return parts.join(' · ');
 }
 
-/** "2 chapters + 1 letter" for a set of items. @param {PlanItem[]} items */
+/** How many chapters, letters and prefaces a set of items holds (a preface is never a letter). @param {PlanItem[]} items */
+export function itemKinds(items) {
+  let chapters = 0, letters = 0, prefaces = 0;
+  for (const it of items) { if (!it.t) chapters++; else if (it.p) prefaces++; else letters++; }
+  return { chapters, letters, prefaces };
+}
+
+/** "1 chapter", "3 letters", "2 chapters + 1 letter", "29 letters and a preface". @param {PlanItem[]} items */
 export function itemsCount(items) {
-  let ch = 0, le = 0;
-  for (const it of items) { if (it.t) le++; else ch++; }
+  const { chapters: ch, letters: le, prefaces: pr } = itemKinds(items);
+  const fmt = (/** @type {number} */ n) => n.toLocaleString('en-US');
   const p = [];
-  if (ch) p.push(ch + (ch === 1 ? ' chapter' : ' chapters'));
-  if (le) p.push(le + (le === 1 ? ' letter' : ' letters'));
-  return p.join(' + ');
+  if (ch) p.push(fmt(ch) + (ch === 1 ? ' chapter' : ' chapters'));
+  if (le) p.push(fmt(le) + (le === 1 ? ' letter' : ' letters'));
+  let s = p.join(' + ');
+  if (pr) s += (s ? ' and ' : '') + (pr === 1 ? 'a preface' : fmt(pr) + ' prefaces');
+  return s;
 }
 
 /** Words in a set of items. @param {PlanItem[]} items */
@@ -209,12 +239,27 @@ export const minutesFor = (words) => Math.max(1, Math.round(words / WORDS_PER_MI
 
 // ── where a run stands ───────────────────────────────────────────────────
 
-/** Whether every item of day d is ticked. */
-function dayDone(run, d) {
+/**
+ * THE "is this day done" decision: every item of day d is ticked (a credited tick, read before the start, counts).
+ * @param {PlanRun} run @param {number} d
+ */
+export function isDayDone(run, d) {
   const items = dayItems(run, d);
   if (!items.length) return true;
   for (const it of items) if (!(it.k in (run.ticks || {}))) return false;
   return true;
+}
+const dayDone = isDayDone;
+
+/**
+ * The date day d was finished on: its latest dated tick. '' when it is done only by credited (undated) ticks, null
+ * when it is not done. @param {PlanRun} run @param {number} d @returns {string | null}
+ */
+export function dayDoneOn(run, d) {
+  if (!isDayDone(run, d)) return null;
+  let best = '';
+  for (const it of dayItems(run, d)) { const v = (run.ticks || {})[it.k]; if (v && v > best) best = v; }
+  return best;
 }
 
 /** Total days of the run. @param {PlanRun} run */
@@ -230,12 +275,16 @@ export function totalDays(run) {
  * @param {PlanRun} run @param {Date} now
  * @returns {{ total: number, day: number, finished: boolean, todayItems: PlanItem[], todayTicked: number,
  *   doneToday: boolean, doneDays: number, itemsDone: number, itemsTotal: number, projected: string, target: string,
- *   behind: number, ahead: number, paused: boolean, perDay: { items: number, words: number } }}
+ *   behind: number, ahead: number, late: number, paused: boolean, notStarted: boolean, percent: number,
+ *   perDay: { items: number, words: number } }}
+ *   day: the portion's day (the first day not fully read); todayItems its items. notStarted: the start date is
+ *   still ahead (no portion yet). late: calendar days the projected finish lies past the planned one (0 when
+ *   paused, not started or finished). behind / ahead: the same in reading days (older callers).
  */
 export function runStatus(run, now) {
   const total = totalDays(run);
   const ticks = run.ticks || {};
-  const today = dayNum(todayKey(now));
+  const today = /** @type {number} */ (dayNum(todayKey(now)));
   let day = total;
   for (let d = 0; d < total; d++) if (!dayDone(run, d)) { day = d; break; }
   let doneDays = 0;
@@ -249,17 +298,19 @@ export function runStatus(run, now) {
   let doneToday = false;
   if (day > 0) {
     const prev = dayItems(run, day - 1);
-    doneToday = prev.length > 0 && prev.some((it) => ticks[it.k] === dateOf(/** @type {number} */ (today)))
+    doneToday = prev.length > 0 && prev.some((it) => ticks[it.k] === dateOf(today))
       && todayTicked === 0;
   }
   const paused = run.status === 'paused' || !!run.paused;
+  const startN = dayNum(run.start);
+  const notStarted = !finished && startN != null && today < startN;
   const remaining = total - day;
-  const from = /** @type {number} */ (today) + (doneToday || paused ? 1 : 0);
+  const from = notStarted ? /** @type {number} */ (startN) : today + (doneToday || paused ? 1 : 0);
   const projectedN = finished ? from - 1 : nthReadingDay(run, from, remaining - 1);
   const targetN = dayNum(run.target);
-  let behind = 0, ahead = 0;
-  if (!finished && targetN != null) {
-    if (projectedN > targetN) behind = readingDaysBetween(run, targetN + 1, projectedN);
+  let behind = 0, ahead = 0, late = 0;
+  if (!finished && !paused && !notStarted && targetN != null) {
+    if (projectedN > targetN) { behind = readingDaysBetween(run, targetN + 1, projectedN); late = projectedN - targetN; }
     else if (projectedN < targetN) ahead = readingDaysBetween(run, projectedN + 1, targetN);
   }
   const nextDays = Math.max(1, remaining);
@@ -267,9 +318,125 @@ export function runStatus(run, now) {
   for (let d = day; d < total; d++) for (const it of dayItems(run, d)) { leftItems++; leftWords += Number(it.w) || 0; }
   return {
     total, day, finished, todayItems, todayTicked, doneToday, doneDays, itemsDone, itemsTotal,
-    projected: dateOf(projectedN), target: run.target, behind, ahead, paused,
+    projected: paused && !finished ? run.target : dateOf(projectedN), target: run.target, behind, ahead, late, paused, notStarted,
+    percent: finished ? 100 : itemsTotal ? Math.min(99, Math.round(itemsDone * 100 / itemsTotal)) : 0,
     perDay: { items: leftItems / nextDays, words: leftWords / nextDays },
   };
+}
+
+/** THE "is this plan late" decision, in calendar days later than planned (0 = on time, paused or not started). */
+export const lateDays = (/** @type {PlanRun} */ run, /** @type {Date} */ now) => runStatus(run, now).late;
+
+/** The first date day `from` (a portion not read yet) can be read on: the start, else today. */
+function firstOpenDate(run, st, today) {
+  const startN = dayNum(run.start);
+  const base = st.notStarted && startN != null ? startN : today + (st.doneToday ? 1 : 0);
+  return nthReadingDay(run, base, 0);
+}
+
+/**
+ * Every day of the run, for the whole schedule: its items, minutes, whether it is done and on what date, the date it
+ * is planned for (a day still to read: from the open date on, one reading day each), and the sections (books or
+ * collections) whose last item it holds. `name` is a section's name (sections()).
+ * @param {PlanRun} run @param {Date} now @param {(bid: string) => string} [bookTitle]
+ * @returns {{ day: number, items: PlanItem[], minutes: number, done: boolean, doneOn: string | null, credited: boolean,
+ *   date: string, today: boolean, ends: string[] }[]}
+ */
+export function schedule(run, now, bookTitle) {
+  const st = runStatus(run, now);
+  const today = /** @type {number} */ (dayNum(todayKey(now)));
+  const open = st.finished ? today : firstOpenDate(run, st, today);
+  const ends = new Map();
+  for (const s of sections(run, bookTitle || (() => ''))) {
+    if (s.lastDay < 0) continue;
+    if (!ends.has(s.lastDay)) ends.set(s.lastDay, []);
+    ends.get(s.lastDay).push(s.name);
+  }
+  const out = [];
+  const total = st.total;
+  let cursor = open;
+  for (let d = 0; d < total; d++) {
+    const items = dayItems(run, d);
+    const doneOn = dayDoneOn(run, d);
+    const done = doneOn != null;
+    let date = doneOn || '';
+    if (d >= st.day) {
+      // A day from the portion on (read ahead or not): planned one reading day each from the open date.
+      const n = nthReadingDay(run, cursor, 0);
+      date = dateOf(n);
+      cursor = n + 1;
+    }
+    out.push({
+      day: d, items, minutes: items.length ? minutesFor(itemsWords(items)) : 0, done, doneOn, credited: doneOn === '',
+      date, today: !st.finished && !st.notStarted && !st.paused && d === st.day && !st.doneToday, ends: ends.get(d) || [],
+    });
+  }
+  return out;
+}
+
+/**
+ * The road: the run's sections in reading order, a Bible book or a letter collection each (a mixed run lists both
+ * tracks', by the day each begins). count / done its items; firstDay / lastDay the days it starts and ends on.
+ * @param {PlanRun} run @param {(bid: string) => string} bookTitle
+ * @returns {{ key: string, name: string, track: number, count: number, done: number, firstDay: number, lastDay: number }[]}
+ */
+export function sections(run, bookTitle) {
+  const days = planDays(run);
+  /** @type {number[][]} */ const dayOf = run.tracks.map((tr) => new Array(tr.items.length).fill(-1));
+  days.forEach((day, d) => { for (const [t, a, b] of day.parts) for (let i = a; i < b; i++) dayOf[t][i] = d; });
+  const ticks = run.ticks || {};
+  /** @typedef {{ key: string, name: string, track: number, count: number, done: number, firstDay: number, lastDay: number }} Section */
+  /** @type {Section[]} */ const out = [];
+  run.tracks.forEach((tr, t) => {
+    /** @type {Section | null} */ let last = null;
+    tr.items.forEach((it, i) => {
+      const bid = it.k.slice(0, it.k.lastIndexOf(':'));
+      const key = it.t ? 'l:' + (it.s || bid) : 'b:' + bid;
+      /** @type {Section} */ let cur;
+      if (!last || last.key !== key) {
+        cur = { key, name: it.t ? (it.s || bid) : (bookTitle(bid) || bid), track: t, count: 0, done: 0, firstDay: -1, lastDay: -1 };
+        out.push(cur);
+        last = cur;
+      } else cur = last;
+      cur.count++;
+      if (it.k in ticks) cur.done++;
+      const d = dayOf[t][i];
+      if (d >= 0) { if (cur.firstDay < 0) cur.firstDay = d; cur.lastDay = Math.max(cur.lastDay, d); }
+    });
+  });
+  return out.map((s, i) => ({ s, i })).sort((a, b) => (a.s.firstDay - b.s.firstDay) || (a.s.track - b.s.track) || (a.i - b.i)).map((x) => x.s);
+}
+
+/**
+ * Days in a row and this week, from the dates days were finished on (credited days never count). A reading day with
+ * nothing finished ends the run of days, except today, which is still open; days the plan does not read on (its
+ * weekdays off, a pause) are passed over. Never a count of what was not read.
+ * @param {PlanRun} run @param {Date} now
+ * @returns {{ inRow: number, weekDone: number, weekDays: number, week: { date: string, n: number, done: boolean, today: boolean }[] }}
+ */
+export function streak(run, now) {
+  const done = new Set();
+  const total = totalDays(run);
+  for (let d = 0; d < total; d++) { const on = dayDoneOn(run, d); if (on) done.add(on); }
+  const today = /** @type {number} */ (dayNum(todayKey(now)));
+  const startN = dayNum(run.start) ?? today;
+  let inRow = 0;
+  for (let n = today, guard = 0; n >= startN && guard < 4000; n--, guard++) {
+    if (done.has(dateOf(n))) { inRow++; continue; }
+    if (n === today || !isReadingDay(run, n)) continue;
+    break;
+  }
+  const sunday = today - weekdayOf(today);
+  const week = [];
+  let weekDone = 0, weekDays = 0;
+  for (let n = sunday; n < sunday + 7; n++) {
+    const key = dateOf(n);
+    const isDone = done.has(key);
+    if (isDone) weekDone++;
+    if (n >= startN && isReadingDay({ ...run, paused: undefined }, n)) weekDays++;
+    week.push({ date: key, n: Number(key.slice(8)), done: isDone, today: n === today });
+  }
+  return { inRow, weekDone, weekDays: Math.max(weekDays, weekDone), week };
 }
 
 /**
@@ -338,13 +505,16 @@ function remainingFrom(run, d) {
 /**
  * A new run. `tracks` are frozen as given; side-by-side tracks share every day, serial ones are joined into one.
  * @param {{ plan: string, name?: string, tracks: PlanTrack[], share?: 'side' | 'serial', weekdays?: boolean[], pace: PlanPace,
- *   id?: string }} spec
+ *   id?: string, startOn?: string }} spec
+ *   startOn: a later start date ('YYYY-MM-DD'); today when absent, unreadable or past
  * @param {Date} now
  * @returns {PlanRun}
  */
 export function newRun(spec, now) {
-  const startKey = todayKey(now);
-  const startN = /** @type {number} */ (dayNum(startKey));
+  const todayN = /** @type {number} */ (dayNum(todayKey(now)));
+  const askedN = spec.startOn ? dayNum(spec.startOn) : null;
+  const startN = askedN != null && askedN > todayN ? askedN : todayN;
+  const startKey = dateOf(startN);
   let tracks = spec.tracks.filter((t) => t && Array.isArray(t.items) && t.items.length);
   if (spec.share === 'serial' && tracks.length > 1) {
     tracks = [{ kind: 'mixed', by: tracks.every((t) => t.by === 'count') ? 'count' : 'words', items: tracks.flatMap((t) => t.items) }];
@@ -379,7 +549,7 @@ function recut(run, days, now) {
 /** The first reading day the re-cut schedule starts on. */
 function recutStart(run, now) {
   const st = runStatus(run, now);
-  const t = /** @type {number} */ (dayNum(todayKey(now))) + (st.doneToday ? 1 : 0);
+  const t = st.notStarted ? /** @type {number} */ (dayNum(run.start)) : /** @type {number} */ (dayNum(todayKey(now))) + (st.doneToday ? 1 : 0);
   return isReadingDay({ ...run, paused: undefined }, t) ? t : nthReadingDay(run, t, 0);
 }
 
@@ -405,22 +575,74 @@ export function spreadPreview(run, now) {
   return { items: st.perDay.items, words: st.perDay.words, minutes: minutesFor(st.perDay.words), days: st.total - st.day };
 }
 
-/** A new pace or length for what is left; the target follows. @param {PlanRun} run @param {PlanPace} pace @param {Date} now */
-export function changePace(run, pace, now) {
+/**
+ * A new pace or length for what is left; the target follows. A length in days is the whole plan's ("90 days" means
+ * 90: the days already read count toward it, plans2), never less than one day still to go.
+ * @param {PlanRun} run @param {PlanPace} pace @param {Date} now @param {number} [keepDays] re-cut over exactly this many days
+ */
+export function changePace(run, pace, now, keepDays) {
   const st = runStatus(run, now);
   if (st.finished) return run;
   const startN = recutStart(run, now);
   const left = [];
   for (let d = st.day; d < st.total; d++) left.push(...dayItems(run, d));
-  const days = daysForPace(run, pace, startN, left);
+  const days = keepDays != null ? Math.max(1, keepDays)
+    : pace.mode === 'days' ? Math.max(1, Math.floor(Number(pace.n) || 1) - st.day) : daysForPace(run, pace, startN, left);
   const next = recut({ ...run, pace }, days, now);
   return { ...next, target: dateOf(nthReadingDay(next, startN, days - 1)) };
 }
 
-/** New reading weekdays; the schedule from today follows. */
+/** New reading weekdays; the days left stay as many (a finish-by date is kept instead), so the finish follows. */
 export function changeWeekdays(run, weekdays, now) {
   const next = { ...run, weekdays: weekdays.map(Boolean), updated: now.getTime() };
-  return run.pace ? changePace(next, run.pace.mode === 'by' ? run.pace : { mode: 'days', n: totalDays(run) - runStatus(run, now).day }, now) : next;
+  if (!run.pace) return next;
+  return run.pace.mode === 'by' ? changePace(next, run.pace, now) : changePace(next, run.pace, now, totalDays(run) - runStatus(run, now).day);
+}
+
+/**
+ * Credit reads from before the start (plans2 "Count my N"): every item the read record holds is ticked with no
+ * date, so it counts toward progress but never toward "done today" or days in a row. `credited` keeps how many.
+ * @param {PlanRun} run @param {(bid: string, cid: string) => boolean} isRead @returns {PlanRun}
+ */
+export function creditRead(run, isRead) {
+  const ticks = { ...(run.ticks || {}) };
+  let n = 0;
+  for (const tr of run.tracks) for (const it of tr.items) {
+    if (it.k in ticks) continue;
+    const i = it.k.lastIndexOf(':');
+    if (isRead(it.k.slice(0, i), it.k.slice(i + 1))) { ticks[it.k] = ''; n++; }
+  }
+  if (!n) return run;
+  return finishIfDone({ ...run, ticks, credited: (run.credited || 0) + n }, run.start);
+}
+
+/** How many items of these tracks the read record already holds (the "Count my N" offer). */
+export function readCount(/** @type {PlanTrack[]} */ tracks, /** @type {(bid: string, cid: string) => boolean} */ isRead) {
+  let n = 0;
+  for (const tr of tracks) for (const it of tr.items) { const i = it.k.lastIndexOf(':'); if (isRead(it.k.slice(0, i), it.k.slice(i + 1))) n++; }
+  return n;
+}
+
+/** Start today instead of a later start date: the plan's days move up with it. */
+export function startToday(run, now) {
+  const st = runStatus(run, now);
+  if (!st.notStarted) return run;
+  const key = todayKey(now);
+  const moved = { ...run, start: key, updated: now.getTime() };
+  const days = totalDays(run);
+  const todayN = /** @type {number} */ (dayNum(key));
+  const first = isReadingDay(moved, todayN) ? todayN : nthReadingDay(moved, todayN, 0);
+  return { ...moved, target: dateOf(nthReadingDay(moved, first, days - 1)) };
+}
+
+/** Untick one item (the session's "Not read yet"). @param {PlanRun} run @param {string} k @param {Date} now */
+export function untickItem(run, k, now) {
+  if (!(k in (run.ticks || {}))) return run;
+  const ticks = { ...(run.ticks || {}) };
+  delete ticks[k];
+  const next = { ...run, ticks, updated: now.getTime() };
+  if (next.status === 'finished') { next.status = 'running'; delete next.finished; }
+  return next;
 }
 
 /** Pause from today. */
@@ -517,14 +739,14 @@ function finishIfDone(run, dateKey) {
  * order, each in its own order), the reader has not marked read. Null when no letter of it is read yet, when that
  * letter is the plan's first anyway, or when every letter is read. Bible chapters (items with no title) never count.
  * @param {PlanTrack[]} tracks @param {(bid: string, cid: string) => boolean} isRead
- * @returns {{ k: string, t: string } | null}
+ * @returns {{ k: string, t: string, skipped: number } | null}  skipped: the earlier readings it leaves out (plans2 says so)
  */
 export function resumeAt(tracks, isRead) {
   const letters = tracks.flatMap((tr) => (tr && Array.isArray(tr.items) ? tr.items : [])).filter((it) => it.t);
   const read = (/** @type {PlanItem} */ it) => { const i = it.k.lastIndexOf(':'); return !!isRead(it.k.slice(0, i), it.k.slice(i + 1)); };
   const at = letters.findIndex((it) => !read(it));
   if (at <= 0) return null;
-  return { k: letters[at].k, t: String(letters[at].t) };
+  return { k: letters[at].k, t: String(letters[at].t), skipped: at };
 }
 
 /**

@@ -1381,7 +1381,7 @@ describe('CachedStore W2.4 — clearLegacyLs (one-time LS cleanup)', () => {
     expect(LS_SKIP_LIST).toContain('vot-notes-tab');
     expect(LS_SKIP_LIST).toContain('vot-tabs-hint-seen');
     expect(LS_SKIP_LIST).toContain('vot-scrollheal-1');
-    expect(LS_SKIP_LIST.length).toBe(34);
+    expect(LS_SKIP_LIST.length).toBe(33);   // plans2 retired vot-plan-ribbon-hidden (the ribbon lost its ×)
     expect(Object.isFrozen(LS_SKIP_LIST)).toBe(true);
   });
 

@@ -821,40 +821,23 @@
          floats instead of hugging the right. */
       .top-nav .nav-search-btn[title="Home"] { margin-right: auto; }
       .top-nav .nav-home:not(:has(~ [title="Home"])):not(:has(~ .srch-input-row)) { margin-right: auto; }
-      /* Gear is hidden in the top nav by default (toggle: "Settings Gear in Top Nav"). */
-      body.no-gear .settings-gear-btn { display: none; }
       /* Search + history can be disabled in Settings. Target by title attr to
          avoid editing every button instance. */
       body.no-search .nav-search-btn[title="Search"] { display: none; }
       body.no-history .nav-search-btn[title="History"] { display: none; }
-      /* History button in the top nav: shown only when "History in Top Nav" is
-         on. Universal across EVERY nav (reading / index / settings / about) —
-         matched by title, not a per-screen class — so the toggle is the single
-         source of truth. History stays reachable from the Home "Recently
-         Visited" card, which is not a nav button and so is unaffected. */
-      body:not(.history-in-nav) .nav-search-btn[title="History"] { display: none; }
       /* Bookmark button: hidden in the top nav when "Bookmark Button in Top
          Nav" is off. Saved bookmarks stay reachable from Library; this only
          hides the per-chapter quick-bookmark icon. */
       body.no-bookmark-nav .nav-bookmark-btn { display: none; }
-      /* Theme switcher: hidden in the top nav when "Theme Button in Top Nav" is
-         off. Theme stays changeable via the Light Theme setting (Text & Translation). */
-      body.no-theme-nav .nav-theme-btn { display: none; }
 
       .nav-theme-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); transition: color 0.2s; min-width: 44px; min-height: 44px; flex-shrink: 0; }
       @media (hover: hover) { .nav-theme-btn:hover { color: var(--gold-bright); } }
       .nav-theme-btn svg { width: 22px; height: 22px; }
 
-      /* ── THE COMPACT TOP BAR + its ⋯ menu (the redesign, 2026-09-25; ui/components/MoreMenu.jsx) ──
-         The bar carried six to eight equal-weight gold icons; a UX walk ranked "a newcomer cannot tell
-         them apart" the #1 friction, and every direction of the Codex mockups folded them into one menu.
-         With settings.compactTopBar on (body.compact-topbar, the default) Settings, History and the theme
-         switch leave the bar — matched the way the per-icon toggles above match them — and the ⋯ menu
-         names them, beside a Text size stepper. Back, Home, Search, the bookmark and Tabs stay. Off
-         restores the old row exactly: nothing here applies and the ⋯ button renders nothing. */
-      body.compact-topbar .top-nav .settings-gear-btn,
-      body.compact-topbar .top-nav .nav-search-btn[title="History"],
-      body.compact-topbar .top-nav .nav-theme-btn { display: none; }
+      /* ── The reader bar holds no gear, no History and no theme icon (W2d, X-hidden 116: the old icon-row
+         switches compactTopBar / showSettingsGear / historyInNav / showThemeBtn are gone). The ⋯ menu
+         (ui/components/MoreMenu.jsx) names them. The tab screens' bar shows its gear (ONE TOP-BAR RULE). ── */
+      .top-nav :is(.settings-gear-btn, .nav-search-btn[title="History"], .nav-theme-btn) { display: none; }
       .nav-more-btn { background: none; border: none; cursor: pointer; color: var(--gold); padding: 0.5rem; display: flex; align-items: center; justify-content: center; border-radius: var(--radius); min-width: 44px; min-height: 44px; flex-shrink: 0; transition: color 0.2s, background 0.2s; -webkit-tap-highlight-color: transparent; }
       .nav-more-btn svg { width: 22px; height: 22px; }
       .nav-more-btn.open, .nav-more-btn:active { background: var(--gold-faint); color: var(--gold-bright); }
@@ -1154,12 +1137,6 @@
          targets cannot fit at 360px without clipping Back/Home. History is
          already a first-class Home card, so keep it there on compact phones;
          on the smallest supported tier Settings follows the same rule. */
-      @media (max-width: 380px) {
-        .top-nav .nav-search-btn[title="History"] { display: none; }
-      }
-      @media (max-width: 339px) {
-        .top-nav .settings-gear-btn { display: none; }
-      }
       .nav-home {
         font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.18em;
         text-transform: uppercase; color: var(--gold); background: none; border: none;
@@ -2359,47 +2336,18 @@
       .vot-large-text .hero-play-row.is-off > .hero-play-pill { flex: 1 1 100%; justify-content: center; }
 
       /* ── HERO ── */
-      .hero {
-        position: relative; overflow: hidden;
-        /* rem up to a px ceiling: at Text Size 1.8 the old 5.5rem/4rem grew to 158/115 px and the
-           hero filled 77 % of a 360x800 screen with the first words below the fold (2026-09-05). */
-        padding: min(2.5rem, 52px) min(1.8rem, max(29px, 7vw)) min(2.25rem, 44px); text-align: center;
-        border-bottom: 1px solid var(--gold-border);
-      }
       /* No banner on any reading page (Corbin 2026-11-01: "get rid of blue banner on each
          letter", then the amber ones on studies and Bible chapters, "one consistent page
          top"; the redesign's round 2 take 1). The centred eyebrow, title, ornament and
          Listen sit on plain black, and the padding the band needed is taken back so the
          text starts sooner. */
       .hero-content { position: relative; z-index: 3; }
-      .hero-eyebrow {
-        font-family: 'Cinzel', serif;
-        /* Fluid: the ENDS are scale tokens, the vw term between them is the
-           point (see the type-scale block's documented clamp exception). */
-        font-size: clamp(var(--fs-12), 2.3vw, var(--fs-13));   /* was 10-12: every phone got the 10 px floor */
-        letter-spacing: 0.2em; text-transform: uppercase;
-        color: var(--gold); opacity: 0.85; margin-bottom: 0.85rem;
-        overflow-wrap: break-word; word-wrap: break-word; line-height: 1.6;
-      }
       /* Bible chapter: the text follows the recording's translation while it
          plays (BibleChapterView); one calm line says so. */
       .hero-audio-text {
         font-family: var(--font-body); font-style: italic;   /* s00.7: the Reading Font, like the text it describes */
         font-size: var(--fs-14); color: var(--cream-muted);
         opacity: 0.9; margin: -0.45rem 0 0.7rem;
-      }
-      .hero-title {
-        font-family: 'Cinzel Decorative', serif;
-        /* Standardized reading-title size — gentle responsive scale that sits
-           just above the index titles (.vol-index-title) and never balloons
-           past its top token. Length-independent: a long title wraps at the
-           same size as a short one (the old .hero-title-long shrink is gone).
-           Fluid ends are tokens; the vw term between them is the point. */
-        font-size: clamp(var(--fs-30), 5vw, var(--fs-36));
-        font-size: min(clamp(var(--fs-30), 5vw, var(--fs-36)), 9vw);   /* U05.4: Text Size never pushes a title past the screen */
-        color: var(--cream); line-height: 1.2; margin-bottom: 1.6rem;
-        overflow-wrap: break-word; word-wrap: break-word;
-        hyphens: auto;
       }
       .hero-subtitle {
         font-family: var(--font-body); font-size: var(--fs-16); font-style: italic;
@@ -2481,14 +2429,6 @@
         .section-heading.section-heading-tappable:hover { color: var(--gold); }
         .section-heading-psalm119.section-heading-tappable:hover { background: rgba(200,164,86,0.04); }
       }
-      .hero-ornament { display: flex; align-items: center; gap: 0.75rem; max-width: 280px; margin: 0 auto; }
-      .hero-ornament-line {
-        flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent);
-      }
-      .hero-ornament-line.r {
-        background: linear-gradient(to left, transparent, var(--gold-border), transparent);
-      }
-      .hero-ornament-diamond { width: 7px; height: 7px; background: var(--gold-dim); transform: rotate(45deg); flex-shrink: 0; }
       /* ── PAGE / CHAPTER BODY ── */
       .page-wrapper {
         /* The sides stop growing at their phone size (the hero's rule, above):
@@ -2626,23 +2566,12 @@
       @supports (width: min(1px, 2px)) {
         .bottom-nav { grid-template-columns: repeat(auto-fit, minmax(min(100%, max(140px, 7rem)), 1fr)); }
       }
-      .bottom-nav-card {
-        background: var(--bg2); border: 1px solid var(--gold-border); border-radius: var(--radius);
-        padding: 1rem 1.1rem; text-align: left;
-        transition: all var(--transition); color: inherit; cursor: pointer;
-        /* A track that may shrink below its content needs the words inside to wrap, or the clip
-           moves one box inward: "Warning" ran 16 px past its 122 px card at Text Size 1.8. */
-        min-width: 0; overflow-wrap: break-word;
-      }
-      @media (hover: hover) { .bottom-nav-card:hover { border-color: var(--gold); background: var(--gold-faint); } }
+      .bottom-nav-card { background: var(--surface-1); border: 0; border-radius: var(--r-card); padding: 12px 14px; text-align: left; color: inherit; cursor: pointer; min-width: 0; overflow-wrap: break-word; }
+      @media (hover: hover) { .bottom-nav-card:hover { background: var(--surface-2); } }
       .bottom-nav-card.next { text-align: right; }
       .bottom-nav-card.placeholder { opacity: 0.3; pointer-events: none; }
-      .bottom-nav-label {
-        font-family: 'Cinzel', serif; font-size: var(--fs-11); letter-spacing: 0.22em;
-        text-transform: uppercase; color: var(--gold); margin-bottom: 0.3rem; overflow-wrap: break-word;
-      }
-      .bottom-nav-title { font-size: var(--fs-16); color: var(--cream); line-height: 1.4; }
-      @media (hover: hover) { .bottom-nav-card:hover .bottom-nav-title { color: var(--gold-bright); } }
+      .bottom-nav-label { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); overflow-wrap: break-word; }
+      .bottom-nav-title { font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); line-height: 1.35; margin-top: 3px; }
       /* ── ORNAMENT DIVIDER ── */
       .ornament-divider { display: flex; align-items: center; gap: 0.75rem; margin: 2.5rem 0 1.5rem; }
       .ornament-divider-line { flex: 1; height: 1px; background: linear-gradient(to right, transparent, var(--gold-border), transparent); }
@@ -2733,62 +2662,6 @@
       @media (min-width: 768px) {
         .mode-toggle-wrap { right: calc(50vw - var(--col-max) / 2 + 1.5rem); }
       }
-      /* ── First-run annotation tip (AnnotationHint) ── */
-      .ann-hint-pill {
-        /* U05.6 (UX wave 3): a full-width strip along the bottom, not a centred pill (at 300% the pill was a 646 px
-           column with its close half off-screen). */
-        position: fixed; left: 0; right: 0;
-        /* Message lane, above the context row (cz1: the Study Notes toggle sat on its ✕). */
-        bottom: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context));
-        z-index: 190; /* under the mode-toggle pill (200) + sheets */
-        display: flex; align-items: center; gap: 10px;
-        justify-content: center;
-        padding: 6px 6px 6px 14px;
-        /* No backdrop-filter (2026-07-28): floats over scrolling text; the
-           96%-opaque bg needs no blur. */
-        background: var(--bg3);  /* cz7: opaque */
-        border-top: 1px solid var(--gold-border);
-        box-shadow: 0 -4px 18px rgba(0,0,0,0.4);
-        animation: annHintIn 0.5s ease;
-        transition: opacity 0.6s ease;
-        /* Wave-0 (P1-1): the pill teaches the long-press gesture yet sat
-           ON TOP of the reading text — a long-press landing under the pill
-           selected the pill's own label and raised the native Copy menu,
-           punishing the exact gesture it advertises. pointer-events:none
-           makes the whole pill click-through so the gesture reaches the
-           verse text beneath (the ✕ close re-enables events on itself
-           below); user-select:none keeps the pill's label out of any
-           selection that starts inside it. */
-        pointer-events: none;
-        user-select: none;
-        -webkit-user-select: none;
-      }
-      body.light .ann-hint-pill { background: var(--bg3); box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
-      @keyframes annHintIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
-      .ann-hint-pill.is-fading { opacity: 0; }   /* U10.7: it goes by itself */
-      /* ux3 (A15 critique, 2026-09-22): while this tip pill is up, a toast sits ABOVE it instead of on its words
-         ("Copied" covered "Long-press any text..."). The pill starts at the
-         same base offset and is up to three lines tall on a 320 px phone;
-         7.5rem clears that. Not while autoscroll hides the pill. Kept AFTER the
-         pill's own rule: app-css.test.js reads the first '.ann-hint-pill'. */
-      body:not(.autoscroll-on):has(.ann-hint-pill) {
-        --dock-message: calc(max(1.2rem, var(--dock-sys)) + var(--dock-context) + 7.5rem);
-      }
-      .ann-hint-icon { width: 22px; height: 22px; color: var(--gold); flex-shrink: 0; }
-      .ann-hint-text {
-        font-family: var(--font-body); font-style: italic;
-        font-size: var(--fs-14); line-height: 1.35; color: var(--cream-dim);
-      }
-      .ann-hint-close {
-        /* Only interactive child of the click-through pill — re-enable
-           events here so the ✕ still dismisses (P1-1). */
-        pointer-events: auto;
-        background: none; border: none; cursor: pointer;
-        color: var(--gold); font-family: var(--font-body); font-size: var(--fs-16); line-height: 1;
-        min-height: 44px; padding: 0 12px; flex-shrink: 0; text-decoration: underline; text-underline-offset: 3px;
-        -webkit-tap-highlight-color: transparent;
-      }
-      .ann-hint-close:active { color: var(--gold); }
 
       /* cz7: caption and segments are ONE opaque card (the caption floated over verse text with no backing,
          and the segments let the text show through). The card is the surface; the caption is its top line. */
@@ -2864,7 +2737,6 @@
       .tab-card-thumb.thumb-theme-flip { filter: invert(1) hue-rotate(180deg); }
     /* ── LETTER META ── */
     .letter-meta { padding:0 0 0.25rem; margin-bottom:2.5rem; }
-    .meta-date { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.2em; color:var(--gold); text-transform:uppercase; margin-bottom:0.5rem; }
     .meta-from { font-style:italic; color:var(--cream-dim); font-size:var(--fs-16); margin-bottom:0.2rem; }
     .meta-spoken { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
     .meta-for { font-size:var(--fs-15); color:var(--cream-muted); margin-bottom:0.2rem; }
@@ -3351,12 +3223,12 @@
     @media (hover: hover) { .inline-note-plain:hover { opacity:1 !important; } }
     @keyframes pulse { 0%,100%{opacity:0.5} 50%{opacity:1} }
     /* ── FOOTNOTE LIST ── */
-    .footnote-list { margin-top:2.5rem; padding-top:2rem; border-top:1px solid var(--gold-border); }
+    .footnote-list { margin-top:var(--label-above); }
     /* The ✦ ornament IS the finishing rule (owner directive 2026-08-06): when
        the footnote list sits directly under it (letters that END on a
        standalone "Says The Lord." closing), the list's own top border would
        stack a second line under the ornament — drop it and tighten up. */
-    .ornament-divider + .footnote-list { border-top:none; padding-top:0; margin-top:1.5rem; }
+
     /* Read-along: the sentence currently being read aloud (CSS Custom
        Highlight API — no DOM mutation; only these properties apply). */
     /* LITERAL colours in the three ::highlight rules, repeated per theme, never
@@ -3398,7 +3270,7 @@
       transition:color 0.18s ease;
     }
     @media (hover: hover) { .wtlb-cite:hover, .wtlb-cite:active { color:var(--gold-bright); } }
-    .footnote-list-header { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.18em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:1rem; }
+    .footnote-list-header { font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); font-weight:600; letter-spacing:var(--track-label); text-transform:uppercase; color:var(--accent); margin-bottom:var(--label-below); }
     /* The body beside the number may shrink below its longest line and wraps:
        a verse quote ran 570 px wide in a 360 px phone at Text Size 3. */
     .footnote-list-item > :not(.footnote-list-num) { flex:1 1 auto; min-width:0; overflow-wrap:break-word; }
@@ -3440,6 +3312,51 @@
     .letter-listen-row { flex-wrap:wrap; gap:.75rem; }
     .letter-listen-row .hero-play-pill { min-height:40px; padding:.6em 1.1em; font-size:var(--fs-13); font-weight:600; letter-spacing:.1em; white-space:nowrap; }
     .letter-listen-row.has-songs .hero-play-pill { flex:1 1 9.5rem; max-width:15rem; justify-content:center; }
+
+    /* ═══ W2d readers (mock v2 r-letter): the calm page top. Place line, title, one gold Listen; the date line
+       in the UI face over a hairline. Shared by every reader's .hero (letters, studies, Bible, Words To Live By).
+       The letter's own text keeps its typography. ═══ */
+    .hero { position: relative; overflow: hidden; text-align: center; padding: var(--sp-2) min(1.8rem, max(var(--gutter), 7vw)) 18px; }
+    .hero-eyebrow { font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); margin-bottom: 5px; overflow-wrap: break-word; }
+    .hero-title { font-family: var(--font-serif); font-weight: 600; font-size: min(var(--ts-display), 9vw); line-height: 1.17; color: var(--text-1); margin: 0; overflow-wrap: break-word; hyphens: auto; }
+    .hero .hero-play-row { margin-top: 14px; }
+    .hero .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .hero .hero-play-pill svg { width: var(--icon-sm); height: var(--icon-sm); }
+    .hero .hero-play-pill.letter-sung-pill { background: var(--surface-1); color: var(--text-1); }
+    .hero .hero-play-pill.letter-sung-pill svg { color: var(--accent); }
+    @media (hover: hover) { .hero .hero-play-pill:hover { transform: none; filter: brightness(1.06); } }
+    .hero + .page-wrapper:has(> .letter-meta:first-child) { padding-top: 0; }
+    .hero + .page-wrapper > .letter-meta:first-child { border-top: 1px solid var(--hairline); padding-top: 14px; }
+    .meta-date { font-family: var(--font-ui); font-size: var(--ts-meta); font-weight: 500; color: var(--text-2); margin-bottom: 0.15rem; }
+    /* The tip "Hold your finger on any line" is the More menu's first row (AnnotationHint.jsx), never a pill on the text. */
+    .more-menu-hint .more-menu-item-sub { color: var(--accent); }
+    /* ═══ end W2d r-letter ═══ */
+    /* ═══ W2d readers (mock v2 r-end): the end of a letter. Footnotes in one card, the related groups as gold labels
+       over chips, the website's recordings and videos as one group, Previous / Next as two quiet cards. ═══ */
+    .footnote-list-card { background: var(--surface-1); border-radius: var(--r-card); padding: 4px 0; }
+    .footnote-list-card .footnote-list-item { margin: 0; padding: 12px 14px; border-radius: 0; }
+    .footnote-list-card .footnote-list-item + .footnote-list-item { box-shadow: inset 0 1px 0 var(--hairline); }
+    .footnote-list-card .footnote-list-num { font-family: var(--font-ui); font-size: var(--ts-control); }
+    .related-section { display: block; border-top: 0; margin-top: 0; padding-top: 0; }
+    .related-section > .related-card:not(.letter-songs-card), .rd-web .related-card { display: contents; }
+    .related-section .related-card-title, .rd-web-label { display: block; font-family: var(--font-ui); font-size: var(--ts-label); line-height: var(--lh-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; color: var(--accent); margin: var(--label-above) 0 var(--label-below); }
+    .related-section > .related-card:not(.letter-songs-card) > :not(.related-card-title) { display: inline-flex; vertical-align: top; margin: 0 8px 8px 0; }
+    .rd-web { display: flex; flex-wrap: wrap; gap: 8px; }
+    .rd-web > .rd-web-label { flex-basis: 100%; margin-bottom: 2px; }
+    .rd-web .related-card > div:not(.related-card-title) { display: contents; }
+    .related-section .related-link { display: inline-flex; align-items: center; gap: 7px; min-height: var(--chip-h); padding: 0 14px; border: 0; border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); line-height: 1.25; }
+    .related-section .related-link svg { color: var(--accent); flex: none; }
+    @media (hover: hover) { .related-section .related-link:hover { background: var(--surface-2); color: var(--text-1); border-bottom-color: transparent; } }
+    .rd-web .related-card-title { display: none; }
+    .rd-web:not(:has(.related-link)) { display: none; }
+    .letter-songs-card { margin-top: var(--label-above); }
+    .bottom-nav { gap: var(--grid-gap); }
+    /* A footnote that opens a letter: a plain row, the title over a meta line, no boxed button. */
+    .footnote-list-card .footnote-list-link-btn.fn-list-rich { background: none; border: 0; padding: 0; width: 100%; }
+    .footnote-list-card .footnote-list-link-btn.fn-list-rich .fn-list-rich-body { flex-direction: column-reverse; }
+    .footnote-list-card .footnote-list-link-btn.fn-list-rich .fn-list-rich-title { font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; color: var(--text-1); letter-spacing: 0; text-transform: none; }
+    .footnote-list-card .footnote-list-link-btn.fn-list-rich .fn-list-rich-eyebrow { font-family: var(--font-ui); font-size: var(--ts-meta); letter-spacing: 0; text-transform: none; color: var(--text-2); }
+    /* ═══ end W2d r-end ═══ */
     .letter-listen-pill { border-color:var(--gold); background:var(--gold); color:var(--bg); }
     .letter-listen-pill.is-playing { background:var(--gold-bright); border-color:var(--gold-bright); }
     .letter-sung-pill { border-color:var(--gold); background:transparent; }
@@ -3513,7 +3430,6 @@
       to   { opacity: 0.65; transform: translateY(0); }
     }
     /* homeHeroIn — removed (unused) */
-    .prg-start { margin:0.25rem 0 1rem; }
     /* Home's up-next card (TodayCard.jsx; the layout pass 2026-11-10, mock read.png; tokens W1): one row per running
        plan, then Continue, in one surface card. The pills are the small secondary and primary buttons; they draw 38 px
        and take a 44 px press through ::after. */
@@ -3654,8 +3570,6 @@
     .root-tile-eyebrow, .ui-tile-label { margin-bottom: 6px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
     .root-tile-title, .ui-tile-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: var(--lh-headline); overflow-wrap: break-word; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .root-tile-detail, .ui-tile-meta { margin-top: auto; padding-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
-    .lib-tiles .root-tile { min-height: 76px; }
-    .lib-tiles .root-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
     :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool):active { background-color: var(--surface-2); }
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }
@@ -3747,7 +3661,7 @@
     .ui-card .ui-seg, .ui-sheet .ui-seg { background: var(--surface-2); }
     .ui-seg-item { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--seg-h); padding: 0 6px; border: 0; border-radius: 9px; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
     .ui-seg-item::after { content: ''; position: absolute; inset: -4px 0; }
-    .ui-seg-item[aria-checked="true"] { background: var(--surface-3); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--accent-ring); }
+    .ui-seg-item:is([aria-checked="true"], [aria-selected="true"]) { background: var(--surface-3); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--accent-ring); }
     /* a tool that shows its value (rule 14): the icon, its name, what it is set to. Tiles in a row of up to four, or a chip. */
     .ui-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--sp-2); }
     .ui-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 64px; padding: 10px 2px 9px; border: 0; border-radius: var(--r-field); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); text-align: center; cursor: pointer; }
@@ -3767,6 +3681,10 @@
     :is(.ui-btn, .ui-chip, .ui-seg-item, .ui-tool, .ui-row-press, .ui-row-main, .ui-row-menu, .ui-link, .bar-action, .bar-text-action, .root-tile, .root-row, .root-explore-btn, .upnext-pill):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     /* the empty state (rule 15): a 64 px icon tile, the title, one sentence on how it fills, one button that goes there */
     .ui-empty { display: flex; flex-direction: column; align-items: center; padding: 64px var(--gutter) 0; text-align: center; }
+    .ui-empty .ui-btn { max-width: 100%; height: auto; min-height: var(--btn-h); white-space: normal; }
+    .library-root .ui-row-title, .library-root .ui-row-meta { white-space: normal; }
+    .library-root .ui-row-text { min-width: 50%; }
+    .library-root .ui-row-value { white-space: normal; text-align: right; }
     .ui-empty-icon { display: grid; place-items: center; width: 64px; height: 64px; margin-bottom: 18px; border-radius: var(--r-sheet); background: var(--surface-1); color: var(--accent); }
     .ui-empty-icon svg { width: 28px; height: 28px; }
     .ui-empty-title { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-title); font-weight: 700; line-height: 1.25; }
@@ -3797,105 +3715,16 @@
     .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
     .today-btn-wide { width:100%; margin-top:0.6rem; }
     @media (hover:hover) { .today-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .today-progress-row { display:flex; align-items:center; gap:0.75rem; margin-top:0.7rem; }
     .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
     .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
     .today-percent { color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
     .today-check { flex:none; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1.5px solid var(--gold); border-radius:50%; color:var(--bg, #000); }
     .today-check[data-done="1"] { background:var(--gold); }
-    /* rp1: the Plans screen (ReadingPlansScreen.jsx; mockup r2-plans.png) */
     .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:1.25rem 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }   /* 1.25rem top: the personal-study header's one inset */
     .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
-    .plans-eyebrow { margin:0.5rem 0 0.6rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
-    .plans-plan { margin:0 0 0.9rem; padding:0.9rem 1rem 0.6rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
-    .plans-plan-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
-    .plans-plan-sub { margin:0.2rem 0 0.5rem; color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-plan .today-progress { display:block; }
-    .plans-month { margin-top:0.9rem; }
-    .plans-month-name { margin-bottom:0.4rem; color:var(--gold); text-align:center; font-size:var(--fs-18); }
-    .plans-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem 0.2rem; text-align:center; }
-    .plans-weekday { color:var(--cream-muted); font-size:var(--fs-12); }
-    .plans-day { display:flex; flex-direction:column; align-items:center; gap:0.15rem; min-height:44px; padding-top:0.2rem; border:1px solid transparent; border-radius:6px; font-size:var(--fs-15); }
-    .plans-day-mark { width:10px; height:10px; }
-    .plans-day[data-state="done"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
-    .plans-day[data-state="missed"] .plans-day-mark { border:1.5px solid var(--gold); border-radius:50%; box-sizing:border-box; }
-    .plans-day[data-state="today"] { border-color:var(--gold); }
-    .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
-    .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-detail-links { display:flex; flex-wrap:wrap; justify-content:center; gap:0 1.25rem; margin-top:0.6rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
-    /* rp-s1: the daily reminder's offer, its quiet ask, and its time in the details */
-    .plans-remind-ask { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-remind { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 1rem; margin-top:0.6rem; padding-top:0.5rem; border-top:1px solid var(--gold-border); }
-    .plans-remind-time { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem 0.6rem; color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-remind-time input { min-height:44px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:var(--cream); font:inherit; }
-    .plans-remind .plans-note { flex-basis:100%; margin:0; }
-    /* mw18 C3/C4/C6: behind, its two ways back, a new pace, marking a day (mockup r1-behind.png) */
-    .plans-behind { margin-top:0.8rem; padding-top:0.7rem; border-top:1px solid var(--gold-border); }
-    /* mw18 S6: this week's recordings, saved to the phone from Plan details */
-    .plans-audio { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
-    .plans-behind-title { margin:0; color:var(--cream); font-size:var(--fs-20); font-weight:400; }
-    .plans-option { display:flex; flex-direction:column; gap:0.2rem; width:100%; min-height:56px; margin-top:0.6rem; padding:0.65rem 0.9rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-    .plans-option-name { color:var(--gold); font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; }
-    .plans-option-sub { color:var(--cream-dim); font-size:var(--fs-15); }
-    @media (hover:hover) { .plans-option:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .plans-pace-pick { margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
-    .plans-pace-pick .plans-pick { padding:0 0 0.4rem; }
-    .plans-chip[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
-    .plans-by { display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; min-height:44px; color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-by input[type="date"] { min-height:40px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--cream); font:inherit; color-scheme:dark; }
-    body.light .plans-by input[type="date"] { color-scheme:light; }
-    .plans-by input[type="checkbox"] { width:20px; height:20px; accent-color:var(--gold); }
-    /* dl-d5: the plan week's switch keeps its words beside the box at any text size. */
-    .plans-audio-auto { flex-wrap:nowrap; margin-bottom:0.5rem; }
-    .plans-audio-auto input[type="checkbox"] { flex:none; }
-    .plans-audio-auto span { flex:1 1 auto; min-width:0; }
-    .plans-hold { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-    .plans-mark { display:block; margin:0 auto; font-size:var(--fs-13); }
-    /* mw18 landing 1: the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
-    .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }
     .today-btn:disabled { opacity:0.5; cursor:default; }
-    .plans-plan .today-eyebrow { display:block; margin-bottom:0.25rem; }
-    .plans-done { display:flex; align-items:center; gap:0.65rem; }
-    .plans-actions { margin:0.6rem 0 0.2rem; }
-    .plans-actions .today-btn { flex:1; }
-    .plans-items { display:flex; flex-wrap:wrap; justify-content:center; gap:0.25rem 0.6rem; list-style:none; margin:0.75rem 0 0; padding:0.7rem 0 0; border-top:1px solid var(--gold-border); }
-    .plans-item { display:flex; flex-direction:column; align-items:center; gap:0.2rem; min-width:44px; min-height:44px; padding:0.2rem 0.3rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    .plans-item-label { max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .plans-items-count { margin:0.1rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
-    .plans-week { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.2rem; margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); text-align:center; }
-    .plans-week .plans-day { min-height:40px; }
-    .plans-day[data-read="1"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
-    .plans-day[data-state="ahead"] .plans-day-mark { border:1px solid var(--gold-border); border-radius:50%; box-sizing:border-box; }
-    .plans-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.75rem; margin-top:0.5rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
-    .plans-counts { color:var(--cream-dim); font-size:var(--fs-14); }
-    .plans-foot .today-link { color:var(--gold); }
-    .plans-details { margin-top:0.25rem; }
-    .plans-legend { margin:0.5rem 0 0; color:var(--cream-muted); font-size:var(--fs-13); text-align:center; }
-    .plans-key { display:inline-block; width:9px; height:9px; margin:0 0.3rem 0 0.6rem; border-radius:50%; vertical-align:middle; box-sizing:border-box; }
-    .plans-key[data-state="done"] { background:var(--gold); opacity:0.8; }
-    .plans-key[data-state="missed"] { border:1.5px solid var(--gold); }
-    .plans-group { margin:0 0 0.9rem; }
-    .plans-group-title { display:flex; align-items:center; gap:0.6rem; margin:0.4rem 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
-    .plans-group-title::after { content:""; flex:1; height:1px; background:var(--gold-border); }
-    .plans-list { list-style:none; margin:0; padding:0; }
-    .plans-list > li + li { border-top:1px solid var(--gold-border); }
-    .plans-row { display:flex; align-items:center; gap:0.85rem; width:100%; min-height:56px; padding:0.5rem 0.2rem; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-    .plans-row:disabled { cursor:default; }
-    .plans-row-icon { flex:none; color:var(--gold); opacity:0.85; }
-    .plans-row-text { display:flex; flex-direction:column; flex:1; min-width:0; }
-    .plans-row-name { color:var(--cream); font-size:var(--fs-18); }
-    .plans-row-sub { color:var(--cream-dim); font-size:var(--fs-14); }
-    .plans-row:disabled .plans-row-sub { color:var(--gold); font-style:italic; }
-    .plans-row-chev { flex:none; color:var(--gold); }
-    .plans-row:disabled .plans-row-chev { visibility:hidden; }
-    @media (hover:hover) { .plans-row:not(:disabled):hover { background:var(--gold-faint); } .plans-item:hover { color:var(--cream); } }
-    .plans-pick { display:flex; flex-wrap:wrap; gap:0.4rem; padding:0 0 0.7rem 2.6rem; }
-    .plans-chip { min-height:44px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    /* n354b: Start where I am names a letter, which can run to two lines */
-    .plans-chip-resume { padding:0.45rem 0.9rem; border-radius:1.1rem; text-align:left; line-height:1.3; color:var(--gold); }
     .plans-note:empty { display:none; }
     /* mw18: Build your own plan (PlanBuilder.jsx; mockups r1-build-pick.png, r1-build-goal.png) */
-    .plans-build-row { margin-top:0.2rem; border-top:1px solid var(--gold-border); }
     .plans-build .study-head .today-eyebrow { display:block; margin-bottom:0.3rem; }
     .build-tabs { display:grid; grid-template-columns:1fr 1fr; margin:0.4rem 0 0.75rem; border:1px solid var(--gold-border); border-radius:8px; overflow:hidden; }
     .build-tabs button { min-height:44px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
@@ -3946,26 +3775,196 @@
     .build-each p { margin:0.1rem 0; }
     .build-each .today-btn-wide { margin-top:0.8rem; }
     .build-each .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
-    /* mw18 C9/C11: the month pages and its days open their reading; finished plans (mockup r1-complete.png) */
-    .plans-month-head { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.4rem; }
-    .plans-month-head .plans-month-name { margin:0; min-width:9rem; }
-    .plans-month-step { width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-24); line-height:1; cursor:pointer; }
-    button.plans-day { width:100%; margin:0; background:transparent; color:inherit; font:inherit; font-size:var(--fs-15); cursor:pointer; }
-    @media (hover:hover) { button.plans-day:hover { border-color:var(--gold-border); } }
-    .plans-complete { text-align:center; }
-    .plans-complete-check { display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; margin:0.2rem 0 0.4rem; border:1.5px solid var(--gold); border-radius:50%; color:var(--gold); }
-    .plans-complete-title { margin:0; color:var(--cream); font-size:var(--fs-24); font-weight:400; }
-    .plans-complete-title span { display:block; color:var(--gold); }
-    .plans-complete .plans-actions { justify-content:center; }
-    .plans-finished { margin-bottom:1rem; }
-    .plans-note-link { display:block; margin:0.15rem auto 0; font-size:var(--fs-13); }
-    .plans-weeks { margin:0.35rem 0 0; color:var(--gold); font-size:var(--fs-14); text-align:center; }
-    .plans-finished-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; min-height:56px; padding:0.35rem 0.2rem; }
     /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
-    .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-body); font-size:var(--fs-14); box-sizing:border-box; }
+    .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-14); box-sizing:border-box; }
     .plan-ribbon-text { flex:1 1 auto; }
     .plan-ribbon-next { min-height:44px; padding:0 0.4rem; border:0; background:transparent; color:var(--gold); font:inherit; cursor:pointer; text-align:left; }
-    .plan-ribbon-hide { width:44px; min-height:44px; margin-left:auto; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-18); cursor:pointer; }
+    /* ══ READING PLANS (plans2, branch ui-plans, 2026-11-11) ═════════════════════════════════════════════════════════
+       The plans screens only: PlansHub.jsx and its views (list, preview, plan page, schedule, finished, builder), the
+       plan sheets (PlanBits.jsx PlanSheet, on the shared select-sheet grammar), the reader's session strip, end panel
+       and Day done (PlanRibbon.jsx), and the Read tab up-next row's open-the-plan button. Rows reuse the roots' shared
+       .root-list / .root-row; nothing here restyles a shared class. Controls use the foundation's --font-ui, cards its
+       --surface-1 (light twin through the tokens). ── */
+    .plans-hub { padding-bottom: 32px; }
+    .plans-hub, .plan-sheet, .plan-daydone, .plan-strip, .plan-end { --pl-ui: var(--font-ui); }
+    .plan-bar-title { flex: 1; }
+    .top-nav .plan-gear { display: flex; }
+    .plan-list, .plan-items, .plan-road, .plan-days-list, .plan-sched, .plan-choices { margin: 0; padding: 0; list-style: none; }
+    .plan-list > li + li .root-row, .plan-road > li + li .root-row, .plan-choices > li + li .root-row { border-top: 1px solid var(--border); }
+    .plan-chev { flex: none; margin: 0 6px 0 2px; color: var(--gold-dim); }
+    .plan-sec { display: flex; align-items: baseline; gap: 8px; }
+    .plan-sec .root-section { flex: 1; }
+    .plan-sec-link { font-family: var(--pl-ui); font-size: var(--fs-15); }
+    .plan-group-title { margin: 18px 2px 8px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; }
+    .plan-find-title { outline: none; }
+    .plan-find-title + .plan-group .plan-group-title { margin-top: 4px; }
+    .plan-build-list { margin-top: 12px; }
+    .plan-foot-note { margin: 18px 4px 0; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.45; }
+    /* The list's rows: ring, name and one state line, a Paused mark; the catalog's minutes and days at the right. */
+    .plan-run-row { min-height: 72px; }
+    .plan-state b { color: var(--gold); font-weight: 400; }
+    .plan-list .root-row-sub, .plan-choices .root-row-sub { font-style: normal; font-family: var(--pl-ui); font-size: var(--fs-14); }   /* U rule 5: facts upright */
+    .plan-tag { flex: none; padding: 2px 10px; border: 1px solid var(--gold-border); border-radius: 999px; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-12); letter-spacing: 0.08em; }
+    .plan-find-meta { flex: none; display: flex; flex-direction: column; align-items: flex-end; color: var(--gold-dim); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.35; text-align: right; }
+    .plan-empty { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
+    .plan-empty-text { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
+    /* The ring: gold progress on a quiet track, the percent inside. */
+    .plan-ring { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; }
+    .plan-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+    .plan-ring-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+    .plan-ring-fg { fill: none; stroke: var(--gold); stroke-width: 6; stroke-linecap: round; }
+    .plan-ring b { position: relative; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-12); font-weight: 500; }
+    .plan-ring-big { width: 92px; height: 92px; }
+    .plan-ring-big b { font-size: var(--fs-20); font-weight: 400; }
+    .plan-tick { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid var(--gold-dim); border-radius: 50%; box-sizing: border-box; color: var(--bg); }
+    .plan-tick[data-done="1"] { border-color: var(--gold); background: var(--gold); }
+    /* Buttons are the shared .ui-btn (primary, plain, is-wide); here only the worded ones. */
+    .plan-text-btn { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-15); cursor: pointer; }
+    .plan-text-btn:disabled { opacity: 0.5; cursor: default; }
+    .plan-link { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--gold-border); }
+    .plan-danger { color: var(--tone-danger); }
+    .plan-links { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 6px; }
+    .plan-links-center { justify-content: center; }
+    @media (hover:hover) { .plan-text-btn:hover { color: var(--gold-bright); } }
+    .plan-text-btn:focus-visible, .plan-day-toggle:focus-visible, .plan-switch:focus-visible, .plan-day-btn:focus-visible, .plan-item-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    /* Preview: the group, the name, two sentences, three facts. */
+    .plan-eyebrow { margin: 4px 2px 6px; }
+    .plan-hero-name { margin: 0 2px; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-30); font-weight: 400; line-height: 1.15; letter-spacing: 0.03em; }
+    .plan-about { margin: 10px 2px 18px; color: var(--cream); font-size: var(--fs-18); line-height: 1.45; }
+    .plan-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin: 0 0 6px; }
+    .plan-fact { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 6px; border: 1px solid var(--gold-border); border-radius: 14px; background: var(--surface-1); }
+    .plan-fact b { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-20); font-weight: 400; }
+    .plan-fact span { color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); text-align: center; }
+    .plan-loading { color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-preview > .plan-chips { margin: 0 0 14px; }
+    /* Days lists (first week, coming up, the schedule): Day N over the date, the portion, minutes. */
+    .plan-day-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; margin: 0; padding: 10px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; box-sizing: border-box; }
+    .plan-days-list > li + li .plan-day-row, .plan-days-list > li + li.plan-day-row, .plan-sched > li + li > .plan-day-row { border-top: 1px solid var(--border); }
+    .plan-day-btn { cursor: pointer; }
+    .plan-day-when { flex: none; display: flex; flex-direction: column; width: 6.6rem; }
+    .plan-day-n { color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; }
+    .plan-day-date { color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-day-portion { flex: 1; min-width: 0; color: var(--cream); font-size: var(--fs-18); line-height: 1.3; overflow-wrap: anywhere; }
+    .plan-day-min { flex: none; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-note-mark { flex: none; color: var(--gold-dim); font-size: var(--fs-14); }
+    .plan-sched-item.is-today > .plan-day-row { background: var(--gold-faint); }
+    .plan-sched-item.is-today .plan-day-n { color: var(--gold); }
+    .plan-sched-end { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 18px; border-top: 1px solid var(--border); background: var(--gold-faint); color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.16em; text-transform: uppercase; }
+    /* Make it yours / plan settings: a label column and the controls. */
+    .plan-opts { padding: 4px 14px; }
+    .plan-opt { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 10px 0; }
+    .plan-opt + .plan-opt { border-top: 1px solid var(--border); }
+    .plan-opt-label { flex: none; width: 4.6rem; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; }
+    .plan-opt-body { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; }
+    .plan-opt-text { flex: 1; color: var(--cream); font-size: var(--fs-16); }
+    .plan-opt-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+    .plan-opt-note { width: 100%; margin: 2px 0 0; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); line-height: 1.4; }
+    .plan-days { display: flex; flex-wrap: nowrap; gap: 4px; }
+    .plan-day-toggle { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--gold-border); border-radius: 50%; background: transparent; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-14); cursor: pointer; }
+    .plan-day-toggle::after { content: ''; position: absolute; inset: -5px -2px; }   /* a 44 px press */
+    .plan-day-toggle[aria-pressed="true"] { border-color: var(--gold); background: var(--gold-faint); color: var(--gold); }
+    .plan-switch { position: relative; flex: none; width: 52px; height: 32px; margin-left: auto; padding: 0; border: 1px solid var(--gold-border); border-radius: 999px; background: var(--border); cursor: pointer; }
+    .plan-switch::after { content: ''; position: absolute; inset: -6px -2px; }
+    .plan-switch-knob { position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--cream-muted); transition: transform 0.15s ease; }
+    .plan-switch[aria-checked="true"] { border-color: var(--gold); background: var(--gold); }
+    .plan-switch[aria-checked="true"] .plan-switch-knob { transform: translateX(20px); background: var(--bg); }
+    .plan-date, .plan-time { min-height: 40px; padding: 0 10px; border: 1px solid var(--gold-border); border-radius: 12px; background: transparent; color: var(--cream); font-family: var(--pl-ui); font-size: var(--fs-15); color-scheme: dark; }
+    body.light .plan-date, body.light .plan-time { color-scheme: light; }
+    .plan-time-text { display: none; }
+    .plan-start { margin-top: 22px; text-align: center; }
+    .plan-start-note { margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-start-note:empty { display: none; }
+    /* The plan's page: progress, Today, This week, the road. */
+    .plan-progress { display: flex; align-items: center; gap: 18px; }
+    .plan-progress-text { flex: 1; min-width: 0; }
+    .plan-progress-day { margin: 0 0 4px; color: var(--cream); font-size: var(--fs-24); line-height: 1.2; }
+    .plan-progress-line { margin: 0; color: var(--cream-dim); font-size: var(--fs-16); line-height: 1.45; }
+    .plan-late { color: var(--cream-muted); }
+    .plan-late.is-gold { color: var(--gold); }
+    .plan-late .plan-link { min-height: 32px; padding: 0 2px; font-size: var(--fs-15); }
+    .plan-today { margin-top: 14px; }
+    .plan-today-head { display: flex; align-items: center; gap: 10px; margin: 0 0 6px; }
+    .plan-today-head .root-eyebrow { flex: 1; min-width: 0; color: var(--gold); }
+    .plan-today-left { flex: none; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-today-title { margin: 0; color: var(--cream); font-size: var(--fs-20); line-height: 1.3; }
+    .plan-today-sub { margin: 4px 0 12px; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); line-height: 1.45; }
+    .plan-today-done .plan-today-head .plan-today-title { flex: 1; }
+    .plan-items { margin: 0 0 12px; }
+    .plan-item-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; margin: 0; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; }
+    .plan-items .root-row.plan-item-row { padding: 6px 12px; }
+    .plan-item-name { flex: 1; min-width: 0; color: var(--cream); font-size: var(--fs-20); }
+    .plan-item-row .root-row-title { flex: 1; min-width: 0; }
+    .plan-sheet .plan-items > li + li .root-row { border-top: 1px solid var(--border); }
+    .plan-item-meta { flex: none; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .plan-actions > .ui-btn { flex: 1 1 auto; }
+    .plan-week { margin-top: 14px; padding: 14px 10px; }
+    .plan-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; }
+    .plan-week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .plan-week-letter { color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-13); }
+    .plan-week-mark { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border: 1px solid var(--gold-border); border-radius: 50%; box-sizing: border-box; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-week-mark[data-done="1"] { border-color: var(--gold); background: var(--gold); color: var(--bg); font-weight: 600; }
+    .plan-week-mark[data-today="1"] { border: 2px solid var(--gold); color: var(--gold); }
+    .plan-week-mark[data-done="1"][data-today="1"] { color: var(--bg); }
+    .plan-week-line { margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); text-align: center; }
+    .plan-road-row { min-height: 60px; gap: 14px; padding-right: 14px; }
+    .plan-road-name { flex: 0 0 34%; min-width: 0; color: var(--cream); font-size: var(--fs-18); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .plan-road-row.is-current .plan-road-name { color: var(--gold); }
+    .plan-road-bar { flex: 1; height: 4px; border-radius: 2px; background: var(--border); overflow: hidden; }
+    .plan-road-bar > span { display: block; height: 100%; background: var(--gold); }
+    .plan-road-meta { flex: none; min-width: 5.2rem; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); text-align: right; }
+    .plan-page .root-section { margin-top: 26px; }
+    /* Schedule: the two tabs as one segmented control, the month history. */
+    .plan-seg { margin: 0 0 14px; }
+    .plan-cal { margin-bottom: 14px; padding: 12px; }
+    .plan-cal-name { margin: 0 0 8px; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); text-align: center; }
+    .plan-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; justify-items: center; }
+    .plan-cal-wd { color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-12); }
+    .plan-cal-day { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-13); }
+    .plan-cal-day[data-done="1"] { background: var(--gold); color: var(--bg); }
+    .plan-cal-day[data-today="1"] { box-shadow: inset 0 0 0 1.5px var(--gold); }
+    /* The plan sheets: the shared select-sheet with a left title and worded actions at the foot. */
+    .plan-sheet { max-height: 82vh; padding-bottom: calc(var(--inset-bottom, 0px) + 1rem); color: var(--cream); font-family: var(--font-body); }
+    .plan-sheet-title { margin: 0 0 4px; color: var(--cream); font-size: var(--fs-20); font-weight: 600; }
+    .plan-sheet-sub { margin: 0 0 12px; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    .plan-sheet-body .plan-opts { margin: 0 -14px; }
+    .plan-sheet-body .ui-btn.is-wide { margin-top: 14px; }
+    .plan-sheet-body .root-list { margin-bottom: 4px; }
+    .plan-sheet-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
+    .plan-sheet-actions .plan-danger { margin-left: auto; }
+    .plan-sheet-foot { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+    .plan-sheet-foot .plan-text-btn:last-child { color: var(--gold); font-weight: 600; }
+    /* Day done and the finish page. */
+    .plan-daydone { position: fixed; inset: 0; z-index: 260; display: flex; overflow-y: auto; background: var(--bg); color: var(--cream); font-family: var(--font-body); }
+    .plan-daydone-inner { width: 100%; max-width: 30rem; margin: auto; padding: calc(var(--inset-top, 0px) + 32px) 20px calc(var(--inset-bottom, 0px) + 32px); box-sizing: border-box; text-align: center; }
+    .plan-daydone-tick { display: inline-flex; align-items: center; justify-content: center; width: 96px; height: 96px; margin: 8px auto 18px; border: 1.5px solid var(--gold); border-radius: 50%; color: var(--gold); }
+    .plan-daydone-tick svg { width: 48px; height: 48px; }
+    .plan-daydone-title { margin: 0; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-30); font-weight: 400; letter-spacing: 0.04em; }
+    .plan-daydone-sub { margin: 8px 0 20px; color: var(--cream); font-size: var(--fs-18); }
+    .plan-daydone-mark { margin: 12px 0 0; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); letter-spacing: 0.04em; }
+    .plan-daydone-next { margin: 16px 0 20px; text-align: left; }
+    .plan-daydone-next .root-eyebrow { margin: 0 0 4px; }
+    .plan-daydone .ui-btn.is-wide, .plan-finished .ui-btn.is-wide { margin-top: 12px; }
+    .plan-finished { text-align: center; padding-top: 28px; }
+    .plan-finished .plan-daydone-tick { display: flex; }
+    .plan-finished .plan-facts { margin-bottom: 18px; }
+    /* Inside the reader: the session strip under the top bar, the end panel, the one-line ribbon outside a session. */
+    .plan-strip { position: sticky; top: 0; z-index: 5; margin: 0 0 6px; padding: 10px 16px 8px; border-bottom: 1px solid var(--gold-border); background: var(--bg); font-family: var(--pl-ui); }
+    .plan-strip-line { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; max-width: 36rem; margin: 0 auto 7px; }
+    .plan-strip-name { color: var(--gold); font-size: var(--fsc-14); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .plan-strip-left { flex: none; color: var(--cream-dim); font-size: var(--fsc-14); }
+    .plan-strip-segs { display: flex; gap: 6px; max-width: 36rem; margin: 0 auto; }
+    .plan-strip-segs > span { flex: 1; height: 3px; border-radius: 2px; background: var(--border); }
+    .plan-strip-segs > span[data-done="1"] { background: var(--gold); }
+    .plan-strip-segs > span[data-now="1"]:not([data-done]) { background: linear-gradient(90deg, var(--gold) 50%, var(--border) 50%); }
+    .plan-end { max-width: 34rem; margin: 18px auto 8px; text-align: center; font-family: var(--font-body); }
+    .plan-end-read { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 14px; color: var(--cream); font-size: var(--fs-18); }
+    .plan-end-note { margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
+    /* The Read tab's plan row: its text opens the plan's page. */
+    .upnext-open { min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+    .upnext-open .upnext-sub { min-height: 0; margin: 0; font-style: normal; }
+    .upnext-more { display: block; min-height: 36px; margin: -6px 0 2px 0.875rem; font-size: var(--fs-14); }
+    /* ══ end READING PLANS ══ */
     .home-status { width:100%; max-width:30rem; margin:0.5rem 0 0; color:var(--cream-muted); font-family:var(--font-body); font-size:var(--fs-14); }
     .home-status:empty { display:none; }
     .surprise-fab:disabled { opacity:0.6; cursor:wait; }
@@ -4204,7 +4203,6 @@
     .settings-seg { display:flex; gap:3px; margin:0 0.95rem 0.2rem; padding:3px; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg); }
     .settings-seg > button { flex:1; min-height:44px; border:0; border-radius:8px; background:transparent; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-15); cursor:pointer; }
     .settings-seg > button[aria-checked="true"] { background:var(--gold); color:var(--bg); }
-    .settings-seg-desc { padding-top:0.55rem; }
     .vot-large-text .settings-seg { margin-left:12px; margin-right:12px; }
     /* max-width + shrinkable label: 300%-cap spill fix (chip must never run
        off-screen; the mini toggle stays, the label wraps). */
@@ -4859,8 +4857,6 @@
     .part-chevron.is-open { transform:rotate(90deg); }
     /* Expanded chapter list: flush-indented, no decorative vertical rule. */
     .part-chapters { padding:0.5rem 0 0.2rem 0; margin:0.35rem 0 0.15rem 0; display:flex; flex-direction:column; gap:0.5rem; }
-    .study-external-card { border-style:dashed; border-color:var(--gold-border); text-decoration:none; }
-    .study-external-card .chapter-card-num { font-size:var(--fs-20); color:var(--gold-dim); }
     /* Resume-reading dot — lives IN the top nav (right cluster, left of the
        Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
        a position:fixed float over the top-right of index screens; in the nav
@@ -4875,40 +4871,8 @@
        only opacity breathes (compositor-only). The global reduced-motion block still stills it. */
     .reading-dot-nav .rdg-glyph { display:block; width:16px; height:16px; color:var(--gold); filter:drop-shadow(0 0 5px var(--gold-glow)); animation: ribbon-pulse 2.8s ease-in-out infinite; will-change:opacity; }
     @keyframes ribbon-pulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
-    .history-empty {
-      text-align:center; color:var(--cream-dim);
-      font-family:var(--font-body); padding:3.5rem 1.5rem 4rem;
-      max-width:28.75rem; margin:0 auto;
-    }
-    .history-empty-sigil {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-36);
-      color:var(--gold-dim); opacity:0.5; margin-bottom:1rem;
-    }
-    .history-empty-title {
-      font-family:'Cinzel Decorative',serif; font-size:var(--fs-24);
-      color:var(--gold-bright); margin-bottom:0.9rem;
-    }
-    .history-empty-body {
-      font-size:var(--fs-16); line-height:1.65; color:var(--cream-muted); font-style:italic;
-    }
-    /* n130: a history row is label, full-width title (wraps at word boundaries, never clamped
-       to a stub), then one meta line: progress · time · visits. */
-    .history-entry-eyebrow { display:flex; align-items:baseline; min-width:0; margin-bottom:0.18rem; }
-    .history-entry-eyebrow .chapter-card-label { margin-bottom:0; flex:0 1 auto; min-width:0; }
-    .history-entry-num { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.08em; text-transform:uppercase; color:var(--gold-dim); white-space:nowrap; flex-shrink:0; }
-    .history-entry-eyebrow .chapter-card-label + .history-entry-num::before { content:'·'; margin:0 0.45rem; }
-    .history-entry-card .chapter-card-title { display:block; -webkit-line-clamp:unset; overflow:visible; word-break:normal; overflow-wrap:break-word; }
-    .history-entry-meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:0.1rem 0.5rem; margin-top:0.3rem; }
-    .history-entry-meta > * + *::before { content:'·'; margin-right:0.5rem; color:var(--gold-dim); }
-    .history-entry-meta .idx-min-chip { margin-left:0; align-self:baseline; }
-    .history-entry-time { font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em; color:var(--gold-dim); white-space:nowrap; }
-    /* Result tally under the search box — states the count in words so the
-       filtered emptiness below it is never mistaken for a broken screen. */
-    .history-search-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:0.12em;
-      text-transform:uppercase; color:var(--gold-dim);
-      margin:-0.35rem 0 0.9rem; padding-left:0.15rem;
-    }
+    /* W2b (mock v2 l-hist): a history row is a ListRow; its reading chip reads as plain meta text. */
+    .history-entry-card .idx-min-chip { margin:0; padding:0; border:0; background:none; font:inherit; color:inherit; letter-spacing:0; }
     /* A broad search draws the newest 100 matches; this draws the rest (sweep W69). The tally's
        voice (Cinzel caps, dim gold) on a full-width hairline button, 44 px tall for a thumb. */
     .history-show-all {
@@ -4968,21 +4932,8 @@
     }
     .history-current-section { margin-top:0.6rem; }
     .history-day-section { margin-top:0.3rem; }
-    .history-day-header {
-      width:100%; display:flex; align-items:center; gap:0.55rem;
-      background:transparent; border:none; padding:0.85rem 1.2rem 0.6rem 1.8rem;
-      cursor:pointer; -webkit-tap-highlight-color:transparent; color:inherit;
-      min-height:46px;
-    }
-    .history-day-label {
-      font-family:'Cinzel',serif; font-size:var(--fs-15); letter-spacing:0.2em;
-      color:var(--gold); text-transform:uppercase; white-space:nowrap;
-    }
-    .history-day-count {
-      font-family:'Cinzel',serif; font-size:var(--fs-14); letter-spacing:0.08em;
-      color:var(--gold-dim);
-    }
-    .history-day-spacer { flex:1; min-width:1.5rem; }
+    .history-day-header { width:100%; display:flex; align-items:center; justify-content:space-between; gap:var(--sp-3); min-height:var(--tap); margin-top:var(--sp-2); padding:0; background:none; border:0; color:inherit; cursor:pointer; text-align:left; -webkit-tap-highlight-color:transparent; }
+    .history-day-header .ui-label { margin:0; }
     .history-chevron {
       font-size:var(--fs-24); color:var(--gold-dim); line-height:1;
       transition:transform 0.2s; flex-shrink:0;
@@ -4990,10 +4941,6 @@
       padding:0 0.2rem;
     }
     .history-chevron.is-open { transform:rotate(90deg); color:var(--gold); }
-    .history-day-section .chapter-cards { padding-left:0.9rem; }
-    /* "3 visits" beside the newest visit's time on the meta line: a day's repeats of one reading
-       are one row (journey row 3, 2026-09-12; the Deduplicate chore left with it). */
-    .history-entry-visits { font-family:var(--font-body); font-size:var(--fs-12); color:var(--cream-muted); white-space:nowrap; }
     .verse-sup { color:var(--gold); font-size:0.65em; margin-right:0.15em; font-family:'Cinzel',serif; }
     .fn-link { color:var(--gold); text-decoration:underline; }
     .inline-scrip-ref { color:var(--tap-ref); font-style:italic; text-decoration:none; border-bottom:1px dotted var(--tap-ref-sub); cursor:pointer; padding-bottom:0.02em; }
@@ -5197,13 +5144,6 @@
       text-shadow:0 1px 2px rgba(0,0,0,0.85);
     }
     body.light .tab-card-eyebrow { color:rgba(122,92,16,0.85); text-shadow:0 1px 2px rgba(247,242,232,0.8); }
-    /* [11] notebook color tags — card dot + drilled-header swatch row. */
-    .nb-card-dot { display:inline-block; width:0.55rem; height:0.55rem; border-radius:50%; margin-right:0.4rem; vertical-align:0.02rem; box-shadow:0 0 0 1px rgba(0,0,0,0.35); }
-    .nb-card-dot.is-none { background:transparent; box-shadow:inset 0 0 0 1px var(--cream-muted); }
-    .nb-color-row { display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center; padding:0.4rem 0 0.7rem; }
-    .nb-color-swatch { width:1.5rem; height:1.5rem; border-radius:50%; border:2px solid transparent; cursor:pointer; padding:0; }
-    .nb-color-swatch.selected { border-color:var(--cream); box-shadow:0 0 0 2px var(--gold-border); }
-    .nb-color-swatch.default { position:relative; }
     /* [7] pin badge on bulk-close-immune tabs. */
     .tab-card-pin { width:0.7rem; height:0.7rem; vertical-align:-0.12rem; margin-right:0.25rem; color:var(--gold); }
     /* [7] inline rename editor inside the TabActionSheet. */
@@ -5545,37 +5485,6 @@
        Tap 🎨 → chip expands to color row.
        Outside tap → dismisses entirely.
        ════════════════════════════════════════════════════════════ */
-    .ann-chip {
-      background: rgba(38,32,24,0.97);
-      border: 1px solid var(--gold-border);
-      border-radius: 12px;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.55);
-      display: flex; align-items: stretch;
-      overflow: hidden;
-      animation: annChipIn 0.16s ease;
-      -webkit-user-select: none; user-select: none;
-    }
-    body.light .ann-chip { background: rgba(232,222,200,0.97); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
-    @keyframes annChipIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-    .ann-chip-btn {
-      background: none; border: none;
-      padding: 9px 13px;
-      display: flex; flex-direction: column; align-items: center; gap: 2px;
-      color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, color 0.12s;
-      min-width: 56px;
-    }
-    .ann-chip-btn + .ann-chip-btn { border-left: 1px solid rgba(224,201,127,0.12); }
-    .ann-chip-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
-    .ann-chip-btn svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-    /* Destructive Remove sits LAST in the chip, behind a real gutter + a
-       stronger divider, so a tap aimed at Color/Style/Note can't reach it. */
-    .ann-chip-btn.danger { color: var(--danger); margin-left: 6px; border-left: 1px solid var(--gold-border); }
-    .ann-chip-btn.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
     /* Confirm strip — replaces the chip in place. */
     .ann-chip-confirm {
       display: flex; align-items: center; gap: 10px;
@@ -5601,79 +5510,63 @@
     .ann-chip-confirm-yes { color: var(--danger); border-color: rgba(239,154,154,0.35); }
     .ann-chip-confirm-yes:active { background: rgba(244,143,177,0.18); color: var(--accent-pink); }
     /* Color row inside the chip (replaces buttons when 🎨 is tapped). */
-    .ann-chip-colors {
-      display: flex; align-items: center; gap: 8px;
-      padding: 9px 11px;
-      max-width: min(360px, calc(100vw - 16px));
-      overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .ann-chip-colors::-webkit-scrollbar { display: none; }
-    .ann-chip-color-btn {
-      width: 34px; height: 34px; border-radius: 50%;   /* U06.2 / RC.10: the toolbar's size, a thumb's target */
-      border: 1.5px solid transparent;
-      cursor: pointer; flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-      transition: transform 0.12s, border-color 0.12s;
-    }
-    .ann-chip-color-btn:active { transform: scale(0.88); }
-    .ann-chip-color-btn.active { border-color: var(--cream); box-shadow: 0 0 0 2px var(--gold) inset; }
-    .ann-chip-color-btn[data-color="yellow"] { background: var(--hl-yellow); }
-    .ann-chip-color-btn[data-color="green"]  { background: var(--hl-green); }
-    .ann-chip-color-btn[data-color="pink"]   { background: var(--hl-pink); }
-    .ann-chip-color-btn[data-color="red"]    { background: var(--hl-red); }
-    .ann-chip-color-btn[data-color="orange"] { background: var(--hl-orange); }
-    .ann-chip-color-btn[data-color="blue"]   { background: var(--hl-blue); }
-    .ann-chip-color-btn[data-color="purple"] { background: var(--hl-purple); }
-    .ann-chip-color-btn[data-color="teal"]   { background: var(--hl-teal); }
-    .ann-chip-color-btn[data-color="brown"]  { background: var(--hl-brown); }
-    .ann-chip-color-btn[data-color="gray"]   { background: var(--hl-gray); }
-    .ann-chip-back {
-      background: none; border: none;
-      padding: 6px 4px;
-      color: var(--cream-muted); cursor: pointer;
-      font-size: var(--fs-18); line-height: 1;
-      -webkit-tap-highlight-color: transparent;
-      flex-shrink: 0;
-    }
-    .ann-chip-back:active { color: var(--cream); }
 
-    /* ── SELECTION TOOLBAR ───────────────────────────────────────── */
-    .sel-toolbar {
-      position: fixed; z-index: 9000;
-      background: rgb(38,32,24); border: 1px solid var(--gold-border);
-      border-radius: 14px; padding: 8px 10px 6px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.6);
-      display: flex; flex-direction: column; gap: 4px;
-      opacity: 1;
-      animation: selToolbarIn 0.16s ease;
-      width: max-content; max-width: min(360px, calc(100vw - 16px));
+    /* ── W2e readers (mock v2 r-sel, r-mark): the reader's action sheet. The selection's bar and a
+       tapped mark's chip are one bottom sheet docked at the foot (never placed against the words, so it
+       never moves the page): style switch, ten colours in a row, worded tiles, then a pair row. ── */
+    .rd-sheet {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 9000;
+      display: flex; flex-direction: column; max-height: 85vh; overflow-y: auto;
+      background: var(--surface-1); border-radius: var(--r-sheet) var(--r-sheet) 0 0;
+      padding: var(--sp-5) var(--gutter) calc(var(--inset-bottom, 0px) + var(--sp-6));
+      box-shadow: 0 -10px 30px rgba(0,0,0,0.6);
+      animation: rdSheetIn 0.18s ease;
       -webkit-user-select: none; user-select: none;
-      /* No backdrop-filter — promotes the toolbar to a GPU layer and makes
-         the action labels and "A" style buttons render fuzzy. The background
-         is SOLID (7c, 2026-09-24): at 0.97 alpha a settled capture still
-         showed the letter text through it, over the Listen from here row. */
     }
-    body.light .sel-toolbar { background: rgb(232,222,200); box-shadow: 0 6px 22px rgba(0,0,0,0.22); }
-    /* cp1 sweep: while the selection is being changed (a handle drag, Shift+
-       arrows) the toolbar steps aside — it sat two lines above the words, over
-       the lines a start handle is dragged up into — and fades back where the
-       selection settles (SelectionToolbar SETTLE_MS). */
-    .sel-toolbar { transition: opacity 0.12s ease; }
+    body.light .rd-sheet { box-shadow: 0 -10px 30px rgba(0,0,0,0.14); }
+    :is(.rd-sheet, .rd-form-sheet)::before { content: ''; position: absolute; top: 8px; left: 50%; width: 36px; height: 4px; margin-left: -18px; border-radius: 2px; background: var(--surface-3); }
+    @keyframes rdSheetIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+    /* cp1 sweep: while the selection is being changed (a handle drag, Shift+arrows) the sheet steps aside
+       and fades back where the selection settles (SelectionToolbar SETTLE_MS). */
+    .sel-toolbar.rd-sheet { transition: opacity 0.12s ease; }
     .sel-toolbar.is-adjusting { opacity: 0; pointer-events: none; }
-    /* Animate ONLY opacity (transform is set via inline style for positioning,
-       and animating transform here clobbered the inline translateY(-100%)
-       that makes the toolbar sit above the y-coordinate). */
-    @keyframes selToolbarIn {
-      from { opacity:0; }
-      to   { opacity:1; }
+    .ann-chip.rd-sheet { z-index: 3000; }
+    .rd-sheet-scrim { position: fixed; inset: 0; z-index: 2999; }
+    .rd-quote {
+      margin: 2px 0 12px; padding-left: 12px; border-left: 2px solid var(--surface-3);
+      color: var(--text-2); font-family: var(--font-serif); font-style: italic; font-size: var(--ts-body); line-height: 1.45;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
     }
-    .sel-toolbar-row { display: flex; align-items: center; gap: 6px; }
-    .sel-toolbar-styles { padding: 2px 0; }
-    .sel-toolbar-divider {
-      width: 1px; height: 24px; background: var(--gold-border);
-      margin: 0 4px; flex-shrink: 0;
+    .rd-seg { background: var(--surface-2); }
+    .rd-seg .sel-style-btn { width: auto; height: auto; min-height: var(--seg-h); border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; }
+    .rd-seg .sel-style-btn.active { border: 0; background: var(--surface-3); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--accent-ring); }
+    .rd-colors { display: flex; justify-content: space-between; margin: 14px 1px; }
+    .rd-colors .sel-color-btn { position: relative; width: 28px; height: 28px; padding: 0; }
+    .rd-colors .sel-color-btn:not(.sel-color-underline):not(.sel-color-squiggle) { border: 0; }
+    .rd-colors .sel-color-btn::before { content: ''; position: absolute; inset: -8px -4px; }
+    .rd-colors .sel-color-btn.active { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--text-1); }
+    .rd-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .rd-tiles.is-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .rd-tile, .rd-pair-btn, .sel-link-choice-btn {
+      display: flex; align-items: center; justify-content: center; border: 0; border-radius: var(--r-field);
+      background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); font-weight: 500;
+      cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background-color var(--press) ease;
     }
+    .rd-tile { flex-direction: column; gap: 5px; min-height: 58px; padding: 6px 4px; font-size: var(--ts-meta); }
+    .rd-pair { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
+    .rd-pair-btn, .sel-link-choice-btn { flex: 1 1 40%; gap: 7px; min-height: var(--tap); padding: 0 12px; font-size: var(--ts-value); white-space: nowrap; }
+    .rd-pair-btn.sel-repeat-btn { flex: 0 1 auto; }
+    .rd-tile svg, .rd-pair-btn svg { flex-shrink: 0; color: var(--accent); }
+    .rd-tile:active, .rd-pair-btn:active, .sel-link-choice-btn:active { background: var(--surface-3); }
+    :is(.rd-tile, .rd-pair-btn).is-danger, :is(.rd-tile, .rd-pair-btn).is-danger svg { color: var(--tone-danger); }
+    :is(.rd-tile, .rd-pair-btn, .sel-link-choice-btn, .sel-link-choice-cancel):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    /* cp2: Share held offers the website link too, in a row above the tiles. */
+    .sel-link-choice { display: flex; gap: 10px; margin-bottom: 8px; }
+    .sel-link-choice-cancel { flex: 0 0 auto; min-height: var(--tap); padding: 0 14px; border: 0; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
+    .rd-sheet .ann-chip-confirm { padding: 4px 0; }
+    /* ── end W2e readers (r-sel, r-mark) ── */
+
+    /* ── the style buttons and colour dots (NoteSheet shares them) ── */
     /* Style toggle: highlight-fill "A" and underline "A" */
     .sel-style-btn {
       width: 30px; height: 30px; border-radius: 8px;
@@ -5685,11 +5578,7 @@
       transition: border-color 0.12s, background 0.12s, color 0.12s;
       flex-shrink: 0;
     }
-    .sel-style-btn-underline .sel-style-glyph { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
-    .sel-style-btn-squiggle .sel-style-glyph { text-decoration: underline; text-decoration-style: wavy; text-decoration-thickness: 1.6px; text-underline-offset: 2px; }
     /* A06.5: each glyph says what it is under it. */
-    .sel-style-btn:has(.sel-style-name) { width: auto; min-width: 44px; height: auto; min-height: 44px; padding: 2px 6px; flex-direction: column; gap: 1px; }
-    .sel-style-name { font-family: var(--font-ui, system-ui, sans-serif); font-size: var(--fsc-10, 10px); font-weight: 500; letter-spacing: 0; line-height: 1.1; }
     .sel-style-btn.active {
       border-color: var(--gold); background: var(--gold-faint);
       color: var(--gold);
@@ -5697,11 +5586,7 @@
     /* Color circles. They WRAP onto a second row (zones L2, 2026-10-05): the row scrolled sideways, so on a
        360 or 412 px phone purple, teal, brown and gray sat out of sight past the bar's edge with nothing to
        say they were there (tools/e2e-phone-fit.mjs W1). Same colours, same size. */
-    .sel-toolbar-colors {
-      display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
-      flex-grow: 1; min-width: 0;
-      padding: 2px 0;
-    }
+
     .sel-color-btn {
       width: 34px; height: 34px; border-radius: 50%;   /* U06.2: 26 px dots at a 32 px pitch took near misses */
       border: 2px solid transparent; cursor: pointer;
@@ -5752,28 +5637,17 @@
     .sel-color-btn.sel-color-squiggle[data-color="teal"]   { border-color: var(--hl-teal); }
     .sel-color-btn.sel-color-squiggle[data-color="brown"]  { border-color: var(--hl-brown); }
     .sel-color-btn.sel-color-squiggle[data-color="gray"]   { border-color: var(--hl-gray); }
-    /* Clear/remove circle (X) at end of color row */
-    /* Gap before the destructive ✕ so it reads as its own action, not the
-       next swatch in the color row (it was flush against the last color). */
-    .sel-color-clear {
-      background: transparent; color: var(--cream-dim);
-      border: 2px solid var(--gold-border);
-      display: flex; align-items: center; justify-content: center;
-      font-size: var(--fs-14); font-weight: 600;
-      margin-left: 10px;
-    }
-    .sel-color-clear:active { background: rgba(244,143,177,0.2); border-color: var(--accent-pink) !important; color: var(--accent-pink); }
     /* Blank ("no color") swatch — outline circle + diagonal slash (the
        universal "none" glyph). Shown in the note + chip color rows only when
        the Highlight style is active; squiggle/underline are always a visible
        color, so blank never appears there. Distinct from the underline/
        squiggle rings (no slash) and from solid highlight fills. */
-    .sel-color-btn[data-color="blank"], .ann-chip-color-btn[data-color="blank"] {
+    .sel-color-btn[data-color="blank"] {
       background: transparent;
       border: 2px solid var(--cream-dim);
       position: relative; overflow: hidden;
     }
-    .sel-color-btn[data-color="blank"]::after, .ann-chip-color-btn[data-color="blank"]::after {
+    .sel-color-btn[data-color="blank"]::after {
       content: ''; position: absolute; left: 50%; top: 50%;
       width: 2px; height: 150%; background: var(--cream-dim);
       transform: translate(-50%, -50%) rotate(45deg);
@@ -5781,95 +5655,6 @@
     /* Side-scroll cue — fade the right edge of the color strips so it's clear
        the palette continues off-screen (the colors overflow horizontally on
        a phone). Applied to all three color rows for consistency. */
-    .sel-toolbar-colors, .ann-chip-colors, .note-sheet-menu-colors {
-      -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
-      mask-image: linear-gradient(to right, #000 calc(100% - 20px), transparent);
-    }
-    /* Action button row: 5 buttons, equal-width grid */
-    /* 3-across so the 6 actions form two balanced rows (5-across left a lone
-       orphan button wrapping onto its own row) and each target gets wider. */
-    .sel-toolbar-actions {
-      display: grid; grid-template-columns: repeat(3, 1fr);
-      gap: 2px; padding-top: 4px;
-      border-top: 1px solid var(--gold-border);
-    }
-    /* Plain words under the icons ("Note", "Bookmark"), not 10 px capitals: the
-       redesign's round 6 (2026-09-25) drew every take this way, and each of the
-       three columns has ~105 px, room for "Bookmark" at 13 px. Pinned to px
-       below, like the rest of the toolbar. */
-    .sel-action-btn {
-      display: flex; flex-direction: column; align-items: center; gap: 4px;
-      padding: 8px 6px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: none;
-      color: var(--cream-dim); font-family: var(--font-body);
-      font-size: var(--fs-13); letter-spacing: 0; text-transform: none;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .sel-action-btn:active { background: var(--gold-faint); }
-    .sel-action-btn svg { width: 18px; height: 18px; stroke: var(--cream-dim); fill: none; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-    /* LISTEN FROM HERE (item 7, 2026-09-24): an outlined action in its own
-       row between the colours and the six actions (Codex mockup r1 option 2);
-       rendered only on text with a recording. Gold, so it reads as the
-       listening action, not a seventh annotation tool; 44 px tall with a
-       12 px semibold label and a solid gold edge after Codex's critique of the
-       built row (7b). */
-    .sel-toolbar-listen { padding-top: 2px; gap: 0; }
-    .sel-listen-btn {
-      flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold);
-      color: var(--gold); font-family: 'Cinzel', serif;
-      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .sel-listen-btn:active { background: var(--gold-faint); }
-    /* cp2: Share held offers the website link too, in a row above the actions. */
-    .sel-link-choice { gap: 8px; }
-    .sel-link-choice-btn {
-      flex: 1 1 auto; min-height: 44px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold); color: var(--gold);
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .sel-link-choice-btn:active { background: var(--gold-faint); }
-    .sel-link-choice-cancel {
-      flex: 0 0 auto; min-width: 44px; min-height: 44px; border-radius: 8px; cursor: pointer;
-      background: none; border: 1px solid transparent; color: var(--cream-muted); font-size: var(--fs-15);
-      -webkit-tap-highlight-color: transparent;
-    }
-    .sel-listen-btn svg { width: 15px; height: 15px; fill: var(--gold); stroke: none; flex-shrink: 0; }
-    /* REPEAT (rp1 part 3, mockup r1-repeat.png): the right-hand segment of the
-       same outlined box, Listen from here on the left, one gold divider. */
-    .sel-repeat-btn {
-      flex: 0 0 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 44px; padding: 6px 14px; border-radius: 0 8px 8px 0; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold); border-left-width: 0;
-      color: var(--gold); font-family: 'Cinzel', serif;
-      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .sel-repeat-btn:active { background: var(--gold-faint); }
-    .sel-repeat-btn svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .sel-listen-btn:not(:last-child) { border-radius: 8px 0 0 8px; }
-    /* THE SCRIPTURE WEB'S DOOR (the navigation stream; review of 2026-10-18): its own row under the
-       six actions, the Listen row's outlined shape, since as a seventh action it laid the grid of
-       three out 3/3/1 with an orphan; full width, so it says what it does ("Show in Scripture Web") */
-    .sel-toolbar-web { padding-top: 4px; }
-    .sel-web-btn {
-      flex: 1 1 auto; display: flex; align-items: center; justify-content: center; gap: 8px;
-      min-height: 44px; padding: 6px 12px; border-radius: 8px; cursor: pointer;
-      background: transparent; border: 1px solid var(--gold);
-      color: var(--gold); font-family: 'Cinzel', serif;
-      font-size: var(--fs-12); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .sel-web-btn:active { background: var(--gold-faint); }
-    .sel-web-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
-
     /* ── LINK ICON (next to verse) ───────────────────────────────── */
     .verse-link-icon {
       display: inline-flex; align-items: center; justify-content: center;
@@ -6107,24 +5892,6 @@
 
     /* ── Navigation picker (full picker UI, replaces old simple picker) ── */
     .navpick-sheet { padding: 0; }
-    .navpick-header {
-      display: flex; align-items: center; gap: 14px;
-      padding: 18px 20px 12px;
-    }
-    .navpick-check {
-      width: 22px; height: 22px;
-      stroke: var(--cream); flex-shrink: 0;
-    }
-    .navpick-title {
-      font-family: 'Cinzel', serif; font-size: var(--fs-18);
-      color: var(--cream); flex: 1;
-    }
-    .navpick-close {
-      background: none; border: none; color: var(--cream-dim);
-      font-size: var(--fs-30); line-height: 1; padding: 0 6px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .navpick-close-undo { color: var(--alert); }
     .navpick-confirm-green {
       background: none; border: none; padding: 0 6px;
       cursor: pointer; -webkit-tap-highlight-color: transparent;
@@ -6139,20 +5906,6 @@
       cursor: not-allowed;
       color: var(--cream-dim);
     }
-    .navpick-search-wrap {
-      padding: 4px 18px 12px;
-    }
-    .navpick-search-input {
-      width: 100%; padding: 12px 18px;
-      background: rgba(70,62,48,0.55);
-      border: 1px solid transparent; border-radius: 999px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-16);
-      outline: none; transition: border-color 0.15s, background 0.15s;
-    }
-    body.light .navpick-search-input { background: var(--bg); color: var(--input-text); border-color: var(--gold-border); }
-    .navpick-search-input::placeholder { color: var(--cream-muted); }
-    .navpick-search-input:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
     .navpick-body {
       flex: 1; overflow-y: auto;
       padding: 0 18px 20px;
@@ -6215,62 +5968,11 @@
       color: var(--cream-muted); line-height: 1.5;
     }
     /* ── LinkPicker mode tabs (Search / Browse / Recent) ── */
-    .navpick-tabs {
-      display: flex; gap: 6px;
-      margin: 2px 18px 10px; padding: 3px;
-      background: rgba(0,0,0,0.25);
-      border: 1px solid var(--gold-border); border-radius: 999px;
-    }
-    body.light .navpick-tabs { background: rgba(0,0,0,0.05); }
-    .navpick-tab {
-      flex: 1; min-height: 38px;
-      background: transparent; border: none; border-radius: 999px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--cream-muted);
-      cursor: pointer; transition: background 0.15s ease, color 0.15s ease;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .navpick-tab.active {
-      background: rgba(200,164,86,0.16); color: var(--gold-bright);
-      border: 1px solid var(--gold-border);
-    }
-    body.light .navpick-tab.active { color: #7a5c1e; }
     /* ── Search scope toggle (Titles & refs / Full text) ── */
-    .navpick-scope {
-      display: flex; gap: 18px;
-      margin: 4px 22px 0; padding: 0 2px;
-    }
-    .navpick-scope-btn {
-      background: transparent; border: none; border-bottom: 2px solid transparent;
-      padding: 8px 2px; min-height: 36px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.15s ease, border-color 0.15s ease;
-    }
-    .navpick-scope-btn.active { color: var(--gold-bright); border-bottom-color: var(--gold); }
-    body.light .navpick-scope-btn.active { color: #7a5c1e; }
     /* ── Corpus chips (All / Scriptures / Volumes) — SearchScreen's
        .srch-corpus-row control wearing the picker's sheet chrome. Full 44px
        tap height (the underlined scope row above is a text toggle; these are
        standalone pills the finger aims at). ── */
-    .navpick-corpus {
-      display: flex; gap: 6px;
-      margin: 10px 22px 0;
-    }
-    .navpick-corpus-btn {
-      flex: 1; min-height: 44px; padding: 0 6px;
-      background: transparent; border: 1px solid var(--gold-border); border-radius: 999px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
-      text-transform: uppercase; color: var(--cream-muted); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
-    }
-    .navpick-corpus-btn.active {
-      background: var(--gold-faint); color: var(--gold-bright); border-color: var(--gold-dim);
-    }
-    body.light .navpick-corpus-btn.active { color: #7a5c1e; }
-    .navpick-corpus-btn:active { background: rgba(200,164,86,0.15); }
     .navpick-scope-jump {
       margin-top: 16px; padding: 10px 22px; min-height: 44px;
       background: rgba(200,164,86,0.10); border: 1px solid var(--gold-border);
@@ -6296,7 +5998,6 @@
       font-family: 'Cinzel', serif; font-size: var(--fs-13); letter-spacing: 0.08em;
       color: var(--cream); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
-    .navpick-row-chevron { margin-left: auto; color: var(--gold-dim); font-size: var(--fs-18); flex-shrink: 0; }
     /* ── Chapter grid (a Bible book / Matthew Study Bible) ── */
     .navpick-ch-grid {
       display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
@@ -6390,19 +6091,6 @@
     .picker-letter-block { transition: background-color 0.35s ease; border-radius: 4px; }
     .picker-letter-block.picker-find-hit { background-color: rgba(200,164,86,0.16); }
     body.light .picker-letter-block.picker-find-hit { background-color: rgba(168,126,40,0.18); }
-    .navpick-flash {
-      display: flex; align-items: center; gap: 8px;
-      margin: 0 18px 8px;
-      padding: 8px 14px;
-      background: rgba(31,121,165,0.18);
-      border-left: 2px solid var(--link-blue);
-      border-radius: 0 6px 6px 0;
-      color: #b9d8e9;
-      font-family: var(--font-body); font-size: var(--fs-15);
-      animation: navpickFlashIn 0.18s ease-out;
-    }
-    .navpick-flash svg { width: 18px; height: 18px; flex-shrink: 0; }
-    body.light .navpick-flash { background: rgba(64,153,198,0.18); color: #1f5876; }
     @keyframes navpickFlashIn {
       from { opacity: 0; transform: translateY(-4px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -6565,28 +6253,11 @@
          insets) so the sheet always sits inside the safe region. */
       max-height: 100%; overflow-y: auto;
     }
-    body.light .note-sheet { background: var(--bg3); }
     .note-sheet-header {
       display: flex; align-items: center; gap: 10px;
       margin-bottom: 12px;
     }
     /* #10: the dot is 18 px; the button around it is the 44 px a finger needs, laid out as the dot. */
-    .note-sheet-color-hit {
-      display: flex; align-items: center; justify-content: center;
-      width: 44px; height: 44px; margin: -13px; padding: 0;
-      background: none; border: none; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .note-sheet-color-dot {
-      display: block;
-      width: 18px; height: 18px; border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.15);
-      flex-shrink: 0; padding: 0;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: transform 0.12s, box-shadow 0.12s;
-    }
-    @media (hover: hover) { .note-sheet-color-dot:hover { transform: scale(1.1); box-shadow: 0 0 0 2px rgba(214,179,95,0.25); } }
-    .note-sheet-color-dot:active { transform: scale(0.92); }
     .note-sheet-title {
       flex: 1;
       font-family: 'Cinzel', serif; font-size: var(--fs-12);
@@ -6606,140 +6277,18 @@
     }
     .note-sheet-menu-btn:active { background: rgba(224,201,127,0.10); color: var(--gold); }
     .note-sheet-menu-btn svg { width: 18px; height: 18px; }
-    .note-sheet-anchor {
-      font-family: var(--font-body);
-      font-size: var(--fs-15); font-style: italic;
-      color: var(--cream-muted); line-height: 1.5;
-      padding: 8px 12px; margin-bottom: 12px;
-      border-left: 2px solid var(--gold-border);
-      background: rgba(200,164,86,0.04); border-radius: 0 6px 6px 0;
-    }
     /* Relative date under the anchor in NoteSheet read mode. */
-    .note-sheet-date {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold-dim);
-      margin: -8px 0 12px;
-    }
-    .note-sheet-body {
-      font-family: var(--font-body);
-      font-size: var(--fs-16); color: var(--cream);
-      line-height: 1.6; white-space: pre-wrap; word-break: break-word;
-      padding: 4px 2px 10px;
-    }
-    .note-sheet-empty {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-15); color: var(--cream-muted);
-      padding: 14px 2px; text-align: center;
-    }
     /* Empty-note primary action — a real tappable affordance instead of a
        "Tap ⋯ → Edit" instruction. Dashed outline reads as "fill me in". */
-    .note-sheet-empty-btn {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      width: 100%; margin: 10px 0 4px; padding: 12px;
-      background: transparent;
-      border: 1px dashed var(--gold-border); border-radius: 8px;
-      color: var(--gold-dim); cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s, border-color 0.12s, background 0.12s;
-    }
-    .note-sheet-empty-btn svg { width: 15px; height: 15px; }
-    .note-sheet-empty-btn:active { color: var(--gold); border-color: var(--gold); background: var(--gold-faint); }
-    @media (hover: hover) { .note-sheet-empty-btn:hover { color: var(--gold); border-color: var(--gold); } }
-    .note-sheet-textarea {
-      width: 100%; min-height: 120px; padding: 10px 14px;
-      background: var(--bg); border: 1px solid var(--gold-border);
-      border-radius: 8px; color: var(--cream-dim); resize: vertical;
-      font-family: var(--font-body); font-size: var(--fs-16);
-      outline: none; transition: border-color 0.15s;
-      box-sizing: border-box;
-    }
-    body.light .note-sheet-textarea { background: var(--bg); color: var(--input-text); }
-    .note-sheet-textarea:focus { border-color: var(--gold); }
-    .note-sheet-footer {
-      display: flex; gap: 10px; margin-top: 12px;
-    }
     /* Discard ConfirmStrip swaps in for the footer when a dismissal
        arrives with unsaved note text (honest-Save, 2026-07-12). */
     .note-sheet-discard-confirm { margin-top: 12px; width: 100%; }
-    .note-sheet-save {
-      flex: 1; min-height: 44px;
-      padding: 11px; border-radius: 8px; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.16em; text-transform: uppercase;
-      background: var(--gold); border: 1px solid var(--gold);
-      color: var(--bg); transition: background 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .note-sheet-save:active { background: var(--gold-bright); }
-    .note-sheet-save.disabled, .note-sheet-save:disabled {
-      background: transparent;
-      border-color: var(--gold-border);
-      color: var(--cream-muted);
-      cursor: not-allowed;
-      opacity: 0.55;
-    }
-    .note-sheet-save.disabled:active, .note-sheet-save:disabled:active { background: transparent; }
-    .note-sheet-secondary {
-      flex: 1; min-height: 44px;
-      padding: 11px; border-radius: 8px; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.16em; text-transform: uppercase;
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-dim); transition: background 0.15s, color 0.15s, border-color 0.15s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .note-sheet-secondary:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
     /* ⋯ menu panel — slides in below the header */
-    .note-sheet-menu {
-      margin-top: 8px;
-      border: 1px solid var(--gold-border); border-radius: 10px;
-      overflow: hidden;
-      background: rgba(0,0,0,0.18);
-    }
-    body.light .note-sheet-menu { background: rgba(0,0,0,0.04); }
-    .note-sheet-menu-item {
-      display: block; width: 100%; padding: 12px 16px;
-      background: none; border: none;
-      text-align: left; cursor: pointer;
-      font-family: 'Cinzel', serif; font-size: var(--fs-11);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-dim);
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, color 0.12s;
-    }
-    .note-sheet-menu-item + .note-sheet-menu-item { border-top: 1px solid rgba(224,201,127,0.10); }
-    .note-sheet-menu-item:active { background: rgba(224,201,127,0.08); color: var(--gold); }
     /* Destructive Delete gets a visible gap + stronger rule above it so it
        reads as its own zone below the routine menu items. */
-    .note-sheet-menu-item.danger { color: var(--danger); margin-top: 6px; border-top: 1px solid rgba(224,201,127,0.25); }
-    .note-sheet-menu-item.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
-    .note-sheet-menu-item.disabled { color: var(--cream-muted); opacity: 0.5; cursor: not-allowed; }
-    .note-sheet-menu-item.disabled:active { background: none; color: var(--cream-muted); }
-    .note-sheet-menu-colors {
-      display: flex; align-items: center; gap: 8px;
-      padding: 12px 14px;
-      flex-wrap: wrap;
-    }
     /* Edit-mode style + color picker (mirrors the selection toolbar): the 3
        style buttons + a divider + the horizontally-scrolling color row. */
-    .note-edit-style-row {
-      display: flex; align-items: center; gap: 6px;
-      padding: 4px 16px 10px;
-      min-width: 0;
-    }
     /* Notebook row in edit mode — tappable, shows current assignment */
-    .note-edit-nb-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 8px 16px 6px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      border: none; background: none; width: 100%; text-align: left;
-      color: var(--cream-dim); font-size: var(--fs-13);
-    }
-    .note-edit-nb-row:active { color: var(--gold); }
-    .note-edit-nb-row svg { flex-shrink: 0; width: 14px; height: 14px; stroke: var(--gold-dim); }
 
     /* ══════════════════════════════════════════════════════════════
        LIBRARY SCREEN — the reader's own things, one row each (the
@@ -6789,118 +6338,29 @@
     }
     /* (The old Library list, .library-grid / .library-tile*, was removed with the UI pass (W1): LibraryScreen draws .root-*.) */
 
-    /* ══════════════════════════════════════════════════════════════
-       PROGRESS SCREEN — read-only dashboard unifying mark-as-read
-       progress, streaks, journaling, listening, library counts and the
-       most-annotated sources. The redesign (2026-09-25, Codex mockup r5
-       take 1): one summary sentence, the 14-day chart, then plain
-       sections of label / value rows on hairlines, the Settings and
-       Library rows' language. The grid of gold-outlined stat boxes and
-       the boxed cards went, and nothing here is under 12 px.
-       ════════════════════════════════════════════════════════════ */
-    .prg-screen {
-      max-width: 40rem; margin: 0 auto;
-      padding: 1.25rem 1.2rem 4rem;
-      width: 100%;
-    }
-    .prg-summary {
-      margin: 0 0 1.5rem;
-      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1.45;
-      color: var(--cream);
-    }
-    .prg-section { margin: 0 0 1.9rem; }
-    /* Wraps at a large Text Size: the figure drops to its own line at the right
-       ("12 of 89 reached" ran 66 px past a 360 px screen at 180 %, the 09-25 walk). */
-    .prg-section-head {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 1rem; row-gap: 0.15rem;
-      padding-bottom: 0.45rem; border-bottom: 1px solid var(--border);
-    }
-    .prg-section-head h2 {
-      margin: 0;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); font-weight: 400;
-      letter-spacing: 0.12em; text-transform: uppercase; color: var(--gold-dim);
-    }
-    .prg-section-meta {
-      margin-left: auto;
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; white-space: nowrap;
-    }
-    .prg-facts { margin: 0; }
-    /* A row wraps rather than squeezes: at a large Text Size the value drops to
-       its own line at the right, whole ("3h 24m", never "3h / 24m"), and the
-       label keeps the width (measured at 180 % on 360 px). */
-    .prg-fact {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 1rem; row-gap: 0.15rem;
-      min-height: 2.75rem; box-sizing: border-box; padding: 0.6rem 0;
-      border-bottom: 1px solid var(--border);
-    }
-    .prg-fact dt { min-width: 0; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-    .prg-fact dd {
-      margin: 0 0 0 auto; text-align: right; white-space: nowrap;
-      font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums;
-    }
-    /* A shelf: name and tally, a thin bar under them. */
-    .prg-row, .prg-note, .prg-history-row, .prg-src-row { border-bottom: 1px solid var(--border); }
-    .prg-row { display: flex; flex-direction: column; gap: 0.45rem; padding: 0.7rem 0 0.8rem; }
-    .prg-row-head {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 0.75rem; row-gap: 0.15rem;
-    }
-    .prg-row-label { min-width: 0; font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-    .prg-row-tally {
-      margin-left: auto;
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; text-align: right;
-    }
-    .prg-words-note { white-space: nowrap; }
-    .prg-bar { height: 3px; border-radius: 2px; background: var(--gold-faint); overflow: hidden; }
-    .prg-bar-fill { height: 100%; border-radius: 2px; background: var(--gold-dim); }
-    .prg-history-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; padding: 0.7rem 0; }
-    .prg-history-label { font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim); }
-    .prg-note {
-      padding: 0.8rem 0;
-      font-family: var(--font-body); font-size: var(--fs-15); color: var(--cream-muted); line-height: 1.5;
-    }
-    .prg-retry {
-      margin-left: 0.25rem; min-height: 44px; padding: 0 1.2rem; border-radius: 999px;
-      border: 1px solid var(--gold-border); background: transparent; color: var(--cream); font: inherit; cursor: pointer;
-    }
-    .prg-src-row { display: flex; align-items: baseline; gap: 0.75rem; padding: 0.7rem 0; }
-    .prg-src-main { flex: 1; display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
-    .prg-src-title {
-      font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-dim);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .prg-src-col { font-family: var(--font-body); font-size: var(--fs-13); color: var(--cream-muted); }
-    /* 14-day words-read mini bars, on the page rather than in a box. Bars are
-       purely decorative (aria-hidden); the accessible summary is the sr-only
-       sentence beside them. */
-    .prg-days-wrap { margin: 0 0 1.9rem; }
-    .prg-days-head {
-      display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between;
-      column-gap: 0.75rem; row-gap: 0.15rem;
-      margin-bottom: 0.55rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12); letter-spacing: 0.12em;
-      text-transform: uppercase; color: var(--gold-dim);
-    }
-    .prg-days-head > :last-child {
-      margin-left: auto;
-      font-family: var(--font-body); font-size: var(--fs-14); letter-spacing: 0;
-      text-transform: none; color: var(--cream-muted); white-space: nowrap;
-    }
-    .prg-days-bars {
-      display: flex; align-items: flex-end; gap: 0.25rem;
-      height: 2.75rem; border-bottom: 1px solid var(--border);
-    }
-    .prg-days-bar {
-      flex: 1; min-width: 0;
-      height: 2px; /* zero-word baseline; read days get an inline % height */
-      border-radius: 2px 2px 0 0;
-      background: var(--gold-dim);
-    }
+    /* ── W2b PROGRESS (mock v2 l-prog, l-prog2): three tiles, the 14-day chart card, then cards of rows. ── */
+    .prg-section { margin: 0; }
+    .prg-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-2); margin-top: var(--sp-2); }
+    .prg-tile { min-width: 0; background: var(--surface-1); border-radius: var(--r-card); padding: 13px 12px 12px; }
+    .prg-tile b { display: block; font: 600 var(--ts-display)/1 var(--font-serif); color: var(--text-1); overflow-wrap: anywhere; }
+    .prg-tile span { display: block; margin-top: var(--sp-1); font-family: var(--font-ui); font-size: var(--ts-label); line-height: var(--lh-label); color: var(--text-2); }
+    .prg-days-wrap { margin-top: var(--sp-2); }
+    .prg-days-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 var(--sp-3); font-family: var(--font-ui); font-size: var(--ts-meta); color: var(--text-2); }
+    .prg-days-head > :first-child { font-size: var(--ts-control); color: var(--text-1); }
+    .prg-days-bars { display: flex; align-items: flex-end; gap: 6px; height: 84px; margin-top: 14px; }
+    .prg-days-bar { flex: 1; min-width: 0; height: 4px; border-radius: 3px; background: var(--surface-3); }
+    .prg-days-bar.is-on { background: var(--accent); }
+    .prg-days-axis { display: flex; justify-content: space-between; margin-top: var(--sp-2); font-family: var(--font-ui); font-size: var(--ts-label); color: var(--text-3); }
+    .prg-row { position: relative; display: flex; flex-direction: column; padding: 12px var(--card-pad) 13px; }
+    .prg-row + .prg-row::before, .prg-row + .ui-row::before { content: ""; position: absolute; top: 0; left: var(--card-pad); right: 0; height: 1px; background: var(--hairline); }
+    .prg-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-3); }
+    .prg-row-label { min-width: 0; font-family: var(--font-serif); font-size: var(--ts-body); font-weight: 600; color: var(--text-1); }
+    .prg-row .ui-progress { margin-top: var(--sp-2); }
+    .prg-fact .ui-row-title, .prg-history-row.is-one .ui-row-title { font-family: var(--font-ui); font-size: var(--ts-body); font-weight: 500; }
+    .prg-src-row .ui-row-title { white-space: normal; }
+    .prg-row .ui-row-meta { margin-top: 6px; }
+    .prg-note { padding: 14px var(--card-pad); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); color: var(--text-2); }
+    .prg-retry { min-height: var(--tap); padding: 0 var(--sp-2); border: 0; background: none; color: var(--accent); font: inherit; cursor: pointer; }
 
     /* Settings → Your Data → Growth. Same div-bar idiom as the reading-day
        strip above (no SVG, no dependency, theme-aware through --gold-dim),
@@ -6923,176 +6383,6 @@
        sort. Each row leads with its source label and shows a body
        preview, anchored quote, and any notebook chips.
        ════════════════════════════════════════════════════════════ */
-    .notes-index-screen {
-      max-width: 45rem; margin: 0 auto;
-      padding: 1.25rem 1rem 4rem;
-      width: 100%;
-    }
-    /* Tab strip at top of the Notes hub: [Notebooks] [All Notes] */
-    .notes-tabs {
-      display: flex; gap: 0;
-      border-bottom: 1px solid var(--gold-border);
-      margin: 0 0 1.1rem;
-    }
-    .notes-tab {
-      flex: 1;
-      padding: 11px 12px 13px;
-      background: transparent; border: none;
-      border-bottom: 2px solid transparent;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: color 0.15s, border-color 0.15s;
-      margin-bottom: -1px;
-    }
-    .notes-tab.active {
-      color: var(--gold);
-      border-bottom-color: var(--gold);
-    }
-    @media (hover: hover) {
-      .notes-tab:hover:not(.active) { color: var(--cream-dim); }
-    }
-    /* The Notebooks tab: one row per notebook (the redesign, 2026-09-25, Codex
-       mockup r5 take 1). It was a grid of gold-outlined cards, each with a
-       10 px "DEFAULT" / "NOTEBOOK" eyebrow over a gold Cinzel name, and a
-       dashed box for New Notebook. Now: the colour dot and name, the count at
-       the right, a chevron, on hairlines; "New notebook" is a row too. */
-    .nb-card-grid {
-      display: flex; flex-direction: column;
-      border-top: 1px solid var(--border);
-    }
-    .nb-card {
-      position: relative;
-      display: flex; align-items: center; gap: 0.75rem;
-      width: 100%; min-height: 3.5rem; box-sizing: border-box;
-      padding: 0.7rem 0.2rem;
-      background: none; border: 0; border-bottom: 1px solid var(--border); border-radius: 0;
-      color: var(--cream-dim);
-      cursor: pointer; text-align: left;
-      font-family: var(--font-body);
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.18s ease;
-    }
-    @media (hover: hover) {
-      .nb-card:hover { background: var(--gold-faint); }
-      .nb-card:hover .nb-card-name { color: var(--gold-bright); }
-    }
-    .nb-card:active { background: var(--gold-faint); }
-    .nb-card-name {
-      flex: 1; min-width: 0;
-      font-family: var(--font-body); font-size: var(--fs-18);
-      color: var(--cream-dim); line-height: 1.3;
-      overflow-wrap: break-word;
-    }
-    .nb-card-count {
-      flex: 0 0 auto;
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; white-space: nowrap;
-    }
-    .nb-card-arrow {
-      flex: 0 0 auto;
-      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1;
-      color: var(--gold-dim);
-    }
-    .nb-card.new-notebook { color: var(--gold); }
-    /* The + stands where a notebook's colour dot does (same width and gap), so
-       "New notebook" starts at the names' edge. */
-    .nb-card.new-notebook .nb-card-plus {
-      display: inline-block; width: 0.55rem; margin-right: 0.4rem; text-align: center;
-      font-weight: 400; line-height: 1;
-    }
-    .nb-card.new-notebook .nb-card-name { color: inherit; }
-    @media (hover: hover) { .nb-card.new-notebook:hover .nb-card-name { color: var(--gold-bright); } }
-    /* Inline-create card state: replaces card content with input + actions */
-    .nb-card-create-form {
-      display: flex; flex-direction: column; gap: 8px;
-      width: 100%; align-items: stretch;
-    }
-    .nb-card-create-input {
-      padding: 9px 12px;
-      background: var(--bg); border: 1px solid var(--gold-border); border-radius: 8px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-15);
-      outline: none; width: 100%; box-sizing: border-box;
-    }
-    body.light .nb-card-create-input { background: var(--bg); color: var(--input-text); }
-    .nb-card-create-input:focus { border-color: var(--gold); }
-    .nb-card-create-actions { display: flex; gap: 6px; }
-    .nb-card-create-actions button { flex: 1; }
-    /* Drilled view header — TWO rows: [‹ back][notebook name][count] over a
-       row of actions. One row for all of it made the name the only flexible
-       item, so at --font-scale 1.6 the uppercase Cinzel buttons ate the row
-       and the name ellipsised to nothing. Split, the name gets nearly the
-       whole title row and the actions wrap among themselves instead. The
-       name is CONTENT (the screen title while drilled), so it stays in rem
-       and scales — deliberately NOT in the chrome-pin block at the end. */
-    .nb-drilled-header {
-      display: flex; flex-direction: column; gap: 0.5rem;
-      margin-bottom: 0.9rem;
-    }
-    .nb-drilled-titlerow {
-      display: flex; align-items: center; gap: 0.55rem;
-      min-width: 0;
-    }
-    .nb-drilled-actions {
-      display: flex; align-items: center; gap: 0.55rem;
-      flex-wrap: wrap;
-    }
-    .nb-drilled-actions:empty { display: none; }
-    .nb-drilled-back {
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-dim);
-      width: 32px; height: 32px;
-      border-radius: 8px;
-      display: inline-flex; align-items: center; justify-content: center;
-      font-family: var(--font-body); font-size: var(--fs-20); line-height: 1;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      flex-shrink: 0;
-    }
-    .nb-drilled-back:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
-    /* A notebook's name is the screen's title while drilled in: the same face
-       and count as the personal-study header (.study-head), in one line. */
-    .nb-drilled-title {
-      margin: 0;
-      font-family: 'Cinzel Decorative', serif; font-size: clamp(var(--fs-20), 3.4vw, var(--fs-24));
-      letter-spacing: 0.02em; color: var(--cream); line-height: 1.2;
-      flex: 1; min-width: 0;
-      overflow-wrap: break-word;   /* wraps, never "Study o…" (180 %, the 09-25 walk) */
-    }
-    .nb-drilled-count {
-      font-family: var(--font-body); font-size: var(--fs-14); color: var(--cream-muted);
-      font-variant-numeric: tabular-nums; white-space: nowrap;
-      flex-shrink: 0;
-    }
-    .nb-drilled-action {
-      background: transparent; border: 1px solid var(--gold-border);
-      color: var(--cream-muted);
-      padding: 6px 10px; border-radius: 6px;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      /* Own row now, so the label can carry a real touch target. */
-      min-height: 44px;
-      display: inline-flex; align-items: center; justify-content: center;
-    }
-    .nb-drilled-action:active { background: var(--gold-faint); color: var(--gold); border-color: var(--gold); }
-    /* Extra gap before the destructive Delete so a tap aimed at Rename
-       can't land on it (flex gap 0.55rem + this margin ≈ 16px clear). */
-    .nb-drilled-action.danger { color: var(--danger); border-color: rgba(239,154,154,0.35); margin-left: 0.45rem; }
-    .nb-drilled-action.danger:active { background: rgba(244,143,177,0.16); color: var(--accent-pink); }
-    /* Inline rename input in drilled header */
-    .nb-drilled-rename {
-      flex: 1; min-width: 0;
-      padding: 7px 12px;
-      background: var(--bg); border: 1px solid var(--gold); border-radius: 8px;
-      color: var(--cream);
-      font-family: 'Cinzel', serif; font-size: var(--fs-16);
-      letter-spacing: 0.06em;
-      outline: none;
-    }
-    body.light .nb-drilled-rename { background: var(--bg); color: var(--input-text); }
-    .nb-drilled-rename-note { margin: 0.35rem 0 0; font-family: var(--font-body); font-size: var(--fs-14); color: var(--danger); }
 
     .notes-index-search {
       width: 100%; padding: 11px 16px;
@@ -7109,29 +6399,6 @@
     .notes-index-search:focus { border-color: var(--gold); background: rgba(70,62,48,0.85); }
     body.light .notes-index-search:focus { background: var(--white); }
 
-    /* C2-C [C9] — the Highlights search box. It was the one index search that
-       was neither `type="search"` nor on the shared class, and its styling
-       lived in HighlightsScreen's JS-INJECTED stylesheet, out of reach of the
-       static sheet's tooling. The input now carries BOTH classes; these three
-       rules moved here verbatim from that injected sheet and, sitting after
-       .notes-index-search at equal specificity, still win every property they
-       declare — the box renders exactly as it did.
-
-       Two neutralisers are the only additions, both purely to hold that
-       "exactly": the shared rule's 0.85rem bottom margin would double up on
-       .hlx-controls' own 10px flex gap, and its focus BACKGROUND would repaint
-       a box whose own focus rule only ever changed the border. What the shared
-       class does add, deliberately, is the placeholder colour every sibling
-       search box already uses.
-
-       Nothing else moved: no other .hlx-* rule references .hlx-search, and its
-       parent .hlx-controls stays with the rest of the screen's sheet. */
-    .hlx-search { background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px; color: var(--cream); font-family: var(--font-garamond); font-size: var(--fs-14); outline: none; box-sizing: border-box; }
-    body.light .hlx-search { background: #f7f2e8; color: #2a2520; border-color: var(--gold-border); }
-    .hlx-search:focus { border-color: var(--gold); }
-    .notes-index-search.hlx-search { margin-bottom: 0; }
-    .notes-index-search.hlx-search:focus { background: var(--bg2); }
-    body.light .notes-index-search.hlx-search:focus { background: #f7f2e8; }
     .notes-index-controls {
       display: flex; flex-wrap: wrap; gap: 0.45rem;
       margin-bottom: 1rem;
@@ -7154,116 +6421,75 @@
       display: inline-flex; align-items: center; gap: 0.35rem;
     }
     .notes-index-sort-btn:active { background: var(--gold-faint); }
-    .notes-index-list {
-      display: flex; flex-direction: column;
-      gap: 0.6rem;
-    }
-    .note-row {
-      display: flex; gap: 0.85rem;
-      padding: 0.95rem 1rem;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
-      cursor: pointer; text-align: left;
-      -webkit-tap-highlight-color: transparent;
-      transition: border-color 0.18s ease, background 0.18s ease, transform 0.1s ease;
-      align-items: flex-start;
-    }
-    @media (hover: hover) { .note-row:hover { border-color: var(--gold); background: var(--gold-faint); } }
-    .note-row:active { transform: scale(0.99); }
-    /* The row's keyboard / screen-reader control (NoteRow): a full-row button laid under the text; the
-       segment buttons and the expandable preview sit above it (positioned, later in the flow). */
-    .note-row { position: relative; }
-    .note-row-open {
-      position: absolute; inset: 0; width: 100%; height: 100%;
-      margin: 0; padding: 0; border: 0; border-radius: 10px; background: transparent;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .note-row .note-row-open:focus-visible { outline-offset: 2px; border-radius: 10px; }
-    .note-row-source-seg, .note-row-preview-expandable, .note-row-anchor-expandable { position: relative; }
-    .note-row-swatch {
-      flex-shrink: 0;
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      margin-top: 0.4rem;
-      border: 1.5px solid rgba(255,255,255,0.10);
-    }
-    body.light .note-row-swatch { border-color: rgba(0,0,0,0.10); }
-    .note-row-body {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 0.18rem;
-    }
-    .note-row-source-line {
-      display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap;
-    }
-    .note-row-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
-      color: var(--gold-bright); letter-spacing: 0.04em;
-      flex-shrink: 1; min-width: 0;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    body.light .note-row-source { color: var(--gold); }
-    /* Each source segment of a multi-chapter note is its own tap target
-       (NoteRow onTapSegment). Reset the native button and carry the same
-       dotted-underline affordance the inline scripture refs use, so it reads
-       as a link rather than as chrome. */
-    .note-row-source-seg {
-      font: inherit; color: inherit; letter-spacing: inherit;
-      background: none; border: 0; padding: 0; margin: 0;
-      border-bottom: 1px dotted var(--tap-ref-sub);
-      cursor: pointer;
-    }
-    .note-row-date {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-      margin-left: auto;
-      flex-shrink: 0;
-    }
-    /* No CSS clamp — short/medium notes show in FULL; only text past the
-       JrnExpandable char threshold (160) collapses behind "Show more". A
-       visual line-clamp here would re-open the "donut hole" (clipped with an
-       ellipsis but under the char threshold, so no Show-more button). */
-    .note-row-preview {
-      font-family: var(--font-body); font-size: var(--fs-15);
-      color: var(--cream); line-height: 1.4;
-      overflow-wrap: break-word; word-break: break-word;
-    }
-    /* When the preview is wrapped in JrnExpandable, the truncation is
-       handled in JS (head + …); revert the line-clamp so the toggle
-       button is visible alongside the head text. */
-    .note-row-preview-expandable {
-      display: block; -webkit-line-clamp: unset; overflow: visible;
-    }
-    /* Same as .note-row-preview — no clamp; the anchor shows in full until
-       the JrnExpandable threshold, then collapses behind "Show more". */
-    .note-row-anchor {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-13); color: var(--cream-muted);
-      line-height: 1.4;
-      overflow-wrap: break-word; word-break: break-word;
-    }
-    .note-row-anchor-expandable {
-      display: block; -webkit-line-clamp: unset; overflow: visible;
-    }
-    .note-row-tags {
-      display: flex; flex-wrap: wrap; gap: 0.35rem;
-      margin-top: 0.25rem;
-    }
-    .note-row-nb {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-muted);
-      padding: 2px 7px;
-      border: 1px solid rgba(204,196,180,0.18);
-      border-radius: 999px;
-      background: transparent;
-    }
-    .note-row-nb-icon {
-      width: 9px; height: 9px;
-      stroke: currentColor; fill: none; stroke-width: 1.6;
-    }
+    /* ── W2 LIBRARY FAMILY: the lists (mock v2 library.html; LibraryList.jsx, NoteRow.jsx) ─────────────────────
+       Every Library list: title in the bar, a search pill, one quiet line "N things · Newest first", rows with a
+       menu. Notes are cards (dot, place, when, menu; the note; the words it holds). */
+    .lib-screen { max-width: 45rem; margin: 0 auto; padding: var(--sp-1) var(--gutter) var(--sp-8); box-sizing: border-box; }
+    .lib-seg { margin-bottom: var(--sp-3); }
+    .lib-search { margin-bottom: 0; }
+    .lib-qline { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); margin: 14px 2px var(--sp-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .lib-none, .lib-foot { margin: var(--sp-4) 2px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .lib-new { margin-top: var(--sp-3); }
+    .lib-nb-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .lib-name { margin-bottom: var(--sp-3); }
+    .lib-taken { margin: 0 2px var(--sp-3); color: var(--tone-danger); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .lib-colour-label { margin: var(--sp-1) 2px var(--sp-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .lib-colours { display: flex; flex-wrap: wrap; gap: var(--sp-3); margin: 0 2px var(--sp-4); }
+    .lib-colour { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; }
+    .lib-colour[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 4px var(--text-1); }
+    .notes-index-list { display: flex; flex-direction: column; gap: 10px; }
+    .note-row { position: relative; display: block; padding: 14px 12px 14px var(--card-pad); border-radius: var(--r-card); background: var(--surface-1); cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; transition: background-color var(--press) ease; }
+    .note-row:active { background: var(--surface-2); }
+    /* The row's keyboard / screen-reader control: a full-row button laid under the text; the segment, menu and
+       Show more buttons sit above it (positioned, later in the flow). */
+    .note-row-open { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; padding: 0; border: 0; border-radius: var(--r-card); background: transparent; cursor: pointer; }
+    .note-row-source-seg, .note-row-preview-expandable, .note-row-anchor-expandable, .note-row-menu { position: relative; }
+    .note-row-body { display: flex; flex-direction: column; min-width: 0; }
+    .note-row-source-line { display: flex; align-items: center; gap: 9px; min-height: 20px; }
+    .note-row-swatch { flex: none; width: 10px; height: 10px; border-radius: 50%; }
+    .note-row-source { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; }
+    .note-row-source-seg { font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
+    .note-row-date { flex: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .note-row-menu { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin: -12px -8px -12px -6px; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-3); cursor: pointer; }
+    /* No CSS clamp: only text past JrnExpandable's 160-character threshold collapses behind "Show more". */
+    .note-row-preview { display: block; margin-top: var(--sp-2); color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); line-height: 26px; overflow-wrap: break-word; }
+    .note-row-anchor { display: block; margin-top: 10px; padding-left: 12px; border-left: 2px solid var(--surface-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; overflow-wrap: break-word; }
+    .note-row-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .note-row-nb { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill); background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); }
+    .note-row-nb-icon { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 1.6; }
+    /* Highlights (mock v2 l-high): the kind and colour chips, rows in one card, the words in their own mark. */
+    .hlx-chips { margin-top: var(--sp-3); }
+    .hlx-chips + .hlx-chips { margin-top: var(--sp-2); }
+    .hlx-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+    .hlx-row { position: relative; display: flex; gap: 14px; width: 100%; padding: 14px 12px 14px 14px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; transition: background-color var(--press) ease; }
+    .hlx-row:active { background: var(--surface-2); }
+    .hlx-row + .hlx-row::before { content: ""; position: absolute; top: 0; left: 32px; right: 0; height: 1px; background: var(--hairline); }
+    .hlx-swatch { flex: none; align-self: stretch; width: 4px; border-radius: 2px; }
+    .hlx-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .hlx-text { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); line-height: 27px; overflow-wrap: break-word; }
+    .hlx-mark { padding: 1px 3px; border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+    .hlx-meta { margin-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .hlx-none-text { margin: 0 0 var(--sp-2); }
+    /* Bookmarks (mock v2 l-book): rows are ListRows; the reader's thought is read in the bookmark's sheet. */
+    .bkm-thought { margin: 0 2px var(--sp-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; }
+    /* Links (mock v2 l-links): one card per link, From and To halves (each opens its end) on a hairline with the
+       link mark, a foot with when, See in My Web and the menu. */
+    .link-row { border-radius: var(--r-card); background: var(--surface-1); overflow: hidden; }
+    .link-half { display: flex; flex-direction: column; width: 100%; padding: 14px var(--card-pad) 15px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--press) ease; }
+    .link-half:active { background: var(--surface-2); }
+    .link-half-word { margin-bottom: 3px; color: var(--text-3); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 500; }
+    .link-half-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: var(--lh-headline); }
+    .link-half-cat { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .link-half-quote { margin-top: var(--sp-2); padding-left: 12px; border-left: 2px solid var(--surface-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .link-join { position: relative; height: 1px; margin: 0 var(--card-pad); background: var(--hairline); }
+    .link-join span { position: absolute; left: 50%; top: -14px; display: grid; place-items: center; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: var(--surface-2); color: var(--accent); }
+    .link-foot { display: flex; align-items: center; gap: var(--sp-3); padding: 2px 4px 2px var(--card-pad); border-top: 1px solid var(--hairline); }
+    .link-foot-date { flex: 1; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .link-foot-web { display: inline-flex; align-items: center; gap: 2px; min-height: var(--tap); }
+    .link-arrow { color: var(--accent); }
+    .links-broken { margin-top: var(--sp-3); }
+    .links-empty-web { display: flex; justify-content: center; margin-top: calc(-1 * var(--sp-4)); }
+    /* ── end W2 LIBRARY FAMILY: the lists ── */
     .notes-empty {
       padding: 3rem 1rem; text-align: center;
       font-family: var(--font-body);
@@ -7305,188 +6531,14 @@
       transition: padding-bottom 0.18s ease;
       animation: selectSheetBackdropIn 0.22s ease;
     }
-    .nb-picker {
-      width: 100%; max-width: 480px;
-      background: var(--bg3);
-      border-top: 1px solid var(--gold-border);
-      border-radius: 18px 18px 0 0;
-      padding: 18px 16px 24px;
-      animation: sheetRiseIn 0.28s cubic-bezier(0.32,0.72,0,1);
-      max-height: 100%; overflow-y: auto;
-    }
-    .nb-picker-header {
-      display: flex; align-items: center; gap: 10px;
-      margin-bottom: 14px;
-    }
-    .nb-picker-title {
-      flex: 1;
-      font-family: 'Cinzel', serif; font-size: var(--fs-12);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold);
-    }
-    .nb-picker-close {
-      background: none; border: none;
-      width: 32px; height: 32px;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--cream-muted); cursor: pointer;
-      font-size: var(--fs-24); line-height: 1;
-      border-radius: 6px;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-close:active { background: rgba(224,201,127,0.10); color: var(--gold); }
-    .nb-picker-new {
-      display: flex; gap: 8px;
-      margin-bottom: 12px;
-    }
-    .nb-picker-new-input {
-      flex: 1;
-      padding: 10px 14px;
-      background: var(--bg);
-      border: 1px solid var(--gold-border);
-      border-radius: 8px;
-      color: var(--cream-dim);
-      font-family: var(--font-body); font-size: var(--fs-15);
-      outline: none;
-    }
-    body.light .nb-picker-new-input { background: var(--bg); color: var(--input-text); }
-    .nb-picker-new-input:focus { border-color: var(--gold); }
-    .nb-picker-new-btn {
-      padding: 10px 14px; border-radius: 8px;
-      background: var(--gold); border: 1px solid var(--gold);
-      color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-new-btn:active { background: var(--gold-bright); }
-    .nb-picker-new-btn:disabled, .nb-picker-new-btn.disabled {
-      background: transparent; color: var(--cream-muted);
-      border-color: var(--gold-border);
-      opacity: 0.55; cursor: not-allowed;
-    }
-    .nb-picker-list {
-      display: flex; flex-direction: column;
-      gap: 4px;
-    }
-    .nb-picker-row {
-      display: flex; align-items: center; gap: 12px;
-      padding: 11px 12px;
-      background: transparent; border: 1px solid transparent;
-      border-radius: 8px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s, border-color 0.12s;
-    }
-    .nb-picker-row:active { background: var(--gold-faint); }
     /* The row's toggle (a checkbox button holding the box and the name; Delete is its sibling). */
-    .nb-picker-row-toggle {
-      flex: 1; min-width: 0;
-      display: flex; align-items: center; gap: 12px;
-      margin: 0; padding: 0; border: 0; background: transparent;
-      color: inherit; font: inherit; text-align: left;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    @media (hover: hover) { .nb-picker-row:hover { background: var(--gold-faint); } }
-    .nb-picker-row.checked { background: var(--gold-faint); border-color: var(--gold-border); }
-    .nb-picker-check {
-      flex-shrink: 0;
-      width: 20px; height: 20px;
-      border: 1.5px solid var(--gold-border);
-      border-radius: 5px;
-      display: flex; align-items: center; justify-content: center;
-      color: transparent;
-    }
-    .nb-picker-row.checked .nb-picker-check {
-      background: var(--gold);
-      border-color: var(--gold);
-      color: var(--bg);
-    }
-    .nb-picker-check svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
-    .nb-picker-name {
-      flex: 1; min-width: 0;
-      font-family: var(--font-body); font-size: var(--fs-16);
-      color: var(--cream); line-height: 1.3;
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .nb-picker-empty {
-      padding: 1.5rem 1rem; text-align: center;
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted);
-    }
-    .nb-picker-row-delete {
-      background: none; border: none;
-      color: var(--cream-muted);
-      font-size: var(--fs-14);
-      padding: 4px 8px;
-      border-radius: 4px;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      flex-shrink: 0;
-      /* Destructive-control separation: a faint divider + gap keep the
-         delete × from reading as part of the toggle row, and a WL4 ::after
-         overlay gives the small glyph a 44px effective hit area. */
-      position: relative;
-      margin-left: 10px; padding-left: 14px;
-      border-left: 1px solid var(--border);
-      border-radius: 0 4px 4px 0;
-    }
-    .nb-picker-row-delete::after {
-      content: ""; position: absolute;
-      top: 50%; left: 50%;
-      width: 44px; height: 44px;
-      transform: translate(-50%, -50%);
-    }
-    .nb-picker-row-delete:active { color: var(--accent-pink); background: rgba(244,143,177,0.12); }
 
     /* ── Notebook picker footer — the transactional Save/Cancel pair
        (2026-07-12): membership toggles buffer locally; Save commits,
        Cancel/×/backdrop discard (ConfirmStrip-gated when dirty). ── */
-    .nb-picker-footer {
-      display: flex; gap: 12px;
-      margin-top: 16px; padding-top: 14px;
-      border-top: 1px solid var(--border);
-    }
-    .nb-picker-cancel {
-      flex: 1; padding: 12px 0; border-radius: 8px;
-      background: transparent; border: 1px solid var(--border);
-      color: var(--cream-dim);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-cancel:active { background: var(--gold-faint); color: var(--gold); }
-    .nb-picker-save {
-      flex: 1.4; padding: 12px 0; border-radius: 8px;
-      background: var(--gold); border: 1px solid var(--gold);
-      color: var(--bg);
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-    }
-    .nb-picker-save:active { background: var(--gold-bright); }
-    .nb-picker-save:disabled {
-      background: transparent; color: var(--cream-muted);
-      border-color: var(--gold-border);
-      opacity: 0.55; cursor: not-allowed;
-    }
     .nb-picker-discard-confirm { margin-top: 16px; width: 100%; }
 
     /* ── NoteSheet inline notebook chips (in read mode header area) ── */
-    .note-sheet-nb-chips {
-      display: flex; flex-wrap: wrap; gap: 0.35rem;
-      margin: 0.6rem 0 0.4rem;
-    }
-    .note-sheet-nb-chip {
-      display: inline-flex; align-items: center; gap: 0.3rem;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.10em; text-transform: uppercase;
-      color: var(--cream-muted);
-      padding: 3px 9px;
-      border: 1px solid rgba(204,196,180,0.20);
-      border-radius: 999px;
-    }
-    .note-sheet-nb-chip svg {
-      width: 10px; height: 10px;
-      stroke: currentColor; fill: none; stroke-width: 1.6;
-    }
 
     /* ── Multi-note disambiguation popover ── */
     .multinote-overlay {
@@ -7549,106 +6601,6 @@
       color: var(--cream-muted);
     }
 
-    /* ── Links Screen ── */
-    .links-screen {
-      max-width: 45rem; margin: 0 auto;
-      padding: 1.25rem 1rem 4rem;
-      width: 100%;
-    }
-    /* Link row: two tappable endpoint buttons (source / target) connected
-       by a chain icon in between. */
-    .link-row {
-      display: flex; flex-direction: column;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
-      overflow: hidden;
-      transition: border-color 0.18s ease, background 0.18s ease;
-    }
-    @media (hover: hover) { .link-row:hover { border-color: var(--gold); } }
-    .link-row-side {
-      display: flex; flex-direction: column; gap: 0.2rem;
-      width: 100%; padding: 0.85rem 1rem 0.8rem;
-      background: transparent; border: none;
-      text-align: left; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .link-row-side:active { background: var(--gold-faint); }
-    @media (hover: hover) { .link-row-side:hover { background: var(--gold-faint); } }
-    .link-row-source { border-bottom: 1px solid var(--gold-border); }
-    .link-row-side-eyebrow {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--gold-dim); margin-bottom: 0.1rem;
-    }
-    .link-row-source .link-row-side-eyebrow { color: var(--gold); }
-    .link-row-side-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-13);
-      letter-spacing: 0.04em;
-      color: var(--cream-dim);
-      line-height: 1.25;
-    }
-    .link-row-source .link-row-side-label { color: var(--gold-bright); }
-    body.light .link-row-source .link-row-side-label { color: var(--gold); }
-    .link-row-side-cat {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-    }
-    .link-row-side-preview {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted);
-      line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical; overflow: hidden;
-      margin-top: 0.15rem;
-    }
-    .link-row-mid {
-      display: flex; align-items: center; justify-content: center;
-      gap: 0.6rem;
-      padding: 6px 1rem;
-      background: rgba(214,179,95,0.04);
-      position: relative;
-    }
-    /* Visible ⋯ options button (mirrors .bkm-row-more) — pinned to the mid
-       strip's right edge with a 44px hit area; opens the same action sheet
-       long-press does. */
-    .link-row-more {
-      position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; cursor: pointer;
-      color: var(--cream-muted); padding: 10px;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s;
-    }
-    .link-row-more:active, .link-row-more:hover { color: var(--gold); }
-    .link-row-more svg { width: 16px; height: 16px; display: block; }
-    .link-row-chain {
-      width: 14px; height: 14px;
-      stroke: var(--gold-dim); flex-shrink: 0;
-    }
-    .link-row-date {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-    }
-    /* Broken-links passive callout */
-    .links-broken-callout {
-      display: flex; align-items: flex-start; gap: 0.7rem;
-      padding: 0.85rem 1rem;
-      background: rgba(244,143,177,0.07);
-      border: 1px solid rgba(239,154,154,0.22);
-      border-radius: 10px;
-      margin: 0.85rem 0 0;
-    }
-    .links-broken-icon {
-      flex-shrink: 0; color: var(--danger); margin-top: 1px;
-    }
-    .links-broken-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
-    .links-broken-text {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-15); color: var(--cream-muted); line-height: 1.45;
-    }
     /* Link action sheet (long-press) */
     .link-action-overlay {
       position: fixed; inset: 0; z-index: 8550;
@@ -7785,19 +6737,6 @@
     /* the picker sheets (LinkPicker, the nav picker, BookmarkCreateSheet) on the sheet tokens: surface-1, 20 px corners,
        no gold edge, the title in the serif. The bookmark sheet's head reads Cancel | title | Save in words (rule 9). */
     .link-picker-sheet { background: var(--surface-1); border-top: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; }
-    .navpick-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); font-weight: 700; letter-spacing: 0; }
-    .bkm-create-head { gap: var(--sp-2); padding: 10px 10px 8px; }
-    .bkm-create-head .navpick-title { text-align: center; }
-    .bkm-create-head .navpick-close, .bkm-create-head .navpick-confirm-green { flex: none; min-width: 64px; min-height: var(--tap); padding: 0 12px; border: 0; border-radius: var(--r-pill); background: none; font-family: var(--font-ui); font-size: var(--fsc-15); line-height: 1; cursor: pointer; }
-    .bkm-create-head .navpick-close { color: var(--text-2); font-weight: 500; }
-    .bkm-create-head .navpick-confirm-green { color: var(--accent); font-weight: 600; }
-    .bkm-create-head .navpick-confirm-green:disabled { color: var(--text-3); opacity: 1; cursor: default; }
-    .bkm-create-head :is(.navpick-close, .navpick-confirm-green):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-    .bkm-create-sheet :is(.bkm-create-source, .bkm-create-field-label) { color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); }
-    .bkm-create-sheet .bkm-create-source { color: var(--text-2); font-weight: 400; font-size: var(--ts-meta); letter-spacing: 0; text-transform: none; }
-    .bkm-create-sheet .bkm-create-excerpt { border-left: 0; border-radius: var(--r-field); background: var(--surface-2); color: var(--text-2); }
-    .bkm-create-sheet .bkm-create-label-input { min-height: var(--field-h); padding: 0 14px; border: 0; border-radius: var(--r-field); background: var(--surface-2); color: var(--text-1); font-family: var(--font-ui); box-shadow: none; }
-    .bkm-create-sheet .bkm-create-label-input:focus { outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
 
     /* ── Bookmark inline icons ── */
     /* Small flag icon injected at the end of a bookmarked range in
@@ -7832,43 +6771,80 @@
       content: ''; position: absolute; inset: -8px -10px;
     }
     .hl-note-icon svg, .inline-link-icon svg, .inline-bookmark-icon svg { position: relative; z-index: 1; }
-    /* Bookmark create sheet — pre-commit form, reuses link-picker overlay
-       chrome (navpick-sheet) for consistency with the new-link flow. */
-    .bkm-create-sheet { min-height: auto; }
-    .bkm-create-body { padding: 4px 20px 22px; overflow-y: auto; }
-    .bkm-create-source {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.2em; text-transform: uppercase;
-      color: var(--gold-dim); margin-bottom: 4px;
-    }
-    .bkm-create-excerpt {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-15); color: var(--cream-muted);
-      line-height: 1.45;
-      padding: 8px 12px; margin-bottom: 18px;
-      border-left: 2px solid var(--gold-border);
-      background: rgba(200,164,86,0.04); border-radius: 0 6px 6px 0;
-      max-height: 110px; overflow-y: auto;
-    }
-    .bkm-create-field-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.18em; text-transform: uppercase;
-      color: var(--gold-dim); margin: 14px 0 6px;
-    }
-    .bkm-create-field-hint {
-      letter-spacing: 0.08em; color: var(--cream-muted);
-      font-size: var(--fs-10); text-transform: none;
-    }
-    .bkm-create-label-input {
-      width: 100%; box-sizing: border-box;
-      background: var(--bg2); color: var(--cream);
-      border: 1px solid var(--gold-border); border-radius: 8px;
-      padding: 10px 12px;
-      font-family: var(--font-body);
-      outline: none; transition: border-color 0.15s;
-    }
-    .bkm-create-label-input { font-size: var(--fs-16); }
-    .bkm-create-label-input:focus { border-color: var(--gold); }
+    /* ── W2e readers (mock v2 r-bm): the bookmark sheet. A grab, the title, where it is, the name field on
+       surface-2 with a clear, one line on where it is kept, then Cancel | Save at the foot. ── */
+    .rd-form-sheet { position: relative; min-height: auto; padding: var(--sp-5) var(--gutter) calc(var(--inset-bottom, 0px) + var(--sp-6)); }
+    .rd-form-sheet .ui-sheet-head { margin: 0 2px 10px; }
+    .rd-field { background: var(--surface-2); cursor: text; }
+    .rd-field-clear { flex: none; display: grid; place-items: center; width: var(--tap); height: var(--tap); margin-right: -12px; border: 0; background: none; color: var(--text-2); cursor: pointer; }
+    .rd-note { margin: 12px 2px 16px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: 1.45; }
+    .bkm-create-body { overflow-y: auto; }
+    .rd-foot { margin-top: 4px; }
+    .rd-foot .ui-btn:not(.is-primary) { background: var(--surface-2); }
+    .rd-foot .ui-btn:disabled { opacity: 0.45; cursor: default; }
+    /* ── end W2e readers (r-bm) ── */
+    /* ── W2f readers (mock v2 r-note, r-note-view, r-nbpick): the note sheet and the notebook picker wear the
+       bookmark sheet's form (.rd-form-sheet): surface-1, a grab, a serif title, the words as a quote, fields on
+       surface-2, a worded row for the notebook, Cancel | Save; a note read shows four worded buttons. ── */
+    .rd-note-sheet, .rd-nb-sheet { box-sizing: border-box; border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; background: var(--surface-1); }
+    .rd-nb-sheet { width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; animation: sheetRiseIn 0.28s cubic-bezier(0.32,0.72,0,1); }
+    .rd-note-head { display: flex; align-items: center; gap: 4px; margin: 0 0 12px; }
+    .rd-note-head .ui-sheet-title { flex: 1; min-width: 0; margin: 0; }
+    .note-sheet-color-hit { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -13px; padding: 0; border: 0; background: none; cursor: pointer; }
+    .note-sheet-color-dot.sel-color-btn { display: block; width: 12px; height: 12px; padding: 0; border: 0; border-radius: 50%; pointer-events: none; }
+    .note-sheet-color-dot[data-color="blank"] { box-shadow: inset 0 0 0 1.5px var(--text-3); }
+    .rd-note-sheet .rd-note-head + .rd-colors { margin-top: 0; }
+    .note-sheet-body { margin: 0 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-sheet); line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+    .note-sheet-empty-btn { justify-content: flex-start; min-height: var(--tap); padding: 0 2px; color: var(--accent); }
+    .note-sheet-date { margin: 8px 2px 16px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .note-sheet-textarea { display: block; width: 100%; min-height: 104px; box-sizing: border-box; padding: 12px 14px; resize: vertical; border: 1px solid var(--accent-ring); border-radius: var(--r-field); background: var(--surface-2); color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-body); line-height: 1.45; }
+    .note-sheet-textarea:focus { outline: none; border-color: var(--accent); }
+    .rd-label { margin: 16px 2px 8px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .rd-note-sheet .rd-colors { margin: 12px 1px 14px; }
+    .rd-note-nb, .nb-picker-list { margin: 0 0 14px; }
+    .note-edit-nb-row .ui-row-value { margin-left: auto; }
+    .note-sheet-menu .ann-chip-confirm { padding: 4px 0; }
+    .nb-picker-row { display: flex; align-items: center; padding-right: 12px; border-top: 1px solid var(--hairline); }
+    .nb-picker-none + .nb-picker-row, .nb-picker-row + .nb-picker-row { border-top: 1px solid var(--hairline); }
+    .nb-picker-row-toggle { flex: 1; min-width: 0; cursor: pointer; }
+    .nb-picker-list .ui-row-title { flex: 1; min-width: 0; text-align: left; }
+    .nb-picker-row-delete:active { color: var(--tone-danger); }
+    .nb-picker-new { display: flex; gap: 8px; }
+    .nb-picker-new .ui-field { flex: 1; }
+    .nb-picker-new-btn { flex: none; border-radius: var(--r-field); background: var(--surface-2); }
+    .nb-picker-new-btn:disabled { opacity: 0.45; cursor: default; }
+    .rd-nb-sheet .rd-note { margin-bottom: 0; }
+    .rd-nb-sheet .rd-foot { margin-top: 16px; }
+    /* ── end W2f readers (r-note, r-note-view, r-nbpick) ── */
+    /* ── W2f readers (mock v2 r-link1, r-link2, r-link3): "Link to…" wears the form sheet: where from in a
+       card, Search | Browse | Recent, the field, scope chips; once made, one "Linked to" card with Undo, Link
+       another, Done. The verse picker: the chapter in the bar with Cancel, a field, a gold button naming the verse. ── */
+    .rd-link-sheet { border: 0; border-radius: var(--r-sheet) var(--r-sheet) 0 0; background: var(--surface-1); }
+    .navpick-header { display: flex; align-items: center; margin: 0 0 12px; }
+    .navpick-header .ui-sheet-title { flex: 1; min-width: 0; margin: 0 2px; }
+    .navpick-x { margin-right: -12px; }
+    .navpick-context { padding: 12px 14px; border-radius: var(--r-card); background: var(--surface-2); }
+    .navpick-context-source { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .navpick-context .rd-quote { margin: 6px 0 0; font-size: var(--ts-value); -webkit-line-clamp: 1; }
+    .navpick-tabs { margin-top: 12px; }
+    .rd-link-sheet .navpick-search-wrap { margin-top: 12px; }
+    .navpick-scope, .navpick-corpus { margin-top: 10px; }
+    .rd-link-sheet .ui-chip:not(.is-on) { background: var(--surface-2); }
+    .navpick-row-chevron { flex: none; margin-left: auto; color: var(--text-3); }
+    .rd-link-sheet .rd-note { margin: 12px 2px 0; }
+    .rd-link-done-head { display: flex; align-items: center; gap: 10px; }
+    .rd-link-done-head .ui-sheet-title { margin: 0; }
+    .rd-link-done-tick { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-pill); background: var(--accent-soft); color: var(--accent); }
+    .navpick-success .rd-note { margin: 10px 2px 16px; }
+    .rd-link-done-foot { display: grid; grid-template-columns: auto 1fr 1fr; gap: 10px; }
+    .rd-link-another { background: var(--surface-2); }
+    .picker-header.rd-vpick-bar { gap: 4px; min-height: var(--bar-h); padding: calc(var(--inset-top, 0px) + 4px) 8px 4px; border-bottom: 0; }
+    .rd-vpick-bar .picker-title { font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 700; color: var(--text-1); letter-spacing: 0; }
+    .rd-vpick-bar .picker-back { padding: 0; color: var(--text-1); font-size: inherit; }
+    .picker-footer-btn svg { color: currentColor; }
+    .picker-footer-btn:disabled { opacity: 0.45; cursor: default; }
+    .rd-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    /* ── end W2f readers (r-link1, r-link2, r-link3) ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */
@@ -7933,111 +6909,6 @@
       100% { color: var(--gold-dim);    transform: scale(1);    filter: none; }
     }
 
-    /* ── Bookmarks Screen ── */
-    .bkm-screen {
-      max-width: 45rem; margin: 0 auto;
-      padding: 1.25rem 1rem 4rem;
-      width: 100%;
-    }
-    /* One bookmark row */
-    .bkm-row {
-      display: flex; align-items: flex-start; gap: 0.4rem;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
-      margin-bottom: 0.55rem;
-      overflow: hidden;
-      transition: border-color 0.18s ease;
-    }
-    @media (hover: hover) { .bkm-row:hover { border-color: var(--gold); } }
-    .bkm-row-content {
-      flex: 1; min-width: 0;
-      display: flex; flex-direction: column; gap: 0.2rem;
-      padding: 0.85rem 0 0.85rem 1rem;
-      background: transparent; border: none;
-      text-align: left; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .bkm-row-content:active { background: var(--gold-faint); }
-    @media (hover: hover) { .bkm-row-content:hover:not(:disabled) { background: var(--gold-faint); } }
-    .bkm-row-content:disabled { cursor: default; }
-    .bkm-row-source {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--gold);
-    }
-    .bkm-row-label {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-16); color: var(--cream-dim);
-      line-height: 1.3; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-    }
-    /* Optional "why" thought displayed under the label on a row.
-       Subtler than the label; truncates to a single line by default.
-       Long thoughts (>80 chars) become tappable for read-more expansion;
-       the expanded mode drops the ellipsis and wraps. */
-    .bkm-row-passage { display: block; margin-top: 2px; color: var(--cream-dim); font-size: var(--fs-14); font-style: italic; line-height: 1.4; }
-    .bkm-row-thought {
-      display: block;
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-13); color: var(--cream-muted);
-      line-height: 1.35; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis;
-      margin-top: 2px;
-      padding-left: 8px;
-      border-left: 2px solid var(--gold-faint);
-    }
-    .bkm-row-thought.is-collapsible {
-      cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s, border-color 0.12s;
-    }
-    .bkm-row-thought.is-collapsible:hover,
-    .bkm-row-thought.is-collapsible:active {
-      color: var(--cream-dim);
-      border-left-color: var(--gold-border);
-    }
-    .bkm-row-thought.is-expanded {
-      white-space: normal; overflow: visible; text-overflow: clip;
-    }
-    /* When the thought is wrapped in JrnExpandable, truncation is handled
-       in JS (head + … + Show more/less button). The parent's nowrap clamp
-       would otherwise hide everything past line 1 and make the toggle a
-       no-op, so reset wrapping for the expandable body. */
-    .bkm-row-thought:has(.bkm-row-thought-body) {
-      white-space: normal; overflow: visible; text-overflow: clip;
-    }
-    .bkm-row-thought-body {
-      white-space: normal; display: block;
-    }
-    /* Tiny "· More" / "· Less" affordance at the end of a collapsible
-       thought line. Cinzel caps so it reads as UI rather than content. */
-    .bkm-row-edit-input {
-      width: 100%; background: var(--bg3);
-      border: 1px solid var(--gold-border); border-radius: 6px;
-      color: var(--cream-dim); font-family: var(--font-body);
-      font-size: var(--fs-16); padding: 4px 8px;
-      outline: none;
-    }
-    .bkm-row-edit-input:focus { border-color: var(--gold); }
-    .bkm-row-meta {
-      display: flex; flex-direction: column; align-items: flex-end;
-      gap: 0.25rem; padding: 0.7rem 0.6rem 0.7rem 0.3rem;
-      flex-shrink: 0;
-    }
-    .bkm-row-date {
-      font-size: var(--fs-11); color: var(--cream-muted);
-      white-space: nowrap;
-    }
-    .bkm-row-more {
-      background: none; border: none; cursor: pointer;
-      color: var(--cream-muted); padding: 14px; margin: -12px;   /* 44 px to hit, laid out as 20 (#10) */
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s;
-    }
-    .bkm-row-more:active, .bkm-row-more:hover { color: var(--gold); }
-    .bkm-row-more svg { width: 16px; height: 16px; display: block; }
 
     /* ── Bookmark inline popover ── */
     .bkm-popover {
@@ -8162,62 +7033,9 @@
        All new rules; each dark rule has a body.light counterpart. */
 
     /* LinkPicker — "what am I linking from" context strip */
-    .navpick-context {
-      margin: 0 18px 12px; padding: 10px 14px;
-      background: var(--gold-faint);
-      border-left: 2px solid var(--gold-dim);
-      border-radius: 0 8px 8px 0;
-      display: flex; flex-direction: column; gap: 3px;
-    }
-    body.light .navpick-context { background: rgba(180,150,90,0.10); }
-    .navpick-context-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--gold-dim);
-    }
-    .navpick-context-source {
-      font-family: var(--font-body); font-size: var(--fs-16);
-      color: var(--cream);
-    }
-    body.light .navpick-context-source { color: var(--input-text); }
-    .navpick-context-excerpt {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted); line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
     /* LinkPicker — success confirmation + separated Undo (replaces the
        old red-×-beside-green-✓ header pair). */
-    .navpick-success {
-      display: flex; align-items: center; gap: 10px;
-      margin: 0 18px 12px; padding: 9px 10px 9px 14px;
-      background: rgba(76,175,80,0.14);
-      border-left: 2px solid var(--ok);
-      border-radius: 0 8px 8px 0;
-      animation: navpickFlashIn 0.18s ease-out;
-    }
-    body.light .navpick-success { background: rgba(76,175,80,0.12); }
-    .navpick-success-check { width: 18px; height: 18px; color: var(--ok); flex-shrink: 0; }
-    .navpick-success-text {
-      flex: 1; min-width: 0;
-      font-family: var(--font-body); font-size: var(--fs-15);
-      color: var(--cream);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    body.light .navpick-success-text { color: var(--input-text); }
-    .navpick-undo {
-      position: relative; flex-shrink: 0;
-      background: none; border: 1px solid var(--gold-border);
-      border-radius: 999px; padding: 8px 18px;
-      font-family: 'Cinzel', serif; font-size: var(--fs-10);
-      letter-spacing: 0.1em; text-transform: uppercase;
-      color: var(--cream-dim); cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s, border-color 0.12s;
-    }
     /* WL4 — extend the pill's touch target to ~44px without bloating it. */
-    .navpick-undo::after { content: ''; position: absolute; inset: -6px -4px; }
-    .navpick-undo:active { color: var(--accent-pink); border-color: var(--accent-pink); }
 
     /* Picker screens — step breadcrumb + footer action bar */
     .picker-breadcrumb {
@@ -8234,25 +7052,6 @@
       background: var(--bg);
     }
     body.light .picker-footer { background: var(--bg); }
-    .picker-footer-btn {
-      width: 100%; min-height: 52px;
-      border: 1px solid var(--gold-border);
-      border-radius: 12px;
-      background: var(--gold-faint);
-      color: var(--gold);
-      font-family: 'Cinzel', serif; font-size: var(--fs-14);
-      letter-spacing: 0.05em;
-      cursor: pointer; -webkit-tap-highlight-color: transparent;
-      transition: background 0.14s, border-color 0.14s, color 0.14s;
-    }
-    .picker-footer-btn:active { background: rgba(212,183,114,0.22); border-color: var(--gold); }
-    .picker-footer-btn:disabled,
-    .picker-footer-btn.is-disabled {
-      opacity: 0.55; cursor: default;
-      color: var(--cream-muted);
-      background: transparent;
-      border-color: rgba(110,98,76,0.30);
-    }
 
     /* MultiNotePopover — slim scrollbar for the clamped/scrolling case */
     .multinote-popover::-webkit-scrollbar { width: 6px; }
@@ -8411,12 +7210,6 @@
        at the end of the file (--fs-10/--fsc-10 and --fs-11/--fsc-11). */
     .ascroll-dwell-label { font-size: var(--fs-10); text-transform: uppercase; padding-right: 2px; }
     .ascroll-dwell-value { font-size: var(--fs-11); min-width: 42px; text-align: center; color: var(--gold); }
-    /* A reader who has switched auto-scroll on is not the audience for the
-       first-run annotation tip, and both sit bottom-centre. */
-    body.autoscroll-on .ann-hint-pill { display: none; }
-    /* Nor is a reader stepping through search words (FindInUnit's pill sits in
-       the same bottom-centre spot). */
-    body:has(.find-pill) .ann-hint-pill { display: none; }
 
     /* ── SESSION-4 TEXT-ONLY SCALING — chrome pin (must stay LAST) ───────
        --font-scale multiplies the ROOT font-size (the WL1 rule near the top
@@ -8446,11 +7239,6 @@
     .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
     .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }
     .sel-style-btn { font-size: var(--fsc-16); }
-    .sel-action-btn { font-size: var(--fsc-13); }
-    .sel-listen-btn { font-size: var(--fsc-12); }
-    .sel-repeat-btn { font-size: var(--fsc-12); }
-    .sel-web-btn { font-size: var(--fsc-12); }
-    .ann-chip-btn { font-size: var(--fsc-10); }
     .mode-toggle-label { font-size: var(--fsc-10); }
     .ascroll-step { font-size: var(--fsc-20); }
     .ascroll-cancel { font-size: var(--fsc-10); }
@@ -8542,7 +7330,7 @@
        steps aside too. */
     body.sel-dragging .top-nav, body.sel-dragging .audio-bar, body.sel-dragging .audio-bar-pull,
     body.sel-dragging .ascroll-pill, body.sel-dragging .find-pill, body.sel-dragging .mode-toggle-wrap,
-    body.sel-dragging .chapter-nav-sticky, body.sel-dragging .ann-hint-pill, body.sel-dragging .mini-title,
+    body.sel-dragging .chapter-nav-sticky, body.sel-dragging .mini-title,
     body.sel-dragging .back-hint-row, body.sel-dragging .vot-toast, body.sel-dragging .sel-toolbar {
       pointer-events: none;
     }
@@ -9530,7 +8318,6 @@
       border: 2px solid currentColor;
     }
     .sw-key-pin.is-dot { border: 0; background: currentColor; }
-    .sw-key-pin.is-ring-dot { background: radial-gradient(circle, currentColor 0 1.5px, transparent 2px); }
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
     .sw-key-gradient {
       width: 120px; height: 4px; border-radius: 2px; display: inline-block; margin: 0 4px;
@@ -9760,7 +8547,7 @@
     .sw-root:not(.sw-narrow) .sw-empty { top: max(58%, 200px); }
     .sw-empty-close {
       /* The panel is pointer-events:none so it never swallows a drag on the
-         web beneath it — the same pattern as .ann-hint-close, and it works
+         web beneath it — a real <button> inside an inert panel, and it works
          for the same reason: this is a real <button> with its own onClick,
          nothing is delegated to the inert parent. */
       pointer-events: auto;
@@ -9785,7 +8572,6 @@
     }
     .sw-root.sw-rotated .sw-btn { padding-left: 10px; padding-right: 10px; }
     .sw-root.sw-rotated .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
-    .sw-root.sw-rotated .sw-select-face { padding-left: 10px; padding-right: 8px; }
     /* The rotated root is `width: 100vh; height: 100vw` (the CSS rotation
        swaps the axes). The docked panel needs no rotated cap: it is top: 0 /
        bottom: 0 of that root, its own height whatever the physical viewport

@@ -9,6 +9,7 @@ import { shareText, shareLinkSetting } from '../../utils/copy-share.js';
 import { passageLinkFor } from '../../utils/passage-link.js';
 import { passageLabel, translationTag, siteLinkForKey } from '../../utils/passage-copy.js';
 import { relativeDate } from '../../utils/dates.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 import {
   readNoteDraft, writeNoteDraft, clearNoteDraft, noteDraftRecoverable, clearNoteDraftWhenSaved, NOTE_DRAFT_DELAY_MS,
 } from '../../utils/note-draft.js';
@@ -39,7 +40,6 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
   });
   const [mode, setMode] = React.useState(startInEditMode || recovered ? 'edit' : 'read');
   const [body, setBody] = React.useState(recovered ? recovered.body : (note ? note.body || '' : ''));
-  const [menuOpen, setMenuOpen] = React.useState(false);
   const [confirmDelete, setConfirmDelete] = React.useState(false);
   const [showColors, setShowColors] = React.useState(false);
   // Discard-gate for an edit-mode dismissal with unsaved text. Holds the
@@ -169,7 +169,7 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // initialized) — just close; nothing left to cancel or discard.
     if (!note || !segs.length) { onClose(); return; }
     if (confirmingDiscard) { setConfirmingDiscard(null); return; }
-    if (menuOpen) { setMenuOpen(false); setConfirmDelete(false); setShowColors(false); return; }
+    if (confirmDelete) { setConfirmDelete(false); return; }
     if (showColors) { setShowColors(false); return; }
     if (mode === 'edit') { requestCancel('close'); return; }
     onClose();
@@ -185,7 +185,6 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     // Whatever you last set a note to becomes the default for the next note.
     if (typeof NoteDefaultStore !== 'undefined') NoteDefaultStore.set(curStyle, c);
     setShowColors(false);
-    setMenuOpen(false);
   };
 
   // Switch the note's visual style. Squiggle/underline can't be blank, so a
@@ -235,7 +234,6 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
       ? '\u201C' + anchor + '\u201D \u2014 ' + passageLabel(key, lastKey) + translationTag(key)
         + (note.body ? '\n\nMy note: ' + note.body : '') + '\n\n' + link
       : anchor + (note.body ? '\n\n' + note.body : '');
-    setMenuOpen(false);
     shareText(text).then((outcome) => {
       if (typeof showToast !== 'function') return;
       if (outcome === 'copied-instead') {
@@ -246,230 +244,109 @@ export function NoteSheet({ groupId, startInEditMode, freshGroup, onClose, onOpe
     });
   };
 
-  // Blank notes are allowed — the body can be empty. (Pre-Q3.3f-dead a
-  // `const canSave = true` lived here; the Save button never reads it.)
-  // Tapping the header color dot opens the color picker — works in either
-  // mode AND closes any other panel that's open (menu, delete confirm).
-  const openColorPicker = () => {
-    setShowColors(true);
-    setMenuOpen(false);
-    setConfirmDelete(false);
-  };
+
+  // r-note / r-note-view (the UI pass, mock v2 readers): one bottom sheet. Writing: a title, the words as a
+  // quote, the text area, "Colour" (style switch, blank + ten), a Notebook row, Cancel | Save. Reading: the
+  // colour dot, "Note" and a close, the quote, the note, "when · notebook", then Edit / Notebook / Share /
+  // Delete as four worded buttons (no menu inside a menu).
+  const nbNames = (note.notebookIds || []).map(id => { const nb = NotebookStore.get(id); return nb ? nb.name : null; }).filter(Boolean);
+  const openPicker = () => { onOpenNotebookPicker && onOpenNotebookPicker(groupId); };
+  const styleBtn = (id, label, word) => (
+    <button key={id} type="button" className={'ui-seg-item sel-style-btn' + (id === 'highlight' ? '' : ' sel-style-btn-' + id) + (curStyle === id ? ' active' : '')} onClick={() => setStyle(id)} aria-label={label} aria-pressed={curStyle === id}>{word}</button>
+  );
+  const colours = (
+    <div className="rd-colors note-sheet-colors">
+      {curStyle === 'highlight' && (
+        <button type="button" className={'sel-color-btn' + (color === 'blank' ? ' active' : '')} data-color="blank"
+          onClick={() => recolor('blank')} title="No color (icon only)" aria-label="No color (icon only)" aria-pressed={color === 'blank'} />
+      )}
+      {HL_COLORS.map(c => (
+        <button key={c} type="button" className={'sel-color-btn sel-color-' + curStyle + (color === c ? ' active' : '')} data-color={c}
+          onClick={() => recolor(c)} title={c} aria-label={c} aria-pressed={color === c} />
+      ))}
+    </div>
+  );
+  const when = (note.updated || note.created) ? relativeDate(note.updated || note.created) : '';
+  const where = nbNames.length ? nbNames.join(', ') : 'Not in a notebook';
 
   return (
     <div className="note-sheet-overlay" onClick={requestClose}>
-      <div className="note-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="note-sheet-title" onClick={e => e.stopPropagation()}>
-        {/* Header: color dot (tappable) · "Note" · ⋯ menu (read mode only) */}
-        <div className="note-sheet-header">
-          <button
-            className="note-sheet-color-hit"
-            onClick={openColorPicker}
-            title="Change color"
-            aria-label="Change note color"
-          >
-            <span className="note-sheet-color-dot ann-chip-color-btn" data-color={color} aria-hidden="true" />
-          </button>
-          <div className="note-sheet-title" id="note-sheet-title">{mode === 'edit' ? (note.body ? 'Edit note' : 'New note') : 'Note'}</div>
-          {mode === 'read' && (
-            <button
-              className="note-sheet-menu-btn"
-              onClick={() => { setMenuOpen(v => !v); setShowColors(false); setConfirmDelete(false); }}
-              aria-label="Options"
-              aria-expanded={menuOpen}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <circle cx="12" cy="5" r="1.7" />
-                <circle cx="12" cy="12" r="1.7" />
-                <circle cx="12" cy="19" r="1.7" />
-              </svg>
-            </button>
-          )}
-        </div>
-        {/* Color picker takes over the body area when opened — by tapping the
-            header dot OR the ⋯ menu's "Change color" item. */}
-        {showColors ? (
-          <div className="note-sheet-menu-colors">
-            <button className="ann-chip-back" onClick={() => setShowColors(false)} title="Back" aria-label="Back">‹</button>
-            {curStyle === 'highlight' && (
-              <button
-                type="button"
-                className={"ann-chip-color-btn" + (color === 'blank' ? ' active' : '')}
-                data-color="blank"
-                onClick={() => recolor('blank')}
-                title="No color (icon only)"
-                aria-label="No color (icon only)"
-                aria-pressed={color === 'blank'}
+      <div className="note-sheet rd-form-sheet rd-note-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="note-sheet-title" onClick={e => e.stopPropagation()}>
+        {mode === 'edit' ? (
+          <>
+            <div className="ui-sheet-head">
+              <h2 className="ui-sheet-title" id="note-sheet-title">{note.body ? 'Edit note' : 'New note'}</h2>
+            </div>
+            <div className="rd-quote note-sheet-anchor">{truncatedAnchor}</div>
+            <textarea
+              ref={textareaRef}
+              className="note-sheet-textarea"
+              value={body}
+              onChange={e => setBody(e.target.value)}
+              placeholder="Write your note…"
+              aria-label="Note text"
+              onFocus={() => {
+                const t = setTimeout(() => {
+                  focusScrollsRef.current.delete(t);
+                  try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
+                }, 220);
+                focusScrollsRef.current.add(t);
+              }}
+            />
+            <div className="rd-label">Colour</div>
+            <div className="ui-seg rd-seg" role="group" aria-label="Style">
+              {styleBtn('highlight', 'Highlight', 'Highlighter')}
+              {styleBtn('underline', 'Underline', 'Underline')}
+              {styleBtn('squiggle', 'Squiggle underline', 'Squiggle')}
+            </div>
+            {colours}
+            <div className="ui-group is-inset rd-note-nb">
+              <button type="button" className="ui-row is-one no-lead ui-row-press note-edit-nb-row" onClick={openPicker}>
+                <span className="ui-row-title">Notebook</span>
+                <span className={'ui-row-value' + (nbNames.length ? '' : ' is-none')}>{nbNames.length ? nbNames.join(', ') : 'Not in one'}</span>
+                <UiIcon name="chev" size="sm" className="ui-row-chev" />
+              </button>
+            </div>
+            {confirmingDiscard ? (
+              <ConfirmStrip
+                className="note-sheet-discard-confirm"
+                question={freshUnsaved ? 'Discard this note?' : 'Discard changes?'}
+                yesLabel="Yes, discard"
+                onCancel={() => setConfirmingDiscard(null)}
+                onConfirm={() => performDiscard(confirmingDiscard)}
               />
+            ) : (
+              <div className="ui-btn-row rd-foot">
+                <button type="button" className="ui-btn note-sheet-secondary" onClick={() => requestCancel('cancel')}>Cancel</button>
+                <button type="button" className="ui-btn is-primary note-sheet-save" onClick={save}>Save</button>
+              </div>
             )}
-            {HL_COLORS.map(c => (
-              <button
-                key={c}
-                type="button"
-                className={"ann-chip-color-btn" + (color === c ? ' active' : '')}
-                data-color={c}
-                onClick={() => recolor(c)}
-                title={c}
-                aria-label={c}
-                aria-pressed={color === c}
-              />
-            ))}
-          </div>
+          </>
         ) : (
           <>
-            {/* Anchor text (italic quote) */}
-            <div className="note-sheet-anchor">“{truncatedAnchor}”</div>
-            {/* Date row — read mode only. Shows when the note was last edited
-                (or when it was created if never edited). Subtle Cinzel caps
-                so it doesn't compete with the body content. */}
-            {mode === 'read' && (note.updated || note.created) && (
-              <div className="note-sheet-date">{relativeDate(note.updated || note.created)}</div>
-            )}
-            {/* Edit mode: style toggle + color row (mirrors the selection
-                toolbar). Pick a style — Highlight / Underline / Squiggle — and
-                a color; squiggle/underline are always a visible color, while
-                Highlight also offers a blank (invisible) swatch for a note
-                with no visual overhead. */}
-            {mode === 'edit' && (
-              <div className="note-edit-style-row">
-                <button type="button" className={"sel-style-btn" + (curStyle === 'highlight' ? ' active' : '')} onClick={() => setStyle('highlight')} title="Highlight" aria-label="Highlight" aria-pressed={curStyle === 'highlight'}>A</button>
-                <button type="button" className={"sel-style-btn sel-style-btn-underline" + (curStyle === 'underline' ? ' active' : '')} onClick={() => setStyle('underline')} title="Underline" aria-label="Underline" aria-pressed={curStyle === 'underline'}>A</button>
-                <button type="button" className={"sel-style-btn sel-style-btn-squiggle" + (curStyle === 'squiggle' ? ' active' : '')} onClick={() => setStyle('squiggle')} title="Squiggle underline" aria-label="Squiggle underline" aria-pressed={curStyle === 'squiggle'}>A</button>
-                <div className="sel-toolbar-divider" />
-                <div className="sel-toolbar-colors">
-                  {curStyle === 'highlight' && (
-                    <button
-                      type="button"
-                      className={"sel-color-btn" + (color === 'blank' ? ' active' : '')}
-                      data-color="blank"
-                      onClick={() => recolor('blank')}
-                      title="No color (icon only)"
-                      aria-label="No color (icon only)"
-                      aria-pressed={color === 'blank'}
-                    />
-                  )}
-                  {HL_COLORS.map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      className={"sel-color-btn sel-color-" + curStyle + (color === c ? ' active' : '')}
-                      data-color={c}
-                      onClick={() => recolor(c)}
-                      title={c}
-                      aria-label={c}
-                      aria-pressed={color === c}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Notebook chips (only in read mode and only if any are assigned) */}
-            {mode === 'read' && (note.notebookIds || []).length > 0 && (
-              <div className="note-sheet-nb-chips">
-                {(note.notebookIds || []).map(id => {
-                  const nb = NotebookStore.get(id);
-                  if (!nb) return null;
-                  return (
-                    <span key={id} className="note-sheet-nb-chip">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
-                        <polyline points="15 4 15 9 20 9" />
-                      </svg>
-                      {nb.name}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-            {/* Body — read mode displays it; edit mode shows textarea */}
-            {mode === 'read' ? (
-              note.body
-                ? <div className="note-sheet-body">{note.body}</div>
-                : (
-                  <button className="note-sheet-empty-btn" onClick={() => setMode('edit')}>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 20h9" />
-                      <path d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4z" />
-                    </svg>
-                    Add note text
-                  </button>
-                )
-            ) : (
-              <textarea
-                ref={textareaRef}
-                className="note-sheet-textarea"
-                value={body}
-                onChange={e => setBody(e.target.value)}
-                placeholder="Write your note…"
-                aria-label="Note text"
-                onFocus={() => {
-                  const t = setTimeout(() => {
-                    focusScrollsRef.current.delete(t);
-                    try { textareaRef.current && textareaRef.current.scrollIntoView({ block: 'nearest', behavior: scrollBehavior() }); } catch (_e) { /* DOM access — element may not exist or API unsupported */ }
-                  }, 220);
-                  focusScrollsRef.current.add(t);
-                }}
-              />
-            )}
-            {/* Edit mode: notebook assignment row — always visible so users
-                can assign to a notebook during creation, not just after. */}
-            {mode === 'edit' && (
-              <button
-                className="note-edit-nb-row"
-                onClick={() => { onOpenNotebookPicker && onOpenNotebookPicker(groupId); }}
-              >
-                <svg viewBox="0 0 24 24" fill="none" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4 4h11l5 5v11a1 1 0 0 1-1 1H4z" />
-                  <polyline points="15 4 15 9 20 9" />
-                </svg>
-                {(note.notebookIds || []).length > 0
-                  ? ((note.notebookIds || []).map(id => { const nb = NotebookStore.get(id); return nb ? nb.name : null; }).filter(Boolean).join(', ') || "Add to notebook…")
-                  : "Add to notebook…"}
+            <div className="rd-note-head">
+              <button type="button" className="note-sheet-color-hit" onClick={() => setShowColors(v => !v)} title="Change color" aria-label="Change note color" aria-expanded={showColors}>
+                <span className="note-sheet-color-dot sel-color-btn" data-color={color} aria-hidden="true" />
               </button>
-            )}
-            {/* Read mode: no Edit footer — use ⋯ → Edit. Edit mode: Cancel + Save.
-                Save is always enabled — blank notes are valid. A dismissal
-                with unsaved text swaps the footer for a discard ConfirmStrip
-                (typed words are never silently dropped). */}
-            {mode === 'edit' && (
-              confirmingDiscard ? (
-                <ConfirmStrip
-                  className="note-sheet-discard-confirm"
-                  question={freshUnsaved ? 'Discard this note?' : 'Discard changes?'}
-                  yesLabel="Yes, discard"
-                  onCancel={() => setConfirmingDiscard(null)}
-                  onConfirm={() => performDiscard(confirmingDiscard)}
-                />
-              ) : (
-                <div className="note-sheet-footer">
-                  <button className="note-sheet-secondary" onClick={() => requestCancel('cancel')}>Cancel</button>
-                  <button className="note-sheet-save" onClick={save}>Save</button>
-                </div>
-              )
-            )}
-            {/* ⋯ menu panel (read mode only). Color sub-panel was hoisted above
-                so the menu only carries the action items + delete confirm. */}
-            {mode === 'read' && menuOpen && (
+              <h2 className="ui-sheet-title" id="note-sheet-title">Note</h2>
+              <button type="button" className="rd-field-clear rd-note-close" onClick={requestClose} aria-label="Close"><UiIcon name="x" /></button>
+            </div>
+            {showColors && colours}
+            <div className="rd-quote note-sheet-anchor">{truncatedAnchor}</div>
+            {note.body
+              ? <div className="note-sheet-body">{note.body}</div>
+              : <button type="button" className="ui-btn is-text note-sheet-empty-btn" onClick={() => setMode('edit')}><UiIcon name="pen" size="sm" />Add note text</button>}
+            <div className="note-sheet-date">{[when, where].filter(Boolean).join(' · ')}</div>
+            {confirmDelete ? (
               <div className="note-sheet-menu">
-                {confirmDelete ? (
-                  <ConfirmStrip
-                    question={deleteQuestion}
-                    onCancel={() => setConfirmDelete(false)}
-                    onConfirm={remove}
-                  />
-                ) : (
-                  <>
-                    <button className="note-sheet-menu-item" onClick={() => { setMenuOpen(false); setMode('edit'); }}>Edit note</button>
-                    <button className="note-sheet-menu-item" onClick={() => { setMenuOpen(false); openColorPicker(); }}>Change color</button>
-                    <button
-                      className="note-sheet-menu-item"
-                      onClick={() => { setMenuOpen(false); onOpenNotebookPicker && onOpenNotebookPicker(groupId); }}
-                    >
-                      {((note.notebookIds || []).length > 0 ? "Manage notebooks…" : "Add to notebook…")}
-                    </button>
-                    <button className="note-sheet-menu-item" onClick={share}>Share</button>
-                    <button className="note-sheet-menu-item danger" onClick={() => setConfirmDelete(true)}>Delete note</button>
-                  </>
-                )}
+                <ConfirmStrip question={deleteQuestion} onCancel={() => setConfirmDelete(false)} onConfirm={remove} />
+              </div>
+            ) : (
+              <div className="rd-tiles is-4">
+                <button type="button" className="rd-tile" onClick={() => setMode('edit')}><UiIcon name="pen" /><span>Edit</span></button>
+                <button type="button" className="rd-tile" onClick={openPicker} aria-haspopup="dialog"><UiIcon name="journal" /><span>Notebook</span></button>
+                <button type="button" className="rd-tile" onClick={share}><UiIcon name="share" /><span>Share</span></button>
+                <button type="button" className="rd-tile is-danger" onClick={() => setConfirmDelete(true)}><UiIcon name="trash" /><span>Delete</span></button>
               </div>
             )}
           </>

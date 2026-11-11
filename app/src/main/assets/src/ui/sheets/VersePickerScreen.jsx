@@ -2,6 +2,7 @@
    VersePickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from '../components/UiIcon.jsx';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 
 export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourceStart, sourceEnd, sourceText, onClose, returnTargetInsteadOfLink }) {
@@ -335,19 +336,23 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
   // source passage.)
   const contextLine = returnTargetInsteadOfLink
     ? 'Choose scripture to insert'
-    : (sourceLabel ? 'Linking from ' + sourceLabel : 'Choose scripture to link');
+    : (sourceLabel ? 'Linking from ' + sourceLabel + '. Tap a verse number for the whole verse, or select the words you want.' : 'Choose scripture to link');
   // Footer primary — a scripture link always targets a specific verse/passage,
   // so it stays disabled until the user selects one (removes the old silent
   // dead-end where an empty header ✓ just cancelled).
+  // r-link2 (the UI pass, mock v2 readers): the button names the verse it links to.
+  const vs = selInfo && selInfo.verseStart;
+  const selRef = vs ? titleText + ':' + vs + (selInfo.verseEnd && selInfo.verseEnd !== vs ? '-' + selInfo.verseEnd : '') : '';
   const primaryLabel = hasSelection
-    ? (returnTargetInsteadOfLink ? 'Insert this selection' : 'Link this selection')
+    ? (returnTargetInsteadOfLink ? (selRef ? 'Insert ' + selRef : 'Insert this selection') : (selRef ? 'Link to ' + selRef : 'Link this selection'))
     : 'Select a verse to continue';
 
   return (
     <div className="picker-screen" ref={trapRef} role="dialog" aria-modal="true" aria-label="Select scripture text">
-      <div className="picker-header">
-        <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
-        <span className="picker-title">Select Text</span>
+      <div className="picker-header rd-vpick-bar">
+        <button type="button" className="bar-action picker-back" onClick={() => onClose(null)} aria-label="Back"><UiIcon name="back" /></button>
+        <span className="bar-title picker-title">{titleText}</span>
+        <button type="button" className="bar-text-action rd-vpick-cancel" onClick={() => onClose(null)}>Cancel</button>
       </div>
       <div className="picker-breadcrumb">{contextLine}</div>
       <div
@@ -355,13 +360,12 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
         onTouchEnd={captureSelection}
         onMouseUp={captureSelection}
       >
-        <div className="picker-letter-title">{titleText}</div>
-        <div className="picker-letter-subtitle">{isStudy ? "Matthew Study Bible" : "Bible Chapter"}</div>
-        <div className="picker-find">
+        <div className="ui-field rd-field picker-find">
+          <UiIcon name="search" size="sm" />
           <input
             className="picker-find-input"
             type="search"
-            placeholder="Find a verse by its words…"
+            placeholder="Find a verse by its words"
             value={verseFilter}
             onChange={e => setVerseFilter(e.target.value)}
             aria-label="Filter verses by text"
@@ -370,13 +374,8 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
             <span className="picker-find-count" role="status" aria-live="polite">{shownVerses.length} of {verses.length}</span>
           )}
         </div>
-        <div
-          className={"picker-selection-hint" + (hasSelection ? "" : " picker-selection-hint-empty")}
-          aria-live="polite"
-        >{hasSelection
-          ? previewText
-          : "Highlight any portion, or tap a verse number to grab the whole verse (tap a second number for a range)."
-        }</div>
+        {/* The chosen words show in the text itself (washed gold); the line under the bar says how to choose. */}
+        <div className="rd-sr-only picker-selection-hint" aria-live="polite">{hasSelection ? previewText : ''}</div>
         <div ref={bodyRef} className="picker-verses">
           {filterQ && shownVerses.length === 0 && (
             <div className="picker-find-none">No verse in this chapter contains “{verseFilter.trim()}”.</div>
@@ -406,10 +405,10 @@ export function VersePickerScreen({ refineRequest, sourceKey, sourceLabel, sourc
       <div className="picker-footer">
         <button
           type="button"
-          className={"picker-footer-btn" + (hasSelection ? "" : " is-disabled")}
+          className={"ui-btn is-primary is-wide picker-footer-btn" + (hasSelection ? "" : " is-disabled")}
           onClick={hasSelection ? confirmLink : undefined}
           disabled={!hasSelection}
-        >{primaryLabel}</button>
+        >{hasSelection && <UiIcon name="link" size="sm" />}{primaryLabel}</button>
       </div>
     </div>
   );

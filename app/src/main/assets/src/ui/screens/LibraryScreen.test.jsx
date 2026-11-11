@@ -1,13 +1,13 @@
 // @ts-nocheck — free-var globals stubbed per test (bundle-d screen contract)
-/* LibraryScreen — the LIBRARY tab's root (the layout pass, 2026-11-10, mock library.png): Reading plans and
-   Progress rows; "Yours" tiles with a real count from each store, or a plain line of what the tile holds while
-   it is empty; "Recently read" with the three newest History rows and See all. Scripture Web left for Read. */
+/* LibraryScreen — the LIBRARY tab's root (the UI pass, mock v2 library.html l-root): Reading plans and
+   Progress rows; "Yours" rows with a real count from each store at the right, "None yet" while one is empty;
+   "History" with the three newest places (one row each) and See all. Scripture Web left for Read. */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, render, cleanup, fireEvent, screen } from '@testing-library/react';
-import { LibraryScreen, readWhen, plansLine, RECENT_ROWS } from './LibraryScreen.jsx';
+import { LibraryScreen, readWhen, plansLine, progressLine, RECENT_ROWS } from './LibraryScreen.jsx';
 
-const GLOBALS = ['ScreenLayout', 'NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore', 'COL_BY_INDEX_SC'];
+const GLOBALS = ['ScreenLayout', 'NoteStore', 'LinkStore', 'BookmarkStore', 'JournalStore', 'AnnotationStore', 'ReadingPlanStore', 'ReadingStreakStore', 'COL_BY_INDEX_SC'];
 
 const fakeStore = (extra = {}) => ({
   subscribe: () => () => {}, getVersion: () => 0, all: () => ({}), count: () => 0,
@@ -41,8 +41,8 @@ const renderLibrary = (props = {}) => render(
   />
 );
 
-const tile = (title) => [...document.querySelectorAll('.lib-tile')].find((t) => t.querySelector('.root-tile-title').textContent === title);
-const tileLine = (title) => tile(title).querySelector('.root-tile-detail').textContent;
+const tile = (title) => [...document.querySelectorAll('.lib-row')].find((t) => t.querySelector('.ui-row-title').textContent === title);
+const tileLine = (title) => tile(title).querySelector('.ui-row-value').textContent;
 
 describe('LibraryScreen — the Library root', () => {
   it('is a root titled Library, with Search and the gear', () => {
@@ -66,17 +66,17 @@ describe('LibraryScreen — the Library root', () => {
     expect(screen.getByRole('button', { name: /Reading plans/ }).textContent).toContain('The Bible, the letters, short starts');
   });
 
-  it('Yours: five tiles in the mock order, each opening its list; no Scripture Web', () => {
+  it('Yours: five rows in the mock order, each opening its list; no Scripture Web', () => {
     setupGlobals();
     const handlers = { onOpenNotes: vi.fn(), onOpenHighlights: vi.fn(), onOpenBookmarks: vi.fn(), onOpenJournal: vi.fn(), onOpenLinks: vi.fn() };
     renderLibrary(handlers);
-    expect([...document.querySelectorAll('.lib-tile .root-tile-title')].map((t) => t.textContent)).toEqual(['Notes', 'Highlights', 'Bookmarks', 'Journal', 'Links']);
+    expect([...document.querySelectorAll('.lib-row .ui-row-title')].map((t) => t.textContent)).toEqual(['Notes', 'Highlights', 'Bookmarks', 'Journal', 'Links']);
     for (const t of ['Notes', 'Highlights', 'Bookmarks', 'Journal', 'Links']) fireEvent.click(tile(t));
     for (const fn of Object.values(handlers)) expect(fn).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/Scripture Web/)).toBeNull();
   });
 
-  it('a tile gives its live count, and "None yet" while it is empty', () => {
+  it('a row gives its live count, and "None yet" (greyed) while it is empty', () => {
     setupGlobals({
       NoteStore: fakeStore({ count: () => 23 }),
       BookmarkStore: fakeStore({ count: () => 1 }),
@@ -84,11 +84,13 @@ describe('LibraryScreen — the Library root', () => {
       AnnotationStore: fakeStore({ all: () => ({ 'v1:john:3': [{ id: 'a1', kind: 'highlight', color: 'yellow' }] }) }),
     });
     renderLibrary();
-    expect(tileLine('Notes')).toBe('23 notes');
-    expect(tileLine('Highlights')).toBe('1 marked passage');
-    expect(tileLine('Bookmarks')).toBe('1 place');
-    expect(tileLine('Journal')).toBe('4 entries');
+    expect(tileLine('Notes')).toBe('23');
+    expect(tileLine('Highlights')).toBe('1');
+    expect(tileLine('Bookmarks')).toBe('1');
+    expect(tileLine('Journal')).toBe('4');
     expect(tileLine('Links')).toBe('None yet');
+    expect(tile('Links').querySelector('.ui-row-value').classList.contains('is-none')).toBe(true);
+    expect(tile('Notes').querySelector('.ui-row-value').classList.contains('is-none')).toBe(false);
   });
 
   it('a blank-colour note is not counted as a highlight (n363)', () => {
@@ -97,7 +99,7 @@ describe('LibraryScreen — the Library root', () => {
       'v1:john:4': [{ id: 'a2', groupId: 'g1', kind: 'highlight', color: 'yellow' }],
     }) }) });
     renderLibrary();
-    expect(tileLine('Highlights')).toBe('1 marked passage');
+    expect(tileLine('Highlights')).toBe('1');
   });
 
   /* The counts read their stores directly at render; what re-renders the screen when one changes is the screen's
@@ -122,11 +124,11 @@ describe('LibraryScreen — the Library root', () => {
     renderLibrary();
     expect(tileLine(title)).not.toMatch(/^\d/);
     act(() => { n = 1; version++; listeners.forEach((cb) => cb()); });
-    expect(tileLine(title)).toMatch(/^1 /);
+    expect(tileLine(title)).toBe('1');
   });
 });
 
-describe('LibraryScreen — Recently read', () => {
+describe('LibraryScreen — History', () => {
   const NOW = Date.now();
   const rows = [
     { type: 'letter', letterTitle: 'Wisdom Has Spoken', letterNum: 14, volumeScreen: 'vot-index', ts: NOW },
@@ -140,9 +142,10 @@ describe('LibraryScreen — Recently read', () => {
     globalThis.COL_BY_INDEX_SC = new Map([['vot-index', { label: 'Volume Two' }]]);
     const onOpenHistory = vi.fn(), onOpenHistoryEntry = vi.fn();
     renderLibrary({ history: rows, onOpenHistory, onOpenHistoryEntry });
-    const list = [...document.querySelectorAll('.root-row-plain')];
+    const list = [...document.querySelectorAll('.lib-recent .ui-row')];
     expect(list).toHaveLength(RECENT_ROWS);
-    expect(list[0].textContent).toBe('Wisdom Has SpokenVolume Two, Letter 14 · today›');
+    expect(list[0].querySelector('.ui-row-title').textContent).toBe('Wisdom Has Spoken');
+    expect(list[0].querySelector('.ui-row-meta').textContent).toBe('Volume Two · Letter 14 · today');
     expect(list[1].textContent).toContain('The Scriptures of Truth · today');
     expect(list[2].textContent).toContain('John 3');
     fireEvent.click(list[1]);
@@ -154,10 +157,23 @@ describe('LibraryScreen — Recently read', () => {
   it('is gone with History switched off, and with nothing read', () => {
     setupGlobals();
     renderLibrary({ history: rows, historyEnabled: false });
-    expect(screen.queryByText('Recently read')).toBeNull();
+    expect(screen.queryByText('History')).toBeNull();
     cleanup();
     renderLibrary({ history: [] });
-    expect(screen.queryByText('Recently read')).toBeNull();
+    expect(screen.queryByText('History')).toBeNull();
+  });
+
+  it('lists each place once, at its newest visit (bug: one row per visit)', () => {
+    setupGlobals();
+    const visits = [
+      { type: 'bible', key: 'b:john:3', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: NOW },
+      { type: 'bible', key: 'b:john:3', bookId: 'john', bookTitle: 'John', chapterNum: 3, ts: NOW - 5000 },
+      { type: 'bible', bookId: 'acts', bookTitle: 'Acts', chapterNum: 2, ts: NOW - 6000 },
+      { type: 'bible', bookId: 'acts', bookTitle: 'Acts', chapterNum: 2, ts: NOW - 7000 },
+    ];
+    renderLibrary({ history: visits });
+    const titles = [...document.querySelectorAll('.lib-recent .ui-row-title')].map((t) => t.textContent);
+    expect(titles).toEqual(['John 3', 'Acts 2']);
   });
 
   it('says when in a word', () => {
@@ -166,6 +182,22 @@ describe('LibraryScreen — Recently read', () => {
     expect(readWhen(new Date(2026, 10, 9, 23).getTime(), now)).toBe('yesterday');
     expect(readWhen(new Date(2026, 10, 3).getTime(), now)).toBe('Nov 3');
     expect(readWhen(undefined, now)).toBe('');
+  });
+});
+
+describe('LibraryScreen — the Progress line', () => {
+  it('says what is read and the streak in plain units, or what the screen is', () => {
+    expect(progressLine(0, 0)).toBe('Your reading at a glance');
+    expect(progressLine(1, 1)).toBe('1 read · 1 day in a row');
+    expect(progressLine(1200, 0)).toBe('1,200 read');
+    expect(progressLine(0, 3)).toBe('3 days in a row');
+  });
+
+  it('reads the streak from ReadingStreakStore', () => {
+    setupGlobals();
+    globalThis.ReadingStreakStore = { subscribe: () => () => {}, getVersion: () => 0, get: () => ({ currentStreak: 2 }) };
+    renderLibrary({ totalReadCount: 5 });
+    expect(screen.getByRole('button', { name: /Progress/ }).textContent).toContain('5 read · 2 days in a row');
   });
 });
 

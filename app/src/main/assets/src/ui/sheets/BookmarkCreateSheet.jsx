@@ -2,7 +2,7 @@
    BookmarkCreateSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { normalizeExcerptDisplay } from '../../utils/excerpt-display.js';
+import { UiIcon } from '../components/UiIcon.jsx';
 
 /**
  * @param {{ pending: any, onConfirm: any, onCancel: any, onDelete?: any, onOpen?: any }} props
@@ -116,43 +116,27 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
     if (typeof onOpen === 'function') onOpen(pending.editId);
   }
 
-  var title = isEditMode ? 'Edit Bookmark' : 'New Bookmark';
+  var title = isEditMode ? 'Edit bookmark' : 'New bookmark';
   var saveTitle = isEditMode ? 'Save changes' : 'Save bookmark';
 
   return (
     <div className="link-picker-overlay" onClick={onCancel}>
       <div
-        className={'link-picker-sheet navpick-sheet bkm-create-sheet' + (isEditMode ? ' bkm-create-sheet-edit' : '')}
+        className={'link-picker-sheet rd-form-sheet bkm-create-sheet' + (isEditMode ? ' bkm-create-sheet-edit' : '')}
         ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="bookmark-create-title"
         onClick={function(e) { e.stopPropagation(); }}
       >
-        <div className="navpick-header bkm-create-head">
-          <button
-            className="navpick-close navpick-close-undo"
-            onClick={onCancel}
-            aria-label="Cancel"
-          >Cancel</button>
-          <span className="navpick-title" id="bookmark-create-title">{title}</span>
-          <button
-            className="navpick-confirm-green"
-            onClick={canSave ? commit : undefined}
-            disabled={!canSave}
-            aria-label={saveTitle}
-            title={canSave ? saveTitle : (isEditMode ? 'No changes to save' : 'Add a label')}
-          >
-            {/* rule 9 (the UI pass, W1): Cancel and Save are words, never a red cross and a green tick */}
-            Save
-          </button>
+        {/* r-bm (the UI pass, mock v2 readers): a title, where it is, a name field, a line on where it is
+            kept, then Cancel | Save in words at the foot. */}
+        <div className="ui-sheet-head">
+          <h2 className="ui-sheet-title" id="bookmark-create-title">{title}</h2>
+          {pending.sourceLabel && <div className="ui-sheet-sub bkm-create-source">{pending.sourceLabel}</div>}
         </div>
-
         <div className="bkm-create-body">
-          {pending.sourceLabel && <div className="bkm-create-source">{pending.sourceLabel}</div>}
-          {pending.excerpt && <div className="bkm-create-excerpt">“{normalizeExcerptDisplay(pending.excerpt)}”</div>}
-
-          <div className="bkm-create-field-label" id="bookmark-create-label">Label</div>
+          <div className="ui-field is-square rd-field">
           <input
             ref={labelRef}
             className="bkm-create-label-input"
@@ -164,9 +148,15 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
               else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
             }}
             placeholder="A short name for this bookmark…"
-            aria-labelledby="bookmark-create-label"
+            aria-label="Bookmark name"
             maxLength={200}
           />
+            {label && (
+              <button type="button" className="rd-field-clear" aria-label="Clear the name"
+                onClick={function() { setLabel(''); if (labelRef.current) labelRef.current.focus(); }}><UiIcon name="x" size="sm" /></button>
+            )}
+          </div>
+          {!isEditMode && <p className="rd-note">Give it a name you will know it by. It is kept in Library, under Bookmarks.</p>}
 
           {/* Edit-mode actions: Open Source + Delete (tap-confirm). Only
               rendered when we're editing an existing bookmark.
@@ -218,6 +208,17 @@ export function BookmarkCreateSheet({ pending, onConfirm, onCancel, onDelete, on
               )}
             </div>
           )}
+        </div>
+        <div className="ui-btn-row rd-foot">
+          <button type="button" className="ui-btn" onClick={onCancel} aria-label="Cancel">Cancel</button>
+          <button
+            type="button"
+            className="ui-btn is-primary navpick-confirm-green"
+            onClick={canSave ? commit : undefined}
+            disabled={!canSave}
+            aria-label={saveTitle}
+            title={canSave ? saveTitle : (isEditMode ? 'No changes to save' : 'Add a label')}
+          >Save</button>
         </div>
       </div>
     </div>

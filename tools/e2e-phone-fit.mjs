@@ -265,7 +265,10 @@ async function main() {
 
     await step('onboarding', async () => {
       await clickText(/^Continue$/); await check('onboarding');
-      await clickText(/Begin Reading/); await check('home-tour');
+      // Begin Reading opens the first letter; the tour offer is no longer over it (U §4) but a card at
+      // the end of the Read tab, so the walk goes Home for it.
+      await clickText(/Begin Reading/); await check('first-letter');
+      await goHome(); await check('home-tour');
       await clickText(/^Maybe later$/);
     });
     await step('home', async () => { await goHome(); await check('home'); });
@@ -315,12 +318,12 @@ async function main() {
     });
     await step('history', async () => {
       await goHome(); await clickText(/^Library$/, '.tabbar-tab'); await clickText(/^See all$/); await check('history');
-      // A screen with the bar: Back, Search, Tabs, the gear last; no Home icon, no ⋯ (the top-bar rule).
+      // The utility bar (rule 11, mock v2 l-hist): Back (named by where it goes), Tabs, the screen's own menu.
       const bar = await page.evaluate(() => [...document.querySelectorAll('.top-nav button')]
         .filter((b) => b.getClientRects().length > 0 && getComputedStyle(b).display !== 'none')
         .map((b) => b.getAttribute('aria-label') || b.className));
-      const names = bar.map((n) => (/^Open tabs/.test(n) ? 'Tabs' : /^Back/.test(n) ? 'Back' : n));
-      if (names.join() !== 'Back,Search,Tabs,Settings') throw new Error(`top bar on History reads ${names.join(', ')}, wanted Back, Search, Tabs, Settings`);
+      const names = bar.map((n, i) => (/^Open tabs/.test(n) ? 'Tabs' : i === 0 ? 'Back' : n));
+      if (names.join() !== 'Back,Tabs,History options') throw new Error(`top bar on History reads ${names.join(', ')}, wanted Back, Tabs, History options`);
     });
     await step('tabs', async () => { await clickText(/Open tabs/, 'button'); await check('open-tabs'); await page.keyboard.press('Escape'); });
     await step('search', async () => {

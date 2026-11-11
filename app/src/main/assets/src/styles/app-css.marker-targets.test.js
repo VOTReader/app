@@ -80,9 +80,9 @@ describe('#10 — the markers in the reading text take a tap near them', () => {
 });
 
 describe('#10 — out of the text the targets are 44 px', () => {
-  it('the note sheet\'s Save and Cancel are at least 44 px tall', () => {
-    expect(decls('.note-sheet-save')['min-height']).toBe('44px');
-    expect(decls('.note-sheet-secondary')['min-height']).toBe('44px');
+  it('the note sheet\'s Save and Cancel are the shared buttons, 48 px tall', () => {
+    // r-note (W2f): Cancel | Save are .ui-btn (min-height var(--btn-h), 48 px).
+    expect(decls('.ui-btn')['min-height']).toBe('var(--btn-h)');
   });
 
   it('the note colour dot sits in a 44 px button that takes no more room than the dot', () => {
@@ -92,9 +92,4 @@ describe('#10 — out of the text the targets are 44 px', () => {
     expect(hit.margin).toBe('-13px');          // 44 - 2 x 13 = the dot's 18 px
   });
 
-  it('the bookmark row\'s options button is 44 px across in the room of its 20 px glyph box', () => {
-    const more = decls('.bkm-row-more');
-    expect(more.padding).toBe('14px');         // 16 px glyph + 2 x 14
-    expect(more.margin).toBe('-12px');         // laid out as the 20 px it was
-  });
 });

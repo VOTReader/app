@@ -361,10 +361,10 @@
     var LEGS = [
       { screen: 'notes-index', label: 'Library tab → Notes',
         open: async function () { await goHome(); openTab('Library'); await sleep(340); return clickByText(/My Notes|^\s*Notes(?![a-z])/); },
-        // The shared personal-study header titles the screen "Notes" (2026-09-25); any
-        // pager peek of the Library beside it is titled "Library", so match the title exactly.
+        // The utility bar titles the screen "Notes" (the UI pass, W2); any pager peek of the
+        // Library beside it is titled "Library", so match the title exactly.
         there: function () {
-          return [].slice.call(document.querySelectorAll('.study-head-title'))
+          return [].slice.call(document.querySelectorAll('.bar-title, .study-head-title'))
             .some(function (h) { return (h.textContent || '').trim() === 'Notes'; });
         } },
       { screen: 'audio-library', label: 'Listen tab',
@@ -629,7 +629,7 @@
     await step('Library → Journal', async function () { return lib(/My Journal|^\s*Journal(?![a-z])/, /Journal/); });
     await step('Library → Progress', async function () {
       await lib(/My Progress|^\s*Progress(?![a-z])/);
-      return /Most Annotated/i.test(document.body.textContent || '');
+      return /Most (Annotated|marked)/i.test(document.body.textContent || '');   // W2b: the section is Most marked (mock v2 l-prog2)
     });
     await step('Settings', async function () {
       openSettings(); await sleep(360);
