@@ -14,6 +14,7 @@ import { runStatus, dayItems, itemsLabel, itemsWords, minutesFor, todayKey } fro
 import { bookTitle, runName, migrateRp1 } from '../data/plan-catalog.js';
 import { countItemWords } from './word-count.js';
 import { supported as reminderSupported, syncPlanReminders, onReminderOpen } from './plan-reminder.js';
+import { openPlanNav } from './plan-nav.js';
 
 /** @typedef {import('../data/plan-engine.js').PlanRun} PlanRun */
 /** @typedef {import('../data/plan-catalog.js').LetterSource} LetterSource */
@@ -141,21 +142,10 @@ export function saveRun(run) { const s = _store(); if (s) s.put(run); }
 /** Stop a run: it stays on the device, stopped (finished runs are the archive; stopped ones are not shown). */
 export function stopRun(run, now) { saveRun({ ...run, status: 'stopped', updated: now.getTime(), stopped: todayKey(now) }); }
 
-/* rp-s1: a tapped reminder asks the Plans screen to open that plan's details. The ask waits here until the
-   screen takes it (a cold start reaches the screen after the tap), and a screen already showing hears it. */
-let _openAsk = /** @type {string | null} */ (null);
-const _openSubs = new Set();
-/** @param {string} id */
-export function askPlanOpen(id) { _openAsk = id; for (const f of _openSubs) f(id); }
-/** The plan a reminder asked to open, once. @returns {string | null} */
-export function takePlanOpen() { const id = _openAsk; _openAsk = null; return id; }
-/** @param {(id: string) => void} f @returns {() => void} */
-export function onPlanOpenAsk(f) { _openSubs.add(f); return () => { _openSubs.delete(f); }; }
-
 /**
  * rp-s1, mounted once at the app: hands the native reminder the runs on every store change and at boot (a stop,
  * pause or Clear All drops a reminder because the run is no longer running), and opens the plan a tapped reminder
- * names. A no-op on the web. @param {() => void} openPlans
+ * names (plans2: on that plan's own page). A no-op on the web. @param {() => void} openPlans
  */
 export function usePlanReminders(openPlans) {
   const store = _store();
@@ -172,5 +162,5 @@ export function usePlanReminders(openPlans) {
   }, [store, version]);
   const openRef = React.useRef(openPlans);
   React.useEffect(() => { openRef.current = openPlans; });
-  React.useEffect(() => onReminderOpen((id) => { askPlanOpen(id); openRef.current(); }), []);
+  React.useEffect(() => onReminderOpen((id) => { openPlanNav([{ v: 'list' }, { v: 'plan', id }]); openRef.current(); }), []);
 }

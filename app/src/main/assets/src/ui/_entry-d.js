@@ -262,6 +262,7 @@ import { ScriptureWebScreen, ensureScriptureWebData } from './screens/ScriptureW
 import { MyProgressScreen } from './screens/MyProgressScreen.jsx';
 import { BookmarkRow, BookmarkRowActionSheet, BookmarksScreen } from './screens/BookmarksScreen.jsx';
 import { ReadingPlansScreen } from './screens/ReadingPlansScreen.jsx';
+import { PlansHub } from './screens/PlansHub.jsx';
 import { HistoryScreen } from './screens/HistoryScreen.jsx';
 import { NotesIndexScreen } from './screens/NotesIndexScreen.jsx';
 import {
@@ -410,6 +411,7 @@ Object.assign(window, {
   BookmarkRow, BookmarkRowActionSheet, BookmarksScreen,
   HistoryScreen,
   ReadingPlansScreen,
+  PlansHub,
   NotesIndexScreen,
   _linkEndpointCategory, _endpointResolves, _epSearchText,
   LinkRow, LinkRowActionSheet, LinksScreen,

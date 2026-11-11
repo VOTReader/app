@@ -25,6 +25,7 @@ import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand, stickyCover } from '../components/MiniTitleBand.jsx';
 import { EditionCompare } from '../components/EditionCompare.jsx';
+import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 
 
 /** Readable fallback for a {{nav:bookId:ch}} target before the lazy Bible
@@ -563,6 +564,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
       {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
       {/* Plain black, no banner (Corbin 2026-11-01), like every reading page. */}
+      {!isAns && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanSessionStrip bid={COL_BY_KEY.get(volKey).readKey} cid={entry.id} inert={inert} /> : null}
       <header className="hero" ref={heroRef}>
         <div className="hero-content">
           <div className="hero-eyebrow">{eyebrow}</div>
@@ -631,6 +633,7 @@ export function WtlbEntryView({ entry, volKey, partLabel, onHome, onNavigate, on
               <div className="ornament-divider-symbol">✦</div>
               <div className="ornament-divider-line" />
             </div>
+            {!isAns && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanRibbon bid={COL_BY_KEY.get(volKey).readKey} cid={entry.id} inert={inert} /> : null}
 
             <div className="bottom-nav">
               {prevEntry ? (

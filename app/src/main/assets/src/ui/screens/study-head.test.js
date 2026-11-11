@@ -14,6 +14,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (...p) => readFileSync(resolve(here, ...p), 'utf8');
 
 // LibraryScreen left the family on 2026-11-10: it is the Library tab's root, named in the root top bar (RootNav.jsx).
+// ReadingPlansScreen left it on 2026-11-11 (plans2): Reading plans is named in its top bar (PlansHub.jsx, U rules 10-11).
 const TITLES = {
   MyProgressScreen: 'Progress',
   JournalHubScreen: 'Journal',
@@ -21,7 +22,6 @@ const TITLES = {
   BookmarksScreen: 'Bookmarks',
   LinksScreen: 'Links',
   HighlightsScreen: 'Highlights & Underlines',
-  ReadingPlansScreen: 'Reading plans',   // rp1 (web-builder, 2026-09-25) joined the family
 };
 const RETIRED = [
   'library-eyebrow', 'library-title', 'library-sub', 'jrn-hub-header', 'jrn-hub-title', 'jrn-hub-count',

@@ -87,10 +87,11 @@ const STAR_ICON = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
  * @param {{ onSelect: (id: string) => void, onSurprise: () => void, showSurprise?: boolean, onSettings: () => void,
  *   onSearch: () => void, onScriptureWeb?: () => void, historyEnabled?: boolean, searchEnabled?: boolean, history?: any[],
  *   onContinue?: (entry: any) => void, onStartHere?: () => void, translation?: string, readingPlans?: any,
- *   isRead?: any, markAsReadEnabled?: boolean, onPlanRead?: (next: any) => void, onPlanListen?: (items: any[], name: string) => void,
+ *   isRead?: any, markAsReadEnabled?: boolean, onPlanRead?: (next: any, planId: string) => void, onPlanListen?: (items: any[], name: string) => void,
+ *   onOpenPlan?: (planId: string) => void,
  *   planTracks?: any, onOpenPlans?: () => void, onPlansMoved?: (left: any[]) => void, onEnableMarkAsRead?: () => void }} props
  */
-export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onScriptureWeb, historyEnabled, searchEnabled, history, onContinue, onStartHere, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onPlansMoved, onEnableMarkAsRead }) {
+export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onSearch, onScriptureWeb, historyEnabled, searchEnabled, history, onContinue, onStartHere, translation, readingPlans, isRead, markAsReadEnabled, onPlanRead, onPlanListen, planTracks, onOpenPlans, onOpenPlan, onPlansMoved, onEnableMarkAsRead }) {
   // U09.2: the Scriptures tile names the edition the Bible shows ("WEB · NKJV until it downloads").
   useOfflineEditions(translation);
   // rp1: the reader's plans for today and the Continue row, one up-next card under the search field (TodayCard.jsx)
@@ -168,7 +169,7 @@ export function HomeScreen({ onSelect, onSurprise, showSurprise, onSettings, onS
           </button>
         ) : null}
         <TodayCard rows={todayRows} markAsReadEnabled={markAsReadEnabled} tracksOf={planTracks}
-          onRead={(next) => onPlanRead && onPlanRead(next)} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
+          onRead={(next, planId) => onPlanRead && onPlanRead(next, planId)} onOpenPlan={onOpenPlan} onListen={(items, planId) => onPlanListen && onPlanListen(items, (todayRows.find((r) => r.id === planId) || { name: '' }).name)}
           onEnableMarkAsRead={onEnableMarkAsRead} onOpenPlans={() => onOpenPlans && onOpenPlans()}
           offerStart={offerPlan} onHideOffer={hideOffer}>
           {/* n131/n352 (A07.2, L1.1, U02.1): the newest place is one tap (Continue), and before any reading the row
