@@ -497,7 +497,9 @@ export function JournalEditorScreen(props) {
       if (typeof JournalStatsStore === 'undefined') return;
       var marker = localStorage.getItem(JRN_NEW_ENTRY_STATS_KEY);
       if (!marker || marker !== eid) return;
-      if (!(titleNow || '').trim() && !_blocksHaveContent(blocksNow)) return; // still blank — keep waiting
+      // Still blank — keep waiting. A plan day's note that opened titled counts once its title changes or it holds
+      // something (POL4: Done used to count it here, so the exit prune never saw the marker and kept it).
+      if ((!(titleNow || '').trim() || titleNow === openedTitleRef.current) && !_blocksHaveContent(blocksNow)) return;
       try { localStorage.removeItem(JRN_NEW_ENTRY_STATS_KEY); } catch (_e) { /* ignore */ }
       JournalStatsStore.recordNewEntry(createdRef.current || Date.now());
       countedRef.current = true;

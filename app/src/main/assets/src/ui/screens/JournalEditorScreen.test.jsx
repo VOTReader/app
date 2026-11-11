@@ -611,6 +611,17 @@ describe('JournalEditorScreen — P1-7: blank entries prune on exit', () => {
     expect(JournalStore.get(entry.id)).not.toBeNull();
   });
 
+  it('a plan day note left as it opened is pruned even after Done (Done does not count its title)', () => {
+    const entry = JournalStore.add({ title: 'Psalms · Day 3' });
+    localStorage.setItem('vot-journal-new-entry-stats', entry.id);
+    const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);
+    const done = Array.from(document.querySelectorAll('button')).find((b) => b.textContent.trim() === 'Done');
+    fireEvent.click(done);
+    unmount();
+    expect(JournalStore.get(entry.id)).toBeNull();
+    expect(localStorage.getItem('vot-journal-new-entry-stats')).toBeNull();
+  });
+
   it('an entry that is ONLY a voice memo (no text) is content — kept', () => {
     const entry = JournalStore.add({ title: '', blocks: [JournalHelpers.newBlock('audio', { mediaId: 'm_1', duration: 3 })] });
     const { unmount } = render(<JournalEditorScreen entryId={entry.id} onBack={() => {}} />);

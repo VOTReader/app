@@ -706,6 +706,14 @@ export function buildScreenRoutes({
     return false;
   };
   window.__songsBack = screen === SONGS_SCREEN ? _songsBack : null;
+  // The journal editor's Back (its Done and the phone's Back alike): a plan day's note returns to its plan, a new
+  // entry to the Journal list, any other entry to its read-only view.
+  const _journalEditorBack = () => {
+    // plans2: a plan day's note goes Back to the plan it was written from.
+    if (window.navHandoff.take('journalPlanReturn') === journalEntryId) { window.navHandoff.take('journalNewEntry'); keepPlanNav(); setNavOrigin({ screen: 'library', returnOrigin: null }); setScreen('reading-plans'); return; }
+    if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId);
+  };
+  window.__journalEditorBack = screen === 'journal-editor' ? _journalEditorBack : null;
   // A letter page's songs card opens a song or the letter's songs; Back returns to this letter.
   // Already on the Songs screen (the desk's "Song page ›" over a song list), the frames go on top of its stack, so
   // Back returns to the list. From anywhere else Back returns to that page, the root pill naming it (W-03).
@@ -1405,11 +1413,7 @@ export function buildScreenRoutes({
         onSettings={goSettings}
         entryId={journalEntryId}
         // U03.6: an entry just made with New entry goes Back to the Journal list (its read-only view was a second Back away).
-        onBack={() => {
-          // plans2: a plan day's note goes Back to the plan it was written from.
-          if (window.navHandoff.take('journalPlanReturn') === journalEntryId) { window.navHandoff.take('journalNewEntry'); keepPlanNav(); setNavOrigin({ screen: 'library', returnOrigin: null }); setScreen('reading-plans'); return; }
-          if (window.navHandoff.take('journalNewEntry') === journalEntryId) setScreen('journal-home'); else goJournalViewer(journalEntryId);
-        }}
+        onBack={_journalEditorBack}
         onHome={goHome}
         onSearch={goSearch}
         onHistory={goHistory}

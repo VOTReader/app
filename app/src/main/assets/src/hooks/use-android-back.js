@@ -374,7 +374,8 @@ export function useAndroidBack({
         if (backActiveRef.current) {tapThroughBackRef.current();return "true";}
         setScreen("journal-home");return "true";
       } else
-      if (s === "journal-editor") {goJournalViewer(journalEntryIdRef.current);return "true";} else
+      // POL4: the editor's own Back (screen-routes owns it): a plan note returns to its plan, a new entry to the list.
+      if (s === "journal-editor") {if (typeof window.__journalEditorBack === "function") window.__journalEditorBack(); else goJournalViewer(journalEntryIdRef.current);return "true";} else
       // Track D: a chapter picked from the index a book-level hit opened (fromSearchIndex) backs
       // to that index, which backs to the results; one a hit opened backs to the results.
       if (s === "matthew-ch") {if (fromSurpriseRef.current) {setFromSurprise(false);goHome();return "true";}if (fromSearchRef.current && !fromSearchIndexRef.current) {setFromSearch(false);setSurpriseAnchor(null);setScreen("search");} else {if (fromSearchIndexRef.current && setFromSearchIndex) setFromSearchIndex(false);setChapterNum(null);setScreen("matthew-idx");}return "true";} else
