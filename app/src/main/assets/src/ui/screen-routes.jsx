@@ -1183,6 +1183,9 @@ export function buildScreenRoutes({
         historyCount={readHistory.length}
         theme={theme} onThemeChange={setTheme}
         onAbout={goAbout}
+        onSearchLibrary={(q) => { setSearchQuery(q); goSearch(); }}
+        onOpenPlans={() => { openPlanNav([{ v: 'list' }]); setNavOrigin({ screen: 'settings', returnOrigin: navOrigin || null }); setScreen('reading-plans'); }}
+        onOpenGarden={() => handleVolumeSelect('garden')}
       />
     ),
     'search': () => (

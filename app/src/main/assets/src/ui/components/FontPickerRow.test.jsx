@@ -51,7 +51,7 @@ describe('FontPickerRow (SelectField dropdown, all fonts vendored)', () => {
     const value = document.querySelector('.settings-row-value');
     expect(value.textContent).toBe('EB Garamond');
     expect(value.style.fontFamily).toContain('EB Garamond');
-    expect(document.querySelector('.settings-row-label').textContent).toBe('Reading Font');
+    expect(document.querySelector('.settings-row-label').textContent).toBe('Reading font');
   });
 
   it('a corrupt persisted id degrades to System Serif instead of crashing', () => {
@@ -111,7 +111,7 @@ describe('FontPickerRow (SelectField dropdown, all fonts vendored)', () => {
 });
 
 // A09.4: "Easy to read" opens the sheet (Atkinson Hyperlegible was card 24 of 25), and each card shows a sample in its face.
-describe('FontPickerRow — Easy to read, and a sample per font', () => {
+describe('FontPickerRow — Easy to read, and one sample preview', () => {
   it('heads the sheet with Easy to read: Atkinson Hyperlegible and Lexend, then the serif faces', () => {
     mount();
     openSheet();
@@ -121,14 +121,16 @@ describe('FontPickerRow — Easy to read, and a sample per font', () => {
     expect(options()[2].querySelector('.select-sheet-option-label').textContent).toBe('System Serif');
   });
 
-  it('every card carries a sample line set in its own face, hidden from the screen reader', () => {
-    mount();
+  // WS2 settings (st-font): one preview on top, set in the face now chosen, instead of the same line on every card.
+  it('one preview on top shows the sample in the chosen face, and no card repeats it', () => {
+    mount('cardo');
     openSheet();
-    for (const o of options()) {
-      const sample = o.querySelector('.select-sheet-option-sample');
-      expect(sample.textContent).toBe('In the beginning was the Word');
-      expect(sample.getAttribute('aria-hidden')).toBe('true');
-      expect(sample.style.fontFamily).toBe(o.querySelector('.select-sheet-option-label').style.fontFamily);
-    }
+    const previews = document.querySelectorAll('.ws2-font-preview');
+    expect(previews.length).toBe(1);
+    const sample = previews[0].querySelector('.ws2-font-sample');
+    expect(sample.textContent).toBe('In the beginning was the Word');
+    expect(sample.style.fontFamily).toBe(option('Cardo').querySelector('.select-sheet-option-label').style.fontFamily);
+    expect(previews[0].querySelector('.ws2-font-name').textContent).toMatch(/^Cardo · /);
+    for (const o of options()) expect(o.querySelector('.select-sheet-option-sample')).toBeNull();
   });
 });

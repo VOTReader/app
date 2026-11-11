@@ -9,24 +9,33 @@ beforeEach(() => { setupSettingsGlobals(); });
 afterEach(() => { cleanup(); teardownSettingsGlobals(); });
 
 const find = (value) => fireEvent.change(screen.getByLabelText('Find settings'), { target: { value } });
-const shownGroups = () => groupHeads().map((h) => h.closest('[data-settings-group]').getAttribute('data-settings-group'));
+// WS2 settings (st-find): the find draws found ROWS, each with its place, not whole groups.
+const foundPlaces = () => [...document.querySelectorAll('[data-found] .ws2-place')].map((p) => p.textContent);
 
 describe('the find box matches the start of a word (s23.3)', () => {
-  it('"a" no longer lights every group', () => {
+  it('"a" no longer lights every row', () => {
+    renderSettings();
+    const all = document.querySelectorAll('.settings-row').length;   // every group's screen at once
+    cleanup();
     renderSettings({}, {}, { expandGroups: false });
-    const all = 10;   // every group: the root itself hides Auto-scroll and Help
     find('a');
-    expect(shownGroups().length).toBeLessThan(all);
-    expect(shownGroups()).not.toContain('topnav');
-    expect(shownGroups()).toContain('appearance');
+    expect(groupHeads()).toHaveLength(0);   // no group heads while finding
+    expect(foundPlaces().length).toBeGreaterThan(0);
+    expect(foundPlaces().length).toBeLessThan(all);
+    expect(row('Answers reading path')).toBeTruthy();
+    expect(row('Search')).toBeUndefined();
   });
 
-  it('a word typed in part still finds its group, and the middle of a word does not', () => {
+  it('a word typed in part still finds its rows, and the middle of a word does not', () => {
     renderSettings({}, {}, { expandGroups: false });
-    find('back');
-    expect(shownGroups()).toEqual(['data']);
+    find('backu');
+    expect(foundPlaces().length).toBeGreaterThan(0);
+    for (const place of foundPlaces()) expect(place).toMatch(/^Your data/);
+    expect(row('Verify a Backup')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toBe(foundPlaces().length + ' settings');
     find('ackup');
-    expect(shownGroups()).toEqual([]);
+    expect(foundPlaces()).toEqual([]);
+    expect(screen.getByRole('status').textContent).toContain('No matching settings');
   });
 
   it('says "Find a setting" in the empty box', () => {
@@ -48,19 +57,22 @@ describe('small copy and a11y pieces', () => {
     expect(icon('share')).not.toBe(icon('appearance'));
   });
 
+  // WS2 settings: the line is the design's short one; the live dwell time is the row's value beside it.
   it('the streak row states the live dwell time (A09.12)', () => {
     renderSettings({ dwellMs: '45000' });
-    expect(row('Reading Streak Dwell Time').textContent).toContain('A day counts toward your reading streak on My Progress after 45 seconds reading one chapter or letter.');
+    expect(row('Reading streak').textContent).toContain('A day counts after this long on one chapter or letter');
+    expect(screen.getByRole('button', { name: 'Reading streak: 45 seconds' })).toBeTruthy();
     cleanup();
     renderSettings({ dwellMs: '60000' });
-    expect(row('Reading Streak Dwell Time').textContent).toContain('after 1 minute reading');
+    expect(screen.getByRole('button', { name: 'Reading streak: 60 seconds' })).toBeTruthy();
   });
 
-  it('the Letter Voice description reads as plain sentences (s23.8)', () => {
+  it('the Letter voice description reads as plain sentences (s23.8)', () => {
     renderSettings();
-    const text = row('Letter Voice').textContent;
+    const text = row('Letter voice').textContent;
     expect(text).not.toMatch(/haven't keep/);
-    expect(text).toContain('Letters they have not recorded play the primary reading.');
+    // WS2 settings: the row carries the design's short line (U 8.7)
+    expect(row('Letter voice').querySelector('.settings-row-desc').textContent).toBe('The reader you prefer for the Letters');
   });
 });
 

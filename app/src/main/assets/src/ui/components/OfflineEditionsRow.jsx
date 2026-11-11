@@ -7,6 +7,7 @@
    says 'unsupported' and the row is not drawn). State: utils/offline-editions.js.
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { useSettingsFind } from './settings-find.jsx';
 import { OfflineEditions, editionCodes, editionBytes, formatEditionBytes, useOfflineEditions } from '../../utils/offline-editions.js';
 
 /** @param {{ translation?: string }} props the picked edition: a new pick re-reads the caches */
@@ -15,32 +16,41 @@ export function OfflineEditionsRow({ translation }) {
   useOfflineEditions(translation);
 
   const { phase, have, missing, done, total } = OfflineEditions.getState();
+  const f = useSettingsFind('editions on this phone offline download all only nkjv');
   if (phase === 'unknown' || phase === 'unsupported') return null;
   const count = editionCodes().length;
   const size = formatEditionBytes(editionBytes(missing));
 
+  // WS2 settings (st-read): "Editions on this phone", the mock's short line, and the download as a small pill.
   /** @type {string} */
   let line;
   /** @type {string | null} */
   let action = null;
-  if (phase === 'complete') line = 'All ' + count + ' are on this device and open offline. NKJV is built in.';
+  /** @type {string | null} */
+  let actionName = null;
+  if (phase === 'complete') line = 'All ' + count + ' open offline. NKJV is built in.';
   else if (phase === 'downloading') line = 'Downloading ' + Math.min(done + 1, total) + ' of ' + total + '…';
   else if (phase === 'stopped') {
-    line = have.length + ' of ' + count + ' on this device. The download stopped: check the connection.';
+    line = have.length + ' of ' + count + '. The download stopped: check the connection.';
     action = 'Try again · ' + size;
+    actionName = 'Try the download again, ' + size;
   } else {
-    line = (have.length ? have.length + ' of ' + count + ' on this device.' : 'Only NKJV is on this device.')
-      + ' The edition you pick downloads when you pick it.';
-    action = 'Download all · ' + size;
+    line = (have.length ? have.length + ' of ' + count + '.' : 'Only NKJV.') + ' Another downloads when you pick it.';
+    action = 'All · ' + size;
+    actionName = 'Download all editions, ' + size;
   }
+  if (!f.show) return null;
 
   return (
-    <div className="settings-row offline-editions-row">
+    <div className="settings-row offline-editions-row" data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
-        <span className="settings-row-label">Editions for offline</span>
-        <span className="settings-row-grow" />
+        <span className="settings-row-text">
+          {f.place ? <span className="ws2-place">{f.place}</span> : null}
+          <span className="settings-row-label">Editions on this phone</span>
+          <span className="settings-row-desc" role="status">{line}</span>
+        </span>
         {action ? (
-          <button type="button" className="settings-clear-btn" onClick={(e) => { e.stopPropagation(); void OfflineEditions.downloadAll(); }}>
+          <button type="button" className="ui-btn is-small ws2-pill-btn" aria-label={actionName || undefined} onClick={(e) => { e.stopPropagation(); void OfflineEditions.downloadAll(); }}>
             {action}
           </button>
         ) : null}
@@ -50,7 +60,6 @@ export function OfflineEditionsRow({ translation }) {
           <span style={{ width: (total ? Math.max(4, (done / total) * 100) : 0) + '%' }} />
         </span>
       ) : null}
-      <div className="settings-data-value" role="status">{line}</div>
     </div>
   );
 }

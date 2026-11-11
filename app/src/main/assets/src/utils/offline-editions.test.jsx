@@ -153,10 +153,10 @@ describe('OfflineEditionsRow', () => {
     const w = stubWorld({ held: ['kjv'] });
     render(<OfflineEditionsRow translation="nkjv" />);
     await act(async () => {});
-    expect(screen.getByRole('status').textContent).toBe('1 of 3 on this device. The edition you pick downloads when you pick it.');
-    const btn = screen.getByRole('button', { name: 'Download all · ' + formatEditionBytes(EDITION_BYTES.web + EDITION_BYTES.rkjv) });
+    expect(screen.getByRole('status').textContent).toBe('1 of 3. Another downloads when you pick it.');
+    const btn = screen.getByRole('button', { name: 'Download all editions, ' + formatEditionBytes(EDITION_BYTES.web + EDITION_BYTES.rkjv) });
     await act(async () => { fireEvent.click(btn); });
-    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('All 3 are on this device and open offline. NKJV is built in.'));
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('All 3 open offline. NKJV is built in.'));
     expect(w.fetched.length).toBe(2);
     expect(screen.queryByRole('button')).toBeNull();
   });
@@ -166,21 +166,21 @@ describe('OfflineEditionsRow', () => {
     render(<OfflineEditionsRow translation="nkjv" />);
     await act(async () => {});
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: /^Download all/ })); });
-    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('0 of 3 on this device. The download stopped: check the connection.'));
-    expect(screen.getByRole('button', { name: /^Try again · \d+ MB$/ })).toBeTruthy();
+    await vi.waitFor(() => expect(screen.getByRole('status').textContent).toBe('0 of 3. The download stopped: check the connection.'));
+    expect(screen.getByRole('button', { name: /^Try the download again, \d+ MB$/ }).textContent).toMatch(/^Try again · \d+ MB$/);
   });
 
   it('reads the caches again when the picked edition\'s script lands', async () => {
     const w = stubWorld();
     render(<OfflineEditionsRow translation="web" />);
     await act(async () => {});
-    expect(screen.getByRole('status').textContent).toMatch(/^Only NKJV is on this device\./);
+    expect(screen.getByRole('status').textContent).toMatch(/^Only NKJV\./);
     w.cached.add(editionUrl('web'));
     const s = document.createElement('script');
     s.src = 'https://example.test/src/data/bible-web.js';
     document.body.appendChild(s);
     await act(async () => { s.dispatchEvent(new Event('load')); });
-    expect(screen.getByRole('status').textContent).toMatch(/^1 of 3 on this device\./);
+    expect(screen.getByRole('status').textContent).toMatch(/^1 of 3\. /);
     s.remove();
   });
 });

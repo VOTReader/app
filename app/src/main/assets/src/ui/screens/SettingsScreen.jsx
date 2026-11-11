@@ -14,7 +14,10 @@ import { openWhatsNew } from '../../utils/whats-new.js';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
-import { ListRow, Segmented, SectionLabel } from '../components/UiParts.jsx';
+import { ListRow, Segmented, SectionLabel, UiButton } from '../components/UiParts.jsx';
+import { SelectSheet } from '../components/SelectField.jsx';
+import { SettingsNavRow, SettingsStepRow } from '../components/SettingsRow.jsx';
+import { settingsFindContext, SettingsSection, Findable, findMatches, useSettingsFind } from '../components/settings-find.jsx';
 
 /* WS1 settings: the root's group titles (U 8.7, X-hidden 6 "Groups"), and the bar title of each group's screen. */
 const GROUP_TITLES = {
@@ -88,81 +91,40 @@ function TextSizeSliderRow({ value, onChange }) {
    know. The reading pill measures that from the page in front of the reader
    and shows the real number there. */
 function AutoScrollDwellRow({ value, onChange }) {
+  // WS2 settings (st-auto): the wait at the end of the page as "− 2.5 s +", half a second a step, 0 to 15 s.
   const ms = clampEndDwell(value);
   const secs = Math.round(ms / 100) / 10;
+  const set = (/** @type {number} */ n) => onChange(String(clampEndDwell(n)));
   return (
-    <div className="settings-row">
-      <div className="settings-row-head">
-        <span className="settings-row-label">Auto-Continue Pause</span>
-        <span className="settings-row-grow" />
-        <span className="settings-row-value">{secs === 0 ? 'None' : secs + 's'}</span>
-      </div>
-      <div className="txtsize-controls">
-        <input
-          type="range"
-          className="txtsize-slider"
-          min="0"
-          max="15000"
-          step="500"
-          value={ms}
-          onChange={(e) => onChange(String(clampEndDwell(e.target.value)))}
-          aria-label="Pause before continuing to the next page"
-          aria-valuetext={secs === 0 ? 'No pause' : secs + (secs === 1 ? ' second' : ' seconds')}
-        />
-        <span className="txtsize-value">{secs === 0 ? '0s' : secs + 's'}</span>
-        <button
-          type="button"
-          className="txtsize-reset"
-          disabled={ms === 2500}
-          onClick={() => onChange('2500')}
-        >Reset</button>
-      </div>
-      <div className="settings-row-desc">
-        How long to wait at the end of the text before moving to the next page.
-        The countdown stays visible on the pill the whole time, and tapping
-        Cancel stops it. The pill’s ± adjust this too — even mid-countdown.
-        Very short pages hold a little longer than this so a run of brief
-        entries can’t flick past.
-      </div>
-    </div>
+    <SettingsStepRow label="Wait before going on" desc="The countdown shows on the pill; Cancel stops it"
+      find="auto continue pause dwell countdown" value={secs === 0 ? 'None' : secs + ' s'}
+      lessLabel="Shorter wait" moreLabel="Longer wait" lessDisabled={ms <= 0} moreDisabled={ms >= 15000}
+      onLess={() => set(ms - 500)} onMore={() => set(ms + 500)} />
   );
 }
 
 function AutoScrollSpeedRow({ value, onChange }) {
+  // WS2 settings (st-auto): the speed card, "16 lines a minute" with Reset, then − slider +.
   const v = clampLpm(value);
+  const set = (/** @type {number} */ n) => onChange(String(clampLpm(n)));
   return (
-    <div className="settings-row">
-      <div className="settings-row-head">
-        <span className="settings-row-label">Scroll Speed</span>
-        <span className="settings-row-grow" />
-        <span className="settings-row-value">{v} lines/min</span>
+    <Findable text="speed scroll lines minute pace fast slow">
+      <div className="settings-row ws2-speed">
+        <div className="settings-row-head">
+          <span className="settings-row-label">{v + (v === 1 ? ' line a minute' : ' lines a minute')}</span>
+          <span className="settings-row-grow" />
+          {v !== 16 ? <button type="button" className="txtsize-reset" onClick={() => onChange('16')}>Reset</button> : null}
+        </div>
+        <div className="txtsize-controls">
+          <button type="button" className="settings-step-btn" aria-label="Slower" disabled={v <= 4} onClick={() => set(v - 1)}>{'−'}</button>
+          <input type="range" className="txtsize-slider" min="4" max="40" step="1" value={v}
+            onChange={(e) => set(Number(e.target.value))}
+            aria-label="Auto-scroll speed in lines per minute"
+            aria-valuetext={v + (v === 1 ? ' line' : ' lines') + ' per minute'} />
+          <button type="button" className="settings-step-btn" aria-label="Faster" disabled={v >= 40} onClick={() => set(v + 1)}>+</button>
+        </div>
       </div>
-      <div className="txtsize-controls">
-        <input
-          type="range"
-          className="txtsize-slider"
-          min="4"
-          max="40"
-          step="1"
-          value={v}
-          onChange={(e) => onChange(String(clampLpm(e.target.value)))}
-          aria-label="Auto-scroll speed in lines per minute"
-          aria-valuetext={v + (v === 1 ? ' line' : ' lines') + ' per minute'}
-        />
-        <span className="txtsize-value">{v}/min</span>
-        <button
-          type="button"
-          className="txtsize-reset"
-          disabled={v === 16}
-          onClick={() => onChange('16')}
-        >Reset</button>
-      </div>
-      <div className="settings-row-desc">
-        How fast the page moves on its own. The ± buttons on the reading
-        pill adjust this too, without leaving the page — and the pill shows
-        your words per minute, measured from the page you are on.
-      </div>
-    </div>
+    </Findable>
   );
 }
 
@@ -172,19 +134,23 @@ function AutoScrollSpeedRow({ value, onChange }) {
    SettingsScreen) so React identity stays stable across renders. */
 
 function HistoryClearRow({ historyCount, onClearHistory }) {
+  // WS2 settings (st-tools): the entry count with Clear history as a button beside it.
   const [confirming, setConfirming] = React.useState(false);
+  const f = useSettingsFind('clear history entries reading history');
+  if (!f.show) return null;
   return (
     <>
-      <div className="progress-row" style={{ background: 'var(--bg2)', borderTop: '1px solid var(--gold-border)', borderRadius: '4px', marginTop: '0.4rem' }}>
-        <span className="progress-row-label" style={{ color: 'var(--cream-muted)' }}>Reading history</span>
-        <span className="progress-row-tally">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
-        {!confirming && (
-          <button
-            className="settings-clear-btn"
-            disabled={historyCount === 0}
-            onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
-          >Clear History</button>
-        )}
+      <div className="settings-row ws2-history" data-found={f.place ? '' : undefined}>
+        <div className="settings-row-head">
+          <span className="settings-row-text">
+            {f.place ? <span className="ws2-place">{f.place}</span> : null}
+            <span className="settings-row-label">{historyCount} {historyCount === 1 ? 'entry' : 'entries'}</span>
+          </span>
+          {!confirming && (
+            <button type="button" className="ui-btn is-small ws2-text-btn" disabled={historyCount === 0}
+              onClick={(e) => { e.stopPropagation(); setConfirming(true); }}>Clear history</button>
+          )}
+        </div>
       </div>
       {confirming && (
         <ConfirmStrip
@@ -215,9 +181,20 @@ function HistoryClearRow({ historyCount, onClearHistory }) {
    the tests find a group the same way they always did. */
 const GROUP_ICONS = { appearance: 'sun', reading: 'book', listening: 'head', autoscroll: 'scroll', features: 'search',
   share: 'share', garden: 'img', data: 'data', progress: 'check', help: 'help' };
-function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hidden = false, mode = 'search', tag = null, children = null }) {
+function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hidden = false, mode = 'search', tag = null, findWords = null, children = null }) {
   if (hidden) return null;
   if (mode === 'screen' && !open) return null;
+  // WS2 settings (st-find): while finding, a group is no head, only its rows that match, each with its place.
+  if (mode === 'search') {
+    const Ctx = settingsFindContext();
+    return (
+      <section className="settings-section is-search open" data-settings-group={sectionId}>
+        <div className="settings-group-body" id={'settings-group-' + sectionId}>
+          <Ctx.Provider value={{ words: findWords || [], group: label, place: label }}>{children}</Ctx.Provider>
+        </div>
+      </section>
+    );
+  }
   const root = mode === 'root';
   return (
     <section className={'settings-section is-' + mode + (open ? ' open' : '')} data-settings-group={sectionId}>
@@ -280,9 +257,10 @@ function AudioRateRow() {
   return (
     <SelectField
       eyebrow="Listening"
-      title="Default Speed"
-      label="Default Speed"
-      desc="How fast recordings play when you start one. The listening desk can still change speed for what is playing; whatever you leave it on becomes this setting, because both are the same preference."
+      title="Speed"
+      label="Speed"
+      desc="Same as the speed in the player"
+      find="default rate playback fast slow"
       value={String(current)}
       options={listed.map((rate) => ({
         id: String(rate),
@@ -321,11 +299,16 @@ function SkipStepRow({ value, onChange }) {
   };
   const lo = clamp(0);
   const hi = clamp(1e9);
+  const f = useSettingsFind('skip length seconds back forward jump buttons lock screen headphones');
+  if (!f.show) return null;
   return (
-    <div className="settings-row">
+    <div className="settings-row" data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
-        <span className="settings-row-label" id="settings-skip-label">Skip Buttons</span>
-        <span className="settings-row-grow" />
+        <span className="settings-row-text">
+          {f.place ? <span className="ws2-place">{f.place}</span> : null}
+          <span className="settings-row-label" id="settings-skip-label">Skip length</span>
+          <span className="settings-row-desc">Player, lock screen and headphones</span>
+        </span>
         <span className="settings-step" role="group" aria-labelledby="settings-skip-label">
           <button type="button" className="settings-step-btn" aria-label="Shorter skip" disabled={sec <= lo}
             onClick={() => set(Math.ceil(sec / SKIP_STEP_BY) * SKIP_STEP_BY - SKIP_STEP_BY)}>{'−'}</button>
@@ -342,7 +325,6 @@ function SkipStepRow({ value, onChange }) {
             onClick={() => set(Math.floor(sec / SKIP_STEP_BY) * SKIP_STEP_BY + SKIP_STEP_BY)}>{'+'}</button>
         </span>
       </div>
-      <div className="settings-row-desc">{'How far back and forward the player’s skip buttons jump: ' + sec + ' seconds. The lock screen and headphones skip the same.'}</div>
     </div>
   );
 }
@@ -368,6 +350,7 @@ function SongsKeptRow() {
     if (typeof open === 'function') open([{ k: 'list', v: 'kept' }], 'Settings');
   };
   return (
+    <Findable text="songs kept on this phone music manage">
     <div className="settings-row">
       <div className="settings-row-head">
         <span className="settings-row-label">Songs kept on this phone</span>
@@ -378,6 +361,7 @@ function SongsKeptRow() {
         </button>
       </div>
     </div>
+    </Findable>
   );
 }
 
@@ -398,23 +382,18 @@ function DownloadsStorageRow() {
   const free = off.freeBytes();
   const fmt = (/** @type {number} */ b) => (b >= 1e9 ? (b / 1e9).toFixed(1).replace(/\.0$/, '') + ' GB' : Math.max(1, Math.round(b / 1e6)) + ' MB');
   const value = [n ? (n === 1 ? '1 recording' : n + ' recordings') + ' · ' + fmt(used) : 'None yet', free >= 0 ? fmt(free) + ' free' : ''].filter(Boolean).join(' · ');
-  const share = free > 0 && used > 0 ? Math.max(2, Math.min(100, (used / (used + free)) * 100)) : 0;
-  return (
-    <div className="settings-row">
-      <button type="button" className="settings-downloads-row" aria-label={'Downloads and storage: ' + value + '. Open'} onClick={() => open({ tab: 'phone' }, 'Settings')}>
-        <span className="settings-row-label">Downloads &amp; storage</span>
-        {share ? <span className="settings-downloads-bar" aria-hidden="true"><span style={{ width: share + '%' }} /></span> : null}
-        <span className="settings-row-value">{value}</span>
-        <span className="settings-select-chev" aria-hidden="true">{"›"}</span>
-      </button>
-    </div>
-  );
+  // WS2 settings (st-listen): one Downloads row, its line what is on the phone, opening Downloads' On this phone tab.
+  return <SettingsNavRow label="Downloads" desc={value} find="storage audio offline recordings space free"
+    onClick={() => open({ tab: 'phone' }, 'Settings')} />;
 }
 
 /* DataInfoRow — compact label + value (+ optional action button) for "Your Data". */
-function DataInfoRow({ label, value = null, children = null }) {
+function DataInfoRow({ label, value = null, children = null, find = '' }) {
+  const f = useSettingsFind(label + ' ' + find);
+  if (!f.show) return null;
   return (
-    <div className="settings-row">
+    <div className="settings-row" data-found={f.place ? '' : undefined}>
+      {f.place ? <span className="ws2-place">{f.place}</span> : null}
       <div className="settings-row-head">
         <span className="settings-row-label">{label}</span>
         <span className="settings-row-grow" />
@@ -464,12 +443,15 @@ function StorageTrendValue({ samples }) {
 }
 
 /* DataActionRow — label + ⓘ-revealed description + action button. */
-function DataActionRow({ label, desc = null, children = null, className = '' }) {
+function DataActionRow({ label, desc = null, children = null, className = '', find = '' }) {
   // WS1 settings (U 8.7): the plain line is always shown under the name, no "i" to open it.
+  const f = useSettingsFind(label + ' ' + (typeof desc === 'string' ? desc : '') + ' ' + find);
+  if (!f.show) return null;
   return (
-    <div className={'settings-row' + (className ? ' ' + className : '')}>
+    <div className={'settings-row' + (className ? ' ' + className : '')} data-found={f.place ? '' : undefined}>
       <div className="settings-row-head">
         <span className="settings-row-text">
+          {f.place ? <span className="ws2-place">{f.place}</span> : null}
           <span className="settings-row-label">{label}</span>
           {desc && <span className="settings-row-desc">{desc}</span>}
         </span>
@@ -634,33 +616,64 @@ function _platformLabel(platform) {
 
 // Search groups by the reader's vocabulary, including controls hidden behind
 // dependencies. A match opens its group; dependent rows still obey their toggles.
-/** Settings › Copy & Share › Share Includes (cp3): the link a tap on Share sends. */
+/** Settings › Sharing › Links I share point to (cp3): the link a tap on Share sends. WS2 settings (st-share): website first. */
 const SHARE_LINK_OPTIONS = [
-  { id: 'app', label: 'App Link', desc: 'Opens the passage in VOTReader, even offline, for anyone who has the app.' },
-  { id: 'site', label: 'Website Link', desc: 'Opens the letter on thevolumesoftruth.com, for anyone, with a connection.' },
+  { id: 'site', label: 'The website', desc: 'Opens the letter on thevolumesoftruth.com, for anyone, with a connection' },
+  { id: 'app', label: 'The app', desc: 'Opens the passage in VOTReader, even offline, for anyone who has the app' },
 ];
 
-const SETTINGS_TOPICS = {
-  // WS1 settings (st-find): synonyms the 2026-11-10 capture typed and missed (wifi, dark mode, songs, keep, night).
-  appearance: 'appearance theme light dark mode night day text size font typeface letters bigger smaller zoom',
-  reading: 'reading bible translation version nkjv kjv offline editions download all chapter titles section headings restored names chapter letter arrows previous next scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on awake dim lock double tap click fullscreen full screen auto scroll',
-  listening: 'listening bible letter audio voice reader speed rate skip length seconds read along highlight words playback follow turn page songs music wifi wi fi keep ready downloads star',
-  autoscroll: 'auto scroll hands free reading speed continue pause',
-  features: 'buttons tools search synonyms synonym filter stop words tabs history clear top bar nav icons bookmark',
-  share: 'copy share sharing link links website app highlight passage words thevolumesoftruth',
-  garden: 'a return to the garden image quality pictures',
-  data: 'your data backup export import restore verify storage privacy diagnostic diagnostics log app version updates clear delete reset platform total growth protection',
-  progress: 'mark as read progress book reading clear',
-  // The tour's re-entry (Settings › Help › Show me around). Every group the screen renders needs a
-  // row here: matchesGroup dereferences SETTINGS_TOPICS[id] for the first typed character, and a
-  // group without one crashed the screen (2026-09-04, the Help group meeting this table).
-  help: 'help tour show me around guide about welcome',
+/* WS2 settings (st-arrows, X-hidden 6 "Chapter & Letter Arrows"): the picker says where the arrows sit, each with a
+   small picture, and no option calls itself the default. Same ids and settings.arrowLayout key as index.html's list. */
+const ARROW_WORDS = {
+  split: ['One on each side', 'Arrows on opposite edges of the page'],
+  right: ['Both on the right', 'For one-thumb reach, right hand'],
+  left: ['Both on the left', 'For one-thumb reach, left hand'],
+  nav: ['In the top bar', 'Two small arrows beside the title'],
+  off: ['Hidden', 'Use the Previous and Next cards at the end of the page'],
 };
-// A typed word matches the start of a topic word (s23.3): a raw substring test let "a" light every group.
-/** @type {Record<string, string[]>} */
-const SETTINGS_TOPIC_WORDS = Object.fromEntries(Object.entries(SETTINGS_TOPICS).map(([id, t]) => [id, t.split(' ')]));
+const ARROW_DOTS = { split: [[3, 14], [25, 14]], right: [[25, 10], [25, 18]], left: [[3, 10], [3, 18]], nav: [[10, 3], [18, 3]], off: [] };
+/** @param {{ id: string }} props */
+function ArrowPicture({ id }) {
+  return (
+    <svg viewBox="0 0 28 28" width="28" height="28" focusable="false">
+      {[9, 13, 17, 21].map((y) => <rect key={y} x="7" y={y} width="14" height="1.6" rx=".8" className="ws2-pic-line" />)}
+      {(ARROW_DOTS[/** @type {'off'} */ (id)] || []).map(([x, y]) => <circle key={x + '-' + y} cx={x} cy={y} r="2.4" className="ws2-pic-dot" />)}
+    </svg>
+  );
+}
+function arrowOptions() {
+  const list = typeof ARROW_LAYOUT_OPTIONS !== 'undefined' && Array.isArray(ARROW_LAYOUT_OPTIONS) ? ARROW_LAYOUT_OPTIONS : [];
+  return list.map((/** @type {any} */ o) => {
+    const w = ARROW_WORDS[/** @type {'off'} */ (o.id)];
+    return { id: o.id, label: w ? w[0] : o.label, desc: w ? w[1] : o.desc, lead: <ArrowPicture id={o.id} /> };
+  });
+}
 
-export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch: _onSearch, onHistory: _onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null, initialGroups = null }) {
+/** WS2 settings (st-share): a short choice drawn as rows with a radio each, right on the screen (no sheet). */
+function RadioRows({ label, value, options, onChange, find = '' }) {
+  const f = useSettingsFind(label + ' ' + find + ' ' + options.map((/** @type {any} */ o) => o.label + ' ' + o.desc).join(' '));
+  if (!f.show) return null;
+  return (
+    <div role="radiogroup" aria-label={label} className="ws2-radios" data-found={f.place ? '' : undefined}>
+      {f.place ? <span className="ws2-place ws2-place-pad">{f.place}</span> : null}
+      {options.map((/** @type {any} */ o) => (
+        <button key={o.id} type="button" role="radio" aria-checked={value === o.id} className="settings-row ws2-radio" onClick={() => onChange(o.id)}>
+          <span className="settings-row-text">
+            <span className="settings-row-label">{o.label}</span>
+            <span className="settings-row-desc">{o.desc}</span>
+          </span>
+          <span className={'ws2-radio-dot' + (value === o.id ? ' is-on' : '')} aria-hidden="true" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/* WS2 settings (st-find): the group topic table that opened whole groups is gone; each row is found by its own name,
+   line and a few synonyms (the `find` words on the row), utils in components/settings-find.jsx. */
+const BACKUP_WORDS = 'keep backup back up export save copy safe restore';
+
+export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabel, onSearch: _onSearch, onHistory: _onHistory, theme, onThemeChange, readItems, onClearBook, onClearAll, onClearHistory, historyCount, onAbout = null, initialGroups = null, onSearchLibrary = null, onOpenPlans = null, onOpenGarden = null }) {
   const bibleVer = React.useSyncExternalStore(
     React.useCallback((cb) => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.subscribe(cb) : () => {}, []),
     () => (typeof window.__bibleCorpus !== 'undefined') ? window.__bibleCorpus.getVersion() : 0
@@ -691,30 +704,39 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   const [openGroups, setOpenGroups] = React.useState(() => new Set(initialGroups || []));
   const [settingsQuery, setSettingsQuery] = React.useState('');
   const settingsFindRef = React.useRef(null);
-  const [closedMatches, setClosedMatches] = React.useState(() => new Set());
-  const queryWords = settingsQuery.toLowerCase().trim().split(/[\s-]+/).filter(Boolean);
+  const queryWords = settingsQuery.toLowerCase().replace(/[’'“”"]/g, '').trim().split(/[\s-]+/).filter(Boolean);
   const searching = queryWords.length > 0;
   const mode = searching ? 'search' : (openGroups.size ? 'screen' : 'root');
-  const matchesGroup = (id) => queryWords.every((word) => SETTINGS_TOPIC_WORDS[id].some((w) => w.startsWith(word)));
-  const groupOpen = (id) => searching ? matchesGroup(id) && !closedMatches.has(id) : openGroups.has(id);
-  const toggleGroup = (id) => (searching ? setClosedMatches : setOpenGroups)((prev) => {
+  // WS2 settings (st-find): while finding, every group draws its matching rows; the rows decide (settings-find.jsx).
+  const groupOpen = (id) => searching || openGroups.has(id);
+  // st-quality: on the root, the Garden row opens its picker directly.
+  const [gardenPick, setGardenPick] = React.useState(false);
+  const toggleGroup = (id) => setOpenGroups((prev) => {
     if (!searching && prev.size === 0) return new Set([id]);
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
     return next;
   });
   // Auto-scroll is a screen inside Reading (st-auto): no row of its own on the root.
-  const groupProps = (id) => ({ sectionId: id, mode, label: GROUP_TITLES[id], open: groupOpen(id),
-    hidden: !matchesGroup(id) || (mode === 'root' && id === 'autoscroll'), onToggle: () => toggleGroup(id) });
+  const groupProps = (id) => ({ sectionId: id, mode, label: GROUP_TITLES[id], open: groupOpen(id), findWords: queryWords,
+    hidden: mode === 'root' && id === 'autoscroll',
+    onToggle: mode === 'root' && id === 'garden' ? () => setGardenPick(true) : () => toggleGroup(id) });
   const openScreen = (id) => setOpenGroups(new Set([id]));
   const screenTitle = mode === 'screen' ? GROUP_TITLES[[...openGroups][0]] || 'Settings' : 'Settings';
   const goUp = () => {
     if (mode === 'screen') { setOpenGroups(openGroups.has('autoscroll') && openGroups.size === 1 ? new Set(['reading']) : new Set()); return; }
     if (typeof onBack === 'function') onBack();
   };
-  const changeSettingsQuery = (value) => { setSettingsQuery(value); setClosedMatches(new Set()); };
-  const matchingCount = Object.keys(SETTINGS_TOPICS).filter(matchesGroup).length;
-  const progressOpen = groupOpen('progress');
+  const changeSettingsQuery = (value) => setSettingsQuery(value);
+  // The count of found rows, read off the page once they have drawn (each found row carries data-found).
+  const groupsRef = React.useRef(/** @type {HTMLDivElement | null} */ (null));
+  const [foundCount, setFoundCount] = React.useState(0);
+  React.useLayoutEffect(() => {
+    const el = groupsRef.current;
+    setFoundCount(searching && el ? el.querySelectorAll('[data-found]').length : 0);
+  }, [searching, settingsQuery, settings, historyCount]);
+  const backupHit = searching && findMatches(queryWords, BACKUP_WORDS);
+  const progressOpen = !searching && openGroups.has('progress');
   // Only the progress table needs the corpora. Changing a font or exporting
   // a backup must not parse the whole library as a side effect.
   // The Studies rows need Matthew and the Bible studies too: without them the
@@ -1102,6 +1124,13 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     lastBackupAt: _lastBackupAt(),
   });
 
+  // WS2 settings (st-quality): the Garden picker, from the Garden row on the root and on its own screen.
+  const gardenOptions = (typeof GARDEN_TIERS !== 'undefined' ? GARDEN_TIERS : []).map((/** @type {any} */ t) => ({
+    id: t.id, label: t.label + ' · about ' + String(t.size).replace(/^~\s*/, ''), desc: t.res + ' · ' + t.desc }));
+  const gardenSub = (/** @type {any} */ (globalThis).GARDEN_TOTAL || 209) + ' photographs. Pages load from the internet as you read and are kept on this phone.';
+  const gardenDoor = typeof onOpenGarden === 'function'
+    ? <UiButton wide icon="img" onClick={() => { setGardenPick(false); onOpenGarden(); }}>Open A Return to The Garden</UiButton> : null;
+
   return (
     <ScreenLayout
       utility={{
@@ -1112,7 +1141,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
       <div className={'settings-screen ws1-settings is-' + mode + (textScalePercent >= 180 ? ' settings-large-type' : '')}>
         <h1 className="ws1-sr-only">{screenTitle}</h1>
 
-        <div className="settings-groups">
+        <div className="settings-groups" ref={groupsRef}>
         {mode !== 'screen' && (
           <div className="settings-find">
             <label htmlFor="settings-find-input" className="ws1-sr-only">Find settings</label>
@@ -1121,50 +1150,58 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               <input ref={settingsFindRef} id="settings-find-input" type="search" placeholder="Find a setting" value={settingsQuery} onChange={(e) => changeSettingsQuery(e.target.value)} />
               {settingsQuery && <button type="button" className="ws1-find-clear" aria-label="Clear filter" onClick={() => { changeSettingsQuery(''); settingsFindRef.current?.focus(); }}><UiIcon name="x" size="sm" /></button>}
             </div>
-            {searching && <p role="status" className="ws1-find-status">{matchingCount ? matchingCount + (matchingCount === 1 ? ' matching group' : ' matching groups') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
+            {searching && <p role="status" className={'ws1-find-status' + (foundCount ? ' ui-label' : '')}>{foundCount ? foundCount + (foundCount === 1 ? ' setting' : ' settings') : 'No matching settings. Try font, audio, backup, or clear the filter.'}</p>}
           </div>
         )}
 
         <RootCard mode={mode}>
         <SettingsGroup sub={glance.appearance} {...groupProps('appearance')}>
           {/* WS1 settings (st-look): Theme is Dark | Light (X-hidden 1 "theme"), then text size, then the font. */}
-          <SectionLabel>Theme</SectionLabel>
-          <Segmented label="Theme" className="ws1-theme" options={[{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }]}
-            value={theme === 'light' ? 'light' : 'dark'} onChange={(v) => { if (v !== theme) onThemeChange(v); }} />
+          <Findable text="theme dark light mode night day look colour color">
+            <SectionLabel>Theme</SectionLabel>
+            <Segmented label="Theme" className="ws1-theme" options={[{ id: 'dark', label: 'Dark' }, { id: 'light', label: 'Light' }]}
+              value={theme === 'light' ? 'light' : 'dark'} onChange={(v) => { if (v !== theme) onThemeChange(v); }} />
+          </Findable>
           {/* [10] True Black toggle REMOVED 2026-08-03 (owner: "just make
               it default, looks better anyway") — pure-black surfaces are
               now the dark theme's own tokens in app.css. A persisted
               settings.trueBlack key is an ignored orphan. */}
-          <SectionLabel>Text size</SectionLabel>
-          <div className="settings-card">
-            <TextSizeSliderRow
-              value={settings.fontScale || "1"}
-              onChange={(v) => onSetting("fontScale", v)}
-            />
-          </div>
+          <Findable text="text size font bigger smaller zoom letters scale">
+            <SectionLabel>Text size</SectionLabel>
+            <div className="settings-card">
+              <TextSizeSliderRow
+                value={settings.fontScale || "1"}
+                onChange={(v) => onSetting("fontScale", v)}
+              />
+            </div>
+          </Findable>
           <p className="ws1-note">Changes reading text everywhere in the app. Icons and menus stay the same size, and your phone’s own font size does not affect it.</p>
           {/* Reading Font (2026-07-31) — replaces the two-state "Modern
               Fonts" toggle. settings.fontStyle now holds any READING_FONTS
               id; "classic"/"modern" keep their historical meanings so
               persisted + backup-imported values stay valid. */}
-          <SectionLabel>Reading font</SectionLabel>
-          <div className="settings-card">
+          <SettingsSection label="Reading font">
             <FontPickerRow
               value={settings.fontStyle || "classic"}
               onSelect={(id) => onSetting("fontStyle", id)}
             />
-          </div>
+          </SettingsSection>
           <p className="ws1-note">Theme and text size are also in every reader’s menu.</p>
         </SettingsGroup>
 
-        <SettingsGroup label="Reading" sub={glance.reading} {...groupProps('reading')}>
-          <div className="settings-card">
+        {/* WS2 settings (st-read, st-read2): three sections, The Bible, The page, Your place, each row its name, the
+            mock's short line and its control; then Kept elsewhere (Mark as read, Reading plans). */}
+        <SettingsGroup sub={glance.reading} {...groupProps('reading')}>
+          <SettingsSection label="The Bible">
             <SelectField
               eyebrow="Reading"
-              title="Bible Translation"
-              label="Bible Translation"
+              title="Bible translation"
+              label="Bible translation"
               desc={<TranslationInfoDesc />}
-              line="Verse text for the 66 books. More explains the editions and the Restored Name."
+              line="Verse text for the 66 books"
+              moreTitle="The Restored Name editions"
+              moreLabel="NKJV-R · KJV-R"
+              find="version edition restored name yahushua"
               value={settings.translation || "nkjv"}
               valueLabel={editionShownLabel(settings.translation || "nkjv")}
               options={TRANSLATION_OPTIONS}
@@ -1172,84 +1209,108 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             <OfflineEditionsRow translation={settings.translation || "nkjv"} />
             <SettingsRow
-              label="Chapter Titles"
-              desc="Show the curated chapter title below the chapter number (e.g. 'The Creation', 'The Genealogy of YahuShua'). Applies universally. Tap the title in a chapter for a per-session focus mode."
+              label="Chapter titles"
+              desc="The title under the chapter number, like “The Creation”"
               checked={settings.showChapterTitle !== false}
               onToggle={() => onToggle("showChapterTitle")}
             />
             <SettingsRow
-              label="Section Headings"
-              desc="Show inline topic breaks between verses (e.g. 'The Fall', 'The Call of Abraham'). Applies universally. Tap any heading in a chapter for a per-session focus mode."
+              label="Section headings"
+              desc="Topic breaks between verses, like “The Fall”"
               checked={settings.showSectionHeadings !== false}
               onToggle={() => onToggle("showSectionHeadings")}
             />
-            {/* Redesign 2026-07-31: dependent settings are UNMOUNTED, not
-                disabled, while their dependency is off (the auto-scroll
-                disclosure discipline, now applied screen-wide). Restored
-                Names only ever appears inside titles/headings, so with both
-                off the row is gone — it returns when either comes back. */}
+            {/* Redesign 2026-07-31: Restored names only ever appears inside titles/headings, so with both off the
+                row is gone; it returns when either comes back. */}
             {!(settings.showChapterTitle === false && settings.showSectionHeadings === false) && (
               <SettingsRow
-                label="Restored Names"
-                desc="Uses the proper Name of The Father (YAHUWAH) and The Son (YahuShua) in chapter titles and section headings — only where the underlying verses bear the Name. Verse text itself is never altered."
+                label="Restored names"
+                desc="The Father’s and The Son’s Names in titles and headings. Verse text is never altered."
+                find="yahuwah yahushua name"
                 checked={!!settings.restoredNames}
                 onToggle={() => onToggle("restoredNames")}
               />
             )}
             <SelectField
               eyebrow="Reading"
-              title="Chapter Arrows"
-              label="Chapter & Letter Arrows"
-              desc="Where the previous/next arrows live in a chapter or letter view."
-              value={settings.arrowLayout || "split"}
-              options={ARROW_LAYOUT_OPTIONS}
-              onChange={(v) => onSetting("arrowLayout", v)}
-            />
-            <SelectField
-              eyebrow="Reading"
-              title="Scripture Browser"
-              label="Scripture Browser"
-              desc="How books are organized on the Scriptures screen."
+              title="Scripture browser"
+              label="Scripture browser"
+              desc="How books are laid out on the Scriptures screen"
+              find="genre grid list layout books"
               value={settings.scriptureLayout || "genre"}
               options={SCRIPTURE_LAYOUT_OPTIONS}
               onChange={(v) => onSetting("scriptureLayout", v)}
             />
+          </SettingsSection>
+          <SettingsSection label="The page">
+            <SelectField
+              eyebrow="Reading"
+              title="Previous and next arrows"
+              label="Previous and next arrows"
+              desc="Where they sit on a chapter or letter"
+              find="chapter letter arrows layout left right handed top bar"
+              value={settings.arrowLayout || "split"}
+              options={arrowOptions()}
+              sheetFoot="Swiping sideways turns the page with any of these."
+              onChange={(v) => onSetting("arrowLayout", v)}
+            />
+            {/* st-read2: Auto-scroll is a screen inside Reading; its row says the speed it is set to. */}
+            {mode === 'screen' && (
+              <SettingsNavRow label="Auto-scroll" desc="Hands-free reading at a steady pace"
+                value={clampLpm(settings.autoScrollLpm || '16') + ' lines a minute'} onClick={() => openScreen('autoscroll')} />
+            )}
             <SettingsRow
-              label="Inline Reference Echoes"
-              desc="In the Matthew Study Bible's inline mode, when a reference spans multiple verse ranges (e.g. verses 1-5 and 10-15), show a compact echo pill at the end of each additional range that scrolls back to the full note. Helps you see what references relate to as you read."
-              checked={settings.showInlineEchoes !== false}
-              onToggle={() => onToggle("showInlineEchoes")}
+              label="Keep screen on while reading"
+              desc="The screen does not dim or lock while the app is open"
+              find="awake dim lock battery"
+              checked={settings.keepScreenOn !== false}
+              onToggle={() => onToggle("keepScreenOn")}
             />
             <SettingsRow
-              label="Scrollbar Content Marker"
-              desc="A small notch on the scrollbar showing where the reading content ends and the footnotes or navigation area begins."
+              label="Double-tap for full screen"
+              desc="Double-tap an open area, or double-click one on a computer"
+              find="fullscreen click"
+              checked={settings.doubleTapFullscreen !== false}
+              onToggle={() => onToggle("doubleTapFullscreen")}
+            />
+            <SettingsRow
+              label="Scrollbar content marker"
+              desc="A notch where the reading ends and the footnotes begin"
+              find="notch"
               checked={!!settings.showScrollNotch}
               onToggle={() => onToggle("showScrollNotch")}
             />
-            {/* Named for what it does, not its shape (2026-09-10): the marker was a pulsing dot,
-                then a bookmark ribbon, now text lines with a pointer (w-marker-icon); the row, the
-                control's accessible name and the tour's settings stop all say "Reading Position Marker". */}
-            {/* A place opened from a search is a look until the reader reads it: their own scroll, or a
-                stay of SEARCH_LOOK_MS, 8 s (utils/search-visit.js; search200 UX D7). */}
             <SettingsRow
-              label="Reading Position Marker"
-              desc="Shows where you left off reading, in the top bar; tap it to go back. It moves to each chapter or letter you open. One opened from a search is just a look until you read it: scroll it yourself, or stay on it 8 seconds."
+              label="Inline reference echoes"
+              desc="Matthew Study Bible: a pill at each extra verse range that leads back to the full note"
+              find="echo pill"
+              checked={settings.showInlineEchoes !== false}
+              onToggle={() => onToggle("showInlineEchoes")}
+            />
+          </SettingsSection>
+          <SettingsSection label="Your place">
+            {/* Named for what it does, not its shape (2026-09-10); the tour's settings stop names it too. A place
+                opened from a search stays a look until it is read (utils/search-visit.js). */}
+            <SettingsRow
+              label="Reading position marker"
+              desc="Shows where you left off, in the top bar. Tap it to go back."
+              find="dot resume"
               checked={settings.showReadingDot}
               onToggle={() => onToggle("showReadingDot")}
             />
-            {/* AOGCG (2026-10-22): the reading path on the Answers landing, its ticks, "N read" counts and
-                Continue row; off hides them all and keeps what is stored (U16). */}
+            {/* AOGCG (2026-10-22): off hides the path's ticks, counts and Continue and keeps what is stored (U16). */}
             <SettingsRow
-              label="Answers Reading Path"
-              desc="Ticks and Continue on the Answers screen. Kept only on this device."
+              label="Answers reading path"
+              desc="Ticks and Continue on the Answers screen"
               checked={settings.answersReadingPath !== false}
               onToggle={() => onToggle("answersReadingPath")}
             />
             <SelectField
               eyebrow="Reading"
-              title="Reading Streak Dwell Time"
-              label="Reading Streak Dwell Time"
-              desc={'A day counts toward your reading streak on My Progress after ' + _dwellWords(settings.dwellMs) + ' reading one chapter or letter. The reading position marker is not affected: it always follows where you are.'}
+              title="Reading streak"
+              label="Reading streak"
+              desc="A day counts after this long on one chapter or letter"
+              find="dwell time seconds"
               value={settings.dwellMs || "20000"}
               options={[
                 { id: "3000",  label: "3 seconds",  desc: "Counts almost immediately" },
@@ -1263,46 +1324,37 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               ]}
               onChange={(v) => onSetting("dwellMs", v)}
             />
-            {/* The Home button says "Surprise Me"; the row says the same, so a reader sent here
-                by the tour finds it (it was "Random Letter Button" until 2026-09-10). */}
             <SettingsRow
-              label="Surprise Me Button"
-              desc="A breathing dice on the Home screen that opens a random chapter or letter when tapped."
+              label="Surprise me button"
+              desc="A dice on the Read tab that opens a random chapter or letter"
+              find="random dice"
               checked={settings.showSurpriseButton}
               onToggle={() => onToggle("showSurpriseButton")}
             />
-            <SettingsRow
-              label="Keep Screen On While Reading"
-              desc="Don't let the screen dim or lock while the app is open. Helpful for long reading sessions; turn off to save battery. Has no effect on desktop browsers."
-              checked={settings.keepScreenOn !== false}
-              onToggle={() => onToggle("keepScreenOn")}
-            />
-            <SettingsRow
-              label="Double-Tap / Click Fullscreen"
-              desc="Double-tap an open area on a phone or double-click one on a computer to switch between fullscreen and regular view. Buttons, links, fields, navigation, and other controls are ignored. Turn this off to disable the shortcut."
-              checked={settings.doubleTapFullscreen !== false}
-              onToggle={() => onToggle("doubleTapFullscreen")}
-            />
-          </div>
-          {/* WS1 settings (st-read2): Auto-scroll is a screen inside Reading, its row says what it is set to. */}
+          </SettingsSection>
           {mode === 'screen' && (
-            <div className="ui-group ws1-door">
-              <ListRow icon="scroll" title="Auto-scroll" meta={glance.autoscroll} onClick={() => openScreen('autoscroll')} />
-            </div>
+            <>
+              <SectionLabel>Kept elsewhere</SectionLabel>
+              <div className="ui-group ws1-door">
+                <ListRow icon="check" title="Mark as read" meta="Settings · Reading progress" onClick={() => openScreen('progress')} />
+                {typeof onOpenPlans === 'function'
+                  ? <ListRow icon="cal" title="Reading plans" meta="Library · reminders and the daily portion" onClick={onOpenPlans} /> : null}
+              </div>
+            </>
           )}
         </SettingsGroup>
 
-        {/* Listening (2026-08-09). The audio controls were scattered: the two
-            voice pickers sat under Reading beside translation and headings,
-            and the read-along toggles carried a comment promising this move.
-            One group now owns every choice that shapes what you HEAR. */}
-        <SettingsGroup label="Listening" sub={glance.listening} {...groupProps('listening')}>
-          <div className="settings-card">
+        {/* Listening (2026-08-09): one group owns every choice that shapes what you HEAR. WS2 settings (st-listen):
+            Voices, Playing, Read-along, Songs and downloads. The Wi-Fi and keep-ready switches stay here until the
+            Downloads screen carries them (au-dlauto, the Listen family's). */}
+        <SettingsGroup sub={glance.listening} {...groupProps('listening')}>
+          <SettingsSection label="Voices">
             <SelectField
               eyebrow="Listening"
-              title="Bible Audio"
-              label="Bible Audio"
-              desc="Recorded voice for the Listen button on Bible books and chapters. Every edition is recorded a chapter at a time, so Listen starts at the chapter you are on. Independent of the reading translation. More recorded editions can be added over time; Off hides the button."
+              title="Bible audio"
+              label="Bible audio"
+              desc="The recorded voice for Listen on Bible chapters. Off hides the button."
+              find="voice reader recording"
               value={settings.bibleAudio || "brm-kjv"}
               options={[
                 /* Registry source of truth: utils/audio-track.js
@@ -1313,10 +1365,8 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
                 ...Object.entries(/** @type {any} */ (globalThis).BIBLE_AUDIO_EDITIONS || {})
                   .filter(([, ed]) => /** @type {any} */ (globalThis).bibleAudioOffered(ed))
                   .map(([id, ed]) => {
-                  /* B2 (2026-08-10): "Whole-book audiobook" was true of BRM for
-                     one day in s3. Every shipped edition is recorded a chapter
-                     at a time; how many chapters that is lives in the registry
-                     and its manifest, never in a number written here.
+                  /* B2 (2026-08-10): every shipped edition is recorded a chapter at a time; how many chapters that is
+                     lives in the registry and its manifest, never in a number written here.
 
                      ONLY A CODE THE APP'S OWN REGISTRY CARRIES MAY REACH THE
                      READER. `translation` holds a real translation code for the
@@ -1325,13 +1375,10 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
                      and toUpperCase cannot tell those apart — it printed
                      "Per-chapter audiobook · VOT-MATTHEW text" to readers from c48.
                      A positive match keeps the clause for the first kind and
-                     drops it for the second, so a future edition with a real
-                     code is covered without anyone editing this line, and one
-                     with a marker falls through silently instead of leaking it.
+                     drops it for the second.
 
                      NOT translationLabel(): it falls back to the NKJV strings
-                     for an unknown code, which would describe Matthew as NKJV
-                     — a wrong answer in place of no answer.
+                     for an unknown code, which would describe Matthew as NKJV.
 
                      FREE VARIABLE, NOT globalThis: TRANSLATION_OPTIONS is a
                      top-level `const` in index.html, so it lives in the global
@@ -1361,54 +1408,68 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             <SelectField
               eyebrow="Listening"
-              title="Letter Voice"
-              label="Letter Voice"
-              desc="Preferred reader for the recorded Letters. Automatic uses each recording's own primary reading; choosing a reader plays every letter that reader has recorded in their voice, including the letters that play next. Letters they have not recorded play the primary reading. You can always switch voice for the recording that is playing from the listening desk."
+              title="Letter voice"
+              label="Letter voice"
+              desc="The reader you prefer for the Letters"
+              find="voice reader recording automatic"
               value={settings.letterReader || "auto"}
               /* One list with the Listen tab's Letter voice row (AudioLibraryScreen letterVoiceOptions: Automatic, then
                  utils/audio-track.js AUDIO_READERS in the app's reader rank). */
               options={letterVoiceOptions()}
               onChange={(v) => onSetting("letterReader", v)}
             />
-            {/* Default Speed reads and writes the LISTENING LIBRARY, not a
-                settings key: AudioLibraryStore has owned `rate` since the desk
-                shipped (the player rehydrates from it at every track start), so
-                a settings.audioRate twin would be a second truth to keep in
-                sync. The write prefers AudioPlayer.setPlaybackRate — that IS
-                the store write, plus it retimes whatever is playing right now —
-                and falls back to the store when the player module is absent. */}
+          </SettingsSection>
+          <SettingsSection label="Playing">
+            {/* Speed reads and writes the LISTENING LIBRARY, not a settings key (AudioRateRow above). */}
             <AudioRateRow />
             <SkipStepRow value={settings.skipSeconds} onChange={(sec) => onSetting("skipSeconds", sec)} />
+          </SettingsSection>
+          <SettingsSection label="Read-along">
             <SettingsRow
-              label="Read-Along Highlight"
-              desc="While a recorded letter is playing, softly wash the sentence being read so your eye can follow the voice. It uses the timings that ship with the app; letters that don't have them simply play as before."
+              label="Highlight the words"
+              desc="Softly marks the sentence being read"
+              find="read along highlight wash"
               checked={settings.readAlongHighlight !== false}
               onToggle={() => onToggle("readAlongHighlight")}
             />
-            {/* Dependent row: with no wash there is nothing to follow, so the
-                scroll toggle is UNMOUNTED rather than greyed (the disclosure
-                discipline the whole screen follows). */}
-            {/* w-audio-continue (2026-09-11): the player continues in site order by itself (no switch — Pause is
-                the off switch); this row governs the SCREEN only. "Turn the Page", not "Follow the audio": the
-                row below already owns Follow, and two rows named Follow would be the one-label confusion again. */}
+            {/* Dependent row: with no highlight there is nothing to follow, so the scroll switch is unmounted. */}
+            {settings.readAlongHighlight !== false && (
+              <SettingsRow
+                label="Follow the voice"
+                desc="Scrolls to keep that sentence in view"
+                find="read along scroll"
+                checked={settings.readAlongFollow !== false}
+                onToggle={() => onToggle("readAlongFollow")}
+              />
+            )}
+            {/* w-audio-continue (2026-09-11): the player continues in site order by itself; this row governs the
+                SCREEN only. */}
+            <SettingsRow
+              label="Turn the page with the audio"
+              desc="The reading moves on when the recording does"
+              find="read along"
+              checked={settings.audioTurnPage !== false}
+              onToggle={() => onToggle("audioTurnPage")}
+            />
+          </SettingsSection>
+          <SettingsSection label="Songs and downloads">
             <SettingsRow
               label="Show songs on letter pages"
-              desc="Adds Hear It Sung beside Listen, and a Songs From This Letter card below the text, on letters the flock has sung. Off keeps the letter page text-only; the songs stay in the Listening Library."
+              desc="Hear It Sung and Songs From This Letter"
+              find="music sung"
               checked={settings.showLetterSongs !== false}
               onToggle={() => onToggle("showLetterSongs")}
             />
             <SongsKeptRow />
             <DownloadsStorageRow />
-            {/* Download only on Wi-Fi (ra6, Corbin 2026-10-14, brief design-10): off by default; on, recordings and
-                kept songs wait while the phone is on mobile data (utils/download-gate.js). Only where this app keeps
-                downloads, and only where it can tell Wi-Fi from mobile data: elsewhere the switch did nothing (downloads
-                brief 2026-10-23, section 7 item 10), so it is not offered. */}
+            {/* Download only on Wi-Fi (ra6): only where this app keeps downloads and can tell Wi-Fi from mobile data. */}
             {OfflineAudio.available() && canTell() && (
               <SettingsRow
                 label="Download only on Wi-Fi"
                 desc={settings.downloadWifiOnly === true
-                  ? "Downloads wait until you are on Wi-Fi, so they never use mobile data. One already on its way stops and starts again on Wi-Fi."
+                  ? "Downloads wait for Wi-Fi, so they never use mobile data"
                   : "Off: downloads use mobile data too." + (networkType() ? " Big ones ask first." : "")}
+                find="wifi wireless mobile data cellular"
                 checked={settings.downloadWifiOnly === true}
                 onToggle={() => onToggle("downloadWifiOnly")}
               />
@@ -1416,161 +1477,165 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {OfflineAudio.available() && canTell() && (
               <SettingsRow
                 label="Keep the next 3 ready"
-                desc="On Wi-Fi, the 3 recordings after the one playing download by themselves, so they play with no signal. Nothing is removed."
+                desc="While you listen, the next three download ahead"
+                find="ready ahead offline"
                 checked={settings.keepNextReady === true}
                 onToggle={() => onToggle("keepNextReady")}
               />
             )}
-            <SettingsRow
-              label="Turn the Page with the Audio"
-              desc="The reading moves with the audio. Off keeps the audio going; use Open the reading on the player."
-              checked={settings.audioTurnPage !== false}
-              onToggle={() => onToggle("audioTurnPage")}
-            />
-            {settings.readAlongHighlight !== false && (
-              <SettingsRow
-                label="Follow the Voice"
-                desc="Let the page scroll a little on its own to keep the sentence being read inside the middle of the screen. It stands down the moment you scroll by hand, and never scrolls while auto-scroll is running."
-                checked={settings.readAlongFollow !== false}
-                onToggle={() => onToggle("readAlongFollow")}
-              />
-            )}
-          </div>
+          </SettingsSection>
         </SettingsGroup>
 
-        <SettingsGroup label="Auto-Scroll" sub={glance.autoscroll} {...groupProps('autoscroll')}>
+        {/* WS2 settings (st-auto): Auto-scroll on one screen inside Reading; every row always shown. */}
+        <SettingsGroup sub={glance.autoscroll} {...groupProps('autoscroll')}>
+          {mode === 'screen' && <p className="ws1-note ws2-intro">Scrolls the page for you at a steady reading pace. Touching the screen pauses it; it picks back up a moment after you lift your finger.</p>}
           <div className="settings-card">
             <SettingsRow
-              label="Auto-Scroll"
-              desc="Adds a small play/pause pill to chapter and letter screens that scrolls the page for you at a steady reading pace. Touching the screen pauses it instantly; it picks back up a moment after you lift your finger. The pill fades out of the way while it runs."
+              label="Auto-scroll pill on reading pages"
+              desc="A small play and pause pill on chapters and letters"
+              find="auto scroll hands free"
               checked={!!settings.autoScroll}
               onToggle={() => onToggle("autoScroll")}
             />
-            {/* Auto-scroll's sub-settings are COLLAPSED, not merely disabled,
-                while the feature is off: a greyed control still occupies the
-                page and still reads as something you might be able to use.
-                They are unmounted, so they are also unreachable by tab/screen
-                reader. Auto-Continue Pause nests one level deeper — it means
-                nothing at all unless Auto-Continue is on. */}
-            {!!settings.autoScroll && (
-              <>
-                <AutoScrollSpeedRow
-                  value={settings.autoScrollLpm || "16"}
-                  onChange={(v) => onSetting("autoScrollLpm", v)}
-                />
-                <SettingsRow
-                  label="Auto-Continue"
-                  desc="When auto-scroll reaches the end of the text, count down and turn to the next page on its own, the way a swipe does: on into the next chapter, letter, book, volume or study. It stops at the very end, and after a long unattended run."
-                  checked={!!settings.autoScrollNext}
-                  onToggle={() => onToggle("autoScrollNext")}
-                />
-                {!!settings.autoScrollNext && (
-                  <AutoScrollDwellRow
-                    value={settings.autoScrollEndMs || "2500"}
-                    onChange={(v) => onSetting("autoScrollEndMs", v)}
-                  />
-                )}
-              </>
-            )}
           </div>
+          <SettingsSection label="Speed">
+            <AutoScrollSpeedRow
+              value={settings.autoScrollLpm || "16"}
+              onChange={(v) => onSetting("autoScrollLpm", v)}
+            />
+          </SettingsSection>
+          <p className="ws1-note">The − and + on the pill change this too, without leaving the page, and the pill shows your words a minute.</p>
+          <SettingsSection label="At the end of the page">
+            <SettingsRow
+              label="Go on to the next page"
+              desc="Counts down, then turns to the next chapter, letter, book, volume or study"
+              find="auto continue"
+              checked={!!settings.autoScrollNext}
+              onToggle={() => onToggle("autoScrollNext")}
+            />
+            <AutoScrollDwellRow
+              value={settings.autoScrollEndMs || "2500"}
+              onChange={(v) => onSetting("autoScrollEndMs", v)}
+            />
+          </SettingsSection>
+          <p className="ws1-note">It stops at the very end, and after a long run with nobody there.</p>
         </SettingsGroup>
 
+        {/* WS2 settings (st-tools): the old Top bar group and Search, Tabs & History in one screen, a section each. */}
         <SettingsGroup sub={glance.features} {...groupProps('features')}>
-          <div className="settings-card">
+          <SettingsSection label="Search">
             <SettingsRow
               label="Search"
-              desc="Full-text search across all 66 books + Volumes. When off, the search button is hidden everywhere."
+              desc="Off hides the search button everywhere"
+              find="find"
               checked={settings.searchEnabled !== false}
               onToggle={() => onToggle("searchEnabled")}
             />
-            {/* Search's sub-settings unmount with it (redesign 2026-07-31 —
-                formerly greyed with a "Turn on Search" hint). */}
+            {/* Search's sub-settings unmount with it (redesign 2026-07-31). */}
             {settings.searchEnabled !== false && (
               <>
                 <SettingsRow
-                  label="Synonym Search"
-                  desc="On (default): also match scripture synonyms — searching 'mercy' finds 'compassion', 'shepherd' finds 'pastor', 'faith' finds 'belief' and 'trust'. Exact-word matches always rank first. Off: match only the words you type."
+                  label="Synonym search"
+                  desc="“mercy” also finds “compassion”. Exact words rank first."
+                  find="synonyms"
                   checked={settings.searchSynonyms !== false}
                   onToggle={() => onToggle("searchSynonyms")}
                 />
                 <SettingsRow
-                  label="Filter Stop Words in Search"
-                  desc="On (default): strip filler words (the, is, of, and, this, that, etc.) from queries of 5+ words so results focus on meaningful terms. Off: match every word exactly as typed. Turn off if a search is missing results you know are there — especially with KJV-style phrasing."
+                  label="Leave out filler words"
+                  desc="Drops the, is, of, and from long searches. Turn off if a KJV phrase is missing."
+                  find="filter stop words"
                   checked={settings.searchUseStopWords !== false}
                   onToggle={() => onToggle("searchUseStopWords")}
                 />
               </>
             )}
+          </SettingsSection>
+          <SettingsSection label="Tabs">
             <SettingsRow
               label="Tabs"
-              desc="Run up to 50 independent reading places in parallel — flip between a chapter, a letter, a study, and back. All tabs share settings, theme, mark-as-read, history, and reading progress. Disabling preserves all your open tabs — they'll be waiting when you turn it back on."
+              desc="Up to 50 reading places side by side. Off keeps your open tabs for later."
               checked={!!settings.tabsEnabled}
               onToggle={() => onToggle("tabsEnabled")}
             />
+          </SettingsSection>
+          <SettingsSection label="History">
             <SettingsRow
               label="History"
-              desc="Keep a running list of chapters and letters you've visited. When off, recording stops and the history button is hidden. Existing history is preserved."
+              desc="A list of the chapters and letters you have opened"
               checked={settings.historyEnabled !== false}
               onToggle={() => onToggle("historyEnabled")}
             />
-          </div>
-          <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
-          {/* WS1 settings (st-tools): the old Top bar group's one row lives here now. The three tabs (2026-11-10)
-              gave every screen one top bar, so the bookmark on a reading page is the one optional icon left. */}
-          <div className="settings-card">
+            <HistoryClearRow historyCount={historyCount} onClearHistory={onClearHistory} />
+          </SettingsSection>
+          {/* The three tabs (2026-11-10) gave every screen one top bar; the bookmark on a reading page is its one
+              optional icon. */}
+          <SettingsSection label="Top bar">
             <SettingsRow
               label="Bookmark button"
-              desc="On a reading page, the bookmark icon beside Search."
+              desc="On a reading page, beside Search"
+              find="top bar nav icons"
               checked={settings.showBookmarkNav !== false}
               onToggle={() => onToggle("showBookmarkNav")}
             />
-          </div>
+          </SettingsSection>
         </SettingsGroup>
 
-        {/* Copy & Share (cp3, Corbin 2026-09-27). A copy of a letter ends with its
-            link on thevolumesoftruth.com (utils/site-link.js); so does Share,
-            unless the reader picks the app's (the default since 2026-10-25). Two choices live here so no one needs a long press to reach
-            them: which link a tap on Share sends (holding or right-clicking Share
-            still picks either for one share), and whether a website link opens
-            on the copied words highlighted (off: the letter itself). */}
-        <SettingsGroup label="Copy & Share" sub={glance.share} {...groupProps('share')}>
-          <div className="settings-card">
-            <SelectField
-              eyebrow="Copy & Share"
-              title="Share Includes"
-              label="Share Includes"
-              desc="The link a tap on Share puts under the passage. Hold Share, or right-click it on a computer, to pick the other one for a single share. Copy adds the website link wherever the passage has a page there."
-              value={settings.shareLink === 'app' ? 'app' : 'site'}
-              options={SHARE_LINK_OPTIONS}
-              onChange={(v) => onSetting("shareLink", v)}
-            />
+        {/* Sharing (cp3, Corbin 2026-09-27). A copy of a letter ends with its link on thevolumesoftruth.com
+            (utils/site-link.js); so does Share, unless the reader picks the app's. WS2 settings (st-share): the choice
+            as two rows on the screen, Highlight the passage, then what a shared passage looks like. */}
+        <SettingsGroup sub={glance.share} {...groupProps('share')}>
+          <SettingsSection label="Links I share point to">
+            <RadioRows label="Links I share point to" find="share link links copy website app"
+              value={settings.shareLink === 'app' ? 'app' : 'site'} options={SHARE_LINK_OPTIONS}
+              onChange={(v) => onSetting("shareLink", v)} />
+          </SettingsSection>
+          <p className="ws1-note">Share puts this link under the passage. Hold Share, or right-click it on a computer, to send the other one for a single share. Copy adds the website link wherever the passage has a page there.</p>
+          <SettingsSection label="Website links">
             <SettingsRow
-              label="Highlight the Passage"
-              desc="Off (default): a website link opens the letter itself, like thevolumesoftruth.com/The_Wide_Path. On: it opens the letter scrolled to the words you copied, highlighted."
+              label="Highlight the passage"
+              desc="The link opens the letter scrolled to the words you shared, highlighted. Off: it opens the letter itself."
+              find="share link words"
               checked={!!settings.linkHighlight}
               onToggle={() => onToggle("linkHighlight")}
             />
-          </div>
+          </SettingsSection>
+          {mode === 'screen' && (
+            <>
+              <SectionLabel>What a shared passage looks like</SectionLabel>
+              <div className="ui-card ws2-share-preview">
+                <p className="ws2-share-quote">“The words you picked”</p>
+                <p className="ws2-share-src">The Wide Path · The Volumes of Truth</p>
+                <p className="ws2-share-link">{settings.shareLink === 'app'
+                  ? 'votreader.github.io/app/?p=…'
+                  : 'thevolumesoftruth.com/The_Wide_Path' + (settings.linkHighlight ? '#:~:text=…' : '')}</p>
+              </div>
+            </>
+          )}
         </SettingsGroup>
 
-        <SettingsGroup label="A Return to The Garden" sub={glance.garden} {...groupProps('garden')}>
+        {/* WS2 settings (st-quality): on the root the Garden row opens this picker directly; it ends in a door to
+            the Garden itself. */}
+        <SettingsGroup sub={glance.garden} {...groupProps('garden')}>
           <div className="settings-card">
             <SelectField
               eyebrow="A Return to The Garden"
-              title="Image Quality"
-              label="Image Quality"
-              desc="Changing this re-downloads images at the selected quality next time you view them."
+              title="Image quality"
+              label="Image quality"
+              desc="Pages download again at this size the next time you view them"
+              find="garden pictures images photographs resolution"
               value={settings.gardenTier || GARDEN_DEFAULT_TIER}
-              options={GARDEN_TIERS.map((t) => ({
-                id: t.id,
-                label: `${t.label} · ${t.size}`,
-                desc: `${t.res} · ${t.desc}`
-              }))}
+              options={gardenOptions}
+              sheetSub={gardenSub}
+              sheetFoot={gardenDoor}
               onChange={(v) => onSetting("gardenTier", v)}
             />
           </div>
         </SettingsGroup>
         </RootCard>
+        <SelectSheet open={gardenPick} onClose={() => setGardenPick(false)} eyebrow="A Return to The Garden" title="Image quality"
+          value={settings.gardenTier || GARDEN_DEFAULT_TIER} options={gardenOptions} sub={gardenSub}
+          onChange={(v) => onSetting("gardenTier", v)}>{gardenDoor}</SelectSheet>
 
         <RootCard mode={mode}>
         <SettingsGroup sub={glance.data} tag={_lastBackupAt() ? null : 'Back up'} {...groupProps('data')}>
@@ -1758,13 +1823,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
         <SettingsGroup label="Mark as Read" sub={glance.progress} {...groupProps('progress')}>
           <div className="settings-card">
             <SettingsRow
-              label="Mark as Read"
-              desc="Chapters and letters are checked off automatically once you've genuinely read them — nearly all of the text seen, for about as long as reading it takes. A quick scroll to the bottom doesn't count. Re-reads add a small ×2, ×3 beside the check. Progress stops recording when this is off, but what's already saved is kept."
+              label="Mark as read"
+              desc="Checks off a chapter or letter once you have really read it. Off stops recording and keeps what is saved."
+              find="progress read marks checked"
               checked={settings.markAsRead}
               onToggle={() => onToggle("markAsRead")}
             />
           </div>
-          {settings.markAsRead && (
+          {settings.markAsRead && !searching && (
             <div className="progress-table">
               {PROGRESS_GROUPS.map((grp) => {
                 const isOpen = openSections.has(grp.id);
@@ -1843,6 +1909,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
         {/* review-tutorial: the tour is re-openable from here, whatever the Home strip decided. */}
         {mode !== 'root' && <SettingsGroup sub={glance.help} {...groupProps('help')}>
+          <Findable text="show me around tour guide help welcome about votreader version credits">
           <div className="settings-card settings-help-body">
             <button type="button" className="settings-help-btn" onClick={startTour}>Show me around</button>
             {/* The count comes from the tour (bundle-b's TourController, ambient here); with no
@@ -1856,7 +1923,19 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               </button>
             ) : null}
           </div>
+          </Findable>
         </SettingsGroup>}
+        {searching && (
+          <>
+            <SectionLabel>Also</SectionLabel>
+            <div className="ui-group ws2-also">
+              {backupHit ? <ListRow icon="data" title="Keep a backup" meta="Your data · Back up now" onClick={() => { changeSettingsQuery(''); openScreen('data'); }} /> : null}
+              {typeof onSearchLibrary === 'function'
+                ? <ListRow icon="search" title={'Search the library for “' + settingsQuery.trim() + '”'} onClick={() => onSearchLibrary(settingsQuery.trim())} /> : null}
+            </div>
+            <p className="ws1-note">A setting is found by any word in its name or in the line under it, and can be changed right here.</p>
+          </>
+        )}
         </div>
       </div>
     </ScreenLayout>

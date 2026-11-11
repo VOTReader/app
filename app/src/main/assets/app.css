@@ -1991,12 +1991,8 @@
       .dl-finished-row small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
       .audio-library-hero-actions .audio-collection-choose, .audio-collection-choose { min-height:44px; padding:.3rem .2rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
       .audio-collection-choose:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
-      .settings-downloads-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.3rem .6rem; width:100%; min-height:56px; padding:.3rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-      .settings-downloads-row .settings-row-label { grid-column:1; }
-      .settings-downloads-row .settings-select-chev { grid-column:2; grid-row:1 / span 3; color:var(--gold); }
       .settings-downloads-bar { grid-column:1; display:block; height:6px; border-radius:3px; background:var(--gold-faint); overflow:hidden; }
       .settings-downloads-bar > span { display:block; height:100%; background:var(--gold); }
-      .settings-downloads-row .settings-row-value { grid-column:1; }
       .offline-editions-bar { margin:0 0.95rem 0.45rem; }
       .offline-row-download:focus-visible, .offline-row-link:focus-visible, .audio-library-secondary-action:focus-visible, .offline-confirm-cancel:focus-visible, .offline-confirm-go:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       .audio-library-search { position:relative; z-index:1; min-height:46px; margin-top:1rem; display:flex; align-items:center; gap:.5rem; padding:0 .68rem; border:1px solid var(--gold-border); border-radius:9px; background:rgba(9,8,5,.22); transition:border-color .16s ease,background .16s ease; }
@@ -6926,6 +6922,52 @@
     .ws1-settings .ws1-more-body { padding:0 var(--card-pad) var(--sp-3); }
     .ws1-settings .ui-row-meta { overflow:visible; text-overflow:clip; -webkit-line-clamp:unset; }
     /* ── end WS1 settings (st-root, st-find, st-look, st-read) ── */
+    /* ── WS2 settings (st-find rows, st-read sections, st-font, st-restored, st-arrows, st-quality, st-listen, st-auto, st-tools, st-share) ── */
+    .ws2-place { display:block; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-label); line-height:var(--lh-label); }
+    .ws2-place-pad, .ws2-found > .ws2-place { padding:var(--sp-3) var(--card-pad) 0; }
+    .ws1-settings .settings-section.is-search { margin:0; }
+    .ws1-settings .settings-section.is-search .ui-label, .ws1-settings .settings-section.is-search .ws1-note { display:none; }
+    .ws1-settings .settings-card:empty { display:none; }
+    .ws2-found { margin-bottom:var(--sp-3); border-radius:var(--r-card); background:var(--surface-1); }
+    .ws2-nav.settings-row-head { width:100%; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .ws2-nav .settings-row-text { flex:1; min-width:0; }
+    .ws2-nav .settings-row-value { white-space:nowrap; }
+    .ws1-settings .settings-select-trigger { flex:none; max-width:52%; min-height:var(--tap); padding:0 0 0 var(--sp-2); border:0; border-radius:0; background:none; box-shadow:none; color:var(--text-1); text-align:right; }
+    .ws1-settings .settings-select-trigger .settings-select-chev, .ws2-nav .settings-select-chev { color:var(--text-3); }
+    .select-sheet-option.has-lead { position:relative; padding-left:calc(var(--icon-chip) + var(--sp-4) + var(--sp-3)); }
+    .select-sheet-option.has-lead .ws2-opt-lead { position:absolute; left:var(--sp-4); top:50%; margin:0; transform:translateY(-50%); }
+    .ws2-stepper { display:flex; align-items:center; gap:var(--sp-2); flex:none; }
+    .ws2-step-value { min-width:3.2em; text-align:center; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); }
+    .ws1-settings .settings-step-btn { width:36px; height:36px; border:0; background:var(--surface-2); color:var(--text-1); }
+    .ws1-settings .settings-step-btn:disabled { opacity:.4; }
+    .ws2-speed .txtsize-controls { gap:var(--sp-3); padding:0 var(--card-pad) var(--sp-3); }
+    .ws2-speed .txtsize-reset { min-height:var(--tap); border:0; background:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws2-radio { display:flex; flex-direction:row; align-items:center; gap:var(--sp-3); width:100%; min-height:var(--row-h); padding:var(--sp-3) var(--card-pad); border:0; border-bottom:1px solid var(--hairline); background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
+    .ws2-radio .settings-row-text { flex:1; min-width:0; }
+    .ws2-radio-dot { flex:none; width:22px; height:22px; border:2px solid var(--text-3); border-radius:50%; }
+    .ws2-radio-dot.is-on { border-color:var(--accent); background:var(--accent); box-shadow:inset 0 0 0 4px var(--surface-1); }
+    .ws2-text-btn.ui-btn, .ws2-pill-btn.ui-btn { flex:none; color:var(--accent); }
+    .ws2-share-preview { padding:var(--card-pad); }
+    .ws2-share-preview p { margin:0; }
+    .ws2-share-quote { color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-body); font-style:italic; }
+    .ws2-share-src { margin-top:var(--sp-2) !important; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws2-share-link { margin-top:var(--sp-1) !important; color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); overflow-wrap:anywhere; }
+    .ws2-opt-lead { display:inline-grid; place-items:center; flex:none; width:var(--icon-chip); height:var(--icon-chip); margin-right:var(--sp-3); border-radius:var(--r-chip); background:var(--surface-2); color:var(--text-2); }
+    .ws2-pic-line { fill:currentColor; opacity:.7; }
+    .ws2-pic-dot { fill:var(--accent); }
+    .ws2-sheet-sub { padding:0 var(--gutter) var(--sp-3); }
+    .ws2-sheet-foot { padding:var(--sp-3) var(--gutter) var(--sp-5); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws2-font-preview { margin:0 var(--gutter) var(--sp-3); padding:var(--card-pad); border-radius:var(--r-card); background:var(--surface-2); }
+    .ws2-font-preview p { margin:0; }
+    .ws2-font-sample { color:var(--text-1); font-size:var(--ts-headline); line-height:var(--lh-headline); }
+    .ws2-font-name { margin-top:var(--sp-2) !important; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .ws2-more-page { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws2-more-page p { margin:var(--sp-3) 0 0; }
+    .ws2-more-page strong { color:var(--text-1); }
+    .ws2-more-page ul { margin:var(--sp-3) 0 0; padding-left:1.2em; }
+    .ws2-more-page li { margin-bottom:var(--sp-2); }
+    .ws2-intro { margin-top:var(--sp-2); }
+    /* ── end WS2 settings ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family
        so the visual language stays consistent across sheets. */
