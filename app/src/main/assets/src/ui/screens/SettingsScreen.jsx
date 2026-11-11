@@ -1214,7 +1214,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             {/* st-read2: Auto-scroll is a screen inside Reading; its row says the speed it is set to. */}
             {mode === 'screen' && (
-              <SettingsNavRow label="Auto-scroll" desc="Hands-free reading at a steady pace"
+              <SettingsNavRow label="Auto-scroll" desc="Hands-free reading. Start it from a reader’s menu."
                 value={clampLpm(settings.autoScrollLpm || '16') + ' lines a minute'} onClick={() => openScreen('autoscroll')} />
             )}
             <SettingsRow
@@ -1226,7 +1226,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             />
             <SettingsRow
               label="Double-tap for full screen"
-              desc="Double-tap an open area, or double-click one on a computer"
+              desc="Double-tap an open area. Also in a reader’s menu."
               find="fullscreen click"
               checked={settings.doubleTapFullscreen !== false}
               onToggle={() => onToggle("doubleTapFullscreen")}
@@ -1450,7 +1450,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           <div className="settings-card">
             <SettingsRow
               label="Auto-scroll pill on reading pages"
-              desc="A small play and pause pill on chapters and letters"
+              desc="A small play and pause pill on chapters and letters. Off: start it from a reader’s menu."
               find="auto scroll hands free"
               checked={!!settings.autoScroll}
               onToggle={() => onToggle("autoScroll")}

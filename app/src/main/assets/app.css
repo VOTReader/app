@@ -51,18 +51,23 @@
         left: 50%;
         transform: translateX(-50%);
         bottom: var(--dock-toast-bottom); top: var(--dock-toast-top);
-        max-width: min(92%, 32rem);
-        background: rgb(20,20,24);  /* cz7: opaque, nothing reads through */
-        color: #f0e6d2;
-        border: 1px solid rgba(255,215,140,0.35);
-        border-radius: 12px;
-        padding: 14px 20px;
-        font-family: var(--font-cinzel, Georgia, serif);
-        font-size: var(--fs-13);
-        letter-spacing: 0.04em;
-        line-height: 1.45;
-        text-align: center;
-        box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+        /* MERGE2 (mock settings.html sy-notices, U 8 "Notices: one style"): a surface pill in the UI face, words at
+           the left, an action in gold at the right. */
+        box-sizing: border-box;
+        width: max-content;
+        max-width: min(calc(100% - 32px), 32rem);
+        min-height: 48px;
+        background: var(--surface-3);  /* cz7: opaque, nothing reads through */
+        color: var(--text-1);
+        border: 0;
+        border-radius: 24px;
+        padding: 13px 18px;
+        font-family: var(--font-ui);
+        font-size: var(--ts-value);
+        letter-spacing: 0;
+        line-height: 1.5;
+        text-align: left;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.5);
         pointer-events: none;
         opacity: 0;
         transition: opacity 220ms ease-out;
@@ -70,13 +75,8 @@
       .vot-toast.show { opacity: 1; }
       /* n138: a long message (toast.js sets .is-long past 60 characters) reads in the body face;
          Cinzel's capitals suit a short line, not a sentence or two. */
-      .vot-toast.is-long { font-family: var(--font-body); font-size: var(--fs-15); letter-spacing: normal; text-align: left; }
-      body.light .vot-toast {
-        background: rgb(247,242,232);
-        color: #2a2018;
-        border-color: rgba(176,144,56,0.5);
-        box-shadow: 0 8px 28px rgba(0,0,0,0.18);
-      }
+      .vot-toast.is-long { border-radius: 20px; }
+      body.light .vot-toast { box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
       /* UX7 — tab-close undo toast. Reuses .vot-toast's look but is CLICKABLE
          (base .vot-toast is pointer-events:none), so the Undo control works; it
          already sits at z-index 9998, above the tabs overview (z-index 400). */
@@ -93,13 +93,12 @@
          (the same reason .vot-toast-undo exists). The button carries its own
          44 px box rather than inheriting the text line-height: it is a real
          target the reader hunts for on a stuck screen, not a nicety. */
-      .vot-toast-action { pointer-events:auto; }
+      .vot-toast-action { pointer-events:auto; display:flex; align-items:center; justify-content:space-between; gap:4px; padding-top:2px; padding-bottom:2px; padding-right:6px; }
       /* W55: the same fade trap as .vot-toast-undo above: a faded "Tap to continue
          listening." took a late tap and toggled playback. */
       .vot-toast-action:not(.show) { pointer-events:none; }
-      .vot-toast-action .vot-escape-btn, .vot-toast-action .vot-toast-link { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 4px; color:var(--gold,#ffd78c); font:inherit; font-weight:600; text-decoration:underline; text-underline-offset:2px; cursor:pointer; vertical-align:middle; }
+      .vot-toast-action .vot-escape-btn, .vot-toast-action .vot-toast-link { margin-left:0.7em; min-height:44px; display:inline-flex; align-items:center; background:none; border:none; padding:0 12px; color:var(--accent); font:inherit; font-weight:600; text-decoration:none; cursor:pointer; vertical-align:middle; flex:0 0 auto; }
       .vot-toast-action .vot-toast-link { white-space:nowrap; }
-      body.light .vot-toast-action .vot-escape-btn, body.light .vot-toast-action .vot-toast-link { color:var(--gold-strong,#9a7b2e); }
 
       /* copy-fallback (A15) — the passage a Copy / Share could not deliver,
          kept on screen in a bottom sheet with a retry (CopyFallbackSheet.jsx;

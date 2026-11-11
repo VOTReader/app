@@ -787,7 +787,7 @@ describe('bottom dock stack (cz1)', () => {
     for (const sel of ['\n    .ascroll-pill {']) {
       expect(decl(sel, 'background'), sel).toBe('var(--bg3)');
     }
-    expect(decl('.vot-toast {', 'background')).toBe('rgb(20,20,24)');
+    expect(decl('.vot-toast {', 'background')).toBe('var(--surface-3)'); // MERGE2: the notice pill, an opaque surface
     expect(bare).not.toMatch(/\.ascroll-pill\.is-dim\s*\{\s*opacity/);
     expect(decl('body:is(.audio-bar-open, .autoscroll-on, :has(.jrn-fab, .find-pill)) .screen-scroll {', 'padding-bottom'))
       .toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px)');
