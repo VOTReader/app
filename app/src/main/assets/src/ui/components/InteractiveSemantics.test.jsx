@@ -69,8 +69,7 @@ describe('LinkCard controls', () => {
       onNavigate={onNavigate}
     />);
 
-    const openLink = screen.getByRole('link', { name: 'Open linked passage John 3:16' });
-    fireEvent.keyDown(openLink, { key: 'Enter' });
+    fireEvent.click(screen.getByRole('button', { name: 'Open John 3:16' }));
     expect(onNavigate).toHaveBeenCalledWith(target);
     fireEvent.click(screen.getByRole('button', { name: 'Remove link' }));
     expect(screen.getByText('Remove this link?')).toBeTruthy();

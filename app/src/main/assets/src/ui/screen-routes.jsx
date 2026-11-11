@@ -737,6 +737,14 @@ export function buildScreenRoutes({
   // below, which hands it to the screen while the web is up; anywhere else it is spent, so the web
   // opened later from the Library opens where it was. Reassigned every build, like __openSongs.
   window.__openScriptureWeb = (start, opts) => {
+    // opts.mine (r-links' "My Web"): the web opens in My Web, the reader's own links, with no start.
+    if (opts && opts.mine) {
+      if (opts.check) return true;
+      window.navHandoff.set('webMine', true);
+      setNavOrigin({ screen, bookId, chapterNum, letterId, studyId, studyChapterId, returnOrigin: navOrigin || null });
+      setScreen('scripture-web');
+      return true;
+    }
     let to = start;
     if (start === 'this-letter') {
       to = screen === 'bible-study-chapter' && studyId && studyChapterId

@@ -60,6 +60,9 @@ export function ReadingChromeProvider({ screen, dotEnabled, onGo, dotPlace = nul
     // A Bible chapter's menu also switches the translation (mw17 A02.1).
     translationHere: screen === 'bible-ch',
     translation: String(s.translation || 'nkjv'),
+    // r-menu: Auto-scroll starts (and stops) from the reader menu; the pill shows while it is on.
+    autoScroll: !!s.autoScroll,
+    onAutoScroll: (on) => { if (updateSetting) updateSetting('autoScroll', !!on); },
     onTranslation: (v) => { if (updateSetting) updateSetting('translation', v); },
   };
 

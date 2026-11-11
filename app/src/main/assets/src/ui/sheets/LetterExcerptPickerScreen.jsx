@@ -2,6 +2,7 @@
    LetterExcerptPickerScreen — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
 
+import { UiIcon } from '../components/UiIcon.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { excerptBlocks, formatBFootnotesMode, piecesQuote } from '../../utils/excerpt-pieces.js';
 
@@ -208,9 +209,9 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
   if (!entry) {
     return (
       <div className="picker-screen" ref={trapRef}>
-        <div className="picker-header">
-          <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
-          <span className="picker-title">Select Text to Link</span>
+        <div className="picker-header rd-vpick-bar">
+          <button type="button" className="bar-action picker-back" onClick={() => onClose(null)} aria-label="Back"><UiIcon name="back" /></button>
+          <span className="bar-title picker-title">Select text to link</span>
         </div>
         <div className="picker-empty">Letter not found.</div>
       </div>
@@ -237,14 +238,17 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
 
   return (
     <div className="picker-screen" ref={trapRef} role="dialog" aria-modal="true" aria-label="Select letter text">
-      <div className="picker-header">
-        <button className="picker-back" onClick={() => onClose(null)} aria-label="Back">←</button>
-        <span className="picker-title">Select Text</span>
+      {/* r-link2's letter twin (the UI pass): the letter in the bar with Cancel, as the verse picker has the chapter. */}
+      <div className="picker-header rd-vpick-bar">
+        <button type="button" className="bar-action picker-back" onClick={() => onClose(null)} aria-label="Back"><UiIcon name="back" /></button>
+        <span className="bar-title picker-title">{titleText}</span>
+        <button type="button" className="bar-text-action rd-vpick-cancel" onClick={() => onClose(null)}>Cancel</button>
       </div>
       <div className="picker-breadcrumb">{contextLine}</div>
       {/* Find sits OUTSIDE the scrolling body: ‹ › scroll the letter to each
           hit, and inside the body the row scrolled away with the first one. */}
-      <div className="picker-find picker-find-bar">
+      <div className="ui-field rd-field picker-find picker-find-bar">
+        <UiIcon name="search" size="sm" />
         <input
           className="picker-find-input"
           type="search"
@@ -256,8 +260,8 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         {findTrim.length >= 2 && (
           <>
             <span className="picker-find-count" role="status" aria-live="polite">{findMatches.length ? (Math.min(findIdx, findMatches.length - 1) + 1) + ' of ' + findMatches.length : '0 found'}</span>
-            <button type="button" className="picker-find-nav" onClick={() => findStep(-1)} disabled={!findMatches.length} aria-label="Previous match">{"‹"}</button>
-            <button type="button" className="picker-find-nav" onClick={() => findStep(1)} disabled={!findMatches.length} aria-label="Next match">{"›"}</button>
+            <button type="button" className="picker-find-nav" onClick={() => findStep(-1)} disabled={!findMatches.length} aria-label="Previous match"><UiIcon name="up" size="sm" /></button>
+            <button type="button" className="picker-find-nav" onClick={() => findStep(1)} disabled={!findMatches.length} aria-label="Next match"><UiIcon name="down" size="sm" /></button>
           </>
         )}
       </div>
@@ -267,7 +271,6 @@ export function LetterExcerptPickerScreen({ refineRequest, sourceKey, sourceLabe
         onMouseUp={captureSelection}
         onTouchEnd={captureSelection}
       >
-        <div className="picker-letter-title">{titleText}</div>
         {subtitleText && <div className="picker-letter-subtitle">{subtitleText}</div>}
         {hasSelection && <div className="picker-selection-hint">{'"' + (selInfo.text.length > 80 ? selInfo.text.slice(0, 77) + '…' : selInfo.text) + '"'}</div>}
         {!hasSelection && <div className="picker-selection-hint picker-selection-hint-empty">Long-press and drag to select an excerpt from one paragraph — or use the button below to {returnTargetInsteadOfLink ? 'insert' : 'link'} the whole {entryNoun}.</div>}

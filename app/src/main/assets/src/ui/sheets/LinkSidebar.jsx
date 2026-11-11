@@ -1,6 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════════════
    LinkSidebar — Cluster D (esbuild bundle-d.js)
+   r-links (the UI pass, mock v2 readers): a tap on a link mark opens "Links here", a bottom sheet with
+   the count and a close, then one card per link (To / From, the place, where it sits and when, its
+   words) with Open <place> | My Web | Remove under it. (The name is the old right-hand panel's.)
    ═══════════════════════════════════════════════════════════════════════ */
+
+import { UiIcon } from '../components/UiIcon.jsx';
 
 export function LinkSidebar({ hlKey, onClose, onNavigate }) {
   // Subscribe to LinkStore — sidebar re-renders when any link is created
@@ -24,28 +29,25 @@ export function LinkSidebar({ hlKey, onClose, onNavigate }) {
     return () => { window.__closeSheet = prev || null; };
   }, [hlKey, onClose]);
   if (!hlKey) return null;
-  // Show a count subtitle instead of a hardcoded date. The sidebar can contain
-  // links created on different days (multiple links on one passage), so a
-  // fixed "today" date would be actively misleading. A count is always correct
-  // and tells the user at a glance how many links are on this passage.
-  const countStr = links.length === 0 ? 'No links' : (links.length === 1 ? '1 link' : links.length + ' links');
+  // "See in My Web": the Scripture Web opens in My Web (the reader's door, window.__openScriptureWeb).
+  const onMyWeb = typeof window.__openScriptureWeb === 'function'
+    ? () => { onClose(); window.__openScriptureWeb(null, { mine: true }); }
+    : null;
+  const countStr = links.length === 1 ? '1 link' : links.length + ' links';
   return (
-    <>
-      <div className="link-sidebar-overlay" aria-hidden="true" onClick={onClose} />
-      <div className="link-sidebar" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-sidebar-title">
-        {/* Close on the RIGHT, matching every other sheet in the app. */}
+    <div className="link-sidebar-overlay" onClick={onClose}>
+      <div className="link-sidebar rd-form-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-labelledby="link-sidebar-title" onClick={e => e.stopPropagation()}>
         <div className="link-sidebar-header">
-          <span className="link-sidebar-title" id="link-sidebar-title">Links</span>
-          <button className="link-sidebar-close" onClick={onClose} aria-label="Close links" title="Close">×</button>
+          <h2 className="ui-sheet-title link-sidebar-title" id="link-sidebar-title">Links here</h2>
+          {/* Count only when there are links: the empty line below already says so. */}
+          {links.length > 0 && <span className="link-sidebar-count">{countStr}</span>}
+          <button type="button" className="rd-field-clear link-sidebar-close" onClick={onClose} aria-label="Close links"><UiIcon name="x" /></button>
         </div>
-        {/* Count only when there are links — the empty body message below
-            already says "No links yet", so a "No links" line here was redundant. */}
-        {links.length > 0 && <div className="link-sidebar-date link-sidebar-count">{countStr}</div>}
         <div className="link-sidebar-body">
-          {links.length === 0 && <div className="link-sidebar-empty">No links yet</div>}
-          {links.map(lnk => <LinkCard key={lnk.id} lnk={lnk} hlKey={hlKey} isBlockScope={isBlockScope} onNavigate={onNavigate} />)}
+          {links.length === 0 && <p className="rd-note link-sidebar-empty">No links yet</p>}
+          {links.map(lnk => <LinkCard key={lnk.id} lnk={lnk} hlKey={hlKey} isBlockScope={isBlockScope} onNavigate={onNavigate} onMyWeb={onMyWeb} />)}
         </div>
       </div>
-    </>
+    </div>
   );
 }

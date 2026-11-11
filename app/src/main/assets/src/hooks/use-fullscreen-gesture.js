@@ -95,6 +95,19 @@ export function useFullscreenGesture({ enabled, paused = false, hintCount, onHin
   const hintCountRef = useRefMirror(safeHintCount);
   const onHintShownRef = useRefMirror(onHintShown);
 
+  // r-menu: the reader menu's "Full screen" row sends 'vot:fullscreen-toggle'; it toggles as the double
+  // tap does, through the same Android ref, and works with the double-tap setting off.
+  React.useEffect(() => {
+    if (paused) return undefined;
+    const onToggle = () => {
+      const entering = PlatformBridge.isAndroid ? !androidFullscreenRef.current : !document.fullscreenElement;
+      PlatformBridge.setImmersiveMode(entering);
+      if (PlatformBridge.isAndroid) androidFullscreenRef.current = entering;
+    };
+    document.addEventListener('vot:fullscreen-toggle', onToggle);
+    return () => document.removeEventListener('vot:fullscreen-toggle', onToggle);
+  }, [paused]);
+
   // The setting switched OFF while the gesture holds fullscreen hands the screen back (settings hunt,
   // 2026-11-04): the double tap was the only way out, and on Android the bars stayed hidden for the
   // life of the activity. A reader who turns it off because fullscreen keeps happening by accident is

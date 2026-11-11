@@ -31,7 +31,7 @@ describe('LinkSidebar chrome', () => {
     expect(titleIdx).toBeGreaterThanOrEqual(0);
     expect(closeIdx).toBeGreaterThan(titleIdx); // close is on the right
     expect(container.querySelector('.link-sidebar-close').getAttribute('aria-label')).toBe('Close links');
-    const dialog = screen.getByRole('dialog', { name: 'Links' });
+    const dialog = screen.getByRole('dialog', { name: 'Links here' });
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     expect(dialog.contains(document.activeElement)).toBe(true);
   });

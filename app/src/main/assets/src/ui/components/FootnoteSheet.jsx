@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════
    FootnoteSheet — Cluster D (esbuild bundle-d.js)
    ═══════════════════════════════════════════════════════════════════════ */
+import { UiIcon } from './UiIcon.jsx';
 
 import { inertAttr } from '../../utils/inert-attr.js';
 import { sheetReference } from '../../utils/passage-copy.js';
@@ -115,7 +116,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
             <div className="fn-sheet-num-row">
               <div className="fn-sheet-num">
                 Footnote {num}
-                {showNav && <span className="fn-sheet-num-of">{numberIsPlace ? ` of ${total}` : ` \xB7 ${curIdx + 1} of ${total}`}</span>}
+                {total > 0 && curIdx !== -1 && <span className="fn-sheet-num-of">{numberIsPlace ? ` of ${total}` : ` \xB7 ${curIdx + 1} of ${total}`}</span>}
               </div>
               {showNav && (
                 <div className="fn-sheet-nav">
@@ -126,7 +127,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                     aria-label="Previous footnote"
                     title="Previous footnote"
                   >
-                    ‹
+                    <UiIcon name="back" size="sm" />
                   </button>
                   <button
                     className="fn-sheet-nav-btn"
@@ -135,10 +136,11 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                     aria-label="Next footnote"
                     title="Next footnote"
                   >
-                    ›
+                    <UiIcon name="chev" size="sm" />
                   </button>
                 </div>
               )}
+              <button type="button" className="rd-field-clear fn-sheet-x" onClick={onClose} aria-label="Close footnote"><UiIcon name="x" /></button>
             </div>
             {inner ? (
               <>
@@ -178,7 +180,7 @@ export function FootnoteSheet({ num, fn, nkjv, footnotes, onClose, onInAppLink, 
                 {fn.url && (
                   <div className={(fn.link || fn.text) ? "fn-sheet-url-extra" : "fn-sheet-note"}>
                     <a href={fn.url} target="_blank" rel="noopener noreferrer" className="fn-link">
-                      {(fn.link || fn.text) ? "Open external link" : fn.url}
+                      {(fn.link || fn.text) ? <><UiIcon name="out" size="sm" />Open on the website</> : fn.url}
                     </a>
                   </div>
                 )}

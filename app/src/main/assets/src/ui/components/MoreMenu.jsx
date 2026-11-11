@@ -46,6 +46,7 @@ import { SelectSheet } from './SelectField.jsx';
 import { translationName } from '../../data/translations.js';
 import { pageMenu } from '../../utils/page-menu.js';
 import { AnnotationHintItem } from './AnnotationHint.jsx';
+import { UiIcon } from './UiIcon.jsx';
 
 /**
  * @typedef {Object} NavMenuValue
@@ -61,6 +62,8 @@ import { AnnotationHintItem } from './AnnotationHint.jsx';
  * @property {boolean} [translationHere] a Bible chapter: the menu offers the translation picker
  * @property {string} [translation]      settings.translation
  * @property {(v: string) => void} [onTranslation]
+ * @property {boolean} [autoScroll]      settings.autoScroll (r-menu's Auto-scroll row says On / Off)
+ * @property {(on: boolean) => void} [onAutoScroll]
  */
 
 /** The ⋯ menu's actions and state (a NavMenuValue, or null outside the provider). */
@@ -234,91 +237,94 @@ export function MoreMenuBtn() {
       </button>
       {open && pos ? ReactDOM.createPortal(
         <>
+        {/* r-menu (the UI pass, mock v2 readers): one bottom sheet of worded rows in three groups: the page's own
+            things (Find, Copy website link, Auto-scroll, Full screen), the look (Text size, Theme), and the doors out
+            (History, Reading plans, Settings). Still a role=menu: arrows, Home/End and Tab work as before. */}
+        <div className="rd-menu-scrim" aria-hidden="true" />
         <div
-          className="more-menu"
+          className="more-menu rd-menu-sheet"
           role="menu"
           aria-label="More"
           ref={menuRef}
-          style={{ top: pos.top + 'px', right: pos.right + 'px' }}
           onKeyDown={onKeyDown}
         >
           {/* The first-run tip, as a row (W2d r-letter: it no longer floats over the text). */}
           <AnnotationHintItem onDone={() => close(true)} />
-          {pageItems ? pageItems.map((it) => (
-            <button key={it.key} type="button" role="menuitem" className={'more-menu-item more-menu-page-item' + (it.danger ? ' danger' : '')} onClick={go(it.onSelect)}>
-              {it.icon === 'find' ? (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-                  <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
-                </svg>
-              ) : null}
-              <span>{it.label}</span>
+          <div className="rd-menu-group" role="group" aria-label="This page">
+            {pageItems ? pageItems.map((it) => (
+              <button key={it.key} type="button" role="menuitem" className={'more-menu-item more-menu-page-item' + (it.danger ? ' danger' : '')} onClick={go(it.onSelect)}>
+                {it.icon === 'find' ? <UiIcon name="search" /> : null}
+                <span>{it.label}</span>
+              </button>
+            )) : null}
+            {page ? (
+              <button type="button" role="menuitem" className="more-menu-item" onClick={copyPageLink}>
+                <UiIcon name="copy" />
+                <span className="more-menu-item-text">
+                  <span>Copy website link</span>
+                  <span className="more-menu-item-sub">{siteName(page.link)}</span>
+                </span>
+              </button>
+            ) : null}
+            {typeof ctx.onAutoScroll === 'function' ? (
+              <button type="button" role="menuitem" className="more-menu-item" onClick={() => { close(true); ctx.onAutoScroll(!ctx.autoScroll); }}>
+                <UiIcon name="scroll" />
+                <span className="more-menu-item-text">
+                  <span>Auto-scroll</span>
+                  <span className="more-menu-item-sub">{ctx.autoScroll ? 'On' : 'Off'}</span>
+                </span>
+              </button>
+            ) : null}
+            <button type="button" role="menuitem" className="more-menu-item" onClick={() => { close(true); document.dispatchEvent(new CustomEvent('vot:fullscreen-toggle')); }}>
+              <UiIcon name="full" />
+              <span>Full screen</span>
             </button>
-          )) : null}
-          {page ? (
-            <button type="button" role="menuitem" className="more-menu-item" onClick={copyPageLink}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-              <span className="more-menu-item-text">
-                <span>Copy website link</span>
-                <span className="more-menu-item-sub">{siteName(page.link)}</span>
-              </span>
-            </button>
-          ) : null}
-          {ctx.historyEnabled ? (
-            <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onHistory)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                <polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 .49-5.01" />
-              </svg>
-              <span>History</span>
-            </button>
-          ) : null}
-          {ctx.onPlans ? (
-            <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onPlans)}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-                <rect x="4" y="5" width="16" height="15" rx="2" /><path d="M8 3v4M16 3v4M4 10h16M9 15l2 2 4-4" />
-              </svg>
-              <span>Reading plans</span>
-            </button>
-          ) : null}
-          {canPickTranslation ? (
-            <button type="button" role="menuitem" className="more-menu-item" aria-haspopup="dialog" onClick={go(() => setPickOpen(true))}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-              </svg>
-              <span className="more-menu-item-text">
-                <span>Bible translation</span>
-                <span className="more-menu-item-sub">{translationName(ctx.translation)}</span>
-              </span>
-            </button>
-          ) : null}
-          <div className="more-menu-row" role="group" aria-label="Theme">
-            <span className="more-menu-row-label">Theme</span>
-            <span className="more-menu-seg">
-              <button type="button" role="menuitemradio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'on' : ''}
-                onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); }}>Dark</button>
-              <button type="button" role="menuitemradio" aria-checked={theme === 'light'} className={theme === 'light' ? 'on' : ''}
-                onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); }}>Light</button>
-            </span>
           </div>
-          <div className="more-menu-row" role="group" aria-label="Text size">
-            <span className="more-menu-row-label">Text size</span>
-            <span className="more-menu-step">
-              <button type="button" role="menuitem" aria-label="Smaller text" aria-disabled={atMin}
-                onClick={() => { if (!atMin) ctx.onFontScale(stepFontScale(ctx.fontScale, -1)); }}>A−</button>
-              <span className="more-menu-step-value">{pct === 100 ? 'Standard' : pct + '%'}</span>
-              <button type="button" role="menuitem" aria-label="Larger text" aria-disabled={atMax}
-                onClick={() => { if (!atMax) ctx.onFontScale(stepFontScale(ctx.fontScale, 1)); }}>A+</button>
-            </span>
+          <div className="rd-menu-group" role="group" aria-label="Look">
+            {canPickTranslation ? (
+              <button type="button" role="menuitem" className="more-menu-item" aria-haspopup="dialog" onClick={go(() => setPickOpen(true))}>
+                <UiIcon name="book" />
+                <span className="more-menu-item-text">
+                  <span>Bible translation</span>
+                  <span className="more-menu-item-sub">{translationName(ctx.translation)}</span>
+                </span>
+              </button>
+            ) : null}
+            <div className="more-menu-row" role="group" aria-label="Text size">
+              <span className="more-menu-row-label">Text size</span>
+              <span className="more-menu-step">
+                <button type="button" role="menuitem" aria-label="Smaller text" aria-disabled={atMin}
+                  onClick={() => { if (!atMin) ctx.onFontScale(stepFontScale(ctx.fontScale, -1)); }}>A−</button>
+                <span className="more-menu-step-value">{pct === 100 ? 'Standard' : pct + '%'}</span>
+                <button type="button" role="menuitem" aria-label="Larger text" aria-disabled={atMax}
+                  onClick={() => { if (!atMax) ctx.onFontScale(stepFontScale(ctx.fontScale, 1)); }}>A+</button>
+              </span>
+            </div>
+            <div className="more-menu-row" role="group" aria-label="Theme">
+              <span className="more-menu-row-label">Theme</span>
+              <span className="more-menu-seg">
+                <button type="button" role="menuitemradio" aria-checked={theme === 'dark'} className={theme === 'dark' ? 'on' : ''}
+                  onClick={() => { if (theme !== 'dark') ctx.onThemeChange('dark'); }}>Dark</button>
+                <button type="button" role="menuitemradio" aria-checked={theme === 'light'} className={theme === 'light' ? 'on' : ''}
+                  onClick={() => { if (theme !== 'light') ctx.onThemeChange('light'); }}>Light</button>
+              </span>
+            </div>
           </div>
-          <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onSettings)}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-            <span>Settings</span>
-          </button>
+          <div className="rd-menu-group" role="group" aria-label="More places">
+            {ctx.historyEnabled ? (
+              <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onHistory)}>
+                <UiIcon name="clock" /><span>History</span><UiIcon name="chev" size="sm" />
+              </button>
+            ) : null}
+            {ctx.onPlans ? (
+              <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onPlans)}>
+                <UiIcon name="cal" /><span>Reading plans</span><UiIcon name="chev" size="sm" />
+              </button>
+            ) : null}
+            <button type="button" role="menuitem" className="more-menu-item" onClick={go(ctx.onSettings)}>
+              <UiIcon name="gear" /><span>Settings</span><UiIcon name="chev" size="sm" />
+            </button>
+          </div>
         </div>
         {/* The text size's announcement: a role=menu may own only its items, so
             the live region sits beside the menu, visually hidden (axe

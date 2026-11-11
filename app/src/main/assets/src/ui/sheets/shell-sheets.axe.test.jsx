@@ -271,7 +271,7 @@ describe('axe — LinkSidebar', () => {
   it('no links yet', async () => {
     stub({ LinkStore: store([]) });
     render(<LinkSidebar hlKey="bible:john:3:16" onClose={noop} onNavigate={noop} />);
-    expectModal('Links');
+    expectModal('Links here');
     expect(await seriousViolations(document)).toEqual([]);
   });
 

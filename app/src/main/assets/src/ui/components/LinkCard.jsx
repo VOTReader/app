@@ -1,12 +1,16 @@
 /* ═══════════════════════════════════════════════════════════════════════
    LinkCard — Cluster D (esbuild bundle-d.js)
+   r-links (the UI pass, mock v2 readers): one link in "Links here". A card on surface-2 says which way
+   it runs (To / From), the place, where it sits and when, and its words; under it Open <place> (gold),
+   My Web, and Remove (asks first, then offers Undo).
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { relativeDate } from '../../utils/dates.js';
 import { keyTouchesVerse } from '../../utils/hl-keys.js';
 import { offerUndoLinkRemoved } from '../../utils/annotation-undo.js';
+import { UiIcon } from './UiIcon.jsx';
 
-export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
+export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate, onMyWeb }) {
   const [expanded, setExpanded] = React.useState(false);
   // confirmRemove: false | true — governs the tap-confirm strip (§11.1: no instant delete).
   const [confirmRemove, setConfirmRemove] = React.useState(false);
@@ -16,9 +20,6 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const isSource = matchesSide(lnk.source.key);
   const other = isSource ? lnk.target : lnk.source;
   const thisSide = isSource ? lnk.source : lnk.target;
-  // isOutbound = true when THIS container is the source of the link.
-  // Shown as a subtle directional eyebrow in the card header.
-  const isOutbound = isSource;
   const preview = resolveVerseText(other);
   // Preview chain: prefer the OTHER side's text (what we linked TO),
   // then resolveVerseText (Bible/study lookup), then fall back to
@@ -28,93 +29,52 @@ export function LinkCard({ lnk, hlKey, isBlockScope, onNavigate }) {
   const usingFromFallback = !otherText && !!thisSide.text;
   const rawText = otherText || thisSide.text || '';
   const isLong = rawText.length > 150;
-  const chainSvg = (
-    <svg className="link-card-chain" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
-  );
+  const where = other.type === 'bible' ? bookCategory(other.bookId) :
+    other.type === 'study' ? 'Matthew Study Bible' :
+    other.type === 'study-letter' ? (other.collection || 'Bible Study') :
+    other.type === 'letter' ? (other.collection || 'Letter') :
+    other.type === 'wtlb' ? (other.collection || 'Words To Live By') :
+    other.type === 'blessed' ? 'The Blessed' :
+    other.type === 'holy-days' ? 'Holy Days' : '';
+  const meta = [where, lnk.created ? relativeDate(lnk.created) : ''].filter(Boolean).join(' · ');
+  const open = () => onNavigate && onNavigate(other);
   const doRemove = (e) => { e.stopPropagation(); LinkStore.remove(lnk.id); offerUndoLinkRemoved(lnk); };   // A06.6
   return (
     <div className="link-card">
-      <div
-        className="link-card-open"
-        role="link"
-        tabIndex={confirmRemove ? -1 : 0}
-        aria-disabled={confirmRemove}
-        aria-label={`Open linked passage ${other.label}`}
-        onClick={confirmRemove ? undefined : (() => onNavigate && onNavigate(other))}
-        onKeyDown={confirmRemove ? undefined : ((e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            onNavigate && onNavigate(other);
-          }
-        })}
-      >
-      <div className="link-card-header">
-        <div className="link-card-ref">
-          <span className="link-card-direction">{isOutbound ? "to " : "from "}</span>
-          {other.label}
-        </div>
-        {chainSvg}
+      <div className="link-card-box">
+        <div className="link-card-direction">{isSource ? 'To' : 'From'}</div>
+        <div className="link-card-ref">{other.label}</div>
+        {meta && <div className="link-card-cat">{meta}</div>}
+        {rawText && (
+          <div className={'rd-quote link-card-preview' + (expanded ? ' is-open' : '')}>
+            {usingFromFallback && <span className="link-card-from-label">From: </span>}
+            {rawText}
+          </div>
+        )}
+        {isLong && (
+          <button type="button" className="ui-btn is-text is-small link-card-show-more" aria-expanded={expanded}
+            onClick={() => setExpanded(x => !x)}>{expanded ? 'Show less' : 'Show more'}</button>
+        )}
       </div>
-      <div className="link-card-cat">
-        {other.type === 'bible' ? bookCategory(other.bookId) :
-          other.type === 'study' ? 'Matthew Study Bible' :
-          other.type === 'study-letter' ? (other.collection || 'Bible Study') :
-          other.type === 'letter' ? (other.collection || 'Letter') :
-          other.type === 'wtlb' ? (other.collection || 'Words To Live By') :
-          other.type === 'blessed' ? 'The Blessed' :
-          other.type === 'holy-days' ? 'Holy Days' :
-          ''}
-      </div>
-      {/* Created-date row — subtle Cinzel caps so the user can see when they
-          anchored the link without having to open the full Links browser. */}
-      {lnk.created && (
-        <div className="link-card-date">{relativeDate(lnk.created)}</div>
-      )}
-      <div
-        className="link-card-preview"
-        style={expanded ? { display: 'block', WebkitLineClamp: 'unset', overflow: 'visible' } : undefined}
-      >
-        {((other.type === 'bible' || other.type === 'study') && other.verse) && <strong>{other.verse + " "}</strong>}
-        {usingFromFallback && <em className="link-card-from-label">From: </em>}
-        {rawText}
-      </div>
-      </div>
-      {/* Actions row: show-more toggle + remove (with tap-confirm per §11.1) */}
-      {!confirmRemove && (
-        <div className="link-card-actions">
-          {isLong && (
-            <button
-              type="button"
-              className="link-card-show-more"
-              aria-expanded={expanded}
-              onClick={(e) => { e.stopPropagation(); setExpanded(x => !x); }}
-            >
-              {expanded ? "Show less" : "Show more"}
+      {/* Tap-confirm strip in place of the buttons while Remove asks: nothing here navigates meanwhile. */}
+      {confirmRemove ? (
+        <ConfirmStrip
+          question="Remove this link?"
+          yesLabel="Yes, remove"
+          onCancel={() => setConfirmRemove(false)}
+          onConfirm={doRemove}
+        />
+      ) : (
+        <div className={'link-card-actions' + (onMyWeb ? '' : ' is-2')}>
+          <button type="button" className="ui-btn is-primary is-small link-card-open" onClick={open}
+            aria-label={'Open ' + other.label}><span className="link-card-open-label">Open {other.label}</span></button>
+          {onMyWeb && (
+            <button type="button" className="ui-btn is-small link-card-web" onClick={onMyWeb}>
+              <UiIcon name="web" size="sm" />My Web
             </button>
           )}
-          <button
-            type="button"
-            className="link-card-remove"
-            onClick={(e) => { e.stopPropagation(); setConfirmRemove(true); }}
-          >
-            Remove link
-          </button>
-        </div>
-      )}
-      {/* Tap-confirm strip — replaces the actions row when confirmRemove=true.
-          The separate .link-card-open link is disabled during confirmation,
-          so the destructive choice cannot accidentally navigate away. */}
-      {confirmRemove && (
-        <div onClick={(e) => e.stopPropagation()}>
-          <ConfirmStrip
-            question="Remove this link?"
-            yesLabel="Yes, remove"
-            onCancel={() => setConfirmRemove(false)}
-            onConfirm={doRemove}
-          />
+          <button type="button" className="ui-btn is-small link-card-remove" onClick={() => setConfirmRemove(true)}
+            aria-label="Remove link">Remove</button>
         </div>
       )}
     </div>

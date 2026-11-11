@@ -300,7 +300,7 @@ describe('a note footnote: markers, references and the source letter are followa
     render(<Sheet num="1" fn={web} nkjv={{}} footnotes={{ '1': web }} onClose={() => {}} onInAppLink={onInAppLink} />);
     click(document.querySelector('.fn-sheet-link-btn'));
     expect(onInAppLink).toHaveBeenCalledWith({ collection: 'Answers Only God Can Give', letterTitle: 'Regarding True Repentance' });
-    expect(document.querySelector('.fn-sheet a.fn-link').textContent).toBe('Open external link');
+    expect(document.querySelector('.fn-sheet a.fn-link').textContent).toBe('Open on the website');
     cleanup(); onInAppLink.mockClear();
     g.VOT_LETTER_REGISTRY = new Map();
     g.__loadAnswersCorpus = () => { g.VOT_LETTER_REGISTRY = new Map([['Answers Only God Can Give::Regarding True Repentance', {}]]); return Promise.resolve(); };

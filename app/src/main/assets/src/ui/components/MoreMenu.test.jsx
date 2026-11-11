@@ -59,7 +59,7 @@ describe('MoreMenuBtn — the compact bar', () => {
     for (const name of ['History', 'Dark', 'Light', 'Smaller text', 'Larger text', 'Settings']) {
       expect(item(name), name).toBeTruthy();
     }
-    expect(document.activeElement, 'focus lands on the first item').toBe(item('History'));
+    expect(document.activeElement, 'focus lands on the first item').toBe(item('Full screen'));
   });
 
   it('offers Reading plans when the app wires it (mw18 C8), and opens them', () => {
@@ -199,7 +199,7 @@ describe('MoreMenuBtn — the compact bar', () => {
   it('arrow keys move between the items and wrap', () => {
     const s = setup();
     s.open();
-    const order = ['History', 'Dark', 'Light', 'Smaller text', 'Larger text', 'Settings'];
+    const order = ['Full screen', 'Smaller text', 'Larger text', 'Dark', 'Light', 'History', 'Settings'];
     act(() => { fireEvent.keyDown(s.menu(), { key: 'ArrowUp' }); });
     expect(document.activeElement).toBe(s.item('Settings'));
     act(() => { fireEvent.keyDown(s.menu(), { key: 'ArrowDown' }); });
