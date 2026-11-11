@@ -148,9 +148,9 @@ function PlanRow({ r, many, onRead, onListen, onOpenPlans, markAsReadEnabled, on
     }
   }
   return (
-    <div className="upnext-row" data-plan={r.id}>
+    <div className="upnext-row upnext-plan" data-plan={r.id}>
+      <span className="upnext-eyebrow">{eyebrow}</span>
       <div className="upnext-text">
-        <span className="upnext-eyebrow">{eyebrow}</span>
         <span className="upnext-title">{doneToday ? 'Today’s reading is done' : portionOf(r)}</span>
         {sub}
       </div>

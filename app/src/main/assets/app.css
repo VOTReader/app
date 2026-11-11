@@ -3529,11 +3529,15 @@
     .prg-start { margin:0.25rem 0 1rem; }
     @media (hover:hover) { .home-shortcuts button:hover { border-color:var(--gold); background:var(--gold-faint); } }
     /* Home's up-next card (TodayCard.jsx; the layout pass 2026-11-10, mock read.png): one slim row per running plan,
-       then Continue, in one card. Rows ~54 px; the pills draw 36 px and take a 44 px press through ::after. */
+       then Continue, in one card. Rows ~54-60 px; the pills draw 34 px and take a 44 px press through ::after. */
     .upnext { width:100%; max-width:30rem; margin:0 0 0.75rem; border:1px solid var(--gold-border); border-radius:12px; background:var(--bg3); color:var(--cream); font-family:var(--font-body); text-align:left; box-sizing:border-box; overflow:hidden; }
     body.light .upnext { background:var(--bg2); }
     .upnext-row { display:flex; align-items:center; gap:0.6rem; width:100%; min-height:54px; padding:0.45rem 0.5rem 0.45rem 0.875rem; box-sizing:border-box; }
     .upnext-row + .upnext-row { border-top:1px solid var(--gold-border); }
+    /* A plan row: the eyebrow across the whole row (it never shares its line with the pills), then the portion
+       beside Read and Listen. */
+    .upnext-plan { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:0.1rem 0.6rem; align-items:center; padding-top:0.5rem; padding-bottom:0.5rem; }
+    .upnext-plan > .upnext-eyebrow { grid-column:1 / -1; }
     .upnext-text { display:flex; flex-direction:column; flex:1; min-width:0; }
     .upnext-eyebrow { font-family:var(--font-cinzel); font-size:var(--fs-12); letter-spacing:0.16em; text-transform:uppercase; color:var(--gold-dim); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .upnext-title { color:var(--cream); font-size:var(--fs-18); line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -3541,15 +3545,17 @@
     .upnext-sub { align-self:flex-start; min-height:32px; margin:-0.2rem 0 -0.35rem; padding:0; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); font-style:italic; text-align:left; }
     button.upnext-sub { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
     .upnext-actions { display:flex; align-items:center; gap:0.45rem; flex:none; }
-    .upnext-pill { position:relative; display:inline-flex; align-items:center; gap:0.4rem; height:36px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:18px; background:transparent; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; cursor:pointer; }
-    .upnext-pill::after { content:''; position:absolute; inset:-4px -2px; }
-    .upnext-pill-solid { padding:0 1rem; border-color:var(--gold); background:var(--gold); color:var(--bg); font-weight:700; }
+    .upnext-pill { position:relative; display:inline-flex; align-items:center; gap:0.4rem; height:34px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:18px; background:transparent; color:var(--gold); font-family:var(--font-cinzel); font-size:var(--fs-12); letter-spacing:0.14em; text-transform:uppercase; white-space:nowrap; cursor:pointer; }
+    .upnext-pill { justify-content:center; min-width:5.9rem; }
+    .upnext-textlink::after { content:''; position:absolute; inset:-5px 0; }
+    .upnext-pill::after { content:''; position:absolute; inset:-5px -2px; }
+    .upnext-pill-solid { min-width:4.75rem; padding:0 1rem; border-color:var(--gold); background:var(--gold); color:var(--bg); font-weight:700; }
     .upnext-pill:disabled { opacity:0.5; cursor:default; }
     .upnext-go { display:flex; align-items:center; gap:0.6rem; flex:1; min-width:0; min-height:44px; margin:0; padding:0; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
     .upnext-row.upnext-go { padding:0.45rem 0.5rem 0.45rem 0.875rem; }
     .upnext-chev { flex:none; padding:0 0.45rem; color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
     .upnext-x { flex:none; width:44px; height:44px; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-20); line-height:1; cursor:pointer; }
-    .upnext-textlink { flex:none; min-height:44px; padding:0 0.5rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
+    .upnext-textlink { position:relative; flex:none; min-height:34px; padding:0 0.5rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
     @media (hover:hover) {
       .upnext-pill:hover { border-color:var(--gold); background:var(--gold-faint); }
       .upnext-pill-solid:hover { background:var(--gold-bright); }
