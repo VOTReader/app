@@ -77,20 +77,20 @@ describe('AboutScreen — page 2 describes the app that actually shipped', () =>
   it('no longer claims the Garden images are the only thing fetched', () => {
     const text = page2();
     expect(text).not.toMatch(/nothing is downloaded/i);
-    expect(text).toMatch(/Listen streams/i);
+    expect(text).toMatch(/Listening needs a connection/i);   // WS4 (fr-2): the mock's shorter line
   });
 
   // Downloads brief 2026-10-23, section 7 item 21: it said only "Tapping Listen streams that recording".
   it('says a downloaded recording plays with no connection', () => {
-    expect(page2()).toMatch(/download a recording and it plays with no connection/i);
+    expect(page2()).toMatch(/needs a connection unless you download it/i);
   });
 
   it('still promises the reader that their own data stays on the device', () => {
-    expect(page2()).toMatch(/your notes, highlights and journal never leave this device/i);
+    expect(page2()).toMatch(/your notes never leave this device/i);
   });
 
-  it('names the Listening Library among what the library holds', () => {
-    expect(page2()).toMatch(/Listening Library/);
+  it('names listening among what the library holds', () => {
+    expect(page2()).toMatch(/The Letters and the Bible, read aloud/);
   });
 
   // A08.6 / s40.1: no build words, no marketing, and the offline line says what needs a connection.
@@ -105,16 +105,29 @@ describe('AboutScreen — page one (A08.6 / U02.3)', () => {
   it('gives the backup path Settings really has', () => {
     setupGlobals();
     const { container } = renderAbout();
-    expect(container.querySelector('.about-body').textContent).toContain('Settings → Your data → Export');
+    expect(container.querySelector('.ws4-fr-points').textContent).toContain('Back them up from Settings › Your data');
   });
 
-  it('folds the credits and privacy policy under one line, still on page one', () => {
+  // WS4 (fr-1): Credits and privacy is a text button under Continue that opens its own page, privacy first.
+  it('opens Credits and privacy as its own page from page one, and Back returns to page one', () => {
     setupGlobals();
     const { container } = renderAbout();
-    const fold = container.querySelector('details.about-credits');
-    expect(fold.querySelector('summary').textContent).toBe('Credits & privacy');
-    expect(fold.querySelectorAll('.about-credit').length).toBe(3);
-    expect(container.querySelector('.about-body').querySelector('.about-credit')).toBeNull();
+    expect(container.querySelector('.about-credit')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Credits and privacy' }));
+    expect(container.querySelector('.about-credit').textContent).toMatch(/CC-BY/);
+    expect(container.querySelector('.about-songs-credit')).toBeTruthy();
+    expect(container.querySelector('a[href$="privacy.html"]')).toBeTruthy();
+    act(() => { window.__screenBack(); });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeTruthy();
+  });
+
+  it('ends page two with Show me around first when the tour can start', () => {
+    setupGlobals();
+    const onTour = vi.fn();
+    renderAbout({ onTour });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Show me around first/ }));
+    expect(onTour).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -141,6 +154,7 @@ describe('AboutScreen — the Songs of the Letters credit (L8)', () => {
       setupGlobals();
       /** @type {any} */ (globalThis).SongCatalog = Songs.SongCatalog;
       renderAbout();                                      // a fresh install opens here, before Home asks for songs
+      fireEvent.click(screen.getByRole('button', { name: 'Credits and privacy' }));
       const credit = () => document.querySelector('.about-songs-credit').textContent;
       expect(credit()).not.toMatch(/With songs by/);
       act(() => { vi.advanceTimersByTime(2000); });
@@ -161,12 +175,13 @@ describe('AboutScreen — the Songs of the Letters credit (L8)', () => {
    carries it on its first page; since Q5 the web carries it too (the legend's tail, the panel's
    footer, the guide's footer), and none of those replaces this one. */
 describe('AboutScreen — the OpenBible.info credit', () => {
-  it('names the dataset, links it and states the licence on the first page', () => {
+  it('names the dataset, links it and states the licence on the Credits and privacy page', () => {
     setupGlobals();
     const { container } = renderAbout();
+    fireEvent.click(screen.getByRole('button', { name: 'Credits and privacy' }));   // WS4 (fr-1): one tap from page one
     const credit = [...container.querySelectorAll('.about-credit')].find((p) => /OpenBible/.test(p.textContent));
     expect(credit, 'the OpenBible.info credit line').toBeTruthy();
-    expect(credit.textContent.replace(/\s+/g, ' ').trim()).toBe('Cross-reference data from OpenBible.info, used under CC-BY.');
+    expect(credit.querySelector('.ws3-credit-text').textContent).toBe('Cross-reference data, used under CC-BY.');
     const link = credit.querySelector('a');
     expect(link.getAttribute('href')).toBe('https://www.openbible.info/labs/cross-references/');
     expect(link.getAttribute('rel')).toMatch(/noopener/);

@@ -1251,6 +1251,9 @@ export function buildScreenRoutes({
         }}
         onBack={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
         firstRun={!navOrigin && !AboutSeenFlagStore.is()}
+        /* WS4 settings (fr-2): "Show me around first" ends the welcome and starts the tour, whose first stop opens
+           its own place (as the Read tab's offer does). */
+        onTour={() => { AboutSeenFlagStore.set(); goHome(); TourController.start('prompt'); }}
         onYourData={() => { openYourData(); goSettings(); }}
         onSearch={goSearch}
         onHistory={goHistory}

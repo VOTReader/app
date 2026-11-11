@@ -10,8 +10,6 @@ import { canTell, networkType } from '../../utils/download-gate.js';
 import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
 import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
-import { openWhatsNew } from '../../utils/whats-new.js';
-import { useBuildInfo } from '../components/about-parts.jsx';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
@@ -220,8 +218,40 @@ function SettingsGroup({ sectionId = 'settings', label, sub, open, onToggle, hid
 }
 
 /** The root's cards: one .ui-group around a run of group rows, only on the root. */
-function RootCard({ mode, children }) {
-  return mode === 'root' ? <div className="ui-group ws1-root-card">{children}</div> : <>{children}</>;
+function RootCard({ mode, children, last = false }) {
+  if (mode === 'root') return <div className="ui-group ws1-root-card">{children}</div>;
+  // WS4 settings (st-find): every found row in one card, as drawn (the groups' own cards go flat inside it; the
+  // two root cards join edge to edge).
+  if (mode === 'search') return <div className={'ui-group ws4-found-card' + (last ? ' is-last' : ' is-first')}>{children}</div>;
+  return <>{children}</>;
+}
+
+/** WS4 settings (st-find): the typed words light up gold in each found row's name. CSS custom highlights
+    (Chrome 105+) paint ranges without writing into React's DOM; without the API the rows are found, only unlit.
+    @param {HTMLElement | null} el @param {string[]} words */
+function paintFound(el, words) {
+  const api = typeof CSS !== 'undefined' && /** @type {any} */ (CSS).highlights && typeof (/** @type {any} */ (window)).Highlight === 'function'
+    ? /** @type {any} */ (CSS).highlights : null;
+  if (!api) return;
+  api.delete('ws4-find');
+  if (!el || !words.length) return;
+  const ranges = [];
+  for (const t of el.querySelectorAll('[data-found] .settings-row-label, .ws4-backup-hit .ui-row-title')) {
+    const node = t.firstChild;
+    if (!node || node.nodeType !== 3) continue;
+    const text = node.textContent || '';
+    const re = /[A-Za-z0-9]+/g;
+    let m;
+    while ((m = re.exec(text))) {
+      const w = m[0].toLowerCase();
+      const q = words.filter((x) => w.startsWith(x)).sort((x, y) => y.length - x.length)[0];
+      if (!q) continue;
+      const r = document.createRange();
+      r.setStart(node, m.index); r.setEnd(node, m.index + q.length);
+      ranges.push(r);
+    }
+  }
+  if (ranges.length) api.set('ws4-find', new (/** @type {any} */ (window)).Highlight(...ranges));
 }
 
 /* AudioRateRow — Listening → Default Speed.
@@ -388,23 +418,6 @@ function DownloadsStorageRow() {
     onClick={() => open({ tab: 'phone' }, 'Settings')} />;
 }
 
-/* DataInfoRow — compact label + value (+ optional action button) for "Your Data". */
-function DataInfoRow({ label, value = null, children = null, find = '' }) {
-  const f = useSettingsFind(label + ' ' + find);
-  if (!f.show) return null;
-  return (
-    <div className="settings-row" data-found={f.place ? '' : undefined}>
-      {f.place ? <span className="ws2-place">{f.place}</span> : null}
-      <div className="settings-row-head">
-        <span className="settings-row-label">{label}</span>
-        <span className="settings-row-grow" />
-        {children}
-      </div>
-      {value != null && value !== '' && <div className="settings-data-value">{value}</div>}
-    </div>
-  );
-}
-
 /* WS3 settings (st-data, st-data2): one Your data row: the name, one plain line, then a value, a pill or a button. */
 function DataRow({ label, desc = null, value = null, pill = false, children = null, className = '', find = '' }) {
   const f = useSettingsFind(label + ' ' + (typeof desc === 'string' ? desc : '') + ' ' + find);
@@ -494,50 +507,42 @@ function _verifyWords(r) {
   return { s, title, sub, line };
 }
 
-/* TranslationInfoDesc — the Bible Translation row's ⓘ content: the base
-   sentence, then the Restored-Name editions' reasoning laid out concisely,
-   then the AI-assistance disclaimer (owner directive 2026-07-12). The full
-   evidence trail and the generator live in RESTORED-NAMES-PLAN.txt /
-   tools/gen-restored-nt.mjs — this block is the reader-facing summary. */
+/* TranslationInfoDesc — the Bible Translation row's More page (WS4 settings, st-restored): the Restored Name
+   editions as a readable page (mock settings.html st-restored): the Name, the count, the rules as "X becomes Y"
+   cards (four, then Three more rules), and the AI-assistance note (owner directive 2026-07-12). The full evidence
+   trail and the generator live in RESTORED-NAMES-PLAN.txt / tools/gen-restored-nt.mjs; this is the reader's summary. */
+const RESTORED_RULES = [
+  ['Jesus', 'YahuShua', '“YAH Is Salvation” (Zechariah 6:11). The naming verses and the cross inscription keep their capitals: YAHUSHUA (Matthew 1:21; John 19:19).'],
+  ['Jesus Christ', 'YahuShua HaMashiach', 'Christ Jesus too: always in the commanded order of the Name.'],
+  ['Christ', 'HaMashiach', '“Ha” is Hebrew for “the,” so “the Christ” becomes simply HaMashiach (Matthew 16:16).'],
+  ['False christs', 'false messiahs', 'A generic plural, not His title. “Antichrist” and “Christian” are unchanged.'],
+  ['His Christ', 'His Mashiach', 'Hebrew never puts “Ha” on a possessed title (Acts 4:26): “the Lord’s Mashiach” (Luke 2:26), “called Mashiach” (Matthew 1:16), “both Lord and Mashiach” (Acts 2:36).'],
+  ['Messiah, in John’s notes', 'the Anointed', 'John’s translation notes render the meaning, so they don’t repeat themselves (John 1:41; 4:25).'],
+  ['Bar-Jesus, Justus', 'unchanged', 'Other bearers of the name are untouched (Acts 13:6; Colossians 4:11), and the KJV’s two Joshua verses (Acts 7:45; Hebrews 4:8) now read “Joshua,” as in the NKJV.'],
+];
 function TranslationInfoDesc() {
+  const [all, setAll] = React.useState(false);
+  const rules = all ? RESTORED_RULES : RESTORED_RULES.slice(0, 4);
   return (
     <>
-      Verse text for the 66-book reading flow. Section headings stay in place
-      across translations. Does not affect the Matthew Study Bible, which uses
-      its own curated text.
-      <p>
-        <strong>NKJV-R / KJV-R — the Restored Name editions.</strong> “His name
-        is YahuShua HaMashiach” (“Death and Deliverance”; “Proclaim The Name of
-        The Lord”). These editions restore the Name across the New Testament —
-        1,212 NKJV and 1,217 KJV verses, each checked against the Textus
-        Receptus, the Greek text behind both versions. The Old Testament is not
-        yet restored.
-      </p>
-      <ul>
-        <li>Jesus → YahuShua, “YAH Is Salvation” (Zechariah 6:11). The naming
-        verses and the cross inscription keep their capitals: YAHUSHUA
-        (Matthew 1:21; John 19:19).</li>
-        <li>Jesus Christ and Christ Jesus → YahuShua HaMashiach — always in the
-        commanded order of the Name.</li>
-        <li>Christ standing alone → HaMashiach. “Ha” is Hebrew for “the,” so
-        “the Christ” becomes simply HaMashiach (Matthew 16:16).</li>
-        <li>Hebrew never puts “Ha” on a possessed title: “His Mashiach”
-        (Acts 4:26), “the Lord’s Mashiach” (Luke 2:26), “called Mashiach”
-        (Matthew 1:16), “both Lord and Mashiach” (Acts 2:36).</li>
-        <li>“False christs” becomes “false messiahs” — a generic plural, not
-        His title. “Antichrist” and “Christian” are unchanged.</li>
-        <li>John’s translation notes render the meaning, “the Anointed,” so
-        they don’t repeat themselves (John 1:41; 4:25).</li>
-        <li>Other bearers of the name are untouched — Bar-Jesus (Acts 13:6),
-        Jesus called Justus (Colossians 4:11) — and the KJV’s two Joshua verses
-        (Acts 7:45; Hebrews 4:8) now read “Joshua,” as in the NKJV.</li>
-      </ul>
-      <p>
-        <strong>Please note:</strong> the Restored Name editions were prepared
-        with AI assistance (Claude Fable 5, 2026). Every change was
-        rule-generated and machine-checked against the Greek, but errors are
-        possible — where a rendering matters, compare the base NKJV or KJV.
-      </p>
+      <p className="ws4-rn-quote">“His name is YahuShua HaMashiach”</p>
+      <p className="ws4-rn-src">“Death and Deliverance”; “Proclaim The Name of The Lord”</p>
+      <p>These editions restore the Name across the New Testament: <strong>1,212 NKJV and 1,217 KJV verses</strong>, each
+        checked against the Textus Receptus, the Greek text behind both versions. The Old Testament is not yet restored.</p>
+      <div className="ws4-rn-rules">
+        {rules.map(([from, to, why]) => (
+          <div key={from} className="ws4-rn-rule">
+            <div className="ws4-rn-pair"><span className="ws4-rn-from">{from}</span><span className="ws4-rn-arrow">becomes</span><span>{to}</span></div>
+            <div className="ws4-rn-why">{why}</div>
+          </div>
+        ))}
+        <button type="button" className="ws4-rn-more" aria-expanded={all} onClick={() => setAll((v) => !v)}>
+          {all ? 'Fewer rules' : 'Three more rules'}<UiIcon name="down" size="sm" />
+        </button>
+      </div>
+      <p><strong>Please note:</strong> the Restored Name editions were prepared with AI assistance (Claude Fable 5, 2026).
+        Every change was rule-generated and machine-checked against the Greek, but errors are possible. Where a rendering
+        matters, compare the base NKJV or KJV.</p>
     </>
   );
 }
@@ -765,6 +770,18 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     const el = groupsRef.current;
     setFoundCount(searching && el ? el.querySelectorAll('[data-found]').length : 0);
   }, [searching, settingsQuery, settings, historyCount]);
+  React.useLayoutEffect(() => {
+    paintFound(searching ? groupsRef.current : null, queryWords);
+    return () => paintFound(null, []);
+  });
+  // WS4 settings: the phone's Back inside a group's screen goes up to Settings (or Reading), as the bar's Back does,
+  // instead of leaving Settings (window.__screenBack, the screen-internal level hooks/use-android-back.js calls).
+  React.useEffect(() => {
+    if (mode !== 'screen') return undefined;
+    const fn = () => { goUp(); return true; };
+    window.__screenBack = fn;
+    return () => { if (window.__screenBack === fn) window.__screenBack = null; };
+  });
   const backupHit = searching && findMatches(queryWords, BACKUP_WORDS);
   const progressOpen = !searching && openGroups.has('progress');
   // Only the progress table needs the corpora. Changing a font or exporting
@@ -819,14 +836,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   // for each (status, persisted, persistDenied) combination.
   const storageInfo = useStorageInfo();
 
-  // APP VERSION (2026-08-11) — which build is actually running, and is it the
-  // newest one published? Added after a long misdiagnosis in which "the cache is
-  // stale" and "this was never deployed" were indistinguishable from inside the
-  // app, so the wrong fix got attempted repeatedly. `running` comes from the
-  // controlling service worker (the only artifact that knows CACHE_VERSION and is
-  // not itself inside the hash it is derived from); `server` is a read-only probe
-  // of the deployed service-worker.js that installs nothing.
-  const [buildInfo, refreshBuildInfo] = useBuildInfo();
   // datasafe 10-05: the automatic snapshots' line in Your Data (DataSafety lives in bundle-b).
   const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number, tooBig?: number } | null} */ (null));
   // dl-weekly: the weekly copy in Downloads (phone app, Android 10+).
@@ -846,36 +855,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     }
     return () => { alive = false; };
   }, []);
-  // WS3 settings: the build check moved to components/about-parts.jsx (useBuildInfo), shared with About.
-
-  const versionDisplayText = (() => {
-    const fmt = (typeof formatBuildVersion === 'function') ? formatBuildVersion : ((s) => String(s || 'unknown'));
-    if (buildInfo.state === 'loading') return 'Checking…';
-    if (buildInfo.state === 'installed') {
-      // Android, and we read the version out of the APK's own service-worker.js.
-      // There is nothing to compare it against — an APK cannot update itself over
-      // the web — so this states the build and stops, rather than inventing a
-      // verdict about currency it has no evidence for.
-      return fmt(buildInfo.running.cacheVersion)
-        + ' · corpus ' + (buildInfo.running.corpusVersion || '?')
-        + ' — the version installed on this device. New versions arrive by installing an update, not over the web.';
-    }
-    if (buildInfo.state === 'no-sw') {
-      // Android reaches here only when the APK's own service-worker.js could not be
-      // read, so the honest answer is still that there is no version to show.
-      return PlatformBridge.isAndroid
-        ? 'Installed app build — updates arrive by installing a new APK, not over the web.'
-        : 'Not yet managed by the offline service worker on this device.';
-    }
-    const runningText = fmt(buildInfo.running.cacheVersion)
-      + ' · corpus ' + (buildInfo.running.corpusVersion || '?');
-    if (!buildInfo.server) return runningText + ' — could not reach the server to compare.';
-    if (buildInfo.server.cacheVersion === buildInfo.running.cacheVersion) {
-      return runningText + ' — up to date with the published version.';
-    }
-    return runningText + ' — an update is available ('
-      + fmt(buildInfo.server.cacheVersion) + '). Reopen the app to apply it.';
-  })();
   // WS3 settings (st-data): Protection is a line and a pill; "Protect now" stays the button where the browser can be asked.
   const protection = (() => {
     if (storageInfo.status === 'loading') return { line: 'Checking…', pill: null };
@@ -1616,7 +1595,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           value={settings.gardenTier || GARDEN_DEFAULT_TIER} options={gardenOptions} sub={gardenSub}
           onChange={(v) => onSetting("gardenTier", v)}>{gardenDoor}</SelectSheet>
 
-        <RootCard mode={mode}>
+        <RootCard mode={mode} last>
         <SettingsGroup sub={glance.data} tag={_lastBackupAt() ? null : 'Back up'} {...groupProps('data')}>
           {/* WS3 settings (st-data): the backup first, as one gold button; restore and check under it. */}
           <Findable text={'Backup Back up now ' + BACKUP_WORDS + ' votbak file last backup'}>
@@ -1686,19 +1665,6 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
                 + (diagnosticLog.length ? ' Last entry ' + new Date(diagnosticLog[diagnosticLog.length - 1].t).toLocaleString() + '.' : '')}
               value={diagnosticLog.length ? (diagnosticLog.length === 1 ? '1 entry' : diagnosticLog.length + ' entries') : 'Nothing logged'} />
             <DataRow label="Running on" desc="Where this copy of the app is installed" value={_platformLabel(StorageHealth.getPlatform())} find="platform browser android" />
-          </SettingsSection>
-          <SettingsSection label="This app">
-            <DataInfoRow label="App version" value={versionDisplayText}>
-              <button
-                className="settings-clear-btn"
-                disabled={buildInfo.state === 'loading'}
-                onClick={(e) => { e.stopPropagation(); refreshBuildInfo(); }}
-              >Check</button>
-            </DataInfoRow>
-            {/* up1: the changes behind recent updates, in plain words (WhatsNewSheet) */}
-            <DataInfoRow label="What's new">
-              <button className="settings-clear-btn" aria-label="Show what's new" onClick={(e) => { e.stopPropagation(); void openWhatsNew(); }}>Show</button>
-            </DataInfoRow>
           </SettingsSection>
           <SettingsSection label="Start over">
             <DataRow label="Delete all my data" className="ws3-danger" find="clear wipe erase reset delete everything personal"
@@ -1865,7 +1831,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           <>
             <SectionLabel>Also</SectionLabel>
             <div className="ui-group ws2-also">
-              {backupHit ? <ListRow icon="data" title="Keep a backup" meta="Your data · Back up now" onClick={() => { changeSettingsQuery(''); openScreen('data'); }} /> : null}
+              {backupHit ? <ListRow className="ws4-backup-hit" icon="data" title="Keep a backup" meta="Your data · Back up now" onClick={() => { changeSettingsQuery(''); openScreen('data'); }} /> : null}
               {typeof onSearchLibrary === 'function'
                 ? <ListRow icon="search" title={'Search the library for “' + settingsQuery.trim() + '”'} onClick={() => onSearchLibrary(settingsQuery.trim())} /> : null}
             </div>
