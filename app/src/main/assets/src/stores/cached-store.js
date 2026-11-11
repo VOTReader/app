@@ -1406,9 +1406,6 @@ export function _resetStoreRegistry() {
                                (utils/audio-player.js PERSIST_KEY): current
                                track, position, queue, forward-only horizon.
                                Written every few seconds while playing.
-     'vot-audio-recent-open' — the Listening Library's recently-played
-                               disclosure state (ui/screens/AudioLibraryScreen.jsx
-                               RECENT_OPEN_KEY).
    Both audio keys post-date W2.4 and are deliberately LS (sync reads on the
    player's hot path). A sweep can still meet them: one deferred past a
    session (a store not loaded at the first boot), or the boot after Clear
@@ -1427,7 +1424,6 @@ export function _resetStoreRegistry() {
 export const LS_SKIP_LIST = Object.freeze([
   'vot-state',
   'vot-audio-pos',
-  'vot-audio-recent-open',
   'vot-recent-searches',          // search/recent-searches.js
   'vot-journal-draft',            // JournalEditorScreen
   'vot-note-draft',               // utils/note-draft.js — a note's words typed before a kill (dl4)

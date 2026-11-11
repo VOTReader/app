@@ -15,6 +15,7 @@ import { UiIcon } from '../components/UiIcon.jsx';
 import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { queueMenuItems } from '../components/queue-menu.js';
 import { songClock, currentSongId } from '../components/SongParts.jsx';
+import { remainingLabel } from '../components/AudioShelf.jsx';
 
 /** The song catalog (bundle-d's SongCatalog), or null before it is wired. @returns {any} */
 function songCatalog() {
