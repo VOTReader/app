@@ -346,8 +346,6 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
     }
   }, [sheetFn, letter.id]);
   const hasFn = letter.footnotes ? Object.keys(letter.footnotes).length > 0 : false;
-  // "Says The Lord." standing alone as the letter's final block (closing /
-  // closing-fn) — drives where the ✦ ornament-divider renders (see below).
 
   return (
     <ScreenLayout
