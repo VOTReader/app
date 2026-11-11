@@ -20,7 +20,8 @@ afterEach(() => {
 
 const entry = (extra = {}) => ({ score: 1, doc: { kind: 'verse', ref: 'Exodus 20:13', bookId: 'exodus', chapterNum: 20, verseNum: 13, translation: 'nkjv', text: 'You shall not murder.' }, ...extra });
 const marks = (/** @type {HTMLElement} */ c) => [...c.querySelectorAll('mark')].map((m) => m.textContent);
-const badges = (/** @type {HTMLElement} */ c) => [...c.querySelectorAll('.srch-card-badge')].map((b) => b.textContent);
+/* WA3: no badges; the edition is a part of the card's one meta line ("KJV · heading"). */
+const badges = (/** @type {HTMLElement} */ c) => [...c.querySelectorAll('.srch-card-loc')].flatMap((b) => b.textContent.split(' · '));
 
 it('shows the KJV words it matched, marked, with a KJV badge', () => {
   /** @type {any} */ (globalThis).BIBLE_KJV = { exodus: { 20: [{ n: 13, text: 'Thou shalt not kill.' }] } };

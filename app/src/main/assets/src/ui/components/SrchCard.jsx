@@ -85,7 +85,7 @@ function cardBody(doc) {
  * verses/headings lead with their reference. The location (ref) becomes a muted sub-line
  * when it isn't the name. @param {any} doc
  */
-function cardHeads(doc) {
+export function cardHeads(doc) {
   const refLine = doc.ref || (doc.title || '') + (doc.chapterNum ? ' ' + doc.chapterNum : '');
   const named = doc.kind !== 'verse' && doc.kind !== 'heading' && doc.kind !== 'chapter-title' && !!doc.title;
   let headline = named ? doc.title : refLine;
@@ -222,19 +222,30 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
   if (isDirect) {
     // A verse card quotes the verse, so its head says it is the way in (search200 audit 6):
     // "Open at John 3:16". A chapter keeps its bare reference over "Open chapter".
-    const atVerse = !!(entry.ref && entry.ref.verseStart);
+    /* WA3 (s-ref): a passage card - its label, the reference, the words, the edition, and one worded way in:
+       "Open John 3" (it lands at the verse). A book or a letter card says "Open" and its name. */
+    const r = entry.ref || null;
+    const atVerse = !!(r && r.verseStart && r.bookTitle && !r.chapterEnd);
+    const kindLabel = r && r.kind === 'ref-book' ? 'Book' : r && r.kind === 'ref-letter' ? 'Letter' : 'Passage';
+    const openLabel = atVerse ? 'Open ' + r.bookTitle + ' ' + r.chapter : 'Open ' + (entry.__label || '');
     return (
-      <button className="srch-card card-direct" onClick={() => onSelect(entry)}>
+      <div className="srch-card card-direct">
+        <div className="srch-direct-k">{kindLabel}</div>
         <div className="srch-card-top">
-          <span className="srch-card-ref">{atVerse ? 'Open at ' + entry.__label : entry.__label}</span>
+          <span className="srch-card-ref">{entry.__label}</span>
         </div>
-        <div className="srch-card-snippet">{entry.__sub || 'Go'}</div>
-      </button>
+        {entry.__sub ? <div className="srch-card-snippet">{entry.__sub}</div> : null}
+        {entry.__trans ? <div className="srch-card-loc">{entry.__trans}</div> : null}
+        <button type="button" className="ui-btn is-primary is-small srch-direct-open" onClick={() => onSelect(entry)}>{openLabel}</button>
+      </div>
     );
 
   }
   const meta = SRCH_KIND_LABEL[doc.kind] || { label: doc.kind, cls: '' };
   const { named, headline, locLine } = cardHeads(doc);
+  const isVerse = doc.kind === 'verse';
+  const edition = kjv ? translationLabel(kjv.edition) : doc.translation && doc.translation !== 'nkjv' ? translationLabel(doc.translation) : '';
+  const metaLine = [edition, isVerse && doc.heading ? cutAtWord(doc.heading, 40) : '', locLine].filter(Boolean).join(' · ');
   const own = cardBody(doc);
   const titled = own.titled;
   const body = kjv ? kjv.text : own.body;
@@ -245,18 +256,15 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
     ? smHead.highlightSpans(headline, hlTerms, terms) : null;
   const card = (
     <button className="srch-card" onClick={() => onSelect(entry)}>
+      {/* WA3 (s-results, s-scriptures): no tags. The kind is said to a screen reader; the edition, a verse's heading
+          and the place are one meta line (beside a verse's reference, under a title). W0: the engine's raw
+          translation id ('rnkjv') reads through the TRANSLATION_OPTIONS registry ('NKJV-R'), never uppercased. */}
       <div className="srch-card-top">
         <span className="srch-card-ref">{headSpans ? markSpans(headSpans) : headline}</span>
-        <span className={"srch-card-badge " + (meta.cls || '')}>{meta.label}</span>
-        {/* W0: resolve the engine's raw translation id ('rnkjv') through the
-            TRANSLATION_OPTIONS registry ('NKJV-R') — the same label the rest
-            of the app shows. Never render the raw id uppercased ('RNKJV');
-            translationLabel falls back to the NKJV default for unknown ids. */}
-        {kjv ? <span className="srch-card-badge">{translationLabel(kjv.edition)}</span>
-          : doc.translation && doc.translation !== 'nkjv' && <span className="srch-card-badge">{translationLabel(doc.translation)}</span>}
-        {doc.heading && doc.kind === 'verse' && <span className="srch-card-badge badge-heading">{cutAtWord(doc.heading, 28)}</span>}
+        <span className="sr-only">{' ' + meta.label}</span>
+        {isVerse && metaLine ? <span className="srch-card-loc is-inline">{metaLine}</span> : null}
       </div>
-      {locLine && <div className="srch-card-loc">{locLine}</div>}
+      {!isVerse && metaLine ? <div className="srch-card-loc">{metaLine}</div> : null}
       <div className="srch-card-snippet">
         <SrchSnippet text={body || ''} terms={hlTerms} typed={terms} start={titled ? undefined : placeStart} />
       </div>

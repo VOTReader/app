@@ -1207,6 +1207,7 @@ export function buildScreenRoutes({
         onToggleScope={() => setSearchScope((prev) => prev ? null : searchContext)}
         onOpenSongs={(q) => _openSongs([{ k: 'hub', q }], { screen: 'search' })}
         onOpenPlans={goReadingPlans}
+        onOpenAnswers={() => { resetAnswersLanding(); setScreen('answers-home'); }}
       />
     ),
     'home': () => (

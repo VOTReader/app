@@ -337,6 +337,8 @@ export function useSearch({
       // A collection search never indexes offers no scope: kept to it, every search found nothing (sweep W34).
       if (_scCol && _scCol.indexed !== false) ctx = { kind: 'volume', volumeId: _scCol.searchVolId, label: _scCol.label };
     }
+    // Where the reader was (WA3, s-inpage): a letter or a chapter, for Search's "Find … in this letter" row.
+    if (ctx && (letterId || chapterNum)) ctx = { ...ctx, at: { letterId: letterId || null, bookId: bookId || null, chapterNum: chapterNum || null } };
     setSearchContext(ctx);
     setSearchScope(null);
     // If a pending query was stashed by the SelectionToolbar's Search

@@ -3,6 +3,7 @@
    ═══════════════════════════════════════════════════════════════════════ */
 
 import { recall, remember, docKey } from './srch-memory.js';
+import { UiIcon } from './UiIcon.jsx';
 
 /* What a group counts, so the header says "8 letters", not "8 matches": a card is
    one letter, entry, topic, chapter or verse, and a letter can match in several
@@ -55,14 +56,10 @@ export function SrchGroup({ gkey, items, terms, stopTyped = undefined, onSelect,
           open-close button inside it (the ARIA accordion pattern). */}
       <h3 className="srch-group-h">
         <button className="srch-group-header" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-          <span>
-            {meta.label}
-            <span className="srch-group-count-inline"> · {items.length.toLocaleString('en-US')}{capped ? '+' : ''} {more ? 'more ' : ''}{unit}</span>
-          </span>
-          {/* Session-5 (5): the old 0.55rem ▾/▸ glyph was a near-invisible
-              affordance — a real 24px chevron that ROTATES makes the
-              collapse/expand state legible at a glance. */}
-          <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true">▸</span>
+          {/* WA3 (s-sections): the plain name, its count at the right as a value, a chevron down (up when open). */}
+          <span className="srch-group-name">{meta.label}</span>
+          <span className="srch-group-count-inline">{items.length.toLocaleString('en-US')}{capped ? '+' : ''} {more ? 'more ' : ''}{unit}</span>
+          <span className={"srch-group-chevron" + (open ? " open" : "")} aria-hidden="true"><UiIcon name="down" size="sm" /></span>
         </button>
       </h3>
       {/* A closed group renders no cards: a long result set opens with every

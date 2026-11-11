@@ -73,7 +73,8 @@ describe('the search box at large Text Size', () => {
     expect(c['font-size']).toBe('min(var(--fs-20), 28px)');
   });
   it('leaves the box alone below large text', () => {
-    expect(decls('.search-input').padding).toBe('0.45rem 0.75rem');
-    expect(decls('.search-input')['font-size']).toBe('var(--fs-16)');
+    // WA3: the box is a pill; the field inside it pads 4px / 10px at its sides, at the control size
+    expect(decls('.search-input').padding).toBe('0 4px 0 10px');
+    expect(decls('.search-input')['font-size']).toBe('var(--ts-control)');
   });
 });

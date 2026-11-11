@@ -7,7 +7,7 @@
    SrchCard must union entry.terms into the highlight list, and must pass
    results WITHOUT entry.terms (direct-ref parses) through unchanged. */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
 import { SrchCard } from './SrchCard.jsx';
 import { SrchSnippet } from './SrchSnippet.jsx';
@@ -90,7 +90,10 @@ describe('SrchCard translation badge (W0: registry label, never a raw id)', () =
   it('renders no translation badge for nkjv (default translation, existing behavior)', () => {
     const e = { score: 1, doc: { kind: 'verse', ref: 'John 1:1', text: VERSE, translation: 'nkjv' } };
     const { container } = render(<SrchCard entry={e} terms={[]} onSelect={() => {}} isDirect={false} />);
-    expect(container.querySelectorAll('.srch-card-badge')).toHaveLength(1); // kind badge only
+    // WA3: no edition in the meta line (a bare verse has no meta line at all); the kind is said to a screen reader only
+    expect(container.querySelectorAll('.srch-card-loc')).toHaveLength(0);
+    expect(container.textContent).not.toContain('NKJV');
+    expect(container.querySelectorAll('.srch-card-top .sr-only')).toHaveLength(1);
   });
 });
 
@@ -202,7 +205,7 @@ describe('SrchCard for a Matthew Study Bible note', () => {
     const { container } = render(<SrchCard entry={e} terms={['meek']} onSelect={() => {}} isDirect={false} />);
     expect(container.querySelector('.srch-card-ref').textContent).toBe('Matthew 5:3-12');
     expect(container.querySelector('.srch-card-loc').textContent).toBe('Volume Two \u00b7 Concerning the Meek');
-    expect(container.querySelector('.srch-card-badge').textContent).toBe('Study Note');
+    expect(container.querySelector('.srch-card-top .sr-only').textContent.trim()).toBe('Study Note');
   });
 });
 
@@ -367,29 +370,54 @@ describe('a direct reference card says where it opens (audit 6)', () => {
     cleanup();
     return t;
   };
-  it('a verse, a range: "Open at …"', () => {
-    expect(head({ __direct: true, __label: 'John 3:16', __sub: 'For God so loved the world', ref: { kind: 'ref-bible', chapter: 3, verseStart: 16 } })).toBe('Open at John 3:16');
-    expect(head({ __direct: true, __label: 'John 3:16-18', __sub: 'For God…', ref: { kind: 'ref-bible', chapter: 3, verseStart: 16, verseEnd: 18 } })).toBe('Open at John 3:16-18');
+  /* WA3 (s-ref): the reference stands bare; the way in is its own worded button, "Open John 3" for a verse
+     (book and chapter), "Open " and the label otherwise, and the kind sits over it ("Passage" / "Letter"). */
+  const card = (/** @type {any} */ e) => {
+    const onSelect = vi.fn();
+    const { container } = render(<SrchCard entry={e} terms={[]} onSelect={onSelect} isDirect />);
+    const out = {
+      k: container.querySelector('.srch-direct-k').textContent,
+      ref: container.querySelector('.srch-card-ref').textContent,
+      open: container.querySelector('button.srch-direct-open').textContent,
+      buttons: container.querySelectorAll('button').length,
+    };
+    fireEvent.click(container.querySelector('button.srch-direct-open'));
+    out.selected = onSelect.mock.calls.length === 1 && onSelect.mock.calls[0][0] === e;
+    cleanup();
+    return out;
+  };
+  it('a verse, a range: "Open John 3"', () => {
+    const v = { __direct: true, __label: 'John 3:16', __sub: 'For God so loved the world', ref: { kind: 'ref-bible', bookTitle: 'John', chapter: 3, verseStart: 16 } };
+    expect(head(v)).toBe('John 3:16');
+    expect(card(v)).toEqual({ k: 'Passage', ref: 'John 3:16', open: 'Open John 3', buttons: 1, selected: true });
+    const r = { __direct: true, __label: 'John 3:16-18', __sub: 'For God…', ref: { kind: 'ref-bible', bookTitle: 'John', chapter: 3, verseStart: 16, verseEnd: 18 } };
+    expect(head(r)).toBe('John 3:16-18');
+    expect(card(r).open).toBe('Open John 3');
   });
   it('a chapter and a letter keep their label', () => {
-    expect(head({ __direct: true, __label: 'John 3', __sub: 'Open chapter', ref: { kind: 'ref-bible', chapter: 3 } })).toBe('John 3');
-    expect(head({ __direct: true, __label: 'Volume Two · Letter 5', __sub: 'Open letter', ref: { kind: 'ref-letter' } })).toBe('Volume Two · Letter 5');
+    const ch = { __direct: true, __label: 'John 3', __sub: 'Open chapter', ref: { kind: 'ref-bible', chapter: 3 } };
+    expect(head(ch)).toBe('John 3');
+    expect(card(ch)).toMatchObject({ k: 'Passage', open: 'Open John 3', selected: true });
+    const l = { __direct: true, __label: 'Volume Two · Letter 5', __sub: 'Open letter', ref: { kind: 'ref-letter' } };
+    expect(head(l)).toBe('Volume Two · Letter 5');
+    expect(card(l)).toMatchObject({ k: 'Letter', open: 'Open Volume Two · Letter 5', selected: true });
   });
 });
 
 /* search200 audit 252: the heading badge was cut at 28 characters mid-word ("The Parable of the Mustard S…"). */
 describe('SrchCard — a long heading badge is cut at a word', () => {
-  it('cuts at the last space at or before 28 characters, then the ellipsis; a short heading stays whole', () => {
+  /* WA3: the heading now sits in the verse's inline meta line, cut at 40 characters. */
+  it('cuts at the last space at or before 40 characters, then the ellipsis; a short heading stays whole', () => {
     const v = (heading) => ({ score: 1, doc: { kind: 'verse', ref: 'Matthew 13:31', text: 'Another parable He put forth to them.', heading } });
     const badge = (heading) => {
       const { container, unmount } = render(<SrchCard entry={v(heading)} terms={['parable']} onSelect={() => {}} isDirect={false} />);
-      const t = container.querySelector('.badge-heading').textContent;
+      const t = container.querySelector('.srch-card-top .srch-card-loc.is-inline').textContent;
       unmount();
       return t;
     };
-    expect(badge('The Parable of the Mustard Seed and the Leaven')).toBe('The Parable of the Mustard…');
+    expect(badge('The Parable of the Mustard Seed and the Leaven')).toBe('The Parable of the Mustard Seed and the…');
     expect(badge('The Beatitudes')).toBe('The Beatitudes');
-    expect(badge('Exactly twenty-eight chars!!')).toBe('Exactly twenty-eight chars!!');
-    expect(badge('Supercalifragilisticexpialidocious heading'), 'one word longer than the cut is cut in it').toBe('Supercalifragilisticexpialid…');
+    expect(badge('Exactly forty characters, then no more!!')).toBe('Exactly forty characters, then no more!!');
+    expect(badge('Supercalifragilisticexpialidociouslyandsoforth heading'), 'one word longer than the cut is cut in it').toBe('Supercalifragilisticexpialidociouslyands…');
   });
 });

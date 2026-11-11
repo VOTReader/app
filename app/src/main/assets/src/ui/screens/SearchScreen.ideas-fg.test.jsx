@@ -151,7 +151,7 @@ describe('G: what a search that found nothing offers', () => {
     expect([...document.querySelectorAll('.srch-nearest .stub-card')].map((c) => c.textContent)).toEqual(['Genesis 1:11 [by meaning]']);
     // no fewer words to offer: today's line and tip stand
     const none = document.querySelector('.search-no-results');
-    expect(none.textContent).toContain('No results for “photosynthesis” in the Scriptures.');
+    expect(none.querySelector('h3.srch-none-title').textContent).toBe('Nothing for “photosynthesis” in the Scriptures');
     expect(none.textContent).toContain('Check the spelling');
     expect(document.querySelector('.srch-fewer')).toBeNull();
   });
