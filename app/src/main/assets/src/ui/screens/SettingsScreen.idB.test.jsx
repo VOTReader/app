@@ -2,7 +2,7 @@
 /* SettingsScreen — id-myweb group B (2026-10-23): the find box, the copy and the small a11y pieces the
    10-22 sweep approved (s23.3, L1.8, A09.9, A09.12, s23.8, A09.10). */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, cleanup, fireEvent, within } from '@testing-library/react';
+import { screen, cleanup, fireEvent, within, act } from '@testing-library/react';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings, groupHeads, groupHead, row } from './settings-harness.jsx';
 
 beforeEach(() => { setupSettingsGlobals(); });
@@ -35,6 +35,30 @@ describe('the find box matches the start of a word (s23.3)', () => {
   });
 });
 
+describe('Your data > Growth', () => {
+  const withSamples = async (samples) => {
+    teardownSettingsGlobals();
+    setupSettingsGlobals({
+      measureUserData: () => Promise.resolve({ total: 2e6, structured: 2e6, media: 0, mediaCount: 0 }),
+      recordUserDataSample: () => Promise.resolve(samples),
+    });
+    renderSettings();
+    await act(async () => {});
+  };
+
+  it('is not drawn until two measurements exist, and never promises a later day', async () => {
+    await withSamples([{ d: '2026-11-09', b: 2e6 }]);
+    expect(row('Growth')).toBeFalsy();
+    expect(document.body.textContent).not.toMatch(/First measurement|appears the next day/);
+  });
+
+  it('is drawn from two measurements on', async () => {
+    await withSamples([{ d: '2026-11-09', b: 2e6 }, { d: '2026-11-10', b: 2.5e6 }]);
+    expect(row('Growth')).toBeTruthy();
+    expect(row('Growth').textContent).toMatch(/grown by .* across 2 measurements/);
+  });
+});
+
 describe('small copy and a11y pieces', () => {
   it('the Scroll Speed slider speaks its unit (L1.8)', () => {
     renderSettings({ autoScroll: true, autoScrollLpm: '16' });
@@ -50,12 +74,28 @@ describe('small copy and a11y pieces', () => {
 
   it('the streak row states the live dwell time (A09.12)', () => {
     renderSettings({ dwellMs: '45000' });
-    fireEvent.click(within(row('Reading Streak Dwell Time')).getByLabelText(/Show description/));
-    expect(row('Reading Streak Dwell Time').textContent).toContain('A day counts toward your reading streak on My Progress after 45 seconds reading one chapter or letter.');
+    fireEvent.click(within(row('Count a page as read after')).getByLabelText(/Show description/));
+    expect(row('Count a page as read after').textContent).toContain('Reading one chapter or letter for 45 seconds counts that day toward your reading streak on My Progress.');
     cleanup();
     renderSettings({ dwellMs: '60000' });
-    fireEvent.click(within(row('Reading Streak Dwell Time')).getByLabelText(/Show description/));
-    expect(row('Reading Streak Dwell Time').textContent).toContain('after 1 minute reading');
+    fireEvent.click(within(row('Count a page as read after')).getByLabelText(/Show description/));
+    expect(row('Count a page as read after').textContent).toContain('for 1 minute counts that day');
+  });
+
+  it('the reading rows are named by what they do, and the old names still find them', () => {
+    renderSettings();
+    for (const name of ['Answers progress', 'Marks on the scrollbar', 'Verses shown inline (Matthew Study Bible)', 'Count a page as read after']) {
+      expect(row(name)).toBeTruthy();
+    }
+    for (const old of ['Answers Reading Path', 'Scrollbar Content Marker', 'Inline Reference Echoes', 'Reading Streak Dwell Time']) {
+      expect(screen.queryByText(old)).toBeNull();
+    }
+    cleanup();
+    renderSettings({}, {}, { expandGroups: false });
+    for (const [typed, group] of [['scrollbar content marker', 'reading'], ['answers reading path', 'reading'], ['inline reference echoes', 'reading'], ['dwell time', 'reading'], ['marks on the scrollbar', 'reading'], ['count a page', 'reading'], ['top nav buttons', 'topnav'], ['top bar buttons', 'topnav']]) {
+      find(typed);
+      expect(shownGroups(), typed).toContain(group);
+    }
   });
 
   it('the Letter Voice description reads as plain sentences (s23.8)', () => {

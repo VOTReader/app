@@ -475,31 +475,24 @@ function DataInfoRow({ label, value = null, children = null }) {
    the trend is stated in words first, the bars are aria-hidden, and the
    per-sample figures are exposed to assistive tech as an sr-only list.
 
-   Day one shows text only: a single bar is noise, and a one-point line
-   draws nothing. */
+   With fewer than two measurements there is no trend, so nothing is drawn. */
 function StorageTrendValue({ samples }) {
-  if (!samples || samples.length === 0) return null;
+  if (!samples || samples.length < 2) return null;
   const first = samples[0];
   const last = samples[samples.length - 1];
   const delta = last.b - first.b;
-  const sentence = samples.length === 1
-    ? `First measurement recorded — ${formatBytes(last.b)}. The trend appears the next day you open Settings.`
-    : `Your data has ${delta > 0 ? 'grown' : delta < 0 ? 'shrunk' : 'stayed level'}${delta === 0 ? '' : ' by ' + formatBytes(Math.abs(delta))} across ${samples.length} measurements since ${first.d} — now ${formatBytes(last.b)}.`;
+  const sentence = `Your data has ${delta > 0 ? 'grown' : delta < 0 ? 'shrunk' : 'stayed level'}${delta === 0 ? '' : ' by ' + formatBytes(Math.abs(delta))} across ${samples.length} measurements since ${first.d} — now ${formatBytes(last.b)}.`;
   const max = samples.reduce((m, s) => (s.b > m ? s.b : m), 0);
   return (
     <div className="settings-trend" role="group" aria-label="Your data size over time">
       <span>{sentence}</span>
-      {samples.length > 1 && (
-        <>
-          <span className="sr-only">{samples.map((s) => `${s.d}: ${formatBytes(s.b)}`).join('. ')}</span>
-          <div className="settings-trend-bars" aria-hidden="true">
-            {samples.map((s) => (
-              <div key={s.d} className="settings-trend-bar"
-                style={max > 0 ? { height: Math.max(2, Math.round((s.b / max) * 24)) + 'px' } : undefined} />
-            ))}
-          </div>
-        </>
-      )}
+      <span className="sr-only">{samples.map((s) => `${s.d}: ${formatBytes(s.b)}`).join('. ')}</span>
+      <div className="settings-trend-bars" aria-hidden="true">
+        {samples.map((s) => (
+          <div key={s.d} className="settings-trend-bar"
+            style={max > 0 ? { height: Math.max(2, Math.round((s.b / max) * 24)) + 'px' } : undefined} />
+        ))}
+      </div>
     </div>
   );
 }
@@ -694,10 +687,10 @@ const SHARE_LINK_OPTIONS = [
 
 const SETTINGS_TOPICS = {
   appearance: 'appearance theme light dark text size font typeface',
-  reading: 'reading bible translation offline editions download all chapter titles section headings restored names chapter letter arrows scripture browser inline reference echoes scrollbar content marker reading position marker dot answers reading path ticks continue resume streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
+  reading: 'reading bible translation offline editions download all chapter titles section headings restored names chapter letter arrows scripture browser verses shown inline matthew study bible inline reference echoes marks on the scrollbar scrollbar content marker reading position marker dot answers progress answers reading path ticks continue resume count a page as read after streak dwell time surprise me button random letter dice keep screen on double tap click fullscreen',
   listening: 'listening bible letter audio voice speed rate skip seconds read along highlight playback follow',
   autoscroll: 'auto scroll hands free reading speed continue pause',
-  topnav: 'top nav buttons icons settings gear history theme bookmark compact bar more menu',
+  topnav: 'top bar buttons top nav icons settings gear history theme bookmark compact bar more menu',
   features: 'search synonyms synonym filter stop words tabs history',
   share: 'copy share sharing link links website app highlight passage words thevolumesoftruth',
   garden: 'a return to the garden image quality pictures',
@@ -874,33 +867,40 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   }, []);
   React.useEffect(() => { refreshBuildInfo(); }, [refreshBuildInfo]);
 
-  const versionDisplayText = (() => {
-    const fmt = (typeof formatBuildVersion === 'function') ? formatBuildVersion : ((s) => String(s || 'unknown'));
-    if (buildInfo.state === 'loading') return 'Checking…';
+  // The row says the version and whether it is current; the build id and corpus id sit behind "Details".
+  const [versionDetailsOpen, setVersionDetailsOpen] = React.useState(false);
+  const { versionDisplayText, versionDetailText } = (() => {
+    /** @param {any} v */
+    const parts = (v) => {
+      const m = /^v?([\d.]+)-([0-9a-f]+)$/.exec(String(v || ''));
+      return m ? { num: m[1], build: m[2] } : { num: String(v || 'unknown'), build: '' };
+    };
+    if (buildInfo.state === 'loading') return { versionDisplayText: 'Checking…', versionDetailText: '' };
+    if (buildInfo.state === 'no-sw') {
+      // Android reaches here only when the APK's own service-worker.js could not be
+      // read, so the honest answer is still that there is no version to show.
+      return {
+        versionDisplayText: PlatformBridge.isAndroid
+          ? 'Installed app build — updates arrive by installing a new APK, not over the web.'
+          : 'Not yet managed by the offline service worker on this device.',
+        versionDetailText: '',
+      };
+    }
+    const run = parts(buildInfo.running.cacheVersion);
+    const version = 'Version ' + run.num;
+    const detail = [run.build ? 'Build ' + run.build : '', 'corpus ' + (buildInfo.running.corpusVersion || '?')].filter(Boolean).join(' · ');
     if (buildInfo.state === 'installed') {
       // Android, and we read the version out of the APK's own service-worker.js.
       // There is nothing to compare it against — an APK cannot update itself over
       // the web — so this states the build and stops, rather than inventing a
       // verdict about currency it has no evidence for.
-      return fmt(buildInfo.running.cacheVersion)
-        + ' · corpus ' + (buildInfo.running.corpusVersion || '?')
-        + ' — the version installed on this device. New versions arrive by installing an update, not over the web.';
+      return { versionDisplayText: version + ' · installed on this device. New versions arrive by installing an update.', versionDetailText: detail };
     }
-    if (buildInfo.state === 'no-sw') {
-      // Android reaches here only when the APK's own service-worker.js could not be
-      // read, so the honest answer is still that there is no version to show.
-      return PlatformBridge.isAndroid
-        ? 'Installed app build — updates arrive by installing a new APK, not over the web.'
-        : 'Not yet managed by the offline service worker on this device.';
-    }
-    const runningText = fmt(buildInfo.running.cacheVersion)
-      + ' · corpus ' + (buildInfo.running.corpusVersion || '?');
-    if (!buildInfo.server) return runningText + ' — could not reach the server to compare.';
+    if (!buildInfo.server) return { versionDisplayText: version + ' · could not reach the server to check.', versionDetailText: detail };
     if (buildInfo.server.cacheVersion === buildInfo.running.cacheVersion) {
-      return runningText + ' — up to date with the published version.';
+      return { versionDisplayText: version + ' · up to date', versionDetailText: detail };
     }
-    return runningText + ' — an update is available ('
-      + fmt(buildInfo.server.cacheVersion) + '). Reopen the app to apply it.';
+    return { versionDisplayText: version + ' · an update is available. Reopen the app to apply it.', versionDetailText: detail + ' · newer build ' + (parts(buildInfo.server.cacheVersion).build || buildInfo.server.cacheVersion) };
   })();
   const protectionDisplayText = (() => {
     if (storageInfo.status === 'loading') return 'Checking…';
@@ -1171,7 +1171,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           <div className="settings-card">
             <SettingsRow
               label="Light Theme"
-              desc="Switch between the dark (default) and light reading themes. Also in the top bar: the ⋯ menu with the compact bar (the default), or the sun/moon icon without it (Top-Nav Buttons)."
+              desc="Switch between the dark (default) and light reading themes. Also in the top bar: the ⋯ menu with the compact bar (the default), or the sun/moon icon without it (Top bar buttons)."
               checked={theme === "light"}
               onToggle={() => onThemeChange(theme === "light" ? "dark" : "light")}
             />
@@ -1251,14 +1251,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
               onChange={(v) => onSetting("scriptureLayout", v)}
             />
             <SettingsRow
-              label="Inline Reference Echoes"
-              desc="In the Matthew Study Bible's inline mode, when a reference spans multiple verse ranges (e.g. verses 1-5 and 10-15), show a compact echo pill at the end of each additional range that scrolls back to the full note. Helps you see what references relate to as you read."
+              label="Verses shown inline (Matthew Study Bible)"
+              desc="When a study note covers several verse ranges, show a small pill after each extra range; tap it to go back to the full note."
               checked={settings.showInlineEchoes !== false}
               onToggle={() => onToggle("showInlineEchoes")}
             />
             <SettingsRow
-              label="Scrollbar Content Marker"
-              desc="A small notch on the scrollbar showing where the reading content ends and the footnotes or navigation area begins."
+              label="Marks on the scrollbar"
+              desc="Shows a small notch on the scrollbar where the reading ends and the footnotes begin."
               checked={!!settings.showScrollNotch}
               onToggle={() => onToggle("showScrollNotch")}
             />
@@ -1276,16 +1276,16 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {/* AOGCG (2026-10-22): the reading path on the Answers landing, its ticks, "N read" counts and
                 Continue row; off hides them all and keeps what is stored (U16). */}
             <SettingsRow
-              label="Answers Reading Path"
-              desc="Ticks and Continue on the Answers screen. Kept only on this device."
+              label="Answers progress"
+              desc="Shows ticks and a Continue row on the Answers screen, and keeps them only on this device."
               checked={settings.answersReadingPath !== false}
               onToggle={() => onToggle("answersReadingPath")}
             />
             <SelectField
               eyebrow="Reading"
-              title="Reading Streak Dwell Time"
-              label="Reading Streak Dwell Time"
-              desc={'A day counts toward your reading streak on My Progress after ' + _dwellWords(settings.dwellMs) + ' reading one chapter or letter. The reading position marker is not affected: it always follows where you are.'}
+              title="Count a page as read after"
+              label="Count a page as read after"
+              desc={'Reading one chapter or letter for ' + _dwellWords(settings.dwellMs) + ' counts that day toward your reading streak on My Progress.'}
               value={settings.dwellMs || "20000"}
               options={[
                 { id: "3000",  label: "3 seconds",  desc: "Counts almost immediately" },
@@ -1511,7 +1511,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
           </div>
         </SettingsGroup>
 
-        <SettingsGroup label="Top-Nav Buttons" sub={glance.topnav} {...groupProps('topnav')}>
+        <SettingsGroup label="Top bar buttons" sub={glance.topnav} {...groupProps('topnav')}>
           <div className="settings-card">
             {/* The compact bar (the redesign, 2026-09-25; ui/components/MoreMenu.jsx). While
                 it is on, the three icons it moves live in the ⋯ menu, so their chips unmount
@@ -1627,7 +1627,14 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
 
         <SettingsGroup label="Your Data" sub={glance.data} {...groupProps('data')}>
           <div className="settings-card">
-            <DataInfoRow label="App version" value={versionDisplayText}>
+            <DataInfoRow label="App version" value={<>{versionDisplayText}{versionDetailsOpen && versionDetailText ? <div className="settings-data-detail">{versionDetailText}</div> : null}</>}>
+              {versionDetailText ? (
+                <button
+                  className="settings-clear-btn"
+                  aria-expanded={versionDetailsOpen}
+                  onClick={(e) => { e.stopPropagation(); setVersionDetailsOpen((v) => !v); }}
+                >Details</button>
+              ) : null}
               <button
                 className="settings-clear-btn"
                 disabled={buildInfo.state === 'loading'}
@@ -1644,7 +1651,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
             {!(typeof PlatformBridge !== 'undefined' && PlatformBridge && PlatformBridge.isAndroid)
               ? <DataInfoRow label="Offline library" value={<OfflineLibraryStatus />} /> : null}
             <DataInfoRow label="Your data" value={userDataDisplayText} />
-            {dataSamples.length > 0 && (
+            {dataSamples.length > 1 && (
               <DataInfoRow label="Growth" value={<StorageTrendValue samples={dataSamples} />} />
             )}
             {/* datasafe 10-05: passive, no nag - when this device last exported, and the automatic snapshots. */}

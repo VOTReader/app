@@ -1250,7 +1250,7 @@ describe('Android v3 import — native stream not closed until the confirm settl
    screen-reader order, same discipline as the auto-scroll disclosure.
    ─────────────────────────────────────────────────────────────────────── */
 describe('settings groups — collapsible accordion', () => {
-  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top-Nav Buttons',
+  const GROUPS = ['Appearance', 'Reading', 'Listening', 'Auto-Scroll', 'Top bar buttons',
     'Search, Tabs & History', 'Copy & Share', 'A Return to The Garden', 'Your Data', 'Mark as Read', 'Help'];
 
   it('renders all 11 group headers, every one collapsed on entry', () => {

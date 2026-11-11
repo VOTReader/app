@@ -45,7 +45,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import 'fake-indexeddb/auto';
-import { cleanup, act } from '@testing-library/react';
+import { cleanup, act, fireEvent, within } from '@testing-library/react';
 import {
   setupSettingsGlobals, teardownSettingsGlobals, renderSettings, row,
 } from './settings-harness.jsx';
@@ -108,8 +108,12 @@ describe('the App version row on Android', () => {
     expect(typeof globalThis.getBuildVersion).not.toBe('function');
     expect(text).not.toContain('testhash01');
 
-    expect(text).toContain('60a64a8486');
-    expect(text).toContain('c45');
+    // The row says the version; the build and corpus ids sit behind "Details".
+    expect(text).toContain('Version 1.0.2');
+    expect(text).not.toContain('60a64a8486');
+    fireEvent.click(within(row('App version')).getByText('Details'));
+    expect(valueOf('App version')).toContain('Build 60a64a8486');
+    expect(valueOf('App version')).toContain('corpus c45');
     expect(text).not.toContain('Installed app build');
   });
 
@@ -129,8 +133,9 @@ describe('the App version row on Android', () => {
 
     const text = valueOf('App version');
     expect(row('App version')).toBeTruthy();
-    expect(text).toContain('60a64a8486');
-    expect(text).toContain('up to date with the published version');
+    expect(text).toBe('Version 1.0.2 · up to date');
+    fireEvent.click(within(row('App version')).getByText('Details'));
+    expect(valueOf('App version')).toContain('Build 60a64a8486');
   });
 
   /* ADDED BY THE WEB BUILDER with the fix (the two cases above are the
@@ -174,9 +179,9 @@ describe('the App version row on Android', () => {
     await act(async () => {});
 
     const text = valueOf('App version');
-    expect(text).toContain('the version installed on this device');
+    expect(text).toContain('installed on this device');
     expect(text).not.toContain('could not reach the server');
-    expect(text).not.toContain('up to date with the published version');
+    expect(text).not.toContain('up to date');
     expect(text).not.toContain('an update is available');
   });
 });

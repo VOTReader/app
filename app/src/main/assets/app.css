@@ -4080,6 +4080,7 @@
     .settings-row-desc li { margin-top:0.35em; }
     .settings-row-desc li::marker { color:var(--gold-dim); }
     .settings-data-value { font-size:var(--fs-13); color:var(--gold-dim); font-style:italic; line-height:1.45; padding:0 0.95rem 0.66rem; }
+    .settings-data-detail { margin-top:0.25rem; font-style:normal; overflow-wrap:anywhere; }
     /* Hit area is not paint: the target stays 44 px, the visible ⓘ is a 29 px hairline ring drawn
        inside it (a 44 px bordered square stood taller than the 26 px Export button beside it). */
     .settings-info-btn { display:inline-flex; align-items:center; justify-content:center; width:44px; height:44px; flex-shrink:0; padding:0; line-height:1; border:0; border-radius:50%; background:radial-gradient(circle, transparent 13px, var(--gold-border) 13.5px, var(--gold-border) 14.5px, transparent 15px); color:var(--gold); font-family:'Cinzel',serif; font-style:italic; font-size:var(--fs-13); cursor:pointer; }
