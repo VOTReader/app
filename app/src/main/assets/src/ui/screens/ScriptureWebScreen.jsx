@@ -157,6 +157,14 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
   // opened My Web from a verse's "Show in Scripture Web" (w4 interaction hunt).
   const resumeRef = React.useRef(/** @type {any} */ (undefined));
   if (resumeRef.current === undefined) { resumeRef.current = start ? null : (resumeWeb || readSavedSpot(0)); resumeWeb = null; }
+  // A door straight into My Web (the Library's Links: "See in My Web", "Open My Web"; W2 2026-11-11): navHandoff
+  // 'webMine', taken once. It starts fresh in My Web, as a start does on the canon.
+  const mineRef = React.useRef(/** @type {boolean | undefined} */ (undefined));
+  if (mineRef.current === undefined) {
+    const h = typeof window !== 'undefined' ? /** @type {any} */ (window).navHandoff : null;
+    mineRef.current = !!(h && h.peek && h.peek('webMine'));
+    if (mineRef.current) { h.clear('webMine'); resumeRef.current = null; }
+  }
   const glRef = React.useRef(null);
   const uiRef = React.useRef(null);
   const wrapRef = React.useRef(null);
@@ -167,7 +175,7 @@ export function ScriptureWebScreen({ navigateToLink, onBack, settings, updateSet
 
   // the graph asset, loaded once (use-web-renderer.js); Try again refetches
   const { graph, loadError, setLoadError, retryLoad } = useWebGraph();
-  const [mode, setMode] = React.useState(() => (resumeRef.current && resumeRef.current.mode) || 'canonical');   // 'canonical' | 'personal'
+  const [mode, setMode] = React.useState(() => (mineRef.current ? 'personal' : (resumeRef.current && resumeRef.current.mode) || 'canonical'));   // 'canonical' | 'personal'
   // The empty-web notice hands focus back here when it closes, so a keyboard
   // reader stays in the control they were using instead of at the document top.
   const myWebBtnRef = React.useRef(null);

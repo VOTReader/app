@@ -13,6 +13,7 @@
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent } from '@testing-library/react';
+import * as ReactDOM from 'react-dom';
 import { LinksScreen } from './LinksScreen.jsx';
 
 const GLOBALS = ['ScreenLayout', 'LibraryNav', 'LinkStore', 'relativeDate', 'ConfirmStrip'];
@@ -29,6 +30,7 @@ beforeEach(() => {
     <div data-testid="screen-layout">{navChildren}{children}</div>
   );
   globalThis.LibraryNav = () => null;
+  globalThis.ReactDOM = ReactDOM;
   globalThis.ConfirmStrip = () => null;
   globalThis.relativeDate = () => '';
   globalThis.LinkStore = {
@@ -46,55 +48,43 @@ const show = () => render(
   <LinksScreen onBack={() => {}} onSearch={() => {}} onHistory={() => {}} theme="dark" onThemeChange={() => {}} />,
 );
 
-const sortBtn = () => document.querySelector('.notes-index-sort-btn');
-const sideLabels = (side) => [...document.querySelectorAll('.link-row-' + side + ' .link-row-side-label')]
-  .map((el) => el.textContent);
-const step = () => fireEvent.click(sortBtn());
+const sortBtn = () => document.querySelector('.lib-qline .ui-tool');
+const sideLabels = (side) => [...document.querySelectorAll('.link-row')]
+  .map((row) => row.querySelectorAll('.link-half-title')[side === 'source' ? 0 : 1].textContent);
+const pick = (name) => {
+  fireEvent.click(sortBtn());
+  fireEvent.click([...document.querySelectorAll('[role="radio"]')].find((b) => b.textContent.includes(name)));
+};
 
-describe('LinksScreen — the sort cycle reaches every implemented mode', () => {
-  it('starts newest-first', () => {
+describe('LinksScreen — the sort sheet reaches every implemented order', () => {
+  it('starts newest-first and says so', () => {
     show();
-    expect(sortBtn().textContent).toBe('Sort: Newest ↓');
+    expect(sortBtn().getAttribute('aria-label')).toBe('Sort: Newest first');
     expect(sideLabels('source')).toEqual(['Alpha', 'Mu', 'Zeta']);
   });
 
-  it('steps to oldest-first', () => {
+  it('oldest-first', () => {
     show();
-    step();
-    expect(sortBtn().textContent).toBe('Sort: Oldest ↑');
+    pick('Oldest first');
     expect(sideLabels('source')).toEqual(['Zeta', 'Mu', 'Alpha']);
   });
 
-  it('reaches source A-Z — which nothing could reach before', () => {
+  it('From A-Z — which nothing could reach before', () => {
     show();
-    step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Source A-Z');
+    pick('From A-Z');
     expect(sideLabels('source')).toEqual(['Alpha', 'Mu', 'Zeta']);
   });
 
-  it('reaches target A-Z — likewise', () => {
+  it('To A-Z — likewise', () => {
     show();
-    step(); step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Target A-Z');
+    pick('To A-Z');
     expect(sideLabels('target')).toEqual(['Alpha', 'Mu', 'Tau']);
-  });
-
-  it('wraps back to the start on the fourth press', () => {
-    show();
-    step(); step(); step(); step();
-    expect(sortBtn().textContent).toBe('Sort: Newest ↓');
-    expect(sideLabels('source')).toEqual(['Alpha', 'Mu', 'Zeta']);
-  });
-
-  it('names itself as a cycle, not a toggle', () => {
-    show();
-    expect(sortBtn().getAttribute('title')).toBe('Cycle sort order');
   });
 
   it('sorts the FILTERED list, not the whole store', () => {
     show();
-    fireEvent.change(document.querySelector('input.notes-index-search'), { target: { value: 'alpha' } });
-    step(); step();   // → source A-Z
+    fireEvent.change(document.querySelector('input[type="search"]'), { target: { value: 'alpha' } });
+    pick('From A-Z');
     // Both links touching Alpha survive; the Mu→Tau link does not.
     expect(sideLabels('source')).toEqual(['Alpha', 'Zeta']);
   });

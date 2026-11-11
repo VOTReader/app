@@ -7,6 +7,11 @@
 /* Human-readable category label for a link endpoint.
    Mirrors the logic in LinkCard inside index.html so the two surfaces
    stay in sync. */
+import { UiIcon } from '../components/UiIcon.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { EmptyState, Notice, UiButton } from '../components/UiParts.jsx';
+import { ListSearch, ListLine } from '../components/LibraryList.jsx';
+
 export function _linkEndpointCategory(ep) {
   if (!ep) return '';
   if (ep.type === 'bible') return (typeof bookCategory === 'function') ? bookCategory(ep.bookId) : 'Bible';
@@ -99,158 +104,78 @@ export function _epSearchText(ep) {
   return [ep.label || '', _linkEndpointCategory(ep), ep.text || '', ep.preview || ''].join(' ').toLowerCase();
 }
 
-/* ── LinkRow component ───────────────────────────────────────────── */
+/* ── LinkRow (mock v2 l-links): From and To, each opening its own end; a door to My Web; ONE menu ── */
 /**
- * @param {{ key?: any, lnk: any, onNavigateSource: any, onNavigateTarget: any, onLongPress: any }} props
+ * @param {{ key?: any, lnk: any, onNavigateSource: any, onNavigateTarget: any, onMenu: any, onMyWeb?: any }} props
  */
-export function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onLongPress }) {
+export function LinkRow({ lnk, onNavigateSource, onNavigateTarget, onMenu, onMyWeb }) {
   var src = lnk.source;
   var tgt = lnk.target;
   var date = (typeof relativeDate === 'function') ? relativeDate(lnk.created) : '';
-  var srcCat = _linkEndpointCategory(src);
-  var tgtCat = _linkEndpointCategory(tgt);
-  var srcPreview = (src && (src.text || src.preview)) || '';
-  var tgtPreview = (tgt && (tgt.text || tgt.preview)) || '';
-
-  return (
-    <div
-      className="link-row"
-      onContextMenu={function(e) { e.preventDefault(); if (onLongPress) onLongPress(lnk, e); }}
-    >
-      {/* Source side — tappable */}
-      <button
-        className="link-row-side link-row-source"
-        onClick={function() { if (onNavigateSource) onNavigateSource(lnk); }}
-        title={'Open source: ' + (src && src.label ? src.label : '')}
-      >
-        <span className="link-row-side-eyebrow">SOURCE</span>
-        <span className="link-row-side-label">{src && src.label ? src.label : '(unknown)'}</span>
-        {srcCat && <span className="link-row-side-cat">{srcCat}</span>}
-        {srcPreview && <span className="link-row-side-preview">{srcPreview}</span>}
+  var half = function(ep, word, open) {
+    var label = ep && ep.label ? ep.label : '(unknown)';
+    var cat = _linkEndpointCategory(ep);
+    var preview = (ep && (ep.text || ep.preview)) || '';
+    return (
+      <button type="button" className="link-half" onClick={function() { if (open) open(lnk); }} aria-label={word + ': ' + label + ', open it'}>
+        <span className="link-half-word">{word}</span>
+        <span className="link-half-title">{label}</span>
+        {cat && <span className="link-half-cat">{cat}</span>}
+        {preview && <span className="link-half-quote">{preview}</span>}
       </button>
-      {/* Chain icon + date + a VISIBLE options affordance. The action sheet
-          (Open source/target, Delete) was long-press-only — invisible, and
-          inconsistent with BookmarkRow's ⋯ button. Same handler, now
-          discoverable. */}
-      <div className="link-row-mid">
-        <svg
-          className="link-row-chain"
-          viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" strokeWidth="1.6"
-          strokeLinecap="round" strokeLinejoin="round"
-        >
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-        </svg>
-        {date && <span className="link-row-date">{date}</span>}
-        <button
-          className="link-row-more"
-          onClick={function(e) { e.stopPropagation(); if (onLongPress) onLongPress(lnk, e); }}
-          title="Link options"
-          aria-label="Link options"
-        >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="5" r="1" />
-            <circle cx="12" cy="12" r="1" />
-            <circle cx="12" cy="19" r="1" />
-          </svg>
+    );
+  };
+  return (
+    <div className="link-row" onContextMenu={function(e) { e.preventDefault(); if (onMenu) onMenu(lnk); }}>
+      {half(src, 'From', onNavigateSource)}
+      <div className="link-join" aria-hidden="true"><span><UiIcon name="link" size="sm" /></span></div>
+      {half(tgt, 'To', onNavigateTarget)}
+      <div className="link-foot">
+        <span className="link-foot-date">{date}</span>
+        {onMyWeb ? <button type="button" className="ui-link link-foot-web" onClick={function() { onMyWeb(lnk); }}>See in My Web<UiIcon name="chev" size="sm" /></button> : null}
+        <button type="button" className="ui-row-menu" onClick={function() { if (onMenu) onMenu(lnk); }} aria-label="Link options" title="Link options" aria-haspopup="dialog">
+          <UiIcon name="more" />
         </button>
       </div>
-      {/* Target side — tappable */}
-      <button
-        className="link-row-side link-row-target"
-        onClick={function() { if (onNavigateTarget) onNavigateTarget(lnk); }}
-        title={'Open target: ' + (tgt && tgt.label ? tgt.label : '')}
-      >
-        <span className="link-row-side-eyebrow">TARGET</span>
-        <span className="link-row-side-label">{tgt && tgt.label ? tgt.label : '(unknown)'}</span>
-        {tgtCat && <span className="link-row-side-cat">{tgtCat}</span>}
-        {tgtPreview && <span className="link-row-side-preview">{tgtPreview}</span>}
-      </button>
     </div>
   );
 }
 
-/* ── LinkRowActionSheet ──────────────────────────────────────────── */
-export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateTarget, onDelete }) {
-  var useState = React.useState;
-  var _state = useState(false);
-  var confirming = _state[0];
-  var setConfirming = _state[1];
-  var trapRef = useFocusTrap(!!lnk);
-
+/* ── LinkRowActionSheet (mock v2 l-link-menu): the menu names the two places ── */
+/** @param {{ lnk: any, onClose: () => void, onNavigateSource: any, onNavigateTarget: any, onMyWeb?: any, onDelete: any }} props */
+export function LinkRowActionSheet({ lnk, onClose, onNavigateSource, onNavigateTarget, onMyWeb, onDelete }) {
   if (!lnk) return null;
-
-  var doDelete = function() {
-    LinkStore.remove(lnk.id);
-    onDelete();
-    onClose();
-  };
-
+  var from = lnk.source && lnk.source.label ? lnk.source.label : '(unknown)';
+  var to = lnk.target && lnk.target.label ? lnk.target.label : '(unknown)';
+  var when = (typeof relativeDate === 'function') ? relativeDate(lnk.created) : '';
+  /** @type {any[]} */
+  var actions = [
+    { id: 'from', icon: 'note', label: 'Open ' + from, onSelect: function() { onNavigateSource(lnk); } },
+    { id: 'to', icon: 'book', label: 'Open ' + to, onSelect: function() { onNavigateTarget(lnk); } },
+  ];
+  if (onMyWeb) actions.push({ id: 'web', icon: 'web', label: 'See in My Web', onSelect: function() { onMyWeb(lnk); } });
+  actions.push({ id: 'delete', icon: 'trash', label: 'Delete link', danger: true, onSelect: function() { onDelete(lnk); } });
   return (
-    <div className="link-action-overlay" onClick={onClose}>
-      <div className="link-action-sheet" ref={trapRef} role="dialog" aria-modal="true" aria-label="Link actions" onClick={function(e) { e.stopPropagation(); }}>
-        <SheetHandle onClose={onClose} />
-        {!confirming && (
-          <>
-            <button className="link-action-btn" onClick={function() { onNavigateSource(lnk); onClose(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <line x1="12" y1="8" x2="12" y2="16" />
-                <line x1="8" y1="12" x2="16" y2="12" />
-              </svg>
-              <span>Open Source</span>
-            </button>
-            <button className="link-action-btn" onClick={function() { onNavigateTarget(lnk); onClose(); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-              <span>Open Target</span>
-            </button>
-            <button className="link-action-btn link-action-btn-danger" onClick={function() { setConfirming(true); }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="3 6 5 6 21 6" />
-                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-                <path d="M10 11v6" />
-                <path d="M14 11v6" />
-              </svg>
-              <span>Delete Link</span>
-            </button>
-          </>
-        )}
-        {confirming && (
-          <ConfirmStrip
-            style={{ padding: '14px 12px' }}
-            question="Delete this link?"
-            onCancel={function() { setConfirming(false); }}
-            onConfirm={doDelete}
-          />
-        )}
-      </div>
-    </div>
+    <ActionSheet open={!!lnk} onClose={onClose} portal
+      title={<>{from} <span className="link-arrow" aria-label="to">→</span> {to}</>}
+      sub={when ? 'Linked ' + when.charAt(0).toLowerCase() + when.slice(1) : undefined}
+      actions={actions} />
   );
 }
 
-/* The sort cycle, in the order the one button steps through it. Each `mode`
-   IS a branch of displayLinks' comparator; adding a mode to one without the
-   other is what produced the dead branches C2-C [C10] found. */
-var SORT_CYCLE = [
-  { mode: 'recent',    label: 'Sort: Newest ↓' },
-  { mode: 'oldest',    label: 'Sort: Oldest ↑' },
-  { mode: 'source-az', label: 'Sort: Source A-Z' },
-  { mode: 'target-az', label: 'Sort: Target A-Z' },
-];
+/* The orders the sort sheet offers, each a branch of displayLinks' comparator (C2-C [C10]). */
+export var LINK_SORTS = Object.freeze([
+  { id: 'recent', label: 'Newest first' },
+  { id: 'oldest', label: 'Oldest first' },
+  { id: 'source-az', label: 'From A-Z' },
+  { id: 'target-az', label: 'To A-Z' },
+]);
 
 /* ── LinksScreen ─────────────────────────────────────────────────── */
 export function LinksScreen(props) {
   var onBack = props.onBack;
   var onNavigateToSource = props.onNavigateToSource;
   var onNavigateToTarget = props.onNavigateToTarget;
-  var theme = props.theme;
-  var onThemeChange = props.onThemeChange;
-  var onSearch = props.onSearch;
-  var onHistory = props.onHistory;
 
   // Subscribe to LinkStore — index re-renders on any link mutation.
   React.useSyncExternalStore(
@@ -270,34 +195,10 @@ export function LinksScreen(props) {
   var sortMode = _ss[0];
   var setSortMode = _ss[1];
 
-  // (Pre-Q3.3f-dead: var _sm = useState(false) + showSortMenu/setShowSortMenu
-  //  destructure — neither half was referenced. Removed.)
-  //
-  // C2-C [C10]: 'source-az' and 'target-az' were IMPLEMENTED in the comparator
-  // below and unreachable from the UI — the control was a two-state
-  // recent/oldest toggle, so half the sort logic was dead weight that read as
-  // a finished feature. The toggle becomes a CYCLE over the same one button
-  // (this screen's existing control shape), so the comparator's four branches
-  // and the affordance finally describe each other.
-  var nextSort = function() {
-    setSortMode(function(m) {
-      var i = SORT_CYCLE.findIndex(function(s) { return s.mode === m; });
-      return SORT_CYCLE[(i + 1) % SORT_CYCLE.length].mode;
-    });
-  };
-  var sortLabel = (SORT_CYCLE.find(function(s) { return s.mode === sortMode; }) || SORT_CYCLE[0]).label;
-
+  // C2-C [C10]: the comparator's four orders are all reachable, from the sort sheet (LINK_SORTS).
   var _as = useState(null);
   var actionTarget = _as[0];
   var setActionTarget = _as[1];
-
-  // W1.5(a.2) — Escape-key dispatch registration for the long-press
-  // action sheet rendered at the bottom of this screen.
-  useModalRegistry({
-    id: 'link-row-action-sheet',
-    dismiss: function() { setActionTarget(null); },
-    active: !!actionTarget,
-  });
 
   var allLinks = LinkStore.all();
 
@@ -383,120 +284,54 @@ export function LinksScreen(props) {
     }
   };
 
-  var onDeleteFromSheet = function() {};
-
-  // Standard app-wide Library nav (back + Home left, icon cluster right).
-  var navChildren = LibraryNav({
-    onBack: onBack, onSearch: onSearch, onHistory: onHistory,
-    onSettings: props.onSettings,
-    theme: theme, onThemeChange: onThemeChange
-  });
+  var _dl = useState(null);
+  var deleting = _dl[0];
+  var setDeleting = _dl[1];
+  var closeAction = React.useCallback(function() { setActionTarget(null); }, [setActionTarget]);
+  var closeDelete = React.useCallback(function() { setDeleting(null); }, [setDeleting]);
+  var onMyWeb = props.onOpenMyWeb ? function() { props.onOpenMyWeb(); } : null;
 
   return (
-    <ScreenLayout navChildren={navChildren}>
-      <div className="links-screen">
-        {/* Header */}
-        <header className="study-head">
-          <h1 className="study-head-title">Links</h1>
-          <span className="study-head-count">
-            {allLinks.length}
-            {allLinks.length === 1 ? ' link' : ' links'}
-          </span>
-        </header>
-
-        {/* Search, then the sort CYCLE (C2-C [C10]). One empty-state pattern (n118): an empty
-            list shows its how-to and one button, no search box or sort. */}
-        {allLinks.length > 0 && (
+    <ScreenLayout utility={{ title: 'Links', onBack: onBack }}>
+      <div className="links-screen lib-screen">
+        {allLinks.length === 0 ? (
           <>
-            <input
-              className="notes-index-search"
-              type="search"
-              placeholder="Search links…"
-              aria-label="Search links"
-              value={searchQuery}
-              onChange={function(e) { setSearchQuery(e.target.value); }}
-            />
-            <div className="notes-index-controls" style={{ marginTop: '0.7rem' }}>
-              <button
-                className="notes-index-sort-btn"
-                style={{ marginLeft: 'auto' }}
-                onClick={nextSort}
-                title="Cycle sort order"
-              >
-                {sortLabel}
-              </button>
-            </div>
+            <EmptyState icon="link" title="No links yet"
+              text="Select some words while you read, tap Link, and choose the passage they belong with. Your links also draw My Web."
+              action={props.onHome ? { label: 'Start reading', onClick: function() { (props.onStartReading || props.onHome)(); } } : null} />
+            {onMyWeb ? <div className="links-empty-web"><UiButton kind="text" icon="web" onClick={onMyWeb}>Open My Web</UiButton></div> : null}
+          </>
+        ) : (
+          <>
+            <ListSearch placeholder="Search links" value={searchQuery} onChange={setSearchQuery} />
+            {/* Broken links: the one notice style (W1 Notice). */}
+            {brokenLinks.length > 0 && !searchQuery && (
+              <Notice tone="warn" icon="link" className="links-broken"
+                title={brokenLinks.length === 1 ? '1 link leads nowhere' : brokenLinks.length + ' links lead nowhere'}
+                text={(brokenLinks.length === 1
+                  ? 'Its source or target was deleted.'
+                  : 'A source or target was deleted.') + ' Remove one with its menu.'} />
+            )}
+            <ListLine count={displayLinks.length} of={allLinks.length} noun="link" sort={sortMode} onSort={setSortMode} options={LINK_SORTS} />
+            {displayLinks.length === 0
+              ? <p className="lib-none">No links match “{searchQuery.trim()}”.</p>
+              : (
+                <div className="notes-index-list">
+                  {displayLinks.map(function(lnk) {
+                    return <LinkRow key={lnk.id} lnk={lnk} onNavigateSource={onNavigateSource} onNavigateTarget={onNavigateTarget}
+                      onMenu={setActionTarget} onMyWeb={onMyWeb} />;
+                  })}
+                </div>
+              )}
           </>
         )}
 
-        {/* Broken links callout */}
-        {brokenLinks.length > 0 && !searchQuery && (
-          <div className="links-broken-callout">
-            <span className="links-broken-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                <line x1="2" y1="2" x2="22" y2="22" />
-              </svg>
-            </span>
-            <span className="links-broken-text">
-              {brokenLinks.length}
-              {brokenLinks.length === 1
-                ? ' link points to content that can no longer be found (the source or target was deleted).'
-                : ' links point to content that can no longer be found (a source or target was deleted).'}
-              {' Tap ⋮ on a link to remove it.'}
-            </span>
-          </div>
-        )}
-
-        {/* Empty state: no links at all */}
-        {allLinks.length === 0 && (
-          <div className="notes-empty">
-            <div className="notes-empty-title">No Links Yet</div>
-            <div className="notes-empty-hint">
-              Select text in any letter or Bible chapter, tap Link in the toolbar, and pick a destination. Your links will appear here.
-            </div>
-            {props.onHome && (
-              <button type="button" className="empty-cta" onClick={function() { props.onHome(); }}>Start reading</button>
-            )}
-          </div>
-        )}
-
-        {/* Empty state: no matches */}
-        {allLinks.length > 0 && displayLinks.length === 0 && (
-          <div className="notes-empty">
-            <div className="notes-empty-title">No Matches</div>
-            <div className="notes-empty-hint">Try a different search term.</div>
-          </div>
-        )}
-
-        {/* Link rows */}
-        {displayLinks.length > 0 && (
-          <div className="notes-index-list" style={{ marginTop: '0.75rem' }}>
-            {displayLinks.map(function(lnk) {
-              return (
-                <LinkRow
-                  key={lnk.id}
-                  lnk={lnk}
-                  onNavigateSource={onNavigateSource}
-                  onNavigateTarget={onNavigateTarget}
-                  onLongPress={function(l) { setActionTarget(l); }}
-                />
-              );
-            })}
-          </div>
-        )}
-
-        {/* Action sheet (long-press on a row) */}
-        {actionTarget && (
-          <LinkRowActionSheet
-            lnk={actionTarget}
-            onClose={function() { setActionTarget(null); }}
-            onNavigateSource={function(lnk) { onNavigateSource(lnk); setActionTarget(null); }}
-            onNavigateTarget={function(lnk) { onNavigateTarget(lnk); setActionTarget(null); }}
-            onDelete={onDeleteFromSheet}
-          />
-        )}
+        <LinkRowActionSheet lnk={actionTarget} onClose={closeAction} onNavigateSource={onNavigateSource}
+          onNavigateTarget={onNavigateTarget} onMyWeb={onMyWeb} onDelete={setDeleting} />
+        <ActionSheet open={!!deleting} onClose={closeDelete} title="Delete this link?" portal
+          confirm={{ label: 'Delete', danger: true, onConfirm: function() { if (deleting) LinkStore.remove(deleting.id); } }}>
+          Both passages stay; only the link between them goes.
+        </ActionSheet>
       </div>
     </ScreenLayout>
   );

@@ -7066,6 +7066,23 @@
     .hlx-none-text { margin: 0 0 var(--sp-2); }
     /* Bookmarks (mock v2 l-book): rows are ListRows; the reader's thought is read in the bookmark's sheet. */
     .bkm-thought { margin: 0 2px var(--sp-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; }
+    /* Links (mock v2 l-links): one card per link, From and To halves (each opens its end) on a hairline with the
+       link mark, a foot with when, See in My Web and the menu. */
+    .link-row { border-radius: var(--r-card); background: var(--surface-1); overflow: hidden; }
+    .link-half { display: flex; flex-direction: column; width: 100%; padding: 14px var(--card-pad) 15px; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color var(--press) ease; }
+    .link-half:active { background: var(--surface-2); }
+    .link-half-word { margin-bottom: 3px; color: var(--text-3); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 500; }
+    .link-half-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: var(--lh-headline); }
+    .link-half-cat { color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+    .link-half-quote { margin-top: var(--sp-2); padding-left: 12px; border-left: 2px solid var(--surface-3); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); font-style: italic; line-height: 23px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+    .link-join { position: relative; height: 1px; margin: 0 var(--card-pad); background: var(--hairline); }
+    .link-join span { position: absolute; left: 50%; top: -14px; display: grid; place-items: center; width: 28px; height: 28px; margin-left: -14px; border-radius: 50%; background: var(--surface-2); color: var(--accent); }
+    .link-foot { display: flex; align-items: center; gap: var(--sp-3); padding: 2px 4px 2px var(--card-pad); border-top: 1px solid var(--hairline); }
+    .link-foot-date { flex: 1; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); }
+    .link-foot-web { display: inline-flex; align-items: center; gap: 2px; min-height: var(--tap); }
+    .link-arrow { color: var(--accent); }
+    .links-broken { margin-top: var(--sp-3); }
+    .links-empty-web { display: flex; justify-content: center; margin-top: calc(-1 * var(--sp-4)); }
     /* ── end W2 LIBRARY FAMILY: the lists ── */
     .notes-empty {
       padding: 3rem 1rem; text-align: center;
@@ -7352,106 +7369,6 @@
       color: var(--cream-muted);
     }
 
-    /* ── Links Screen ── */
-    .links-screen {
-      max-width: 45rem; margin: 0 auto;
-      padding: 1.25rem 1rem 4rem;
-      width: 100%;
-    }
-    /* Link row: two tappable endpoint buttons (source / target) connected
-       by a chain icon in between. */
-    .link-row {
-      display: flex; flex-direction: column;
-      background: var(--bg2);
-      border: 1px solid var(--gold-border);
-      border-radius: 10px;
-      overflow: hidden;
-      transition: border-color 0.18s ease, background 0.18s ease;
-    }
-    @media (hover: hover) { .link-row:hover { border-color: var(--gold); } }
-    .link-row-side {
-      display: flex; flex-direction: column; gap: 0.2rem;
-      width: 100%; padding: 0.85rem 1rem 0.8rem;
-      background: transparent; border: none;
-      text-align: left; cursor: pointer;
-      -webkit-tap-highlight-color: transparent;
-      transition: background 0.12s;
-    }
-    .link-row-side:active { background: var(--gold-faint); }
-    @media (hover: hover) { .link-row-side:hover { background: var(--gold-faint); } }
-    .link-row-source { border-bottom: 1px solid var(--gold-border); }
-    .link-row-side-eyebrow {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--gold-dim); margin-bottom: 0.1rem;
-    }
-    .link-row-source .link-row-side-eyebrow { color: var(--gold); }
-    .link-row-side-label {
-      font-family: 'Cinzel', serif; font-size: var(--fs-13);
-      letter-spacing: 0.04em;
-      color: var(--cream-dim);
-      line-height: 1.25;
-    }
-    .link-row-source .link-row-side-label { color: var(--gold-bright); }
-    body.light .link-row-source .link-row-side-label { color: var(--gold); }
-    .link-row-side-cat {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-    }
-    .link-row-side-preview {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-14); color: var(--cream-muted);
-      line-height: 1.4;
-      display: -webkit-box; -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical; overflow: hidden;
-      margin-top: 0.15rem;
-    }
-    .link-row-mid {
-      display: flex; align-items: center; justify-content: center;
-      gap: 0.6rem;
-      padding: 6px 1rem;
-      background: rgba(214,179,95,0.04);
-      position: relative;
-    }
-    /* Visible ⋯ options button (mirrors .bkm-row-more) — pinned to the mid
-       strip's right edge with a 44px hit area; opens the same action sheet
-       long-press does. */
-    .link-row-more {
-      position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
-      background: none; border: none; cursor: pointer;
-      color: var(--cream-muted); padding: 10px;
-      -webkit-tap-highlight-color: transparent;
-      transition: color 0.12s;
-    }
-    .link-row-more:active, .link-row-more:hover { color: var(--gold); }
-    .link-row-more svg { width: 16px; height: 16px; display: block; }
-    .link-row-chain {
-      width: 14px; height: 14px;
-      stroke: var(--gold-dim); flex-shrink: 0;
-    }
-    .link-row-date {
-      font-family: 'Cinzel', serif; font-size:var(--fs-12);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: var(--cream-muted);
-    }
-    /* Broken-links passive callout */
-    .links-broken-callout {
-      display: flex; align-items: flex-start; gap: 0.7rem;
-      padding: 0.85rem 1rem;
-      background: rgba(244,143,177,0.07);
-      border: 1px solid rgba(239,154,154,0.22);
-      border-radius: 10px;
-      margin: 0.85rem 0 0;
-    }
-    .links-broken-icon {
-      flex-shrink: 0; color: var(--danger); margin-top: 1px;
-    }
-    .links-broken-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 1.6; }
-    .links-broken-text {
-      font-family: var(--font-body); font-style: italic;
-      font-size: var(--fs-15); color: var(--cream-muted); line-height: 1.45;
-    }
     /* Link action sheet (long-press) */
     .link-action-overlay {
       position: fixed; inset: 0; z-index: 8550;

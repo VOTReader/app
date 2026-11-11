@@ -212,8 +212,8 @@ describe('app.css — the personal-study header starts at one height', () => {
     const m = new RegExp('(?:^|\\n)\\s*' + sel.replace(/[.]/g, '\\.') + ' \\{([^}]*)\\}').exec(bare);
     return m ? m[1] : '';
   };
-  // Notes and Bookmarks left for the UI pass's .lib-screen (W2): their title is the bar's, with no page header.
-  it.each(['.library-screen', '.prg-screen', '.links-screen', '.plans-screen'])(
+  // Notes, Bookmarks and Links left for the UI pass's .lib-screen (W2): their title is the bar's, with no page header.
+  it.each(['.library-screen', '.prg-screen', '.plans-screen'])(
     '%s pads its top 1.25rem', (sel) => {
       expect(block(sel)).toMatch(/padding:\s*1\.25rem\s/);
     });
@@ -756,8 +756,8 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
     // Label pass 2 (2026-09-25): the personal-study screens, the index lists, and the back and Listen pills.
     '.back-hint-pill', '.notes-index-sort', '.notes-index-sort-btn', '.note-row-date', '.note-row-nb',
     '.coverage-badge', '.coverage-badge-detail',
-    '.history-entry-time', '.history-search-count', '.link-row-date',
-    '.link-row-side-eyebrow', '.link-row-side-cat', '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
+    '.history-entry-time', '.history-search-count',
+    '.hero-play-pill', '.chapter-cards.two-col .two-col-num',
     '.part-group-num', '.idx-note-chip',
   ];
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');

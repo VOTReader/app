@@ -1371,6 +1371,13 @@ export function buildScreenRoutes({
             _listOpen(endpoint, meta || { sourceLetterTitle: 'My Links' });
           }
         }}
+        onStartReading={() => _openFirstLetter('Links')}
+        onOpenMyWeb={() => {
+          // "See in My Web" / "Open My Web" (W2): the Scripture Web takes navHandoff 'webMine' and starts in My Web.
+          window.navHandoff.set('webMine', true);
+          setNavOrigin({ screen: 'links-index', returnOrigin: navOrigin || null });
+          setScreen('scripture-web');
+        }}
         onSearch={goSearch}
         onHistory={goHistory}
         historyEnabled={settings.historyEnabled !== false}
