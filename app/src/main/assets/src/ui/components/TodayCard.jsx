@@ -131,7 +131,7 @@ export function PlanListen({ refs, tracksOf, label, disabled = false, onListen, 
     );
   }
   return (
-    <button type="button" className="today-btn" aria-label={name} disabled={disabled} onClick={onListen}>
+    <button type="button" className="ui-btn" aria-label={name} disabled={disabled} onClick={onListen}>
       {minutes ? 'Listen · ' + minutes + ' min' : 'Listen'}
     </button>
   );

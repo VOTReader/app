@@ -3940,7 +3940,7 @@
     .plan-sec { display: flex; align-items: baseline; gap: 8px; }
     .plan-sec .root-section { flex: 1; }
     .plan-sec-link { font-family: var(--pl-ui); font-size: var(--fs-15); }
-    .plan-group-title { margin: 18px 2px 8px; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; }
+    .plan-group-title { margin: 18px 2px 8px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; }
     .plan-find-title { outline: none; }
     .plan-find-title + .plan-group .plan-group-title { margin-top: 4px; }
     .plan-build-list { margin-top: 12px; }
@@ -4043,7 +4043,6 @@
     .plan-item-meta { flex: none; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
     .plan-actions { display: flex; flex-wrap: wrap; gap: 10px; }
     .plan-actions > .ui-btn { flex: 1 1 auto; }
-    .plan-actions > .today-btn { flex: 1 1 auto; min-height: 48px; border-radius: 999px; font-family: var(--pl-ui); font-size: var(--fs-15); letter-spacing: 0.02em; text-transform: none; }
     .plan-week { margin-top: 14px; padding: 14px 10px; }
     .plan-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; }
     .plan-week-day { display: flex; flex-direction: column; align-items: center; gap: 6px; }
