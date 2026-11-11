@@ -7902,7 +7902,7 @@
     .more-menu-page-item.danger { color: var(--tone-danger); }
     .more-menu-row-label { color: var(--text-1); font-family: var(--font-ui); font-size: var(--fsc-16); font-weight: 500; }
     .more-menu-seg button, .more-menu-step button { border: 0; background: var(--surface-2); color: var(--text-2); font-family: var(--font-ui); }
-    .more-menu-seg button.on { background: var(--accent-soft); border: 0; color: var(--accent); font-weight: 500; }
+    .more-menu-seg button.on { background: var(--accent-soft); border: 0; box-shadow: inset 0 0 0 1px var(--accent-ring); color: var(--accent); font-weight: 500; }
     .more-menu-step button { color: var(--text-1); }
     .more-menu-step-value { color: var(--text-2); font-family: var(--font-ui); }
     body.light .more-menu { box-shadow: var(--shadow-float); }
