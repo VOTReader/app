@@ -144,3 +144,21 @@ describe('NoteRow — one control per action', () => {
     expect(onTap).toHaveBeenCalledWith(multi);
   });
 });
+
+describe('NoteRow colour dot (half-baked 17)', () => {
+  it('a note saved with No color shows a hollow ring, not a coloured dot', () => {
+    setupGlobals();
+    const { container } = render(<NoteRow note={{ ...note, color: 'blank' }} onTap={() => {}} />);
+    const dot = /** @type {HTMLElement} */ (container.querySelector('.note-row-swatch'));
+    expect(dot.classList.contains('is-blank')).toBe(true);
+    expect(dot.style.background).toBe('');
+  });
+
+  it('a coloured note still shows its colour', () => {
+    setupGlobals();
+    const { container } = render(<NoteRow note={{ ...note, color: 'green' }} onTap={() => {}} />);
+    const dot = /** @type {HTMLElement} */ (container.querySelector('.note-row-swatch'));
+    expect(dot.classList.contains('is-blank')).toBe(false);
+    expect(dot.style.background).not.toBe('');
+  });
+});

@@ -28,7 +28,9 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
   const noteNbs = (note.notebookIds || [])
     .filter(id => id !== hideNotebookId)
     .map(id => NotebookStore.get(id)).filter(Boolean);
-  const swatchBg = ({
+  // Half-baked 17: a note saved with "No color" (stored as 'blank') shows no coloured dot, never the yellow fallback.
+  const blank = note.color === 'blank';
+  const swatchBg = blank ? null : ({
     yellow: '#ffd700', green: '#76ff03', pink: '#ff4081', red: '#f44336',
     orange: '#ff9100', blue: '#2196f3', purple: '#ba68c8', teal: '#00bcd4',
     brown: '#8d6e63', gray: '#9e9e9e', cyan: '#00bcd4'
@@ -46,7 +48,7 @@ export function NoteRow({ note, onTap, onTapSegment, hideNotebookId }) {
     >
       <button type="button" className="note-row-open"
         aria-label={'Open note: ' + (segments.length > 0 ? segments.map((seg) => seg.label).join(' · ') : sourceLabel)} />
-      <span className="note-row-swatch" style={{ background: swatchBg }} />
+      <span className={'note-row-swatch' + (blank ? ' is-blank' : '')} style={swatchBg ? { background: swatchBg } : undefined} />
       <span className="note-row-body">
         <span className="note-row-source-line">
           {segments.length > 0 ? (

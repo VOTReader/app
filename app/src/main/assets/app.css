@@ -7188,6 +7188,7 @@
       border: 1.5px solid rgba(255,255,255,0.10);
     }
     body.light .note-row-swatch { border-color: rgba(0,0,0,0.10); }
+    .note-row-swatch.is-blank, body.light .note-row-swatch.is-blank { background: transparent; border-color: var(--cream-dim); }
     .note-row-body {
       flex: 1; min-width: 0;
       display: flex; flex-direction: column; gap: 0.18rem;
