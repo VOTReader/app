@@ -30,7 +30,7 @@ const top = (b) => (/(?:^|[\s;{])top:\s*([^;]+);/.exec(b || '') || [])[1];
 describe('the offline-library strip takes layout space (b5l)', () => {
   const strip = top(blocks('.sh-banner.offline-library-banner')[0]);
 
-  it('sits flush under the nav: its 44px buttons + its padding (pinned in px) + its 1px border', () => {
+  it('sits flush under the nav: its 44px buttons + its padding (pinned in px), no border since the UI pass (W1)', () => {
     // The chrome-pin block at the end of app.css freezes the nav's padding in px at every text
     // size (last rule wins), so a rem term drifts from the nav as the reader's text size changes.
     const pin = blocks('.top-nav').pop();
@@ -40,8 +40,14 @@ describe('the offline-library strip takes layout space (b5l)', () => {
     // n229: the strip and the arrows read the one token, --dock-nav-bottom (:root), instead of four
     // hand-copied calcs; the token is what must equal the nav's height.
     expect(strip).toBe('var(--dock-nav-bottom)');
+    // The UI pass (W1, 2026-11-11): the bar has no bottom border (a scroll hairline is a box-shadow, outside the box),
+    // so the token is the inset + --bar-h, and --bar-h must be the 44px row + the pinned padding.
     const token = (/--dock-nav-bottom:\s*([^;]+);/.exec(CSS) || [])[1];
-    expect(token).toBe(`calc(var(--inset-top, 0px) + 44px + ${pad}px + 1px)`);
+    expect(token).toBe('calc(var(--inset-top, 0px) + var(--bar-h))');
+    const barH = (/--bar-h:\s*([\d.]+)px;/.exec(CSS) || [])[1];
+    expect(Number(barH)).toBe(44 + pad);
+    const base = blocks('.top-nav')[0] || '';
+    expect(base).toMatch(/border-bottom:\s*0;/);
   });
 
   it('opens its own height of room under the page nav (not under the tabs overview, which covers it)', () => {
