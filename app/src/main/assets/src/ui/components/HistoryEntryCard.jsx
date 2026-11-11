@@ -47,9 +47,6 @@ export function HistoryEntryCard({ entry, onSelect, chip = null }) {
         <div className="history-entry-meta">
           {chip}
           <span className="history-entry-time">{timeAgo(entry.ts)}</span>
-          {/* A day's repeats of this reading are one row (HistoryScreen folds them); more than one
-              visit says so beside the newest visit's time. Absent, not "1 visits". */}
-          {entry.visits > 1 ? <span className="history-entry-visits">{entry.visits} visits</span> : null}
         </div>
       </div>
     </button>

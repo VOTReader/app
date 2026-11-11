@@ -268,22 +268,30 @@ describe('HistoryScreen — search reaches inside collapsed groups', () => {
 describe('HistoryScreen — resume chips on chapter rows', () => {
   const chipText = () => [...document.querySelectorAll('.idx-min-chip')].map((c) => c.textContent);
 
-  it('shows the cold estimate for a chapter with no frontier', () => {
+  it('shows no progress for a chapter with no frontier, and never a reading-time estimate', () => {
     setupGlobals({ progress: {} });
     renderScreen([chapter('psalms', 'Psalms', 1, today(5))]);
-    expect(chipText()).toEqual([expect.stringMatching(/^~\d+ min$/)]);
-    expect(document.querySelector('.idx-min-chip.in-progress')).toBeNull();
+    expect(chipText()).toEqual([]);
+    expect(document.querySelector('.history-entry-time').textContent).toMatch(/ago|just now|now/i);
   });
 
-  it('shows percent-read and time-left for a chapter left part-way', () => {
+  it('says "Read" for a chapter read to its end, and "N% read" when left part-way: one form, with when', () => {
+    setupGlobals({
+      progress: { [`${READ_VERSION_ID}:psalms:1`]: { b: 4, c: [1, 2, 3, 4], tw: 400, w: 400 } },
+    });
+    renderScreen([chapter('psalms', 'Psalms', 1, today(5))]);
+    expect(chipText()).toEqual(['Read']);
+    expect(document.querySelector('.history-entry-meta').textContent).toMatch(/^Read.*(ago|now)/i);
+  });
+
+  it('shows percent read (no minutes left) for a chapter left part-way', () => {
     setupGlobals({
       progress: { [`${READ_VERSION_ID}:psalms:1`]: { b: 10, c: [1, 2, 3, 4, 5, 6], tw: 500, w: 300 } },
     });
     renderScreen([chapter('psalms', 'Psalms', 1, today(5))]);
     const chip = document.querySelector('.idx-min-chip.in-progress');
     expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('60%');
-    expect(chip.textContent).toContain('min left');
+    expect(chip.textContent).toBe('60% read');
   });
 
   it('reads the frontier under the SAME key the index card uses', () => {
@@ -293,8 +301,8 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
     });
     renderScreen([chapter('psalms', 'Psalms', 1, today(5)), chapter('psalms', 'Psalms', 2, today(9))]);
     const cards = [...document.querySelectorAll('.chapter-card-btn')];
-    expect(within(cards[0]).queryByText(/min left/)).toBeNull();
-    expect(within(cards[1]).getByText(/50% read · ~\d+ min left/)).toBeTruthy();
+    expect(within(cards[0]).queryByText(/% read/)).toBeNull();
+    expect(within(cards[1]).getByText('50% read')).toBeTruthy();
   });
 
   it('gives an unresolvable book no chip at all', () => {
@@ -320,10 +328,10 @@ describe('HistoryScreen — resume chips on chapter rows', () => {
 describe('HistoryScreen — resume chips on letter rows', () => {
   const chipText = () => [...document.querySelectorAll('.idx-min-chip')].map((c) => c.textContent);
 
-  it('shows the cold estimate on a letter row (it showed nothing before)', () => {
+  it('shows no estimate on a letter row with no frontier', () => {
     setupGlobals({ progress: {} });
     renderScreen([letter('the-wide-path', 'The Wide Path', 1, today(5))]);
-    expect(chipText()).toEqual([expect.stringMatching(/^~\d+ min$/)]);
+    expect(chipText()).toEqual([]);
   });
 
   it('shows percent-read and time-left for a letter left part-way', () => {
@@ -333,8 +341,7 @@ describe('HistoryScreen — resume chips on letter rows', () => {
     renderScreen([letter('the-wide-path', 'The Wide Path', 1, today(5))]);
     const chip = document.querySelector('.idx-min-chip.in-progress');
     expect(chip).toBeTruthy();
-    expect(chip.textContent).toContain('40%');
-    expect(chip.textContent).toContain('min left');
+    expect(chip.textContent).toBe('40% read');
   });
 
   it('reads the frontier under v1:<collection readKey>:<letterId>, not a neighbor', () => {
@@ -346,8 +353,8 @@ describe('HistoryScreen — resume chips on letter rows', () => {
       letter('the-seventh-day', 'The Seventh Day', 2, today(9)),
     ]);
     const cards = [...document.querySelectorAll('.chapter-card-btn')];
-    expect(within(cards[0]).queryByText(/min left/)).toBeNull();
-    expect(within(cards[1]).getByText(/50% read · ~\d+ min left/)).toBeTruthy();
+    expect(within(cards[0]).queryByText(/% read/)).toBeNull();
+    expect(within(cards[1]).getByText('50% read')).toBeTruthy();
   });
 
   it('gives a legacy row with no volumeScreen no chip rather than guessing a collection', () => {
@@ -455,14 +462,15 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
   ];
   const cardLabels = () => [...document.querySelectorAll('.chapter-card-label')].map((t) => t.textContent);
   const rowVisits = () => [...document.querySelectorAll('.chapter-card-btn')]
-    .map((r) => (r.querySelector('.history-entry-visits') || {}).textContent || '');
+    .map((r) => (r.querySelector('.history-entry-visits') || {}).textContent || '');   // half-baked 23: always absent
 
-  it('one row per reading per day, counting its visits, at the newest visit; a single visit says nothing; another book at the same number is its own row', () => {
+  it('one row per reading per day, at the newest visit, with no visit count; another book at the same number is its own row', () => {
     setupGlobals();
     renderScreen(REPEATS);
     expect(cardTitles()).toEqual(['The Lord Is My Shepherd', 'Chapter 1', 'Chapter 1']);
     expect(cardLabels()).toEqual(['Psalms', 'Psalms', 'Genesis']);
-    expect(rowVisits()).toEqual(['', '3 visits', '']);
+    expect(rowVisits(), 'no visit counts on a row').toEqual(['', '', '']);
+    expect(document.body.textContent).not.toMatch(/\d+ visits/);
     // The day header counts ROWS, not visits — "Today · 3", never "· 5".
     expect(document.querySelector('.history-day-count').textContent).toBe('\xB7 3');
     expect(document.querySelector('.history-dedupe-btn'), 'the chore button is gone').toBeNull();
@@ -493,7 +501,7 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     expect(cardTitles(), 'the day is shut until tapped').toEqual([]);
     fireEvent.click(document.querySelector('.history-day-header'));
     expect(cardTitles()).toEqual(['Chapter 1']);
-    expect(rowVisits()).toEqual(['2 visits']);
+    expect(rowVisits()).toEqual(['']);
     expect(document.querySelector('.history-day-count'), 'one row, so the day header shows no count').toBeNull();
   });
 
@@ -520,7 +528,7 @@ describe('HistoryScreen — repeats collapse into one row per reading per day', 
     type('chapter 1');
     expect(cardTitles()).toEqual(['Chapter 1', 'Chapter 1']);
     expect(cardLabels()).toEqual(['Psalms', 'Genesis']);
-    expect(rowVisits()).toEqual(['3 visits', '']);
+    expect(rowVisits()).toEqual(['', '']);
   });
 });
 

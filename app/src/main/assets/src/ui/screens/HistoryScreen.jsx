@@ -197,7 +197,17 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
      source's item map is built on FIRST touch and only for sources that
      actually appear in rendered rows, so opening History does not sweep every
      corpus. Collapsed groups never call this at all. */
-  const chipWpm = readingChipWpm();
+  // Half-baked 23: a row's second line is one form, "N% read · when" ("Read · when" at 100%), from the same tracker
+  // record the index card reads. A row with no reading recorded shows only when; no reading-time estimate, no visit count.
+  const progressText = (key) => {
+    if (!key || typeof ReadingStatsStore === 'undefined' || typeof ReadingStatsStore.getProgress !== 'function') return null;
+    let p = null;
+    try { p = ReadingStatsStore.getProgress(key); } catch (_e) { /* stats optional */ }
+    if (!(p && p.b > 0 && p.c && p.c.length > 0)) return null;
+    if (p.c.length >= p.b) return 'Read';
+    const fraction = p.tw > 0 && p.w >= 0 && p.w < p.tw ? p.w / p.tw : p.c.length / p.b;
+    return Math.min(99, Math.round(fraction * 100)) + '% read';
+  };
   const sourceItemCache = new Map();
   const sourceItem = (sourceId, itemKey) => {
     if (!sourceId || itemKey == null || typeof bookItemsFor !== 'function') return null;
@@ -230,7 +240,8 @@ export function HistoryScreen({ history, onBack, backLabel, onHome, onSelect, on
     if (!item) return null;
     const key = (typeof READ_VERSION_ID === 'string')
       ? `${READ_VERSION_ID}:${sourceId}:${itemKey}` : null;
-    return readingMinChip(item, key, chipWpm);
+    const text = progressText(key);
+    return text ? <span className="idx-min-chip in-progress">{text}</span> : null;
   };
 
   // Render one day-section. Used both for current-month days (top of screen)
