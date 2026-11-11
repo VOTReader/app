@@ -63,15 +63,12 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
   // It renders UNDER the title, inside the info column, rather than as a
   // second right-hand chip: at 375px a right-hand pill crushed the title
   // column to 48px (measured live). See the .idx-note-chip block in app.css.
+  // Half-baked 8: the badge is a plain count ("12 notes"), from the chapter's own votNotes; a chapter with none
+  // shows nothing. `noteWeights` now only marks the study index (the ratio it carried read as jargon).
   const noteChip = (ch) => {
-    const ratio = noteWeights ? noteWeights[ch.num] : 0;
-    if (!(ratio > 0)) return null;
-    return (
-      <span
-        className="idx-note-chip"
-        title={`Study commentary runs ${ratio.toFixed(1)}× the length of this chapter's verse text`}
-      >{ratio.toFixed(1)}{"\xD7"} notes</span>
-    );
+    const n = noteWeights && Array.isArray(ch.votNotes) ? ch.votNotes.length : 0;
+    if (!(n > 0)) return null;
+    return <span className="idx-note-chip">{n} {n === 1 ? 'note' : 'notes'}</span>;
   };
   return (
     <ScreenLayout
@@ -100,10 +97,6 @@ export function ChapterIndex({ book, onSelect, onBack, backLabel, onSearch, onHi
             <div className="vol-index-ornament-diamond" />
             <div className="vol-index-ornament-line r" />
           </div>
-          {/* A02.11: the chip's tooltip is the only thing that said what it meant, and a phone shows no tooltips */}
-          {noteWeights && Object.values(noteWeights).some((r) => r > 0) ? (
-            <div className="idx-note-legend">{"\xD7"} notes: how long a chapter{"\u2019"}s study notes run, against its verses</div>
-          ) : null}
         </div>
         <div className="chapter-cards">
           {book.chapters.map((ch, _i) => {

@@ -4740,14 +4740,9 @@
     .idx-note-chip {
       display:inline-block; margin-top:0.3rem; white-space:nowrap;
       font-family:'Cinzel',serif; font-size:var(--fs-12);
-      letter-spacing:0.06em; text-transform:uppercase;
+      letter-spacing:0.06em;
       color:var(--gold-dim); border:1px solid var(--gold-border);
       border-radius:999px; padding:1px 7px;
-    }
-    /* A02.11: what the chip means, said once under the index header (a phone shows no tooltip) */
-    .idx-note-legend {
-      margin-top:0.7rem; font-family:var(--font-body); font-style:italic; font-size:var(--fs-13);
-      color:var(--cream-muted); text-align:center;
     }
     /* ── Part group cards (3-part study hierarchy) ── */
     /* Visual language matches .chapter-card-btn so Parts mesh with chapters. */

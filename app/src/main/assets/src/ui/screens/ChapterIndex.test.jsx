@@ -167,39 +167,34 @@ describe('ChapterIndex — commentary-weight chip', () => {
     expect(noteChips()).toEqual([]);
   });
 
-  it('states the measured ratio per chapter', () => {
+  it('states a plain count of notes per chapter, and nothing for a chapter with none', () => {
     setupGlobals();
-    renderIndex({ noteWeights: { 1: 0.49, 2: 0, 3: 8.43 } });
-    // Chapter 2 carries no notes at all → silence, not "0.0× notes".
-    expect(noteChips()).toEqual(['0.5× notes', '8.4× notes']);
+    const withNotes = { ...BOOK, chapters: [
+      { num: 1, title: 'One', votNotes: [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}] },
+      { num: 2, title: 'Two', votNotes: [] },
+      { num: 3, title: 'Three', votNotes: [{}] },
+    ] };
+    renderIndex({ book: withNotes, noteWeights: { 1: 0.49, 2: 0, 3: 8.43 } });
+    expect(noteChips()).toEqual(['12 notes', '1 note']);
   });
 
-  it('explains itself in the tooltip rather than leaving a bare number', () => {
+  it('draws no badge when the chapters carry no note list, and no caption about ratios', () => {
     setupGlobals();
     renderIndex({ noteWeights: { 1: 2.14 } });
-    expect(document.querySelector('.idx-note-chip').getAttribute('title'))
-      .toBe("Study commentary runs 2.1× the length of this chapter's verse text");
-  });
-
-  /* A02.11: a phone shows no tooltip, so the page says once what the chip means */
-  it('says once under the header what the chip means, and only on an index that has chips', () => {
-    setupGlobals();
-    renderIndex({ noteWeights: { 1: 2.14 } });
-    expect(document.querySelector('.idx-note-legend').textContent).toContain('study notes run');
-    cleanup();
-    renderIndex({ noteWeights: { 1: 0 } });
+    expect(noteChips()).toEqual([]);
     expect(document.querySelector('.idx-note-legend')).toBeNull();
+    expect(document.body.textContent).not.toMatch(/×/);
   });
 
   it('sits alongside the minute chip without displacing it', () => {
     setupGlobals();
     globalThis.countItemWords = countItemWords;
     globalThis.readingMinutes = readingMinutes;
-    const WORDY = { ...BOOK, chapters: [{ num: 1, title: 'One', sections: [{ verses: [{ n: 1, text: Array.from({ length: 460 }, () => 'w').join(' ') }] }] }] };
+    const WORDY = { ...BOOK, chapters: [{ num: 1, title: 'One', votNotes: [{}, {}, {}], sections: [{ verses: [{ n: 1, text: Array.from({ length: 460 }, () => 'w').join(' ') }] }] }] };
     renderIndex({ book: WORDY, noteWeights: { 1: 3.58 } });
     const card = document.querySelector('.chapter-card-btn');
     expect(card.querySelector('.idx-min-chip').textContent).toBe('~2 min');
-    expect(card.querySelector('.idx-note-chip').textContent).toBe('3.6× notes');
+    expect(card.querySelector('.idx-note-chip').textContent).toBe('3 notes');
   });
 });
 
