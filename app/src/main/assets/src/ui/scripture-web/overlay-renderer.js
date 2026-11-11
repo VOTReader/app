@@ -218,7 +218,7 @@ const MAJOR_BOOKS = ['genesis', 'psalms', 'isaiah', 'matthew', 'john', 'revelati
     apart, not r2-01a's seven: in canon order the epistles begin at ROM, and 1COR gives way. */
 const PICTURE_BOOKS = ['exodus', 'leviticus', 'numbers', 'deuteronomy', 'joshua', 'judges', 'mark', 'luke', 'acts', 'romans', '1corinthians'];
 /** The DOM chrome the canvas keeps its text off (the round buttons; the strip when it sits low). */
-const ZONE_SELECTORS = ['.sw-hide-all', '.sw-guide-btn', '.sw-controls'];
+const ZONE_SELECTORS = ['.sw-hide-all', '.sw-wbot-end', '.sw-controls', '.sw-wpills'];
 
 /** Type sizes, PC / compact (spec §3, §4.3; the compact sizes under 12 are lifted to the 12 floor). */
 const SIZES = {

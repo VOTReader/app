@@ -74,7 +74,7 @@ const CHIP_GAP = 10;
 const CHIP_GUTTER = 8;
 /** The page's own controls the verse chip keeps off when they stand in its row (w4: over a sheet it
  * ran under hide-UI, "Isaiah 53:5 · 27 connecti…"). */
-const CHIP_KEEP_OFF = '.sw-hide-all, .sw-guide-btn, .sw-controls';
+const CHIP_KEEP_OFF = '.sw-hide-all, .sw-wbot-end, .sw-controls';
 
 /**
  * The boxes of CHIP_KEEP_OFF in the root, CSS px: from the offsets, not the client rects, so a turned
@@ -627,12 +627,13 @@ export function useGoTo(web) {
   if (!live) return NO_GOTO;
 
   const button = mode === 'personal' ? null : (
-    <button type="button" ref={buttonRef} className="sw-btn sw-btn-icon sw-goto-btn"
+    <button type="button" ref={buttonRef} className="sw-btn sw-goto-btn"
       aria-label="Go to a book, chapter or verse" title="Go to ( / )" aria-haspopup="dialog" aria-expanded={isOpen}
       onClick={() => (isOpen ? close() : open())}>
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
         <circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5L20.5 20.5" />
       </svg>
+      Go to
     </button>
   );
 

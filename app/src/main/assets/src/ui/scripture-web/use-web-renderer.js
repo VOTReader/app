@@ -245,7 +245,8 @@ export function useWebRenderer({
   // without WebGL2 the screen shows the canon web as a list; My Web stays drawn (w3 item 31)
   const listShown = noWebGL && mode !== 'personal';
   const [glRetry, setGlRetry] = React.useState(0);
-  const [railZoom, setRailZoom] = React.useState({ top: false, bottom: false });
+  // WA4: `whole` = the canon zoomed in past its fit (the bottom bar's Whole web)
+  const [railZoom, setRailZoom] = React.useState(/** @type {{ top: boolean, bottom: boolean, whole?: boolean }} */ ({ top: false, bottom: false }));
   const railZoomRef = React.useRef(railZoom);
   const rendererRef = React.useRef(null);
   // the convergence pills: the counted cells, cached across frames while
@@ -392,6 +393,9 @@ export function useWebRenderer({
     // Its anchored count (the shader's arcAnchored over the drawn feet) is the
     // crowding law's: every anchored thread is drawn, so it counts them all.
     const set = frameSet(g, cam, base);
+    // WA4: the canon zoomed in past its fit shows "Whole web" (setState only when the answer changes)
+    const whole = zoom > 1.02;
+    if (whole !== !!railZoomRef.current.whole) { railZoomRef.current = { ...railZoomRef.current, whole }; setRailZoom(railZoomRef.current); }
     const perCssPx = base.localize > 0 ? set.anchored / ((v.W || 1) / (v.DPR || 1)) : 0;
     // the ceiling's own ease takes the crowd to 1 (D1 at every ceiling): it reads the CSS px a verse
     const style = ribbonStyle(zoom, base.localize, perCssPx, cam.ppv / (v.DPR || 1));

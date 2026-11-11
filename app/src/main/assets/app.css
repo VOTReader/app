@@ -4680,6 +4680,7 @@
     .card-direct .srch-card-snippet { color:var(--text-1); font-size:var(--ts-headline); }
     .srch-direct-acts { display:flex; gap:10px; margin-top:14px; }
     .srch-direct-acts > .ui-btn { flex:1 1 0; }
+    .srch-direct-acts > .srch-direct-listen { background:var(--surface-2); }
     .search-screen .srch-direct > .ui-label { background:none; border-radius:0; margin:6px 0 0; }
     .srch-card-wrap > .srch-card { padding-bottom:8px; }
     .srch-places-toggle, .srch-also-toggle { width:calc(100% - 2 * var(--card-pad)); margin:0 var(--card-pad); border-top-color:var(--hairline); color:var(--accent); font-family:var(--font-ui); font-size:var(--ts-meta); letter-spacing:0; text-transform:none; }
@@ -7369,7 +7370,6 @@
     .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-title { flex-wrap: wrap; row-gap: 0; }
     /* the count beside the title stood over the chosen verse's gold fan, and says nothing of what was
        chosen: with a verse open on a phone it steps aside (h1104-7) */
-    .sw-root.sw-compact.sw-panel-open .sw-title-count { visibility: hidden; }
     /* STACKED (use-panel-layout.js stackedFor: a tablet's 348 px of canvas beside the panel at
        768x1024, a small phone's): the strip drops under the header, clear of the density's hint
        line under the title, and the go-to's edge chips under the strip (its 58 px and 8 more);
@@ -7409,11 +7409,11 @@
     .sw-root.sw-compact .sw-btn { min-height: 36px; font-size: var(--fsc-15); }
     .sw-root.sw-compact .sw-btn::after { top: -5px; bottom: -5px; }
     /* Back, ? and hide-UI are round: 44 px on PC, 40 with a 44 hit on a phone. */
-    :is(.sw-topbar, .sw-fallback) .sw-btn-icon, .sw-hide-all, .sw-guide-btn { width: 44px; height: 44px; border-radius: 50%; }
+    :is(.sw-topbar, .sw-fallback) .sw-btn-icon, .sw-hide-all { width: 44px; height: 44px; border-radius: 50%; }
     /* the error page replaces the root, topbar and all, and carries its own Back where the topbar's
        sits: on a phone it is the same 40 px (w4 review), so Back keeps its size when a load fails */
-    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn), .sw-fallback.sw-compact .sw-fallback-back { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
-    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all, .sw-guide-btn)::after, .sw-fallback.sw-compact .sw-fallback-back::after { left: -2px; right: -2px; top: -2px; bottom: -2px; }
+    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all), .sw-fallback.sw-compact .sw-fallback-back { width: 40px; height: 40px; min-width: 40px; min-height: 40px; }
+    .sw-root.sw-compact :is(.sw-topbar .sw-btn-icon, .sw-hide-all)::after, .sw-fallback.sw-compact .sw-fallback-back::after { left: -2px; right: -2px; top: -2px; bottom: -2px; }
     /* HIDE ALL. One button OUTSIDE everything it hides (it is the way back), in the
        bottom-right corner with ? beside it (spec 4.1: bottom 16 / right 24, a 12 px gap; 8 / 16
        on a phone). Hidden, it says so in words, "Show controls": the label flips with its name,
@@ -7485,8 +7485,6 @@
        The verse chip rides the verse's foot (placed per frame from JS; it
        takes no pointer; over a bottom sheet it stands on the sheet's top
        edge); the edge chips sit at the frame's edges and Follow. */
-    .sw-goto-btn { width: 44px; height: 44px; min-width: 44px; padding: 0; }
-    .sw-goto-btn svg { width: 20px; height: 20px; }
     /* goto.jsx gotoBoxPlace measures where the PC box sits clear of the title and the control row
        (--sw-goto-x its centre, --sw-goto-w, --sw-goto-top); the fallbacks are the spec's place */
     .sw-goto {
@@ -8087,25 +8085,14 @@
       max-width: calc(100% - var(--sw-panel-w, 40%) - 48px);
     }
     .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-controls { right: calc(var(--sw-panel-w, 42%) + 16px - 7px); }
-    .sw-root.sw-panel-open[data-panel="dock"] .sw-guide-btn { right: auto; left: 24px; }
     .sw-root.sw-panel-open[data-panel="dock"] .sw-hide-all { right: auto; left: 80px; }
-    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-guide-btn { left: 16px; }
     .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-hide-all { left: 68px; }
     /* ...but a phone keeps the key's tail, the CC-BY credit (w4 integration; the hub: the credit
        stays on screen, a licence obligation). Its panel's own credit is last in the scroll, below
        the fold (ink F8), so the credit alone stays at the canvas area's bottom-right, clear of ?
        and hide-UI at its bottom-left (16 + 40 + 12 + 40 + 16; the "Show controls" pill is wider),
        and wraps rather than clip on a phone too narrow for one line. PC pins the panel's credit. */
-    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend {
-      display: block; left: auto; right: calc(var(--sw-panel-w, 42%) + 16px);
-      max-width: calc(100% - var(--sw-panel-w, 42%) - 140px); text-align: right;
-    }
-    .sw-root.sw-compact.sw-chrome-hidden.sw-panel-open[data-panel="dock"] .sw-legend { max-width: calc(100% - var(--sw-panel-w, 42%) - 240px); }
-    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend-line { justify-content: flex-end; }
-    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend-line > :not(.sw-credit) { display: none; }
-    .sw-root.sw-compact.sw-panel-open[data-panel="dock"] .sw-legend .sw-credit { white-space: normal; }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-hide-all { bottom: calc(var(--sw-sheet-h, 60%) + 8px); }
-    .sw-root.sw-panel-open[data-panel="sheet"] .sw-guide-btn { bottom: calc(var(--sw-sheet-h, 60%) + 60px); }
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-controls { bottom: calc(var(--sw-sheet-h, 60%) + 10px); }
     /* the go-to's edge chips over a sheet ride above the bottom row (the ? at 60 px + 44, the
        controls at 10 px + 58), never on it. A compact sheet leaves the canvas about 176 px
@@ -8114,7 +8101,6 @@
     .sw-root.sw-panel-open[data-panel="sheet"] .sw-goto-edge {
       top: min(max(23%, calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 8px)), calc(100% - var(--sw-sheet-h, 60%) - 112px - 44px));
     }
-    .sw-root.sw-compact.sw-panel-open[data-panel="sheet"] .sw-guide-btn { right: 68px; bottom: calc(var(--sw-sheet-h, 60%) + 8px); }
     .sw-root.sw-compact.sw-panel-open[data-panel="sheet"] .sw-goto-edge {
       top: min(max(23%, calc(var(--sw-chrome-top) + var(--sw-topbar-floor) + 8px)), calc(100% - var(--sw-sheet-h, 60%) - 68px - 40px));
       min-height: 40px;
@@ -8157,16 +8143,11 @@
        phone. On a narrower one it WRAPS (the line's own flex-wrap), the credit to the second line:
        never clipped, it is the licence's (w4 review: nowrap under the clip cut "(CC-BY)" at 780 px).
        Each item keeps its words together; the canvas reads the legend's live top. */
-    .sw-root.sw-compact .sw-legend {
-      left: 16px; bottom: calc(8px + var(--sw-safe-bottom));
-      font-size: var(--fsc-12); line-height: 1.25; max-width: calc(100% - 140px);
-    }
     .sw-root.sw-compact .sw-legend-line > * { white-space: nowrap; }
     .sw-key-short { display: none; }
     .sw-root.sw-compact .sw-key-long { display: none; }
     .sw-root.sw-compact .sw-key-short { display: inline; }
     /* hidden, the hide-UI pill says "Show controls" and is wider than the two round buttons */
-    .sw-root.sw-chrome-hidden .sw-legend { max-width: calc(100% - 210px); }
     /* THE SEPARATORS. Each item carries its dot in its own 21 px left margin and the line is pulled
        left by that margin, so the first item of every line, wrapped or not, has its dot outside the
        legend's clipped box: a wrapped line never starts with a dot. */
@@ -8223,8 +8204,6 @@
     .sw-key-ramp { gap: 0; }
     .sw-key-ramp .sw-chip { padding: 1px 5px; }
     .sw-key-ramp .sw-key-gradient { margin: 0 2px; }
-    .sw-chip-more { color: var(--sw-text-meta); }
-    .sw-chip-more svg { flex: none; display: block; }
     /* the pill: what is on and the count it leaves, centred under the top bar (the bar's row is the
        title's and the controls', and on a PC they meet in the middle), at the top with the controls
        hidden, there either way */
@@ -8353,25 +8332,10 @@
       font-family: var(--sw-font); color: var(--sw-text-body);
     }
     .sw-guide-title { font-size: var(--fs-20); color: var(--sw-title); margin-bottom: 8px; }
-    .sw-guide-body { margin: 0 0 10px; padding-left: 18px; font-size: var(--fs-15); line-height: 1.45; }
-    .sw-guide-body li + li { margin-top: 4px; }
-    .sw-guide-body strong { color: var(--sw-gold); font-weight: 600; }
     /* Got it is the web's own control (the panel is dark in both themes, so the light theme's
        grey-blob problem it once had cannot arise), right-aligned. */
-    .sw-guide-close { display: flex; margin: 0 0 0 auto; }
-    .sw-guide-btn {
-      /* beside the hide-all button, on its left (44 + a 12 px gap; 40 + 12 on a phone): above
-         it the button sat on the ruler's last chapter numeral (the l14 sky picture). Its ink is
-         the web's own, so it reads in the light theme too (item 18, crop-pc-light-qbtn). */
-      position: absolute; z-index: 5; right: 80px;
-      bottom: calc(16px + var(--sw-safe-bottom));
-      font-size: var(--fsc-20); font-weight: 500;
-    }
-    .sw-root.sw-compact .sw-guide-btn { right: 68px; bottom: calc(8px + var(--sw-safe-bottom)); font-size: var(--fsc-18); }
-    .sw-root.sw-chrome-hidden .sw-guide-btn { display: none; }
     /* a narrow root parks the controls bottom-left and keeps the right 76 px
        column free: the ? stacks above hide-all there instead */
-    .sw-root.sw-narrow .sw-guide-btn { right: 14px; bottom: calc(60px + var(--sw-safe-bottom)); }
 
     /* My Web — the empty state, shown until the reader's first link lands. */
     .sw-empty {
@@ -8493,6 +8457,97 @@
     }
 
     .sw-fallback-row { display: flex; gap: 10px; }
+    /* ── WA4 web: the Scripture Web's chrome to the v2 pictures (mock web.html w-main, w-guide, w-menu, w-focus).
+       The drawing is untouched; these are the bars around it. The title is the Scripture Web | My Web switch
+       beside a round Back; the ⋯ holds the rare things; the bottom bar holds Go to, Filters, List, the key, and
+       the zoom pair (with "Whole web" while zoomed in). Glass = the mock's dark pill, in both themes, as the
+       web's chrome always is (its ink tokens stay the web's own). ── */
+    .sw-root { --sw-glass: rgba(24, 24, 22, 0.95); --sw-glass-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
+    .sw-root .sw-topbar { align-items: center; gap: 8px; padding: 0; left: 12px; top: var(--sw-chrome-top); }
+    .sw-root .sw-topbar .sw-title { display: flex; align-items: center; gap: 10px; padding-top: 0; min-width: 0; }
+    .sw-root .sw-topbar .sw-title p { margin: 0; font-family: var(--font-ui); font-size: var(--fsc-12); color: var(--sw-text-meta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sw-root :is(.sw-topbar .sw-btn-icon, .sw-more-btn) {
+      width: 42px; height: 42px; min-width: 42px; min-height: 42px; padding: 0; border: 0; border-radius: 50%;
+      background: var(--sw-glass); box-shadow: var(--sw-glass-shadow); color: var(--sw-title);
+    }
+    .sw-root :is(.sw-topbar .sw-btn-icon, .sw-more-btn)::after { inset: -3px; }
+    .sw-root .sw-more-btn.is-on { box-shadow: inset 0 0 0 1.5px var(--sw-gold), var(--sw-glass-shadow); }
+    .sw-root .sw-topbar .sw-wname { flex: none; height: 42px; box-sizing: border-box; padding: 3px; gap: 0; border: 0; border-radius: 21px; background: var(--sw-glass); box-shadow: var(--sw-glass-shadow); }
+    .sw-root .sw-wname .sw-seg-btn {
+      min-height: 36px; padding: 0 15px; border: 0; border-radius: 18px; background: none;
+      font-family: var(--sw-font); font-size: var(--fsc-18); font-weight: 600; line-height: 1; color: var(--sw-text-muted);
+    }
+    .sw-root .sw-wname .sw-seg-btn.is-on { background: var(--sw-active-fill); color: var(--sw-title); box-shadow: inset 0 0 0 1px var(--sw-active-border); }
+    .sw-root .sw-wname .sw-seg-btn::after { top: -6px; bottom: -6px; }
+    .sw-root .sw-controls { right: 12px; top: var(--sw-chrome-top); padding: 0; }
+    /* the ⋯ menu: worded rows, a short fact under the rare ones */
+    .sw-root.sw-collapse.sw-menu-open .sw-menu.sw-wmenu {
+      position: absolute; top: calc(100% + 6px); right: 0; bottom: auto; left: auto; width: 262px;
+      display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 6px 0;
+      background: var(--sw-glass); border: 0; border-radius: 16px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.6);
+    }
+    .sw-mrow {
+      display: flex; align-items: center; gap: 13px; width: 100%; min-height: 48px; box-sizing: border-box;
+      padding: 5px 16px 5px 14px; border: 0; background: none; color: var(--sw-title); text-align: left; cursor: pointer;
+      font-family: var(--font-ui); font-size: var(--fsc-15); font-weight: 500; line-height: 1.3;
+    }
+    .sw-mrow svg { width: 20px; height: 20px; flex: none; color: var(--sw-gold); }
+    .sw-mrow small { display: block; font-size: var(--fsc-12); font-weight: 400; color: var(--sw-text-meta); }
+    .sw-mrow:active { background: var(--sw-active-fill); }
+    .sw-mrow:focus-visible { outline: 2px solid var(--sw-gold); outline-offset: -2px; }
+    /* the bottom bar */
+    .sw-wbot {
+      position: absolute; z-index: 4; left: 12px; right: 12px; bottom: calc(7px + var(--sw-safe-bottom)); height: 40px;
+      display: flex; align-items: center; gap: 8px; pointer-events: none;
+    }
+    .sw-wbot > * { pointer-events: auto; }
+    .sw-root .sw-wbot .sw-legend .sw-chip { min-height: 0; padding-top: 0; padding-bottom: 0; }
+    .sw-wpills { flex: none; display: flex; gap: 8px; }
+    .sw-root .sw-wbot .sw-btn {
+      flex: none; min-height: 40px; height: 40px; min-width: 40px; gap: 7px; padding: 0 14px 0 12px; border: 0; border-radius: 20px;
+      background: var(--sw-glass); box-shadow: var(--sw-glass-shadow); color: var(--sw-title);
+      font-family: var(--font-ui); font-size: var(--fsc-14); font-weight: 500;
+    }
+    .sw-root .sw-wbot .sw-btn::after { top: -4px; bottom: -4px; }
+    .sw-root .sw-wbot .sw-btn svg { width: 19px; height: 19px; color: var(--sw-gold); }
+    .sw-root .sw-wbot .sw-btn.is-on { box-shadow: inset 0 0 0 1.5px var(--sw-gold), var(--sw-glass-shadow); color: var(--sw-title); }
+    .sw-wpill-count { min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 4px; border-radius: 9px; background: var(--sw-gold); color: #1a1608; font-size: var(--fsc-12); font-weight: 600; line-height: 18px; text-align: center; }
+    .sw-wbot-end { flex: none; display: flex; gap: 8px; margin-left: auto; }
+    .sw-wzoom { display: flex; border-radius: 20px; background: var(--sw-glass); box-shadow: var(--sw-glass-shadow); pointer-events: auto; }
+    .sw-root .sw-wbot .sw-wzoom .sw-btn { width: 42px; min-width: 42px; padding: 0; background: none; box-shadow: none; border-radius: 20px; }
+    .sw-root .sw-wbot .sw-wzoom .sw-btn + .sw-btn { box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.12); border-radius: 0 20px 20px 0; }
+    .sw-root .sw-wbot .sw-wzoom .sw-btn svg { color: var(--sw-title); }
+    /* the key: two centred lines between the pills and the zoom; the count and the credit on the second */
+    .sw-root .sw-wbot .sw-legend {
+      position: static; flex: 1 1 auto; min-width: 0; max-width: none; align-self: flex-end; overflow: visible; padding: 0; margin-bottom: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px;
+      font-family: var(--font-ui); font-size: var(--fsc-12); line-height: 1; color: var(--sw-text-meta); pointer-events: none;
+    }
+    .sw-root .sw-wbot .sw-legend-line { flex-wrap: nowrap; justify-content: center; margin-left: -14px; }
+    .sw-root .sw-wbot .sw-legend-line > * { margin-left: 14px; white-space: nowrap; }
+    .sw-root .sw-wbot .sw-legend-line > *::before { content: none; }
+    .sw-legend-sub { max-width: 100%; text-align: center; line-height: 1.2; font-size: var(--fsc-11); color: var(--sw-text-muted); }
+    /* a phone zoomed in: the key's cues give way to the deep ruler (the canvas keeps its text above the key's top;
+       two lines cost the verse numerals at ~200x); the count and the credit stay, and Filters holds the same toggles */
+    .sw-root.sw-compact.sw-zoomed .sw-wbot .sw-legend-line { display: none; }
+    /* a card open: the key's cues give way, its count and the CC-BY credit stay (the licence's), wrapping if short of room */
+    .sw-root.sw-panel-open .sw-wbot .sw-legend { display: flex; }
+    .sw-root.sw-panel-open .sw-wbot .sw-legend-line { display: none; }
+    .sw-root.sw-panel-open[data-panel="dock"] .sw-wbot { right: calc(var(--sw-panel-w, 42%) + 12px); }
+    .sw-root.sw-panel-open[data-panel="sheet"] .sw-wbot { bottom: calc(var(--sw-sheet-h, 60%) + 10px); }
+    /* hidden controls: the key stays, the bar's buttons go; "Show controls" keeps the corner */
+    .sw-root.sw-chrome-hidden .sw-wbot > :not(.sw-legend) { visibility: hidden; }
+    .sw-root .sw-hide-all { right: 12px; bottom: calc(7px + var(--sw-safe-bottom)); background: var(--sw-glass); border: 0; box-shadow: var(--sw-glass-shadow); font-family: var(--font-ui); font-size: var(--fsc-14); }
+    /* How to read this web: four points, each with its icon; the way back to it named at the foot */
+    .sw-root .sw-guide .sw-guide-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+    .sw-guide-pt { display: flex; gap: 12px; align-items: flex-start; font-family: var(--font-ui); font-size: var(--fsc-14); line-height: 1.45; color: var(--sw-text-body); }
+    .sw-guide-pt b { color: var(--sw-title); font-weight: 700; }
+    .sw-guide-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; background: var(--sw-active-fill); color: var(--sw-gold); }
+    .sw-guide-ic svg { width: 17px; height: 17px; }
+    .sw-guide-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+    .sw-guide-again { font-family: var(--font-ui); font-size: var(--fsc-13); color: var(--sw-text-muted); }
+    .sw-root .sw-guide .sw-guide-close { margin: 0; min-height: 40px; padding: 0 22px; border: 0; border-radius: 20px; background: var(--sw-gold); color: #1a1608; font-family: var(--font-ui); font-size: var(--fsc-15); font-weight: 600; }
+    /* ── end WA4 web ── */
 
       /* ══════════════════════════════════════════════════════════════════
          "Show me around" — the tour (review-tutorial, 2026-09-04)

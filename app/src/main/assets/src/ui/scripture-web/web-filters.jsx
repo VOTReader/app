@@ -127,13 +127,6 @@ export function legendChips({ web }) {
       [<i className="sw-key-tick" aria-hidden="true" key="i" />, 'cited in the Volumes'], 'Show only verses cited in the Volumes'),
     chip('prophecy', f.prophecy, () => web.toggle('prophecy'),
       [<i className="sw-key-arc" aria-hidden="true" key="i" />, 'prophecy fulfilled'], 'Show only prophecy fulfilled'),
-    <button type="button" key="filters" className={'sw-key sw-chip sw-chip-more' + (web.sheetOpen ? ' is-on' : '')}
-      aria-expanded={web.sheetOpen} aria-haspopup="dialog" onClick={() => web.setSheetOpen(!web.sheetOpen)}>
-      <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
-        <path d="M4 6h16M7 12h10M10 18h4" />
-      </svg>
-      Filters
-    </button>,
   ];
 }
 
