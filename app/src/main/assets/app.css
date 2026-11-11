@@ -3717,8 +3717,6 @@
     .root-tile-eyebrow, .ui-tile-label { margin-bottom: 6px; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-label); font-weight: 600; letter-spacing: var(--track-label); text-transform: uppercase; line-height: var(--lh-label); }
     .root-tile-title, .ui-tile-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: var(--lh-headline); overflow-wrap: break-word; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .root-tile-detail, .ui-tile-meta { margin-top: auto; padding-top: 6px; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); font-style: normal; line-height: var(--lh-meta); }
-    .lib-tiles .root-tile { min-height: 76px; }
-    .lib-tiles .root-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
     /* pressed: the surface goes one step lighter for --press; hover (a mouse) does the same */
     :is(.root-tile, .ui-tile, .root-row, .ui-row-press, .root-explore-btn, .ui-btn, .ui-chip, .root-search, .ui-tool):active { background-color: var(--surface-2); }
     :is(.ui-btn.is-primary, .ui-play, .listen-play):active { background-color: var(--gold-bright); }

@@ -84,7 +84,7 @@ try {
     const click = async (l) => { await page.evaluate((l) => { const b = [...document.querySelectorAll('button,[role=button]')].find((b) => (b.getAttribute('aria-label') || b.textContent.trim().replace(/\s+/g, ' ')).startsWith(l) && b.getBoundingClientRect().width > 0); if (b) b.click(); }, l); await sleep(600); await setScale(); await sleep(150); };
     // The three-tab layout (Read, Listen, Library; Settings is the gear): a tab by its label, else the reader's Home.
     const tab = async (l) => { const hit = await page.evaluate((l) => { const t = [...document.querySelectorAll('.tabbar-tab')].find((b) => b.textContent.trim() === l); if (t) t.click(); return !!t; }, l); if (!hit && l === 'Read') await click('Home'); else { await sleep(600); await setScale(); await sleep(150); } };
-    const libTile = async (id) => { await page.evaluate((id) => { const t = document.querySelector('.lib-tile[data-tile="' + id + '"]'); t && t.click(); }, id); await sleep(700); await setScale(); };
+    const libTile = async (id) => { await page.evaluate((id) => { const t = [...document.querySelectorAll('.lib-row')].find((r) => r.querySelector('.ui-row-title').textContent.toLowerCase() === id); t && t.click(); }, id); await sleep(700); await setScale(); };
     const measure = (name) => page.evaluate((name) => {
       const vw = window.innerWidth;
       const nav = document.querySelector('.top-nav');
