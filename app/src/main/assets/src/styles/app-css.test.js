@@ -356,15 +356,13 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     // what bound the words now; the Home scroller reserves the strip's measured height; and
     // tools/e2e-tour.mjs (stripGeometry) pins the geometry that a rule's presence cannot. What a
     // cap-free strip costs is measured there too: 274 / 290 / 356 px of 800 at Text Size 1 / 1.8 / 3.
-    const own = ruleBlock(CSS, '\n      .tour-prompt {');
-    expect(own, 'the strip has a rule of its own').toBeTruthy();
-    expect(own, 'CONTROL: the extractor found the strip\'s own rule').toMatch(/z-index:\s*310/);
-    expect(own).not.toMatch(/max-height/);
+    // MERGE2b: the strip is an inline card in the page's flow (W1), so it has no float rule and no height cap.
+    expect(ruleBlock(CSS, '\n      .tour-prompt {'), 'no floating strip rule').toBeFalsy();
     // Each selector's OWN rule (the title and text also appear in comma lists shared with the tour
     // card, which keep growing: the card is the only way out of the tour and must stay readable).
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
-    for (const sel of ['\\.tour-prompt-title', '\\.tour-prompt-text', '\\.tour-prompt \\.tour-btn']) {
-      expect(bare, sel).toMatch(new RegExp('[\\n\\r]\\s*' + sel + ' \\{[^}]*font-size:\\s*min\\(var\\(--fs-\\d+\\),\\s*\\d+px\\)'));
+    for (const sel of ['\\.tour-inline \\.tour-prompt-text', '\\.tour-inline \\.tour-prompt-title', '\\.tour-inline \\.tour-btn']) {
+      expect(bare, sel).toMatch(new RegExp('[\\n\\r]\\s*' + sel + ' \\{[^}]*font-size:\\s*var\\(--ts-'));
     }
   });
   /* THE TOUR CARD'S OWN LINES (the Tour Reviewer, 2026-09-13, five measured defects on 5fc80c69): the
@@ -378,13 +376,13 @@ describe('app.css — large-type caps on rem-scaled chrome', () => {
     const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
     const capped = (sel, token) => new RegExp('[\\n\\r]\\s*' + sel + '[^{]*\\{[^}]*font-size:\\s*min\\(var\\(--' + token + '\\),\\s*\\d+px\\)');
     expect(bare).toMatch(capped('\\.tour-eyebrow', 'fs-11'));
-    expect(bare).toMatch(capped('\\.tour-title, \\.tour-prompt-title', 'fs-20'));
-    expect(bare).toMatch(capped('\\.tour-text, \\.tour-prompt-text', 'fs-18'));
+    expect(bare).toMatch(capped('\\.tour-title', 'fs-20'));
+    expect(bare).toMatch(capped('\\.tour-text', 'fs-18'));
     expect(bare).toMatch(capped('\\.tour-tip', 'fs-16'));
     expect(bare).toMatch(capped('\\.tour-card \\.tour-btn', 'fs-14'));
     expect(bare).toMatch(capped('\\.tour-never', 'fs-16'));
     // CONTROL: the matcher sees a cap that is there and not one that is not.
-    expect(bare).toMatch(capped('\\.tour-prompt \\.tour-btn', 'fs-14'));
+    expect(bare).toMatch(capped('\\.tour-inline \\.tour-btn', 'fs-14'));
     expect(bare).not.toMatch(capped('\\.tour-wait', 'fs-16'));
   });
   it('the tour card\'s button row wraps between whole buttons, and the card takes the width a short frame has', () => {
@@ -760,10 +758,8 @@ describe('bottom dock stack (cz1)', () => {
     expect(decl('\n    .find-pill {', 'bottom')).toBe('calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport))');
     expect(decl('.vot-toast {', 'bottom')).toBe('var(--dock-toast-bottom)');
     expect(decl('.vot-toast {', 'top')).toBe('var(--dock-toast-top)');
-    // tour-dock: the strip stacks on the reading rows and steps aside while find is open.
-    expect(decl('\n      .tour-prompt { bottom', 'bottom')).toBe('var(--dock-tour)');
-    expect(decl('body { --dock-tour:', '--dock-tour')).toMatch(/var\(--dock-player\) \+ var\(--dock-transport\) \+ var\(--dock-context\)/);
-    expect(decl('body:has(.find-pill) .tour-prompt {', 'display')).toBe('none');
+    // MERGE2b: the tour offer is an inline card in the Read tab, never on the dock (no --dock-tour row).
+    expect(bare).not.toMatch(/--dock-tour/);
   });
   it('the pairwise lifts are gone', () => {
     expect(bare).not.toMatch(/body\.audio-bar-open \.ascroll-pill/);
@@ -872,7 +868,8 @@ describe('app.css — tour and Answers boxes are sized by the visible viewport (
   const bare = CSS.replace(/\/\*[\s\S]*?\*\//g, '');
   const blocks = [...bare.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
     .filter((m) => /\.(tour-card|tour-prompt|ans-sheet\.is-tall|ans-card|ans-rail)\b/.test(m[1]) && /100vh/.test(m[2]));
-  it('found the boxes', () => { expect(blocks.length).toBeGreaterThanOrEqual(5); });
+  // MERGE2b: 4, the floating tour strip's max-height went with the strip (the offer is an inline card).
+  it('found the boxes', () => { expect(blocks.length).toBeGreaterThanOrEqual(4); });
   it('every 100vh line has a 100dvh line for the same property after it', () => {
     for (const [, sel, body] of blocks) {
       const decls = [...body.matchAll(/(?<![\w-])([a-z-]+)\s*:\s*([^;]+)/g)].map((m) => [m[1], m[2].trim()]);

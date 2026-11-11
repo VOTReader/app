@@ -61,13 +61,11 @@ const PARTS = {
   find:       '<div class="find-pill"><div style="height:44px;width:100vw"></div></div>',
   toast:      '<div class="vot-toast show"><div style="height:38px;width:100vw"></div></div>',          // two lines: 68px
   rootexit:   `<div id="vot-root-exit-toast" style="${ROOT_EXIT};opacity:1"><div style="height:20px;width:200px"></div></div>`,
-  tour:       '<div class="tour-prompt"><div style="height:192px"></div></div>',                         // 218px
   fab:        '<button class="jrn-fab jrn-fab-newentry"></button>',
 };
 // What can be on screen at once. (The first-run annotation hint no longer floats: W2d made it the first row of the
-// reader's More menu, AnnotationHint.jsx, and its .ann-hint-pill rules are gone.) Home and first run's Letter 1: the tour prompt, which stacks on
-// the reading screen's rows and steps aside while find is open, and on a short screen for the pill
-// (tour-dock). Journal: the FAB.
+// reader's More menu, AnnotationHint.jsx, and its .ann-hint-pill rules are gone. The tour offer is an inline card in
+// the Read tab since W1, so it is not on the dock either.) Journal: the FAB.
 const CASES = [];
 for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded', 'stopped']) for (const find of [0, 1])
   for (const msg of ['', 'toast', 'rootexit']) {
@@ -75,14 +73,8 @@ for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded', 'st
     CASES.push(c);
   }
 for (const player of [0, 1]) for (const msg of ['', 'toast', 'rootexit']) {
-  CASES.push(['tour', player && 'player', msg].filter(Boolean));
   CASES.push(['fab', player && 'player', msg].filter(Boolean));
 }
-for (const player of [0, 1]) for (const as of ['', 'autoscroll', 'expanded']) for (const find of [0, 1])
-  for (const msg of ['', 'toast']) {
-    if (!as && !find) continue;   // the plain tour cases above
-    CASES.push(['tour', player && 'player', as, find && 'find', msg].filter(Boolean));
-  }
 const VIEWPORTS = [[412, 915], [360, 740], [915, 412]];
 const insetsFor = (w, h) => [null, w > h ? [28, 24] : [68, 24]];
 
@@ -109,9 +101,6 @@ try {
             + c.map((k) => parts[k]).join('');
           document.body.classList.toggle('audio-bar-open', c.includes('player'));
           document.body.classList.toggle('autoscroll-on', c.includes('autoscroll') || c.includes('expanded') || c.includes('stopped'));
-          document.body.classList.toggle('tour-prompt-open', c.includes('tour'));
-          const tour = document.querySelector('.tour-prompt');
-          if (tour) document.documentElement.style.setProperty('--tour-prompt-h', Math.round(tour.getBoundingClientRect().height) + 'px');
           // As AudioPlayerBar measures itself: its height less the system inset's share of its bottom padding.
           const bar = document.querySelector('.audio-bar');
           document.documentElement.style.removeProperty('--audio-bar-h');
@@ -122,7 +111,7 @@ try {
           }
           const sys = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-bottom')) || 0;
           const navBottom = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--inset-top')) || 0) + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--bar-h')) || 67.4);
-          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .vot-toast, #vot-root-exit-toast, .tour-prompt, .jrn-fab')];
+          const els = [...document.body.querySelectorAll('.audio-bar, .audio-bar-pull, .ascroll-pill, .find-pill, .vot-toast, #vot-root-exit-toast, .jrn-fab')];
           const vis = els.map((el) => ({ el, k: el.className || el.id, cs: getComputedStyle(el), q: el.getBoundingClientRect() }))
             .filter((o) => o.cs.display !== 'none' && o.q.width && o.q.height);
           const out = { hits: [], off: [], missing: [], shown: [], text: [] };
@@ -146,12 +135,11 @@ try {
               out.off.push(`${o.k} [${[o.q.left, o.q.top, o.q.right, o.q.bottom].map(Math.round)}]`);
           }
           const want = { player: '.audio-bar', autoscroll: '.ascroll-pill', expanded: '.ascroll-pill', stopped: '.ascroll-pill', find: '.find-pill',
-            toast: '.vot-toast', rootexit: '#vot-root-exit-toast', tour: '.tour-prompt', fab: '.jrn-fab' };
+            toast: '.vot-toast', rootexit: '#vot-root-exit-toast', fab: '.jrn-fab' };
           for (const k of c) {
             const el = document.querySelector(want[k]);
             const shown = vis.some((o) => o.el === el);
-            const expect = !(k === 'tour' && (c.includes('find') || (innerHeight <= 500 && c.some((x) => ['autoscroll', 'expanded'].includes(x)))))
-              && !(k === 'stopped' && c.includes('find'));
+            const expect = !(k === 'stopped' && c.includes('find'));
             if (shown !== expect) out.missing.push(`${k} ${shown ? 'shown' : 'hidden'}`);
           }
           return out;

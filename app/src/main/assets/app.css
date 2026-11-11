@@ -6212,7 +6212,8 @@
     .ws1-settings .settings-section.is-root { margin:0; }
     .ws1-settings .settings-section.is-root + .settings-section.is-root > .settings-group-head { border-top:1px solid var(--hairline); }
     .settings-group-head.ui-row { min-height:var(--row-h); margin:0; padding:var(--sp-3) var(--card-pad); gap:var(--sp-3); border:0; border-radius:0; background:none; box-shadow:none; transform:none; text-align:left; }
-    .settings-group-head.ui-row .settings-section-label { margin:0; font-family:var(--font-serif); font-size:var(--ts-body); letter-spacing:0; text-transform:none; color:var(--text-1); }
+    /* MERGE2b (mock st-root .t): a group's name is the shared row title, serif --ts-headline at --fw-name. */
+    .settings-group-head.ui-row .settings-section-label { margin:0; font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:var(--fw-name); line-height:var(--lh-headline); letter-spacing:0; text-transform:none; color:var(--text-1); }
     .settings-group-head.ui-row .settings-group-sub { font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); color:var(--text-2); }
     .ws1-tag.ui-row-mark { padding:2px var(--sp-2); border-radius:var(--r-pill); background:var(--accent-soft); color:var(--accent); font-size:var(--ts-label); }
     .ws1-foot { margin:var(--sp-5) 0 0; text-align:center; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-meta); }
@@ -6223,7 +6224,10 @@
     .ws1-settings .settings-row { border-bottom:1px solid var(--hairline); }
     .ws1-settings .settings-row-head { flex-wrap:nowrap; gap:var(--sp-3); min-height:var(--row-h-1); padding:var(--sp-3) var(--card-pad); }
     .ws1-settings .settings-row-text { display:flex; flex-direction:column; gap:2px; }
-    .ws1-settings .settings-row-label { font-family:var(--font-serif); font-size:var(--ts-body); letter-spacing:0; color:var(--text-1); }
+    /* MERGE2b (mock .set .u): inside a group every row's name is the UI face 500, a setting and a door alike
+       (the serif 400 here and the serif 18 of the shared rows read as two families in one card). */
+    .ws1-settings .settings-row-label, .ws1-settings .settings-section.is-screen .ui-row-title, .ws2-found .ui-row-title, .ws2-also .ui-row-title,
+    .ws3-about .ui-row-title, .ws3-new-empty .ui-row-title { font-family:var(--font-ui); font-size:var(--ts-body); font-weight:500; line-height:1.375; letter-spacing:0; color:var(--text-1); }
     .ws1-settings .settings-row-desc { padding:0; font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); font-style:normal; color:var(--text-2); }
     .ws1-settings .settings-row-value { font-family:var(--font-ui); font-size:var(--ts-value); font-style:normal; color:var(--text-1); }
     .ws1-note { margin:0 var(--sp-1) var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
@@ -6349,6 +6353,8 @@
     .ws3-check-row:last-child { border-bottom:0; }
     .ws3-check-row > svg { flex:none; margin-top:2px; color:var(--text-2); }
     .ws3-new-head { padding-top:0; }
+    /* MERGE2b (mock ab-new .sh): What's new is an fn-sheet, whose own x the footnote head replaces; this one has none. */
+    .fn-sheet.whats-new-sheet .sheet-handle-back { display:flex; }
     .ws3-new-empty { padding:0 var(--gutter) var(--sp-5); }
     .ws3-about .ui-row-meta, .ws3-new-empty .ui-row-meta { white-space:normal; overflow:visible; }
     /* ── end WS3 settings ── */
@@ -8214,7 +8220,7 @@
       .tour-arrow { position: fixed; z-index: 322; width: 0; height: 0; border: 10px solid transparent; pointer-events: none; }
       .tour-arrow.up { border-bottom-color: var(--gold-border); }
       .tour-arrow.down { border-top-color: var(--gold-border); }
-      .tour-card, .tour-prompt {
+      .tour-card {
         position: fixed; left: 12px; right: 12px; z-index: 322;
         max-width: 520px; margin: 0 auto;
         background: var(--bg3); color: var(--cream-dim);
@@ -8226,40 +8232,10 @@
            (Skip, Next), so it must fit whole and scroll inside itself before it can overflow. */
         max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow-y: auto;
       }
-      /* As tall as its words and no taller (journey F1.1, 2026-09-12). The 33vh cap of 2026-09-05
-         ("never more than a third of the screen": at Text Size 1.8 the strip was 350 px of 800)
-         predates the type caps below, which now bound the words — and it made the strip scroll
-         INSIDE itself wherever the words were taller than a third: every landscape phone
-         (800x360: 119 px of room for 194 px of strip at Text Size 1, "Don't show this again" off
-         the frame) and a portrait phone at Text Size 3 (264 for 298). The Home scroller reserves
-         the strip's measured height below, so growing costs no tile its reach. Measured after:
-         portrait 360x800 194 / 232 / 298 px at Text Size 1 / 1.8 / 3. */
-      /* Message lane (cz1): over the mini player, not on it (z310 hid the whole bar, pause and close included). */
-      /* tour-dock (2026-10-23): since first run's offer also shows over Letter 1 (n114), it covered the find pill until
-         dismissed (S22). The strip stacks on the reading screen's rows (the auto-scroll pill, the Study Notes card; those sit
-         on --dock-floor, hence the extra 9px once a row is up) and steps aside while find is open, coming back when find
-         closes: the reader is busy with find, and the offer keeps. On a short screen it also steps aside for the pill or the
-         card, as there is no room left under the nav. Set on body, where the rows resolve. */
-      body { --dock-tour: calc(max(14px, var(--dock-sys)) + var(--dock-player) + var(--dock-transport) + var(--dock-context)
-        + min(calc(var(--dock-transport) + var(--dock-context)), 9px)); }
-      /* Over the tab bar (the layout pass): the bar holds the gesture inset, so the strip starts from its top. */
-      body.tabbar-on { --dock-tour: calc(var(--dock-tabbar) + 10px + var(--dock-player) + var(--dock-transport) + var(--dock-context)); }
-      body:has(.find-pill) .tour-prompt { display: none; }
-      @media (max-height: 500px) { body.autoscroll-on .tour-prompt { display: none; } }
-      .tour-prompt { bottom: var(--dock-tour); z-index: 310; padding: 14px 16px 10px; }
-      /* On a short screen (landscape, the player open) it scrolls inside itself rather than climb onto the nav.
-         While it shows, toasts drop in under the nav (first run on Home is where the root-exit toast shows):
-         the 80px it leaves free there is that lane (a two-line toast is 68px). */
-      .tour-prompt { max-height: calc(100vh - var(--dock-tour) - var(--dock-under-nav) - 80px); max-height: calc(100dvh - var(--dock-tour) - var(--dock-under-nav) - 80px); }
-      body.tour-prompt-open:not(:has(.find-pill)) { --dock-toast-bottom: auto; --dock-toast-top: var(--dock-under-nav); }
-      /* Neither button ever breaks a word (journey F1.2): "Show me around" (176 px) and "Maybe
-         later" (141) need 325 px of row and have 262 on a 320 phone, 302 on a 360 — so on those the
-         second drops to its own line, right-aligned under a full-width primary, instead of the
-         primary wrapping to SHOW ME / AROUND. On 412 and up both share one line as before. Two
-         lines, each load-bearing (bitten 2026-09-12): nowrap makes a label's min-content the whole
-         label, so the row breaks between buttons and never inside one; wrap gives the break
-         somewhere to go — without it two nowrap buttons overflow a 302 px row sideways. */
-      .tour-prompt .tour-row { flex-wrap: wrap; justify-content: flex-end; }
+      /* MERGE2b: the offer is an inline card in the Read tab (W1, 4fdc1652b), so the 2026-09 strip's float, its dock
+         row (--dock-tour), the find and auto-scroll hides and the toast lane it moved are gone. */
+      /* Neither button ever breaks a word (journey F1.2): nowrap makes a label's min-content the whole label, so the
+         row breaks between buttons and never inside one; the inline row wraps. */
       .tour-prompt .tour-btn { white-space: nowrap; }
       /* The card's row too (the Tour Reviewer, 2026-09-13): with no wrap and no font cap, Next sat
          13 px past the card's edge at Text Size 1.8 on a 360 phone, 41 px off the screen at 1.8 on a
@@ -8285,11 +8261,6 @@
         .tour-card .tour-row { padding: 4px 0 6px; bottom: -6px; margin-bottom: -6px; }
         .tour-card .tour-btn { min-height: 44px; }
       }
-      /* Room for the strip (TourPrompt measures itself into --tour-prompt-h): the last Home tile
-         scrolls clear of it, as the last paragraph does of the player bar above. */
-      body.tour-prompt-open:not(:has(.find-pill)) .screen-scroll {
-        padding-bottom: calc(var(--tour-prompt-h, 200px) + 14px + var(--dock-tour));
-      }
       /* THE CARD'S TYPE IS CAPPED, like the strip's since 2026-09-12 (the Tour Reviewer, 2026-09-13):
          uncapped, Text Size 3 on a 360x800 phone showed the Listen card's eyebrow and title with 11
          of its 15 lines under the fold, and "Press Listen" was never seen. The caps are the largest
@@ -8299,14 +8270,11 @@
         font-family: var(--font-cinzel); font-size: min(var(--fs-11), 15px);
         letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); margin-bottom: 6px;
       }
-      .tour-title, .tour-prompt-title {
+      .tour-title {
         font-family: var(--font-cinzel); font-weight: 600; font-size: min(var(--fs-20), 30px);
         line-height: 1.2; color: var(--cream); margin: 0 0 8px;
       }
-      .tour-prompt-title { font-size: min(var(--fs-18), 22px); margin-bottom: 4px; }
-      .tour-text, .tour-prompt-text { font-size: min(var(--fs-18), 28px); line-height: 1.4; margin: 0 0 14px; }
-      .tour-prompt-text { font-size: min(var(--fs-16), 20px); margin-bottom: 12px; }
-      .tour-prompt .tour-btn { font-size: min(var(--fs-14), 16px); }
+      .tour-text { font-size: min(var(--fs-18), 28px); line-height: 1.4; margin: 0 0 14px; }
       .tour-tip { font-size: min(var(--fs-16), 24px); font-style: italic; color: var(--cream-muted); margin: -6px 0 12px; }
       .tour-row { display: flex; gap: 8px; align-items: center;
         /* Stuck to the card's bottom edge while its text scrolls (a tall card at a large text
@@ -8342,15 +8310,6 @@
            link was 48 px, the largest type on the strip under a 22 px title. */
         font-family: var(--font-body); font-size: min(var(--fs-16), 18px); text-decoration: underline;
       }
-      /* THE STRIP IS SLIM (n115/n351, A07.6; Codex mockup lanes/myweb/out/id1/A/mockup/board-r1.png, C): it was
-         a 215 px card over Home's cards. The words and × on top, Show me around and Later under them, in the
-         body face (not the card's capitals). Type capped like the card's. */
-      .tour-prompt.tour-strip { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0 6px; padding: 4px 6px 6px 14px; border-radius: 14px; }
-      .tour-strip .tour-prompt-text { order: 0; flex: 1 1 calc(100% - 60px); min-width: 0; margin: 0; font-size: min(var(--fs-15), 18px); line-height: 1.3; }
-      .tour-strip .tour-prompt-title { display: inline; margin: 0; font-size: inherit; }
-      .tour-strip .tour-btn { order: 2; flex: 0 0 auto; min-height: 44px; padding: 0 14px; font-family: var(--font-body); font-size: min(var(--fs-15), 18px); letter-spacing: 0; text-transform: none; }
-      .tour-strip .tour-btn.quiet { order: 3; padding: 0 10px; }
-      .tour-strip .tour-never { order: 1; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 44px; margin: 0; padding: 0; }
       /* The UI pass (U §4, W1 2026-11-11): the offer is an inline card at the end of the Read tab, in the page's flow,
          never a float. Words left, × at the top right; Show me around (primary) and Later (text) under them. */
       .tour-prompt.tour-strip.tour-inline {
@@ -8361,10 +8320,10 @@
       }
       .tour-inline .tour-prompt-text { flex: 1 1 calc(100% - 56px); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-control); line-height: 1.4; }
       .tour-inline .tour-prompt-title { color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; }
-      .tour-inline .tour-btn { min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; }
+      .tour-inline .tour-btn { flex: 0 0 auto; min-height: var(--btn-h-sm); padding: 0 16px; border: 0; border-radius: var(--r-pill); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; letter-spacing: 0; text-transform: none; }
       .tour-inline .tour-btn.primary { flex: 0 0 auto; background: var(--accent); color: var(--accent-ink); font-weight: 600; }
-      .tour-inline .tour-btn.quiet { background: none; color: var(--text-2); }
-      .tour-inline .tour-never { color: var(--text-3); }
+      .tour-inline .tour-btn.quiet { padding: 0 10px; background: none; color: var(--text-2); }
+      .tour-inline .tour-never { display: flex; align-items: center; justify-content: center; margin: 0; padding: 0; color: var(--text-3); }
       .tour-wait {
         position: fixed; left: 12px; right: 12px; bottom: var(--dock-message, 16px); z-index: 322; text-align: center;
         font-family: var(--font-body); font-size: var(--fs-16); color: var(--cream-muted);
