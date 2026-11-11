@@ -1286,7 +1286,8 @@
       }
       .audio-bar-mark svg { width: 24px; height: 24px; }
       .audio-bar.is-song .audio-bar-mark { background: none; border: 0; }
-      .audio-bar-cover { width: 40px; height: 40px; border-radius: 8px; }
+      /* .song-cover (below, 56 px) comes later and won, so the cover overflowed its 40 px slot into the bar's corner (half-baked 20). */
+      .audio-bar .audio-bar-cover { width: 40px; height: 40px; border-radius: 8px; }
       .audio-bar-cover .song-cover-note { font-size: var(--fsc-20); }
       .vot-large-text .audio-bar-mark { display: none; }
       .audio-bar-summary-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
