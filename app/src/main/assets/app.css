@@ -1954,13 +1954,6 @@
          Same --seek-pct fill contract as the bar's and the desk's. */
       /* Prev/next beside Resume — same conditional rules as the mini-player. */
       .audio-library-section { margin-top:1.8rem; }
-      .audio-library-section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:.75rem; padding:0 .1rem .63rem; }
-      .audio-library-section-head > div { display:flex; flex-direction:column; gap:.1rem; min-width:0; }
-      .audio-library-section-head span { color:var(--gold-dim); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.18em; text-transform:uppercase; }
-      .audio-library-section-head h2 { margin:.12rem 0 0; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-16); font-weight:400; }
-      .audio-library-section-head p { margin:.18rem 0 0; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; line-height:1.35; }
-      .audio-library-section-head > strong { min-width:34px; color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-16); font-weight:500; text-align:right; }
-      .audio-library-section-head strong small { color:var(--gold-dim); font-family:inherit; font-size:var(--fs-10); font-weight:400; }
       .audio-library-disclosure { width:44px; min-height:44px; display:inline-flex; align-items:center; justify-content:center; padding:0; border:0; border-radius:7px; background:transparent; color:var(--gold-dim); cursor:pointer; }.audio-library-disclosure svg { width:18px; height:18px; transition:transform .18s ease; }.audio-library-disclosure.is-open svg { transform:rotate(180deg); }
       .audio-library-more { display:block; width:100%; min-height:44px; margin-top:.1rem; padding:.4rem; border:1px solid rgba(200,164,86,.16); border-top:0; border-radius:0 0 10px 10px; background:transparent; color:var(--gold-dim); cursor:pointer; font:inherit; font-size:var(--fs-11); }
       .audio-library-list { overflow:hidden; border:1px solid rgba(200,164,86,.16); border-top:0; border-radius:0 0 10px 10px; background:rgba(0,0,0,.045); }.audio-library-row { position:relative; display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:center; gap:.56rem; padding:.42rem .5rem; border-top:1px solid rgba(200,164,86,.13); transition:background .16s ease; }.audio-library-row:first-child { border-top:0; }.audio-library-row.is-current { background:rgba(200,164,86,.085); }.audio-library-row.is-current::before { content:""; position:absolute; left:0; top:.5rem; bottom:.5rem; width:2px; background:var(--gold); border-radius:0 2px 2px 0; }
@@ -1968,17 +1961,14 @@
       .audio-library-row-copy { min-width:0; min-height:47px; padding:.1rem 0; display:flex; flex-direction:column; justify-content:center; gap:.12rem; }.audio-library-row-copy strong { overflow:hidden; color:var(--cream); font-size:var(--fs-13); font-weight:500; line-height:1.25; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-copy small { overflow:hidden; color:var(--cream-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
       .audio-library-row-actions { display:flex; align-items:center; justify-content:flex-end; gap:.1rem; }.audio-library-row-actions > span { max-width:5.4rem; overflow:hidden; padding:0 .12rem; color:var(--cream-dim); font-size:var(--fs-10); text-align:right; text-overflow:ellipsis; white-space:nowrap; }.audio-library-row-actions > span.audio-library-remaining { color:var(--gold-dim); font-variant-numeric:tabular-nums; }
       .audio-library-empty { margin:0; padding:1rem .85rem .1rem; color:var(--cream-dim); font-size:var(--fs-12); font-style:italic; line-height:1.5; }.audio-library-empty b { color:var(--cream); font-style:normal; font-weight:500; }.audio-library-retry { margin:.5rem 0 0; min-height:44px; padding:0 1.2rem; border-radius:999px; border:1px solid var(--ink-gold-border, currentColor); background:transparent; color:var(--cream); font:inherit; font-style:normal; cursor:pointer; }
-      .audio-library-shelf { overflow:hidden; border:1px solid rgba(200,164,86,.16); border-radius:10px; background:rgba(0,0,0,.045); }
-      .audio-library-shelf-row { display:grid; grid-template-columns:36px minmax(0,1fr) auto; align-items:center; width:100%; min-height:64px; gap:.6rem; padding:.6rem .72rem; border:0; border-top:1px solid rgba(200,164,86,.13); background:transparent; color:inherit; cursor:pointer; text-align:left; font:inherit; transition:background .16s ease; }.audio-library-shelf-row:first-child { border-top:0; }
-      .audio-library-shelf-copy { min-width:0; display:flex; flex-direction:column; gap:.13rem; }.audio-library-shelf-copy strong { overflow:hidden; color:var(--cream); font-family:'Cinzel',serif; font-size:var(--fs-11); font-weight:400; line-height:1.32; text-overflow:ellipsis; white-space:nowrap; }.audio-library-shelf-copy small { overflow:hidden; color:var(--gold-dim); font-size:var(--fs-10); font-style:italic; text-overflow:ellipsis; white-space:nowrap; }
-      .audio-library-search button:focus-visible,.audio-library-icon-button:focus-visible,.audio-library-row-play:focus-visible,.audio-library-disclosure:focus-visible,.audio-library-more:focus-visible,.audio-library-shelf-row:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
+      .audio-library-search button:focus-visible, .audio-library-icon-button:focus-visible, .audio-library-row-play:focus-visible, .audio-library-disclosure:focus-visible, .audio-library-more:focus-visible { outline:2px solid var(--gold); outline-offset:2px; }
       /* On parchment the primary action is a dark-gold button, so its text is the page ground, not the
          near-black meant for the bright gold of the dark theme: #17130a read 2.97:1 on light --gold and
          2.54:1 on the hover ground; var(--bg) reads 5.59:1 and 6.54:1. */
       @media (hover:hover) {.audio-library-icon-button:hover,.audio-library-disclosure:hover,.audio-library-more:hover { background:var(--gold-faint); color:var(--gold); }.audio-library-row:hover { background:rgba(200,164,86,.06); }.audio-library-row-play:hover { border-color:var(--gold); background:var(--gold-faint); }.audio-library-shelf-row:hover { background:rgba(200,164,86,.06); }.audio-library-shelf-row:hover .audio-library-shelf-copy strong,.audio-library-shelf-row:hover .audio-library-shelf-tail { color:var(--gold-bright); } }
       body.light .audio-library-search { border-color:rgba(122,92,16,.3); background:rgba(255,255,255,.66); }
       body.light .audio-library-search:focus-within { border-color:var(--gold); background:rgba(255,255,255,.94); }
-      body.light .audio-library-list, body.light .audio-library-shelf { background:rgba(255,255,255,.4); }
+      body.light .audio-library-list { background:rgba(255,255,255,.4); }
       @media (prefers-reduced-motion:reduce) { .audio-library-search,.audio-library-row,.audio-library-shelf-row,.audio-library-disclosure svg { transition:none; } }
       @media (max-width:560px) { .audio-library-screen { padding-left:1rem; padding-right:1rem; }.audio-library-row { grid-template-columns:44px minmax(0,1fr); gap:.54rem; padding:.46rem .45rem; }.audio-library-row-actions { grid-column:2; justify-content:flex-start; margin-top:-.22rem; }.audio-library-row-actions > span { max-width:none; padding-left:0; text-align:left; }.audio-library-section-head { align-items:flex-start; }.audio-library-section-head > strong { padding-top:.35rem; } }
       @media (max-width:360px) {.audio-library-shelf-row { grid-template-columns:30px minmax(0,1fr) auto; padding:.55rem .55rem; }.audio-library-shelf-mark { width:28px; height:28px; } }
@@ -2075,26 +2065,15 @@
       /* Keep on this phone (K1, picture r2-more-screens, third panel): a card in three states — KEEP FOR OFFLINE
          LISTENING with a filled KEEP · 64 MB, KEEPING… with a thin bar and Cancel, AVAILABLE OFFLINE with a check —
          and the same states on one line for a list and a letter's songs card. Tokens only. */
-      .song-keep-card { width: 100%; margin-top: 1.1rem; padding: .85rem .95rem 1rem; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); text-align: left; }
-      .song-keep-card.is-kept { border-color: var(--gold); }
-      .song-keep-head { margin: 0 0 .7rem; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-13); font-weight: 600; letter-spacing: .2em; text-transform: uppercase; }
-      .song-keep-body { display: flex; align-items: flex-start; gap: .9rem; }
-      .song-keep-icon { width: 52px; height: 52px; flex: none; display: inline-flex; align-items: center; justify-content: center; border: 1.5px solid var(--gold); border-radius: 10px; color: var(--gold); }
-      .song-keep-icon.is-round { border-radius: 50%; }
       .song-keep-svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
-      .song-keep-copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .45rem; }
-      .song-keep-text { margin: 0; color: var(--cream); font-size: var(--fs-18); line-height: 1.35; }
-      .song-keep-card.is-kept .song-keep-text, .song-keep-card.is-busy .song-keep-text { padding-top: .75rem; }
-      .song-keep-sub, .song-keep-note { margin: 0; color: var(--cream-dim); font-size: var(--fs-15); font-style: italic; line-height: 1.35; }
+      .song-keep-note { margin: 0; color: var(--cream-dim); font-size: var(--fs-15); font-style: italic; line-height: 1.35; }
       .song-keep-note[role="status"] { color: var(--cream); font-style: normal; }
-      .songs-shuffle.song-keep-go { width: auto; align-self: stretch; margin-top: .2rem; }
-      .song-keep-progress { display: flex; align-items: center; gap: .9rem; }
       .song-keep-bar { flex: 1; min-width: 0; height: 6px; overflow: hidden; border-radius: 999px; background: var(--gold-faint); }
       .song-keep-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--gold); transition: width .3s ease; }
       .song-keep-cancel { flex: none; min-height: 44px; padding: 0 .2rem; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-16); text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
       .song-keep-action { display: grid; gap: .35rem; margin-top: .8rem; }
       .songs-outline-action.song-keep-btn { width: 100%; font-size: var(--fs-15); }
-      .songs-outline-action.song-keep-btn:disabled, .songs-shuffle.song-keep-go:disabled { opacity: .5; cursor: default; }
+      .songs-outline-action.song-keep-btn:disabled { opacity: .5; cursor: default; }
       .song-keep-line { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; min-height: 44px; margin: 0; color: var(--cream); font-size: var(--fs-16); }
       .song-keep-line .song-keep-svg { width: 22px; height: 22px; flex: none; color: var(--gold); }
       .song-keep-line.is-note { color: var(--cream-dim); font-style: italic; }
@@ -2161,10 +2140,6 @@
       body.light .song-vote-note-ok, body.light .song-vote-note::after, body.light .song-vote-note.is-below::after { border-color: rgba(122,92,16,.35); }
       .songs-row-kept .song-keep-svg { width: 15px; height: 15px; stroke-width: 2.1; }
       /* W2-06 + the desk's keep row: a quiet underlined Remove / Keep beside "On this phone". */
-      .song-keep-quiet { flex: none; min-height: 44px; padding: 0 .2rem; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-15); text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
-      .song-keep-quiet:disabled { opacity: .5; cursor: default; text-decoration: none; }
-      .song-keep-quiet:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
-      .song-keep-kept-line { display: flex; align-items: center; flex-wrap: wrap; gap: 0 .6rem; }
       .letter-songs-card .song-keep-action { margin-top: .5rem; }
       .song-keep-cancel:focus-visible, .song-keep-remove:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
       /* Letters read with music (L7, picture final-06): READINGS in outlined cards, a READ-ALONG pill and the round play. */
@@ -4752,7 +4727,6 @@
     /* In a study card, and on a shelf row, the badge sits on its own line
        under the title rather than stretching the one-line ellipsis. */
     .chapter-card-info .coverage-badge-wrap,
-    .audio-library-shelf-copy .coverage-badge-wrap { margin-left:0; margin-top:0.3rem; }
     .chapter-card-btn.is-locked { opacity:0.45; cursor:default; }
     .chapter-card-btn.is-locked .chapter-card-num { color:var(--gold-dim); }
     /* Estimated reading time — quiet, right-aligned, never wraps or

@@ -113,7 +113,7 @@ import { SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSo
 import { SongKeep, formatSongBytes } from '../utils/song-keep.js';
 // Is the network there (2026-10-05): ONE store beside the player; the lazy screens read the NetStatus global.
 import { NetStatus } from '../utils/net-status.js';
-import { SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon } from './components/SongKeepParts.jsx';
+import { SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon } from './components/SongKeepParts.jsx';
 /* The Listening Library screens went lazy (bundle-h, landing 24, until lz1) while all of
    this stayed here, because AudioPlayerBar and AudioManagerSheet are mounted in
    the always-present shell and play on every screen. The library reads these
@@ -348,7 +348,7 @@ Object.assign(window, {
   SongCover, SongPlayButton, SongListRow, ShuffleIcon, RepeatIcon, NextIcon, PrevIcon, RecentIcon, ChevronRightIcon, ChoiceSheet,
   loadSongLyrics, useSongLyrics, lyricLineAt, findSongFamilies, songLyricsFoot,
   SONGS_SCREEN, decodeSongsRoute, encodeSongsRoute, pushSongsFrame, popSongsFrame, replaceSongsTop,
-  SongKeep, formatSongBytes, NetStatus, SongKeepCard, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon,
+  SongKeep, formatSongBytes, NetStatus, SongKeepAction, useSongKeep, useSongsOnline, KeepIcon, KeptIcon,
   // …and the shelf parts + audio tables the Listening Library reads as free globals.
   BIBLE_AUDIO_EDITIONS, audioReaderLabel, bibleAudioOffered,
   COVERAGE_NONE, COVERAGE_READ_ALONG, bibleEditionCoverage, AudioSeekSlider, CoverageBadge,

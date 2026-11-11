@@ -708,7 +708,7 @@ describe('app.css — labels in spaced capitals are 12 px or more', () => {
   const LABELS = [
     '.vol-index-eyebrow', '.genre-col-label', '.scriptures-landing .genre-col-label',
     '.volumes-landing .genre-col-label', '.audio-library-eyebrow',
-    '.audio-library-section-head span', '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
+    '.select-sheet-eyebrow', '.tabs-overview-eyebrow',
     '.footnote-list-header', '.related-card-title', '.settings-section-label',
     '.srch-section-label', '.srch-group-header', '.chapter-card-label', '.ans-label',
     '.section-heading', '.compact-list-header',
