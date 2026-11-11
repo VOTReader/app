@@ -70,11 +70,10 @@ describe.each([
   it('does NOT print the title twice when vol duplicates the letter', () => {
     render(<Comp scriptures={[]} votNotes={[DUPLICATED]} onVotLetterClick={() => {}} />);
     // The title stays (r-study2, W2i: a serif title, no quotes); the caption above it must be gone.
+    // InlineNotes still quotes it. Exactly one leaf carries the words: a caption would be a second.
     const hits = screen.getAllByText((_t, el) => !!el && !el.children.length
-      && (el.textContent || '').trim() === 'The Promise');
+      && /^["“”]?The Promise["“”]?$/.test((el.textContent || '').trim()));
     expect(hits).toHaveLength(1);
-    expect(hits[0].className).toBe('vot-note-letter');
-    expect(document.querySelector('.vot-note-vol')).toBeNull();
   });
 
   it('renders a volume-less note as static text, not a dead-end button', () => {
