@@ -3543,7 +3543,6 @@
     .today-link { min-height:44px; padding:0 0.25rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
     .today-actions { display:flex; gap:0.5rem; }
     .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
-    .today-btn-wide { width:100%; margin-top:0.6rem; }
     @media (hover:hover) { .today-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
     .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
     .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
@@ -3601,10 +3600,7 @@
     .build-days { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem; padding-top:0.3rem; }
     .build-days button { min-height:44px; padding:0; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-14); cursor:pointer; }
     .build-days button[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); }
-    .build-each-main { margin:0.2rem 0 0.1rem; color:var(--gold); font-size:var(--fs-20); }
-    .build-each p { margin:0.1rem 0; }
-    .build-each .today-btn-wide { margin-top:0.8rem; }
-    .build-each .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
+    .plan-start .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
     /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
     .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-14); box-sizing:border-box; }
     .plan-ribbon-copy { flex:1 1 auto; display:flex; flex-direction:column; gap:2px; min-width:0; }

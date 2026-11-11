@@ -16,8 +16,9 @@
 
 import { BIBLE_BOOKS } from '../../data/reading-plans.js';
 import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
-import { LETTER_CHAIN } from '../../data/plan-catalog.js';
-import { newRun, todayKey, resumeAt, startFrom } from '../../data/plan-engine.js';
+import { LETTER_CHAIN, bookTitle } from '../../data/plan-catalog.js';
+import { newRun, todayKey, resumeAt, startFrom, schedule, itemsLabel } from '../../data/plan-engine.js';
+import { PlanSec, dayDate, minText } from '../components/PlanBits.jsx';
 import { letterSource, saveRun, shortDate } from '../../utils/plan-runs-view.js';
 
 /** @typedef {import('../../data/plan-builder.js').Pick} Pick */
@@ -251,13 +252,41 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
   }
 
   const radio = (/** @type {typeof mode} */ m) => ({ role: 'radio', 'aria-checked': mode === m, onClick: () => setMode(m) });
+  // POL5: the last step is the plan's preview (PlanPreview's page): its name, three facts, the first days it will
+  // read, then the choices as "Make it yours" and one Start plan with the finish under it. The first days are read
+  // off the run these choices would start, so the page says what the plan will do.
+  const draft = preview ? newRun(spec, now) : null;
+  const first = draft ? schedule(draft, now, bookTitle).filter((d) => !d.done).slice(0, 3) : [];
+  // the third fact as the preview says it: how many chapters, letters, or (a mix) readings
+  const count = draft ? draft.tracks.reduce((n, t) => n + t.items.length, 0) : 0;
+  const unit = mixed ? (count === 1 ? 'reading' : 'readings') : picks.some((p) => p.t === 'b') ? (count === 1 ? 'chapter' : 'chapters') : (count === 1 ? 'letter' : 'letters');
   return (
-    <div className="plans-build">
-      <header className="study-head">
-        <span className="today-eyebrow">Step 2 of 2</span>
-        <h1 className="study-head-title">How do you want to read it?</h1>
-        <p className="study-head-sub">{preview ? preview.picked : ''}</p>
-      </header>
+    <div className="plans-build plan-preview">
+      <p className="root-eyebrow plan-eyebrow">Your own plan · Step 2 of 2</p>
+      <h1 className="plan-hero-name">{name.trim() || defaultName(picks, src)}</h1>
+      <p className="plan-about">{preview ? preview.picked : ''}</p>
+      {preview ? (
+        <div className="plan-facts" role="list" aria-label="This plan">
+          <div className="plan-fact" role="listitem"><b>{minText(preview.dayMinutes)}</b><span>a day</span></div>
+          <div className="plan-fact" role="listitem"><b>{preview.days.toLocaleString('en-US')}</b><span>{preview.days === 1 ? 'reading day' : 'reading days'}</span></div>
+          <div className="plan-fact" role="listitem"><b>{count.toLocaleString('en-US')}</b><span>{unit}</span></div>
+        </div>
+      ) : null}
+      {first.length ? (
+        <>
+          <PlanSec title="Your first week" />
+          <ol className="root-list plan-days-list" aria-label="Your first week">
+            {first.map((d) => (
+              <li key={d.day} className="plan-day-row">
+                <span className="plan-day-when"><span className="plan-day-n">{'Day ' + (d.day + 1)}</span><span className="plan-day-date">{dayDate(d.date)}</span></span>
+                <span className="plan-day-portion">{itemsLabel(d.items, bookTitle)}</span>
+                <span className="plan-day-min">{minText(d.minutes)}</span>
+              </li>
+            ))}
+          </ol>
+        </>
+      ) : null}
+      <PlanSec title="Make it yours" />
       <section className="build-card" role="radiogroup" aria-label="Your goal">
         <h2 className="build-card-title">Your goal</h2>
         <div className="build-goal">
@@ -316,20 +345,13 @@ export function PlanBuilder({ step, onStep, lettersReady, onStarted, isRead }) {
         <input className="build-input build-name" type="text" aria-label="Plan name" maxLength={60} value={name}
           placeholder={defaultName(picks, src)} onChange={(e) => setName(e.target.value)} />
       </section>
-      <section className="build-card build-each" aria-label="Each day">
-        <h2 className="build-card-title">Each day</h2>
-        {preview ? (
-          <>
-            <p className="build-each-main">{preview.each}</p>
-            <p className="build-row-sub">{'about ' + preview.dayWords.toLocaleString('en-US') + ' words · about ' + preview.dayMinutes + ' min'}</p>
-            <p className="build-row-sub">{'Finishes ' + shortDate(preview.finish) + ' · ' + preview.days + (preview.days === 1 ? ' reading day' : ' reading days')}</p>
-          </>
-        ) : null}
-        <button type="button" className="today-btn today-btn-wide" disabled={!preview || (mode === 'by' && !by)} onClick={() => start()}>Start plan</button>
+      <div className="plan-start">
+        <button type="button" className="ui-btn is-primary is-wide" disabled={!preview || (mode === 'by' && !by)} onClick={() => start()}>Start plan</button>
         {resume ? (
           <button type="button" className="today-link build-resume" disabled={mode === 'by' && !by} onClick={() => start(resume.k)}>{'Start where I am: ' + resume.t}</button>
         ) : null}
-      </section>
+        {preview ? <p className="plan-start-note">{'Finishes ' + shortDate(preview.finish) + ' · about ' + preview.dayWords.toLocaleString('en-US') + ' words a day'}</p> : null}
+      </div>
     </div>
   );
 }

@@ -45,13 +45,15 @@ describe('PlanBuilder', () => {
     expect(within(screen.getByRole('list', { name: 'Your picks' })).getByText('Genesis 1-4')).toBeTruthy();
     expect(summary()).toMatch(/^4 chapters · about [\d,]+ words$/);
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByRole('heading', { name: 'How do you want to read it?' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Genesis 1-4' })).toBeTruthy();   // POL5: step 2 is the plan's preview
     fireEvent.click(screen.getByRole('radio', { name: /chapter or letter a day/ }));
     fireEvent.click(screen.getByRole('button', { name: 'More: chapters or letters a day' }));
-    const each = screen.getByRole('region', { name: 'Each day' });
-    expect(within(each).getByText('2 chapters')).toBeTruthy();
-    expect(within(each).getByText(/^Finishes .* · 2 reading days$/)).toBeTruthy();
-    act(() => { fireEvent.click(within(each).getByRole('button', { name: 'Start plan' })); });
+    const facts = screen.getByRole('list', { name: 'This plan' });
+    expect(within(facts).getByText('chapters').previousSibling.textContent).toBe('4');
+    expect(within(facts).getByText('reading days').previousSibling.textContent).toBe('2');
+    expect(within(screen.getByRole('list', { name: 'Your first week' })).getAllByRole('listitem').length).toBe(2);
+    expect(screen.getByText(/^Finishes .* · about [\d,]+ words a day$/)).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Start plan' })); });
     const [run] = ReadingPlanStore.active();
     expect(run.plan).toBe('custom');
     expect(run.name).toBe('Genesis 1-4');
@@ -70,7 +72,7 @@ describe('PlanBuilder', () => {
     expect(within(share).getByRole('radio', { name: /Side by side/ }).getAttribute('aria-checked')).toBe('true');
     fireEvent.click(screen.getByRole('radio', { name: /^In \d+ days/ }));
     fireEvent.change(screen.getByRole('spinbutton', { name: 'Number of days' }), { target: { value: '4' } });
-    expect(within(screen.getByRole('region', { name: 'Each day' })).getByText('1 chapter + 1 letter')).toBeTruthy();
+    expect(within(screen.getByRole('list', { name: 'This plan' })).getByText('reading days').previousSibling.textContent).toBe('4');
     fireEvent.click(within(share).getByRole('radio', { name: /One after the other/ }));
     fireEvent.change(screen.getByRole('textbox', { name: 'Plan name' }), { target: { value: 'Ruth, then Seven' } });
     // Back goes to step 1 with the picks kept, and forward again
