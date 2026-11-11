@@ -315,6 +315,18 @@ class OfflineAudioQueueTest {
         waitFor("the next start's try") { s3.isSaved(url(1)) && s3.isSaved(url(2)) }
     }
 
+    @Test
+    fun `an app open makes the will-try-again list due now, its tries kept`() {
+        val good = AtomicBoolean(false)
+        val s = store(executor = pool(), opener = { if (good.get()) whole() else null }, later = listOf(600_000L))
+        s.enqueueJson(items(1).toString())
+        waitFor("the list") { types().contains("failed") }
+        assertTrue(JSONObject(s.stateJson()).getJSONArray("later").getJSONObject(0).getLong("at") > System.currentTimeMillis() + 60_000)
+        good.set(true)
+        s.opened()
+        waitFor("the try at the open") { s.isSaved(url(1)) }
+    }
+
     // dl-rework D (defect 23): a GitHub 404 or 5xx read as no network.
     @Test
     fun `a 404 or a 5xx is the server's answer with its status, not no network`() {

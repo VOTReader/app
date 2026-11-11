@@ -459,6 +459,20 @@ class OfflineAudioStore(
         if (busy) busyNow()
     }
 
+    /**
+     * The app came to the front: the "will try again" list is due now (an open is one of its times, as a start is;
+     * the store outlives an Activity, so loadQueue alone covers only a cold start). Its tries stand: a failure again
+     * waits the next, longer gap.
+     */
+    fun opened() {
+        val any = synchronized(lock) {
+            var n = false
+            for (w in waits.values) if (w.later && w.at > 0L) { w.at = 0L; n = true }
+            n
+        }
+        if (any) wake()
+    }
+
     /** Retry now: every one on the "will try again" list (and every wait) is tried at once. */
     fun retryNow() {
         synchronized(lock) {

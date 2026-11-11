@@ -1577,6 +1577,7 @@ class MainActivity : AppCompatActivity(), BridgeHost {
         // schedule only now, while it is visible.
         try {
             val store = OfflineAudioStore.shared(this)
+            store.opened()   // dl-rework D: an app open is one of the "will try again" list's times
             if (store.busy()) DownloadJob.schedule(this, store)
         } catch (e: Exception) { Timber.w(e, "downloads: resume check") }
     }
