@@ -687,15 +687,15 @@
         --dock-floor: max(1.4rem, calc(var(--dock-sys) + 0.4rem));
         --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px;
         --dock-tabbar: 0px;
-        /* the top bar's bottom edge: .top-nav's 44px row + 22.4px padding + 1px border, as .chapter-nav-sticky has it */
-        --dock-nav-bottom: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
+        /* the top bar's bottom edge: .top-nav's 44px row + 2 x 6px padding = --bar-h (56px), no border (the UI pass) */
+        --dock-nav-bottom: calc(var(--inset-top, 0px) + var(--bar-h));
       }
       body.audio-bar-open { --dock-player: var(--audio-bar-h, 65px); }   /* measured by AudioPlayerBar; 64 + its top border */
       /* The tab bar (TabBar.jsx, the layout pass 2026-11-10) is the dock's new bottom row while it shows: it owns the
          gesture-bar inset, the mini player sits directly on it (with its own bottom edge, no inset of its own) and
          every row above starts from its top, so toasts, the tour strip and the selection toolbar clear both. */
       body.tabbar-on {
-        --tabbar-h: 60px;
+        --tabbar-h: 64px;   /* the UI pass (mock/v2 .tabbar) */
         --dock-tabbar: calc(var(--tabbar-h) + var(--dock-sys));
         --dock-floor: calc(var(--dock-tabbar) + 0.75rem);
       }
@@ -800,8 +800,7 @@
         --tone-danger: #a02622;
         --tone-warn:   #8a5a00;
       }
-      body.light .top-nav { background: rgba(247,242,232,0.95); }
-      /* ── Right-cluster alignment ──────────────────────────────────────────
+            /* ── Right-cluster alignment ──────────────────────────────────────────
          Back + Home stay on the LEFT; every other nav control hugs the RIGHT,
          on every screen and in every settings combination. The push comes from
          ONE always-visible anchor — margin-right:auto absorbs all free space to
@@ -1139,9 +1138,14 @@
            was visually nil but forced a backdrop readback+blur every composited
            frame — at the 120 Hz ARR vote that's half the raster budget on an
            always-visible surface. Alpha bumped to compensate. */
-        background: rgba(0,0,0,0.97);
-        border-bottom: 1px solid var(--gold-border);
+        background: var(--bg);
+        /* The UI pass (W1): no edge at rest; a hairline fades in once the page under it has scrolled
+           (ScreenLayout sets .is-scrolled). */
+        border-bottom: 0;
+        box-shadow: 0 1px 0 transparent;
+        transition: box-shadow 160ms ease;
       }
+      .top-nav.is-scrolled { box-shadow: 0 1px 0 var(--hairline); }
       /* A fully-enabled reading bar has eight controls. Their 44px touch
          targets cannot fit at 360px without clipping Back/Home. History is
          already a first-class Home card, so keep it there on compact phones;
@@ -1221,8 +1225,8 @@
          clone-side only: SCREENSHOT_IGNORE_CLASSES in platform-bridge.js.) */
       /* Floating — pinned to the viewport just under the top nav. Takes zero
          layout space, so the hero tucks flush under the nav bar with no gap.
-         Top offset = inset-top + nav button height (44px) + nav padding (22.4px)
-         + its 1px border. The padding is px, not 1.4rem: the chrome-pin block at
+         Top offset = inset-top + --bar-h (the 44px row + 2 x 6px padding, no
+         border since the UI pass). The padding is px, not 1.4rem: the chrome-pin block at
          the end of this file freezes the nav in px at every text size, and 1.4rem
          grows with the reader's text size (6.7 px below the nav at size 1.3). */
       .chapter-nav-sticky {
@@ -3667,22 +3671,22 @@
       display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
       height: var(--dock-tabbar); box-sizing: border-box;
       padding: 0 max(0px, calc((100vw - 36rem) / 2)) var(--dock-sys);
-      background: var(--bg); border-top: 1px solid var(--border);
+      background: var(--tabbar-bg); border-top: 1px solid var(--hairline);
     }
+    /* The UI pass (W1, mock/v2 base.css .tabbar): sentence-case labels in the UI face; the lit tab is a gold icon with a
+       soft gold fill and a gold label at 600; the others are muted. */
     .tabbar-tab {
-      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-      min-height: 44px; border: 0; background: transparent; color: var(--cream-muted); cursor: pointer;
-      font-family: var(--font-cinzel); font-size: var(--fsc-12); letter-spacing: 0.14em; text-transform: uppercase;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--sp-1);
+      min-height: 44px; border: 0; background: transparent; color: var(--text-2); cursor: pointer;
+      font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 500; letter-spacing: 0; text-transform: none;
       -webkit-tap-highlight-color: transparent;
     }
-    .tabbar-tab svg { width: 24px; height: 24px; stroke-width: 1.6; }
-    .tabbar-tab.is-on { color: var(--gold-bright); }
-    .tabbar-tab.is-on svg { stroke-width: 2; }
-    .tabbar-tab.is-on .tabbar-label { font-weight: 700; }
-    body.light .tabbar-tab { color: #6b6253; }   /* the taupe the vote rows use: 5.6:1 on the light ground */
-    body.light .tabbar-tab.is-on { color: var(--gold); }
-    .tabbar-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; border-radius: 10px; }
-    @media (hover:hover) { .tabbar-tab:hover { color: var(--gold); } }
+    .tabbar-tab svg { width: 24px; height: 24px; stroke-width: 1.7; }
+    .tabbar-tab.is-on { color: var(--accent); }
+    .tabbar-tab.is-on svg { fill: var(--accent-soft); }
+    .tabbar-tab.is-on .tabbar-label { font-weight: 600; }
+    .tabbar-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--r-chip); }
+    @media (hover:hover) { .tabbar-tab:hover { color: var(--text-1); } .tabbar-tab.is-on:hover { color: var(--accent); } }
 
     /* ── ONE TOP-BAR RULE (the three tabs, 2026-11-10). Every screen with the bar (body.nav-tabbed, TabBar.jsx):
        Back where there is one, Search, Tabs, the Settings gear; no Home icon (the bar is the way home), no ⋯ menu,
@@ -3709,11 +3713,36 @@
     }
 
     /* ── A root's top bar (RootNav.jsx): the place's name, Search, Tabs, the gear. ── */
-    .top-nav.top-nav-root { padding-left: 16px; }
-    .root-title { flex: 1; min-width: 0; margin: 0; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fsc-20); font-weight: 400; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .root-gear-btn { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px; border: 0; border-radius: var(--radius); background: none; color: var(--gold); cursor: pointer; flex-shrink: 0; }
-    .root-gear-btn svg { width: 22px; height: 22px; }
-    @media (hover:hover) { .root-gear-btn:hover { color: var(--gold-bright); } }
+    /* ── THE BARS (W1, the UI pass; mock/v2 base.css .bar): 56 high, no edge at rest, the title in the serif at 22 bold
+       in the primary text colour, every icon the primary text colour at 88% in a 44 px target, 22 px, stroke 1.7. Gold in
+       the bar means "you are here" only (the open Tabs overview). A root bar (RootNav.jsx) and a utility bar
+       (utilityNav, RootNav.jsx) share the title class. ── */
+    .top-nav.top-nav-root, .top-nav.top-nav-utility { padding-left: var(--gutter); }
+    .top-nav.top-nav-utility:has(> .nav-home:first-child) { padding-left: var(--sp-1); }
+    .root-title, .bar-title { flex: 1; min-width: 0; margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-title); font-weight: 700; line-height: 1.15; letter-spacing: 0.005em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .root-gear-btn { display: flex; align-items: center; justify-content: center; min-width: var(--tap); min-height: var(--tap); padding: 8px; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-1); cursor: pointer; flex-shrink: 0; }
+    .top-nav :is(.nav-search-btn, .settings-gear-btn, .root-gear-btn, .nav-theme-btn, .nav-more-btn, .nav-bookmark-btn, .nav-home, .bar-action) { color: var(--text-1); }
+    .top-nav :is(.nav-search-btn, .settings-gear-btn, .root-gear-btn, .nav-theme-btn, .nav-more-btn, .nav-bookmark-btn, .bar-action) svg { width: var(--icon); height: var(--icon); stroke-width: 1.7; opacity: 0.88; }
+    .top-nav .nav-home { opacity: 0.88; }
+    .top-nav :is(.nav-search-btn, .settings-gear-btn, .root-gear-btn, .nav-theme-btn, .nav-more-btn, .nav-bookmark-btn, .nav-home, .bar-action):active { background: var(--surface-2); }
+    @media (hover:hover) { .top-nav :is(.nav-search-btn, .settings-gear-btn, .root-gear-btn, .nav-theme-btn, .nav-more-btn, .nav-bookmark-btn, .nav-home, .bar-action):hover { background: var(--surface-1); color: var(--text-1); } }
+    /* The open-tabs counter: the number in a 22 px rounded square, no pill around it; the 44 px press comes from ::before. */
+    .top-nav .tabs-nav-btn { justify-content: center; min-width: var(--tap); height: var(--tap); margin: 0; padding: 0; border: 0; border-radius: var(--r-pill); background: none; color: var(--text-1); }
+    .top-nav .tabs-nav-btn::before { inset: 0; }
+    .top-nav .tabs-nav-btn-count { display: grid; place-items: center; box-sizing: border-box; width: 22px; height: 22px; border: 1.6px solid currentColor; border-radius: 6px; font-family: var(--font-ui); font-size: var(--fsc-12); font-weight: 600; letter-spacing: 0; line-height: 1; opacity: 0.88; }
+    .top-nav .tabs-nav-btn.active { background: none; color: var(--accent); }
+    .top-nav .tabs-nav-btn:active { background: var(--surface-2); }
+    @media (hover:hover) { .top-nav .tabs-nav-btn:hover { background: var(--surface-1); color: var(--text-1); border-color: transparent; } }
+    /* A utility bar's worded action ("Done", "Save"): gold text, no box. */
+    .bar-text-action { flex: none; min-height: var(--tap); padding: 0 var(--sp-3); border: 0; border-radius: var(--r-pill); background: none; color: var(--accent); font-family: var(--font-ui); font-size: var(--fsc-15); font-weight: 600; cursor: pointer; }
+    .top-nav.top-nav-utility > .nav-home.bar-back { margin-right: 0; min-width: var(--tap); min-height: var(--tap); padding: 0; justify-content: center; border-radius: var(--r-pill); }
+    .top-nav .bar-back svg { width: var(--icon); height: var(--icon); opacity: 0.88; }
+    .top-nav.top-nav-utility > .bar-title { padding-left: var(--sp-1); }
+    /* The UI icon (UiIcon.jsx): a 24-grid line icon in currentColor. */
+    .ui-i { width: var(--icon); height: var(--icon); flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .ui-i-sm { width: var(--icon-sm); height: var(--icon-sm); }
+    .ui-i-fill { fill: currentColor; stroke: none; }
+    .bar-action { display: flex; align-items: center; justify-content: center; flex: none; min-width: var(--tap); min-height: var(--tap); padding: 0; border: 0; border-radius: var(--r-pill); background: none; cursor: pointer; }
 
     /* ── The three roots' page (HomeScreen, AudioLibraryScreen, LibraryScreen): one 36rem column ── */
     .root-screen { width: 100%; max-width: 36rem; margin: 0 auto; padding: 14px 16px 8px; box-sizing: border-box; font-family: var(--font-body); color: var(--cream); }
@@ -8577,12 +8606,13 @@
        step, so an unpaired change is visible in the diff. Keep this block at
        the END of the file (same specificity: last wins) and add any new
        floating chrome here. */
-    .top-nav { gap: 1.92px; padding: 11.2px 8px 11.2px; padding-top: calc(var(--inset-top, 0px) + 11.2px); }
+    .top-nav { gap: 1.92px; padding: 6px 6px 6px 4px; padding-top: calc(var(--inset-top, 0px) + 6px); min-height: calc(var(--inset-top, 0px) + var(--bar-h)); box-sizing: border-box; }
     .nav-home { font-size: var(--fsc-12); padding: 7.2px 8.8px; }
     .nav-back-icon { font-size: var(--fsc-36); padding: 0 5.6px; min-width: 44px; }
     .nav-theme-btn, .nav-search-btn, .nav-more-btn { padding: 8px; }  /* the ⋯ button too: its 0.5rem grew the bar with Text Size, under the fixed --dock-nav-bottom */
     .reading-dot-nav { width: 40px; height: 40px; }
-    .tabs-nav-btn { font-size: var(--fsc-11); padding: 5.6px 8px; gap: 4px; margin-left: 2.4px; }
+    .tabs-nav-btn { font-size: var(--fsc-11); gap: 4px; }
+    .top-nav .tabs-nav-btn-count { font-size: var(--fsc-12); }
     .nav-arrows { gap: 4.8px; }
     .nav-btn { font-size: var(--fsc-12); padding: 7.2px 12px; }
     .nav-arrow-btn { width: 30.4px; height: 30.4px; font-size: var(--fsc-16); }

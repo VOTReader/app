@@ -9,6 +9,7 @@ import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 import { MoreMenuBtn } from './MoreMenu.jsx';
 import { NavGearHost } from './NavButtons.jsx';
 import { AutoScrollControl } from './AutoScrollControl.jsx';
+import { utilityNav } from './RootNav.jsx';
 
 /** The document's selected text; '' when nothing is selected or it cannot be read. */
 function selectionText() {
@@ -42,12 +43,18 @@ function applySavedScrollToEl(el, saved) {
 /**
  * @param {{ navChildren?: any, children?: any, hideTabsBtn?: boolean, trackScroll?: boolean, pager?: any,
  *   stickyNav?: boolean, inert?: boolean, restoreScroll?: any, placeKey?: string, landmarks?: boolean,
- *   className?: string, root?: boolean, navEnd?: any }} props  className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2).
+ *   className?: string, root?: boolean, navEnd?: any,
+ *   utility?: { title: string, onBack?: () => void, backLabel?: string, actions?: any[], menu?: any } }} props
+ *   className: more classes on .screen-layout (the Answers screens' ans-wide / ans-ts2).
  *   root: one of the three tab roots (Read, Listen, Library; the layout pass 2026-11-10): no resume dot and no ⋯ menu
  *   (its items live in the Library and Settings); `navEnd` is drawn after Tabs instead (the Settings gear, RootNav.jsx).
+ *   utility: the utility bar (U rule 11, RootNav.jsx utilityNav): Back, the title, at most two actions, Tabs, and the
+ *   screen's own ⋯ (`menu`) only when it has one. No resume dot, no gear slot, no app-wide ⋯ menu. `navChildren` is
+ *   ignored in this mode.
  */
-export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '', root = false, navEnd = null }) {
+export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '', root = false, navEnd = null, utility = null }) {
   const scrollRef = React.useRef(null);
+  const navRef = React.useRef(/** @type {any} */ (null));
   // The slot after Tabs where NavButtons draws the Settings gear (NavGearHost, NavButtons.jsx).
   const [gearHost, setGearHost] = React.useState(null);
   const gearCtx = React.useMemo(() => ({ host: gearHost }), [gearHost]);
@@ -287,6 +294,23 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
     };
   }, [inert]);
 
+  // The top bar's hairline (the UI pass, U §3): none at rest, one once the page has scrolled. A passive listener that
+  // touches the class only when the state flips, so a scroll costs one property read per event.
+  React.useEffect(() => {
+    if (inert) return undefined;
+    const el = scrollRef.current;
+    const nav = navRef.current;
+    if (!el || !nav) return undefined;
+    let on = false;
+    const sync = () => {
+      const next = el.scrollTop > 2;
+      if (next !== on) { on = next; nav.classList.toggle('is-scrolled', on); }
+    };
+    sync();
+    el.addEventListener('scroll', sync, { passive: true });
+    return () => el.removeEventListener('scroll', sync);
+  }, [inert]);
+
   // Inert clone (a pager peek): render ONLY the scrollable content, in a
   // container whose box model is byte-identical to the live `.screen-scroll`
   // (same overflow/scrollbar-gutter → same content width → same text wrapping).
@@ -314,14 +338,22 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   const Main = landmarks ? 'main' : 'div';
   return (
     <div className={className ? 'screen-layout ' + className : 'screen-layout'}>
-      <NavGearHost.Provider value={root ? null : gearCtx}>
-        <Nav className={root ? 'top-nav top-nav-root' : 'top-nav'}>
-          {navChildren}
-          {root ? null : <ResumeReadingNavBtn />}
-          {hideTabsBtn ? null : <TabsNavBtn />}
-          {root ? navEnd : <span className="nav-gear-slot" ref={setGearHost} />}
-          {root ? null : <MoreMenuBtn />}
-        </Nav>
+      <NavGearHost.Provider value={root || utility ? null : gearCtx}>
+        {utility ? (
+          <Nav className="top-nav top-nav-utility" ref={navRef}>
+            {utilityNav(utility)}
+            {hideTabsBtn ? null : <TabsNavBtn />}
+            {utility.menu || null}
+          </Nav>
+        ) : (
+          <Nav className={root ? 'top-nav top-nav-root' : 'top-nav'} ref={navRef}>
+            {navChildren}
+            {root ? null : <ResumeReadingNavBtn />}
+            {hideTabsBtn ? null : <TabsNavBtn />}
+            {root ? navEnd : <span className="nav-gear-slot" ref={setGearHost} />}
+            {root ? null : <MoreMenuBtn />}
+          </Nav>
+        )}
       </NavGearHost.Provider>
       {pager ? (
         <div className="pager-viewport">

@@ -36,7 +36,7 @@ export function TabsNavBtn() {
         aria-label={`Open tabs (${count} open)`}
         aria-haspopup="dialog"
       >
-        <span className="tabs-nav-btn-glyph">{"▢"}</span>
+        {/* the UI pass (W1): the number in a 22 px rounded square is the whole button; no glyph beside it */}
         <span className="tabs-nav-btn-count">{label}</span>
       </button>
       {hintVisible ? (
