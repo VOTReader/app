@@ -3603,8 +3603,9 @@
        no resume marker, no History or theme icon. Readers (no bar): Back, Home, Search, the bookmark, Tabs and the
        ⋯ menu of page options. The gear is shown whatever the old gear switch says, and sits after Tabs. ── */
     body.nav-tabbed .top-nav :is(.nav-more-btn, .reading-dot-nav, .nav-theme-btn, .nav-search-btn[title="Home"], .nav-search-btn[title="History"]) { display: none; }
-    body.nav-tabbed .top-nav :is(.settings-gear-btn, .root-gear-btn) { display: flex; order: 2; }
-    body.nav-tabbed .top-nav .tabs-hint-wrap, body.nav-tabbed .top-nav .tabs-nav-btn { order: 1; }
+    body.nav-tabbed .top-nav :is(.settings-gear-btn, .root-gear-btn) { display: flex; }
+    /* The DOM order is the keyboard order: Back, Search, Tabs, gear. NavButtons draws the gear into this slot, after Tabs. */
+    .top-nav .nav-gear-slot { display: contents; }
     body.nav-tabbed .top-nav .nav-home { margin-right: auto; }
     body.nav-tabbed .top-nav .nav-home ~ .nav-home { margin-right: 0; }
 

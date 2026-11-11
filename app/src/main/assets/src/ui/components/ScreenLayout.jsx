@@ -7,6 +7,7 @@ import { PagerPeek } from './pager-preview.jsx';
 import { AnnotationHint } from './AnnotationHint.jsx';
 import { ResumeReadingNavBtn } from './ResumeReadingNavBtn.jsx';
 import { MoreMenuBtn } from './MoreMenu.jsx';
+import { NavGearHost } from './NavButtons.jsx';
 import { AutoScrollControl } from './AutoScrollControl.jsx';
 
 /** The document's selected text; '' when nothing is selected or it cannot be read. */
@@ -47,6 +48,9 @@ function applySavedScrollToEl(el, saved) {
  */
 export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll = true, pager, stickyNav, inert = false, restoreScroll = null, placeKey = '', landmarks = true, className = '', root = false, navEnd = null }) {
   const scrollRef = React.useRef(null);
+  // The slot after Tabs where NavButtons draws the Settings gear (NavGearHost, NavButtons.jsx).
+  const [gearHost, setGearHost] = React.useState(null);
+  const gearCtx = React.useMemo(() => ({ host: gearHost }), [gearHost]);
   // `inert`: this ScreenLayout is a THROWAWAY visual clone of a neighbor screen,
   // mounted by the pager (PagerPeek) UNDER the live screen so the finger-follow
   // swipe drags the REAL next/prev page (identical UI, width, wrapping, inline
@@ -310,12 +314,15 @@ export function ScreenLayout({ navChildren, children, hideTabsBtn, trackScroll =
   const Main = landmarks ? 'main' : 'div';
   return (
     <div className={className ? 'screen-layout ' + className : 'screen-layout'}>
-      <Nav className={root ? 'top-nav top-nav-root' : 'top-nav'}>
-        {navChildren}
-        {root ? null : <ResumeReadingNavBtn />}
-        {hideTabsBtn ? null : <TabsNavBtn />}
-        {root ? navEnd : <MoreMenuBtn />}
-      </Nav>
+      <NavGearHost.Provider value={root ? null : gearCtx}>
+        <Nav className={root ? 'top-nav top-nav-root' : 'top-nav'}>
+          {navChildren}
+          {root ? null : <ResumeReadingNavBtn />}
+          {hideTabsBtn ? null : <TabsNavBtn />}
+          {root ? navEnd : <span className="nav-gear-slot" ref={setGearHost} />}
+          {root ? null : <MoreMenuBtn />}
+        </Nav>
+      </NavGearHost.Provider>
       {pager ? (
         <div className="pager-viewport">
           <Main className="screen-scroll" ref={ref}>

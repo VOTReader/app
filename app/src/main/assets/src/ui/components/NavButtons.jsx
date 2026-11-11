@@ -14,18 +14,26 @@
    accessible-name computation, it is not announced by every AT, and it never
    appears on touch — where this app lives. The label is the name; the title
    stays exactly as it is because CSS reads it. */
+/* Where the Settings gear sits in the DOM. ScreenLayout provides { host } (its slot after the Tabs button) on every
+   screen but a tab root, and the gear is drawn into it, so keyboard order on those screens is Back, Search, Tabs,
+   gear (the top-bar rule, 2026-11-10) with no CSS `order`. With no provider (a test, a harness) the gear renders
+   inline, first, as it always did. */
+export const NavGearHost = React.createContext(null);
+
 export function NavButtons({ onSettings, onHistory, onSearch, theme, onThemeChange, reading, chapterBookmark, hide }) {
   const off = (k) => !!(hide && hide.indexOf(k) !== -1);
-  return (
-    <>
-      {off('settings') ? null : (
+  const gear = off('settings') ? null : (
       <button className="settings-gear-btn" onClick={onSettings} title="Settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
           <circle cx="12" cy="12" r="3" />
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg>
       </button>
-      )}
+  );
+  return (
+    <>
+      {/* a Consumer, not a hook: tests (and callers) invoke NavButtons(...) as a plain function */}
+      <NavGearHost.Consumer>{(gearHost) => (gearHost ? (gearHost.host ? ReactDOM.createPortal(gear, gearHost.host) : null) : gear)}</NavGearHost.Consumer>
       {off('history') ? null : (
       <button className={reading ? "nav-search-btn nav-history-reading" : "nav-search-btn"} onClick={onHistory} title="History" aria-label="History">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
