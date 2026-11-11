@@ -93,6 +93,22 @@ describe('BookmarkCreateSheet — thought field removed', () => {
     });
   });
 
+  /* Half-baked 16: the top tick IS "Save bookmark" (one control, named for what it does). It saves exactly as the
+     Enter key in the label field does, and nothing else in the sheet saves. */
+  it('the top tick is the Save bookmark control and saves the same as Enter', () => {
+    const onConfirm = vi.fn();
+    const pending = { hlKey: 'bible:psalms:23:1', defaultLabel: 'Psalms 23:1', text: 'The LORD is my shepherd' };
+    const { container } = render(<BookmarkCreateSheet pending={pending} onConfirm={onConfirm} onCancel={() => {}} />);
+    const tick = container.querySelector('.navpick-confirm-green');
+    expect(tick.getAttribute('aria-label')).toBe('Save bookmark');
+    expect(screen.getAllByRole('button', { name: 'Save bookmark' })).toEqual([tick]);
+    fireEvent.click(tick);
+    fireEvent.keyDown(container.querySelector('.bkm-create-label-input'), { key: 'Enter' });
+    expect(onConfirm).toHaveBeenCalledTimes(2);
+    expect(onConfirm.mock.calls[0][0]).toEqual(onConfirm.mock.calls[1][0]);
+    expect(onConfirm.mock.calls[0][0]).toMatchObject({ editId: null, hlKey: 'bible:psalms:23:1', label: 'Psalms 23:1' });
+  });
+
   /* W48: the words a bookmark was made on ride to the store, so its icon can
      follow them after an edit; an edit never touches the record's own words. */
   it('CREATE commit passes the recorded words through; EDIT sends none', () => {
