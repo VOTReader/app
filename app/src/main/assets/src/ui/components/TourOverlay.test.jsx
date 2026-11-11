@@ -198,8 +198,8 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
   });
 
   it('a ring taller than the room below: the card sits inside the viewport, over the ring if it must', () => {
-    document.body.innerHTML = '<div id="app"><button class="home-nav-item">The Volumes of Truth</button></div>';
-    const tile = document.querySelector('.home-nav-item');
+    document.body.innerHTML = '<div id="app"><button class="home-tile">The Volumes of Truth</button></div>';
+    const tile = document.querySelector('.home-tile');
     tile.getBoundingClientRect = rect(12, vh() * 0.55, 330, 300);     // the Letters tile at 1.8
     startAt('letters');
     render(<TourOverlay />, { container: document.body.appendChild(document.createElement('div')) });
@@ -225,8 +225,8 @@ describe('TourOverlay — the card never leaves the screen; the ring is kept on 
   it('a card that fits on neither side where the ring sits scrolls the ring to the top of its screen', async () => {
     // The tall Listen card at 1.8: the pill sits mid-screen, the card fits neither above nor below it,
     // but would below once the pill is at the top. Centre-scrolling cannot get there.
-    document.body.innerHTML = '<div id="app"><button class="home-nav-item">The Volumes of Truth</button></div>';
-    const tile = document.querySelector('.home-nav-item');
+    document.body.innerHTML = '<div id="app"><button class="home-tile">The Volumes of Truth</button></div>';
+    const tile = document.querySelector('.home-tile');
     tile.getBoundingClientRect = rect(12, 250, 330, 300);
     const scrolls = vi.fn();
     tile.scrollIntoView = scrolls;

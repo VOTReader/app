@@ -21,7 +21,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { TourController, TOUR_LATER_MS } from './tour-controller.js';
 import { TourDoneFlagStore, AboutSeenFlagStore } from '../stores/app-flag-stores.js';
 
-const nav = () => ({ goHome: vi.fn(), goLibrary: vi.fn(), openLetter: vi.fn(), openBible: vi.fn(), goJournalHub: vi.fn(), openSettingsData: vi.fn() });
+const nav = () => ({ goHome: vi.fn(), goLibrary: vi.fn(), goListen: vi.fn(), openLetter: vi.fn(), openBible: vi.fn(), goJournalHub: vi.fn(), openSettingsData: vi.fn() });
 
 beforeEach(() => {
   localStorage.clear();
@@ -123,8 +123,7 @@ describe('TourController — moving', () => {
     TourController.next(); TourController.next();      // demonstrate, stay; then → scripture-web
     expect(onClick).not.toHaveBeenCalled();
     expect(TourController.getState().step.id).toBe('scripture-web');
-    expect(n.goHome).toHaveBeenCalledTimes(2);        // the welcome card's enter and the letters stop's
-    expect(n.goLibrary).toHaveBeenCalledTimes(1);     // this stop's: the Library's Scripture Web tile (2026-11-10)
+    expect(n.goHome).toHaveBeenCalledTimes(3);        // the welcome card's enter, the letters stop's, and this stop's (Read > Explore)
   });
 
   it('next() on a press stop clicks the visible target once, then moves on', () => {

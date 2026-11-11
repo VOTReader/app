@@ -128,15 +128,22 @@ describe('tour-steps — shape', () => {
      shortcut the same ask restores, so `enter` is goHome (the Bible stop left the tour on
      bible-ch). Its three sentences are the trailer slide's own (Creative's cut 8 plan), so the
      app and the trailer agree, and they name BOTH halves by their on-screen names. */
-  it('the scripture-web stop follows the highlight stop (the Bible moved to the end, 2026-09-13) and rings the Library tile (Home lost its button, 2026-11-10)', () => {
+  it('the scripture-web stop follows the highlight stop (the Bible moved to the end, 2026-09-13) and rings Read > Explore (2026-11-10)', () => {
     const sw = TOUR_STEPS.find((s) => s.id === 'scripture-web');
     const hl = TOUR_STEPS.find((s) => s.id === 'highlight');
     expect(TOUR_STEPS.indexOf(sw)).toBe(TOUR_STEPS.indexOf(hl) + 1);
-    expect(sw.screen).toBe('library');
-    expect(sw.enter).toBe('goLibrary');
-    expect(sw.target).toEqual({ selector: '.library-tile', text: 'Scripture Web' });
+    expect(sw.screen).toBe('home');
+    expect(sw.enter).toBe('goHome');
+    expect(sw.target).toEqual({ selector: '.root-explore-btn', text: 'Scripture Web' });
     expect(sw.act).toBeNull();
     expect(sw.primary).toBe('Next');
+  });
+
+  it('the songs stop opens the Listen tab and rings its Songs row (2026-11-10)', () => {
+    const songs = TOUR_STEPS.find((s) => s.id === 'songs');
+    expect(songs.screen).toBe('audio-library');
+    expect(songs.enter).toBe('goListen');
+    expect(songs.target).toEqual({ selector: '.root-row', text: 'Songs of the Letters' });
   });
 
   it("the scripture-web stop says the trailer slide's three sentences and names both halves", () => {
@@ -239,9 +246,9 @@ describe('tour-steps — findTarget', () => {
   });
 
   it('matches by text when the step names one, so a reordered Home still finds the tile', () => {
-    document.body.innerHTML = '<button class="home-nav-item">The Holy Bible</button><button class="home-nav-item">The Volumes of Truth</button>';
+    document.body.innerHTML = '<button class="home-tile">The Holy Bible</button><button class="home-tile">The Volumes of Truth</button>';
     for (const b of document.querySelectorAll('button')) b.getBoundingClientRect = () => /** @type {any} */ ({ x: 24, y: 263, width: 312, height: 87, left: 24, right: 336, top: 263, bottom: 350 });
-    const el = findTarget({ target: { selector: '.home-nav-item', text: 'The Volumes of Truth' } });
+    const el = findTarget({ target: { selector: '.home-tile', text: 'The Volumes of Truth' } });
     expect(el && el.textContent).toBe('The Volumes of Truth');
   });
 

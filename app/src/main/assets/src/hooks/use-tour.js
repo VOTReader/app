@@ -8,7 +8,8 @@
    app's current closures. Nothing here decides anything — the stops do.
 
      goHome            App's goHome
-     goLibrary         App's goLibrary (the Scripture Web tile)
+     goLibrary         App's goLibrary
+     goListen          the Listen tab's root (the Songs row)
      openLetter        Volume One › "Chosen by God" (short, has a recording)
      openBible         John 3, in whatever translation the reader chose
      goJournalHub      App's goJournalHub (Library › Journal)
@@ -37,6 +38,7 @@ export function useTour({ goHome, goLibrary, goJournalHub, goReadingPlans, goSet
     TourController.attachNav({
       goHome,
       goLibrary,
+      goListen: () => setScreen('audio-library'),
       openLetter: () => { setLetterId(TOUR_LETTER.id); setScreen(TOUR_LETTER.screen); },
       openBible,
       goJournalHub,

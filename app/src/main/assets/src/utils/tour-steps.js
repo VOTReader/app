@@ -120,7 +120,7 @@ const STOPS = [
   },
   {
     id: 'letters', screen: 'home', enter: 'goHome',
-    target: { selector: '.home-nav-item', text: 'The Volumes of Truth' }, act: 'openLetter',
+    target: { selector: '.home-tile', text: 'The Volumes of Truth' }, act: 'openLetter',
     label: 'The Letters',
     title: 'The Letters live here',
     text: 'Tap a Volume, then a letter. Tap this tile now, or press Next and I will open one for you.',
@@ -162,11 +162,10 @@ const STOPS = [
      the trailer slide's own (Creative's cut 8), so the app and the trailer agree, and they name
      both halves by their on-screen names. It sat after the Bible stop until 2026-09-13, when the
      Bible moved to the end so the tour could finish with the verses still being read. */
-  /* The layout pass (2026-11-10): Home's quick row lost its Scripture Web button, so the stop rings the Library's
-     Scripture Web tile instead (enter goLibrary, one navigation as before). */
+  /* The three tabs (2026-11-10): the web's one way in is Read > Explore, so the stop rings that button on Home. */
   {
-    id: 'scripture-web', screen: 'library', enter: 'goLibrary',
-    target: { selector: '.library-tile', text: 'Scripture Web' }, act: null,
+    id: 'scripture-web', screen: 'home', enter: 'goHome',
+    target: { selector: '.root-explore-btn', text: 'Scripture Web' }, act: null,
     label: 'The Scripture Web',
     title: 'See the Scriptures as a web',
     text: 'Every place one verse points to another is drawn as a thread. Scripture Web shows the whole Bible\'s threads. My Web holds the links you make yourself.',
@@ -176,9 +175,10 @@ const STOPS = [
   /* SONGS OF THE LETTERS GET A STOP (ai-music L8, 2026-09-25): the Home card, after the listening stops. It sits
      after the Scripture Web stop, not straight after Listen, so the tour does not go Home and back to the letter
      for the highlight stop: it is the second of the Home stops that follow the letter stops. Rings the card; the words are the design's (README §3.10). */
+  /* The three tabs (2026-11-10): Songs live in Listen, so the stop opens the Listen tab and rings its row. */
   {
-    id: 'songs', screen: 'home', enter: 'goHome',
-    target: { selector: '.home-nav-item', text: 'Songs of the Letters' }, act: null,
+    id: 'songs', screen: 'audio-library', enter: 'goListen',
+    target: { selector: '.root-row', text: 'Songs of the Letters' }, act: null,
     label: 'Songs of the Letters',
     title: 'Songs from the letters',
     text: 'Songs made by the flock from the letters. Tap to listen.',
