@@ -745,6 +745,8 @@ function App() {
       <ErrorBoundary key={screen}><RouteSlot route={ROUTES[screen] || ROUTES.home} /></ErrorBoundary>
       {/* Audio mini-player (null while idle): after the screen, so Tab and screen readers meet it last (W66). */}
       <ErrorBoundary fallback={null} resetKey={screen}><AudioPlayerBar /></ErrorBoundary>
+      {/* Read / Listen / Library (utils/app-sections.js decides where it shows): a tab opens its root, fresh. */}
+      <ErrorBoundary fallback={null} resetKey={screen}><TabBar screen={screen} overviewOpen={tabsOverviewOpen} onOpen={(t, root) => { if (t === 'read') goHome(); else { setNavOrigin(null); setScreen(root); } }} /></ErrorBoundary>
       <AnnotationDomSync
         screen={screen}
         letterId={letterId} studiesLoading={studiesLoading}

@@ -618,10 +618,26 @@
         --dock-sys: max(env(safe-area-inset-bottom, 0px), var(--inset-bottom, 0px));
         --dock-floor: max(1.4rem, calc(var(--dock-sys) + 0.4rem));
         --dock-player: 0px; --dock-transport: 0px; --dock-context: 0px; --dock-find: 0px;
+        --dock-tabbar: 0px;
         /* the top bar's bottom edge: .top-nav's 44px row + 22.4px padding + 1px border, as .chapter-nav-sticky has it */
         --dock-nav-bottom: calc(var(--inset-top, 0px) + 44px + 22.4px + 1px);
       }
       body.audio-bar-open { --dock-player: var(--audio-bar-h, 65px); }   /* measured by AudioPlayerBar; 64 + its top border */
+      /* The tab bar (TabBar.jsx, the layout pass 2026-11-10) is the dock's new bottom row while it shows: it owns the
+         gesture-bar inset, the mini player sits directly on it (with its own bottom edge, no inset of its own) and
+         every row above starts from its top, so toasts, the tour strip and the selection toolbar clear both. */
+      body.tabbar-on {
+        --tabbar-h: 60px;
+        --dock-tabbar: calc(var(--tabbar-h) + var(--dock-sys));
+        --dock-floor: calc(var(--dock-tabbar) + 0.75rem);
+      }
+      body.tabbar-on .audio-bar {
+        bottom: calc(var(--dock-tabbar) + 6px);
+        padding-bottom: min(0.5rem, 8px);
+        border-bottom: 1px solid var(--gold-border); border-radius: 14px;
+      }
+      body.tabbar-on .screen-scroll { padding-bottom: calc(var(--dock-tabbar) + 16px); }
+      body.tabbar-on .dl-footer { bottom: calc(var(--dock-tabbar) + var(--dock-player)); }
       body.autoscroll-on { --dock-transport: 60px; }
       body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
       body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
@@ -643,6 +659,7 @@
          audio (player brief 2026-10-22, 3a, approved 10-23). */
       html.kb-up .audio-bar { display: none; }
       html.kb-up body { --dock-player: 0px; }
+      html.kb-up .tabbar { display: none; }
       /* cz7: the reading text can always scroll clear of the dock: the scroller's end padding is the live stack. */
       body:is(.audio-bar-open, .autoscroll-on, :has(.mode-toggle-wrap, .jrn-fab, .find-pill)) .screen-scroll {
         padding-bottom: calc(var(--dock-floor) + var(--dock-player) + var(--dock-transport) + var(--dock-find) + var(--dock-context) + 8px);
@@ -3556,6 +3573,101 @@
     .upnext-chev { flex:none; padding:0 0.45rem; color:var(--gold-dim); font-size:var(--fs-24); line-height:1; }
     .upnext-x { flex:none; width:44px; height:44px; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-20); line-height:1; cursor:pointer; }
     .upnext-textlink { position:relative; flex:none; min-height:34px; padding:0 0.5rem; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-15); cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--gold-border); }
+    /* ── The bottom tab bar (TabBar.jsx; mocks read.png / listen.png / library.png) ── chrome, so its type is the
+       frozen --fsc ladder (it does not grow with Text size, as the top bar does not). Wide screens keep it at the
+       bottom with its three tabs centred to the roots' column. */
+    .tabbar {
+      position: fixed; left: 0; right: 0; bottom: 0; z-index: 140;
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      height: var(--dock-tabbar); box-sizing: border-box;
+      padding: 0 max(0px, calc((100vw - 36rem) / 2)) var(--dock-sys);
+      background: var(--bg); border-top: 1px solid var(--border);
+    }
+    .tabbar-tab {
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+      min-height: 44px; border: 0; background: transparent; color: var(--cream-muted); cursor: pointer;
+      font-family: var(--font-cinzel); font-size: var(--fsc-12); letter-spacing: 0.14em; text-transform: uppercase;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tabbar-tab svg { width: 24px; height: 24px; stroke-width: 1.6; }
+    .tabbar-tab.is-on { color: var(--gold-bright); }
+    .tabbar-tab.is-on svg { stroke-width: 2; }
+    .tabbar-tab.is-on .tabbar-label { font-weight: 700; }
+    body.light .tabbar-tab { color: #6b6253; }   /* the taupe the vote rows use: 5.6:1 on the light ground */
+    body.light .tabbar-tab.is-on { color: var(--gold); }
+    .tabbar-tab:focus-visible { outline: 2px solid var(--gold); outline-offset: -4px; border-radius: 10px; }
+    @media (hover:hover) { .tabbar-tab:hover { color: var(--gold); } }
+
+    /* ── A root's top bar (RootNav.jsx): the place's name, Search, Tabs, the gear. ── */
+    .top-nav.top-nav-root { padding-left: 16px; }
+    .root-title { flex: 1; min-width: 0; margin: 0; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fsc-20); font-weight: 400; letter-spacing: 0.08em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .root-gear-btn { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 8px; border: 0; border-radius: var(--radius); background: none; color: var(--gold); cursor: pointer; flex-shrink: 0; }
+    .root-gear-btn svg { width: 22px; height: 22px; }
+    @media (hover:hover) { .root-gear-btn:hover { color: var(--gold-bright); } }
+
+    /* ── The three roots' page (HomeScreen, AudioLibraryScreen, LibraryScreen): one 36rem column ── */
+    .root-screen { width: 100%; max-width: 36rem; margin: 0 auto; padding: 14px 16px 8px; box-sizing: border-box; font-family: var(--font-body); color: var(--cream); }
+    .root-screen .upnext { max-width: none; margin: 12px 0 0; }
+    .root-search { display: flex; align-items: center; gap: 10px; width: 100%; height: 46px; padding: 0 16px; border: 1px solid var(--gold-border); border-radius: 23px; background: var(--bg3); color: var(--cream-muted); font: inherit; font-size: var(--fs-16); text-align: left; cursor: pointer; box-sizing: border-box; }
+    .root-search svg { flex: none; width: 19px; height: 19px; color: var(--gold); }
+    .root-search span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body.light .root-search { background: var(--bg2); }
+    .root-screen > .root-section:first-child { margin-top: 4px; }
+    .root-section { margin: 20px 2px 8px; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); font-weight: 400; letter-spacing: 0.18em; text-transform: uppercase; line-height: 1.3; }
+    .root-section-row { display: flex; align-items: baseline; gap: 0.5rem; }
+    .root-section-row .root-section { flex: 1; }
+    .root-link { min-height: 32px; padding: 0 2px; border: 0; background: none; color: var(--gold); font: inherit; font-size: var(--fs-15); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--gold-border); cursor: pointer; }
+    .root-eyebrow { color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.16em; text-transform: uppercase; line-height: 1.35; }
+    /* Tiles: two columns, the gold Cinzel title, an italic line at the foot. */
+    .root-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .root-tile { display: flex; flex-direction: column; align-items: flex-start; min-height: 104px; padding: 14px 14px 13px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; }
+    body.light .root-tile { background: var(--bg2); }
+    .root-tile-eyebrow { margin-bottom: 6px; color: var(--gold-dim); font-family: var(--font-cinzel); font-size: var(--fs-12); letter-spacing: 0.14em; text-transform: uppercase; line-height: 1.3; }
+    .root-tile-title { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-16); line-height: 1.25; letter-spacing: 0.02em; overflow-wrap: break-word; max-width: 100%; }
+    .root-tile-detail { margin-top: auto; padding-top: 6px; color: var(--cream-muted); font-size: var(--fs-14); font-style: italic; line-height: 1.3; }
+    .lib-tiles .root-tile { min-height: 76px; }
+    .lib-tiles .root-tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
+    @media (hover:hover) { .root-tile:hover, .root-explore-btn:hover, .root-row:hover { border-color: var(--gold); } }
+    .root-explore { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; }
+    .root-explore-btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 12px; border: 1px solid var(--gold-border); border-radius: 12px; background: transparent; color: var(--gold); font: inherit; font-size: var(--fs-16); cursor: pointer; }
+    .root-explore-btn svg { flex: none; width: 18px; height: 18px; }
+    .root-explore-btn:disabled { opacity: 0.6; cursor: default; }
+    .root-screen .home-status { max-width: none; }
+    /* Lists: one card, a row each (icon square, title, italic line, count, chevron). */
+    .root-list { border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); overflow: hidden; }
+    body.light .root-list { background: var(--bg2); }
+    .root-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; margin: 0; padding: 8px 6px 8px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; }
+    .root-row + .root-row, .root-row + .root-sublist, .root-sublist + .root-row { border-top: 1px solid var(--border); }
+    .root-row-plain { min-height: 52px; }
+    .root-row-icon { flex: none; display: flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 9px; background: var(--gold-faint); color: var(--gold); }
+    .root-row-icon svg { width: 19px; height: 19px; }
+    .root-row-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .root-row-title { color: var(--cream); font-size: var(--fs-18); line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .root-row-sub { color: var(--cream-muted); font-size: var(--fs-14); font-style: italic; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .root-row-count { flex: none; color: var(--cream-muted); font-size: var(--fs-15); }
+    .root-row-chev { flex: none; padding: 0 8px; color: var(--gold-dim); font-size: var(--fs-24); line-height: 1; transition: transform 0.15s ease; }
+    .root-row-chev.is-open { transform: rotate(90deg); }
+    .root-sublist { background: var(--gold-faint); }
+    .root-sublist .root-row { padding-left: 26px; }
+    .root-sublist .root-row-title { font-size: var(--fs-16); white-space: normal; }
+    /* The Listen root's Continue listening card. */
+    .listen-continue { border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); }
+    body.light .listen-continue { background: var(--bg2); }
+    .listen-continue-main { display: flex; align-items: center; gap: 12px; padding: 12px 12px 12px 14px; }
+    .listen-art { flex: none; display: flex; align-items: center; justify-content: center; width: 54px; height: 54px; padding: 0; border: 1px solid var(--gold-border); border-radius: 10px; background: linear-gradient(135deg, rgba(214,179,95,0.16), transparent); color: var(--gold); cursor: pointer; }
+    .listen-art:disabled { cursor: default; }
+    .listen-art svg { width: 22px; height: 22px; }
+    .listen-continue-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+    .listen-continue-title { margin: 0; color: var(--cream); font-size: var(--fs-18); font-weight: 400; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .listen-continue-meta { color: var(--cream-muted); font-size: var(--fs-14); font-style: italic; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .listen-play { flex: none; display: flex; align-items: center; justify-content: center; width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; background: var(--gold); color: var(--bg); cursor: pointer; }
+    .listen-play svg { width: 20px; height: 20px; }
+    .listen-progress { height: 3px; margin: 0 14px 12px; border-radius: 2px; background: var(--border); overflow: hidden; }
+    .listen-progress > span { display: block; height: 100%; background: var(--gold); }
+    .listen-recent { margin-top: 4px; }
+    .listen-recent .audio-library-disclosure { flex: none; }
+    .listen-recent .audio-library-list { border: 1px solid var(--gold-border); border-radius: 12px; background: var(--bg3); }
+    body.light .listen-recent .audio-library-list { background: var(--bg2); }
     @media (hover:hover) {
       .upnext-pill:hover { border-color:var(--gold); background:var(--gold-faint); }
       .upnext-pill-solid:hover { background:var(--gold-bright); }
@@ -9799,6 +9911,8 @@
          card, as there is no room left under the nav. Set on body, where the rows resolve. */
       body { --dock-tour: calc(max(14px, var(--dock-sys)) + var(--dock-player) + var(--dock-transport) + var(--dock-context)
         + min(calc(var(--dock-transport) + var(--dock-context)), 9px)); }
+      /* Over the tab bar (the layout pass): the bar holds the gesture inset, so the strip starts from its top. */
+      body.tabbar-on { --dock-tour: calc(var(--dock-tabbar) + 10px + var(--dock-player) + var(--dock-transport) + var(--dock-context)); }
       body:has(.find-pill) .tour-prompt { display: none; }
       @media (max-height: 500px) { body.autoscroll-on .tour-prompt, body:has(.mode-toggle-wrap) .tour-prompt { display: none; } }
       .tour-prompt { bottom: var(--dock-tour); z-index: 310; padding: 14px 16px 10px; }

@@ -195,6 +195,7 @@ import { LinkIcon } from './components/LinkIcon.jsx';
 import { BookmarkIcon } from './components/BookmarkIcon.jsx';
 import { HolyDaysPlaylistHeader } from './components/HolyDaysPlaylistHeader.jsx';
 import { AudioPlayerBar } from './components/AudioPlayerBar.jsx';
+import { TabBar } from './components/TabBar.jsx';
 import { AudioManagerSheet } from './components/AudioManagerSheet.jsx';
 import { AudioPlayButton, AudioSectionChips } from './components/AudioPlayButton.jsx';
 import { StorageHealthBanner, useStorageHealth } from './components/StorageHealthBanner.jsx';
@@ -379,7 +380,7 @@ Object.assign(window, {
   SrchCard, SrchSnippet, SrchGroup,
   SettingsRow, SelectField, FontPickerRow, VolumeLetterIndex, HistoryEntryCard,
   NoteRow, LinkCard, LinkIcon, BookmarkIcon, HolyDaysPlaylistHeader,
-  AudioPlayerBar, AudioManagerSheet, AudioPlayButton, AudioSectionChips,
+  AudioPlayerBar, TabBar, AudioManagerSheet, AudioPlayButton, AudioSectionChips,
   StorageHealthBanner, useStorageHealth, Safari7DayModal, IosPwaWelcomeCard,
   AppShellOverlays, AppShellSheets, AnnotationDomSync, TourPrompt,
   buildScreenRoutes,

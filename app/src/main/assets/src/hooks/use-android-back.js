@@ -213,11 +213,12 @@ function runBackRouter() {
 /** @type {Record<string, 'origin' | 'home' | 'scriptures' | 'studies' | 'searchOrigin' | 'answers'>} */
 const BACK_BY_SCREEN = {
   'settings': 'origin', 'history': 'origin', 'about': 'origin', 'reading-plans': 'origin', 'scripture-web': 'origin',
-  'audio-library': 'origin', 'audio-library-volumes': 'origin', 'audio-library-collection': 'origin',
+  'audio-library-volumes': 'origin', 'audio-library-collection': 'origin',
   'audio-library-saved': 'origin', 'audio-library-studies': 'origin', 'audio-library-offline': 'origin',
   'notes-index': 'origin', 'my-progress': 'origin', 'links-index': 'origin', 'bookmarks-index': 'origin',
   'highlights-index': 'origin', 'journal-home': 'origin',
-  'library': 'home', 'scriptures-home': 'home', 'volumes-home': 'home', 'studies-home': 'home', 'answers-home': 'home',
+  // The Listen and Library tab roots (the layout pass, 2026-11-10): Back goes to Read, whatever opened them.
+  'audio-library': 'home', 'library': 'home', 'scriptures-home': 'home', 'volumes-home': 'home', 'studies-home': 'home', 'answers-home': 'home',
   'search': 'searchOrigin',
   'scripture-genre': 'scriptures',
   'bible-study-index': 'studies',

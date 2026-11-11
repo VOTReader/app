@@ -113,7 +113,17 @@ describe('useAndroidBack — UX2 search-anchor clear', () => {
 });
 
 describe('useAndroidBack — UX3 index-screen origin + safe fallthrough', () => {
-  for (const idx of ['notes-index', 'links-index', 'bookmarks-index', 'highlights-index', 'journal-home', 'audio-library', 'audio-library-volumes', 'audio-library-collection', 'audio-library-saved', 'audio-library-offline']) {
+  // The Listen and Library tab roots go to Read (the layout pass, 2026-11-10), whatever opened them.
+  for (const root of ['audio-library', 'library']) {
+    it(`back from the ${root} root goes to Read (Home)`, () => {
+      const props = baseProps({ screen: root });
+      renderHook(() => useAndroidBack(props));
+      expect(window.handleAndroidBack()).toBe('true');
+      expect(props.goHome).toHaveBeenCalledTimes(1);
+      expect(props.goNavOrigin).not.toHaveBeenCalled();
+    });
+  }
+  for (const idx of ['notes-index', 'links-index', 'bookmarks-index', 'highlights-index', 'journal-home', 'audio-library-volumes', 'audio-library-collection', 'audio-library-saved', 'audio-library-offline']) {
     it(`back from ${idx} restores navOrigin (not a hardcoded Library)`, () => {
       const props = baseProps({ screen: idx });
       renderHook(() => useAndroidBack(props));

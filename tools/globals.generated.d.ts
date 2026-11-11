@@ -7,7 +7,7 @@
 // trace them without ambient declarations. This file declares every
 // known bare-name global as `any` and Window as a permissive index
 // signature. NOT proper types — that's a separate project.
-// Total: 631 distinct identifiers.
+// Total: 632 distinct identifiers.
 
 // Cross-bundle bare-name globals — `any` by design, except React and
 // ReactDOM, typed from @types/react 18 (TYPED_GLOBALS in the generator).
@@ -309,6 +309,7 @@ declare const THUMB_DB: any;
 declare const THUMB_STORE: any;
 declare const TRANSLATION_OPTIONS: any;
 declare const TabActionSheet: any;
+declare const TabBar: any;
 declare const TabsContext: any;
 declare const TabsNavBtn: any;
 declare const TabsOverview: any;
