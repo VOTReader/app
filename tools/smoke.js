@@ -372,7 +372,7 @@
         there: function () { return /Saved recordings/.test(document.body.textContent || ''); } },
       { screen: 'settings', label: 'the gear → Settings',
         open: async function () { await goHome(); return openSettings(); },
-        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || ''); } },
+        there: function () { return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Your data/.test(document.body.textContent || ''); } },
       { screen: 'scripture-web', label: 'Read › Explore → Scripture Web',
         open: async function () { await goHome(); return clickByText(/Scripture Web/); },
         there: function () { return !!document.querySelector('.sw-root'); } },
@@ -632,7 +632,7 @@
     });
     await step('Settings', async function () {
       openSettings(); await sleep(360);
-      return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data/.test(document.body.textContent || '');
+      return /TEXT & TRANSLATION|READING EXPERIENCE|Your Data|Your data/.test(document.body.textContent || '');
     });
     await goHome();
     return out;
