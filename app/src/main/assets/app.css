@@ -637,7 +637,9 @@
         border-bottom: 1px solid var(--gold-border); border-radius: 14px;
       }
       body.tabbar-on .screen-scroll { padding-bottom: calc(var(--dock-tabbar) + 16px); }
-      body.tabbar-on .dl-footer { bottom: calc(var(--dock-tabbar) + var(--dock-player)); }
+      /* A sticky bottom counts from the scroller's padding edge, and the padding above already clears the bar (+16px):
+         so this lands the footer on the tab bar (or on the player above it), not 76px over it with rows showing below. */
+      body.tabbar-on .dl-footer { bottom: calc(var(--dock-player) - 16px); }
       body.autoscroll-on { --dock-transport: 60px; }
       body.autoscroll-on:has(.ascroll-pill.is-expanded) { --dock-transport: 106px; }  /* two 44px rows: 98px + 8 */
       body:has(.find-pill) { --dock-find: 58px; }  /* 50px pill + 8 */
