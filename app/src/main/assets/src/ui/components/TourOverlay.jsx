@@ -332,10 +332,18 @@ export function TourOverlay({ waitMs = TARGET_WAIT_MS } = {}) {
         const fitsAbove = r.top - TOUR_RING_PAD - CARD_GAP - ch >= CARD_EDGE;
         const top0 = sc ? Math.max(0, sc.getBoundingClientRect().top) : 0;
         scrollerTopRef.current = top0;
-        const fitsAtStart = top0 + ringH + CARD_GAP + ch + CARD_EDGE <= vh;
+        /* WS6: the top of the screen a ring can use is under the fixed top bar, not the scroller's own
+           top (a scroller that runs under the bar put the Settings row at y 0, its ring at -8 on 320x640).
+           The row's scroll margin keeps the bar's height and the ring's pad above it when it scrolls to the start. */
+        const nav = document.querySelector('.top-nav');
+        const navB = nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+        const startTop = Math.max(top0, navB);
+        const margin = Math.ceil(startTop - top0 + TOUR_RING_PAD + 2) + 'px';
+        try { const hs = /** @type {HTMLElement} */ (el).style; if (hs.scrollMarginTop !== margin) hs.scrollMarginTop = margin; } catch (_e) { /* not an element with style */ }
+        const fitsAtStart = startTop + ringH + CARD_GAP + ch + CARD_EDGE <= vh;
         // A docked stop scrolls an out-of-reach target to the TOP of its scroller: centring it in a
         // viewport whose bottom the card owns can land it right back under the card.
-        const block = off ? (docked ? 'start' : 'center') : (!docked && !fitsBelow && !fitsAbove && fitsAtStart && r.top - TOUR_RING_PAD > top0 + 1 ? 'start' : null);
+        const block = off ? (docked ? 'start' : 'center') : (!docked && !fitsBelow && !fitsAbove && fitsAtStart && r.top - TOUR_RING_PAD > startTop + 1 ? 'start' : null);
         if (!scrolled || (block && (now - started < RESCROLL_WINDOW_MS || shifted) && now - lastScroll >= RESCROLL_EVERY_MS)) {
           scrolled = true; lastScroll = now;
           try { el.scrollIntoView({ block: block || 'center', inline: 'nearest' }); } catch (_e) { /* jsdom */ }

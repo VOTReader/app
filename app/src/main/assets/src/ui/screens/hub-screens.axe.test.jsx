@@ -268,7 +268,7 @@ describe('axe — the Garden', () => {
     put('GardenPosStore', { getState: () => 'loaded', get: () => 0, set: noop, subscribe: () => () => {} });
     const { getByRole } = render(<GardenView page={3} onPageChange={noop} onBack={noop} theme="dark" onThemeChange={noop} tier="std" />);
     await check();
-    fireEvent.click(getByRole('button', { name: /jump to a page/ }));
+    fireEvent.click(getByRole('button', { name: /go to a page/ }));
     expect(getByRole('spinbutton', { name: 'Jump to page' })).toBeTruthy();
     await check();
   });
@@ -286,7 +286,7 @@ describe('axe — the Garden', () => {
     put('GardenPosStore', { getState: () => 'loaded', get: () => 0, set: noop, subscribe: () => () => {} });
     const { container, getByRole } = render(<GardenView page={3} onPageChange={noop} onBack={noop} theme="dark" onThemeChange={noop} tier="std" />);
     fireEvent.error(container.querySelector('.garden-page-img'));
-    expect(getByRole('alert').textContent).toMatch(/Failed to load|No connection/);
+    expect(getByRole('status').textContent).toMatch(/Page \d+ did not load/);  // WS6: the empty state (mock g-fail), a polite live region
     await check();
   });
 });

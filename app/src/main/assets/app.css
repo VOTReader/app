@@ -4056,69 +4056,48 @@
     .genre-full-width { grid-column:1 / -1; margin-left:10%; margin-right:10%; }
     .genre-full-width .genre-tile-title { font-size:var(--fs-16); }
 
-    /* Garden viewer — immersive fullscreen */
-    .garden-fullscreen { position:fixed; inset:0; z-index:100; background:#000; display:flex; flex-direction:column; user-select:none; -webkit-user-select:none; }
+    /* ═══ WS6 garden (mock settings.html g-page, g-jump, g-fail, g-gate) ═══
+       The viewer is a dark room in both themes: the photographs sit on black, so its tokens are set dark here
+       (the jump sheet and the failed-page empty state inside it read them). The gate is the shared sheet. */
+    .garden-fullscreen { position:fixed; inset:0; z-index:100; background:#000; display:flex; flex-direction:column; color-scheme:dark;
+      --text-1:rgba(255,255,255,0.92); --text-2:rgba(255,255,255,0.62); --text-3:rgba(255,255,255,0.4);
+      --surface-1:#1c1b18; --surface-2:#2a2824; --surface-3:#36332d; --hairline:rgba(255,255,255,0.08); }
     .garden-image-area { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative; touch-action:none; }
     .garden-page-img { display:block; max-width:100%; max-height:100%; object-fit:contain; }
     .garden-loading { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-    /* gap-garden-viewer-and-image-cache-7 — GardenView bypasses ScreenLayout,
-       so it also bypassed the app-wide inset discipline: .garden-fullscreen is
-       position:fixed inset:0 and these two bars padded with fixed rems, while
-       every other chrome surface calc()s the injected insets in (.top-nav, the
-       tabs overview, the sheets, and the Garden's OWN warning overlay twenty
-       lines below). On a cutout phone the back button sat under the notch and
-       the page arrows under the gesture bar. Same max() idiom as the overlay:
-       the rem is the floor, the inset wins when it is larger. */
-    .garden-top-bar { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; gap:1rem; padding:max(1.2rem, var(--inset-top, 0px)) 1rem 1.2rem; background:linear-gradient(to bottom,rgba(0,0,0,0.5),transparent); }
-    .garden-back-btn { background:none; border:none; color:rgba(255,255,255,0.85); width:2rem; height:2rem; display:flex; align-items:center; justify-content:center; cursor:pointer; padding:0; }
-    .garden-back-btn svg { width:1.4rem; height:1.4rem; }
-    .garden-page-counter { display:inline-flex; align-items:center; gap:0.35rem; min-height:44px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.25); border-radius:999px; font-family:var(--font-cinzel); font-size:var(--fs-13); color:rgba(255,255,255,0.85); letter-spacing:0.05em; cursor:pointer; padding:0 0.9rem; }
-    .garden-page-counter:hover { background:rgba(255,255,255,0.16); }
-    .garden-page-counter:focus-visible, .garden-jump-go:focus-visible { outline:2px solid var(--white); outline-offset:2px; }
+    .garden-loading .ui-empty { padding-top:0; }
+    .garden-loading-text { color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); }
+    /* gap-garden-viewer-and-image-cache-7: the bars calc the injected insets in, like every other chrome surface. */
+    .garden-top-bar { position:absolute; top:0; left:0; right:0; z-index:10; display:flex; align-items:center; gap:var(--sp-2); min-height:var(--bar-h);
+      padding:max(var(--sp-1), var(--inset-top, 0px)) var(--sp-2) var(--sp-1); background:linear-gradient(to bottom, rgba(0,0,0,0.72), rgba(0,0,0,0)); }
+    .garden-back-btn { flex:none; width:var(--tap); height:var(--tap); display:flex; align-items:center; justify-content:center; background:none; border:0; border-radius:var(--r-chip); color:var(--text-1); cursor:pointer; }
+    .garden-title { flex:1; min-width:0; margin:0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-headline); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .garden-bottom-bar { position:absolute; bottom:0; left:0; right:0; z-index:10; padding:var(--sp-2) var(--sp-3) max(var(--sp-3), var(--inset-bottom, 0px)); background:linear-gradient(to top, rgba(0,0,0,0.72), rgba(0,0,0,0)); }
+    .garden-ctl { display:flex; align-items:center; gap:var(--sp-1); min-height:56px; padding:0 var(--sp-2); border-radius:var(--r-pill); background:rgba(28,27,24,0.92); }
+    .garden-ctl-gap { flex:1; }
+    .garden-arrow-btn { flex:none; width:var(--tap); height:var(--tap); display:flex; align-items:center; justify-content:center; background:none; border:0; border-radius:var(--r-pill); color:var(--text-1); cursor:pointer; }
+    .garden-arrow-btn:active, .garden-back-btn:active { background:var(--surface-2); }
+    .garden-arrow-btn:disabled { opacity:0.35; pointer-events:none; }
+    .garden-page-counter { display:inline-flex; align-items:center; gap:var(--sp-1); min-height:var(--tap); padding:0 var(--sp-3); border:0; border-radius:var(--r-pill); background:var(--surface-2); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-value); font-weight:600; cursor:pointer; white-space:nowrap; }
     .garden-page-chevron { flex:none; opacity:0.75; }
-    .garden-jump-go { min-height:44px; min-width:44px; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:999px; color:var(--white); font-family:var(--font-cinzel); font-size:var(--fs-13); letter-spacing:0.05em; cursor:pointer; padding:0 0.8rem; }
-    .garden-jump-form { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem; flex:1 1 auto; min-width:0; }
-    /* the scrubber: its own line under the number and Go, the bar's whole width, a 44 px track to hold */
-    .garden-jump-scrub { flex:1 0 100%; min-height:44px; margin:0; accent-color:var(--white); cursor:pointer; }
-    .garden-jump-input { width:3rem; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.4); border-radius:4px; color:var(--white); font-family:var(--font-cinzel); font-size:var(--fs-13); text-align:center; padding:0.2rem 0.3rem; outline:none; -moz-appearance:textfield; }
+    .garden-fullscreen.is-bare .garden-top-bar, .garden-fullscreen.is-bare .garden-bottom-bar { display:none; }
+    .garden-unbare-btn { position:absolute; z-index:11; top:max(var(--sp-2), var(--inset-top, 0px)); right:var(--sp-2); width:var(--tap); height:var(--tap); display:flex; align-items:center; justify-content:center; border:0; border-radius:var(--r-pill); background:rgba(0,0,0,0.45); color:var(--text-1); opacity:0.7; cursor:pointer; }
+    .garden-jump-row { display:flex; align-items:center; gap:var(--sp-3); }
+    .garden-jump-field { flex:1; min-width:0; }
+    .garden-jump-input { flex:1; min-width:0; background:none; border:0; outline:none; color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-headline); font-weight:600; -moz-appearance:textfield; appearance:textfield; }
     .garden-jump-input::-webkit-inner-spin-button, .garden-jump-input::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
-    .garden-jump-hint { font-family:var(--font-cinzel); font-size:var(--fs-13); color:rgba(255,255,255,0.5); }
-    .garden-bottom-bar { position:absolute; bottom:0; left:0; right:0; z-index:10; display:flex; align-items:center; justify-content:center; gap:3rem; padding:0.8rem 1rem max(1rem, var(--inset-bottom, 0px)); background:linear-gradient(to top,rgba(0,0,0,0.5),transparent); }
-    .garden-arrow-btn { background:none; border:1px solid rgba(255,255,255,0.3); color:rgba(255,255,255,0.85); width:3rem; height:2.5rem; display:flex; align-items:center; justify-content:center; cursor:pointer; border-radius:6px; transition:background 0.15s; }
-    .garden-arrow-btn:active { background:rgba(255,255,255,0.15); }
-    .garden-arrow-btn:disabled { opacity:0.25; pointer-events:none; }
-    .garden-arrow-btn svg { width:1.3rem; height:1.3rem; }
-    /* Centered confirmation overlay — padding uses max(<design>,<inset>)
-       on each edge so the 1.5rem ergonomic gutter is preserved on devices
-       without cutouts and auto-expands on phones with notches / gesture
-       bars / soft keyboards. Same pattern as .disable-tabs-overlay. */
-    .garden-warning-overlay { position:fixed; inset:0; z-index:300; background:rgba(0,0,0,0.75); display:flex; align-items:center; justify-content:center; padding:max(1.5rem, var(--inset-top, 0px)) 1.5rem max(1.5rem, max(var(--keyboard-height, 0px), var(--inset-bottom, 0px))); transition: padding-bottom 0.18s ease; backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
-    /* max-height + overflow: the overlay flex-CENTERS this modal, so a modal
-       taller than the padded viewport (large --font-scale, landscape, short
-       screens) clips at BOTH ends with the title and the Go Back / Proceed
-       buttons unreachable — nothing scrolls a plain flex child. Capping at
-       100% of the overlay's content box keeps every control reachable. */
-    .garden-warning-modal { background:var(--bg2); border:1px solid var(--gold-border); border-radius:12px; max-width:24rem; width:100%; max-height:100%; overflow-y:auto; padding:1.8rem 1.6rem 1.4rem; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
-    .garden-warning-title { font-family:var(--font-cinzel); font-size:var(--fs-16); letter-spacing:0.08em; color:var(--gold); text-align:center; margin-bottom:1rem; text-transform:uppercase; }
-    .garden-warning-body { font-family:var(--font-garamond); font-size:var(--fs-16); line-height:1.55; color:var(--cream-muted); text-align:center; margin-bottom:1.4rem; }
-    .garden-warning-body strong { color:var(--cream); }
-    .garden-warning-actions { display:flex; gap:0.7rem; }
-    .garden-warning-btn { flex:1; font-family:var(--font-cinzel); font-size:var(--fs-12); letter-spacing:0.1em; text-transform:uppercase; padding:0.75rem 0.5rem; border-radius:6px; cursor:pointer; transition:background 0.15s, border-color 0.15s; }
-    .garden-warning-btn-cancel { background:transparent; border:1px solid var(--gold-border); color:var(--cream-muted); }
-    .garden-warning-btn-cancel:active { background:rgba(255,255,255,0.05); }
-    .garden-warning-btn-proceed { background:var(--gold-faint); border:1px solid var(--gold); color:var(--gold-bright); }
-    .garden-warning-btn-proceed:active { background:var(--gold-border); }
-    .garden-tier-selector { display:flex; flex-direction:column; gap:0.4rem; margin-bottom:1.2rem; }
-    .garden-tier-label { font-family:var(--font-cinzel); font-size:var(--fs-11); letter-spacing:0.12em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:0.3rem; text-align:center; }
-    .garden-tier-hint { font-family:var(--font-garamond); font-size:var(--fs-13); color:var(--cream-dim); font-style:italic; text-align:center; margin-bottom:0.5rem; }
-    .garden-tier-option { background:transparent; border:1px solid var(--gold-border); border-radius:6px; padding:0.6rem 0.75rem; text-align:left; cursor:pointer; transition:background 0.15s, border-color 0.15s; }
-    .garden-tier-option:active { background:rgba(255,255,255,0.03); }
-    .garden-tier-option.selected { border-color:var(--gold); background:var(--gold-faint); }
-    .garden-tier-option-main { display:flex; justify-content:space-between; align-items:baseline; }
-    .garden-tier-option-name { font-family:var(--font-cinzel); font-size:var(--fs-14); letter-spacing:0.08em; color:var(--cream); text-transform:uppercase; }
-    .garden-tier-option.selected .garden-tier-option-name { color:var(--gold-bright); }
-    .garden-tier-option-size { font-family:var(--font-cinzel); font-size:var(--fs-11); color:var(--cream-muted); letter-spacing:0.05em; }
-    .garden-tier-option-desc { font-family:var(--font-garamond); font-size:var(--fs-14); color:var(--cream-muted); line-height:1.3; margin-top:0.2rem; }
+    .garden-jump-hint { flex:none; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-value); }
+    .garden-jump-scrub { display:block; width:100%; min-height:var(--tap); margin:var(--sp-3) 0 0; accent-color:var(--accent); cursor:pointer; }
+    .garden-jump-ends { display:flex; justify-content:space-between; margin:0 2px var(--sp-2); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); }
+    .garden-gate-note { margin:0 2px var(--sp-3); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .garden-gate-label { margin:0 2px var(--sp-2); }
+    .garden-tier-option { width:100%; text-align:left; }
+    .garden-tier-radio { flex:none; width:20px; height:20px; margin-left:var(--sp-3); border-radius:50%; border:2px solid var(--text-3); box-sizing:border-box; }
+    .garden-tier-option.selected .garden-tier-radio { border-color:var(--accent); background:radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px); }
+    .garden-gate-wifi { display:flex; gap:var(--sp-3); align-items:flex-start; margin:var(--sp-3) 2px var(--sp-1); color:var(--accent); }
+    .garden-gate-wifi .garden-gate-note { margin:0; }
+    .garden-gate-foot { margin-top:var(--sp-2); }
+    /* ═══ end WS6 garden ═══ */
     .genre-col { display:flex; flex-direction:column; gap:0.6rem; }
     .genre-col-stretch .genre-tile { flex:1; }
     /* Genre sub-screen: compact hero, top-aligned */

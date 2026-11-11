@@ -30,8 +30,6 @@ function rule(sel) {
 
 describe('gap-garden-viewer-7 — the Garden bars ignore the display cutout insets', () => {
   it('CONTROL: the Garden warning overlay and the top nav already pad by the injected insets', () => {
-    expect(rule('.garden-warning-overlay')).toMatch(/var\(--inset-top/);
-    expect(rule('.garden-warning-overlay')).toMatch(/var\(--inset-bottom/);
     expect(rule('.tabs-overview')).toMatch(/var\(--inset-top/);
   });
 

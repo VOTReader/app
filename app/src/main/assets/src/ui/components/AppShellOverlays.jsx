@@ -21,7 +21,11 @@
    same convention as the rest of this cluster.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { GARDEN_TIERS, getGardenTier } from '../../utils/garden.js';
+import { GARDEN_TIERS } from '../../utils/garden.js';
+import { formatBytes } from '../../utils/format-bytes.js';
+import { ActionSheet } from './SelectField.jsx';
+import { UiButton } from './UiParts.jsx';
+import { UiIcon } from './UiIcon.jsx';
 import { navOriginLabel } from '../../utils/tabs.js';
 import { OPEN_YOUR_DATA_EVENT } from '../../utils/your-data-link.js';
 
@@ -65,11 +69,6 @@ export function AppShellOverlays({
     dismiss: () => setDisableTabsPromptOpen(false),
     active: !!disableTabsPromptOpen,
   });
-  useModalRegistry({
-    id: 'garden-warning',
-    dismiss: () => setGardenWarningOpen(false),
-    active: !!gardenWarningOpen,
-  });
   // [13] focus traps — Tab stays inside the open dialog (Escape already
   // routes through the registry above). Refs land on each dialog's root.
   const disableTabsTrapRef = useFocusTrap(!!disableTabsPromptOpen);
@@ -79,7 +78,6 @@ export function AppShellOverlays({
     window.addEventListener(OPEN_YOUR_DATA_EVENT, go);
     return () => window.removeEventListener(OPEN_YOUR_DATA_EVENT, go);
   }, [setScreen]);
-  const gardenTrapRef = useFocusTrap(!!gardenWarningOpen);
   const tabsTrapRef = useFocusTrap(!!(settings.tabsEnabled && tabsOverviewOpen));
   // (TabActionSheet traps itself — it mounts only while open.)
 
@@ -176,65 +174,64 @@ export function AppShellOverlays({
         </div>
       )}
 
-      {gardenWarningOpen && (() => {
-        const selectedTier = getGardenTier(settings.gardenTier);
-        // U09.6: offline, the Wi-Fi and size gate led on to "Failed to load". Before the first visit nothing of the
-        // Garden is on the phone, so the same dialog says it needs a connection and offers only Go Back.
-        const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
-        return (
-          <div className="garden-warning-overlay" onClick={() => setGardenWarningOpen(false)}>
-            <div className="garden-warning-modal" ref={gardenTrapRef} role="dialog" aria-modal="true" aria-labelledby="garden-warning-title" onClick={(e) => e.stopPropagation()}>
-              <div className="garden-warning-title" id="garden-warning-title">{offline ? 'No connection' : 'Before You Begin'}</div>
-              {offline ? (<>
-                <div className="garden-warning-body">
-                  The pictures of <em>A Return to The Garden</em> come from the internet, and stay on your phone once you have seen them. Connect, then open it again.
-                </div>
-                <div className="garden-warning-actions">
-                  <button className="garden-warning-btn garden-warning-btn-cancel" onClick={() => setGardenWarningOpen(false)}>Go Back</button>
-                </div>
-              </>) : (<>
-              <div className="garden-warning-body">
-                <em>A Return to The Garden</em> contains <strong>209 high-resolution photographs</strong> totaling <strong>{selectedTier.size}</strong> at the selected quality. Pages stream from the internet as you read and are cached on your device.
-                <br /><br />For the best experience, connect to <strong>Wi-Fi</strong> before proceeding. Mobile data charges may apply otherwise.
-                <br /><br />Please also ensure your device has sufficient <strong>free storage</strong> available to cache the full collection.
-              </div>
-              <div className="garden-tier-selector" role="group" aria-labelledby="garden-tier-label">
-                <div className="garden-tier-label" id="garden-tier-label">Image Quality</div>
-                <div className="garden-tier-hint">You can change this anytime from the Settings menu.</div>
-                {GARDEN_TIERS.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={`garden-tier-option${settings.gardenTier === t.id ? " selected" : ""}`}
-                    aria-pressed={settings.gardenTier === t.id}
-                    onClick={() => updateSetting("gardenTier", t.id)}>
-                    <div className="garden-tier-option-main">
-                      <span className="garden-tier-option-name">{t.label}</span>
-                      <span className="garden-tier-option-size">{t.size}</span>
-                    </div>
-                    <div className="garden-tier-option-desc">{t.res}{" \xB7 "}{t.desc}</div>
-                  </button>
-                ))}
-              </div>
-              <div className="garden-warning-actions">
-                <button className="garden-warning-btn garden-warning-btn-cancel"
-                  onClick={() => setGardenWarningOpen(false)}>Go Back</button>
-                <button className="garden-warning-btn garden-warning-btn-proceed"
-                  onClick={() => {
-                    GardenWarningFlagStore.set();
-                    setGardenWarningOpen(false);
-                    setScreen("garden-view");
-                  }}>Proceed</button>
-              </div>
-              </>)}
-            </div>
-          </div>
-        );
-      })()}
+      {/* WS6 (mock g-gate): the Garden's gate is a sheet. Quality as a column of sizes, the free space when the
+          browser can say, Go back | Open the Garden. U09.6: offline, nothing of the Garden is on the phone before
+          the first visit, so the same sheet says it needs a connection and offers only Go back. */}
+      <GardenGate open={!!gardenWarningOpen} settings={settings} updateSetting={updateSetting}
+        onClose={() => setGardenWarningOpen(false)}
+        onOpen={() => { GardenWarningFlagStore.set(); setGardenWarningOpen(false); setScreen("garden-view"); }} />
       {/* The tour itself, a bundle-d free global (guarded like every shell free global: unit tests render the shell
           without it). Its offer, "Show me around", is an inline card at the end of the Read tab (HomeScreen). */}
       {typeof TourOverlay !== 'undefined' ? <TourOverlay /> : null}
     </>
     </ErrorBoundary>
+  );
+}
+
+/** The Garden's gate (WS6, mock g-gate). @param {{ open: boolean, settings: any, updateSetting: (k: string, v: any) => void,
+    onClose: () => void, onOpen: () => void }} props */
+export function GardenGate({ open, settings, updateSetting, onClose, onOpen }) {
+  const [free, setFree] = React.useState(/** @type {number|null} */ (null));
+  React.useEffect(() => {
+    if (!open) return undefined;
+    let live = true;
+    try {
+      const est = typeof navigator !== 'undefined' && navigator.storage && navigator.storage.estimate ? navigator.storage.estimate() : null;
+      if (est) est.then((e) => { if (live && e && e.quota) setFree(Math.max(0, e.quota - (e.usage || 0))); }, () => {});
+    } catch (_e) { /* no estimate: the line leaves the number out */ }
+    return () => { live = false; };
+  }, [open]);
+  const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+  const total = /** @type {any} */ (globalThis).GARDEN_TOTAL || 209;
+  if (offline) {
+    return (
+      <ActionSheet open={open} onClose={onClose} label="A Return to The Garden" title="No connection" className="garden-gate">
+        <p className="garden-gate-note">The pictures come from the internet, and stay on your phone once you have seen them. Connect, then open it again.</p>
+        <div className="garden-gate-foot"><UiButton wide onClick={onClose}>Go back</UiButton></div>
+      </ActionSheet>
+    );
+  }
+  const pick = settings.gardenTier || 'standard';
+  return (
+    <ActionSheet open={open} onClose={onClose} label="A Return to The Garden" title="Before you begin" className="garden-gate"
+      confirm={{ label: 'Open the Garden', onConfirm: () => { onOpen(); return false; } }} cancelLabel="Go back">
+      <p className="garden-gate-note">{total} high-resolution photographs. Pages stream from the internet as you read and are kept on your device.</p>
+      <div className="ui-sheet-label garden-gate-label" id="garden-tier-label">Image quality</div>
+      <div className="ui-group is-inset garden-tier-selector" role="radiogroup" aria-labelledby="garden-tier-label">
+        {GARDEN_TIERS.map((t) => (
+          <button key={t.id} type="button" role="radio" aria-checked={pick === t.id}
+            className={'ui-row is-one no-lead garden-tier-option' + (pick === t.id ? ' selected' : '')}
+            onClick={() => updateSetting('gardenTier', t.id)}>
+            <span className="ui-row-text"><span className="ui-row-title">{t.label}</span><span className="ui-row-meta">{t.short || t.desc}</span></span>
+            <span className="ui-row-value">{String(t.size).replace(/^~\s*/, '')}</span>
+            <span className="garden-tier-radio" aria-hidden="true" />
+          </button>
+        ))}
+      </div>
+      <div className="garden-gate-wifi">
+        <UiIcon name="wifi" size="sm" />
+        <p className="garden-gate-note">Best on Wi-Fi; mobile data charges may apply otherwise.{free != null ? ' ' + formatBytes(free) + ' free on this phone.' : ''} You can change the quality any time in Settings.</p>
+      </div>
+    </ActionSheet>
   );
 }
