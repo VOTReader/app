@@ -529,7 +529,7 @@ describe('axe — Journal editor', () => {
       objectUrl: () => Promise.resolve(null), get: () => Promise.resolve(null),
     });
     put('showToast', noop);
-    put('StorageHealth', { onWriteFailure: noop });
+    put('StorageHealth', { onWriteFailure: noop, onWriteSuccess: noop });   // the store calls both on a landed or failed write (storage-health.js 939)
     put('JournalBlockView', JournalBlockView);
     put('JournalImageBlock', JournalImageBlock);
     put('JournalAudioBlock', JournalAudioBlock);
