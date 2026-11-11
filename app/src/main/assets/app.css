@@ -9280,14 +9280,14 @@ body.light .letter-para.pulse, body.light .letter-poetry.pulse { --land-base:168
 .ans-landing .ans-tab:first-child{border-radius:var(--r-chip) 0 0 var(--r-chip)}
 .ans-landing .ans-tab:last-child{border-radius:0 var(--r-chip) var(--r-chip) 0}
 .ans-landing .ans-tab[aria-selected=true]{border-radius:var(--r-chip);background:var(--surface-3);box-shadow:0 0 0 3px var(--surface-1) inset;color:var(--text-1)}
-.ans-landing .ans-tab[aria-selected=true]::after,.ans-landing .ans-az-key[aria-current=true]::after,.ans-landing .ans-az-strip::after{display:none}
+.ans-landing .ans-tab[aria-selected=true]::after,:is(.ans-landing,.ans-hero) :is(.ans-az-key[aria-current=true],.ans-az-strip)::after{display:none}
 .ans-landing .ans-az-strip{top:52px;gap:var(--sp-2);margin:0 calc(-1 * var(--sp-4));padding:0 var(--sp-4) 4px;border:0;background:var(--bg)}
-.ans-landing .ans-az-key{isolation:isolate;min-width:44px;height:var(--tap);padding:0 12px;font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-1)}
-.ans-landing .ans-az-key::before{content:"";position:absolute;inset:5px 0;z-index:-1;border-radius:var(--r-pill);background:var(--surface-1)}
+:is(.ans-landing,.ans-hero) .ans-az-key{isolation:isolate;min-width:44px;height:var(--tap);padding:0 12px;font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-1)}
+:is(.ans-landing,.ans-hero) .ans-az-key::before{content:"";position:absolute;inset:5px 0;z-index:-1;border-radius:var(--r-pill);background:var(--surface-1)}
 .ans-landing .ans-az-strip:not(.ans-jump-strip) .ans-az-key{padding:0}
 .ans-landing .ans-az-strip:not(.ans-jump-strip) .ans-az-key::before{inset:5px}
-.ans-landing .ans-az-key[aria-current=true]{color:var(--accent)}
-.ans-landing .ans-az-key[aria-current=true]::before{background:var(--accent-soft)}
+:is(.ans-landing,.ans-hero) .ans-az-key[aria-current=true]{color:var(--accent)}
+:is(.ans-landing,.ans-hero) .ans-az-key[aria-current=true]::before{background:var(--accent-soft)}
 .ans-landing .ans-az-head{position:static;padding:20px 0 var(--sp-2);border:0;background:none}
 .ans-landing :is([data-az],[data-jump]){scroll-margin-top:104px}
 .ans-landing .ans-sechead{margin:22px 0 var(--sp-2)}
@@ -9318,6 +9318,20 @@ nav:has(.ans-bar-field) .tabs-hint-wrap{display:none}
 .ans-res .ans-hit-snip mark{color:var(--text-1)}
 .ans-res .ans-hit-src{margin-top:6px;font-family:var(--font-ui);font-size:var(--ts-label);font-style:normal;color:var(--text-2)}
 .ans-more-btn{width:100%;margin-top:12px}
+/* WA1 answers, the topic (AnswersTopic.jsx: a-topic, a-topic2): the sections strip, the hero on the tokens, the running head in the bar */
+.ans-sec-strip{position:static;gap:var(--sp-2);margin:14px -24px 0;padding:0 24px;border:0;background:none}
+.ans-sec-strip .ans-az-key{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.ans-sec-strip .ans-ico{width:var(--icon-sm);height:var(--icon-sm)}
+.ans-hero .ans-label{font-family:var(--font-ui);font-size:var(--ts-label);font-weight:600;letter-spacing:var(--track-label);color:var(--accent)}
+.ans-hero .ans-display{font-weight:600}
+.ans-hero .ans-meta{font-family:var(--font-ui);font-size:var(--ts-meta);color:var(--text-2)}
+.ans-runhead{top:calc(var(--dock-nav-bottom) - var(--bar-h) + var(--offline-strip-h,0px));left:52px;right:184px;width:auto;height:var(--bar-h);padding:0 4px;border:0;background:var(--bg);font-family:var(--font-serif);font-size:var(--ts-headline);font-weight:600;color:var(--text-1);transition:opacity var(--press),visibility var(--press)}
+.ans-runhead.is-hidden{transform:none;opacity:0}
+.ans-runhead :is(.ans-runhead-num,.ans-runhead-t){display:none}
+.ans-runhead .ans-ico{width:var(--icon-sm);height:var(--icon-sm);color:var(--accent)}
+.ans-runhead .ans-runhead-text{flex:0 1 auto}
+.ans-sec-strip .ans-az-key.ans-contents-line{flex:none;width:auto;margin:0}
+.ans-runhead:not(.is-hidden){z-index:1000}
 /* ── INSTALL AS AN APP (ip1, 2026-09-25; mockup lanes/myweb/out/mockups/ip1/ip1-r2-endcard.png) ──
    A card at the end of a chapter or letter, above the prev/next cards; SHOW ME HOW opens a bottom sheet of
    numbered steps with a picture each. Browser only (components/InstallCard.jsx). */

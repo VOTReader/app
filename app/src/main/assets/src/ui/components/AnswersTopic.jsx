@@ -56,7 +56,8 @@ export function answersHlDomChanged() {
 /** How much of the page's top the running head covers (0 on desktop, where it is hidden). */
 export function answersHeadCover() {
   const rh = typeof document !== 'undefined' ? /** @type {HTMLElement | null} */ (document.querySelector('.ans-runhead')) : null;
-  return rh && getComputedStyle(rh).display !== 'none' ? rh.offsetHeight : 0;
+  // WA1: it sits in the top bar now, over no page text
+  return rh && getComputedStyle(rh).display !== 'none' && rh.getBoundingClientRect().top > 8 ? rh.offsetHeight : 0;
 }
 
 /* ── A paragraph's decorated runs, as elements ─────────────────────── */
@@ -286,11 +287,12 @@ function closesPassage(entry, meta, i) {
 
 /**
  * @param {{ entry: any, entries: any[] | null, meta: any, pending: boolean, heroRef: any, onEyebrow: (shelf: any) => void,
- *   onContents: () => void, h1: any }} props
+ *   onContents: () => void, h1: any, rows?: any[], onSection?: (k: number) => void }} props
  */
-function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1 }) {
+function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h1, rows, onSection }) {
   const eb = entries ? answersEyebrow(entries, entry) : null;
   const cl = meta ? answersContentsLine(entry, meta) : null;
+  const n = meta ? answersTopSections(meta).length : 0;
   return (
     <>
       {entry.id === ANSWERS_MAIN_PAGE_ID ? <img className="ans-banner" src="answers-banner.jpg" alt="Answers Only God Can Give" width="1200" height="304" /> : null}
@@ -301,10 +303,12 @@ function Hero({ entry, entries, meta, pending, heroRef, onEyebrow, onContents, h
         {h1 || <h1 className={'ans-display' + (answersLongTitle(entry) ? ' is-long' : '')}>{entry.title}</h1>}
         {/* no line once the sidecars are in without this topic's row, or could not load */}
         {meta ? <p className="ans-meta">{answersHeroMeta(entry, meta)}</p> : pending ? <p className="ans-meta"><em>Loading contents…</em></p> : null}
+        {/* WA1 (a-topic): the sections as a strip under the title; the first chip opens "On this page" */}
         {cl ? (
-          <button type="button" className="ans-contents-line" aria-haspopup="dialog" onClick={onContents}>
-            <span className="ans-names">{cl.names}</span><span className="ans-more">{cl.more}<Chev /></span>
-          </button>
+          <nav className="ans-az-strip ans-jump-strip ans-sec-strip" aria-label="Sections">
+            <button type="button" className="ans-az-key ans-contents-line" aria-haspopup="dialog" aria-current="true" onClick={onContents}><AnsIcon name="list" />{pl(n, 'section')}</button>
+            {(rows || []).map((r, k) => <button key={k} type="button" className="ans-az-key" onClick={() => onSection(k)}>{r.title}</button>)}
+          </nav>
         ) : null}
       </header>
     </>
@@ -389,11 +393,11 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     const sc = root && root.closest('.screen-scroll');
     if (!sc) return undefined;
     setLayoutEl(sc.closest('.screen-layout'));
-    let heroVis = true, last = sc.scrollTop, up = 0, raf = 0;
+    let heroVis = true, raf = 0;
     const IO = typeof IntersectionObserver !== 'undefined' ? IntersectionObserver : null;
     const io1 = IO && heroRef.current ? new IO((es) => {
       for (const e of es) heroVis = e.isIntersecting;
-      if (heroVis && !sheetRef.current) setShown(false);
+      if (!sheetRef.current && pinRef.current <= Date.now()) setShown(!heroVis);
     }) : null;
     if (io1 && heroRef.current) io1.observe(heroRef.current);
     // The current section: the last heading whose top has reached the head's lower edge (48 under the
@@ -420,16 +424,14 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
       raf = requestAnimationFrame(() => {
         raf = 0;
         const st = sc.scrollTop;
-        const d = st - last;
-        last = st;
         const max = sc.scrollHeight - sc.clientHeight;
         const pct = (max > 0 ? Math.min(100, Math.max(0, (st / max) * 100)) : 0).toFixed(1) + '%';
         if (barRef.current) barRef.current.style.width = pct;
         if (railBarRef.current) railBarRef.current.style.width = pct;
         section(st);
         if (sheetRef.current || pinRef.current > Date.now()) return;
-        if (heroVis) { up = 0; setShown(false); return; }
-        if (d < 0) { up -= d; if (up >= 8) setShown(true); } else if (d > 0) { up = 0; setShown(false); }
+        // WA1 (a-topic2): the running head sits in the bar and names the section whenever the hero is out of view
+        setShown(!heroVis);
       });
     };
     sc.addEventListener('scroll', onScroll, { passive: true });
@@ -620,7 +622,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
     {btn ? <span className="ans-runhead-s"><span className="ans-runhead-num">{curRow.num}</span> <span className="ans-runhead-sec">{curRow.title}</span></span> : null}
     <span className="ans-runhead-t">{btn ? short + NBSP + '·' + NBSP : short}</span>
   </span>,
-  btn ? <AnsIcon name="list" /> : null, <span className="ans-runhead-bar" ref={barRef} />), layoutEl) : null;
+  btn ? <AnsIcon name="down" /> : null, <span className="ans-runhead-bar" ref={barRef} />), layoutEl) : null;
 
   const top = meta ? answersTopSections(meta).length : 0;
   const passages = answersPassageCount(entry);
@@ -639,7 +641,7 @@ export function AnswersTopic({ entry, entries, meta, metaAll, metaFailed, site, 
         ) : null}
         <div className="ans-topic-main" ref={mainRef} data-copy-key={'wtlb:' + entry.id} data-mark-entry={'wtlb:' + entry.id + ':'}
           data-mark-blocks={entry.paragraphs.length} onClick={(e) => onTap(e, null)} onKeyDown={(e) => onTap(e, null)}>
-          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} />
+          <Hero entry={entry} entries={entries} meta={meta} pending={!metaAll && !metaFailed} heroRef={heroRef} onEyebrow={openShelf} onContents={() => setSheet({ kind: 'contents' })} h1={h1} rows={rows} onSection={jumpRow} />
           <div className="ans-reading">{body}</div>
           {/* Reading-end sentinel: end of body text, before the foot. */}
           <div className="reading-end" />

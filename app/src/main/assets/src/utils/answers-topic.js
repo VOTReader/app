@@ -98,7 +98,7 @@ export function answersHeroMeta(entry, meta) {
   const size = fd ? pl(top, 'category') : answersSizeWords(entry, meta, { minutes: false });
   const parts = [size];
   if (!size.startsWith('See:') && !size.startsWith('~')) parts.push('~' + answersMinutes(meta) + NBSP + 'min');
-  if (!fd && top >= 2) parts.push(pl(top, 'section'));
+  if (!fd && top === 2) parts.push(pl(top, 'section')); // WA1 (a-topic): 3 or more are counted by the sections strip
   const pos = (m) => (m.at === 'end' ? 1e9 : m.at);
   return parts.concat(mediaWords(pageMedia(meta).slice().sort((a, b) => pos(a) - pos(b)))).filter(Boolean).join(SEP);
 }
