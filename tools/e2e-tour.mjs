@@ -279,7 +279,7 @@ async function run(browser, { width, height, label, light }) {
     // usePersistedState writes it. Until 2026-09-04 this wrote StateStore directly, and the next
     // effect tick from the hook wrote the old settings back: every "1.8" walk here had run at 1
     // (the var read 1.8 for 400 ms, then hydration and the hook put 1 back). The stops re-check.
-    await clickLabel('App Configuration'); await sleep(500);
+    await clickLabel('Settings'); await sleep(500);
     await page.evaluate(() => { const head = [...document.querySelectorAll('.settings-group-head')].find((h) => /Appearance/.test(h.textContent)); if (head && head.getAttribute('aria-expanded') !== 'true') head.click(); });
     await sleep(400);
     const slid = await page.evaluate((sc) => {
@@ -327,9 +327,8 @@ async function run(browser, { width, height, label, light }) {
   f = await facts();
   if (f.prompt || !f.tourDone) fail("Don't show this again did not survive a reload"); else ok("Don't show this again is durable");
 
-  // Start from Settings › Help.
-  await clickLabel('App Configuration'); await sleep(500);
-  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); h && h.click(); });
+  // Start from the Settings root: Show me around is a row of its own there (WS2 settings, st-root).
+  await clickLabel('Settings'); await sleep(500);
   await sleep(400);
   await clickLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
@@ -549,8 +548,7 @@ async function run(browser, { width, height, label, light }) {
   else ok('the strip stays away');
 
   // Escape means Skip (through the registry), from a fresh start.
-  await clickLabel('App Configuration'); await sleep(400);
-  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); if (h && h.getAttribute('aria-expanded') !== 'true') h.click(); });
+  await clickLabel('Settings'); await sleep(400);
   await sleep(300);
   await clickLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
@@ -564,8 +562,7 @@ async function run(browser, { width, height, label, light }) {
      saves nothing; a reader who leaves while the colour is on the page is the other half, and
      it is the half where an undo would have to run. Skip, not Escape, because Skip is the
      button on the card and Escape is already covered above. */
-  await clickLabel('App Configuration'); await sleep(400);
-  await page.evaluate(() => { const h = [...document.querySelectorAll('.settings-group-head')].find((h) => /Help/.test(h.textContent)); h && h.scrollIntoView({ block: 'center' }); if (h && h.getAttribute('aria-expanded') !== 'true') h.click(); });
+  await clickLabel('Settings'); await sleep(400);
   await sleep(300);
   await clickLabel('Show me around');
   await page.waitForFunction(() => document.querySelector('.tour-card'), { timeout: 20000 });
