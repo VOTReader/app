@@ -2527,69 +2527,33 @@
          long-press on a verse's first word takes its number too (S22). */
       .verse-num { white-space: pre; }
       /* ── STUDY MODE PANELS ── */
-      .study-panels {
-        margin-top: 2.5rem;
-      }
-      .study-panel-group { margin-bottom: 1.5rem; }
-      .study-panel-group-title {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.3em;
-        text-transform: uppercase; color: var(--gold); margin-bottom: 0.7rem;
-        display: flex; align-items: center; gap: 0.6rem;
-      }
-      .study-panel-group-title::after {
-        content: ''; flex: 1; height: 1px;
-        background: linear-gradient(to right, var(--gold-border), transparent);
-      }
-      /* Scripture refs */
-      .scripture-refs { display: flex; flex-direction: column; gap: 0.4rem; }
-      .scripture-ref {
-        display: flex; gap: 0.75rem; align-items: baseline;
-        background: var(--study-note); border: 1px solid var(--study-border);
-        border-radius: var(--radius); padding: 0.5rem 0.8rem;
-        font-size: var(--fs-14); cursor: pointer; text-align: left; width: 100%;
-        transition: background 0.2s ease, border-color 0.2s ease;
-      }
-      @media (hover: hover) {
-      .scripture-ref:hover, .scripture-ref:focus-visible {
-        background: rgba(200,164,86,0.1); border-color: var(--gold-dim);
-        outline: none;
-      }
-      }
-      .scripture-ref-tag {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); color: var(--gold);
-        letter-spacing: 0.08em; white-space: nowrap; flex-shrink: 0; padding-top: 0.05rem;
-      }
-      .scripture-ref-text { color: var(--cream-muted); font-style: italic; line-height: 1.5; }
-      /* VOT Notes */
-      .vot-notes { display: flex; flex-direction: column; gap: 0.85rem; }
-      .vot-note {
-        background: var(--study-note);
-        border: 1px solid var(--study-border);
-        border-left: 3px solid var(--gold-dim);
-        border-radius: 0 var(--radius) var(--radius) 0;
-        padding: 0.85rem 1rem;
-      }
-      .vot-note-header { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.4rem; flex-wrap: wrap; }
-      .vot-note-ref {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.1em;
-        color: var(--gold); white-space: nowrap;
-      }
-      .vot-note-vol {
-        font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.1em;
-        color: var(--gold-dim); font-style: normal;
-      }
-      .vot-note-letter {
-        font-size: var(--fs-13); color: var(--cream-muted); font-style: italic;
-      }
-      .vot-note-excerpt {
-        font-size: var(--fs-15); color: var(--cream-dim); line-height: 1.7;
-        border-top: 1px solid var(--study-border); padding-top: 0.5rem; margin-top: 0.4rem;
-      }
-      .vot-note-excerpt em { color: var(--gold); font-style: normal; }
-      .vot-note-chevron {
-        margin-left: auto; color: var(--gold-dim); font-size: var(--fs-16); line-height: 1;
-        align-self: center; flex-shrink: 0;
-      }
+      /* ── W2i readers (r-study2): the study chapter's end. "Scripture references" is one card of rows (verse,
+         reference, chevron); "From the Volumes of Truth" one card of letters (verse · volume, serif title, two-line
+         excerpt). The titles and cards are the shared .ui-label / .ui-group (StudyPanels.jsx). ── */
+      .study-panels { margin-top: var(--sp-6); }
+      .study-panel-group { margin-bottom: var(--sp-5); }
+      .study-panels .scripture-ref { position: relative; display: flex; align-items: center; gap: var(--sp-3); width: 100%; min-height: var(--row-h-1); margin: 0; padding: 10px 12px 10px var(--card-pad); border: 0; border-radius: 0; background: none; color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); text-align: left; cursor: pointer; box-sizing: border-box; }
+      .study-panels .scripture-ref + .scripture-ref { border-top: 1px solid var(--hairline); }
+      .study-panels .scripture-ref:active { background: var(--surface-2); }
+      .study-panels .scripture-ref:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .scripture-ref-tag { flex: none; min-width: 3.4em; color: var(--accent); font-family: var(--font-ui); font-size: var(--ts-meta); font-variant-numeric: tabular-nums; }
+      .scripture-ref-text { flex: 1; min-width: 0; color: var(--text-1); font-size: var(--fs-16); font-weight: 500; line-height: 1.35; overflow-wrap: break-word; }
+      .scripture-ref-note { cursor: default; }
+      .scripture-ref-note .scripture-ref-text { color: var(--text-2); font-family: var(--font-serif); font-style: italic; font-weight: 400; }
+      .scripture-ref-chevron { flex: none; color: var(--text-3); font-size: var(--fs-20); line-height: 1; }
+      .study-panels .vot-note { display: block; width: 100%; margin: 0; padding: 14px var(--card-pad); border: 0; border-radius: 0; background: none; color: inherit; font: inherit; text-align: left; box-sizing: border-box; }
+      .study-panels .vot-note + .vot-note { border-top: 1px solid var(--hairline); }
+      .vot-note-tappable { cursor: pointer; }
+      .study-panels .vot-note-tappable:active { background: var(--surface-2); }
+      .vot-note-tappable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .vot-note-header { display: flex; align-items: baseline; flex-wrap: wrap; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-meta); line-height: var(--lh-meta); }
+      .vot-note-ref { color: var(--accent); white-space: nowrap; }
+      .vot-note-ref + .vot-note-vol::before { content: '\00a0\00b7\00a0'; }
+      .vot-note-chevron { display: none; }
+      .vot-note-letter { margin-top: 2px; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-headline); font-weight: 600; line-height: 1.3; }
+      .vot-note-excerpt { margin-top: var(--sp-1); color: var(--text-2); font-family: var(--font-serif); font-size: var(--ts-body); line-height: 1.5; }
+      .vot-note-tappable .vot-note-excerpt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+      .vot-note-excerpt em { color: var(--accent); font-style: normal; }
       .vot-note-hm, .inline-vot-hm {
         margin-left: auto; align-self: center; flex-shrink: 0;
         font-family: 'Cinzel', serif; font-size: var(--fs-10); letter-spacing: 0.14em;
@@ -2597,14 +2561,7 @@
         border: 1px solid var(--gold-border); border-radius: 2px;
         text-transform: uppercase;
       }
-      .vot-note-tappable {
-        display: block; width: 100%; text-align: left; cursor: pointer;
-        background: inherit; border: inherit; padding: inherit; color: inherit;
-        font: inherit; transition: all var(--transition);
-      }
-      @media (hover: hover) { .vot-note-tappable:hover { background: rgba(200,164,86,0.06); border-color: var(--gold); } }
-      .vot-note-tappable:focus-visible { outline: 1px solid var(--gold); outline-offset: 2px; }
-      .vot-note-tappable:active .vot-note-chevron { color: var(--gold-bright); }
+      /* ── end W2i readers (r-study2) ── */
 
       /* Links */
       .study-links { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -3278,9 +3235,6 @@
     /* screen-routes _fallbackView (mw17 s17.3): loading, failed loads, stale tabs. */
     .route-fallback { display:flex; flex-direction:column; align-items:center; justify-content:center; height:60vh; gap:14px; text-align:center; padding:0 24px; }
     .route-fallback-btn { padding:8px 20px; border-radius:999px; border:1px solid currentColor; background:transparent; color:inherit; font:inherit; cursor:pointer; opacity:0.85; }
-    .scripture-ref-chevron { margin-left:auto; padding-left:0.5rem; color:var(--gold-dim); font-size:var(--fs-16); flex-shrink:0; align-self:center; }
-    .scripture-ref-note { cursor:default; }
-    @media (hover: hover) { .scripture-ref-note:hover, .scripture-ref-note:focus-visible { background:var(--study-note) !important; border-color:var(--study-border) !important; outline:none; } }
     .inline-note-chevron { margin-left:auto; color:var(--gold-dim); font-size:var(--fs-14); flex-shrink:0; align-self:center; padding-left:0.3rem; }
     .inline-note-plain { cursor:default; }
     @media (hover: hover) { .inline-note-plain:hover { opacity:1 !important; } }
@@ -6902,7 +6856,7 @@
        "Bible translation" sheet's code column. ── */
     .rd-bindex { padding-top: var(--sp-2); text-align: left; align-items: stretch; }
     .rd-bindex > * { width: 100%; }
-    .rd-bindex-screen .bar-title { font-size: var(--ts-headline); }
+    .rd-bindex-screen .bar-title { font-size: var(--fsc-18); }   /* W2i: the capped 18 px, as bar titles are, so it fits at large text */
     .rd-bindex-tools { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); flex-wrap: wrap; margin: 0 0 var(--sp-2); }
     .rd-bindex-tools .ui-seg { flex: none; width: auto; }
     .rd-trans-pill { display: inline-flex; align-items: center; gap: var(--sp-2); min-height: var(--chip-h); max-width: 100%; padding: 0 var(--sp-3); border: 1px solid var(--hairline); border-radius: var(--r-pill); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); font-size: var(--ts-value); cursor: pointer; }
@@ -6943,6 +6897,22 @@
     .rd-book .chapter-card-info { flex: 1; min-width: 0; }
     .rd-book .chapter-card-title { display: block; overflow: visible; -webkit-line-clamp: unset; white-space: normal; color: var(--text-1); font-family: var(--font-serif); font-size: var(--ts-control); line-height: 1.3; letter-spacing: 0; text-transform: none; }
     /* ── end W2h readers (r-bible, r-study, r-book) ── */
+    /* ── W2i readers (r-book, r-bindex, r-trans, gospels): the book's gold Listen at the head's right with the gap
+       above it trimmed; the index rows are ListRow one (54 px, the mock's .row.one); translation rows 60 px as the
+       mock draws; a Bible group (Gospels...) is the index's rows, keeping .chapter-card-btn for the walks. ── */
+    .vol-index.rd-book { padding-top: var(--sp-2); }
+    .rd-book-head { padding-top: 0; }
+    .rd-book-head .hero-play-row { flex: none; margin: 0; }
+    .rd-book-head .hero-play-pill { min-height: var(--btn-h-sm); padding: 0 14px; gap: 7px; border: 0; border-radius: var(--r-pill); background: var(--accent); color: var(--accent-ink); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 600; letter-spacing: 0; text-transform: none; }
+    .rd-book-head .hero-play-pill svg { width: var(--icon-sm); height: var(--icon-sm); }
+    .select-sheet-option.has-code { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
+    .rd-genre .ui-row.chapter-card-btn { gap: 14px; padding: 10px 12px 10px var(--card-pad); border: 0; border-radius: 0; background: transparent; container-type: normal; }
+    .rd-genre .ui-row.chapter-card-btn:active { background: var(--surface-2); }
+    /* a book name never gives way to its chapter count: the count wraps instead (textzoom: "Matthew" crushed at 2) */
+    .rd-bindex.rd-genre { justify-content: flex-start; min-height: 0; }
+    .rd-genre .ui-row-text { flex: 1 0 auto; max-width: 100%; }
+    .rd-genre .ui-row-value { flex: 0 1 auto; min-width: 0; white-space: normal; text-align: right; }
+    /* ── end W2i readers (r-book, r-bindex, r-trans, gospels) ── */
     .ascroll-btn {
       background: none; border: none; cursor: pointer; color: var(--gold);
       display: flex; align-items: center; justify-content: center;

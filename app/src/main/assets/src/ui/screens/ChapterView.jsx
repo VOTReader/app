@@ -262,7 +262,7 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
 
           {showStudy && hasLinks && (
             <div className="study-panel-group" style={{ marginTop: "2rem" }}>
-              <div className="study-panel-group-title">Further Study</div>
+              <div className="study-panel-group-title ui-label">Further Study</div>
               <div className="study-links">
                 {chapter.links.map((link, i) => (
                   <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="study-link">
@@ -273,42 +273,37 @@ export function ChapterView({ book, chapter, mode, showStudy, showEchoes, showCh
             </div>
           )}
 
-          <div className="ornament-divider" aria-hidden="true">
-            <div className="ornament-divider-line" />
-            <div className="ornament-divider-symbol">✦</div>
-            <div className="ornament-divider-line" />
-          </div>
           <div className="bottom-nav">
             {prevCh ? (
               <button className="bottom-nav-card" onClick={() => onNavigate(prevCh.num)}>
-                <div className="bottom-nav-label">‹ Previous</div>
+                <div className="bottom-nav-label">Previous</div>
                 <div className="bottom-nav-title">{chapterRef(prevCh.num)}</div>
               </button>
             ) : prevBoundary ? (
               <button className="bottom-nav-card" onClick={onPrevBoundary}>
-                <div className="bottom-nav-label">‹ Previous Book</div>
+                <div className="bottom-nav-label">Previous book</div>
                 <div className="bottom-nav-title">{prevBoundary.title}</div>
               </button>
             ) : (
               <div className="bottom-nav-card placeholder">
-                <div className="bottom-nav-label">‹ Previous</div>
+                <div className="bottom-nav-label">Previous</div>
                 <div className="bottom-nav-title">—</div>
               </div>
             )}
 
             {nextCh ? (
               <button className="bottom-nav-card next" onClick={() => onNavigate(nextCh.num)}>
-                <div className="bottom-nav-label">Next ›</div>
+                <div className="bottom-nav-label">Next</div>
                 <div className="bottom-nav-title">{chapterRef(nextCh.num)}</div>
               </button>
             ) : nextBoundary ? (
               <button className="bottom-nav-card next" onClick={onNextBoundary}>
-                <div className="bottom-nav-label">Next Book ›</div>
+                <div className="bottom-nav-label">Next book</div>
                 <div className="bottom-nav-title">{nextBoundary.title}</div>
               </button>
             ) : (
               <div className="bottom-nav-card next placeholder">
-                <div className="bottom-nav-label">Next ›</div>
+                <div className="bottom-nav-label">Next</div>
                 <div className="bottom-nav-title">—</div>
               </div>
             )}

@@ -75,10 +75,10 @@ export function ScripturesHome({ onSelect, onGenre, onBack, onSearch, layout, on
           <ListGroup key={sec.label} label={sec.label}>
             {allBooks
               ? sec.genres.flatMap((g) => g.books).map((b) => (
-                <ListRow key={b.id} noLead title={b.title} value={String(b.detail || '').toLowerCase()} onClick={() => handleBook(b.id)} />
+                <ListRow key={b.id} noLead one title={b.title} value={String(b.detail || '').toLowerCase()} onClick={() => handleBook(b.id)} />
               ))
               : sec.genres.map((g) => (
-                <ListRow key={g.id} noLead title={g.label} value={countOf(g.books.length, 'book') + ' · ' + chapters(g.books)}
+                <ListRow key={g.id} noLead one title={g.label} value={countOf(g.books.length, 'book') + ' · ' + chapters(g.books)}
                   onClick={() => handleTile(g)} />
               ))}
           </ListGroup>
