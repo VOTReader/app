@@ -402,6 +402,28 @@ describe('a direct reference card says where it opens (audit 6)', () => {
     expect(head(l)).toBe('Volume Two · Letter 5');
     expect(card(l)).toMatchObject({ k: 'Letter', open: 'Open Volume Two · Letter 5', selected: true });
   });
+  /* WA4 (s-ref): Listen only where the chapter has a recording; "See it in the Scripture Web" only where the
+     web has a door (window.__openScriptureWeb's check), and tapping it opens the web at the verse. */
+  it('Listen plays the chapter, and the web door opens at the verse, each only where it leads somewhere', () => {
+    const v = { __direct: true, __label: 'John 3:16', __sub: 'For God so loved the world', ref: { kind: 'ref-bible', bookId: 'john', bookTitle: 'John', chapter: 3, verseStart: 16 } };
+    const open = vi.fn(() => true);
+    /** @type {any} */ (window).__openScriptureWeb = open;
+    const play = vi.fn();
+    let r = render(<SrchCard entry={v} terms={[]} onSelect={() => {}} isDirect listenRef={{ can: () => true, play }} />);
+    fireEvent.click(r.container.querySelector('button.srch-direct-listen'));
+    expect(play).toHaveBeenCalledWith({ bid: 'john', cid: 3 }, 'John 3');
+    const row = r.container.querySelector('.srch-direct-also button');
+    expect(row.textContent).toContain('See it in the Scripture Web');
+    fireEvent.click(row);
+    expect(open).toHaveBeenLastCalledWith({ verse: { bookId: 'john', chapter: 3, verse: 16 } });
+    cleanup();
+    open.mockImplementation(() => false);
+    r = render(<SrchCard entry={v} terms={[]} onSelect={() => {}} isDirect listenRef={{ can: () => false, play }} />);
+    expect(r.container.querySelector('.srch-direct-listen')).toBeNull();
+    expect(r.container.querySelector('.srch-direct-also')).toBeNull();
+    cleanup();
+    delete (/** @type {any} */ (window)).__openScriptureWeb;
+  });
 });
 
 /* search200 audit 252: the heading badge was cut at 28 characters mid-word ("The Parable of the Mustard S…"). */

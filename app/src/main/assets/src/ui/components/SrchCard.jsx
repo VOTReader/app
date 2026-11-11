@@ -7,6 +7,8 @@ import { kjvVisitEdition } from '../../utils/kjv-visit.js';
 import { recall, remember, docKey } from './srch-memory.js';
 import { formsToMark } from '../../utils/marked-forms.js';
 import { snippetText, markSpans } from './SrchSnippet.jsx';
+import { UiIcon } from './UiIcon.jsx';
+import { ListGroup, ListRow } from './UiParts.jsx';
 
 /* What one unit of a kind is called in "3 more passages in this letter": the kinds
    whose one doc is a whole letter, entry, topic or study chapter, so its text can
@@ -172,7 +174,7 @@ function useKjvWording(entry) {
 /* `also`: the reprints Best Matches folded under this card (search200 UX B10 2), offered in an
    "Also in N places" row after the snippet, each its own tap. `why`: one quiet line under the
    snippet saying how a card that holds no typed word matched ("by meaning", search200 ideas E/G). */
-export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined, why = '' }) {
+export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = '', stopTyped = undefined, also = undefined, why = '', listenRef = null }) {
   const doc = (!isDirect && entry && entry.doc) || null;
   const hlTerms = cardTerms(entry, terms, stopTyped);
   const kjv = useKjvWording(doc ? entry : null);
@@ -228,16 +230,42 @@ export function SrchCard({ entry, terms, onSelect, isDirect, memo = '', where = 
     const atVerse = !!(r && r.verseStart && r.bookTitle && !r.chapterEnd);
     const kindLabel = r && r.kind === 'ref-book' ? 'Book' : r && r.kind === 'ref-letter' ? 'Letter' : 'Passage';
     const openLabel = atVerse ? 'Open ' + r.bookTitle + ' ' + r.chapter : 'Open ' + (entry.__label || '');
+    /* WA4 (s-ref): Listen plays the passage's chapter, shown only where a recording of it exists
+       (listenRef.can, screen-routes planPortion); "Also" offers the Scripture Web at the passage, shown
+       only where the web has a door for it (__openScriptureWeb check). */
+    const chap = r && r.kind === 'ref-bible' && r.bookId && r.chapter ? { bid: r.bookId, cid: r.chapter } : null;
+    const canListen = !!(chap && listenRef && listenRef.can(chap));
+    const openWeb = typeof window !== 'undefined' ? /** @type {any} */ (window).__openScriptureWeb : null;
+    const webStart = typeof openWeb !== 'function' || !r || !r.bookId ? null
+      : r.kind === 'ref-book' ? { book: r.bookId }
+      : r.kind !== 'ref-bible' || !r.chapter ? null
+      : r.verseStart ? { verse: { bookId: r.bookId, chapter: r.chapter, verse: r.verseStart } } : { book: r.bookId, chapter: r.chapter };
+    const hasWeb = !!(webStart && openWeb(webStart, { check: true }));
     return (
-      <div className="srch-card card-direct">
-        <div className="srch-direct-k">{kindLabel}</div>
-        <div className="srch-card-top">
-          <span className="srch-card-ref">{entry.__label}</span>
+      <>
+        <div className="srch-card card-direct">
+          <div className="srch-direct-k">{kindLabel}</div>
+          <div className="srch-card-top">
+            <span className="srch-card-ref">{entry.__label}</span>
+          </div>
+          {entry.__sub ? <div className="srch-card-snippet">{entry.__sub}</div> : null}
+          {entry.__trans ? <div className="srch-card-loc">{entry.__trans}</div> : null}
+          <div className="srch-direct-acts">
+            <button type="button" className="ui-btn is-primary is-small srch-direct-open" onClick={() => onSelect(entry)}>{openLabel}</button>
+            {canListen ? (
+              <button type="button" className="ui-btn is-small srch-direct-listen"
+                onClick={() => listenRef.play(chap, (r.bookTitle || '') + ' ' + r.chapter)}>
+                <UiIcon name="head" size="sm" />Listen
+              </button>
+            ) : null}
+          </div>
         </div>
-        {entry.__sub ? <div className="srch-card-snippet">{entry.__sub}</div> : null}
-        {entry.__trans ? <div className="srch-card-loc">{entry.__trans}</div> : null}
-        <button type="button" className="ui-btn is-primary is-small srch-direct-open" onClick={() => onSelect(entry)}>{openLabel}</button>
-      </div>
+        {hasWeb ? (
+          <ListGroup label="Also" className="srch-direct-also">
+            <ListRow icon="web" one title="See it in the Scripture Web" onClick={() => openWeb(webStart)} />
+          </ListGroup>
+        ) : null}
+      </>
     );
 
   }

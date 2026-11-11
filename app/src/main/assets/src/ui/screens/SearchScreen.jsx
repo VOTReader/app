@@ -157,7 +157,7 @@ export function useImeHideBlur(inputRef) {
   }, []);
 }
 
-export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null, onOpenPlans = null, onOpenAnswers = null }) {
+export function SearchScreen({ query, onQueryChange, settings, onSettingsChange, onSelect, onBack, searchScope, searchContext, onToggleScope, onCommand, onOpenSongs = null, onOpenPlans = null, onOpenAnswers = null, listenRef = null }) {
   // Songs of the Letters (L8): ONE shortcut row at the top when the LOADED song catalog matches the query — a
   // pure in-memory filter (findSongFamilies, bundle-d). Songs never join the MiniSearch index, so a daily catalog
   // change never forces the index rebuild; a catalog not yet loaded shows nothing and is not fetched from here.
@@ -1226,7 +1226,7 @@ export function SearchScreen({ query, onQueryChange, settings, onSettingsChange,
         {directEntries.length > 0 && (
           <div className="srch-direct">
             {directEntries.map((d, i) => (
-              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} />
+              <SrchCard key={'d' + i} entry={d} terms={[]} onSelect={handleSelect} isDirect={true} listenRef={listenRef} />
             ))}
           </div>
         )}

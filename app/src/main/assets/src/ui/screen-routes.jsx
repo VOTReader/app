@@ -1208,6 +1208,15 @@ export function buildScreenRoutes({
         onOpenSongs={(q) => _openSongs([{ k: 'hub', q }], { screen: 'search' })}
         onOpenPlans={goReadingPlans}
         onOpenAnswers={() => { resetAnswersLanding(); setScreen('answers-home'); }}
+        listenRef={{
+          // WA4 (s-ref): a passage card's Listen plays its chapter in the reader's audio edition, the way a
+          // plan's Listen does (planPortion); a chapter with no recording gets no button.
+          can: (/** @type {any} */ r) => planPortion([r]).length > 0,
+          play: (/** @type {any} */ r, /** @type {string} */ label) => {
+            const items = planPortion([r]);
+            if (items.length) AudioPlayer.playPortion({ items, label });
+          },
+        }}
       />
     ),
     'home': () => (
