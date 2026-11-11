@@ -124,6 +124,8 @@ function _doneBytes() {
 
 /** Note how far the batch is, at most once a second, for the rate. */
 function _sample() {
+  // Measured only while something downloads: idle time (waiting to start, a hold) is not a slow rate.
+  if (!_actives.size) { _samples = []; return; }
   const now = Date.now();
   const last = _samples[_samples.length - 1];
   if (last && now - last[0] < 1000) return;

@@ -216,7 +216,7 @@ describe('offline-audio-web (cf1)', () => {
     await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r1'))).toBe('server'));
     fetchMock.mockImplementationOnce(async () => answer(200, {}));
     OfflineAudio.download([{ url: URL_OF('r2'), key: 'k', title: 't' }]);
-    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r2'))).toBe('size'));
+    await vi.waitFor(() => expect(OfflineAudio.failureOf(URL_OF('r2'))).toBe('nosize'));
     expect(bodies.length, 'PRECONDITION: both answers were fetched').toBe(2);
     await vi.waitFor(() => {
       expect(bodies[0], 'the refusal\'s body').toHaveBeenCalledTimes(1);

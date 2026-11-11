@@ -1471,6 +1471,8 @@ export function buildScreenRoutes({
         onBack={goNavOrigin}
         backLabel={(navOrigin && navOrigin.label) || 'Listening Library'}
         bibleAudio={settings.bibleAudio}
+        letterReader={settings.letterReader}
+        onLetterReader={(/** @type {string} */ v) => updateSetting('letterReader', v)}
         onSearch={goSearch}
         onHistory={goHistory}
         onSettings={goSettings}

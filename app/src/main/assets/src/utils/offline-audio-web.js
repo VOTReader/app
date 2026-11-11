@@ -604,7 +604,8 @@ async function _run(it) {
     // the reader's cancel.
     if (res.status !== 200 || !res.body) { _drop(res); throw new Failed('server', res.status); }
     const total = Number(res.headers.get('Content-Length')) || 0;
-    if (!(total > 0)) { _drop(res); throw new Failed('size'); }
+    // No Content-Length: 'nosize' ('size' is the phone app's too-big; defect 22 read one as the other).
+    if (!(total > 0)) { _drop(res); throw new Failed('nosize'); }
     job.total = total;
     if (!(it.bytes > 0)) it.bytes = total;
     if (!it.counted && it.b === _batchId) { _batch.bytes += total; it.counted = true; }

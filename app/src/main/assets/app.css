@@ -1762,6 +1762,32 @@
       .dl-voice { flex:0 1 auto; min-width:0; max-width:100%; }
       .dl-voice select { min-height:44px; width:100%; max-width:100%; text-overflow:ellipsis; padding:.3rem 2rem .3rem .8rem; border:1px solid var(--gold); border-radius:7px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); }
       .dl-voice select option { background:var(--bg); color:var(--cream); }
+      /* dl-rework B, C: the one letter voice (Settings > Letter Voice), what it does said from the data, readers named. */
+      .dl-voicebar { margin:.6rem 0 .8rem; padding:.7rem .9rem .8rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--dl-surface); }
+      .dl-voicebar .dl-voice { display:flex; flex-direction:column; gap:.25rem; }
+      .dl-voice-label { color:var(--gold); font-family:'Cinzel',serif; font-size:var(--fs-12); letter-spacing:.14em; text-transform:uppercase; }
+      .dl-voice-line { margin:.55rem 0 0; color:var(--cream); font-size:var(--fs-16); line-height:1.4; }
+      .dl-voice-note { margin:.35rem 0 0; color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-only { display:flex; align-items:center; gap:.6rem; min-height:44px; margin-top:.3rem; color:var(--cream); font-size:var(--fs-16); cursor:pointer; }
+      .dl-only input { appearance:none; -webkit-appearance:none; position:relative; flex:0 0 auto; width:42px; height:26px; margin:0; border:1px solid var(--gold-dim); border-radius:13px; background:transparent; cursor:pointer; }
+      .dl-only input::after { content:''; position:absolute; top:4px; left:4px; width:16px; height:16px; border-radius:50%; background:var(--cream-dim); transition:left .15s ease; }
+      .dl-only input:checked { background:var(--gold); border-color:var(--gold); }
+      .dl-only input:checked::after { left:20px; background:var(--bg); }
+      .dl-reader { display:inline-block; margin-left:.45rem; padding:0 .45rem; border:1px solid var(--gold-border); border-radius:999px; color:var(--gold); font-style:normal; font-size:var(--fs-12); line-height:1.6; white-space:nowrap; vertical-align:middle; }
+      .dl-reader.is-fallback { border-style:dashed; color:var(--cream-dim); }
+      .dl-unit > .dl-row { min-height:52px; }
+      .dl-readings { display:flex; flex-wrap:wrap; gap:.4rem; padding:0 0 .6rem calc(48px + .35rem); }
+      .dl-reading { position:relative; min-height:40px; padding:.2rem .8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream); font:inherit; font-size:var(--fs-14); cursor:pointer; }
+      .dl-reading.is-kept { background:var(--gold-faint); border-color:var(--gold-dim); }
+      .dl-reading.is-add { background:var(--gold); border-color:var(--gold); color:#17130a; }
+      body.light .dl-reading.is-add { color:var(--bg); }
+      .dl-reading.is-remove { border-color:var(--dl-brick); color:var(--dl-brick); text-decoration:line-through; }
+      .dl-reading.is-none.is-fetch { border-color:var(--gold); color:var(--gold); }
+      .dl-reading-tick { width:12px; height:12px; margin-right:.3rem; fill:none; stroke:var(--gold); stroke-width:3; stroke-linecap:round; stroke-linejoin:round; vertical-align:-1px; }
+
+      .dl-reading:focus-visible, .dl-only input:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
+      .dl-edition-reader { margin:0 0 .5rem calc(48px + .35rem); color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
+      .dl-sheet-split { margin:.2rem 0 .4rem; color:var(--cream); font-size:var(--fs-16); line-height:1.4; }
       .dl-editions { display:flex; flex-wrap:wrap; gap:.5rem; padding:0 0 .5rem calc(48px + .35rem); }
       .dl-edition { min-height:44px; padding:.3rem .9rem; border:1px solid var(--gold); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
       .dl-edition.is-on { background:var(--gold); color:#17130a; }
@@ -1861,7 +1887,21 @@
       .dl-queue-copy strong { color:var(--cream); font-weight:400; font-size:var(--fs-16); line-height:1.3; overflow-wrap:anywhere; }
       .dl-queue-copy small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
       .dl-queue-row.is-more { min-height:44px; }
+      .dl-queue-row .dl-icon-btn { margin-left:auto; }
       .dl-queue-retry-all { margin-top:.2rem; }
+      /* dl-rework D, E: the will-try-again list, a hand-over that stopped midway, Cancel's question, and Finished. */
+      .dl-queue-head.is-failed { margin-top:.8rem; }
+      .dl-queue.is-failed-only { margin:.2rem 0 .6rem; }
+      .dl-unsent { display:flex; flex-wrap:wrap; align-items:center; gap:.2rem 1rem; margin:.4rem 0 .6rem; padding:.6rem .9rem; border:1px solid var(--dl-brick); border-radius:10px; }
+      .dl-unsent p { flex:1 1 12em; margin:0; color:var(--cream); font-size:var(--fs-16); }
+      .dl-cancel-ask { margin-top:.6rem; }
+      .dl-finished { margin:.6rem 0 1rem; }
+      .dl-finished-sets, .dl-finished-rows { list-style:none; margin:0; padding:0; }
+      .dl-finished-set { padding:.5rem 0; border-bottom:1px solid var(--gold-faint); color:var(--cream); font-size:var(--fs-16); }
+      .dl-finished-set.is-whole { color:var(--gold); }
+      .dl-finished-row { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.1rem .8rem; min-height:44px; padding:.4rem 0; border-bottom:1px solid var(--gold-faint); }
+      .dl-finished-title { flex:1 1 10em; min-width:0; color:var(--cream); font-size:var(--fs-16); overflow-wrap:anywhere; }
+      .dl-finished-row small { color:var(--cream-dim); font-style:italic; font-size:var(--fs-14); }
       .audio-library-hero-actions .audio-collection-choose, .audio-collection-choose { min-height:44px; padding:.3rem .2rem; border:0; background:none; color:var(--gold); font:inherit; font-size:var(--fs-16); cursor:pointer; }
       .audio-collection-choose:focus-visible { outline:2px solid var(--gold-bright); outline-offset:2px; }
       .settings-downloads-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:.3rem .6rem; width:100%; min-height:56px; padding:.3rem 0; border:0; background:none; color:inherit; font:inherit; text-align:left; cursor:pointer; }
