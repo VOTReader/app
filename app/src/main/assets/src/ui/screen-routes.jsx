@@ -1449,7 +1449,7 @@ export function buildScreenRoutes({
     'audio-library-volumes': () => (
       <AudioVolumesScreen
         onBack={goNavOrigin}
-        backLabel="Listening Library"
+        backLabel="Back to Listen"
         onOpenCollection={(vk) => {
           setAudioColKey(vk);
           setNavOrigin({ screen: 'audio-library-volumes', returnOrigin: navOrigin || null });
@@ -1513,9 +1513,9 @@ export function buildScreenRoutes({
       <AudioCollectionScreen
         volKey={audioColKey}
         onBack={goNavOrigin}
-        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'The Volumes'
-          : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Studies'
-          : 'Listening Library'}
+        backLabel={navOrigin && navOrigin.screen === 'audio-library-volumes' ? 'Back to The Volumes of Truth'
+          : navOrigin && navOrigin.screen === 'audio-library-studies' ? 'Back to Studies'
+          : 'Back to Listen'}
         onOpenText={(track) => _openAudioText(track, 'audio-library-collection')}
         onSearch={goSearch}
         onHistory={goHistory}

@@ -51,12 +51,14 @@ export function ListGroup({ label, aside, onAside, inset = false, children, clas
  *   menu     ONE menu: { label, onClick }; with a menu the row's own tap is a separate button beside it
  *   onClick  the row opens something: it is a button, with a chevron unless `chevron={false}` or it has a menu
  *   one      a one-line row (54 px); `noLead` drops the leading slot (the hairline then starts at the padding)
+ *   star     the row's one button besides its menu (rule 12): { on, label, onClick }, a Save star (listen.html au-coll)
  * @param {{ icon?: string, lead?: any, title: any, meta?: any, value?: any, valueNone?: boolean,
  *   mark?: { label: string, icon?: string, tick?: boolean } | null, menu?: { label: string, onClick: () => void } | null,
+ *   star?: { on: boolean, label: string, onClick: () => void } | null,
  *   onClick?: () => void, chevron?: boolean, one?: boolean, noLead?: boolean, ariaLabel?: string, className?: string,
  *   current?: boolean }} props
  */
-export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, onClick, chevron,
+export function ListRow({ icon, lead, title, meta, value, valueNone = false, mark = null, menu = null, star = null, onClick, chevron,
   one = false, noLead = false, ariaLabel, className = '', current = false }) {
   const leading = noLead ? null : (lead || (icon ? <span className="ui-row-lead" aria-hidden="true"><UiIcon name={icon} /></span> : null));
   const showChev = chevron === undefined ? !!onClick && !menu : chevron;
@@ -78,15 +80,21 @@ export function ListRow({ icon, lead, title, meta, value, valueNone = false, mar
   );
   const rowCls = cx('ui-row', one && 'is-one', (noLead || !leading) && 'no-lead', className);
   const aria = current ? 'true' : undefined;
-  if (menu) {
+  if (menu || star) {
     return (
       <div className={rowCls}>
         {onClick
           ? <button type="button" className="ui-row-main" onClick={onClick} aria-label={ariaLabel} aria-current={aria}>{body}</button>
           : <span className="ui-row-main" aria-current={aria}>{body}</span>}
-        <button type="button" className="ui-row-menu" onClick={menu.onClick} aria-label={menu.label} title={menu.label} aria-haspopup="dialog">
-          <UiIcon name="more" />
-        </button>
+        {star ? (
+          <button type="button" className={cx('ui-row-star', star.on && 'is-on')} onClick={star.onClick} aria-label={star.label}
+            title={star.label} aria-pressed={!!star.on}><UiIcon name="star" filled={!!star.on} /></button>
+        ) : null}
+        {menu ? (
+          <button type="button" className="ui-row-menu" onClick={menu.onClick} aria-label={menu.label} title={menu.label} aria-haspopup="dialog">
+            <UiIcon name="more" />
+          </button>
+        ) : null}
       </div>
     );
   }

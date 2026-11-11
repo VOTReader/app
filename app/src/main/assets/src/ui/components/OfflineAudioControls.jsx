@@ -20,18 +20,6 @@ import { hideToast, showToast } from '../../utils/toast.js';
 const _noSubscribe = () => () => {};
 const _noShape = () => '';
 
-/**
- * One of these recordings is the one playing (or starting): offline it plays on from what it buffered (RC.5).
- * @param {string[]} urls @returns {boolean}
- */
-function usePlayingOneOf(urls) {
-  const has = typeof AudioPlayer !== 'undefined' && typeof AudioPlayer.getShape === 'function';
-  React.useSyncExternalStore(has ? AudioPlayer.subscribe : _noSubscribe, has ? AudioPlayer.getShape : _noShape);
-  if (!has) return false;
-  const s = AudioPlayer.getState();
-  const cur = s && Array.isArray(s.queue) ? s.queue[s.qi] : null;
-  return !!cur && urls.includes(cur.url) && (s.status === 'playing' || s.status === 'loading');
-}
 
 /** The phone keeps this much free beyond a download (OfflineAudioStore's SPACE_MARGIN). */
 export const SPACE_MARGIN = 200 * 1024 * 1024;
@@ -318,14 +306,6 @@ function CheckIcon() {
 export function AlertIcon() {
   return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><path d="M12 16.5v.01" /></svg>;
 }
-function NoSignalIcon() {
-  return <svg className="offline-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M5.6 5.6l12.8 12.8" /></svg>;
-}
-
-/** A row's Download asks first past this many recordings or bytes: a Bible book (Genesis is 206 MB) started on one tap
- *  with no size or room check (downloads brief 2026-10-23, section 7 item 6). A letter, even in parts, does not ask. */
-const ROW_ASK_TRACKS = 3;
-const ROW_ASK_BYTES = 50e6;
 
 /**
  * "Download <label>?" with the count, the size and the phone's free space; Download is off when it would not fit.
@@ -358,78 +338,6 @@ function DownloadConfirm({ off, label, todo, count, onCancel, onGo }) {
         </button>
       </div>
     </div>
-  );
-}
-
-/**
- * The line under a recording row. `tracks` is the reading the row's own Play plays (AudioPlayer.playbackTracks).
- * `quiet` (a row with a tick and a ... menu, picture 14): only a download on its way or one that failed says a line;
- * on the phone is the tick, offline is the row's own "Not on this phone", and Download is in the menu.
- * @param {{ tracks: any[], name: string, quiet?: boolean }} props
- */
-export function OfflineRowStatus({ tracks, name, quiet = false }) {
-  const off = useOfflineAudio();
-  const online = useOnline();
-  const list = Array.isArray(tracks) ? tracks.filter((t) => t && typeof t.url === 'string') : [];
-  const urls = list.map((t) => t.url);
-  const urlKey = urls.join('\n');
-  React.useEffect(() => {
-    if (off && urls.length) off.requestSizes(urls);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined urls: a new array each render must not re-ask
-  }, [off, urlKey]);
-  const u = off && urls.length ? unitState(off, urls) : null;
-  const shown = !u ? '' : u.status === 'saved' ? 'saved' : !online && u.status !== 'downloading' ? 'offline' : u.status;
-  const focus = useKeepFocus(shown);
-  const playing = usePlayingOneOf(urls);
-  const [asking, setAsking] = React.useState(false);
-  if (!off || !u) return null;
-  if (quiet && (shown === 'saved' || shown === 'offline' || shown === 'none')) return null;
-  const download = () => off.download(list.map((t) => _item(t, name)));
-  if (shown === 'saved') {
-    return <p className="offline-row is-saved" {...focus}><CheckIcon /><span>On this phone{u.bytes ? ' · ' + formatBytes(u.bytes) : ''}</span></p>;
-  }
-  if (shown === 'offline') {
-    // The one playing goes on from what it buffered (RC.5): it did say it needed a connection while it played.
-    return <p className="offline-row is-offline" {...focus}><NoSignalIcon /><span>{playing ? 'Playing from the buffer' : 'Needs a connection'}</span></p>;
-  }
-  if (u.status === 'downloading') {
-    return (
-      <div className="offline-row is-busy" {...focus}>
-        <span className="offline-row-label"><DownloadIcon /><span>{waitsForWifi(off, urls) ? WAITING_WORDS : u.started ? 'Downloading ' + u.percent + '%' : 'Waiting'}</span></span>
-        <button type="button" className="offline-row-link" onClick={() => _cancel(off, urls)} aria-label={'Cancel the download of ' + name}>Cancel</button>
-        {/* Queued rows said "Downloading 0%" over an empty bar (brief section 7 item 7): the bar starts with the bytes. */}
-        {u.started ? (
-          <span className="offline-row-bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={u.percent}
-            aria-label={'Downloading ' + name}><span style={{ width: u.percent + '%' }} /></span>
-        ) : null}
-      </div>
-    );
-  }
-  if (u.status === 'failed') {
-    return (
-      <p className="offline-row is-failed" {...focus}>
-        <AlertIcon />
-        <span>{u.failed === 'space' ? 'Not enough room on this phone' : 'Didn’t download yet · it tries again'}</span>
-        <span aria-hidden="true">·</span>
-        <button type="button" className="offline-row-link" onClick={download} aria-label={'Retry the download of ' + name}>Retry now</button>
-      </p>
-    );
-  }
-  const size = formatBytes(u.remaining || 0);
-  const big = list.length > ROW_ASK_TRACKS || (u.remaining || 0) > ROW_ASK_BYTES;
-  const todo = list.filter((t) => off.statusOf(t.url) !== 'saved');
-  return (
-    <>
-      <button type="button" className="offline-row offline-row-download" {...focus}
-        onClick={big ? () => { off.refresh(); setAsking(true); } : download} aria-expanded={big ? asking : undefined}
-        aria-label={'Download ' + name + ' to this phone' + (size ? ', ' + size : '')}>
-        <DownloadIcon /><span>{'Download' + (size ? ' · ' + size : '')}</span>
-      </button>
-      {big && asking ? (
-        <DownloadConfirm off={off} label={name} todo={todo} onCancel={() => setAsking(false)}
-          onGo={() => { off.download(todo.map((t) => _item(t, name))); setAsking(false); }} />
-      ) : null}
-    </>
   );
 }
 
@@ -550,42 +458,6 @@ export function rowOnPhone(off, tracks) {
   return { state: u.status === 'saved' ? 'saved' : u.status === 'downloading' ? 'busy' : u.saved ? 'part' : 'none', saved: u.saved, count: u.count };
 }
 
-/**
- * The download half of a row's ... menu (picture 14): Download · 11 MB (Download when online with no signal; the
- * rest of a part-saved book), Cancel download while it is on its way, Remove · 13 MB with a 5 s Undo.
- * @param {{ off: any, online: boolean, tracks: any[], name: string }} a
- * @returns {Array<{ id: string, text: string, icon: string, onSelect: () => void, disabled?: boolean }>}
- */
-export function offlineMenuItems({ off, online, tracks, name }) {
-  const list = (Array.isArray(tracks) ? tracks : []).filter((t) => t && typeof t.url === 'string');
-  if (!off || !list.length) return [];
-  const urls = list.map((t) => t.url);
-  const u = unitState(off, urls);
-  /** @type {Array<{ id: string, text: string, icon: string, onSelect: () => void, disabled?: boolean }>} */
-  const out = [];
-  if (u.status === 'downloading') {
-    out.push({ id: 'cancel', text: 'Cancel download', icon: 'cancel', onSelect: () => _cancel(off, urls) });
-  } else if (u.status !== 'saved') {
-    const todo = list.filter((t) => _leaving.has(t.url) || off.statusOf(t.url) !== 'saved');
-    const need = _need(off, todo);
-    const free = off.freeBytes();
-    // The size is on the item, so it starts on one tap; it is off when it would not fit (DownloadConfirm's room check).
-    const noRoom = need !== null && free > 0 && need + SPACE_MARGIN > free;
-    const size = need ? ' · ' + formatBytes(need) : '';
-    const text = !online ? 'Download when online' : noRoom ? 'Not enough room' + size : (u.saved ? 'Download the rest' : 'Download') + size;
-    out.push({ id: 'download', text, icon: 'download', disabled: online && noRoom, onSelect: () => downloadWhenOnline(off, todo.map((t) => _item(t, name))) });
-  }
-  if (u.saved > 0 && u.status !== 'downloading') {
-    const held = list.filter((t) => !_leaving.has(t.url) && off.statusOf(t.url) === 'saved');
-    const bytes = held.reduce((n, t) => n + (off.sizeOf(t.url) || 0), 0);
-    out.push({
-      id: 'remove', text: 'Remove' + (bytes ? ' · ' + formatBytes(bytes) : ''), icon: 'remove',
-      onSelect: () => removeWithUndo(off, held.map((t) => t.url), 'Removed ' + name + (bytes ? ' · ' + formatBytes(bytes) : '')),
-    });
-  }
-  return out;
-}
-
 /* ── The Listen hero (D4b; downloads brief 3a, 3j; pictures 15, 16, 21) ─────────────────────────────────────────── */
 
 /**
@@ -620,100 +492,21 @@ export function ofBytes(done, total) {
   return (unit && a.endsWith(unit[0]) ? a.slice(0, -unit[0].length) : a) + ' of ' + b;
 }
 
-/**
- * Beside a Listen pill (picture 15): a round Download with its size under it; while it downloads, a ring with a stop
- * square and "4 of 10 MB" (a tap cancels); once saved, a tick with "On this phone"; a failed one offers Retry.
- * Nothing where downloads are not possible here, and nothing offline for a recording not on the phone: the pill
- * itself says so then (NotOnPhone).
- * @param {{ tracks: any[], name: string }} props tracks = what the Listen beside it plays
- */
-export function HeroDownload({ tracks, name }) {
-  const off = useOfflineAudio();
-  const online = useOnline();
-  const list = (Array.isArray(tracks) ? tracks : []).filter((t) => t && typeof t.url === 'string');
-  const urls = list.map((t) => t.url);
-  const urlKey = urls.join('\n');
-  React.useEffect(() => {
-    if (off && urls.length) off.requestSizes(urls);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the joined urls: a new array each render must not re-ask
-  }, [off, urlKey]);
-  const u = off && urls.length ? unitState(off, urls) : null;
-  const focus = useKeepFocus(u ? u.status : '');
-  if (!off || !u) return null;
-  if (u.status === 'saved') {
-    return <p className="hero-dl is-saved" {...focus}><OnPhoneRing share={1} /><span>On this phone</span></p>;
-  }
-  if (u.status === 'downloading') {
-    let done = 0;
-    for (const x of urls) {
-      if (off.statusOf(x) === 'saved') done += off.sizeOf(x) || 0;
-      else { const p = off.progressOf(x); if (p) done += p.bytes; }
-    }
-    const cap = !u.started ? (waitsForWifi(off, urls) ? WAITING_WORDS : !online ? 'Waiting for a connection' : 'Waiting')
-      : u.bytes ? ofBytes(done, u.bytes) : u.percent + '%';
-    return (
-      <button type="button" className="hero-dl is-busy" {...focus} onClick={() => _cancel(off, urls)} aria-label={'Cancel the download of ' + name + '. ' + cap}>
-        <svg className="hero-dl-ring" viewBox="0 0 24 24" aria-hidden="true">
-          <circle className="offline-ring-track" cx="12" cy="12" r="10" />
-          <circle className="offline-ring-arc" cx="12" cy="12" r="10" transform="rotate(-90 12 12)"
-            strokeDasharray={(2 * Math.PI * 10 * Math.max(0.04, u.started ? u.percent / 100 : 0)).toFixed(2) + ' ' + (2 * Math.PI * 10).toFixed(2)} />
-          <rect x="9" y="9" width="6" height="6" rx="1" />
-        </svg>
-        <span className="hero-dl-cap">{cap}</span>
-      </button>
-    );
-  }
-  if (!online) return null;
-  const todo = list.filter((t) => _leaving.has(t.url) || off.statusOf(t.url) !== 'saved');
-  const need = _need(off, todo);
-  const failed = u.status === 'failed';
-  return (
-    <button type="button" className={'hero-dl' + (failed ? ' is-failed' : '')} {...focus}
-      onClick={() => off.download(todo.map((t) => _item(t, name)))}
-      aria-label={(failed ? 'Download failed. Retry ' : 'Download ') + name + (need ? ', ' + formatBytes(need) : '')}>
-      <span className="hero-dl-icon">{failed ? <AlertIcon /> : <DownloadIcon />}</span>
-      <span className="hero-dl-cap">{failed ? (u.failed === 'space' ? 'No room · Retry' : 'Failed · Retry') : 'Download' + (need ? ' · ' + formatBytes(need) : '')}</span>
-    </button>
-  );
-}
-
 /** The disabled pill in a Listen's place, offline, for a recording not on the phone (pictures 15, 21). */
 export function NotOnPhonePill() {
   return <button type="button" className="hero-play-pill is-off" disabled aria-label="Not on this phone"><CloudOffIcon /><span>Not on this phone</span></button>;
 }
 
 /**
- * "Download when online" under a Listen that cannot play offline: queues it for the signal (downloadWhenOnline), then
- * says it will. Nothing where downloads are not possible here.
- * @param {{ tracks: any[], name: string }} props
+ * Offline, and the Listen's recording is not on the phone (pictures 15, 21): the pill itself says "Not on this phone"
+ * and the line says why. No download here (Corbin 11-11): Downloads is the one place to download.
+ * @param {{ tracks?: any[], name?: string, line?: string }} props
  */
-export function DownloadWhenOnline({ tracks, name }) {
-  const off = useOfflineAudio();
-  const list = (Array.isArray(tracks) ? tracks : []).filter((t) => t && typeof t.url === 'string');
-  if (!off || !list.length) return null;
-  if (unitState(off, list.map((t) => t.url)).status === 'downloading') {
-    return <p className="hero-offline-line hero-dl-held" role="status">It will download when you’re back online.</p>;
-  }
-  return (
-    <div className="hero-play-row is-off">
-      <button type="button" className="hero-dl-when" onClick={() => downloadWhenOnline(off, list.map((t) => _item(t, name)))}>
-        <DownloadIcon /><span>Download when online</span>
-      </button>
-    </div>
-  );
-}
-
-/**
- * Offline, and the Listen's recording is not on the phone (pictures 15, 21): the pill itself says "Not on this phone",
- * the line says why, and "Download when online" queues it for the signal.
- * @param {{ tracks: any[], name: string, line?: string }} props
- */
-export function NotOnPhone({ tracks, name, line = 'You’re offline. This isn’t on this phone.' }) {
+export function NotOnPhone({ line = 'You’re offline. This isn’t on this phone.' }) {
   return (
     <>
       <div className="hero-play-row is-off"><NotOnPhonePill /></div>
       <p className="hero-offline-line" role="status">{line}</p>
-      <DownloadWhenOnline tracks={tracks} name={name} />
     </>
   );
 }

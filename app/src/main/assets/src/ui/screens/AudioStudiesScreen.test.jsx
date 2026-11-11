@@ -49,7 +49,7 @@ const MANIFEST = {
 };
 
 function installGlobals({ manifest = MANIFEST, studies = STUDIES } = {}) {
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
+  globalThis.ScreenLayout = ({ children, utility }) => <main>{utility ? <h1>{utility.title}</h1> : null}{children}</main>;
   globalThis.LibraryNav = () => null;
   Object.assign(globalThis, Shelf, AudioTrack, AudioCoverage, { AudioSeekSlider, CoverageBadge });
   globalThis.AudioPlayer = player;
@@ -166,15 +166,15 @@ describe('a study in the recordings screen', () => {
     const onOpenText = vi.fn();
     render(<AudioCollectionScreen volKey="study:lamb-of-god" onBack={noop} onOpenText={onOpenText} {...common} />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('YahuShua The Messiah, The Lamb of God');
-    expect(document.querySelector('.audio-library-intro').textContent).toBe('2 of 3 chapters have recordings');
+    expect(document.querySelector('.listen-sum').textContent).toBe('2 recordings');
     // Codex critique 4: the count names what a listener will skip, and each name opens its text.
     const skip = document.querySelector('.audio-collection-text-only');
     expect(skip.textContent).toBe('Text only: Preface');
     fireEvent.click(skip.querySelector('button'));
     expect(onOpenText).toHaveBeenCalledWith(expect.objectContaining({ key: 'study:lamb-of-god-ch0' }));
     // Each row: the chapter's number badge, then its title (the letters' shape).
-    const rows = [...document.querySelectorAll('.audio-collection-item strong')];
-    expect(rows.map((n) => n.querySelector('.audio-collection-num').textContent)).toEqual(['1', '2']);
+    const rows = [...document.querySelectorAll('.listen-rec .ui-row-title')];
+    expect(rows.map((n) => n.querySelector('.listen-rec-num').textContent)).toEqual(['1', '2']);
     expect(rows.map((n) => n.lastChild.textContent)).toEqual(['I Am The Passover', 'Anointing']);
     fireEvent.click(screen.getByText('Play all').closest('button'));
     expect(player.playCollection).toHaveBeenCalledWith(expect.objectContaining({ volKey: 'study', items: STUDIES[1].chapters, collectionLabel: STUDIES[1].title }));

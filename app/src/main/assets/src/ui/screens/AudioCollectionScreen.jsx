@@ -14,11 +14,13 @@
    reading, the row discloses the voices and each one starts the same queue
    on that rendition.
 */
-import {
-  OfflineRowStatus, OfflineCollectionAction, OfflineCollectionMark, OfflineNote, OnPhoneTick, offlineMenuItems, rowOnPhone,
-  useOfflineAudio, useOnline,
-} from '../components/OfflineAudioControls.jsx';
-import { RowMenu, openRowMenu } from '../components/RowMenu.jsx';
+import { OfflineCollectionMark, OfflineNote, rowOnPhone, useOfflineAudio, useOnline } from '../components/OfflineAudioControls.jsx';
+import { CollectionDownload } from '../components/CollectionDownload.jsx';
+import { ActionSheet } from '../components/SelectField.jsx';
+import { EmptyState, ListGroup, ListRow, RowPlay, SectionLabel, UiButton } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { audioLibraryStore } from '../components/AudioShelf.jsx';
+import { toggleSavedRecording } from '../../utils/saved-shelf.js';
 import { CoverageBadge } from '../components/CoverageBadge.jsx';
 import { COVERAGE_READ_ALONG, bibleBookPartialDetail } from '../../utils/audio-coverage.js';
 import { queueMenuItems } from '../components/queue-menu.js';
@@ -120,7 +122,7 @@ export function recordingsLine(col, items, playable, preface) {
  *   onThemeChange: (theme: any) => void,
  * }} props
  */
-export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening Library', onOpenText, onSearch, onHistory, onSettings, theme, onThemeChange }) {
+export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Back to Listen', onOpenText }) {
   // Not the 1 Hz clock: nothing here draws it (s18.3).
   React.useSyncExternalStore(AudioPlayer.subscribe, AudioPlayer.getShape);
   useAudioPositions();
@@ -152,7 +154,14 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
     () => typeof window.__votCorpus !== 'undefined' ? window.__votCorpus.getVersion() : 0
   );
 
-  const [openVoices, setOpenVoices] = React.useState(/** @type {string | null} */ (null));
+  // The row whose menu sheet is open (listen.html au-rowmenu), by item id.
+  const [menuFor, setMenuFor] = React.useState(/** @type {string | null} */ (null));
+  // The Save star on every row (X-hidden-decisions: "Save a recording" was hidden in the player's menu).
+  const library = audioLibraryStore();
+  React.useSyncExternalStore(
+    React.useCallback((cb) => (library && typeof library.subscribe === 'function' ? library.subscribe(cb) : () => {}), [library]),
+    React.useCallback(() => (library && typeof library.getVersion === 'function' ? library.getVersion() : 0), [library])
+  );
   // Downloads to the phone (item 8): the store where downloads are possible (the Android app, or a browser: cf1), else null; and the signal.
   const offline = useOfflineAudio();
   const online = useOnline();
@@ -160,12 +169,10 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   // lists 66 books and Psalms alone would put 150 rows on the page uninvited.
   const [openChapters, setOpenChapters] = React.useState(/** @type {string | null} */ (null));
 
-  const { label, items, col, preface } = resolveSource(volKey);
+  const { label, items, col } = resolveSource(volKey);
   const playable = items.filter((item) => item && item.id && AudioPlayer.hasAudio(srcKey, item.id));
   const missing = items.length - playable.length;
   const sections = bible || study ? null : AudioPlayer.sectionsFor(volKey);
-  // What each compilation plays is what its Download saves (AudioPlayer.sectionTracks, item 8 follow-up).
-  const sectionOwn = sections && offline && typeof AudioPlayer.sectionTracks === 'function' ? AudioPlayer.sectionTracks(volKey, label) : [];
   // Per ROW, through the one rule every Listening Library surface uses: a
   // collection that declares a letter screen, or any Bible edition (whose
   // tracks open the book's chapter in the reader). The screen-level `!bible`
@@ -181,25 +188,23 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   const current = queue[state.qi] || null;
   const live = state.status === 'playing' || state.status === 'loading';
 
-  const nav = LibraryNav({ onBack, backLabel, showHome: false, onSearch, onHistory, onSettings, theme, onThemeChange });
+  const utility = { title: label || 'Recordings', onBack, backLabel };
 
   if (!label && !items.length) {
     return (
-      <ScreenLayout navChildren={nav}>
-        <div className="audio-library-screen">
-          <header className="audio-library-hero">
-            <div className="audio-library-eyebrow">Listening Library</div>
-            <h1>Recordings</h1>
-          </header>
-          <div className="audio-library-empty">This source has no recordings to show. Step back to the Listening Library to choose another.</div>
+      <ScreenLayout utility={utility}>
+        <div className="audio-library-screen listen-screen">
+          <EmptyState icon="music" title="No recordings to show" text="This source has no recordings. Step back to Listen to choose another."
+            action={{ label: 'Back to Listen', onClick: onBack }} />
         </div>
       </ScreenLayout>
     );
   }
 
+  // listen.html au-coll: "29 recordings · 2 h 5 min" (the hero's long sentence went with the hero).
   const countLine = bible
-    ? (playable.length === 1 ? 'One book' : 'All ' + playable.length + ' books')
-    : recordingsLine(col, items, playable, preface);
+    ? (playable.length === 1 ? 'One book' : playable.length + ' books')
+    : playable.length + (playable.length === 1 ? ' recording' : ' recordings');
 
   // The reading each row's own Play plays: what a download saves (AudioPlayer.playbackTracks, item 8).
   const ownTracks = (item) => (typeof AudioPlayer.playbackTracks === 'function'
@@ -217,7 +222,6 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
   const noneHere = !online && !bible && playable.length > 0
     && !(offline && playable.some((item) => ownTracks(item).some((t) => offline.isSaved(t.url))));
   const saveFirst = noneHere && !!offline && typeof window.__openDownloads === 'function';
-  const openChoose = () => window.__openDownloads({ tab: 'choose', focus: volKey }, label);
   // U04.1: the whole collection's length beside its count, once every reading's length is known.
   let totalSec = 0;
   if (online && !bible) {
@@ -232,244 +236,164 @@ export function AudioCollectionScreen({ volKey, onBack, backLabel = 'Listening L
     else AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label, startId: item.id });
   };
 
+  // The collection's one Download (au-dlcoll): each row's reading in the voice the sheet picks, '' = the one Listen plays.
+  const unitsFor = (/** @type {string} */ voice) => playable.map((item) => {
+    const own = ownTracks(item);
+    const pick = voice ? AudioPlayer.renditionsFor(srcKey, item, label).find((/** @type {any} */ r) => r.reader === voice) : null;
+    return { name: item.title || label, tracks: pick ? pick.tracks : own };
+  });
+  const readers = [...new Set(playable.flatMap((item) => AudioPlayer.renditionsFor(srcKey, item, label).map((/** @type {any} */ r) => r.reader)).filter(Boolean))];
+  const openDownloads = (/** @type {'choose' | 'phone'} */ tab) => {
+    if (typeof window.__openDownloads === 'function') window.__openDownloads({ tab, focus: volKey }, label);
+  };
+  const noun = bible ? 'book' : itemNoun(col, 1);
+  const Noun = noun.charAt(0).toUpperCase() + noun.slice(1);
+  /** @type {Record<string, { title: string, sub: string, actions: any[] }>} */
+  const sheets = {};
+
   return (
-    <ScreenLayout navChildren={nav}>
-      <div className="audio-library-screen">
+    <ScreenLayout utility={utility}>
+      <div className="audio-library-screen listen-screen listen-coll">
         {offline ? <OfflineNote text={'You’re offline. Showing what’s on this phone.'} /> : null}
-        <header className="audio-library-hero">
-          <div className="audio-library-eyebrow">Listening Library</div>
-          <h1>{label}</h1>
-          <p className="audio-library-intro">{heroLine}</p>
-          {/* "12 of 30 on this phone" (pictures 10, 14, 17). A Bible edition's books say it on their own rows. */}
-          {offline && !bible && playable.length ? <OfflineCollectionMark units={playable.map(ownTracks)} /> : null}
-          {textOnly.length ? (
-            <p className="audio-collection-text-only">
-              {textOnly.length > 3 ? textOnly.length + ' ' + itemNoun(col, textOnly.length) + ' are text only' : (
-                <>
-                  {'Text only: '}
-                  {textOnly.map((item, i) => (
-                    <React.Fragment key={item.id}>
-                      {i ? ', ' : null}
-                      {canOpenText
-                        ? <button type="button" className="audio-collection-text-only-link" onClick={() => onOpenText({ key: srcKey + ':' + item.id })}>{item.title}</button>
-                        : item.title}
-                    </React.Fragment>
-                  ))}
-                </>
-              )}
-            </p>
-          ) : null}
-          {playable.length ? (
-            <div className="audio-library-hero-actions">
-              {saveFirst ? (
-                <button type="button" className="audio-library-primary-action" onClick={openChoose}>
-                  <span>Save recordings to play offline</span>
-                </button>
-              ) : (
-                <button type="button" className="audio-library-primary-action" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>
-                  <PlayIcon /><span>{playAllLabel}</span>
-                </button>
-              )}
-              {/* A collection at once; a Bible edition a book at a time from its rows until the Downloads picker (downloads
-                  brief D3) offers the whole edition, which Corbin allowed 2026-10-23 (it was an agent design, not his). */}
-              {offline && !bible ? <OfflineCollectionAction units={playable.map(ownTracks)} label={label} note={false} /> : null}
-              {/* The Downloads tree opened at this collection or edition (downloads brief 3a, picture 14). */}
-              {offline && !saveFirst && typeof window.__openDownloads === 'function' ? (
-                <button type="button" className="audio-collection-choose" onClick={openChoose}>Choose…</button>
-              ) : null}
-            </div>
-          ) : null}
-        </header>
+        <p className="listen-sum">{heroLine}</p>
+        {offline && !bible && playable.length ? <OfflineCollectionMark units={playable.map(ownTracks)} /> : null}
+        {textOnly.length ? (
+          <p className="audio-collection-text-only">
+            {textOnly.length > 3 ? textOnly.length + ' ' + itemNoun(col, textOnly.length) + ' are text only' : (
+              <>
+                {'Text only: '}
+                {textOnly.map((item, i) => (
+                  <React.Fragment key={item.id}>
+                    {i ? ', ' : null}
+                    {canOpenText
+                      ? <button type="button" className="audio-collection-text-only-link" onClick={() => onOpenText({ key: srcKey + ':' + item.id })}>{item.title}</button>
+                      : item.title}
+                  </React.Fragment>
+                ))}
+              </>
+            )}
+          </p>
+        ) : null}
+        {playable.length ? (
+          <div className="ui-btn-row listen-coll-actions">
+            {saveFirst ? (
+              <UiButton kind="primary" icon="dl" onClick={() => openDownloads('choose')}>Save recordings to play offline</UiButton>
+            ) : (
+              <UiButton kind="primary" icon="play" onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label })}>{playAllLabel}</UiButton>
+            )}
+            {/* The one Download for the whole collection (Corbin 11-11): no single letter has one. A Bible edition
+                downloads from Downloads, by edition, testament or book. */}
+            {offline && !bible && !saveFirst ? <CollectionDownload label={label} unitsFor={unitsFor} readers={readers} onOpenDownloads={openDownloads} /> : null}
+          </div>
+        ) : null}
 
         {sections ? (
-          <section className="audio-library-section" aria-labelledby="audio-collection-sections">
-            <div className="audio-library-section-head"><div><span>In longer sittings</span><h2 id="audio-collection-sections">Compilations</h2></div></div>
-            <div className={'audio-collection-chips' + (offline ? ' has-offline' : '')}>
-              {sections.map((section, index) => {
-                const chip = (
-                  <button key={section[1] || index} type="button" onClick={() => AudioPlayer.playSection(volKey, index, label)}>
-                    <PlayIcon /><span>{section[0]}</span>
-                  </button>
-                );
-                if (!offline) return chip;
-                // In the phone app a compilation is a recording like any row (item 8 follow-up): the same line
-                // beside it, saved under a name that says which collection it is on the On this phone shelf.
-                const own = sectionOwn[index] ? [sectionOwn[index]] : [];
-                const unavailable = !online && !(own.length && offline.isSaved(own[0].url));
-                return (
-                  <div key={section[1] || index} className={'audio-collection-compilation' + (unavailable ? ' is-unavailable' : '')}>
-                    {chip}
-                    <OfflineRowStatus tracks={own} name={(label ? label + ' · ' : '') + section[0]} />
-                  </div>
-                );
-              })}
+          <section className="listen-coll-sections" aria-labelledby="audio-collection-sections">
+            <SectionLabel id="audio-collection-sections">In longer sittings</SectionLabel>
+            <div className="ui-chips">
+              {sections.map((section, index) => (
+                <button key={section[1] || index} type="button" className="ui-chip" onClick={() => AudioPlayer.playSection(volKey, index, label)}>
+                  <UiIcon name="play" size="sm" filled /><span>{section[0]}</span>
+                </button>
+              ))}
             </div>
           </section>
         ) : null}
 
-        <section className="audio-library-section" aria-labelledby="audio-collection-list">
-          <div className="audio-library-section-head">
-            <div><span>{bible ? 'Book by book' : 'In order'}</span><h2 id="audio-collection-list">Recordings</h2></div>
-            <strong><span aria-hidden="true">{playable.length}</span><span className="sr-only">{playable.length + ' recordings'}</span></strong>
-          </div>
-          {playable.length ? (
-            <div className="audio-library-list">
-              {playable.map((item) => {
-                const key = srcKey + ':' + item.id;
-                const renditions = AudioPlayer.renditionsFor(srcKey, item, label);
-                const primary = renditions[0] || null;
-                // The reading the row's own Play plays and its Download saves (the Letter Voice where that reader
-                // recorded it, ra5): the row names ITS reader, parts and time left, not the manifest primary's.
-                const plays = ownTracks(item);
-                const reading = (plays[0] && renditions.find((r) => r.tracks[0] && r.tracks[0].url === plays[0].url)) || primary;
-                const isCurrent = !!(current && current.key === key);
-                const rowPlaying = isCurrent && live;
-                const parts = reading ? reading.tracks.length : 0;
-                const reader = reading ? AudioPlayer.readerLabel(reading.reader) : null;
-                // A Bible book's "parts" ARE its chapters — every shipped
-                // edition is recorded one chapter at a time — and the row's own
-                // disclosure below already calls them that (B2, 2026-08-10).
-                // U04.1: the reading's length from the build's baked lengths, so it shows offline too.
-                const secs = reading ? tracksSeconds(reading.tracks) : 0;
-                const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader, secs ? formatClock(secs) : null].filter(Boolean).join(' · ');
-                // A Bible book whose read-along ships before every chapter is aligned says how far it goes (Corbin 10-23).
-                const partly = bible ? bibleBookPartialDetail(volKey, item.id) : null;
-                const remaining = reading ? renditionRemainingLabel(reading.tracks) : '';
-                const voicesOpen = openVoices === item.id;
-                const own = offline ? plays : [];
-                // No signal and not on the phone: the row cannot play (item 8).
-                const unavailable = !!offline && !online && !(own.length && own.every((t) => offline.isSaved(t.url)));
-                // A per-chapter Bible book is a list of recordings, not one:
-                // the row discloses them so a chapter can be started from the
-                // Listening Library instead of only from the reader.
-                const chapters = bible && parts > 1 ? primary.tracks : null;
-                const chaptersOpen = !!chapters && openChapters === item.id;
-                // Picture 14: the row's line ends with a tick once it is on the phone; a book part on it says how much.
-                const held = offline ? rowOnPhone(offline, own) : null;
-                const heldLine = held && held.state === 'part' ? held.saved + ' of ' + held.count + ' on this phone' : '';
-                // RC.5: the one playing from its buffer says so, not 'Not on this phone'.
-                const line = unavailable ? (rowPlaying ? 'Playing from the buffer' : 'Not on this phone') : [meta, heldLine].filter(Boolean).join(' · ');
-                const opensText = canOpenText && hasTextDestination({ key });
-                const openText = () => onOpenText(current && current.key === key ? current : { key });
-                // Play next / Add to queue (player brief 3c): every row that plays, downloads or not.
-                const menu = [
-                  ...(unavailable ? [] : queueMenuItems({ tracks: plays, name: item.title || label })),
-                  ...(offline ? [
-                    ...offlineMenuItems({ off: offline, online, tracks: own, name: item.title || label }),
-                    ...(typeof window.__openDownloads === 'function'
-                      ? [{ id: 'choose', text: 'Choose more…', icon: 'choose', onSelect: () => window.__openDownloads({ tab: 'choose', focus: volKey }, label) }] : []),
-                    ...(opensText ? [{ id: 'open', text: 'Open the ' + (bible ? 'book' : itemNoun(col, 1)), icon: 'open', onSelect: openText }] : []),
-                  ] : []),
-                ];
-                return (
-                  <article key={item.id} className={'audio-collection-item' + (isCurrent ? ' is-current' : '') + (unavailable ? ' is-unavailable' : '')}
-                    onContextMenu={menu.length ? openRowMenu : undefined}>
-                    <div className="audio-library-row">
-                      <button
-                        type="button"
-                        className={'audio-library-row-play' + (rowPlaying ? ' is-playing' : '')}
-                        onClick={() => playFrom(item)}
-                        aria-label={(rowPlaying ? 'Pause ' : 'Play ') + (item.title || 'this recording')}
-                        aria-pressed={rowPlaying}
-                      >
-                        {rowPlaying ? <PauseIcon /> : <PlayIcon />}
-                      </button>
-                      <div className="audio-library-row-copy">
-                        <strong>{!bible && item.num ? <span className="audio-collection-num">{item.num}</span> : null}{item.title}</strong>
-                        {line || (held && held.state === 'saved') ? (
-                          <small>{line}{!unavailable && held && held.state === 'saved' ? <>{line ? ' ' : null}<OnPhoneTick /></> : null}</small>
-                        ) : null}
-                        {partly ? <CoverageBadge state={COVERAGE_READ_ALONG} detail={partly} /> : null}
-                        {offline ? <OfflineRowStatus tracks={own} name={item.title} quiet /> : null}
-                      </div>
-                      <div className="audio-library-row-actions">
-                        {remaining ? <span className="audio-library-remaining">{remaining}</span> : null}
-                        {renditions.length > 1 ? (
-                          <button
-                            type="button"
-                            className={'audio-collection-voices' + (voicesOpen ? ' is-open' : '')}
-                            onClick={() => setOpenVoices(voicesOpen ? null : item.id)}
-                            aria-expanded={voicesOpen}
-                            aria-controls={'audio-voices-' + item.id}
-                            aria-label={renditions.length + ' voices for ' + (item.title || 'this recording')}
-                          >
-                            <span>{renditions.length} voices</span><ChevronIcon />
-                          </button>
-                        ) : null}
-                        {chapters ? (
-                          <button
-                            type="button"
-                            className={'audio-collection-voices' + (chaptersOpen ? ' is-open' : '')}
-                            onClick={() => setOpenChapters(chaptersOpen ? null : item.id)}
-                            aria-expanded={chaptersOpen}
-                            aria-controls={'audio-chapters-' + item.id}
-                            aria-label={chapters.length + ' chapters of ' + (item.title || 'this book')}
-                          >
-                            <span>{chapters.length} chapters</span><ChevronIcon />
-                          </button>
-                        ) : null}
-                        {opensText ? (
-                          // The reading under the clock when the player is inside THIS row: the
-                          // playing track carries the chapter ("Chapter N") and the part the opener
-                          // lands on. A bare key opened Nehemiah 1 under a Nehemiah 10 recording —
-                          // nothing lit, taps seeked nothing (myweb's walk, 2026-09-22).
-                          <button type="button" className="audio-library-icon-button" onClick={openText} aria-label={'Open text for ' + (item.title || 'this recording')} title="Open text"><TextIcon /></button>
-                        ) : null}
-                        {menu.length ? <RowMenu label={'More for ' + (item.title || 'this recording')} items={menu} /> : null}
-                      </div>
+        {playable.length ? (
+          <ListGroup className="listen-recs" ariaLabel={playable.length + ' recordings'}>
+            {playable.map((item) => {
+              const key = srcKey + ':' + item.id;
+              const renditions = AudioPlayer.renditionsFor(srcKey, item, label);
+              const primary = renditions[0] || null;
+              // The reading the row's own Play plays (the Letter Voice where that reader recorded it, ra5): the row
+              // names ITS reader and length, not the manifest primary's.
+              const plays = ownTracks(item);
+              const reading = (plays[0] && renditions.find((/** @type {any} */ r) => r.tracks[0] && r.tracks[0].url === plays[0].url)) || primary;
+              const isCurrent = !!(current && current.key === key);
+              const rowPlaying = isCurrent && live;
+              const parts = reading ? reading.tracks.length : 0;
+              const reader = reading ? AudioPlayer.readerLabel(reading.reader) : null;
+              // U04.1: the reading's length from the build's baked lengths, so it shows offline too.
+              const secs = reading ? tracksSeconds(reading.tracks) : 0;
+              // A Bible book's "parts" ARE its chapters; its length in hours and minutes, never "215:01" (X lengths).
+              const length = secs ? (bible ? queueTime(secs) : formatClock(secs)) : null;
+              const meta = [parts > 1 ? parts + (bible ? ' chapters' : ' parts') : null, reader, length].filter(Boolean).join(' · ');
+              // A Bible book whose read-along ships before every chapter is aligned says how far it goes (Corbin 10-23).
+              const partly = bible ? bibleBookPartialDetail(volKey, item.id) : null;
+              const remaining = reading ? renditionRemainingLabel(reading.tracks) : '';
+              const own = offline ? plays : [];
+              // No signal and not on the phone: the row cannot play (item 8).
+              const unavailable = !!offline && !online && !(own.length && own.every((/** @type {any} */ t) => offline.isSaved(t.url)));
+              const chapters = bible && parts > 1 ? primary.tracks : null;
+              const chaptersOpen = !!chapters && openChapters === item.id;
+              // State only (rule 12): a tick once it is on the phone; a book part on it says how much.
+              const held = offline ? rowOnPhone(offline, own) : null;
+              const heldLine = held && held.state === 'part' ? held.saved + ' of ' + held.count + ' on this phone' : '';
+              // RC.5: the one playing from its buffer says so, not 'Not on this phone'.
+              const line = unavailable ? (rowPlaying ? 'Playing from the buffer' : 'Not on this phone') : [meta, heldLine, remaining].filter(Boolean).join(' · ');
+              const opensText = canOpenText && hasTextDestination({ key });
+              const openText = () => onOpenText(current && current.key === key ? current : { key });
+              const starTrack = plays[0] || (primary && primary.tracks[0]) || null;
+              const starred = !!(library && starTrack && typeof library.isSaved === 'function' && library.isSaved(starTrack));
+              const name = item.title || label;
+              const toggleStar = () => { if (starTrack) toggleSavedRecording(library, starTrack); };
+              // The menu (au-rowmenu): Play next, Add to the end of Up next, Save, Open the letter; a letter read by
+              // more than one voice offers the others here, a Bible book its chapters. No download: Downloads has it.
+              const queued = unavailable ? [] : queueMenuItems({ tracks: plays, name });
+              sheets[item.id] = {
+                title: name,
+                sub: [label, !bible && item.num ? Noun + ' ' + item.num : null, reader, length].filter(Boolean).join(' · '),
+                actions: [
+                  ...queued.map((q) => ({ id: q.id, icon: q.id === 'next' ? 'next' : 'plus', label: q.id === 'queue' ? 'Add to the end of Up next' : q.text, onSelect: q.onSelect })),
+                  ...(starTrack ? [{ id: 'save', icon: 'star', label: starred ? 'Remove from Saved' : 'Save', onSelect: toggleStar }] : []),
+                  ...renditions.filter((/** @type {any} */ r) => r !== reading).map((/** @type {any} */ r) => ({
+                    id: 'voice-' + (r.reader || ''), icon: 'mic', label: 'Play in another voice: ' + (AudioPlayer.readerLabel(r.reader) || 'this reading'),
+                    onSelect: () => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label, startId: item.id, startReader: r.reader }),
+                  })),
+                  ...(chapters ? [{ id: 'chapters', icon: 'list', label: chaptersOpen ? 'Hide the chapters' : 'Show the ' + chapters.length + ' chapters',
+                    onSelect: () => setOpenChapters(chaptersOpen ? null : item.id) }] : []),
+                  ...(opensText ? [{ id: 'open', icon: 'book', label: 'Open the ' + noun, onSelect: openText }] : []),
+                ],
+              };
+              return (
+                <React.Fragment key={item.id}>
+                  <ListRow
+                    className={'listen-rec' + (unavailable ? ' is-unavailable' : '')}
+                    current={isCurrent}
+                    lead={<RowPlay label={(rowPlaying ? 'Pause ' : 'Play ') + (item.title || 'this recording')} playing={rowPlaying} onClick={() => playFrom(item)} />}
+                    title={<>{!bible && item.num ? <span className="listen-rec-num">{item.num}</span> : null}{item.title}</>}
+                    meta={<>{line}{partly ? <CoverageBadge state={COVERAGE_READ_ALONG} detail={partly} /> : null}</>}
+                    mark={!unavailable && held && held.state === 'saved' ? { tick: true, label: 'On this phone' } : null}
+                    star={starTrack ? { on: starred, label: starred ? 'Remove ' + name + ' from Saved' : 'Save ' + name, onClick: toggleStar } : null}
+                    menu={{ label: 'More for ' + name, onClick: () => setMenuFor(item.id) }}
+                  />
+                  {chaptersOpen ? (
+                    <div className="listen-chapters" id={'audio-chapters-' + item.id} role="group" aria-label={'Chapters of ' + name}>
+                      {chapters.map((/** @type {any} */ track, /** @type {number} */ index) => {
+                        const chapterNum = index + 1;
+                        const playingThis = !!(current && current.url === track.url);
+                        return (
+                          <ListRow key={track.url} one current={playingThis}
+                            lead={<RowPlay label={'Play ' + name + ' ' + chapterNum} onClick={() => AudioPlayer.playBibleBook({ volKey, bookId: item.id, label, chapterNum })} />}
+                            title={[track.partLabel || ('Chapter ' + chapterNum), chapterTitleOf(track)].filter(Boolean).join(' · ')}
+                            value={secondsOf(track.url) ? formatClock(secondsOf(track.url)) : ''} />
+                        );
+                      })}
                     </div>
-                    {voicesOpen ? (
-                      <div className="audio-collection-voice-list" id={'audio-voices-' + item.id}>
-                        {renditions.map((rendition) => {
-                          const name = AudioPlayer.readerLabel(rendition.reader) || 'This reading';
-                          const playingThis = !!(current && rendition.tracks.some((track) => track.url === current.url));
-                          return (
-                            <div key={rendition.reader || name} className={'audio-collection-voice' + (playingThis ? ' is-current' : '')}>
-                              <button
-                                type="button"
-                                className="audio-library-row-play"
-                                onClick={() => AudioPlayer.playCollection({ volKey: srcKey, items, collectionLabel: label, startId: item.id, startReader: rendition.reader })}
-                                aria-label={'Play ' + (item.title || 'this recording') + ' — ' + name}
-                              >
-                                <PlayIcon />
-                              </button>
-                              <span>{name}{rendition.tracks.length > 1 ? ' · ' + rendition.tracks.length + ' parts' : ''}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                    {chaptersOpen ? (
-                      <div className="audio-collection-voice-list" id={'audio-chapters-' + item.id}>
-                        {chapters.map((track, index) => {
-                          const chapterNum = index + 1;
-                          const playingThis = !!(current && current.url === track.url);
-                          return (
-                            <div key={track.url} className={'audio-collection-voice' + (playingThis ? ' is-current' : '')}>
-                              <button
-                                type="button"
-                                className="audio-library-row-play"
-                                onClick={() => AudioPlayer.playBibleBook({ volKey, bookId: item.id, label, chapterNum })}
-                                aria-label={'Play ' + (item.title || 'this book') + ' ' + chapterNum}
-                              >
-                                <PlayIcon />
-                              </button>
-                              <span>{[track.partLabel || ('Chapter ' + chapterNum), chapterTitleOf(track), secondsOf(track.url) ? formatClock(secondsOf(track.url)) : ''].filter(Boolean).join(' · ')}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="audio-library-empty">No recordings here yet. They arrive as each reading is finished.</div>
-          )}
-          {missing > 0 ? <p className="audio-collection-note">{missing} {itemNoun(col, missing)} {missing === 1 ? 'awaits' : 'await'} recording.</p> : null}
-        </section>
+                  ) : null}
+                </React.Fragment>
+              );
+            })}
+          </ListGroup>
+        ) : (
+          <EmptyState icon="music" title="No recordings here yet" text="They arrive as each reading is finished." />
+        )}
+        {missing > 0 ? <p className="listen-coll-note">{missing} {itemNoun(col, missing)} {missing === 1 ? 'awaits' : 'await'} recording.</p> : null}
       </div>
+      {menuFor && sheets[menuFor] ? (
+        <ActionSheet open onClose={() => setMenuFor(null)} title={sheets[menuFor].title} sub={sheets[menuFor].sub} actions={sheets[menuFor].actions} />
+      ) : null}
     </ScreenLayout>
   );
 }

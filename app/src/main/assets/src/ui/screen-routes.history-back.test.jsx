@@ -427,7 +427,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     const { routes: nextRoutes, props: nextProps } = makeRoutes({ navOrigin: { screen: 'audio-library', returnOrigin: hubOrigin } });
     const collection = nextRoutes['audio-library-collection']();
     expect(collection.props.onBack).toBe(nextProps.goNavOrigin);
-    expect(collection.props.backLabel).toBe('Listening Library');
+    expect(collection.props.backLabel).toBe('Back to Listen');
   });
 
   it('hub → The Volumes → collection is a four-deep chain that still unwinds level by level', () => {
@@ -441,7 +441,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
     const { routes: volRoutes, props: volProps } = makeRoutes({ navOrigin: volumesOrigin });
     const volumes = volRoutes['audio-library-volumes']();
     expect(volumes.props.onBack).toBe(volProps.goNavOrigin);
-    expect(volumes.props.backLabel).toBe('Listening Library');
+    expect(volumes.props.backLabel).toBe('Back to Listen');
     volumes.props.onOpenCollection('two');
     expect(volProps.setAudioColKey).toHaveBeenCalledWith('two');
     expect(volProps.setNavOrigin).toHaveBeenCalledWith({ screen: 'audio-library-volumes', returnOrigin: volumesOrigin });
@@ -449,7 +449,7 @@ describe('screen-routes — the Listening Library returns to its actual origin',
 
     // The collection's pill names the volumes list it came from.
     const { routes: colRoutes } = makeRoutes({ navOrigin: { screen: 'audio-library-volumes', returnOrigin: volumesOrigin } });
-    expect(colRoutes['audio-library-collection']().props.backLabel).toBe('The Volumes');
+    expect(colRoutes['audio-library-collection']().props.backLabel).toBe('Back to The Volumes of Truth');
   });
 
   it('hub → saved shelf takes the same chain, and its Text taps name their own screen', () => {
