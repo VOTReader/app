@@ -11,6 +11,7 @@ import { OfflineLibraryStatus } from '../components/OfflineLibraryBanner.jsx';
 import { OfflineEditionsRow } from '../components/OfflineEditionsRow.jsx';
 import { OfflineEditions, editionShownLabel } from '../../utils/offline-editions.js';
 import { openWhatsNew } from '../../utils/whats-new.js';
+import { useBuildInfo } from '../components/about-parts.jsx';
 import { OPEN_YOUR_DATA_EVENT, takeYourDataAsk } from '../../utils/your-data-link.js';
 import { AudioPlayer } from '../../utils/audio-player.js';
 import { UiIcon } from '../components/UiIcon.jsx';
@@ -825,7 +826,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
   // controlling service worker (the only artifact that knows CACHE_VERSION and is
   // not itself inside the hash it is derived from); `server` is a read-only probe
   // of the deployed service-worker.js that installs nothing.
-  const [buildInfo, setBuildInfo] = React.useState({ state: 'loading', running: null, server: null });
+  const [buildInfo, refreshBuildInfo] = useBuildInfo();
   // datasafe 10-05: the automatic snapshots' line in Your Data (DataSafety lives in bundle-b).
   const [safety, setSafety] = React.useState(/** @type {{ where: string | null, count: number, newestAt: number, tooBig?: number } | null} */ (null));
   // dl-weekly: the weekly copy in Downloads (phone app, Android 10+).
@@ -845,46 +846,7 @@ export function SettingsScreen({ settings, onToggle, onSetting, onBack, backLabe
     }
     return () => { alive = false; };
   }, []);
-  const refreshBuildInfo = React.useCallback(async () => {
-    setBuildInfo((b) => ({ ...b, state: 'loading' }));
-    // typeof guards: these three live in bundle-b and reach this screen (bundle-d)
-    // as ambient globals, so they are absent in any host that renders Settings
-    // without the stores bundle — the vitest harness does exactly that. An
-    // unguarded call throws inside a passive effect, which surfaces as an
-    // unhandled test error rather than a failure, i.e. noise that hides real ones.
-    const running = (typeof getBuildVersion === 'function') ? await getBuildVersion() : null;
-    if (!running) {
-      // No service worker to ask: the Android WebView (assets ship inside the APK)
-      // or a first visit before the SW has taken control. Those two are different
-      // questions and only one of them has an answer.
-      //
-      // ANDROID: the APK ships its own assets/service-worker.js (measured in the
-      // installed launch build: assets/service-worker.js, CACHE_VERSION
-      // v1.0.2-60a64a8486, CORPUS_VERSION c45), and MainActivity maps /assets/ to
-      // AssetsPathHandler with the page loaded from
-      // https://appassets.androidplatform.net/assets/index.html — so the relative
-      // './service-worker.js' that fetchServerBuildVersion already fetches resolves
-      // HERE to the installed build's own copy. Same function, same regex, no native
-      // code and no new bridge verb. Only the MEANING of the answer changes with the
-      // platform: on the web that file is what the SERVER has; on Android it is what
-      // the reader INSTALLED, which is why it lands in `running` and not in `server`.
-      //
-      // WEB: deliberately NOT given the same fallback. Off Android an uncontrolled
-      // page is a first visit, and the deployed service-worker.js would describe what
-      // the server publishes, not what this page is running — a version the reader
-      // could not act on and has no reason to trust.
-      const installed = (PlatformBridge.isAndroid && typeof fetchServerBuildVersion === 'function')
-        ? await fetchServerBuildVersion()
-        : null;
-      setBuildInfo(installed
-        ? { state: 'installed', running: installed, server: null }
-        : { state: 'no-sw', running: null, server: null });
-      return;
-    }
-    const server = (typeof fetchServerBuildVersion === 'function') ? await fetchServerBuildVersion() : null;
-    setBuildInfo({ state: 'ok', running, server });
-  }, []);
-  React.useEffect(() => { refreshBuildInfo(); }, [refreshBuildInfo]);
+  // WS3 settings: the build check moved to components/about-parts.jsx (useBuildInfo), shared with About.
 
   const versionDisplayText = (() => {
     const fmt = (typeof formatBuildVersion === 'function') ? formatBuildVersion : ((s) => String(s || 'unknown'));

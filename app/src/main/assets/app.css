@@ -6992,6 +6992,23 @@
     .ws3-prog .progress-row.is-sub { padding:var(--sp-1) var(--sp-3); border-bottom:0; }
     .ws3-clear-all { margin-top:var(--sp-4); }
     .ws3-foot { margin:var(--sp-3) 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); text-align:center; }
+    .ws3-about { padding:var(--sp-2) var(--gutter) var(--sp-8); }
+    .ws3-about-lead { margin:0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-sheet); font-style:italic; line-height:var(--lh-headline); }
+    .ws3-about-line { margin:var(--sp-3) 0 var(--sp-4); color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws3-link-row a.ui-row-main { color:inherit; text-decoration:none; }
+    .ui-row.ws3-version { gap:var(--sp-3); padding-right:var(--card-pad); }
+    .ws3-version .ui-row-text { flex:1; min-width:0; }
+    .ws3-about-build { margin:var(--sp-4) 0 0; color:var(--text-3); font-family:var(--font-ui); font-size:var(--ts-label); text-align:center; }
+    .ws3-credit { margin-bottom:var(--sp-2); }
+    .ws3-credit-title { margin:0; color:var(--text-1); font-family:var(--font-serif); font-size:var(--ts-body); line-height:var(--lh-headline); }
+    .ws3-credit-link { color:var(--accent); }
+    .ws3-credit-text { margin:var(--sp-2) 0 0; color:var(--text-2); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws3-check-row { display:flex; align-items:flex-start; gap:var(--sp-3); padding:var(--sp-3) var(--card-pad); border-bottom:1px solid var(--hairline); color:var(--text-1); font-family:var(--font-ui); font-size:var(--ts-meta); line-height:var(--lh-meta); }
+    .ws3-check-row:last-child { border-bottom:0; }
+    .ws3-check-row > svg { flex:none; margin-top:2px; color:var(--text-2); }
+    .ws3-new-head { padding-top:0; }
+    .ws3-new-empty { padding:0 var(--gutter) var(--sp-5); }
+    .ws3-about .ui-row-meta, .ws3-new-empty .ui-row-meta { white-space:normal; overflow:visible; }
     /* ── end WS3 settings ── */
     /* Edit-mode action row at the bottom of the body: Open Source + Delete.
        Buttons share the same chrome as the existing link-action-btn family

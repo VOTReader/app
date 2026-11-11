@@ -68,6 +68,7 @@ import { GARDEN_DEFAULT_TIER } from '../utils/garden.js';
 import { searchBackActive, isSearchLook, RESULTS_LABEL } from '../utils/search-visit.js';
 import { PANEL_MODES } from './scripture-web/use-web-selection.js';
 import { holyDaysLetter } from './components/pager-preview.jsx';
+import { openYourData } from '../utils/your-data-link.js';
 
 export function chapterIndexCurrentChapter(readKey, activeReadKey, lastReadChapters) {
   return activeReadKey === readKey ? (lastReadChapters[readKey] || null) : null;
@@ -1249,6 +1250,8 @@ export function buildScreenRoutes({
           setScreen(first.screen);
         }}
         onBack={() => { AboutSeenFlagStore.set(); goNavOrigin(); }}
+        firstRun={!navOrigin && !AboutSeenFlagStore.is()}
+        onYourData={() => { openYourData(); goSettings(); }}
         onSearch={goSearch}
         onHistory={goHistory}
         theme={theme} onThemeChange={setTheme}

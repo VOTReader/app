@@ -33,9 +33,112 @@ function useSongCatalog() {
   }, [cat]);
 }
 
-export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange }) {
+import { ListRow, SectionLabel, UiButton } from '../components/UiParts.jsx';
+import { UiIcon } from '../components/UiIcon.jsx';
+import { useBuildInfo, versionWords, LinkRow, tourMeta } from '../components/about-parts.jsx';
+import { openWhatsNew } from '../../utils/whats-new.js';
+
+const LIBRARY_POINTS = [
+  'Every volume and letter of The Volumes of Truth.',
+  'The entire Bible in eleven translations, including two custom Restored Name editions and the Spanish Reina-Valera 1960.',
+  'Every PDF, Bible study, and letter study.',
+  'The Letters and the Bible, read aloud.',
+];
+const TOOL_POINTS = [
+  'Highlight, underline, bookmark, and note, anywhere.',
+  'A private journal with photos and voice memos, kept on your device.',
+  'Full-text search across the entire library.',
+  'Reading plans: the Bible in a year, the letters, or any mix you build.',
+  'Reading works offline. Listening needs a connection unless you download it. Your notes never leave this device.',
+];
+
+/* WS3 settings (ab-about, ab-credits): About reached from Settings is a page of rows, with Credits and privacy and
+   What you can do as pages of their own. The first run keeps the two-page welcome below (fr-1, fr-2 are next). */
+function AboutHome({ onBack, onYourData }) {
+  const [page, setPage] = React.useState('about');
+  const [buildInfo, refresh] = useBuildInfo();
+  const v = versionWords(buildInfo);
+  const tour = typeof TourController !== 'undefined' ? TourController : null;
+  const title = page === 'credits' ? 'Credits and privacy' : page === 'features' ? 'What you can do' : 'About VOTReader';
+  const back = page === 'about' ? onBack : () => setPage('about');
+  const points = (list) => (
+    <div className="ui-group">{list.map((t) => <div key={t} className="ws3-check-row"><UiIcon name="check" size="sm" /><span>{t}</span></div>)}</div>
+  );
+  const makers = songMakers();
+  return (
+    <ScreenLayout utility={{ title, onBack: back, backLabel: page === 'about' ? 'Back' : 'Back to About VOTReader' }}>
+      <div className="ws3-about" key={page}>
+        {page === 'about' ? (
+          <>
+            <p className="ws3-about-lead">The Volumes of Truth are the Word of The Lord, given through His servant Timothy.</p>
+            <p className="ws3-about-line">This reader was made by a disciple for personal study; it is not the canonical source.</p>
+            <div className="ui-group">
+              <LinkRow href="https://www.thevolumesoftruth.com" icon="out" title="thevolumesoftruth.com" meta="The canonical text, audio, video and PDFs" />
+              {typeof onYourData === 'function' ? (
+                <ListRow icon="data" title="Your notes stay on this phone" meta="Notes, journal and highlights. Back them up in Your data." onClick={onYourData} />
+              ) : null}
+            </div>
+            <SectionLabel>This app</SectionLabel>
+            <div className="ui-group">
+              <div className="ui-row no-lead ws3-version">
+                <span className="ui-row-text">
+                  <span className="ui-row-title">{v.title}</span>
+                  <span className="ui-row-meta" role="status">{v.line}</span>
+                </span>
+                <UiButton small className="ws2-pill-btn" disabled={buildInfo.state === 'loading'} onClick={() => { void refresh(); }}>Check for updates</UiButton>
+              </div>
+              <ListRow noLead title="What’s new" onClick={() => { void openWhatsNew(); }} />
+              <ListRow noLead title="What you can do" onClick={() => setPage('features')} />
+              {tour ? <ListRow noLead title="Show me around" meta={tourMeta()} onClick={() => tour.start('settings')} /> : null}
+              <ListRow noLead title="Credits and privacy" onClick={() => setPage('credits')} />
+            </div>
+            {v.build ? <p className="ws3-about-build">{v.build}</p> : null}
+          </>
+        ) : page === 'credits' ? (
+          <>
+            {/* Privacy first (ab-credits); pp1: the public privacy policy (the page Google Play links to). */}
+            <SectionLabel>Privacy</SectionLabel>
+            <div className="ui-card ws3-credit">
+              <p className="ws3-credit-title">No accounts, and nothing you write leaves this device.</p>
+              <p className="ws3-credit-text">Listen streams each recording, and the Garden images load as you view them, unless you saved them to this phone.</p>
+              <p className="ws3-credit-text"><a className="ws3-credit-link" href="https://votreader.github.io/app/privacy.html" target="_blank" rel="noopener noreferrer">Privacy policy</a></p>
+            </div>
+            {/* CC-BY obligation for the Scripture Web's cross-reference dataset (AboutScreen.test.jsx pins the first-run copy). */}
+            <SectionLabel>Scripture cross-references</SectionLabel>
+            <div className="ui-card ws3-credit">
+              <p className="ws3-credit-title"><a className="ws3-credit-link" href="https://www.openbible.info/labs/cross-references/" target="_blank" rel="noopener noreferrer">OpenBible.info</a></p>
+              <p className="ws3-credit-text">Cross-reference data, used under CC-BY.</p>
+            </div>
+            {/* Songs of the Letters (L8): the consented credits the catalog publishes (never an email), most songs first. */}
+            <SectionLabel>Songs of the Letters</SectionLabel>
+            <div className="ui-card ws3-credit about-songs-credit">
+              <p className="ws3-credit-title">Sung by the flock</p>
+              <p className="ws3-credit-text">AI songs made by members of the flock with Suno (suno.com), from the words of The Volumes of Truth. Shared freely, never sold.</p>
+              {makers.length ? <p className="ws3-credit-text">With songs by {makers.join(', ')}, and others of the flock.</p> : null}
+            </div>
+            <SectionLabel>Bible editions</SectionLabel>
+            <div className="ui-card ws3-credit">
+              <p className="ws3-credit-title">The Restored Name editions</p>
+              <p className="ws3-credit-text">NKJV-R and KJV-R were prepared with AI assistance and machine-checked against the Greek.</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <SectionLabel>The library</SectionLabel>
+            {points(LIBRARY_POINTS)}
+            <SectionLabel>Your tools</SectionLabel>
+            {points(TOOL_POINTS)}
+          </>
+        )}
+      </div>
+    </ScreenLayout>
+  );
+}
+
+export function AboutScreen({ onContinue, onBack, onSearch, onHistory, theme, onThemeChange, firstRun = true, onYourData = null }) {
   const [page, setPage] = React.useState(1);
   useSongCatalog();
+  if (!firstRun) return <AboutHome onBack={onBack} onYourData={onYourData} />;
 
   const handleBack     = page === 2 ? () => setPage(1) : onBack;
   const handleContinue = page === 1 ? () => setPage(2) : onContinue;
