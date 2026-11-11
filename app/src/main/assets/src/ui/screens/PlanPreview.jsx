@@ -131,7 +131,7 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
       ) : null}
 
       <PlanSec title="Make it yours" />
-      <div className="plan-card plan-opts">
+      <div className="ui-card plan-opts">
         <PlanOptRow label="Start">
           <PlanChips label="Start" value={choice.start} options={startOpts} onChange={(v) => set({ start: v })} />
           {choice.start === 'pick' ? (
@@ -167,7 +167,7 @@ export function PlanPreview({ planId, opt, now, lettersReady, isRead, onStarted,
       </div>
 
       <div className="plan-start">
-        <button type="button" className="plan-btn plan-btn-wide" disabled={!draft} onClick={start}>Start plan</button>
+        <button type="button" className="ui-btn is-primary is-wide" disabled={!draft} onClick={start}>Start plan</button>
         {draft ? <p className="plan-start-note">{'Finishes ' + shortDate(draft.target) + ' · you can change any of this later'}</p> : null}
         <p className="plan-start-note" role="status">{status}</p>
       </div>

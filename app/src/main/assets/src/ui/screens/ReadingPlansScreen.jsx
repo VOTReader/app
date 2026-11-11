@@ -91,9 +91,9 @@ export function ReadingPlansScreen({ runs, finished, now, lettersReady, onOpenPl
           })}
         </ul>
       ) : (
-        <div className="plan-card plan-empty">
+        <div className="ui-card plan-empty">
           <p className="plan-empty-text">Pick a plan below and today’s reading shows here and on the Read tab.</p>
-          <button type="button" className="plan-btn" onClick={goFind}>Find a plan</button>
+          <button type="button" className="ui-btn is-primary" onClick={goFind}>Find a plan</button>
         </div>
       )}
 

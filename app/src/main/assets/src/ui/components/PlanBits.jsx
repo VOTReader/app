@@ -120,9 +120,9 @@ export function PlanSec({ title, link, onLink, id }) {
  */
 export function PlanChips({ label, options, value, onChange }) {
   return (
-    <div className="plan-chips" role="radiogroup" aria-label={label}>
+    <div className="ui-chips plan-chips" role="radiogroup" aria-label={label}>
       {options.map((o) => (
-        <button key={o.id} type="button" role="radio" aria-checked={o.id === value} className="plan-chip" onClick={() => onChange(o.id)}>{o.label}</button>
+        <button key={o.id} type="button" role="radio" aria-checked={o.id === value} className={'ui-chip' + (o.id === value ? ' is-on' : '')} onClick={() => onChange(o.id)}>{o.label}</button>
       ))}
     </div>
   );

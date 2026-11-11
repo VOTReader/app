@@ -3810,7 +3810,7 @@
     .ui-card .ui-seg, .ui-sheet .ui-seg { background: var(--surface-2); }
     .ui-seg-item { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; min-height: var(--seg-h); padding: 0 6px; border: 0; border-radius: 9px; background: none; color: var(--text-2); font-family: var(--font-ui); font-size: var(--ts-value); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }
     .ui-seg-item::after { content: ''; position: absolute; inset: -4px 0; }
-    .ui-seg-item[aria-checked="true"] { background: var(--surface-3); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--accent-ring); }
+    .ui-seg-item:is([aria-checked="true"], [aria-selected="true"]) { background: var(--surface-3); color: var(--text-1); box-shadow: inset 0 0 0 1px var(--accent-ring); }
     /* a tool that shows its value (rule 14): the icon, its name, what it is set to. Tiles in a row of up to four, or a chip. */
     .ui-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: var(--sp-2); }
     .ui-tool { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 64px; padding: 10px 2px 9px; border: 0; border-radius: var(--r-field); background: var(--surface-1); color: var(--text-1); font-family: var(--font-ui); text-align: center; cursor: pointer; }
@@ -3860,105 +3860,16 @@
     .today-btn { min-height:44px; padding:0 1.1rem; border:1px solid var(--gold-border); border-radius:6px; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
     .today-btn-wide { width:100%; margin-top:0.6rem; }
     @media (hover:hover) { .today-btn:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .today-progress-row { display:flex; align-items:center; gap:0.75rem; margin-top:0.7rem; }
     .today-progress { flex:1; height:3px; border-radius:2px; background:var(--gold-faint); overflow:hidden; }
     .today-progress > span { display:block; height:100%; background:var(--gold); opacity:0.75; }
     .today-percent { color:var(--cream-dim); font-size:var(--fs-13); font-style:italic; }
     .today-check { flex:none; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border:1.5px solid var(--gold); border-radius:50%; color:var(--bg, #000); }
     .today-check[data-done="1"] { background:var(--gold); }
-    /* rp1: the Plans screen (ReadingPlansScreen.jsx; mockup r2-plans.png) */
     .plans-screen { width:100%; max-width:36rem; margin:0 auto; padding:1.25rem 1rem 2rem; box-sizing:border-box; font-family:var(--font-body); color:var(--cream); }   /* 1.25rem top: the personal-study header's one inset */
     .plans-note { color:var(--cream-muted); font-size:var(--fs-14); font-style:italic; }
-    .plans-eyebrow { margin:0.5rem 0 0.6rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
-    .plans-plan { margin:0 0 0.9rem; padding:0.9rem 1rem 0.6rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); }
-    .plans-plan-title { margin:0; color:var(--gold); font-size:var(--fs-20); font-weight:400; }
-    .plans-plan-sub { margin:0.2rem 0 0.5rem; color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-plan .today-progress { display:block; }
-    .plans-month { margin-top:0.9rem; }
-    .plans-month-name { margin-bottom:0.4rem; color:var(--gold); text-align:center; font-size:var(--fs-18); }
-    .plans-grid { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.3rem 0.2rem; text-align:center; }
-    .plans-weekday { color:var(--cream-muted); font-size:var(--fs-12); }
-    .plans-day { display:flex; flex-direction:column; align-items:center; gap:0.15rem; min-height:44px; padding-top:0.2rem; border:1px solid transparent; border-radius:6px; font-size:var(--fs-15); }
-    .plans-day-mark { width:10px; height:10px; }
-    .plans-day[data-state="done"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
-    .plans-day[data-state="missed"] .plans-day-mark { border:1.5px solid var(--gold); border-radius:50%; box-sizing:border-box; }
-    .plans-day[data-state="today"] { border-color:var(--gold); }
-    .plans-day[data-state="ahead"], .plans-day[data-state="none"] { color:var(--cream-muted); }
-    .plans-catchup { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-detail-links { display:flex; flex-wrap:wrap; justify-content:center; gap:0 1.25rem; margin-top:0.6rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
-    /* rp-s1: the daily reminder's offer, its quiet ask, and its time in the details */
-    .plans-remind-ask { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-remind { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:0.4rem 1rem; margin-top:0.6rem; padding-top:0.5rem; border-top:1px solid var(--gold-border); }
-    .plans-remind-time { display:flex; flex-wrap:wrap; align-items:center; gap:0.3rem 0.6rem; color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-remind-time input { min-height:44px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:var(--cream); font:inherit; }
-    .plans-remind .plans-note { flex-basis:100%; margin:0; }
-    /* mw18 C3/C4/C6: behind, its two ways back, a new pace, marking a day (mockup r1-behind.png) */
-    .plans-behind { margin-top:0.8rem; padding-top:0.7rem; border-top:1px solid var(--gold-border); }
-    /* mw18 S6: this week's recordings, saved to the phone from Plan details */
-    .plans-audio { margin-top:0.75rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
-    .plans-behind-title { margin:0; color:var(--cream); font-size:var(--fs-20); font-weight:400; }
-    .plans-option { display:flex; flex-direction:column; gap:0.2rem; width:100%; min-height:56px; margin-top:0.6rem; padding:0.65rem 0.9rem; border:1px solid var(--gold-border); border-radius:8px; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-    .plans-option-name { color:var(--gold); font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; }
-    .plans-option-sub { color:var(--cream-dim); font-size:var(--fs-15); }
-    @media (hover:hover) { .plans-option:hover { border-color:var(--gold); background:var(--gold-faint); } }
-    .plans-pace-pick { margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); }
-    .plans-pace-pick .plans-pick { padding:0 0 0.4rem; }
-    .plans-chip[aria-pressed="true"] { border-color:var(--gold); color:var(--gold); background:var(--gold-faint); }
-    .plans-by { display:flex; align-items:center; flex-wrap:wrap; gap:0.5rem; min-height:44px; color:var(--cream-dim); font-size:var(--fs-15); }
-    .plans-by input[type="date"] { min-height:40px; padding:0 0.5rem; border:1px solid var(--gold-border); border-radius:6px; background:var(--bg2); color:var(--cream); font:inherit; color-scheme:dark; }
-    body.light .plans-by input[type="date"] { color-scheme:light; }
-    .plans-by input[type="checkbox"] { width:20px; height:20px; accent-color:var(--gold); }
-    /* dl-d5: the plan week's switch keeps its words beside the box at any text size. */
-    .plans-audio-auto { flex-wrap:nowrap; margin-bottom:0.5rem; }
-    .plans-audio-auto input[type="checkbox"] { flex:none; }
-    .plans-audio-auto span { flex:1 1 auto; min-width:0; }
-    .plans-hold { -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
-    .plans-mark { display:block; margin:0 auto; font-size:var(--fs-13); }
-    /* mw18 landing 1: the Plans screen's Today block and Find a plan (mockup r2-plans-list.png) */
-    .plans-links { display:flex; flex-wrap:wrap; gap:0 1rem; margin-top:0.2rem; }
     .today-btn:disabled { opacity:0.5; cursor:default; }
-    .plans-plan .today-eyebrow { display:block; margin-bottom:0.25rem; }
-    .plans-done { display:flex; align-items:center; gap:0.65rem; }
-    .plans-actions { margin:0.6rem 0 0.2rem; }
-    .plans-actions .today-btn { flex:1; }
-    .plans-items { display:flex; flex-wrap:wrap; justify-content:center; gap:0.25rem 0.6rem; list-style:none; margin:0.75rem 0 0; padding:0.7rem 0 0; border-top:1px solid var(--gold-border); }
-    .plans-item { display:flex; flex-direction:column; align-items:center; gap:0.2rem; min-width:44px; min-height:44px; padding:0.2rem 0.3rem; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    .plans-item-label { max-width:7rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .plans-items-count { margin:0.1rem 0 0; color:var(--cream-dim); font-size:var(--fs-14); text-align:center; }
-    .plans-week { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.2rem; margin-top:0.7rem; padding-top:0.6rem; border-top:1px solid var(--gold-border); text-align:center; }
-    .plans-week .plans-day { min-height:40px; }
-    .plans-day[data-read="1"] .plans-day-mark { border-radius:50%; background:var(--gold); opacity:0.8; }
-    .plans-day[data-state="ahead"] .plans-day-mark { border:1px solid var(--gold-border); border-radius:50%; box-sizing:border-box; }
-    .plans-foot { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0 0.75rem; margin-top:0.5rem; padding-top:0.3rem; border-top:1px solid var(--gold-border); }
-    .plans-counts { color:var(--cream-dim); font-size:var(--fs-14); }
-    .plans-foot .today-link { color:var(--gold); }
-    .plans-details { margin-top:0.25rem; }
-    .plans-legend { margin:0.5rem 0 0; color:var(--cream-muted); font-size:var(--fs-13); text-align:center; }
-    .plans-key { display:inline-block; width:9px; height:9px; margin:0 0.3rem 0 0.6rem; border-radius:50%; vertical-align:middle; box-sizing:border-box; }
-    .plans-key[data-state="done"] { background:var(--gold); opacity:0.8; }
-    .plans-key[data-state="missed"] { border:1.5px solid var(--gold); }
-    .plans-group { margin:0 0 0.9rem; }
-    .plans-group-title { display:flex; align-items:center; gap:0.6rem; margin:0.4rem 0 0.2rem; color:var(--gold); font-size:var(--fs-12); font-weight:400; letter-spacing:0.16em; text-transform:uppercase; }
-    .plans-group-title::after { content:""; flex:1; height:1px; background:var(--gold-border); }
-    .plans-list { list-style:none; margin:0; padding:0; }
-    .plans-list > li + li { border-top:1px solid var(--gold-border); }
-    .plans-row { display:flex; align-items:center; gap:0.85rem; width:100%; min-height:56px; padding:0.5rem 0.2rem; border:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; }
-    .plans-row:disabled { cursor:default; }
-    .plans-row-icon { flex:none; color:var(--gold); opacity:0.85; }
-    .plans-row-text { display:flex; flex-direction:column; flex:1; min-width:0; }
-    .plans-row-name { color:var(--cream); font-size:var(--fs-18); }
-    .plans-row-sub { color:var(--cream-dim); font-size:var(--fs-14); }
-    .plans-row:disabled .plans-row-sub { color:var(--gold); font-style:italic; }
-    .plans-row-chev { flex:none; color:var(--gold); }
-    .plans-row:disabled .plans-row-chev { visibility:hidden; }
-    @media (hover:hover) { .plans-row:not(:disabled):hover { background:var(--gold-faint); } .plans-item:hover { color:var(--cream); } }
-    .plans-pick { display:flex; flex-wrap:wrap; gap:0.4rem; padding:0 0 0.7rem 2.6rem; }
-    .plans-chip { min-height:44px; padding:0 0.8rem; border:1px solid var(--gold-border); border-radius:999px; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-14); cursor:pointer; }
-    /* n354b: Start where I am names a letter, which can run to two lines */
-    .plans-chip-resume { padding:0.45rem 0.9rem; border-radius:1.1rem; text-align:left; line-height:1.3; color:var(--gold); }
     .plans-note:empty { display:none; }
     /* mw18: Build your own plan (PlanBuilder.jsx; mockups r1-build-pick.png, r1-build-goal.png) */
-    .plans-build-row { margin-top:0.2rem; border-top:1px solid var(--gold-border); }
     .plans-build .study-head .today-eyebrow { display:block; margin-bottom:0.3rem; }
     .build-tabs { display:grid; grid-template-columns:1fr 1fr; margin:0.4rem 0 0.75rem; border:1px solid var(--gold-border); border-radius:8px; overflow:hidden; }
     .build-tabs button { min-height:44px; border:0; background:transparent; color:var(--cream-dim); font:inherit; font-size:var(--fs-13); letter-spacing:0.14em; text-transform:uppercase; cursor:pointer; }
@@ -4009,40 +3920,21 @@
     .build-each p { margin:0.1rem 0; }
     .build-each .today-btn-wide { margin-top:0.8rem; }
     .build-each .build-resume { display:block; width:100%; margin-top:0.3rem; text-align:center; }
-    /* mw18 C9/C11: the month pages and its days open their reading; finished plans (mockup r1-complete.png) */
-    .plans-month-head { display:flex; align-items:center; justify-content:center; gap:0.5rem; margin-bottom:0.4rem; }
-    .plans-month-head .plans-month-name { margin:0; min-width:9rem; }
-    .plans-month-step { width:44px; min-height:44px; border:0; background:transparent; color:var(--gold); font:inherit; font-size:var(--fs-24); line-height:1; cursor:pointer; }
-    button.plans-day { width:100%; margin:0; background:transparent; color:inherit; font:inherit; font-size:var(--fs-15); cursor:pointer; }
-    @media (hover:hover) { button.plans-day:hover { border-color:var(--gold-border); } }
-    .plans-complete { text-align:center; }
-    .plans-complete-check { display:inline-flex; align-items:center; justify-content:center; width:56px; height:56px; margin:0.2rem 0 0.4rem; border:1.5px solid var(--gold); border-radius:50%; color:var(--gold); }
-    .plans-complete-title { margin:0; color:var(--cream); font-size:var(--fs-24); font-weight:400; }
-    .plans-complete-title span { display:block; color:var(--gold); }
-    .plans-complete .plans-actions { justify-content:center; }
-    .plans-finished { margin-bottom:1rem; }
-    .plans-note-link { display:block; margin:0.15rem auto 0; font-size:var(--fs-13); }
-    .plans-weeks { margin:0.35rem 0 0; color:var(--gold); font-size:var(--fs-14); text-align:center; }
-    .plans-finished-row { display:flex; align-items:center; justify-content:space-between; gap:0.75rem; min-height:56px; padding:0.35rem 0.2rem; }
     /* mw18 S8: the plan line at the end of a chapter or letter (PlanRibbon.jsx) */
-    .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-body); font-size:var(--fs-14); box-sizing:border-box; }
+    .plan-ribbon { display:flex; align-items:center; flex-wrap:wrap; gap:0.2rem 0.75rem; max-width:36rem; margin:1.25rem auto 0.5rem; padding:0.35rem 0.4rem 0.35rem 0.9rem; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg2); color:var(--cream-dim); font-family:var(--font-ui); font-size:var(--fs-14); box-sizing:border-box; }
     .plan-ribbon-text { flex:1 1 auto; }
     .plan-ribbon-next { min-height:44px; padding:0 0.4rem; border:0; background:transparent; color:var(--gold); font:inherit; cursor:pointer; text-align:left; }
-    .plan-ribbon-hide { width:44px; min-height:44px; margin-left:auto; border:0; background:transparent; color:var(--cream-muted); font:inherit; font-size:var(--fs-18); cursor:pointer; }
     /* ══ READING PLANS (plans2, branch ui-plans, 2026-11-11) ═════════════════════════════════════════════════════════
        The plans screens only: PlansHub.jsx and its views (list, preview, plan page, schedule, finished, builder), the
        plan sheets (PlanBits.jsx PlanSheet, on the shared select-sheet grammar), the reader's session strip, end panel
        and Day done (PlanRibbon.jsx), and the Read tab up-next row's open-the-plan button. Rows reuse the roots' shared
-       .root-list / .root-row; nothing here restyles a shared class. Controls use --font-ui when the token exists (the
-       foundation branch), else the body face. ── */
-    .plans-hub { --pl-ui: var(--font-ui, var(--font-body)); --pl-card: var(--bg3); padding-bottom: 32px; }
-    body.light .plans-hub, body.light .plan-sheet, body.light .plan-daydone, body.light .plan-strip, body.light .plan-end { --pl-card: var(--bg2); }
-    .plan-sheet, .plan-daydone, .plan-strip, .plan-end { --pl-ui: var(--font-ui, var(--font-body)); --pl-card: var(--bg3); }
+       .root-list / .root-row; nothing here restyles a shared class. Controls use the foundation's --font-ui, cards its
+       --surface-1 (light twin through the tokens). ── */
+    .plans-hub { padding-bottom: 32px; }
+    .plans-hub, .plan-sheet, .plan-daydone, .plan-strip, .plan-end { --pl-ui: var(--font-ui); }
     .plan-bar-title { flex: 1; }
     .top-nav .plan-gear { display: flex; }
-    .plan-card { border: 1px solid var(--gold-border); border-radius: 14px; background: var(--pl-card); padding: 16px; box-sizing: border-box; }
-    .plan-list > li, .plan-items > li, .plan-road > li, .plan-choices > li { list-style: none; }
-    .plan-list, .plan-items, .plan-road, .plan-days-list, .plan-sched, .plan-choices { margin: 0; padding: 0; }
+    .plan-list, .plan-items, .plan-road, .plan-days-list, .plan-sched, .plan-choices { margin: 0; padding: 0; list-style: none; }
     .plan-list > li + li .root-row, .plan-road > li + li .root-row, .plan-choices > li + li .root-row { border-top: 1px solid var(--border); }
     .plan-chev { flex: none; margin: 0 6px 0 2px; color: var(--gold-dim); }
     .plan-sec { display: flex; align-items: baseline; gap: 8px; }
@@ -4071,35 +3963,26 @@
     .plan-ring-big b { font-size: var(--fs-20); font-weight: 400; }
     .plan-tick { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border: 1.5px solid var(--gold-dim); border-radius: 50%; box-sizing: border-box; color: var(--bg); }
     .plan-tick[data-done="1"] { border-color: var(--gold); background: var(--gold); }
-    /* Buttons: primary gold pill, quiet surface pill, and words. */
-    .plan-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 22px; border: 1px solid var(--gold); border-radius: 999px; background: var(--gold); color: var(--bg); font-family: var(--pl-ui); font-size: var(--fs-15); font-weight: 600; cursor: pointer; box-sizing: border-box; }
-    .plan-btn:disabled { opacity: 0.5; cursor: default; }
-    .plan-btn-quiet { border-color: var(--gold-border); background: transparent; color: var(--gold); }
-    .plan-btn-wide { width: 100%; }
+    /* Buttons are the shared .ui-btn (primary, plain, is-wide); here only the worded ones. */
     .plan-text-btn { min-height: 44px; padding: 0 6px; border: 0; background: transparent; color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-15); cursor: pointer; }
     .plan-text-btn:disabled { opacity: 0.5; cursor: default; }
     .plan-link { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--gold-border); }
-    .plan-danger { color: var(--danger); }
-    body.light .plan-danger { color: #a3271c; }
+    .plan-danger { color: var(--tone-danger); }
     .plan-links { display: flex; flex-wrap: wrap; gap: 0 14px; margin-top: 6px; }
     .plan-links-center { justify-content: center; }
-    @media (hover:hover) { .plan-btn:hover { background: var(--gold-bright); } .plan-btn-quiet:hover { background: var(--gold-faint); } .plan-text-btn:hover { color: var(--gold-bright); } }
-    .plan-btn:focus-visible, .plan-text-btn:focus-visible, .plan-chip:focus-visible, .plan-day-toggle:focus-visible, .plan-switch:focus-visible, .plan-day-btn:focus-visible, .plan-item-row:focus-visible, .plan-seg-item:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+    @media (hover:hover) { .plan-text-btn:hover { color: var(--gold-bright); } }
+    .plan-text-btn:focus-visible, .plan-day-toggle:focus-visible, .plan-switch:focus-visible, .plan-day-btn:focus-visible, .plan-item-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
     /* Preview: the group, the name, two sentences, three facts. */
     .plan-eyebrow { margin: 4px 2px 6px; }
     .plan-hero-name { margin: 0 2px; color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-30); font-weight: 400; line-height: 1.15; letter-spacing: 0.03em; }
     .plan-about { margin: 10px 2px 18px; color: var(--cream); font-size: var(--fs-18); line-height: 1.45; }
     .plan-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 10px; margin: 0 0 6px; }
-    .plan-fact { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 6px; border: 1px solid var(--gold-border); border-radius: 14px; background: var(--pl-card); }
+    .plan-fact { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 6px; border: 1px solid var(--gold-border); border-radius: 14px; background: var(--surface-1); }
     .plan-fact b { color: var(--gold); font-family: var(--font-cinzel); font-size: var(--fs-20); font-weight: 400; }
     .plan-fact span { color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-13); text-align: center; }
     .plan-loading { color: var(--cream-muted); font-family: var(--pl-ui); font-size: var(--fs-14); }
-    .plan-chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .plan-preview > .plan-chips { margin: 0 0 14px; }
-    .plan-chip { min-height: 38px; padding: 0 12px; border: 1px solid var(--gold-border); border-radius: 999px; background: transparent; color: var(--cream); font-family: var(--pl-ui); font-size: var(--fs-14); cursor: pointer; }
-    .plan-chip[aria-checked="true"] { border-color: var(--gold); background: var(--gold); color: var(--bg); }
     /* Days lists (first week, coming up, the schedule): Day N over the date, the portion, minutes. */
-    .plan-days-list, .plan-sched { list-style: none; }
     .plan-day-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 64px; margin: 0; padding: 10px 14px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; box-sizing: border-box; }
     .plan-days-list > li + li .plan-day-row, .plan-days-list > li + li.plan-day-row, .plan-sched > li + li > .plan-day-row { border-top: 1px solid var(--border); }
     .plan-day-btn { cursor: pointer; }
@@ -4151,7 +4034,7 @@
     .plan-today-title { margin: 0; color: var(--cream); font-size: var(--fs-20); line-height: 1.3; }
     .plan-today-sub { margin: 4px 0 12px; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); line-height: 1.45; }
     .plan-today-done .plan-today-head .plan-today-title { flex: 1; }
-    .plan-items { list-style: none; margin: 0 0 12px; }
+    .plan-items { margin: 0 0 12px; }
     .plan-item-row { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 52px; margin: 0; padding: 4px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; }
     .plan-items .root-row.plan-item-row { padding: 6px 12px; }
     .plan-item-name { flex: 1; min-width: 0; color: var(--cream); font-size: var(--fs-20); }
@@ -4159,7 +4042,7 @@
     .plan-sheet .plan-items > li + li .root-row { border-top: 1px solid var(--border); }
     .plan-item-meta { flex: none; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
     .plan-actions { display: flex; flex-wrap: wrap; gap: 10px; }
-    .plan-actions > .plan-btn { flex: 1 1 auto; }
+    .plan-actions > .ui-btn { flex: 1 1 auto; }
     .plan-actions > .today-btn { flex: 1 1 auto; min-height: 48px; border-radius: 999px; font-family: var(--pl-ui); font-size: var(--fs-15); letter-spacing: 0.02em; text-transform: none; }
     .plan-week { margin-top: 14px; padding: 14px 10px; }
     .plan-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); justify-items: center; gap: 4px; }
@@ -4178,9 +4061,7 @@
     .plan-road-meta { flex: none; min-width: 5.2rem; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); text-align: right; }
     .plan-page .root-section { margin-top: 26px; }
     /* Schedule: the two tabs as one segmented control, the month history. */
-    .plan-seg { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; margin: 0 0 14px; padding: 3px; border: 1px solid var(--gold-border); border-radius: 12px; background: var(--pl-card); }
-    .plan-seg-item { min-height: 40px; border: 0; border-radius: 9px; background: transparent; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); cursor: pointer; }
-    .plan-seg-item[aria-selected="true"] { background: var(--gold-faint); color: var(--gold); box-shadow: inset 0 0 0 1px var(--gold-border); }
+    .plan-seg { margin: 0 0 14px; }
     .plan-cal { margin-bottom: 14px; padding: 12px; }
     .plan-cal-name { margin: 0 0 8px; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); text-align: center; }
     .plan-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; justify-items: center; }
@@ -4190,10 +4071,10 @@
     .plan-cal-day[data-today="1"] { box-shadow: inset 0 0 0 1.5px var(--gold); }
     /* The plan sheets: the shared select-sheet with a left title and worded actions at the foot. */
     .plan-sheet { max-height: 82vh; padding-bottom: calc(var(--inset-bottom, 0px) + 1rem); color: var(--cream); font-family: var(--font-body); }
-    .plan-sheet-title { margin: 0 0 4px; color: var(--cream); font-family: var(--font-body); font-size: var(--fs-20); font-weight: 600; }
+    .plan-sheet-title { margin: 0 0 4px; color: var(--cream); font-size: var(--fs-20); font-weight: 600; }
     .plan-sheet-sub { margin: 0 0 12px; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
     .plan-sheet-body .plan-opts { margin: 0 -14px; }
-    .plan-sheet-body .plan-btn-wide { margin-top: 14px; }
+    .plan-sheet-body .ui-btn.is-wide { margin-top: 14px; }
     .plan-sheet-body .root-list { margin-bottom: 4px; }
     .plan-sheet-actions { display: flex; align-items: center; gap: 12px; margin-top: 14px; }
     .plan-sheet-actions .plan-danger { margin-left: auto; }
@@ -4209,7 +4090,7 @@
     .plan-daydone-mark { margin: 12px 0 0; color: var(--gold); font-family: var(--pl-ui); font-size: var(--fs-14); letter-spacing: 0.04em; }
     .plan-daydone-next { margin: 16px 0 20px; text-align: left; }
     .plan-daydone-next .root-eyebrow { margin: 0 0 4px; }
-    .plan-daydone .plan-btn-wide, .plan-finished .plan-btn-wide { margin-top: 12px; }
+    .plan-daydone .ui-btn.is-wide, .plan-finished .ui-btn.is-wide { margin-top: 12px; }
     .plan-finished { text-align: center; padding-top: 28px; }
     .plan-finished .plan-daydone-tick { display: flex; }
     .plan-finished .plan-facts { margin-bottom: 18px; }
@@ -4225,8 +4106,6 @@
     .plan-end { max-width: 34rem; margin: 18px auto 8px; text-align: center; font-family: var(--font-body); }
     .plan-end-read { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 0 0 14px; color: var(--cream); font-size: var(--fs-18); }
     .plan-end-note { margin: 10px 0 0; color: var(--cream-dim); font-family: var(--pl-ui); font-size: var(--fs-14); }
-    .plan-ribbon { font-family: var(--font-ui, var(--font-body)); font-size: var(--fs-14); }
-    .plan-ribbon .plan-ribbon-next { min-height: 44px; }
     /* The Read tab's plan row: its text opens the plan's page. */
     .upnext-open { min-height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
     .upnext-open .upnext-sub { min-height: 0; margin: 0; font-style: normal; }
@@ -4470,7 +4349,6 @@
     .settings-seg { display:flex; gap:3px; margin:0 0.95rem 0.2rem; padding:3px; border:1px solid var(--gold-border); border-radius:10px; background:var(--bg); }
     .settings-seg > button { flex:1; min-height:44px; border:0; border-radius:8px; background:transparent; color:var(--cream); font-family:var(--font-body); font-size:var(--fs-15); cursor:pointer; }
     .settings-seg > button[aria-checked="true"] { background:var(--gold); color:var(--bg); }
-    .settings-seg-desc { padding-top:0.55rem; }
     .vot-large-text .settings-seg { margin-left:12px; margin-right:12px; }
     /* max-width + shrinkable label: 300%-cap spill fix (chip must never run
        off-screen; the mini toggle stays, the label wraps). */
@@ -5125,8 +5003,6 @@
     .part-chevron.is-open { transform:rotate(90deg); }
     /* Expanded chapter list: flush-indented, no decorative vertical rule. */
     .part-chapters { padding:0.5rem 0 0.2rem 0; margin:0.35rem 0 0.15rem 0; display:flex; flex-direction:column; gap:0.5rem; }
-    .study-external-card { border-style:dashed; border-color:var(--gold-border); text-decoration:none; }
-    .study-external-card .chapter-card-num { font-size:var(--fs-20); color:var(--gold-dim); }
     /* Resume-reading dot — lives IN the top nav (right cluster, left of the
        Tabs button), rendered by ScreenLayout via ResumeReadingNavBtn. It was
        a position:fixed float over the top-right of index screens; in the nav
@@ -9796,7 +9672,6 @@
       border: 2px solid currentColor;
     }
     .sw-key-pin.is-dot { border: 0; background: currentColor; }
-    .sw-key-pin.is-ring-dot { background: radial-gradient(circle, currentColor 0 1.5px, transparent 2px); }
     /* My Web's context ink: cream at the law's depth alpha, so the key matches the thread. */
     .sw-key-gradient {
       width: 120px; height: 4px; border-radius: 2px; display: inline-block; margin: 0 4px;
@@ -10051,7 +9926,6 @@
     }
     .sw-root.sw-rotated .sw-btn { padding-left: 10px; padding-right: 10px; }
     .sw-root.sw-rotated .sw-seg-btn { padding-left: 10px; padding-right: 10px; }
-    .sw-root.sw-rotated .sw-select-face { padding-left: 10px; padding-right: 8px; }
     /* The rotated root is `width: 100vh; height: 100vw` (the CSS rotation
        swaps the axes). The docked panel needs no rotated cap: it is top: 0 /
        bottom: 0 of that root, its own height whatever the physical viewport

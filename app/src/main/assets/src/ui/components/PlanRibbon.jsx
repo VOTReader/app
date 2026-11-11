@@ -103,13 +103,13 @@ export function DayDone({ runId, day, name, onClose }) {
         {finishedSecs.map((s) => <p key={s.key} className="plan-daydone-mark">{'◆ ' + s.name + ' finished · ' + s.count + (s.key.startsWith('b:') ? ' chapters' : ' readings')}</p>)}
         {quarter ? <p className="plan-daydone-mark">{'◆ ' + quarter}</p> : null}
         {next.length ? (
-          <div className="plan-card plan-daydone-next">
+          <div className="ui-card plan-daydone-next">
             <p className="root-eyebrow">Tomorrow</p>
             <p className="plan-today-title">{itemsLabel(next, bookTitle)}</p>
             <p className="plan-today-sub">{'about ' + minutesFor(itemsWords(next)) + ' min'}</p>
           </div>
         ) : st.finished ? <p className="plan-daydone-sub">{'That was the last day. You finished ' + name + '.'}</p> : null}
-        <button type="button" className="plan-btn plan-btn-wide" onClick={onDone}>Done</button>
+        <button type="button" className="ui-btn is-primary is-wide" onClick={onDone}>Done</button>
         <div className="plan-links plan-links-center">
           {host ? <button type="button" className="plan-text-btn plan-link" onClick={() => { onClose(false); host.openNote(runId, day); }}>Write a note</button> : null}
           {host && next.length ? (
@@ -148,14 +148,14 @@ function SessionEnd({ k }) {
   // Back runs once the overlay has unmounted (its registry entry gone), else the Back would only close it again.
   const closeDone = (/** @type {boolean} */ back) => { setDone(null); endPlanSession(); if (back && host) setTimeout(() => host.back(), 0); };
   return (
-    <aside className="plan-card plan-end" ref={(el) => { ref.current = el; }} aria-label="Reading plan">
+    <aside className="ui-card plan-end" ref={(el) => { ref.current = el; }} aria-label="Reading plan">
       <p className="plan-end-read">{ticked ? <><PlanTick on />{' ' + itemName(run, k) + ' read'}</> : itemName(run, k)}</p>
       {nextK ? (
-        <button type="button" className="plan-btn plan-btn-wide" onClick={() => { if (!ticked) sessionReachedEnd(k, true); if (host) host.move(itemRef(nextK)); }}>
+        <button type="button" className="ui-btn is-primary is-wide" onClick={() => { if (!ticked) sessionReachedEnd(k, true); if (host) host.move(itemRef(nextK)); }}>
           {'Next · ' + itemName(run, nextK) + ' →'}
         </button>
       ) : (
-        <button type="button" className="plan-btn plan-btn-wide" onClick={() => { if (!ticked) sessionReachedEnd(k, true); finish(); }}>{'Finish day ' + (s.day + 1)}</button>
+        <button type="button" className="ui-btn is-primary is-wide" onClick={() => { if (!ticked) sessionReachedEnd(k, true); finish(); }}>{'Finish day ' + (s.day + 1)}</button>
       )}
       {lastOne ? <p className="plan-end-note">{'Last one for today · about ' + minutesFor(itemsWords(dayItems(run, s.day).filter((it) => it.k === nextK))) + ' min'}</p> : null}
       <div className="plan-links plan-links-center">

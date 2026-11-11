@@ -78,8 +78,8 @@ function PlanFinished({ run, onFind, onAgain, onDone }) {
         <div className="plan-fact"><b>{days.toLocaleString('en-US')}</b><span>{days === 1 ? 'day' : 'days'}</span></div>
         {parts.map((p) => { const [n, ...w] = p.split(' '); return <div key={p} className="plan-fact"><b>{n}</b><span>{w.join(' ')}</span></div>; })}
       </div>
-      <button type="button" className="plan-btn plan-btn-wide" onClick={onFind}>Find the next plan</button>
-      <button type="button" className="plan-btn plan-btn-quiet plan-btn-wide" onClick={onAgain}>Run it again</button>
+      <button type="button" className="ui-btn is-primary is-wide" onClick={onFind}>Find the next plan</button>
+      <button type="button" className="ui-btn is-wide" onClick={onAgain}>Run it again</button>
       <div className="plan-links plan-links-center"><button type="button" className="plan-text-btn plan-link" onClick={onDone}>Done</button></div>
     </div>
   );

@@ -64,7 +64,7 @@ export function DaySheet({ run, day, now, preview = false, onClose, onRead }) {
           </li>
         ))}
       </ul>
-      {canAct ? <button type="button" className="plan-btn plan-btn-wide" onClick={() => { onClose(); onRead(d.day); }}>Read this day</button> : null}
+      {canAct ? <button type="button" className="ui-btn is-primary is-wide" onClick={() => { onClose(); onRead(d.day); }}>Read this day</button> : null}
     </PlanSheet>
   );
 }
@@ -98,7 +98,7 @@ function MonthHistory({ doneOn, month, today }) {
     cells.push(<span key={n} className="plan-cal-day" data-done={doneOn.has(key) ? '1' : undefined} data-today={key === today ? '1' : undefined}>{n}</span>);
   }
   return (
-    <div className="plan-card plan-cal" role="img" aria-label={MONTHS[m] + ': ' + [...doneOn].filter((k) => k.startsWith(y + '-' + String(m + 1).padStart(2, '0'))).length + ' days read'}>
+    <div className="ui-card plan-cal" role="img" aria-label={MONTHS[m] + ': ' + [...doneOn].filter((k) => k.startsWith(y + '-' + String(m + 1).padStart(2, '0'))).length + ' days read'}>
       <p className="plan-cal-name">{MONTHS[m] + ' ' + y}</p>
       <div className="plan-cal-grid" aria-hidden="true">
         {WEEK_LETTERS.map((w, i) => <span key={'w' + i} className="plan-cal-wd">{w}</span>)}
@@ -132,9 +132,9 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
   return (
     <div className="root-screen plans-hub plan-schedule">
       {preview ? null : (
-        <div className="plan-seg" role="tablist" aria-label="Schedule">
-          <button type="button" role="tab" aria-selected={shown === 'ahead'} className="plan-seg-item" onClick={() => pick('ahead')}>Coming up</button>
-          <button type="button" role="tab" aria-selected={shown === 'read'} className="plan-seg-item" onClick={() => pick('read')}>What I’ve read</button>
+        <div className="ui-seg plan-seg" role="tablist" aria-label="Schedule">
+          <button type="button" role="tab" aria-selected={shown === 'ahead'} className="ui-seg-item" onClick={() => pick('ahead')}>Coming up</button>
+          <button type="button" role="tab" aria-selected={shown === 'read'} className="ui-seg-item" onClick={() => pick('read')}>What I’ve read</button>
         </div>
       )}
       {shown === 'ahead' || preview ? (
@@ -156,9 +156,9 @@ export function PlanSchedule({ run, now, tab = 'ahead', at, preview = false, onT
               {readDays.map((d) => <DayRow key={d.day} d={d} run={run} read onOpen={() => setSheet(d.day)} note={!!(noteOf && noteOf(d.day))} />)}
             </ol>
           ) : (
-            <div className="plan-card plan-empty">
+            <div className="ui-card plan-empty">
               <p className="plan-empty-text">Each day you finish shows here, with the date you read it.</p>
-              <button type="button" className="plan-btn" onClick={() => pick('ahead')}>See what’s coming up</button>
+              <button type="button" className="ui-btn is-primary" onClick={() => pick('ahead')}>See what’s coming up</button>
             </div>
           )}
         </>

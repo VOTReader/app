@@ -54,7 +54,7 @@ function QuietAsk({ run }) {
     if (keep) saveRun({ ...run, updated: Date.now() }); else { const { remind: _off, ...rest } = run; saveRun({ ...rest, updated: Date.now() }); }
   };
   return (
-    <div className="plan-card plan-quiet" role="group" aria-label="Daily reminder">
+    <div className="ui-card plan-quiet" role="group" aria-label="Daily reminder">
       <p className="plan-today-sub">Keep the daily reminder for this plan?</p>
       <div className="plan-links">
         <button type="button" className="plan-text-btn plan-link" onClick={() => answer(true)}>Keep it</button>
@@ -157,8 +157,8 @@ function PlanSettings({ run, now, tracksOf, onClose, onStopped }) {
       ) : (
         <div className="plan-sheet-actions">
           {st.finished ? null : st.paused
-            ? <button type="button" className="plan-btn" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume plan</button>
-            : <button type="button" className="plan-btn plan-btn-quiet" onClick={() => saveRun(pauseRun(run, new Date()))}>Pause plan</button>}
+            ? <button type="button" className="ui-btn is-primary" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume plan</button>
+            : <button type="button" className="ui-btn" onClick={() => saveRun(pauseRun(run, new Date()))}>Pause plan</button>}
           <button type="button" className="plan-text-btn plan-danger" onClick={() => setStopping(true)}>Stop plan</button>
         </div>
       )}
@@ -227,16 +227,16 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
   let todayCard;
   if (st.paused) {
     todayCard = (
-      <div className="plan-card plan-today plan-today-paused">
+      <div className="ui-card plan-today plan-today-paused">
         <p className="plan-today-head"><span className="root-eyebrow">Paused</span></p>
         <p className="plan-today-title">{run.paused ? 'Paused since ' + monthDay(run.paused) : 'Paused'}</p>
         <p className="plan-today-sub">{'Day ' + (st.day + 1) + ' is waiting for you · ' + itemsLabel(today, bookTitle)}</p>
-        <button type="button" className="plan-btn" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume</button>
+        <button type="button" className="ui-btn is-primary" onClick={() => saveRun(resumeRun(run, new Date()))}>Resume</button>
       </div>
     );
   } else if (st.notStarted) {
     todayCard = (
-      <div className="plan-card plan-today">
+      <div className="ui-card plan-today">
         <p className="plan-today-head"><span className="root-eyebrow">{'Starts ' + dayDate(run.start)}</span></p>
         <p className="plan-today-title">{itemsLabel(dayItems(run, 0), bookTitle)}</p>
         <p className="plan-today-sub">{'Day 1 · about ' + minText(minutesFor(itemsWords(dayItems(run, 0))))}</p>
@@ -245,7 +245,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
     );
   } else if (st.doneToday) {
     todayCard = (
-      <div className="plan-card plan-today plan-today-done">
+      <div className="ui-card plan-today plan-today-done">
         <p className="plan-today-head"><PlanTick on /><span className="plan-today-title">Done today</span></p>
         {today.length ? <p className="plan-today-sub">{'Tomorrow · ' + itemsLabel(today, bookTitle) + ' · ' + minText(minutesFor(itemsWords(today)))}</p> : null}
         <div className="plan-links">
@@ -257,7 +257,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
     );
   } else if (!st.finished) {
     todayCard = (
-      <div className="plan-card plan-today">
+      <div className="ui-card plan-today">
         <p className="plan-today-head">
           <span className="root-eyebrow">{'Today · ' + itemsLabel(today, bookTitle)}</span>
           <span className="plan-today-left">{left.length ? minText(leftMin) + ' left' : ''}</span>
@@ -275,7 +275,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
           ))}
         </ul>
         <div className="plan-actions">
-          <button type="button" className="plan-btn" onClick={() => onRead(st.day)}>{st.todayTicked ? 'Continue reading' : 'Start reading'}</button>
+          <button type="button" className="ui-btn is-primary" onClick={() => onRead(st.day)}>{st.todayTicked ? 'Continue reading' : 'Start reading'}</button>
           {onListen && listenRefs.length ? (
             <PlanListen refs={listenRefs} tracksOf={tracksOf} label={'Listen to today: ' + itemsLabel(left, bookTitle)}
               onListen={() => onListen(listenRefs, name)} />
@@ -287,7 +287,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
 
   return (
     <div className="root-screen plans-hub plan-page">
-      <div className="plan-card plan-progress">
+      <div className="ui-card plan-progress">
         <PlanRing percent={st.percent} size="big" />
         <div className="plan-progress-text">
           <p className="plan-progress-day">{st.notStarted ? countOf(st.total, 'day') : 'Day ' + Math.min(st.total, (st.doneToday ? st.day : st.day + 1)) + ' of ' + st.total.toLocaleString('en-US')}</p>
@@ -305,7 +305,7 @@ export function PlanPage({ run, now, settingsOpen, onSettings, onRead, onListen,
       <QuietAsk run={run} />
 
       {st.paused ? null : (
-        <div className="plan-card plan-week" role="group" aria-label="This week">
+        <div className="ui-card plan-week" role="group" aria-label="This week">
           <div className="plan-week-days">
             {week.week.map((d, i) => (
               <span key={d.date} className="plan-week-day" role="img"
