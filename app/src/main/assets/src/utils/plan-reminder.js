@@ -13,8 +13,8 @@
    syncPlanReminders(runs) whenever runs change (a tick, pause, resume, a new
    time, a stop, Clear All) and once at boot: the native side decides every
    later day from that list alone. On the web (no AndroidBridge) every call is
-   a quiet no-op and `supported()` is false, so the page shows its in-app nudge
-   instead.
+   a quiet no-op and `supported()` is false, so the plan screens offer no reminder
+   (plans2: Remind me shows only where this is true).
 
    window.AndroidBridge is read at call time (the same direct, guarded pattern
    as snapshot-sink.js); tests pass `bridge`.

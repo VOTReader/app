@@ -22,7 +22,7 @@ import { ScripturesHome } from './ScripturesHome.jsx';
 import { ScriptureGenre } from './ScriptureGenre.jsx';
 import { StudiesHome } from './StudiesHome.jsx';
 import { AboutScreen } from './AboutScreen.jsx';
-import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
+import { PlansHub as ReadingPlansScreen } from './PlansHub.jsx';
 import { GardenView } from './GardenView.jsx';
 import { setupSettingsGlobals, teardownSettingsGlobals, renderSettings } from './settings-harness.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
@@ -163,13 +163,16 @@ describe('leaks — Reading plans', () => {
     put('colLetterArr', () => LETTERS);
     put('colPreface', () => null);
   };
-  const screenOf = () => render(<ReadingPlansScreen readingPlans={[]} isRead={() => false} markAsReadEnabled onPlansMoved={noop} onRead={noop} onBack={noop} />);
+  const screenOf = () => render(<ReadingPlansScreen readingPlans={[]} isRead={() => false} onPlansMoved={noop} onStartSession={noop} onBack={noop} />);
   it('a plan running, its details open', async () => {
     plans();
     let run = startCatalogPlan('bible-year', null, daysAgo(4));
     for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
     ReadingPlanStore.put(run);
-    await leakFree('ReadingPlansScreen', screenOf, (r) => { fireEvent.click(r.getAllByRole('button', { name: 'Plan details' })[0]); });
+    await leakFree('ReadingPlansScreen', screenOf, (r) => {
+      fireEvent.click(r.getAllByRole('button', { name: /^Bible in a Year: Today/ })[0]);
+      fireEvent.click(r.getAllByRole('button', { name: 'Plan settings' })[0]);
+    });
   });
   it('the plan builder open', async () => {
     plans();

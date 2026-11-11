@@ -7,6 +7,10 @@
    Study Bible) and Bible slices (New Testament, Psalms, Proverbs in 31 days,
    the Gospels). Call 1b A: letter plans are cut by words, and "The Volumes
    in Order" is now "Every letter, in order" (it holds 14 collections).
+   plans2 (2026-11-10): groups Start here, The Scriptures, The Letters and
+   Together (Volumes and Scriptures in a year, side by side); each plan has
+   two sentences for its preview, and its minutes a day and days are
+   computed from its items (catalogFacts), never typed.
 
    Every plan here is the plan engine (plan-engine.js) with a preset choice
    of items; the custom builder makes the same specs from the reader's picks.
@@ -18,7 +22,7 @@
 
 import { BIBLE_BOOKS } from './reading-plans.js';
 import { BIBLE_CHAPTER_WORDS } from './plan-bible-words.js';
-import { newRun, runStatus, todayKey, resumeAt, startFrom } from './plan-engine.js';
+import { newRun, runStatus, todayKey, resumeAt, startFrom, creditRead, totalDays, itemsWords, itemsCount, minutesFor } from './plan-engine.js';
 
 /** @typedef {import('./plan-engine.js').PlanItem} PlanItem */
 /** @typedef {import('./plan-engine.js').PlanTrack} PlanTrack */
@@ -70,7 +74,13 @@ export function collectionItems(volKey, src) {
   const pref = src.preface(col);
   const list = (pref ? [pref] : []).concat(src.letters(col) || []);
   const short = col.short || col.label || '';
-  return list.filter((e) => e && e.id).map((e) => ({ k: col.readKey + ':' + e.id, w: Math.max(1, Number(src.words(e)) || 1), t: e.title || e.id, s: short }));
+  // plans2: the preface is marked (p: 1), so a collection's letter count is the same on every screen and the preface
+  // is named apart ("29 letters and a preface").
+  return list.filter((e) => e && e.id).map((e) => {
+    /** @type {PlanItem} */ const it = { k: col.readKey + ':' + e.id, w: Math.max(1, Number(src.words(e)) || 1), t: e.title || e.id, s: short };
+    if (pref && e === pref) it.p = 1;
+    return it;
+  });
 }
 
 const ALL_WEEK = [true, true, true, true, true, true, true];
@@ -122,42 +132,67 @@ const lettersTrack = (keys, src) => ({ kind: 'letters', by: 'words', items: keys
 const bibleTrack = (items) => ({ kind: 'bible', by: 'count', items });
 
 /**
- * @typedef {{ id: string, group: 'bible' | 'letters' | 'starter', name: string, sub: string, letters?: boolean,
- *   tracks: (src: LetterSource | null, opt?: any) => PlanTrack[], pace: PlanPace, weekdays?: boolean[],
- *   paces?: PlanPace[] }} PlanDef
+ * @typedef {{ id: string, group: 'starter' | 'bible' | 'letters' | 'together', name: string, sub: string, about: string,
+ *   letters?: boolean, tracks: (src: LetterSource | null, opt?: any) => PlanTrack[], pace: PlanPace, weekdays?: boolean[],
+ *   paces?: PlanPace[], share?: 'side' | 'serial' }} PlanDef
+ *   sub: one line of what it is (no typed lengths: minutes and days are computed from the items, catalogFacts);
+ *   about: the preview's two sentences, prefaces included or not said there
  */
 
-/** The plans there are (call 1A), in the order the Plans screen lists them. @type {PlanDef[]} */
+/** The groups of Find a plan, in order (plans2: Start here, The Scriptures, The Letters, Together). */
+export const PLAN_GROUPS = Object.freeze([['starter', 'Start here'], ['bible', 'The Scriptures'], ['letters', 'The Letters'], ['together', 'Together']]);
+
+/** The plans there are (call 1A, plans2), in the order Find a plan lists them within each group. @type {PlanDef[]} */
 export const PLAN_CATALOG = [
-  { id: 'bible-year', group: 'bible', name: 'Bible in a Year', sub: 'Genesis to Revelation · 90 days to 2 years',
+  { id: 'bible-year', group: 'bible', name: 'Bible in a Year', sub: 'Genesis to Revelation',
+    about: 'Genesis to Revelation, straight through. About three chapters a day, read or listened to.',
     tracks: () => [bibleTrack(bibleItems('genesis', 1, 'revelation'))], pace: { mode: 'days', n: 365 },
-    paces: [{ mode: 'days', n: 90 }, { mode: 'days', n: 365 }, { mode: 'days', n: 730 }, { mode: 'by' }] },
-  { id: 'new-testament', group: 'bible', name: 'New Testament', sub: 'A chapter each weekday · 260 days',
+    paces: [{ mode: 'days', n: 90 }, { mode: 'days', n: 365 }, { mode: 'days', n: 730 }] },
+  { id: 'new-testament', group: 'bible', name: 'New Testament', sub: 'A chapter each weekday',
+    about: 'Matthew to Revelation, one chapter each weekday. Weekends are free.',
     tracks: () => [bibleTrack(bibleItems('matthew-plain', 1, 'revelation'))], pace: { mode: 'days', n: 260 }, weekdays: WEEKDAYS },
-  { id: 'psalms', group: 'bible', name: 'Psalms', sub: 'Five psalms a day · 30 days',
+  { id: 'psalms', group: 'bible', name: 'Psalms', sub: 'Five psalms a day',
+    about: 'All 150 psalms in a month. Five a day, read or listened to.',
     tracks: () => [bibleTrack(bibleItems('psalms'))], pace: { mode: 'days', n: 30 } },
   { id: 'proverbs', group: 'bible', name: 'Proverbs in 31 days', sub: 'A chapter a day',
+    about: 'One chapter of Proverbs for each day of a month. Short enough for any morning.',
     tracks: () => [bibleTrack(bibleItems('proverbs'))], pace: { mode: 'days', n: 31 } },
-  { id: 'gospels', group: 'bible', name: 'The Gospels', sub: 'Matthew to John · 45 days',
+  { id: 'gospels', group: 'bible', name: 'The Gospels', sub: 'Matthew to John',
+    about: 'Matthew, Mark, Luke and John, in order. About two chapters a day.',
     tracks: () => [bibleTrack(bibleItems('matthew-plain', 1, 'john'))], pace: { mode: 'days', n: 45 } },
-  { id: 'seven-volumes', group: 'letters', name: 'The Seven Volumes', sub: 'Volumes One to Seven · about 5 min a day', letters: true,
+  { id: 'seven-volumes', group: 'letters', name: 'The Seven Volumes', sub: 'Volumes One to Seven', letters: true,
+    about: 'Every letter of Volumes One to Seven, in order. Each volume begins with its preface.',
     tracks: (src) => [lettersTrack(SEVEN, src)], pace: { mode: 'minutes', n: 5 } },
   { id: 'letters-year', group: 'letters', name: 'Letters in a Year', sub: 'Every collection, balanced by words', letters: true,
+    about: 'All fourteen collections in a year, prefaces included. Each day is about the same length.',
     tracks: (src) => [lettersTrack(LETTER_CHAIN, src)], pace: { mode: 'days', n: 365 } },
-  { id: 'volumes', group: 'letters', name: 'Every letter, in order', sub: 'All 14 collections · about 5 min a day', letters: true,
+  { id: 'volumes', group: 'letters', name: 'Every letter, in order', sub: 'All 14 collections', letters: true,
+    about: 'Every letter of all fourteen collections, in the order they stand, prefaces included. A few minutes a day.',
     tracks: (src) => [lettersTrack(LETTER_CHAIN, src)], pace: { mode: 'minutes', n: 5 } },
-  { id: 'letters-chrono', group: 'letters', name: 'Letters by date', sub: 'Every letter in the order it was given · about 5 min a day', letters: true,
+  { id: 'letters-chrono', group: 'letters', name: 'Letters by date', sub: 'Every letter in the order it was given', letters: true,
+    about: 'Every letter in the order it was given. Prefaces come before their collection, and the undated letters come last.',
     tracks: (src) => [{ kind: 'letters', by: 'words', items: chronoItems(src) }], pace: { mode: 'minutes', n: 5 } },
   { id: 'collection', group: 'letters', name: 'One collection', sub: 'Any collection, at your pace', letters: true,
+    about: 'One collection of your choice, start to finish, its preface included.',
     tracks: (src, opt) => [lettersTrack([String(opt && opt.volKey || 'one')], src)], pace: { mode: 'minutes', n: 5 } },
-  { id: 'blessed', group: 'starter', name: 'The Blessed', sub: '8 days', letters: true,
+  { id: 'blessed', group: 'starter', name: 'The Blessed', sub: 'Eight short readings to begin with', letters: true,
+    about: 'The Blessed, one reading a day, its introduction first. A gentle way to begin.',
     tracks: (src) => [{ ...lettersTrack(['blessed'], src), by: 'count' }], pace: { mode: 'items', n: 1 } },
-  { id: 'timothy', group: 'starter', name: 'Timothy', sub: '15 days', letters: true,
+  { id: 'timothy', group: 'starter', name: 'Timothy', sub: 'The letters from Timothy', letters: true,
+    about: 'The letters from Timothy, one a day, with the preface first.',
     tracks: (src) => [{ ...lettersTrack(['timothy'], src), by: 'count' }], pace: { mode: 'items', n: 1 } },
-  { id: 'holy-days', group: 'starter', name: 'Holy Days', sub: '16 days', letters: true,
+  { id: 'holy-days', group: 'starter', name: 'Holy Days', sub: 'One reading a day', letters: true,
+    about: 'The Holy Days readings, one a day.',
     tracks: (src) => [{ ...lettersTrack(['holydays'], src), by: 'count' }], pace: { mode: 'items', n: 1 } },
-  { id: 'matthew-study', group: 'starter', name: 'Matthew Study Bible', sub: '28 days',
+  { id: 'matthew-study', group: 'starter', name: 'Matthew Study Bible', sub: 'A chapter a day with the study',
+    about: 'The Gospel of Matthew with the study, one chapter a day.',
     tracks: () => [bibleTrack(bibleItems('matthew-plain').map((it) => ({ ...it, k: 'matthew:' + it.k.split(':')[1] })))], pace: { mode: 'days', n: 28 } },
+  // plans2: the first Together plan: the letters in a year and the Bible in a year, side by side on the same days.
+  { id: 'together-year', group: 'together', name: 'Volumes and Scriptures in a year', sub: 'The letters and the Bible, side by side', letters: true,
+    about: 'Every letter and the whole Bible in a year, side by side: some of each every day. Prefaces included.',
+    tracks: (src) => { const l = lettersTrack(LETTER_CHAIN, src); return l.items.length ? [l, bibleTrack(bibleItems('genesis', 1, 'revelation'))] : []; },
+    pace: { mode: 'days', n: 365 }, share: 'side',
+    paces: [{ mode: 'days', n: 365 }, { mode: 'days', n: 730 }] },
 ];
 
 /** @param {string} id @returns {PlanDef | null} */
@@ -173,8 +208,10 @@ export function runName(run, src) {
 /**
  * Start a catalog plan. Null when it needs the Volumes and they are not loaded.
  * @param {string} id @param {LetterSource | null} src @param {Date} now
- * @param {{ pace?: PlanPace, weekdays?: boolean[], volKey?: string, name?: string, from?: string }} [opt]
- *   from: start at this letter (n354b's Start where I am), the plan's letters before it left out
+ * @param {{ pace?: PlanPace, weekdays?: boolean[], volKey?: string, name?: string, from?: string, startOn?: string,
+ *   credit?: (bid: string, cid: string) => boolean }} [opt]
+ *   from: start at this letter (n354b's Start where I am), the plan's letters before it left out; startOn: a later
+ *   start date (plans2); credit: the read record, whose items of the plan are counted as read (plans2 "Count my N")
  * @returns {PlanRun | null}
  */
 export function startCatalogPlan(id, src, now, opt = {}) {
@@ -182,12 +219,34 @@ export function startCatalogPlan(id, src, now, opt = {}) {
   if (!def) return null;
   const tracks = opt.from ? startFrom(def.tracks(src, opt), opt.from) : def.tracks(src, opt);
   if (!tracks.some((t) => t.items.length)) return null;
-  const run = newRun({ plan: id, tracks, pace: opt.pace || def.pace, weekdays: opt.weekdays || def.weekdays || ALL_WEEK }, now);
+  let run = newRun({ plan: id, tracks, share: def.share, pace: opt.pace || def.pace, weekdays: opt.weekdays || def.weekdays || ALL_WEEK, startOn: opt.startOn }, now);
   if (id === 'collection') {
     const col = src && src.colByKey.get(String(opt.volKey || 'one'));
     run.name = (col && (col.label || col.short)) || 'One collection';
   } else if (opt.name) run.name = opt.name;
+  if (typeof opt.credit === 'function') run = creditRead(run, opt.credit);
   return run;
+}
+
+/**
+ * What a catalog plan asks, computed from its real items (plans2: no typed lengths): minutes a day (the average day),
+ * days, and the items counted ("1,189 chapters", "29 letters and a preface"). Null when its items are not loaded.
+ * @param {string} id @param {LetterSource | null} src @param {Date} now @param {any} [opt]
+ * @returns {{ minutes: number, days: number, count: string, items: number } | null}
+ */
+export function catalogFacts(id, src, now, opt) {
+  const def = planDef(id);
+  if (!def) return null;
+  const tracks = def.tracks(src, opt);
+  if (!tracks.some((t) => t.items.length)) return null;
+  return runFacts(newRun({ plan: id, tracks, share: def.share, pace: (opt && opt.pace) || def.pace, weekdays: def.weekdays || ALL_WEEK }, now));
+}
+
+/** The same facts for any run. @param {PlanRun} run */
+export function runFacts(run) {
+  const items = run.tracks.flatMap((t) => t.items);
+  const days = Math.max(1, totalDays(run));
+  return { minutes: minutesFor(itemsWords(items) / days), days, count: itemsCount(items), items: items.length };
 }
 
 /**

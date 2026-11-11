@@ -15,7 +15,7 @@ import { FindInUnit } from '../components/FindInUnit.jsx';
 import { letterHlKey, letterHlPrefix } from '../../utils/hl-keys.js';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
-import { PlanRibbon } from '../components/PlanRibbon.jsx';
+import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { highlightExcerptInDom } from '../../utils/highlight.jsx';
 import { BackHintPill } from '../components/BackHintPill.jsx';
 import { MiniTitleBand } from '../components/MiniTitleBand.jsx';
@@ -392,6 +392,7 @@ export function LetterView({ letter, volKey, onHome, onNavigate, onStudyNavigate
       <BackHintPill backHint={backHint} onClick={onBack}>{miniTitle}</BackHintPill>
       {!backHint && miniTitle ? <div className="mini-title-anchor">{miniTitle}</div> : null}
 
+      {!studyMode && typeof COL_BY_KEY !== 'undefined' && COL_BY_KEY.get(volKey) ? <PlanSessionStrip bid={COL_BY_KEY.get(volKey).readKey} cid={letter.id} inert={inert} /> : null}
       {/* Plain black, no banner (Corbin 2026-11-01: blue on letters, amber on studies). */}
       <header className="hero" ref={heroRef}>
         <div className="hero-content">

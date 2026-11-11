@@ -1,80 +1,299 @@
-// @ts-nocheck - ScreenLayout / LibraryNav are free globals, as the other personal-study screens
-/* ReadingPlansScreen: start, follow and stop a plan. rp1's look (lanes/myweb/out/mockups/rp1/r2-plans.png);
-   since mw18 the plans are runs in ReadingPlanStore with the flexible engine. */
+// @ts-nocheck - ScreenLayout / LibraryNav / ConfirmStrip are free globals, as the other personal-study screens
+/* Reading plans as a place (plans2, P2-plans-design.md): the list, a plan's preview, the plan's own page, its whole
+   schedule and day sheet, a finished plan. PlansHub holds the views; the runs are real ReadingPlanStore records. */
 import 'fake-indexeddb/auto';   // the runs are really saved: the rp1 move waits for that save
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, fireEvent, screen, within, act, waitFor } from '@testing-library/react';
-import { ReadingPlansScreen } from './ReadingPlansScreen.jsx';
+import { PlansHub } from './PlansHub.jsx';
 import { ReadingPlanStore } from '../../stores/reading-plan-store.js';
 import { startCatalogPlan } from '../../data/plan-catalog.js';
-import { tickItem, todayKey } from '../../data/plan-engine.js';
-import { usePlanReminders, takePlanOpen } from '../../utils/plan-runs-view.js';
+import { tickItem, todayKey, dayItems, markDay, pauseRun, runStatus, dayNum, dateOf } from '../../data/plan-engine.js';
+import { usePlanReminders } from '../../utils/plan-runs-view.js';
+import { _resetPlanNavForTests } from '../../utils/plan-nav.js';
 import { _resetForTests } from '../../utils/plan-reminder.js';
 
 const daysAgo = (n) => { const d = new Date(); d.setDate(d.getDate() - n); d.setHours(12); return d; };
+const tomorrowKey = () => dateOf(dayNum(todayKey(new Date())) + 1);
 
 beforeEach(() => {
-  globalThis.ScreenLayout = ({ children }) => <main>{children}</main>;
-  globalThis.LibraryNav = () => null;
+  globalThis.ScreenLayout = ({ children, navChildren }) => <main>{navChildren}{children}</main>;
+  globalThis.LibraryNav = ({ onBack, leftExtras, rightExtras }) => <div><button type="button" onClick={onBack}>Back</button>{leftExtras}{rightExtras}</div>;
   globalThis.ConfirmStrip = ({ question, yesLabel, onConfirm, onCancel }) => (
     <div><span>{question}</span><button type="button" onClick={onConfirm}>{yesLabel || 'Yes'}</button><button type="button" onClick={onCancel}>No</button></div>
   );
   localStorage.clear();
+  _resetPlanNavForTests();
   ReadingPlanStore._resetForTests({ forceLoaded: true });
   globalThis.ReadingPlanStore = ReadingPlanStore;
 });
 afterEach(() => { cleanup(); delete globalThis.ReadingPlanStore; });
 
-const base = (o) => ({ readingPlans: [], isRead: () => false, markAsReadEnabled: true, onPlansMoved: vi.fn(), onRead: vi.fn(), onBack: vi.fn(), ...o });
+const base = (o) => ({ readingPlans: [], isRead: () => false, onPlansMoved: vi.fn(), onStartSession: vi.fn(), onBack: vi.fn(), ...o });
 const runs = () => ReadingPlanStore.active();
+const barTitle = () => document.querySelector('.plan-bar-title').textContent;
+/** The running plan's row on the list (its aria-label starts with the name and the state). */
+const openRow = (name = 'Bible in a Year') => fireEvent.click(screen.getByRole('button', { name: new RegExp('^' + name + ': (Today|Done today|Starts|Day )') }));
+const lateRun = () => {
+  let run = startCatalogPlan('bible-year', null, daysAgo(4));
+  for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
+  return run;
+};
 
-describe('ReadingPlansScreen', () => {
-  it('offers both plans to start, and says the plans stay on this phone', () => {
-    render(<ReadingPlansScreen {...base()} />);
-    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Reading plans');
-    expect(screen.getByText('Your plans stay on this phone.')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
-    expect(runs().map((r) => [r.plan, r.start])).toEqual([['bible-year', todayKey(new Date())]]);
-    expect(screen.queryByRole('button', { name: 'Start Bible in a Year' })).toBeNull();
+describe('Reading plans: the list (3.1)', () => {
+  it('no plans yet: one sentence and Find a plan; the title is in the bar and the catalog is grouped', () => {
+    render(<PlansHub {...base()} />);
+    expect(barTitle()).toBe('Reading plans');
+    expect(screen.getByText(/Pick a plan below/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Find a plan' })).toBeTruthy();
+    expect([...document.querySelectorAll('.plan-group-title')].map((h) => h.textContent)).toEqual(['Start here', 'The Scriptures', 'The Letters', 'Together']);
+    expect(screen.getByRole('button', { name: /^Bible in a Year: Genesis to Revelation, \d+ min a day, 365 days$/ })).toBeTruthy();
   });
 
-  it('a running plan shows its day and month, offers no Start, and Catch me up clears behind', () => {
-    let run = startCatalogPlan('bible-year', null, daysAgo(4));
-    for (const it of run.tracks[0].items.slice(0, 3)) run = tickItem(run, it.k, todayKey(daysAgo(4)), 1);
+  it('a tap on a catalog plan opens its preview and never starts it', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    expect(runs()).toEqual([]);
+    expect(screen.getByText('Genesis to Revelation, straight through. About three chapters a day, read or listened to.')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Start plan' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }));
+    expect(screen.getByText(/Pick a plan below/)).toBeTruthy();
+  });
+
+  it('running plans keep their start order and one state line each; a paused one says so and waits', () => {
+    const a = startCatalogPlan('bible-year', null, new Date());
+    const b = pauseRun({ ...startCatalogPlan('psalms', null, new Date()), id: 'p_b' }, new Date());
+    ReadingPlanStore.put(a);
+    ReadingPlanStore.put(b);
+    ReadingPlanStore.put({ ...a, updated: Date.now() });   // a save keeps its place
+    render(<PlansHub {...base()} />);
+    const rows = within(screen.getByRole('list', { name: 'Your plans' })).getAllByRole('button');
+    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Bible in a Year: Today · Genesis 1-3 · 0 of 3', 'Psalms: Day 1 of 30 · waiting for you, paused']);
+    expect(rows[1].textContent).toMatch(/Paused/);
+  });
+});
+
+describe('Reading plans: the preview (3.2)', () => {
+  it('says the facts and the first week, and START PLAN starts it and opens its page', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    const facts = screen.getByRole('list', { name: 'This plan' }).textContent;
+    expect(facts).toMatch(/365days/);
+    expect(facts).toMatch(/1,189chapters/);
+    const week = within(screen.getByRole('list', { name: 'Your first week' })).getAllByRole('listitem');
+    expect(week.map((li) => li.querySelector('.plan-day-portion').textContent)).toEqual(['Genesis 1-3', 'Genesis 4-7', 'Genesis 8-10']);
+    expect(screen.getByText(/^Finishes .* · you can change any of this later$/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    expect(runs().map((r) => [r.plan, r.start])).toEqual([['bible-year', todayKey(new Date())]]);
+    expect(barTitle()).toBe('Bible in a Year');
+    expect(screen.getByRole('group', { name: 'This week' })).toBeTruthy();
+  });
+
+  it('Length changes the plan ("90 days" means 90), and Tomorrow starts it later', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    fireEvent.click(screen.getByRole('radio', { name: '90 days' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Tomorrow' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    const run = runs()[0];
+    expect(run.start).toBe(tomorrowKey());
+    expect(runStatus(run, new Date()).total).toBe(90);
+    expect(runStatus(run, new Date()).notStarted).toBe(true);
+    expect(screen.getByText(/^Starts /)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Start today instead' }));
+    expect(runs()[0].start).toBe(todayKey(new Date()));
+  });
+
+  it('Already read: "Count my N" credits the chapters read before; they never make a day done today', () => {
+    const isRead = (b, c) => b === 'genesis' && Number(c) <= 3;
+    render(<PlansHub {...base({ isRead })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    expect(screen.getByText('Count my 3 chapters')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    const st = runStatus(runs()[0], new Date());
+    expect(st.itemsDone).toBe(3);
+    expect(st.doneToday).toBe(false);
+    expect(st.day).toBe(1);                       // today's portion is the first day not read
+    expect(screen.getByText(/^Today · Genesis 4-7/)).toBeTruthy();
+  });
+
+  it('Days: the seven toggles, at least one always on', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Psalms: / }));
+    for (const d of ['Sunday', 'Saturday']) fireEvent.click(screen.getByRole('button', { name: d }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    expect(runs()[0].weekdays).toEqual([false, true, true, true, true, true, false]);
+  });
+});
+
+describe('Reading plans: the plan page (3.3, 3.8)', () => {
+  it('Today: each item reads inside the plan; Start reading begins the session on the day', () => {
+    const run = startCatalogPlan('bible-year', null, new Date());
     ReadingPlanStore.put(run);
     const p = base();
-    render(<ReadingPlansScreen {...p} />);
-    expect(screen.queryByRole('button', { name: 'Start Bible in a Year' })).toBeNull();
-    const plan = screen.getByRole('region', { name: 'Bible in a Year' });
-    expect(within(plan).getByText(/^Day 2 of 365/)).toBeTruthy();       // the next unfinished day, not day 5 (days split by words: day 2 is Genesis 4-7)
-    expect(plan.querySelector('.plans-day[data-state="today"]')).not.toBeNull();
-    fireEvent.click(within(plan).getByRole('button', { name: 'Read today: Genesis 4-7' }));
-    expect(p.onRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 4 });
-    expect(within(plan).getByText(/days? behind/)).toBeTruthy();
-    fireEvent.click(within(plan).getByRole('button', { name: 'Catch up' }));
-    expect(within(plan).getByText(/^At this pace you finish /)).toBeTruthy();
-    act(() => { fireEvent.click(within(plan).getByRole('button', { name: /^Catch me up/ })); });
-    expect(within(screen.getByRole('region', { name: 'Bible in a Year' })).queryByText(/days? behind/)).toBeNull();
+    render(<PlansHub {...p} />);
+    openRow();
+    expect(screen.getByText('Day 1 of 365')).toBeTruthy();
+    expect(screen.getByText('0 of 1,189 chapters read')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 2' }));
+    expect(p.onStartSession).toHaveBeenLastCalledWith(run.id, 0, 'genesis:2');
+    fireEvent.click(screen.getByRole('button', { name: 'Start reading' }));
+    expect(p.onStartSession).toHaveBeenLastCalledWith(run.id, 0, undefined);
   });
 
-  it('stops a plan only after asking; the run is kept, stopped', () => {
+  it('late: one quiet line in days and Adjust; Keep my daily amount moves the finish', () => {
+    ReadingPlanStore.put(lateRun());
+    render(<PlansHub {...base()} />);
+    openRow();
+    expect(screen.getByText(/days? later than planned/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust' }));
+    expect(screen.getByRole('button', { name: /^Finish on time/ })).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: /^Keep my daily amount/ })); });
+    expect(screen.queryByText(/later than planned/)).toBeNull();
+  });
+
+  it('never says behind, missed or catch up, on the list or the page', () => {
+    ReadingPlanStore.put(lateRun());
+    const { container } = render(<PlansHub {...base()} />);
+    expect(container.textContent).not.toMatch(/behind|missed|catch up|streak/i);
+    openRow();
+    expect(container.textContent).not.toMatch(/behind|missed|catch up|streak/i);
+  });
+
+  it('a paused plan is never late: Paused since and Resume, nothing else', () => {
+    ReadingPlanStore.put(pauseRun(lateRun(), new Date()));
+    render(<PlansHub {...base()} />);
+    openRow();
+    expect(screen.getByText(/^Paused since /)).toBeTruthy();
+    expect(screen.queryByText(/later than planned/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Start reading' })).toBeNull();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Resume' })); });
+    expect(runs()[0].status).toBe('running');
+  });
+
+  it('done today: tomorrow, Read ahead opens the next day’s sheet, Not read yet takes it back', () => {
+    const run = startCatalogPlan('bible-year', null, new Date());
+    ReadingPlanStore.put(markDay(run, 0, true, new Date()));
+    const p = base();
+    render(<PlansHub {...p} />);
+    openRow();
+    expect(screen.getByText('Done today')).toBeTruthy();
+    expect(screen.getByText(/^Tomorrow · Genesis 4-7/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Read ahead' }));
+    const sheet = screen.getByRole('dialog', { name: /^Day 2/ });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Read this day' }));
+    expect(p.onStartSession).toHaveBeenLastCalledWith(run.id, 1, undefined);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Not read yet' })); });
+    expect(runStatus(runs()[0], new Date()).itemsDone).toBe(0);
+  });
+
+  it('this week and days in a row (from 2 up only)', () => {
+    let run = startCatalogPlan('bible-year', null, daysAgo(2));
+    run = markDay(run, 0, true, daysAgo(2));
+    run = markDay(run, 1, true, daysAgo(1));
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    openRow();
+    expect(screen.getByRole('group', { name: 'This week' }).textContent).toMatch(/2 days in a row/);
+  });
+
+  it('the road: books with their counts; a tap opens the schedule there', () => {
     ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    expect(screen.getByRole('group', { name: /^(January|February|March|April|May|June|July|August|September|October|November|December)$/ })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Stop Bible in a Year' }));
+    render(<PlansHub {...base()} />);
+    openRow();
+    const road = screen.getByRole('list', { name: 'The road' });
+    expect(within(road).getAllByRole('button').map((b) => b.querySelector('.plan-road-name').textContent)).toEqual(['Genesis', 'Exodus', 'Leviticus']);
+    fireEvent.click(screen.getByRole('button', { name: 'All 66 books' }));
+    expect(within(screen.getByRole('list', { name: 'The road' })).getAllByRole('button').length).toBe(66);
+    fireEvent.click(screen.getByRole('button', { name: 'Exodus: 0 of 40 read' }));
+    expect(barTitle()).toBe('Bible in a Year · Schedule');
+  });
+
+  it('the gear: stop asks first, and the run is kept, stopped', () => {
+    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
+    render(<PlansHub {...base()} />);
+    openRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Plan settings' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Stop plan' }));
     expect(runs().length).toBe(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, stop' }));   // C12: never "Delete"
+    act(() => { fireEvent.click(within(screen.getByText(/^Stop this plan\?/).parentElement).getByRole('button', { name: 'Stop plan' })); });
     expect(runs().length).toBe(0);
     expect(ReadingPlanStore.all()[0].status).toBe('stopped');
+    expect(barTitle()).toBe('Reading plans');
   });
 
+  it('the gear: a new length keeps what was read; pause turns the page to Paused', () => {
+    ReadingPlanStore.put(markDay(startCatalogPlan('bible-year', null, new Date()), 0, true, new Date()));
+    render(<PlansHub {...base()} />);
+    openRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Plan settings' }));
+    act(() => { fireEvent.click(screen.getByRole('radio', { name: '2 years' })); });
+    expect(runStatus(runs()[0], new Date()).total).toBe(730);
+    expect(runStatus(runs()[0], new Date()).itemsDone).toBe(3);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Pause plan' })); });
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(screen.getByText(/^Paused since /)).toBeTruthy();
+  });
+
+  it('Write a note opens the day’s Journal note, and the same note again', () => {
+    const entries = new Map();
+    globalThis.JournalStore = { add: vi.fn((e) => { const x = { ...e, id: 'j' + (entries.size + 1) }; entries.set(x.id, x); return x; }), get: (id) => entries.get(id) || null };
+    try {
+      const run = startCatalogPlan('bible-year', null, new Date());
+      ReadingPlanStore.put(markDay(run, 0, true, new Date()));
+      const onNote = vi.fn();
+      render(<PlansHub {...base({ onNote })} />);
+      openRow();
+      fireEvent.click(screen.getByRole('button', { name: 'Write a note' }));
+      expect(globalThis.JournalStore.add).toHaveBeenCalledWith({ title: 'Bible in a Year · Day 1' });
+      expect(onNote).toHaveBeenLastCalledWith('j1');
+      expect(runs()[0].notes).toEqual({ 0: 'j1' });
+      fireEvent.click(screen.getByRole('button', { name: 'Your note' }));
+      expect(globalThis.JournalStore.add).toHaveBeenCalledTimes(1);
+      expect(onNote).toHaveBeenLastCalledWith('j1');
+    } finally { delete globalThis.JournalStore; }
+  });
+});
+
+describe('Reading plans: the whole schedule and the day sheet (3.4)', () => {
+  it('Coming up lists every day with section ends; a day sheet marks a day read; What I’ve read lists it', () => {
+    const run = startCatalogPlan('bible-year', null, new Date());
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    openRow();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Whole schedule' })[0]);
+    expect(screen.getByRole('tab', { name: 'Coming up' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByText(/Genesis finished/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Day 2, .*: Genesis 4-7/ }));
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark day as read' })); });
+    expect(dayItems(runs()[0], 1).every((it) => it.k in runs()[0].ticks)).toBe(true);
+    fireEvent.click(screen.getByRole('tab', { name: 'What I’ve read' }));
+    expect(screen.getByRole('list', { name: 'What I’ve read' }).textContent).toMatch(/Genesis 4-7/);
+  });
+});
+
+describe('Reading plans: finished (3.7)', () => {
+  it('a finished plan is kept under Finished; its page marks it seen; Run it again starts a new run', () => {
+    let run = startCatalogPlan('psalms', null, daysAgo(30));
+    for (let d = 0; d < 30; d++) run = markDay(run, d, true, daysAgo(30 - d));
+    ReadingPlanStore.put(run);
+    render(<PlansHub {...base()} />);
+    const fin = screen.getByRole('list', { name: 'Finished' });
+    fireEvent.click(within(fin).getByRole('button'));
+    expect(screen.getByText('You finished Psalms')).toBeTruthy();
+    expect(ReadingPlanStore.get(run.id).seen).toBe(true);
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Run it again' })); });
+    expect(runs().map((r) => r.plan)).toEqual(['psalms']);
+    expect(screen.getByRole('group', { name: 'This week' })).toBeTruthy();
+  });
+});
+
+describe('Reading plans: the old settings plans (rp1)', () => {
   it('moves rp1\'s settings plan into a run and clears it from settings once the run is saved', async () => {
     const p = base({ readingPlans: [{ id: 'bible-year', start: todayKey(daysAgo(1)) }], isRead: (b, c) => b === 'genesis' && c <= 3 });
-    render(<ReadingPlansScreen {...p} />);
+    render(<PlansHub {...p} />);
     expect(runs().map((r) => r.plan)).toEqual(['bible-year']);
     await waitFor(() => expect(p.onPlansMoved).toHaveBeenCalledWith([]));
-    expect(within(screen.getByRole('region', { name: 'Bible in a Year' })).getByText(/^Day 2 of 365/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Bible in a Year: Today · Genesis 4-7/ })).toBeTruthy();
   });
 
   it('keeps rp1\'s settings plan when the run could not be saved', async () => {
@@ -82,212 +301,11 @@ describe('ReadingPlansScreen', () => {
     ReadingPlanStore.whenSaved = () => Promise.resolve(false);
     try {
       const p = base({ readingPlans: [{ id: 'bible-year', start: todayKey(daysAgo(1)) }] });
-      render(<ReadingPlansScreen {...p} />);
+      render(<PlansHub {...p} />);
       await act(async () => { await Promise.resolve(); });
       expect(runs().length).toBe(1);
       expect(p.onPlansMoved).not.toHaveBeenCalled();
     } finally { ReadingPlanStore.whenSaved = whenSaved; }
-  });
-
-  it('opens on today: the portion, Read, Listen to today’s portion, its chapters as checks, this week and honest counts (C1, C5, C10)', () => {
-    let run = startCatalogPlan('bible-year', null, new Date());
-    run = tickItem(run, 'genesis:1', todayKey(new Date()), 1);
-    ReadingPlanStore.put(run);
-    const p = base({ onListen: vi.fn() });
-    render(<ReadingPlansScreen {...p} />);
-    const plan = screen.getByRole('region', { name: 'Bible in a Year' });
-    expect(within(plan).getByRole('heading', { name: 'Genesis 1-3' })).toBeTruthy();
-    expect(within(plan).getByText('1 of 3 today')).toBeTruthy();
-    expect(within(plan).getByText(/^1 of 1,189 chapters · on pace to finish /)).toBeTruthy();
-    expect(plan.textContent).not.toMatch(/%/);
-    fireEvent.click(within(plan).getByRole('button', { name: 'Listen to today: Genesis 1-3' }));
-    expect(p.onListen).toHaveBeenCalledWith([{ bid: 'genesis', cid: 2 }, { bid: 'genesis', cid: 3 }], 'Bible in a Year');
-    fireEvent.click(within(plan).getByRole('button', { name: 'Read 3' }));
-    expect(p.onRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 3 });
-    expect(within(plan).getByRole('group', { name: 'This week' }).querySelectorAll('.plans-day')).toHaveLength(7);
-  });
-
-  /* n354 (A09.7, s21.9): the week strip's days were role-less spans; a day with a reading is a button that
-     opens it (today opens today's next), and every day says its whole name. */
-  it('this week: today opens its reading, a later planned day opens its own, every day is named in full', () => {
-    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-    const p = base();
-    render(<ReadingPlansScreen {...p} />);
-    const week = within(screen.getByRole('region', { name: 'Bible in a Year' })).getByRole('group', { name: 'This week' });
-    const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const day = new Date().getDay();
-    const today = within(week).getByRole('button', { name: new RegExp('^Open ' + names[day] + ' \\d+, today$') });
-    fireEvent.click(today);
-    expect(p.onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 1 });
-    if (day < 6) {
-      fireEvent.click(within(week).getByRole('button', { name: new RegExp('^Open ' + names[day + 1] + ' ') }));
-      expect(p.onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 4 });
-    }
-    for (const el of week.querySelectorAll('.plans-day')) expect(el.getAttribute('aria-label')).toMatch(/^(Open )?(Sun|Mon|Tues|Wednes|Thurs|Fri|Satur)day \d+/);
-  });
-
-  it('a day read through says Done today, tomorrow’s portion, Read ahead and Read again (C2)', () => {
-    let run = startCatalogPlan('bible-year', null, new Date());
-    for (const k of ['genesis:1', 'genesis:2', 'genesis:3']) run = tickItem(run, k, todayKey(new Date()), 1);
-    ReadingPlanStore.put(run);
-    const p = base();
-    render(<ReadingPlansScreen {...p} />);
-    const plan = screen.getByRole('region', { name: 'Bible in a Year' });
-    expect(within(plan).getByRole('heading', { name: 'Done today' })).toBeTruthy();
-    expect(within(plan).getByText('Tomorrow: Genesis 4-7')).toBeTruthy();
-    fireEvent.click(within(plan).getByRole('button', { name: 'Read ahead' }));
-    expect(p.onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 4 });
-    fireEvent.click(within(plan).getByRole('button', { name: 'Read again' }));
-    expect(p.onRead).toHaveBeenLastCalledWith({ bid: 'genesis', cid: 1 });
-  });
-
-  it('Find a plan lists every catalog plan in its group, one tap to start; a running one says Following (Corbin: B)', () => {
-    render(<ReadingPlansScreen {...base()} />);
-    for (const [g, names] of [['The Bible', ['Bible in a Year', 'New Testament', 'Psalms', 'Proverbs in 31 days', 'The Gospels']],
-      ['The Letters', ['The Seven Volumes', 'Letters in a Year', 'Every letter, in order', 'Letters by date', 'One collection']],
-      ['Short starts', ['The Blessed', 'Timothy', 'Holy Days', 'Matthew Study Bible']]]) {
-      const group = screen.getByRole('region', { name: g });
-      for (const n of names) expect(within(group).getByText(n)).toBeTruthy();
-    }
-    fireEvent.click(screen.getByRole('button', { name: 'Start Psalms' }));
-    expect(runs().map((r) => r.plan)).toEqual(['psalms']);
-    expect(screen.getByRole('button', { name: 'Psalms, following' }).disabled).toBe(true);
-    expect(screen.getByText('A day ticks when you read it through or listen to the end.')).toBeTruthy();
-  });
-
-  it('Spread it out keeps the planned finish and asks a little more each day (C3)', () => {
-    const run = startCatalogPlan('bible-year', null, daysAgo(6));
-    ReadingPlanStore.put(run);
-    render(<ReadingPlansScreen {...base()} />);
-    const plan = screen.getByRole('region', { name: 'Bible in a Year' });
-    fireEvent.click(within(plan).getByRole('button', { name: 'Catch up' }));
-    const spread = within(plan).getByRole('button', { name: /^Spread it out/ });
-    expect(spread.textContent).toMatch(/Keep .* · about \d+ min a day from now/);
-    act(() => { fireEvent.click(spread); });
-    const after = ReadingPlanStore.active()[0];
-    expect(after.target).toBe(run.target);
-    expect(screen.getByRole('region', { name: 'Bible in a Year' }).textContent).not.toMatch(/days? behind/);
-  });
-
-  it('pauses and resumes a plan from Plan details (C3)', () => {
-    ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Pause plan' })); });
-    expect(ReadingPlanStore.active()[0].status).toBe('paused');
-    expect(screen.getByText(/^Paused since /)).toBeTruthy();
-    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Resume' })); });
-    expect(ReadingPlanStore.active()[0].status).toBe('running');
-  });
-
-  it('changes the pace and keeps what was read (C6)', () => {
-    let run = startCatalogPlan('bible-year', null, new Date());
-    run = tickItem(run, 'genesis:1', todayKey(new Date()), 1);
-    ReadingPlanStore.put(run);
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Change pace' }));
-    act(() => { fireEvent.click(screen.getByRole('button', { name: '90 days' })); });
-    const after = ReadingPlanStore.active()[0];
-    expect(after.pace).toEqual({ mode: 'days', n: 90 });
-    expect('genesis:1' in after.ticks).toBe(true);
-    expect(screen.getByText(/^Day 1 of 90/)).toBeTruthy();
-  });
-
-  it('marks today read by hand (a link, or holding the chapters), and un-marks it (C4)', () => {
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-    try {
-      ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-      render(<ReadingPlansScreen {...base()} />);
-      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark today as read' })); });
-      expect(screen.getByRole('heading', { name: 'Done today' })).toBeTruthy();
-      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Not read yet' })); });
-      expect(screen.getByRole('heading', { name: 'Genesis 1-3' })).toBeTruthy();
-      const hold = document.querySelector('.plans-hold');
-      fireEvent.pointerDown(hold);
-      act(() => { vi.advanceTimersByTime(600); });
-      expect(screen.getByRole('heading', { name: 'Done today' })).toBeTruthy();
-    } finally { vi.useRealTimers(); }
-  });
-
-  it('the month pages back and forth, and a planned day opens its reading (C9)', () => {
-    // On a pinned day late in a month: next month's 1st must still fall inside Genesis, which a real clock early in a
-    // month breaks (from November 1, December 1 is day 31, in Leviticus).
-    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 20, 12) });
-    try {
-      ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-      const p = base();
-      render(<ReadingPlansScreen {...p} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-      const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-      const now = new Date();
-      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      fireEvent.click(screen.getByRole('button', { name: 'Next month' }));
-      const month = screen.getByRole('group', { name: new RegExp('^' + MONTHS[next.getMonth()]) });
-      // The first of next month is a planned day: it opens that day's first chapter.
-      fireEvent.click(within(month).getByRole('button', { name: new RegExp('^Open ' + MONTHS[next.getMonth()] + ' 1, ahead') }));
-      const [call] = p.onRead.mock.calls;
-      expect(call[0].bid).toBe('genesis');
-      expect(call[0].cid).toBeGreaterThan(3);
-      fireEvent.click(screen.getByRole('button', { name: 'Previous month' }));
-      expect(screen.getByRole('group', { name: MONTHS[now.getMonth()] })).toBeTruthy();
-    } finally { vi.useRealTimers(); }
-  });
-
-  it('a finished plan is celebrated quietly, listed with its dates, and can run again (C11)', () => {
-    let run = startCatalogPlan('proverbs', null, daysAgo(2));
-    run = { ...run, status: 'finished', finished: todayKey(new Date()) };
-    ReadingPlanStore.put(run);
-    render(<ReadingPlansScreen {...base()} />);
-    const done = screen.getByRole('region', { name: 'You finished Proverbs in 31 days' });
-    expect(within(done).getByText(/^Started .* · finished .* · 3 days$/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Run Proverbs in 31 days again' })).toBeTruthy();
-    act(() => { fireEvent.click(within(done).getByRole('button', { name: 'Run it again' })); });
-    expect(ReadingPlanStore.active().map((r) => r.plan)).toEqual(['proverbs']);
-    expect(ReadingPlanStore.all().filter((r) => r.status === 'finished').length).toBe(1);
-    expect(screen.queryByRole('region', { name: 'You finished Proverbs in 31 days' })).toBeNull();
-  });
-
-  it('a missed day can be marked read, and whole weeks read show as weeks on plan (S4)', () => {
-    // On a pinned mid-month day, so yesterday is in this month's calendar (on a real 1st it is last month's).
-    vi.useFakeTimers({ toFake: ['Date'], now: new Date(2026, 9, 15, 12) });
-    try {
-      ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(1)));
-      render(<ReadingPlansScreen {...base()} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-      act(() => { fireEvent.click(screen.getByRole('button', { name: /: mark it read$/ })); });
-      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Mark it read' })); });
-      const run = ReadingPlanStore.active()[0];
-      expect(['genesis:1', 'genesis:2', 'genesis:3'].every((k) => run.ticks[k] === todayKey(daysAgo(1)))).toBe(true);
-      expect(screen.queryByRole('button', { name: /: mark it read$/ })).toBeNull();
-      expect(screen.getByText(/^\d+ weeks? on plan$/)).toBeTruthy();
-    } finally { vi.useRealTimers(); }
-  });
-
-  it('writes the day\u2019s note in the Journal, and opens the same note again from the day (S5)', () => {
-    const entries = [];
-    globalThis.JournalStore = {
-      add: (seed) => { const e = { id: 'j' + (entries.length + 1), title: seed.title }; entries.push(e); return e; },
-      get: (id) => entries.find((e) => e.id === id) || null,
-    };
-    try {
-      ReadingPlanStore.put(startCatalogPlan('bible-year', null, new Date()));
-      const onNote = vi.fn();
-      render(<ReadingPlansScreen {...base()} onNote={onNote} />);
-      act(() => { fireEvent.click(screen.getByRole('button', { name: 'Write a note' })); });
-      expect(entries).toEqual([{ id: 'j1', title: 'Bible in a Year · Day 1 · Genesis 1-3' }]);
-      expect(onNote).toHaveBeenLastCalledWith('j1');
-      expect(ReadingPlanStore.active()[0].notes).toEqual({ 0: 'j1' });
-      fireEvent.click(screen.getByRole('button', { name: 'Your note for this day' }));
-      expect(onNote).toHaveBeenLastCalledWith('j1');
-      expect(entries.length).toBe(1);
-    } finally { delete globalThis.JournalStore; }
-  });
-
-  it('never scores the reader', () => {
-    ReadingPlanStore.put(startCatalogPlan('bible-year', null, daysAgo(4)));
-    const { container } = render(<ReadingPlansScreen {...base()} />);
-    expect(container.textContent).not.toMatch(/streak/i);
   });
 });
 
@@ -304,96 +322,82 @@ function fakeBridge({ allowed = true, quiet = [] } = {}) {
   return b;
 }
 
-describe('the daily reminder (rp-s1)', () => {
+describe('the daily reminder (rp-s1, plans2)', () => {
   afterEach(() => { delete window.AndroidBridge; _resetForTests(); });
 
   it('on the web nothing offers a reminder', () => {
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
-    expect(screen.queryByText(/A reminder each day/)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    expect(screen.queryByRole('button', { name: 'Remind me each day' })).toBeNull();
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    expect(screen.queryByRole('switch', { name: 'Remind me each day' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Plan settings' }));
+    expect(screen.queryByRole('switch', { name: 'Remind me each day' })).toBeNull();
   });
 
-  it('a plan just started offers one; yes keeps 07:30 on the run and asks the phone once', () => {
+  it('the preview offers it, on at 7:30; starting keeps 07:30 on the run and asks the phone once', () => {
     const b = fakeBridge();
     window.AndroidBridge = b;
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
-    expect(screen.getByText('A reminder each day at 7:30 AM?')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Yes, remind me' }));
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Bible in a Year: Genesis/ }));
+    expect(screen.getByRole('switch', { name: 'Remind me each day' }).getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
     expect(runs()[0].remind).toBe('07:30');
     expect(b.planReminderAsk).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText(/A reminder each day/)).toBeNull();
   });
 
-  it('no thanks leaves it off; the details turn it on, change its time and turn it off', () => {
-    window.AndroidBridge = fakeBridge();
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start Bible in a Year' }));
-    fireEvent.click(screen.getByRole('button', { name: 'No thanks' }));
-    expect(runs()[0].remind).toBeUndefined();
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Remind me each day' }));
-    expect(runs()[0].remind).toBe('07:30');
-    fireEvent.change(screen.getByLabelText('Reminder each day at'), { target: { value: '21:15' } });
-    expect(runs()[0].remind).toBe('21:15');
-    fireEvent.click(screen.getByRole('button', { name: 'Turn off' }));
-    expect('remind' in runs()[0]).toBe(false);
-  });
-
-  it('notifications refused: the details say so and open the phone’s settings', () => {
+  it('the gear changes its time and turns it off; refused notifications say so and open the phone’s settings', () => {
     const b = fakeBridge({ allowed: false });
     window.AndroidBridge = b;
     ReadingPlanStore.put({ ...startCatalogPlan('bible-year', null, new Date()), remind: '07:30' });
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Plan details' }));
+    render(<PlansHub {...base()} />);
+    openRow();
+    fireEvent.click(screen.getByRole('button', { name: 'Plan settings' }));
     expect(screen.getByText(/Notifications are off for this app/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Open settings' }));
     expect(b.planReminderSettings).toHaveBeenCalled();
+    act(() => { fireEvent.change(screen.getByLabelText('Reminder time'), { target: { value: '21:15' } }); });
+    expect(runs()[0].remind).toBe('21:15');
+    act(() => { fireEvent.click(screen.getByRole('switch', { name: 'Remind me each day' })); });
+    expect('remind' in runs()[0]).toBe(false);
   });
 
   it('a quiet plan asks once whether to keep its reminder; Turn it off drops it', () => {
     const run = { ...startCatalogPlan('bible-year', null, daysAgo(10)), remind: '07:30' };
     window.AndroidBridge = fakeBridge({ quiet: [run.id] });
     ReadingPlanStore.put(run);
-    const first = render(<ReadingPlansScreen {...base()} />);
-    expect(screen.getByText('Keep the daily reminder for Bible in a Year?')).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Turn it off' }));
+    const first = render(<PlansHub {...base()} />);
+    openRow();
+    expect(screen.getByText('Keep the daily reminder for this plan?')).toBeTruthy();
+    act(() => { fireEvent.click(screen.getByRole('button', { name: 'Turn it off' })); });
     expect('remind' in runs()[0]).toBe(false);
     first.unmount();
     ReadingPlanStore.put({ ...runs()[0], remind: '07:30', updated: run.updated });
-    render(<ReadingPlansScreen {...base()} />);
+    render(<PlansHub {...base()} />);
+    openRow();
     expect(screen.queryByText(/Keep the daily reminder/)).toBeNull();     // asked once for this quiet stretch
   });
 
-  it('the app hands the native side the running plans on each change, and a tapped reminder opens its plan', async () => {
+  it('the app hands the native side the running plans on each change, and a tapped reminder opens its plan page', async () => {
     const b = fakeBridge();
-    b.opened = 'none-yet';
     window.AndroidBridge = b;
     const run = { ...startCatalogPlan('bible-year', null, new Date()), remind: '06:45' };
     const openPlans = vi.fn();
     function App() { usePlanReminders(openPlans); return null; }
-    const cold = render(<App />);
-    expect(openPlans).toHaveBeenCalledTimes(1);                               // the tap that cold-started the app
-    expect(takePlanOpen()).toBe('none-yet');
-    cold.unmount();
-    render(<><App /><ReadingPlansScreen {...base()} /></>);
+    render(<><App /><PlansHub {...base()} /></>);
     act(() => { ReadingPlanStore.put(run); });
     expect(b.sent.at(-1).plans.map((p) => [p.id, p.time, p.name])).toEqual([[run.id, '06:45', 'Bible in a Year']]);
     act(() => { ReadingPlanStore.put({ ...run, status: 'stopped', updated: Date.now() }); });
     expect(b.sent.at(-1).plans).toEqual([]);                                   // a stopped plan drops its reminder
     act(() => { ReadingPlanStore.put({ ...run, updated: Date.now() }); });
-    expect(screen.queryByRole('button', { name: 'Stop Bible in a Year' })).toBeNull();
-    act(() => { window.__votPlanReminderOpen(run.id); });                     // a later tap while the page runs
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Stop Bible in a Year' })).toBeTruthy());
-    expect(openPlans).toHaveBeenCalledTimes(2);
+    act(() => { window.__votPlanReminderOpen(run.id); });                     // a tap while the page runs
+    await waitFor(() => expect(barTitle()).toBe('Bible in a Year'));
+    expect(openPlans).toHaveBeenCalled();
   });
 });
 
-/* n354b (hub call 2026-10-23 19:30): a letters plan the reader is partway through offers "Start where I am: <title>"
-   beside the normal start; with nothing of it read the tap starts it as before. */
-describe('ReadingPlansScreen — Start where I am (n354b)', () => {
+/* n354b, plans2: a letters plan the reader is partway through offers "Where I am" as a Start choice, saying what it
+   leaves out; with nothing of it read the choice is not there. */
+describe('Reading plans: Start where I am (n354b)', () => {
   const KEYS = ['COL_BY_KEY', 'colLetterArr', 'colPreface', 'READING_CHAIN'];
   let saved;
   beforeEach(() => {
@@ -410,39 +414,20 @@ describe('ReadingPlansScreen — Start where I am (n354b)', () => {
   });
   const readOf = (ids) => (bid, cid) => bid === 'the-blessed' && ids.includes(cid);
 
-  it('with a letter read, the tap offers both starts; Start where I am begins at the first unread', () => {
-    render(<ReadingPlansScreen {...base({ isRead: readOf(['b1']) })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start The Blessed' }));
-    expect(runs()).toHaveLength(0);
-    const group = screen.getByRole('group', { name: 'Start The Blessed' });
-    expect(within(group).getByRole('button', { name: 'From the beginning' })).toBeTruthy();
-    fireEvent.click(within(group).getByRole('button', { name: 'Start where I am: Second' }));
-    expect(runs()).toHaveLength(1);
+  it('with a letter read, Where I am starts at the first unread and says what it skips', () => {
+    render(<PlansHub {...base({ isRead: readOf(['b1']) })} />);
+    fireEvent.click(screen.getByRole('button', { name: /^The Blessed: / }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Where I am' }));
+    expect(screen.getByText('Starts at Second · skips 1 earlier reading')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
     expect(runs()[0].tracks[0].items.map((it) => it.k)).toEqual(['the-blessed:b2', 'the-blessed:b3']);
   });
 
-  it('From the beginning starts the whole plan', () => {
-    render(<ReadingPlansScreen {...base({ isRead: readOf(['b1']) })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start The Blessed' }));
-    fireEvent.click(screen.getByRole('button', { name: 'From the beginning' }));
-    expect(runs()[0].tracks[0].items).toHaveLength(3);
-  });
-
-  it('with nothing read the tap starts the plan at once, no offer', () => {
-    render(<ReadingPlansScreen {...base()} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start The Blessed' }));
-    expect(screen.queryByRole('group', { name: 'Start The Blessed' })).toBeNull();
-    expect(runs()).toHaveLength(1);
-    expect(runs()[0].tracks[0].items).toHaveLength(3);
-  });
-
-  it('a second tap on the row puts the offer away', () => {
-    render(<ReadingPlansScreen {...base({ isRead: readOf(['b1']) })} />);
-    const row = screen.getByRole('button', { name: 'Start The Blessed' });
-    fireEvent.click(row);
-    expect(row.getAttribute('aria-expanded')).toBe('true');
-    fireEvent.click(row);
-    expect(screen.queryByRole('group', { name: 'Start The Blessed' })).toBeNull();
-    expect(runs()).toHaveLength(0);
+  it('with nothing read there is no Where I am, and the plan starts whole', () => {
+    render(<PlansHub {...base()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^The Blessed: / }));
+    expect(screen.queryByRole('radio', { name: 'Where I am' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Start plan' }));
+    expect(runs()[0].tracks[0].items.length).toBe(3);
   });
 });

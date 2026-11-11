@@ -150,7 +150,7 @@ describe('HomeScreen — the Read root', () => {
     const search = container.querySelector('.root-search');
     expect(search.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Read Genesis 1-3' }));
-    expect(onPlanRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 });
+    expect(onPlanRead).toHaveBeenCalledWith({ bid: 'genesis', cid: 1 }, expect.any(String));   // plans2: and the plan, for its session
     expect(window.__loadVotCorpus).not.toHaveBeenCalled();
     cleanup();
     ReadingPlanStore.replaceAll([]);

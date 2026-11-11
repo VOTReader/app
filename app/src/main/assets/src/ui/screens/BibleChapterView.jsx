@@ -10,7 +10,7 @@ import { ReadAlongHighlight } from '../components/ReadAlongHighlight.jsx';
 import { FindInUnit } from '../components/FindInUnit.jsx';
 import { scrollBehavior } from '../../utils/reduced-motion.js';
 import { InstallCard } from '../components/InstallCard.jsx';
-import { PlanRibbon } from '../components/PlanRibbon.jsx';
+import { PlanRibbon, PlanSessionStrip } from '../components/PlanRibbon.jsx';
 import { tapToggle } from '../../utils/tap-guard.js';
 import { bibleHlKey } from '../../utils/hl-keys.js';
 import { translateVerse, loadTranslation, translationLabel, translationLang, holdTranslation, isTranslationLoaded } from '../../data/translations.js';
@@ -280,6 +280,8 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
         const titleIsTappable = titleEffective && hasCuratedTitle;
         // Plain black, no amber banner (Corbin 2026-11-01), like every reading page.
         return (
+          <>
+          <PlanSessionStrip bid={book.id} cid={chapter.num} inert={inert} />
           <header className="hero" ref={heroRef}>
             <div className="hero-content">
               <div className="hero-eyebrow">{book.title} {"\xA0\xB7\xA0"} Chapter {chapter.num}</div>
@@ -329,6 +331,7 @@ export function BibleChapterView({ book, chapter, onIndex, onNavigate, prevBook,
               )}
             </div>
           </header>
+          </>
         );
       })()}
       <div className="page-wrapper">

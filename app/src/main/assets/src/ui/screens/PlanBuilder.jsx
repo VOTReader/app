@@ -14,7 +14,6 @@
    the same behind / Catch me up / Spread it out as every plan.
    ═══════════════════════════════════════════════════════════════════════ */
 
-import { useModalRegistry } from '../../hooks/use-modal-registry.js';
 import { BIBLE_BOOKS } from '../../data/reading-plans.js';
 import { BIBLE_GROUPS, chapterCount, pickName, pickKey, pickChips, defaultName, builderSpec, builderPreview } from '../../data/plan-builder.js';
 import { LETTER_CHAIN } from '../../data/plan-catalog.js';

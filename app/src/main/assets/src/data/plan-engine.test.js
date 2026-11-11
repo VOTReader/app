@@ -100,7 +100,7 @@ describe('the flexible schedule', () => {
     const st = runStatus(run, at('2026-10-11'));
     expect(Object.keys(run.ticks).length).toBe(ticks);
     expect(st.day).toBe(10);
-    expect(st.total).toBe(90);
+    expect(st.total).toBe(80);   // plans2: "80 days" means 80, the days already read included
     expect(st.behind).toBe(0);
     expect(dayItems(run, 9).map((it) => it.k)).toEqual(biblePortion(9).items.map((it) => it.bid + ':' + it.cid));
   });
@@ -216,8 +216,8 @@ describe('start where I am (n354b)', () => {
   const readOf = (ids) => (bid, cid) => bid === 'one' && ids.includes(cid);
 
   it('names the first unread letter in plan order once something is read', () => {
-    expect(resumeAt([letters], readOf(['a', 'b']))).toEqual({ k: 'one:c', t: 'Letter c' });
-    expect(resumeAt([letters], readOf(['a', 'c']))).toEqual({ k: 'one:b', t: 'Letter b' });
+    expect(resumeAt([letters], readOf(['a', 'b']))).toEqual({ k: 'one:c', t: 'Letter c', skipped: 2 });
+    expect(resumeAt([letters], readOf(['a', 'c']))).toEqual({ k: 'one:b', t: 'Letter b', skipped: 1 });
   });
 
   it('offers nothing when nothing is read, when the first letter is still unread, or when every letter is read', () => {
@@ -228,7 +228,7 @@ describe('start where I am (n354b)', () => {
 
   it('looks at the letters only: Bible chapters read or not change nothing', () => {
     const isRead = (bid, cid) => bid === 'genesis' || (bid === 'one' && cid === 'a');
-    expect(resumeAt([bible, letters], isRead)).toEqual({ k: 'one:b', t: 'Letter b' });
+    expect(resumeAt([bible, letters], isRead)).toEqual({ k: 'one:b', t: 'Letter b', skipped: 1 });
     expect(resumeAt([bible], () => true)).toBeNull();
   });
 

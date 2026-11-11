@@ -677,7 +677,7 @@ function App() {
     searchQuery, setSearchQuery, searchScope, setSearchScope, searchContext,
     journalEntryId, createAndEditJournal,
     openInAppLetter, openLinkSidebar, navigateToLink, pushFromLetter,
-    backHint, tapThroughBack, goToLetterFromMatthew,
+    backHint, tapThroughBack, goToLetterFromMatthew, retargetTop,
     setNavOrigin, setNoteSheetTarget,
     bcvPrevBook, bcvNextBook, bcvOnPrevBook, bcvOnNextBook,
     bcvPrevBoundaryTitle, bcvNextBoundaryTitle,

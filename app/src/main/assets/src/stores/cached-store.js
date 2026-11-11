@@ -1456,9 +1456,8 @@ export const LS_SKIP_LIST = Object.freeze([
   // deleted them; ls-skip-list.gate.test.js now finds each live key in the source and fails here.
   'vot-notes-tab',                // NotesIndexScreen: the Notes tab the reader last chose
   'vot-answers-fold',             // AnswersTopic: the sections the reader folded
-  'vot-plan-ribbon-hidden',       // PlanRibbon: the plan line hidden for today
   'vot-plans-offer-hidden',       // HomeScreen: the reading-plan offer dismissed
-  'vot-plan-quiet-asked',         // ReadingPlansScreen: the plans already asked about going quiet
+  'vot-plan-quiet-asked',         // PlanPage: the plans already asked about going quiet
   'vot-install-offer',            // InstallCard: the reader's answer to the install offer
   'vot-ios-pwa-welcomed',         // SafariFlows: the Home Screen app's welcome, shown once
   'vot-tabs-hint-seen',           // TabsNavBtn: the tabs hint, shown once
