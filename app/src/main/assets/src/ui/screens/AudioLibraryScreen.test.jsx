@@ -118,7 +118,7 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     expect([...document.querySelectorAll('.root-section')].map((h) => h.textContent)).toEqual(['Listen to', 'On this phone', 'Recently played']);
     // The saved shelf is a doorway, with its count.
     expect(screen.queryByText('The Wide Path')).toBeNull();
-    const saved = screen.getByRole('button', { name: /Saved recordings/ });
+    const saved = screen.getByRole('button', { name: /^Saved/ });
     expect(saved.querySelector('.root-row-count').textContent).toBe('1');
     fireEvent.click(saved);
     expect(onOpenSaved).toHaveBeenCalledTimes(1);
@@ -205,7 +205,7 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     setPlayerState({ queue: [savedTrack], qi: 0, status: 'playing', time: 48, duration: 120 });
     const openTrack = vi.fn();
     renderScreen({ onOpenTrack: openTrack });
-    expect(screen.getByText('Now playing')).toBeTruthy();
+    expect(screen.getByText('Continue listening'), 'au-root: always Continue listening').toBeTruthy();
     expect(screen.getByRole('heading', { name: 'The Wide Path · Part 1' })).toBeTruthy();
     expect(screen.getByText('Volume One · 1 min left')).toBeTruthy();
     expect(screen.getByRole('progressbar', { name: 'Playback position' }).getAttribute('aria-valuenow')).toBe('40');
@@ -225,7 +225,8 @@ describe('AudioLibraryScreen -- the Listen root', () => {
     try {
       renderScreen({ onSetLetterReader, letterReader: 'auto' });
       const row = screen.getByRole('button', { name: /Letter voice/ });
-      expect(row.textContent).toContain('Automatic · each recording’s own reader');
+      expect(row.textContent).toContain('Each recording’s own reader');
+      expect(row.querySelector('.root-row-count').textContent).toBe('Automatic');
       fireEvent.click(row);
       fireEvent.click(screen.getByRole('radio', { name: /Read by Timothy/ }));
       expect(onSetLetterReader).toHaveBeenCalledWith('T');
@@ -260,7 +261,7 @@ describe('AudioLibraryScreen -- Clear history has an Undo', () => {
     globalThis.AudioLibraryStore.clearRecent = vi.fn(() => gone);
     globalThis.AudioLibraryStore.restoreRecent = vi.fn();
     renderScreen();
-    fireEvent.click(screen.getByRole('button', { name: 'Clear history' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear recently played' }));
     const toast = document.getElementById('vot-toast-history-cleared');
     expect(toast.textContent).toBe('History clearedUndo');
     fireEvent.click(toast.querySelector('.vot-undo-btn'));
@@ -347,7 +348,7 @@ describe('AudioLibraryScreen -- the Downloads line speaks the dl-rework queue', 
   it('with nothing on its way, says what is on the phone', () => {
     store({ items: () => [savedTrack], totalBytes: () => 5 * 1024 * 1024 });
     renderScreen();
-    expect(sub()).toContain('1 on this phone');
+    expect(sub()).toContain('1 recording · ');
   });
 });
 

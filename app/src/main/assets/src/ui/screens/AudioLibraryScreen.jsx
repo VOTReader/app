@@ -138,7 +138,8 @@ function downloadsLine(/** @type {any} */ offline, /** @type {any} */ queueLine,
   }
   if (busy) return 'Downloading · ' + (busy === 1 ? '1 recording' : busy + ' recordings') + ' to go';
   if (!downloads.length) return 'Download for offline listening';
-  return downloads.length + ' on this phone · ' + formatBytes(offline.totalBytes());
+  // listen.html au-root: "29 recordings · 238 MB".
+  return (downloads.length === 1 ? '1 recording' : downloads.length + ' recordings') + ' · ' + formatBytes(offline.totalBytes());
 }
 
 /** The Letter Voice choices, one list for Settings > Listening and the Listen tab's row: Automatic, then every reader
@@ -157,6 +158,12 @@ export function letterVoiceLabel(code) {
   if (!code || code === 'auto') return 'Automatic · each recording’s own reader';
   const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};
   return readers[code] ? String(readers[code]) : 'Automatic · each recording’s own reader';
+}
+
+/** The Letter voice row's value at the right (au-root): "Automatic", or the reader. @param {string | undefined} code */
+export function letterVoiceValue(code) {
+  const readers = /** @type {any} */ (globalThis).AUDIO_READERS || {};
+  return code && code !== 'auto' && readers[code] ? String(readers[code]) : 'Automatic';
 }
 
 /** A Bible edition's short name for The Bible row's line ("KJV · NKJV · WEB · Matthew"). @param {any} edition */
@@ -315,7 +322,7 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
               <button type="button" className="listen-art" disabled={!hasTextDestination(resume)} onClick={() => onOpenTrack(resume)}
                 aria-label={'Open the text of ' + trackName(resume)} title="Open text">{BIBLE_ICON}</button>
               <div className="listen-continue-text">
-                <span className="root-eyebrow">{current && isPlaying ? 'Now playing' : 'Continue listening'}</span>
+                <span className="root-eyebrow">Continue listening</span>
                 <h2 id="listen-continue-title" className="listen-continue-title">{continueTitle(resume)}</h2>
                 <span className="listen-continue-meta">{[resume.sub || trackMeta(resume), left].filter(Boolean).join(' · ')}</span>
               </div>
@@ -346,8 +353,9 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
               ))}
             </div>
           ) : null}
-          {studies.recorded > 0 ? (
-            <ListRow icon={STUDIES_ICON} title="Studies" onClick={() => { if (onOpenStudies) onOpenStudies(); }}
+          {/* au-root: Studies is always one of the four (its screen says when none has a recording yet). */}
+          {onOpenStudies && studies.count > 0 ? (
+            <ListRow icon={STUDIES_ICON} title="Studies" onClick={() => onOpenStudies()}
               sub={studies.count + (studies.count === 1 ? ' study' : ' studies') + ' · ' + studies.recorded + ' with audio'} />
           ) : null}
           {onOpenSongs ? (
@@ -362,10 +370,12 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
             <ListRow icon={DOWNLOAD_ICON} title="Downloads" className="listen-downloads" onClick={() => { if (onOpenOffline) onOpenOffline(); }}
               sub={downloadsLine(offline, queueLine, busy, downloads)} />
           ) : null}
-          <ListRow icon={SAVED_ICON} title="Saved recordings" count={saved.length} onClick={() => onOpenSaved()}
-            sub={saved.length ? 'Kept · travels with your backup' : 'Tap the star beside any recording to keep it'} />
+          <ListRow icon={SAVED_ICON} title="Saved" count={saved.length} onClick={() => onOpenSaved()}
+            sub="Recordings and songs you starred" />
           {onSetLetterReader ? (
-            <ListRow icon={VOICE_ICON} title="Letter voice" onClick={() => setVoiceOpen(true)} sub={letterVoiceLabel(letterReader)} />
+            <ListRow icon={VOICE_ICON} title="Letter voice" onClick={() => setVoiceOpen(true)}
+              count={letterVoiceValue(letterReader)} className="is-valued"
+              sub={!letterReader || letterReader === 'auto' ? 'Each recording’s own reader' : 'Prefer this reading wherever it exists'} />
           ) : null}
         </div>
 
@@ -373,7 +383,7 @@ export function AudioLibraryScreen({ onOpenCollection, onOpenVolumes, onOpenSave
         <section className="listen-recent" aria-labelledby="audio-library-recent">
           <div className="root-section-row">
             <h2 className="root-section" id="audio-library-recent">Recently played</h2>
-            {recent.length ? <button type="button" className="root-link" onClick={() => clearHistory(library)}>Clear history</button> : null}
+            {recent.length ? <button type="button" className="root-link" onClick={() => clearHistory(library)} aria-label="Clear recently played">Clear</button> : null}
             <button type="button" className={'audio-library-disclosure' + (recentOpen ? ' is-open' : '')} onClick={toggleRecent}
               aria-expanded={recentOpen} aria-controls="audio-library-recent-list"
               aria-label={recentOpen ? 'Collapse recently played' : 'Expand recently played'}>
